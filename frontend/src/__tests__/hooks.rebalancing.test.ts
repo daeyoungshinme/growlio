@@ -50,11 +50,8 @@ vi.mock("@/hooks/useHaptic", () => ({ triggerHaptic: vi.fn().mockResolvedValue(u
 
 import { useRebalancingBalances } from "@/hooks/useRebalancingBalances";
 import { useRebalancingPrices } from "@/hooks/useRebalancingPrices";
-import {
-  useRebalancingExecution,
-  getActionableItems,
-  executionReducer,
-} from "@/hooks/rebalancingExecution/index";
+import { useRebalancingExecution, getActionableItems } from "@/hooks/rebalancingExecution/index";
+import { executionReducer } from "@/hooks/rebalancingExecution/reducer";
 import type { ExecutionState, ExecutionAction } from "@/hooks/rebalancingExecution/types";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 import type { AssetAccount } from "@/api/assets";

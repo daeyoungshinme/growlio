@@ -136,7 +136,7 @@ async def _get_real_portfolio_holdings(
         .join(AssetAccount, AssetSnapshot.account_id == AssetAccount.id)
         .where(
             AssetSnapshot.user_id == user_id,
-            AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.is_active == True,
             *([AssetAccount.asset_type.in_(asset_types)] if asset_types else []),
         )
         .group_by(AssetSnapshot.account_id)

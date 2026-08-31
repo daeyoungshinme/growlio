@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import UTC, date, datetime
+from functools import partial
 from typing import Any, TypedDict
 
 import structlog
@@ -22,7 +23,6 @@ from app.core.database import AsyncSessionLocal
 from app.models.alert import AlertHistory
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
-from app.services.alerts.alert_service import save_alert_history
 from app.services.isa_service import get_isa_status_summary
 from app.services.pension_contribution_service import calc_pension_contribution_status
 from app.services.tax_service import get_tax_summary
@@ -50,7 +50,7 @@ async def _has_pension_accounts(user_id: uuid.UUID, db: AsyncSession) -> bool:
         .where(
             AssetAccount.user_id == user_id,
             AssetAccount.tax_type.in_(_PENSION_TAX_TYPES),
-            AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.is_active == True,
         )
         .limit(1)
     )
@@ -102,8 +102,8 @@ async def _get_reminder_subscribers(db: AsyncSession) -> list[tuple[User, UserSe
         select(User, UserSettings)
         .join(UserSettings, UserSettings.user_id == User.id)
         .where(
-            User.is_active == True,  # noqa: E712
-            UserSettings.year_end_tax_reminder_enabled == True,  # noqa: E712
+            User.is_active == True,
+            UserSettings.year_end_tax_reminder_enabled == True,
         )
     )
     return [(user, user_settings) for user, user_settings in result.all()]
@@ -126,8 +126,8 @@ async def _already_sent_reminder_today(db: AsyncSession, user_id: uuid.UUID) -> 
 
 
 async def _send_reminder_to_user(user: User, user_settings: UserSettings, sem: asyncio.Semaphore) -> None:
+    from app.services.alerts._dispatch import dispatch_dual_channel_alert
     from app.services.email_service import send_year_end_tax_reminder_email
-    from app.services.push_service import send_push_to_user
 
     async with sem:
         try:
@@ -141,12 +141,6 @@ async def _send_reminder_to_user(user: User, user_settings: UserSettings, sem: a
 
                 to_email = user_settings.notification_email or user.email
 
-                email_sent = False
-                try:
-                    email_sent = await send_year_end_tax_reminder_email(to_email, content)
-                except Exception as exc:
-                    logger.error("year_end_tax_reminder_email_failed", user_id=str(user.id), error=str(exc))
-
                 push_body_parts: list[str] = []
                 if content["harvesting_top"]:
                     push_body_parts.append(f"손실수확 후보 {len(content['harvesting_top'])}종목")
@@ -155,21 +149,18 @@ async def _send_reminder_to_user(user: User, user_settings: UserSettings, sem: a
                 if content["isa_near_maturity"] or content["isa_over_limit_count"]:
                     push_body_parts.append("ISA 확인 필요")
 
-                push_sent = False
-                try:
-                    push_sent = await send_push_to_user(
-                        user_id=user.id,
-                        title="연말 절세 리마인더",
-                        body=" · ".join(push_body_parts) or "활용 가능한 절세 방법을 확인해보세요.",
-                        fcm_token=user_settings.fcm_token,
-                        data={"type": "YEAR_END_TAX_REMINDER"},
-                    )
-                except Exception as exc:
-                    logger.error("year_end_tax_reminder_push_failed", user_id=str(user.id), error=str(exc))
-
-                if email_sent or push_sent:
-                    await save_alert_history(db, user.id, "YEAR_END_TAX_REMINDER", "연말 절세 리마인더 발송")
-                    await db.commit()
+                await dispatch_dual_channel_alert(
+                    db,
+                    user.id,
+                    event_prefix="year_end_tax_reminder",
+                    alert_type="YEAR_END_TAX_REMINDER",
+                    history_message="연말 절세 리마인더 발송",
+                    send_email=partial(send_year_end_tax_reminder_email, to_email, content),
+                    push_title="연말 절세 리마인더",
+                    push_body=" · ".join(push_body_parts) or "활용 가능한 절세 방법을 확인해보세요.",
+                    push_type="YEAR_END_TAX_REMINDER",
+                    fcm_token=user_settings.fcm_token,
+                )
         except Exception as exc:
             logger.error("year_end_tax_reminder_user_failed", user_id=str(user.id), error=str(exc))
 

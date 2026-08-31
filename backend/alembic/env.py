@@ -4,7 +4,7 @@ from logging.config import fileConfig
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
-import app.models  # noqa: F401 — ensure all models are imported for metadata
+import app.models
 from alembic import context
 from app.core.config import settings
 from app.core.database import Base

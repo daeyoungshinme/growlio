@@ -15,7 +15,7 @@ async def get_owned_account(account_id: UUID, user_id: UUID, db: AsyncSession) -
         select(AssetAccount).where(
             AssetAccount.id == account_id,
             AssetAccount.user_id == user_id,
-            AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.is_active == True,
         )
     )
     if not account:

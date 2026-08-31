@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef } from "react";
+import { createContext, useCallback, useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { App } from "@capacitor/app";
 import Sidebar from "./Sidebar";
@@ -19,12 +19,6 @@ interface RefreshContextValue {
 const RefreshContext = createContext<RefreshContextValue>({
   registerRefresh: () => {},
 });
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function useRegisterRefresh(fn: (() => Promise<void>) | null) {
-  const ctx = useContext(RefreshContext);
-  ctx.registerRefresh(fn);
-}
 
 export default function AppLayout() {
   const needsPasswordReset = useAuthStore((s) => s.needsPasswordReset);

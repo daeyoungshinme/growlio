@@ -160,6 +160,7 @@ services/
   │   ├── stock_price_service.py   # 주가 알림 조건 체크 서비스 (구 stock_price_alert_service.py)
   │   ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림 + 매일 08:30 KST 요약 다이제스트(`send_market_signal_daily_digest`, 옵트인). `check_composite_signal`(리스크+시장신호 복합 판정)을 제공해 rebalancing/alert_check.py·rebalancing/diagnosis_service.py와 공유. 등급전환 알림 발송 성공 시 rebalancing/alert_check.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신 — 같은 날 두 서비스가 같은 신호로 중복 발송하지 않도록 함
   │   ├── calculator.py       # 알림 조건 판단 로직 (구 alert_calculator.py, alert_service.py에서 분리)
+  │   ├── _dispatch.py        # `dispatch_dual_channel_alert()` — 유저별 이메일+푸시 2채널 발송 후 하나라도 성공하면 AlertHistory 저장하는 공용 헬퍼(등급전환/매일요약/추천드리프트/연말절세가 공유). `send_email`은 `functools.partial`로 넘김. push 실패는 `<event_prefix>_push_failed`로 로깅(과거 일부 경로가 침묵하던 것 통일)
   │   ├── tax_reminder_service.py # 연말(11~12월) 절세 리마인더 콘텐츠 조합(`build_reminder_content` — 손실수확 후보·연금공제 잔여한도·ISA 만기, tax_service/pension_contribution_service/isa_service 재사용) + 유저별 발송(`send_year_end_tax_reminder`, 알릴 내용 없으면 스킵)
   │   └── recommendation_drift_alert_service.py # 매주 월요일 09:15 KST — 목표 역산 추천 비중(전체 자산 기준 + 투자기간별)이 타겟 포트폴리오의 현재 목표 비중과 유의미하게(3%p 이상 또는 신규 후보 존재) 달라지면 이메일/푸시 발송(옵트인, 기본 OFF). `compute_recommendation_drift()`(goal_recommendation_service.py)가 프론트 `recommendationDrift.ts`와 동일한 로직 — 임계값도 항상 함께 맞출 것. 타겟 포트폴리오 판별은 계좌 태그 추론 폴백 없이 단순화(전체: 연결 계좌 전부가 target_portfolio_id로 지정, 기간별: Portfolio.investment_horizon/tax_type 명시값만)
   ├── rebalancing/            # 리밸런싱 도메인 패키지 (분석·실행·계획·전략·알림)

@@ -2,7 +2,7 @@ import React from "react";
 import type { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { SideBadge } from "./RebalancingBadges";
-import { isOverseasMarket } from "@/hooks/useRebalancingExecution";
+import { isOverseasMarket } from "@/constants/markets";
 import type { ExecutionAction, OrderType, PriceLoadState } from "@/hooks/useRebalancingExecution";
 import { PriceCell } from "./RebalancingPriceCell";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";

@@ -300,7 +300,7 @@ async def _active_account_tax_types(db: AsyncSession, user_id: uuid.UUID) -> lis
             await db.execute(
                 select(AssetAccount.tax_type).where(
                     AssetAccount.user_id == user_id,
-                    AssetAccount.is_active == True,  # noqa: E712
+                    AssetAccount.is_active == True,
                 )
             )
         )

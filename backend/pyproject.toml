@@ -46,6 +46,9 @@ dependencies = [
     "firebase-admin>=6.5.0,<7.0.0",
     # 포트폴리오 최적화 — 효율적 프론티어 MVO
     "scipy>=1.12.0",
+    # 수치 계산 — estimation.py 등에서 직접 import (scipy/yfinance/pykrx 전이 의존이 아닌 직접 의존이므로 명시)
+    "numpy>=1.26.0,<3.0.0",
+    "pandas>=2.0.0,<3.0.0",
     # XML 파서 (DART API — XXE/XML bomb 방어)
     "defusedxml>=0.7.1",
 ]
@@ -97,7 +100,7 @@ target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "C90", "ASYNC", "PT"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C90", "ASYNC", "PT", "RUF100"]
 ignore = [
     "E712",   # SQLAlchemy boolean 비교 (Model.is_active == True) 허용
     "B008",   # FastAPI Depends() 호출 허용

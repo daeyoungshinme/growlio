@@ -107,8 +107,8 @@ async def calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) 
             .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
             .where(
                 AssetSnapshot.user_id == user_id,
-                AssetAccount.is_active == True,  # noqa: E712
-                AssetAccount.include_in_total == True,  # noqa: E712
+                AssetAccount.is_active == True,
+                AssetAccount.include_in_total == True,
             )
             .group_by(AssetSnapshot.snapshot_date)
             .order_by(asc(AssetSnapshot.snapshot_date))

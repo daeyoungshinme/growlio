@@ -311,54 +311,24 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const applyOverallMutation = useMutation({
-    mutationFn: async (portfolioId: string) => {
-      if (!overallData) throw new Error("추천 비중이 없습니다");
-      await updatePortfolio(portfolioId, {
-        items: normalizeWeights(overallData.recommended_items),
-      });
-      return portfolioId;
-    },
-    onSuccess: async (portfolioId) => {
-      setConfirmOpen(false);
-      await invalidatePortfolioData(queryClient);
-      onApplied?.(portfolioId);
-    },
-    onError: (e) => toast(extractErrorMessage(e), "error"),
-  });
-
-  const applyAgeMutation = useMutation({
-    mutationFn: async (portfolioId: string) => {
-      if (!ageData) throw new Error("추천 비중이 없습니다");
-      await updatePortfolio(portfolioId, {
-        items: normalizeWeights(ageData.recommended_items),
-      });
-      return portfolioId;
-    },
-    onSuccess: async (portfolioId) => {
-      setConfirmOpen(false);
-      await invalidatePortfolioData(queryClient);
-      onApplied?.(portfolioId);
-    },
-    onError: (e) => toast(extractErrorMessage(e), "error"),
-  });
-
-  const applyHorizonMutation = useMutation({
-    mutationFn: async () => {
-      if (!activeHorizonRec || !horizonTargetPortfolio) throw new Error("추천 비중이 없습니다");
+  // 전체/연령대/기간별 3개 탭이 공유하는 단일 적용 뮤테이션. 기간별 탭에서 현금성 자산 반영이
+  // 필요할 때만 account_ids를 함께 넘긴다(연결 계좌 자동 확장).
+  const applyMutation = useMutation({
+    mutationFn: async ({
+      portfolioId,
+      items,
+      accountIds,
+    }: {
+      portfolioId: string;
+      items: GoalRecommendationItem[];
+      accountIds?: string[];
+    }) => {
       const body: { items: PortfolioItem[]; account_ids?: string[] } = {
-        items: normalizeWeights(activeHorizonRec.recommended_items),
+        items: normalizeWeights(items),
       };
-      if (activeHorizonRec.includes_cash_equivalent && horizonTargetPortfolio.account_ids?.length) {
-        body.account_ids = Array.from(
-          new Set([
-            ...horizonTargetPortfolio.account_ids,
-            ...cashEquivalentMatches.map((a) => a.id),
-          ]),
-        );
-      }
-      await updatePortfolio(horizonTargetPortfolio.id, body);
-      return horizonTargetPortfolio.id;
+      if (accountIds?.length) body.account_ids = accountIds;
+      await updatePortfolio(portfolioId, body);
+      return portfolioId;
     },
     onSuccess: async (portfolioId) => {
       setConfirmOpen(false);
@@ -420,6 +390,70 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
     hasAgeRecommendation && ageData && overallConfirmTarget
       ? computeRecommendationDrift(ageData.recommended_items, overallConfirmTarget.items)
       : null;
+
+  // 전체/연령대/기간별 3개 탭이 각각 그리던 "적용" 확인창을 하나로 통합 — 현재 탭에 맞는
+  // 대상 포트폴리오/추천 데이터/안내 문구를 골라준다(null이면 확인창을 띄우지 않음).
+  const pickMetrics = (d: {
+    expected_return_pct: number | null;
+    expected_dividend_yield_pct: number | null;
+    expected_volatility_pct: number | null;
+  }) => ({
+    expected_return_pct: d.expected_return_pct,
+    expected_dividend_yield_pct: d.expected_dividend_yield_pct,
+    expected_volatility_pct: d.expected_volatility_pct,
+  });
+  const applyConfirm: {
+    target: (typeof portfolios)[number];
+    items: GoalRecommendationItem[];
+    metrics: ReturnType<typeof pickMetrics>;
+    message: string;
+    accountIds?: string[];
+  } | null = (() => {
+    if (effectiveTab === "전체" && overallConfirmTarget) {
+      return {
+        target: overallConfirmTarget,
+        items: overallData.recommended_items,
+        metrics: pickMetrics(overallData),
+        message: `${overallConfirmTarget.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`,
+      };
+    }
+    if (effectiveTab === "연령대" && ageData && overallConfirmTarget) {
+      return {
+        target: overallConfirmTarget,
+        items: ageData.recommended_items,
+        metrics: pickMetrics(ageData),
+        message: `${overallConfirmTarget.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`,
+      };
+    }
+    if (
+      effectiveTab !== "전체" &&
+      effectiveTab !== "연령대" &&
+      horizonTargetPortfolio &&
+      activeHorizonRec
+    ) {
+      const withCash =
+        activeHorizonRec.includes_cash_equivalent && cashEquivalentMatches.length > 0;
+      const accountIds =
+        activeHorizonRec.includes_cash_equivalent && horizonTargetPortfolio.account_ids?.length
+          ? Array.from(
+              new Set([
+                ...horizonTargetPortfolio.account_ids,
+                ...cashEquivalentMatches.map((a) => a.id),
+              ]),
+            )
+          : undefined;
+      return {
+        target: horizonTargetPortfolio,
+        items: activeHorizonRec.recommended_items,
+        metrics: pickMetrics(activeHorizonRec),
+        accountIds,
+        message: withCash
+          ? `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 현금성 자산 반영을 위해 ${cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에 자동으로 연결됩니다. 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
+          : `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`,
+      };
+    }
+    return null;
+  })();
 
   return (
     <>
@@ -511,7 +545,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                       selectedTargetId: selectedOverallTargetId,
                       onSelectTarget: setSelectedOverallTargetId,
                       onApplyClick: () => setConfirmOpen(true),
-                      applyPending: applyOverallMutation.isPending,
+                      applyPending: applyMutation.isPending,
                       noTargetMessage:
                         "포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.",
                       onCreatePortfolio: onCreatePortfolio
@@ -587,7 +621,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                       selectedTargetId: selectedOverallTargetId,
                       onSelectTarget: setSelectedOverallTargetId,
                       onApplyClick: () => setConfirmOpen(true),
-                      applyPending: applyAgeMutation.isPending,
+                      applyPending: applyMutation.isPending,
                       noTargetMessage:
                         "포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.",
                       onCreatePortfolio: onCreatePortfolio
@@ -657,7 +691,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                         selectedTargetId: horizonTargetPortfolio?.id ?? "",
                         onSelectTarget: () => {},
                         onApplyClick: () => setConfirmOpen(true),
-                        applyPending: applyHorizonMutation.isPending,
+                        applyPending: applyMutation.isPending,
                         noTargetMessage:
                           "포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고 기준 포트폴리오로 지정하면 추천 비중을 바로 적용할 수 있어요.",
                         extraCopyBeforeButtons: activeHorizonRec.includes_cash_equivalent ? (
@@ -720,77 +754,28 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
       {managerOpen && <GoalCandidateManagerModal onClose={() => setManagerOpen(false)} />}
       {optionsOpen && <GoalRecommendationOptionsModal onClose={() => setOptionsOpen(false)} />}
 
-      {confirmOpen && effectiveTab === "전체" && overallConfirmTarget && (
+      {confirmOpen && applyConfirm && (
         <ConfirmModal
-          message={`${overallConfirmTarget.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`}
+          message={applyConfirm.message}
           confirmLabel="적용"
           danger={false}
-          onConfirm={() => applyOverallMutation.mutate(overallConfirmTarget.id)}
+          onConfirm={() =>
+            applyMutation.mutate({
+              portfolioId: applyConfirm.target.id,
+              items: applyConfirm.items,
+              accountIds: applyConfirm.accountIds,
+            })
+          }
           onCancel={() => setConfirmOpen(false)}
         >
           <RecommendationComparisonPreview
-            recommendedItems={overallData.recommended_items}
-            currentItems={overallConfirmTarget.items}
-            recommendedMetrics={{
-              expected_return_pct: overallData.expected_return_pct,
-              expected_dividend_yield_pct: overallData.expected_dividend_yield_pct,
-              expected_volatility_pct: overallData.expected_volatility_pct,
-            }}
-            targetPortfolioId={overallConfirmTarget.id}
+            recommendedItems={applyConfirm.items}
+            currentItems={applyConfirm.target.items}
+            recommendedMetrics={applyConfirm.metrics}
+            targetPortfolioId={applyConfirm.target.id}
           />
         </ConfirmModal>
       )}
-
-      {confirmOpen && effectiveTab === "연령대" && ageData && overallConfirmTarget && (
-        <ConfirmModal
-          message={`${overallConfirmTarget.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`}
-          confirmLabel="적용"
-          danger={false}
-          onConfirm={() => applyAgeMutation.mutate(overallConfirmTarget.id)}
-          onCancel={() => setConfirmOpen(false)}
-        >
-          <RecommendationComparisonPreview
-            recommendedItems={ageData.recommended_items}
-            currentItems={overallConfirmTarget.items}
-            recommendedMetrics={{
-              expected_return_pct: ageData.expected_return_pct,
-              expected_dividend_yield_pct: ageData.expected_dividend_yield_pct,
-              expected_volatility_pct: ageData.expected_volatility_pct,
-            }}
-            targetPortfolioId={overallConfirmTarget.id}
-          />
-        </ConfirmModal>
-      )}
-
-      {confirmOpen &&
-        effectiveTab !== "전체" &&
-        effectiveTab !== "연령대" &&
-        horizonTargetPortfolio && (
-          <ConfirmModal
-            message={
-              activeHorizonRec?.includes_cash_equivalent && cashEquivalentMatches.length > 0
-                ? `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 현금성 자산 반영을 위해 ${cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에 자동으로 연결됩니다. 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
-                : `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
-            }
-            confirmLabel="적용"
-            danger={false}
-            onConfirm={() => applyHorizonMutation.mutate()}
-            onCancel={() => setConfirmOpen(false)}
-          >
-            {activeHorizonRec && (
-              <RecommendationComparisonPreview
-                recommendedItems={activeHorizonRec.recommended_items}
-                currentItems={horizonTargetPortfolio.items}
-                recommendedMetrics={{
-                  expected_return_pct: activeHorizonRec.expected_return_pct,
-                  expected_dividend_yield_pct: activeHorizonRec.expected_dividend_yield_pct,
-                  expected_volatility_pct: activeHorizonRec.expected_volatility_pct,
-                }}
-                targetPortfolioId={horizonTargetPortfolio.id}
-              />
-            )}
-          </ConfirmModal>
-        )}
     </>
   );
 }

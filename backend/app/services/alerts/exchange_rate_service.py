@@ -40,7 +40,7 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
         )
         .join(User, User.id == ExchangeRateAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .where(ExchangeRateAlert.is_active == True)  # noqa: E712
+        .where(ExchangeRateAlert.is_active == True)
     )
     rows = result.all()
 

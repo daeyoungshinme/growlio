@@ -1,6 +1,6 @@
 import React from "react";
 import { fmtKrw } from "@/utils/format";
-import { isOverseasMarket } from "@/hooks/useRebalancingExecution";
+import { isOverseasMarket } from "@/constants/markets";
 import type { ExecutionAction, OrderType, PriceLoadState } from "@/hooks/useRebalancingExecution";
 
 export interface RebalancingPriceInputProps {

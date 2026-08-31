@@ -20,7 +20,7 @@ def active_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
     """user_id의 활성 계좌를 조회하는 SELECT 구문 반환."""
     return select(AssetAccount).where(
         AssetAccount.user_id == user_id,
-        AssetAccount.is_active == True,  # noqa: E712
+        AssetAccount.is_active == True,
     )
 
 

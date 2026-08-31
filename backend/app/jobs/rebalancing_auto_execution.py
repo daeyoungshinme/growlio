@@ -72,7 +72,7 @@ async def _run_auto_execution() -> None:
             .outerjoin(UserSettings, UserSettings.user_id == User.id)
             .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
             .where(
-                RebalancingAlert.is_active == True,  # noqa: E712
+                RebalancingAlert.is_active == True,
                 RebalancingAlert.mode == "AUTO",
             )
         )

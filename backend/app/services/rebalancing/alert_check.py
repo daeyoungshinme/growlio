@@ -9,7 +9,6 @@ alert_scope 전환 → rebalancing/alert_scope.py
 
 from __future__ import annotations
 
-import contextlib
 import uuid
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, Literal, cast
@@ -188,7 +187,7 @@ async def _process_rebalancing_alert(
 
     # FCM 독립 처리 — 이메일 실패와 무관하게 항상 시도
     push_sent = False
-    with contextlib.suppress(Exception):
+    try:
         push_sent = await send_push_to_user(
             user_id=alert.user_id,
             title=push_title,
@@ -196,6 +195,8 @@ async def _process_rebalancing_alert(
             fcm_token=fcm_token,
             data={"type": "REBALANCING", "portfolio_id": str(portfolio.id)},
         )
+    except Exception as exc:
+        logger.warning("rebalancing_alert_push_failed", alert_id=str(alert.id), error=str(exc))
 
     any_sent = email_sent or push_sent
     if not any_sent:
@@ -331,7 +332,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         .join(User, User.id == RebalancingAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
         .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
-        .where(RebalancingAlert.is_active == True)  # noqa: E712
+        .where(RebalancingAlert.is_active == True)
     )
     rows = result.all()
 

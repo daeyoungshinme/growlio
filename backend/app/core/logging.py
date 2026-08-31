@@ -22,7 +22,7 @@ def redact_secrets(text: str) -> str:
     return _SECRET_PATTERN.sub(r"\1=[REDACTED]", text)
 
 
-def _redact_processor(logger, method_name, event_dict):  # noqa: ANN001, ARG001
+def _redact_processor(logger, method_name, event_dict):
     for key, value in event_dict.items():
         if isinstance(value, str):
             event_dict[key] = redact_secrets(value)

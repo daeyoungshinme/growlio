@@ -13,21 +13,7 @@ import { chartTooltipStyle } from "@/utils/chart";
 import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
-
-const MONTH_LABELS = [
-  "1월",
-  "2월",
-  "3월",
-  "4월",
-  "5월",
-  "6월",
-  "7월",
-  "8월",
-  "9월",
-  "10월",
-  "11월",
-  "12월",
-];
+import { MONTH_LABELS } from "@/utils/dividendUtils";
 
 interface Props {
   onOpenSettings: () => void;

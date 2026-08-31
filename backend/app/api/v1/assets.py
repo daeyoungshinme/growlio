@@ -219,7 +219,7 @@ async def update_account(
         or req.deposit_krw is not None
         or req.deposit_usd is not None
         or req.real_estate_details is not None
-    ):  # noqa: E501
+    ):
         account.manual_updated_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(account)

@@ -45,7 +45,7 @@ async def get_active_alert_thresholds(db: AsyncSession, user_id: uuid.UUID) -> d
         select(RebalancingAlert.portfolio_id, func.min(RebalancingAlert.threshold_pct))
         .where(
             RebalancingAlert.user_id == user_id,
-            RebalancingAlert.is_active == True,  # noqa: E712
+            RebalancingAlert.is_active == True,
         )
         .group_by(RebalancingAlert.portfolio_id)
     )

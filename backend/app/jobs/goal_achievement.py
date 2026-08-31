@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from datetime import UTC, date, datetime
 
 import structlog
@@ -45,8 +44,8 @@ async def _run_goal_achievement_check(db: AsyncSession, cache: CacheStoreType) -
         select(User, UserSettings)
         .join(UserSettings, User.id == UserSettings.user_id)
         .where(
-            User.is_active == True,  # noqa: E712
-            UserSettings.goal_achievement_alerts_enabled == True,  # noqa: E712
+            User.is_active == True,
+            UserSettings.goal_achievement_alerts_enabled == True,
             UserSettings.goal_amount.isnot(None)
             | UserSettings.annual_deposit_goal.isnot(None)
             | UserSettings.annual_dividend_goal.isnot(None),
@@ -100,7 +99,7 @@ async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: 
                         )
                         await db.commit()
                         logger.info("goal_asset_alert_sent", user_id=str(user.id), pct=goal_pct)
-                        with contextlib.suppress(Exception):
+                        try:
                             await send_push_to_user(
                                 user_id=user.id,
                                 title="자산 목표 달성",
@@ -108,6 +107,8 @@ async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: 
                                 fcm_token=settings_row.fcm_token,
                                 data={"type": "GOAL_ASSET"},
                             )
+                        except Exception as exc:
+                            logger.warning("goal_asset_alert_push_failed", user_id=str(user.id), error=str(exc))
 
                 if (
                     settings_row.annual_deposit_goal
@@ -137,7 +138,7 @@ async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: 
                         )
                         await db.commit()
                         logger.info("goal_deposit_alert_sent", user_id=str(user.id), pct=deposit_pct)
-                        with contextlib.suppress(Exception):
+                        try:
                             await send_push_to_user(
                                 user_id=user.id,
                                 title="입금 목표 달성",
@@ -145,6 +146,8 @@ async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: 
                                 fcm_token=settings_row.fcm_token,
                                 data={"type": "GOAL_DEPOSIT"},
                             )
+                        except Exception as exc:
+                            logger.warning("goal_deposit_alert_push_failed", user_id=str(user.id), error=str(exc))
 
                 if (
                     settings_row.annual_dividend_goal
@@ -175,7 +178,7 @@ async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: 
                         )
                         await db.commit()
                         logger.info("goal_dividend_alert_sent", user_id=str(user.id), pct=dividend_pct)
-                        with contextlib.suppress(Exception):
+                        try:
                             await send_push_to_user(
                                 user_id=user.id,
                                 title="배당 목표 달성",
@@ -183,6 +186,8 @@ async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: 
                                 fcm_token=settings_row.fcm_token,
                                 data={"type": "GOAL_DIVIDEND"},
                             )
+                        except Exception as exc:
+                            logger.warning("goal_dividend_alert_push_failed", user_id=str(user.id), error=str(exc))
 
         except Exception as e:
             logger.error("goal_achievement_check_failed", user_id=str(user.id), error=str(e))

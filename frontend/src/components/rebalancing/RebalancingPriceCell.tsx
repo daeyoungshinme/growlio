@@ -1,6 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { fmtKrwPrice } from "@/utils/format";
-import { isOverseasMarket } from "@/hooks/useRebalancingExecution";
+import { isOverseasMarket } from "@/constants/markets";
 import type { PriceLoadState } from "@/hooks/useRebalancingExecution";
 
 export interface PriceCellProps {

@@ -28,7 +28,7 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, cache) -> None:
         )
         .join(User, User.id == StockPriceAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .where(StockPriceAlert.is_active == True)  # noqa: E712
+        .where(StockPriceAlert.is_active == True)
     )
     rows = result.all()
     if not rows:

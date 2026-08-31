@@ -7,7 +7,7 @@ False=이메일 미설정 또는 발송 실패). 예외는 설정 확인 진단�
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 from urllib.parse import quote
 
@@ -65,6 +65,34 @@ def _email_configured() -> bool:
     return bool(settings.resend_api_key)
 
 
+async def _send_templated(
+    to_email: str,
+    build_template: Callable[[], tuple[str, str]],
+    *,
+    ok_event: str,
+    fail_event: str,
+    not_configured_event: str = "email_not_configured_skip_email",
+    **log_fields: Any,
+) -> bool:
+    """모든 `send_*` 알림 함수의 공통 골격.
+
+    이메일 미설정 시 `False`(발송 안 함), 발송 성공 시 `True`, 발송 실패 시 예외를
+    삼키고 `False`. `build_template`은 미설정이 아닐 때만 호출된다(불필요한 템플릿
+    렌더 방지). `log_fields`는 성공 로그에 추가로 실리는 구조화 키.
+    """
+    if not _email_configured():
+        logger.warning(not_configured_event, to=to_email)
+        return False
+    subject, html = build_template()
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info(ok_event, to=to_email, **log_fields)
+        return True
+    except Exception as e:
+        logger.error(fail_event, to=to_email, error=str(e))
+        return False
+
+
 async def send_exchange_rate_alert(
     to_email: str,
     target_rate: float,
@@ -72,17 +100,14 @@ async def send_exchange_rate_alert(
     current_rate: float,
 ) -> bool:
     """목표환율 도달 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = exchange_rate_alert_template(target_rate, direction, current_rate)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("exchange_rate_alert_email_sent", to=to_email, target_rate=target_rate, current_rate=current_rate)
-        return True
-    except Exception as e:
-        logger.error("exchange_rate_alert_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: exchange_rate_alert_template(target_rate, direction, current_rate),
+        ok_event="exchange_rate_alert_email_sent",
+        fail_event="exchange_rate_alert_email_failed",
+        target_rate=target_rate,
+        current_rate=current_rate,
+    )
 
 
 async def send_rebalancing_alert(
@@ -100,38 +125,30 @@ async def send_rebalancing_alert(
     automation_note: str | None = None,
 ) -> bool:
     """리밸런싱 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
     app_link = f"{settings.frontend_url}/rebalancing?rtab={quote('진단')}"
-    subject, html = rebalancing_alert_template(
-        portfolio_name,
-        threshold_pct,
-        items_to_show,
-        drifting_count,
-        is_scheduled_report,
-        schedule_type,
-        is_test=is_test,
-        is_composite_triggered=is_composite_triggered,
-        composite_reason=composite_reason,
-        order_preview_items=order_preview_items,
-        app_link=app_link,
-        automation_note=automation_note,
+    return await _send_templated(
+        to_email,
+        lambda: rebalancing_alert_template(
+            portfolio_name,
+            threshold_pct,
+            items_to_show,
+            drifting_count,
+            is_scheduled_report,
+            schedule_type,
+            is_test=is_test,
+            is_composite_triggered=is_composite_triggered,
+            composite_reason=composite_reason,
+            order_preview_items=order_preview_items,
+            app_link=app_link,
+            automation_note=automation_note,
+        ),
+        ok_event="rebalancing_alert_email_sent",
+        fail_event="rebalancing_alert_email_failed",
+        portfolio=portfolio_name,
+        items=len(items_to_show),
+        drifting=drifting_count,
+        is_scheduled=is_scheduled_report,
     )
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info(
-            "rebalancing_alert_email_sent",
-            to=to_email,
-            portfolio=portfolio_name,
-            items=len(items_to_show),
-            drifting=drifting_count,
-            is_scheduled=is_scheduled_report,
-        )
-        return True
-    except Exception as e:
-        logger.error("rebalancing_alert_email_failed", to=to_email, error=str(e))
-        return False
 
 
 async def send_rebalancing_execution_email(
@@ -144,93 +161,70 @@ async def send_rebalancing_execution_email(
     total_skipped: int,
 ) -> bool:
     """리밸런싱 자동 실행 완료 이메일 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = rebalancing_execution_template(
-        portfolio_name, executed_at, result_items, total_success, total_fail, total_skipped
+    return await _send_templated(
+        to_email,
+        lambda: rebalancing_execution_template(
+            portfolio_name, executed_at, result_items, total_success, total_fail, total_skipped
+        ),
+        ok_event="rebalancing_execution_email_sent",
+        fail_event="rebalancing_execution_email_failed",
+        portfolio=portfolio_name,
+        success=total_success,
+        fail=total_fail,
     )
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info(
-            "rebalancing_execution_email_sent",
-            to=to_email,
-            portfolio=portfolio_name,
-            success=total_success,
-            fail=total_fail,
-        )
-        return True
-    except Exception as e:
-        logger.error("rebalancing_execution_email_failed", to=to_email, error=str(e))
-        return False
 
 
 async def send_rebalancing_plan_execution_failed_email(
     to_email: str, portfolio_name: str, side: str, error_message: str | None
 ) -> bool:
     """AUTO 매수/매도 leg 실행 자체가 예외로 실패했을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = rebalancing_plan_execution_failed_template(portfolio_name, side, error_message)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("rebalancing_plan_execution_failed_email_sent", to=to_email, portfolio=portfolio_name, side=side)
-        return True
-    except Exception as e:
-        logger.error("rebalancing_plan_execution_failed_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: rebalancing_plan_execution_failed_template(portfolio_name, side, error_message),
+        ok_event="rebalancing_plan_execution_failed_email_sent",
+        fail_event="rebalancing_plan_execution_failed_email_failed",
+        portfolio=portfolio_name,
+        side=side,
+    )
 
 
 async def send_tax_impact_gate_blocked_email(
     to_email: str, portfolio_name: str, estimated_tax_krw: float, max_tax_impact_krw: float
 ) -> bool:
     """세금영향 게이트로 AUTO 계획 생성이 보류됐을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = tax_impact_gate_blocked_template(portfolio_name, estimated_tax_krw, max_tax_impact_krw)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("tax_impact_gate_blocked_email_sent", to=to_email, portfolio=portfolio_name)
-        return True
-    except Exception as e:
-        logger.error("tax_impact_gate_blocked_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: tax_impact_gate_blocked_template(portfolio_name, estimated_tax_krw, max_tax_impact_krw),
+        ok_event="tax_impact_gate_blocked_email_sent",
+        fail_event="tax_impact_gate_blocked_email_failed",
+        portfolio=portfolio_name,
+    )
 
 
 async def send_market_signal_gate_blocked_email(
     to_email: str, portfolio_name: str, composite_level: str, market_condition_mode: str
 ) -> bool:
     """시장신호 게이트로 AUTO 계획 생성이 보류됐을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = market_signal_gate_blocked_template(portfolio_name, composite_level, market_condition_mode)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("market_signal_gate_blocked_email_sent", to=to_email, portfolio=portfolio_name)
-        return True
-    except Exception as e:
-        logger.error("market_signal_gate_blocked_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: market_signal_gate_blocked_template(portfolio_name, composite_level, market_condition_mode),
+        ok_event="market_signal_gate_blocked_email_sent",
+        fail_event="market_signal_gate_blocked_email_failed",
+        portfolio=portfolio_name,
+    )
 
 
 async def send_daily_value_cap_gate_blocked_email(
     to_email: str, portfolio_name: str, today_total_krw: float, attempted_value_krw: float, cap_krw: float
 ) -> bool:
     """하루 합산 거래한도 게이트로 AUTO 계획 생성이 보류됐을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = daily_value_cap_gate_blocked_template(portfolio_name, today_total_krw, attempted_value_krw, cap_krw)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("daily_value_cap_gate_blocked_email_sent", to=to_email, portfolio=portfolio_name)
-        return True
-    except Exception as e:
-        logger.error("daily_value_cap_gate_blocked_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: daily_value_cap_gate_blocked_template(portfolio_name, today_total_krw, attempted_value_krw, cap_krw),
+        ok_event="daily_value_cap_gate_blocked_email_sent",
+        fail_event="daily_value_cap_gate_blocked_email_failed",
+        portfolio=portfolio_name,
+    )
 
 
 async def send_rebalancing_plan_pending_email(
@@ -247,9 +241,6 @@ async def send_rebalancing_plan_pending_email(
     주문이 섞여 있으면 side당 leg가 최대 2개(KR/US)일 수 있다. 각 leg는 `token` 속성으로
     원문 토큰을 함께 받는다(모델 자체엔 해시만 저장되므로 호출부가 별도로 실어 전달).
     """
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
 
     def _to_section(leg) -> dict:
         return {
@@ -259,28 +250,20 @@ async def send_rebalancing_plan_pending_email(
             "link": f"{settings.frontend_url}/rebalancing/plan-confirm?token={leg.token}",
         }
 
-    buy_sections = [_to_section(leg) for leg in buy_legs]
-    sell_sections = [_to_section(leg) for leg in sell_legs]
-
-    subject, html = rebalancing_plan_pending_template(
-        portfolio_name,
-        account_name,
-        buy_sections,
-        sell_sections,
+    return await _send_templated(
+        to_email,
+        lambda: rebalancing_plan_pending_template(
+            portfolio_name,
+            account_name,
+            [_to_section(leg) for leg in buy_legs],
+            [_to_section(leg) for leg in sell_legs],
+        ),
+        ok_event="rebalancing_plan_pending_email_sent",
+        fail_event="rebalancing_plan_pending_email_failed",
+        portfolio=portfolio_name,
+        buy_items=sum(len(leg.items) for leg in buy_legs),
+        sell_items=sum(len(leg.items) for leg in sell_legs),
     )
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info(
-            "rebalancing_plan_pending_email_sent",
-            to=to_email,
-            portfolio=portfolio_name,
-            buy_items=sum(len(leg.items) for leg in buy_legs),
-            sell_items=sum(len(leg.items) for leg in sell_legs),
-        )
-        return True
-    except Exception as e:
-        logger.error("rebalancing_plan_pending_email_failed", to=to_email, error=str(e))
-        return False
 
 
 async def send_stock_price_alert(
@@ -292,17 +275,14 @@ async def send_stock_price_alert(
     direction: str,
 ) -> bool:
     """주가 목표가 도달 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = stock_price_alert_template(ticker, name, target_price, current_price, direction)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("stock_price_alert_email_sent", to=to_email, ticker=ticker, current_price=current_price)
-        return True
-    except Exception as e:
-        logger.error("stock_price_alert_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: stock_price_alert_template(ticker, name, target_price, current_price, direction),
+        ok_event="stock_price_alert_email_sent",
+        fail_event="stock_price_alert_email_failed",
+        ticker=ticker,
+        current_price=current_price,
+    )
 
 
 async def send_monthly_report_email(
@@ -321,30 +301,26 @@ async def send_monthly_report_email(
     asset_allocation: list[dict],
 ) -> bool:
     """월별 포트폴리오 요약 리포트 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = monthly_report_template(
-        report_month,
-        total_assets_krw,
-        mom_change_krw,
-        mom_change_pct,
-        annual_return_pct,
-        xirr_pct,
-        goal_amount,
-        goal_achievement_pct,
-        annual_deposit_goal,
-        deposit_achievement_pct,
-        annual_dividends_received,
-        asset_allocation,
+    return await _send_templated(
+        to_email,
+        lambda: monthly_report_template(
+            report_month,
+            total_assets_krw,
+            mom_change_krw,
+            mom_change_pct,
+            annual_return_pct,
+            xirr_pct,
+            goal_amount,
+            goal_achievement_pct,
+            annual_deposit_goal,
+            deposit_achievement_pct,
+            annual_dividends_received,
+            asset_allocation,
+        ),
+        ok_event="monthly_report_email_sent",
+        fail_event="monthly_report_email_failed",
+        month=report_month,
     )
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("monthly_report_email_sent", to=to_email, month=report_month)
-        return True
-    except Exception as e:
-        logger.error("monthly_report_email_failed", to=to_email, error=str(e))
-        return False
 
 
 async def send_goal_achievement_email(
@@ -358,17 +334,14 @@ async def send_goal_achievement_email(
 
     발송 성공 시 True, 이메일 미설정/실패 시 False 반환.
     """
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = goal_achievement_template(goal_type, goal_amount, current_amount, achievement_pct)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("goal_achievement_email_sent", to=to_email, goal_type=goal_type, pct=achievement_pct)
-        return True
-    except Exception as e:
-        logger.error("goal_achievement_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: goal_achievement_template(goal_type, goal_amount, current_amount, achievement_pct),
+        ok_event="goal_achievement_email_sent",
+        fail_event="goal_achievement_email_failed",
+        goal_type=goal_type,
+        pct=achievement_pct,
+    )
 
 
 async def send_test_email(to_email: str) -> bool:
@@ -392,17 +365,13 @@ async def send_test_email(to_email: str) -> bool:
 
 async def send_account_deletion_email(to_email: str) -> bool:
     """회원 탈퇴 완료 안내 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_account_deletion_email", to=to_email)
-        return False
-    subject, html = account_deletion_template()
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("account_deletion_email_sent", to=to_email)
-        return True
-    except Exception as e:
-        logger.error("account_deletion_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        account_deletion_template,
+        ok_event="account_deletion_email_sent",
+        fail_event="account_deletion_email_failed",
+        not_configured_event="email_not_configured_skip_account_deletion_email",
+    )
 
 
 async def send_market_signal_change_alert(
@@ -412,60 +381,44 @@ async def send_market_signal_change_alert(
     reason: str | None = None,
 ) -> bool:
     """시장 위험 신호등 등급 변경 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = market_signal_change_template(old_level, new_level, reason)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("market_signal_change_email_sent", to=to_email, old_level=old_level, new_level=new_level)
-        return True
-    except Exception as e:
-        logger.error("market_signal_change_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: market_signal_change_template(old_level, new_level, reason),
+        ok_event="market_signal_change_email_sent",
+        fail_event="market_signal_change_email_failed",
+        old_level=old_level,
+        new_level=new_level,
+    )
 
 
 async def send_year_end_tax_reminder_email(to_email: str, content: Mapping[str, Any]) -> bool:
     """연말 절세 리마인더 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = year_end_tax_reminder_template(content)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("year_end_tax_reminder_email_sent", to=to_email)
-        return True
-    except Exception as e:
-        logger.error("year_end_tax_reminder_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: year_end_tax_reminder_template(content),
+        ok_event="year_end_tax_reminder_email_sent",
+        fail_event="year_end_tax_reminder_email_failed",
+    )
 
 
 async def send_market_signal_daily_digest_alert(to_email: str, level: str, reason: str | None) -> bool:
     """매일 시장 신호 요약 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = market_signal_daily_digest_template(level, reason)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("market_signal_daily_digest_email_sent", to=to_email, level=level)
-        return True
-    except Exception as e:
-        logger.error("market_signal_daily_digest_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: market_signal_daily_digest_template(level, reason),
+        ok_event="market_signal_daily_digest_email_sent",
+        fail_event="market_signal_daily_digest_email_failed",
+        level=level,
+    )
 
 
 async def send_recommendation_drift_alert_email(to_email: str, portfolio_names: list[str]) -> bool:
     """추천 비중 변화 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
     app_link = f"{settings.frontend_url}/rebalancing?rtab={quote('포트폴리오')}"
-    subject, html = recommendation_drift_alert_template(portfolio_names, app_link)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("recommendation_drift_alert_email_sent", to=to_email, portfolio_count=len(portfolio_names))
-        return True
-    except Exception as e:
-        logger.error("recommendation_drift_alert_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(
+        to_email,
+        lambda: recommendation_drift_alert_template(portfolio_names, app_link),
+        ok_event="recommendation_drift_alert_email_sent",
+        fail_event="recommendation_drift_alert_email_failed",
+        portfolio_count=len(portfolio_names),
+    )
