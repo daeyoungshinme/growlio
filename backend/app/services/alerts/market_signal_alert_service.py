@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, date, datetime
+from functools import partial
 
 import structlog
 from sqlalchemy import or_, select
@@ -22,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import AsyncSessionLocal
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
-from app.services.alerts.alert_service import save_alert_history
 from app.services.market_signal_service import (
     get_confirmed_composite_level,
     get_last_composite_level,
@@ -57,8 +57,8 @@ async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreTy
     비교해, 경계값 근처에서 등급이 잦게 오갈 때 발생하는 알림 flapping을 억제한다. 최초 실행
     (이전 관측값 없음)은 저장만 하고 발송하지 않는다 — 배포 직후 스팸 방지.
     """
+    from app.services.alerts._dispatch import dispatch_dual_channel_alert
     from app.services.email_service import send_market_signal_change_alert
-    from app.services.push_service import send_push_to_user
     from app.services.rebalancing.alert_check import _mark_composite_alert_sent_today
 
     old_level = await get_last_composite_level(db)
@@ -83,28 +83,22 @@ async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreTy
         to_email = getattr(user_settings, "notification_email", None) or user.email
         fcm_token = getattr(user_settings, "fcm_token", None)
 
-        email_sent = False
-        try:
-            email_sent = await send_market_signal_change_alert(to_email, old_level, new_level, reason)
-        except Exception as exc:
-            logger.error("market_signal_change_email_failed", user_id=str(user.id), error=str(exc))
-
-        push_sent = False
-        try:
-            push_sent = await send_push_to_user(
-                user_id=user.id,
-                title="시장 위험 신호 변경",
-                body=f"시장 위험 신호가 {old_level} → {new_level}로 변경되었습니다.",
-                fcm_token=fcm_token,
-                data={"type": "MARKET_SIGNAL"},
-            )
-        except Exception as exc:
-            logger.error("market_signal_change_push_failed", user_id=str(user.id), error=str(exc))
-
-        if email_sent or push_sent:
-            await save_alert_history(db, user.id, "MARKET_SIGNAL", f"시장 위험 신호: {old_level} → {new_level}")
+        sent = await dispatch_dual_channel_alert(
+            db,
+            user.id,
+            event_prefix="market_signal_change",
+            alert_type="MARKET_SIGNAL",
+            history_message=f"시장 위험 신호: {old_level} → {new_level}",
+            send_email=partial(send_market_signal_change_alert, to_email, old_level, new_level, reason),
+            push_title="시장 위험 신호 변경",
+            push_body=f"시장 위험 신호가 {old_level} → {new_level}로 변경되었습니다.",
+            push_type="MARKET_SIGNAL",
+            fcm_token=fcm_token,
+            commit=False,  # 루프 후 일괄 커밋
             # 같은 날 rebalancing/alert_check의 복합신호 알림과 중복 발송되지 않도록 dedup을 공유한다.
-            await _mark_composite_alert_sent_today(db, user.id)
+            after_sent=partial(_mark_composite_alert_sent_today, db, user.id),
+        )
+        if sent:
             sent_count += 1
 
     if sent_count:
@@ -149,8 +143,8 @@ async def _already_sent_digest_today(db: AsyncSession, user_id) -> bool:
 async def _send_digest_to_user(
     user: User, user_settings: UserSettings, level: str, reason: str, sem: asyncio.Semaphore
 ) -> None:
+    from app.services.alerts._dispatch import dispatch_dual_channel_alert
     from app.services.email_service import send_market_signal_daily_digest_alert
-    from app.services.push_service import send_push_to_user
 
     async with sem:
         try:
@@ -159,28 +153,18 @@ async def _send_digest_to_user(
                     return
 
                 to_email = user_settings.notification_email or user.email
-
-                email_sent = False
-                try:
-                    email_sent = await send_market_signal_daily_digest_alert(to_email, level, reason)
-                except Exception as exc:
-                    logger.error("market_signal_daily_digest_email_failed", user_id=str(user.id), error=str(exc))
-
-                push_sent = False
-                try:
-                    push_sent = await send_push_to_user(
-                        user_id=user.id,
-                        title="오늘의 시장 신호",
-                        body=f"오늘의 시장 위험 신호: {level}. {reason}",
-                        fcm_token=user_settings.fcm_token,
-                        data={"type": "MARKET_SIGNAL_DIGEST"},
-                    )
-                except Exception as exc:
-                    logger.error("market_signal_daily_digest_push_failed", user_id=str(user.id), error=str(exc))
-
-                if email_sent or push_sent:
-                    await save_alert_history(db, user.id, "MARKET_SIGNAL_DIGEST", f"오늘의 시장 신호: {level}")
-                    await db.commit()
+                await dispatch_dual_channel_alert(
+                    db,
+                    user.id,
+                    event_prefix="market_signal_daily_digest",
+                    alert_type="MARKET_SIGNAL_DIGEST",
+                    history_message=f"오늘의 시장 신호: {level}",
+                    send_email=partial(send_market_signal_daily_digest_alert, to_email, level, reason),
+                    push_title="오늘의 시장 신호",
+                    push_body=f"오늘의 시장 위험 신호: {level}. {reason}",
+                    push_type="MARKET_SIGNAL_DIGEST",
+                    fcm_token=user_settings.fcm_token,
+                )
         except Exception as exc:
             logger.error("market_signal_daily_digest_user_failed", user_id=str(user.id), error=str(exc))
 

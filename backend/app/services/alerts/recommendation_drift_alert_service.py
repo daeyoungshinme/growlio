@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import UTC, date, datetime
+from functools import partial
 
 import structlog
 from sqlalchemy import select
@@ -32,7 +33,6 @@ from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services._account_queries import active_accounts_stmt
 from app.services._portfolio_queries import get_linked_portfolios
-from app.services.alerts.alert_service import save_alert_history
 from app.services.goal_candidate_service import existing_items_from_positions
 from app.services.goal_recommendation_service import (
     _RECOMMENDATION_DRIFT_THRESHOLD_PCT,
@@ -149,8 +149,8 @@ async def _find_drifted_portfolios(
 
 async def _send_alert_to_user(user: User, user_settings: UserSettings, sem: asyncio.Semaphore) -> None:
     from app.core.cache_store import get_cache_store
+    from app.services.alerts._dispatch import dispatch_dual_channel_alert
     from app.services.email_service import send_recommendation_drift_alert_email
-    from app.services.push_service import send_push_to_user
 
     async with sem:
         try:
@@ -164,30 +164,19 @@ async def _send_alert_to_user(user: User, user_settings: UserSettings, sem: asyn
                     return
 
                 to_email = user_settings.notification_email or user.email
-
-                email_sent = False
-                try:
-                    email_sent = await send_recommendation_drift_alert_email(to_email, drifted_names)
-                except Exception as exc:
-                    logger.error("recommendation_drift_alert_email_failed", user_id=str(user.id), error=str(exc))
-
-                push_sent = False
-                try:
-                    push_sent = await send_push_to_user(
-                        user_id=user.id,
-                        title="추천 비중이 달라졌어요",
-                        body=f"{', '.join(drifted_names)} 포트폴리오의 추천 비중을 확인해보세요.",
-                        fcm_token=user_settings.fcm_token,
-                        data={"type": "RECOMMENDATION_DRIFT"},
-                    )
-                except Exception as exc:
-                    logger.error("recommendation_drift_alert_push_failed", user_id=str(user.id), error=str(exc))
-
-                if email_sent or push_sent:
-                    await save_alert_history(
-                        db, user.id, "RECOMMENDATION_DRIFT", f"추천 비중 변화 알림 발송 ({', '.join(drifted_names)})"
-                    )
-                    await db.commit()
+                names = ", ".join(drifted_names)
+                await dispatch_dual_channel_alert(
+                    db,
+                    user.id,
+                    event_prefix="recommendation_drift_alert",
+                    alert_type="RECOMMENDATION_DRIFT",
+                    history_message=f"추천 비중 변화 알림 발송 ({names})",
+                    send_email=partial(send_recommendation_drift_alert_email, to_email, drifted_names),
+                    push_title="추천 비중이 달라졌어요",
+                    push_body=f"{names} 포트폴리오의 추천 비중을 확인해보세요.",
+                    push_type="RECOMMENDATION_DRIFT",
+                    fcm_token=user_settings.fcm_token,
+                )
         except Exception as exc:
             logger.error("recommendation_drift_alert_user_failed", user_id=str(user.id), error=str(exc))
 
