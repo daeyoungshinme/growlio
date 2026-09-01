@@ -10,15 +10,18 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
 import { useKisCredentialVerify } from "@/hooks/useKisCredentialVerify";
+import { useTossCredentialVerify } from "@/hooks/useTossCredentialVerify";
 import { convertUsdToKrw } from "@/utils/format";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import StockDepositFields from "./StockDepositFields";
 import KisCredentialFields from "./KisCredentialFields";
 import KiwoomCredentialFields from "./KiwoomCredentialFields";
+import TossCredentialFields from "./TossCredentialFields";
 
 const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
   STOCK_KIS: "주식 (KIS 한국투자증권)",
   STOCK_KIWOOM: "주식 (키움증권)",
+  STOCK_TOSS: "주식 (토스증권)",
   STOCK_OTHER: "주식 (타증권사 / 수동)",
   CASH_OTHER: "예수금 (기타)",
 };
@@ -26,12 +29,14 @@ const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
 function defaultAssetTypeForSource(source: string): string {
   if (source === "KIS_API") return "STOCK_KIS";
   if (source === "KIWOOM_API") return "STOCK_KIWOOM";
+  if (source === "TOSS_API") return "STOCK_TOSS";
   return "STOCK_OTHER";
 }
 
 const INSTITUTION_FOR_SOURCE: Record<string, string> = {
   KIS_API: "한국투자증권",
   KIWOOM_API: "키움증권",
+  TOSS_API: "토스증권",
 };
 
 interface Props {
@@ -74,13 +79,25 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
   );
 
   const isKis = form.data_source === "KIS_API";
+  const isToss = form.data_source === "TOSS_API";
   const KIS_ACCOUNT_NO_REGEX = /^\d{8}-\d{2}$|^\d{10}$/;
   const kisAccountNoValid =
     !isKis || isEdit || (!!form.kis_account_no && KIS_ACCOUNT_NO_REGEX.test(form.kis_account_no));
   const kisValid =
     !isKis || isEdit || (kisAccountNoValid && !!form.kis_app_key && !!form.kis_app_secret);
 
+  const tossValid =
+    !isToss ||
+    isEdit ||
+    (!!form.toss_account_no && !!form.toss_client_id && !!form.toss_client_secret);
+
   const { verifyState, verifyError, verify, reset: resetVerify } = useKisCredentialVerify();
+  const {
+    verifyState: tossVerifyState,
+    verifyError: tossVerifyError,
+    verify: tossVerify,
+    reset: resetTossVerify,
+  } = useTossCredentialVerify();
 
   const [depositSectionOpen, toggleDepositSection] = useCollapsible(true);
   const [credentialSectionOpen, toggleCredentialSection] = useCollapsible(true);
@@ -89,6 +106,11 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
   const handleVerify = async () => {
     if (!form.kis_app_key || !form.kis_app_secret) return;
     await verify(form.kis_app_key, form.kis_app_secret, form.is_mock_mode ?? true);
+  };
+
+  const handleTossVerify = async () => {
+    if (!form.toss_client_id || !form.toss_client_secret) return;
+    await tossVerify(form.toss_client_id, form.toss_client_secret);
   };
 
   const handleSourceChange = (source: string) => {
@@ -110,6 +132,12 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
       set("kiwoom_account_no", undefined);
       set("kiwoom_app_key", undefined);
       set("kiwoom_app_secret", undefined);
+    }
+    if (source !== "TOSS_API") {
+      set("toss_account_no", undefined);
+      set("toss_client_id", undefined);
+      set("toss_client_secret", undefined);
+      resetTossVerify();
     }
   };
 
@@ -146,6 +174,8 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     if (form.kis_app_secret) data.kis_app_secret = form.kis_app_secret;
     if (form.kiwoom_app_key) data.kiwoom_app_key = form.kiwoom_app_key;
     if (form.kiwoom_app_secret) data.kiwoom_app_secret = form.kiwoom_app_secret;
+    if (form.toss_client_id) data.toss_client_id = form.toss_client_id;
+    if (form.toss_client_secret) data.toss_client_secret = form.toss_client_secret;
     onSubmit(data);
   };
 
@@ -155,11 +185,16 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     isLoading ||
     !form.name ||
     !kisValid ||
+    !tossValid ||
     (isKis && !isEdit && verifyState !== "ok") ||
+    (isToss && !isEdit && tossVerifyState !== "ok") ||
     (form.data_source === "MANUAL" && usdPending);
   const editDisabled = isLoading || !form.name || usdPending;
 
-  const accountNo = initialAccount?.kis_account_no ?? initialAccount?.kiwoom_account_no;
+  const accountNo =
+    initialAccount?.kis_account_no ??
+    initialAccount?.kiwoom_account_no ??
+    initialAccount?.toss_account_no;
   const typeLabel =
     STOCK_TYPE_LABELS[initialAccount?.asset_type ?? ""] ?? initialAccount?.asset_type;
 
@@ -191,11 +226,13 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                   {accountNo}
                 </span>
               )}
-              <span
-                className={`px-2 py-0.5 text-xs rounded-full ${initialAccount?.is_mock_mode ? "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400" : "bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400"}`}
-              >
-                {initialAccount?.is_mock_mode ? "모의투자" : "실투자"}
-              </span>
+              {initialAccount?.data_source !== "TOSS_API" && (
+                <span
+                  className={`px-2 py-0.5 text-xs rounded-full ${initialAccount?.is_mock_mode ? "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400" : "bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400"}`}
+                >
+                  {initialAccount?.is_mock_mode ? "모의투자" : "실투자"}
+                </span>
+              )}
             </div>
           )}
 
@@ -234,6 +271,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                     <option value="MANUAL">수동 입력</option>
                     <option value="KIS_API">KIS 한국투자증권 (자동)</option>
                     <option value="KIWOOM_API">키움증권 (자동)</option>
+                    <option value="TOSS_API">토스증권 (자동)</option>
                   </select>
                 </div>
                 <div>
@@ -416,7 +454,9 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
             )}
 
             {/* 계좌 연동 자격증명 */}
-            {(form.data_source === "KIS_API" || form.data_source === "KIWOOM_API") && (
+            {(form.data_source === "KIS_API" ||
+              form.data_source === "KIWOOM_API" ||
+              form.data_source === "TOSS_API") && (
               <CollapsibleSection
                 label="계좌 연동 자격증명"
                 isOpen={credentialSectionOpen}
@@ -440,7 +480,19 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                     <KiwoomCredentialFields form={form} set={set} isEdit={isEdit} />
                   )}
 
-                  {!isEdit && (
+                  {form.data_source === "TOSS_API" && (
+                    <TossCredentialFields
+                      form={form}
+                      set={set}
+                      isEdit={isEdit}
+                      verifyState={tossVerifyState}
+                      verifyError={tossVerifyError}
+                      onVerify={handleTossVerify}
+                      onCredentialChange={resetTossVerify}
+                    />
+                  )}
+
+                  {!isEdit && !isToss && (
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"

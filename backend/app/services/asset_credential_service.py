@@ -12,7 +12,7 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount
-from app.models.token import KisToken, KiwoomToken
+from app.models.token import KisToken, KiwoomToken, TossToken
 from app.utils.cache_keys import account_detail_key, invalidate_user_caches
 
 
@@ -35,6 +35,26 @@ async def verify_kis_credentials(
         db=db,
         user_id=str(user_id),
         account_id=None,
+    )
+
+
+async def verify_toss_credentials(toss_client_id: str, toss_client_secret: str) -> None:
+    """토스 자격증명 유효성을 확인한다 (계좌 생성/토큰 저장 없이). 실패 시 예외를 그대로 전파한다."""
+    from app.toss.auth import verify_credentials
+
+    await verify_credentials(toss_client_id, toss_client_secret)
+
+
+async def delete_toss_credentials(account: AssetAccount, db: AsyncSession, cache) -> None:
+    """계좌별 토스 Open API 자격증명을 삭제한다."""
+    await _delete_credentials(
+        account,
+        db,
+        cache,
+        app_key_attr="toss_client_id",
+        app_secret_attr="toss_client_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
+        token_model=TossToken,
+        cache_key=f"toss_token:account:{account.id}",
     )
 
 

@@ -28,6 +28,15 @@ cd backend && uv run alembic revision --autogenerate -m "description"
 
 > **주의:** autogenerate는 `alembic/env.py`에 모델 import 필요. 새 모델 추가 시 env.py 확인.
 
+> **버전 테이블 분리:** growlio는 자매 앱 nestlio와 같은 Supabase DB의 `public` 스키마를
+> 공유하므로, alembic 버전 포인터를 기본 `alembic_version`이 아닌 **`growlio_alembic_version`**
+> (`alembic/env.py`의 `VERSION_TABLE`)에 저장한다. 기본 테이블을 쓰면 두 앱이 서로의
+> 리비전을 덮어써 `Can't locate revision ...`로 마이그레이션이 막힌다. 이 버전 테이블이
+> 없는 DB(전환 직후의 기존 DB)는 `alembic upgrade head` 전에
+> `python scripts/bootstrap_alembic.py`를 한 번 실행해 seed해야 한다(멱등, 신규 DB는 무동작).
+> `render.yaml` preDeployCommand도 이 순서로 구성돼 있음. `public.alembic_version`(nestlio)은
+> 건드리지 않는다.
+
 ```bash
 # 마이그레이션 롤백 (1단계)
 cd backend && uv run alembic downgrade -1
@@ -80,7 +89,7 @@ cd backend && uv run mypy app/
 - `FRONTEND_URL` — 이메일 링크 생성용 프론트엔드 URL
 - `API_SEMAPHORE_LIMIT` — 외부 API 동시 호출 제한 세마포어 크기
 - `CACHE_TTL_SECONDS` — 환율 등 in-memory 캐시 기본 TTL
-- 기타 튜닝용 env var(환율 fallback, KIS/Kiwoom rate limit, circuit breaker 임계값, DB pool 설정 등)는 `app/core/config.py`의 `Settings` 클래스 참고 — 전부 기본값 있어 운영 필수 아님
+- 기타 튜닝용 env var(환율 fallback, KIS/Kiwoom/Toss rate limit, circuit breaker 임계값, DB pool 설정 등)는 `app/core/config.py`의 `Settings` 클래스 참고 — 전부 기본값 있어 운영 필수 아님
 
 **Supabase** (`supabase.com > Project Settings > API`):
 - `SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
@@ -107,13 +116,13 @@ cd backend && uv run mypy app/
 
 ### 데이터 모델
 
-- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API) 조합으로 동작 결정. ISA 계좌는 `isa_open_date`/`isa_type`(GENERAL/PREFERENTIAL)/`isa_manual_cumulative_pnl_krw`로 의무가입 만기·수동입력 누적손익 관리. `tax_type`(GENERAL/ISA/PENSION_SAVINGS/IRP/OVERSEAS_DEDICATED)은 세제 성격(리밸런싱 세금 계산·매도 우선순위에 사용), `investment_horizon`(SHORT_TERM/MID_TERM/LONG_TERM/null)은 투자기간 그룹핑 태그 — 둘 다 `Portfolio`에도 동일 컬럼 존재하며 목표 역산 추천(`goal_recommendation_service.py`, 프론트 `RecommendationCard`)이 어느 포트폴리오가 어느 (기간, 세제유형) 조합을 담당하는지 매칭하는 데 사용
+- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_TOSS/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API/TOSS_API) 조합으로 동작 결정. 토스증권 계좌는 `toss_account_no`/`toss_client_id`/`toss_client_secret`(AES-256) — 토스에는 모의투자 없음(`is_mock_mode` 미사용). ISA 계좌는 `isa_open_date`/`isa_type`(GENERAL/PREFERENTIAL)/`isa_manual_cumulative_pnl_krw`로 의무가입 만기·수동입력 누적손익 관리. `tax_type`(GENERAL/ISA/PENSION_SAVINGS/IRP/OVERSEAS_DEDICATED)은 세제 성격(리밸런싱 세금 계산·매도 우선순위에 사용), `investment_horizon`(SHORT_TERM/MID_TERM/LONG_TERM/null)은 투자기간 그룹핑 태그 — 둘 다 `Portfolio`에도 동일 컬럼 존재하며 목표 역산 추천(`goal_recommendation_service.py`, 프론트 `RecommendationCard`)이 어느 포트폴리오가 어느 (기간, 세제유형) 조합을 담당하는지 매칭하는 데 사용
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
 - `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표, 단기 목표 추천 최소 주식비중(`goal_short_term_equity_floor_pct`), 전체 자산 기준 목표 역산 추천 전용 채권/현금성 비중 상한(`goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`, nullable — NULL이면 상한 없음, `PUT /settings/goal-recommendation-options`로 설정), 연령대별 추천 전용 연령대(`age_group`, nullable — TWENTIES/THIRTIES/FORTIES/FIFTIES/SIXTIES_PLUS, 온보딩에서 입력한 `birth_year`로 자동 파생 가능 — `goal_age_recommendation_service.age_group_from_birth_year()`), AUTO 리밸런싱 유저 단위 하루 합산 거래대금 상한(`auto_rebalancing_daily_value_cap_krw`, nullable — NULL이면 무제한/기본값, `PUT /settings/auto-rebalancing-daily-cap`으로 설정)
 
-> 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken` 등 전체 목록은 `app/models/` 참고.
+> 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken`/`TossToken` 등 전체 목록은 `app/models/` 참고.
 
 ```
 API Request
@@ -151,7 +160,7 @@ API Request
 services/
 > 파일명 접미사 컨벤션: `*_service.py`(DB/외부 API 연동 포함 유스케이스), `*_calculator.py`/`*_aggregator.py`(순수 계산·집계, 부수효과 없음), 접미사 없는 파일(`yahoo_price.py`, `backtest_metrics.py` 등)은 특정 도메인 유틸 모음. 강제 통일 대상 아님 — 새 파일 추가 시 참고용.
   ├── asset_service.py        # 계좌별 sync 함수 + sync_account_now(캐시 무효화·API 응답 포맷 포함, assets.py `/sync` 전용) — 대시보드 집계는 asset_aggregator.py로 분리됨
-  ├── asset_credential_service.py  # 계좌 KIS/키움 자격증명 검증(verify_kis_credentials)·삭제(delete_kis_credentials/delete_kiwoom_credentials) — assets.py 라우터에서 분리
+  ├── asset_credential_service.py  # 계좌 KIS/키움/토스 자격증명 검증(verify_kis_credentials/verify_toss_credentials)·삭제(delete_kis_credentials/delete_kiwoom_credentials/delete_toss_credentials) — assets.py 라우터에서 분리
   ├── sync_all_service.py     # "전체 갱신" 백그라운드 배치 동기화 — jobs/asset_sync.py의 _sync_accounts 재사용, in-memory 캐시(core/cache_store.py)로 락/진행상태 관리 (POST /assets/sync-all, GET /assets/sync-all/status)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
   ├── alerts/                 # 범용 알림 도메인 패키지 (환율/주가/시장신호 체크 + 공통 이력)
@@ -260,11 +269,13 @@ core/                         # 설정·DB·in-memory 캐시 store (구 app/conf
   └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 store 싱글톤, get_cache_store/close_cache_store (단일 프로세스 배포 전제 — 구 Redis 클라이언트 대체). `sweep_expired()`를 `jobs/cache_sweep.py`가 15분마다 호출해 만료 키를 능동 청소(lazy expiration만으로는 재방문 없는 유저의 키가 계속 남아 `scan()` 비용 증가). **주의**: 워커/인스턴스를 2개 이상으로 늘리면 캐시가 프로세스 로컬이라 적중률이 급락하고 무효화도 다른 워커에 전파되지 않음 — 확장 시 Redis 등 공유 캐시 재도입 필요(현재 `render.yaml`은 단일 워커/단일 인스턴스 전제)
 kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote)
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants). `client.py`는 KIS와 동일한 `AsyncRateLimiter`로 초당 `kiwoom_rate_per_second`(기본 4.0, 관측 유량 5/s 대비 20% 버퍼) 건 제한 — `providers/http_client.py`의 rate-limit 응답 감지도 키움 `return_code=5`(EGW00201과 동일 의미)에 대응
+toss/                         # 토스증권 Open API 클라이언트 (auth, balance, client, constants). OAuth2 Client Credentials(form-encoded), 국내+미국 보유종목이 `GET /api/v1/holdings` 한 번에 통합, 예수금은 `/api/v1/buying-power`. 샌드박스 없음(운영 도메인 단일), 토큰 ~1h(지연 갱신), **토스 `Open API → IP 관리`에 서버 IP 등록 필수**(미등록 시 403 `edge-blocked`). `client.py`는 `AsyncRateLimiter`로 `toss_rate_per_second`(기본 1.0, ACCOUNT group 1req/s 기준) 제한 — `providers/http_client.py`가 토스 `error.code=rate-limit-*`도 rate-limit 응답으로 감지
 providers/                    # 금융 데이터 provider
   ├── base.py                 # Provider 추상 베이스
   ├── http_client.py          # 공통 HTTP 클라이언트. `broker_request()`의 `retry_on_request_error`(기본 True)를 False로 넘기면 `httpx.RequestError`(타임아웃/커넥션 오류) 시 재시도 없이 즉시 실패 — KIS/키움 주문 접수(`kis/order.py`·`kiwoom/order.py`의 4개 `place_*_order`)만 False로 호출해, 응답 유실 시 이미 접수됐을 수 있는 주문을 맹목적으로 재시도해 중복 주문이 나가는 것을 막는다(KIS/키움 API는 클라이언트 지정 idempotency key 미지원). 조회성 호출(잔고·시세 등)은 기본값 유지
   ├── kis_provider.py         # KIS API provider
   ├── kiwoom_provider.py      # 키움증권 API provider
+  ├── toss_provider.py        # 토스증권 Open API provider (holdings 통합 조회 — 키움보다 단순, `_overseas_cache` 미사용)
   ├── manual_provider.py      # 수동 입력 provider
   ├── _token_cache.py         # 토큰 캐싱 헬퍼
   ├── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
@@ -273,7 +284,7 @@ providers/                    # 금융 데이터 provider
   └── _error_mapping.py       # KIS/키움 공용 HTTP 에러 매핑 (5xx/4xx 분기, ConnectError/TimeoutException) — 브로커별 에러 메시지 키(msg1 vs return_msg)만 파라미터로 받음
 utils/
   ├── cache_keys.py           # 캐시 키 빌더 + TTL 상수 (`dividend_ticker_summary_key` 등) — Tier1(휘발성) 캐시 전용, get_cached_json/set_cached_json/invalidate_* 포함
-  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
+  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom/Toss 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
   ├── currency.py             # USD/KRW 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
   ├── durable_state.py        # Postgres(`AppState` 테이블) 기반 key-value durable state — get_durable/set_durable/delete_durable. 재시작에도 유지돼야 하는 상태(시장신호 등급 마지막 값, 알림 dedup 플래그) 전용, cache_keys.py의 휘발성 캐시와는 별개
   ├── inproc_lock.py          # 프로세스 내 락 — 동일 계좌 동시 sync 방지, 콜드 캐시 single-flight 중복 조회 방지 (구 redis_lock.py, 단일 프로세스 배포 전제로 대체)
@@ -302,7 +313,7 @@ jobs/                         # APScheduler 정기 작업
 
 > **새 job 추가:** `jobs/` 에 파일 생성 후 `app/scheduler.py`의 `init_scheduler()`에 `scheduler.add_job()` 호출로 등록. `timezone="Asia/Seoul"` 필수.
 
-**자격증명 암호화:** KIS/키움 App Key/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
+**자격증명 암호화:** KIS/키움 App Key/Secret·토스 Client ID/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
 
 **현재가 조회 우선순위:** `price_service.py` — Yahoo Finance(yfinance, API 키 불필요) → KIS API. yfinance는 `run_in_executor`로 동기 함수 비동기 실행.
 
@@ -318,7 +329,7 @@ jobs/                         # APScheduler 정기 작업
 ## Absolute Rules
 
 **자격증명 암호화**
-- KIS/키움 App Key·Secret은 반드시 `credential_service.encrypt()` 후 DB 저장, 읽을 때 `decrypt()` 호출.
+- KIS/키움 App Key·Secret·토스 Client ID·Secret은 반드시 `credential_service.encrypt()` 후 DB 저장, 읽을 때 `decrypt()` 호출.
 - 평문 자격증명을 DB에 직접 저장하거나 로그에 출력 금지.
 
 **금액 단위**

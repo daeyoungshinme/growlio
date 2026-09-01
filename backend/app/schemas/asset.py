@@ -136,6 +136,9 @@ class AssetAccountCreate(BaseModel):
     kiwoom_account_no: str | None = None
     kiwoom_app_key: str | None = None  # 키움 App Key (평문, 저장 시 암호화)
     kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
+    toss_account_no: str | None = None
+    toss_client_id: str | None = None  # 토스 Client ID (평문, 저장 시 암호화)
+    toss_client_secret: str | None = None  # 토스 Client Secret (평문, 저장 시 암호화)
     is_mock_mode: bool = True
     manual_amount: float | None = None
     manual_currency: str = "KRW"
@@ -174,6 +177,16 @@ class AssetAccountCreate(BaseModel):
             raise ValueError("KIS App Key와 App Secret을 입력하세요.")
         return self
 
+    @model_validator(mode="after")
+    def toss_credentials_required(self) -> "AssetAccountCreate":
+        if self.data_source != "TOSS_API":
+            return self
+        if not self.toss_account_no:
+            raise ValueError("토스 계좌번호를 입력하세요.")
+        if not self.toss_client_id or not self.toss_client_secret:
+            raise ValueError("토스 Client ID와 Client Secret을 입력하세요.")
+        return self
+
 
 class AssetAccountUpdate(BaseModel):
     name: str | None = None
@@ -182,6 +195,8 @@ class AssetAccountUpdate(BaseModel):
     kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
     kiwoom_app_key: str | None = None  # 키움 App Key (평문, 저장 시 암호화)
     kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
+    toss_client_id: str | None = None  # 토스 Client ID (평문, 저장 시 암호화)
+    toss_client_secret: str | None = None  # 토스 Client Secret (평문, 저장 시 암호화)
     manual_amount: float | None = None
     deposit_krw: float | None = None
     deposit_usd: float | None = None
@@ -214,6 +229,7 @@ class AssetAccountResponse(BaseModel):
     institution: str | None
     kis_account_no: str | None = None
     kiwoom_account_no: str | None = None
+    toss_account_no: str | None = None
     is_mock_mode: bool
     manual_amount: float | None
     manual_currency: str
@@ -229,6 +245,7 @@ class AssetAccountResponse(BaseModel):
     created_at: datetime
     has_own_kis_credentials: bool = False  # KIS 계좌별 API 키 보유 여부
     has_own_kiwoom_credentials: bool = False  # 키움 계좌별 API 키 보유 여부
+    has_own_toss_credentials: bool = False  # 토스 계좌별 API 키 보유 여부
     target_portfolio_id: UUID | None = None
     tax_type: AccountTaxType = AccountTaxType.GENERAL
     investment_horizon: InvestmentHorizon | None = None
@@ -249,6 +266,11 @@ class KisCredentialVerifyRequest(BaseModel):
     kis_app_key: str
     kis_app_secret: str
     is_mock: bool = True
+
+
+class TossCredentialVerifyRequest(BaseModel):
+    toss_client_id: str
+    toss_client_secret: str
 
 
 class BatchSetTargetPortfolioRequest(BaseModel):

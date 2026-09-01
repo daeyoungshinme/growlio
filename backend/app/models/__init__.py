@@ -17,7 +17,7 @@ from app.models.asset import (
 from app.models.backtest import BacktestPortfolio
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
-from app.models.token import KisToken, KiwoomToken
+from app.models.token import KisToken, KiwoomToken, TossToken
 from app.models.user import User, UserSettings
 
 __all__ = [
@@ -33,6 +33,7 @@ __all__ = [
     "RebalancingExecutionResult",
     "KisToken",
     "KiwoomToken",
+    "TossToken",
     "BacktestPortfolio",
     "Portfolio",
     "PortfolioItem",

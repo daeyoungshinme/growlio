@@ -67,6 +67,12 @@ class AssetAccount(Base):
     kiwoom_app_key: Mapped[str | None] = mapped_column(String(512))
     kiwoom_app_secret: Mapped[str | None] = mapped_column(String(512))
 
+    # 토스증권 계좌 (STOCK_TOSS) — data_source=TOSS_API
+    toss_account_no: Mapped[str | None] = mapped_column(String(20))
+    # 계좌별 토스 Open API 자격증명 (AES-256 암호화) — 전역 폴백 없음, 항상 필수. 토스에는 모의투자 없음
+    toss_client_id: Mapped[str | None] = mapped_column(String(512))
+    toss_client_secret: Mapped[str | None] = mapped_column(String(512))
+
     # 수동 입력 금액 / 종목 목록
     manual_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     manual_currency: Mapped[str] = mapped_column(String(3), default="KRW")

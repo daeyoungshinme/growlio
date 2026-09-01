@@ -99,6 +99,9 @@ class TestCrossUserAccess:
             kis_app_secret=None,
             kiwoom_app_key=None,
             kiwoom_app_secret=None,
+            toss_account_no=None,
+            toss_client_id=None,
+            toss_client_secret=None,
         )
 
         db = AsyncMock(spec=AsyncSession)

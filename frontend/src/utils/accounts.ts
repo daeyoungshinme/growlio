@@ -5,7 +5,7 @@ export function isPortfolioAccount(assetType: string): boolean {
   return assetType.startsWith("STOCK") || assetType === "CASH_OTHER";
 }
 
-/** KIS/키움/기타 증권계좌 유형인지 판별 */
+/** KIS/키움/토스/기타 증권계좌 유형인지 판별 */
 export function isStockAccount(assetType: string): boolean {
   return STOCK_TYPES.includes(assetType);
 }
@@ -15,7 +15,7 @@ export function isBankAccount(assetType: string): boolean {
   return BANK_TYPES.includes(assetType);
 }
 
-/** KIS/키움 API 연동 계좌라 브로커 동기화가 가능한지 판별 (account.data_source 전달) */
+/** KIS/키움/토스 API 연동 계좌라 브로커 동기화가 가능한지 판별 (account.data_source 전달) */
 export function isSyncableAccount(dataSource: string): boolean {
   return SYNCABLE_DATA_SOURCES.includes(dataSource);
 }

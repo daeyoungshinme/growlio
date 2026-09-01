@@ -17,6 +17,7 @@ export interface AssetAccount {
   institution: string | null;
   kis_account_no: string | null;
   kiwoom_account_no: string | null;
+  toss_account_no?: string | null;
   is_mock_mode: boolean;
   manual_amount: number | null;
   manual_currency: string;
@@ -31,6 +32,7 @@ export interface AssetAccount {
   created_at: string;
   has_own_kis_credentials: boolean;
   has_own_kiwoom_credentials: boolean;
+  has_own_toss_credentials?: boolean;
   target_portfolio_id?: string | null;
   tax_type?: AccountTaxType;
   investment_horizon?: InvestmentHorizon | null;
@@ -81,6 +83,9 @@ export interface AssetAccountCreate {
   kiwoom_account_no?: string;
   kiwoom_app_key?: string;
   kiwoom_app_secret?: string;
+  toss_account_no?: string;
+  toss_client_id?: string;
+  toss_client_secret?: string;
   ob_fintech_use_no?: string;
   is_mock_mode?: boolean;
   manual_amount?: number;
@@ -146,6 +151,11 @@ export const verifyKisCredentials = (data: {
   kis_app_secret: string;
   is_mock: boolean;
 }) => apiPost<{ valid: boolean; message: string }>("/assets/verify-kis-credentials", data);
+
+export const verifyTossCredentials = (data: {
+  toss_client_id: string;
+  toss_client_secret: string;
+}) => apiPost<{ valid: boolean; message: string }>("/assets/verify-toss-credentials", data);
 
 export interface StockSuggestion {
   ticker: string;

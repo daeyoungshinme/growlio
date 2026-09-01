@@ -11,6 +11,7 @@ from app.models.asset import AssetAccount
 from app.providers.base import BrokerProvider
 from app.providers.kis_provider import KISProvider
 from app.providers.kiwoom_provider import KiwoomProvider
+from app.providers.toss_provider import TossProvider
 from app.schemas.rebalancing import KisBalancePosition, KisBalanceResponse
 from app.services.credential_service import decrypt_kis_credentials
 
@@ -33,12 +34,17 @@ async def fetch_broker_balance(
         provider: BrokerProvider = KISProvider()
     elif account.asset_type == "STOCK_KIWOOM":
         provider = KiwoomProvider()
+    elif account.asset_type == "STOCK_TOSS":
+        provider = TossProvider()
     else:
         raise ValueError(f"지원하지 않는 계좌 유형: {account.asset_type}")
 
     result = await provider.sync(account, db, cache)
 
     orderable_krw: float | None = None
+    if account.asset_type == "STOCK_TOSS":
+        # 토스는 sync 시 deposit_krw에 cashBuyingPower(주문가능 현금)를 그대로 담는다.
+        orderable_krw = result.deposit_krw
     if account.asset_type == "STOCK_KIS" and account.kis_app_key and account.kis_app_secret and account.kis_account_no:
         try:
             creds = decrypt_kis_credentials(account)

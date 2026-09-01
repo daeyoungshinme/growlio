@@ -21,14 +21,19 @@ from app.schemas.asset import (
     IsaPnlOverrideUpdate,
     KisCredentialVerifyRequest,
     SetTargetPortfolioRequest,
+    TossCredentialVerifyRequest,
 )
 from app.services._account_queries import portfolio_accounts_stmt
 from app.services.asset_credential_service import (
     delete_kis_credentials,
     delete_kiwoom_credentials,
+    delete_toss_credentials,
 )
 from app.services.asset_credential_service import (
     verify_kis_credentials as _verify_kis_credentials_service,
+)
+from app.services.asset_credential_service import (
+    verify_toss_credentials as _verify_toss_credentials_service,
 )
 from app.services.asset_service import (
     list_accounts as _list_accounts,
@@ -54,7 +59,14 @@ from app.utils.currency import fetch_usd_krw
 from app.utils.inproc_lock import inproc_lock
 from app.utils.pnl import calc_net_asset_amount
 
-_CREDENTIAL_FIELDS: set[str] = {"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"}
+_CREDENTIAL_FIELDS: set[str] = {
+    "kis_app_key",
+    "kis_app_secret",
+    "kiwoom_app_key",
+    "kiwoom_app_secret",
+    "toss_client_id",
+    "toss_client_secret",
+}
 # 시장가 변동이 없는 순수 현금성 계좌 — 잔액 변경은 전액 입출금으로 간주
 _CASH_ASSET_TYPES: set[str] = {"BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER"}
 
@@ -64,6 +76,7 @@ def _account_response(account: AssetAccount) -> AssetAccountResponse:
     data = AssetAccountResponse.model_validate(account)
     data.has_own_kis_credentials = bool(account.kis_app_key)
     data.has_own_kiwoom_credentials = bool(account.kiwoom_app_key)
+    data.has_own_toss_credentials = bool(account.toss_client_id)
     return data
 
 
@@ -124,6 +137,46 @@ async def verify_kis_credentials(
     return {"valid": True, "message": "KIS 자격증명이 확인되었습니다."}
 
 
+@router.post("/verify-toss-credentials")
+@limiter.limit("10/minute")
+async def verify_toss_credentials(
+    request: Request,
+    req: TossCredentialVerifyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """토스 자격증명 유효성 확인 (계좌 생성 없이)."""
+    from app.toss.client import TossApiError
+
+    try:
+        await _verify_toss_credentials_service(req.toss_client_id, req.toss_client_secret)
+    except TossApiError as e:
+        if e.status_code == 403 or e.code in ("edge-blocked", "forbidden"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="토스 API 접근이 거부되었습니다. 토스 'Open API → IP 관리'에 서버 IP를 등록했는지 확인하세요.",
+            ) from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"토스 자격증명이 잘못되었습니다: {e.message}",
+        ) from e
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in (400, 401, 403):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="토스 자격증명이 잘못되었습니다. Client ID/Secret을 확인하세요.",
+            ) from e
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="토스 서버 오류. 잠시 후 다시 시도하세요.",
+        ) from e
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="토스 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.",
+        ) from e
+    return {"valid": True, "message": "토스 자격증명이 확인되었습니다."}
+
+
 @router.post("", response_model=AssetAccountResponse, status_code=status.HTTP_201_CREATED)
 async def create_account(
     req: AssetAccountCreate,
@@ -150,6 +203,17 @@ async def create_account(
         req_data["kiwoom_app_key"] = encrypt(req.kiwoom_app_key)
         req_data["kiwoom_app_secret"] = encrypt(req.kiwoom_app_secret)
         req_data["asset_type"] = "STOCK_KIWOOM"
+        account = AssetAccount(user_id=current_user.id, **req_data)
+    elif req.data_source == "TOSS_API":
+        if not req.toss_account_no or not req.toss_client_id or not req.toss_client_secret:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="토스 계좌번호와 API 자격증명(Client ID, Client Secret)을 모두 입력하세요.",
+            )
+        req_data = req.model_dump(exclude=_CREDENTIAL_FIELDS)
+        req_data["toss_client_id"] = encrypt(req.toss_client_id)
+        req_data["toss_client_secret"] = encrypt(req.toss_client_secret)
+        req_data["asset_type"] = "STOCK_TOSS"
         account = AssetAccount(user_id=current_user.id, **req_data)
     else:
         account = AssetAccount(user_id=current_user.id, **req.model_dump(exclude=_CREDENTIAL_FIELDS))
@@ -213,6 +277,10 @@ async def update_account(
     if req.kiwoom_app_key is not None:
         account.kiwoom_app_key = encrypt_if_present(req.kiwoom_app_key)
         account.kiwoom_app_secret = encrypt_if_present(req.kiwoom_app_secret)
+
+    if req.toss_client_id is not None:
+        account.toss_client_id = encrypt_if_present(req.toss_client_id)
+        account.toss_client_secret = encrypt_if_present(req.toss_client_secret)
 
     if (
         req.manual_amount is not None
@@ -305,6 +373,18 @@ async def delete_account_kiwoom_credentials(
     account = await _get_owned_account(account_id, current_user.id, db)
     cache = await get_cache_store()
     await delete_kiwoom_credentials(account, db, cache)
+
+
+@router.delete("/{account_id}/toss-credentials", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account_toss_credentials(
+    account_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """계좌별 토스 Open API 자격증명을 삭제한다."""
+    account = await _get_owned_account(account_id, current_user.id, db)
+    cache = await get_cache_store()
+    await delete_toss_credentials(account, db, cache)
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)

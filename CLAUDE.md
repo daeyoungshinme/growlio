@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Growlio** — 한국투자증권(KIS)/키움증권(Kiwoom) API를 연동하는 자산관리 웹앱. React SPA + FastAPI 백엔드 구조.
+**Growlio** — 한국투자증권(KIS)/키움증권(Kiwoom)/토스증권(Toss) API를 연동하는 자산관리 웹앱. React SPA + FastAPI 백엔드 구조.
 
 ## Prerequisites
 

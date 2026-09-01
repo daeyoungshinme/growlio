@@ -7,7 +7,7 @@ services:
     plan: free
     region: singapore
     healthCheckPath: /health
-    preDeployCommand: alembic upgrade head
+    preDeployCommand: python scripts/bootstrap_alembic.py && alembic upgrade head
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000
     envVars:
       - key: APP_ENV

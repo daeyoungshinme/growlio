@@ -78,7 +78,7 @@ make build-android-release         # APK Release 빌드
 - `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
 - `/assets` — **자산 관리 허브** 단일 라우트. `AssetsPage`가 내부적으로 "투자현황"(조회 전용 PortfolioContent)/"계좌관리"(CRUD AssetManagementContent) 2개 탭으로 분기 (`ASSETS_TOP_TABS`, `?tab=` 쿼리 파라미터)
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
-- `/settings` — DART API 키, 계정 정보(비밀번호 변경), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). KIS/키움 계좌 연동(`/assets`)·투자/입금/배당 목표·DCA(`/invest-plan`)·목표 역산 추천 옵션(`/rebalancing`)·알림 설정(`/settings/notifications`)은 실제 편집 UI가 각 페이지에 있고, 설정 탭에는 상태 요약 + 딥링크만 표시됨
+- `/settings` — DART API 키, 계정 정보(비밀번호 변경), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). KIS/키움/토스 계좌 연동(`/assets`)·투자/입금/배당 목표·DCA(`/invest-plan`)·목표 역산 추천 옵션(`/rebalancing`)·알림 설정(`/settings/notifications`)은 실제 편집 UI가 각 페이지에 있고, 설정 탭에는 상태 요약 + 딥링크만 표시됨
 - `/settings/notifications` — 알림 설정 상세(`NotificationSettingsPage`, `/settings`에서 딥링크). 공통 수신 이메일(`NotificationEmailSection`) + 카테고리별 `CollapsibleCard` 3개("정기 리포트·요약"/"즉시 알림"/"시장 모니터링") + 환율/주가/발송이력 탭. `SettingsPage.tsx`(2026-07-26 이전)의 3중 중첩(`SectionCard`›`CollapsibleCard`×3›내부 pill탭)을 완화하기 위해 별도 라우트로 분리됨 — `MarketSignalBanner.tsx`/`RebalancingHistoryTab.tsx`의 `?atab=` 딥링크도 이 경로를 가리킴
 - `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
 - 미매칭 경로(`*`)는 `/dashboard`로 리다이렉트

@@ -72,3 +72,28 @@ class KiwoomToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (Index("uq_kiwoom_token_account", "account_id", unique=True),)
+
+
+class TossToken(Base):
+    """토스증권 Open API OAuth2 액세스 토큰 (DB 영속화 — 캐시 미스 시 fallback)
+
+    토스는 전역 자격증명 없음(사용자가 계좌 단위로 client_id/secret 발급) — account_id는
+    항상 NOT NULL. 토스에는 모의투자가 없어 is_mock_mode 컬럼도 없다.
+    unique 제약: uq_toss_token_account (account_id)
+    """
+
+    __tablename__ = "toss_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    access_token: Mapped[str] = mapped_column(Text, nullable=False)
+    token_type: Mapped[str] = mapped_column(String(50), default="Bearer", nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("uq_toss_token_account", "account_id", unique=True),)
