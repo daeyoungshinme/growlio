@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     kiwoom_semaphore_limit: int = 5
     kiwoom_default_retries: int = 3
     kiwoom_rate_per_second: float = 4.0  # 관측된 유량=5/s(ust21070) 대비 20% 버퍼
+    toss_semaphore_limit: int = 5
+    toss_default_retries: int = 3
+    toss_rate_per_second: float = 1.0  # 토스 ACCOUNT group 1req/s 제한에 맞춤(가장 엄격한 그룹 기준)
 
     # Circuit breaker 공통 임계값
     cb_default_fail_max: int = 5  # 실패 횟수 임계값 (기본)

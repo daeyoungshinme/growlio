@@ -13,6 +13,11 @@ config = context.config
 _migration_url = (settings.migration_database_url or settings.database_url).replace("%", "%%")
 config.set_main_option("sqlalchemy.url", _migration_url)
 
+# growlio 전용 alembic 버전 테이블 — 같은 Supabase DB의 public 스키마를 nestlio와 공유하므로
+# 기본 `alembic_version` 을 쓰면 두 앱의 마이그레이션 이력이 서로 포인터를 덮어쓴다.
+# 신규 DB 부트스트랩은 scripts/bootstrap_alembic.py 참고.
+VERSION_TABLE = "growlio_alembic_version"
+
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
@@ -21,13 +26,22 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        version_table=VERSION_TABLE,
+    )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        version_table=VERSION_TABLE,
+    )
     with context.begin_transaction():
         context.run_migrations()
 

@@ -138,6 +138,7 @@ def _make(name: str, fail_max: int, reset_timeout: float) -> CircuitBreaker:
 
 kis_circuit = _make("KIS", _cfg().cb_default_fail_max, _cfg().cb_default_reset_timeout)
 kiwoom_circuit = _make("Kiwoom", _cfg().cb_default_fail_max, _cfg().cb_default_reset_timeout)
+toss_circuit = _make("Toss", _cfg().cb_default_fail_max, _cfg().cb_default_reset_timeout)
 yahoo_circuit = _make("YahooFinance", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)
 dart_circuit = _make("DART", _cfg().cb_default_fail_max, _cfg().cb_ext_reset_timeout)
 naver_circuit = _make("NaverFinance", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)

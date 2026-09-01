@@ -23,6 +23,7 @@ from app.providers.base import BalanceResult, BrokerProvider
 from app.providers.kis_provider import KISProvider
 from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.manual_provider import ManualProvider
+from app.providers.toss_provider import TossProvider
 from app.services._account_queries import active_accounts_stmt
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import (
@@ -30,7 +31,7 @@ from app.utils.cache_keys import (
     invalidate_account_caches,
     invalidate_asset_account_caches,
 )
-from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit
+from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit, toss_circuit
 from app.utils.metrics import broker_sync_duration
 
 logger = structlog.get_logger()
@@ -38,12 +39,14 @@ logger = structlog.get_logger()
 _PROVIDERS: dict[str, BrokerProvider] = {
     "KIS_API": KISProvider(),
     "KIWOOM_API": KiwoomProvider(),
+    "TOSS_API": TossProvider(),
     "MANUAL": ManualProvider(),
 }
 
 _CIRCUITS: dict[str, CircuitBreaker] = {
     "KIS_API": kis_circuit,
     "KIWOOM_API": kiwoom_circuit,
+    "TOSS_API": toss_circuit,
 }
 
 

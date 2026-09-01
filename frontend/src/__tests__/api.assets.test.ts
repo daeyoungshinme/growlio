@@ -33,6 +33,7 @@ import {
   setAccountTargetPortfolio,
   batchSetTargetPortfolio,
   verifyKisCredentials,
+  verifyTossCredentials,
   searchStocks,
   fetchExchangeRate,
   fetchStockPrice,
@@ -123,6 +124,20 @@ describe("api/assets", () => {
       kis_app_key: "key",
       kis_app_secret: "secret",
       is_mock: false,
+    });
+    expect(result).toEqual(mockResponse);
+  });
+
+  it("verifyTossCredentials calls POST /assets/verify-toss-credentials", async () => {
+    const mockResponse = { valid: true, message: "OK" };
+    vi.mocked(api.post).mockResolvedValue({ data: mockResponse });
+    const result = await verifyTossCredentials({
+      toss_client_id: "cid",
+      toss_client_secret: "csecret",
+    });
+    expect(api.post).toHaveBeenCalledWith("/assets/verify-toss-credentials", {
+      toss_client_id: "cid",
+      toss_client_secret: "csecret",
     });
     expect(result).toEqual(mockResponse);
   });

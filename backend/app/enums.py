@@ -8,6 +8,7 @@ class AssetType(StrEnum):
     DEPOSIT = "DEPOSIT"
     STOCK_KIS = "STOCK_KIS"
     STOCK_KIWOOM = "STOCK_KIWOOM"
+    STOCK_TOSS = "STOCK_TOSS"
     STOCK_OTHER = "STOCK_OTHER"
     CASH_OTHER = "CASH_OTHER"
     CASH_STOCK = "CASH_STOCK"
@@ -19,6 +20,7 @@ class DataSource(StrEnum):
     MANUAL = "MANUAL"
     KIS_API = "KIS_API"
     KIWOOM_API = "KIWOOM_API"
+    TOSS_API = "TOSS_API"
 
 
 class TransactionType(StrEnum):

@@ -4,8 +4,7 @@ import { Loader2, RefreshCw, Check, AlertCircle } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
 import { syncAccount } from "@/api/assets";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
-
-const SYNCABLE_SOURCES = ["KIS_API", "KIWOOM_API"];
+import { isSyncableAccount } from "@/utils/accounts";
 
 const SOURCE_LABEL: Record<string, string> = {
   KIS_API: "KIS",
@@ -21,7 +20,7 @@ interface Props {
 
 export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) {
   const queryClient = useQueryClient();
-  const syncableAccounts = accounts.filter((a) => SYNCABLE_SOURCES.includes(a.data_source));
+  const syncableAccounts = accounts.filter((a) => isSyncableAccount(a.data_source));
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(syncableAccounts.map((a) => a.id)),

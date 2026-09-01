@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { isPortfolioAccount, isStockAccount, isBankAccount } from "@/utils/accounts";
+import {
+  isPortfolioAccount,
+  isStockAccount,
+  isBankAccount,
+  isSyncableAccount,
+} from "@/utils/accounts";
 
 describe("isPortfolioAccount", () => {
   it("STOCK으로 시작하는 유형은 true다", () => {
@@ -49,5 +54,17 @@ describe("isBankAccount", () => {
     expect(isBankAccount("STOCK_KIS")).toBe(false);
     expect(isBankAccount("OTHER")).toBe(false);
     expect(isBankAccount("")).toBe(false);
+  });
+});
+
+describe("isSyncableAccount", () => {
+  it("KIS/키움 API 연동 계좌는 true다", () => {
+    expect(isSyncableAccount("KIS_API")).toBe(true);
+    expect(isSyncableAccount("KIWOOM_API")).toBe(true);
+  });
+
+  it("수동/기타 data_source는 false다", () => {
+    expect(isSyncableAccount("MANUAL")).toBe(false);
+    expect(isSyncableAccount("")).toBe(false);
   });
 });

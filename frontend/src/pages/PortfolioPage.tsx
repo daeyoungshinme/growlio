@@ -1,9 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, lazy, Suspense } from "react";
+import { useCallback, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
-import { fetchAccounts, syncAllAccounts } from "@/api/assets";
+import { fetchAccounts, syncAccount, syncAllAccounts } from "@/api/assets";
 import { useSyncStore } from "@/stores/syncStore";
 import { useDividendData } from "@/hooks/useDividendData";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
@@ -27,7 +27,7 @@ import { PORTFOLIO_TABS } from "@/constants/tabs";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { SELECT_SM } from "@/constants/inputStyles";
 import type { PortfolioOverview } from "@/types";
-import { isPortfolioAccount, isStockAccount } from "@/utils/accounts";
+import { isPortfolioAccount, isStockAccount, isSyncableAccount } from "@/utils/accounts";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 const TaxTabContainer = lazy(() => import("../components/portfolio-analysis/TaxTabContainer"));
@@ -36,6 +36,7 @@ const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
 
 const CHARTS_OPEN_KEY = "portfolio:chartsOpen";
+const SYNC_BUTTON_CLASS = `${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors`;
 const fetchOverview = (accountId?: string | null) =>
   api
     .get<PortfolioOverview>("/portfolio/overview", {
@@ -90,6 +91,7 @@ export default function PortfolioPage() {
   const syncDone = useSyncStore((s) => s.done);
   const syncTotal = useSyncStore((s) => s.total);
   const startSyncAll = useSyncStore((s) => s.startSyncAll);
+  const [isSyncingSelected, setIsSyncingSelected] = useState(false);
   const [chartsOpen, handleChartsToggle] = useCollapsible(true, CHARTS_OPEN_KEY);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
@@ -104,6 +106,11 @@ export default function PortfolioPage() {
     () => (accountsList ?? []).filter((a) => isStockAccount(a.asset_type)),
     [accountsList],
   );
+  const selectedAccount = useMemo(
+    () => accountOptions.find((a) => a.id === selectedAccountId) ?? null,
+    [accountOptions, selectedAccountId],
+  );
+  const canSyncSelected = !!selectedAccount && isSyncableAccount(selectedAccount.data_source);
 
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview(selectedAccountId),
@@ -126,6 +133,20 @@ export default function PortfolioPage() {
       startSyncAll(total);
     } catch (e) {
       toast(extractErrorMessage(e, "전체 동기화를 시작하지 못했습니다"), "error");
+    }
+  };
+
+  const handleSyncSelected = async () => {
+    if (!selectedAccount) return;
+    setIsSyncingSelected(true);
+    try {
+      await syncAccount(selectedAccount.id);
+      await invalidateSyncData(qc);
+      toast("동기화 완료", "success");
+    } catch (e) {
+      toast(extractErrorMessage(e, "계좌 동기화에 실패했습니다"), "error");
+    } finally {
+      setIsSyncingSelected(false);
     }
   };
 
@@ -219,14 +240,22 @@ export default function PortfolioPage() {
                 ))}
               </select>
             )}
-            <button
-              onClick={handleSyncAll}
-              disabled={isSyncingAll}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors`}
-            >
-              <RefreshCw size={14} className={isSyncingAll ? "animate-spin" : ""} />
-              {isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신"}
-            </button>
+            {selectedAccount ? (
+              <button
+                onClick={handleSyncSelected}
+                disabled={isSyncingSelected || !canSyncSelected}
+                title={canSyncSelected ? undefined : "수동 계좌는 갱신할 수 없습니다"}
+                className={SYNC_BUTTON_CLASS}
+              >
+                <RefreshCw size={14} className={isSyncingSelected ? "animate-spin" : ""} />
+                {isSyncingSelected ? "갱신 중..." : "선택 계좌 갱신"}
+              </button>
+            ) : (
+              <button onClick={handleSyncAll} disabled={isSyncingAll} className={SYNC_BUTTON_CLASS}>
+                <RefreshCw size={14} className={isSyncingAll ? "animate-spin" : ""} />
+                {isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신"}
+              </button>
+            )}
           </div>
         </div>
         <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600 dark:text-blue-400">

@@ -3,6 +3,7 @@ export const ASSET_TYPE_LABELS: Record<string, string> = {
   DEPOSIT: "예금/적금",
   STOCK_KIS: "주식 (KIS)",
   STOCK_KIWOOM: "주식 (키움)",
+  STOCK_TOSS: "주식 (토스)",
   STOCK_OTHER: "주식 (타증권사)",
   CASH_OTHER: "예수금 (기타)",
   CASH_STOCK: "예수금 (증권계좌)",
@@ -13,6 +14,7 @@ export const ASSET_TYPE_LABELS: Record<string, string> = {
 export const STOCK_TYPE_LABELS: Record<string, string> = {
   STOCK_KIS: "KIS",
   STOCK_KIWOOM: "키움",
+  STOCK_TOSS: "토스",
   STOCK_OTHER: "타증권사",
   CASH_OTHER: "예수금",
 };
@@ -23,8 +25,10 @@ export const BANK_TYPE_LABELS: Record<string, string> = {
   CASH_OTHER: "현금/기타",
 };
 
-export const STOCK_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"];
+export const STOCK_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS", "STOCK_OTHER"];
 export const BANK_TYPES: string[] = ["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"];
+/** 브로커 API 연동으로 데이터 동기화가 가능한 data_source 값 */
+export const SYNCABLE_DATA_SOURCES: string[] = ["KIS_API", "KIWOOM_API", "TOSS_API"];
 export const REAL_ESTATE_TYPES: string[] = ["REAL_ESTATE"];
 
 export { DOMESTIC_MARKETS } from "./markets";

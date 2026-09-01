@@ -71,12 +71,17 @@ class AsyncRateLimiter:
 
 
 def _is_rate_limit_body(response: httpx.Response) -> bool:
-    """KIS EGW00201 또는 키움 return_code=5 (둘 다 초당 거래건수 초과) 응답 감지."""
+    """KIS EGW00201 / 키움 return_code=5 / 토스 error.code=rate-limit-* (전부 초당 호출 초과) 응답 감지."""
     try:
         data = response.json()
     except Exception:
         return False
-    return data.get("msg_cd") == "EGW00201" or str(data.get("return_code")) == "5"
+    err = data.get("error")
+    return (
+        data.get("msg_cd") == "EGW00201"
+        or str(data.get("return_code")) == "5"
+        or (isinstance(err, dict) and err.get("code") in {"rate-limit-exceeded", "edge-rate-limit-exceeded"})
+    )
 
 
 async def broker_request(
