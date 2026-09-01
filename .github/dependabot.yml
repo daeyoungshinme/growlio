@@ -8,6 +8,37 @@ updates:
     labels:
       - "dependencies"
       - "backend"
+    groups:
+      # minor/patch는 한 PR로 묶는다. major는 개별 PR로 남겨 건별 검토
+      # (structlog 25→26, pytest 등 상한 없는 major 포함).
+      backend-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # pyproject.toml이 일부러 건 상한과 일치 — 상한을 넘는 업데이트는 알림도 만들지 않는다
+      # (버전 올릴 땐 pyproject.toml 상한을 먼저 넓히면 Dependabot이 다시 알림).
+      # yfinance: 비공식 스크래핑 기반이라 minor도 breaking 잦음 → 0.2.x 패치만
+      - dependency-name: "yfinance"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      # ruff: 0.x 릴리스라 minor(0.15→0.16)가 사실상 breaking(새 lint 룰) → 0.15.x 패치만
+      - dependency-name: "ruff"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "tenacity"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "cryptography"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "firebase-admin"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "npm"
     directory: "/frontend"
@@ -18,10 +49,20 @@ updates:
       - "dependencies"
       - "frontend"
     groups:
+      # react-types가 먼저 매칭되도록 frontend-dependencies보다 위에 둔다.
       react-types:
         patterns:
           - "@types/react"
           - "@types/react-dom"
+      # minor/patch는 한 PR로 묶는다. major(react 19, recharts 3, tailwind 4, zustand 5,
+      # vite, lucide-react, @sentry/react)는 개별 PR 유지 — docs/plans/20 #5 로드맵이
+      # "하나씩 별도 PR로 검증"을 원함. @capacitor/* minor는 이 그룹으로 묶여 함께 올라감.
+      frontend-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       - dependency-name: "@types/react"
         versions: ["19.x"]
@@ -36,3 +77,12 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+    groups:
+      # minor/patch는 한 PR로. major(checkout v7, setup-python v7, setup-uv v9, cache v6)는
+      # 개별 PR로 남겨 SHA 재핀 + 러너 호환(node24)을 건별로 확인.
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
