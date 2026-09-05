@@ -15,7 +15,7 @@ Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.11+, Node 22+, [uv
 
 > Android 빌드 시 추가 필요: JDK 17+, Android Studio (SDK 포함).
 
-> **pre-commit hooks** 설정됨 — commit 시 ruff, mypy, eslint, trailing-whitespace 자동 실행. 실패 시 commit 블록.
+> **pre-commit hooks**: `make install-backend`가 `pre-commit install`까지 실행함. commit 시 ruff/ruff-format(backend), mypy(backend, venv 있을 때), eslint/prettier(frontend, node_modules 있을 때), trailing-whitespace·end-of-file·merge-conflict·yaml/json 검사. 실패 시 commit 블록. 설정: `.pre-commit-config.yaml`.
 
 ## First-time Setup (순서 중요)
 
@@ -24,7 +24,7 @@ Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.11+, Node 22+, [uv
 docker compose up -d db
 
 # 2. 의존성 설치
-make install-backend   # backend uv venv + pip install (최초 1회)
+make install-backend   # backend uv venv + pip install + pre-commit install (최초 1회)
 make install-frontend  # npm install
 
 # 3. 환경 변수 설정
@@ -55,7 +55,8 @@ make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh) 
 make dev-keep-port    # 위와 동일하되, 8000 포트가 이미 사용 중이면 강제 종료 대신 다음 빈 포트로 백엔드 구동
 make dev-backend      # 백엔드만 (localhost:8000)
 make dev-frontend     # 프론트엔드만 (localhost:5173)
-make test-backend     # cd backend && pytest
+make test-backend     # cd backend && pytest (커버리지 없이 빠르게)
+make test-backend-cov # cd backend && pytest --cov=app --cov-fail-under=80 (로컬 커버리지 체크)
 make test-frontend    # cd frontend && npm run test
 make lint             # ruff (backend) + eslint (frontend)
 make typecheck        # mypy (backend) + tsc --noEmit (frontend)

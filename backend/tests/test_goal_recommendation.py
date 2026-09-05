@@ -15,7 +15,12 @@ from app.services.goal_age_recommendation_service import (
     age_group_from_birth_year,
     get_age_based_recommendation,
 )
-from app.services.goal_candidate_service import _seed_candidate_tickers, detect_duplicate_tracking_index_note
+from app.services.goal_candidate_service import (
+    _seed_candidate_tickers,
+    detect_duplicate_tracking_index_note,
+    existing_items_from_positions,
+)
+from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal_portfolio_optimizer import compute_weighted_expected_metrics
 from app.services.goal_recommendation_service import (
     _apply_index_region_preference,
@@ -27,9 +32,7 @@ from app.services.goal_recommendation_service import (
     _suggest_for_dividend_goal,
     compute_portfolio_expected_metrics,
     compute_recommendation_drift,
-    existing_items_from_positions,
     get_goal_recommendation,
-    get_horizon_recommendations,
 )
 from app.services.goal_return_solver import (
     months_until_year_end,
@@ -68,9 +71,10 @@ def _mock_dividend_yields():
     배당 목표(A1)를 검증하는 `TestGetGoalRecommendation`의 일부 테스트와 기간별 배당 반영(Part 3)을
     검증하는 테스트는 이 fixture 범위 안에서 `patch(...)`로 개별 재정의한다.
 
-    `goal_age_recommendation_service.py`(연령대별 추천, 2026-08-13 분리)가 이 심볼을
+    `goal_age_recommendation_service.py`(연령대별, 2026-08-13 분리)와
+    `goal_horizon_recommendation_service.py`(투자기간별, 2026-09-01 분리)가 이 심볼을
     `goal_recommendation_service`에서 import해 자기 모듈 네임스페이스에 별도로 바인딩하므로,
-    호출 시점 룩업 대상인 두 경로 모두 patch해야 한다 — 하나만 patch하면 나머지 경로가 실제
+    호출 시점 룩업 대상인 세 경로 모두 patch해야 한다 — 하나만 patch하면 나머지 경로가 실제
     Naver/Yahoo API를 호출한다.
     """
     with (
@@ -80,6 +84,10 @@ def _mock_dividend_yields():
         ),
         patch(
             "app.services.goal_age_recommendation_service._fetch_dividend_yields",
+            AsyncMock(return_value={}),
+        ),
+        patch(
+            "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
             AsyncMock(return_value={}),
         ),
     ):
@@ -2094,7 +2102,7 @@ class TestGetHorizonRecommendations:
         mock_db.execute = AsyncMock(return_value=_execute_result([]))
 
         with patch(
-            "app.services.goal_recommendation_service.query_latest_position_map",
+            "app.services.goal_horizon_recommendation_service.query_latest_position_map",
             AsyncMock(return_value={}),
         ):
             result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
@@ -2130,23 +2138,23 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                "app.services.goal_horizon_recommendation_service.prefetch_accounts_snapshot_positions",
                 AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
             ),
             patch(
-                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                "app.services.goal_horizon_recommendation_service.compute_total_assets_krw",
                 return_value=5_000_000.0,
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2200,23 +2208,23 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                "app.services.goal_horizon_recommendation_service.prefetch_accounts_snapshot_positions",
                 AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
             ),
             patch(
-                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                "app.services.goal_horizon_recommendation_service.compute_total_assets_krw",
                 return_value=5_000_000.0,
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2258,19 +2266,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 fetch_returns_mock,
             ),
         ):
@@ -2326,31 +2334,35 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                "app.services.goal_horizon_recommendation_service.prefetch_accounts_snapshot_positions",
                 AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
             ),
             patch(
-                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                "app.services.goal_horizon_recommendation_service.compute_total_assets_krw",
                 return_value=5_000_000.0,
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value=dividend_map),
             ),
             patch(
                 "app.services.goal_recommendation_service._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2412,31 +2424,35 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                "app.services.goal_horizon_recommendation_service.prefetch_accounts_snapshot_positions",
                 AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
             ),
             patch(
-                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                "app.services.goal_horizon_recommendation_service.compute_total_assets_krw",
                 return_value=5_000_000.0,
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value=dividend_map),
             ),
             patch(
                 "app.services.goal_recommendation_service._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2523,31 +2539,35 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                "app.services.goal_horizon_recommendation_service.prefetch_accounts_snapshot_positions",
                 AsyncMock(return_value=({general_account_id: object(), overseas_account_id: object()}, {}, {}, {})),
             ),
             patch(
-                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                "app.services.goal_horizon_recommendation_service.compute_total_assets_krw",
                 return_value=5_000_000.0,
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
+                AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
                 "app.services.goal_recommendation_service._fetch_dividend_yields",
                 AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2616,31 +2636,35 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                "app.services.goal_horizon_recommendation_service.prefetch_accounts_snapshot_positions",
                 AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
             ),
             patch(
-                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                "app.services.goal_horizon_recommendation_service.compute_total_assets_krw",
                 return_value=5_000_000.0,
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
+                AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
                 "app.services.goal_recommendation_service._fetch_dividend_yields",
                 AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2671,11 +2695,11 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 1_000_000.0}),
             ),
         ):
@@ -2704,11 +2728,11 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 1_000_000.0}),
             ),
         ):
@@ -2747,19 +2771,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2798,19 +2822,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2848,19 +2872,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2893,19 +2917,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -2950,19 +2974,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 3_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3022,19 +3046,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 2_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3087,19 +3111,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3137,19 +3161,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3200,19 +3224,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3263,19 +3287,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 2_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3320,19 +3344,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 2_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3376,19 +3400,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 2_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
             patch(
@@ -3431,19 +3455,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 2_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3509,23 +3533,23 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                "app.services.goal_horizon_recommendation_service.prefetch_accounts_snapshot_positions",
                 AsyncMock(return_value=(accounts_by_id, {}, {}, {})),
             ),
             patch(
-                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                "app.services.goal_horizon_recommendation_service.compute_total_assets_krw",
                 compute_total_assets_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3558,19 +3582,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 15.0}}),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value={},  # Yahoo 서킷브레이커 오픈 상황 시뮬레이션 — 일별수익률 조회 실패
             ),
         ):
@@ -3600,19 +3624,19 @@ class TestGetHorizonRecommendations:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 15.0}}),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):

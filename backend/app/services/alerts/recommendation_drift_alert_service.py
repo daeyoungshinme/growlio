@@ -34,11 +34,11 @@ from app.models.user import User, UserSettings
 from app.services._account_queries import active_accounts_stmt
 from app.services._portfolio_queries import get_linked_portfolios
 from app.services.goal_candidate_service import existing_items_from_positions
+from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal_recommendation_service import (
     _RECOMMENDATION_DRIFT_THRESHOLD_PCT,
     compute_recommendation_drift,
     get_goal_recommendation,
-    get_horizon_recommendations,
 )
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map

@@ -30,11 +30,11 @@ from app.services._portfolio_queries import get_active_alert_thresholds, get_lin
 from app.services._settings_queries import get_or_create_settings, get_settings_row
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.goal_age_recommendation_service import get_age_based_recommendation
+from app.services.goal_candidate_service import existing_items_from_positions
+from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal_recommendation_service import (
     compute_portfolio_expected_metrics,
-    existing_items_from_positions,
     get_goal_recommendation,
-    get_horizon_recommendations,
 )
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
