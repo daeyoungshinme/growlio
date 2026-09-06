@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.services._goal_recommendation_common import _fetch_dividend_yields, _suggest_for_dividend_goal
 from app.services.goal_age_recommendation_service import (
     _AGE_GROUP_PROFILE,
     age_group_from_birth_year,
@@ -25,11 +26,9 @@ from app.services.goal_portfolio_optimizer import compute_weighted_expected_metr
 from app.services.goal_recommendation_service import (
     _apply_index_region_preference,
     _compute_overall_class_bounds,
-    _fetch_dividend_yields,
     _matches_index_region_preference,
     _optimize_goal_portfolio,
     _persist_added_candidates,
-    _suggest_for_dividend_goal,
     compute_portfolio_expected_metrics,
     compute_recommendation_drift,
     get_goal_recommendation,
@@ -58,7 +57,7 @@ def _mock_market_signal():
     이 fixture 범위 안에서 `patch(...)`로 개별 재정의한다.
     """
     with patch(
-        "app.services.goal_recommendation_service.get_market_signal",
+        "app.services._goal_recommendation_common.get_market_signal",
         AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
     ):
         yield
@@ -71,25 +70,12 @@ def _mock_dividend_yields():
     배당 목표(A1)를 검증하는 `TestGetGoalRecommendation`의 일부 테스트와 기간별 배당 반영(Part 3)을
     검증하는 테스트는 이 fixture 범위 안에서 `patch(...)`로 개별 재정의한다.
 
-    `goal_age_recommendation_service.py`(연령대별, 2026-08-13 분리)와
-    `goal_horizon_recommendation_service.py`(투자기간별, 2026-09-01 분리)가 이 심볼을
-    `goal_recommendation_service`에서 import해 자기 모듈 네임스페이스에 별도로 바인딩하므로,
-    호출 시점 룩업 대상인 세 경로 모두 patch해야 한다 — 하나만 patch하면 나머지 경로가 실제
-    Naver/Yahoo API를 호출한다.
+    전체/연령대별/투자기간별 세 진입점이 이 헬퍼를 `_goal_recommendation_common`에서 모듈 참조
+    (`_grc._fetch_dividend_yields()`)로 호출하므로 한 경로만 patch하면 세 경로 모두 커버된다.
     """
-    with (
-        patch(
-            "app.services.goal_recommendation_service._fetch_dividend_yields",
-            AsyncMock(return_value={}),
-        ),
-        patch(
-            "app.services.goal_age_recommendation_service._fetch_dividend_yields",
-            AsyncMock(return_value={}),
-        ),
-        patch(
-            "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
-            AsyncMock(return_value={}),
-        ),
+    with patch(
+        "app.services._goal_recommendation_common._fetch_dividend_yields",
+        AsyncMock(return_value={}),
     ):
         yield
 
@@ -1073,7 +1059,7 @@ class TestSuggestForDividendGoal:
         # 이미 달성(expected=1.2 >= required=1.0)했고, 개선 목표(1.2+0.5=1.7%)도 등록 후보만으로
         # 이미 달성 가능한 범위(<=1.92%)라 미등록 후보를 제안할 필요가 없다.
         with patch(
-            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            "app.services._goal_recommendation_common._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
@@ -1090,7 +1076,7 @@ class TestSuggestForDividendGoal:
         candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
 
         with patch(
-            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            "app.services._goal_recommendation_common._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
@@ -1110,7 +1096,7 @@ class TestSuggestForDividendGoal:
         candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
 
         with patch(
-            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            "app.services._goal_recommendation_common._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
@@ -1150,7 +1136,7 @@ class TestSuggestForDividendGoal:
         ]
 
         with patch(
-            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            "app.services._goal_recommendation_common._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
@@ -1167,7 +1153,7 @@ class TestSuggestForDividendGoal:
         candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
 
         with patch(
-            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            "app.services._goal_recommendation_common._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
@@ -1182,7 +1168,7 @@ class TestSuggestForDividendGoal:
         candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
 
         with patch(
-            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            "app.services._goal_recommendation_common._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
@@ -1210,7 +1196,7 @@ class TestSuggestForDividendGoal:
             return {tm: yields[tm] for tm in tickers if tm in yields}
 
         with patch(
-            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            "app.services._goal_recommendation_common._fetch_dividend_yields",
             AsyncMock(side_effect=_dividend_side_effect),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
@@ -1230,7 +1216,7 @@ class TestSuggestForDividendGoal:
         candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
 
         with patch(
-            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            "app.services._goal_recommendation_common._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
@@ -1249,7 +1235,7 @@ class TestFetchDividendYields:
 
     async def test_cache_miss_fetches_and_stores_result(self, mock_cache):
         with patch(
-            "app.services.goal_recommendation_service.sync_yahoo_dividend_info",
+            "app.services._goal_recommendation_common.sync_yahoo_dividend_info",
             return_value={"dividend_yield": 0.032},
         ) as mock_yahoo:
             result = await _fetch_dividend_yields(mock_cache, [("SPY", "NYSE")])
@@ -1265,7 +1251,7 @@ class TestFetchDividendYields:
         mock_cache.get = AsyncMock(return_value=json.dumps({"yield_pct": 3.2}))
 
         with patch(
-            "app.services.goal_recommendation_service.sync_yahoo_dividend_info",
+            "app.services._goal_recommendation_common.sync_yahoo_dividend_info",
         ) as mock_yahoo:
             result = await _fetch_dividend_yields(mock_cache, [("SPY", "NYSE")])
 
@@ -1275,7 +1261,7 @@ class TestFetchDividendYields:
 
     async def test_zero_yield_is_cached_but_excluded_from_result(self, mock_cache):
         with patch(
-            "app.services.goal_recommendation_service.sync_yahoo_dividend_info",
+            "app.services._goal_recommendation_common.sync_yahoo_dividend_info",
             return_value={"dividend_yield": 0.0},
         ):
             result = await _fetch_dividend_yields(mock_cache, [("QQQ", "NASDAQ")])
@@ -1357,7 +1343,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
@@ -1419,7 +1405,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
@@ -1482,7 +1468,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
@@ -1533,7 +1519,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -1541,7 +1527,7 @@ class TestGetGoalRecommendation:
                 return_value=returns_map,
             ),
             patch(
-                "app.services.goal_recommendation_service.get_market_signal",
+                "app.services._goal_recommendation_common.get_market_signal",
                 AsyncMock(return_value={"composite_level": "RED", "data_freshness": "LIVE"}),
             ),
         ):
@@ -1573,7 +1559,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -1607,7 +1593,7 @@ class TestGetGoalRecommendation:
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -1640,7 +1626,7 @@ class TestGetGoalRecommendation:
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -1673,7 +1659,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
         ):
@@ -1733,7 +1719,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
         ):
@@ -1771,7 +1757,7 @@ class TestGetGoalRecommendation:
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -1828,7 +1814,7 @@ class TestGetGoalRecommendation:
                     AsyncMock(return_value=cagr_map),
                 ),
                 patch(
-                    "app.services.goal_recommendation_service._fetch_dividend_yields",
+                    "app.services._goal_recommendation_common._fetch_dividend_yields",
                     AsyncMock(return_value={}),
                 ),
                 patch(
@@ -1873,7 +1859,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -1921,7 +1907,7 @@ class TestGetGoalRecommendation:
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -1983,7 +1969,7 @@ class TestGetGoalRecommendation:
                 get_historical_returns_mock,
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -2025,7 +2011,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 15.0}}),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -2067,7 +2053,7 @@ class TestGetGoalRecommendation:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={}),
             ),
             patch(
@@ -2354,11 +2340,7 @@ class TestGetHorizonRecommendations:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
-                AsyncMock(return_value=dividend_map),
-            ),
-            patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
@@ -2444,11 +2426,7 @@ class TestGetHorizonRecommendations:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
-                AsyncMock(return_value=dividend_map),
-            ),
-            patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
@@ -2559,11 +2537,7 @@ class TestGetHorizonRecommendations:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
-                AsyncMock(side_effect=_dividend_side_effect),
-            ),
-            patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
@@ -2656,11 +2630,7 @@ class TestGetHorizonRecommendations:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_horizon_recommendation_service._fetch_dividend_yields",
-                AsyncMock(side_effect=_dividend_side_effect),
-            ),
-            patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
@@ -3416,7 +3386,7 @@ class TestGetHorizonRecommendations:
                 return_value=returns_map,
             ),
             patch(
-                "app.services.goal_recommendation_service.get_market_signal",
+                "app.services._goal_recommendation_common.get_market_signal",
                 AsyncMock(return_value={"composite_level": "RED", "data_freshness": "LIVE"}),
             ),
         ):
@@ -3938,7 +3908,7 @@ class TestGetAgeBasedRecommendation:
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("SCHD", "NYSE"): {"cagr_pct": 8.0}}),
             ),
             patch(
-                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
@@ -3993,7 +3963,7 @@ class TestGetAgeBasedRecommendation:
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("SCHD", "NYSE"): {"cagr_pct": 8.0}}),
             ),
             patch(
-                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
@@ -4042,7 +4012,7 @@ class TestGetAgeBasedRecommendation:
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("114260", "KOSPI"): {"cagr_pct": 3.0}}),
             ),
             patch(
-                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
@@ -4110,11 +4080,7 @@ class TestGetAgeBasedRecommendation:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
-                AsyncMock(side_effect=_dividend_side_effect),
-            ),
-            patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
@@ -4192,11 +4158,7 @@ class TestGetAgeBasedRecommendation:
                 AsyncMock(return_value=cagr_map),
             ),
             patch(
-                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
-                AsyncMock(side_effect=_dividend_side_effect),
-            ),
-            patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
@@ -4287,7 +4249,7 @@ class TestComputePortfolioExpectedMetrics:
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}}),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
                 AsyncMock(return_value={("SPY", "NYSE"): 2.0}),
             ),
             patch(

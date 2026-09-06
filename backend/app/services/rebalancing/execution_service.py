@@ -23,12 +23,11 @@ from app.services.rebalancing._kiwoom_order_executor import (
     _execute_kiwoom_buys_with_cash_check,
     _execute_kiwoom_sells_with_clamp,
 )
+from app.services.rebalancing.order_builder import ORDER_EXECUTABLE_ASSET_TYPES
 from app.utils.cache_keys import invalidate_rebalancing_analysis_cache, invalidate_rebalancing_strategy_cache
 from app.utils.metrics import rebalancing_execution_count
 
 logger = structlog.get_logger()
-
-_BROKER_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
 
 
 async def _load_account(
@@ -39,7 +38,7 @@ async def _load_account(
     account = await db.scalar(active_accounts_stmt(user_id).where(AssetAccount.id == account_id))
     if not account:
         raise HTTPException(status_code=404, detail=f"계좌를 찾을 수 없습니다. (id={account_id})")
-    if account.asset_type not in _BROKER_ASSET_TYPES:
+    if account.asset_type not in ORDER_EXECUTABLE_ASSET_TYPES:
         raise HTTPException(status_code=400, detail="KIS 또는 키움 계좌만 실행 주문이 가능합니다.")
     if account.asset_type == "STOCK_KIS" and not account.kis_account_no:
         raise HTTPException(status_code=400, detail="KIS 계좌번호가 설정되지 않았습니다.")

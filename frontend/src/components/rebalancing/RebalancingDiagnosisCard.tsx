@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle, Info, Zap } from "lucide-react";
+import { AlertTriangle, CircleCheck, Info, Zap } from "lucide-react";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 import DiagnosisInsightList from "./DiagnosisInsightList";
@@ -35,7 +35,7 @@ const STATUS_CONFIG = {
   },
   stable: {
     cardAccent: "",
-    icon: CheckCircle,
+    icon: CircleCheck,
     iconColor: "text-green-600 dark:text-green-400",
     badge: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
     label: "포트폴리오 안정",
@@ -117,7 +117,7 @@ export default function RebalancingDiagnosisCard({
       {/* 안정 상태 - 이탈 없음 메시지 */}
       {status === "stable" && tradeable.length > 0 && (
         <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-3">
-          <CheckCircle size={12} className="text-green-500" />
+          <CircleCheck size={12} className="text-green-500" />
           최대 이탈 {maxDrift.toFixed(1)}% (기준 ±{threshold}%)
         </div>
       )}

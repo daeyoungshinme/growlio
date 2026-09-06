@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, RefreshCw, Check, AlertCircle } from "lucide-react";
+import { Loader2, RefreshCw, Check, CircleAlert } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
 import { syncAccount } from "@/api/assets";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
@@ -119,7 +119,7 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
         {syncResult === "error" && (
           <>
             <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
-              <AlertCircle size={12} />
+              <CircleAlert size={12} />
               일부 동기화 실패
             </span>
             <button

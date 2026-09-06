@@ -1,4 +1,4 @@
-import { CheckCircle, XCircle } from "lucide-react";
+import { CircleCheck, CircleX } from "lucide-react";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { CredentialVerifyState } from "@/hooks/createCredentialVerify";
 
@@ -33,12 +33,12 @@ export default function CredentialVerifyButton({
       </button>
       {verifyState === "ok" && (
         <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-          <CheckCircle size={14} /> 자격증명 확인됨
+          <CircleCheck size={14} /> 자격증명 확인됨
         </span>
       )}
       {verifyState === "error" && (
         <span className="flex items-center gap-1 text-xs text-red-500">
-          <XCircle size={14} /> {verifyError}
+          <CircleX size={14} /> {verifyError}
         </span>
       )}
     </div>

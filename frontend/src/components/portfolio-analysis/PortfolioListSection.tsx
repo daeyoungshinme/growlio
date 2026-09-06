@@ -10,11 +10,11 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  AlertCircle,
   AlertTriangle,
   Anchor,
   Bell,
-  CheckCircle,
+  CircleAlert,
+  CircleCheck,
   Edit2,
   GripVertical,
   Loader2,
@@ -200,7 +200,7 @@ const PortfolioCard = memo(function PortfolioCard({
             </span>
           ) : (
             <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-400">
-              <CheckCircle size={10} />
+              <CircleCheck size={10} />
               안정
             </span>
           ))}
@@ -339,7 +339,7 @@ export default function PortfolioListSection({
       {unassignedAccounts.length > 0 && portfolios.length > 0 && (
         <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3">
           <div className="flex items-center gap-1.5 mb-2">
-            <AlertCircle size={13} className="text-amber-500 flex-shrink-0" />
+            <CircleAlert size={13} className="text-amber-500 flex-shrink-0" />
             <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
               기준 포트폴리오 미지정 계좌
             </p>

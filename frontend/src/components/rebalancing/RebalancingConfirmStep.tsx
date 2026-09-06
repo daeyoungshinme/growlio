@@ -12,7 +12,7 @@ interface Props {
 export function RebalancingConfirmStep({ ordersCount }: Props) {
   const exec = useRebalancingExecutionContext();
   const {
-    kisAccounts,
+    tradableAccounts,
     actionableItems,
     state,
     dispatch,
@@ -166,13 +166,13 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
         </div>
       )}
 
-      {kisAccounts.length === 0 ? (
+      {tradableAccounts.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
           연결된 KIS/키움 계좌가 없습니다.
         </p>
       ) : (
         <>
-          {kisAccounts.map((acc) => {
+          {tradableAccounts.map((acc) => {
             const sellRows = getSellRows(acc.id);
             const buyRows = getBuyRows(acc.id);
             const bState = balanceState[acc.id] ?? "idle";

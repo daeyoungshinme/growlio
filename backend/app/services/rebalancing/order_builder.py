@@ -19,7 +19,9 @@ from app.services.tax_service import _OVERSEAS_MARKETS, _TAX_DEFERRED_TYPES
 
 logger = structlog.get_logger()
 
-_BROKER_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
+ORDER_EXECUTABLE_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
+"""주문 실행 게이트 — 토스는 주문 API 미구현이라 제외.
+읽기·진단 경로의 `_account_queries._BROKER_ASSET_TYPES`(토스 포함)와 의도적으로 다르다."""
 _NON_TRADABLE_TICKERS = ("CASH", "REAL_ESTATE", CASH_EQUIVALENT_TICKER)
 """실제 주문을 낼 수 없는 합성 포트폴리오 항목 티커 — 가격 조회·주문 생성 양쪽에서 제외."""
 
@@ -46,7 +48,9 @@ def _build_sell_orders(
     from app.schemas.rebalancing import ExecutionOrderItem
 
     holders = [
-        a for a in ticker_account_map.get(item.ticker, []) if a.asset_type in _BROKER_ASSET_TYPES and a.quantity > 0
+        a
+        for a in ticker_account_map.get(item.ticker, [])
+        if a.asset_type in ORDER_EXECUTABLE_ASSET_TYPES and a.quantity > 0
     ]
     # 과세이연 계좌(ISA/연금저축/IRP)는 최후순위로 매도해 절세 혜택을 보호한다 — 일반/해외전용 계좌를 먼저 소진.
     holders.sort(key=lambda a: (a.tax_type in _TAX_DEFERRED_TYPES, -a.quantity))

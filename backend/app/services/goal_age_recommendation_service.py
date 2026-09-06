@@ -6,10 +6,9 @@
 (`_NON_BINDING_RETURN_FLOOR`로 required_return_pct 제약을 사실상 무효화한다).
 
 원래 `goal_recommendation_service.py`(1622줄)에 있던 것을 2026-08-13 기술부채 정리에서 분리했다
-— `goal_portfolio_optimizer.py`/`goal_candidate_service.py`와 동일한 서브모듈 패턴. 후보 조회·
-CAGR/배당수익률 조회·MVO 최적화·배당목표 후보제안 등 공유 헬퍼는 여전히 `goal_recommendation_service.py`
-에 남아 있고 이 모듈이 import해서 사용한다(역방향 의존 없음 — `goal_recommendation_service.py`는
-이 모듈을 import하지 않는다).
+— `goal_portfolio_optimizer.py`/`goal_candidate_service.py`와 동일한 서브모듈 패턴. 배당수익률
+조회·시장신호·MVO 결과 조합·배당목표 후보제안 등 세 진입점 공유 헬퍼는
+`_goal_recommendation_common.py`(`_grc`)에 있고 이 모듈이 `_grc.fn()` 모듈 참조로 호출한다.
 """
 
 from __future__ import annotations
@@ -24,28 +23,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.enums import AgeGroup
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation, SuggestedGoalCandidate
+from app.services import _goal_recommendation_common as _grc
 from app.services.goal_candidate_service import (
     _get_or_seed_candidates,
     detect_duplicate_tracking_index_note,
     existing_items_from_positions,
 )
 from app.services.goal_portfolio_optimizer import _MAX_WEIGHT, _MIN_CANDIDATES, _optimize_goal_portfolio
-from app.services.goal_recommendation_service import (
-    _CASH_EQUIVALENT_CAGR_PCT,
-    _CASH_EQUIVALENT_MARKET,
-    _CASH_EQUIVALENT_NAME,
-    _CASH_EQUIVALENT_TICKER,
-    _DEFAULT_CAGR_LOOKBACK_YEARS,
-    _NON_BINDING_RETURN_FLOOR,
-    _attach_dividend_yield,
-    _cash_equivalent_daily_returns,
-    _equity_class_bounds,
-    _fetch_dividend_yields,
-    _fetch_market_signal_level,
-    _no_recommendation,
-    _not_configured,
-    _suggest_for_dividend_goal,
-)
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
@@ -164,7 +148,7 @@ async def _compute_age_based_recommendation(
     조용히 무시되고 note로만 안내된다.
     """
     if not settings_row.age_group or settings_row.age_group not in _AGE_GROUP_PROFILE:
-        return _not_configured("연령대를 설정하면 연령대별 추천을 받을 수 있습니다")
+        return _grc._not_configured("연령대를 설정하면 연령대별 추천을 받을 수 있습니다")
 
     age_bracket, risk_tolerance, equity_floor, equity_ceiling, default_dividend_floor_pct = _AGE_GROUP_PROFILE[
         settings_row.age_group
@@ -189,7 +173,9 @@ async def _compute_age_based_recommendation(
 
     max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
     max_weight = float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
-    cagr_lookback_years = int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
+    cagr_lookback_years = int(
+        getattr(settings_row, "goal_cagr_lookback_years", None) or _grc._DEFAULT_CAGR_LOOKBACK_YEARS
+    )
 
     all_pos_map = await query_latest_position_map(user_id, db, include_name=True)
     existing_items = existing_items_from_positions(all_pos_map)
@@ -206,7 +192,7 @@ async def _compute_age_based_recommendation(
         """배당 제안 판정은 최적화 결과(`expected_dividend_yield_pct`)가 필요하므로 각 반환 지점에서
         호출한다 — 조기 반환 지점은 `None`(미최적화)을 넘긴다."""
         res.age_bracket = age_bracket
-        suggested, dividend_note, dividend_goal_status = await _suggest_for_dividend_goal(
+        suggested, dividend_note, dividend_goal_status = await _grc._suggest_for_dividend_goal(
             cache,
             candidate_dicts,
             required_dividend_yield_pct,
@@ -222,21 +208,21 @@ async def _compute_age_based_recommendation(
 
     if not candidate_dicts:
         return await _with_bracket(
-            _no_recommendation(
+            _grc._no_recommendation(
                 "등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요",
                 required_dividend_yield_pct=required_dividend_yield_pct,
             ),
             None,
         )
 
-    market_signal_level = await _fetch_market_signal_level(cache)
+    market_signal_level = await _grc._fetch_market_signal_level(cache)
 
     candidates = [(c["ticker"], c["name"], c["market"], c.get("asset_class", "EQUITY")) for c in candidate_dicts]
     tickers_only = [(t, m) for t, _, m, _ in candidates]
 
     cagr_map, dividend_map = await asyncio.gather(
         get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
-        _fetch_dividend_yields(cache, tickers_only),
+        _grc._fetch_dividend_yields(cache, tickers_only),
     )
     filtered = [
         (
@@ -255,16 +241,16 @@ async def _compute_age_based_recommendation(
     if include_cash_equivalent:
         filtered.append(
             (
-                _CASH_EQUIVALENT_TICKER,
-                (_CASH_EQUIVALENT_TICKER, _CASH_EQUIVALENT_NAME, _CASH_EQUIVALENT_MARKET),
-                _CASH_EQUIVALENT_CAGR_PCT,
+                _grc._CASH_EQUIVALENT_TICKER,
+                (_grc._CASH_EQUIVALENT_TICKER, _grc._CASH_EQUIVALENT_NAME, _grc._CASH_EQUIVALENT_MARKET),
+                _grc._CASH_EQUIVALENT_CAGR_PCT,
                 False,
                 0.0,
             )
         )
 
     if len(filtered) < _MIN_CANDIDATES:
-        no_data_result = _no_recommendation(
+        no_data_result = _grc._no_recommendation(
             "추천에 필요한 수익률 데이터를 가져오지 못했습니다",
             required_dividend_yield_pct=required_dividend_yield_pct,
         )
@@ -279,17 +265,17 @@ async def _compute_age_based_recommendation(
     f_dividends = [f[4] for f in filtered]
 
     loop = asyncio.get_running_loop()
-    real_symbols = [s for s in f_symbols if s != _CASH_EQUIVALENT_TICKER]
+    real_symbols = [s for s in f_symbols if s != _grc._CASH_EQUIVALENT_TICKER]
     if real_symbols:
         async with _yfinance_sem:
             returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, real_symbols)
     else:
         returns_map = {}
     if include_cash_equivalent:
-        returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
+        returns_map[_grc._CASH_EQUIVALENT_TICKER] = _grc._cash_equivalent_daily_returns()
 
     # `_AGE_GROUP_PROFILE`은 구간마다 equity_floor/equity_ceiling 중 하나만 설정한다(docstring 참고).
-    class_bounds = _equity_class_bounds(equity_floor, equity_ceiling)
+    class_bounds = _grc._equity_class_bounds(equity_floor, equity_ceiling)
 
     items, expected_return_pct, expected_volatility_pct, opt_note = await loop.run_in_executor(
         None,
@@ -299,7 +285,7 @@ async def _compute_age_based_recommendation(
             f_tickers,
             f_cagrs,
             returns_map,
-            _NON_BINDING_RETURN_FLOOR,
+            _grc._NON_BINDING_RETURN_FLOOR,
             max_weight=max_weight,
             risk_tolerance=risk_tolerance,
             asset_classes=f_asset_classes,
@@ -310,7 +296,7 @@ async def _compute_age_based_recommendation(
         ),
     )
 
-    includes_cash_equivalent = any(i["ticker"] == _CASH_EQUIVALENT_TICKER for i in items)
+    includes_cash_equivalent = any(i["ticker"] == _grc._CASH_EQUIVALENT_TICKER for i in items)
     expected_dividend_yield_pct = None
     if items:
         expected_dividend_yield_pct = round(
@@ -331,7 +317,7 @@ async def _compute_age_based_recommendation(
             generated_at=datetime.now(UTC).isoformat(),
             is_configured=True,
             required_dividend_yield_pct=required_dividend_yield_pct,
-            recommended_items=_attach_dividend_yield(items, dividend_map),
+            recommended_items=_grc._attach_dividend_yield(items, dividend_map),
             expected_return_pct=expected_return_pct,
             expected_dividend_yield_pct=expected_dividend_yield_pct,
             expected_volatility_pct=expected_volatility_pct,

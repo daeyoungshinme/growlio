@@ -504,7 +504,7 @@ describe("useRebalancingBalances", () => {
     );
   });
 
-  it("loadAllLiveBalances — kisAccounts가 비어있으면 아무 것도 하지 않는다", async () => {
+  it("loadAllLiveBalances — tradableAccounts가 비어있으면 아무 것도 하지 않는다", async () => {
     const dispatch = vi.fn();
     const { result } = renderHook(() => useRebalancingBalances(dispatch, []), {
       wrapper: createWrapper(),
@@ -808,7 +808,7 @@ describe("useRebalancingExecution", () => {
 
     expect(result.current.state.phase).toBe("confirm");
     expect(result.current.state.orderType).toBe("MARKET");
-    expect(result.current.kisAccounts).toHaveLength(1);
+    expect(result.current.tradableAccounts).toHaveLength(1);
   });
 
   it("actionableItems에서 거래 가능한 아이템만 반환한다", async () => {

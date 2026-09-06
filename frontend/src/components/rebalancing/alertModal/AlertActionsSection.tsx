@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, BellOff, Loader2, PlayCircle, Send } from "lucide-react";
+import { Bell, BellOff, Loader2, CirclePlay, Send } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { sendTestAccountRebalancingAlert, sendTestRebalancingAlert } from "@/api/alerts";
 import { createRebalancingExecutionPlan } from "@/api/rebalancing";
@@ -96,7 +96,7 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
           {quickExecuteMut.isPending ? (
             <Loader2 size={14} className="animate-spin" />
           ) : (
-            <PlayCircle size={14} />
+            <CirclePlay size={14} />
           )}
           지금 테스트 실행
         </button>
