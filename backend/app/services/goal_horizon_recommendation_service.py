@@ -10,9 +10,9 @@
 공유 헬퍼(`_fetch_dividend_yields`/`_attach_dividend_yield`/`_suggest_for_dividend_goal`/
 `_fetch_market_signal_level`/`_equity_class_bounds`/`_cash_equivalent_daily_returns` +
 `_CASH_EQUIVALENT_*`/`_NON_BINDING_RETURN_FLOOR`/`_DEFAULT_CAGR_LOOKBACK_YEARS` 상수)는
-`goal_recommendation_service.py`에서 import한다 — 역방향 의존 없음(grs는 이 모듈을 import하지 않고,
-`get_horizon_recommendations` 소비자(`api/v1/rebalancing.py`,
-`alerts/recommendation_drift_alert_service.py`)가 이 모듈에서 직접 import한다).
+`_goal_recommendation_common.py`(`_grc`)에 있고 이 모듈이 `_grc.fn()` 모듈 참조로 호출한다.
+`get_horizon_recommendations` 소비자는 `api/v1/rebalancing.py`,
+`alerts/recommendation_drift_alert_service.py`.
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ from app.schemas.rebalancing import (
     HorizonRecommendationResponse,
     SuggestedGoalCandidate,
 )
+from app.services import _goal_recommendation_common as _grc
 from app.services.goal_candidate_service import (
     _TAX_TYPE_MARKET_GROUP,
     _apply_index_region_preference,
@@ -47,20 +48,6 @@ from app.services.goal_candidate_service import (
     existing_items_from_positions,
 )
 from app.services.goal_portfolio_optimizer import _MAX_WEIGHT, _MIN_CANDIDATES, _optimize_goal_portfolio
-from app.services.goal_recommendation_service import (
-    _CASH_EQUIVALENT_CAGR_PCT,
-    _CASH_EQUIVALENT_MARKET,
-    _CASH_EQUIVALENT_NAME,
-    _CASH_EQUIVALENT_TICKER,
-    _DEFAULT_CAGR_LOOKBACK_YEARS,
-    _NON_BINDING_RETURN_FLOOR,
-    _attach_dividend_yield,
-    _cash_equivalent_daily_returns,
-    _equity_class_bounds,
-    _fetch_dividend_yields,
-    _fetch_market_signal_level,
-    _suggest_for_dividend_goal,
-)
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import (
     build_portfolio_overview,
@@ -125,7 +112,7 @@ async def _build_horizon_candidate_universe(
     cagr_map, dividend_map = (
         await asyncio.gather(
             get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
-            _fetch_dividend_yields(cache, tickers_only),
+            _grc._fetch_dividend_yields(cache, tickers_only),
         )
         if tickers_only
         else ({}, {})
@@ -146,9 +133,9 @@ async def _build_horizon_candidate_universe(
     if include_cash_equivalent:
         filtered.append(
             (
-                _CASH_EQUIVALENT_TICKER,
-                (_CASH_EQUIVALENT_TICKER, _CASH_EQUIVALENT_NAME, _CASH_EQUIVALENT_MARKET),
-                _CASH_EQUIVALENT_CAGR_PCT,
+                _grc._CASH_EQUIVALENT_TICKER,
+                (_grc._CASH_EQUIVALENT_TICKER, _grc._CASH_EQUIVALENT_NAME, _grc._CASH_EQUIVALENT_MARKET),
+                _grc._CASH_EQUIVALENT_CAGR_PCT,
                 False,
                 0.0,
             )
@@ -174,7 +161,7 @@ def _single_candidate_horizon_result(
     하나만 유효했을 수도 있다 — `is_synthetic`으로 구분해 안내 문구를 다르게 붙인다.
     """
     _, (tk, name, mk), cagr, _, dividend = single
-    is_synthetic = tk == _CASH_EQUIVALENT_TICKER
+    is_synthetic = tk == _grc._CASH_EQUIVALENT_TICKER
     return HorizonGoalRecommendation(
         investment_horizon=horizon,
         tax_type=tax_type,
@@ -309,14 +296,14 @@ async def _build_horizon_result(
     f_dividends = [f[4] for f in filtered]
 
     loop = asyncio.get_running_loop()
-    real_symbols = [s for s in f_symbols if s != _CASH_EQUIVALENT_TICKER]
+    real_symbols = [s for s in f_symbols if s != _grc._CASH_EQUIVALENT_TICKER]
     if real_symbols:
         async with _yfinance_sem:
             returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, real_symbols)
     else:
         returns_map = {}
     if include_cash_equivalent:
-        returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
+        returns_map[_grc._CASH_EQUIVALENT_TICKER] = _grc._cash_equivalent_daily_returns()
 
     equity_floor: float | None = None
     equity_ceiling: float | None = None
@@ -327,7 +314,7 @@ async def _build_horizon_result(
 
     # 자산군 단위 비중 제약 일반화(`_optimize_goal_portfolio`의 `class_bounds`) — 이 경로는
     # EQUITY vs 그 외(OTHER)의 기존 이분법 그대로 매핑한다(단기 주식 하한 / IRP 주식 상한).
-    class_bounds = _equity_class_bounds(equity_floor, equity_ceiling)
+    class_bounds = _grc._equity_class_bounds(equity_floor, equity_ceiling)
 
     items, expected_return_pct, expected_volatility_pct, opt_note = await loop.run_in_executor(
         None,
@@ -337,7 +324,7 @@ async def _build_horizon_result(
             f_tickers,
             f_cagrs,
             returns_map,
-            _NON_BINDING_RETURN_FLOOR,
+            _grc._NON_BINDING_RETURN_FLOOR,
             max_weight=max_weight,
             risk_tolerance=risk_tolerance,
             asset_classes=f_asset_classes,
@@ -348,7 +335,7 @@ async def _build_horizon_result(
         ),
     )
 
-    includes_cash_equivalent = any(i["ticker"] == _CASH_EQUIVALENT_TICKER for i in items)
+    includes_cash_equivalent = any(i["ticker"] == _grc._CASH_EQUIVALENT_TICKER for i in items)
     expected_dividend_yield_pct = None
     if items:
         expected_dividend_yield_pct = round(
@@ -372,7 +359,7 @@ async def _build_horizon_result(
         tax_type=tax_type,
         base_krw=base_krw,
         account_count=len(account_ids),
-        recommended_items=_attach_dividend_yield(items, dividend_map),
+        recommended_items=_grc._attach_dividend_yield(items, dividend_map),
         required_dividend_yield_pct=required_dividend_yield_pct,
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=expected_dividend_yield_pct,
@@ -443,7 +430,9 @@ async def _compute_horizon_recommendations(
     """
     max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
     max_weight = float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
-    cagr_lookback_years = int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
+    cagr_lookback_years = int(
+        getattr(settings_row, "goal_cagr_lookback_years", None) or _grc._DEFAULT_CAGR_LOOKBACK_YEARS
+    )
     short_term_equity_floor_pct_raw = getattr(settings_row, "goal_short_term_equity_floor_pct", None)
     short_term_equity_floor = (
         float(short_term_equity_floor_pct_raw)
@@ -566,7 +555,7 @@ async def _compute_horizon_recommendations(
         await _persist_added_candidates(db, user_id, all_added)
 
     # 15개 조합이 동일한 시장 신호 스냅샷을 공유하도록 조합별 반복 조회 대신 한 번만 조회한다.
-    market_signal_level = await _fetch_market_signal_level(cache)
+    market_signal_level = await _grc._fetch_market_signal_level(cache)
 
     # 2단계: DB에 의존하지 않는 외부 I/O(Yahoo/pykrx 수익률 조회 + SLSQP 최적화)는 조합 수(최대 15개)만큼
     # 동시 실행한다 — `_build_horizon_result`는 `db`를 사용하지 않으므로 AsyncSession 동시성 제약이 없다.
@@ -606,7 +595,7 @@ async def _compute_horizon_recommendations(
     for result, combo in zip(results, combos, strict=True):
         eligible_candidates = combo[4]
         market_filter = combo[6]
-        suggested, dividend_note, dividend_goal_status = await _suggest_for_dividend_goal(
+        suggested, dividend_note, dividend_goal_status = await _grc._suggest_for_dividend_goal(
             cache,
             eligible_candidates,
             required_dividend_yield_pct,
