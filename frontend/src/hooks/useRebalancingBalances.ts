@@ -8,7 +8,7 @@ import type { ExecutionAction } from "./useRebalancingExecution";
 
 export function useRebalancingBalances(
   dispatch: React.Dispatch<ExecutionAction>,
-  kisAccounts: AssetAccount[],
+  tradableAccounts: AssetAccount[],
 ) {
   const queryClient = useQueryClient();
 
@@ -35,8 +35,8 @@ export function useRebalancingBalances(
   }
 
   async function loadAllLiveBalances() {
-    if (kisAccounts.length === 0) return;
-    dispatch({ type: "BALANCES_START", accountIds: kisAccounts.map((a) => a.id) });
+    if (tradableAccounts.length === 0) return;
+    dispatch({ type: "BALANCES_START", accountIds: tradableAccounts.map((a) => a.id) });
     try {
       const responses: KisBalanceResponse[] = await fetchAllBrokerBalances();
       const balances: Record<string, import("../api/rebalancing").KisBalancePosition[]> = {};
@@ -57,7 +57,7 @@ export function useRebalancingBalances(
       });
       dispatch({ type: "BALANCES_LOADED", balances, deposits, orderables, states });
     } catch {
-      dispatch({ type: "BALANCES_ERROR", accountIds: kisAccounts.map((a) => a.id) });
+      dispatch({ type: "BALANCES_ERROR", accountIds: tradableAccounts.map((a) => a.id) });
     }
   }
 

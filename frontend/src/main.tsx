@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/react";
+import "./lib/sentry";
 import { QueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import {
@@ -11,17 +11,6 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { STALE_TIME, PERSIST_CACHE_KEY } from "./constants/queryConfig";
-
-const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
-if (sentryDsn) {
-  Sentry.init({
-    dsn: sentryDsn,
-    environment: import.meta.env.MODE,
-    release: import.meta.env.VITE_SENTRY_RELEASE as string | undefined,
-    integrations: [Sentry.browserTracingIntegration()],
-    tracesSampleRate: 0.1,
-  });
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {

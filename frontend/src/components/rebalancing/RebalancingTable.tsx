@@ -30,7 +30,7 @@ export default function RebalancingTable({
   onExecuted,
   autoOpenExecution,
 }: Props) {
-  const kisAccounts = accounts.filter(
+  const tradableAccounts = accounts.filter(
     (a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM",
   );
   const [executionOpen, setExecutionOpen] = useState(false);
@@ -63,7 +63,7 @@ export default function RebalancingTable({
       <RebalancingDiagnosisCard
         analysis={analysis}
         alertThreshold={alertThreshold}
-        onExecute={kisAccounts.length > 0 ? () => setExecutionOpen(true) : undefined}
+        onExecute={tradableAccounts.length > 0 ? () => setExecutionOpen(true) : undefined}
         portfolioName={analysis.portfolio_name}
       />
 
@@ -77,16 +77,18 @@ export default function RebalancingTable({
       {/* 실행 버튼 행 (데스크탑) */}
       <div className="hidden sm:flex items-center gap-2">
         <div className="flex items-center gap-2 ml-auto">
-          {kisAccounts.length === 0 && (
+          {tradableAccounts.length === 0 && (
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              KIS 증권계좌 연동 시 자동 주문 가능
+              KIS·키움 증권계좌 연동 시 자동 주문 가능
             </span>
           )}
           <button
             onClick={() => setExecutionOpen(true)}
-            disabled={kisAccounts.length === 0}
+            disabled={tradableAccounts.length === 0}
             className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
-            title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
+            title={
+              tradableAccounts.length === 0 ? "자산관리에서 KIS·키움 증권계좌를 연동하세요" : ""
+            }
           >
             <Zap size={14} /> 리밸런싱 실행
           </button>
@@ -154,16 +156,16 @@ export default function RebalancingTable({
         className="sm:hidden fixed bottom-16 left-0 right-0 px-4 z-20"
         style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }}
       >
-        {kisAccounts.length === 0 && (
+        {tradableAccounts.length === 0 && (
           <div className="text-center text-xs text-gray-500 dark:text-gray-400 bg-white/90 dark:bg-gray-900/90 rounded-t-lg px-2 py-1">
-            KIS 증권계좌 연동 시 자동 주문 가능
+            KIS·키움 증권계좌 연동 시 자동 주문 가능
           </div>
         )}
         <button
           onClick={() => setExecutionOpen(true)}
-          disabled={kisAccounts.length === 0}
+          disabled={tradableAccounts.length === 0}
           className="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-sm font-semibold shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
+          title={tradableAccounts.length === 0 ? "자산관리에서 KIS·키움 증권계좌를 연동하세요" : ""}
         >
           <Zap size={16} /> 리밸런싱 실행
         </button>

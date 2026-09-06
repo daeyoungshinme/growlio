@@ -50,10 +50,10 @@ export function getActionableItems(analysis: RebalancingAnalysis): RebalancingIt
 
 function computeInitialBuyAndSelected(
   analysis: RebalancingAnalysis,
-  kisAccounts: AssetAccount[],
+  tradableAccounts: AssetAccount[],
 ): { buyAccounts: Record<string, string[]>; selected: Set<string> } {
   const actionableItems = getActionableItems(analysis);
-  const defaultAccId = kisAccounts[0]?.id ?? "";
+  const defaultAccId = tradableAccounts[0]?.id ?? "";
 
   function getPrimaryAccountId(ticker: string): string {
     const infos = (analysis.ticker_account_map[ticker] ?? []).filter(
@@ -102,14 +102,14 @@ export function useRebalancingExecution({
   onExecuted,
 }: UseRebalancingExecutionParams) {
   const queryClient = useQueryClient();
-  const kisAccounts = accounts.filter(
+  const tradableAccounts = accounts.filter(
     (a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM",
   );
 
   const [state, dispatch] = useReducer(
     executionReducer,
-    { analysis, kisAccounts },
-    ({ analysis: a, kisAccounts: kas }) => {
+    { analysis, tradableAccounts },
+    ({ analysis: a, tradableAccounts: kas }) => {
       const { buyAccounts, selected } = computeInitialBuyAndSelected(a, kas);
       return {
         liveBalances: {},
@@ -149,7 +149,10 @@ export function useRebalancingExecution({
   } = state;
 
   const actionableItems = getActionableItems(analysis);
-  const { loadLiveBalance, loadAllLiveBalances } = useRebalancingBalances(dispatch, kisAccounts);
+  const { loadLiveBalance, loadAllLiveBalances } = useRebalancingBalances(
+    dispatch,
+    tradableAccounts,
+  );
   const { loadAllPrices, retryPrice } = useRebalancingPrices(dispatch, analysis);
 
   function getAccountQuantity(ticker: string, accountId: string): number {
@@ -205,7 +208,7 @@ export function useRebalancingExecution({
       if (!accountHoldsTicker(item.ticker, accountId)) continue;
       const currentQty = getAccountQuantity(item.ticker, accountId);
       if (currentQty <= 0) continue;
-      const allKisQty = kisAccounts.reduce(
+      const allKisQty = tradableAccounts.reduce(
         (sum, acc) => sum + getAccountQuantity(item.ticker, acc.id),
         0,
       );
@@ -232,17 +235,17 @@ export function useRebalancingExecution({
 
   const sellRowsByAccount = useMemo(() => {
     const map: Record<string, ReturnType<typeof getSellRows>> = {};
-    for (const acc of kisAccounts) map[acc.id] = getSellRows(acc.id);
+    for (const acc of tradableAccounts) map[acc.id] = getSellRows(acc.id);
     return map;
     // getSellRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
-  }, [actionableItems, liveBalances, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [actionableItems, liveBalances, tradableAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const buyRowsByAccount = useMemo(() => {
     const map: Record<string, ReturnType<typeof getBuyRows>> = {};
-    for (const acc of kisAccounts) map[acc.id] = getBuyRows(acc.id);
+    for (const acc of tradableAccounts) map[acc.id] = getBuyRows(acc.id);
     return map;
     // getBuyRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
-  }, [actionableItems, liveBalances, buyAccounts, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [actionableItems, liveBalances, buyAccounts, tradableAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function getBuyTotalInfo(ticker: string): { allocated: number; needed: number } {
     const item = actionableItems.find((i) => i.ticker === ticker);
@@ -257,7 +260,7 @@ export function useRebalancingExecution({
 
   function buildOrders(): ExecutionOrderItem[] {
     const orders: ExecutionOrderItem[] = [];
-    kisAccounts.forEach((acc) => {
+    tradableAccounts.forEach((acc) => {
       (sellRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty }) => {
         const key = `sell_${item.ticker}_${acc.id}`;
         if (!selected.has(key)) return;
@@ -336,7 +339,7 @@ export function useRebalancingExecution({
   }
 
   const globalCashSummary = useMemo((): GlobalCashSummary => {
-    const balancesLoaded = kisAccounts.some((acc) => state.balanceState[acc.id] === "loaded");
+    const balancesLoaded = tradableAccounts.some((acc) => state.balanceState[acc.id] === "loaded");
     if (!balancesLoaded) {
       return {
         totalDeposit: null,
@@ -350,7 +353,7 @@ export function useRebalancingExecution({
     }
 
     let totalDeposit = 0;
-    for (const acc of kisAccounts) {
+    for (const acc of tradableAccounts) {
       const useOrderable = acc.id in state.orderableKrw;
       totalDeposit += useOrderable
         ? (state.orderableKrw[acc.id] ?? 0)
@@ -358,7 +361,7 @@ export function useRebalancingExecution({
     }
 
     let totalSellProceeds: number | null = 0;
-    loop: for (const acc of kisAccounts) {
+    loop: for (const acc of tradableAccounts) {
       for (const { item, suggestedQty } of sellRowsByAccount[acc.id] ?? []) {
         const key = `sell_${item.ticker}_${acc.id}`;
         if (!selected.has(key)) continue;
@@ -373,7 +376,7 @@ export function useRebalancingExecution({
     }
 
     let totalBuyCost: number | null = 0;
-    loop2: for (const acc of kisAccounts) {
+    loop2: for (const acc of tradableAccounts) {
       for (const { item, suggestedQty } of buyRowsByAccount[acc.id] ?? []) {
         const key = `buy_${item.ticker}_${acc.id}`;
         if (!selected.has(key)) continue;
@@ -402,7 +405,7 @@ export function useRebalancingExecution({
     // getEstimateKrw는 훅 스코프 함수 — 실제 의존값(orderType, prices, limitPriceOverrides)은 아래에 포함됨.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    kisAccounts,
+    tradableAccounts,
     state.balanceState,
     state.depositKrw,
     state.orderableKrw,
@@ -425,7 +428,7 @@ export function useRebalancingExecution({
     const ratio = globalCashSummary.totalAvailable / globalCashSummary.totalBuyCost;
     const entries: Array<{ key: string; qty: number }> = [];
 
-    for (const acc of kisAccounts) {
+    for (const acc of tradableAccounts) {
       for (const { item, suggestedQty } of buyRowsByAccount[acc.id] ?? []) {
         const key = `buy_${item.ticker}_${acc.id}`;
         if (!selected.has(key)) continue;
@@ -457,7 +460,7 @@ export function useRebalancingExecution({
 
   const orders = buildOrders();
   const hasRealAccount = orders.some((o) => {
-    const acc = kisAccounts.find((a) => a.id === o.account_id);
+    const acc = tradableAccounts.find((a) => a.id === o.account_id);
     return acc && !acc.is_mock_mode;
   });
 
@@ -493,7 +496,7 @@ export function useRebalancingExecution({
   return {
     state,
     dispatch,
-    kisAccounts,
+    tradableAccounts,
     actionableItems,
     orders,
     hasRealAccount,
