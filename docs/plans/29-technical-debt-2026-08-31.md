@@ -24,7 +24,27 @@
 
 ## 이관 항목
 
-### 1. `goal_recommendation_service.py`(1333줄) 투자기간별 경로 분리 — 배치 C1, 미착수
+### 1. `goal_recommendation_service.py`(1333줄) 투자기간별 경로 분리 — 배치 C1, ✅ 완료 (2026-09-01)
+- `goal_horizon_recommendation_service.py` 신규(170줄, `get_horizon_recommendations`/
+  `_compute_horizon_recommendations`/`_build_horizon_result`/`_build_horizon_candidate_universe`/
+  `_single_candidate_horizon_result` + `_HORIZON_*`/`_DEFAULT_{SHORT_TERM_EQUITY,IRP_SAFE_ASSET}_FLOOR_PCT`
+  상수). grs는 1311→793줄. 아래 (b) 방식 채택: 새 모듈이 true-source collaborator
+  (`get_historical_returns`/`fetch_yf_daily_returns`/`query_latest_position_map`/
+  `build_portfolio_overview`/`prefetch_accounts_snapshot_positions`/`compute_total_assets_krw`)를
+  직접 import, grs 소유 헬퍼(`_fetch_dividend_yields`/`_attach_dividend_yield`/
+  `_suggest_for_dividend_goal`/`_fetch_market_signal_level`/`_equity_class_bounds`/
+  `_cash_equivalent_daily_returns`)는 grs에서 import. 순환참조 없음 — grs는 새 모듈을 import하지 않고,
+  소비자(`api/v1/rebalancing.py`·`alerts/recommendation_drift_alert_service.py`)가 새 모듈에서 직접 import
+  (age 서브모듈 전례와 동일).
+- 테스트: `TestGetHorizonRecommendations`(단일 연속 클래스) 내 112곳 patch 경로를 sed로 새 모듈로 이전.
+  `_suggest_for_dividend_goal`(grs 네임스페이스 실행)이 `_fetch_dividend_yields`를 grs에서 룩업하므로
+  배당 제안을 검증하는 5곳은 grs 경로도 함께 patch(age 테스트 4097/4101 전례). autouse
+  `_mock_dividend_yields`에 새 모듈 경로 추가. `_mock_market_signal`은 그대로(horizon이
+  `get_market_signal`을 직접 호출하지 않고 grs `_fetch_market_signal_level` 경유).
+- 검증: `pytest tests/test_goal_recommendation.py` 166 passed(분리 전과 동일), 전체 2085 passed 88.38%,
+  ruff/mypy 클린.
+
+<details><summary>원래 이관 사유 (완료됨)</summary>
 - 최대 파일. plan 11(1113→720)·plan 26(1622→1332, 연령대별 분리) 후에도 재비대. 남은 대형 함수:
   `_compute_horizon_recommendations`(195), `_build_horizon_result`(179), `_compute_goal_recommendation`(166).
 - `get_horizon_recommendations`/`_compute_horizon_recommendations`/`_build_horizon_result`/
@@ -44,6 +64,7 @@
   import하고 patch 경로를 sed로 일괄 이전 + `_mock_dividend_yields`/`_mock_market_signal` autouse
   fixture에 새 모듈 경로 추가(plan 26 교훈). 순수 이동이라 로직 변경 0, 리팩터 전후
   `pytest -k goal_recommendation`(≈167개) 동일 출력 확인.
+</details>
 
 ### 2. 프론트 대형 컴포넌트 워치리스트 — 배치 C3, 미착수
 - `GoalSettingWizard.tsx`(559줄) — 6개 스텝이 인라인. 스텝별 컴포넌트 추출은 공유 state 15개+를
@@ -89,12 +110,24 @@
 - 백엔드 `pip-audit` 전이 의존성 취약점(pillow/starlette/pyasn1 등) 다수라 CI `continue-on-error: true`
   유지. Dependabot 주간 PR로 점진 해소 중. (2026-08-31 재확인: `npm audit` 0건으로 프론트는 클린.)
 
-### 11. `pyproject.toml addopts` 커버리지 강제 — 신규 관찰
-- `addopts = "--tb=short --cov=app --cov-report=term-missing"` 로 모든 `pytest` 실행에 커버리지가
-  강제되어(collect-only 조차 "coverage not reached" 출력) 빠른 반복 실행 시 DX 마찰. `addopts`에서
-  `--cov` 제거하고 CI에서만 `--cov --cov-fail-under=80` 지정하는 방안 검토 — 단, 현재 방식이
-  커버리지 회귀를 로컬에서도 즉시 잡는 장점이 있어 팀 결정 필요. `pytest -p no:cacheprovider` 등
-  간이 우회는 `--cov` 인자 자체를 못 없애 무효(`-p no:cov`도 `addopts`의 `--cov` 인자 때문에 에러).
+### 11. `pyproject.toml addopts` 커버리지 강제 — ✅ 완료 (2026-09-01)
+- `addopts`를 `"--tb=short"`로 축소(`--cov=app --cov-report=term-missing` 제거). 로컬 `pytest` 실행
+  (`-k`·`--collect-only`·단일 파일)에서 커버리지 측정 마찰 제거.
+- **CI 무영향**: `.github/workflows/ci.yml`이 이미 `--cov=app --cov-report=xml --cov-fail-under=80`을
+  명시적으로 전달 → 80% 게이트 그대로 유지.
+- 로컬 커버리지 원커맨드: `make test-backend-cov`(신규 Makefile 타깃,
+  `pytest --cov=app --cov-report=term-missing --cov-fail-under=80`). 루트/백엔드 CLAUDE.md 갱신.
+
+### 13. 토스 연동 후 문서/독스트링 드리프트 — ✅ 완료 (2026-09-01, 신규)
+- `b8a3d37`(토스 연동) 이후 `broker_balance_service.py`(모듈+`fetch_broker_balance` 독스트링),
+  `asset_credential_service.py` 독스트링, `backend/CLAUDE.md` `broker_balance_service.py` 줄이
+  여전히 "KIS/키움"만 언급 → "KIS/키움/토스"로 갱신.
+- **부수 발견(미해결, 판단 필요)**: `fetch_broker_balance`에 `STOCK_TOSS` 분기가 구현돼 있으나
+  현재 **도달 불가능** — `/broker-balance/{id}` 엔드포인트 게이트, `_account_queries._BROKER_ASSET_TYPES`
+  (`active_broker_accounts_stmt`), 프론트 `AnalysisPanel.tsx`/`useRebalancingBalances.ts` 필터가 전부
+  KIS/키움만 통과시킨다. 토스 실시간 잔고를 리밸런싱 진단 화면에 노출할지(백+프론트 게이트 3곳
+  확장) 아니면 사변적으로 추가된 이 분기를 제거할지는 기능 판단 — 실계좌 E2E 미검증 상태와 함께
+  다음 세션/사용자 결정 대기. 독스트링에 현 상태를 명시해둠.
 
 ### 12. `portfolio_optimizer.get_efficient_frontier` `# noqa: C901` — plan 24 #3, **종결**
 - 배치 A에서 `RUF100` 추가 시 이 noqa가 **이미 불필요**함이 드러나 자동 제거됨(함수가 리팩터 누적으로

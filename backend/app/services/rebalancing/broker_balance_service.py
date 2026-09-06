@@ -1,4 +1,10 @@
-"""KIS/키움 계좌 실시간 잔고 조회 — api/v1/rebalancing.py의 broker-balance 엔드포인트 전용 헬퍼."""
+"""브로커 계좌(KIS/키움/토스) 실시간 잔고 조회 — api/v1/rebalancing.py의 broker-balance 엔드포인트 전용 헬퍼.
+
+토스 분기(`STOCK_TOSS`)는 구현돼 있으나 현재 두 엔드포인트(`/broker-balance/{id}`,
+`/broker-balance-all`)와 `active_broker_accounts_stmt()`가 KIS/키움으로만 게이팅하므로 실제로는
+KIS/키움 계좌만 이 헬퍼에 도달한다 — 토스 실시간 잔고를 리밸런싱 화면에 노출하려면 그 게이트와
+프론트 필터(`AnalysisPanel.tsx`/`useRebalancingBalances.ts`)를 함께 넓혀야 한다.
+"""
 
 from __future__ import annotations
 
@@ -23,9 +29,9 @@ async def fetch_broker_balance(
     db: AsyncSession,
     cache,
 ) -> KisBalanceResponse:
-    """KIS 또는 키움 계좌 실시간 잔고를 조회해 KisBalanceResponse로 반환한다.
+    """브로커 계좌(KIS/키움/토스) 실시간 잔고를 조회해 KisBalanceResponse로 반환한다.
 
-    실제 조회는 BrokerProvider(KISProvider/KiwoomProvider)에 위임한다 — 자격증명 검증,
+    실제 조회는 BrokerProvider(KISProvider/KiwoomProvider/TossProvider)에 위임한다 — 자격증명 검증,
     토큰 갱신-재시도, 원화 포지션 변환은 sync_account()가 쓰는 것과 동일한 provider
     경로를 공유한다. 실패 시 SyncError 계층 예외(ProviderCredentialError 등)가 그대로
     전파되며 main.py 전역 핸들러가 HTTP 응답으로 변환한다.

@@ -105,6 +105,8 @@
 
 2026-08-31, "기술부채 검토 후 수정 계획" 요청으로 `docs/plans/26`(8/13) 이후 커밋 4건 변경분에 초점을 두고 백엔드/프론트를 병렬 재조사(Explore 2개)해 29번을 추가했다. 여전히 고전적 기술부채(죽은 코드, 미사용 의존성, TODO 마커, `any`)는 거의 소진 상태 — 남은 건 (1) 소량의 죽은 재노출/무효 지시자, (2) 기능 증가로 반복 축적된 보일러플레이트(`email_service.py` 15개 래퍼, 알림 2채널 디스패치 5~6곳), (3) 재비대한 `goal_recommendation_service.py`(1333줄)뿐이었다. 저위험 항목은 사용자가 배치 A·B·C로 나눠 같은 세션에 구현(커밋 `fd4ac30`·`7654894`·`830feb1`) — A(무해한 정리), B(보일러플레이트 헬퍼 추출), C2(RecommendationCard 3중복). `RUF100` 룰 추가 시 `portfolio_optimizer.get_efficient_frontier`의 `# noqa: C901`이 이미 불필요함이 드러나 자동 제거되며 계획24 #3도 종결됐다. C1(`goal_recommendation_service.py` 투자기간별 분리)은 투자기간별 테스트 클래스가 collaborator를 `patch("...goal_recommendation_service.X")` 형태로 ~113곳 patch해, 깔끔한 분리에는 그 patch 경로 대량 이전(또는 테스트 자체 리팩터 선행)이 필요해 29번으로 이관.
 
+2026-09-01, "기술부채 있으면 수정 계획세워줘" 요청으로 `docs/plans/29`(8/31) 이후 커밋 4건(토스증권 연동 `b8a3d37` 중심)의 변경분에 초점을 두고 재조사. 고전적 기술부채는 여전히 소진 상태 — 실질 잔여는 계획29 이관 목록뿐이었다. 사용자가 "저위험 정리 + `goal_recommendation_service.py` 분리" 범위를 선택해 같은 세션에 전부 구현: **계획29 #1** (`goal_horizon_recommendation_service.py` 신규 분리, grs 1311→793줄, 테스트 patch 경로 112곳 sed 이전 + 배당제안 5곳 grs 경로 병행 patch, `pytest` 166 passed 동일), **계획29 #11** (`pyproject.toml addopts`에서 `--cov` 제거 + `make test-backend-cov` 신설, CI 게이트 무영향), **계획29 #13(신규)** (토스 연동 후 `broker_balance_service.py`/`asset_credential_service.py`/CLAUDE.md 독스트링 드리프트 갱신). 부수 발견: `fetch_broker_balance`의 `STOCK_TOSS` 분기가 엔드포인트·쿼리·프론트 필터 3곳이 KIS/키움만 통과시켜 **현재 도달 불가능** — 토스 실시간 잔고 노출 여부는 기능 판단으로 계획29 #13에 기록. 전체 백엔드 2085 tests 88.38%, ruff/mypy 클린.
+
 ## 경쟁앱 대비 기능격차 (로드맵, 착수 계획 없음 — 계획16 D절)
 
 코드 조사가 아니라 도메인 지식+웹검색 기반 분석. 별도 계획 문서 없이 여기에만 기록:
