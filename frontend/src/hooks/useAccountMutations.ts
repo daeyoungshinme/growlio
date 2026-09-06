@@ -5,6 +5,8 @@ import { createAccount, updateAccount, deleteAccount, syncAccount } from "@/api/
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { invalidateAccountData, invalidateSyncData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
+import { STOCK_TYPE_LABELS } from "@/constants";
+import { isSyncableAccount } from "@/utils/accounts";
 
 interface Options {
   onBankModalClose: () => void;
@@ -33,7 +35,7 @@ export function useAccountMutations({
       void invalidateAll();
       onBankModalClose();
       onStockModalClose();
-      if (data.data_source === "KIS_API" || data.data_source === "KIWOOM_API") {
+      if (isSyncableAccount(data.data_source)) {
         setSyncingStockIds((prev) => new Set(prev).add(data.id));
         try {
           await syncAccount(data.id);
@@ -134,7 +136,7 @@ export function useAccountMutations({
         await invalidateSyncData(queryClient);
         toast("동기화 완료", "success");
       } catch (e) {
-        const broker = acc?.asset_type === "STOCK_KIWOOM" ? "키움" : "KIS";
+        const broker = acc ? (STOCK_TYPE_LABELS[acc.asset_type] ?? "증권사") : "증권사";
         const fallback = `동기화 실패. ${broker} API 자격증명을 확인하세요.`;
         toast(getHttpStatus(e) != null ? extractErrorMessage(e, fallback) : fallback);
       } finally {

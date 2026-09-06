@@ -1,4 +1,4 @@
-"""KIS/Kiwoom 공유 HTTP 클라이언트 — 속도제한·재시도 로직 추출."""
+"""KIS/Kiwoom/Toss 공유 HTTP 클라이언트 — 속도제한·재시도 로직 추출."""
 
 from __future__ import annotations
 
@@ -102,7 +102,7 @@ async def broker_request(
     post_request_delay: float = 0.05,
     retry_on_request_error: bool = True,
 ) -> dict[str, Any]:
-    """KIS/Kiwoom 공통 HTTP 요청 함수 — 속도제한(429) 지수 백오프 + 재시도 포함.
+    """KIS/Kiwoom/Toss 공통 HTTP 요청 함수 — 속도제한(429) 지수 백오프 + 재시도 포함.
 
     Args:
         check_token_expired: (data, status_code) → bool. 토큰 만료 여부 반환.

@@ -14,7 +14,6 @@ TOSS_TOKEN_PATH = "/oauth2/token"  # nosec B105 — API 경로, 비밀번호 아
 TOSS_ACCOUNTS_PATH = "/api/v1/accounts"
 TOSS_HOLDINGS_PATH = "/api/v1/holdings"
 TOSS_BUYING_POWER_PATH = "/api/v1/buying-power"
-TOSS_EXCHANGE_RATE_PATH = "/api/v1/exchange-rate"
 
 TOSS_TOKEN_CACHE_KEY = "toss_token:account:{account_id}"  # nosec B105 — 캐시 키 템플릿
 TOSS_ACCTSEQ_CACHE_KEY = "toss_acctseq:{account_id}"

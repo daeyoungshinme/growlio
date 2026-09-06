@@ -4,6 +4,7 @@ import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
 import { fetchBrokerBalance } from "@/api/rebalancing";
+import { isBrokerBalanceAccount } from "@/utils/accounts";
 
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
@@ -98,7 +99,7 @@ export function AnalysisPanel({
       currentPortfolio?.account_ids?.length
         ? activeAccounts.filter((a) => currentPortfolio.account_ids!.includes(a.id))
         : activeAccounts
-    ).filter((a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM");
+    ).filter((a) => isBrokerBalanceAccount(a.asset_type));
 
     let depositKrwOverride: number | undefined;
     if (brokerAccounts.length > 0) {

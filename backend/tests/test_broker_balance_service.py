@@ -113,6 +113,28 @@ class TestFetchBrokerBalance:
         assert result.orderable_krw is None
 
     @pytest.mark.asyncio
+    async def test_toss_account_uses_deposit_krw_as_orderable_cash(self, make_account, mock_db, mock_cache):
+        account = make_account(
+            asset_type="STOCK_TOSS",
+            data_source="TOSS_API",
+            toss_client_id=b"enc_id",
+            toss_client_secret=b"enc_secret",
+        )
+        balance = BalanceResult(
+            positions=[_position(ticker="AAPL", name="Apple", market="NASDAQ", currency="USD")],
+            deposit_krw=123_456.0,
+        )
+
+        with patch("app.services.rebalancing.broker_balance_service.TossProvider") as mock_provider_cls:
+            mock_provider_cls.return_value.sync = AsyncMock(return_value=balance)
+            result = await fetch_broker_balance(account, mock_db, mock_cache)
+
+        # 토스는 별도 orderable-cash API가 없어 sync의 deposit_krw(=cashBuyingPower)를 그대로 쓴다
+        assert result.orderable_krw == 123_456.0
+        assert result.deposit_krw == 123_456.0
+        assert result.positions[0].ticker == "AAPL"
+
+    @pytest.mark.asyncio
     async def test_kiwoom_account_never_fetches_orderable_cash(self, make_account, mock_db, mock_cache):
         account = make_account(
             asset_type="STOCK_KIWOOM",

@@ -4,6 +4,7 @@ import {
   isStockAccount,
   isBankAccount,
   isSyncableAccount,
+  isBrokerBalanceAccount,
 } from "@/utils/accounts";
 
 describe("isPortfolioAccount", () => {
@@ -58,13 +59,28 @@ describe("isBankAccount", () => {
 });
 
 describe("isSyncableAccount", () => {
-  it("KIS/키움 API 연동 계좌는 true다", () => {
+  it("KIS/키움/토스 API 연동 계좌는 true다", () => {
     expect(isSyncableAccount("KIS_API")).toBe(true);
     expect(isSyncableAccount("KIWOOM_API")).toBe(true);
+    expect(isSyncableAccount("TOSS_API")).toBe(true);
   });
 
   it("수동/기타 data_source는 false다", () => {
     expect(isSyncableAccount("MANUAL")).toBe(false);
     expect(isSyncableAccount("")).toBe(false);
+  });
+});
+
+describe("isBrokerBalanceAccount", () => {
+  it("KIS/키움/토스 증권계좌 유형은 true다", () => {
+    expect(isBrokerBalanceAccount("STOCK_KIS")).toBe(true);
+    expect(isBrokerBalanceAccount("STOCK_KIWOOM")).toBe(true);
+    expect(isBrokerBalanceAccount("STOCK_TOSS")).toBe(true);
+  });
+
+  it("그 외 유형은 false다", () => {
+    expect(isBrokerBalanceAccount("STOCK_OTHER")).toBe(false);
+    expect(isBrokerBalanceAccount("BANK_ACCOUNT")).toBe(false);
+    expect(isBrokerBalanceAccount("")).toBe(false);
   });
 });

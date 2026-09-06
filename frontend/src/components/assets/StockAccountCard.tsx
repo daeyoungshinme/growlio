@@ -9,6 +9,7 @@ import { useHaptic } from "@/hooks/useHaptic";
 import { convertUsdToKrw, fmtKrw, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
+import { isSyncableAccount } from "@/utils/accounts";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import EditableNameField from "@/components/common/EditableNameField";
 import AccountActionsMenu from "@/components/common/AccountActionsMenu";
@@ -99,6 +100,11 @@ export default function StockAccountCard({
                 키움 API 키
               </span>
             )}
+            {account.has_own_toss_credentials && (
+              <span className="px-1.5 py-px border border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 text-xs rounded-full shrink-0">
+                토스 API 키
+              </span>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-1 shrink-0">
@@ -110,19 +116,15 @@ export default function StockAccountCard({
           >
             <Settings size={16} />
           </button>
-          {(account.data_source === "KIS_API" || account.data_source === "KIWOOM_API") && (
+          {isSyncableAccount(account.data_source) && (
             <button
               onClick={() => {
                 impact("light");
                 onSync(account.id);
               }}
               disabled={isSyncing}
-              title={
-                account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"
-              }
-              aria-label={
-                account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"
-              }
+              title={`${STOCK_TYPE_LABELS[account.asset_type] ?? "증권사"} 데이터 동기화`}
+              aria-label={`${STOCK_TYPE_LABELS[account.asset_type] ?? "증권사"} 데이터 동기화`}
               className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-50`}
             >
               {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}

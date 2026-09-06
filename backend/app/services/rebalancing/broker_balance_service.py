@@ -1,9 +1,8 @@
 """브로커 계좌(KIS/키움/토스) 실시간 잔고 조회 — api/v1/rebalancing.py의 broker-balance 엔드포인트 전용 헬퍼.
 
-토스 분기(`STOCK_TOSS`)는 구현돼 있으나 현재 두 엔드포인트(`/broker-balance/{id}`,
-`/broker-balance-all`)와 `active_broker_accounts_stmt()`가 KIS/키움으로만 게이팅하므로 실제로는
-KIS/키움 계좌만 이 헬퍼에 도달한다 — 토스 실시간 잔고를 리밸런싱 화면에 노출하려면 그 게이트와
-프론트 필터(`AnalysisPanel.tsx`/`useRebalancingBalances.ts`)를 함께 넓혀야 한다.
+세 브로커 모두 이 헬퍼에 도달한다(엔드포인트 게이트·`active_broker_accounts_stmt()`·프론트
+필터가 STOCK_TOSS 포함). 단 **주문 실행**은 별개다 — 토스 Open API에 주문 클라이언트가
+없어 `execution_service.py`/`order_builder.py`는 KIS/키움만 통과시킨다(토스는 진단·잔고까지만).
 """
 
 from __future__ import annotations

@@ -19,3 +19,9 @@ export function isBankAccount(assetType: string): boolean {
 export function isSyncableAccount(dataSource: string): boolean {
   return SYNCABLE_DATA_SOURCES.includes(dataSource);
 }
+
+/** 실시간 잔고 조회·리밸런싱 진단 대상 브로커 계좌 유형인지 판별 (account.asset_type 전달).
+ *  주문 실행은 별개 — 토스는 주문 API 미구현이라 실행 경로는 KIS/키움만. */
+export function isBrokerBalanceAccount(assetType: string): boolean {
+  return assetType === "STOCK_KIS" || assetType === "STOCK_KIWOOM" || assetType === "STOCK_TOSS";
+}
