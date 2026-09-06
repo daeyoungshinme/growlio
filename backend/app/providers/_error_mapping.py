@@ -1,4 +1,7 @@
-"""KIS/키움 provider 공용 HTTP 에러 매핑 — 브로커별 에러 메시지 키(msg1 vs return_msg)만 다르고 구조는 동일."""
+"""KIS/키움/토스 provider 공용 HTTP 에러 매핑.
+
+브로커별 에러 메시지 키(KIS msg1 / 키움 return_msg / 토스 message)만 다르고 구조는 동일하다.
+"""
 
 from __future__ import annotations
 

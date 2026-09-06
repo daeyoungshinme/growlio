@@ -191,7 +191,7 @@ services/
   │   ├── _order_quantity_guard.py # `clamp_sell_orders()`(매도→보유 수량) / `clamp_buy_orders_to_budget()`(매수→실행 직전 예산) — 양쪽 executor·FULL 공용
   │   ├── diagnosis_service.py # 진단 화면용 시장상황/리스크/세금영향 코멘트 생성 — needs_rebalancing 판정과 분리된 설명 전용, alert 아님
   │   ├── overview_enrichment.py # 목표 포트폴리오 미보유 종목의 배당수익률·현재가 보완 — rebalancing.py analyze_portfolio 전용
-  │   ├── broker_balance_service.py # 브로커(KIS/키움/토스) 실시간 잔고 조회 — rebalancing.py broker-balance 엔드포인트 전용. 토스 분기는 구현돼 있으나 엔드포인트·`active_broker_accounts_stmt()`·프론트 필터가 아직 KIS/키움만 통과시킴
+  │   ├── broker_balance_service.py # 브로커(KIS/키움/토스) 실시간 잔고 조회 — rebalancing.py broker-balance 엔드포인트 전용. 세 브로커 모두 도달(잔고·진단). 단 주문 실행은 execution_service.py/order_builder.py가 KIS/키움만 통과(토스 주문 API 미구현)
   │   └── _alert_queries.py   # RebalancingAlert portfolio_id+user_id 조회 헬퍼
   ├── backtest_service.py     # 백테스트 엔진 (상관관계 분석은 correlation_service.py로 분리됨)
   ├── correlation_service.py  # 종목 간 월별 수익률 상관관계 분석 — backtest_service.py에서 분리 (CorrelationRequest/Result 스키마)
@@ -283,7 +283,7 @@ providers/                    # 금융 데이터 provider
   ├── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
   ├── _overseas_cache.py      # KIS/키움 공용 해외 잔고 조회 캐시 헬퍼(has_overseas 캐시 플래그로 해외 보유 없는 계좌의 API 콜 스킵)
   ├── _overseas_name_enrichment.py # 해외 포지션 종목명 한글/영문 혼재 방지 — 동기화 시점에 티커 기준 영문 캐노니컬 이름 조회(stock_search_service.resolve_english_name) 후 캐싱, 조회 실패 시 브로커 원본명 폴백
-  └── _error_mapping.py       # KIS/키움 공용 HTTP 에러 매핑 (5xx/4xx 분기, ConnectError/TimeoutException) — 브로커별 에러 메시지 키(msg1 vs return_msg)만 파라미터로 받음
+  └── _error_mapping.py       # KIS/키움/토스 공용 HTTP 에러 매핑 (5xx/4xx 분기, ConnectError/TimeoutException) — 브로커별 에러 메시지 키(KIS msg1 / 키움 return_msg / 토스 message)만 파라미터로 받음
 utils/
   ├── cache_keys.py           # 캐시 키 빌더 + TTL 상수 (`dividend_ticker_summary_key` 등) — Tier1(휘발성) 캐시 전용, get_cached_json/set_cached_json/invalidate_* 포함
   ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom/Toss 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
@@ -348,7 +348,7 @@ rows = result.scalars().all()
 # 저장
 db.add(obj); await db.commit(); await db.refresh(obj)
 ```
-- Boolean 필터: `Model.is_active == True  # noqa: E712` (SQLAlchemy 연산자 호환)
+- Boolean 필터: `Model.is_active == True` (SQLAlchemy 연산자 호환 — `is True`/`== 1` 아님). ruff 설정에서 E712 제외라 `# noqa` 불필요. 활성 **계좌** 조회는 가능하면 `_account_queries`의 `active_accounts_stmt()`/`active_broker_accounts_stmt()` 사용
 
 **FK cascade 규칙**
 - `user_id` FK → `ondelete="CASCADE"` (유저 삭제 시 연관 데이터 전부 삭제)

@@ -14,7 +14,7 @@ from app.providers._error_mapping import map_http_status_error, map_network_erro
 from app.providers._overseas_cache import fetch_overseas_cached
 from app.providers._overseas_name_enrichment import enrich_overseas_names
 from app.providers._retry import with_token_refresh
-from app.providers.base import BalanceResult, BrokerProvider, raw_to_position
+from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
 from app.services.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
 
@@ -25,8 +25,6 @@ if TYPE_CHECKING:
     from app.models.asset import AssetAccount
 
 logger = structlog.get_logger()
-
-_SYNC_TIMEOUT = 50.0
 
 
 class KiwoomProvider(BrokerProvider):
@@ -85,7 +83,7 @@ class KiwoomProvider(BrokerProvider):
             )
 
         try:
-            domestic, overseas = await asyncio.wait_for(_do(), timeout=_SYNC_TIMEOUT)
+            domestic, overseas = await asyncio.wait_for(_do(), timeout=SYNC_TIMEOUT_SECONDS)
         except TimeoutError as e:
             logger.error("kiwoom_sync_timeout", account_no=account.kiwoom_account_no)
             raise ProviderNetworkError("키움 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.") from e

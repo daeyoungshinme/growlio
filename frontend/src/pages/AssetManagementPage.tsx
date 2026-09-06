@@ -26,6 +26,7 @@ import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "@/constants";
 import { useAssetManagementData } from "@/hooks/useAssetManagementData";
 import { useAssetModals } from "@/hooks/useAssetModals";
 import { useAccountMutations } from "@/hooks/useAccountMutations";
+import { isSyncableAccount } from "@/utils/accounts";
 import { useStockAccountStats } from "@/hooks/useStockAccountStats";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
@@ -385,10 +386,7 @@ export default function AssetManagementPage() {
           <StockPositionsModal
             accountId={positionsAccount.id}
             accountName={positionsAccount.name}
-            readonly={
-              positionsAccount.dataSource === "KIS_API" ||
-              positionsAccount.dataSource === "KIWOOM_API"
-            }
+            readonly={isSyncableAccount(positionsAccount.dataSource)}
             onClose={() => {
               setPositionsAccount(null);
               void invalidateAccountData(queryClient);

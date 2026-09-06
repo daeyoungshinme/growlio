@@ -264,7 +264,7 @@ async def get_broker_account_balance(
     db: AsyncSession = Depends(get_db),
     cache=Depends(get_cache_store),
 ):
-    """KIS 또는 키움 계좌의 실시간 보유 종목 잔고를 조회한다 (비활성 계좌 포함)."""
+    """KIS/키움/토스 계좌의 실시간 보유 종목 잔고를 조회한다 (비활성 계좌 포함)."""
     account = await get_account_including_inactive(db, account_id, current_user.id)
     if not account:
         logger.warning(
@@ -273,10 +273,10 @@ async def get_broker_account_balance(
             user_id=str(current_user.id),
         )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다")
-    if account.asset_type not in ("STOCK_KIS", "STOCK_KIWOOM"):
+    if account.asset_type not in ("STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="KIS 또는 키움 계좌만 잔고 조회가 가능합니다",
+            detail="KIS/키움/토스 계좌만 잔고 조회가 가능합니다",
         )
 
     try:
@@ -293,7 +293,7 @@ async def get_all_broker_balances(
     db: AsyncSession = Depends(get_db),
     cache=Depends(get_cache_store),
 ):
-    """연동된 모든 활성 KIS/키움 계좌의 실시간 잔고를 병렬로 조회한다."""
+    """연동된 모든 활성 KIS/키움/토스 계좌의 실시간 잔고를 병렬로 조회한다."""
     acc_result = await db.execute(active_broker_accounts_stmt(current_user.id))
     accounts = acc_result.scalars().all()
 

@@ -19,7 +19,7 @@ from app.exceptions import ProviderApiError, ProviderCredentialError, ProviderNe
 from app.providers._error_mapping import map_http_status_error, map_network_error
 from app.providers._overseas_name_enrichment import enrich_overseas_names
 from app.providers._retry import with_token_refresh
-from app.providers.base import BalanceResult, BrokerProvider, raw_to_position
+from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
@@ -32,15 +32,13 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
-_SYNC_TIMEOUT = 50.0
-
-
 _IP_BLOCK_MSG = "토스 API 접근이 거부되었습니다. 토스 `Open API → IP 관리`에 서버 IP가 등록되어 있는지 확인하세요."
+_EDGE_BLOCK_CODES = frozenset({"edge-blocked", "forbidden"})
 
 
 def _is_edge_blocked(response: httpx.Response) -> bool:
     try:
-        return (response.json().get("error") or {}).get("code") == "edge-blocked"
+        return (response.json().get("error") or {}).get("code") in _EDGE_BLOCK_CODES
     except Exception:
         return False
 
@@ -50,12 +48,12 @@ async def _run_fetch(do: Callable[[], Awaitable[dict]], *, account_id: str) -> d
     from app.toss.client import TossApiError
 
     try:
-        return await asyncio.wait_for(do(), timeout=_SYNC_TIMEOUT)
+        return await asyncio.wait_for(do(), timeout=SYNC_TIMEOUT_SECONDS)
     except TimeoutError as e:
         logger.error("toss_sync_timeout", account_id=account_id)
         raise ProviderNetworkError("토스 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.") from e
     except TossApiError as e:
-        if e.status_code == 403 or e.code in ("edge-blocked", "forbidden"):
+        if e.status_code == 403 or e.code in _EDGE_BLOCK_CODES:
             raise ProviderApiError(_IP_BLOCK_MSG, http_status=403) from e
         raise ProviderApiError(f"토스 계좌 조회 실패: {e.message} (코드={e.code})") from e
     except MaxRetriesExceededError as e:

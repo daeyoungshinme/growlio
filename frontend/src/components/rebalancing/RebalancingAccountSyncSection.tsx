@@ -5,11 +5,7 @@ import type { AssetAccount } from "@/api/assets";
 import { syncAccount } from "@/api/assets";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { isSyncableAccount } from "@/utils/accounts";
-
-const SOURCE_LABEL: Record<string, string> = {
-  KIS_API: "KIS",
-  KIWOOM_API: "키움",
-};
+import { STOCK_TYPE_LABELS } from "@/constants";
 
 type SyncResult = "idle" | "syncing" | "done" | "error";
 
@@ -98,7 +94,7 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
             />
             <span className="font-medium truncate max-w-[120px]">{account.name}</span>
             <span className="shrink-0 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded text-xs">
-              {SOURCE_LABEL[account.data_source] ?? account.data_source}
+              {STOCK_TYPE_LABELS[account.asset_type] ?? account.data_source}
             </span>
           </label>
         ))}

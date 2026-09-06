@@ -1,4 +1,4 @@
-"""KIS API 자격증명 AES-256 암호화/복호화."""
+"""KIS/키움/토스 API 자격증명 AES-256 암호화/복호화."""
 
 from __future__ import annotations
 
@@ -65,13 +65,6 @@ def decrypt_kiwoom_credentials(account: AssetAccount) -> tuple[str, str] | None:
     if not account.kiwoom_app_key or not account.kiwoom_app_secret:
         return None
     return decrypt(account.kiwoom_app_key), decrypt(account.kiwoom_app_secret)
-
-
-def decrypt_toss_credentials(account: AssetAccount) -> tuple[str, str] | None:
-    """계좌의 토스 Client ID/Secret을 복호화한다. 둘 중 하나라도 미설정이면 None."""
-    if not account.toss_client_id or not account.toss_client_secret:
-        return None
-    return decrypt(account.toss_client_id), decrypt(account.toss_client_secret)
 
 
 async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | None:
