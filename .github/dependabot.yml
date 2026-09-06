@@ -54,9 +54,10 @@ updates:
         patterns:
           - "@types/react"
           - "@types/react-dom"
-      # minor/patch는 한 PR로 묶는다. major(react 19, recharts 3, tailwind 4, zustand 5,
-      # vite, lucide-react, @sentry/react)는 개별 PR 유지 — docs/plans/20 #5 로드맵이
+      # minor/patch는 한 PR로 묶는다. major(recharts 3, tailwind 4, zustand 5,
+      # lucide-react, @sentry/react)는 개별 PR 유지 — docs/plans/20 #5 로드맵이
       # "하나씩 별도 PR로 검증"을 원함. @capacitor/* minor는 이 그룹으로 묶여 함께 올라감.
+      # react/react-dom/@vitejs/plugin-react/typescript major는 아래 ignore로 보류(React 18 고정).
       frontend-dependencies:
         patterns:
           - "*"
@@ -64,10 +65,30 @@ updates:
           - "minor"
           - "patch"
     ignore:
+      # React 19 미채택 — 프로젝트는 React 18에 고정(react-dom/@types/react-dom도 18).
+      # @types/react만 막으면 Dependabot이 react major PR에 @types/react를 "함께" 끌어와
+      # 부분 major 조합(react 19 + react-dom 18)이 되어 npm ERESOLVE로 CI가 깨진다.
+      # → react/react-dom 자체의 major를 막아야 조합 PR이 생기지 않는다.
+      - dependency-name: "react"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "react-dom"
+        update-types:
+          - "version-update:semver-major"
       - dependency-name: "@types/react"
-        versions: ["19.x"]
+        update-types:
+          - "version-update:semver-major"
       - dependency-name: "@types/react-dom"
-        versions: ["19.x"]
+        update-types:
+          - "version-update:semver-major"
+      # @vitejs/plugin-react 6은 React 19 피어를 요구 → React 18 유지 동안 major 보류
+      - dependency-name: "@vitejs/plugin-react"
+        update-types:
+          - "version-update:semver-major"
+      # TypeScript 7(네이티브 포트)은 별도 검증 필요 — major 자동 PR 보류
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"
