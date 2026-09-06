@@ -19,13 +19,17 @@ export default defineConfig({
     sourcemap: "hidden",
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-charts": ["recharts"],
-          "vendor-query": ["@tanstack/react-query"],
-          "vendor-dnd": ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
-          "vendor-router": ["react-router-dom"],
-          "vendor-utils": ["axios", "zod"],
-          "vendor-supabase": ["@supabase/supabase-js"],
+        // Vite 8은 번들러가 Rollup → Rolldown으로 바뀌어 `manualChunks` 객체 형식 대신
+        // Rolldown 네이티브 `advancedChunks.groups`(정규식 기반 모듈 매칭)를 사용한다.
+        advancedChunks: {
+          groups: [
+            { name: "vendor-charts", test: /[\\/]node_modules[\\/]recharts[\\/]/ },
+            { name: "vendor-query", test: /[\\/]node_modules[\\/]@tanstack[\\/]react-query[\\/]/ },
+            { name: "vendor-dnd", test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/ },
+            { name: "vendor-router", test: /[\\/]node_modules[\\/]react-router(-dom)?[\\/]/ },
+            { name: "vendor-utils", test: /[\\/]node_modules[\\/](axios|zod)[\\/]/ },
+            { name: "vendor-supabase", test: /[\\/]node_modules[\\/]@supabase[\\/]/ },
+          ],
         },
       },
     },
@@ -101,7 +105,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   server: {

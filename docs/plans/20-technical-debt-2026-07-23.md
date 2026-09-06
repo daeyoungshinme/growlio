@@ -31,6 +31,8 @@
 `npm outdated` 기준 뒤처진 메이저 버전:
 - `@sentry/react` 8.x → 10.x, `recharts` 2.x → 3.x, `react-router-dom` 6.x → 7.x, `tailwindcss` 3.x → 4.x, `zustand` 4.x → 5.x, `lucide-react` 0.x → 1.x, `vite` 6.x → 8.x, `react`/`react-dom` 18.x → 19.x.
 - 각각 breaking change가 있어(Tailwind 4는 설정 파일 구조 전면 변경, Recharts 3/Router 7은 API 변경) 한 번에 다 올리면 회귀 위험이 큼. 다음 세션에서 항목별로 리스크/이득을 따져 우선순위를 정하고, 하나씩 별도 PR로 검증 권장.
+- ✅ `vite` 6 → 8 완료 (2026-09-06). Dependabot이 `@vitejs/plugin-react`를 4.x에 둔 채 vite만 8로 올려 npm ERESOLVE로 CI가 깨진 걸 계기로 함께 처리. vite 8은 번들러가 Rollup → **Rolldown**으로 교체되어 `vite.config.ts`의 `rollupOptions.output.manualChunks`(객체) → `advancedChunks.groups`(정규식) 마이그레이션 필요. `@vitejs/plugin-react` 4 → 5.2.0(vite 8 지원, React 18 유지, 6.x의 oxc/rolldown-babel 재설계 회피). `__dirname` → `import.meta.dirname`. build/typecheck/lint/test(1463개) 통과. `dependabot.yml`에 `vite`·`@vitejs/plugin-react` major ignore 추가 — 이후 major는 건별 처리.
+- ✅ `react-router-dom` 6 → 7 완료(커밋 25a5ffc, open redirect CVE 해소).
 
 ## 이번 세션에서 조사 후 "조치 불필요"로 종결한 항목 (참고용, 재작업 대상 아님)
 
