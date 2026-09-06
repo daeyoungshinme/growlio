@@ -66,6 +66,7 @@ cd backend && uv run pytest --cov=app --cov-report=term-missing --cov-fail-under
 ```
 
 > 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`tests/conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `tests/conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
+> **Windows 주의:** 전체 `pytest` 실행 시 모든 테스트가 통과(`N passed`)한 뒤 인터프리터 종료 단계에서 access violation(exit `-1073741819` / `0xC0000005`)으로 비정상 종료 코드가 나올 수 있다 — 네이티브 확장(numpy/cryptography 등) teardown 이슈로, **테스트 실패가 아니다**. 단일 파일 실행과 Linux CI는 정상이므로 판정은 `N passed` 출력과 CI 결과를 기준으로 한다.
 > **주요 fixtures:** `mock_db` (AsyncSession mock, scalars/execute/commit/get 포함), `mock_cache` (in-memory 캐시 store mock — get/set/setex), `make_account` (AssetAccount stub), `make_snapshot` (AssetSnapshot stub), `make_user_settings` (UserSettings stub).
 
 **테스트 위치:** `backend/tests/` — 현재 목록은 `cd backend && uv run pytest --collect-only -q` 확인.
