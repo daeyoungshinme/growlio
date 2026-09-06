@@ -48,7 +48,7 @@ dependencies = [
     "scipy>=1.12.0",
     # 수치 계산 — estimation.py 등에서 직접 import (scipy/yfinance/pykrx 전이 의존이 아닌 직접 의존이므로 명시)
     "numpy>=1.26.0,<3.0.0",
-    "pandas>=2.0.0,<3.0.0",
+    "pandas>=2.0.0,<4.0.0",
     # XML 파서 (DART API — XXE/XML bomb 방어)
     "defusedxml>=0.7.1",
 ]
