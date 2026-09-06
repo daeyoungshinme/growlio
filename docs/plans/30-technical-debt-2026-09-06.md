@@ -42,7 +42,12 @@
 
 ## 이관 항목 (이번 세션 미착수)
 
-### 1. `goal_recommendation_service.py` 공통 모듈 추출 — 배치 C1, 이관
+> **2026-09-06 라운드 #2 갱신**: 1번(C1) **완료**(브랜치 `tech-debt-2026-09-06b`) —
+> `_goal_recommendation_common.py` 신규, grs 782→498줄, 테스트 patch 49곳 단일 경로 이전 +
+> autouse fixture 3→1. `pytest tests/test_goal_recommendation.py` 166 passed 전후 동일.
+> 2번(C2)은 characterization 스냅샷 테스트 하네스 선행이 필요해 다음 세션으로 재이관.
+
+### 1. `goal_recommendation_service.py` 공통 모듈 추출 — 배치 C1, **완료(2026-09-06 라운드 #2)**
 `e82fae4`의 투자기간별 분리는 크기를 옮겼을 뿐 줄이지 못했다(grs 782 / horizon 626 / age 346).
 `goal_horizon_recommendation_service.py`·`goal_age_recommendation_service.py`가 각각 grs에서
 **private 심볼 ~13개**를 import한다:
