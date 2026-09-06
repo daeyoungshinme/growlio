@@ -32,6 +32,10 @@ dependencies = [
     "yfinance>=0.2.66,<0.3.0",
     # KRX 공식 데이터 (ETF 분배금 이력 조회 — 인증 불필요)
     "pykrx>=1.0.47,<2.0.0",
+    # pykrx가 import 시 pkg_resources를 요구하는데 setuptools를 의존성으로 선언하지 않음.
+    # uv 가상환경은 setuptools를 자동 시딩하지 않아 CI에서 ModuleNotFoundError 발생 — 명시 필요.
+    # setuptools 81+는 pkg_resources를 제거했으므로 상한 필수.
+    "setuptools>=70.0.0,<81.0.0",
     # ETF 분배금/배당율 fallback 데이터 소스 (네이버 금융 기반, import: FinanceDataReader)
     "finance-datareader>=0.9,<1.0",
     # Rate limiting
