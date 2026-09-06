@@ -148,7 +148,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useStockAccountStats.ts` — 증권 계좌별 평가금액·투자원금·손익·입금액·배당액 통계 집계 (portfolio overview + 거래내역 조인)
 - `usePositionsEditor.ts` — 포지션(종목) 편집 폼 상태 관리
 - `usePortfolioItemsEditor.ts` — 포트폴리오 종목 편집 폼 상태 (종목 검색 연동)
-- `useKisCredentialVerify.ts` / `useTossCredentialVerify.ts` — KIS·토스 자격증명 검증 상태 머신 (`verify*Credentials` 래핑)
+- `createCredentialVerify.ts` — 브로커 자격증명 "확인" 버튼용 상태 머신(idle→loading→ok/error) 제네릭 팩토리. `useKisCredentialVerify.ts`/`useTossCredentialVerify.ts`는 검증 API 호출부만 클로저로 넘겨 얹은 얇은 래퍼 (`components/assets/CredentialVerifyButton.tsx`가 결과 UI 공용)
 
 *배당*
 - `useDividendData.ts` — 배당 요약 데이터 조회

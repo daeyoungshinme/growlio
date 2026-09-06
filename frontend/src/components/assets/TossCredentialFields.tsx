@@ -1,8 +1,8 @@
-import { CheckCircle, Info, XCircle } from "lucide-react";
+import { Info } from "lucide-react";
 import type { AssetAccountCreate } from "@/api/assets";
 import { INPUT_SM } from "@/constants/inputStyles";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useForm } from "@/hooks/useForm";
+import CredentialVerifyButton from "./CredentialVerifyButton";
 
 interface Props {
   form: AssetAccountCreate;
@@ -90,28 +90,13 @@ export default function TossCredentialFields({
         />
       </div>
 
-      {(!isEdit || form.toss_client_id || form.toss_client_secret) && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onVerify}
-            disabled={verifyState === "loading" || !form.toss_client_id || !form.toss_client_secret}
-            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors`}
-          >
-            {verifyState === "loading" ? "확인 중..." : "자격증명 확인"}
-          </button>
-          {verifyState === "ok" && (
-            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-              <CheckCircle size={14} /> 자격증명 확인됨
-            </span>
-          )}
-          {verifyState === "error" && (
-            <span className="flex items-center gap-1 text-xs text-red-500">
-              <XCircle size={14} /> {verifyError}
-            </span>
-          )}
-        </div>
-      )}
+      <CredentialVerifyButton
+        show={!isEdit || !!form.toss_client_id || !!form.toss_client_secret}
+        disabled={!form.toss_client_id || !form.toss_client_secret}
+        verifyState={verifyState}
+        verifyError={verifyError}
+        onVerify={onVerify}
+      />
 
       <div className="flex gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 p-2.5 text-xs text-blue-700 dark:text-blue-300">
         <Info size={14} className="mt-0.5 shrink-0" />

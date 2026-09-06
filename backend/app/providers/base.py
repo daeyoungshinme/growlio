@@ -14,6 +14,10 @@ if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
     from app.models.asset import AssetAccount
 
+# 계좌 1건 동기화(잔고+포지션 조회)의 전체 상한 — 초과 시 ProviderNetworkError.
+# 브로커 API 다중 왕복(토큰 갱신·국내/해외 분리 조회 등)을 감안한 값.
+SYNC_TIMEOUT_SECONDS = 50.0
+
 
 @dataclass
 class Position:
