@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { App } from "@capacitor/app";
 import Sidebar from "./Sidebar";
@@ -10,15 +10,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
 import { isNativePlatform } from "@/utils/platform";
-
-// 페이지 컴포넌트가 새로고침 콜백을 AppLayout에 등록하기 위한 컨텍스트
-interface RefreshContextValue {
-  registerRefresh: (fn: (() => Promise<void>) | null) => void;
-}
-
-const RefreshContext = createContext<RefreshContextValue>({
-  registerRefresh: () => {},
-});
+import { RefreshContext } from "./RefreshContext";
 
 export default function AppLayout() {
   const needsPasswordReset = useAuthStore((s) => s.needsPasswordReset);
@@ -130,5 +122,3 @@ export default function AppLayout() {
     </ExchangeRateProvider>
   );
 }
-
-export { RefreshContext };

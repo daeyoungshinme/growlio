@@ -12,10 +12,10 @@ import App from "./App";
 import "./index.css";
 import { STALE_TIME, PERSIST_CACHE_KEY } from "./constants/queryConfig";
 
-const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
-if (SENTRY_DSN) {
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
+if (sentryDsn) {
   Sentry.init({
-    dsn: SENTRY_DSN,
+    dsn: sentryDsn,
     environment: import.meta.env.MODE,
     release: import.meta.env.VITE_SENTRY_RELEASE as string | undefined,
     integrations: [Sentry.browserTracingIntegration()],
