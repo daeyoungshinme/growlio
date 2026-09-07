@@ -6,6 +6,7 @@ ConsoleRenderer)을 그대로 사용한다. `configure_logging()`은 그 체인�
 렌더러 바로 앞에 redact 프로세서만 끼워 넣어 기존 로그 포맷을 그대로 유지한다.
 """
 
+import logging
 import re
 
 import structlog
@@ -29,6 +30,29 @@ def _redact_processor(logger, method_name, event_dict):
     return event_dict
 
 
+_BENIGN_YF_PATTERNS = (
+    "No fundamentals data found for symbol",
+    "HTTP Error 404",
+)
+
+
+class _DropBenignYFinance404(logging.Filter):
+    """yfinance가 quoteSummary 404(상장폐지·OTC·비미국·일부 ETF 심볼에서 정상 발생)를
+    ERROR로 남기는 것을 억제한다. 배당/팩터 폴백 체인이 이미 처리하므로 순수 소음이다.
+    레이트리밋 등 다른 yfinance 로그는 통과시킨다.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return not any(p in msg for p in _BENIGN_YF_PATTERNS)
+
+
+def _quiet_yfinance_noise() -> None:
+    yf_logger = logging.getLogger("yfinance")
+    if not any(isinstance(f, _DropBenignYFinance404) for f in yf_logger.filters):
+        yf_logger.addFilter(_DropBenignYFinance404())
+
+
 def configure_logging() -> None:
     """앱 로거를 최초로 사용하기 전에 호출.
 
@@ -36,6 +60,7 @@ def configure_logging() -> None:
     `structlog.configure()`를 호출해두므로, 그 경우 여기서는 아무 것도 하지 않는다
     — 무조건 재설정하면 conftest의 설정을 덮어써 hang이 재발한다.
     """
+    _quiet_yfinance_noise()
     if structlog.is_configured():
         return
     processors = list(structlog.get_config()["processors"])

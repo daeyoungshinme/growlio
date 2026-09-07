@@ -1,8 +1,14 @@
 """app/core/logging.py의 시크릿 redaction 프로세서 테스트."""
 
+import logging
 from unittest.mock import patch
 
-from app.core.logging import _redact_processor, configure_logging, redact_secrets
+from app.core.logging import (
+    _DropBenignYFinance404,
+    _redact_processor,
+    configure_logging,
+    redact_secrets,
+)
 
 
 class TestRedactSecrets:
@@ -50,3 +56,33 @@ class TestConfigureLogging:
         ):
             configure_logging()
         mock_configure.assert_called_once_with(processors=["a", "b", _redact_processor, "renderer"])
+
+    def test_attaches_yfinance_noise_filter_once(self):
+        yf_logger = logging.getLogger("yfinance")
+        yf_logger.filters = [f for f in yf_logger.filters if not isinstance(f, _DropBenignYFinance404)]
+        try:
+            with patch("app.core.logging.structlog.is_configured", return_value=True):
+                configure_logging()
+                configure_logging()
+            attached = [f for f in yf_logger.filters if isinstance(f, _DropBenignYFinance404)]
+            assert len(attached) == 1
+        finally:
+            yf_logger.filters = [f for f in yf_logger.filters if not isinstance(f, _DropBenignYFinance404)]
+
+
+class TestDropBenignYFinance404:
+    def _record(self, msg: str) -> logging.LogRecord:
+        return logging.LogRecord("yfinance", logging.ERROR, __file__, 0, msg, None, None)
+
+    def test_drops_quotesummary_404_noise(self):
+        f = _DropBenignYFinance404()
+        msg = (
+            'HTTP Error 404: {"quoteSummary":{"result":null,"error":'
+            '{"code":"Not Found","description":"No fundamentals data found for symbol: SPYG"}}}'
+        )
+        assert f.filter(self._record(msg)) is False
+
+    def test_passes_through_other_yfinance_logs(self):
+        f = _DropBenignYFinance404()
+        assert f.filter(self._record("YFRateLimitError: Too Many Requests. Rate limited.")) is True
+        assert f.filter(self._record("network unreachable")) is True
