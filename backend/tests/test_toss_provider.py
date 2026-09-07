@@ -123,7 +123,7 @@ class TestTossProviderSync:
                 {
                     "ticker": "AAPL",
                     "name": "애플",
-                    "market": "NASDAQ",
+                    "market": "US",  # 토스 holdings는 미국 하위 거래소를 구분하지 않음 → 센티널
                     "qty": 5,
                     "avg_price": 150.0,
                     "current_price": 200.0,
@@ -142,8 +142,8 @@ class TestTossProviderSync:
             patch("app.toss.balance.get_balance", new=AsyncMock(return_value=bal)),
             patch("app.providers.toss_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
             patch(
-                "app.providers._overseas_name_enrichment.resolve_english_name",
-                new=AsyncMock(return_value="Apple Inc."),
+                "app.providers._overseas_name_enrichment.resolve_ticker_meta",
+                new=AsyncMock(return_value=("Apple Inc.", "NASDAQ")),
             ),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
@@ -153,6 +153,7 @@ class TestTossProviderSync:
         assert result.deposit_foreign == 100.0
         aapl = result.positions[0]
         assert aapl.name == "Apple Inc."
+        assert aapl.market == "NASDAQ"  # "US" 센티널 → enrich_overseas_positions()가 확정
         assert aapl.currency == "USD"
         assert aapl.avg_price_usd == 150.0
         assert aapl.avg_price == 150.0 * 1300.0

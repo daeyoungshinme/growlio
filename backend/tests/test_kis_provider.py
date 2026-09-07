@@ -153,11 +153,12 @@ class TestKISProviderSync:
                 new=AsyncMock(side_effect=Exception("quote unavailable")),
             ),
             patch(
-                "app.providers._overseas_name_enrichment.resolve_english_name",
-                new=AsyncMock(return_value="Apple Inc."),
+                "app.providers._overseas_name_enrichment.resolve_ticker_meta",
+                new=AsyncMock(return_value=("Apple Inc.", "NASDAQ")),
             ),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         aapl = next(p for p in result.positions if p.ticker == "AAPL")
         assert aapl.name == "Apple Inc."
+        assert aapl.market == "NASDAQ"  # KIS가 확정한 시장은 그대로 유지

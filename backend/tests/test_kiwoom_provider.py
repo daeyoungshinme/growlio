@@ -40,7 +40,7 @@ def _overseas_balance(total_value_usd=1_000.0, deposit_usd=100.0):
             {
                 "ticker": "AAPL",
                 "name": "Apple",
-                "market": "NASDAQ",
+                "market": "US",  # 키움 balance.py는 상장 거래소를 판별하지 않고 센티널만 채움
                 "qty": 5,
                 "avg_price": 150.0,
                 "current_price": 200.0,
@@ -147,7 +147,10 @@ class TestKiwoomProviderSync:
                 new=AsyncMock(return_value=_overseas_balance(total_value_usd=1_000.0, deposit_usd=100.0)),
             ),
             patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
-            patch("app.providers._overseas_name_enrichment.resolve_english_name", new=AsyncMock(return_value=None)),
+            patch(
+                "app.providers._overseas_name_enrichment.resolve_ticker_meta",
+                new=AsyncMock(return_value=(None, None)),
+            ),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -159,6 +162,7 @@ class TestKiwoomProviderSync:
         assert tickers == {"005930", "AAPL"}
         aapl = next(p for p in result.positions if p.ticker == "AAPL")
         assert aapl.currency == "USD"
+        assert aapl.market == "NASDAQ"  # 조회 실패 시 "US" 센티널 → NASDAQ 폴백
         assert aapl.avg_price_usd == 150.0
         assert aapl.avg_price == 150.0 * 1300.0
 
@@ -237,14 +241,21 @@ class TestKiwoomProviderSync:
             patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock(return_value=overseas)),
             patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
             patch(
-                "app.providers._overseas_name_enrichment.resolve_english_name",
-                new=AsyncMock(return_value="Apple Inc."),
+                "app.providers._overseas_name_enrichment.resolve_ticker_meta",
+                new=AsyncMock(return_value=("Apple Inc.", "NASDAQ")),
             ),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         aapl = next(p for p in result.positions if p.ticker == "AAPL")
         assert aapl.name == "Apple Inc."
-        from app.utils.cache_keys import TTL_OVERSEAS_STOCK_NAME, overseas_stock_name_key
+        assert aapl.market == "NASDAQ"
+        import json
 
-        mock_cache.setex.assert_any_call(overseas_stock_name_key("AAPL"), TTL_OVERSEAS_STOCK_NAME, "Apple Inc.")
+        from app.utils.cache_keys import TTL_OVERSEAS_STOCK_META, overseas_stock_meta_key
+
+        mock_cache.setex.assert_any_call(
+            overseas_stock_meta_key("AAPL"),
+            TTL_OVERSEAS_STOCK_META,
+            json.dumps({"name": "Apple Inc.", "market": "NASDAQ"}, ensure_ascii=False, allow_nan=False),
+        )

@@ -284,7 +284,7 @@ providers/                    # 금융 데이터 provider
   ├── _token_cache.py         # 토큰 캐싱 헬퍼
   ├── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
   ├── _overseas_cache.py      # KIS/키움 공용 해외 잔고 조회 캐시 헬퍼(has_overseas 캐시 플래그로 해외 보유 없는 계좌의 API 콜 스킵)
-  ├── _overseas_name_enrichment.py # 해외 포지션 종목명 한글/영문 혼재 방지 — 동기화 시점에 티커 기준 영문 캐노니컬 이름 조회(stock_search_service.resolve_english_name) 후 캐싱, 조회 실패 시 브로커 원본명 폴백
+  ├── _overseas_name_enrichment.py # 해외 포지션 메타 보강(`enrich_overseas_positions`) — 동기화 시점에 티커 기준 Yahoo Finance 조회(stock_search_service.resolve_ticker_meta)로 영문 캐노니컬 이름 + 상장 시장을 채우고 7일 캐싱(overseas_stock_meta_key). 이름 실패 시 브로커 원본, 시장은 브로커가 "US" 센티널/빈값으로 미확정한 경우에만 채우고 실패 시 NASDAQ 폴백(키움 ust21070·토스 holdings가 거래소 미구분). KIS 등 브로커 확정 시장은 불변
   └── _error_mapping.py       # KIS/키움/토스 공용 HTTP 에러 매핑 (5xx/4xx 분기, ConnectError/TimeoutException) — 브로커별 에러 메시지 키(KIS msg1 / 키움 return_msg / 토스 message)만 파라미터로 받음
 utils/
   ├── cache_keys.py           # 캐시 키 빌더 + TTL 상수 (`dividend_ticker_summary_key` 등) — Tier1(휘발성) 캐시 전용, get_cached_json/set_cached_json/invalidate_* 포함

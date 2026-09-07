@@ -17,7 +17,7 @@ import structlog
 
 from app.exceptions import ProviderApiError, ProviderCredentialError, ProviderNetworkError
 from app.providers._error_mapping import map_http_status_error, map_network_error
-from app.providers._overseas_name_enrichment import enrich_overseas_names
+from app.providers._overseas_name_enrichment import enrich_overseas_positions
 from app.providers._retry import with_token_refresh
 from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
 from app.providers.http_client import MaxRetriesExceededError
@@ -116,11 +116,8 @@ class TossProvider(BrokerProvider):
         raw_positions = bal["positions"]
         usd_positions = [p for p in raw_positions if p.get("currency") == "USD"]
         if usd_positions:
-            enriched = {p["ticker"]: p["name"] for p in await enrich_overseas_names(usd_positions, cache)}
-            raw_positions = [
-                {**p, "name": enriched.get(p["ticker"], p["name"])} if p.get("currency") == "USD" else p
-                for p in raw_positions
-            ]
+            enriched = {p["ticker"]: p for p in await enrich_overseas_positions(usd_positions, cache)}
+            raw_positions = [enriched.get(p["ticker"], p) if p.get("currency") == "USD" else p for p in raw_positions]
         positions = [raw_to_position(p, usd_krw_rate) for p in raw_positions]
 
         def _krw(components: dict) -> float:

@@ -62,7 +62,7 @@ TTL_GOAL_RECOMMENDATION = 3600  # 목표 역산 추천(전체/기간별) 1시간
 TTL_GOAL_CANDIDATE_DIVIDEND_YIELD = 3600  # 목표 역산 추천 후보 배당수익률 1시간 — ticker+market 전역 공유(유저 무관)
 TTL_REBALANCING_ANALYSIS = 90  # 리밸런싱 진단(analyze) 응답 90초 — 포트폴리오 선택 시 자동 실행되어 재방문마다
 # 전체 파이프라인(배당·수익률·현재가 다중 조회)이 재실행되는 것을 막기 위한 단기 캐시
-TTL_OVERSEAS_STOCK_NAME = 7 * 24 * 3600  # 해외 종목 영문 캐노니컬 이름 7일 — 회사명은 사실상 불변
+TTL_OVERSEAS_STOCK_META = 7 * 24 * 3600  # 해외 종목 영문 캐노니컬 이름 + 상장 시장 7일 — 사실상 불변
 
 # ---------------------------------------------------------------------------
 # 캐시 스키마 버전 상수
@@ -147,8 +147,9 @@ def has_overseas_key(account_id: uuid.UUID) -> str:
     return f"{_env_prefix()}has_overseas:{account_id}"
 
 
-def overseas_stock_name_key(ticker: str) -> str:
-    return f"{_env_prefix()}overseas_stock_name:{ticker}"
+def overseas_stock_meta_key(ticker: str) -> str:
+    """해외 종목 티커 → {name, market} JSON 캐시 키 (동기화 시점 Yahoo 조회 결과 재사용)."""
+    return f"{_env_prefix()}overseas_stock_meta:{ticker}"
 
 
 def dividend_summary_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:

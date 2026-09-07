@@ -14,7 +14,7 @@ from typing import Any
 
 import structlog
 
-from app.kiwoom.client import KiwoomApiError, kiwoom_request
+from app.kiwoom.client import kiwoom_request
 from app.kiwoom.constants import (
     API_ID_DOMESTIC_BALANCE,
     API_ID_DOMESTIC_DEPOSIT,
@@ -25,13 +25,11 @@ from app.kiwoom.constants import (
 logger = structlog.get_logger()
 
 _OVERSEAS_ACCOUNT_PATH = "/api/us/acnt"
-# ust21070의 stex_tp/stk_cd는 실측 결과 "둘 다 비움" 또는 "둘 다 지정"만 허용된다 —
-# 하나만 지정하면 1517(파라미터 누락) 오류, 지정한 거래소가 해당 종목의 실제 상장
-# 거래소가 아니면 1903("종목 정보가 없습니다") 오류가 난다. 즉 "거래소별 필터 조회"
-# 자체가 안 되고, stex_nm(응답 거래소명)도 실측 결과 항상 "미국"만 반환해 거래소
-# 구분에 못 쓴다. 그래서 (1) 먼저 비운 채로 호출해 보유종목 전체를 얻고, (2) 종목별로
-# ND/NY/NA를 각각 stk_cd와 함께 넣어 어느 조합이 성공하는지로 실제 상장 거래소를 판별한다.
-_STEX_TP_MARKETS: dict[str, str] = {"ND": "NASDAQ", "NY": "NYSE", "NA": "AMEX"}
+# ust21070은 상장 거래소를 신뢰성 있게 주지 않는다 — stex_tp 단독 필터는 1517 오류,
+# 응답 stex_nm은 항상 "미국"(국가명) 고정값. 그래서 market은 여기서 판별하지 않고 "US"
+# 센티널로 두고, provider가 enrich_overseas_positions()(Yahoo Finance 조회 + 7일 캐시)로
+# NASDAQ/NYSE/AMEX를 확정한다. providers._overseas_name_enrichment.UNRESOLVED_MARKET와 동일 값.
+_UNRESOLVED_MARKET = "US"
 
 
 def _auth_headers(access_token: str, api_id: str) -> dict[str, str]:
@@ -149,7 +147,8 @@ async def get_domestic_balance(
 
 async def _fetch_overseas_all(access_token: str, *, is_mock: bool) -> list[dict[str, Any]]:
     """ust21070을 stex_tp/stk_cd 없이 호출 — 보유종목 전체(수량·가격 포함)를 한 번에 받는다.
-    이 응답의 stex_nm은 항상 "미국"만 반환되어 거래소 구분에는 쓸 수 없다."""
+    이 응답의 stex_nm은 항상 "미국"만 반환되어 거래소 구분에는 쓸 수 없다(market은 provider의
+    enrich_overseas_positions()가 별도로 판별)."""
     headers = _auth_headers(access_token, API_ID_OVERSEAS_BALANCE)
     data = await kiwoom_request(
         "POST",
@@ -161,43 +160,6 @@ async def _fetch_overseas_all(access_token: str, *, is_mock: bool) -> list[dict[
     return data.get("result_list", [])
 
 
-async def _resolve_overseas_market(access_token: str, stk_cd: str, *, is_mock: bool) -> str:
-    """stex_tp(ND/NY/NA)를 stk_cd와 함께 각각 넣어 실제 성공하는 조합으로 상장 거래소를 판별한다.
-
-    이 프로빙은 본질적으로 최선 노력(best-effort) 호출이므로 1903(거래소 불일치,
-    KiwoomApiError) 뿐 아니라 rate limit 소진(MaxRetriesExceededError) 등 임의의 예외도
-    전부 "매칭 안 됨"으로 삼킨다 — 여기서 예외가 전파되면 get_overseas_balance()의
-    바깥쪽 gather 전체가 실패해 해외 잔고 전체가 EMPTY_OVERSEAS로 치환되고 기존에 저장된
-    해외 Position까지 삭제되는 결과로 이어지므로(asset_service.sync_account 참고),
-    종목 하나의 프로빙 실패가 다른 종목/조합에 영향을 주지 않도록 격리한다.
-    셋 다 실패(보유는 되어있는데 조회가 전부 안 되는 이례적인 경우)하면 가장 흔한
-    NASDAQ으로 폴백한다.
-    """
-    headers = _auth_headers(access_token, API_ID_OVERSEAS_BALANCE)
-
-    async def _try(stex_tp: str) -> str | None:
-        try:
-            await kiwoom_request(
-                "POST",
-                _OVERSEAS_ACCOUNT_PATH,
-                is_mock=is_mock,
-                headers=headers,
-                json={"stex_tp": stex_tp, "stk_cd": stk_cd},
-                quiet=True,  # 1903(거래소 불일치)은 프로빙의 정상 결과이지 오류가 아님
-            )
-            return stex_tp
-        except Exception as e:
-            if not isinstance(e, KiwoomApiError):
-                logger.warning("kiwoom_overseas_market_probe_failed", stk_cd=stk_cd, stex_tp=stex_tp, error=str(e))
-            return None
-
-    results = await asyncio.gather(*(_try(stex_tp) for stex_tp in _STEX_TP_MARKETS))
-    matched = next((tp for tp in results if tp), None)
-    if matched is None:
-        logger.warning("kiwoom_overseas_market_unresolved", stk_cd=stk_cd)
-    return _STEX_TP_MARKETS.get(matched or "", "NASDAQ")
-
-
 async def get_overseas_balance(
     access_token: str,
     account_no: str,
@@ -207,12 +169,12 @@ async def get_overseas_balance(
     """미국주식 잔고 조회 — 원장잔고(ust21070) + 예수금(ust21110), /api/us/acnt.
 
     국내(/api/dostk/acnt)와 경로 자체가 다르다. ust21070 응답의 stex_nm(거래소명)은 실측
-    결과 항상 "미국"(국가명)만 반환되어 거래소 구분에 쓸 수 없었다 — NASDAQ/NYSE/AMEX
-    보유가 전부 market="미국"으로 저장되어 수동입력/타 계좌의 동일 종목(예: QQQ-NASDAQ)과
-    ticker-market 키가 어긋나 리밸런싱 진단 등에서 별개 종목으로 취급되는 버그가 있었다.
-    stex_tp로 필터링해서 한 번에 거래소별 조회하는 것도 안 된다(stex_tp만 지정하면 1517
-    오류) — 그래서 전체 조회 후 종목별로 _resolve_overseas_market()을 호출해 market을
-    판별한다. account_no는 인터페이스 일관성을 위해서만 유지.
+    결과 항상 "미국"(국가명)만 반환되고, stex_tp 필터 조회도 안 되므로(stex_tp만 지정하면
+    1517, 거래소 불일치면 1903) 여기서는 상장 거래소를 판별하지 않는다 — market을 "US"
+    센티널로 두고 KiwoomProvider가 enrich_overseas_positions()(Yahoo Finance 조회 + 티커당
+    7일 캐시)로 NASDAQ/NYSE/AMEX를 확정한다. 과거에는 종목별로 ND/NY/NA를 각각 프로빙했으나
+    (보유 종목당 3콜, 2콜 이상은 반드시 1903 실패) NYSE Arca 상장 ETF(SPY 등)를 판별하지
+    못하고 로그를 오염시켜 폐기했다. account_no는 인터페이스 일관성을 위해서만 유지.
     """
     deposit_headers = _auth_headers(access_token, API_ID_OVERSEAS_DEPOSIT)
 
@@ -228,18 +190,15 @@ async def get_overseas_balance(
     )
 
     held_items = [item for item in items if int(_parse_num(item.get("poss_qty"))) > 0]
-    markets = await asyncio.gather(
-        *(_resolve_overseas_market(access_token, item.get("stk_cd", ""), is_mock=is_mock) for item in held_items)
-    )
 
     positions = []
-    for item, market in zip(held_items, markets, strict=True):
+    for item in held_items:
         crnc_code = item.get("crnc_code") or "USD"
         positions.append(
             {
                 "ticker": item.get("stk_cd"),
                 "name": item.get("frgn_stk_nm"),
-                "market": market,
+                "market": _UNRESOLVED_MARKET,
                 "qty": int(_parse_num(item.get("poss_qty"))),
                 "avg_price": _parse_price(item.get("frgn_stk_book_uv")),
                 "current_price": _parse_price(item.get("now_pric")),
