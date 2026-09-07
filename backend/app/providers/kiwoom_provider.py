@@ -12,7 +12,7 @@ import structlog
 from app.exceptions import ProviderApiError, ProviderCredentialError, ProviderNetworkError
 from app.providers._error_mapping import map_http_status_error, map_network_error
 from app.providers._overseas_cache import fetch_overseas_cached
-from app.providers._overseas_name_enrichment import enrich_overseas_names
+from app.providers._overseas_name_enrichment import enrich_overseas_positions
 from app.providers._retry import with_token_refresh
 from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
 from app.services.credential_service import decrypt
@@ -107,7 +107,7 @@ class KiwoomProvider(BrokerProvider):
             float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate for p in overseas["positions"]
         )
 
-        overseas_positions = await enrich_overseas_names(overseas["positions"], cache)
+        overseas_positions = await enrich_overseas_positions(overseas["positions"], cache)
         all_raw = domestic["positions"] + [
             {**p, "value_krw": p["value_usd"] * usd_krw_rate} for p in overseas_positions
         ]

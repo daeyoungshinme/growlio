@@ -99,11 +99,22 @@ async def _search_yahoo(q: str, limit: int) -> list[dict]:
     return results
 
 
-async def resolve_english_name(ticker: str) -> str | None:
-    """티커로 Yahoo Finance를 조회해 영문 캐노니컬 종목명을 반환한다. 정확히 일치하는 결과가
-    없으면 None (브로커 원본 이름으로 폴백하도록 호출부에서 처리)."""
+async def resolve_ticker_meta(ticker: str) -> tuple[str | None, str | None]:
+    """티커로 Yahoo Finance를 조회해 (영문 캐노니컬 종목명, 상장 시장) 튜플을 반환한다.
+
+    정확히 일치하는 결과가 없으면 (None, None). market은 `EXCHANGE_TO_MARKET`로 정규화된
+    값(KOSPI/KOSDAQ/NASDAQ/NYSE/AMEX 등)이며, Yahoo가 매핑되지 않은 거래소 코드를 주면
+    그대로 반환하므로 호출부에서 유효 시장 여부를 검증해야 한다.
+    """
     results = await _search_yahoo(ticker, limit=5)
     for r in results:
         if r["ticker"].upper() == ticker.upper():
-            return r["name"]
-    return None
+            return r["name"], r["market"]
+    return None, None
+
+
+async def resolve_english_name(ticker: str) -> str | None:
+    """티커로 Yahoo Finance를 조회해 영문 캐노니컬 종목명을 반환한다. 정확히 일치하는 결과가
+    없으면 None (브로커 원본 이름으로 폴백하도록 호출부에서 처리)."""
+    name, _ = await resolve_ticker_meta(ticker)
+    return name

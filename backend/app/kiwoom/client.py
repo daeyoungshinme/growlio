@@ -37,12 +37,11 @@ def _is_token_invalid_error(return_code: str, msg: str) -> bool:
     return return_code == "3" and "8005" in msg
 
 
-def _check_kiwoom_api_error(data: dict[str, Any], path: str, *, quiet: bool = False) -> None:
+def _check_kiwoom_api_error(data: dict[str, Any], path: str) -> None:
     return_code = data.get("return_code")
     if return_code is not None and str(return_code) != "0":
         msg = data.get("return_msg", "알 수 없는 오류")
-        log = logger.debug if quiet else logger.warning
-        log("kiwoom_api_error", return_code=return_code, msg=msg, path=path)
+        logger.warning("kiwoom_api_error", return_code=return_code, msg=msg, path=path)
         if _is_token_invalid_error(str(return_code), msg):
             raise KiwoomTokenExpiredError(msg)
         raise KiwoomApiError(str(return_code), msg)
@@ -57,14 +56,9 @@ async def kiwoom_request(
     params: dict[str, str] | None = None,
     json: dict[str, Any] | None = None,
     retries: int | None = None,
-    quiet: bool = False,
     retry_on_request_error: bool = True,
 ) -> dict[str, Any]:
-    """키움 OpenAPI+ 기본 HTTP 클라이언트.
-
-    quiet=True면 API 논리 오류(return_code != "0")를 WARNING 대신 DEBUG로 로깅한다 —
-    호출부가 실패를 정상 제어 흐름으로 취급하는 경우(예: 거래소구분 프로빙) 사용.
-    """
+    """키움 OpenAPI+ 기본 HTTP 클라이언트."""
     await _rate_limiter.acquire()  # broker_request 밖에서 호출 — 세마포어 취득 전 간격 보장
     return await broker_request(
         method,
@@ -78,7 +72,7 @@ async def kiwoom_request(
         semaphore=_semaphore,
         log_prefix="kiwoom",
         check_token_expired=_check_kiwoom_token_expired,
-        check_api_error=lambda data, path: _check_kiwoom_api_error(data, path, quiet=quiet),
+        check_api_error=_check_kiwoom_api_error,
         token_expired_exc=KiwoomTokenExpiredError,
         retry_on_request_error=retry_on_request_error,
     )
