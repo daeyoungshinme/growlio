@@ -86,7 +86,9 @@ class KiwoomProvider(BrokerProvider):
             domestic, overseas = await asyncio.wait_for(_do(), timeout=SYNC_TIMEOUT_SECONDS)
         except TimeoutError as e:
             logger.error("kiwoom_sync_timeout", account_no=account.kiwoom_account_no)
-            raise ProviderNetworkError("키움 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.") from e
+            raise ProviderNetworkError(
+                f"키움 API 응답 시간 초과 (약 {int(SYNC_TIMEOUT_SECONDS)}초). 잠시 후 다시 시도하세요."
+            ) from e
         except KiwoomApiError as e:
             raise ProviderApiError(f"키움 계좌 조회 실패: {e.msg} (코드={e.return_code})") from e
         except httpx.HTTPStatusError as e:

@@ -51,7 +51,9 @@ async def _run_fetch(do: Callable[[], Awaitable[dict]], *, account_id: str) -> d
         return await asyncio.wait_for(do(), timeout=SYNC_TIMEOUT_SECONDS)
     except TimeoutError as e:
         logger.error("toss_sync_timeout", account_id=account_id)
-        raise ProviderNetworkError("토스 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.") from e
+        raise ProviderNetworkError(
+            f"토스 API 응답 시간 초과 (약 {int(SYNC_TIMEOUT_SECONDS)}초). 잠시 후 다시 시도하세요."
+        ) from e
     except TossApiError as e:
         if e.status_code == 403 or e.code in _EDGE_BLOCK_CODES:
             raise ProviderApiError(_IP_BLOCK_MSG, http_status=403) from e

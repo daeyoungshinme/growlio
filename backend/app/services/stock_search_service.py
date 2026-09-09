@@ -111,10 +111,3 @@ async def resolve_ticker_meta(ticker: str) -> tuple[str | None, str | None]:
         if r["ticker"].upper() == ticker.upper():
             return r["name"], r["market"]
     return None, None
-
-
-async def resolve_english_name(ticker: str) -> str | None:
-    """티커로 Yahoo Finance를 조회해 영문 캐노니컬 종목명을 반환한다. 정확히 일치하는 결과가
-    없으면 None (브로커 원본 이름으로 폴백하도록 호출부에서 처리)."""
-    name, _ = await resolve_ticker_meta(ticker)
-    return name
