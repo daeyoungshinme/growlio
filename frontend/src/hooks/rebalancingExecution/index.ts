@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
+import { isOrderExecutableAccount } from "@/utils/accounts";
 import { triggerHaptic } from "../useHaptic";
 import { isOverseasMarket } from "@/constants/markets";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
@@ -56,8 +57,8 @@ function computeInitialBuyAndSelected(
   const defaultAccId = tradableAccounts[0]?.id ?? "";
 
   function getPrimaryAccountId(ticker: string): string {
-    const infos = (analysis.ticker_account_map[ticker] ?? []).filter(
-      (a) => a.asset_type === "STOCK_KIS",
+    const infos = (analysis.ticker_account_map[ticker] ?? []).filter((a) =>
+      isOrderExecutableAccount(a.asset_type),
     );
     if (infos.length === 0) return defaultAccId;
     return infos.reduce((best, a) => (a.quantity > best.quantity ? a : best), infos[0]).account_id;
@@ -77,7 +78,7 @@ function computeInitialBuyAndSelected(
   actionableItems.forEach((i) => {
     if ((i.shares_to_trade ?? 0) < 0) {
       (analysis.ticker_account_map[i.ticker] ?? [])
-        .filter((a) => a.asset_type === "STOCK_KIS")
+        .filter((a) => isOrderExecutableAccount(a.asset_type))
         .forEach((a) => selected.add(`sell_${i.ticker}_${a.account_id}`));
     } else if ((i.shares_to_trade ?? 0) > 0) {
       const accId = getPrimaryAccountId(i.ticker) || defaultAccId;
@@ -102,9 +103,7 @@ export function useRebalancingExecution({
   onExecuted,
 }: UseRebalancingExecutionParams) {
   const queryClient = useQueryClient();
-  const tradableAccounts = accounts.filter(
-    (a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM",
-  );
+  const tradableAccounts = accounts.filter((a) => isOrderExecutableAccount(a.asset_type));
 
   const [state, dispatch] = useReducer(
     executionReducer,
@@ -169,10 +168,7 @@ export function useRebalancingExecution({
       return liveBalances[accountId].some((p) => p.ticker === ticker && p.quantity > 0);
     }
     return (analysis.ticker_account_map[ticker] ?? []).some(
-      (a) =>
-        a.account_id === accountId &&
-        (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") &&
-        a.quantity > 0,
+      (a) => a.account_id === accountId && isOrderExecutableAccount(a.asset_type) && a.quantity > 0,
     );
   }
 

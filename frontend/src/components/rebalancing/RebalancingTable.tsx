@@ -3,6 +3,7 @@ import { Zap } from "lucide-react";
 import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { AssetAccount } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
+import { isOrderExecutableAccount } from "@/utils/accounts";
 import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import RebalancingDividendSection from "./RebalancingDividendSection";
@@ -30,9 +31,7 @@ export default function RebalancingTable({
   onExecuted,
   autoOpenExecution,
 }: Props) {
-  const tradableAccounts = accounts.filter(
-    (a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM",
-  );
+  const tradableAccounts = accounts.filter((a) => isOrderExecutableAccount(a.asset_type));
   const [executionOpen, setExecutionOpen] = useState(false);
 
   const autoOpenRef = useRef(autoOpenExecution);

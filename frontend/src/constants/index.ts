@@ -26,6 +26,9 @@ export const BANK_TYPE_LABELS: Record<string, string> = {
 };
 
 export const STOCK_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS", "STOCK_OTHER"];
+/** 리밸런싱 주문을 실제로 실행할 수 있는 브로커 계좌 asset_type — 토스 제외(주문 API 미구현).
+ * 백엔드 order_builder.ORDER_EXECUTABLE_ASSET_TYPES와 동일 집합 유지. */
+export const ORDER_EXECUTABLE_ASSET_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM"];
 export const BANK_TYPES: string[] = ["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"];
 /** 브로커 API 연동으로 데이터 동기화가 가능한 data_source 값 */
 export const SYNCABLE_DATA_SOURCES: string[] = ["KIS_API", "KIWOOM_API", "TOSS_API"];

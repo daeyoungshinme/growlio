@@ -21,6 +21,7 @@ import { invalidateRebalancingAlertData } from "@/utils/queryInvalidation";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import { recommendDriftThresholdPct } from "@/utils/rebalancingThresholdRecommendation";
+import { isOrderExecutableAccount } from "@/utils/accounts";
 
 const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
@@ -64,7 +65,7 @@ export function useRebalancingAlertQueries({
   });
 
   const brokerAccounts = accounts.filter(
-    (a) => (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") && a.is_active,
+    (a) => isOrderExecutableAccount(a.asset_type) && a.is_active,
   );
 
   const executionEligibleAccounts = brokerAccounts.filter(
@@ -73,7 +74,7 @@ export function useRebalancingAlertQueries({
 
   const autoExecutionAccounts = accounts.filter(
     (a) =>
-      (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") &&
+      isOrderExecutableAccount(a.asset_type) &&
       a.is_active &&
       (accountIds == null || accountIds.includes(a.id)),
   );
@@ -82,7 +83,7 @@ export function useRebalancingAlertQueries({
     ? accounts.find((a) => a.id === targetAccountId)
     : undefined;
   const targetAccountIsAutoEligible = targetAccountId
-    ? targetAccount?.asset_type === "STOCK_KIS" || targetAccount?.asset_type === "STOCK_KIWOOM"
+    ? !!targetAccount && isOrderExecutableAccount(targetAccount.asset_type)
     : true;
 
   return {
