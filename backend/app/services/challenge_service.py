@@ -77,20 +77,19 @@ async def _monthly_net_deposits(
     account_id: uuid.UUID | None,
 ) -> dict[str, float]:
     """start_month 이후 각 월의 순입금(DEPOSIT - WITHDRAWAL) 합계. {"2026-01": 500000.0, ...}"""
-    account_clause = "AND account_id = :account_id" if account_id is not None else ""
-    sql = text(f"""
+    base_sql = """
         SELECT to_char(transaction_date, 'YYYY-MM') AS month,
                SUM(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE -amount END) AS net
         FROM transactions
         WHERE user_id = :user_id
           AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
           AND to_char(transaction_date, 'YYYY-MM') >= :start_month
-          {account_clause}
-        GROUP BY 1
-    """)
+    """
     params: dict[str, Any] = {"user_id": str(user_id), "start_month": start_month}
     if account_id is not None:
+        base_sql += " AND account_id = :account_id"
         params["account_id"] = str(account_id)
+    sql = text(base_sql + " GROUP BY 1")
     result = await db.execute(sql, params)
     return {row.month: float(row.net) for row in result.all()}
 
