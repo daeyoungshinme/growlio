@@ -30,16 +30,14 @@ def _redact_processor(logger, method_name, event_dict):
     return event_dict
 
 
-_BENIGN_YF_PATTERNS = (
-    "No fundamentals data found for symbol",
-    "HTTP Error 404",
-)
+_BENIGN_YF_PATTERNS = ("No fundamentals data found for symbol",)
 
 
 class _DropBenignYFinance404(logging.Filter):
-    """yfinance가 quoteSummary 404(상장폐지·OTC·비미국·일부 ETF 심볼에서 정상 발생)를
-    ERROR로 남기는 것을 억제한다. 배당/팩터 폴백 체인이 이미 처리하므로 순수 소음이다.
-    레이트리밋 등 다른 yfinance 로그는 통과시킨다.
+    """yfinance가 quoteSummary 404(상장폐지·OTC·비미국·일부 ETF 심볼에서 `.info`/`.calendar`
+    조회 시 정상 발생 — "No fundamentals data found for symbol ...")를 ERROR로 남기는 것을
+    억제한다. 배당/팩터 폴백 체인이 이미 처리하므로 순수 소음이다. 레이트리밋이나 가격
+    조회(`.history()`) 404 등 다른 yfinance 로그는 통과시킨다.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:

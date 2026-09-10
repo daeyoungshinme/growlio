@@ -89,8 +89,8 @@ async def place_overseas_order(
 
     api-id/경로/파라미터명은 오픈소스 .NET 클라이언트(dongbin300/KiwoomRestApi.Net,
     Clients/UsStocks/KiwoomRestApiClientUsStockOrder.cs)로 교차검증 — 거래소 코드(stex_tp:
-    ND/NY/NA)는 balance.py의 실측 확정값과 일치. 국내주문과 달리 필드명이 stex_tp(dmst_stex_tp
-    아님)이고 trde_tp가 2자리 코드(00=지정가/03=시장가, 국내는 0/3 1자리)임에 주의.
+    ND/NY/NA)는 constants.py의 KIWOOM_OVERSEAS_MARKET_CODES 참고. 국내주문과 달리 필드명이
+    stex_tp(dmst_stex_tp 아님)이고 trde_tp가 2자리 코드(00=지정가/03=시장가, 국내는 0/3 1자리)임에 주의.
     """
     api_id = API_ID_OVERSEAS_BUY if side == "BUY" else API_ID_OVERSEAS_SELL
     headers = _auth_headers(access_token, api_id)

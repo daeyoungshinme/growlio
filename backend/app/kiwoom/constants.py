@@ -19,8 +19,9 @@ API_ID_OVERSEAS_DEPOSIT = "ust21110"  # 해외주식 예수금
 API_ID_OVERSEAS_BUY = "ust20000"  # 미국주식 매수주문
 API_ID_OVERSEAS_SELL = "ust20001"  # 미국주식 매도주문
 
-# 해외 거래소 코드(stex_tp) — balance.py의 _STEX_TP_MARKETS(실측 확정: ND/NY/NA)와 동일 체계.
-# 위 오픈소스 클라이언트의 KiwoomUsStockOrderExchangeType enum과도 일치(NA=AMEX/ND=NASDAQ/NY=NYSE).
+# 해외 거래소 코드(stex_tp) — 위 오픈소스 .NET 클라이언트의 KiwoomUsStockOrderExchangeType enum으로
+# 교차검증(NA=AMEX/ND=NASDAQ/NY=NYSE). 주문 경로 전용 — 잔고 조회는 거래소를 구분하지 않고
+# Yahoo enrichment(_overseas_name_enrichment.py)로 시장을 판별한다.
 KIWOOM_OVERSEAS_MARKET_CODES = {
     "NYSE": "NY",
     "NASDAQ": "ND",

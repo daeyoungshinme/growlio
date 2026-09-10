@@ -368,7 +368,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **리스크 유틸리티 (`src/utils/riskLevel.ts`)**
 - `buildMetrics(m)` — `PortfolioRiskMetrics`를 `RiskMetricsCard` 표시용 `MetricConfig[]`로 변환.
-- `summarizeRiskLevel(...)` — 리스크 레벨(`RiskLevel`: low/medium/high) 판정 + `LEVEL_BADGE` 색상 매핑. `RiskMetricsCard.tsx`/`DiagnosisSummaryHeader.tsx`가 소비.
+- `summarizeRiskLevel(...)` — 리스크 레벨(`RiskLevel`: low/medium/high) 판정 + `LEVEL_BADGE` 색상 매핑. `RiskMetricsCard.tsx`가 소비.
 
 **배당 유틸리티 (`src/utils/dividendUtils.ts`)**
 - `yieldBadgeClass(yield)` — 배당수익률에 따른 Tailwind 뱃지 클래스 반환 (≥7%: 초록, ≥4%: 에메랄드, ≥2%: 황색).

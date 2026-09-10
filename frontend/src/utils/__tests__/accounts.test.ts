@@ -5,6 +5,7 @@ import {
   isBankAccount,
   isSyncableAccount,
   isBrokerBalanceAccount,
+  isOrderExecutableAccount,
 } from "@/utils/accounts";
 
 describe("isPortfolioAccount", () => {
@@ -82,5 +83,22 @@ describe("isBrokerBalanceAccount", () => {
     expect(isBrokerBalanceAccount("STOCK_OTHER")).toBe(false);
     expect(isBrokerBalanceAccount("BANK_ACCOUNT")).toBe(false);
     expect(isBrokerBalanceAccount("")).toBe(false);
+  });
+});
+
+describe("isOrderExecutableAccount", () => {
+  it("KIS/키움 증권계좌는 true다", () => {
+    expect(isOrderExecutableAccount("STOCK_KIS")).toBe(true);
+    expect(isOrderExecutableAccount("STOCK_KIWOOM")).toBe(true);
+  });
+
+  it("토스는 주문 API 미구현이라 false다", () => {
+    expect(isOrderExecutableAccount("STOCK_TOSS")).toBe(false);
+  });
+
+  it("그 외 유형은 false다", () => {
+    expect(isOrderExecutableAccount("STOCK_OTHER")).toBe(false);
+    expect(isOrderExecutableAccount("BANK_ACCOUNT")).toBe(false);
+    expect(isOrderExecutableAccount("")).toBe(false);
   });
 });

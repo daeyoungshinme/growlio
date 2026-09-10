@@ -86,3 +86,9 @@ class TestDropBenignYFinance404:
         f = _DropBenignYFinance404()
         assert f.filter(self._record("YFRateLimitError: Too Many Requests. Rate limited.")) is True
         assert f.filter(self._record("network unreachable")) is True
+
+    def test_passes_through_non_quotesummary_404(self):
+        """상장폐지 티커의 가격 조회(`.history()`) 404 등은 삼키지 않는다."""
+        f = _DropBenignYFinance404()
+        assert f.filter(self._record("DELISTED?: possibly delisted; no price data found  (1d)")) is True
+        assert f.filter(self._record("HTTP Error 404: Not Found for url https://.../v8/finance/chart/XYZ")) is True
