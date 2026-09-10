@@ -54,6 +54,17 @@ updates:
         patterns:
           - "@types/react"
           - "@types/react-dom"
+      # vitest / @vitest/* 는 서로 exact-version 피어 의존(@vitest/ui, @vitest/coverage-v8가
+      # vitest 정확한 버전을 peer로 요구) → 하나씩 올리면 npm ERESOLVE로 CI(npm ci)가 깨진다.
+      # major 포함해 한 PR로 묶어 함께 올린다(테스트 러너 전용이라 prod 번들 영향 없음).
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+        update-types:
+          - "minor"
+          - "patch"
+          - "major"
       # minor/patch는 한 PR로 묶는다. major(recharts 3, tailwind 4, zustand 5,
       # lucide-react, @sentry/react)는 개별 PR 유지 — docs/plans/20 #5 로드맵이
       # "하나씩 별도 PR로 검증"을 원함. @capacitor/* minor는 이 그룹으로 묶여 함께 올라감.
