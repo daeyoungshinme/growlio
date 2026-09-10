@@ -21,6 +21,8 @@ export const QUERY_KEYS = {
     ["dividend-positions", accountId ?? "all"] as const,
   dcaAnalysis: ["dca-analysis"] as const,
   dividendPlan: ["dividend-plan"] as const,
+  challenges: ["challenges"] as const,
+  challengeSummary: ["challenges", "summary"] as const,
   settings: ["settings"] as const,
   exchangeRate: ["exchange-rate"] as const,
   exchangeRateAlerts: ["exchange-rate-alerts"] as const,

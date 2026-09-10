@@ -122,7 +122,8 @@ cd backend && uv run mypy app/
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
-- `UserSettings` — KIS/키움 자격증명(AES-256), 투자·입금 목표. 목표 역산 추천 옵션: `goal_short_term_equity_floor_pct`, `goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`(nullable=상한 없음, `PUT /settings/goal-recommendation-options`), `age_group`(nullable, TWENTIES~SIXTIES_PLUS, `birth_year`로 자동 파생 가능). AUTO 하루 거래대금 상한: `auto_rebalancing_daily_value_cap_krw`(nullable=무제한, `PUT /settings/auto-rebalancing-daily-cap`)
+- `InvestmentChallenge` — 적립식 투자 챌린지(매달 입금 습관/수익률/평가금액 목표). `challenge_type`(DEPOSIT/RETURN_PCT/TARGET_VALUE) × `target_amount`/`target_pct`/`target_months` 조합. `account_id`(DEPOSIT만 지정 허용, 나머지는 전체 투자자산). 진행률/스트릭은 저장 안 함
+- `UserSettings` — KIS/키움 자격증명(AES-256), 투자·입금 목표. `challenge_reminders_enabled`(적립 챌린지 독려/결산 알림 옵트인). 목표 역산 추천 옵션: `goal_short_term_equity_floor_pct`, `goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`(nullable=상한 없음, `PUT /settings/goal-recommendation-options`), `age_group`(nullable, TWENTIES~SIXTIES_PLUS, `birth_year`로 자동 파생 가능). AUTO 하루 거래대금 상한: `auto_rebalancing_daily_value_cap_krw`(nullable=무제한, `PUT /settings/auto-rebalancing-daily-cap`)
 
 > 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken`/`TossToken` 등 전체 목록은 `app/models/` 참고.
 
@@ -136,6 +137,7 @@ API Request
         ├── dashboard.py      # 대시보드 집계 라우터 (get_dashboard_summary 구현은 asset_aggregator.py)
         ├── dividends.py      # 배당금 요약 + 예상 배당금 + 월별 균등화 제안 — /summary, /positions, /by-ticker 모두 ?account_id= 옵션 지원(미지정 시 전체 계좌 통합)
         ├── invest.py         # DCA 분석 + 목표 설정 마법사용 필요수익률·적립액 프리뷰(GET /invest/goal-feasibility, 저장 없음)
+        ├── challenges.py     # 적립식 투자 챌린지 CRUD + 진행률/스트릭 조회(GET /challenges, /challenges/summary는 네비 배지용 경량)
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
         ├── portfolio_analysis.py  # 포트폴리오 분석 (prefix: /portfolio) — /overview, /allocation-history, /risk, /rebalancing-strategy. /overview·/allocation-history는 ?account_id= 옵션(미지정 시 전체 통합)
         ├── rebalancing.py    # 리밸런싱 추천 + 목표 역산 추천(GET /rebalancing/goal-recommendation/{by-horizon,by-age}) + 적용 전 비교 미리보기(GET /rebalancing/portfolios/{id}/expected-metrics)
@@ -199,6 +201,7 @@ services/
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend/fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
+  ├── challenge_service.py    # 적립식 투자 챌린지 진행률/스트릭 계산 + CRUD — 스트릭 기본단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변). DEPOSIT/RETURN_PCT/TARGET_VALUE 타입, 진행률은 저장 안 하고 매 조회 시 transactions/스냅샷에서 재계산
   ├── estimation.py           # MVO 입력 축소추정 유틸 — Ledoit-Wolf 공분산 축소(`shrink_covariance`) + James-Stein류 기대수익률 축소(`shrink_expected_returns`, 고정 가정 노이즈분산 사용 — 표본분산 재사용 시 축소강도 상쇄 버그 주의). 순수 계산, `goal_portfolio_optimizer.py`/`portfolio_optimizer.py` 공용
   ├── goal_recommendation_service.py  # 전체 자산 기준 목표 역산 추천 API 진입점(`get_goal_recommendation`) — 목표금액/월적립액/목표연도 → 필요수익률 역산 → MVO 최적화로 최소분산 포트폴리오 추천. 배당 목표(`annual_dividend_goal`)는 필요 배당수익률 제약으로 전달(달성 불가 시 fail-soft). `_suggest_for_dividend_goal()`은 등록 후보로 배당 목표가 어려우면 큐레이션 유니버스(`recommendation_universe.py`)에서 고배당 미등록 후보를 `suggested_candidates`로 제안(DB·계산 미반영, 사용자가 "후보에 추가"로 승인 → `PUT /settings/goal-candidate-tickers` 저장 → 다음 추천부터 반영). `_get_or_seed_candidates()`는 최초 1회만 시딩(자동 병합 없음). `compute_portfolio_expected_metrics()`(적용 전 비교), `compute_recommendation_drift()`(프론트 `recommendationDrift.ts` 포팅, 주간 job 전용). 추천은 자동 반영 안 됨 — 수동 적용
   ├── _goal_recommendation_common.py  # goal_recommendation/age/horizon 세 진입점이 공유하는 헬퍼 소유 모듈 — 배당수익률 조회(`_fetch_dividend_yields`, ticker+market 전역 캐시)·시장신호(`_fetch_market_signal_level`)·MVO 결과 조합(`_attach_dividend_yield`)·배당목표 후보제안(`_suggest_for_dividend_goal`)·자산군 bounds 변환(`_equity_class_bounds`)·현금성 합성수익률(`_cash_equivalent_daily_returns`) + `_CASH_EQUIVALENT_*`/`_NON_BINDING_RETURN_FLOOR`/`_DEFAULT_CAGR_LOOKBACK_YEARS` 상수. 세 소비 모듈이 `import _goal_recommendation_common as _grc` 후 `_grc.fn()` 모듈 참조로 호출 — 테스트 patch 경로도 `_goal_recommendation_common.*` 하나로 통일(과거 3경로 patch). 역방향 의존 없음
@@ -256,6 +259,7 @@ services/
 schemas/                      # Pydantic 요청/응답 스키마
   ├── _validators.py          # 공용 field_validator 헬퍼
   ├── asset.py / auth.py / backtest.py / invest.py / portfolio.py
+  ├── challenge.py             # 적립식 투자 챌린지 스키마 (challenges.py 전용) — ChallengeCreate/Update/Response/Progress/Month/Summary
   ├── transaction.py           # 입출금/배당 내역 스키마 (transactions.py 전용)
   ├── dashboard.py              # 대시보드 응답 스키마 (dashboard.py 전용)
   ├── rebalancing/             # 리밸런싱 스키마 패키지 — `__init__.py`가 전체 재노출하므로 `from app.schemas.rebalancing import X`는 무변경
@@ -300,6 +304,8 @@ jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 15:30 KST intraday + 18:00 KST daily 전체 계좌 스냅샷
   ├── exchange_rate_alert.py  # 5분 간격 환율 알림 체크
   ├── goal_achievement.py     # 매일 18:45 KST 투자 목표 달성도 확인
+  ├── challenge_deposit_reminder.py  # 매월 25일 09:00 KST — 이번 달 적립 안 한 입금 챌린지 독려(옵트인). 챌린지별 durable_state dedup
+  ├── challenge_monthly_wrap.py      # 매월 1일 09:30 KST — 지난달 적립 챌린지 결산(달성/미달·스트릭·마일스톤) + 수익률/평가금액 챌린지 목표 도달 시 status=COMPLETED 전환
   ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송
   ├── rebalancing_alert.py    # 10분 간격(app/scheduler.py:44) — 리밸런싱 드리프트 초과 시 이메일 알림(SCHEDULE/DRIFT/BOTH 조건 체크)
   ├── market_signal_alert.py  # 1시간 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림

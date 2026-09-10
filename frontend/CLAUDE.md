@@ -77,7 +77,7 @@ make build-android-release         # APK Release 빌드
 - `/rebalancing/plan-confirm?token=` — 리밸런싱 자동화 매수 취소/매도 승인 (RebalancingPlanConfirmPage, 이메일 링크 전용, 인증 불필요)
 - `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
 - `/assets` — **자산 관리 허브** 단일 라우트. `AssetsPage`가 내부적으로 "투자현황"(조회 전용 PortfolioContent)/"계좌관리"(CRUD AssetManagementContent) 2개 탭으로 분기 (`ASSETS_TOP_TABS`, `?tab=` 쿼리 파라미터)
-- `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
+- `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 + 적립 챌린지 (InvestPlanPage, 상단 탭: 적립 계획/챌린지/배당 계획)
 - `/settings` — DART API 키, 계정 정보(비밀번호 변경), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). 계좌 연동·목표·DCA·추천 옵션·알림 설정은 각 페이지에 실제 편집 UI가 있고 설정 탭엔 상태 요약 + 딥링크만
 - `/settings/notifications` — 알림 설정 상세(`NotificationSettingsPage`, `/settings`에서 딥링크). 공통 수신 이메일(`NotificationEmailSection`) + `CollapsibleCard` 3개("정기 리포트·요약"/"즉시 알림"/"시장 모니터링") + 환율/주가/발송이력 탭. `MarketSignalBanner.tsx`/`RebalancingHistoryTab.tsx`의 `?atab=` 딥링크가 이 경로를 가리킴
 - `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
@@ -110,6 +110,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/portfolio-analysis/TaxLimitsSection.tsx`** — "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`(계좌 조건부) + `HealthInsuranceRiskCard`(항상)를 감싸는 순수 프레젠테이션. 항상 전체 계좌 기준(`accountId` prop 없음). 항상 렌더 카드가 있어 empty-state 없음.
 - **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드(lazy). 전체/연령대/기간별 3탭. 결과 렌더는 `RecommendationResultPanel.tsx`로 통합, 탭별 문구·`useMutation`·전환 상태머신은 이 파일.
 - **`components/rebalancing/RecommendationResultPanel.tsx`** — 3탭 공유 추천 결과 프레젠테이션(드리프트 배지·`RecommendationWeightList`·`MarketSignalLevelBadge`·`SuggestedCandidatesBlock`·`RecommendationApplySection`). `applySection===null`이면 적용 섹션 생략(현금성 자동 연결 계좌 없을 때).
+- **`components/invest/ChallengeSection.tsx`** — 계획 탭 "챌린지" 서브탭(lazy). `useChallenges`+`useChallengeMutations`, `ChallengeCard` 리스트, `ChallengeFormModal`(생성/편집), `ChallengeMonthGrid`(적립 습관 캘린더). 스트릭 기준은 백엔드가 "월 순입금>0"으로 계산 — 목표액 수정해도 과거 스트릭 불변. `components/dashboard/ChallengeProgressCard.tsx`가 홈에서 진행 중 챌린지 요약(입금 스트릭 우선), `BottomNav`가 `useChallengeNudge`로 계획 탭 아이콘에 빨간 점.
 - **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정 6단계 마법사(자산 확인→금액/시점→월 적립액→결과→투자성향·배당목표→추천 포트폴리오). `GET /invest/goal-feasibility`로 프리셋별 필요 적립액 역산, 6단계에서 `GET /rebalancing/goal-recommendation` → "이 추천으로 포트폴리오 만들기"로 신규 `Portfolio` 생성(계좌 미연결). `InvestPlanPage.tsx`의 플랫 편집 모달(재설정 전용)과 별개. 상태: `useGoalSettings.ts`.
 
 **Android 홈 위젯:** `useWidget.ts`(React 훅) ↔ `src/plugins/WidgetPlugin.ts`(Capacitor 플러그인 브리지) ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java`. 위젯 UI 변경 시 네이티브 Java 코드도 함께 수정 필요.
@@ -162,6 +163,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
 - `useGoalSettings.ts` — 투자 목표 설정 폼 상태
+- `useChallenges.ts` / `useChallengeMutations.ts` / `useChallengeNudge.ts` — 적립 챌린지 목록 조회 / 생성·수정·삭제 뮤테이션 / 하단 네비 배지용 넛지 요약
 - `useAddSuggestedCandidates.ts` — 목표 역산 추천의 `suggested_candidates`(고배당 미등록 후보 제안)를 "후보에 추가" 클릭으로 승인하는 뮤테이션. `RecommendationCard.tsx`/`DividendPlanSection.tsx` 공용
 - `usePortfolioTabFetching.ts` — 포트폴리오 탭 데이터 프리패치
 
@@ -173,6 +175,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useGoalAchievementAlertsToggle.ts` — 목표 달성 알림 on/off. `goal_achievement_alerts_enabled` · `PUT /settings/goal-achievement-alerts`. 기본 `true`
 - `useMonthlyReportAlertsToggle.ts` — 월간 리포트 이메일 on/off. `monthly_report_enabled` · `PUT /settings/monthly-report-alerts`. 기본 `true`
 - `useRecommendationDriftAlertToggle.ts` — "추천 비중이 달라졌어요" 알림 on/off. `recommendation_drift_alert_enabled` · `PUT /settings/recommendation-drift-alert`. 기본 `false`(옵트인)
+- `useChallengeRemindersToggle.ts` — 적립 챌린지 독려(매월 25일)·월간 결산(매월 1일) 알림 on/off. `challenge_reminders_enabled` · `PUT /settings/challenge-reminders`. 기본 `false`(옵트인)
 
 *모바일/네이티브 (Capacitor)*
 - `useBiometric.ts` — 생체 인증 (Capacitor Android)
@@ -258,6 +261,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 | 배당금 요약 (accountId 지정 시 계좌별) | `["dividend-summary", accountId]` — `dividendSummaryBase` 무효화 전용 |
 | 배당금 포지션 (accountId 지정 시 계좌별) | `["dividend-positions", accountId]` — `dividendPositionsBase` 무효화 전용 |
 | DCA 분석 (InvestPlanPage + DashboardPage) | `["dca-analysis"]` |
+| 적립 챌린지 목록 + 진행률 (계획 탭 · 대시보드) | `["challenges"]` |
+| 적립 챌린지 넛지 요약 (하단 네비 배지) | `["challenges", "summary"]` |
 | 배당 계획 (연/월배당) | `["dividend-plan"]` |
 | 배당 월별 균등화 제안 | `["monthly-optimization"]` |
 | 설정 | `["settings"]` |
@@ -428,7 +433,9 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 등 무효화.
 - 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions-all + dashboard 무효화.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
-- DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard 무효화.
+- DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + challenges 무효화.
+- 적립 챌린지 CUD 후: `invalidateChallengeData(queryClient)` — challenges(+summary 프리픽스) + dashboard 무효화.
+- 적립 챌린지 알림 설정 변경 후: `invalidateChallengeRemindersData(queryClient)` — settings 무효화.
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
 - 배당 계획 변경 후: `invalidateDividendPlanData(queryClient)`.

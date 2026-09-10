@@ -63,6 +63,7 @@ TTL_GOAL_CANDIDATE_DIVIDEND_YIELD = 3600  # 목표 역산 추천 후보 배당�
 TTL_REBALANCING_ANALYSIS = 90  # 리밸런싱 진단(analyze) 응답 90초 — 포트폴리오 선택 시 자동 실행되어 재방문마다
 # 전체 파이프라인(배당·수익률·현재가 다중 조회)이 재실행되는 것을 막기 위한 단기 캐시
 TTL_OVERSEAS_STOCK_META = 7 * 24 * 3600  # 해외 종목 영문 캐노니컬 이름 + 상장 시장 7일 — 사실상 불변
+TTL_CHALLENGE_PROGRESS = 300  # 적립 챌린지 진행률(진행률/스트릭) 5분 — 목표/거래내역 변경 시 수동 무효화가 primary
 
 # ---------------------------------------------------------------------------
 # 캐시 스키마 버전 상수
@@ -117,6 +118,11 @@ def dashboard_summary_key(user_id: uuid.UUID) -> str:
 
 def monthly_trend_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}monthly_trend:{user_id}"
+
+
+def challenge_progress_key(user_id: uuid.UUID) -> str:
+    """적립 챌린지 목록+진행률 응답(JSON) 캐시 키."""
+    return f"{_env_prefix()}challenge_progress:{user_id}"
 
 
 def dividend_ticker_summary_key(user_id: uuid.UUID, year: int, acct_suffix: str = "all") -> str:

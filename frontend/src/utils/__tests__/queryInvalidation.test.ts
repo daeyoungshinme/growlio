@@ -11,6 +11,8 @@ import {
   invalidateRebalancingAlertData,
   invalidateRebalancingHistoryData,
   invalidateGoalRecommendationData,
+  invalidateChallengeData,
+  invalidateChallengeRemindersData,
 } from "../queryInvalidation";
 
 function makeQueryClient() {
@@ -44,12 +46,32 @@ describe("invalidateAccountData", () => {
 });
 
 describe("invalidateTransactionData", () => {
-  it("transactions, dashboard 무효화", async () => {
+  it("transactions, dashboard, challenges 무효화", async () => {
     const qc = makeQueryClient();
     await invalidateTransactionData(qc as any);
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
     expect(keys).toContain("transactions");
     expect(keys).toContain("dashboard");
+    expect(keys).toContain("challenges");
+  });
+});
+
+describe("invalidateChallengeData", () => {
+  it("challenges, dashboard 무효화", async () => {
+    const qc = makeQueryClient();
+    await invalidateChallengeData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toContain("challenges");
+    expect(keys).toContain("dashboard");
+  });
+});
+
+describe("invalidateChallengeRemindersData", () => {
+  it("settings 무효화", async () => {
+    const qc = makeQueryClient();
+    await invalidateChallengeRemindersData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toContain("settings");
   });
 });
 

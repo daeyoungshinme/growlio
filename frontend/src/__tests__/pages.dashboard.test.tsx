@@ -93,6 +93,7 @@ describe("DashboardPage", () => {
       accountsLoading: true,
       exchangeRate: null,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     await waitFor(() => {
@@ -113,6 +114,7 @@ describe("DashboardPage", () => {
       accountsLoading: false,
       exchangeRate: null,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     expect(screen.getByText("데이터를 불러오지 못했습니다")).toBeInTheDocument();
@@ -132,6 +134,7 @@ describe("DashboardPage", () => {
       accountsLoading: false,
       exchangeRate: null,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     expect(screen.getByText("데이터를 불러오지 못했습니다")).toBeInTheDocument();
@@ -150,6 +153,7 @@ describe("DashboardPage", () => {
       accountsLoading: false,
       exchangeRate: 1350,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     expect(screen.queryByText("데이터를 불러오지 못했습니다")).not.toBeInTheDocument();
@@ -169,6 +173,7 @@ describe("DashboardPage", () => {
       accountsLoading: false,
       exchangeRate: 1350,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     expect(screen.getByText("Growlio 시작하기")).toBeInTheDocument();
@@ -188,6 +193,7 @@ describe("DashboardPage", () => {
       accountsLoading: true,
       exchangeRate: 1350,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     // accountsLoading=true means we skip the empty-accounts branch
@@ -209,6 +215,7 @@ describe("DashboardPage", () => {
       accountsLoading: false,
       exchangeRate: 1350,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
@@ -229,6 +236,7 @@ describe("DashboardPage", () => {
       accountsLoading: false,
       exchangeRate: 1350,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
@@ -247,6 +255,7 @@ describe("DashboardPage", () => {
       accountsLoading: false,
       exchangeRate: 1350,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
@@ -265,6 +274,7 @@ describe("DashboardPage", () => {
       accountsLoading: false,
       exchangeRate: null,
       marketSignal: undefined,
+      challenges: [],
     });
     renderDashboard();
     const retryBtn = screen.getByRole("button", { name: "다시 시도" });

@@ -125,6 +125,22 @@ def init_scheduler() -> None:
         id="recommendation_drift_alert",
         replace_existing=True,
     )
+    from app.jobs.challenge_deposit_reminder import run_challenge_deposit_reminder
+
+    scheduler.add_job(
+        run_challenge_deposit_reminder,
+        CronTrigger(day=25, hour=9, minute=0, timezone="Asia/Seoul"),
+        id="challenge_deposit_reminder",
+        replace_existing=True,
+    )
+    from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
+
+    scheduler.add_job(
+        run_challenge_monthly_wrap,
+        CronTrigger(day=1, hour=9, minute=30, timezone="Asia/Seoul"),
+        id="challenge_monthly_wrap",
+        replace_existing=True,
+    )
     from app.jobs.cache_sweep import run_cache_sweep
 
     scheduler.add_job(

@@ -101,6 +101,7 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     goal_achievement_alerts_enabled: true,
     monthly_report_enabled: true,
     recommendation_drift_alert_enabled: false,
+    challenge_reminders_enabled: false,
     goal_candidate_tickers: [
       { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", asset_class: "EQUITY" },
     ],

@@ -4,6 +4,7 @@ import { fetchDashboard } from "@/api/dashboard";
 import { fetchDCAAnalysis } from "@/api/invest";
 import { fetchAllocationHistory, fetchPortfolioOverviewLite } from "@/api/portfolios";
 import { fetchMarketSignal } from "@/api/marketSignals";
+import { fetchChallenges } from "@/api/challenges";
 import { useExchangeRate } from "./useExchangeRate";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
@@ -37,6 +38,12 @@ export function useDashboardData() {
     staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 계좌 목록은 자주 변하지 않음
   });
 
+  const { data: challenges = [] } = useQuery({
+    queryKey: QUERY_KEYS.challenges,
+    queryFn: fetchChallenges,
+    staleTime: STALE_TIME.MEDIUM,
+  });
+
   const exchangeRate = useExchangeRate();
 
   const { data: marketSignal } = useQuery({
@@ -66,5 +73,6 @@ export function useDashboardData() {
     accountsLoading,
     exchangeRate,
     marketSignal,
+    challenges,
   };
 }

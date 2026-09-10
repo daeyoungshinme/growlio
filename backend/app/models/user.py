@@ -78,6 +78,9 @@ class UserSettings(Base):
     # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
     # 달라지면 이메일/푸시 발송 — 옵트인(기본 OFF)
     recommendation_drift_alert_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # 적립 챌린지 독려·결산 알림(CHALLENGE_REMINDER/CHALLENGE_WRAPUP) 전역 수신 — 옵트인(기본 OFF).
+    # job이 이 플래그로 1차 필터, 챌린지별 InvestmentChallenge.reminder_enabled로 2차 필터
+    challenge_reminders_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # AUTO 리밸런싱(대기 플랜 생성) 유저 단위 하루 합산 거래대금 상한(KRW) — NULL이면 상한 없음(기존
     # 동작과 동일, 기본값). 주문 1건당 상한(auto_rebalancing_max_order_value_krw, env 설정)과 별개로,
     # PER_ACCOUNT 스코프에서 여러 알림이 같은 날 각각 개별 상한까지 트리거될 때 합산 노출을 제한한다.

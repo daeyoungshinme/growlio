@@ -5,6 +5,7 @@ from app.api.v1 import (
     assets,
     auth,
     backtest,
+    challenges,
     dashboard,
     dividends,
     economic_indicators,
@@ -37,6 +38,7 @@ router.include_router(transactions.router)
 router.include_router(dividends.router)
 router.include_router(insights.router)
 router.include_router(invest.router)
+router.include_router(challenges.router)
 router.include_router(backtest.router)
 router.include_router(rebalancing.router)
 router.include_router(rebalancing_execution.router)

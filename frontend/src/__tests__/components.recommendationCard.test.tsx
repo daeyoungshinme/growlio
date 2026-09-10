@@ -128,6 +128,7 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     goal_achievement_alerts_enabled: true,
     monthly_report_enabled: true,
     recommendation_drift_alert_enabled: false,
+    challenge_reminders_enabled: false,
     goal_candidate_tickers: [],
     goal_risk_tolerance: "CONSERVATIVE",
     goal_max_weight_pct: 40.0,

@@ -36,12 +36,26 @@ export function invalidateAccountData(qc: QueryClient) {
   ]);
 }
 
-/** 거래내역 CUD 후 — transactions + dashboard */
+/** 거래내역 CUD 후 — transactions + dashboard + 적립 챌린지(입금이 스트릭에 영향) */
 export function invalidateTransactionData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
   ]);
+}
+
+/** 적립 챌린지 CUD 후 — challenges(+summary 프리픽스 매칭) + dashboard */
+export function invalidateChallengeData(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
+  ]);
+}
+
+/** 적립 챌린지 알림 수신 여부 설정 변경 후 */
+export function invalidateChallengeRemindersData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 }
 
 /** 포트폴리오/백테스트/리밸런싱 CUD 후 */
@@ -54,13 +68,14 @@ export function invalidatePortfolioData(qc: QueryClient) {
   ]);
 }
 
-/** DCA 목표 변경 후 — dca-analysis + settings + dashboard + dividend-plan */
+/** DCA 목표 변경 후 — dca-analysis + settings + dashboard + dividend-plan + 적립 챌린지(수익률/평가금액 진행률 기준값 변경) */
 export function invalidateDcaData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
   ]);
 }
 

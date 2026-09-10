@@ -10,6 +10,7 @@ import { useGoalAchievementAlertsToggle } from "@/hooks/useGoalAchievementAlerts
 import { useMonthlyReportAlertsToggle } from "@/hooks/useMonthlyReportAlertsToggle";
 import { useYearEndTaxReminderToggle } from "@/hooks/useYearEndTaxReminderToggle";
 import { useRecommendationDriftAlertToggle } from "@/hooks/useRecommendationDriftAlertToggle";
+import { useChallengeRemindersToggle } from "@/hooks/useChallengeRemindersToggle";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
@@ -38,6 +39,8 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   GOAL_DIVIDEND: "배당 목표 달성 알림",
   MONTHLY_REPORT: "월간 리포트",
   RECOMMENDATION_DRIFT: "추천 비중 변화 알림",
+  CHALLENGE_REMINDER: "적립 챌린지 독려 알림",
+  CHALLENGE_WRAPUP: "적립 챌린지 월간 결산",
 };
 
 const ALERT_HISTORY_PAGE_SIZE = 50;
@@ -146,6 +149,11 @@ export default function NotificationSettingsPage() {
     toggle: toggleRecommendationDriftAlert,
     isPending: recommendationDriftAlertPending,
   } = useRecommendationDriftAlertToggle();
+  const {
+    enabled: challengeRemindersEnabled,
+    toggle: toggleChallengeReminders,
+    isPending: challengeRemindersPending,
+  } = useChallengeRemindersToggle();
 
   const [isReportAlertsOpen, toggleReportAlertsOpen] = useCollapsible(
     false,
@@ -168,6 +176,7 @@ export default function NotificationSettingsPage() {
     monthlyReportEnabled,
     yearEndTaxReminderEnabled,
     recommendationDriftAlertEnabled,
+    challengeRemindersEnabled,
   ]);
   const instantAlertsEnabledCount = countEnabled([goalAlertsEnabled]);
 
@@ -243,6 +252,20 @@ export default function NotificationSettingsPage() {
               disabled={recommendationDriftAlertPending}
               onChange={toggleRecommendationDriftAlert}
               ariaLabel="추천 비중 변화 알림"
+            />
+          </div>
+
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
+            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">적립 챌린지 알림</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              매월 25일 이번 달 적립 독려, 매월 1일 지난달 결산·연속 적립 현황을 이메일/푸시로
+              알려드립니다.
+            </p>
+            <ToggleSwitch
+              checked={challengeRemindersEnabled}
+              disabled={challengeRemindersPending}
+              onChange={toggleChallengeReminders}
+              ariaLabel="적립 챌린지 알림"
             />
           </div>
         </CollapsibleCard>

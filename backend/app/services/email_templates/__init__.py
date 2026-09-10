@@ -29,6 +29,8 @@ from app.services.email_templates.rebalancing import (
 )
 from app.services.email_templates.reports import (
     account_deletion_template,
+    challenge_reminder_template,
+    challenge_wrap_template,
     goal_achievement_template,
     monthly_report_template,
     recommendation_drift_alert_template,
@@ -37,6 +39,8 @@ from app.services.email_templates.reports import (
 
 __all__ = [
     "account_deletion_template",
+    "challenge_reminder_template",
+    "challenge_wrap_template",
     "daily_value_cap_gate_blocked_template",
     "exchange_rate_alert_template",
     "goal_achievement_template",
