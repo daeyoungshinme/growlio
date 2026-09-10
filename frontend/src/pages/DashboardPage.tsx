@@ -8,6 +8,7 @@ import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
+import ChallengeProgressCard from "@/components/dashboard/ChallengeProgressCard";
 import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfolioBanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -123,6 +124,7 @@ export default function DashboardPage() {
     accountsLoading,
     exchangeRate,
     marketSignal,
+    challenges,
   } = useDashboardData();
 
   // SetupTargetPortfolioBanner와 동일 queryKey를 재사용 — 캐시 공유로 추가 네트워크 요청 없음.
@@ -201,6 +203,11 @@ export default function DashboardPage() {
         {/* 투자 목표 달성 현황 */}
         <ErrorBoundary variant="section">
           <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading || dcaLoading} />
+        </ErrorBoundary>
+
+        {/* 적립 챌린지 진행 현황 (ACTIVE 챌린지 있을 때만 렌더) */}
+        <ErrorBoundary variant="section">
+          <ChallengeProgressCard challenges={challenges} />
         </ErrorBoundary>
 
         {/* 주식 투자 현황 (투자기간별 자산현황·배당·세금 한도 요약 포함) */}

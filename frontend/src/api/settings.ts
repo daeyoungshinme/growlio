@@ -44,6 +44,7 @@ export interface SettingsData {
   goal_achievement_alerts_enabled: boolean;
   monthly_report_enabled: boolean;
   recommendation_drift_alert_enabled: boolean;
+  challenge_reminders_enabled: boolean;
   goal_candidate_tickers: GoalCandidateTicker[];
   goal_risk_tolerance: GoalRiskTolerance;
   goal_max_weight_pct: number;
@@ -79,6 +80,9 @@ export const updateMonthlyReportAlerts = (enabled: boolean) =>
 
 export const updateRecommendationDriftAlert = (enabled: boolean) =>
   apiPut("/settings/recommendation-drift-alert", { enabled });
+
+export const updateChallengeReminders = (enabled: boolean) =>
+  apiPut("/settings/challenge-reminders", { enabled });
 
 export const updateGoalCandidateTickers = (tickers: GoalCandidateTicker[]) =>
   apiPut("/settings/goal-candidate-tickers", { tickers });

@@ -19,6 +19,7 @@ from app.services.credential_service import encrypt
 from app.services.goal_age_recommendation_service import age_group_from_birth_year
 from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
 from app.utils.cache_keys import (
+    challenge_progress_key,
     dashboard_summary_key,
     invalidate_goal_recommendation_caches,
     invalidate_user_caches,
@@ -163,6 +164,10 @@ class RecommendationDriftAlertUpdate(BaseModel):
     enabled: bool
 
 
+class ChallengeRemindersUpdate(BaseModel):
+    enabled: bool
+
+
 class AutoRebalancingDailyCapUpdate(BaseModel):
     """AUTO 리밸런싱 유저 단위 하루 합산 거래대금 상한(KRW). None(또는 생략)이면 무제한(기본값)."""
 
@@ -194,6 +199,7 @@ class SettingsResponse(BaseModel):
     goal_achievement_alerts_enabled: bool = True
     monthly_report_enabled: bool = True
     recommendation_drift_alert_enabled: bool = False
+    challenge_reminders_enabled: bool = False
     goal_candidate_tickers: list[GoalCandidateTicker] = []
     goal_risk_tolerance: GoalRiskTolerance = GoalRiskTolerance.CONSERVATIVE
     goal_max_weight_pct: float = 40.0
@@ -250,6 +256,7 @@ async def get_settings(
         goal_achievement_alerts_enabled=row.goal_achievement_alerts_enabled,
         monthly_report_enabled=row.monthly_report_enabled,
         recommendation_drift_alert_enabled=row.recommendation_drift_alert_enabled,
+        challenge_reminders_enabled=row.challenge_reminders_enabled,
         goal_candidate_tickers=[GoalCandidateTicker(**t) for t in (row.goal_candidate_tickers or [])],
         goal_risk_tolerance=(
             GoalRiskTolerance(row.goal_risk_tolerance) if row.goal_risk_tolerance else GoalRiskTolerance.CONSERVATIVE
@@ -334,7 +341,7 @@ async def update_goal(
         row.age_group = age_group_from_birth_year(req.birth_year).value
     await db.commit()
     cache = await get_cache_store()
-    await invalidate_user_caches(cache, dashboard_summary_key(current_user.id))
+    await invalidate_user_caches(cache, dashboard_summary_key(current_user.id), challenge_progress_key(current_user.id))
     await invalidate_goal_recommendation_caches(cache, current_user.id)
     return {"detail": "목표가 저장되었습니다"}
 
@@ -483,6 +490,21 @@ async def update_recommendation_drift_alert(
     row.recommendation_drift_alert_enabled = req.enabled
     await db.commit()
     return {"detail": "추천 비중 변화 알림 설정이 저장되었습니다"}
+
+
+@router.put("/challenge-reminders")
+@limiter.limit("10/minute")
+async def update_challenge_reminders(
+    request: Request,
+    req: ChallengeRemindersUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """적립 챌린지 독려(매월 25일)·월간 결산(매월 1일) 알림 수신 여부 — 옵트인(기본 OFF)."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.challenge_reminders_enabled = req.enabled
+    await db.commit()
+    return {"detail": "적립 챌린지 알림 설정이 저장되었습니다"}
 
 
 @router.put("/auto-rebalancing-daily-cap")

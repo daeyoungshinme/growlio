@@ -15,6 +15,7 @@ from app.models.asset import (
     UserTickerSettings,
 )
 from app.models.backtest import BacktestPortfolio
+from app.models.challenge import InvestmentChallenge
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.models.token import KisToken, KiwoomToken, TossToken
@@ -35,6 +36,7 @@ __all__ = [
     "KiwoomToken",
     "TossToken",
     "BacktestPortfolio",
+    "InvestmentChallenge",
     "Portfolio",
     "PortfolioItem",
     "PortfolioAccount",

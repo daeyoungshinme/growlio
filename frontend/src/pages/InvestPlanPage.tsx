@@ -14,6 +14,7 @@ import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
 const DividendPlanSection = lazy(() => import("../components/invest/DividendPlanSection"));
+const ChallengeSection = lazy(() => import("../components/invest/ChallengeSection"));
 const SavingsSimulatorCard = lazy(() => import("../components/invest/SavingsSimulatorCard"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
@@ -28,7 +29,7 @@ import CollapsibleSection from "@/components/common/CollapsibleSection";
 import GoalSettingWizard from "@/components/invest/GoalSettingWizard";
 import Tabs from "@/components/common/Tabs";
 
-const TABS = ["적립 계획", "배당 계획"] as const;
+const TABS = ["적립 계획", "챌린지", "배당 계획"] as const;
 type Tab = (typeof TABS)[number];
 
 const GOAL_TABS = ["목표 현황", "저축 시뮬레이터"] as const;
@@ -331,6 +332,15 @@ export default function InvestPlanPage() {
               </ErrorBoundary>
             )}
           </div>
+        )}
+
+        {/* 챌린지 탭 */}
+        {activeTab === "챌린지" && (
+          <ErrorBoundary variant="section">
+            <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+              <ChallengeSection settings={settingsData} />
+            </Suspense>
+          </ErrorBoundary>
         )}
 
         {/* 배당 계획 탭 */}

@@ -253,3 +253,77 @@ def recommendation_drift_alert_template(portfolio_names: list[str], app_link: st
         "알림 설정은 설정 &gt; 알림 설정에서 변경하세요.",
     )
     return subject, html
+
+
+def challenge_reminder_template(
+    title: str, month_label: str, this_month_net_krw: float, target_amount: float | None, current_streak: int
+) -> tuple[str, str]:
+    """매월 25일 발송되는 적립 챌린지 독려 이메일 — 이번 달 아직 목표를 채우지 못한 경우."""
+    subject = f"[Growlio] 이번 달 적립, 아직이에요 — {title}"
+    rows: list[tuple[str, str]] = [("챌린지", title), ("이번 달", month_label)]
+    if target_amount:
+        remaining = max(target_amount - this_month_net_krw, 0.0)
+        rows.append(("이번 달 입금", f"{this_month_net_krw:,.0f}원 / {target_amount:,.0f}원"))
+        rows.append(("남은 금액", f"<span style='font-weight:bold;color:#dc2626;'>{remaining:,.0f}원</span>"))
+    else:
+        rows.append(("이번 달 입금", f"{this_month_net_krw:,.0f}원"))
+    if current_streak > 0:
+        rows.append(("현재 연속 적립", f"{current_streak}개월 — 이번 달을 놓치면 끊깁니다"))
+    body = (
+        "<p style='color:#374151;margin-top:8px;'>이번 달이 지나기 전에 적립을 완료해 습관을 이어가세요.</p>"
+        + _kv_table(rows)
+    )
+    html = _email_div(
+        "이번 달 적립을 잊지 마세요",
+        "#d97706",
+        body,
+        "이 알림은 매월 25일 09:00 KST에 발송됩니다.<br>"
+        "Growlio 앱 계획 &gt; 챌린지 탭에서 진행 현황을 확인하세요.<br>"
+        "알림 설정은 설정 &gt; 알림 설정에서 변경하세요.",
+    )
+    return subject, html
+
+
+def challenge_wrap_template(
+    title: str,
+    month_label: str,
+    prev_month_net_krw: float,
+    target_met: bool,
+    current_streak: int,
+    longest_streak: int,
+    milestone: int | None,
+    completed: bool,
+) -> tuple[str, str]:
+    """매월 1일 발송되는 적립 챌린지 월간 결산 이메일."""
+    if completed:
+        subject = f"[Growlio] 챌린지 달성! 🎉 — {title}"
+        heading = "챌린지를 달성했어요"
+    elif milestone:
+        subject = f"[Growlio] 연속 {milestone}개월 적립 달성! 🎉 — {title}"
+        heading = f"연속 {milestone}개월 적립 달성"
+    else:
+        subject = f"[Growlio] {month_label} 적립 챌린지 결산 — {title}"
+        heading = f"{month_label} 적립 결산"
+
+    status_html = (
+        "<span style='font-weight:bold;color:#16a34a;'>달성 ✅</span>"
+        if target_met
+        else "<span style='font-weight:bold;color:#dc2626;'>미달 ✕</span>"
+    )
+    rows: list[tuple[str, str]] = [
+        ("챌린지", title),
+        (f"{month_label} 결과", status_html),
+        (f"{month_label} 순입금", f"{prev_month_net_krw:,.0f}원"),
+        ("현재 연속 적립", f"{current_streak}개월"),
+        ("최장 연속 기록", f"{longest_streak}개월"),
+    ]
+    body = "<p style='color:#374151;margin-top:8px;'>지난달 적립 현황을 정리했어요.</p>" + _kv_table(rows)
+    html = _email_div(
+        heading,
+        "#16a34a" if (target_met or milestone or completed) else "#1d4ed8",
+        body,
+        "이 알림은 매월 1일 09:30 KST에 발송됩니다.<br>"
+        "Growlio 앱 계획 &gt; 챌린지 탭에서 상세 내역을 확인하세요.<br>"
+        "알림 설정은 설정 &gt; 알림 설정에서 변경하세요.",
+    )
+    return subject, html

@@ -23,6 +23,8 @@ from tenacity import (
 from app.core.config import settings
 from app.services.email_templates import (
     account_deletion_template,
+    challenge_reminder_template,
+    challenge_wrap_template,
     daily_value_cap_gate_blocked_template,
     exchange_rate_alert_template,
     goal_achievement_template,
@@ -421,4 +423,45 @@ async def send_recommendation_drift_alert_email(to_email: str, portfolio_names: 
         ok_event="recommendation_drift_alert_email_sent",
         fail_event="recommendation_drift_alert_email_failed",
         portfolio_count=len(portfolio_names),
+    )
+
+
+async def send_challenge_reminder_email(
+    to_email: str,
+    title: str,
+    month_label: str,
+    this_month_net_krw: float,
+    target_amount: float | None,
+    current_streak: int,
+) -> bool:
+    """적립 챌린지 독려 이메일 발송(매월 25일). 발송 성공 시 True, 미설정/실패 시 False."""
+    return await _send_templated(
+        to_email,
+        lambda: challenge_reminder_template(title, month_label, this_month_net_krw, target_amount, current_streak),
+        ok_event="challenge_reminder_email_sent",
+        fail_event="challenge_reminder_email_failed",
+        title=title,
+    )
+
+
+async def send_challenge_wrap_email(
+    to_email: str,
+    title: str,
+    month_label: str,
+    prev_month_net_krw: float,
+    target_met: bool,
+    current_streak: int,
+    longest_streak: int,
+    milestone: int | None,
+    completed: bool,
+) -> bool:
+    """적립 챌린지 월간 결산 이메일 발송(매월 1일). 발송 성공 시 True, 미설정/실패 시 False."""
+    return await _send_templated(
+        to_email,
+        lambda: challenge_wrap_template(
+            title, month_label, prev_month_net_krw, target_met, current_streak, longest_streak, milestone, completed
+        ),
+        ok_event="challenge_wrap_email_sent",
+        fail_event="challenge_wrap_email_failed",
+        title=title,
     )

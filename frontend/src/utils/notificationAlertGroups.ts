@@ -5,6 +5,7 @@ export const REPORT_ALERT_FIELDS = [
   "monthly_report_enabled",
   "year_end_tax_reminder_enabled",
   "recommendation_drift_alert_enabled",
+  "challenge_reminders_enabled",
 ] as const satisfies readonly (keyof SettingsData)[];
 
 /** "즉시 알림" 그룹 필드 */

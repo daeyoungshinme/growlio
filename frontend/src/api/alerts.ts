@@ -174,7 +174,8 @@ export const deleteStockPriceAlert = (id: string) => apiDelete(`/alerts/stock-pr
 
 export interface AlertHistoryItem {
   id: string;
-  alert_type: "EXCHANGE_RATE" | "REBALANCING" | "STOCK_PRICE" | "MARKET_SIGNAL";
+  // 백엔드가 GOAL_*·MONTHLY_REPORT·CHALLENGE_* 등도 기록하므로 넓게 받는다 (NotificationSettingsPage의 라벨 맵이 매핑)
+  alert_type: string;
   message: string;
   created_at: string;
 }

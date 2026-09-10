@@ -6,6 +6,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { fetchPortfolios } from "@/api/portfolios";
 import { fetchDriftSummary } from "@/api/rebalancing";
+import { useChallengeNudge } from "@/hooks/useChallengeNudge";
 
 export default function BottomNav() {
   const { data: portfoliosRaw } = useQuery({
@@ -28,6 +29,9 @@ export default function BottomNav() {
   }, [driftSummaries]);
 
   const showRebalancingBadge = portfolioCount > 0 && needsCount > 0;
+
+  const { data: challengeNudge } = useChallengeNudge();
+  const showChallengeBadge = challengeNudge?.needs_attention ?? false;
 
   return (
     <nav
@@ -52,6 +56,12 @@ export default function BottomNav() {
               <span
                 className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"
                 aria-label={`리밸런싱 필요 ${needsCount}개`}
+              />
+            )}
+            {to === "/invest-plan" && showChallengeBadge && (
+              <span
+                className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"
+                aria-label="이번 달 적립 챌린지 미완료"
               />
             )}
           </div>
