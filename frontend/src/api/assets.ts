@@ -39,6 +39,8 @@ export interface AssetAccount {
   isa_open_date?: string | null;
   isa_type?: IsaType | null;
   isa_manual_cumulative_pnl_krw?: number | null;
+  last_synced_at?: string | null;
+  last_sync_error?: string | null;
 }
 
 // GENERAL: 일반 | ISA: ISA | PENSION_SAVINGS: 연금저축 | IRP: IRP | OVERSEAS_DEDICATED: 해외전용

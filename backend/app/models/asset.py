@@ -84,6 +84,11 @@ class AssetAccount(Base):
     # 부동산 상세 (REAL_ESTATE 전용) — {address, property_type, purchase_price_krw, purchase_date, mortgage_balance_krw}
     real_estate_details: Mapped[dict | None] = mapped_column(JSONB)
 
+    # 마지막 동기화 성공 시각 (KIS/키움/토스 sync 전용, MANUAL은 무의미). 실패 시엔 갱신 안 됨
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 마지막 동기화 실패 사유 — 다음 성공 시 None으로 초기화됨. None이면 정상(또는 미동기화)
+    last_sync_error: Mapped[str | None] = mapped_column(String(200))
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     include_in_total: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

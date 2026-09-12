@@ -252,6 +252,8 @@ class AssetAccountResponse(BaseModel):
     isa_open_date: date | None = None
     isa_type: IsaType | None = None
     isa_manual_cumulative_pnl_krw: float | None = None
+    last_synced_at: datetime | None = None
+    last_sync_error: str | None = None
 
     model_config = {"from_attributes": True}
 

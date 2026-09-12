@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 
 import structlog
 from sqlalchemy import delete as sql_delete
@@ -19,6 +19,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
+from app.core.logging import redact_secrets
 from app.exceptions import ProviderNetworkError
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.providers.base import BalanceResult, BrokerProvider
@@ -50,6 +51,8 @@ _CIRCUITS: dict[str, CircuitBreaker] = {
     "KIWOOM_API": kiwoom_circuit,
     "TOSS_API": toss_circuit,
 }
+
+_MAX_SYNC_ERROR_LENGTH = 200
 
 
 @dataclass(frozen=True)
@@ -103,10 +106,18 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     provider = get_provider(account)
     circuit = _CIRCUITS.get(account.data_source)
 
-    if circuit:
-        balance = await circuit.call(_retry_provider_sync, provider, account, db, cache)
-    else:
-        balance = await _retry_provider_sync(provider, account, db, cache)
+    try:
+        if circuit:
+            balance = await circuit.call(_retry_provider_sync, provider, account, db, cache)
+        else:
+            balance = await _retry_provider_sync(provider, account, db, cache)
+    except Exception as e:
+        account.last_sync_error = redact_secrets(str(e))[:_MAX_SYNC_ERROR_LENGTH]
+        await db.commit()
+        broker_sync_duration.labels(data_source=account.data_source, status="failure").observe(
+            _time.monotonic() - _sync_start
+        )
+        raise
 
     if balance.deposit_krw is not None:
         account.deposit_krw = balance.deposit_krw
@@ -168,6 +179,9 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
 
     if balance.positions:
         await sync_snapshot_positions(db, snapshot_id=snapshot.id, account_id=account.id, positions=balance.positions)
+
+    account.last_synced_at = datetime.now(UTC)
+    account.last_sync_error = None
     await db.commit()
 
     # sync 완료 후 관련 캐시 즉시 무효화 — sync 직후에도 최신 데이터 표시
