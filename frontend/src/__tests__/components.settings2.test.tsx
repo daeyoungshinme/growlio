@@ -89,14 +89,14 @@ vi.mock("@/stores/authStore", () => ({
 }));
 
 vi.mock("@/lib/supabase", () => ({
-  supabase: {
+  getSupabase: async () => ({
     auth: {
       onAuthStateChange: vi.fn(() => ({
         data: { subscription: { unsubscribe: vi.fn() } },
       })),
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
     },
-  },
+  }),
 }));
 
 // ---- Imports ----

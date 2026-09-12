@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date
 
 import structlog
@@ -51,6 +52,19 @@ _CIRCUITS: dict[str, CircuitBreaker] = {
 }
 
 
+@dataclass(frozen=True)
+class SyncAccountResult:
+    """sync_account()의 반환값 — 스냅샷과 함께 보유 종목 구성 변경 여부를 전달한다.
+
+    positions_changed는 배당 캐시 무효화 범위를 좁히는 데 쓰인다(cache_keys.invalidate_dividend_caches
+    참고) — 단순 가격/잔고 갱신 동기화마다 종목별 배당 추정(외부 API 폴백 체인)을 재계산하지
+    않기 위함.
+    """
+
+    snapshot: AssetSnapshot
+    positions_changed: bool
+
+
 def get_provider(account: AssetAccount) -> BrokerProvider:
     """data_source에 맞는 BrokerProvider를 반환한다.
 
@@ -77,7 +91,7 @@ async def _retry_provider_sync(
     return await provider.sync(account, db, cache)
 
 
-async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStoreType) -> AssetSnapshot:
+async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStoreType) -> SyncAccountResult:
     """모든 데이터 소스를 통합 처리하는 계좌 동기화 진입점.
 
     SyncError 계층 예외 및 CircuitOpenError를 그대로 전파한다.
@@ -100,7 +114,18 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     if balance.deposit_foreign is not None:
         account.deposit_usd = balance.deposit_foreign
 
+    positions_changed = False
     if balance.positions:
+        existing_positions = await db.execute(
+            select(Position.ticker, Position.market).where(
+                Position.account_id == account.id,
+                Position.snapshot_id == None,  # noqa: E711
+            )
+        )
+        old_tickers = {(row.ticker, row.market) for row in existing_positions.all()}
+        new_tickers = {(p.ticker, p.market) for p in balance.positions}
+        positions_changed = old_tickers != new_tickers
+
         await db.execute(
             sql_delete(Position).where(Position.account_id == account.id, Position.snapshot_id == None)  # noqa: E711
         )
@@ -146,7 +171,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     await db.commit()
 
     # sync 완료 후 관련 캐시 즉시 무효화 — sync 직후에도 최신 데이터 표시
-    await invalidate_account_caches(cache, account.user_id)
+    await invalidate_account_caches(cache, account.user_id, positions_changed=positions_changed)
 
     broker_sync_duration.labels(data_source=account.data_source, status="success").observe(
         _time.monotonic() - _sync_start
@@ -157,7 +182,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         source=source,
         total_krw=balance.total_value_krw,
     )
-    return snapshot
+    return SyncAccountResult(snapshot=snapshot, positions_changed=positions_changed)
 
 
 async def sync_account_now(account: AssetAccount, user_id: uuid.UUID, cache: CacheStoreType) -> dict[str, str | float]:
@@ -169,13 +194,13 @@ async def sync_account_now(account: AssetAccount, user_id: uuid.UUID, cache: Cac
     """
     async with AsyncSessionLocal() as db:
         merged_account = await db.merge(account)
-        snapshot = await sync_account(merged_account, db, cache)
+        sync_result = await sync_account(merged_account, db, cache)
 
-    await invalidate_asset_account_caches(cache, user_id, account.id)
+    await invalidate_asset_account_caches(cache, user_id, account.id, positions_changed=sync_result.positions_changed)
     return {
         "detail": "동기화 완료",
-        "snapshot_date": str(snapshot.snapshot_date),
-        "amount_krw": float(snapshot.amount_krw),
+        "snapshot_date": str(sync_result.snapshot.snapshot_date),
+        "amount_krw": float(sync_result.snapshot.amount_krw),
     }
 
 

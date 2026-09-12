@@ -153,6 +153,38 @@ class TestInvalidateRebalancingStrategyCache:
         cache.unlink.assert_called_once_with(written_key)
 
 
+class TestInvalidateDividendCaches:
+    """positions_changed 플래그로 종목별 배당 추정(외부 API 폴백 체인 필요) 캐시 무효화를
+    건너뛸 수 있는지 검증 — 계좌 동기화마다 매번 지우던 기존 동작이 "동기화 후 대시보드
+    로딩이 느리다"는 체감 지연의 원인이었다."""
+
+    @pytest.mark.asyncio
+    async def test_full_invalidation_by_default(self, override_settings):
+        from app.utils.cache_keys import invalidate_dividend_caches
+
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, []))
+        cache.unlink = AsyncMock()
+
+        await invalidate_dividend_caches(cache, uuid.uuid4(), 2026)
+
+        assert cache.scan.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_positions_unchanged_skips_by_ticker_cache(self, override_settings):
+        from app.utils.cache_keys import invalidate_dividend_caches
+
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, []))
+        cache.unlink = AsyncMock()
+
+        await invalidate_dividend_caches(cache, uuid.uuid4(), 2026, positions_changed=False)
+
+        cache.scan.assert_called_once()
+        _, kwargs = cache.scan.call_args
+        assert "dividend_summary:" in kwargs["match"]
+
+
 class TestInvalidateUserCaches:
     @pytest.mark.asyncio
     async def test_calls_cache_delete(self, override_settings):

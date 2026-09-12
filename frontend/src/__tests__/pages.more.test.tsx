@@ -15,16 +15,18 @@ vi.mock("@/stores/authStore", () => ({
   }),
 }));
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      onAuthStateChange: vi.fn(() => ({
-        data: {
-          subscription: { unsubscribe: vi.fn() },
-        },
-      })),
-    },
+const { mockSupabaseAuth } = vi.hoisted(() => ({
+  mockSupabaseAuth: {
+    onAuthStateChange: vi.fn(() => ({
+      data: {
+        subscription: { unsubscribe: vi.fn() },
+      },
+    })),
   },
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  getSupabase: async () => ({ auth: mockSupabaseAuth }),
 }));
 
 vi.mock("@/utils/toast", () => ({
@@ -35,7 +37,6 @@ import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import FindAccountPage from "@/pages/FindAccountPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { useAuthStore } from "@/stores/authStore";
-import { supabase } from "@/lib/supabase";
 import { toast } from "@/utils/toast";
 import type { AuthState } from "@/stores/authStore";
 
@@ -252,7 +253,7 @@ describe("ResetPasswordPage", () => {
     onAuthStateChangeMock = vi.fn(() => ({
       data: { subscription: { unsubscribe: vi.fn() } },
     }));
-    vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
+    vi.mocked(mockSupabaseAuth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
   });
 
   it("shows waiting screen when session not ready", () => {
@@ -274,7 +275,7 @@ describe("ResetPasswordPage", () => {
       callback("PASSWORD_RECOVERY");
       return { data: { subscription: { unsubscribe: vi.fn() } } };
     });
-    vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
+    vi.mocked(mockSupabaseAuth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
     renderWithRouter(<ResetPasswordPage />);
     await waitFor(() => {
       expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument();
@@ -288,7 +289,9 @@ describe("ResetPasswordPage", () => {
         callback("PASSWORD_RECOVERY");
         return { data: { subscription: { unsubscribe: vi.fn() } } };
       });
-      vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
+      vi.mocked(mockSupabaseAuth.onAuthStateChange).mockImplementation(
+        onAuthStateChangeMock as any,
+      );
     });
 
     it("shows error when password is less than 8 chars", async () => {

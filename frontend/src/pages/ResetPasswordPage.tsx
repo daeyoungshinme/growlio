@@ -1,7 +1,7 @@
 import { LineChart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { INPUT_SM } from "@/constants/inputStyles";
@@ -25,12 +25,24 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     // Supabase가 이메일 링크의 #access_token= 프래그먼트를 감지해 세션 설정
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setSessionReady(true);
-      }
-    });
-    return () => subscription.subscription.unsubscribe();
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
+
+    void (async () => {
+      const supabase = await getSupabase();
+      if (cancelled) return;
+      const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "PASSWORD_RECOVERY") {
+          setSessionReady(true);
+        }
+      });
+      unsubscribe = () => subscription.subscription.unsubscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
 
   useEffect(() => {

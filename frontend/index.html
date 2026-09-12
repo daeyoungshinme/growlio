@@ -15,7 +15,39 @@
     <link rel="dns-prefetch" href="https://growlio-api.onrender.com" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <style>
+        #boot-loader {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #f9fafb;
+        }
+        @media (prefers-color-scheme: dark) {
+          #boot-loader {
+            background: #111827;
+          }
+        }
+        #boot-loader-spinner {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          border: 3px solid rgba(37, 99, 235, 0.2);
+          border-top-color: #2563eb;
+          animation: boot-loader-spin 0.8s linear infinite;
+        }
+        @keyframes boot-loader-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      </style>
+      <div id="boot-loader">
+        <div id="boot-loader-spinner"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

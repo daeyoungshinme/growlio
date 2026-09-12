@@ -6,14 +6,16 @@ vi.mock("@/api/auth", () => ({
   deleteAccount: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      signOut: vi.fn().mockResolvedValue({ error: null }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
-      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
-    },
+const { mockSupabaseAuth } = vi.hoisted(() => ({
+  mockSupabaseAuth: {
+    signOut: vi.fn().mockResolvedValue({ error: null }),
+    getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
   },
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  getSupabase: async () => ({ auth: mockSupabaseAuth }),
 }));
 
 vi.mock("@/api/client", () => ({
@@ -26,7 +28,6 @@ vi.mock("@/utils/toast", () => ({
 
 import DeleteAccountModal from "@/components/settings/DeleteAccountModal";
 import { deleteAccount } from "@/api/auth";
-import { supabase } from "@/lib/supabase";
 import { toast } from "@/utils/toast";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -85,7 +86,7 @@ describe("DeleteAccountModal", () => {
       expect(useAuthStore.getState().isAuthenticated).toBe(false);
     });
     expect(clearSpy).toHaveBeenCalled();
-    expect(supabase.auth.signOut).toHaveBeenCalled();
+    expect(mockSupabaseAuth.signOut).toHaveBeenCalled();
     expect(toast).toHaveBeenCalledWith("회원 탈퇴가 완료되었습니다", "success");
     expect(onClose).toHaveBeenCalled();
   });

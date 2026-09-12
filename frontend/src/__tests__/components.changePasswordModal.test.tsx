@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      signInWithPassword: vi.fn(),
-      updateUser: vi.fn(),
-      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
-      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
-    },
+const { mockSupabaseAuth } = vi.hoisted(() => ({
+  mockSupabaseAuth: {
+    signInWithPassword: vi.fn(),
+    updateUser: vi.fn(),
+    getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
   },
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  getSupabase: async () => ({ auth: mockSupabaseAuth }),
 }));
 
 vi.mock("@/api/client", () => ({
@@ -21,7 +23,6 @@ vi.mock("@/utils/toast", () => ({
 }));
 
 import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
-import { supabase } from "@/lib/supabase";
 import { toast } from "@/utils/toast";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -72,7 +73,7 @@ describe("ChangePasswordModal", () => {
     await waitFor(() => {
       expect(screen.getByText("새 비밀번호는 8자 이상이어야 합니다.")).toBeInTheDocument();
     });
-    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+    expect(mockSupabaseAuth.signInWithPassword).not.toHaveBeenCalled();
   });
 
   it("새 비밀번호와 확인이 일치하지 않으면 에러를 표시한다", async () => {
@@ -85,11 +86,11 @@ describe("ChangePasswordModal", () => {
   });
 
   it("성공 시 성공 토스트를 표시하고 모달을 닫는다", async () => {
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: { user: { id: "user-1" }, session: {} },
       error: null,
     } as never);
-    vi.mocked(supabase.auth.updateUser).mockResolvedValue({ data: {}, error: null } as never);
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({ data: {}, error: null } as never);
     const { onClose } = renderModal();
     fillForm("oldpass123", "newpass123", "newpass123");
     fireEvent.click(screen.getByRole("button", { name: "변경하기" }));
@@ -101,7 +102,7 @@ describe("ChangePasswordModal", () => {
   });
 
   it("현재 비밀번호가 틀리면 에러 문구를 표시한다", async () => {
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: { user: null, session: null },
       error: new Error("Invalid login credentials"),
     } as never);
@@ -112,6 +113,6 @@ describe("ChangePasswordModal", () => {
     await waitFor(() => {
       expect(screen.getByText("현재 비밀번호가 일치하지 않습니다.")).toBeInTheDocument();
     });
-    expect(supabase.auth.updateUser).not.toHaveBeenCalled();
+    expect(mockSupabaseAuth.updateUser).not.toHaveBeenCalled();
   });
 });

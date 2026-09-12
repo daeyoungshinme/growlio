@@ -1,6 +1,6 @@
 import axios from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { toast } from "@/utils/toast";
 import { getApiBaseUrl } from "@/utils/platform";
 
@@ -15,13 +15,17 @@ let failedQueue: QueueEntry[] = [];
 // 세션 토큰 캐시 — 매 요청마다 getSession() 호출을 피하기 위해 모듈 레벨에서 관리
 let cachedToken: string | null = null;
 
-// 앱 시작 시 현재 세션 토큰 초기화
-void supabase.auth.getSession().then(({ data: { session } }) => {
-  cachedToken = session?.access_token ?? null;
-});
-// 로그인·로그아웃·토큰 갱신 시 캐시 자동 갱신
-supabase.auth.onAuthStateChange((_event, session) => {
-  cachedToken = session?.access_token ?? null;
+// 앱 시작 시 현재 세션 토큰 초기화 + 로그인·로그아웃·토큰 갱신 시 캐시 자동 갱신.
+// getSupabase()가 @supabase/supabase-js를 동적 import하므로 이 초기화도 자연히 지연되지만,
+// 이미 비동기·eventually-consistent 구조(interceptor는 cachedToken이 채워지기 전엔 헤더 없이
+// 요청)라 기능 영향은 없다.
+void getSupabase().then((supabase) => {
+  void supabase.auth.getSession().then(({ data: { session } }) => {
+    cachedToken = session?.access_token ?? null;
+  });
+  supabase.auth.onAuthStateChange((_event, session) => {
+    cachedToken = session?.access_token ?? null;
+  });
 });
 
 function processQueue(error: unknown, token: string | null = null) {
@@ -66,6 +70,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
+        const supabase = await getSupabase();
         const {
           data: { session },
         } = await supabase.auth.refreshSession();

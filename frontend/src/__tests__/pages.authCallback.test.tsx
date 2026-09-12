@@ -2,15 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      })),
-      getSession: vi.fn(() => Promise.resolve({ data: { session: null } })),
-    },
+const { mockSupabaseAuth } = vi.hoisted(() => ({
+  mockSupabaseAuth: {
+    onAuthStateChange: vi.fn(() => ({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    })),
+    getSession: vi.fn(() => Promise.resolve({ data: { session: null } })),
   },
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  getSupabase: async () => ({ auth: mockSupabaseAuth }),
 }));
 
 const checkAuthMock = vi.fn();
@@ -22,7 +24,6 @@ vi.mock("@/stores/authStore", () => ({
 }));
 
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
-import { supabase } from "@/lib/supabase";
 
 function renderAt(path: string) {
   return render(
@@ -39,10 +40,10 @@ describe("AuthCallbackPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     checkAuthMock.mockResolvedValue(undefined);
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: { session: null },
     } as never);
-    vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(
+    vi.mocked(mockSupabaseAuth.onAuthStateChange).mockImplementation(
       () =>
         ({
           data: { subscription: { unsubscribe: vi.fn() } },
@@ -65,7 +66,7 @@ describe("AuthCallbackPage", () => {
   });
 
   it("SIGNED_IN 이벤트를 받으면 checkAuth 후 성공 화면을 보여준다", async () => {
-    vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(((
+    vi.mocked(mockSupabaseAuth.onAuthStateChange).mockImplementation(((
       callback: (event: string) => void,
     ) => {
       callback("SIGNED_IN");
@@ -81,7 +82,7 @@ describe("AuthCallbackPage", () => {
   });
 
   it("마운트 시점에 이미 세션이 있으면 checkAuth 후 성공 화면을 보여준다", async () => {
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: { session: { user: { id: "user-1" } } },
     } as never);
 

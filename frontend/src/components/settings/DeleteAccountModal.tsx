@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteAccount } from "@/api/auth";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { AUTH_ME_CACHE_KEY, useAuthStore } from "@/stores/authStore";
 import { PERSIST_CACHE_KEY } from "@/constants/queryConfig";
 import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
@@ -24,6 +24,7 @@ export default function DeleteAccountModal({ onClose }: Props) {
       queryClient.clear();
       window.localStorage.removeItem(PERSIST_CACHE_KEY);
       window.localStorage.removeItem(AUTH_ME_CACHE_KEY);
+      const supabase = await getSupabase();
       await supabase.auth.signOut().catch(() => {});
       useAuthStore.setState({
         isAuthenticated: false,

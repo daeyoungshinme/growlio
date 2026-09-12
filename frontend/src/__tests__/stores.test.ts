@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn().mockResolvedValue({}),
-      resetPasswordForEmail: vi.fn(),
-      updateUser: vi.fn(),
-    },
+const { mockSupabaseAuth } = vi.hoisted(() => ({
+  mockSupabaseAuth: {
+    getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    signInWithPassword: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn().mockResolvedValue({}),
+    resetPasswordForEmail: vi.fn(),
+    updateUser: vi.fn(),
   },
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  getSupabase: async () => ({ auth: mockSupabaseAuth }),
 }));
 
 vi.mock("@/api/client", () => ({
@@ -89,9 +91,8 @@ describe("useAuthStore", () => {
   });
 
   it("login이 성공하면 isAuthenticated가 true가 된다", async () => {
-    const { supabase } = await import("@/lib/supabase");
     const { api } = await import("@/api/client");
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: { user: { id: "user-1", email: "test@example.com" }, session: null },
       error: null,
     } as any);
@@ -105,8 +106,7 @@ describe("useAuthStore", () => {
   });
 
   it("login이 실패하면 에러를 throw한다", async () => {
-    const { supabase } = await import("@/lib/supabase");
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: { user: null, session: null },
       error: { message: "Invalid credentials" },
     } as any);
@@ -121,8 +121,7 @@ describe("useAuthStore", () => {
     const { useAuthStore } = await import("@/stores/authStore");
     useAuthStore.setState({ isAuthenticated: true, userId: "user-1", email: "test@example.com" });
 
-    const { supabase } = await import("@/lib/supabase");
-    vi.mocked(supabase.auth.signOut).mockResolvedValue({ error: null });
+    vi.mocked(mockSupabaseAuth.signOut).mockResolvedValue({ error: null });
 
     await useAuthStore.getState().logout();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
@@ -130,8 +129,7 @@ describe("useAuthStore", () => {
   });
 
   it("checkAuth가 세션 없을 때 로그아웃 상태로 설정한다", async () => {
-    const { supabase } = await import("@/lib/supabase");
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: { session: null },
     } as any);
 
@@ -142,9 +140,8 @@ describe("useAuthStore", () => {
   });
 
   it("checkAuth가 세션 있을 때 인증 상태로 설정한다", async () => {
-    const { supabase } = await import("@/lib/supabase");
     const { api } = await import("@/api/client");
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: {
         session: { user: { id: "user-1", email: "test@example.com" } },
       },
@@ -169,8 +166,7 @@ describe("useAuthStore", () => {
   });
 
   it("forgotPassword가 이메일을 전송한다", async () => {
-    const { supabase } = await import("@/lib/supabase");
-    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.resetPasswordForEmail).mockResolvedValue({
       data: {},
       error: null,
     } as never);
@@ -182,8 +178,7 @@ describe("useAuthStore", () => {
   });
 
   it("forgotPassword가 실패하면 에러를 throw한다", async () => {
-    const { supabase } = await import("@/lib/supabase");
-    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.resetPasswordForEmail).mockResolvedValue({
       data: null,
       error: new Error("Email not found"),
     } as any);
@@ -193,8 +188,7 @@ describe("useAuthStore", () => {
   });
 
   it("resetPassword가 성공하면 needsPasswordReset을 false로 설정한다", async () => {
-    const { supabase } = await import("@/lib/supabase");
-    vi.mocked(supabase.auth.updateUser).mockResolvedValue({ data: {}, error: null } as never);
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({ data: {}, error: null } as never);
 
     const { useAuthStore } = await import("@/stores/authStore");
     useAuthStore.setState({ needsPasswordReset: true });

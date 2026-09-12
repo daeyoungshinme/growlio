@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { api } from "@/api/client";
 import { getHttpStatus } from "@/utils/error";
 import { BIOMETRIC_SESSION_KEY } from "@/hooks/useBiometric";
@@ -86,6 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     needsPasswordReset: optimistic.needsPasswordReset,
 
     login: async (email, password) => {
+      const supabase = await getSupabase();
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error || !data.user) throw new Error(error?.message ?? "Login failed");
 
@@ -118,6 +119,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     register: async (email, password, displayName?) => {
+      const supabase = await getSupabase();
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -139,10 +141,12 @@ export const useAuthStore = create<AuthState>((set, get) => {
     logout: async () => {
       set({ isAuthenticated: false, userId: null, email: null, needsPasswordReset: false });
       localStorage.removeItem(AUTH_ME_CACHE_KEY);
+      const supabase = await getSupabase();
       await supabase.auth.signOut();
     },
 
     checkAuth: async (onSessionFound) => {
+      const supabase = await getSupabase();
       let session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"];
       try {
         const {
@@ -219,6 +223,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     forgotPassword: async (email: string) => {
+      const supabase = await getSupabase();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -226,6 +231,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     resetPassword: async (newPassword: string) => {
+      const supabase = await getSupabase();
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       set({ needsPasswordReset: false });
@@ -235,6 +241,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const email = get().email;
       if (!email) throw new Error("로그인 정보를 확인할 수 없습니다.");
 
+      const supabase = await getSupabase();
       // 현재 비밀번호 재인증 — 세션이 유효해도 본인 확인 없이 변경되지 않도록 검증
       const { error: verifyError } = await supabase.auth.signInWithPassword({
         email,
@@ -247,6 +254,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     resendConfirmationEmail: async (email: string) => {
+      const supabase = await getSupabase();
       const { error } = await supabase.auth.resend({
         type: "signup",
         email,
