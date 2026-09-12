@@ -279,8 +279,9 @@ async def get_broker_account_balance(
             detail="KIS/키움/토스 계좌만 잔고 조회가 가능합니다",
         )
 
+    await db.commit()  # 브로커 조회(느린 외부 HTTP 호출) 전 요청 DB 커넥션 풀 슬롯을 미리 반환
     try:
-        return await fetch_broker_balance(account, db, cache)
+        return await fetch_broker_balance(account, cache)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -300,7 +301,8 @@ async def get_all_broker_balances(
     if not accounts:
         return []
 
-    tasks = [fetch_broker_balance(acc, db, cache) for acc in accounts]
+    await db.commit()  # 브로커 조회(느린 외부 HTTP 호출) 전 요청 DB 커넥션 풀 슬롯을 미리 반환
+    tasks = [fetch_broker_balance(acc, cache) for acc in accounts]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     return [

@@ -50,7 +50,11 @@ class Settings(BaseSettings):
 
     migration_database_url: str = ""  # Alembic 전용 Direct connection (비워두면 DATABASE_URL 사용)
 
-    # DB 커넥션 풀 설정 (PgBouncer session mode 한도 15 기준 — 총합 7로 여유 확보)
+    # DB 커넥션 풀 설정 — 과거 PgBouncer session mode(포트 5432, 프로젝트 전체 15 상한) 기준으로
+    # 총합 7(pool_size+max_overflow)로 여유를 뒀던 값. 현재 운영은 transaction pooler(6543)를
+    # 쓰지만, 요청 핸들러가 느린 브로커 HTTP 호출 동안 커넥션을 오래 붙잡으면 이 작은 풀도
+    # 쉽게 고갈될 수 있어(2026-09 QueuePool timeout 인시던트) 값 자체는 유지 — 세션 스코프를
+    # 좁히는 게 우선 대응, 상향은 Supabase 대시보드에서 실제 상한 확인 후 별도 검토.
     database_pool_size: int = 5
     database_max_overflow: int = 2
     database_pool_timeout: int = 30

@@ -96,4 +96,65 @@ describe("useSyncAllWatcher", () => {
       expect(toast).toHaveBeenCalledWith("1개 계좌 동기화에 실패했습니다", "error");
     });
   });
+
+  it("실패 계좌 상세가 있으면 계좌명을 포함한 토스트를 표시하고 store에 저장한다", async () => {
+    const failedAccounts = [
+      { account_id: "acc-1", account_name: "키움 종합계좌", error: "인증에 실패했습니다" },
+    ];
+    vi.mocked(getSyncAllStatus).mockResolvedValue({
+      status: "done",
+      total: 2,
+      done: 2,
+      failed: 1,
+      failed_accounts: failedAccounts,
+    });
+    useSyncStore.getState().startSyncAll(2);
+
+    renderHook(() => useSyncAllWatcher(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith("키움 종합계좌 동기화 실패", "error");
+    });
+    expect(useSyncStore.getState().failedAccounts).toEqual(failedAccounts);
+  });
+
+  it("실패 계좌가 3개 이상이면 앞 2개 이름 뒤 '외 N개'로 요약한다", async () => {
+    const failedAccounts = [
+      { account_id: "a1", account_name: "계좌A", error: "e1" },
+      { account_id: "a2", account_name: "계좌B", error: "e2" },
+      { account_id: "a3", account_name: "계좌C", error: "e3" },
+    ];
+    vi.mocked(getSyncAllStatus).mockResolvedValue({
+      status: "done",
+      total: 5,
+      done: 5,
+      failed: 3,
+      failed_accounts: failedAccounts,
+    });
+    useSyncStore.getState().startSyncAll(5);
+
+    renderHook(() => useSyncAllWatcher(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith("계좌A, 계좌B 외 1개 계좌 동기화 실패", "error");
+    });
+  });
+
+  it("배치 전체 실패(error 상태)면 error 메시지를 토스트로 표시한다", async () => {
+    vi.mocked(getSyncAllStatus).mockResolvedValue({
+      status: "error",
+      total: 2,
+      done: 0,
+      failed: 2,
+      failed_accounts: [],
+      error: "boom",
+    });
+    useSyncStore.getState().startSyncAll(2);
+
+    renderHook(() => useSyncAllWatcher(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith("전체 동기화 실패: boom", "error");
+    });
+  });
 });

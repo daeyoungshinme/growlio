@@ -116,11 +116,19 @@ export const deleteAccount = (id: string) => apiDelete(`/assets/${id}`);
 
 export const syncAccount = (id: string) => apiPost(`/assets/${id}/sync`);
 
+export interface FailedSyncAccount {
+  account_id: string;
+  account_name: string;
+  error: string;
+}
+
 export interface SyncAllStatus {
   status: "idle" | "running" | "done" | "error";
   total?: number;
   done?: number;
   failed?: number;
+  failed_accounts?: FailedSyncAccount[];
+  error?: string;
 }
 
 export const syncAllAccounts = () => apiPost<{ total: number; status: string }>("/assets/sync-all");

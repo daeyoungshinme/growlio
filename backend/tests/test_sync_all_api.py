@@ -108,6 +108,29 @@ class TestGetSyncAllStatus:
         assert resp.status_code == 200
         assert resp.json() == stored
 
+    def test_returns_failed_accounts_when_partial_failure(self):
+        user = _make_user()
+        db = _make_mock_db([])
+        app = _setup_app(user, db)
+        stored = {
+            "status": "done",
+            "total": 2,
+            "done": 2,
+            "failed": 1,
+            "failed_accounts": [
+                {"account_id": "acc-1", "account_name": "키움 종합계좌", "error": "인증에 실패했습니다"}
+            ],
+        }
+
+        with (
+            patch("app.api.v1.assets.get_sync_all_status", AsyncMock(return_value=stored)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/assets/sync-all/status")
+
+        assert resp.status_code == 200
+        assert resp.json() == stored
+
     def test_returns_idle_when_nothing_running(self):
         user = _make_user()
         db = _make_mock_db([])

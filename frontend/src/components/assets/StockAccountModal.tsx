@@ -165,11 +165,6 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
       isa_open_date: form.tax_type === "ISA" ? (form.isa_open_date ?? null) : undefined,
       isa_type: form.tax_type === "ISA" ? form.isa_type : undefined,
     };
-    if (initialAccount!.data_source === "MANUAL") {
-      const usdConverted = convertUsdToKrw(depositUsd, usdRate);
-      const total = (depositKrw ?? 0) + usdConverted;
-      data.manual_amount = total > 0 ? total : undefined;
-    }
     if (form.kis_app_key) data.kis_app_key = form.kis_app_key;
     if (form.kis_app_secret) data.kis_app_secret = form.kis_app_secret;
     if (form.kiwoom_app_key) data.kiwoom_app_key = form.kiwoom_app_key;

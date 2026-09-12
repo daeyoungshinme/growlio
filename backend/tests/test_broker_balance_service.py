@@ -25,13 +25,20 @@ def _position(**overrides):
     return Position(**defaults)
 
 
+def _patch_session(mock_db):
+    """fetch_broker_balance가 여는 AsyncSessionLocal()을 mock_db로 대체."""
+    mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db.__aexit__ = AsyncMock(return_value=None)
+    return patch("app.services.rebalancing.broker_balance_service.AsyncSessionLocal", return_value=mock_db)
+
+
 class TestFetchBrokerBalance:
     @pytest.mark.asyncio
-    async def test_unsupported_asset_type_raises(self, make_account, mock_db, mock_cache):
+    async def test_unsupported_asset_type_raises(self, make_account, mock_cache):
         account = make_account(asset_type="BANK_ACCOUNT")
 
         with pytest.raises(ValueError, match="지원하지 않는 계좌 유형"):
-            await fetch_broker_balance(account, mock_db, mock_cache)
+            await fetch_broker_balance(account, mock_cache)
 
     @pytest.mark.asyncio
     async def test_kis_account_fetches_orderable_cash_when_credentials_present(self, make_account, mock_db, mock_cache):
@@ -45,6 +52,7 @@ class TestFetchBrokerBalance:
         balance = BalanceResult(positions=[_position()], deposit_krw=100_000.0)
 
         with (
+            _patch_session(mock_db),
             patch("app.services.rebalancing.broker_balance_service.KISProvider") as mock_provider_cls,
             patch(
                 "app.services.rebalancing.broker_balance_service.decrypt_kis_credentials",
@@ -61,7 +69,7 @@ class TestFetchBrokerBalance:
         ):
             mock_provider_cls.return_value.sync = AsyncMock(return_value=balance)
 
-            result = await fetch_broker_balance(account, mock_db, mock_cache)
+            result = await fetch_broker_balance(account, mock_cache)
 
         mock_orderable.assert_awaited_once()
         assert result.orderable_krw == 250_000.0
@@ -79,9 +87,12 @@ class TestFetchBrokerBalance:
         )
         balance = BalanceResult(positions=[], deposit_krw=0.0)
 
-        with patch("app.services.rebalancing.broker_balance_service.KISProvider") as mock_provider_cls:
+        with (
+            _patch_session(mock_db),
+            patch("app.services.rebalancing.broker_balance_service.KISProvider") as mock_provider_cls,
+        ):
             mock_provider_cls.return_value.sync = AsyncMock(return_value=balance)
-            result = await fetch_broker_balance(account, mock_db, mock_cache)
+            result = await fetch_broker_balance(account, mock_cache)
 
         assert result.orderable_krw is None
 
@@ -97,6 +108,7 @@ class TestFetchBrokerBalance:
         balance = BalanceResult(positions=[], deposit_krw=0.0)
 
         with (
+            _patch_session(mock_db),
             patch("app.services.rebalancing.broker_balance_service.KISProvider") as mock_provider_cls,
             patch(
                 "app.services.rebalancing.broker_balance_service.decrypt_kis_credentials",
@@ -108,7 +120,7 @@ class TestFetchBrokerBalance:
             ),
         ):
             mock_provider_cls.return_value.sync = AsyncMock(return_value=balance)
-            result = await fetch_broker_balance(account, mock_db, mock_cache)
+            result = await fetch_broker_balance(account, mock_cache)
 
         assert result.orderable_krw is None
 
@@ -125,9 +137,12 @@ class TestFetchBrokerBalance:
             deposit_krw=123_456.0,
         )
 
-        with patch("app.services.rebalancing.broker_balance_service.TossProvider") as mock_provider_cls:
+        with (
+            _patch_session(mock_db),
+            patch("app.services.rebalancing.broker_balance_service.TossProvider") as mock_provider_cls,
+        ):
             mock_provider_cls.return_value.sync = AsyncMock(return_value=balance)
-            result = await fetch_broker_balance(account, mock_db, mock_cache)
+            result = await fetch_broker_balance(account, mock_cache)
 
         # 토스는 별도 orderable-cash API가 없어 sync의 deposit_krw(=cashBuyingPower)를 그대로 쓴다
         assert result.orderable_krw == 123_456.0
@@ -144,9 +159,12 @@ class TestFetchBrokerBalance:
         )
         balance = BalanceResult(positions=[_position(ticker="000660", name="SK하이닉스")], deposit_krw=50_000.0)
 
-        with patch("app.services.rebalancing.broker_balance_service.KiwoomProvider") as mock_provider_cls:
+        with (
+            _patch_session(mock_db),
+            patch("app.services.rebalancing.broker_balance_service.KiwoomProvider") as mock_provider_cls,
+        ):
             mock_provider_cls.return_value.sync = AsyncMock(return_value=balance)
-            result = await fetch_broker_balance(account, mock_db, mock_cache)
+            result = await fetch_broker_balance(account, mock_cache)
 
         assert result.orderable_krw is None
         assert result.deposit_krw == 50_000.0

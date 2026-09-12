@@ -11,6 +11,7 @@ import uuid
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import AsyncSessionLocal
 from app.models.asset import AssetAccount
 from app.models.token import KisToken, KiwoomToken, TossToken
 from app.utils.cache_keys import account_detail_key, invalidate_user_caches
@@ -21,21 +22,25 @@ async def verify_kis_credentials(
     kis_app_secret: str,
     is_mock: bool,
     user_id: uuid.UUID,
-    db: AsyncSession,
     cache,
 ) -> None:
-    """KIS 자격증명 유효성을 확인한다 (계좌 생성 없이). 실패 시 httpx 예외를 그대로 전파한다."""
+    """KIS 자격증명 유효성을 확인한다 (계좌 생성 없이). 실패 시 httpx 예외를 그대로 전파한다.
+
+    요청 스코프 세션이 아닌 별도의 짧게 스코프된 세션을 사용한다 — KIS OAuth HTTP 호출 동안
+    요청의 DB 커넥션 풀 슬롯을 오래 붙잡지 않기 위함.
+    """
     from app.kis.auth import _fetch_and_store_token
 
-    await _fetch_and_store_token(
-        kis_app_key,
-        kis_app_secret,
-        is_mock=is_mock,
-        cache=cache,
-        db=db,
-        user_id=str(user_id),
-        account_id=None,
-    )
+    async with AsyncSessionLocal() as db:
+        await _fetch_and_store_token(
+            kis_app_key,
+            kis_app_secret,
+            is_mock=is_mock,
+            cache=cache,
+            db=db,
+            user_id=str(user_id),
+            account_id=None,
+        )
 
 
 async def verify_toss_credentials(toss_client_id: str, toss_client_secret: str) -> None:
