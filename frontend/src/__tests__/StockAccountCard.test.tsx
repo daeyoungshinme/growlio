@@ -129,4 +129,34 @@ describe("StockAccountCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "예수금 수정" }));
     expect(defaultProps.onEdit).toHaveBeenCalledWith(mockAccount);
   });
+
+  it("last_sync_error가 있으면 동기화 실패 배지와 에러 메시지 툴팁을 표시한다", () => {
+    const account = {
+      ...mockAccount,
+      last_sync_error: "KIS 인증에 실패했습니다",
+      last_synced_at: null,
+    };
+    renderWithProviders(<StockAccountCard {...defaultProps} account={account} />);
+    const badge = screen.getByText("동기화 실패");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute("title", "KIS 인증에 실패했습니다");
+  });
+
+  it("last_sync_error 없이 last_synced_at만 있으면 상대 시간을 표시한다", () => {
+    const account = {
+      ...mockAccount,
+      last_sync_error: null,
+      last_synced_at: new Date().toISOString(),
+    };
+    renderWithProviders(<StockAccountCard {...defaultProps} account={account} />);
+    expect(screen.getByText(/동기화$/)).toBeInTheDocument();
+    expect(screen.queryByText("동기화 실패")).not.toBeInTheDocument();
+  });
+
+  it("동기화 이력이 없으면 동기화 상태 줄을 렌더링하지 않는다", () => {
+    const account = { ...mockAccount, last_sync_error: null, last_synced_at: null };
+    renderWithProviders(<StockAccountCard {...defaultProps} account={account} />);
+    expect(screen.queryByText("동기화 실패")).not.toBeInTheDocument();
+    expect(screen.queryByText(/동기화$/)).not.toBeInTheDocument();
+  });
 });

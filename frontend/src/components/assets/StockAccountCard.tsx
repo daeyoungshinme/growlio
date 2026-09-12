@@ -6,7 +6,7 @@ import {
 } from "@/api/assets";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useHaptic } from "@/hooks/useHaptic";
-import { convertUsdToKrw, fmtKrw, fmtPct } from "@/utils/format";
+import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { isSyncableAccount } from "@/utils/accounts";
@@ -75,6 +75,24 @@ export default function StockAccountCard({
               </span>
             </div>
           )}
+          {/* 줄2.5: 동기화 상태 (증권사 연동 계좌만) */}
+          {isSyncableAccount(account.data_source) &&
+            (account.last_sync_error || account.last_synced_at) && (
+              <div className="mt-0.5 min-w-0">
+                {account.last_sync_error ? (
+                  <span
+                    className="text-xs text-red-500 dark:text-red-400 truncate block"
+                    title={account.last_sync_error}
+                  >
+                    동기화 실패
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400 dark:text-gray-500 truncate block">
+                    {relativeTime(account.last_synced_at!)} 동기화
+                  </span>
+                )}
+              </div>
+            )}
           {/* 줄3: 배지 (넘치면 다음 줄로 — 현재 라벨 조합 기준 사실상 1줄) */}
           <div className="flex flex-wrap items-center gap-1.5 gap-y-1 mt-1 min-w-0">
             <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">

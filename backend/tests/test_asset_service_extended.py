@@ -299,6 +299,56 @@ class TestSyncAccount:
         assert result.positions_changed is False
         assert mock_invalidate.call_args.kwargs["positions_changed"] is False
 
+    @pytest.mark.asyncio
+    async def test_sync_account_success_sets_last_synced_at_and_clears_error(
+        self, mock_db, override_settings, make_account
+    ):
+        """성공 시 last_synced_at이 갱신되고, 이전 실패로 남아있던 last_sync_error는 초기화된다."""
+        from app.providers.base import BalanceResult
+        from app.services.asset_service import sync_account
+
+        account = make_account(data_source="MANUAL", last_sync_error="이전 동기화 실패 메시지")
+        balance = BalanceResult(total_value_krw=1_000_000.0, positions=[])
+
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(return_value=balance)
+        fake_snapshot = SimpleNamespace(id=uuid.uuid4())
+
+        with (
+            patch("app.services.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.broker_sync_duration"),
+        ):
+            await sync_account(account, mock_db, cache=MagicMock())
+
+        assert account.last_synced_at is not None
+        assert account.last_sync_error is None
+
+    @pytest.mark.asyncio
+    async def test_sync_account_provider_failure_persists_error_and_reraises(
+        self, mock_db, override_settings, make_account
+    ):
+        """provider 호출 실패 시 last_sync_error를 커밋하고 원래 예외를 그대로 재-raise한다."""
+        from app.exceptions import ProviderCredentialError
+        from app.services.asset_service import sync_account
+
+        account = make_account(data_source="KIS_API")
+
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(side_effect=ProviderCredentialError("KIS 자격증명이 없습니다"))
+
+        with (
+            patch("app.services.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.asset_service.broker_sync_duration"),
+            pytest.raises(ProviderCredentialError),
+        ):
+            await sync_account(account, mock_db, cache=MagicMock())
+
+        assert account.last_sync_error == "KIS 자격증명이 없습니다"
+        assert not hasattr(account, "last_synced_at")
+        mock_db.commit.assert_called_once()
+
 
 class TestSyncAccountNow:
     @pytest.mark.asyncio

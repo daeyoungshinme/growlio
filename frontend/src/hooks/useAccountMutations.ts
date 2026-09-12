@@ -42,6 +42,7 @@ export function useAccountMutations({
           void invalidateAll();
           toast("계좌가 추가되었습니다", "success");
         } catch (e) {
+          void invalidateAll();
           const fallback = "초기 동기화 실패. 계좌 카드의 동기화 버튼으로 재시도하세요.";
           toast(getHttpStatus(e) != null ? extractErrorMessage(e, fallback) : fallback);
         } finally {
@@ -136,6 +137,7 @@ export function useAccountMutations({
         await invalidateSyncData(queryClient);
         toast("동기화 완료", "success");
       } catch (e) {
+        void invalidateSyncData(queryClient);
         const broker = acc ? (STOCK_TYPE_LABELS[acc.asset_type] ?? "증권사") : "증권사";
         const fallback = `동기화 실패. ${broker} API 자격증명을 확인하세요.`;
         toast(getHttpStatus(e) != null ? extractErrorMessage(e, fallback) : fallback);
