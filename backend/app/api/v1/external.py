@@ -32,7 +32,7 @@ from app.models.asset import Transaction
 from app.models.user import User
 from app.services._settings_queries import get_settings_row
 from app.services.asset_service import list_accounts as _list_accounts
-from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot_with_positions
+from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot, get_latest_snapshot_with_positions
 from app.utils.cache_keys import invalidate_asset_account_caches, invalidate_user_caches, monthly_trend_key
 from app.utils.currency import fetch_usd_krw
 
@@ -63,7 +63,7 @@ async def list_account_balances(
     accounts = await _list_accounts(current_user.id, db, skip=0, limit=200)
     result: list[ExternalAccountBalance] = []
     for account in accounts:
-        latest_snap, _positions = await get_latest_snapshot_with_positions(db, account.id)
+        latest_snap = await get_latest_snapshot(db, account.id)
         if latest_snap is not None:
             value = latest_snap.amount_krw
             as_of = latest_snap.snapshot_date

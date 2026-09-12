@@ -118,6 +118,7 @@ max-complexity = 15
 
 [tool.mypy]
 python_version = "3.11"
+platform = "linux"
 strict = false
 ignore_missing_imports = true
 plugins = ["pydantic.mypy"]

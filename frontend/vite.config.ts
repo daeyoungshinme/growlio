@@ -23,6 +23,13 @@ export default defineConfig({
         // Rolldown 네이티브 `advancedChunks.groups`(정규식 기반 모듈 매칭)를 사용한다.
         advancedChunks: {
           groups: [
+            // react/react-dom을 먼저 매칭시켜 별도 청크로 분리 — 안 그러면 Rolldown이
+            // react-dom의 CJS interop 헬퍼를 recharts/@dnd-kit이 내부적으로 쓰는
+            // ReactDOM.createPortal 때문에 vendor-charts/vendor-dnd 청크 안에 배치하고,
+            // 엔트리도 그 헬퍼를 필요로 해 결과적으로 442KB/175KB짜리 vendor-charts·
+            // vendor-dnd 전체가 부팅 시 즉시 로드되는 문제가 있었다(두 그룹 다 실제로는
+            // lazy 페이지 전용인데도).
+            { name: "vendor-react", test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/ },
             { name: "vendor-charts", test: /[\\/]node_modules[\\/]recharts[\\/]/ },
             { name: "vendor-query", test: /[\\/]node_modules[\\/]@tanstack[\\/]react-query[\\/]/ },
             { name: "vendor-dnd", test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/ },

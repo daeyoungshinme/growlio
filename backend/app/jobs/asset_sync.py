@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
+from app.jobs._job_helpers import peak_rss_mb
 from app.models.asset import AssetAccount
 from app.services.asset_service import sync_account
 
@@ -77,7 +78,9 @@ async def run_daily_asset_sync() -> None:
         result = await db.execute(select(AssetAccount).where(AssetAccount.is_active == True))
         accounts = result.scalars().all()
 
+    logger.info("daily_asset_sync_start", account_count=len(accounts), peak_rss_mb=peak_rss_mb())
     await _sync_accounts(list(accounts), "daily_sync")
+    logger.info("daily_asset_sync_done", peak_rss_mb=peak_rss_mb())
 
 
 async def run_intraday_asset_sync() -> None:
@@ -91,4 +94,6 @@ async def run_intraday_asset_sync() -> None:
         )
         accounts = result.scalars().all()
 
+    logger.info("intraday_asset_sync_start", account_count=len(accounts), peak_rss_mb=peak_rss_mb())
     await _sync_accounts(list(accounts), "intraday_sync")
+    logger.info("intraday_asset_sync_done", peak_rss_mb=peak_rss_mb())
