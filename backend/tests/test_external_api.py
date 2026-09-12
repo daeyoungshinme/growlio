@@ -75,7 +75,7 @@ class TestListAccountBalances:
 
         with (
             patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[account])),
-            patch("app.api.v1.external.get_latest_snapshot_with_positions", AsyncMock(return_value=(snapshot, []))),
+            patch("app.api.v1.external.get_latest_snapshot", AsyncMock(return_value=snapshot)),
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.get("/api/v1/external/accounts")
@@ -95,7 +95,7 @@ class TestListAccountBalances:
 
         with (
             patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[account])),
-            patch("app.api.v1.external.get_latest_snapshot_with_positions", AsyncMock(return_value=(None, []))),
+            patch("app.api.v1.external.get_latest_snapshot", AsyncMock(return_value=None)),
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.get("/api/v1/external/accounts")
