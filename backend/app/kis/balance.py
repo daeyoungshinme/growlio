@@ -1,5 +1,7 @@
 from typing import Any
 
+import structlog
+
 from app.kis.client import kis_request
 from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
@@ -10,6 +12,8 @@ from app.kis.constants import (
     TR_OVERSEAS_BALANCE_MOCK,
     TR_OVERSEAS_BALANCE_REAL,
 )
+
+logger = structlog.get_logger()
 
 
 def _auth_headers(app_key: str, app_secret: str, access_token: str, tr_id: str) -> dict[str, str]:
@@ -77,10 +81,23 @@ async def get_domestic_balance(
         )
 
     summary = data.get("output2", [{}])[0] if data.get("output2") else {}
+    # 예수금은 D+2 정산 후 예수금(prvs_rcdl_excc_amt = 가수도정산금액)을 쓴다 — dnca_tot_amt는
+    # 당일 결제기준(D+0)이라 매도대금(T+2 결제)이 빠져 매매 직후 총자산이 덜 찬 것처럼 보인다.
+    # 키움 d2_entra와 동일 의미. 필드 부재/모의계좌 대비로 dnca_tot_amt 폴백.
+    d2_deposit = summary.get("prvs_rcdl_excc_amt")
+    deposit_krw = float(d2_deposit) if d2_deposit not in (None, "") else float(summary.get("dnca_tot_amt", 0))
+    if d2_deposit in (None, ""):
+        logger.warning("kis_deposit_d2_missing_fallback_dnca", dnca_tot_amt=summary.get("dnca_tot_amt"))
+    else:
+        logger.debug(
+            "kis_deposit_raw",
+            prvs_rcdl_excc_amt=d2_deposit,
+            dnca_tot_amt=summary.get("dnca_tot_amt"),
+        )
     return {
         "positions": positions,
         "total_value_krw": float(summary.get("evlu_amt_smtl_amt", 0)),
-        "deposit_krw": float(summary.get("dnca_tot_amt", 0)),
+        "deposit_krw": deposit_krw,
         "invested_krw": float(summary.get("pchs_amt_smtl_amt", 0)),
         "pnl_krw": float(summary.get("evlu_pfls_smtl_amt", 0)),
     }

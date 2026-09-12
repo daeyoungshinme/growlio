@@ -116,11 +116,11 @@ async def _execute_kiwoom_buys_with_cash_check(
     """키움 FULL 전략 매수 실행 — 매도 완료 후 실제 예수금을 재조회해 예산 내로 clamp한다.
 
     KIS 실행기의 `_execute_buys_with_cash_check`와 동일한 목적(매도 leg가 예상보다 적게
-    체결되거나 실패해도 매수가 실제 가용 현금을 초과하지 않도록)의 대응 함수. 키움에는 KIS의
-    `get_orderable_cash()`(미수 없는 매수가능금액 전용 조회)에 대응하는 API가 없어,
-    `get_domestic_balance()`가 함께 반환하는 국내 현금 예수금(`deposit_krw`)을 예산으로 쓴다
-    — 미수/신용 한도까지는 반영하지 못하는 보수적인 근사치이지만, 예수금을 초과해 시도하는
-    것보다는 안전하다.
+    체결되거나 실패해도 매수가 실제 가용 현금을 초과하지 않도록)의 대응 함수. 예산으로는
+    `get_domestic_balance()`가 kt00001에서 함께 반환하는 `orderable_krw`
+    (100stk_ord_alow_amt = 미수 없는 현금 매수여력)를 쓴다 — KIS `get_orderable_cash()`의
+    `nrcvb_buy_amt`와 대칭이며 매도예정금(D+2)을 포함한다. 조회 실패 시 `deposit_krw`(D+2
+    추정예수금)로 폴백한다.
 
     해외 주식 포함 시 국내 예수금으로 clamp하는 것이 의미가 없어(통화·계좌가 다름) 원래 수량
     그대로 실행한다. 예수금 조회 자체가 실패해도 마찬가지로 clamp 없이 원래 수량으로 시도한다
@@ -134,12 +134,12 @@ async def _execute_kiwoom_buys_with_cash_check(
 
     try:
         balance = await kiwoom_get_domestic_balance(access_token, account_no, is_mock=is_mock)
-        deposit_krw = float(balance.get("deposit_krw") or 0.0)
+        budget_krw = float(balance.get("orderable_krw") or balance.get("deposit_krw") or 0.0)
     except Exception as exc:
         logger.warning("kiwoom_full_strategy_deposit_lookup_failed", error=str(exc))
         return [await _execute_kiwoom_single_order(order, access_token, account_no, is_mock) for order in buys]
 
-    adjusted, skipped = clamp_buy_orders_to_budget(buys, deposit_krw)
+    adjusted, skipped = clamp_buy_orders_to_budget(buys, budget_krw)
     results: list[OrderResult] = list(skipped)
     for order in adjusted:
         results.append(await _execute_kiwoom_single_order(order, access_token, account_no, is_mock))

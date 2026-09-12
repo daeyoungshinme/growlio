@@ -144,8 +144,15 @@ def _evaluation_response():
     }
 
 
-def _deposit_response(entr="000000100000"):
-    return {"return_code": 0, "entr": entr}
+def _deposit_response(entr="000000100000", d2_entra="000000120000", ord_alow="000000110000"):
+    """kt00001(예수금상세현황요청) 응답 — 예수금은 d2_entra(D+2 추정예수금)를 쓴다."""
+    return {
+        "return_code": 0,
+        "entr": entr,
+        "d2_entra": d2_entra,
+        "ord_alow_amt": ord_alow,
+        "100stk_ord_alow_amt": ord_alow,
+    }
 
 
 class TestGetDomesticBalance:
@@ -159,7 +166,7 @@ class TestGetDomesticBalance:
                 assert "acnt_no" not in json
                 return _evaluation_response()
             assert headers["api-id"] == "kt00001"
-            assert json == {"qry_tp": "3", "dmst_stex_tp": "KRX"}
+            assert json == {"qry_tp": "3"}  # dmst_stex_tp는 kt00001 스키마에 없음
             return _deposit_response()
 
         with patch("app.kiwoom.balance.kiwoom_request", side_effect=_fake_request):
@@ -177,7 +184,72 @@ class TestGetDomesticBalance:
         assert result["total_value_krw"] == 950000.0
         assert result["invested_krw"] == 900000.0
         assert result["pnl_krw"] == 50000.0
+        assert result["deposit_krw"] == 120000.0  # d2_entra (D+2 추정예수금)
+        assert result["orderable_krw"] == 110000.0  # 100stk_ord_alow_amt
+
+    @pytest.mark.asyncio
+    async def test_deposit_uses_d2_entra_over_entr(self):
+        async def _fake_request(method, path, *, is_mock, headers, json=None, **kwargs):
+            if headers["api-id"] == "kt00018":
+                return _evaluation_response()
+            return _deposit_response(entr="000000100000", d2_entra="000000200000")
+
+        with patch("app.kiwoom.balance.kiwoom_request", side_effect=_fake_request):
+            result = await get_domestic_balance("token", "1234567890", is_mock=True)
+
+        assert result["deposit_krw"] == 200000.0
+
+    @pytest.mark.asyncio
+    async def test_deposit_d2_entra_zero_is_respected(self):
+        """d2_entra 키가 있으면 값이 0이어도 신뢰 — entr로 폴백하지 않는다."""
+
+        async def _fake_request(method, path, *, is_mock, headers, json=None, **kwargs):
+            if headers["api-id"] == "kt00018":
+                return _evaluation_response()
+            return {"return_code": 0, "entr": "000000100000", "d2_entra": "0"}
+
+        with patch("app.kiwoom.balance.kiwoom_request", side_effect=_fake_request):
+            result = await get_domestic_balance("token", "1234567890", is_mock=True)
+
+        assert result["deposit_krw"] == 0.0
+
+    @pytest.mark.asyncio
+    async def test_deposit_falls_back_to_entr_when_d2_missing(self):
+        async def _fake_request(method, path, *, is_mock, headers, json=None, **kwargs):
+            if headers["api-id"] == "kt00018":
+                return _evaluation_response()
+            return {"return_code": 0, "entr": "000000100000"}  # d2_entra 없음
+
+        with (
+            patch("app.kiwoom.balance.kiwoom_request", side_effect=_fake_request),
+            patch("app.kiwoom.balance.logger") as mock_logger,
+        ):
+            result = await get_domestic_balance("token", "1234567890", is_mock=True)
+
         assert result["deposit_krw"] == 100000.0
+        mock_logger.warning.assert_called_once_with("kiwoom_deposit_d2_missing_fallback_entr", entr="000000100000")
+
+    @pytest.mark.asyncio
+    async def test_orderable_krw_fallback_chain(self):
+        """100stk_ord_alow_amt → ord_alow_amt → deposit_krw 순 폴백."""
+
+        async def _no_100stk(method, path, *, is_mock, headers, json=None, **kwargs):
+            if headers["api-id"] == "kt00018":
+                return _evaluation_response()
+            return {"return_code": 0, "d2_entra": "000000120000", "ord_alow_amt": "000000105000"}
+
+        with patch("app.kiwoom.balance.kiwoom_request", side_effect=_no_100stk):
+            result = await get_domestic_balance("token", "1234567890", is_mock=True)
+        assert result["orderable_krw"] == 105000.0
+
+        async def _no_orderable(method, path, *, is_mock, headers, json=None, **kwargs):
+            if headers["api-id"] == "kt00018":
+                return _evaluation_response()
+            return {"return_code": 0, "d2_entra": "000000120000"}
+
+        with patch("app.kiwoom.balance.kiwoom_request", side_effect=_no_orderable):
+            result = await get_domestic_balance("token", "1234567890", is_mock=True)
+        assert result["orderable_krw"] == 120000.0  # deposit_krw 폴백
 
     @pytest.mark.asyncio
     async def test_missing_entr_field_logs_warning_and_returns_zero(self):

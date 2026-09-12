@@ -71,12 +71,34 @@ def _strip_ticker_prefix(stk_cd: str) -> str:
     return stk_cd
 
 
-async def _get_deposit_krw(access_token: str, *, is_mock: bool) -> float:
-    """예수금상세현황요청 (kt00001) — 국내 현금 예수금(entr).
+def _pick_deposit_krw(data: dict[str, Any]) -> tuple[float, str]:
+    """예수금 표시값을 고른다 — d2_entra(D+2 추정예수금) 우선, 키 부재 시에만 entr(D+0) 폴백.
 
-    kt00018(평가잔고)과 동일하게 dmst_stex_tp를 함께 보낸다 — 이전에는 qry_tp만 보내
-    kt00001 응답이 비정상(entr 누락)으로 와서 리밸런싱 실행 화면에 예수금이 0원으로
-    표시되는 버그가 있었다.
+    entr는 당일 결제기준 현금이라 매도대금(T+2 결제)·미결제 매수분이 빠져 매매 직후 며칠간
+    실제 자금과 벌어진다. 키움 MTS/앱이 "예수금"으로 보여주는 값은 d2_entra다.
+
+    `_parse_num()`이 None·빈문자열·파싱실패를 모두 0.0으로 뭉개므로 "키 부재"와 "값 0"을
+    구분하려면 raw dict 접근이 필요하다. d2_entra 키가 있으면 값이 "0"·음수(미수/신용)여도
+    그대로 신뢰한다 — 미결제 매수분이 D+2 현금을 소진한 실제 상태다. "d2가 0이면 entr로
+    폴백"은 하지 않는다: 더 큰 entr로 되돌아가 과대표시되고, d2가 실제 0이면 entr도 사실상 0이다.
+    """
+    if data.get("d2_entra") is not None:
+        return _parse_num(data["d2_entra"]), "d2_entra"
+    if data.get("entr") is not None:
+        return _parse_num(data["entr"]), "entr"
+    return 0.0, "none"
+
+
+async def _get_deposit_info(access_token: str, *, is_mock: bool) -> dict[str, float]:
+    """예수금상세현황요청 (kt00001) — 국내 현금 예수금(D+2) + 주문가능 현금.
+
+    요청 body는 qry_tp만 보낸다(키움 공식 예제 get_domestic_deposit_detail.py 기준) —
+    qry_tp="3"(추정조회)이라야 d2_entra가 채워진다. dmst_stex_tp는 kt00001 스키마에 없어
+    보내지 않는다(kt00018과 달리).
+
+    - deposit_krw: d2_entra(D+2 추정예수금, 앱 표시값). 없으면 entr 폴백
+    - orderable_krw: 100stk_ord_alow_amt(미수 없는 현금 매수여력) → ord_alow_amt(주문가능금액)
+      → deposit_krw 폴백. 리밸런싱 FULL 매수 예산 clamp 전용, KIS nrcvb_buy_amt와 대칭
     """
     headers = _auth_headers(access_token, API_ID_DOMESTIC_DEPOSIT)
     data = await kiwoom_request(
@@ -84,13 +106,29 @@ async def _get_deposit_krw(access_token: str, *, is_mock: bool) -> float:
         "/api/dostk/acnt",
         is_mock=is_mock,
         headers=headers,
-        json={"qry_tp": "3", "dmst_stex_tp": "KRX"},  # 3: 추정조회
+        json={"qry_tp": "3"},  # 3: 추정조회 (d2_entra는 이 모드에서만 채워짐)
     )
-    if data.get("entr") is None:
+
+    deposit_krw, src = _pick_deposit_krw(data)
+    if src == "none":
         logger.warning("kiwoom_deposit_field_missing", response_keys=list(data.keys()))
+    elif src == "entr":
+        logger.warning("kiwoom_deposit_d2_missing_fallback_entr", entr=data.get("entr"))
     else:
-        logger.debug("kiwoom_deposit_raw_response", entr=data.get("entr"))
-    return _parse_num(data.get("entr"))
+        logger.debug(
+            "kiwoom_deposit_raw",
+            d2_entra=data.get("d2_entra"),
+            entr=data.get("entr"),
+            ord_alow_amt=data.get("ord_alow_amt"),
+        )
+
+    orderable_krw = _parse_num(data.get("100stk_ord_alow_amt"))
+    if orderable_krw <= 0:
+        orderable_krw = _parse_num(data.get("ord_alow_amt"))
+    if orderable_krw <= 0:
+        orderable_krw = deposit_krw
+
+    return {"deposit_krw": deposit_krw, "orderable_krw": orderable_krw}
 
 
 async def get_domestic_balance(
@@ -105,7 +143,7 @@ async def get_domestic_balance(
     """
     headers = _auth_headers(access_token, API_ID_DOMESTIC_BALANCE)
 
-    data, deposit_krw = await asyncio.gather(
+    data, deposit_info = await asyncio.gather(
         kiwoom_request(
             "POST",
             "/api/dostk/acnt",
@@ -113,7 +151,7 @@ async def get_domestic_balance(
             headers=headers,
             json={"qry_tp": "1", "dmst_stex_tp": "KRX"},  # qry_tp 1: 합산
         ),
-        _get_deposit_krw(access_token, is_mock=is_mock),
+        _get_deposit_info(access_token, is_mock=is_mock),
     )
 
     positions = []
@@ -139,7 +177,8 @@ async def get_domestic_balance(
     return {
         "positions": positions,
         "total_value_krw": _parse_num(data.get("tot_evlt_amt")),
-        "deposit_krw": deposit_krw,
+        "deposit_krw": deposit_info["deposit_krw"],
+        "orderable_krw": deposit_info["orderable_krw"],
         "invested_krw": _parse_num(data.get("tot_pur_amt")),
         "pnl_krw": _parse_num(data.get("tot_evlt_pl")),
     }

@@ -189,7 +189,7 @@ services/
   │   ├── plan_notifications.py # AUTO 플랜 이메일/푸시/이력 알림 — 생성 안내, 게이트 차단 보류 안내(`notify_*_blocked()`가 하루 1회 durable_state dedup), leg 실행 완료/실패 결과
   │   ├── execution_service.py # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis/_kiwoom_order_executor.py로 분리
   │   ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE/FULL 주문 실행. FULL 매수도 실행 직전 `get_orderable_cash()`로 예산 clamp(매도 부족·실패 시 매수가 가용 현금 초과 방지, AUTO leg도 공유)
-  │   ├── _kiwoom_order_executor.py # Kiwoom 국내/해외 단일 주문 실행 + FULL 매수 예산 clamp(`get_orderable_cash()` 대응 API 없어 `get_domestic_balance().deposit_krw` 사용)
+  │   ├── _kiwoom_order_executor.py # Kiwoom 국내/해외 단일 주문 실행 + FULL 매수 예산 clamp(`get_domestic_balance()`가 kt00001에서 함께 반환하는 `orderable_krw`=100stk_ord_alow_amt 사용, 없으면 `deposit_krw`=D+2 예수금 폴백 — KIS `get_orderable_cash()`와 대칭)
   │   ├── _order_executor_common.py # KIS/Kiwoom 주문 실행 결과 처리 공용 헬퍼
   │   ├── _order_quantity_guard.py # `clamp_sell_orders()`(매도→보유 수량) / `clamp_buy_orders_to_budget()`(매수→실행 직전 예산) — 양쪽 executor·FULL 공용
   │   ├── diagnosis_service.py # 진단 화면용 시장상황/리스크/세금영향 코멘트 생성 — needs_rebalancing 판정과 분리된 설명 전용, alert 아님
@@ -330,6 +330,8 @@ jobs/                         # APScheduler 정기 작업
 **USD/KRW 환율 캐싱:** `app/utils/currency.py`의 `get_usd_krw_rate(cache)` → in-memory 캐시 `usd_krw_rate` 키 조회(TTL: `settings.cache_ttl_seconds`) → 없으면 `settings.usd_krw_fallback_rate` fallback. KIS API 성공 시 `cache_usd_krw_rate(cache, rate)` 호출로 갱신. 테스트 패치 경로: `app.utils.currency.cache_usd_krw_rate`.
 
 **월별 추이 SQL (`_get_monthly_trend`):** `asset_accounts` JOIN + `is_active = TRUE` 필터 필수. 누락 시 비활성·삭제 계좌 스냅샷이 합산되어 금액이 수배 부풀림. 스냅샷은 `date.today()` 기준 저장 — 월말 스냅샷 개념 없음, "해당 월 마지막 sync일" 값이 월별 대표값으로 사용됨.
+
+**브로커 예수금 기준:** KIS/키움 sync가 `deposit_krw`에 담는 값은 **D+2 정산 후 예수금**(키움 `kt00001.d2_entra`, KIS `inquire-balance output2.prvs_rcdl_excc_amt`) — 당일 결제기준(D+0: 키움 `entr`, KIS `dnca_tot_amt`)을 쓰면 매도대금(T+2 결제)이 빠져 매매 직후 며칠간 예수금·총자산이 앱 값과 벌어진다. 각 필드 부재 시 D+0 값으로 폴백하며 `kiwoom_deposit_d2_missing_fallback_entr`/`kis_deposit_d2_missing_fallback_dnca` 경고 로그를 남긴다. 리밸런싱 FULL 매수 예산은 별도로 키움 `orderable_krw`(`100stk_ord_alow_amt`)/KIS `get_orderable_cash()`(`nrcvb_buy_amt`)를 쓴다. 해외 예수금(`deposit_usd`)은 해외 조회 실패 시 `BalanceResult.deposit_foreign=None`으로 표시돼 기존 DB 값을 유지하고, 확정된 `0.0`일 때만 갱신한다(수동계좌는 `deposit_foreign` 미세팅).
 
 **인증:** JWT Bearer 토큰. `api/deps.py`의 `get_current_user` 의존성 주입. Access 30분, Refresh 7일.
 

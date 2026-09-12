@@ -128,6 +128,62 @@ class TestSyncAccount:
         assert account.deposit_usd == 500.0
 
     @pytest.mark.asyncio
+    async def test_sync_account_deposit_foreign_none_preserves_existing_usd(
+        self, mock_db, override_settings, make_account
+    ):
+        """deposit_foreign=None(해외 조회 실패/미조회) → 기존 account.deposit_usd 유지."""
+        from app.providers.base import BalanceResult
+        from app.services.asset_service import sync_account
+
+        account = make_account(data_source="KIWOOM_API")
+        account.deposit_usd = 777.0
+
+        balance = BalanceResult(total_value_krw=5_000_000.0, deposit_foreign=None, positions=[])
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(return_value=balance)
+
+        with (
+            patch("app.services.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.asset_service._CIRCUITS", {}),
+            patch(
+                "app.services.asset_service._upsert_snapshot",
+                new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
+            ),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.broker_sync_duration"),
+        ):
+            await sync_account(account, mock_db, cache=MagicMock())
+
+        assert account.deposit_usd == 777.0
+
+    @pytest.mark.asyncio
+    async def test_sync_account_deposit_foreign_zero_clears_stale_usd(self, mock_db, override_settings, make_account):
+        """deposit_foreign=0.0(확정값) → stale account.deposit_usd를 0으로 갱신."""
+        from app.providers.base import BalanceResult
+        from app.services.asset_service import sync_account
+
+        account = make_account(data_source="KIWOOM_API")
+        account.deposit_usd = 777.0
+
+        balance = BalanceResult(total_value_krw=5_000_000.0, deposit_foreign=0.0, positions=[])
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(return_value=balance)
+
+        with (
+            patch("app.services.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.asset_service._CIRCUITS", {}),
+            patch(
+                "app.services.asset_service._upsert_snapshot",
+                new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
+            ),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.broker_sync_duration"),
+        ):
+            await sync_account(account, mock_db, cache=MagicMock())
+
+        assert account.deposit_usd == 0.0
+
+    @pytest.mark.asyncio
     async def test_sync_account_with_positions_deletes_old_positions(self, mock_db, override_settings, make_account):
         from app.providers.base import BalanceResult, Position
         from app.services.asset_service import sync_account

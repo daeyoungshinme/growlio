@@ -10,10 +10,13 @@ from app.exceptions import ProviderCredentialError
 from app.providers.kiwoom_provider import KiwoomProvider
 
 
-def _domestic_balance(total_value_krw=1_000_000.0, deposit_krw=100_000.0, invested_krw=900_000.0):
+def _domestic_balance(
+    total_value_krw=1_000_000.0, deposit_krw=100_000.0, invested_krw=900_000.0, orderable_krw=100_000.0
+):
     return {
         "total_value_krw": total_value_krw,
         "deposit_krw": deposit_krw,
+        "orderable_krw": orderable_krw,
         "invested_krw": invested_krw,
         "positions": [
             {
@@ -194,6 +197,32 @@ class TestKiwoomProviderSync:
         assert result.total_value_krw == 1_100_000.0
         assert len(result.positions) == 1
         assert result.positions[0].ticker == "005930"
+        # 해외 조회 실패 → deposit_foreign=None (asset_service가 기존 deposit_usd 유지)
+        assert result.deposit_foreign is None
+
+    @pytest.mark.asyncio
+    async def test_sync_overseas_confirmed_empty_emits_zero_deposit_foreign(
+        self, override_settings, make_account, mock_cache
+    ):
+        """해외 조회 성공·보유/예수금 없음이 확정되면 deposit_foreign=0.0 (stale 값 제거용)."""
+        account = make_account(
+            data_source="KIWOOM_API",
+            kiwoom_app_key=b"enc_key",
+            kiwoom_app_secret=b"enc_secret",
+            kiwoom_account_no="1234567890",
+        )
+        provider = KiwoomProvider()
+
+        with (
+            patch("app.providers.kiwoom_provider.decrypt", side_effect=["key", "secret"]),
+            patch("app.kiwoom.auth.get_access_token", new=AsyncMock(return_value="token-1")),
+            patch("app.kiwoom.balance.get_domestic_balance", new=AsyncMock(return_value=_domestic_balance())),
+            patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock(return_value=_empty_overseas())),
+            patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+        ):
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
+
+        assert result.deposit_foreign == 0.0
 
     @pytest.mark.asyncio
     async def test_sync_skips_overseas_when_cache_marks_no_overseas(self, override_settings, make_account, mock_cache):

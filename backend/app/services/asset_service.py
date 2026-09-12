@@ -95,7 +95,8 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
 
     if balance.deposit_krw is not None:
         account.deposit_krw = balance.deposit_krw
-    if balance.deposit_foreign:
+    # None = 미확인(해외 조회 실패/미조회) → 기존 값 유지. 0.0 = 확정값 → stale 값 제거를 위해 반영.
+    if balance.deposit_foreign is not None:
         account.deposit_usd = balance.deposit_foreign
 
     if balance.positions:

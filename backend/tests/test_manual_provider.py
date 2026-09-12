@@ -217,6 +217,20 @@ class TestManualProviderSync:
         assert result.total_value_krw == pytest.approx(1_000_000.0)
 
     @pytest.mark.asyncio
+    async def test_sync_does_not_set_deposit_foreign(self, override_settings, make_account):
+        """수동계좌 sync는 deposit_foreign을 세팅하지 않아야 한다(기본 None) —
+        asset_service가 사용자가 직접 입력한 account.deposit_usd를 0으로 덮어쓰지 않도록."""
+        account = make_account(asset_type="STOCK_OTHER", deposit_krw=1_000_000.0, deposit_usd=300.0)
+        db = _make_mock_db(positions=[])
+        cache = AsyncMock()
+
+        provider = ManualProvider()
+        with patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)):
+            result = await provider.sync(account, db, cache)
+
+        assert result.deposit_foreign is None
+
+    @pytest.mark.asyncio
     async def test_sync_price_not_in_map_uses_fallback(self, override_settings, make_account):
         """가격 맵에 없는 종목은 기존 current_price 유지 (line 50 — else branch)."""
         account = make_account(asset_type="STOCK_OTHER")

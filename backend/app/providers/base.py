@@ -40,7 +40,12 @@ class BalanceResult:
     positions: list[Position] = field(default_factory=list)
     total_value_krw: float = 0.0
     deposit_krw: float = 0.0  # 예수금 (KRW)
-    deposit_foreign: float = 0.0  # 해외 예수금 (원화 환산 전)
+    # 해외 예수금 (원화 환산 전). None = 미확인(해외 조회 실패/미조회 → 기존 DB 값 유지),
+    # 숫자 = 확정값(0도 그대로 반영해 stale 값을 지움)
+    deposit_foreign: float | None = None
+    # 미수 없는 현재 주문가능 현금(KRW). 리밸런싱 FULL 매수 예산 clamp 전용 —
+    # KIS get_orderable_cash()와 대칭. 미제공 시 None (호출부가 deposit_krw로 폴백)
+    orderable_krw: float | None = None
     invested_krw: float = 0.0  # 매입금액
     pnl_krw: float = 0.0  # 평가손익
     usd_krw_rate: float = field(default_factory=lambda: settings.usd_krw_fallback_rate)

@@ -50,6 +50,9 @@ async def fetch_broker_balance(
     if account.asset_type == "STOCK_TOSS":
         # 토스는 sync 시 deposit_krw에 cashBuyingPower(주문가능 현금)를 그대로 담는다.
         orderable_krw = result.deposit_krw
+    elif account.asset_type == "STOCK_KIWOOM":
+        # 키움은 kt00001의 100stk_ord_alow_amt(미수 없는 현금 매수여력)를 orderable_krw로 채운다.
+        orderable_krw = result.orderable_krw
     if account.asset_type == "STOCK_KIS" and account.kis_app_key and account.kis_app_secret and account.kis_account_no:
         try:
             creds = decrypt_kis_credentials(account)

@@ -87,6 +87,8 @@ class ManualProvider(BrokerProvider):
             positions=positions,
             total_value_krw=amount_krw,
             deposit_krw=float(account.deposit_krw or 0),
+            # deposit_foreign은 세팅하지 않음(기본 None) — 수동계좌의 USD 예수금은 사용자가
+            # 직접 입력한 account.deposit_usd이므로 sync가 덮어쓰면 안 된다.
             invested_krw=invested if positions else 0.0,
             pnl_krw=pnl,
             extra={"source": "MANUAL", "snapshot_date": date.today()},

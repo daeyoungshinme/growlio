@@ -125,7 +125,9 @@ class KiwoomProvider(BrokerProvider):
             positions=positions,
             total_value_krw=total_value_krw,
             deposit_krw=domestic["deposit_krw"],
-            deposit_foreign=overseas["deposit_usd"],
+            # 해외 조회 실패(ok=False) 시 None → asset_service가 기존 deposit_usd 유지
+            deposit_foreign=(None if overseas.get("ok") is False else overseas["deposit_usd"]),
+            orderable_krw=domestic.get("orderable_krw"),
             invested_krw=total_invested,
             pnl_krw=stock_value_krw - total_invested,
             usd_krw_rate=usd_krw_rate,

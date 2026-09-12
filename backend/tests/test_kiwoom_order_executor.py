@@ -245,6 +245,25 @@ class TestExecuteKiwoomBuysWithCashCheck:
         assert results[0].status == "SUCCESS"
 
     @pytest.mark.asyncio
+    async def test_orderable_krw_takes_precedence_over_deposit_krw(self, override_settings):
+        """orderable_krw(미수없는 매수여력)가 있으면 그것으로 clamp, deposit_krw는 폴백."""
+        buy_order = _make_order(ticker="005930", side="BUY", quantity=10, order_type="LIMIT", limit_price=1000.0)
+
+        with (
+            patch.object(
+                _kiwoom_order_executor,
+                "kiwoom_get_domestic_balance",
+                AsyncMock(return_value={"positions": [], "deposit_krw": 9000.0, "orderable_krw": 3000.0}),
+            ),
+            patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "1"})),
+        ):
+            results = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
+                [buy_order], "token", "1234567890", True
+            )
+
+        assert results[0].quantity == 3  # 3000 // 1000, not 9
+
+    @pytest.mark.asyncio
     async def test_zero_deposit_skips_buy_without_calling_broker(self, override_settings):
         buy_order = _make_order(ticker="005930", side="BUY", quantity=10, order_type="LIMIT", limit_price=1000.0)
 
