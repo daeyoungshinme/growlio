@@ -69,7 +69,8 @@ class TestSyncAccount:
         ):
             result = await sync_account(account, mock_db, cache=MagicMock())
 
-        assert result is fake_snapshot
+        assert result.snapshot is fake_snapshot
+        assert result.positions_changed is False
         mock_provider.sync.assert_called_once()
 
     @pytest.mark.asyncio
@@ -221,6 +222,83 @@ class TestSyncAccount:
         # db.execute was called for delete operation
         mock_db.execute.assert_called()
 
+    @pytest.mark.asyncio
+    async def test_sync_account_positions_changed_true_for_new_ticker(self, mock_db, override_settings, make_account):
+        """기존 보유가 없던 계좌가 신규 매수하면 positions_changed=True → 배당 캐시 전체 무효화."""
+        from app.providers.base import BalanceResult, Position
+        from app.services.asset_service import sync_account
+
+        account = make_account(data_source="MANUAL")
+        pos = Position(
+            ticker="AAPL",
+            name="Apple",
+            market="NASDAQ",
+            qty=10,
+            avg_price=150_000.0,
+            current_price=185_000.0,
+            currency="USD",
+            value_krw=1_850_000.0,
+        )
+        balance = BalanceResult(total_value_krw=1_850_000.0, positions=[pos])
+
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(return_value=balance)
+        fake_snapshot = SimpleNamespace(id=uuid.uuid4())
+
+        # mock_db.execute 기본값(빈 리스트) = 동기화 전 보유 종목 없음
+        with (
+            patch("app.services.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()) as mock_invalidate,
+            patch("app.services.asset_service.broker_sync_duration"),
+        ):
+            result = await sync_account(account, mock_db, cache=MagicMock())
+
+        assert result.positions_changed is True
+        assert mock_invalidate.call_args.kwargs["positions_changed"] is True
+
+    @pytest.mark.asyncio
+    async def test_sync_account_positions_changed_false_when_ticker_set_unchanged(
+        self, mock_db, override_settings, make_account
+    ):
+        """이미 보유 중인 종목의 가격/수량만 갱신되는 일반 동기화는 positions_changed=False →
+        종목별 배당 추정(외부 API 폴백 체인) 캐시는 그대로 유지해 재계산을 피한다."""
+        from app.providers.base import BalanceResult, Position
+        from app.services.asset_service import sync_account
+
+        account = make_account(data_source="MANUAL")
+        pos = Position(
+            ticker="AAPL",
+            name="Apple",
+            market="NASDAQ",
+            qty=12,  # 수량만 변경 — 티커 구성은 동일
+            avg_price=150_000.0,
+            current_price=190_000.0,
+            currency="USD",
+            value_krw=2_280_000.0,
+        )
+        balance = BalanceResult(total_value_krw=2_280_000.0, positions=[pos])
+
+        # 동기화 전에도 동일 티커(AAPL/NASDAQ)를 보유 중이었던 상황
+        mock_db.execute.return_value.all.return_value = [SimpleNamespace(ticker="AAPL", market="NASDAQ")]
+
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(return_value=balance)
+        fake_snapshot = SimpleNamespace(id=uuid.uuid4())
+
+        with (
+            patch("app.services.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()) as mock_invalidate,
+            patch("app.services.asset_service.broker_sync_duration"),
+        ):
+            result = await sync_account(account, mock_db, cache=MagicMock())
+
+        assert result.positions_changed is False
+        assert mock_invalidate.call_args.kwargs["positions_changed"] is False
+
 
 class TestSyncAccountNow:
     @pytest.mark.asyncio
@@ -236,17 +314,20 @@ class TestSyncAccountNow:
         mock_db.__aexit__ = AsyncMock(return_value=None)
         mock_db.merge = AsyncMock(return_value=account)
 
+        from app.services.asset_service import SyncAccountResult
+
         cache = MagicMock()
+        fake_result = SyncAccountResult(snapshot=fake_snapshot, positions_changed=False)
         with (
             patch("app.services.asset_service.AsyncSessionLocal", return_value=mock_db),
-            patch("app.services.asset_service.sync_account", new=AsyncMock(return_value=fake_snapshot)) as mock_sync,
+            patch("app.services.asset_service.sync_account", new=AsyncMock(return_value=fake_result)) as mock_sync,
             patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()) as mock_invalidate,
         ):
             result = await sync_account_now(account, account.user_id, cache=cache)
 
         mock_db.merge.assert_awaited_once_with(account)
         mock_sync.assert_awaited_once_with(account, mock_db, cache)
-        mock_invalidate.assert_awaited_once()
+        mock_invalidate.assert_awaited_once_with(cache, account.user_id, account.id, positions_changed=False)
         assert result == {
             "detail": "동기화 완료",
             "snapshot_date": "2026-09-12",

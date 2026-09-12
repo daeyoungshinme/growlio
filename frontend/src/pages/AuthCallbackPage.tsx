@@ -1,7 +1,7 @@
 import { LineChart, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { REDIRECT_DELAY_MS } from "@/constants/timers";
 
@@ -59,18 +59,29 @@ export default function AuthCallbackPage() {
       setState("error");
     }, AUTH_CALLBACK_TIMEOUT_MS);
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") void settleSuccess();
-    });
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
 
-    // detectSessionInUrl이 마운트 이전에 이미 세션을 세팅했을 수 있으므로 즉시 한 번 더 확인
-    void supabase.auth.getSession().then(({ data: { session } }) => {
+    void (async () => {
+      const supabase = await getSupabase();
+      if (cancelled) return;
+
+      const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "SIGNED_IN") void settleSuccess();
+      });
+      unsubscribe = () => subscription.subscription.unsubscribe();
+
+      // detectSessionInUrl이 마운트 이전에 이미 세션을 세팅했을 수 있으므로 즉시 한 번 더 확인
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session?.user) void settleSuccess();
-    });
+    })();
 
     return () => {
       window.clearTimeout(timeout);
-      subscription.subscription.unsubscribe();
+      cancelled = true;
+      unsubscribe?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 URL 파라미터를 확인
   }, []);

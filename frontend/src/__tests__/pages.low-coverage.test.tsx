@@ -48,11 +48,11 @@ vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
 vi.mock("@/hooks/useRegisterRefresh", () => ({ useRegisterRefresh: vi.fn() }));
 
 vi.mock("@/lib/supabase", () => ({
-  supabase: {
+  getSupabase: async () => ({
     auth: {
       onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
     },
-  },
+  }),
 }));
 
 vi.mock("@/stores/authStore", () => ({

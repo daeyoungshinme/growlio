@@ -1,18 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── mocks must come before imports ──
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn(),
-      getSession: vi.fn(),
-      resetPasswordForEmail: vi.fn(),
-      updateUser: vi.fn(),
-      resend: vi.fn(),
-    },
+const { mockSupabaseAuth } = vi.hoisted(() => ({
+  mockSupabaseAuth: {
+    signInWithPassword: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+    getSession: vi.fn(),
+    resetPasswordForEmail: vi.fn(),
+    updateUser: vi.fn(),
+    resend: vi.fn(),
   },
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  getSupabase: async () => ({ auth: mockSupabaseAuth }),
 }));
 
 vi.mock("@/api/client", () => {
@@ -38,7 +40,6 @@ vi.mock("@/api/client", () => {
   };
 });
 
-import { supabase } from "@/lib/supabase";
 import { api } from "@/api/client";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -55,7 +56,7 @@ describe("authStore — login", () => {
   });
 
   it("로그인 성공 시 isAuthenticated=true와 이메일을 설정한다", async () => {
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: {
         user: { id: "user-1", email: "user@example.com" },
         session: { access_token: "token" },
@@ -74,7 +75,7 @@ describe("authStore — login", () => {
   });
 
   it("로그인 실패 시 에러를 던진다", async () => {
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: { user: null, session: null },
       error: { message: "Invalid credentials" },
     } as never);
@@ -84,7 +85,7 @@ describe("authStore — login", () => {
   });
 
   it("sync-profile 호출 실패해도 로그인은 계속 진행된다", async () => {
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: {
         user: { id: "user-2", email: "user2@example.com" },
         session: { access_token: "token" },
@@ -105,7 +106,7 @@ describe("authStore — register", () => {
   });
 
   it("이메일 인증 필요 시 EMAIL_CONFIRMATION_REQUIRED를 던진다", async () => {
-    vi.mocked(supabase.auth.signUp).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signUp).mockResolvedValue({
       data: {
         user: { id: "user-3", email: "new@example.com" },
         session: null, // no session = email confirmation needed
@@ -120,7 +121,7 @@ describe("authStore — register", () => {
   });
 
   it("세션이 있으면 sync-profile 호출 후 isAuthenticated=true", async () => {
-    vi.mocked(supabase.auth.signUp).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signUp).mockResolvedValue({
       data: {
         user: { id: "user-4", email: "confirmed@example.com" },
         session: { access_token: "token" },
@@ -138,7 +139,7 @@ describe("authStore — register", () => {
   });
 
   it("supabase 오류 시 에러를 던진다", async () => {
-    vi.mocked(supabase.auth.signUp).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signUp).mockResolvedValue({
       data: { user: null, session: null },
       error: { message: "Email already in use" },
     } as never);
@@ -150,7 +151,7 @@ describe("authStore — register", () => {
   });
 
   it("displayName 없이 register 호출 시 display_name이 null로 전송된다", async () => {
-    vi.mocked(supabase.auth.signUp).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signUp).mockResolvedValue({
       data: {
         user: { id: "user-5", email: "u@example.com" },
         session: { access_token: "token" },
@@ -165,14 +166,14 @@ describe("authStore — register", () => {
   });
 
   it("emailRedirectTo가 /auth/callback 경로로 전송된다", async () => {
-    vi.mocked(supabase.auth.signUp).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signUp).mockResolvedValue({
       data: { user: { id: "user-6", email: "u2@example.com" }, session: null },
       error: null,
     } as never);
 
     const store = await getStore();
     await expect(store.register("u2@example.com", "password123")).rejects.toThrow();
-    expect(supabase.auth.signUp).toHaveBeenCalledWith(
+    expect(mockSupabaseAuth.signUp).toHaveBeenCalledWith(
       expect.objectContaining({
         options: expect.objectContaining({
           emailRedirectTo: expect.stringMatching(/\/auth\/callback$/),
@@ -188,7 +189,7 @@ describe("authStore — logout", () => {
   });
 
   it("로그아웃 시 isAuthenticated=false가 된다", async () => {
-    vi.mocked(supabase.auth.signOut).mockResolvedValue({ error: null } as never);
+    vi.mocked(mockSupabaseAuth.signOut).mockResolvedValue({ error: null } as never);
 
     const store = await getStore();
     await store.logout();
@@ -206,7 +207,7 @@ describe("authStore — checkAuth", () => {
   });
 
   it("세션 없으면 isAuthenticated=false가 된다", async () => {
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: { session: null },
       error: null,
     } as never);
@@ -220,7 +221,7 @@ describe("authStore — checkAuth", () => {
   });
 
   it("세션 있고 /auth/me 성공 시 isAuthenticated=true", async () => {
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: {
         session: {
           user: { id: "user-6", email: "active@example.com" },
@@ -241,7 +242,7 @@ describe("authStore — checkAuth", () => {
   });
 
   it("세션 있고 /auth/me가 401이면 sync-profile 후 재시도한다", async () => {
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: {
         session: {
           user: { id: "user-7", email: "new-verified@example.com" },
@@ -266,7 +267,7 @@ describe("authStore — checkAuth", () => {
   });
 
   it("세션 있고 /auth/me가 401이고 sync-profile도 실패 시 로그아웃된다", async () => {
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: {
         session: {
           user: { id: "user-8", email: "fail@example.com" },
@@ -287,7 +288,7 @@ describe("authStore — checkAuth", () => {
   });
 
   it("세션 있고 /auth/me가 비-401 오류이면 로그아웃된다", async () => {
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: {
         session: {
           user: { id: "user-9", email: "error@example.com" },
@@ -306,7 +307,7 @@ describe("authStore — checkAuth", () => {
   });
 
   it("getSession() 자체가 실패하면 isAuthenticated=false, isAuthChecking=false로 정리된다", async () => {
-    vi.mocked(supabase.auth.getSession).mockRejectedValue(new Error("network error"));
+    vi.mocked(mockSupabaseAuth.getSession).mockRejectedValue(new Error("network error"));
 
     const store = await getStore();
     await store.checkAuth();
@@ -317,7 +318,7 @@ describe("authStore — checkAuth", () => {
   });
 
   it("needs_password_reset=true이면 needsPasswordReset이 true가 된다", async () => {
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: {
         session: {
           user: { id: "user-10", email: "reset@example.com" },
@@ -356,7 +357,7 @@ describe("authStore — forgotPassword", () => {
   });
 
   it("성공 시 에러를 던지지 않는다", async () => {
-    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.resetPasswordForEmail).mockResolvedValue({
       data: {},
       error: null,
     } as never);
@@ -365,7 +366,7 @@ describe("authStore — forgotPassword", () => {
   });
 
   it("supabase 오류 시 에러를 던진다", async () => {
-    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.resetPasswordForEmail).mockResolvedValue({
       data: {},
       error: new Error("rate limited"),
     } as never);
@@ -380,7 +381,7 @@ describe("authStore — resetPassword", () => {
   });
 
   it("성공 시 needsPasswordReset=false가 된다", async () => {
-    vi.mocked(supabase.auth.updateUser).mockResolvedValue({ data: {}, error: null } as never);
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({ data: {}, error: null } as never);
     const store = await getStore();
     await store.resetPassword("newpass123");
     const state = (await import("@/stores/authStore")).useAuthStore.getState();
@@ -388,7 +389,7 @@ describe("authStore — resetPassword", () => {
   });
 
   it("supabase 오류 시 에러를 던진다", async () => {
-    vi.mocked(supabase.auth.updateUser).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({
       data: { user: null },
       error: new Error("update failed"),
     } as never);
@@ -404,22 +405,22 @@ describe("authStore — changePassword", () => {
   });
 
   it("현재 비밀번호 검증과 새 비밀번호 변경을 순서대로 수행한다", async () => {
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: { user: { id: "user-1" }, session: {} },
       error: null,
     } as never);
-    vi.mocked(supabase.auth.updateUser).mockResolvedValue({ data: {}, error: null } as never);
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({ data: {}, error: null } as never);
     const store = await getStore();
     await store.changePassword("oldpass123", "newpass123");
-    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
+    expect(mockSupabaseAuth.signInWithPassword).toHaveBeenCalledWith({
       email: "user@example.com",
       password: "oldpass123",
     });
-    expect(supabase.auth.updateUser).toHaveBeenCalledWith({ password: "newpass123" });
+    expect(mockSupabaseAuth.updateUser).toHaveBeenCalledWith({ password: "newpass123" });
   });
 
   it("현재 비밀번호가 틀리면 재인증 단계에서 에러를 던지고 updateUser를 호출하지 않는다", async () => {
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: { user: null, session: null },
       error: new Error("Invalid login credentials"),
     } as never);
@@ -427,7 +428,7 @@ describe("authStore — changePassword", () => {
     await expect(store.changePassword("wrongpass", "newpass123")).rejects.toThrow(
       "현재 비밀번호가 일치하지 않습니다.",
     );
-    expect(supabase.auth.updateUser).not.toHaveBeenCalled();
+    expect(mockSupabaseAuth.updateUser).not.toHaveBeenCalled();
   });
 
   it("로그인 이메일이 없으면 에러를 던진다", async () => {
@@ -445,16 +446,16 @@ describe("authStore — resendConfirmationEmail", () => {
   });
 
   it("성공 시 에러를 던지지 않는다", async () => {
-    vi.mocked(supabase.auth.resend).mockResolvedValue({ data: {}, error: null } as never);
+    vi.mocked(mockSupabaseAuth.resend).mockResolvedValue({ data: {}, error: null } as never);
     const store = await getStore();
     await expect(store.resendConfirmationEmail("user@example.com")).resolves.not.toThrow();
-    expect(supabase.auth.resend).toHaveBeenCalledWith(
+    expect(mockSupabaseAuth.resend).toHaveBeenCalledWith(
       expect.objectContaining({ type: "signup", email: "user@example.com" }),
     );
   });
 
   it("supabase 오류 시 에러를 던진다", async () => {
-    vi.mocked(supabase.auth.resend).mockResolvedValue({
+    vi.mocked(mockSupabaseAuth.resend).mockResolvedValue({
       data: {},
       error: new Error("rate limited"),
     } as never);

@@ -120,11 +120,11 @@ vi.mock("@/hooks/useHaptic", () => ({
 }));
 
 vi.mock("@/lib/supabase", () => ({
-  supabase: {
+  getSupabase: async () => ({
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
     },
-  },
+  }),
 }));
 
 vi.mock("@capacitor/haptics", () => ({

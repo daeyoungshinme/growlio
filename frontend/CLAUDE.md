@@ -225,7 +225,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시 — 포트폴리오 페이지는 주식 계좌 전용 뷰이므로 의도된 동작.
 
-**`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — API 인증은 백엔드 JWT 담당. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장됨 — httpOnly 쿠키 전환은 Capacitor WebView SameSite 제약으로 보류, CSP + 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제로 경계강화만 적용(결정기록: `docs/plans/28-localstorage-token-decision.md`).
+**`src/lib/supabase.ts`** — `getSupabase()`(async 함수)를 통해 Supabase 클라이언트를 지연 초기화한다(env vars 필요). `@supabase/supabase-js`(약 200KB)를 top-level import하면 이 파일을 참조하는 모든 부팅 경로(authStore/api client)가 실제 렌더 전에 파싱·실행을 먼저 기다려야 해 모바일 저사양 기기에서 체감 로딩 지연을 유발했다 — 그래서 `await import("@supabase/supabase-js")`로 동적 로드하고 클라이언트를 메모이즈한다. 모든 소비 코드(`authStore.ts`, `api/client.ts`, `AuthCallbackPage.tsx` 등)는 `const supabase = await getSupabase();` 형태로 사용 — 동기 `supabase` export는 없음. 직접 확장 금지 — API 인증은 백엔드 JWT 담당. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장됨 — httpOnly 쿠키 전환은 Capacitor WebView SameSite 제약으로 보류, CSP + 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제로 경계강화만 적용(결정기록: `docs/plans/28-localstorage-token-decision.md`).
 
 > **인증 구조:** Supabase는 이메일 인증·OAuth 콜백(리다이렉트 URL) 처리에만 사용됨. 실제 API 인증은 백엔드(`auth.py`)가 발급한 JWT Bearer 토큰 사용. `api/client.ts`의 Axios 인터셉터가 토큰 관리. Supabase Session과 백엔드 JWT는 별개이므로 혼용 금지.
 

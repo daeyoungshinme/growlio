@@ -388,11 +388,22 @@ async def _invalidate_alloc_history(cache: CacheStoreType, user_id: uuid.UUID) -
     await _scan_unlink(cache, f"{_env_prefix()}alloc_history_{_ALLOC_HISTORY_VERSION}:{user_id}:*")
 
 
-async def invalidate_dividend_caches(cache: CacheStoreType, user_id: uuid.UUID, year: int) -> None:
+async def invalidate_dividend_caches(
+    cache: CacheStoreType, user_id: uuid.UUID, year: int, *, positions_changed: bool = True
+) -> None:
     """dividend_summary/dividend_ticker_summary/dividends_positions 캐시를 계좌 조합(acct_suffix)
     전체에 대해 SCAN+UNLINK로 삭제한다 — `_invalidate_alloc_history`와 동일한 이유(무효화 시점엔
-    어떤 account_id 조합이 캐시됐는지 알 수 없음)."""
+    어떤 account_id 조합이 캐시됐는지 알 수 없음).
+
+    `positions_changed=False`면 실수령 배당 집계(dividend_summary, DB 쿼리만이라 저렴)만 지우고
+    종목별 배당 추정(dividend:by-ticker/dividends:positions, 보유 종목마다 외부 API 폴백 체인이
+    필요해 비쌈)은 건드리지 않는다 — 보유 종목 구성이 그대로인 단순 동기화(가격/잔고 갱신)에서
+    다음 대시보드 조회가 불필요하게 외부 API를 재호출하는 것을 막기 위함
+    (호출부: asset_service.sync_account, 계좌 동기화마다 매번 지우던 기존 동작 때문에
+    "동기화 후 대시보드 로딩이 느리다"는 체감 지연의 원인이었음)."""
     await _scan_unlink(cache, f"{_env_prefix()}dividend_summary:{user_id}:*")
+    if not positions_changed:
+        return
     await _scan_unlink(cache, f"{_env_prefix()}dividend:by-ticker:{user_id}:{year}:*")
     await _scan_unlink(cache, f"{_env_prefix()}dividends:positions:{user_id}:*")
 
@@ -451,11 +462,16 @@ async def invalidate_asset_account_caches(
     user_id: uuid.UUID,
     account_id: uuid.UUID | None = None,
     year: int | None = None,
+    *,
+    positions_changed: bool = True,
 ) -> None:
     """계좌 생성/수정/삭제/동기화 후 관련 캐시 일괄 무효화.
 
     계좌 수정에는 investment_horizon/tax_type 태그 변경(목표 역산 추천의 조합 구성에 직접
     영향)도 포함되므로 goal_recommendation 캐시도 함께 무효화한다.
+
+    `positions_changed`: 보유 종목 구성이 실제로 바뀌었는지 — `invalidate_dividend_caches`
+    참고. 계좌 CRUD 등 변경 여부를 모르는 호출부는 기본값(True, 항상 전체 무효화)을 쓴다.
     """
     from datetime import date as _date
 
@@ -469,18 +485,23 @@ async def invalidate_asset_account_caches(
     if account_id is not None:
         keys.append(account_detail_key(user_id, account_id))
     await invalidate_user_caches(cache, *keys)
-    await invalidate_dividend_caches(cache, user_id, _year)
+    await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
     await invalidate_portfolio_overview_cache(cache, user_id)
     await invalidate_rebalancing_analysis_cache_all(cache, user_id)
 
 
-async def invalidate_account_caches(cache: CacheStoreType, user_id: uuid.UUID, year: int | None = None) -> None:
-    """계좌 싱크 완료 후 관련 캐시 일괄 무효화."""
+async def invalidate_account_caches(
+    cache: CacheStoreType, user_id: uuid.UUID, year: int | None = None, *, positions_changed: bool = True
+) -> None:
+    """계좌 싱크 완료 후 관련 캐시 일괄 무효화.
+
+    `positions_changed` — `invalidate_dividend_caches` 참고.
+    """
     from datetime import date as _date
 
     _year = year if year is not None else _date.today().year
     await _invalidate_alloc_history(cache, user_id)
-    await invalidate_dividend_caches(cache, user_id, _year)
+    await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
     await _scan_unlink(cache, f"{_env_prefix()}tax:overseas:{user_id}:*")
     await invalidate_user_caches(
         cache,
