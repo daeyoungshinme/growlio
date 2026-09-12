@@ -12,9 +12,20 @@ import fnmatch
 import re
 import time
 
+_MAX_ENTRIES = 20_000
+"""Render free 인스턴스(512MB)에서 무제한 축적을 막기 위한 상한 — 7일짜리 TTL 캐시(배당/ETF 메타
+등)가 sweep 주기(15분) 안에 자연 만료되지 않는 채로 계속 쌓이는 것을 방어한다. 초과분은 set() 시점에
+가장 오래 안 쓰인(LRU) 항목부터 제거한다. 항목당 페이로드가 대체로 수백 바이트~수 KB인 JSON 문자열
+이므로 2만 건이면 최악의 경우에도 수십 MB 선으로 캡핑된다."""
+
 
 class CacheStore:
-    """dict 기반 TTL 캐시. `set(..., nx=True)`는 asyncio.Lock으로 원자성을 보장한다."""
+    """dict 기반 TTL 캐시. `set(..., nx=True)`는 asyncio.Lock으로 원자성을 보장한다.
+
+    `_data`는 삽입/접근 순서를 그대로 보존하는 plain dict를 LRU 큐로 겸용한다 — `get()` 히트 시
+    `del` 후 재삽입해 맨 뒤(최근 사용)로 옮기고, `set()`이 `_MAX_ENTRIES`를 넘기면 맨 앞(가장
+    오래 안 쓰인 항목)부터 제거한다.
+    """
 
     def __init__(self) -> None:
         self._data: dict[str, tuple[str, float | None]] = {}
@@ -32,6 +43,8 @@ class CacheStore:
             if self._is_expired(expires_at):
                 del self._data[key]
                 return None
+            del self._data[key]
+            self._data[key] = entry
             return value
 
     async def set(self, key: str, value: str, nx: bool = False, ex: int | None = None) -> bool:
@@ -41,7 +54,11 @@ class CacheStore:
                 if existing is not None and not self._is_expired(existing[1]):
                     return False
             expires_at = time.monotonic() + ex if ex is not None else None
+            self._data.pop(key, None)
             self._data[key] = (value, expires_at)
+            while len(self._data) > _MAX_ENTRIES:
+                oldest_key = next(iter(self._data))
+                del self._data[oldest_key]
             return True
 
     async def setex(self, key: str, ttl: int, value: str) -> None:

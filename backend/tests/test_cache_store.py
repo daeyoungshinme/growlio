@@ -32,6 +32,25 @@ class TestSweepExpired:
         assert removed == 0
 
 
+class TestMaxEntriesEviction:
+    @pytest.mark.asyncio
+    async def test_evicts_least_recently_used_when_over_cap(self):
+        from app.core import cache_store as cache_store_module
+
+        store = CacheStore()
+        with patch.object(cache_store_module, "_MAX_ENTRIES", 3):
+            await store.set("a", "1")
+            await store.set("b", "2")
+            await store.set("c", "3")
+            await store.get("a")  # "a"를 최근 사용으로 승격 → 다음 evict 대상은 "b"
+            await store.set("d", "4")  # 상한(3) 초과 → 가장 오래 안 쓰인 "b" 제거
+
+        assert await store.get("b") is None
+        assert await store.get("a") == "1"
+        assert await store.get("c") == "3"
+        assert await store.get("d") == "4"
+
+
 class TestRunCacheSweep:
     @pytest.mark.asyncio
     async def test_calls_sweep_expired_on_shared_store(self):
