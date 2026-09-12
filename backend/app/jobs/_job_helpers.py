@@ -23,7 +23,7 @@ def peak_rss_mb() -> float | None:
         import resource
     except ImportError:
         return None
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024  # type: ignore[attr-defined]
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
 
 
 async def run_alert_job(
