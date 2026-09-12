@@ -112,3 +112,65 @@ class TestRunSyncAll:
 
         stored = json.loads(last_call.args[2])
         assert stored["status"] == "error"
+        assert stored["failed_accounts"] == []
+        assert stored["error"] == "boom"
+
+    @pytest.mark.asyncio
+    async def test_records_failed_accounts_on_partial_failure(self, make_user_id, make_account, mock_cache):
+        """일부 계좌가 실패하면 done 상태에 계좌별 (id, name, error) 목록을 함께 남긴다."""
+        from app.services.sync_all_service import run_sync_all
+
+        mock_cache.set = AsyncMock(return_value=True)
+        mock_cache.get = AsyncMock(return_value="lock-value")
+        accounts = [make_account(), make_account()]
+        failed = [("acc-1", "키움 종합계좌", "인증에 실패했습니다")]
+
+        with (
+            patch("app.services.sync_all_service.get_cache_store", AsyncMock(return_value=mock_cache)),
+            patch(
+                "app.services.sync_all_service._sync_accounts",
+                new_callable=AsyncMock,
+                return_value=failed,
+            ),
+        ):
+            await run_sync_all(make_user_id, accounts)
+
+        last_call = mock_cache.setex.await_args_list[-1]
+        import json
+
+        stored = json.loads(last_call.args[2])
+        assert stored["status"] == "done"
+        assert stored["failed"] == 1
+        assert stored["failed_accounts"] == [
+            {"account_id": "acc-1", "account_name": "키움 종합계좌", "error": "인증에 실패했습니다"}
+        ]
+
+    @pytest.mark.asyncio
+    async def test_truncates_and_redacts_failed_account_error(self, make_user_id, make_account, mock_cache):
+        """실패 사유는 시크릿 패턴을 마스킹하고 200자로 자른다."""
+        from app.services.sync_all_service import run_sync_all
+
+        mock_cache.set = AsyncMock(return_value=True)
+        mock_cache.get = AsyncMock(return_value="lock-value")
+        accounts = [make_account()]
+        long_error = "appkey=abcd1234efgh5678 " + "x" * 300
+        failed = [("acc-1", "KIS 계좌", long_error)]
+
+        with (
+            patch("app.services.sync_all_service.get_cache_store", AsyncMock(return_value=mock_cache)),
+            patch(
+                "app.services.sync_all_service._sync_accounts",
+                new_callable=AsyncMock,
+                return_value=failed,
+            ),
+        ):
+            await run_sync_all(make_user_id, accounts)
+
+        last_call = mock_cache.setex.await_args_list[-1]
+        import json
+
+        stored = json.loads(last_call.args[2])
+        error_message = stored["failed_accounts"][0]["error"]
+        assert "[REDACTED]" in error_message
+        assert "abcd1234efgh5678" not in error_message
+        assert len(error_message) <= 200

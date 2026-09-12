@@ -8,8 +8,8 @@
 from __future__ import annotations
 
 import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import AsyncSessionLocal
 from app.kis.auth import get_access_token
 from app.kis.balance import get_orderable_cash
 from app.models.asset import AssetAccount
@@ -25,7 +25,6 @@ logger = structlog.get_logger()
 
 async def fetch_broker_balance(
     account: AssetAccount,
-    db: AsyncSession,
     cache,
 ) -> KisBalanceResponse:
     """브로커 계좌(KIS/키움/토스) 실시간 잔고를 조회해 KisBalanceResponse로 반환한다.
@@ -34,6 +33,10 @@ async def fetch_broker_balance(
     토큰 갱신-재시도, 원화 포지션 변환은 sync_account()가 쓰는 것과 동일한 provider
     경로를 공유한다. 실패 시 SyncError 계층 예외(ProviderCredentialError 등)가 그대로
     전파되며 main.py 전역 핸들러가 HTTP 응답으로 변환한다.
+
+    호출자의 요청 스코프 세션이 아닌 별도의 짧게 스코프된 세션을 사용한다 — 브로커 HTTP 호출
+    동안 요청의 DB 커넥션 풀 슬롯을 오래 붙잡지 않기 위함. account는 여기서 변경/커밋되지
+    않으므로 db.merge() 없이 그대로 전달해도 안전하다.
     """
     if account.asset_type == "STOCK_KIS":
         provider: BrokerProvider = KISProvider()
@@ -44,35 +47,41 @@ async def fetch_broker_balance(
     else:
         raise ValueError(f"지원하지 않는 계좌 유형: {account.asset_type}")
 
-    result = await provider.sync(account, db, cache)
+    async with AsyncSessionLocal() as db:
+        result = await provider.sync(account, db, cache)
 
-    orderable_krw: float | None = None
-    if account.asset_type == "STOCK_TOSS":
-        # 토스는 sync 시 deposit_krw에 cashBuyingPower(주문가능 현금)를 그대로 담는다.
-        orderable_krw = result.deposit_krw
-    elif account.asset_type == "STOCK_KIWOOM":
-        # 키움은 kt00001의 100stk_ord_alow_amt(미수 없는 현금 매수여력)를 orderable_krw로 채운다.
-        orderable_krw = result.orderable_krw
-    if account.asset_type == "STOCK_KIS" and account.kis_app_key and account.kis_app_secret and account.kis_account_no:
-        try:
-            creds = decrypt_kis_credentials(account)
-            if creds is None:
-                raise ValueError("KIS credentials are not configured for this account")
-            app_key, app_secret = creds
-            access_token = await get_access_token(
-                app_key,
-                app_secret,
-                is_mock=account.is_mock_mode,
-                cache=cache,
-                db=db,
-                user_id=str(account.user_id),
-                account_id=str(account.id),
-            )
-            orderable_krw = await get_orderable_cash(
-                app_key, app_secret, access_token, account.kis_account_no, is_mock=account.is_mock_mode
-            )
-        except Exception as e:
-            logger.warning("orderable_cash_fetch_failed", account_id=str(account.id), error=str(e))
+        orderable_krw: float | None = None
+        if account.asset_type == "STOCK_TOSS":
+            # 토스는 sync 시 deposit_krw에 cashBuyingPower(주문가능 현금)를 그대로 담는다.
+            orderable_krw = result.deposit_krw
+        elif account.asset_type == "STOCK_KIWOOM":
+            # 키움은 kt00001의 100stk_ord_alow_amt(미수 없는 현금 매수여력)를 orderable_krw로 채운다.
+            orderable_krw = result.orderable_krw
+        if (
+            account.asset_type == "STOCK_KIS"
+            and account.kis_app_key
+            and account.kis_app_secret
+            and account.kis_account_no
+        ):
+            try:
+                creds = decrypt_kis_credentials(account)
+                if creds is None:
+                    raise ValueError("KIS credentials are not configured for this account")
+                app_key, app_secret = creds
+                access_token = await get_access_token(
+                    app_key,
+                    app_secret,
+                    is_mock=account.is_mock_mode,
+                    cache=cache,
+                    db=db,
+                    user_id=str(account.user_id),
+                    account_id=str(account.id),
+                )
+                orderable_krw = await get_orderable_cash(
+                    app_key, app_secret, access_token, account.kis_account_no, is_mock=account.is_mock_mode
+                )
+            except Exception as e:
+                logger.warning("orderable_cash_fetch_failed", account_id=str(account.id), error=str(e))
 
     positions = [
         KisBalancePosition(

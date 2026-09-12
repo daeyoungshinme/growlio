@@ -444,4 +444,55 @@ describe("PortfolioPage", () => {
       expect(toast).toHaveBeenCalledWith(expect.any(String), "error");
     });
   });
+
+  it("실패 계좌가 있으면 배너에 계좌명·사유를 표시하고 다시 시도로 제거할 수 있다", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    vi.mocked(syncAccount).mockResolvedValue({ detail: "동기화 완료" } as never);
+    useSyncStore.setState({
+      failedAccounts: [
+        { account_id: "acc-1", account_name: "KIS 계좌", error: "인증에 실패했습니다" },
+      ],
+    });
+    renderPortfolio();
+
+    await waitFor(() => {
+      expect(screen.getByText("1개 계좌 동기화 실패")).toBeInTheDocument();
+    });
+    expect(screen.getByText("KIS 계좌")).toBeInTheDocument();
+    expect(screen.getByText("인증에 실패했습니다")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => {
+      expect(syncAccount).toHaveBeenCalledWith("acc-1");
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("1개 계좌 동기화 실패")).not.toBeInTheDocument();
+    });
+    expect(useSyncStore.getState().failedAccounts).toEqual([]);
+  });
+
+  it("실패 배너의 닫기 버튼을 누르면 배너가 사라진다", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    useSyncStore.setState({
+      failedAccounts: [
+        { account_id: "acc-1", account_name: "KIS 계좌", error: "인증에 실패했습니다" },
+      ],
+    });
+    renderPortfolio();
+
+    await waitFor(() => {
+      expect(screen.getByText("1개 계좌 동기화 실패")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(screen.queryByText("1개 계좌 동기화 실패")).not.toBeInTheDocument();
+    expect(useSyncStore.getState().failedAccounts).toEqual([]);
+  });
 });

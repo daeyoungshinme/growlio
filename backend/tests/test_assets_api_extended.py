@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -322,6 +323,117 @@ class TestUpdateAccountCashTransaction:
         assert db.add.call_count == 0
 
 
+class TestUpdateAccountManualStockSnapshotConsistency:
+    """STOCK_OTHER/MANUAL 계좌 편집 시 manual_amount·deposit_krw가 동시에 전송되어
+    (프론트 StockAccountModal.handleEditSubmit의 실제 동작) 오늘자 스냅샷에서
+    보유 종목 평가액이 누락되던 상호작용 버그의 회귀 테스트."""
+
+    def test_position_value_preserved_when_manual_amount_and_deposit_sent_together(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id)
+        account.deposit_krw = 1_000_000.0
+        account.deposit_usd = 0.0
+        account.manual_amount = 1_000_000.0
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+
+        position = SimpleNamespace(
+            ticker="005930",
+            name="삼성전자",
+            market="KOSPI",
+            qty=10,
+            avg_price=10_000.0,
+            avg_price_usd=None,
+            current_price=15_000.0,
+            value_krw=150_000.0,
+            currency="KRW",
+            usd_rate=None,
+        )
+        yesterday_snap = SimpleNamespace(amount_krw=1_150_000.0, invested_amount=100_000.0, unrealized_pnl=50_000.0)
+
+        upsert_calls: list[dict] = []
+
+        async def fake_upsert_snapshot(_db, **kwargs):
+            upsert_calls.append(kwargs)
+            return SimpleNamespace(id=uuid.uuid4())
+
+        async def fake_get_latest(_db, _account_id):
+            # 수정 전 코드는 이 함수를 블록 1의 upsert 이후 다시 호출해 방금 쓴(포지션 미반영)
+            # 스냅샷을 "최신"으로 잘못 인식한다. 고친 코드는 이 함수를 블록 1 실행 전, 딱 한 번만
+            # 호출하므로 upsert_calls가 항상 비어 있는 시점에 호출돼야 한다.
+            if upsert_calls:
+                stale_amount = upsert_calls[-1]["amount_krw"]
+                stale_snap = SimpleNamespace(amount_krw=stale_amount, invested_amount=None, unrealized_pnl=None)
+                return stale_snap, []
+            return yesterday_snap, [position]
+
+        with (
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
+            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch("app.api.v1.assets.get_latest_snapshot_with_positions", AsyncMock(side_effect=fake_get_latest)),
+            patch("app.api.v1.assets._upsert_snapshot", AsyncMock(side_effect=fake_upsert_snapshot)),
+            patch("app.api.v1.assets.sync_snapshot_positions", AsyncMock()) as mock_sync_pos,
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put(
+                f"/api/v1/assets/{account.id}",
+                json={"manual_amount": 1_000_000.0, "deposit_krw": 1_000_000.0, "deposit_usd": 0.0},
+            )
+
+        assert resp.status_code == 200
+        # 오늘자 스냅샷은 정확히 한 번만 upsert돼야 한다 (포지션 미반영 중간 쓰기 금지).
+        assert len(upsert_calls) == 1
+        # 최종 평가금액에 포지션 평가액(150,000)이 반드시 포함돼야 한다.
+        assert upsert_calls[0]["amount_krw"] == 150_000.0 + 1_000_000.0 + 0.0
+        mock_sync_pos.assert_called_once()
+        assert mock_sync_pos.call_args.kwargs["positions"] == [position]
+
+    def test_real_estate_snapshot_still_written_without_deposit_fields(self, override_settings):
+        """REAL_ESTATE 편집(deposit_krw/usd 미전송)은 블록 1(모기지 차감 경로)이 그대로 실행돼야 한다."""
+        user = _make_user()
+        account = _make_account(user.id)
+        account.asset_type = "REAL_ESTATE"
+        account.data_source = "MANUAL"
+        account.manual_amount = 500_000_000.0
+        account.real_estate_details = {"mortgage_balance_krw": 100_000_000.0}
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+
+        upsert_calls: list[dict] = []
+
+        async def fake_upsert_snapshot(_db, **kwargs):
+            upsert_calls.append(kwargs)
+            return SimpleNamespace(id=uuid.uuid4())
+
+        with (
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
+            patch(
+                "app.api.v1.assets.get_latest_snapshot_with_positions",
+                AsyncMock(return_value=(None, [])),
+            ),
+            patch("app.api.v1.assets._upsert_snapshot", AsyncMock(side_effect=fake_upsert_snapshot)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put(
+                f"/api/v1/assets/{account.id}",
+                json={
+                    "real_estate_details": {
+                        "address": "서울시 강남구",
+                        "property_type": "APARTMENT",
+                        "mortgage_balance_krw": 100_000_000.0,
+                    }
+                },
+            )
+
+        assert resp.status_code == 200
+        assert len(upsert_calls) == 1
+        assert upsert_calls[0]["amount_krw"] == 400_000_000.0
+
+
 class TestDeleteAccount:
     def test_delete_account_success(self, override_settings):
         user = _make_user()
@@ -528,3 +640,36 @@ class TestUpdateIsaPnlOverride:
         assert resp.status_code == 200
         assert account.isa_manual_cumulative_pnl_krw is None
         assert account.kiwoom_app_secret is None
+
+
+class TestSyncAccountEndpoint:
+    """POST /assets/{id}/sync — 브로커 동기화(느린 외부 HTTP) 전 요청 DB 세션을 반환해야 한다
+    (QueuePool 고갈 수정 회귀 테스트)."""
+
+    def test_commits_request_session_before_broker_sync(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id)
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        app = _setup_app(user, db)
+
+        @asynccontextmanager
+        async def fake_lock(cache, key, ttl=120):
+            yield True
+
+        sync_result = {"detail": "동기화 완료", "snapshot_date": "2026-09-12", "amount_krw": 1_000_000.0}
+
+        with (
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
+            patch("app.api.v1.assets.inproc_lock", fake_lock),
+            patch("app.api.v1.assets._sync_account_now", AsyncMock(return_value=sync_result)) as mock_sync_now,
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(f"/api/v1/assets/{account.id}/sync")
+
+        assert resp.status_code == 200
+        assert resp.json() == sync_result
+        db.commit.assert_called_once()
+        mock_sync_now.assert_awaited_once()
+        assert mock_sync_now.await_args.args[0] is account
+        assert mock_sync_now.await_args.args[1] == user.id

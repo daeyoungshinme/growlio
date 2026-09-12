@@ -220,3 +220,35 @@ class TestSyncAccount:
 
         # db.execute was called for delete operation
         mock_db.execute.assert_called()
+
+
+class TestSyncAccountNow:
+    @pytest.mark.asyncio
+    async def test_uses_own_short_lived_session_and_merges_account(self, mock_db, override_settings, make_account):
+        """요청 세션이 아닌 AsyncSessionLocal()로 연 별도 세션을 사용하고, account를 merge해야 한다
+        (커넥션 풀 슬롯을 브로커 HTTP 호출 동안 오래 붙잡지 않기 위한 구조 — QueuePool 고갈 수정)."""
+        from app.services.asset_service import sync_account_now
+
+        account = make_account(data_source="MANUAL")
+        fake_snapshot = SimpleNamespace(id=uuid.uuid4(), snapshot_date="2026-09-12", amount_krw=1_000_000.0)
+
+        mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_db.__aexit__ = AsyncMock(return_value=None)
+        mock_db.merge = AsyncMock(return_value=account)
+
+        cache = MagicMock()
+        with (
+            patch("app.services.asset_service.AsyncSessionLocal", return_value=mock_db),
+            patch("app.services.asset_service.sync_account", new=AsyncMock(return_value=fake_snapshot)) as mock_sync,
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()) as mock_invalidate,
+        ):
+            result = await sync_account_now(account, account.user_id, cache=cache)
+
+        mock_db.merge.assert_awaited_once_with(account)
+        mock_sync.assert_awaited_once_with(account, mock_db, cache)
+        mock_invalidate.assert_awaited_once()
+        assert result == {
+            "detail": "동기화 완료",
+            "snapshot_date": "2026-09-12",
+            "amount_krw": 1_000_000.0,
+        }

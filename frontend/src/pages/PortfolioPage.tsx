@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
-import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { RefreshCw, ChevronDown, ChevronUp, X } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
 import { fetchAccounts, syncAccount, syncAllAccounts } from "@/api/assets";
 import { useSyncStore } from "@/stores/syncStore";
@@ -24,7 +24,10 @@ import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
 import { isNativePlatform } from "@/utils/platform";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import {
+  TOUCH_TARGET_MIN_MOBILE_ONLY,
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+} from "@/constants/uiSizes";
 import { SELECT_SM } from "@/constants/inputStyles";
 import type { PortfolioOverview } from "@/types";
 import { isPortfolioAccount, isStockAccount, isSyncableAccount } from "@/utils/accounts";
@@ -91,6 +94,10 @@ export default function PortfolioPage() {
   const syncDone = useSyncStore((s) => s.done);
   const syncTotal = useSyncStore((s) => s.total);
   const startSyncAll = useSyncStore((s) => s.startSyncAll);
+  const failedAccounts = useSyncStore((s) => s.failedAccounts);
+  const removeFailedAccount = useSyncStore((s) => s.removeFailedAccount);
+  const dismissFailedAccounts = useSyncStore((s) => s.dismissFailedAccounts);
+  const [retryingAccountId, setRetryingAccountId] = useState<string | null>(null);
   const [isSyncingSelected, setIsSyncingSelected] = useState(false);
   const [chartsOpen, handleChartsToggle] = useCollapsible(true, CHARTS_OPEN_KEY);
 
@@ -133,6 +140,20 @@ export default function PortfolioPage() {
       startSyncAll(total);
     } catch (e) {
       toast(extractErrorMessage(e, "전체 동기화를 시작하지 못했습니다"), "error");
+    }
+  };
+
+  const handleRetryFailedAccount = async (accountId: string) => {
+    setRetryingAccountId(accountId);
+    try {
+      await syncAccount(accountId);
+      await invalidateSyncData(qc);
+      removeFailedAccount(accountId);
+      toast("동기화 완료", "success");
+    } catch (e) {
+      toast(extractErrorMessage(e, "계좌 동기화에 실패했습니다"), "error");
+    } finally {
+      setRetryingAccountId(null);
     }
   };
 
@@ -280,6 +301,48 @@ export default function PortfolioPage() {
         {!selectedAccountId && hasHorizonTags && (
           <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
             <HorizonSummaryCard overview={data} />
+          </div>
+        )}
+        {failedAccounts.length > 0 && !isSyncingAll && (
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                  {failedAccounts.length}개 계좌 동기화 실패
+                </p>
+                <button
+                  onClick={dismissFailedAccounts}
+                  aria-label="닫기"
+                  className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} -m-1 text-red-400 hover:text-red-600 dark:hover:text-red-300 rounded-lg transition-colors`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <ul className="mt-2 space-y-1.5">
+                {failedAccounts.map((a) => (
+                  <li
+                    key={a.account_id}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium text-gray-700 dark:text-gray-200">
+                        {a.account_name}
+                      </span>
+                      <span className="block truncate text-red-600 dark:text-red-400">
+                        {a.error}
+                      </span>
+                    </span>
+                    <button
+                      onClick={() => handleRetryFailedAccount(a.account_id)}
+                      disabled={retryingAccountId === a.account_id}
+                      className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 px-2 text-xs border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 disabled:opacity-50 transition-colors`}
+                    >
+                      {retryingAccountId === a.account_id ? "재시도 중..." : "다시 시도"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
       </div>

@@ -17,6 +17,7 @@ from typing import Any
 import structlog
 
 from app.core.cache_store import get_cache_store
+from app.core.logging import redact_secrets
 from app.jobs.asset_sync import _sync_accounts
 from app.models.asset import AssetAccount
 from app.utils.cache_keys import TTL_SYNC_ALL_STATUS, get_cached_json, set_cached_json, sync_all_status_key
@@ -25,6 +26,7 @@ from app.utils.inproc_lock import inproc_lock
 logger = structlog.get_logger()
 
 _LOCK_TTL_SECONDS = 600
+_MAX_ERROR_MESSAGE_LENGTH = 200
 
 
 def _lock_key(user_id: uuid.UUID) -> str:
@@ -86,14 +88,35 @@ async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None
             await set_cached_json(
                 cache,
                 status_key,
-                {"status": "error", "total": total, "done": 0, "failed": total},
+                {
+                    "status": "error",
+                    "total": total,
+                    "done": 0,
+                    "failed": total,
+                    "failed_accounts": [],
+                    "error": redact_secrets(str(e))[:_MAX_ERROR_MESSAGE_LENGTH],
+                },
                 TTL_SYNC_ALL_STATUS,
             )
             return
 
+        failed_accounts = [
+            {
+                "account_id": fid,
+                "account_name": fname,
+                "error": redact_secrets(ferr)[:_MAX_ERROR_MESSAGE_LENGTH],
+            }
+            for fid, fname, ferr in failed
+        ]
         await set_cached_json(
             cache,
             status_key,
-            {"status": "done", "total": total, "done": total, "failed": len(failed)},
+            {
+                "status": "done",
+                "total": total,
+                "done": total,
+                "failed": len(failed),
+                "failed_accounts": failed_accounts,
+            },
             TTL_SYNC_ALL_STATUS,
         )

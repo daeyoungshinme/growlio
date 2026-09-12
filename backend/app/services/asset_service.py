@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
+from app.core.database import AsyncSessionLocal
 from app.exceptions import ProviderNetworkError
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.providers.base import BalanceResult, BrokerProvider
@@ -159,14 +160,16 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     return snapshot
 
 
-async def sync_account_now(
-    account: AssetAccount, user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
-) -> dict[str, str | float]:
+async def sync_account_now(account: AssetAccount, user_id: uuid.UUID, cache: CacheStoreType) -> dict[str, str | float]:
     """계좌 동기화 실행 + 관련 캐시 무효화 + API 응답 dict 반환 (assets.py `/sync` 엔드포인트 전용).
 
+    요청 스코프 세션이 아닌 별도의 짧게 스코프된 세션을 사용한다 — 브로커 HTTP 호출(재시도 포함)
+    동안 요청의 DB 커넥션 풀 슬롯을 오래 붙잡지 않기 위함 (jobs/asset_sync.py와 동일 패턴).
     SyncError/CircuitOpenError는 main.py 전역 핸들러가 처리한다.
     """
-    snapshot = await sync_account(account, db, cache)
+    async with AsyncSessionLocal() as db:
+        merged_account = await db.merge(account)
+        snapshot = await sync_account(merged_account, db, cache)
 
     await invalidate_asset_account_caches(cache, user_id, account.id)
     return {

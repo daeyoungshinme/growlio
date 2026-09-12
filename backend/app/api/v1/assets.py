@@ -106,7 +106,6 @@ async def verify_kis_credentials(
     request: Request,
     req: KisCredentialVerifyRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """KIS 자격증명 유효성 확인 (계좌 생성 없이)."""
     cache = await get_cache_store()
@@ -116,7 +115,6 @@ async def verify_kis_credentials(
             req.kis_app_secret,
             req.is_mock,
             current_user.id,
-            db,
             cache,
         )
     except httpx.HTTPStatusError as e:
@@ -291,10 +289,17 @@ async def update_account(
         account.manual_updated_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(account)
+
+    # 두 블록이 참조할 "요청 시작 시점의" 최신 스냅샷/포지션을 한 번만 조회해 재사용.
+    # 블록 1이 오늘자 스냅샷을 먼저 써버리면 아래 조회가 포지션 0개인 방금 쓴 스냅샷을
+    # latest로 잘못 인식해 주식 평가액이 누락되는 버그(STOCK_OTHER 계좌)를 방지한다.
+    latest_snap, pos_list = await get_latest_snapshot_with_positions(db, account.id)
+
     needs_snapshot = req.manual_amount is not None or (
         account.asset_type == "REAL_ESTATE" and req.real_estate_details is not None
     )
-    if needs_snapshot and account.manual_amount:
+    deposit_trigger = req.deposit_krw is not None or req.deposit_usd is not None
+    if needs_snapshot and account.manual_amount and not deposit_trigger:
         await _upsert_snapshot(
             db,
             account_id=account.id,
@@ -304,10 +309,9 @@ async def update_account(
             source="MANUAL",
         )
         await db.commit()
-    if req.deposit_krw is not None or req.deposit_usd is not None:
+    if deposit_trigger:
         cache = await get_cache_store()
         usd_rate = await fetch_usd_krw(cache)
-        latest_snap, pos_list = await get_latest_snapshot_with_positions(db, account.id)
 
         pos_value = sum(
             (float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0)
@@ -408,6 +412,7 @@ async def sync_account(
     db: AsyncSession = Depends(get_db),
 ):
     account = await _get_owned_account(account_id, current_user.id, db)
+    await db.commit()  # 브로커 동기화(느린 외부 HTTP 호출) 전 요청 DB 커넥션 풀 슬롯을 미리 반환
     cache = await get_cache_store()
 
     lock_key = sync_lock_key(account_id)
@@ -417,7 +422,7 @@ async def sync_account(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="이미 동기화가 진행 중입니다. 잠시 후 다시 시도하세요.",
             )
-        return await _sync_account_now(account, current_user.id, db, cache)
+        return await _sync_account_now(account, current_user.id, cache)
 
 
 @router.post("/sync-all")
