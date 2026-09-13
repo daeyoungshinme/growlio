@@ -14,6 +14,7 @@ import type { Insight, InsightType, InsightSeverity } from "@/api/insights";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 import { buildCombinedStatusNote } from "@/utils/diagnosisInsights";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
+import SkeletonCard from "@/components/common/SkeletonCard";
 
 const OTHER_INSIGHTS_VISIBLE_LIMIT = 3;
 
@@ -192,7 +193,12 @@ export default function RebalancingStatusCard({
 }: Props) {
   const [isOpen, toggleOpen] = useCollapsible(true, storageKey);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
-  const { data: portfoliosRaw } = useQuery({
+  const {
+    data: portfoliosRaw,
+    isLoading: portfoliosLoading,
+    isError: portfoliosError,
+    refetch: refetchPortfolios,
+  } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
     staleTime: STALE_TIME.MEDIUM,
@@ -232,6 +238,27 @@ export default function RebalancingStatusCard({
     () => buildCombinedStatusNote(needsCount, marketSignal?.composite_level),
     [needsCount, marketSignal?.composite_level],
   );
+
+  if (portfoliosLoading) {
+    return <SkeletonCard />;
+  }
+
+  if (portfoliosError) {
+    if (!emptyStateCta) return null;
+    return (
+      <div className="card">
+        <div className="flex items-center justify-between gap-2 text-xs text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-3 py-2">
+          <span>포트폴리오 현황을 불러오지 못했습니다.</span>
+          <button
+            onClick={() => refetchPortfolios()}
+            className="flex-none flex items-center gap-1 font-medium hover:text-red-600 dark:hover:text-red-300 transition-colors"
+          >
+            다시 시도
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (portfolioCount === 0) {
     if (!emptyStateCta) return null;

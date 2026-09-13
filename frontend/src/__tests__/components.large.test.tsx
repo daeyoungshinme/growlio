@@ -613,6 +613,45 @@ describe("RebalancingStatusCard", () => {
     });
   });
 
+  it("포트폴리오 쿼리 로딩 중에는 스켈레톤만 보여주고 CTA를 먼저 보여주지 않는다", async () => {
+    vi.mocked(fetchPortfolios).mockImplementationOnce(() => new Promise(() => {}));
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard emptyStateCta={vi.fn()} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("status")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /포트폴리오 만들기/ })).not.toBeInTheDocument();
+  });
+
+  it("포트폴리오 쿼리 에러 시 emptyStateCta 있으면 에러+다시 시도 카드를 보여준다", async () => {
+    vi.mocked(fetchPortfolios).mockRejectedValueOnce(new Error("network error"));
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard emptyStateCta={vi.fn()} />
+      </MemoryRouter>,
+    );
+    const retryBtn = await screen.findByRole("button", { name: /다시 시도/ });
+    expect(screen.queryByRole("button", { name: /포트폴리오 만들기/ })).not.toBeInTheDocument();
+    const callsBefore = vi.mocked(fetchPortfolios).mock.calls.length;
+    fireEvent.click(retryBtn);
+    await waitFor(() => {
+      expect(vi.mocked(fetchPortfolios).mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+  });
+
+  it("포트폴리오 쿼리 에러 시 emptyStateCta 없으면 아무것도 렌더링하지 않는다", async () => {
+    vi.mocked(fetchPortfolios).mockRejectedValueOnce(new Error("network error"));
+    const { container } = renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(container.firstChild).toBeNull();
+    });
+  });
+
   it("emptyStateCta 지정 시 포트폴리오가 없으면 '포트폴리오 만들기' CTA를 렌더한다 (진단 탭)", async () => {
     const onCreate = vi.fn();
     renderWithProviders(
