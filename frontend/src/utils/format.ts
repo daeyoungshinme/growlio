@@ -90,6 +90,14 @@ export function fmtPct(n: number | null, digits = 2): string {
 }
 
 /**
+ * 진행률(%) 값을 프로그레스 바 렌더링용으로 0~100 범위에 클램프
+ * 예: clampPct(120) → 100, clampPct(-5) → 0
+ */
+export function clampPct(pct: number): number {
+  return Math.min(Math.max(pct, 0), 100);
+}
+
+/**
  * ISO 날짜 문자열을 현재 시각 기준 상대 시간으로 변환
  * 예: "3일 전", "오늘", "1시간 전"
  */

@@ -79,6 +79,8 @@ cd backend && uv run ruff check .
 # Mypy 타입 체크
 cd backend && uv run mypy app/
 ```
+`pyproject.toml`의 `[tool.mypy]`에 `platform = "linux"` 고정 — CI는 Linux, 로컬 개발은 Windows일 수 있어
+플랫폼별 stub 분기(`sys.platform` 체크가 있는 의존성) 때문에 결과가 갈리는 것을 방지.
 
 ### Environment
 `backend/.env` (`.env.example` 참고):
@@ -165,7 +167,7 @@ services/
 > 파일명 접미사 컨벤션: `*_service.py`(DB/외부 API 연동 포함 유스케이스), `*_calculator.py`/`*_aggregator.py`(순수 계산·집계, 부수효과 없음), 접미사 없는 파일(`yahoo_price.py`, `backtest_metrics.py` 등)은 특정 도메인 유틸 모음. 강제 통일 대상 아님 — 새 파일 추가 시 참고용.
   ├── asset_service.py        # 계좌별 sync 함수 + sync_account_now(캐시 무효화·API 응답 포맷 포함, assets.py `/sync` 전용) — 대시보드 집계는 asset_aggregator.py로 분리됨
   ├── asset_credential_service.py  # 계좌 KIS/키움/토스 자격증명 검증(verify_kis_credentials/verify_toss_credentials)·삭제(delete_kis_credentials/delete_kiwoom_credentials/delete_toss_credentials) — assets.py 라우터에서 분리
-  ├── sync_all_service.py     # "전체 갱신" 백그라운드 배치 동기화 — jobs/asset_sync.py의 _sync_accounts 재사용, in-memory 캐시(core/cache_store.py)로 락/진행상태 관리 (POST /assets/sync-all, GET /assets/sync-all/status)
+  ├── sync_all_service.py     # "전체 갱신" 백그라운드 배치 동기화 — jobs/asset_sync.py의 _sync_accounts 재사용, in-memory 캐시(core/cache_store.py)로 락/진행상태 관리 (POST /assets/sync-all, GET /assets/sync-all/status). `_sync_accounts`는 계좌별로 짧게 스코프된 `AsyncSessionLocal()`을 새로 열어 처리 — 브로커 HTTP 응답을 기다리는 동안 요청 커넥션을 붙잡지 않기 위한 패턴(DB 커넥션 풀 슬롯 고갈 방지). 계좌 수만큼 동시에 짧은 sync 요청을 쏘는 유사 엔드포인트를 새로 만들 때 이 패턴을 참고할 것
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
   ├── alerts/                 # 범용 알림 도메인 패키지 (환율/주가/시장신호 체크 + 공통 이력)
   │   ├── alert_service.py    # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 alerts/exchange_rate_service.py·alerts/stock_price_service.py·rebalancing/alert_check.py·rebalancing/alert_test.py·rebalancing/order_builder.py) — 의도된 설계, 제거 대상 아님
@@ -274,7 +276,7 @@ schemas/                      # Pydantic 요청/응답 스키마
 core/                         # 설정·DB·in-memory 캐시 store
   ├── config.py                # Settings(pydantic-settings) — env var 로딩
   ├── database.py              # SQLAlchemy async engine/session, Base
-  └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 싱글톤, get_cache_store/close_cache_store. `sweep_expired()`를 `jobs/cache_sweep.py`가 15분마다 호출해 만료 키 능동 청소. **주의**: 워커/인스턴스 2개 이상으로 늘리면 캐시가 프로세스 로컬이라 적중률 급락 + 무효화 미전파 — 확장 시 공유 캐시(Redis) 재도입 필요(`render.yaml`은 단일 워커/단일 인스턴스 전제)
+  └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 싱글톤, get_cache_store/close_cache_store. `sweep_expired()`를 `jobs/cache_sweep.py`가 15분마다 호출해 만료 키 능동 청소. 항목 수 상한(`_MAX_ENTRIES`=20,000, LRU 축출)으로 메모리 무한 증가 방지. **주의**: 워커/인스턴스 2개 이상으로 늘리면 캐시가 프로세스 로컬이라 적중률 급락 + 무효화 미전파 — 확장 시 공유 캐시(Redis) 재도입 필요(`render.yaml`은 단일 워커/단일 인스턴스 전제)
 kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote)
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants). `client.py`는 KIS와 동일 `AsyncRateLimiter`로 `kiwoom_rate_per_second`(기본 4.0) 제한 — http_client.py의 rate-limit 감지가 키움 `return_code=5`(=EGW00201) 대응
 toss/                         # 토스증권 Open API 클라이언트 (auth, balance, client, constants). OAuth2 Client Credentials(form-encoded), 국내+미국 보유종목 `GET /api/v1/holdings` 통합, 예수금 `/api/v1/buying-power`. 샌드박스 없음, 토큰 ~1h(지연 갱신), **`Open API → IP 관리`에 서버 IP 등록 필수**(미등록 시 403 `edge-blocked`). `toss_rate_per_second`(기본 1.0) 제한 — http_client.py가 토스 `error.code=rate-limit-*` 감지

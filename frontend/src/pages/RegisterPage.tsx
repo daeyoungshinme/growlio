@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/react";
-import { LineChart } from "lucide-react";
+import { ChartLine } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
@@ -88,7 +88,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
         <div className="flex items-center gap-2 mb-8 justify-center">
-          <LineChart className="text-blue-600 dark:text-blue-400" size={28} />
+          <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>
         </div>
 

@@ -1,4 +1,12 @@
-import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Settings, Trash2 } from "lucide-react";
+import {
+  ChartNoAxesColumn,
+  Loader2,
+  Pencil,
+  Receipt,
+  RefreshCw,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import {
   type AssetAccount,
   ACCOUNT_TAX_TYPE_LABELS,
@@ -10,6 +18,7 @@ import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { isSyncableAccount } from "@/utils/accounts";
+import { toast } from "@/utils/toast";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import EditableNameField from "@/components/common/EditableNameField";
 import AccountActionsMenu from "@/components/common/AccountActionsMenu";
@@ -80,12 +89,14 @@ export default function StockAccountCard({
             (account.last_sync_error || account.last_synced_at) && (
               <div className="mt-0.5 min-w-0">
                 {account.last_sync_error ? (
-                  <span
-                    className="text-xs text-red-500 dark:text-red-400 truncate block"
+                  <button
+                    type="button"
+                    onClick={() => toast(account.last_sync_error!, "error")}
                     title={account.last_sync_error}
+                    className="text-xs text-red-500 dark:text-red-400 truncate block text-left underline decoration-dotted underline-offset-2"
                   >
                     동기화 실패
-                  </span>
+                  </button>
                 ) : (
                   <span className="text-xs text-gray-400 dark:text-gray-500 truncate block">
                     {relativeTime(account.last_synced_at!)} 동기화
@@ -152,7 +163,7 @@ export default function StockAccountCard({
             ariaLabel="계좌 관리 메뉴"
             items={[
               {
-                icon: <BarChart2 size={16} />,
+                icon: <ChartNoAxesColumn size={16} />,
                 label: "종목 관리",
                 onClick: () =>
                   onManagePositions({

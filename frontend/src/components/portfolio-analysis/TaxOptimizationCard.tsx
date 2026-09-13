@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronUp, Receipt } from "lucide-react";
+import { TriangleAlert, ChevronDown, ChevronUp, Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchOverseasPositionsTax, fetchTaxSummary } from "@/api/tax";
 import TaxPlannerSection from "@/components/tax/TaxPlannerSection";
@@ -80,7 +80,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
             <div className="space-y-2">
               {taxData.domestic_large_holder_warning && (
                 <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                  <AlertTriangle size={14} className="text-orange-500 mt-0.5 shrink-0" />
+                  <TriangleAlert size={14} className="text-orange-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-orange-700 dark:text-orange-400">
                     국내 주식 보유액이 10억원을 {fmtKrw(taxData.domestic_large_holder_excess_krw)}{" "}
                     초과했습니다. 대주주 요건 해당 시 양도소득세(22%)가 부과될 수 있습니다 — 초과분
@@ -90,7 +90,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
               )}
               {taxData.comprehensive_tax_warning ? (
                 <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                  <TriangleAlert size={14} className="text-red-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-red-700 dark:text-red-400">
                     금융소득(배당+해외차익)이 2,000만원 이상입니다. 금융소득 종합과세 대상이 될 수
                     있습니다.
@@ -100,7 +100,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 taxData.comprehensive_tax_remaining_krw > 0 &&
                 taxData.comprehensive_tax_remaining_krw <= COMPREHENSIVE_TAX_NEAR_THRESHOLD_KRW && (
                   <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                    <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                    <TriangleAlert size={14} className="text-amber-500 mt-0.5 shrink-0" />
                     <p className="text-xs text-amber-700 dark:text-amber-400">
                       금융소득(배당+해외차익)이 종합과세 기준(2,000만원)까지{" "}
                       {fmtKrw(taxData.comprehensive_tax_remaining_krw)} 남았습니다.
@@ -117,7 +117,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
             <div className="space-y-1">
               {taxData.health_insurance_estimate.dependent_risk_warning ? (
                 <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                  <TriangleAlert size={14} className="text-red-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-red-700 dark:text-red-400">
                     배당소득(2,000만원 기준)이 건강보험 피부양자 자격상실 기준을 초과했습니다.
                     지역가입자 전환 시 예상 월 보험료는 약{" "}
@@ -127,7 +127,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 </div>
               ) : (
                 <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                  <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                  <TriangleAlert size={14} className="text-amber-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-amber-700 dark:text-amber-400">
                     배당소득(건강보험 피부양자 기준)이 자격상실 기준(2,000만원)까지{" "}
                     {fmtKrw(taxData.health_insurance_estimate.income_remaining_until_risk_krw)}{" "}

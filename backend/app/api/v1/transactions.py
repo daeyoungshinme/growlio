@@ -15,6 +15,7 @@ from app.models.asset import Transaction
 from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate
 from app.utils.cache_keys import (
+    challenge_progress_key,
     dashboard_summary_key,
     invalidate_dividend_caches,
     invalidate_user_caches,
@@ -138,6 +139,7 @@ async def _invalidate_tx_caches(user_id: UUID) -> None:
         cache,
         dashboard_summary_key(user_id),
         monthly_trend_key(user_id),
+        challenge_progress_key(user_id),
     )
     await invalidate_dividend_caches(cache, user_id, date.today().year)
 

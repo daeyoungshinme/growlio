@@ -315,6 +315,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `fmtKrwPrice(n)` — 소수점 없는 원화 가격 표시.
 - `fmtMonth(str)` — "YYYY-MM" → "YYYY년 M월".
 - `fmtPct(n)` — "+5.23%" 형식. null이면 "—".
+- `clampPct(pct)` — 진행률 바 렌더링용 0~100 클램프. 프로그레스 바 `style={{ width }}`에 값 그대로 넣지 말 것.
 - `convertUsdToKrw(usd, rate)` / `formatUsdAsKrw(usd, rate)` — USD → KRW 환산·포맷.
 - `relativeTime(date)` — "3분 전" 등 상대 시간 표시.
 - 차트 X축은 `"YY.M"` 형식 (`"25.1"` 등) — 직접 문자열 파싱으로 타임존 이슈 방지

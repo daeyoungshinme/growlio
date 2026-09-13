@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, AlertTriangle, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
+import { Activity, TriangleAlert, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
 
 import { fetchDriftSummary } from "@/api/rebalancing";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
@@ -308,7 +308,7 @@ export default function RebalancingStatusCard({
           {marketSignal.composite_level === "GREEN" ? (
             <Activity size={13} className="flex-shrink-0" />
           ) : (
-            <AlertTriangle size={13} className="flex-shrink-0" />
+            <TriangleAlert size={13} className="flex-shrink-0" />
           )}
           <span>
             시장 신호:{" "}

@@ -15,7 +15,7 @@ logger = structlog.get_logger()
 _STOCK_SOURCES = ("KIS_API", "KIWOOM_API")
 _ACCOUNT_SYNC_CONCURRENCY = 3
 
-ProgressCallback = Callable[[int, int], Awaitable[None]]
+ProgressCallback = Callable[[int, int, int], Awaitable[None]]
 
 
 async def _sync_accounts(
@@ -57,7 +57,7 @@ async def _sync_accounts(
         if on_progress:
             async with progress_lock:
                 done_count += 1
-                await on_progress(done_count, len(accounts))
+                await on_progress(done_count, len(accounts), len(failed))
 
     await asyncio.gather(*(sync_one(account) for account in accounts))
 

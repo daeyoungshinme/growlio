@@ -1,4 +1,4 @@
-import { LineChart, LogOut, Moon, Sun } from "lucide-react";
+import { ChartLine, LogOut, Moon, Sun } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { NAV_ITEMS } from "@/constants/nav";
 import { useThemeStore } from "@/stores/themeStore";
@@ -15,7 +15,7 @@ export default function Sidebar() {
     >
       <div className="px-3 mb-8">
         <div className="flex items-center gap-2">
-          <LineChart className="text-blue-600 dark:text-blue-400" size={22} aria-hidden="true" />
+          <ChartLine className="text-blue-600 dark:text-blue-400" size={22} aria-hidden="true" />
           <span className="font-bold text-lg text-gray-900 dark:text-gray-50">Growlio</span>
         </div>
       </div>

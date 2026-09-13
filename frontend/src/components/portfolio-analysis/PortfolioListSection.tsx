@@ -10,12 +10,12 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  AlertTriangle,
+  TriangleAlert,
   Anchor,
   Bell,
   CircleAlert,
   CircleCheck,
-  Edit2,
+  Pen,
   GripVertical,
   Loader2,
   Plus,
@@ -171,7 +171,7 @@ const PortfolioCard = memo(function PortfolioCard({
             aria-label="포트폴리오 수정"
             className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
           >
-            <Edit2 size={14} />
+            <Pen size={14} />
           </button>
           <button
             onClick={(e) => {
@@ -190,12 +190,12 @@ const PortfolioCard = memo(function PortfolioCard({
         {drift &&
           (isNeeded ? (
             <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400">
-              <AlertTriangle size={10} />
+              <TriangleAlert size={10} />
               {drift.max_drift_pct.toFixed(1)}% 이탈
             </span>
           ) : isCaution ? (
             <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
-              <AlertTriangle size={10} />
+              <TriangleAlert size={10} />
               {drift.max_drift_pct.toFixed(1)}% 주의
             </span>
           ) : (

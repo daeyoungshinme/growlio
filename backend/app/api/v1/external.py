@@ -33,7 +33,12 @@ from app.models.user import User
 from app.services._settings_queries import get_settings_row
 from app.services.asset_service import list_accounts as _list_accounts
 from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot, get_latest_snapshot_with_positions
-from app.utils.cache_keys import invalidate_asset_account_caches, invalidate_user_caches, monthly_trend_key
+from app.utils.cache_keys import (
+    challenge_progress_key,
+    invalidate_asset_account_caches,
+    invalidate_user_caches,
+    monthly_trend_key,
+)
 from app.utils.currency import fetch_usd_krw
 
 router = APIRouter(prefix="/external", tags=["external"])
@@ -244,7 +249,7 @@ async def create_external_transaction(
 
     cache = await get_cache_store()
     await invalidate_asset_account_caches(cache, current_user.id, account_id=account.id)
-    await invalidate_user_caches(cache, monthly_trend_key(current_user.id))
+    await invalidate_user_caches(cache, monthly_trend_key(current_user.id), challenge_progress_key(current_user.id))
 
     return ExternalTransactionResult(
         transaction_id=str(tx.id),

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Settings2, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Settings2, WandSparkles } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
@@ -171,7 +171,7 @@ export default function InvestPlanPage() {
                         onClick={openWizard}
                         className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors`}
                       >
-                        <Wand2 size={15} />
+                        <WandSparkles size={15} />
                         가이드로 설정
                       </button>
                       <button

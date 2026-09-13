@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { TriangleAlert, Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteAccount } from "@/api/auth";
 import { getSupabase } from "@/lib/supabase";
@@ -42,7 +42,7 @@ export default function DeleteAccountModal({ onClose }: Props) {
     <Modal onClose={onClose} title="회원 탈퇴" size="sm">
       <div className="p-4 space-y-4">
         <div className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
-          <AlertTriangle size={18} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
+          <TriangleAlert size={18} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
           <p>
             탈퇴 시 계좌·거래내역·포트폴리오·리밸런싱 이력 등 저장된 모든 데이터가 영구적으로
             삭제되며 되돌릴 수 없습니다.

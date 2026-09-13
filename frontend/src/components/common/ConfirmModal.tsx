@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { useId, type ReactNode } from "react";
 import { triggerHaptic } from "@/hooks/useHaptic";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
@@ -39,7 +39,7 @@ export default function ConfirmModal({
       >
         <div className="flex items-start gap-3 mb-5">
           {danger && (
-            <AlertTriangle size={20} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
+            <TriangleAlert size={20} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
           )}
           <div className="min-w-0 flex-1">
             <p id={msgId} className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">

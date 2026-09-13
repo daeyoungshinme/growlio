@@ -17,7 +17,7 @@ from typing import Any
 import structlog
 
 from app.core.cache_store import get_cache_store
-from app.core.logging import redact_secrets
+from app.core.logging import format_sync_error
 from app.jobs.asset_sync import _sync_accounts
 from app.models.asset import AssetAccount
 from app.utils.cache_keys import TTL_SYNC_ALL_STATUS, get_cached_json, set_cached_json, sync_all_status_key
@@ -26,7 +26,6 @@ from app.utils.inproc_lock import inproc_lock
 logger = structlog.get_logger()
 
 _LOCK_TTL_SECONDS = 600
-_MAX_ERROR_MESSAGE_LENGTH = 200
 
 
 def _lock_key(user_id: uuid.UUID) -> str:
@@ -73,11 +72,11 @@ async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None
             TTL_SYNC_ALL_STATUS,
         )
 
-        async def on_progress(done: int, total_: int) -> None:
+        async def on_progress(done: int, total_: int, failed_count: int) -> None:
             await set_cached_json(
                 cache,
                 status_key,
-                {"status": "running", "total": total_, "done": done, "failed": 0},
+                {"status": "running", "total": total_, "done": done, "failed": failed_count},
                 TTL_SYNC_ALL_STATUS,
             )
 
@@ -94,7 +93,7 @@ async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None
                     "done": 0,
                     "failed": total,
                     "failed_accounts": [],
-                    "error": redact_secrets(str(e))[:_MAX_ERROR_MESSAGE_LENGTH],
+                    "error": format_sync_error(e),
                 },
                 TTL_SYNC_ALL_STATUS,
             )
@@ -104,7 +103,7 @@ async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None
             {
                 "account_id": fid,
                 "account_name": fname,
-                "error": redact_secrets(ferr)[:_MAX_ERROR_MESSAGE_LENGTH],
+                "error": format_sync_error(ferr),
             }
             for fid, fname, ferr in failed
         ]

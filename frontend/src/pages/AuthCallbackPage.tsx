@@ -1,4 +1,4 @@
-import { LineChart, Loader2 } from "lucide-react";
+import { ChartLine, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getSupabase } from "@/lib/supabase";
@@ -97,7 +97,7 @@ export default function AuthCallbackPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
       <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
         <div className="flex items-center gap-2 mb-6 justify-center">
-          <LineChart className="text-blue-600 dark:text-blue-400" size={28} />
+          <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>
         </div>
 

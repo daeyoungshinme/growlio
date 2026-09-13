@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Plus, Wand2, X } from "lucide-react";
+import { Plus, WandSparkles, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ACCOUNT_TAX_TYPE_LABELS,
@@ -263,7 +263,7 @@ export default function UnifiedPortfolioEditor({
                     className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-2 py-1 rounded-lg transition-colors`}
                     title="현재 보유 종목을 현재 비중으로 자동 채웁니다"
                   >
-                    <Wand2 size={12} /> 현재 보유 종목으로 채우기
+                    <WandSparkles size={12} /> 현재 보유 종목으로 채우기
                   </button>
                   <span
                     className={`text-xs font-medium ${weightOk ? "text-green-600" : "text-orange-500"}`}
