@@ -8,6 +8,10 @@ vi.mock("../hooks/useExchangeRate", () => ({
   useExchangeRate: () => 1350,
 }));
 
+vi.mock("@/utils/toast", () => ({
+  toast: vi.fn(),
+}));
+
 const mockAccount: AssetAccount = {
   id: "acc-1",
   name: "테스트 증권계좌",
@@ -140,6 +144,18 @@ describe("StockAccountCard", () => {
     const badge = screen.getByText("동기화 실패");
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveAttribute("title", "KIS 인증에 실패했습니다");
+  });
+
+  it("동기화 실패 배지를 탭하면 전체 에러 메시지를 토스트로 보여준다 (모바일 접근성)", async () => {
+    const { toast } = await import("@/utils/toast");
+    const account = {
+      ...mockAccount,
+      last_sync_error: "KIS 인증에 실패했습니다",
+      last_synced_at: null,
+    };
+    renderWithProviders(<StockAccountCard {...defaultProps} account={account} />);
+    fireEvent.click(screen.getByRole("button", { name: "동기화 실패" }));
+    expect(toast).toHaveBeenCalledWith("KIS 인증에 실패했습니다", "error");
   });
 
   it("last_sync_error 없이 last_synced_at만 있으면 상대 시간을 표시한다", () => {

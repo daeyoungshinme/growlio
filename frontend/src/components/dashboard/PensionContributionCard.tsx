@@ -3,7 +3,7 @@ import { fetchPensionContribution } from "@/api/tax";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import type { PortfolioOverview } from "@/types";
-import { fmtKrw } from "@/utils/format";
+import { clampPct, fmtKrw } from "@/utils/format";
 
 function achievementColor(pct: number): string {
   if (pct >= 100) return "text-green-600 dark:text-green-400";
@@ -71,7 +71,7 @@ export default function PensionContributionCard({ overview }: Props) {
             <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
               <div
                 className={`h-full rounded-full ${chip.barColorClass}`}
-                style={{ width: `${Math.min(Math.max(chip.pct, 0), 100)}%` }}
+                style={{ width: `${clampPct(chip.pct)}%` }}
               />
             </div>
           </div>

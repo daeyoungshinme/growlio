@@ -5,6 +5,7 @@ import type { ExecutionAction } from "./useRebalancingExecution";
 import { getActionableItems } from "./useRebalancingExecution";
 import { toast } from "@/utils/toast";
 import { getHttpStatus } from "@/utils/error";
+import { isOrderExecutableAccount } from "@/utils/accounts";
 
 // 백엔드 현재가 캐시(TTL_PRICE_CURRENT=900s)와 동기화하는 세션 캐시
 const PRICE_CACHE_TTL_MS = 900_000;
@@ -16,9 +17,13 @@ interface PriceCacheEntry {
 }
 const _priceCache = new Map<string, PriceCacheEntry>();
 
-// 다른 소스가 전부 실패했을 때만 쓰는 최후 폴백용 — 티커를 보유한 KIS 연동 계좌 ID (있으면)
-function findKisAccountId(analysis: RebalancingAnalysis, ticker: string): string | undefined {
-  return analysis.ticker_account_map[ticker]?.find((a) => a.asset_type === "STOCK_KIS")?.account_id;
+// 다른 소스가 전부 실패했을 때만 쓰는 최후 폴백용 — 티커를 보유한 주문 실행 가능 계좌 ID (있으면)
+function findExecutableAccountId(
+  analysis: RebalancingAnalysis,
+  ticker: string,
+): string | undefined {
+  return analysis.ticker_account_map[ticker]?.find((a) => isOrderExecutableAccount(a.asset_type))
+    ?.account_id;
 }
 
 function getCached(ticker: string): PriceCacheEntry | null {
@@ -51,7 +56,7 @@ export function useRebalancingPrices(
       .map(([ticker, market]) => ({
         ticker,
         market,
-        account_id: findKisAccountId(analysis, ticker),
+        account_id: findExecutableAccountId(analysis, ticker),
       }));
 
     if (toFetch.length > 0) {
@@ -98,7 +103,11 @@ export function useRebalancingPrices(
   async function retryPrice(ticker: string, market: string) {
     dispatch({ type: "PRICE_RETRY_START", ticker });
     try {
-      const result = await fetchStockPrice(ticker, market, findKisAccountId(analysis, ticker));
+      const result = await fetchStockPrice(
+        ticker,
+        market,
+        findExecutableAccountId(analysis, ticker),
+      );
       if (result.price_krw != null || result.price_usd != null) {
         _priceCache.set(ticker, { ...result, fetchedAt: Date.now() });
         dispatch({

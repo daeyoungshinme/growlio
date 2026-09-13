@@ -19,7 +19,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
-from app.core.logging import redact_secrets
+from app.core.logging import format_sync_error
 from app.exceptions import ProviderNetworkError
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.providers.base import BalanceResult, BrokerProvider
@@ -51,8 +51,6 @@ _CIRCUITS: dict[str, CircuitBreaker] = {
     "KIWOOM_API": kiwoom_circuit,
     "TOSS_API": toss_circuit,
 }
-
-_MAX_SYNC_ERROR_LENGTH = 200
 
 
 @dataclass(frozen=True)
@@ -112,7 +110,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         else:
             balance = await _retry_provider_sync(provider, account, db, cache)
     except Exception as e:
-        account.last_sync_error = redact_secrets(str(e))[:_MAX_SYNC_ERROR_LENGTH]
+        account.last_sync_error = format_sync_error(e)
         await db.commit()
         broker_sync_duration.labels(data_source=account.data_source, status="failure").observe(
             _time.monotonic() - _sync_start

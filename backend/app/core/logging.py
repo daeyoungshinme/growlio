@@ -23,6 +23,18 @@ def redact_secrets(text: str) -> str:
     return _SECRET_PATTERN.sub(r"\1=[REDACTED]", text)
 
 
+SYNC_ERROR_MESSAGE_MAX_LENGTH = 200
+
+
+def format_sync_error(error: BaseException | str) -> str:
+    """계좌 동기화 실패 사유를 사용자에게 노출 가능한 형태로 가공한다 (비밀정보 redact + 길이 제한).
+
+    asset_service.sync_account()/sync_all_service.run_sync_all() 양쪽에서 각자
+    `redact_secrets(str(e))[:200]`을 독립 구현하고 있던 것을 공용화한 것. 예외 객체와, 이미
+    str(e)로 변환되어 저장된 값(jobs/asset_sync.py의 failed 리스트) 양쪽을 모두 받는다."""
+    return redact_secrets(str(error))[:SYNC_ERROR_MESSAGE_MAX_LENGTH]
+
+
 def _redact_processor(logger, method_name, event_dict):
     for key, value in event_dict.items():
         if isinstance(value, str):

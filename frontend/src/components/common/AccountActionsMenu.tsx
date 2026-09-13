@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MoreVertical } from "lucide-react";
+import { EllipsisVertical } from "lucide-react";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 
 export interface AccountActionsMenuItem {
@@ -49,7 +49,7 @@ export default function AccountActionsMenu({ items, ariaLabel = "더 보기" }: 
         aria-expanded={isOpen}
         className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors`}
       >
-        <MoreVertical size={16} />
+        <EllipsisVertical size={16} />
       </button>
       {isOpen && (
         <div

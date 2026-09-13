@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
+  clampPct,
   convertUsdToKrw,
   formatUsdAsKrw,
   fmtKrw,
@@ -120,6 +121,20 @@ describe("fmtPct", () => {
 
   it("digits 파라미터 적용", () => {
     expect(fmtPct(5.2345, 1)).toBe("+5.2%");
+  });
+});
+
+describe("clampPct", () => {
+  it("범위 안이면 그대로 반환", () => {
+    expect(clampPct(42)).toBe(42);
+  });
+
+  it("100을 넘으면 100으로 클램프", () => {
+    expect(clampPct(150)).toBe(100);
+  });
+
+  it("음수면 0으로 클램프", () => {
+    expect(clampPct(-10)).toBe(0);
   });
 });
 

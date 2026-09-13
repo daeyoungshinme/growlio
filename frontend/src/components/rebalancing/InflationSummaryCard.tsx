@@ -1,4 +1,4 @@
-import { LineChart, TrendingDown, TrendingUp } from "lucide-react";
+import { ChartLine, TrendingDown, TrendingUp } from "lucide-react";
 import type { InflationIndicatorSummary } from "@/api/economicIndicators";
 import { fmtPct } from "@/utils/format";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
@@ -21,7 +21,7 @@ export default function InflationSummaryCard({ data }: Props) {
 
   return (
     <CollapsibleCard
-      icon={LineChart}
+      icon={ChartLine}
       title="물가 지표 (미국)"
       isOpen={isOpen}
       onToggle={toggleOpen}

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertTriangle, CircleCheck, Info, Zap } from "lucide-react";
+import { TriangleAlert, CircleCheck, Info, Zap } from "lucide-react";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 import DiagnosisInsightList from "./DiagnosisInsightList";
@@ -21,7 +21,7 @@ function getDriftStatus(maxDrift: number, threshold: number): DriftStatus {
 const STATUS_CONFIG = {
   critical: {
     cardAccent: "border-red-300 dark:border-red-700/60 ring-1 ring-red-200 dark:ring-red-800/40",
-    icon: AlertTriangle,
+    icon: TriangleAlert,
     iconColor: "text-red-600 dark:text-red-400",
     badge: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
     label: "리밸런싱 필요",
@@ -44,7 +44,7 @@ const STATUS_CONFIG = {
   DriftStatus,
   {
     cardAccent: string;
-    icon: typeof AlertTriangle;
+    icon: typeof TriangleAlert;
     iconColor: string;
     badge: string;
     label: string;

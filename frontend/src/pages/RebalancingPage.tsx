@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { LineChart } from "lucide-react";
+import { ChartLine } from "lucide-react";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
@@ -259,7 +259,7 @@ export default function RebalancingPage() {
             )}
             <ErrorBoundary variant="section">
               <CollapsibleCard
-                icon={LineChart}
+                icon={ChartLine}
                 title="백테스트"
                 isOpen={isBacktestOpen}
                 onToggle={toggleBacktestOpen}

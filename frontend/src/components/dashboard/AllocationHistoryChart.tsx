@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChevronDown, ChevronRight, BarChart2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ChartNoAxesColumn } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
 import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
@@ -72,7 +72,7 @@ function AllocationHistoryChart({
 
   return (
     <CollapsibleCard
-      icon={BarChart2}
+      icon={ChartNoAxesColumn}
       title="자산 추이"
       isOpen={isOpen}
       onToggle={toggleOpen}

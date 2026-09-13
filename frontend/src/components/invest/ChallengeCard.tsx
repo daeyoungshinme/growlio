@@ -2,7 +2,7 @@ import { Flame, Pencil, Archive, Trash2 } from "lucide-react";
 import type { Challenge } from "@/api/challenges";
 import AccountActionsMenu from "@/components/common/AccountActionsMenu";
 import ChallengeMonthGrid from "@/components/invest/ChallengeMonthGrid";
-import { fmtKrw, fmtMonth, fmtPct } from "@/utils/format";
+import { clampPct, fmtKrw, fmtMonth, fmtPct } from "@/utils/format";
 
 const TYPE_LABEL: Record<Challenge["challenge_type"], string> = {
   DEPOSIT: "매달 적립",
@@ -108,7 +108,7 @@ export default function ChallengeCard({ challenge, onEdit, onArchive, onDelete }
           <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
             <div
               className="h-full rounded-full bg-blue-500 transition-all"
-              style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }}
+              style={{ width: `${clampPct(pct)}%` }}
             />
           </div>
         </div>

@@ -22,9 +22,12 @@ export default function ChallengeMonthGrid({ months, hasTarget }: Props) {
           : partial
             ? "bg-amber-400 text-white"
             : "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500";
+        const statusLabel = met ? "완료" : partial ? "일부 달성" : "미완료";
         return (
           <div
             key={m.month}
+            role="img"
+            aria-label={`${fmtMonth(m.month)}, ${statusLabel}, ${fmtKrwShort(m.net_krw)}`}
             title={`${fmtMonth(m.month)} · ${fmtKrwShort(m.net_krw)}`}
             className={`flex flex-col items-center justify-center rounded-md w-11 h-11 text-xs font-medium ${cls}`}
           >

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchTaxSummary } from "@/api/tax";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { fmtKrw } from "@/utils/format";
+import { clampPct, fmtKrw } from "@/utils/format";
 
 function riskColor(pct: number): string {
   if (pct >= 100) return "text-red-600 dark:text-red-400";
@@ -54,7 +54,7 @@ export default function HealthInsuranceRiskCard() {
         <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
           <div
             className={`h-full rounded-full ${riskBarColor(pct)}`}
-            style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }}
+            style={{ width: `${clampPct(pct)}%` }}
           />
         </div>
         {est.dependent_risk_warning && (

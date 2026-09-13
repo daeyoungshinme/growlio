@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight } from "lucide-react";
+import { TriangleAlert, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTaxLimitsSummary } from "@/hooks/useTaxLimitsSummary";
 import type { PortfolioOverview } from "@/types";
@@ -24,7 +24,7 @@ export default function TaxLimitsBanner({ overview }: Props) {
       </p>
       {warningText && (
         <div className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 mb-1.5">
-          <AlertTriangle size={12} className="shrink-0" />
+          <TriangleAlert size={12} className="shrink-0" />
           <span className="truncate">{warningText}</span>
         </div>
       )}

@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Flame, ChevronRight } from "lucide-react";
 import type { Challenge } from "@/api/challenges";
-import { fmtPct } from "@/utils/format";
+import { clampPct, fmtPct } from "@/utils/format";
 
 interface Props {
   challenges: Challenge[];
@@ -69,7 +69,7 @@ export default function ChallengeProgressCard({ challenges }: Props) {
         <div className="mt-3 w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
           <div
             className="h-full rounded-full bg-blue-500 transition-all"
-            style={{ width: `${Math.min(Math.max(progress.progress_pct, 0), 100)}%` }}
+            style={{ width: `${clampPct(progress.progress_pct)}%` }}
           />
         </div>
       )}

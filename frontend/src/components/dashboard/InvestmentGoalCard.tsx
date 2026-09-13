@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Target, TrendingDown, TrendingUp } from "lucide-react";
-import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
+import { clampPct, fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -329,7 +329,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                   <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
                     <div
                       className={`h-full rounded-full ${chip.barColorClass}`}
-                      style={{ width: `${Math.min(Math.max(chip.barPct, 0), 100)}%` }}
+                      style={{ width: `${clampPct(chip.barPct)}%` }}
                     />
                   </div>
                 )}

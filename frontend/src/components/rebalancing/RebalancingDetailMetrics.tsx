@@ -1,4 +1,4 @@
-import { BarChart3 } from "lucide-react";
+import { ChartColumn } from "lucide-react";
 import { RebalancingAnalysis } from "@/api/rebalancing";
 import { CagrCard } from "./RebalancingCells";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
@@ -31,7 +31,7 @@ export default function RebalancingDetailMetrics({ analysis }: Props) {
 
   return (
     <CollapsibleCard
-      icon={BarChart3}
+      icon={ChartColumn}
       title="상세 지표"
       isOpen={isOpen}
       onToggle={toggleOpen}
