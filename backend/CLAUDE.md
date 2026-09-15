@@ -125,7 +125,7 @@ cd backend && uv run mypy app/
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
 - `InvestmentChallenge` — 적립식 투자 챌린지(매달 입금 습관/수익률/평가금액 목표). `challenge_type`(DEPOSIT/RETURN_PCT/TARGET_VALUE) × `target_amount`/`target_pct`/`target_months` 조합. `account_id`(DEPOSIT만 지정 허용, 나머지는 전체 투자자산). 진행률/스트릭은 저장 안 함
-- `UserSettings` — KIS/키움 자격증명(AES-256), 투자·입금 목표. `challenge_reminders_enabled`(적립 챌린지 독려/결산 알림 옵트인). 목표 역산 추천 옵션: `goal_short_term_equity_floor_pct`, `goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`(nullable=상한 없음, `PUT /settings/goal-recommendation-options`), `age_group`(nullable, TWENTIES~SIXTIES_PLUS, `birth_year`로 자동 파생 가능). AUTO 하루 거래대금 상한: `auto_rebalancing_daily_value_cap_krw`(nullable=무제한, `PUT /settings/auto-rebalancing-daily-cap`)
+- `UserSettings` — KIS/키움 자격증명(AES-256), 투자·입금 목표. `challenge_reminders_enabled`(적립 챌린지 독려/결산 알림 옵트인, 기본 OFF — 단 `challenge_service.create_challenge()`가 챌린지별 알림 토글 ON으로 첫 챌린지를 만들면 자동으로 True 전환, 이중 게이트로 알림이 조용히 안 나가는 것 방지). 목표 역산 추천 옵션: `goal_short_term_equity_floor_pct`, `goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`(nullable=상한 없음, `PUT /settings/goal-recommendation-options`), `age_group`(nullable, TWENTIES~SIXTIES_PLUS, `birth_year`로 자동 파생 가능). AUTO 하루 거래대금 상한: `auto_rebalancing_daily_value_cap_krw`(nullable=무제한, `PUT /settings/auto-rebalancing-daily-cap`)
 
 > 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken`/`TossToken` 등 전체 목록은 `app/models/` 참고.
 

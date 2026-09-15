@@ -253,6 +253,48 @@ class TestCrud:
         mock_cache.delete.assert_awaited()
 
     @pytest.mark.asyncio
+    async def test_create_challenge_with_reminder_opts_user_into_global_flag(self, mock_cache):
+        """챌린지별 알림 토글이 ON이면, 꺼져있던 전역 UserSettings.challenge_reminders_enabled도 함께 켠다.
+
+        이걸 안 하면 발송 잡(challenge_deposit_reminder/challenge_monthly_wrap)이 전역
+        플래그(기본 OFF)로 먼저 유저를 걸러 알림이 조용히 안 나가는 이중 게이트 버그가 된다.
+        """
+        from app.schemas.challenge import ChallengeCreate
+
+        db = AsyncMock()
+        db.add = MagicMock()
+        settings_row = SimpleNamespace(challenge_reminders_enabled=False)
+        payload = ChallengeCreate(
+            title="매달 50만원",
+            challenge_type="DEPOSIT",
+            target_amount=500000,
+            start_month="2026-01",
+            reminder_enabled=True,
+        )
+        uid = uuid.uuid4()
+        with patch.object(cs, "get_or_create_settings", AsyncMock(return_value=settings_row)):
+            await cs.create_challenge(uid, db, payload, mock_cache)
+        assert settings_row.challenge_reminders_enabled is True
+
+    @pytest.mark.asyncio
+    async def test_create_challenge_without_reminder_does_not_touch_global_flag(self, mock_cache):
+        from app.schemas.challenge import ChallengeCreate
+
+        db = AsyncMock()
+        db.add = MagicMock()
+        payload = ChallengeCreate(
+            title="매달 50만원",
+            challenge_type="DEPOSIT",
+            target_amount=500000,
+            start_month="2026-01",
+            reminder_enabled=False,
+        )
+        uid = uuid.uuid4()
+        with patch.object(cs, "get_or_create_settings", AsyncMock()) as mock_get_settings:
+            await cs.create_challenge(uid, db, payload, mock_cache)
+        mock_get_settings.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_update_challenge_sets_completed_at_on_complete(self, mock_cache):
         from app.schemas.challenge import ChallengeUpdate
 

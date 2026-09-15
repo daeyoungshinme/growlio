@@ -31,6 +31,7 @@ from app.schemas.challenge import (
     ChallengeSummary,
     ChallengeUpdate,
 )
+from app.services._settings_queries import get_or_create_settings
 from app.services.composition_calculator import build_asset_totals, exclude_real_estate
 from app.utils.cache_keys import (
     TTL_CHALLENGE_PROGRESS,
@@ -272,6 +273,13 @@ async def create_challenge(
         status=CHALLENGE_ACTIVE,
     )
     db.add(challenge)
+    if payload.reminder_enabled:
+        # 챌린지별 알림 토글은 기본 ON이라, 사용자가 이걸 켠 채로 챌린지를 만든 시점에
+        # "알림을 받고 싶다"는 의사가 이미 표현된 것으로 보고 전역 옵트인도 함께 켠다.
+        # 이걸 안 하면 발송 잡이 전역 플래그(기본 OFF)로 먼저 걸러져 알림이 조용히 안 나간다.
+        settings_row = await get_or_create_settings(db, user_id)
+        if not settings_row.challenge_reminders_enabled:
+            settings_row.challenge_reminders_enabled = True
     await db.commit()
     await db.refresh(challenge)
     await invalidate_challenge_cache(cache, user_id)
