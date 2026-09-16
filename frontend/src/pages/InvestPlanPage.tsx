@@ -18,6 +18,7 @@ const ChallengeSection = lazy(() => import("../components/invest/ChallengeSectio
 const SavingsSimulatorCard = lazy(() => import("../components/invest/SavingsSimulatorCard"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
+import AutoInvestStatusBanner from "@/components/invest/AutoInvestStatusBanner";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
 import { fmtKrw, fmtKrwPreview } from "@/utils/format";
@@ -282,6 +283,10 @@ export default function InvestPlanPage() {
                     </div>
                   )}
                 </div>
+
+                <ErrorBoundary variant="section">
+                  <AutoInvestStatusBanner />
+                </ErrorBoundary>
 
                 {isConfigured && data && (
                   <ErrorBoundary variant="section">

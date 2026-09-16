@@ -95,3 +95,8 @@ export const TAX_IMPACT_GATE_OPTIONS: { value: TaxImpactGateMode; label: string;
       desc: "매도로 인한 추정 양도세가 상한을 넘으면 자동 실행 보류",
     },
   ];
+
+/** 정기 적립식 자동매수(DCA) 빠른 설정의 고정 드리프트 임계값 — 사실상 0에 가까운 값으로,
+ * 스케줄일에 예수금이 조금이라도 쌓여 있으면 거의 항상 목표 비중대로 매수되게 한다.
+ * 사용자에게는 노출하지 않고 내부적으로만 사용 (AlertQuickDcaSection.tsx 참고). */
+export const DCA_AUTO_BUY_THRESHOLD_PCT = 0.5;

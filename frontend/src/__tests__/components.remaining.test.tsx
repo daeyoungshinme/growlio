@@ -27,6 +27,7 @@ vi.mock("@/api/client", () => ({
 
 vi.mock("@/api/alerts", () => ({
   fetchRebalancingAlert: vi.fn().mockResolvedValue(null),
+  fetchAccountRebalancingAlert: vi.fn().mockResolvedValue(null),
   upsertRebalancingAlert: vi.fn().mockResolvedValue({}),
   deleteRebalancingAlert: vi.fn().mockResolvedValue({}),
   fetchRebalancingAlerts: vi.fn().mockResolvedValue([]),
@@ -151,6 +152,7 @@ import RebalancingAlertModal from "@/components/rebalancing/RebalancingAlertModa
 import TransactionModal from "@/components/assets/TransactionModal";
 import UnifiedPortfolioEditor from "@/components/portfolio-analysis/UnifiedPortfolioEditor";
 import type { AssetAccount } from "@/api/assets";
+import { fetchRebalancingAlert } from "@/api/alerts";
 
 // ---- Test Fixtures ----
 const mockMetrics: PortfolioMetrics[] = [
@@ -381,6 +383,116 @@ describe("RebalancingAlertModal", () => {
     await waitFor(() => {
       expect(document.body).toBeDefined();
     });
+  });
+
+  it("신규 AGGREGATE 알림은 빠른 설정/직접 설정 선택 화면부터 보여준다", async () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingAlertModal
+          portfolioId="p1"
+          portfolioName="테스트 포트폴리오"
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("정기 적립식 자동매수로 빠르게 설정")).toBeInTheDocument();
+    });
+    expect(screen.getByText("직접 설정할래요 (고급)")).toBeInTheDocument();
+    // 아직 상세 섹션(실행 주기 등)은 보이지 않는다
+    expect(screen.queryByText("실행 주기")).not.toBeInTheDocument();
+  });
+
+  it("빠른 설정을 선택하면 매수 일자/실행 계좌만 있는 축약 폼을 보여준다", async () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingAlertModal
+          portfolioId="p1"
+          portfolioName="테스트 포트폴리오"
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(screen.getByText("정기 적립식 자동매수로 빠르게 설정")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByText("정기 적립식 자동매수로 빠르게 설정"));
+
+    expect(await screen.findByText("매수 일자")).toBeInTheDocument();
+    // 드리프트 임계값 슬라이더 등 고급 섹션은 노출되지 않는다
+    expect(screen.queryByText("실행 조건")).not.toBeInTheDocument();
+  });
+
+  it("직접 설정을 선택하면 기존 전체 섹션을 그대로 보여준다", async () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingAlertModal
+          portfolioId="p1"
+          portfolioName="테스트 포트폴리오"
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText("직접 설정할래요 (고급)")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("직접 설정할래요 (고급)"));
+
+    expect(await screen.findByText("실행 주기")).toBeInTheDocument();
+    expect(screen.getByText("실행 조건")).toBeInTheDocument();
+  });
+
+  it("계좌별 독립 설정(targetAccountId 지정) 편집 시에는 선택 화면 없이 바로 상세로 진입한다", async () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingAlertModal
+          portfolioId="p1"
+          portfolioName="테스트 포트폴리오"
+          targetAccountId="acc-1"
+          targetAccountName="계좌1"
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText("실행 주기")).toBeInTheDocument());
+    expect(screen.queryByText("정기 적립식 자동매수로 빠르게 설정")).not.toBeInTheDocument();
+  });
+
+  it("기존 알림 편집 시에는 선택 화면 없이 바로 상세로 진입한다", async () => {
+    vi.mocked(fetchRebalancingAlert).mockResolvedValueOnce({
+      id: "alert-1",
+      portfolio_id: "p1",
+      threshold_pct: 5,
+      schedule_type: "MONTHLY",
+      schedule_day_of_week: null,
+      schedule_day_of_month: 25,
+      trigger_condition: "SCHEDULE_ONLY",
+      mode: "AUTO",
+      strategy: "BUY_ONLY",
+      account_id: "acc-1",
+      order_type: "MARKET",
+      market_condition_mode: "DISABLED",
+      auto_execution_time: "09:05",
+      notify_time: "08:30",
+      buy_wait_minutes: 10,
+      tax_impact_gate_mode: "DISABLED",
+      max_tax_impact_krw: null,
+      is_active: true,
+      last_triggered_at: null,
+      created_at: "2024-01-01T00:00:00Z",
+      updated_at: "2024-01-01T00:00:00Z",
+    });
+
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingAlertModal
+          portfolioId="p1"
+          portfolioName="테스트 포트폴리오"
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("실행 주기")).toBeInTheDocument();
+    expect(screen.getByText("정기 적립식 자동매수로 설정됨")).toBeInTheDocument();
   });
 });
 
