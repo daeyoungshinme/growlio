@@ -517,6 +517,42 @@ describe("useRebalancingAlertFormState", () => {
     expect(result.current.isNewAlert).toBe(true);
   });
 
+  it("정기 적립식 자동매수 프리셋 setter들을 호출하면 upsert body가 그 조합으로 조립된다", async () => {
+    vi.mocked(upsertRebalancingAlert).mockResolvedValue(mockAlert);
+
+    const { result } = renderHook(
+      () => useRebalancingAlertFormState({ alert: null, portfolioId: "port-1", onClose }),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      result.current.setScheduleType("MONTHLY");
+      result.current.setDayOfMonth(25);
+      result.current.setTriggerCondition("SCHEDULE_ONLY");
+      result.current.setMode("AUTO");
+      result.current.setStrategy("BUY_ONLY");
+      result.current.setThreshold(0.5);
+      result.current.setAccountId("acc-1");
+    });
+
+    await act(async () => {
+      await result.current.upsertMut.mutateAsync();
+    });
+
+    expect(upsertRebalancingAlert).toHaveBeenCalledWith(
+      "port-1",
+      expect.objectContaining({
+        schedule_type: "MONTHLY",
+        schedule_day_of_month: 25,
+        trigger_condition: "SCHEDULE_ONLY",
+        mode: "AUTO",
+        strategy: "BUY_ONLY",
+        threshold_pct: 0.5,
+        account_id: "acc-1",
+      }),
+    );
+  });
+
   it("기존 알림 수정 시에는 계좌유형 정보가 있어도 저장된 값을 유지한다", () => {
     const { result } = renderHook(
       () =>

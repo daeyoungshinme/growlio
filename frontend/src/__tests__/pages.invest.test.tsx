@@ -36,6 +36,19 @@ vi.mock("@/api/invest", () => ({
   fetchDCAAnalysis: vi.fn(),
 }));
 
+// AutoInvestStatusBanner("정기 적립식 자동매수" 상태 배너)가 적립 계획 탭에서 이 두 API를 조회한다 —
+// 위 @/api/client 목의 api.get은 URL과 무관하게 동일 객체를 반환하므로, 배열을 기대하는
+// fetchPortfolios/fetchRebalancingAlerts만 override하고 나머지 export(GoalSettingWizard 등이
+// 쓰는 fetchPortfolioOverviewLite 등)는 실제 모듈 그대로 둔다.
+vi.mock("@/api/portfolios", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/api/portfolios")>();
+  return { ...actual, fetchPortfolios: vi.fn().mockResolvedValue([]) };
+});
+vi.mock("@/api/alerts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/api/alerts")>();
+  return { ...actual, fetchRebalancingAlerts: vi.fn().mockResolvedValue([]) };
+});
+
 vi.mock("@/utils/queryInvalidation", () => ({
   invalidateDcaData: vi.fn().mockResolvedValue(undefined),
   invalidateDividendPlanData: vi.fn().mockResolvedValue(undefined),

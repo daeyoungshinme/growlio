@@ -172,7 +172,7 @@ class TestAlreadyFiredToday:
 class TestCheckAndTriggerAlerts:
     @pytest.mark.asyncio
     async def test_skips_when_rate_is_zero(self, mock_db, override_settings):
-        from app.services.alerts.alert_service import check_and_trigger_alerts
+        from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
         with patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", new=AsyncMock(return_value=0.0)):
             await check_and_trigger_alerts(mock_db)
@@ -181,7 +181,7 @@ class TestCheckAndTriggerAlerts:
 
     @pytest.mark.asyncio
     async def test_no_alerts_nothing_happens(self, mock_db, override_settings):
-        from app.services.alerts.alert_service import check_and_trigger_alerts
+        from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
         exec_result = MagicMock()
         exec_result.all.return_value = []
@@ -199,7 +199,7 @@ class TestCheckAndTriggerAlerts:
 class TestCheckStockPriceAlerts:
     @pytest.mark.asyncio
     async def test_no_alerts_returns_early(self, mock_db, override_settings):
-        from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
+        from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
         exec_result = MagicMock()
         exec_result.all.return_value = []

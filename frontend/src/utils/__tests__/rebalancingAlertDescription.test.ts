@@ -46,6 +46,20 @@ describe("buildAlertDescription", () => {
     expect(text).toBe("매월 15일 08:30에 리밸런싱 현황 리포트를 받습니다.");
   });
 
+  it("SCHEDULE_ONLY + AUTO: 리포트가 아닌 자동 실행 문구를 반환한다 (정기 적립식 자동매수)", () => {
+    const text = buildAlertDescription(
+      "MONTHLY",
+      0,
+      25,
+      "SCHEDULE_ONLY",
+      0.5,
+      "AUTO",
+      "09:05",
+      undefined,
+    );
+    expect(text).toBe("매월 25일 09:05에 자동으로 리밸런싱을 실행합니다.");
+  });
+
   it("BOTH: 정기 리포트 + 이탈 즉시 알림 문구를 함께 반환한다", () => {
     const text = buildAlertDescription("QUARTERLY", 0, 10, "BOTH", 7, "AUTO", "10:00", undefined);
     expect(text).toBe(

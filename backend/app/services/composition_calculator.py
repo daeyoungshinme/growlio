@@ -68,7 +68,7 @@ async def _fetch_current_positions(stock_acc_ids: list, db: AsyncSession) -> dic
         cur_result = await db.execute(
             select(Position).where(
                 Position.account_id.in_(stock_acc_ids),
-                Position.snapshot_id == None,  # noqa: E711
+                Position.snapshot_id.is_(None),
             )
         )
         for pos in cur_result.scalars().all():

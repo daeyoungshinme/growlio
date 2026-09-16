@@ -21,7 +21,7 @@ async def refresh_all_user_tokens() -> None:
     async with AsyncSessionLocal() as db:
         account_result = await db.execute(
             select(AssetAccount).where(
-                AssetAccount.kis_app_key != None,  # noqa: E711
+                AssetAccount.kis_app_key.is_not(None),
                 AssetAccount.is_active == True,
                 AssetAccount.data_source == "KIS_API",
             )

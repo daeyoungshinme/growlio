@@ -31,7 +31,7 @@ export function buildAlertDescription(
     return `비중이 ±${threshold.toFixed(1)}% 이상 이탈 시 ${when} ${action}`;
   }
   if (triggerCondition === "SCHEDULE_ONLY") {
-    return `${when} 리밸런싱 현황 리포트를 받습니다.`;
+    return mode === "AUTO" ? `${when} ${action}` : `${when} 리밸런싱 현황 리포트를 받습니다.`;
   }
   return `${when} 정기 리포트를 받으며, 비중이 ±${threshold.toFixed(1)}% 이탈 시 즉시 ${action}`;
 }

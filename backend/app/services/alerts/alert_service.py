@@ -98,32 +98,3 @@ async def list_alert_history(
         .limit(limit)
     )
     return result.scalars().all()
-
-
-# backward-compatible re-exports (lazy to avoid circular import)
-__all__ = [  # noqa: F822
-    "check_and_trigger_alerts",
-    "check_and_trigger_stock_price_alerts",
-    "check_rebalancing_alerts",
-    "send_test_rebalancing_alert",
-]
-
-
-def __getattr__(name: str):
-    if name == "check_and_trigger_alerts":
-        from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
-
-        return check_and_trigger_alerts
-    if name == "check_and_trigger_stock_price_alerts":
-        from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
-
-        return check_and_trigger_stock_price_alerts
-    if name == "check_rebalancing_alerts":
-        from app.services.rebalancing.alert_check import check_rebalancing_alerts
-
-        return check_rebalancing_alerts
-    if name == "send_test_rebalancing_alert":
-        from app.services.rebalancing.alert_test import send_test_rebalancing_alert
-
-        return send_test_rebalancing_alert
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

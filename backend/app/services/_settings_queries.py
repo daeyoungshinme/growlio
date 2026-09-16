@@ -31,7 +31,7 @@ async def has_active_kis_credentials(db: AsyncSession, user_id: uuid.UUID) -> bo
             AssetAccount.user_id == user_id,
             AssetAccount.data_source == "KIS_API",
             AssetAccount.is_active == True,
-            AssetAccount.kis_app_key != None,  # noqa: E711
+            AssetAccount.kis_app_key.is_not(None),
         )
     )
     return account is not None
