@@ -56,7 +56,7 @@ async def get_access_token(
                 select(KisToken).where(
                     KisToken.user_id == user_id,
                     KisToken.is_mock_mode == is_mock,
-                    KisToken.account_id == None,  # noqa: E711
+                    KisToken.account_id.is_(None),
                     KisToken.expires_at > datetime.now(UTC),
                 )
             )
@@ -129,7 +129,7 @@ async def _fetch_and_store_token(
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=["account_id"],
-            index_where=KisToken.account_id != None,  # noqa: E711
+            index_where=KisToken.account_id.is_not(None),
             set_={"access_token": encrypted_token, "expires_at": expires_at},
         )
     else:
@@ -142,7 +142,7 @@ async def _fetch_and_store_token(
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=["user_id", "is_mock_mode"],
-            index_where=KisToken.account_id == None,  # noqa: E711
+            index_where=KisToken.account_id.is_(None),
             set_={"access_token": encrypted_token, "expires_at": expires_at},
         )
     await db.execute(stmt)
@@ -176,7 +176,7 @@ async def promote_user_token_to_account(
     row = await db.scalar(
         select(KisToken).where(
             KisToken.user_id == user_id,
-            KisToken.account_id == None,  # noqa: E711
+            KisToken.account_id.is_(None),
             KisToken.is_mock_mode == is_mock,
             KisToken.expires_at > datetime.now(UTC),
         )
@@ -201,7 +201,7 @@ async def promote_user_token_to_account(
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=["account_id"],
-        index_where=KisToken.account_id != None,  # noqa: E711
+        index_where=KisToken.account_id.is_not(None),
         set_={"access_token": encrypted_token, "expires_at": row.expires_at},
     )
     await db.execute(stmt)

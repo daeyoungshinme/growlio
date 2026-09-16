@@ -32,7 +32,7 @@ class ManualProvider(BrokerProvider):
         pos_result = await db.execute(
             select(DBPosition).where(
                 DBPosition.account_id == account.id,
-                DBPosition.snapshot_id == None,  # noqa: E711
+                DBPosition.snapshot_id.is_(None),
             )
         )
         db_positions = pos_result.scalars().all()

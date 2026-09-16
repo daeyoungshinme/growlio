@@ -15,7 +15,7 @@ async def fetch_manual_positions(account_id: UUID, db: AsyncSession) -> list[Pos
     result = await db.execute(
         select(Position).where(
             Position.account_id == account_id,
-            Position.snapshot_id == None,  # noqa: E711
+            Position.snapshot_id.is_(None),
         )
     )
     return list(result.scalars().all())

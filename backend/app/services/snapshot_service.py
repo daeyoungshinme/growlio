@@ -72,7 +72,7 @@ async def get_latest_snapshot_with_positions(
         pos_result = await db.execute(
             select(Position).where(
                 Position.account_id == account_id,
-                Position.snapshot_id == None,  # noqa: E711
+                Position.snapshot_id.is_(None),
             )
         )
     return latest_snap, list(pos_result.scalars().all())

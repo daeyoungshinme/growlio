@@ -128,16 +128,14 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         existing_positions = await db.execute(
             select(Position.ticker, Position.market).where(
                 Position.account_id == account.id,
-                Position.snapshot_id == None,  # noqa: E711
+                Position.snapshot_id.is_(None),
             )
         )
         old_tickers = {(row.ticker, row.market) for row in existing_positions.all()}
         new_tickers = {(p.ticker, p.market) for p in balance.positions}
         positions_changed = old_tickers != new_tickers
 
-        await db.execute(
-            sql_delete(Position).where(Position.account_id == account.id, Position.snapshot_id == None)  # noqa: E711
-        )
+        await db.execute(sql_delete(Position).where(Position.account_id == account.id, Position.snapshot_id.is_(None)))
         for p in balance.positions:
             db.add(
                 Position(

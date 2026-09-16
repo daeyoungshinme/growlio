@@ -121,7 +121,7 @@ async def save_positions(
         await db.execute(
             sql_delete(Position).where(
                 Position.account_id == account.id,
-                Position.snapshot_id == None,  # noqa: E711
+                Position.snapshot_id.is_(None),
             )
         )
         for p in positions:

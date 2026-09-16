@@ -280,7 +280,7 @@ async def _get_any_kis_account(user_id: uuid.UUID, db: AsyncSession) -> AssetAcc
     return await db.scalar(
         active_accounts_stmt(user_id).where(
             AssetAccount.data_source == "KIS_API",
-            AssetAccount.kis_app_key != None,  # noqa: E711
+            AssetAccount.kis_app_key.is_not(None),
         )
     )
 

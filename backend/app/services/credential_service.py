@@ -81,7 +81,7 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
     account = await db.scalar(
         active_accounts_stmt(user_id).where(
             AssetAccount.data_source == "KIS_API",
-            AssetAccount.kis_app_key != None,  # noqa: E711
+            AssetAccount.kis_app_key.is_not(None),
         )
     )
     if not account:
