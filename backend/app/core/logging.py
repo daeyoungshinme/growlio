@@ -75,4 +75,7 @@ def configure_logging() -> None:
         return
     processors = list(structlog.get_config()["processors"])
     processors.insert(-1, _redact_processor)
+    console_renderer = processors[-1]
+    if isinstance(console_renderer, structlog.dev.ConsoleRenderer):
+        console_renderer.exception_formatter = structlog.dev.plain_traceback
     structlog.configure(processors=processors)
