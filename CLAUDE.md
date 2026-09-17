@@ -122,6 +122,7 @@ growlio/
 
 - `make up` 후 DB 연결 실패: PostgreSQL 준비 대기 필요 — `docker compose logs db` 로 상태 확인 후 재시도
 - `EMAXCONNSESSION`/`max clients reached` 오류: `backend/.env`의 `DATABASE_URL`이 로컬 Docker Postgres가 아니라 Supabase 풀러를 직접 가리키는 구성일 수 있음(개발자별로 다를 수 있으니 먼저 `.env` 확인) — 이 경우 Session Pooler(5432) 대신 Transaction Pooler(6543) 사용 권장, 상세는 `backend/CLAUDE.md` Environment 섹션 참고
+- `make migrate`가 Supabase(nestlio와 `public` 스키마 공유) DB에서 버전 충돌/실패: growlio는 alembic 버전 포인터를 기본 `alembic_version`이 아닌 `growlio_alembic_version`에 저장함(`backend/alembic/env.py`의 `VERSION_TABLE`). 전환 이전부터 있던 기존 DB라면 `alembic upgrade head` 전에 `python backend/scripts/bootstrap_alembic.py` 1회 실행 필요(멱등, 신규 DB는 무동작) — `render.yaml`의 `preDeployCommand`도 이 순서. 상세는 `backend/CLAUDE.md` 참고
 - `dev.sh`는 기본적으로 8000/5173 포트를 점유한 이전(좀비) 프로세스를 강제 종료 후 재기동함. 다른 세션에서 의도적으로 띄워둔 백엔드까지 종료되는 게 문제라면 `bash dev.sh --keep-port`(또는 `make dev-keep-port`) 사용 — 8000이 사용 중이면 종료하지 않고 다음 빈 포트로 대신 구동, 프론트엔드 Vite 프록시도 자동으로 그 포트를 따라감
 - alembic revision 생성 후 반드시 `alembic/env.py`에 새 모델 import 추가 (누락 시 autogenerate에서 모델 인식 못함)
 - pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인
