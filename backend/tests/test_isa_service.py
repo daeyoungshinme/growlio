@@ -30,8 +30,8 @@ def _dividend_rows_result(rows: list) -> MagicMock:
     return result
 
 
-def _position(qty: float, avg_price: float, current_price: float | None) -> SimpleNamespace:
-    return SimpleNamespace(qty=qty, avg_price=avg_price, current_price=current_price)
+def _position(qty: float, avg_price: float, current_price: float | None, market: str | None = None) -> SimpleNamespace:
+    return SimpleNamespace(qty=qty, avg_price=avg_price, current_price=current_price, market=market)
 
 
 def _snapshot(account_id: uuid.UUID, positions: list) -> SimpleNamespace:
@@ -234,3 +234,152 @@ class TestGetIsaStatusSummary:
         assert status["tax_free_limit_krw"] == 4_000_000
         assert status["taxable_excess_krw"] == 0.0
         assert status["estimated_tax_krw"] == 0.0
+
+    @pytest.mark.asyncio
+    async def test_dividend_heavy_pnl_computes_saved_tax(self, mock_db, make_account, make_user_id, override_settings):
+        account_id = uuid.uuid4()
+        account = make_account(
+            account_id=account_id,
+            user_id=make_user_id,
+            tax_type="ISA",
+            isa_type="GENERAL",
+            isa_open_date=None,
+            isa_manual_cumulative_pnl_krw=None,
+        )
+        # 배당소득 3,000,000 → 한도 200만원 초과 100만원 → ISA세금 99,000
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _accounts_result([account]),
+                _snapshots_result([]),
+                _dividend_rows_result([(account_id, 3_000_000.0)]),
+            ]
+        )
+
+        result = await get_isa_status_summary(make_user_id, mock_db)
+
+        status = result["accounts"][0]
+        assert status["tax_calculation_basis"] == "AUTO_SPLIT"
+        # 일반계좌였다면 배당소득세 15.4% = 462,000
+        assert status["general_account_tax_krw"] == pytest.approx(462_000.0)
+        assert status["tax_saved_krw"] == pytest.approx(363_000.0)
+
+    @pytest.mark.asyncio
+    async def test_overseas_gain_applies_22pct_with_deduction(
+        self, mock_db, make_account, make_user_id, override_settings
+    ):
+        account_id = uuid.uuid4()
+        account = make_account(
+            account_id=account_id,
+            user_id=make_user_id,
+            tax_type="ISA",
+            isa_type="GENERAL",
+            isa_open_date=None,
+            isa_manual_cumulative_pnl_krw=None,
+        )
+        # 해외주식 평가익: (20,000-10,000)*1,000 = 10,000,000
+        snap = _snapshot(account_id, [_position(qty=1_000, avg_price=10_000, current_price=20_000, market="NASDAQ")])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _accounts_result([account]),
+                _snapshots_result([snap]),
+                _dividend_rows_result([]),
+            ]
+        )
+
+        result = await get_isa_status_summary(make_user_id, mock_db)
+
+        status = result["accounts"][0]
+        assert status["estimated_cumulative_pnl_krw"] == pytest.approx(10_000_000.0)
+        # ISA: (10,000,000-2,000,000)*9.9% = 792,000
+        assert status["estimated_tax_krw"] == pytest.approx(792_000.0)
+        # 일반계좌 해외양도세: (10,000,000-2,500,000)*22% = 1,650,000
+        assert status["general_account_tax_krw"] == pytest.approx(1_650_000.0)
+        assert status["tax_saved_krw"] == pytest.approx(858_000.0)
+
+    @pytest.mark.asyncio
+    async def test_domestic_gain_has_no_general_tax_contribution(
+        self, mock_db, make_account, make_user_id, override_settings
+    ):
+        account_id = uuid.uuid4()
+        account = make_account(
+            account_id=account_id,
+            user_id=make_user_id,
+            tax_type="ISA",
+            isa_type="GENERAL",
+            isa_open_date=None,
+            isa_manual_cumulative_pnl_krw=None,
+        )
+        # 국내주식 평가익: (50,000-10,000)*100 = 4,000,000 (일반계좌라도 비과세)
+        snap = _snapshot(account_id, [_position(qty=100, avg_price=10_000, current_price=50_000, market="KOSPI")])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _accounts_result([account]),
+                _snapshots_result([snap]),
+                _dividend_rows_result([]),
+            ]
+        )
+
+        result = await get_isa_status_summary(make_user_id, mock_db)
+
+        status = result["accounts"][0]
+        # ISA 저율과세는 부과되지만(한도 초과 200만원 * 9.9% = 198,000), 일반계좌 대비 세금은 0원이므로 절세액도 0
+        assert status["estimated_tax_krw"] == pytest.approx(198_000.0)
+        assert status["general_account_tax_krw"] == pytest.approx(0.0)
+        assert status["tax_saved_krw"] == pytest.approx(0.0)
+
+    @pytest.mark.asyncio
+    async def test_manual_override_uses_simple_approx_fallback(
+        self, mock_db, make_account, make_user_id, override_settings
+    ):
+        account_id = uuid.uuid4()
+        account = make_account(
+            account_id=account_id,
+            user_id=make_user_id,
+            tax_type="ISA",
+            isa_type="GENERAL",
+            isa_open_date=None,
+            isa_manual_cumulative_pnl_krw=3_000_000.0,
+        )
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _accounts_result([account]),
+                _snapshots_result([]),
+                _dividend_rows_result([]),
+            ]
+        )
+
+        result = await get_isa_status_summary(make_user_id, mock_db)
+
+        status = result["accounts"][0]
+        assert status["tax_calculation_basis"] == "MANUAL_OVERRIDE_APPROX"
+        # 수기입력 3,000,000 전체를 배당소득으로 가정 → 15.4% = 462,000
+        assert status["general_account_tax_krw"] == pytest.approx(462_000.0)
+        assert status["tax_saved_krw"] == pytest.approx(363_000.0)
+
+    @pytest.mark.asyncio
+    async def test_negative_pnl_has_zero_tax_and_saved(self, mock_db, make_account, make_user_id, override_settings):
+        account_id = uuid.uuid4()
+        account = make_account(
+            account_id=account_id,
+            user_id=make_user_id,
+            tax_type="ISA",
+            isa_type="GENERAL",
+            isa_open_date=None,
+            isa_manual_cumulative_pnl_krw=None,
+        )
+        # 국내주식 평가손: (5,000-10,000)*100 = -500,000
+        snap = _snapshot(account_id, [_position(qty=100, avg_price=10_000, current_price=5_000, market="KOSPI")])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _accounts_result([account]),
+                _snapshots_result([snap]),
+                _dividend_rows_result([]),
+            ]
+        )
+
+        result = await get_isa_status_summary(make_user_id, mock_db)
+
+        status = result["accounts"][0]
+        assert status["estimated_tax_krw"] == 0.0
+        assert status["general_account_tax_krw"] == 0.0
+        assert status["tax_saved_krw"] == 0.0

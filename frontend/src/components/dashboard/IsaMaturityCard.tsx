@@ -83,6 +83,16 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
           (9.9%)
         </p>
       )}
+      {status.tax_saved_krw > 0 && (
+        <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+          {status.is_mature
+            ? `의무가입 충족 · 지금 인출 시 일반계좌 대비 약 ${fmtKrw(status.tax_saved_krw)} 절세`
+            : `현재까지 누적 기준 일반계좌 대비 약 ${fmtKrw(status.tax_saved_krw)} 절세 예상`}
+          {status.tax_calculation_basis === "MANUAL_OVERRIDE_APPROX" && (
+            <span className="text-gray-400 dark:text-gray-500"> (직접입력 기준 근사치)</span>
+          )}
+        </p>
+      )}
       <div className="mt-1.5">
         {editing ? (
           <div>
