@@ -34,6 +34,9 @@ function makeStatus(overrides: Partial<IsaAccountStatus> = {}): IsaAccountStatus
     tax_free_limit_krw: 2_000_000,
     taxable_excess_krw: 1_000_000,
     estimated_tax_krw: 99_000,
+    general_account_tax_krw: 462_000,
+    tax_saved_krw: 363_000,
+    tax_calculation_basis: "AUTO_SPLIT",
     ...overrides,
   };
 }
@@ -84,6 +87,32 @@ describe("IsaMaturityCard", () => {
     fetchIsaStatus.mockResolvedValue(makeSummary([makeStatus({ is_manual_override: true })]));
     renderWithProviders(<IsaMaturityCard />);
     await waitFor(() => expect(screen.getByText("자동 추정으로 되돌리기")).toBeInTheDocument());
+  });
+
+  it("의무가입 충족 시 절세액을 강조 문구로 표시한다", async () => {
+    fetchIsaStatus.mockResolvedValue(makeSummary([makeStatus()]));
+    renderWithProviders(<IsaMaturityCard />);
+    await waitFor(() => expect(screen.getByText(/지금 인출 시 일반계좌 대비/)).toBeInTheDocument());
+  });
+
+  it("만기 전에는 절세액을 잠정치 문구로 표시한다", async () => {
+    fetchIsaStatus.mockResolvedValue(
+      makeSummary([makeStatus({ is_mature: false, days_remaining: 30 })]),
+    );
+    renderWithProviders(<IsaMaturityCard />);
+    await waitFor(() =>
+      expect(screen.getByText(/현재까지 누적 기준 일반계좌 대비/)).toBeInTheDocument(),
+    );
+  });
+
+  it("수기입력 기준 절세액은 근사치 안내를 함께 표시한다", async () => {
+    fetchIsaStatus.mockResolvedValue(
+      makeSummary([
+        makeStatus({ is_manual_override: true, tax_calculation_basis: "MANUAL_OVERRIDE_APPROX" }),
+      ]),
+    );
+    renderWithProviders(<IsaMaturityCard />);
+    await waitFor(() => expect(screen.getByText(/직접입력 기준 근사치/)).toBeInTheDocument());
   });
 
   it("카드 헤더/보더 없이 내용만 렌더한다 (TaxLimitsSection 임베드 전용)", async () => {

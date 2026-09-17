@@ -103,6 +103,9 @@ export interface IsaAccountStatus {
   tax_free_limit_krw: number;
   taxable_excess_krw: number;
   estimated_tax_krw: number;
+  general_account_tax_krw: number;
+  tax_saved_krw: number;
+  tax_calculation_basis: "AUTO_SPLIT" | "MANUAL_OVERRIDE_APPROX";
 }
 
 export interface IsaStatusSummary {
