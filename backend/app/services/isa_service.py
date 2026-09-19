@@ -45,6 +45,7 @@ class IsaAccountStatus(TypedDict):
     needs_open_date: bool
     estimated_cumulative_pnl_krw: float
     is_manual_override: bool
+    isa_baseline_captured_at: str | None
     tax_free_limit_krw: int
     taxable_excess_krw: float
     estimated_tax_krw: float
@@ -76,8 +77,16 @@ async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[s
         dividend = dividend_by_account.get(acc.id, 0.0)
         auto_pnl = unrealized["domestic"] + unrealized["overseas"] + dividend
         manual_pnl = acc.isa_manual_cumulative_pnl_krw
+        baseline_auto_pnl = acc.isa_baseline_auto_pnl_krw
         is_override = manual_pnl is not None
-        effective_pnl = float(manual_pnl) if manual_pnl is not None else auto_pnl
+        if manual_pnl is None:
+            effective_pnl = auto_pnl
+        elif baseline_auto_pnl is not None:
+            # baseline 저장 시점 이후의 auto_pnl 변화분(가격변동·신규배당)을 기준값에 더한다
+            effective_pnl = float(manual_pnl) + (auto_pnl - float(baseline_auto_pnl))
+        else:
+            # 레거시 계좌: baseline 스냅샷이 없어 델타를 계산할 수 없으므로 완전 대체 유지
+            effective_pnl = float(manual_pnl)
 
         maturity_date: date | None = None
         is_mature = False
@@ -117,6 +126,9 @@ async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[s
                 "needs_open_date": acc.isa_open_date is None,
                 "estimated_cumulative_pnl_krw": round(effective_pnl, 0),
                 "is_manual_override": is_override,
+                "isa_baseline_captured_at": (
+                    acc.isa_baseline_captured_at.isoformat() if acc.isa_baseline_captured_at else None
+                ),
                 "tax_free_limit_krw": limit,
                 "taxable_excess_krw": round(excess, 0),
                 "estimated_tax_krw": round(estimated_tax, 0),
@@ -127,6 +139,17 @@ async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[s
         )
 
     return {"accounts": statuses, "note": _ISA_STATUS_NOTE}
+
+
+async def calc_account_auto_pnl(user_id: uuid.UUID, account_id: uuid.UUID, db: AsyncSession) -> float:
+    """계좌 1개의 자동 추정 누적손익(국내+해외 미실현손익+배당)을 계산한다.
+
+    ISA 누적손익 수기 입력(baseline) 저장 시점의 스냅샷을 캡처하는 데 쓰인다.
+    """
+    unrealized = await _calc_unrealized_by_account_and_market([account_id], db)
+    dividend = await _calc_dividend_total_by_account(user_id, [account_id], db)
+    u = unrealized.get(account_id, {"domestic": 0.0, "overseas": 0.0})
+    return u["domestic"] + u["overseas"] + dividend.get(account_id, 0.0)
 
 
 async def _calc_unrealized_by_account_and_market(

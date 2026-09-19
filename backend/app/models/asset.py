@@ -51,8 +51,13 @@ class AssetAccount(Base):
     isa_open_date: Mapped[date | None] = mapped_column(Date)
     # GENERAL | PREFERENTIAL — ISA 비과세 한도 구분(일반형 200만원 / 서민형·농어민형 400만원)
     isa_type: Mapped[str | None] = mapped_column(String(20))
-    # 사용자가 직접 입력한 ISA 계좌 누적 손익(원) — 값이 있으면 자동 추정치보다 우선 사용
+    # 사용자가 입력한 ISA 계좌 누적 손익 기준선(원) — 값이 있으면 isa_baseline_auto_pnl_krw와의
+    # 델타를 자동 추정치에 더해 사용(isa_baseline_auto_pnl_krw가 없는 레거시 계좌는 완전 대체로 폴백)
     isa_manual_cumulative_pnl_krw: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    # isa_manual_cumulative_pnl_krw 저장 시점의 시스템 auto_pnl 스냅샷 — 델타 계산 기준점
+    isa_baseline_auto_pnl_krw: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    # isa_manual_cumulative_pnl_krw 저장 날짜 (UI 표시용)
+    isa_baseline_captured_at: Mapped[date | None] = mapped_column(Date)
 
     # KIS 계좌 (STOCK_KIS)
     kis_account_no: Mapped[str | None] = mapped_column(String(20))

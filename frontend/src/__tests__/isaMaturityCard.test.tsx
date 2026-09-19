@@ -31,6 +31,7 @@ function makeStatus(overrides: Partial<IsaAccountStatus> = {}): IsaAccountStatus
     needs_open_date: false,
     estimated_cumulative_pnl_krw: 3_000_000,
     is_manual_override: false,
+    isa_baseline_captured_at: null,
     tax_free_limit_krw: 2_000_000,
     taxable_excess_krw: 1_000_000,
     estimated_tax_krw: 99_000,
@@ -75,9 +76,10 @@ describe("IsaMaturityCard", () => {
     await waitFor(() => expect(screen.getByText("직접 입력")).toBeInTheDocument());
 
     fireEvent.click(screen.getByText("직접 입력"));
-    const input = screen.getByPlaceholderText("누적손익(원)");
+    const input = screen.getByPlaceholderText("오늘 기준 누적손익(원)");
     fireEvent.change(input, { target: { value: "5000000" } });
     expect(screen.getByText("5,000,000원 (500만원)")).toBeInTheDocument();
+    expect(screen.getByText(/이후 가격변동·배당은 자동으로 반영됩니다/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("저장"));
 
     await waitFor(() => expect(updateIsaPnlOverride).toHaveBeenCalledWith("acc1", 5_000_000));
@@ -87,6 +89,16 @@ describe("IsaMaturityCard", () => {
     fetchIsaStatus.mockResolvedValue(makeSummary([makeStatus({ is_manual_override: true })]));
     renderWithProviders(<IsaMaturityCard />);
     await waitFor(() => expect(screen.getByText("자동 추정으로 되돌리기")).toBeInTheDocument());
+  });
+
+  it("수동 입력 기준일이 있으면 기준일 뱃지를 표시한다", async () => {
+    fetchIsaStatus.mockResolvedValue(
+      makeSummary([
+        makeStatus({ is_manual_override: true, isa_baseline_captured_at: "2026-09-18" }),
+      ]),
+    );
+    renderWithProviders(<IsaMaturityCard />);
+    await waitFor(() => expect(screen.getByText("기준일 9/18")).toBeInTheDocument());
   });
 
   it("의무가입 충족 시 절세액을 강조 문구로 표시한다", async () => {

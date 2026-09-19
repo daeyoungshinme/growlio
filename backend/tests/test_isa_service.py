@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.isa_service import get_isa_status_summary
+from app.services.isa_service import calc_account_auto_pnl, get_isa_status_summary
 
 
 def _accounts_result(accounts: list) -> MagicMock:
@@ -182,6 +182,63 @@ class TestGetIsaStatusSummary:
         status = result["accounts"][0]
         assert status["estimated_cumulative_pnl_krw"] == pytest.approx(3_000_000.0)
         assert status["is_manual_override"] is True
+
+    @pytest.mark.asyncio
+    async def test_baseline_delta_added_to_manual_pnl(self, mock_db, make_account, make_user_id, override_settings):
+        account_id = uuid.uuid4()
+        account = make_account(
+            account_id=account_id,
+            user_id=make_user_id,
+            tax_type="ISA",
+            isa_type="GENERAL",
+            isa_open_date=None,
+            isa_manual_cumulative_pnl_krw=1_000_000.0,
+            isa_baseline_auto_pnl_krw=200_000.0,
+        )
+        # 현재 auto_pnl = 미실현손익 20,000 + 배당 330,000 = 350,000 (baseline 200,000 대비 +150,000)
+        snap = _snapshot(account_id, [_position(qty=10, avg_price=10_000, current_price=12_000)])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _accounts_result([account]),
+                _snapshots_result([snap]),
+                _dividend_rows_result([(account_id, 330_000.0)]),
+            ]
+        )
+
+        result = await get_isa_status_summary(make_user_id, mock_db)
+
+        status = result["accounts"][0]
+        assert status["estimated_cumulative_pnl_krw"] == pytest.approx(1_150_000.0)
+        assert status["is_manual_override"] is True
+
+    @pytest.mark.asyncio
+    async def test_legacy_manual_override_without_baseline_falls_back_to_full_replace(
+        self, mock_db, make_account, make_user_id, override_settings
+    ):
+        account_id = uuid.uuid4()
+        account = make_account(
+            account_id=account_id,
+            user_id=make_user_id,
+            tax_type="ISA",
+            isa_type="GENERAL",
+            isa_open_date=None,
+            isa_manual_cumulative_pnl_krw=3_000_000.0,
+            isa_baseline_auto_pnl_krw=None,
+        )
+        # auto_pnl_now(20,000)이 존재하지만 baseline 스냅샷이 없으므로 델타는 무시하고 완전 대체 유지
+        snap = _snapshot(account_id, [_position(qty=10, avg_price=10_000, current_price=12_000)])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _accounts_result([account]),
+                _snapshots_result([snap]),
+                _dividend_rows_result([]),
+            ]
+        )
+
+        result = await get_isa_status_summary(make_user_id, mock_db)
+
+        status = result["accounts"][0]
+        assert status["estimated_cumulative_pnl_krw"] == pytest.approx(3_000_000.0)
 
     @pytest.mark.asyncio
     async def test_general_limit_excess_taxed_at_9_9_pct(self, mock_db, make_account, make_user_id, override_settings):
@@ -383,3 +440,35 @@ class TestGetIsaStatusSummary:
         assert status["estimated_tax_krw"] == 0.0
         assert status["general_account_tax_krw"] == 0.0
         assert status["tax_saved_krw"] == 0.0
+
+
+class TestCalcAccountAutoPnl:
+    @pytest.mark.asyncio
+    async def test_combines_unrealized_and_dividend_for_single_account(self, mock_db, make_user_id):
+        account_id = uuid.uuid4()
+        # 미실현손익: (12000-10000)*10 = 20,000
+        snap = _snapshot(account_id, [_position(qty=10, avg_price=10_000, current_price=12_000)])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _snapshots_result([snap]),
+                _dividend_rows_result([(account_id, 30_000.0)]),
+            ]
+        )
+
+        result = await calc_account_auto_pnl(make_user_id, account_id, mock_db)
+
+        assert result == pytest.approx(50_000.0)
+
+    @pytest.mark.asyncio
+    async def test_zero_when_no_snapshot_or_dividend(self, mock_db, make_user_id):
+        account_id = uuid.uuid4()
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _snapshots_result([]),
+                _dividend_rows_result([]),
+            ]
+        )
+
+        result = await calc_account_auto_pnl(make_user_id, account_id, mock_db)
+
+        assert result == pytest.approx(0.0)

@@ -45,6 +45,7 @@ from app.services.asset_service import (
     sync_account_now as _sync_account_now,
 )
 from app.services.credential_service import encrypt, encrypt_if_present
+from app.services.isa_service import calc_account_auto_pnl
 from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot_with_positions, sync_snapshot_positions
 from app.services.sync_all_service import get_sync_all_status, is_sync_all_running, run_sync_all
 from app.utils.cache_keys import (
@@ -513,11 +514,21 @@ async def update_isa_pnl_override(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """ISA 계좌의 누적 손익 수동 입력을 설정하거나(값 전송) 해제한다(null 전송, 자동 추정치로 복귀)."""
+    """ISA 계좌의 누적 손익 기준선을 설정하거나(값 전송) 해제한다(null 전송, 자동 추정치로 복귀).
+
+    값 설정 시 그 순간의 시스템 자동 추정치(auto_pnl)를 함께 캡처해두고, 이후 조회 시점의
+    auto_pnl과의 차이(가격변동·신규배당)를 기준값에 더해 계속 자동으로 갱신한다.
+    """
     account = await _get_owned_account(account_id, current_user.id, db)
     if account.tax_type != "ISA":
         raise HTTPException(status_code=400, detail="ISA 계좌에만 손익 수동 입력을 설정할 수 있습니다.")
     account.isa_manual_cumulative_pnl_krw = body.cumulative_pnl_krw
+    if body.cumulative_pnl_krw is not None:
+        account.isa_baseline_auto_pnl_krw = await calc_account_auto_pnl(current_user.id, account.id, db)
+        account.isa_baseline_captured_at = date.today()
+    else:
+        account.isa_baseline_auto_pnl_krw = None
+        account.isa_baseline_captured_at = None
     await db.commit()
     await db.refresh(account)
     cache = await get_cache_store()

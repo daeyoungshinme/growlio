@@ -100,6 +100,7 @@ export interface IsaAccountStatus {
   needs_open_date: boolean;
   estimated_cumulative_pnl_krw: number;
   is_manual_override: boolean;
+  isa_baseline_captured_at: string | null;
   tax_free_limit_krw: number;
   taxable_excess_krw: number;
   estimated_tax_krw: number;

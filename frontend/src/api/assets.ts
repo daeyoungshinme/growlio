@@ -39,6 +39,7 @@ export interface AssetAccount {
   isa_open_date?: string | null;
   isa_type?: IsaType | null;
   isa_manual_cumulative_pnl_krw?: number | null;
+  isa_baseline_captured_at?: string | null;
   last_synced_at?: string | null;
   last_sync_error?: string | null;
 }

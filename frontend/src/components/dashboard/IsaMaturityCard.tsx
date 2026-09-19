@@ -12,6 +12,11 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
+function fmtMonthDay(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 function MaturityBadge({ status }: { status: IsaAccountStatus }) {
   if (status.needs_open_date) {
     return (
@@ -103,7 +108,7 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
                 className={`${INPUT_SM} w-32`}
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder="누적손익(원)"
+                placeholder="오늘 기준 누적손익(원)"
               />
               <button
                 onClick={() => mutation.mutate(Number(value) || 0)}
@@ -124,9 +129,12 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
                 {fmtKrwPreview(Number(value))}
               </p>
             )}
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              입력한 금액을 오늘 기준으로 저장하고, 이후 가격변동·배당은 자동으로 반영됩니다.
+            </p>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={() => setEditing(true)}
               className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-blue-600 dark:text-blue-400 hover:underline`}
@@ -141,6 +149,11 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
               >
                 자동 추정으로 되돌리기
               </button>
+            )}
+            {status.is_manual_override && status.isa_baseline_captured_at && (
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                기준일 {fmtMonthDay(status.isa_baseline_captured_at)}
+              </span>
             )}
           </div>
         )}
