@@ -623,11 +623,34 @@ class TestUpdateIsaPnlOverride:
         assert resp.status_code == 200
         assert account.isa_manual_cumulative_pnl_krw == 2_500_000
 
+    def test_sets_override_captures_baseline_auto_pnl(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id)
+        account.tax_type = "ISA"
+        account.isa_manual_cumulative_pnl_krw = None
+        account.isa_baseline_auto_pnl_krw = None
+        account.isa_baseline_captured_at = None
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.patch(
+                f"/api/v1/assets/{account.id}/isa-pnl-override",
+                json={"cumulative_pnl_krw": 2_500_000},
+            )
+        assert resp.status_code == 200
+        # 빈 DB 결과(mock)이므로 auto_pnl은 0.0으로 캡처되지만, 필드 자체는 채워져야 함
+        assert account.isa_baseline_auto_pnl_krw == 0.0
+        assert account.isa_baseline_captured_at == date.today()
+
     def test_clears_override_with_null(self, override_settings):
         user = _make_user()
         account = _make_account(user.id)
         account.tax_type = "ISA"
         account.isa_manual_cumulative_pnl_krw = 2_500_000.0
+        account.isa_baseline_auto_pnl_krw = 100_000.0
+        account.isa_baseline_captured_at = date.today()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
@@ -639,6 +662,8 @@ class TestUpdateIsaPnlOverride:
             )
         assert resp.status_code == 200
         assert account.isa_manual_cumulative_pnl_krw is None
+        assert account.isa_baseline_auto_pnl_krw is None
+        assert account.isa_baseline_captured_at is None
         assert account.kiwoom_app_secret is None
 
 

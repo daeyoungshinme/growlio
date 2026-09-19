@@ -152,6 +152,8 @@ def make_account(make_user_id):
         real_estate_details=None,
         tax_type="GENERAL",
         investment_horizon=None,
+        isa_baseline_auto_pnl_krw=None,
+        isa_baseline_captured_at=None,
         **kwargs,
     ) -> SimpleNamespace:
         return SimpleNamespace(
@@ -167,6 +169,8 @@ def make_account(make_user_id):
             sort_order=sort_order,
             tax_type=tax_type,
             investment_horizon=investment_horizon,
+            isa_baseline_auto_pnl_krw=isa_baseline_auto_pnl_krw,
+            isa_baseline_captured_at=isa_baseline_captured_at,
             kis_account_no=kis_account_no,
             kis_app_key=kis_app_key,
             kis_app_secret=kis_app_secret,
