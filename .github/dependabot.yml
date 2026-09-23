@@ -39,6 +39,13 @@ updates:
       - dependency-name: "firebase-admin"
         update-types:
           - "version-update:semver-major"
+      # pandas major: pykrx(<2.0)가 "pandas<3.0"을 요구 → pandas 3.x로 올리면 uv가
+      # pykrx를 1.2.8→1.0.51로 강제 다운그레이드하는데, 이 구버전이 pkg_resources(setuptools)
+      # 의존 코드를 갖고 있어 CI가 ModuleNotFoundError로 깨짐(PR #81). pykrx 쪽 pandas 3
+      # 지원이 먼저 필요 — 건별 검토 전까지 보류.
+      - dependency-name: "pandas"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "npm"
     directory: "/frontend"
