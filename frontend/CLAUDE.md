@@ -409,6 +409,10 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 보조/상세 카드(`InvestmentSnapshotCard`, `RebalancingStatusCard`, `TaxLimitsSection` 등)는 `useCollapsible`로 접기 가능하게 하되, 최초 방문 시 기본값은 **열림**(`true`)으로 시작 — 사용자가 직접 접으면 그 상태가 `localStorage`로 유지된다.
 - 단, 이미 펼쳐진 부모 카드 내부의 2차 상세 토글(`InflationSummaryCard`, `RebalancingDetailMetrics`, `RebalancingDiagnosisCard` 등 영속화 키 없는 세션 한정 토글)은 이 규칙 대상이 아님 — "최상위 카드"에만 적용되는 규칙이므로 중첩된 하위 토글까지 강제로 펼칠 필요는 없다.
 - 새 카드 추가 시 이 규칙을 따를 것.
+- 예외: `RebalancingPage.tsx`의 백테스트 카드는 이 규칙보다 상위 단계로, **진입점 자체가
+  기본 숨김**이다(`growlio:settings:show-backtest`, 기본 `false`) — `SettingsPage.tsx`
+  "앱 설정"의 "백테스트 기능 표시" 토글을 켜야만 "포트폴리오" 탭에 카드가 나타나고, 나타난
+  뒤에도 별도 키(`growlio:rebalancing:backtest-section-open`)로 펼침/접힘이 관리된다.
 
 **마켓 유틸리티 (`src/constants/markets.ts`)**
 - `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.

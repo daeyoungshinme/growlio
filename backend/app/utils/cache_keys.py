@@ -24,6 +24,7 @@ def _env_prefix() -> str:
 TTL_PRICE_CURRENT = 900  # 현재가 15분
 TTL_MONTHLY_TREND = 300  # 월별 추이 5분
 TTL_DASHBOARD_SUMMARY = 900  # 대시보드 전체 응답 15분 (sync 후 수동 무효화가 primary)
+TTL_DCA_ANALYSIS = 900  # DCA 분석 응답 15분 (대시보드와 동일 무효화 트리거 공유)
 TTL_PRICE_RETURN = 86400  # 기간 수익률 1일
 TTL_BACKTEST = 86400  # 백테스트 결과 1일
 TTL_ALLOC_HISTORY = 86400  # 포트폴리오 배분 이력 1일
@@ -118,6 +119,10 @@ def dashboard_summary_key(user_id: uuid.UUID) -> str:
 
 def monthly_trend_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}monthly_trend:{user_id}"
+
+
+def dca_analysis_key(user_id: uuid.UUID) -> str:
+    return f"{_env_prefix()}dca_analysis:{user_id}"
 
 
 def challenge_progress_key(user_id: uuid.UUID) -> str:
@@ -478,6 +483,7 @@ async def invalidate_asset_account_caches(
     _year = year if year is not None else _date.today().year
     keys = [
         dashboard_summary_key(user_id),
+        dca_analysis_key(user_id),
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
         goal_recommendation_age_key(user_id),
@@ -507,6 +513,7 @@ async def invalidate_account_caches(
         cache,
         monthly_trend_key(user_id),
         dashboard_summary_key(user_id),
+        dca_analysis_key(user_id),
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
         goal_recommendation_age_key(user_id),

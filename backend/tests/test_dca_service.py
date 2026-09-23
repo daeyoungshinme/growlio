@@ -18,6 +18,7 @@ from app.services.dca_service import (
     _month_key,
     get_dca_analysis,
 )
+from app.utils.cache_keys import dca_analysis_key
 
 # ── _elapsed_months ──────────────────────────────────────────
 
@@ -553,3 +554,66 @@ class TestGetDcaAnalysisConfigured:
 
         assert result["is_configured"] is True
         assert result["goal_timeline"]["current_progress_pct"] == 50.0
+
+
+# ── 응답 캐시 (모바일 대시보드 로딩마다 재계산되던 문제 수정) ────────
+
+
+class TestGetDcaAnalysisCache:
+    @pytest.mark.asyncio
+    async def test_cache_hit_skips_db_query(self, mock_db, override_settings):
+        """캐시 히트 시 settings 조회조차 하지 않아야 한다."""
+        user_id = uuid.uuid4()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value='{"is_configured": false, "cached": true}')
+        mock_db.scalar = AsyncMock(side_effect=AssertionError("캐시 히트 시 DB를 조회하면 안 됨"))
+
+        result = await get_dca_analysis(user_id, mock_db, cache)
+
+        assert result == {"is_configured": False, "cached": True}
+        mock_db.scalar.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cache_miss_writes_result_for_not_configured(self, mock_db, override_settings):
+        """미설정 상태 결과도 캐시에 저장돼야 한다."""
+        user_id = uuid.uuid4()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        with patch("app.services.dca_service.set_cached_json", AsyncMock()) as mock_set:
+            result = await get_dca_analysis(user_id, mock_db, cache)
+
+        assert result["is_configured"] is False
+        mock_set.assert_awaited_once()
+        assert mock_set.call_args.args[1] == dca_analysis_key(user_id)
+
+    @pytest.mark.asyncio
+    async def test_cache_miss_writes_result_for_configured(self, mock_db, override_settings):
+        """설정된 목표의 분석 결과도 캐시에 저장돼야 한다."""
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        user_id = uuid.uuid4()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+
+        settings_obj = SimpleNamespace(
+            monthly_deposit_amount=1_000_000,
+            goal_annual_return_pct=7.0,
+            goal_amount=50_000_000.0,
+            goal_start_date=datetime(2020, 1, 1),
+            goal_initial_amount=None,
+        )
+        mock_db.scalar = AsyncMock(return_value=settings_obj)
+        execute_result = MagicMock()
+        execute_result.first.return_value = None
+        execute_result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with patch("app.services.dca_service.set_cached_json", AsyncMock()) as mock_set:
+            result = await get_dca_analysis(user_id, mock_db, cache)
+
+        assert result["is_configured"] is True
+        mock_set.assert_awaited_once()
+        assert mock_set.call_args.args[1] == dca_analysis_key(user_id)

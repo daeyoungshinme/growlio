@@ -99,6 +99,7 @@ export default function RebalancingPage() {
     false,
     "growlio:rebalancing:backtest-section-open",
   );
+  const [showBacktest] = useCollapsible(false, "growlio:settings:show-backtest");
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, REBALANCING_PAGE_TABS, localTab, handleTabChange);
@@ -257,19 +258,21 @@ export default function RebalancingPage() {
                 </Suspense>
               </div>
             )}
-            <ErrorBoundary variant="section">
-              <CollapsibleCard
-                icon={ChartLine}
-                title="백테스트"
-                isOpen={isBacktestOpen}
-                onToggle={toggleBacktestOpen}
-                collapsedHint="과거 데이터로 포트폴리오 성과를 시뮬레이션해볼 수 있어요"
-              >
-                <Suspense fallback={<SkeletonCard />}>
-                  <BacktestTab />
-                </Suspense>
-              </CollapsibleCard>
-            </ErrorBoundary>
+            {showBacktest && (
+              <ErrorBoundary variant="section">
+                <CollapsibleCard
+                  icon={ChartLine}
+                  title="백테스트"
+                  isOpen={isBacktestOpen}
+                  onToggle={toggleBacktestOpen}
+                  collapsedHint="과거 데이터로 포트폴리오 성과를 시뮬레이션해볼 수 있어요"
+                >
+                  <Suspense fallback={<SkeletonCard />}>
+                    <BacktestTab />
+                  </Suspense>
+                </CollapsibleCard>
+              </ErrorBoundary>
+            )}
           </>
         )}
 
