@@ -21,6 +21,7 @@ from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
 from app.utils.cache_keys import (
     challenge_progress_key,
     dashboard_summary_key,
+    dca_analysis_key,
     invalidate_goal_recommendation_caches,
     invalidate_user_caches,
 )
@@ -341,7 +342,12 @@ async def update_goal(
         row.age_group = age_group_from_birth_year(req.birth_year).value
     await db.commit()
     cache = await get_cache_store()
-    await invalidate_user_caches(cache, dashboard_summary_key(current_user.id), challenge_progress_key(current_user.id))
+    await invalidate_user_caches(
+        cache,
+        dashboard_summary_key(current_user.id),
+        dca_analysis_key(current_user.id),
+        challenge_progress_key(current_user.id),
+    )
     await invalidate_goal_recommendation_caches(cache, current_user.id)
     return {"detail": "목표가 저장되었습니다"}
 

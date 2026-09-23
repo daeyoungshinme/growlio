@@ -6,6 +6,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { fetchPortfolios } from "@/api/portfolios";
 import { fetchDriftSummary } from "@/api/rebalancing";
+import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeNudge } from "@/hooks/useChallengeNudge";
 
 export default function BottomNav() {
@@ -30,7 +31,10 @@ export default function BottomNav() {
 
   const showRebalancingBadge = portfolioCount > 0 && needsCount > 0;
 
-  const { data: challengeNudge } = useChallengeNudge();
+  const { data: challenges } = useChallenges();
+  const hasChallenges = (challenges?.length ?? 0) > 0;
+
+  const { data: challengeNudge } = useChallengeNudge(hasChallenges);
   const showChallengeBadge = challengeNudge?.needs_attention ?? false;
 
   return (

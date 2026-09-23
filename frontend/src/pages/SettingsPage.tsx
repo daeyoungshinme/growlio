@@ -12,6 +12,7 @@ import {
   Sparkles,
   ChevronRight,
   KeyRound,
+  ChartLine,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
@@ -29,6 +30,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useLogout } from "@/hooks/useLogout";
 import { useBiometric } from "@/hooks/useBiometric";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import { retryPushRegistration, disablePushNotifications } from "@/hooks/usePushNotifications";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import DeleteAccountModal from "@/components/settings/DeleteAccountModal";
@@ -80,6 +82,10 @@ export default function SettingsPage() {
   const { isDark, toggle } = useThemeStore();
   const logout = useLogout();
   const { isAvailable, isEnabled, setEnabled } = useBiometric();
+  const [showBacktest, toggleShowBacktest] = useCollapsible(
+    false,
+    "growlio:settings:show-backtest",
+  );
   const pushStatus = usePushNotificationStore((s) => s.status);
   const qc = useQueryClient();
   const [dart, setDart] = useState({ api_key: "" });
@@ -270,6 +276,19 @@ export default function SettingsPage() {
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
             {isDark ? "라이트 모드로 전환" : "다크 모드로 전환"}
+          </button>
+          <button
+            onClick={toggleShowBacktest}
+            className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
+            aria-pressed={showBacktest}
+          >
+            <ChartLine size={18} className={showBacktest ? "text-blue-500" : undefined} />
+            백테스트 기능 표시
+            <span
+              className={`ml-auto text-xs font-medium ${showBacktest ? "text-blue-500" : "text-gray-400"}`}
+            >
+              {showBacktest ? "켜짐" : "꺼짐"}
+            </span>
           </button>
           {isNativePlatform() && isAvailable && (
             <button

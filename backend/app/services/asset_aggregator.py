@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from datetime import date
 from typing import Any
@@ -128,23 +127,18 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache: Cac
     if cached is not None:
         return cached
 
-    # 1단계: 서로 독립적인 쿼리들을 병렬 실행
+    # 1단계: 서로 논리적으로는 독립적이지만 같은 AsyncSession을 쓰므로 순차 실행
+    # (asyncpg/SQLAlchemy AsyncSession은 하나의 커넥션에서 동시 쿼리 실행을 지원하지
+    # 않음 — asyncio.gather로 묶으면 병렬화 이득 없이 간헐적 InterfaceError 위험만 생김)
     (
-        (
-            first_snap_date,
-            net_deposits_ytd,
-            non_stock_first_total,
-            non_stock_net_flows_after,
-        ),
-        settings_row,
-        monthly_trend,
-        div_summary,
-    ) = await asyncio.gather(
-        _get_scalar_init_data(user_id, db),
-        db.scalar(select(UserSettings).where(UserSettings.user_id == user_id)),
-        _get_monthly_trend(user_id, db, cache),
-        get_dividend_summary(user_id, db, cache),
-    )
+        first_snap_date,
+        net_deposits_ytd,
+        non_stock_first_total,
+        non_stock_net_flows_after,
+    ) = await _get_scalar_init_data(user_id, db)
+    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
+    monthly_trend = await _get_monthly_trend(user_id, db, cache)
+    div_summary = await get_dividend_summary(user_id, db, cache)
 
     # 2단계: 내부에서 4개 쿼리를 실행하므로 1단계와 분리해 session 충돌 방지
     total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db, cache)

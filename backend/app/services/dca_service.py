@@ -15,7 +15,13 @@ from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import UserSettings
 from app.services.composition_calculator import build_asset_totals, exclude_real_estate
 from app.services.goal_return_solver import solve_required_annual_return_pct, solve_required_monthly_deposit
-from app.utils.cache_keys import CacheStoreType
+from app.utils.cache_keys import (
+    TTL_DCA_ANALYSIS,
+    CacheStoreType,
+    dca_analysis_key,
+    get_cached_json,
+    set_cached_json,
+)
 
 _DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50년)
 
@@ -25,6 +31,10 @@ _ACCELERATION_YEARS_PRESETS: tuple[int, ...] = (1, 2, 3)
 
 async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> dict[str, Any]:
     """DCA 복리 이론 곡선과 실제 자산을 비교한 분석 결과 반환."""
+    cached = await get_cached_json(cache, dca_analysis_key(user_id))
+    if cached is not None:
+        return cached
+
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
 
     pmt = float(settings_row.monthly_deposit_amount) if settings_row and settings_row.monthly_deposit_amount else None
@@ -48,7 +58,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
     }
 
     if not is_configured:
-        return {
+        result = {
             "settings": dca_settings,
             "projection_months": [],
             "yearly_achievements": [],
@@ -62,6 +72,8 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
             },
             "is_configured": False,
         }
+        await set_cached_json(cache, dca_analysis_key(user_id), result, TTL_DCA_ANALYSIS)
+        return result
 
     if pmt is None or annual_return_pct is None or goal_amount is None or start_dt is None:
         raise ValueError("DCA 목표 설정값이 누락되었습니다.")
@@ -100,13 +112,15 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
         initial_value, pmt, r, goal_amount, investable_assets_krw, start_date, months_to_goal, annual_return_pct
     )
 
-    return {
+    result = {
         "settings": dca_settings,
         "projection_months": projection_months,
         "yearly_achievements": yearly_achievements,
         "goal_timeline": goal_timeline,
         "is_configured": True,
     }
+    await set_cached_json(cache, dca_analysis_key(user_id), result, TTL_DCA_ANALYSIS)
+    return result
 
 
 async def _get_initial_value(user_id: uuid.UUID, start_date: date, db: AsyncSession) -> float:

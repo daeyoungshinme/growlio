@@ -14,12 +14,15 @@ from app.utils.cache_keys import (
     correlation_key,
     current_price_display_key,
     current_price_key,
+    dca_analysis_key,
     dividend_info_key,
     dividend_months_key,
     dividend_summary_key,
     dividend_ticker_summary_key,
     economic_indicator_calendar_key,
     has_overseas_key,
+    invalidate_account_caches,
+    invalidate_asset_account_caches,
     invalidate_rebalancing_strategy_cache,
     invalidate_user_caches,
     monthly_trend_key,
@@ -52,6 +55,12 @@ class TestCacheKeyBuilders:
         key = monthly_trend_key(uid)
         assert str(uid) in key
         assert key.startswith("test:monthly_trend:")
+
+    def test_dca_analysis_key(self, override_settings):
+        uid = uuid.uuid4()
+        key = dca_analysis_key(uid)
+        assert str(uid) in key
+        assert key.startswith("test:dca_analysis:")
 
     def test_dividend_ticker_summary_key(self, override_settings):
         uid = uuid.uuid4()
@@ -191,6 +200,36 @@ class TestInvalidateUserCaches:
         cache = AsyncMock()
         await invalidate_user_caches(cache, "key1", "key2")
         cache.delete.assert_called_once_with("key1", "key2")
+
+
+class TestInvalidateDcaAnalysisCache:
+    """DCA 분석 응답 캐시(dca_analysis_key)가 대시보드 캐시와 같은 트리거로 무효화되는지
+    검증 — 별도로 무효화 트리거를 빠뜨리면 계좌 동기화/목표 설정 변경 후에도 낡은 DCA
+    분석 결과가 15분간 그대로 노출된다."""
+
+    @pytest.mark.asyncio
+    async def test_invalidate_asset_account_caches_includes_dca_key(self, override_settings):
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, []))
+        cache.unlink = AsyncMock()
+        user_id = uuid.uuid4()
+
+        await invalidate_asset_account_caches(cache, user_id)
+
+        deleted_keys = cache.delete.call_args.args
+        assert dca_analysis_key(user_id) in deleted_keys
+
+    @pytest.mark.asyncio
+    async def test_invalidate_account_caches_includes_dca_key(self, override_settings):
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, []))
+        cache.unlink = AsyncMock()
+        user_id = uuid.uuid4()
+
+        await invalidate_account_caches(cache, user_id)
+
+        deleted_keys = cache.delete.call_args.args
+        assert dca_analysis_key(user_id) in deleted_keys
 
 
 # ── currency ─────────────────────────────────────────────────────────────────
