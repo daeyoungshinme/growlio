@@ -1,7 +1,7 @@
 import { lazy, memo, Suspense, useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
-import { pnlColor } from "@/utils/colors";
+import { pnlColor, PIE_COLORS } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import SkeletonStatBox from "@/components/common/SkeletonStatBox";
@@ -10,8 +10,6 @@ import type { DashboardData } from "@/api/dashboard";
 const AssetAllocationChart = lazy(() => import("./AssetAllocationChart"));
 
 const CASH_TYPES = new Set(["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"]);
-const CHART_COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2"];
-
 interface Props {
   data: DashboardData | undefined;
   exchangeRate: number | null;
@@ -152,7 +150,7 @@ export default memo(function HeroSummaryCard({
                     <div key={i} className="flex items-center gap-1 min-w-0 w-full">
                       <span
                         className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                        style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
+                        style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
                       />
                       <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight truncate min-w-0">
                         {item.name} {item.pct.toFixed(0)}%

@@ -30,6 +30,7 @@ import { getPortfolioTargetState } from "@/utils/portfolio";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import { PIE_COLORS } from "@/utils/colors";
 
 function SortablePortfolioItem({
   id,
@@ -56,17 +57,6 @@ function SortablePortfolioItem({
     </div>
   );
 }
-
-const MINI_COLORS = [
-  "#2563EB",
-  "#16A34A",
-  "#D97706",
-  "#DC2626",
-  "#7C3AED",
-  "#0891B2",
-  "#DB2777",
-  "#059669",
-];
 
 interface PortfolioCardProps {
   portfolio: Portfolio;
@@ -149,7 +139,7 @@ const PortfolioCard = memo(function PortfolioCard({
                   title={`${item.name ?? item.ticker}: ${item.weight.toFixed(1)}%`}
                   style={{
                     width: `${item.weight}%`,
-                    backgroundColor: MINI_COLORS[ci],
+                    backgroundColor: PIE_COLORS[ci],
                   }}
                 />
               ))}

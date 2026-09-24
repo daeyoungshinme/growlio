@@ -170,6 +170,8 @@ export default function NotificationSettingsPage() {
   );
   useEffect(() => {
     if (initialAlertTab === "시장 신호 알림") setMarketAlertsOpen(true);
+    // setMarketAlertsOpen(useCollapsible)은 렌더마다 새 참조 — dep에 넣으면 매 렌더 다시 펼쳐져 사용자가 접을 수 없다.
+    // 딥링크 탭이 바뀔 때만 1회 펼친다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAlertTab]);
 

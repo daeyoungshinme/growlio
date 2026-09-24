@@ -1,17 +1,7 @@
 import { memo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { PortfolioItem } from "@/api/portfolios";
-
-const PIE_COLORS = [
-  "#2563EB",
-  "#16A34A",
-  "#D97706",
-  "#DC2626",
-  "#7C3AED",
-  "#0891B2",
-  "#DB2777",
-  "#059669",
-];
+import { PIE_COLORS } from "@/utils/colors";
 
 interface Props {
   items: PortfolioItem[];

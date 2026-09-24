@@ -2,8 +2,7 @@ import { memo } from "react";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
-
-const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2"];
+import { PIE_COLORS } from "@/utils/colors";
 
 const CONFIG = {
   "compact-sm": { height: 140, innerRadius: 30, outerRadius: 56 },
@@ -43,7 +42,7 @@ const AssetAllocationChart = memo(function AssetAllocationChart({
               dataKey="value"
             >
               {data.map((_, index) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
               ))}
             </Pie>
             <Tooltip
@@ -62,7 +61,7 @@ const AssetAllocationChart = memo(function AssetAllocationChart({
             <div key={i} className="flex items-center gap-1">
               <span
                 className="inline-block w-2 h-2 rounded-sm shrink-0"
-                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
               />
               <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
                 {item.name} {item.pct.toFixed(0)}%
@@ -77,7 +76,7 @@ const AssetAllocationChart = memo(function AssetAllocationChart({
             <div key={i} className="flex items-center gap-1">
               <span
                 className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
               />
               <span className="text-xs text-gray-600 dark:text-gray-400">
                 {item.name} {item.pct.toFixed(0)}%

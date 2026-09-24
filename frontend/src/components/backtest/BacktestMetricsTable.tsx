@@ -1,19 +1,8 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { PortfolioMetrics } from "@/api/backtest";
-import { pnlColor, LOSS_COLOR } from "@/utils/colors";
+import { pnlColor, LOSS_COLOR, PIE_COLORS } from "@/utils/colors";
 import Tooltip from "@/components/common/Tooltip";
-
-const COLORS = [
-  "#2563EB",
-  "#16A34A",
-  "#D97706",
-  "#DC2626",
-  "#7C3AED",
-  "#0891B2",
-  "#DB2777",
-  "#059669",
-];
 
 interface Props {
   metrics: PortfolioMetrics[];
@@ -83,7 +72,7 @@ export default function BacktestMetricsTable({ metrics }: Props) {
               <div className="flex items-center gap-1.5 min-w-0">
                 <span
                   className="inline-block w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                  style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
                 />
                 <p className="font-medium text-gray-800 dark:text-gray-200 text-sm truncate">
                   {m.name}
@@ -166,7 +155,7 @@ export default function BacktestMetricsTable({ metrics }: Props) {
                 <td className="py-2 px-2 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap">
                   <span
                     className="inline-block w-2 h-2 rounded-full mr-1.5"
-                    style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                    style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
                   />
                   {m.name}
                 </td>
