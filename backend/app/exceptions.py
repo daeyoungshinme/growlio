@@ -24,39 +24,9 @@ class NotFoundError(AppError):
     detail = "리소스를 찾을 수 없습니다."
 
 
-class CredentialMissingError(BadRequestError):
-    detail = "자격증명이 설정되지 않았습니다."
-
-
 class ExternalAPIError(AppError):
     status_code = 502
     detail = "외부 API 오류가 발생했습니다"
-
-
-class RateLimitError(AppError):
-    status_code = 429
-    detail = "요청이 너무 많습니다. 잠시 후 다시 시도하세요"
-
-
-class ConflictError(AppError):
-    status_code = 409
-    detail = "이미 존재하는 리소스입니다"
-
-
-class PortfolioNotFoundError(NotFoundError):
-    detail = "포트폴리오를 찾을 수 없습니다"
-
-
-class AccountNotFoundError(NotFoundError):
-    detail = "계좌를 찾을 수 없습니다"
-
-
-class AlertNotFoundError(NotFoundError):
-    detail = "알림을 찾을 수 없습니다"
-
-
-class TransactionNotFoundError(NotFoundError):
-    detail = "거래 내역을 찾을 수 없습니다"
 
 
 class KisAuthError(ExternalAPIError):

@@ -601,8 +601,10 @@ class TestVerifyKiwoomCredentials:
         svc.assert_awaited_once_with("k", "s", True)
 
     def test_invalid_key_return_code(self, override_settings):
-        # 키움은 잘못된 키에 HTTP 200 + return_code != 0 → _request_token이 RuntimeError
-        resp, _ = self._post(RuntimeError("키움 토큰 발급 실패: 앱키 오류"))
+        # 키움은 잘못된 키에 HTTP 200 + return_code != 0 → _request_token이 KiwoomTokenIssueError
+        from app.kiwoom.client import KiwoomTokenIssueError
+
+        resp, _ = self._post(KiwoomTokenIssueError("키움 토큰 발급 실패: 앱키 오류"))
         assert resp.status_code == 400
         assert "키움 자격증명이 잘못되었습니다" in resp.json()["detail"]
 

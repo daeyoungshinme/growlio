@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import run_alert_job
+from app.jobs._job_helpers import report_job_failure, run_alert_job
 from app.models.challenge import CHALLENGE_ACTIVE, CHALLENGE_DEPOSIT, InvestmentChallenge
 from app.models.user import User, UserSettings
 from app.services import challenge_service
@@ -80,7 +80,7 @@ async def _check_user(user: User, settings_row: UserSettings, cache: CacheStoreT
                 for challenge in challenges:
                     await _remind_one(db, user, settings_row, challenge, to_email, month)
         except Exception as e:
-            logger.error("challenge_deposit_reminder_failed", user_id=str(user.id), error=str(e))
+            report_job_failure("challenge_deposit_reminder_failed", e, user_id=str(user.id))
 
 
 async def _remind_one(db, user, settings_row, challenge, to_email: str, month: str) -> None:

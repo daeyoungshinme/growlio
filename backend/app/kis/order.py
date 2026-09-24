@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from app.kis.client import kis_request
+from app.kis.client import auth_headers, kis_request, split_account_no
 from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
     OVERSEAS_MARKETS,
@@ -15,22 +15,6 @@ from app.kis.constants import (
     TR_OVERSEAS_SELL_MOCK,
     TR_OVERSEAS_SELL_REAL,
 )
-
-
-def _auth_headers(app_key: str, app_secret: str, access_token: str, tr_id: str) -> dict[str, str]:
-    return {
-        "authorization": f"Bearer {access_token}",
-        "appkey": app_key,
-        "appsecret": app_secret,
-        "tr_id": tr_id,
-        "custtype": "P",
-        "Content-Type": "application/json; charset=utf-8",
-    }
-
-
-def _split_account_no(account_no: str) -> tuple[str, str]:
-    """계좌번호를 CANO(8자리)와 ACNT_PRDT_CD로 분리."""
-    return account_no[:8], account_no[8:].lstrip("-") or "01"
 
 
 def is_overseas_market(market: str) -> bool:
@@ -59,8 +43,8 @@ async def place_domestic_order(
     else:
         tr_id = TR_DOMESTIC_SELL_MOCK if is_mock else TR_DOMESTIC_SELL_REAL
 
-    cano, acnt_prdt_cd = _split_account_no(account_no)
-    headers = _auth_headers(app_key, app_secret, access_token, tr_id)
+    cano, acnt_prdt_cd = split_account_no(account_no)
+    headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
     if order_type == "LIMIT" and limit_price is not None:
         ord_dvsn = "00"  # 지정가
@@ -121,8 +105,8 @@ async def place_overseas_order(
         tr_id = TR_OVERSEAS_SELL_MOCK if is_mock else TR_OVERSEAS_SELL_REAL
 
     exchange_cd = OVERSEAS_MARKET_CODES.get(market.upper(), "NASD")
-    cano, acnt_prdt_cd = _split_account_no(account_no)
-    headers = _auth_headers(app_key, app_secret, access_token, tr_id)
+    cano, acnt_prdt_cd = split_account_no(account_no)
+    headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
     if order_type == "LIMIT" and limit_price is not None:
         ord_dvsn = "00"  # 지정가 (해외 KIS: "00"=지정가)

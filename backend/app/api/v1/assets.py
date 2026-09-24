@@ -10,6 +10,7 @@ from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
 from app.core.cache_store import get_cache_store
 from app.kis.auth import promote_user_token_to_account
+from app.kiwoom.client import KiwoomTokenIssueError
 from app.limiter import limiter
 from app.models.asset import AssetAccount, Transaction
 from app.models.user import User
@@ -106,6 +107,26 @@ async def list_accounts(
     return [_account_response(a) for a in accounts]
 
 
+_KIS_INVALID_CREDENTIALS = "KIS 자격증명이 잘못되었습니다. App Key/Secret 및 모드를 확인하세요."
+_KIWOOM_INVALID_CREDENTIALS = "키움 자격증명이 잘못되었습니다. App Key/Secret 및 모의/실계좌 모드를 확인하세요."
+_TOSS_INVALID_CREDENTIALS = "토스 자격증명이 잘못되었습니다. Client ID/Secret을 확인하세요."
+
+
+def _verify_http_error(e: httpx.HTTPError, label: str, invalid_detail: str) -> HTTPException:
+    """자격증명 검증 라우트 공통 HTTP 오류 매핑: 400/401/403 → 400(잘못된 키), 그 외 상태 → 502,
+    연결 실패/타임아웃 → 504."""
+    if isinstance(e, httpx.HTTPStatusError):
+        if e.response.status_code in (400, 401, 403):
+            return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_detail)
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"{label} 서버 오류. 잠시 후 다시 시도하세요."
+        )
+    return HTTPException(
+        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        detail=f"{label} 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.",
+    )
+
+
 @router.post("/verify-kis-credentials")
 @limiter.limit("10/minute")
 async def verify_kis_credentials(
@@ -123,21 +144,8 @@ async def verify_kis_credentials(
             current_user.id,
             cache,
         )
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code in (400, 401, 403):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="KIS 자격증명이 잘못되었습니다. App Key/Secret 및 모드를 확인하세요.",
-            ) from e
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="KIS 서버 오류. 잠시 후 다시 시도하세요.",
-        ) from e
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="KIS 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.",
-        ) from e
+    except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+        raise _verify_http_error(e, "KIS", _KIS_INVALID_CREDENTIALS) from e
     return {"valid": True, "message": "KIS 자격증명이 확인되었습니다."}
 
 
@@ -151,27 +159,14 @@ async def verify_kiwoom_credentials(
     """키움 자격증명 유효성 확인 (계좌 생성 없이)."""
     try:
         await _verify_kiwoom_credentials_service(req.kiwoom_app_key, req.kiwoom_app_secret, req.is_mock)
-    except RuntimeError as e:
+    except KiwoomTokenIssueError as e:
         # 키움은 잘못된 키에 HTTP 200 + return_code != 0으로 응답한다 (kiwoom/auth.py _request_token)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="키움 자격증명이 잘못되었습니다. App Key/Secret 및 모의/실계좌 모드를 확인하세요.",
+            detail=_KIWOOM_INVALID_CREDENTIALS,
         ) from e
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code in (400, 401, 403):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="키움 자격증명이 잘못되었습니다. App Key/Secret 및 모의/실계좌 모드를 확인하세요.",
-            ) from e
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="키움 서버 오류. 잠시 후 다시 시도하세요.",
-        ) from e
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="키움 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.",
-        ) from e
+    except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+        raise _verify_http_error(e, "키움", _KIWOOM_INVALID_CREDENTIALS) from e
     return {"valid": True, "message": "키움 자격증명이 확인되었습니다."}
 
 
@@ -197,21 +192,8 @@ async def verify_toss_credentials(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"토스 자격증명이 잘못되었습니다: {e.message}",
         ) from e
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code in (400, 401, 403):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="토스 자격증명이 잘못되었습니다. Client ID/Secret을 확인하세요.",
-            ) from e
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="토스 서버 오류. 잠시 후 다시 시도하세요.",
-        ) from e
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="토스 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.",
-        ) from e
+    except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
+        raise _verify_http_error(e, "토스", _TOSS_INVALID_CREDENTIALS) from e
     return {"valid": True, "message": "토스 자격증명이 확인되었습니다."}
 
 

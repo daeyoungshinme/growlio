@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import run_alert_job
+from app.jobs._job_helpers import report_job_failure, run_alert_job
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.asset_aggregator import get_dashboard_summary
@@ -191,4 +191,4 @@ async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: 
                             logger.warning("goal_dividend_alert_push_failed", user_id=str(user.id), error=str(exc))
 
         except Exception as e:
-            logger.error("goal_achievement_check_failed", user_id=str(user.id), error=str(e))
+            report_job_failure("goal_achievement_check_failed", e, user_id=str(user.id))

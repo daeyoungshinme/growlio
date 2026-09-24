@@ -14,7 +14,7 @@ from typing import Any
 
 import structlog
 
-from app.kiwoom.client import kiwoom_request
+from app.kiwoom.client import auth_headers, kiwoom_request
 from app.kiwoom.constants import (
     API_ID_DOMESTIC_BALANCE,
     API_ID_DOMESTIC_DEPOSIT,
@@ -30,14 +30,6 @@ _OVERSEAS_ACCOUNT_PATH = "/api/us/acnt"
 # 센티널로 두고, provider가 enrich_overseas_positions()(Yahoo Finance 조회 + 7일 캐시)로
 # NASDAQ/NYSE/AMEX를 확정한다. providers._overseas_name_enrichment.UNRESOLVED_MARKET와 동일 값.
 _UNRESOLVED_MARKET = "US"
-
-
-def _auth_headers(access_token: str, api_id: str) -> dict[str, str]:
-    return {
-        "Content-Type": "application/json;charset=UTF-8",
-        "authorization": f"Bearer {access_token}",
-        "api-id": api_id,
-    }
 
 
 def _parse_num(raw: Any) -> float:
@@ -100,7 +92,7 @@ async def _get_deposit_info(access_token: str, *, is_mock: bool) -> dict[str, fl
     - orderable_krw: 100stk_ord_alow_amt(미수 없는 현금 매수여력) → ord_alow_amt(주문가능금액)
       → deposit_krw 폴백. 리밸런싱 FULL 매수 예산 clamp 전용, KIS nrcvb_buy_amt와 대칭
     """
-    headers = _auth_headers(access_token, API_ID_DOMESTIC_DEPOSIT)
+    headers = auth_headers(access_token, API_ID_DOMESTIC_DEPOSIT)
     data = await kiwoom_request(
         "POST",
         "/api/dostk/acnt",
@@ -141,7 +133,7 @@ async def get_domestic_balance(
 
     account_no는 사용하지 않는다 — 호출 인터페이스 일관성을 위해서만 유지.
     """
-    headers = _auth_headers(access_token, API_ID_DOMESTIC_BALANCE)
+    headers = auth_headers(access_token, API_ID_DOMESTIC_BALANCE)
 
     data, deposit_info = await asyncio.gather(
         kiwoom_request(
@@ -188,7 +180,7 @@ async def _fetch_overseas_all(access_token: str, *, is_mock: bool) -> list[dict[
     """ust21070을 stex_tp/stk_cd 없이 호출 — 보유종목 전체(수량·가격 포함)를 한 번에 받는다.
     이 응답의 stex_nm은 항상 "미국"만 반환되어 거래소 구분에는 쓸 수 없다(market은 provider의
     enrich_overseas_positions()가 별도로 판별)."""
-    headers = _auth_headers(access_token, API_ID_OVERSEAS_BALANCE)
+    headers = auth_headers(access_token, API_ID_OVERSEAS_BALANCE)
     data = await kiwoom_request(
         "POST",
         _OVERSEAS_ACCOUNT_PATH,
@@ -215,7 +207,7 @@ async def get_overseas_balance(
     (보유 종목당 3콜, 2콜 이상은 반드시 1903 실패) NYSE Arca 상장 ETF(SPY 등)를 판별하지
     못하고 로그를 오염시켜 폐기했다. account_no는 인터페이스 일관성을 위해서만 유지.
     """
-    deposit_headers = _auth_headers(access_token, API_ID_OVERSEAS_DEPOSIT)
+    deposit_headers = auth_headers(access_token, API_ID_OVERSEAS_DEPOSIT)
 
     items, deposit_data = await asyncio.gather(
         _fetch_overseas_all(access_token, is_mock=is_mock),

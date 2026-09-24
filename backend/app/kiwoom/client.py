@@ -15,8 +15,25 @@ _semaphore = asyncio.Semaphore(settings.kiwoom_semaphore_limit)
 _rate_limiter = AsyncRateLimiter(rate=settings.kiwoom_rate_per_second)
 
 
+def auth_headers(access_token: str, api_id: str) -> dict[str, str]:
+    """잔고·주문 API 공통 인증 헤더 (balance.py/order.py 공용)."""
+    return {
+        "Content-Type": "application/json;charset=UTF-8",
+        "authorization": f"Bearer {access_token}",
+        "api-id": api_id,
+    }
+
+
 class KiwoomTokenExpiredError(Exception):
     """키움 토큰 만료 오류."""
+
+
+class KiwoomTokenIssueError(RuntimeError):
+    """키움 토큰 발급 거부 — 잘못된 앱키/시크릿 또는 모의/실계좌 모드 불일치.
+
+    키움은 잘못된 키에 HTTP 200 + return_code != 0으로 응답한다. RuntimeError 하위 클래스로 두어
+    기존 `except RuntimeError` 호출부와 호환을 유지하되, 호출부는 메시지 문자열이 아닌 타입으로 판별한다.
+    """
 
 
 class KiwoomApiError(Exception):

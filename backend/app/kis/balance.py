@@ -2,7 +2,7 @@ from typing import Any
 
 import structlog
 
-from app.kis.client import KisTokenExpiredError, kis_request
+from app.kis.client import KisTokenExpiredError, auth_headers, kis_request, split_account_no
 from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
     TR_DOMESTIC_BALANCE_MOCK,
@@ -16,17 +16,6 @@ from app.kis.constants import (
 logger = structlog.get_logger()
 
 
-def _auth_headers(app_key: str, app_secret: str, access_token: str, tr_id: str) -> dict[str, str]:
-    return {
-        "authorization": f"Bearer {access_token}",
-        "appkey": app_key,
-        "appsecret": app_secret,
-        "tr_id": tr_id,
-        "custtype": "P",
-        "Content-Type": "application/json; charset=utf-8",
-    }
-
-
 async def get_domestic_balance(
     app_key: str,
     app_secret: str,
@@ -36,9 +25,9 @@ async def get_domestic_balance(
     is_mock: bool,
 ) -> dict[str, Any]:
     """국내주식 잔고 조회 — 보유종목 + 평가금액."""
-    cano, acnt_prdt_cd = account_no[:8], account_no[8:].lstrip("-") or "01"
+    cano, acnt_prdt_cd = split_account_no(account_no)
     tr_id = TR_DOMESTIC_BALANCE_MOCK if is_mock else TR_DOMESTIC_BALANCE_REAL
-    headers = _auth_headers(app_key, app_secret, access_token, tr_id)
+    headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
     data = await kis_request(
         "GET",
@@ -112,9 +101,9 @@ async def get_orderable_cash(
     is_mock: bool,
 ) -> float:
     """주문가능금액 조회 — 미수없는 매수가능금액 (nrcvb_buy_amt)."""
-    cano, acnt_prdt_cd = account_no[:8], account_no[8:].lstrip("-") or "01"
+    cano, acnt_prdt_cd = split_account_no(account_no)
     tr_id = TR_DOMESTIC_INQUIRE_PSBL_ORDER_MOCK if is_mock else TR_DOMESTIC_INQUIRE_PSBL_ORDER_REAL
-    headers = _auth_headers(app_key, app_secret, access_token, tr_id)
+    headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
     data = await kis_request(
         "GET",
@@ -144,9 +133,9 @@ async def get_overseas_balance(
     is_mock: bool,
 ) -> dict[str, Any]:
     """해외주식 잔고 조회 — NYSE/NASDAQ/AMEX 전 거래소 합산."""
-    cano, acnt_prdt_cd = account_no[:8], account_no[8:].lstrip("-") or "01"
+    cano, acnt_prdt_cd = split_account_no(account_no)
     tr_id = TR_OVERSEAS_BALANCE_MOCK if is_mock else TR_OVERSEAS_BALANCE_REAL
-    headers = _auth_headers(app_key, app_secret, access_token, tr_id)
+    headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
     all_positions: list[dict] = []
     deposit_usd = 0.0

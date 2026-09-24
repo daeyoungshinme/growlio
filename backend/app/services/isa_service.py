@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, select
@@ -60,7 +60,7 @@ class IsaStatusSummary(TypedDict):
     note: str
 
 
-async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[str, Any]:
+async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> IsaStatusSummary:
     """사용자의 ISA 계좌별 의무가입(3년) 진행 상황과 비과세 한도 대비 세금 추정치를 반환한다."""
     accounts_result = await db.execute(active_accounts_stmt(user_id).where(AssetAccount.tax_type == "ISA"))
     accounts = accounts_result.scalars().all()

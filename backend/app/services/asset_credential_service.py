@@ -12,8 +12,11 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
+from app.kis.auth import ACCOUNT_TOKEN_CACHE_KEY as KIS_ACCOUNT_TOKEN_CACHE_KEY
+from app.kiwoom.constants import KIWOOM_TOKEN_CACHE_KEY
 from app.models.asset import AssetAccount
 from app.models.token import KisToken, KiwoomToken, TossToken
+from app.toss.constants import TOSS_TOKEN_CACHE_KEY
 from app.utils.cache_keys import account_detail_key, invalidate_user_caches
 
 
@@ -69,7 +72,7 @@ async def delete_toss_credentials(account: AssetAccount, db: AsyncSession, cache
         app_key_attr="toss_client_id",
         app_secret_attr="toss_client_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
         token_model=TossToken,
-        cache_key=f"toss_token:account:{account.id}",
+        cache_key=TOSS_TOKEN_CACHE_KEY.format(account_id=account.id),
     )
 
 
@@ -82,7 +85,7 @@ async def delete_kis_credentials(account: AssetAccount, db: AsyncSession, cache)
         app_key_attr="kis_app_key",
         app_secret_attr="kis_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
         token_model=KisToken,
-        cache_key=f"kis_token:account:{account.id}",
+        cache_key=KIS_ACCOUNT_TOKEN_CACHE_KEY.format(account_id=account.id),
     )
 
 
@@ -95,7 +98,7 @@ async def delete_kiwoom_credentials(account: AssetAccount, db: AsyncSession, cac
         app_key_attr="kiwoom_app_key",
         app_secret_attr="kiwoom_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
         token_model=KiwoomToken,
-        cache_key=f"kiwoom_token:account:{account.id}",
+        cache_key=KIWOOM_TOKEN_CACHE_KEY.format(account_id=account.id),
     )
 
 

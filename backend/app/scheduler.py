@@ -1,4 +1,5 @@
 import structlog
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_MISSED, JobExecutionEvent
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -14,6 +15,18 @@ scheduler = AsyncIOScheduler(
     timezone="Asia/Seoul",
     job_defaults={"coalesce": True, "max_instances": 1, "misfire_grace_time": MISFIRE_GRACE_SECONDS},
 )
+
+
+def _on_job_event(event: JobExecutionEvent) -> None:
+    """잡이 예외를 밖으로 던졌거나(EVENT_JOB_ERROR) 유예시간을 넘겨 버려졌을 때(EVENT_JOB_MISSED) 기록.
+
+    대부분의 잡은 내부에서 예외를 삼키지만, 삼키지 않는 잡의 실패와 misfire는 이 리스너 없이는
+    APScheduler 기본 stdlib 로그에만 남아 구조화 로그에서 보이지 않는다.
+    """
+    if event.code == EVENT_JOB_MISSED:
+        logger.warning("scheduler_job_missed", job_id=event.job_id, scheduled_run_time=str(event.scheduled_run_time))
+    elif event.exception is not None:
+        logger.error("scheduler_job_error", job_id=event.job_id, error=str(event.exception))
 
 
 def init_scheduler() -> None:
@@ -49,7 +62,7 @@ def init_scheduler() -> None:
         (run_market_signal_alert_check, IntervalTrigger(hours=1), "market_signal_alert_check_interval"),
         (run_rebalancing_auto_execution, kst(minute="*/5"), "rebalancing_auto_execution_intraday"),
         (run_rebalancing_plan_buy_execution, IntervalTrigger(minutes=1), "rebalancing_plan_buy_execution"),
-        (run_rebalancing_plan_sell_expiry, IntervalTrigger(minutes=15), "rebalancing_plan_sell_expiry_daily"),
+        (run_rebalancing_plan_sell_expiry, IntervalTrigger(minutes=15), "rebalancing_plan_sell_expiry"),
         (run_stock_price_alert_check, IntervalTrigger(minutes=10), "stock_price_alert_check"),
         (run_monthly_report, kst(day=1, hour=9, minute=0), "monthly_report_job"),
         (run_goal_achievement_check, kst(hour=18, minute=45), "goal_achievement_check_daily"),
@@ -67,5 +80,6 @@ def init_scheduler() -> None:
     for func, trigger, job_id in jobs:
         scheduler.add_job(func, trigger, id=job_id, replace_existing=True)
 
+    scheduler.add_listener(_on_job_event, EVENT_JOB_ERROR | EVENT_JOB_MISSED)
     scheduler.start()
     logger.info("scheduler_started", jobs=len(scheduler.get_jobs()))

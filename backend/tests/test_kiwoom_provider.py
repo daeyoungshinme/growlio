@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.exceptions import ProviderCredentialError
+from app.kiwoom.client import KiwoomTokenIssueError
+from app.providers.http_client import MaxRetriesExceededError
 from app.providers.kiwoom_provider import KiwoomProvider
 
 
@@ -199,6 +201,35 @@ class TestKiwoomProviderSync:
         assert result.positions[0].ticker == "005930"
         # 해외 조회 실패 → deposit_foreign=None (asset_service가 기존 deposit_usd 유지)
         assert result.deposit_foreign is None
+        assert result.overseas_known is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("exc_factory", "status"),
+        [
+            (lambda: KiwoomTokenIssueError("키움 토큰 발급 실패: x"), 400),
+            (lambda: MaxRetriesExceededError("retry"), 429),
+            (lambda: RuntimeError("기타"), 502),
+        ],
+    )
+    async def test_sync_error_mapping_by_type(self, override_settings, make_account, mock_cache, exc_factory, status):
+        """토큰 발급 거부는 400, 재시도 소진(속도 제한)은 KIS/토스와 같은 429, 그 외 RuntimeError는 502."""
+        from app.exceptions import ProviderApiError
+
+        account = make_account(
+            data_source="KIWOOM_API",
+            kiwoom_app_key=b"enc_key",
+            kiwoom_app_secret=b"enc_secret",
+            kiwoom_account_no="1234567890",
+        )
+        with (
+            patch("app.providers.kiwoom_provider.decrypt", side_effect=["key", "secret"]),
+            patch("app.kiwoom.auth.get_access_token", new=AsyncMock(side_effect=exc_factory())),
+            pytest.raises(ProviderApiError) as ei,
+        ):
+            await KiwoomProvider().sync(account, db=AsyncMock(), cache=mock_cache)
+
+        assert ei.value.http_status == status
 
     @pytest.mark.asyncio
     async def test_sync_overseas_confirmed_empty_emits_zero_deposit_foreign(

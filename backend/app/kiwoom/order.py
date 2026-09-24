@@ -5,7 +5,7 @@
 
 from typing import Any
 
-from app.kiwoom.client import kiwoom_request
+from app.kiwoom.client import auth_headers, kiwoom_request
 from app.kiwoom.constants import (
     API_ID_DOMESTIC_BUY,
     API_ID_DOMESTIC_SELL,
@@ -13,14 +13,6 @@ from app.kiwoom.constants import (
     API_ID_OVERSEAS_SELL,
     KIWOOM_OVERSEAS_MARKET_CODES,
 )
-
-
-def _auth_headers(access_token: str, api_id: str) -> dict[str, str]:
-    return {
-        "Content-Type": "application/json;charset=UTF-8",
-        "authorization": f"Bearer {access_token}",
-        "api-id": api_id,
-    }
 
 
 async def place_domestic_order(
@@ -40,7 +32,7 @@ async def place_domestic_order(
     키움 trde_tp: "0"=보통(지정가), "3"=시장가
     """
     api_id = API_ID_DOMESTIC_BUY if side == "BUY" else API_ID_DOMESTIC_SELL
-    headers = _auth_headers(access_token, api_id)
+    headers = auth_headers(access_token, api_id)
 
     if order_type == "LIMIT" and limit_price is not None:
         trde_tp = "0"  # 보통(지정가)
@@ -93,7 +85,7 @@ async def place_overseas_order(
     stex_tp(dmst_stex_tp 아님)이고 trde_tp가 2자리 코드(00=지정가/03=시장가, 국내는 0/3 1자리)임에 주의.
     """
     api_id = API_ID_OVERSEAS_BUY if side == "BUY" else API_ID_OVERSEAS_SELL
-    headers = _auth_headers(access_token, api_id)
+    headers = auth_headers(access_token, api_id)
 
     exchange_cd = KIWOOM_OVERSEAS_MARKET_CODES.get(market.upper(), "ND")
 

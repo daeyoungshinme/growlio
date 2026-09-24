@@ -61,7 +61,7 @@ async def isa_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    return await get_isa_status_summary(current_user.id, db)
+    return dict(await get_isa_status_summary(current_user.id, db))
 
 
 @router.get("/pension-contribution")
@@ -76,4 +76,4 @@ async def pension_contribution(
     target_year = year if year is not None else current_year
     if target_year < 2000 or target_year > current_year + 1:
         raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
-    return await calc_pension_contribution_status(current_user.id, target_year, db)
+    return dict(await calc_pension_contribution_status(current_user.id, target_year, db))

@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 import structlog
 
 from app.constants import TOKEN_CACHE_TTL_BUFFER
+from app.kiwoom.client import KiwoomTokenIssueError
 from app.kiwoom.constants import (
     KIWOOM_MOCK_BASE_URL,
     KIWOOM_REAL_BASE_URL,
@@ -93,7 +94,7 @@ async def _request_token(app_key: str, app_secret: str, *, is_mock: bool) -> dic
     data = resp.json()
 
     if str(data.get("return_code", "0")) != "0":
-        raise RuntimeError(f"키움 토큰 발급 실패: {data.get('return_msg')}")
+        raise KiwoomTokenIssueError(f"키움 토큰 발급 실패: {data.get('return_msg')}")
     return data
 
 
