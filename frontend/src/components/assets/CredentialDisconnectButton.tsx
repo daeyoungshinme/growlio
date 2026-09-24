@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteAccountCredentials, type CredentialBroker } from "@/api/assets";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
-import { invalidateAccountData } from "@/utils/queryInvalidation";
+import { invalidateBrokerCredentialData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 
@@ -36,7 +36,7 @@ export default function CredentialDisconnectButton({ accountId, broker }: Props)
     onSuccess: () => {
       setDisconnected(true);
       toast(`${label} API 키를 삭제했습니다`, "success");
-      void invalidateAccountData(qc);
+      void invalidateBrokerCredentialData(qc);
     },
     onError: (e) => toast(extractErrorMessage(e, "API 키 삭제에 실패했습니다"), "error"),
   });

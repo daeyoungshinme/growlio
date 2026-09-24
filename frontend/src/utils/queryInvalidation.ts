@@ -37,6 +37,17 @@ export function invalidateAccountData(qc: QueryClient) {
   ]);
 }
 
+/** 계좌 브로커 API 키 삭제(연동 해제) 후 — 계좌 데이터 + 리밸런싱 알림/대기 플랜
+ * (자동 매매 가능 여부가 바뀌므로 리밸런싱 화면이 해제된 계좌를 거래가능으로 계속 표시하지 않게) */
+export function invalidateBrokerCredentialData(qc: QueryClient) {
+  return Promise.all([
+    invalidateAccountData(qc),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlertBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingPlans }),
+  ]);
+}
+
 /** 거래내역 CUD 후 — transactions + dashboard + 적립 챌린지(입금이 스트릭에 영향) */
 export function invalidateTransactionData(qc: QueryClient) {
   return Promise.all([
@@ -154,7 +165,7 @@ export function invalidateRecommendationDriftAlertData(qc: QueryClient) {
  * 포트폴리오별/전체 추천 전부(접두사 매칭) + settings 무효화 */
 export function invalidateGoalRecommendationData(qc: QueryClient) {
   return Promise.all([
-    qc.invalidateQueries({ queryKey: ["goal-recommendation"] }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
   ]);
 }

@@ -125,6 +125,18 @@ describe("StockAccountModal — 키움 자격증명 검증", () => {
     expect(screen.queryByText("자격증명 확인됨")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "등록" })).toBeDisabled();
   });
+  it("키 검증을 통과해도 계좌번호가 비어 있으면 등록할 수 없다", async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: { valid: true, message: "ok" } });
+    renderModal();
+    fillKiwoomCreate();
+    fireEvent.change(byId("stock-kiwoom-account-no"), { target: { value: "  " } });
+    fireEvent.click(screen.getByRole("button", { name: "자격증명 확인" }));
+    await screen.findByText("자격증명 확인됨");
+
+    expect(screen.getByRole("button", { name: "등록" })).toBeDisabled();
+    fireEvent.change(byId("stock-kiwoom-account-no"), { target: { value: "12345678-01" } });
+    expect(screen.getByRole("button", { name: "등록" })).toBeEnabled();
+  });
 });
 
 describe("StockAccountModal — 연동 해제", () => {
