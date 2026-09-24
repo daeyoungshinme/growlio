@@ -1,0 +1,32 @@
+name: Keep-alive
+
+# Render 무료 플랜은 15분간 요청이 없으면 인스턴스를 재운다. 백엔드의 APScheduler 잡(AUTO 리밸런싱 실행,
+# 알림, 일일 동기화 등)이 같은 프로세스에서 돌기 때문에 잠든 동안에는 전부 멈춘다 — 10분마다 /health를 호출해
+# 깨어 있게 유지한다. 한계: GitHub cron은 부하 시 수 분~수십 분 지연되거나 건너뛸 수 있어 완전한 보장은 아님.
+# 공개 저장소라 Actions 사용량 과금 없음. 저장소 활동이 60일간 없으면 GitHub이 schedule 워크플로를 자동 비활성화함.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping backend /health
+        env:
+          # 저장소 변수로 덮어쓸 수 있음 (Settings → Secrets and variables → Actions → Variables)
+          HEALTH_URL: ${{ vars.BACKEND_HEALTH_URL || 'https://growlio-w5wc.onrender.com/health' }}
+        run: |
+          # 콜드 스타트는 수십 초 걸릴 수 있어 넉넉한 타임아웃 + 재시도
+          curl --fail --silent --show-error --max-time 90 \
+            --retry 3 --retry-delay 10 --retry-all-errors \
+            "$HEALTH_URL"

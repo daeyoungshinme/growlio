@@ -54,7 +54,9 @@ def _exclude_capital_gain_outlier(ticker: object) -> float | None:
         remaining = recent.copy()
         remaining.remove(largest)
         return round(sum(remaining), 4)
-    except Exception:
+    except Exception as e:
+        # 보정 실패 시 None(=보정 없이 원본 배당률 사용)으로 폴백 — 배당 동기화 자체는 계속 진행
+        logger.debug("capital_gain_outlier_check_failed", error=str(e), exc_type=type(e).__name__)
         return None
 
 

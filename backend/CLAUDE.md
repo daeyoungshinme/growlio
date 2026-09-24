@@ -309,7 +309,7 @@ jobs/                         # APScheduler 정기 작업
   ├── challenge_deposit_reminder.py  # 매월 25일 09:00 KST — 이번 달 적립 안 한 입금 챌린지 독려(옵트인). 챌린지별 durable_state dedup
   ├── challenge_monthly_wrap.py      # 매월 1일 09:30 KST — 지난달 적립 챌린지 결산(달성/미달·스트릭·마일스톤) + 수익률/평가금액 챌린지 목표 도달 시 status=COMPLETED 전환
   ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송
-  ├── rebalancing_alert.py    # 10분 간격(app/scheduler.py:44) — 리밸런싱 드리프트 초과 시 이메일 알림(SCHEDULE/DRIFT/BOTH 조건 체크)
+  ├── rebalancing_alert.py    # 10분 간격 — 리밸런싱 드리프트 초과 시 이메일 알림(SCHEDULE/DRIFT/BOTH 조건 체크)
   ├── market_signal_alert.py  # 1시간 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
   ├── market_signal_daily_digest.py  # 매일 08:30 KST — 등급 전환 여부와 무관하게 현재 시장 신호를 요약 발송(옵트인, 기본 OFF)
   ├── year_end_tax_reminder.py       # 11~12월 매주 월요일 09:00 KST — 손실수확 후보·연금공제 잔여한도·ISA 만기 현황 요약 발송(옵트인, 기본 OFF). 알릴 내용이 없으면 스킵
@@ -323,7 +323,12 @@ jobs/                         # APScheduler 정기 작업
   └── _job_helpers.py         # job 공통 헬퍼 유틸리티
 ```
 
-> **새 job 추가:** `jobs/` 에 파일 생성 후 `app/scheduler.py`의 `init_scheduler()`에 `scheduler.add_job()` 호출로 등록. `timezone="Asia/Seoul"` 필수.
+> **새 job 추가:** `jobs/` 에 파일 생성 후 `app/scheduler.py`의 `init_scheduler()` 안 `jobs` 스펙 리스트에 `(함수, 트리거, id)` 한 줄 추가 (cron은 `kst(...)` 헬퍼 사용 — `timezone="Asia/Seoul"` 자동). `tests/test_scheduler.py`의 `EXPECTED_JOB_IDS`도 함께 갱신.
+
+> **스케줄러 실행 제약 (운영):** 잡은 전부 웹 프로세스 안의 APScheduler(메모리 jobstore)에서 돈다.
+> - **Render 무료 플랜(`render.yaml` `plan: free`)은 15분 무요청 시 인스턴스를 재운다** — 잠든 동안 위 잡 전부(AUTO 실행 포함)가 멈춘다. `.github/workflows/keep-alive.yml`이 10분마다 `/health`를 호출해 완화하지만, GitHub cron 지연/누락이 있어 완전 보장은 아님. 확실히 하려면 유료 플랜 전환.
+> - 프로세스 재시작(재배포·슬립 복귀) 사이에 놓친 실행은 복구되지 않는다(메모리 jobstore). `misfire_grace_time`(`MISFIRE_GRACE_SECONDS`=900초)은 프로세스가 살아 있는 동안 이벤트 루프 지연으로 잡이 버려지는 것만 막는다. 월/주 1회 잡이 중복 발송되지 않도록 서비스 쪽 "오늘 이미 발송" dedup 패턴을 유지할 것.
+> - 단일 인스턴스 전제 — 인스턴스를 2개 이상으로 늘리면 모든 잡이 중복 실행된다.
 
 **자격증명 암호화:** KIS/키움 App Key/Secret·토스 Client ID/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
 
