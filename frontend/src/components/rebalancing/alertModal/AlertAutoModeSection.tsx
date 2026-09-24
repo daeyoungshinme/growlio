@@ -1,4 +1,5 @@
 import { Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
@@ -57,6 +58,22 @@ export function AlertAutoModeSection({
           </>
         )}
       </p>
+      {settingsData && (
+        <p className="text-xs text-orange-600 dark:text-orange-400">
+          하루 합산 거래한도:{" "}
+          <span className="font-medium">
+            {settingsData.auto_rebalancing_daily_value_cap_krw != null
+              ? fmtKrw(settingsData.auto_rebalancing_daily_value_cap_krw)
+              : "미설정(무제한)"}
+          </span>{" "}
+          <Link
+            to="/settings/notifications"
+            className="underline underline-offset-2 hover:text-orange-800 dark:hover:text-orange-200"
+          >
+            설정에서 변경
+          </Link>
+        </p>
+      )}
 
       <div>
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">

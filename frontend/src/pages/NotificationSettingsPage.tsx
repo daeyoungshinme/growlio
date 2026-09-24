@@ -14,6 +14,7 @@ import { useChallengeRemindersToggle } from "@/hooks/useChallengeRemindersToggle
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
+import { AutoRebalancingDailyCapSection } from "@/components/settings/AutoRebalancingDailyCapSection";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
@@ -201,6 +202,9 @@ export default function NotificationSettingsPage() {
 
       <SectionCard title="알림 설정">
         <RebalancingAlertSummaryCard />
+
+        {/* AUTO 리밸런싱 유저 단위 하루 거래한도 — 리밸런싱 알림과 같은 맥락이라 바로 아래 배치 */}
+        <AutoRebalancingDailyCapSection />
 
         {/* 공통 알림 수신 이메일 — 전체 알림 유형에 적용 */}
         <NotificationEmailSection

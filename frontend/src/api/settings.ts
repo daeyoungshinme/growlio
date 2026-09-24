@@ -69,6 +69,10 @@ export const updateCompositeSignalAlerts = (enabled: boolean) =>
 export const updateMarketSignalDigest = (enabled: boolean) =>
   apiPut("/settings/market-signal-digest", { enabled });
 
+/** AUTO 리밸런싱 하루 합산 거래대금 상한(KRW). null이면 무제한. */
+export const updateAutoRebalancingDailyCap = (daily_value_cap_krw: number | null) =>
+  apiPut("/settings/auto-rebalancing-daily-cap", { daily_value_cap_krw });
+
 export const updateYearEndTaxReminder = (enabled: boolean) =>
   apiPut("/settings/year-end-tax-reminder", { enabled });
 
