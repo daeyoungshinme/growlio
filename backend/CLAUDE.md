@@ -377,6 +377,12 @@ db.add(obj); await db.commit(); await db.refresh(obj)
   logger.info("account_synced", account_id=str(account.id), positions=len(positions))
   ```
 
+**날짜/시각 기준 (KST)**
+- 운영 서버(Render Docker)는 TZ 미설정 = UTC. 사용자 기준 "오늘"(스냅샷 날짜·연도·알림 dedup 등)은 `date.today()`/
+  `datetime.now()` 대신 반드시 `app.utils.kst`의 `today_kst()`/`now_kst()`/`KST` 사용 — UTC면 KST 00~09시에 전날이 된다.
+- 예외: 미국 데이터 소스가 자기 날짜 기준을 요구하는 곳(FRED `realtime_start` 등, `economic_indicator_service`).
+- DB 타임스탬프(`created_at` 등)는 기존대로 `datetime.now(UTC)`.
+
 **HTTP 에러 메시지**
 - `HTTPException(status_code=..., detail="한국어 메시지")` — 사용자 노출 메시지는 한국어.
 
