@@ -8,9 +8,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.services.email_templates._shared import _SIGNAL_LEVEL_COLOR, _SIGNAL_LEVEL_LABEL, _email_div, _kv_table
+from app.utils.kst import KST
+
+
+def _to_kst(dt: datetime) -> datetime:
+    """naive 값은 UTC로 간주해 KST로 변환 — 과거 fromtimestamp(ts + 9h)는 서버 로컬 TZ가
+    UTC가 아니면(로컬 개발 등) 오프셋이 이중 적용됐다."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(KST)
 
 
 def _order_preview_table(items: list) -> str:
@@ -219,9 +228,7 @@ def rebalancing_execution_template(
     heading = "리밸런싱 자동 실행 완료" if not has_fail else "리밸런싱 자동 실행 완료 (일부 실패)"
     subject = f"[Growlio] 리밸런싱 자동 실행 완료 — {portfolio_name}"
 
-    _KST_OFFSET = 9 * 3600
-    kst_time = datetime.fromtimestamp(executed_at.timestamp() + _KST_OFFSET)
-    time_str = kst_time.strftime("%Y-%m-%d %H:%M KST")
+    time_str = _to_kst(executed_at).strftime("%Y-%m-%d %H:%M KST")
 
     _ACTION_LABEL = {"BUY": "매수", "SELL": "매도", "SKIPPED": "건너뜀"}
     _STATUS_COLOR = {"SUCCESS": "#16a34a", "FAILED": "#ef4444", "SKIPPED": "#6b7280"}
@@ -289,12 +296,11 @@ def rebalancing_execution_template(
 
 
 _PLAN_MARKET_LABEL = {"KR": "국내", "US": "미국"}
-_KST_OFFSET_SECONDS = 9 * 3600
 
 
 def _render_plan_buy_section(section: dict, account_note: str, btn_style: str) -> str:
     market_label = _PLAN_MARKET_LABEL.get(section["market"], section["market"])
-    buy_time_str = datetime.fromtimestamp(section["deadline_at"].timestamp() + _KST_OFFSET_SECONDS).strftime("%H:%M")
+    buy_time_str = _to_kst(section["deadline_at"]).strftime("%H:%M")
     return (
         f"<div style='margin-top:20px;padding:16px;background:#eff6ff;border-radius:8px;'>"
         f"<h3 style='margin:0;color:#1d4ed8;font-size:15px;'>매수 주문 ({market_label}){account_note}</h3>"
@@ -310,9 +316,7 @@ def _render_plan_buy_section(section: dict, account_note: str, btn_style: str) -
 
 def _render_plan_sell_section(section: dict, account_note: str, btn_style: str) -> str:
     market_label = _PLAN_MARKET_LABEL.get(section["market"], section["market"])
-    sell_time_str = datetime.fromtimestamp(section["deadline_at"].timestamp() + _KST_OFFSET_SECONDS).strftime(
-        "%Y-%m-%d %H:%M"
-    )
+    sell_time_str = _to_kst(section["deadline_at"]).strftime("%Y-%m-%d %H:%M")
     return (
         f"<div style='margin-top:16px;padding:16px;background:#fef2f2;border-radius:8px;'>"
         f"<h3 style='margin:0;color:#dc2626;font-size:15px;'>매도 주문 ({market_label}){account_note} — 승인 필요</h3>"

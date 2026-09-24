@@ -21,6 +21,7 @@ from app.utils.cache_keys import (
     invalidate_user_caches,
     monthly_trend_key,
 )
+from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -132,7 +133,6 @@ async def delete_transaction(
 
 
 async def _invalidate_tx_caches(user_id: UUID) -> None:
-    from datetime import date
 
     cache = await get_cache_store()
     await invalidate_user_caches(
@@ -141,7 +141,7 @@ async def _invalidate_tx_caches(user_id: UUID) -> None:
         monthly_trend_key(user_id),
         challenge_progress_key(user_id),
     )
-    await invalidate_dividend_caches(cache, user_id, date.today().year)
+    await invalidate_dividend_caches(cache, user_id, today_kst().year)
 
 
 async def _get_owned_tx(tx_id: UUID, user_id: UUID, db: AsyncSession) -> Transaction:

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import io
+import time
 import zipfile
-from datetime import datetime
 
 import defusedxml.ElementTree as ET
 import httpx
 import structlog
+
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -17,7 +19,7 @@ DART_BASE = "https://opendart.fss.or.kr/api"
 
 # ── 종목코드 → corp_code 캐시 ───────────────────────────
 _corp_code_map: dict[str, str] = {}  # "005930" → "00126380"
-_corp_code_loaded_at: datetime | None = None
+_corp_code_loaded_at: float | None = None  # time.monotonic()
 _corp_code_lock = asyncio.Lock()
 _CORP_CODE_TTL_HOURS = 24
 
@@ -58,7 +60,7 @@ async def _ensure_corp_code_map(api_key: str) -> dict[str, str]:
     def _is_fresh() -> bool:
         if not _corp_code_map or _corp_code_loaded_at is None:
             return False
-        age = (datetime.utcnow() - _corp_code_loaded_at).total_seconds()
+        age = time.monotonic() - _corp_code_loaded_at
         return age < _CORP_CODE_TTL_HOURS * 3600
 
     if _is_fresh():
@@ -71,7 +73,7 @@ async def _ensure_corp_code_map(api_key: str) -> dict[str, str]:
         new_map = await _fetch_corp_code_map(api_key)
         if new_map:
             _corp_code_map = new_map
-            _corp_code_loaded_at = datetime.utcnow()
+            _corp_code_loaded_at = time.monotonic()
         else:
             logger.warning("dart_corp_code_refresh_failed", stale_count=len(_corp_code_map))
 
@@ -98,7 +100,7 @@ async def fetch_dart_dividend(ticker: str, api_key: str, year: int | None = None
         logger.debug("dart_corp_code_not_found", ticker=ticker)
         return None
 
-    bsns_year = str(year or datetime.utcnow().year)
+    bsns_year = str(year or today_kst().year)
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -121,7 +123,7 @@ async def fetch_dart_dividend(ticker: str, api_key: str, year: int | None = None
     if status != "000":
         # 당해연도 미공시 → 전년도 재시도 1회
         if year is None and status == "013":
-            return await fetch_dart_dividend(ticker, api_key, datetime.utcnow().year - 1)
+            return await fetch_dart_dividend(ticker, api_key, today_kst().year - 1)
         logger.debug("dart_dividend_no_data", ticker=ticker, status=status, year=bsns_year)
         return None
 

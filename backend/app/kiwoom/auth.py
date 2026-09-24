@@ -2,7 +2,6 @@
 
 import json
 from datetime import UTC, datetime, timedelta
-from zoneinfo import ZoneInfo
 
 import structlog
 
@@ -15,10 +14,9 @@ from app.kiwoom.constants import (
 from app.providers._token_cache import get_or_fetch_token
 from app.providers.http_client import _get_client
 from app.services.credential_service import encrypt
+from app.utils.kst import KST as _KST  # 키움 expires_dt는 KST 벽시계 값 (구분자 없는 YYYYMMDDHHMMSS)
 
 logger = structlog.get_logger()
-
-_KST = ZoneInfo("Asia/Seoul")  # 키움 expires_dt는 KST 벽시계 값 (구분자 없는 YYYYMMDDHHMMSS)
 
 
 async def get_access_token(

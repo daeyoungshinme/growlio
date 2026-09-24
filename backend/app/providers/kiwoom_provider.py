@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date
 from typing import TYPE_CHECKING
 
 import httpx
@@ -17,6 +16,7 @@ from app.providers._retry import with_token_refresh
 from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
 from app.services.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -132,5 +132,5 @@ class KiwoomProvider(BrokerProvider):
             invested_krw=total_invested,
             pnl_krw=stock_value_krw - total_invested,
             usd_krw_rate=usd_krw_rate,
-            extra={"source": "KIWOOM_API", "snapshot_date": date.today()},
+            extra={"source": "KIWOOM_API", "snapshot_date": today_kst()},
         )

@@ -10,7 +10,7 @@ import hashlib
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 
 import structlog
@@ -31,10 +31,9 @@ from app.services.rebalancing.order_builder import (
     refresh_live_prices,
     split_orders_by_market,
 )
+from app.utils.kst import KST as _KST
 
 logger = structlog.get_logger()
-
-_KST = timezone(timedelta(hours=9))
 
 
 @dataclass(frozen=True)

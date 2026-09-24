@@ -16,6 +16,7 @@ import structlog
 
 from app.services.price_sync_sources import sync_pykrx_close_series, yf_symbol_to_krx_ticker
 from app.utils.circuit_breaker import yahoo_circuit
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -68,7 +69,7 @@ def fetch_yf_daily_returns(
     if not all_syms:
         return {}
 
-    end = date.today()
+    end = today_kst()
     start = end - timedelta(days=period_days)
     result: dict[str, list[float]] = {}
 

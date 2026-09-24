@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
 
 import structlog
 from sqlalchemy import func, select
@@ -13,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cache_store import get_cache_store
 from app.models.asset import UserTickerSettings
 from app.utils.cache_keys import dividend_info_key, dividend_months_key, invalidate_dividend_caches
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -50,7 +50,7 @@ async def upsert_ticker_settings(
     await db.commit()
 
     cache = await get_cache_store()
-    current_year = date.today().year
+    current_year = today_kst().year
     await invalidate_dividend_caches(cache, user_id, current_year)
     await cache.delete(dividend_info_key(ticker, market))
     logger.info("ticker_settings_upserted", user_id=str(user_id), ticker=ticker, market=market)
@@ -77,7 +77,7 @@ async def delete_ticker_settings(user_id: uuid.UUID, ticker: str, market: str, d
     await db.commit()
 
     cache = await get_cache_store()
-    current_year = date.today().year
+    current_year = today_kst().year
     await invalidate_dividend_caches(cache, user_id, current_year)
     await cache.delete(dividend_months_key(ticker, market))
     await cache.delete(dividend_info_key(ticker, market))

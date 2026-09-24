@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 import httpx
@@ -62,6 +62,7 @@ from app.utils.cache_keys import (
 )
 from app.utils.currency import fetch_usd_krw
 from app.utils.inproc_lock import inproc_lock
+from app.utils.kst import today_kst
 from app.utils.pnl import calc_net_asset_amount
 
 _CREDENTIAL_FIELDS: set[str] = {
@@ -268,7 +269,7 @@ async def create_account(
             db,
             account_id=account.id,
             user_id=account.user_id,
-            snapshot_date=date.today(),
+            snapshot_date=today_kst(),
             amount_krw=_calc_manual_snap_amount(account),
             source="MANUAL",
         )
@@ -343,7 +344,7 @@ async def update_account(
             db,
             account_id=account.id,
             user_id=account.user_id,
-            snapshot_date=date.today(),
+            snapshot_date=today_kst(),
             amount_krw=_calc_manual_snap_amount(account),
             source="MANUAL",
         )
@@ -362,7 +363,7 @@ async def update_account(
             db,
             account_id=account.id,
             user_id=account.user_id,
-            snapshot_date=date.today(),
+            snapshot_date=today_kst(),
             amount_krw=total,
             invested_amount=latest_snap.invested_amount if latest_snap else None,
             unrealized_pnl=latest_snap.unrealized_pnl if latest_snap else None,
@@ -384,7 +385,7 @@ async def update_account(
                         account_id=account.id,
                         transaction_type="DEPOSIT" if delta > 0 else "WITHDRAWAL",
                         amount=abs(delta),
-                        transaction_date=date.today(),
+                        transaction_date=today_kst(),
                     )
                 )
         await db.commit()
@@ -563,7 +564,7 @@ async def update_isa_pnl_override(
     account.isa_manual_cumulative_pnl_krw = body.cumulative_pnl_krw
     if body.cumulative_pnl_krw is not None:
         account.isa_baseline_auto_pnl_krw = await calc_account_auto_pnl(current_user.id, account.id, db)
-        account.isa_baseline_captured_at = date.today()
+        account.isa_baseline_captured_at = today_kst()
     else:
         account.isa_baseline_auto_pnl_krw = None
         account.isa_baseline_captured_at = None

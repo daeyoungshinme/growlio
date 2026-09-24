@@ -10,7 +10,7 @@ import time
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import delete as sql_delete
@@ -36,6 +36,7 @@ from app.utils.cache_keys import (
     invalidate_asset_account_caches,
 )
 from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit, toss_circuit
+from app.utils.kst import today_kst
 from app.utils.metrics import broker_sync_duration
 
 logger = structlog.get_logger()
@@ -162,7 +163,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     # 중간 실패 시 전체 롤백되어 부분 동기화 상태를 방지한다.
     await db.flush()
 
-    today = balance.extra.get("snapshot_date", date.today())
+    today = balance.extra.get("snapshot_date", today_kst())
     source = balance.extra.get("source", account.data_source)
 
     snapshot = await _upsert_snapshot(

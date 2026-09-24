@@ -137,6 +137,8 @@ async def _fred_get_release_dates(series_id: str, upcoming: bool = False) -> lis
             "include_release_dates_with_no_data": "true" if upcoming else "false",
         }
         if upcoming:
+            # today_kst()가 아닌 서버 date.today() 유지: FRED는 미국 기준 날짜보다 미래인
+            # realtime_start를 400으로 거부하는데, KST는 대부분 시간대에 미국보다 하루 앞선다.
             dates_params["realtime_start"] = date.today().isoformat()
 
         async with httpx.AsyncClient(timeout=10) as client:

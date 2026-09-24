@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from zoneinfo import ZoneInfo
 
 import structlog
 from sqlalchemy import select
@@ -28,10 +27,10 @@ from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.email_service import send_challenge_wrap_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
+from app.utils.kst import KST as _KST
 
 logger = structlog.get_logger()
 
-_KST = ZoneInfo("Asia/Seoul")
 _CONCURRENCY = 3
 _DEDUP_TTL = 45 * 24 * 3600
 _MILESTONES = (3, 6, 12, 24, 36, 60)

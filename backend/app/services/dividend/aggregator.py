@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date
 from typing import TYPE_CHECKING
 
 import structlog
@@ -13,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.utils.cache_keys import TTL_DIVIDEND_SUMMARY, dividend_summary_key, set_cached_json
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
@@ -34,7 +34,7 @@ async def get_dividend_summary(
         except json.JSONDecodeError:
             logger.warning("dividend_cache_read_error", user_id=str(user_id))
 
-    current_year = date.today().year
+    current_year = today_kst().year
 
     annual_received, monthly_breakdown, monthly_ticker_breakdown = await _fetch_dividend_aggregates(
         user_id, db, current_year, account_id

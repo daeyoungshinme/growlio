@@ -16,6 +16,7 @@ from app.utils.cache_keys import (
     get_cached_json,
     set_cached_json,
 )
+from app.utils.kst import today_kst
 
 _EXTENDED_ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.BANK_ACCOUNT: "통장잔고",
@@ -36,7 +37,7 @@ _STOCK_ASSET_TYPES = ("STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER")
 
 def _months_ago_start_date(months: int, today: date | None = None) -> date:
     """`months`개월 전 1일을 반환한다 (예: today=2026-03-15, months=12 → 2025-04-01)."""
-    today = today or date.today()
+    today = today or today_kst()
     start_month = today.month - (months - 1)
     start_year = today.year
     while start_month <= 0:

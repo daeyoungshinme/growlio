@@ -7,12 +7,13 @@
 from __future__ import annotations
 
 import statistics
-from datetime import date, timedelta
+from datetime import timedelta
 
 import structlog
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.utils.circuit_breaker import yahoo_circuit
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -43,7 +44,7 @@ def _exclude_capital_gain_outlier(ticker: object) -> float | None:
         divs = ticker.dividends  # type: ignore[attr-defined]
         if divs is None or len(divs) == 0:
             return None
-        cutoff = date.today() - timedelta(days=365)
+        cutoff = today_kst() - timedelta(days=365)
         recent = [float(v) for ts, v in divs.items() if hasattr(ts, "date") and ts.date() >= cutoff and float(v) > 0]
         if len(recent) < 2:
             return None
@@ -138,7 +139,7 @@ def sync_pykrx_etf_dividend_info(ticker: str) -> dict:
         from pykrx import stock
 
     try:
-        today = date.today()
+        today = today_kst()
         end = today.strftime("%Y%m%d")
         start = (today - timedelta(days=365)).strftime("%Y%m%d")
 
@@ -190,7 +191,7 @@ def sync_fdr_etf_dividend_info(ticker: str) -> dict:
         with contextlib.redirect_stdout(io.StringIO()):
             from pykrx import stock
 
-        today_str = date.today().strftime("%Y%m%d")
+        today_str = today_kst().strftime("%Y%m%d")
         fund_df = stock.get_market_fundamental_by_ticker(today_str, market="ALL")
 
         if fund_df is None or fund_df.empty or ticker not in fund_df.index:
@@ -374,7 +375,7 @@ def sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:
         if divs is None or len(divs) == 0:
             yahoo_circuit.record_success()
             return []
-        cutoff_year = date.today().year - 2
+        cutoff_year = today_kst().year - 2
         months: set[int] = set()
         for ts in divs.index:
             if hasattr(ts, "year") and ts.year >= cutoff_year:

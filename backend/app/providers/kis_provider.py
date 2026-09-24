@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date
 from typing import TYPE_CHECKING
 
 import httpx
@@ -22,6 +21,7 @@ from app.providers.base import BalanceResult, BrokerProvider, raw_to_position
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -154,5 +154,5 @@ class KISProvider(BrokerProvider):
             invested_krw=total_invested,
             pnl_krw=stock_value_krw - total_invested,
             usd_krw_rate=usd_krw_rate,
-            extra={"source": "KIS_API", "snapshot_date": date.today()},
+            extra={"source": "KIS_API", "snapshot_date": today_kst()},
         )

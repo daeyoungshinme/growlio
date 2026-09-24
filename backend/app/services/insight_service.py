@@ -18,6 +18,7 @@ from app.services.tax_service import (
     get_overseas_positions_detail,
 )
 from app.utils.cache_keys import TTL_INSIGHTS, CacheStoreType, get_cached_json, insights_key, set_cached_json
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -254,9 +255,7 @@ async def _check_tax_loss_harvest(
     if not loss_positions or total_gain <= 0:
         return []
 
-    from datetime import date
-
-    rates = _get_rates(date.today().year)
+    rates = _get_rates(today_kst().year)
 
     # 연 250만원 기본 공제 적용 — 공제 후 과세 이익이 없으면 절세 불필요
     taxable_gain = max(0.0, total_gain - rates["overseas_deduction"])

@@ -10,6 +10,8 @@ from datetime import date
 
 from dateutil.relativedelta import relativedelta
 
+from app.utils.kst import today_kst
+
 _LO_ANNUAL_RETURN = -0.9
 _HI_ANNUAL_RETURN = 5.0  # 연 500% — 이 이상 필요하면 사실상 달성 불가능한 목표로 간주
 
@@ -20,7 +22,7 @@ DEPOSIT_GUIDE_PRESET_RETURNS_PCT: tuple[float, ...] = (4.0, 7.0, 10.0)
 
 def months_until_year_end(target_year: int) -> int:
     """오늘부터 `target_year`년 12월 31일까지 남은 개월 수."""
-    today = date.today()
+    today = today_kst()
     delta = relativedelta(date(target_year, 12, 31), today)
     return delta.years * 12 + delta.months
 

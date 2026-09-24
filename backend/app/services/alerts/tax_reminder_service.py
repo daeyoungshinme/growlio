@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from functools import partial
 from typing import Any, TypedDict
 
@@ -26,6 +26,7 @@ from app.models.user import User, UserSettings
 from app.services.isa_service import get_isa_status_summary
 from app.services.pension_contribution_service import calc_pension_contribution_status
 from app.services.tax_service import get_tax_summary
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -59,7 +60,7 @@ async def _has_pension_accounts(user_id: uuid.UUID, db: AsyncSession) -> bool:
 
 async def build_reminder_content(user_id: uuid.UUID, db: AsyncSession) -> TaxReminderContent:
     """세 도메인 서비스를 병렬 조회해 리마인더 콘텐츠로 조합한다."""
-    current_year = date.today().year
+    current_year = today_kst().year
     tax_summary, pension, isa, has_pension_accounts = await asyncio.gather(
         get_tax_summary(user_id, current_year, db),
         calc_pension_contribution_status(user_id, current_year, db),
@@ -111,7 +112,7 @@ async def _get_reminder_subscribers(db: AsyncSession) -> list[tuple[User, UserSe
 
 async def _already_sent_reminder_today(db: AsyncSession, user_id: uuid.UUID) -> bool:
     """오늘 이미 리마인더를 발송했으면 True — 스케줄러 재시작/misfire로 인한 중복 발송 방지."""
-    today = date.today()
+    today = today_kst()
     day_start = datetime(today.year, today.month, today.day, tzinfo=UTC)
     result = await db.execute(
         select(AlertHistory.id)

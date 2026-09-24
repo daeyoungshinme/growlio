@@ -29,6 +29,7 @@ from app.utils.cache_keys import (
     get_cached_json,
     set_cached_json,
 )
+from app.utils.kst import today_kst
 
 # 기존 테스트 임포트 호환 별칭
 _get_latest_snapshot_rows = get_latest_snapshot_rows
@@ -49,7 +50,7 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
     계산하므로(get_dashboard_summary 참고) 여기서는 이중계산 방지를 위해 제외한다.
     first_snap_date는 연환산 기간 계산용으로 전체 계좌 기준을 유지한다.
     """
-    year = date.today().year
+    year = today_kst().year
     row = (
         await db.execute(
             text("""

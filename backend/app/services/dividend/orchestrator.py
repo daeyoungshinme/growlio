@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from datetime import date
 
 import structlog
 from sqlalchemy import bindparam, select, text
@@ -32,6 +31,7 @@ from app.utils.cache_keys import (
     portfolio_overview_acct_suffix,
 )
 from app.utils.currency import get_usd_krw_rate
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -300,7 +300,7 @@ async def get_ticker_dividend_summary(
     user_id: uuid.UUID, db: AsyncSession, account_ids: list[uuid.UUID] | None = None
 ) -> list[dict]:
     """종목별 실수령(올해) + 예상 배당금 통합. 24h 캐시. account_ids 지정 시 해당 계좌들만 집계."""
-    current_year = date.today().year
+    current_year = today_kst().year
     cache_key = dividend_ticker_summary_key(user_id, current_year, portfolio_overview_acct_suffix(account_ids))
 
     cache = await get_cache_store()
