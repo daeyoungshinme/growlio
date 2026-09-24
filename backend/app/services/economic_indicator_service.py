@@ -94,10 +94,10 @@ async def _fred_get_observations(series_id: str, limit: int = 36) -> list[dict[s
             data = resp.json()
             return data.get("observations", [])
     except httpx.HTTPStatusError as e:
-        logger.error("fred_fetch_failed", series=series_id, status_code=e.response.status_code, error=str(e))
+        logger.warning("fred_fetch_failed", series=series_id, status_code=e.response.status_code, error=str(e))
         raise
     except Exception as e:
-        logger.error("fred_fetch_failed", series=series_id, error=str(e))
+        logger.warning("fred_fetch_failed", series=series_id, error=str(e))
         raise
 
 
