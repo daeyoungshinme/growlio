@@ -11,12 +11,14 @@ import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
 import { useKisCredentialVerify } from "@/hooks/useKisCredentialVerify";
 import { useTossCredentialVerify } from "@/hooks/useTossCredentialVerify";
+import { useKiwoomCredentialVerify } from "@/hooks/useKiwoomCredentialVerify";
 import { convertUsdToKrw } from "@/utils/format";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import StockDepositFields from "./StockDepositFields";
 import KisCredentialFields from "./KisCredentialFields";
 import KiwoomCredentialFields from "./KiwoomCredentialFields";
 import TossCredentialFields from "./TossCredentialFields";
+import CredentialDisconnectButton from "./CredentialDisconnectButton";
 
 const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
   STOCK_KIS: "주식 (KIS 한국투자증권)",
@@ -80,6 +82,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
 
   const isKis = form.data_source === "KIS_API";
   const isToss = form.data_source === "TOSS_API";
+  const isKiwoom = form.data_source === "KIWOOM_API";
   const KIS_ACCOUNT_NO_REGEX = /^\d{8}-\d{2}$|^\d{10}$/;
   const kisAccountNoValid =
     !isKis || isEdit || (!!form.kis_account_no && KIS_ACCOUNT_NO_REGEX.test(form.kis_account_no));
@@ -98,6 +101,12 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     verify: tossVerify,
     reset: resetTossVerify,
   } = useTossCredentialVerify();
+  const {
+    verifyState: kiwoomVerifyState,
+    verifyError: kiwoomVerifyError,
+    verify: kiwoomVerify,
+    reset: resetKiwoomVerify,
+  } = useKiwoomCredentialVerify();
 
   const [depositSectionOpen, toggleDepositSection] = useCollapsible(true);
   const [credentialSectionOpen, toggleCredentialSection] = useCollapsible(true);
@@ -111,6 +120,11 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
   const handleTossVerify = async () => {
     if (!form.toss_client_id || !form.toss_client_secret) return;
     await tossVerify(form.toss_client_id, form.toss_client_secret);
+  };
+
+  const handleKiwoomVerify = async () => {
+    if (!form.kiwoom_app_key || !form.kiwoom_app_secret) return;
+    await kiwoomVerify(form.kiwoom_app_key, form.kiwoom_app_secret, form.is_mock_mode ?? true);
   };
 
   const handleSourceChange = (source: string) => {
@@ -132,6 +146,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
       set("kiwoom_account_no", undefined);
       set("kiwoom_app_key", undefined);
       set("kiwoom_app_secret", undefined);
+      resetKiwoomVerify();
     }
     if (source !== "TOSS_API") {
       set("toss_account_no", undefined);
@@ -183,6 +198,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     !tossValid ||
     (isKis && !isEdit && verifyState !== "ok") ||
     (isToss && !isEdit && tossVerifyState !== "ok") ||
+    (isKiwoom && !isEdit && kiwoomVerifyState !== "ok") ||
     (form.data_source === "MANUAL" && usdPending);
   const editDisabled = isLoading || !form.name || usdPending;
 
@@ -472,7 +488,15 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                   )}
 
                   {form.data_source === "KIWOOM_API" && (
-                    <KiwoomCredentialFields form={form} set={set} isEdit={isEdit} />
+                    <KiwoomCredentialFields
+                      form={form}
+                      set={set}
+                      isEdit={isEdit}
+                      verifyState={kiwoomVerifyState}
+                      verifyError={kiwoomVerifyError}
+                      onVerify={handleKiwoomVerify}
+                      onCredentialChange={resetKiwoomVerify}
+                    />
                   )}
 
                   {form.data_source === "TOSS_API" && (
@@ -487,6 +511,10 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                     />
                   )}
 
+                  {initialAccount && (
+                    <CredentialDisconnectSlot account={initialAccount} source={form.data_source} />
+                  )}
+
                   {!isEdit && !isToss && (
                     <div className="flex items-center gap-2">
                       <input
@@ -496,6 +524,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                         onChange={(e) => {
                           set("is_mock_mode", e.target.checked);
                           if (isKis) resetVerify();
+                          if (isKiwoom) resetKiwoomVerify();
                         }}
                         className="w-4 h-4 text-blue-600"
                       />
@@ -563,4 +592,18 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
       </Modal>
     </ErrorBoundary>
   );
+}
+
+/** 수정 모드에서 현재 연동 방식에 해당하는 계좌별 API 키가 저장돼 있으면 삭제(연동 해제) 버튼을 노출. */
+function CredentialDisconnectSlot({ account, source }: { account: AssetAccount; source?: string }) {
+  if (source === "KIS_API" && account.has_own_kis_credentials) {
+    return <CredentialDisconnectButton accountId={account.id} broker="kis" />;
+  }
+  if (source === "KIWOOM_API" && account.has_own_kiwoom_credentials) {
+    return <CredentialDisconnectButton accountId={account.id} broker="kiwoom" />;
+  }
+  if (source === "TOSS_API" && account.has_own_toss_credentials) {
+    return <CredentialDisconnectButton accountId={account.id} broker="toss" />;
+  }
+  return null;
 }

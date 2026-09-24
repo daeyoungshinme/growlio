@@ -34,6 +34,8 @@ import {
   batchSetTargetPortfolio,
   verifyKisCredentials,
   verifyTossCredentials,
+  verifyKiwoomCredentials,
+  deleteAccountCredentials,
   searchStocks,
   fetchExchangeRate,
   fetchStockPrice,
@@ -141,6 +143,25 @@ describe("api/assets", () => {
     });
     expect(result).toEqual(mockResponse);
   });
+
+  it("verifyKiwoomCredentials calls POST /assets/verify-kiwoom-credentials", async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: { valid: true, message: "OK" } });
+    await verifyKiwoomCredentials({ kiwoom_app_key: "k", kiwoom_app_secret: "s", is_mock: false });
+    expect(api.post).toHaveBeenCalledWith("/assets/verify-kiwoom-credentials", {
+      kiwoom_app_key: "k",
+      kiwoom_app_secret: "s",
+      is_mock: false,
+    });
+  });
+
+  it.each(["kis", "kiwoom", "toss"] as const)(
+    "deleteAccountCredentials(%s) calls DELETE /assets/{id}/{broker}-credentials",
+    async (broker) => {
+      vi.mocked(api.delete).mockResolvedValue({ data: null });
+      await deleteAccountCredentials("acc-1", broker);
+      expect(api.delete).toHaveBeenCalledWith(`/assets/acc-1/${broker}-credentials`);
+    },
+  );
 
   it("searchStocks calls GET /stocks/search with query", async () => {
     const mockSuggestions = [

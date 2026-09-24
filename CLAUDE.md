@@ -100,7 +100,8 @@ growlio/
 - **실제 운영 배포**: 백엔드는 `render.yaml`(Render, Docker runtime) — 프론트엔드는 `frontend/vercel.json`(Vercel)이 실제 배포 경로. `vercel.json`이 `/api/*` → Render 백엔드로 rewrite하고, CSP를 포함한 보안 헤더도 여기서 설정됨(`nginx.conf`가 아님 — 과거 이 구분이 문서화돼 있지 않아 "nginx가 CSP를 처리한다"고 오인해 실제 배포에는 CSP가 미적용이던 사고가 있었음). 새 API prefix 추가 시 `frontend/vercel.json`의 `rewrites`도 함께 확인.
 - `nginx/` + `docker-compose.yml` — 위 Render/Vercel 조합을 쓰지 않고 자체 서버에 통째로 호스팅할 때를 위한 대안 구성(포트 80 리버스 프록시, `/api/*` → backend:8000, 그 외 → frontend 정적파일). 현재 운영에서는 사용하지 않음. 이 경로를 실제로 쓰게 되면 `nginx/nginx.conf`의 `location` 블록도 새 API prefix에 맞춰 수정 필요.
 - `monitoring/` — Prometheus 설정(`prometheus.yml`) + Grafana 대시보드. `docker compose --profile monitoring up -d` 로 실행 (Prometheus `:9090`, Grafana `:3000`).
-- `.github/` — 2개 워크플로우: `ci.yml` (lint/test/build, push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행).
+- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build, push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행), `keep-alive.yml` (10분마다 운영 백엔드 `/health` 호출).
+- **Render 무료 플랜 슬립 주의**: 15분 무요청 시 백엔드가 잠들면 같은 프로세스의 스케줄러(AUTO 리밸런싱·알림·일일 동기화)도 멈춘다. `keep-alive.yml`로 완화 중(완전 보장 아님) — 상세는 `backend/CLAUDE.md`의 "스케줄러 실행 제약".
 
 ---
 

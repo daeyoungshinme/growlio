@@ -227,6 +227,7 @@ vi.mock("@/api/settings", () => ({
   fetchSettings: vi
     .fn()
     .mockResolvedValue({ annual_deposit_goal: null, retirement_target_year: null }),
+  updateAutoRebalancingDailyCap: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("@/api/invest", () => ({

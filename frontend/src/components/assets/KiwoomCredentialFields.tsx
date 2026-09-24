@@ -1,15 +1,28 @@
 import type { AssetAccountCreate } from "@/api/assets";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { useForm } from "@/hooks/useForm";
+import CredentialVerifyButton from "./CredentialVerifyButton";
 
 interface Props {
   form: AssetAccountCreate;
   set: ReturnType<typeof useForm<AssetAccountCreate>>["set"];
   isEdit: boolean;
+  verifyState: "idle" | "loading" | "ok" | "error";
+  verifyError: string;
+  onVerify: () => void;
+  onCredentialChange: () => void;
 }
 
 // 키움증권 자격증명 입력
-export default function KiwoomCredentialFields({ form, set, isEdit }: Props) {
+export default function KiwoomCredentialFields({
+  form,
+  set,
+  isEdit,
+  verifyState,
+  verifyError,
+  onVerify,
+  onCredentialChange,
+}: Props) {
   return (
     <>
       {!isEdit && (
@@ -47,7 +60,10 @@ export default function KiwoomCredentialFields({ form, set, isEdit }: Props) {
           type="password"
           className={`mt-1 w-full ${INPUT_SM}`}
           value={form.kiwoom_app_key ?? ""}
-          onChange={(e) => set("kiwoom_app_key", e.target.value || undefined)}
+          onChange={(e) => {
+            set("kiwoom_app_key", e.target.value || undefined);
+            onCredentialChange();
+          }}
           placeholder={isEdit ? "기존 키 유지" : "키움 앱 키"}
           autoComplete="off"
         />
@@ -64,11 +80,21 @@ export default function KiwoomCredentialFields({ form, set, isEdit }: Props) {
           type="password"
           className={`mt-1 w-full ${INPUT_SM}`}
           value={form.kiwoom_app_secret ?? ""}
-          onChange={(e) => set("kiwoom_app_secret", e.target.value || undefined)}
+          onChange={(e) => {
+            set("kiwoom_app_secret", e.target.value || undefined);
+            onCredentialChange();
+          }}
           placeholder={isEdit ? "기존 시크릿 유지" : "키움 앱 시크릿"}
           autoComplete="off"
         />
       </div>
+      <CredentialVerifyButton
+        show={!isEdit || !!form.kiwoom_app_key || !!form.kiwoom_app_secret}
+        disabled={!form.kiwoom_app_key || !form.kiwoom_app_secret}
+        verifyState={verifyState}
+        verifyError={verifyError}
+        onVerify={onVerify}
+      />
     </>
   );
 }

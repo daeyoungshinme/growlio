@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 from fastapi.testclient import TestClient
 
 
@@ -576,6 +577,50 @@ class TestDeleteCredentials:
             resp = client.delete(f"/api/v1/assets/{account.id}/kiwoom-credentials")
         assert resp.status_code == 204
         assert account.kiwoom_app_key is None
+
+
+class TestVerifyKiwoomCredentials:
+    _URL = "/api/v1/assets/verify-kiwoom-credentials"
+    _BODY = {"kiwoom_app_key": "k", "kiwoom_app_secret": "s", "is_mock": True}
+    _SERVICE = "app.api.v1.assets._verify_kiwoom_credentials_service"
+
+    def _post(self, side_effect=None):
+        user = _make_user()
+        app = _setup_app(user, _make_mock_db())
+        with (
+            patch(self._SERVICE, new=AsyncMock(side_effect=side_effect)) as svc,
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(self._URL, json=self._BODY)
+        return resp, svc
+
+    def test_valid(self, override_settings):
+        resp, svc = self._post()
+        assert resp.status_code == 200
+        assert resp.json()["valid"] is True
+        svc.assert_awaited_once_with("k", "s", True)
+
+    def test_invalid_key_return_code(self, override_settings):
+        # 키움은 잘못된 키에 HTTP 200 + return_code != 0 → _request_token이 RuntimeError
+        resp, _ = self._post(RuntimeError("키움 토큰 발급 실패: 앱키 오류"))
+        assert resp.status_code == 400
+        assert "키움 자격증명이 잘못되었습니다" in resp.json()["detail"]
+
+    def test_http_401(self, override_settings):
+        req = httpx.Request("POST", "https://kiwoom.example/oauth2/token")
+        err = httpx.HTTPStatusError("401", request=req, response=httpx.Response(401, request=req))
+        resp, _ = self._post(err)
+        assert resp.status_code == 400
+
+    def test_http_500(self, override_settings):
+        req = httpx.Request("POST", "https://kiwoom.example/oauth2/token")
+        err = httpx.HTTPStatusError("500", request=req, response=httpx.Response(500, request=req))
+        resp, _ = self._post(err)
+        assert resp.status_code == 502
+
+    def test_timeout(self, override_settings):
+        resp, _ = self._post(httpx.ConnectTimeout("timeout"))
+        assert resp.status_code == 504
 
 
 class TestUpdateIsaPnlOverride:

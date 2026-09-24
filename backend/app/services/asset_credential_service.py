@@ -43,6 +43,16 @@ async def verify_kis_credentials(
         )
 
 
+async def verify_kiwoom_credentials(kiwoom_app_key: str, kiwoom_app_secret: str, is_mock: bool) -> None:
+    """키움 자격증명 유효성을 확인한다 (계좌 생성/토큰 저장 없이). 실패 시 예외를 그대로 전파한다.
+
+    키움 토큰은 계좌 단위로만 저장되므로(전역 자격증명 없음) KIS와 달리 DB 세션 없이 발급 API만 호출한다.
+    """
+    from app.kiwoom.auth import verify_credentials
+
+    await verify_credentials(kiwoom_app_key, kiwoom_app_secret, is_mock=is_mock)
+
+
 async def verify_toss_credentials(toss_client_id: str, toss_client_secret: str) -> None:
     """토스 자격증명 유효성을 확인한다 (계좌 생성/토큰 저장 없이). 실패 시 예외를 그대로 전파한다."""
     from app.toss.auth import verify_credentials

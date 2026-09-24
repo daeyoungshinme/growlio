@@ -271,6 +271,12 @@ class KisCredentialVerifyRequest(BaseModel):
     is_mock: bool = True
 
 
+class KiwoomCredentialVerifyRequest(BaseModel):
+    kiwoom_app_key: str
+    kiwoom_app_secret: str
+    is_mock: bool = True
+
+
 class TossCredentialVerifyRequest(BaseModel):
     toss_client_id: str
     toss_client_secret: str
