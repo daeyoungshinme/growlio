@@ -1,12 +1,14 @@
 """공통 테스트 픽스처."""
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.utils.kst import today_kst
 
 # GitHub Actions는 TTY가 감지되어 structlog가 Rich 렌더러를 기본 활성화함.
 # 복잡한 traceback(JWT 오류 체인 등)을 Rich가 렌더링하면 30초+ hang → timeout.
@@ -206,7 +208,7 @@ def make_snapshot(make_user_id):
         id=uuid.uuid4(),
         user_id=make_user_id,
         account_id=uuid.uuid4(),
-        snapshot_date=date.today(),
+        snapshot_date=today_kst(),
         amount_krw=10_000_000.0,
         invested_amount=9_000_000.0,
         unrealized_pnl=1_000_000.0,

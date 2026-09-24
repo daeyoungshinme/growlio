@@ -46,6 +46,7 @@ from app.services.recommendation_universe import (
     resolve_index_region,
     resolve_tracking_index,
 )
+from app.utils.kst import today_kst
 
 
 @pytest.fixture(autouse=True)
@@ -132,14 +133,12 @@ class TestSolveRequiredMonthlyDeposit:
 
 class TestMonthsUntilYearEnd:
     def test_future_year_is_positive(self):
-        from datetime import date
 
-        assert months_until_year_end(date.today().year + 5) > 0
+        assert months_until_year_end(today_kst().year + 5) > 0
 
     def test_past_year_is_non_positive(self):
-        from datetime import date
 
-        assert months_until_year_end(date.today().year - 5) <= 0
+        assert months_until_year_end(today_kst().year - 5) <= 0
 
 
 class TestComputeOverallClassBounds:
@@ -1540,11 +1539,10 @@ class TestGetGoalRecommendation:
 
     async def test_infeasible_required_return_reports_note(self):
         """필요수익률(연 60%)이 해석 가능한 범위 내지만 모든 후보 CAGR을 초과하면 추천 없이 note만 채워진다."""
-        from datetime import date
 
         settings_row = SimpleNamespace(
             goal_amount=1_600_000.0,  # pv 100만원, 무적립, 1년 내 60% 수익률 필요
-            retirement_target_year=date.today().year + 1,
+            retirement_target_year=today_kst().year + 1,
             monthly_deposit_amount=0.0,
             annual_deposit_goal=None,
             annual_dividend_goal=None,

@@ -10,6 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.utils.kst import today_kst
+
 # ── _calc_returns (순수 함수) ─────────────────────────────────
 
 
@@ -31,7 +33,7 @@ class TestCalcReturns:
     def test_first_date_in_future_returns_none(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
 
-        future = date.today() + timedelta(days=30)
+        future = today_kst() + timedelta(days=30)
         ann, cum = _calc_returns(1_100_000, 1_000_000, future)
         assert ann is None
         assert cum is None
@@ -39,14 +41,14 @@ class TestCalcReturns:
     def test_first_date_today_returns_none(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
 
-        ann, cum = _calc_returns(1_100_000, 1_000_000, date.today())
+        ann, cum = _calc_returns(1_100_000, 1_000_000, today_kst())
         assert ann is None
         assert cum is None
 
     def test_positive_return(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
 
-        one_year_ago = date.today().replace(year=date.today().year - 1)
+        one_year_ago = today_kst().replace(year=today_kst().year - 1)
         ann, cum = _calc_returns(1_100_000, 1_000_000, one_year_ago)
         assert ann is not None
         assert cum is not None
@@ -55,7 +57,7 @@ class TestCalcReturns:
     def test_negative_return(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
 
-        one_year_ago = date.today().replace(year=date.today().year - 1)
+        one_year_ago = today_kst().replace(year=today_kst().year - 1)
         ann, cum = _calc_returns(900_000, 1_000_000, one_year_ago)
         assert ann is not None
         assert cum is not None
@@ -69,7 +71,7 @@ class TestCalcReturns:
         """
         from app.services.returns_calculator import calc_returns as _calc_returns
 
-        one_year_ago = date.today().replace(year=date.today().year - 1)
+        one_year_ago = today_kst().replace(year=today_kst().year - 1)
 
         _, cum_correct = _calc_returns(12_000_000, 10_000_000, one_year_ago, net_flows=0)
         assert cum_correct == pytest.approx(20.0, abs=0.01)
@@ -86,7 +88,7 @@ class TestCalcReturns:
         """
         from app.services.returns_calculator import calc_returns as _calc_returns
 
-        one_year_ago = date.today().replace(year=date.today().year - 1)
+        one_year_ago = today_kst().replace(year=today_kst().year - 1)
 
         _, cum_correct = _calc_returns(18_000_000, 16_000_000, one_year_ago, net_flows=2_000_000)
         assert cum_correct == pytest.approx(0.0, abs=0.01)
@@ -582,7 +584,7 @@ class TestGetDashboardSummary:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(date.today(), 0.0, 0.0, 0.0)),
+                new=AsyncMock(return_value=(today_kst(), 0.0, 0.0, 0.0)),
             ),
             patch(
                 "app.services.asset_aggregator._build_asset_totals",

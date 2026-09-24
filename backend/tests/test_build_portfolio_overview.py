@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.services.portfolio_service import build_portfolio_overview
+from app.utils.kst import today_kst
 
 
 def _exec_result(items):
@@ -45,7 +45,7 @@ def _make_snapshot(snap_id, acc_id):
     return SimpleNamespace(
         id=snap_id,
         account_id=acc_id,
-        snapshot_date=date.today(),
+        snapshot_date=today_kst(),
         amount_krw=10_000_000,
         invested_amount=9_000_000,
         unrealized_pnl=1_000_000,
@@ -454,7 +454,7 @@ class TestBuildPortfolioOverviewWithAccounts:
         snapshot2 = SimpleNamespace(
             id=snap_id2,
             account_id=acc_id2,
-            snapshot_date=date.today(),
+            snapshot_date=today_kst(),
             amount_krw=5_000_000,
             invested_amount=4_000_000,
             unrealized_pnl=500_000,

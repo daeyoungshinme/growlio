@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.services.returns_calculator import calc_returns, calc_xirr, xirr
+from app.utils.kst import today_kst
 
 
 class TestXirr:
@@ -71,7 +72,7 @@ class TestXirr:
 
 class TestCalcReturns:
     def test_positive_annualized_return(self):
-        today = date.today()
+        today = today_kst()
         first_date = date(today.year - 2, today.month, 1)
         annualized, cumulative = calc_returns(12000.0, 10000.0, first_date)
         assert annualized is not None
@@ -92,13 +93,13 @@ class TestCalcReturns:
     def test_future_first_date_returns_none(self):
         from datetime import timedelta
 
-        future = date.today() + timedelta(days=30)
+        future = today_kst() + timedelta(days=30)
         annualized, cumulative = calc_returns(10000.0, 5000.0, future)
         assert annualized is None
         assert cumulative is None
 
     def test_same_day_first_date_returns_none(self):
-        annualized, cumulative = calc_returns(10000.0, 5000.0, date.today())
+        annualized, cumulative = calc_returns(10000.0, 5000.0, today_kst())
         assert annualized is None
         assert cumulative is None
 
@@ -107,7 +108,7 @@ class TestCalcReturns:
 
         # 90일 남짓한 기간에 누적 100% 수익률만으로도 (365/91≈4 지수) 연환산이
         # 1000%를 훌쩍 넘김 — xirr()과 동일한 -99~1000 클램프로 None 반환해야 함.
-        first_date = date.today() - timedelta(days=91)
+        first_date = today_kst() - timedelta(days=91)
         annualized, cumulative = calc_returns(20000.0, 10000.0, first_date)
         assert annualized is None
         assert cumulative == pytest.approx(100.0, abs=0.1)
