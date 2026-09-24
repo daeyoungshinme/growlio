@@ -163,6 +163,18 @@ export const verifyKisCredentials = (data: {
   is_mock: boolean;
 }) => apiPost<{ valid: boolean; message: string }>("/assets/verify-kis-credentials", data);
 
+export type CredentialBroker = "kis" | "kiwoom" | "toss";
+
+/** 계좌에 저장된 브로커 API 키 삭제(연동 해제). KIS는 이후 설정의 공통 키로 폴백, 키움/토스는 동기화 중단. */
+export const deleteAccountCredentials = (accountId: string, broker: CredentialBroker) =>
+  apiDelete(`/assets/${accountId}/${broker}-credentials`);
+
+export const verifyKiwoomCredentials = (data: {
+  kiwoom_app_key: string;
+  kiwoom_app_secret: string;
+  is_mock: boolean;
+}) => apiPost<{ valid: boolean; message: string }>("/assets/verify-kiwoom-credentials", data);
+
 export const verifyTossCredentials = (data: {
   toss_client_id: string;
   toss_client_secret: string;

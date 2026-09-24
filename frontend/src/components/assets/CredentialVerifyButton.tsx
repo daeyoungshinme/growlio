@@ -12,7 +12,7 @@ interface Props {
   onVerify: () => void;
 }
 
-/** 브로커 자격증명 "확인" 버튼 + 결과 표시 — KIS/토스 자격증명 입력 폼 공용. */
+/** 브로커 자격증명 "확인" 버튼 + 결과 표시 — KIS/키움/토스 자격증명 입력 폼 공용. */
 export default function CredentialVerifyButton({
   show,
   disabled,

@@ -20,6 +20,7 @@ from app.schemas.asset import (
     BatchSetTargetPortfolioRequest,
     IsaPnlOverrideUpdate,
     KisCredentialVerifyRequest,
+    KiwoomCredentialVerifyRequest,
     SetTargetPortfolioRequest,
     TossCredentialVerifyRequest,
 )
@@ -31,6 +32,9 @@ from app.services.asset_credential_service import (
 )
 from app.services.asset_credential_service import (
     verify_kis_credentials as _verify_kis_credentials_service,
+)
+from app.services.asset_credential_service import (
+    verify_kiwoom_credentials as _verify_kiwoom_credentials_service,
 )
 from app.services.asset_credential_service import (
     verify_toss_credentials as _verify_toss_credentials_service,
@@ -134,6 +138,40 @@ async def verify_kis_credentials(
             detail="KIS 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.",
         ) from e
     return {"valid": True, "message": "KIS 자격증명이 확인되었습니다."}
+
+
+@router.post("/verify-kiwoom-credentials")
+@limiter.limit("10/minute")
+async def verify_kiwoom_credentials(
+    request: Request,
+    req: KiwoomCredentialVerifyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """키움 자격증명 유효성 확인 (계좌 생성 없이)."""
+    try:
+        await _verify_kiwoom_credentials_service(req.kiwoom_app_key, req.kiwoom_app_secret, req.is_mock)
+    except RuntimeError as e:
+        # 키움은 잘못된 키에 HTTP 200 + return_code != 0으로 응답한다 (kiwoom/auth.py _request_token)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="키움 자격증명이 잘못되었습니다. App Key/Secret 및 모의/실계좌 모드를 확인하세요.",
+        ) from e
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in (400, 401, 403):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="키움 자격증명이 잘못되었습니다. App Key/Secret 및 모의/실계좌 모드를 확인하세요.",
+            ) from e
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="키움 서버 오류. 잠시 후 다시 시도하세요.",
+        ) from e
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="키움 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.",
+        ) from e
+    return {"valid": True, "message": "키움 자격증명이 확인되었습니다."}
 
 
 @router.post("/verify-toss-credentials")

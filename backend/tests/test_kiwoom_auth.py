@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from app.kiwoom.auth import _fetch_and_store_token
+from app.kiwoom.auth import _fetch_and_store_token, verify_credentials
 
 
 class TestFetchAndStoreTokenExpiresDt:
@@ -43,3 +43,42 @@ class TestFetchAndStoreTokenExpiresDt:
         expires_at = insert_stmt.compile().params["expires_at"]
         # KST 23:11:20 == UTC 14:11:20 (같은 날, 9시간 차)
         assert expires_at == datetime(2026, 7, 21, 14, 11, 20, tzinfo=UTC)
+
+
+def _client_returning(response: httpx.Response) -> AsyncMock:
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=response)
+    return client
+
+
+class TestVerifyCredentials:
+    """verify_credentials — 계좌 없이 토큰 발급 API만 호출한다(캐시/DB 인자 자체가 없음)."""
+
+    _REQ = httpx.Request("POST", "https://example.com/oauth2/token")
+
+    @pytest.mark.asyncio
+    async def test_valid_credentials(self):
+        response = httpx.Response(200, json={"return_code": 0, "token": "t"}, request=self._REQ)
+        client = _client_returning(response)
+        with patch("app.kiwoom.auth._get_client", return_value=client):
+            await verify_credentials("k", "s", is_mock=True)
+        client.post.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_invalid_key_raises_runtime_error(self):
+        # 키움은 잘못된 키에도 HTTP 200 + return_code != 0 으로 응답한다
+        response = httpx.Response(200, json={"return_code": 3, "return_msg": "앱키 오류"}, request=self._REQ)
+        with (
+            patch("app.kiwoom.auth._get_client", return_value=_client_returning(response)),
+            pytest.raises(RuntimeError, match="앱키 오류"),
+        ):
+            await verify_credentials("bad", "bad", is_mock=True)
+
+    @pytest.mark.asyncio
+    async def test_http_error_propagates(self):
+        response = httpx.Response(401, json={"return_msg": "unauthorized"}, request=self._REQ)
+        with (
+            patch("app.kiwoom.auth._get_client", return_value=_client_returning(response)),
+            pytest.raises(httpx.HTTPStatusError),
+        ):
+            await verify_credentials("bad", "bad", is_mock=False)

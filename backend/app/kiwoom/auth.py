@@ -65,16 +65,11 @@ async def get_access_token(
     return await get_or_fetch_token(cache_key, cache, force_refresh, TOKEN_CACHE_TTL_BUFFER, _query_token_row, _fetch)
 
 
-async def _fetch_and_store_token(
-    app_key: str,
-    app_secret: str,
-    *,
-    is_mock: bool,
-    cache,
-    db,
-    user_id: str,
-    account_id: str,
-) -> str:
+async def _request_token(app_key: str, app_secret: str, *, is_mock: bool) -> dict:
+    """키움 OAuth 토큰 발급 API 호출 — 저장 없이 응답 본문만 반환한다.
+
+    HTTP 4xx/5xx는 httpx.HTTPStatusError, 200 + return_code != "0"(잘못된 키 등)은 RuntimeError로 전파.
+    """
     base_url = KIWOOM_MOCK_BASE_URL if is_mock else KIWOOM_REAL_BASE_URL
 
     client = _get_client(ssl_verify=True)
@@ -101,6 +96,25 @@ async def _fetch_and_store_token(
 
     if str(data.get("return_code", "0")) != "0":
         raise RuntimeError(f"키움 토큰 발급 실패: {data.get('return_msg')}")
+    return data
+
+
+async def verify_credentials(app_key: str, app_secret: str, *, is_mock: bool) -> None:
+    """자격증명 유효성만 확인한다(계좌 생성/토큰 저장 없이). 실패 시 예외 전파."""
+    await _request_token(app_key, app_secret, is_mock=is_mock)
+
+
+async def _fetch_and_store_token(
+    app_key: str,
+    app_secret: str,
+    *,
+    is_mock: bool,
+    cache,
+    db,
+    user_id: str,
+    account_id: str,
+) -> str:
+    data = await _request_token(app_key, app_secret, is_mock=is_mock)
 
     access_token: str = data["token"]  # 키움은 token (표준 access_token 아님)
 
