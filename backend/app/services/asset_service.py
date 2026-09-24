@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -98,9 +99,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     SyncError 계층 예외 및 CircuitOpenError를 그대로 전파한다.
     API 레이어에서 HTTPException으로 변환.
     """
-    import time as _time
-
-    _sync_start = _time.monotonic()
+    _sync_start = time.monotonic()
     provider = get_provider(account)
     circuit = _CIRCUITS.get(account.data_source)
 
@@ -110,10 +109,13 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         else:
             balance = await _retry_provider_sync(provider, account, db, cache)
     except Exception as e:
+        # provider가 세션을 쓰다 실패했을 수 있으므로 롤백 후 에러만 기록(롤백 없이 commit하면
+        # 깨진 트랜잭션 오류가 원래 예외를 가림).
+        await db.rollback()
         account.last_sync_error = format_sync_error(e)
         await db.commit()
         broker_sync_duration.labels(data_source=account.data_source, status="failure").observe(
-            _time.monotonic() - _sync_start
+            time.monotonic() - _sync_start
         )
         raise
 
@@ -124,18 +126,20 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         account.deposit_usd = balance.deposit_foreign
 
     positions_changed = False
-    if balance.positions:
-        existing_positions = await db.execute(
-            select(Position.ticker, Position.market).where(
-                Position.account_id == account.id,
-                Position.snapshot_id.is_(None),
-            )
-        )
+    # 브로커 소스는 조회 성공 = 보유 종목 확정이므로 빈 결과(전량 매도)도 교체해 stale 포지션을 지운다.
+    # MANUAL은 DB 포지션을 그대로 읽어 반환하므로 비었을 때 건드릴 필요가 없다.
+    replace_positions = bool(balance.positions) or account.data_source != "MANUAL"
+    if replace_positions:
+        current_filter = [Position.account_id == account.id, Position.snapshot_id.is_(None)]
+        if not balance.overseas_known:
+            # 해외 조회 실패 — 결과에 해외 종목이 없으므로 국내(KRW) 포지션만 교체하고 해외는 보존
+            current_filter.append(Position.currency == "KRW")
+        existing_positions = await db.execute(select(Position.ticker, Position.market).where(*current_filter))
         old_tickers = {(row.ticker, row.market) for row in existing_positions.all()}
         new_tickers = {(p.ticker, p.market) for p in balance.positions}
         positions_changed = old_tickers != new_tickers
 
-        await db.execute(sql_delete(Position).where(Position.account_id == account.id, Position.snapshot_id.is_(None)))
+        await db.execute(sql_delete(Position).where(*current_filter))
         for p in balance.positions:
             db.add(
                 Position(
@@ -184,7 +188,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     await invalidate_account_caches(cache, account.user_id, positions_changed=positions_changed)
 
     broker_sync_duration.labels(data_source=account.data_source, status="success").observe(
-        _time.monotonic() - _sync_start
+        time.monotonic() - _sync_start
     )
     logger.info(
         "account_synced",

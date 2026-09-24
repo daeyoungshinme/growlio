@@ -347,7 +347,70 @@ class TestSyncAccount:
 
         assert account.last_sync_error == "KIS 자격증명이 없습니다"
         assert not hasattr(account, "last_synced_at")
+        mock_db.rollback.assert_called_once()
         mock_db.commit.assert_called_once()
+
+
+def _executed_deletes(mock_db) -> list[str]:
+    from sqlalchemy.sql.dml import Delete
+
+    return [str(c.args[0]) for c in mock_db.execute.call_args_list if isinstance(c.args[0], Delete)]
+
+
+class TestSyncAccountPositionReplacement:
+    """브로커 동기화 결과로 현재 포지션을 교체하는 규칙 (전량 매도 / 해외 조회 실패)."""
+
+    async def _run(self, account, balance, mock_db):
+        from app.services.asset_service import sync_account
+
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(return_value=balance)
+        with (
+            patch("app.services.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.asset_service._CIRCUITS", {}),
+            patch(
+                "app.services.asset_service._upsert_snapshot",
+                new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
+            ),
+            patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.broker_sync_duration"),
+        ):
+            await sync_account(account, mock_db, cache=MagicMock())
+
+    @pytest.mark.asyncio
+    async def test_broker_empty_result_clears_all_positions(self, mock_db, override_settings, make_account):
+        """브로커 조회 성공 + 빈 결과(전량 매도) → 기존 포지션 전부 삭제."""
+        from app.providers.base import BalanceResult
+
+        account = make_account(data_source="KIS_API")
+        await self._run(account, BalanceResult(total_value_krw=0.0, positions=[]), mock_db)
+
+        deletes = _executed_deletes(mock_db)
+        assert len(deletes) == 1
+        assert "currency" not in deletes[0]
+
+    @pytest.mark.asyncio
+    async def test_overseas_unknown_only_replaces_krw_positions(self, mock_db, override_settings, make_account):
+        """해외 조회 실패(overseas_known=False) → KRW 포지션만 교체, 해외 포지션 보존."""
+        from app.providers.base import BalanceResult
+
+        account = make_account(data_source="KIS_API")
+        balance = BalanceResult(total_value_krw=0.0, positions=[], deposit_foreign=None, overseas_known=False)
+        await self._run(account, balance, mock_db)
+
+        deletes = _executed_deletes(mock_db)
+        assert len(deletes) == 1
+        assert "currency" in deletes[0]
+
+    @pytest.mark.asyncio
+    async def test_manual_empty_result_does_not_touch_positions(self, mock_db, override_settings, make_account):
+        from app.providers.base import BalanceResult
+
+        account = make_account(data_source="MANUAL")
+        await self._run(account, BalanceResult(total_value_krw=1_000.0, positions=[]), mock_db)
+
+        assert _executed_deletes(mock_db) == []
 
 
 class TestSyncAccountNow:

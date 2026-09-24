@@ -2,7 +2,7 @@ from typing import Any
 
 import structlog
 
-from app.kis.client import kis_request
+from app.kis.client import KisTokenExpiredError, kis_request
 from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
     TR_DOMESTIC_BALANCE_MOCK,
@@ -150,6 +150,7 @@ async def get_overseas_balance(
 
     all_positions: list[dict] = []
     deposit_usd = 0.0
+    failed_exchanges: list[str] = []
 
     # KIS 해외잔고 API는 거래소별로 각각 호출해야 한다.
     # "NASD"만 조회하면 NYSE·AMEX 보유 종목이 누락됨.
@@ -169,7 +170,13 @@ async def get_overseas_balance(
                     "CTX_AREA_NK200": "",
                 },
             )
-        except Exception:  # nosec B112 — 한 거래소 실패해도 나머지 거래소 조회 계속
+        except KisTokenExpiredError:
+            raise
+        except Exception as e:
+            # 부분 결과를 정상값처럼 반환하면 호출부가 실패 거래소 종목을 "매도됨"으로 보고
+            # 포지션을 지우고 "해외 없음"을 캐싱한다 — 실패 거래소를 기록해 뒀다가 루프 뒤 raise.
+            logger.warning("kis_overseas_exchange_fetch_failed", exchange=exchange_code, error=str(e))
+            failed_exchanges.append(exchange_code)
             continue
 
         for item in data.get("output1", []):
@@ -195,6 +202,11 @@ async def get_overseas_balance(
         if deposit_usd == 0.0:
             summary = data.get("output2", {}) or {}
             deposit_usd = float(summary.get("frcr_dncl_amt_2", 0))
+
+    if failed_exchanges:
+        # 나머지 거래소 조회는 끝까지 시도(로그 확보)하되, 결과는 불완전하므로 실패로 전파 →
+        # fetch_overseas_cached가 ok=False(미확인)로 처리해 예수금·해외 포지션을 보존한다.
+        raise RuntimeError(f"KIS 해외잔고 조회 실패 거래소: {', '.join(failed_exchanges)}")
 
     return {
         "positions": all_positions,

@@ -46,6 +46,9 @@ class BalanceResult:
     # 미수 없는 현재 주문가능 현금(KRW). 리밸런싱 FULL 매수 예산 clamp 전용 —
     # KIS get_orderable_cash()와 대칭. 미제공 시 None (호출부가 deposit_krw로 폴백)
     orderable_krw: float | None = None
+    # False = 해외 잔고 조회 실패(미확인). positions에 해외 종목이 빠져 있으므로 asset_service가
+    # 기존 해외(비KRW) 포지션을 지우지 않고 보존한다. 해외 조회가 없는 소스는 기본 True.
+    overseas_known: bool = True
     invested_krw: float = 0.0  # 매입금액
     pnl_krw: float = 0.0  # 평가손익
     usd_krw_rate: float = field(default_factory=lambda: settings.usd_krw_fallback_rate)
