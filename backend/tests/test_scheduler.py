@@ -1,6 +1,7 @@
 """app/scheduler.py — 잡 등록 스펙과 misfire 설정 검증."""
 
 import pytest
+from apscheduler.triggers.cron import CronTrigger
 
 from app import scheduler as scheduler_module
 
@@ -52,6 +53,9 @@ def test_misfire_grace_time_in_job_defaults(registered_jobs):
 
 
 def test_cron_triggers_use_kst(registered_jobs):
-    for job in registered_jobs:
-        tz = getattr(job.trigger, "timezone", None)
-        assert str(tz) == "Asia/Seoul", job.id
+    # "매일 18:00" 같은 시각 기반 잡만 대상 — IntervalTrigger("N분마다")는 timezone과 무관하며
+    # 미지정 시 시스템 TZ를 따르므로(CI는 UTC) 검사하지 않는다.
+    cron_jobs = [job for job in registered_jobs if isinstance(job.trigger, CronTrigger)]
+    assert cron_jobs
+    for job in cron_jobs:
+        assert str(job.trigger.timezone) == "Asia/Seoul", job.id
