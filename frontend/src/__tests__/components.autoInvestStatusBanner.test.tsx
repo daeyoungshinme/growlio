@@ -75,7 +75,10 @@ describe("AutoInvestStatusBanner", () => {
     );
 
     expect(await screen.findByText("정기 적립식 자동매수를 설정해보세요")).toBeInTheDocument();
-    expect(screen.getByText("설정하기")).toBeInTheDocument();
+    // 포트폴리오가 1개뿐이면 알림 설정 모달까지 바로 연다
+    expect(screen.getByText("설정하기").closest("a")?.getAttribute("href")).toContain(
+      "openAlert=1",
+    );
   });
 
   it("DCA 프리셋 알림이 있으면 매월 며칠인지와 포트폴리오 이름을 보여준다", async () => {
@@ -90,6 +93,8 @@ describe("AutoInvestStatusBanner", () => {
 
     expect(await screen.findByText("정기 적립식 매월 25일 자동매수 중")).toBeInTheDocument();
     expect(screen.getByText("성장 포트폴리오")).toBeInTheDocument();
-    expect(screen.getByText("설정 관리")).toBeInTheDocument();
+    expect(screen.getByText("설정 관리").closest("a")?.getAttribute("href")).toContain(
+      `portfolioId=${portfolio.id}&openAlert=1`,
+    );
   });
 });

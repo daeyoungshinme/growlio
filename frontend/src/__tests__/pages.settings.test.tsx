@@ -168,7 +168,7 @@ describe("SettingsPage", () => {
     expect(screen.getByText("설정된 목표 없음")).toBeInTheDocument();
     expect(screen.getByText("중립 · 후보 0개")).toBeInTheDocument();
 
-    const kisLink = screen.getByText("계좌 연동 (KIS/키움)").closest("a");
+    const kisLink = screen.getByText("계좌 연동 (KIS/키움/토스)").closest("a");
     expect(kisLink).toHaveAttribute("href", "/assets?tab=계좌관리");
 
     const goalLink = screen.getByText("투자·입금·배당 목표").closest("a");
@@ -204,6 +204,25 @@ describe("SettingsPage", () => {
     });
     expect(screen.getByText("목표 2개 설정됨")).toBeInTheDocument();
     expect(screen.getByText("공격적 · 후보 2개")).toBeInTheDocument();
+  });
+
+  it("KIS 전역 키가 없어도 키움·토스 API 연동 계좌가 있으면 연결 계좌 수를 표시한다", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/settings") return Promise.resolve({ data: mockSettings });
+      if (url === "/assets")
+        return Promise.resolve({
+          data: [
+            { id: "a1", data_source: "KIWOOM_API", is_active: true },
+            { id: "a2", data_source: "TOSS_API", is_active: true },
+            { id: "a3", data_source: "MANUAL", is_active: true },
+          ],
+        });
+      return Promise.resolve({ data: {} });
+    });
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText("2개 계좌 연결됨")).toBeInTheDocument();
+    });
   });
 
   it("has_dart가 true이면 삭제 버튼을 표시한다", async () => {

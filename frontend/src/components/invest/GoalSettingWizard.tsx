@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import Modal from "@/components/common/Modal";
 import FormInput from "@/components/common/FormInput";
@@ -157,6 +157,7 @@ export default function GoalSettingWizard({
     staleTime: 0,
   });
 
+  const navigate = useNavigate();
   const createPortfolioMutation = useMutation({
     mutationFn: () =>
       createPortfolio({
@@ -168,10 +169,13 @@ export default function GoalSettingWizard({
           weight: item.weight,
         })),
       }),
-    onSuccess: async () => {
-      toast("추천 포트폴리오가 생성되었습니다", "success");
+    // 생성만 하고 계획탭에 머물면 계좌 미연결 고아 포트폴리오로 남기 쉬움 — 바로 해당 포트폴리오로
+    // 이동시켜 계좌 연결·드리프트 진단으로 이어지게 한다.
+    onSuccess: async (created) => {
+      toast("추천 포트폴리오가 생성되었습니다 — 계좌를 연결하면 비중 진단이 시작됩니다", "success");
       await invalidatePortfolioData(queryClient);
       onClose();
+      void navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${created.id}`);
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });

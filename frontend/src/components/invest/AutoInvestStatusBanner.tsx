@@ -30,8 +30,11 @@ export default function AutoInvestStatusBanner() {
     .map((p) => ({ portfolio: p, alert: alertByPortfolioId[p.id] }))
     .find(({ alert }) => isDcaAutoBuyPreset(alert));
 
-  const linkTo = activeEntry
-    ? `/rebalancing?rtab=포트폴리오&portfolioId=${activeEntry.portfolio.id}`
+  // 대상 포트폴리오가 하나로 정해지면(DCA 설정된 포트폴리오, 또는 포트폴리오가 1개뿐) openAlert=1로
+  // 알림 설정 모달까지 바로 연다. 여러 개 중 고르는 경우만 목록으로 보낸다.
+  const targetId = activeEntry?.portfolio.id ?? (portfolios.length === 1 ? portfolios[0].id : null);
+  const linkTo = targetId
+    ? `/rebalancing?rtab=포트폴리오&portfolioId=${targetId}&openAlert=1`
     : `/rebalancing?rtab=포트폴리오`;
 
   return (

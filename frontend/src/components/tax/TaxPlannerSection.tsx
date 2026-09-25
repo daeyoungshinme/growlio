@@ -58,8 +58,8 @@ export default function TaxPlannerSection({ positions }: Props) {
           <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
             <span className="font-medium">배당금은 250만원 공제 대상이 아닙니다.</span> 배당금은
             배당소득세(15.4%)로 별도 원천징수됩니다. 이 플래너는 해외 주식
-            <span className="font-medium"> 매매 차익(양도소득)</span>만 계산합니다. 단, 배당금 +
-            양도차익 합계가 연 2,000만원 초과 시 금융소득 종합과세 대상이 될 수 있습니다.
+            <span className="font-medium"> 매매 차익(양도소득)</span>만 계산합니다. 양도차익은
+            분류과세라 금융소득 종합과세(이자·배당 연 2,000만원 초과)와 합산되지 않습니다.
           </p>
         </div>
 

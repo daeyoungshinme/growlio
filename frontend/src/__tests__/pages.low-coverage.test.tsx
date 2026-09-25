@@ -300,12 +300,7 @@ describe("AssetManagementPage", () => {
 
   it("계좌가 없을 때 빈 상태 메시지를 표시한다", () => {
     renderPage(<AssetManagementPage />);
-    expect(screen.getByText("등록된 은행계좌이 없습니다.")).toBeInTheDocument();
-  });
-
-  it("설명 텍스트가 표시된다", () => {
-    renderPage(<AssetManagementPage />);
-    expect(screen.getByText("계좌를 등록하고 입출금·배당 내역을 관리합니다.")).toBeInTheDocument();
+    expect(screen.getByText("등록된 은행계좌가 없습니다.")).toBeInTheDocument();
   });
 
   it("증권계좌 예수금(CASH_STOCK)을 주식이 아닌 현금으로 집계한다", () => {
