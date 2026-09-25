@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import uuid
 from contextlib import asynccontextmanager
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 from fastapi.testclient import TestClient
+
+from app.utils.kst import today_kst
 
 
 def _make_cache_mock() -> AsyncMock:
@@ -72,7 +74,7 @@ def _make_snapshot(user_id, account_id):
         id=uuid.uuid4(),
         user_id=user_id,
         account_id=account_id,
-        snapshot_date=date.today(),
+        snapshot_date=today_kst(),
         amount_krw=10_000_000.0,
         invested_amount=9_000_000.0,
         unrealized_pnl=1_000_000.0,
@@ -601,8 +603,10 @@ class TestVerifyKiwoomCredentials:
         svc.assert_awaited_once_with("k", "s", True)
 
     def test_invalid_key_return_code(self, override_settings):
-        # 키움은 잘못된 키에 HTTP 200 + return_code != 0 → _request_token이 RuntimeError
-        resp, _ = self._post(RuntimeError("키움 토큰 발급 실패: 앱키 오류"))
+        # 키움은 잘못된 키에 HTTP 200 + return_code != 0 → _request_token이 KiwoomTokenIssueError
+        from app.kiwoom.client import KiwoomTokenIssueError
+
+        resp, _ = self._post(KiwoomTokenIssueError("키움 토큰 발급 실패: 앱키 오류"))
         assert resp.status_code == 400
         assert "키움 자격증명이 잘못되었습니다" in resp.json()["detail"]
 
@@ -687,7 +691,7 @@ class TestUpdateIsaPnlOverride:
         assert resp.status_code == 200
         # 빈 DB 결과(mock)이므로 auto_pnl은 0.0으로 캡처되지만, 필드 자체는 채워져야 함
         assert account.isa_baseline_auto_pnl_krw == 0.0
-        assert account.isa_baseline_captured_at == date.today()
+        assert account.isa_baseline_captured_at == today_kst()
 
     def test_clears_override_with_null(self, override_settings):
         user = _make_user()
@@ -695,7 +699,7 @@ class TestUpdateIsaPnlOverride:
         account.tax_type = "ISA"
         account.isa_manual_cumulative_pnl_krw = 2_500_000.0
         account.isa_baseline_auto_pnl_krw = 100_000.0
-        account.isa_baseline_captured_at = date.today()
+        account.isa_baseline_captured_at = today_kst()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)

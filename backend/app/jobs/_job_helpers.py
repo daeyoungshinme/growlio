@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import sentry_sdk
 import structlog
 
 from app.core.cache_store import get_cache_store
@@ -26,6 +27,19 @@ def peak_rss_mb() -> float | None:
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
 
 
+def report_job_failure(event: str, exc: BaseException, **context: str) -> None:
+    """잡 실패 로그 + Sentry 전송.
+
+    structlog는 stdlib logging을 거치지 않아(PrintLogger) Sentry LoggingIntegration이 잡 실패를
+    잡지 못하고, 잡 함수가 예외를 삼키므로 APScheduler의 에러 로그도 남지 않는다 — 명시적으로
+    capture한다(Sentry 미초기화 시 no-op). 로그 쪽은 redact 프로세서가 문자열만 마스킹하므로
+    traceback(exc_info) 대신 error=str(e)만 남긴다. 자격증명을 지역변수로 다루는 잡(token_refresh)은
+    Sentry 스택 로컬 전송을 피하려고 이 헬퍼를 쓰지 않는다.
+    """
+    logger.error(event, error=str(exc), **context)
+    sentry_sdk.capture_exception(exc)
+
+
 async def run_alert_job(
     service_func: Callable,
     job_name: str,
@@ -41,4 +55,4 @@ async def run_alert_job(
             else:
                 await service_func(db)
         except Exception as e:
-            logger.error(f"{job_name}_failed", error=str(e))
+            report_job_failure(f"{job_name}_failed", e)

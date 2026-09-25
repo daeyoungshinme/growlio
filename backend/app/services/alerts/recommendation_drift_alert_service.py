@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from functools import partial
 
 import structlog
@@ -43,6 +43,7 @@ from app.services.goal_recommendation_service import (
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import CacheStoreType
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -65,7 +66,7 @@ async def _get_subscribers(db: AsyncSession) -> list[tuple[User, UserSettings]]:
 
 async def _already_sent_this_week(db: AsyncSession, user_id: uuid.UUID) -> bool:
     """오늘(=이번 주, 주 1회 실행) 이미 발송했으면 True — 스케줄러 재시작/misfire로 인한 중복 발송 방지."""
-    today = date.today()
+    today = today_kst()
     day_start = datetime(today.year, today.month, today.day, tzinfo=UTC)
     result = await db.execute(
         select(AlertHistory.id)

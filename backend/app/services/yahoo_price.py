@@ -20,6 +20,7 @@ import structlog
 from app.constants import DOMESTIC_MARKETS
 from app.core.config import settings
 from app.services.price_sync_sources import sync_pykrx_close_series
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from datetime import date
@@ -151,14 +152,13 @@ def _sync_calc_returns_batch(items: list[tuple[str, str]], years: int = 10) -> d
     `_sync_yahoo_batch`(현재가)와 동일한 패턴 — 종목별 개별 `yf.Ticker().history()` 호출 대신
     한 번의 `yf.download()`로 묶어 조회 속도를 높이고 Yahoo 요청 수를 줄인다.
     """
-    from datetime import date
 
     import yfinance as yf
 
     if not items:
         return {}
 
-    end = date.today()
+    end = today_kst()
     try:
         start = end.replace(year=end.year - years)
     except ValueError:
@@ -209,12 +209,11 @@ def _sync_pykrx_returns_batch(items: list[tuple[str, str]], years: int = 10) -> 
     pykrx는 진짜 배치 API가 없어 종목별 순차 호출이다 — `market_data_fetcher._pykrx_daily_returns_fallback`과
     동일한 전제. Yahoo가 실패했거나(circuit open 포함) 국내 종목만 대상으로 한다.
     """
-    from datetime import date
 
     if not items:
         return {}
 
-    end = date.today()
+    end = today_kst()
     try:
         start = end.replace(year=end.year - years)
     except ValueError:

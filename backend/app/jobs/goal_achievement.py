@@ -3,20 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import run_alert_job
+from app.jobs._job_helpers import report_job_failure, run_alert_job
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_goal_achievement_email
 from app.services.push_service import send_push_to_user
 from app.utils.cache_keys import CacheStoreType
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -25,7 +26,7 @@ _GOAL_CHECK_CONCURRENCY = 3
 
 async def _already_notified_this_month(db, user_id, alert_type: str) -> bool:
     """이번 달 해당 타입 목표 알림이 이미 발송됐으면 True."""
-    today = date.today()
+    today = today_kst()
     month_start = datetime(today.year, today.month, 1, tzinfo=UTC)
     result = await db.execute(
         select(AlertHistory.id)
@@ -190,4 +191,4 @@ async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: 
                             logger.warning("goal_dividend_alert_push_failed", user_id=str(user.id), error=str(exc))
 
         except Exception as e:
-            logger.error("goal_achievement_check_failed", user_id=str(user.id), error=str(e))
+            report_job_failure("goal_achievement_check_failed", e, user_id=str(user.id))

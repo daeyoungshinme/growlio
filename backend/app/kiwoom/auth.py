@@ -2,11 +2,11 @@
 
 import json
 from datetime import UTC, datetime, timedelta
-from zoneinfo import ZoneInfo
 
 import structlog
 
 from app.constants import TOKEN_CACHE_TTL_BUFFER
+from app.kiwoom.client import KiwoomTokenIssueError
 from app.kiwoom.constants import (
     KIWOOM_MOCK_BASE_URL,
     KIWOOM_REAL_BASE_URL,
@@ -15,10 +15,9 @@ from app.kiwoom.constants import (
 from app.providers._token_cache import get_or_fetch_token
 from app.providers.http_client import _get_client
 from app.services.credential_service import encrypt
+from app.utils.kst import KST as _KST  # 키움 expires_dt는 KST 벽시계 값 (구분자 없는 YYYYMMDDHHMMSS)
 
 logger = structlog.get_logger()
-
-_KST = ZoneInfo("Asia/Seoul")  # 키움 expires_dt는 KST 벽시계 값 (구분자 없는 YYYYMMDDHHMMSS)
 
 
 async def get_access_token(
@@ -95,7 +94,7 @@ async def _request_token(app_key: str, app_secret: str, *, is_mock: bool) -> dic
     data = resp.json()
 
     if str(data.get("return_code", "0")) != "0":
-        raise RuntimeError(f"키움 토큰 발급 실패: {data.get('return_msg')}")
+        raise KiwoomTokenIssueError(f"키움 토큰 발급 실패: {data.get('return_msg')}")
     return data
 
 

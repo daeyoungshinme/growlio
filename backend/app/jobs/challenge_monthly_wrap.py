@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from zoneinfo import ZoneInfo
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import run_alert_job
+from app.jobs._job_helpers import report_job_failure, run_alert_job
 from app.models.challenge import (
     CHALLENGE_ACTIVE,
     CHALLENGE_COMPLETED,
@@ -28,10 +27,10 @@ from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.email_service import send_challenge_wrap_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
+from app.utils.kst import KST as _KST
 
 logger = structlog.get_logger()
 
-_KST = ZoneInfo("Asia/Seoul")
 _CONCURRENCY = 3
 _DEDUP_TTL = 45 * 24 * 3600
 _MILESTONES = (3, 6, 12, 24, 36, 60)
@@ -93,7 +92,7 @@ async def _wrap_user(user: User, settings_row: UserSettings, cache: CacheStoreTy
                 for challenge in challenges:
                     await _wrap_one(db, user, settings_row, challenge, to_email, prev_month)
         except Exception as e:
-            logger.error("challenge_monthly_wrap_failed", user_id=str(user.id), error=str(e))
+            report_job_failure("challenge_monthly_wrap_failed", e, user_id=str(user.id))
 
 
 async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month: str) -> None:

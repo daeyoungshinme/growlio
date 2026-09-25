@@ -56,6 +56,28 @@ def _overseas_balance(total_value_usd=1_000.0, deposit_usd=100.0):
 
 class TestKISProviderSync:
     @pytest.mark.asyncio
+    async def test_sync_timeout_raises_network_error(self, override_settings, make_account, mock_cache):
+        """KIS도 키움/토스처럼 전체 동기화에 상한 시간을 둔다."""
+        import asyncio
+
+        from app.exceptions import ProviderNetworkError
+
+        account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
+
+        async def _hang(*args, **kwargs):
+            await asyncio.sleep(10)
+
+        with (
+            patch("app.providers.kis_provider.decrypt", side_effect=["key", "secret"]),
+            patch("app.providers.kis_provider.SYNC_TIMEOUT_SECONDS", 0.01),
+            patch("app.providers.kis_provider.get_access_token", new=AsyncMock(return_value="token-1")),
+            patch("app.providers.kis_provider.get_domestic_balance", new=_hang),
+            patch("app.providers.kis_provider.get_overseas_balance", new=AsyncMock(return_value=_empty_overseas())),
+            pytest.raises(ProviderNetworkError),
+        ):
+            await KISProvider().sync(account, db=AsyncMock(), cache=mock_cache)
+
+    @pytest.mark.asyncio
     async def test_sync_happy_path_no_token_expiry(self, override_settings, make_account, mock_cache):
         account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
         provider = KISProvider()
@@ -79,6 +101,31 @@ class TestKISProviderSync:
         assert result.deposit_krw == 100_000.0
         assert len(result.positions) == 1
         assert result.positions[0].ticker == "005930"
+
+    @pytest.mark.asyncio
+    async def test_sync_overseas_failure_marks_overseas_unknown(self, override_settings, make_account, mock_cache):
+        """해외 잔고 조회 실패 → deposit_foreign=None, overseas_known=False (asset_service가 해외 포지션 보존)."""
+        account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
+        provider = KISProvider()
+
+        with (
+            patch("app.providers.kis_provider.decrypt", side_effect=["key", "secret"]),
+            patch("app.providers.kis_provider.get_access_token", new=AsyncMock(return_value="token-1")),
+            patch(
+                "app.providers.kis_provider.get_domestic_balance",
+                new=AsyncMock(return_value=_domestic_balance()),
+            ),
+            patch(
+                "app.providers.kis_provider.get_overseas_balance",
+                new=AsyncMock(side_effect=RuntimeError("KIS 해외잔고 조회 실패 거래소: AMEX")),
+            ),
+            patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+        ):
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
+
+        assert result.overseas_known is False
+        assert result.deposit_foreign is None
+        mock_cache.setex.assert_not_called()  # "해외 없음"을 캐싱하지 않음
 
     @pytest.mark.asyncio
     async def test_sync_retries_after_token_expired(self, override_settings, make_account, mock_cache):

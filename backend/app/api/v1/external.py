@@ -40,6 +40,7 @@ from app.utils.cache_keys import (
     monthly_trend_key,
 )
 from app.utils.currency import fetch_usd_krw
+from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/external", tags=["external"])
 
@@ -237,7 +238,7 @@ async def create_external_transaction(
             db,
             account_id=account.id,
             user_id=account.user_id,
-            snapshot_date=date.today(),
+            snapshot_date=today_kst(),
             amount_krw=total,
             invested_amount=latest_snap.invested_amount if latest_snap else None,
             unrealized_pnl=latest_snap.unrealized_pnl if latest_snap else None,

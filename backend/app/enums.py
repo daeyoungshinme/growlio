@@ -34,11 +34,6 @@ class PortfolioBaseType(StrEnum):
     TOTAL_ASSETS = "TOTAL_ASSETS"
 
 
-class AlertDirection(StrEnum):
-    ABOVE = "ABOVE"
-    BELOW = "BELOW"
-
-
 class GoalRiskTolerance(StrEnum):
     CONSERVATIVE = "CONSERVATIVE"
     BALANCED = "BALANCED"

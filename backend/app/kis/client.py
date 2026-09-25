@@ -9,6 +9,24 @@ from app.providers.http_client import AsyncRateLimiter, broker_request
 
 logger = structlog.get_logger()
 
+
+def auth_headers(app_key: str, app_secret: str, access_token: str, tr_id: str) -> dict[str, str]:
+    """잔고·주문 API 공통 인증 헤더 (balance.py/order.py 공용)."""
+    return {
+        "authorization": f"Bearer {access_token}",
+        "appkey": app_key,
+        "appsecret": app_secret,
+        "tr_id": tr_id,
+        "custtype": "P",
+        "Content-Type": "application/json; charset=utf-8",
+    }
+
+
+def split_account_no(account_no: str) -> tuple[str, str]:
+    """계좌번호를 CANO(8자리)와 ACNT_PRDT_CD로 분리 ("12345678-01"/"1234567801" 모두 허용, 기본 "01")."""
+    return account_no[:8], account_no[8:].lstrip("-") or "01"
+
+
 _KIS_CONCURRENCY = 1  # KIS API는 초당 호출 제한이 엄격해 완전 직렬화(의도적으로 다른 세마포어보다 낮음)
 _semaphore = asyncio.Semaphore(_KIS_CONCURRENCY)
 _rate_limiter = AsyncRateLimiter(rate=settings.kis_rate_per_second)

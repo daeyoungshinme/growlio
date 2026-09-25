@@ -17,17 +17,7 @@ import {
 import { SeriesData } from "@/api/backtest";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
-
-const COLORS = [
-  "#2563EB",
-  "#16A34A",
-  "#D97706",
-  "#DC2626",
-  "#7C3AED",
-  "#0891B2",
-  "#DB2777",
-  "#059669",
-];
+import { PIE_COLORS } from "@/utils/colors";
 
 type ChartView = "cumulative" | "annual" | "drawdown";
 
@@ -207,7 +197,7 @@ function BacktestResultChart({ dates, series }: Props) {
                 key={s.name}
                 type="monotone"
                 dataKey={s.name}
-                stroke={COLORS[i % COLORS.length]}
+                stroke={PIE_COLORS[i % PIE_COLORS.length]}
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
@@ -241,7 +231,7 @@ function BacktestResultChart({ dates, series }: Props) {
               <Bar
                 key={s.name}
                 dataKey={s.name}
-                fill={COLORS[i % COLORS.length]}
+                fill={PIE_COLORS[i % PIE_COLORS.length]}
                 radius={[2, 2, 0, 0]}
                 maxBarSize={28}
               />
@@ -270,8 +260,8 @@ function BacktestResultChart({ dates, series }: Props) {
                 key={s.name}
                 type="monotone"
                 dataKey={s.name}
-                stroke={COLORS[i % COLORS.length]}
-                fill={`${COLORS[i % COLORS.length]}33`}
+                stroke={PIE_COLORS[i % PIE_COLORS.length]}
+                fill={`${PIE_COLORS[i % PIE_COLORS.length]}33`}
                 strokeWidth={1.5}
                 dot={false}
                 connectNulls={false}

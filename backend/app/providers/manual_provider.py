@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
@@ -12,6 +12,7 @@ from app.models.asset import Position as DBPosition
 from app.providers.base import BalanceResult, BrokerProvider
 from app.providers.base import Position as ProviderPosition
 from app.utils.currency import fetch_usd_krw
+from app.utils.kst import today_kst
 from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount
 
 if TYPE_CHECKING:
@@ -91,7 +92,7 @@ class ManualProvider(BrokerProvider):
             # 직접 입력한 account.deposit_usd이므로 sync가 덮어쓰면 안 된다.
             invested_krw=invested if positions else 0.0,
             pnl_krw=pnl,
-            extra={"source": "MANUAL", "snapshot_date": date.today()},
+            extra={"source": "MANUAL", "snapshot_date": today_kst()},
         )
 
 

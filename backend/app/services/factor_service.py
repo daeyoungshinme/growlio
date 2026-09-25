@@ -27,6 +27,7 @@ from app.utils.cache_keys import (
     get_cached_json,
     set_cached_json,
 )
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -41,10 +42,10 @@ def _safe_float(v: object) -> float | None:
 
 def _sync_fetch_factor_data(symbols: list[str]) -> dict[str, FactorData]:
     """yfinance .info에서 P/E, P/B, 시가총액, 12-1M 모멘텀 수집."""
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     # Step 1: 역사 데이터 일괄 다운로드 (모멘텀 계산용, 12-1M = 최근 21일 제외 335일)
-    end_date = date.today() - timedelta(days=21)
+    end_date = today_kst() - timedelta(days=21)
     start_date = end_date - timedelta(days=335)
     close_series = fetch_yf_close_series(symbols, start_date, end_date)
 

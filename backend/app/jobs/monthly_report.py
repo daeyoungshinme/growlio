@@ -10,12 +10,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import run_alert_job
+from app.jobs._job_helpers import report_job_failure, run_alert_job
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_monthly_report_email
 from app.utils.cache_keys import CacheStoreType
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -29,7 +30,7 @@ def _prev_month_label(today: date) -> str:
 
 
 async def _run_monthly_report(db: AsyncSession, cache: CacheStoreType) -> None:
-    report_month = _prev_month_label(date.today())
+    report_month = _prev_month_label(today_kst())
 
     result = await db.execute(
         select(User, UserSettings).join(UserSettings, User.id == UserSettings.user_id).where(User.is_active == True)
@@ -106,4 +107,4 @@ async def _send_report_for_user(
                 month=report_month,
             )
         except Exception as e:
-            logger.error("monthly_report_failed", user_id=str(user.id), error=str(e))
+            report_job_failure("monthly_report_failed", e, user_id=str(user.id))

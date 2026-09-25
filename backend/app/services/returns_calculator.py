@@ -10,6 +10,7 @@ from sqlalchemy import asc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
+from app.utils.kst import today_kst
 
 _XIRR_INITIAL_RATE = 0.1
 _XIRR_MAX_ITERATIONS = 200
@@ -62,7 +63,7 @@ def calc_returns(
     if base <= 0 or not first_date:
         return None, None
 
-    today = date.today()
+    today = today_kst()
     days = (today - first_date).days
     if days < 1:
         return None, None
@@ -115,7 +116,7 @@ async def calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) 
             .limit(1)
         )
         first = snap_result.first()
-        today = date.today()
+        today = today_kst()
         if not first or float(first.total) <= 0 or first.snapshot_date >= today:
             return None, False
         cashflows: list[tuple[date, float]] = [
@@ -132,6 +133,6 @@ async def calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) 
         else:
             cashflows.append((row.transaction_date, float(row.amount)))
 
-    cashflows.append((date.today(), current_total))
+    cashflows.append((today_kst(), current_total))
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, xirr, cashflows), False

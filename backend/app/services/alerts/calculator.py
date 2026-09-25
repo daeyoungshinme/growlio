@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import calendar
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.models.alert import ExchangeRateAlert, RebalancingAlert, StockPriceAlert
-
-_KST = timezone(timedelta(hours=9))
+from app.utils.kst import KST as _KST
 
 _MULTI_TRIGGER_COOLDOWN = timedelta(hours=1)
 

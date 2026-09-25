@@ -25,6 +25,7 @@ from app.utils.cache_keys import (
     invalidate_goal_recommendation_caches,
     invalidate_user_caches,
 )
+from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -63,14 +64,14 @@ class GoalUpdate(BaseModel):
     @field_validator("retirement_target_year")
     @classmethod
     def validate_target_year(cls, v: int | None) -> int | None:
-        if v is not None and v < date.today().year:
+        if v is not None and v < today_kst().year:
             raise ValueError("목표 연도는 현재 연도 이상이어야 합니다")
         return v
 
     @field_validator("birth_year")
     @classmethod
     def validate_birth_year(cls, v: int | None) -> int | None:
-        if v is not None and not (1900 <= v <= date.today().year):
+        if v is not None and not (1900 <= v <= today_kst().year):
             raise ValueError("출생연도가 올바르지 않습니다")
         return v
 

@@ -10,7 +10,7 @@ alert_scope 전환 → rebalancing/alert_scope.py
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
 import structlog
@@ -36,6 +36,7 @@ from app.services.rebalancing.order_builder import (
 )
 from app.utils.cache_keys import TTL_COMPOSITE_ALERT_SENT, composite_alert_sent_key
 from app.utils.durable_state import get_durable, set_durable
+from app.utils.kst import KST as _KST
 from app.utils.market_hours import is_alert_execution_time
 from app.utils.metrics import alert_trigger_count
 
@@ -46,8 +47,6 @@ __all__ = [
 ]
 
 logger = structlog.get_logger()
-
-_KST = timezone(timedelta(hours=9))
 
 
 async def _composite_alert_sent_today(db: AsyncSession, user_id: uuid.UUID) -> bool:

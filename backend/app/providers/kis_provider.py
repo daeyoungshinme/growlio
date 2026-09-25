@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date
 from typing import TYPE_CHECKING
 
 import httpx
 import structlog
 
-from app.exceptions import ProviderApiError, ProviderCredentialError
+from app.exceptions import ProviderApiError, ProviderCredentialError, ProviderNetworkError
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisApiError, KisTokenExpiredError
@@ -18,10 +17,11 @@ from app.providers._error_mapping import map_http_status_error, map_network_erro
 from app.providers._overseas_cache import fetch_overseas_cached
 from app.providers._overseas_name_enrichment import enrich_overseas_positions
 from app.providers._retry import with_token_refresh
-from app.providers.base import BalanceResult, BrokerProvider, raw_to_position
+from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -89,12 +89,22 @@ class KISProvider(BrokerProvider):
             )
 
         try:
-            domestic, overseas = await with_token_refresh(
-                _fetch,
-                _get_token,
-                KisTokenExpiredError,
-                on_expired=lambda: logger.warning("kis_token_expired_refreshing", account_no=account_no),
+            # 키움/토스와 동일한 전체 동기화 상한 — 해외 3거래소 순차 조회 + 토큰 재발급까지 겹치면
+            # 요청이 무기한 늘어질 수 있다.
+            domestic, overseas = await asyncio.wait_for(
+                with_token_refresh(
+                    _fetch,
+                    _get_token,
+                    KisTokenExpiredError,
+                    on_expired=lambda: logger.warning("kis_token_expired_refreshing", account_no=account_no),
+                ),
+                timeout=SYNC_TIMEOUT_SECONDS,
             )
+        except TimeoutError as e:
+            logger.error("kis_sync_timeout", account_no=account_no)
+            raise ProviderNetworkError(
+                f"KIS API 응답 시간 초과 (약 {int(SYNC_TIMEOUT_SECONDS)}초). 잠시 후 다시 시도하세요."
+            ) from e
         except KisApiError as e:
             raise ProviderApiError(
                 f"KIS 계좌 조회 실패: {e.msg} (rt_cd={e.rt_cd}). 계좌 유형 또는 API 권한 오류."
@@ -150,8 +160,9 @@ class KISProvider(BrokerProvider):
             deposit_krw=domestic["deposit_krw"],
             # 해외 조회 실패(ok=False) 시 None → asset_service가 기존 deposit_usd 유지
             deposit_foreign=(None if overseas.get("ok") is False else overseas["deposit_usd"]),
+            overseas_known=overseas.get("ok") is not False,
             invested_krw=total_invested,
             pnl_krw=stock_value_krw - total_invested,
             usd_krw_rate=usd_krw_rate,
-            extra={"source": "KIS_API", "snapshot_date": date.today()},
+            extra={"source": "KIS_API", "snapshot_date": today_kst()},
         )

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date
 from typing import TYPE_CHECKING
 
 import httpx
@@ -15,8 +14,10 @@ from app.providers._overseas_cache import fetch_overseas_cached
 from app.providers._overseas_name_enrichment import enrich_overseas_positions
 from app.providers._retry import with_token_refresh
 from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
+from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +36,7 @@ class KiwoomProvider(BrokerProvider):
         from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
         from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
         from app.kiwoom.balance import get_overseas_balance as kiwoom_get_overseas_balance
-        from app.kiwoom.client import KiwoomApiError, KiwoomTokenExpiredError
+        from app.kiwoom.client import KiwoomApiError, KiwoomTokenExpiredError, KiwoomTokenIssueError
 
         if not account.kiwoom_app_key or not account.kiwoom_app_secret:
             raise ProviderCredentialError("키움 API 자격증명이 설정되지 않았습니다")
@@ -95,11 +96,13 @@ class KiwoomProvider(BrokerProvider):
             raise map_http_status_error(e, broker_name="키움", message_key="return_msg") from e
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             raise map_network_error("키움") from e
+        except KiwoomTokenIssueError as e:
+            raise ProviderApiError(f"{e} — 앱키/시크릿 및 모의/실계좌 모드를 확인하세요.") from e
+        except MaxRetriesExceededError as e:
+            # MaxRetriesExceededError도 RuntimeError 하위라 아래 일반 분기보다 먼저 — KIS/토스와 같은 429
+            raise ProviderApiError("키움 API 속도 제한 초과. 잠시 후 다시 시도하세요.", http_status=429) from e
         except RuntimeError as e:
-            msg = str(e)
-            if "토큰 발급 실패" in msg:
-                raise ProviderApiError(f"{msg} — 앱키/시크릿 및 모의/실계좌 모드를 확인하세요.") from e
-            raise ProviderApiError(msg, http_status=502) from e
+            raise ProviderApiError(str(e), http_status=502) from e
 
         usd_krw_rate = await get_usd_krw_rate(cache)
 
@@ -127,9 +130,10 @@ class KiwoomProvider(BrokerProvider):
             deposit_krw=domestic["deposit_krw"],
             # 해외 조회 실패(ok=False) 시 None → asset_service가 기존 deposit_usd 유지
             deposit_foreign=(None if overseas.get("ok") is False else overseas["deposit_usd"]),
+            overseas_known=overseas.get("ok") is not False,
             orderable_krw=domestic.get("orderable_krw"),
             invested_krw=total_invested,
             pnl_krw=stock_value_krw - total_invested,
             usd_krw_rate=usd_krw_rate,
-            extra={"source": "KIWOOM_API", "snapshot_date": date.today()},
+            extra={"source": "KIWOOM_API", "snapshot_date": today_kst()},
         )

@@ -3,7 +3,8 @@
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
-_KST = ZoneInfo("Asia/Seoul")
+from app.utils.kst import KST as _KST
+
 _EST = ZoneInfo("America/New_York")
 
 # KRX 정규 거래시간 (KST)

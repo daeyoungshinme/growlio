@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select, text
@@ -13,6 +12,7 @@ from app.models.user import UserSettings
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.portfolio_service import build_portfolio_overview
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
@@ -99,7 +99,7 @@ def _calc_monthly_projected(ticker_summaries: list[dict]) -> list[dict]:
 
 async def _fetch_yearly_received(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     """최근 N년 연도별 실수령 배당금 합계."""
-    today = date.today()
+    today = today_kst()
     start_year = today.year - _YEARLY_HISTORY_YEARS + 1
 
     result = await db.execute(

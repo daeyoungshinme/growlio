@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
@@ -19,10 +19,9 @@ from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.plan_generation import DailyValueCapBlocked, MarketSignalGateBlocked, TaxGateBlocked
+from app.utils.kst import KST as _KST
 
 logger = structlog.get_logger()
-
-_KST = timezone(timedelta(hours=9))
 
 
 async def notify_plan_generated(

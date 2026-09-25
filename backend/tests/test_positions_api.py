@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+
+from app.utils.kst import today_kst
 
 
 def _make_user():
@@ -94,7 +95,7 @@ class TestSavePositions:
             id=uuid.uuid4(),
             account_id=account.id,
             user_id=user.id,
-            snapshot_date=date.today(),
+            snapshot_date=today_kst(),
             amount_krw=0.0,
         )
 

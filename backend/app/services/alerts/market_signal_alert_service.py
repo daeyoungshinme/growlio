@@ -13,7 +13,7 @@ UserSettings.composite_signal_alerts_enabled가 True(기본값 포함)인 활성
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from functools import partial
 
 import structlog
@@ -30,6 +30,7 @@ from app.services.market_signal_service import (
 )
 from app.services.rebalancing.diagnosis_service import _MARKET_NOTES
 from app.utils.cache_keys import CacheStoreType
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -126,7 +127,7 @@ async def _get_daily_digest_subscribers(db: AsyncSession) -> list[tuple[User, Us
 
 async def _already_sent_digest_today(db: AsyncSession, user_id) -> bool:
     """오늘 이미 다이제스트를 발송했으면 True — 스케줄러 재시작/misfire로 인한 중복 발송 방지."""
-    today = date.today()
+    today = today_kst()
     day_start = datetime(today.year, today.month, today.day, tzinfo=UTC)
     result = await db.execute(
         select(AlertHistory.id)

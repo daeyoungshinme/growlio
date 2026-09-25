@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, timedelta
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.services.isa_service import calc_account_auto_pnl, get_isa_status_summary
+from app.utils.kst import today_kst
 
 
 def _accounts_result(accounts: list) -> MagicMock:
@@ -79,7 +80,7 @@ class TestGetIsaStatusSummary:
     @pytest.mark.asyncio
     async def test_mature_when_three_years_elapsed(self, mock_db, make_account, make_user_id, override_settings):
         account_id = uuid.uuid4()
-        open_date = date.today() - timedelta(days=365 * 3 + 5)
+        open_date = today_kst() - timedelta(days=365 * 3 + 5)
         account = make_account(
             account_id=account_id,
             user_id=make_user_id,
@@ -105,7 +106,7 @@ class TestGetIsaStatusSummary:
     @pytest.mark.asyncio
     async def test_not_mature_before_three_years(self, mock_db, make_account, make_user_id, override_settings):
         account_id = uuid.uuid4()
-        open_date = date.today() - timedelta(days=365)
+        open_date = today_kst() - timedelta(days=365)
         account = make_account(
             account_id=account_id,
             user_id=make_user_id,

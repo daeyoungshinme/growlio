@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, select
@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services._account_queries import active_accounts_stmt
 from app.services._snapshot_queries import latest_snapshot_subquery
+from app.utils.kst import today_kst
 
 ISA_MATURITY_YEARS = 3
 _ISA_TAX_FREE_LIMIT: dict[str, int] = {"GENERAL": 2_000_000, "PREFERENTIAL": 4_000_000}
@@ -59,7 +60,7 @@ class IsaStatusSummary(TypedDict):
     note: str
 
 
-async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[str, Any]:
+async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> IsaStatusSummary:
     """사용자의 ISA 계좌별 의무가입(3년) 진행 상황과 비과세 한도 대비 세금 추정치를 반환한다."""
     accounts_result = await db.execute(active_accounts_stmt(user_id).where(AssetAccount.tax_type == "ISA"))
     accounts = accounts_result.scalars().all()
@@ -70,7 +71,7 @@ async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[s
     unrealized_by_account = await _calc_unrealized_by_account_and_market(account_ids, db)
     dividend_by_account = await _calc_dividend_total_by_account(user_id, account_ids, db)
 
-    today = date.today()
+    today = today_kst()
     statuses: list[IsaAccountStatus] = []
     for acc in accounts:
         unrealized = unrealized_by_account.get(acc.id, {"domestic": 0.0, "overseas": 0.0})

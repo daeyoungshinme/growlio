@@ -9,7 +9,7 @@ import {
   Transaction,
   updateTransaction,
 } from "@/api/transactions";
-import { convertUsdToKrw, fmtKrwPreview } from "@/utils/format";
+import { fmtKrwPreview, formatUsdAsKrw } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
@@ -224,9 +224,9 @@ export default function TransactionModal({
                     min={0}
                   />
                 </div>
-                {convertUsdToKrw(amountUsd, usdRate) > 0 && (
+                {formatUsdAsKrw(amountUsd, usdRate) && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                    ≈ ₩{convertUsdToKrw(amountUsd, usdRate).toLocaleString()}
+                    {formatUsdAsKrw(amountUsd, usdRate)}
                   </p>
                 )}
               </div>

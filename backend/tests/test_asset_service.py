@@ -1,11 +1,12 @@
 """asset_service 핵심 로직 단위 테스트."""
 
 import uuid
-from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+from app.utils.kst import today_kst
 
 # ── _upsert_snapshot 테스트 ─────────────────────────────────
 
@@ -24,7 +25,7 @@ class TestUpsertSnapshot:
 
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()
-        today = date.today()
+        today = today_kst()
 
         snap = SimpleNamespace(
             id=uuid.uuid4(),
@@ -58,7 +59,7 @@ class TestUpsertSnapshot:
 
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()
-        today = date.today()
+        today = today_kst()
 
         snap = SimpleNamespace(amount_krw=9_999_000.0, source="KIS_API", snapshot_date=today)
         mock_execute_result = MagicMock()

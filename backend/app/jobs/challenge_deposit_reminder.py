@@ -7,14 +7,13 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import run_alert_job
+from app.jobs._job_helpers import report_job_failure, run_alert_job
 from app.models.challenge import CHALLENGE_ACTIVE, CHALLENGE_DEPOSIT, InvestmentChallenge
 from app.models.user import User, UserSettings
 from app.services import challenge_service
@@ -22,10 +21,10 @@ from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.email_service import send_challenge_reminder_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
+from app.utils.kst import KST as _KST
 
 logger = structlog.get_logger()
 
-_KST = ZoneInfo("Asia/Seoul")
 _CONCURRENCY = 3
 _DEDUP_TTL = 45 * 24 * 3600  # 45일 — 다음 달 발송 전까지만 유지되면 충분
 
@@ -81,7 +80,7 @@ async def _check_user(user: User, settings_row: UserSettings, cache: CacheStoreT
                 for challenge in challenges:
                     await _remind_one(db, user, settings_row, challenge, to_email, month)
         except Exception as e:
-            logger.error("challenge_deposit_reminder_failed", user_id=str(user.id), error=str(e))
+            report_job_failure("challenge_deposit_reminder_failed", e, user_id=str(user.id))
 
 
 async def _remind_one(db, user, settings_row, challenge, to_email: str, month: str) -> None:

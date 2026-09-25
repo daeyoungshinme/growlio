@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +35,9 @@ class PensionContributionStatus(TypedDict):
     note: str
 
 
-async def calc_pension_contribution_status(user_id: uuid.UUID, year: int, db: AsyncSession) -> dict[str, Any]:
+async def calc_pension_contribution_status(
+    user_id: uuid.UUID, year: int, db: AsyncSession
+) -> PensionContributionStatus:
     """연금저축/IRP 계좌군의 연간 DEPOSIT 합산 대비 세액공제 한도(600만원/900만원) 진행률.
 
     Transaction(DEPOSIT) 수기 입력에 의존 — KIS/키움 자동 동기화로는 생성되지 않는다.

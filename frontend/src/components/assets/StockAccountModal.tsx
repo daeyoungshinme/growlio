@@ -94,6 +94,12 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     isEdit ||
     (!!form.toss_account_no && !!form.toss_client_id && !!form.toss_client_secret);
 
+  // 키움 계좌번호 형식은 백엔드도 검증하지 않고 주문 API에 그대로 전달하므로 존재 여부만 확인
+  const kiwoomValid =
+    !isKiwoom ||
+    isEdit ||
+    (!!form.kiwoom_account_no?.trim() && !!form.kiwoom_app_key && !!form.kiwoom_app_secret);
+
   const { verifyState, verifyError, verify, reset: resetVerify } = useKisCredentialVerify();
   const {
     verifyState: tossVerifyState,
@@ -196,6 +202,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     !form.name ||
     !kisValid ||
     !tossValid ||
+    !kiwoomValid ||
     (isKis && !isEdit && verifyState !== "ok") ||
     (isToss && !isEdit && tossVerifyState !== "ok") ||
     (isKiwoom && !isEdit && kiwoomVerifyState !== "ok") ||

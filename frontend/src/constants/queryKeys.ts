@@ -28,6 +28,7 @@ export const QUERY_KEYS = {
   exchangeRateAlerts: ["exchange-rate-alerts"] as const,
   stockPriceAlerts: ["stock-price-alerts"] as const,
   rebalancingAlerts: ["rebalancing-alerts"] as const,
+  rebalancingAlertBase: ["rebalancing-alert"] as const,
   rebalancingAlert: (portfolioId: string) => ["rebalancing-alert", portfolioId] as const,
   rebalancingAlertsByAccount: (portfolioId: string) =>
     ["rebalancing-alert", portfolioId, "accounts"] as const,
@@ -35,6 +36,7 @@ export const QUERY_KEYS = {
     ["rebalancing-alert", portfolioId, "accounts", accountId] as const,
   rebalancingHistory: ["rebalancing-history"] as const,
   rebalancingPlans: ["rebalancing-plans"] as const,
+  rebalancingPlanPreview: (token: string) => ["rebalancing-plan-preview", token] as const,
   taxSummaryBase: ["tax-summary"] as const,
   taxSummary: (year: number, accountId?: string | null) =>
     ["tax-summary", year, accountId ?? "all"] as const,
@@ -55,6 +57,7 @@ export const QUERY_KEYS = {
   rebalancingStrategyBase: ["rebalancing-strategy"] as const,
   driftSummary: ["drift-summary"] as const,
   compositeSignalStatus: ["composite-signal-status"] as const,
+  goalRecommendationBase: ["goal-recommendation"] as const,
   goalRecommendationOverall: ["goal-recommendation", "overall"] as const,
   goalRecommendationByHorizon: ["goal-recommendation", "by-horizon"] as const,
   goalRecommendationByAge: ["goal-recommendation", "by-age"] as const,

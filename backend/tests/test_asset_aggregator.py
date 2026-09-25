@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.utils.kst import today_kst
+
 # ── _xirr 테스트 ────────────────────────────────────────────
 
 
@@ -17,7 +19,7 @@ class TestXirr:
         """1년 후 10% 수익 → XIRR ≈ 10%."""
         from app.services.returns_calculator import xirr as _xirr
 
-        today = date.today()
+        today = today_kst()
         start = today.replace(year=today.year - 1)
         cashflows = [(start, -1_000_000.0), (today, 1_100_000.0)]
         result = _xirr(cashflows)
@@ -28,14 +30,14 @@ class TestXirr:
         """단일 캐시플로는 None 반환."""
         from app.services.returns_calculator import xirr as _xirr
 
-        cashflows = [(date.today(), -1_000_000.0)]
+        cashflows = [(today_kst(), -1_000_000.0)]
         assert _xirr(cashflows) is None
 
     def test_returns_none_for_all_positive(self):
         """모두 양수인 경우 None 반환 (입금만 있는 경우)."""
         from app.services.returns_calculator import xirr as _xirr
 
-        today = date.today()
+        today = today_kst()
         cashflows = [(today - timedelta(days=365), 500_000.0), (today, 500_000.0)]
         assert _xirr(cashflows) is None
 
@@ -43,7 +45,7 @@ class TestXirr:
         """모두 음수인 경우 None 반환 (출금만 있는 경우)."""
         from app.services.returns_calculator import xirr as _xirr
 
-        today = date.today()
+        today = today_kst()
         cashflows = [(today - timedelta(days=365), -500_000.0), (today, -500_000.0)]
         assert _xirr(cashflows) is None
 
@@ -51,7 +53,7 @@ class TestXirr:
         """비현실적인 수익률(-99% 초과 또는 1000% 초과)은 None 반환."""
         from app.services.returns_calculator import xirr as _xirr
 
-        today = date.today()
+        today = today_kst()
         # 극단적인 손실: -99.9% → 반환 불가 범위
         cashflows = [(today - timedelta(days=365), -1_000_000.0), (today, 0.01)]
         result = _xirr(cashflows)
@@ -91,7 +93,7 @@ class TestCalcXirr:
 
         # 두 번째 execute: 스냅샷 조회 → 1년 전 데이터
         snap_row = SimpleNamespace(
-            snapshot_date=date.today().replace(year=date.today().year - 1),
+            snapshot_date=today_kst().replace(year=today_kst().year - 1),
             total=10_000_000.0,
         )
         snap_result = MagicMock()
@@ -131,7 +133,7 @@ class TestCalcXirr:
 
         user_id = uuid.uuid4()
         current_total = 11_000_000.0
-        one_year_ago = date.today().replace(year=date.today().year - 1)
+        one_year_ago = today_kst().replace(year=today_kst().year - 1)
 
         tx_row = SimpleNamespace(
             transaction_date=one_year_ago,

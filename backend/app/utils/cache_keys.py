@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any, TypeAlias
 
+from app.utils.kst import today_kst
+
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
 
@@ -478,9 +480,8 @@ async def invalidate_asset_account_caches(
     `positions_changed`: 보유 종목 구성이 실제로 바뀌었는지 — `invalidate_dividend_caches`
     참고. 계좌 CRUD 등 변경 여부를 모르는 호출부는 기본값(True, 항상 전체 무효화)을 쓴다.
     """
-    from datetime import date as _date
 
-    _year = year if year is not None else _date.today().year
+    _year = year if year is not None else today_kst().year
     keys = [
         dashboard_summary_key(user_id),
         dca_analysis_key(user_id),
@@ -503,9 +504,8 @@ async def invalidate_account_caches(
 
     `positions_changed` — `invalidate_dividend_caches` 참고.
     """
-    from datetime import date as _date
 
-    _year = year if year is not None else _date.today().year
+    _year = year if year is not None else today_kst().year
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
     await _scan_unlink(cache, f"{_env_prefix()}tax:overseas:{user_id}:*")

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +13,7 @@ from app.services.isa_service import get_isa_status_summary
 from app.services.pension_contribution_service import calc_pension_contribution_status
 from app.services.tax_service import get_overseas_positions_detail, get_tax_summary
 from app.utils.cache_keys import TTL_TAX_OVERSEAS, get_cached_json, set_cached_json, tax_overseas_key
+from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/tax", tags=["tax"])
 
@@ -47,7 +47,7 @@ async def tax_summary(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """연도별 세금 추정 요약. account_id 미지정 시 전체 계좌 통합 기준."""
-    current_year = date.today().year
+    current_year = today_kst().year
     target_year = year if year is not None else current_year
     if target_year < 2000 or target_year > current_year + 1:
         raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
@@ -61,7 +61,7 @@ async def isa_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    return await get_isa_status_summary(current_user.id, db)
+    return dict(await get_isa_status_summary(current_user.id, db))
 
 
 @router.get("/pension-contribution")
@@ -72,8 +72,8 @@ async def pension_contribution(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    current_year = date.today().year
+    current_year = today_kst().year
     target_year = year if year is not None else current_year
     if target_year < 2000 or target_year > current_year + 1:
         raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
-    return await calc_pension_contribution_status(current_user.id, target_year, db)
+    return dict(await calc_pension_contribution_status(current_user.id, target_year, db))

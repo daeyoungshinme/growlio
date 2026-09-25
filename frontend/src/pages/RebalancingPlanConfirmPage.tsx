@@ -1,7 +1,7 @@
 import { ChartLine, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Button from "@/components/common/Button";
 import {
   cancelBuyPlanByToken,
@@ -9,7 +9,9 @@ import {
   fetchPlanPreview,
   type RebalancingPlanItemOut,
 } from "@/api/rebalancingPlan";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 import { fmtKrwPrice } from "@/utils/format";
+import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
 
 const REASON_LABEL: Record<string, string> = {
@@ -63,9 +65,10 @@ export default function RebalancingPlanConfirmPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const qc = useQueryClient();
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["rebalancing-plan-preview", token],
+    queryKey: QUERY_KEYS.rebalancingPlanPreview(token),
     queryFn: () => fetchPlanPreview(token),
     enabled: !!token,
     staleTime: 0,
@@ -77,6 +80,8 @@ export default function RebalancingPlanConfirmPage() {
     onSuccess: (res) => {
       setResultMessage(res.message);
       void refetch();
+      // 같은 앱 세션에서 열린 경우 대기 플랜 목록/실행 이력도 갱신
+      void invalidateRebalancingPlanData(qc);
     },
     onError: (e) => setResultMessage(extractErrorMessage(e, "처리 중 오류가 발생했습니다")),
   });
@@ -86,6 +91,7 @@ export default function RebalancingPlanConfirmPage() {
     onSuccess: (res) => {
       setResultMessage(res.message);
       void refetch();
+      void invalidateRebalancingPlanData(qc);
     },
     onError: (e) => setResultMessage(extractErrorMessage(e, "처리 중 오류가 발생했습니다")),
   });

@@ -2,7 +2,7 @@ from typing import Any
 
 import structlog
 
-from app.kis.client import kis_request
+from app.kis.client import KisTokenExpiredError, auth_headers, kis_request, split_account_no
 from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
     TR_DOMESTIC_BALANCE_MOCK,
@@ -16,17 +16,6 @@ from app.kis.constants import (
 logger = structlog.get_logger()
 
 
-def _auth_headers(app_key: str, app_secret: str, access_token: str, tr_id: str) -> dict[str, str]:
-    return {
-        "authorization": f"Bearer {access_token}",
-        "appkey": app_key,
-        "appsecret": app_secret,
-        "tr_id": tr_id,
-        "custtype": "P",
-        "Content-Type": "application/json; charset=utf-8",
-    }
-
-
 async def get_domestic_balance(
     app_key: str,
     app_secret: str,
@@ -36,9 +25,9 @@ async def get_domestic_balance(
     is_mock: bool,
 ) -> dict[str, Any]:
     """국내주식 잔고 조회 — 보유종목 + 평가금액."""
-    cano, acnt_prdt_cd = account_no[:8], account_no[8:].lstrip("-") or "01"
+    cano, acnt_prdt_cd = split_account_no(account_no)
     tr_id = TR_DOMESTIC_BALANCE_MOCK if is_mock else TR_DOMESTIC_BALANCE_REAL
-    headers = _auth_headers(app_key, app_secret, access_token, tr_id)
+    headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
     data = await kis_request(
         "GET",
@@ -112,9 +101,9 @@ async def get_orderable_cash(
     is_mock: bool,
 ) -> float:
     """주문가능금액 조회 — 미수없는 매수가능금액 (nrcvb_buy_amt)."""
-    cano, acnt_prdt_cd = account_no[:8], account_no[8:].lstrip("-") or "01"
+    cano, acnt_prdt_cd = split_account_no(account_no)
     tr_id = TR_DOMESTIC_INQUIRE_PSBL_ORDER_MOCK if is_mock else TR_DOMESTIC_INQUIRE_PSBL_ORDER_REAL
-    headers = _auth_headers(app_key, app_secret, access_token, tr_id)
+    headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
     data = await kis_request(
         "GET",
@@ -144,12 +133,13 @@ async def get_overseas_balance(
     is_mock: bool,
 ) -> dict[str, Any]:
     """해외주식 잔고 조회 — NYSE/NASDAQ/AMEX 전 거래소 합산."""
-    cano, acnt_prdt_cd = account_no[:8], account_no[8:].lstrip("-") or "01"
+    cano, acnt_prdt_cd = split_account_no(account_no)
     tr_id = TR_OVERSEAS_BALANCE_MOCK if is_mock else TR_OVERSEAS_BALANCE_REAL
-    headers = _auth_headers(app_key, app_secret, access_token, tr_id)
+    headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
     all_positions: list[dict] = []
     deposit_usd = 0.0
+    failed_exchanges: list[str] = []
 
     # KIS 해외잔고 API는 거래소별로 각각 호출해야 한다.
     # "NASD"만 조회하면 NYSE·AMEX 보유 종목이 누락됨.
@@ -169,7 +159,13 @@ async def get_overseas_balance(
                     "CTX_AREA_NK200": "",
                 },
             )
-        except Exception:  # nosec B112 — 한 거래소 실패해도 나머지 거래소 조회 계속
+        except KisTokenExpiredError:
+            raise
+        except Exception as e:
+            # 부분 결과를 정상값처럼 반환하면 호출부가 실패 거래소 종목을 "매도됨"으로 보고
+            # 포지션을 지우고 "해외 없음"을 캐싱한다 — 실패 거래소를 기록해 뒀다가 루프 뒤 raise.
+            logger.warning("kis_overseas_exchange_fetch_failed", exchange=exchange_code, error=str(e))
+            failed_exchanges.append(exchange_code)
             continue
 
         for item in data.get("output1", []):
@@ -195,6 +191,11 @@ async def get_overseas_balance(
         if deposit_usd == 0.0:
             summary = data.get("output2", {}) or {}
             deposit_usd = float(summary.get("frcr_dncl_amt_2", 0))
+
+    if failed_exchanges:
+        # 나머지 거래소 조회는 끝까지 시도(로그 확보)하되, 결과는 불완전하므로 실패로 전파 →
+        # fetch_overseas_cached가 ok=False(미확인)로 처리해 예수금·해외 포지션을 보존한다.
+        raise RuntimeError(f"KIS 해외잔고 조회 실패 거래소: {', '.join(failed_exchanges)}")
 
     return {
         "positions": all_positions,

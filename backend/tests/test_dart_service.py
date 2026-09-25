@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import io
+import time
 import xml.etree.ElementTree as ET
 import zipfile
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -84,7 +84,7 @@ class TestEnsureCorpCodeMap:
         import app.services.dart_service as ds
 
         ds._corp_code_map = {"005930": "abc"}
-        ds._corp_code_loaded_at = datetime.utcnow()  # very fresh
+        ds._corp_code_loaded_at = time.monotonic()  # very fresh
 
         with patch.object(ds, "_fetch_corp_code_map", new=AsyncMock()) as mock_fetch:
             result = await ds._ensure_corp_code_map("key")

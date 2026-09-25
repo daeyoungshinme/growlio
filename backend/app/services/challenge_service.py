@@ -10,7 +10,6 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import select, text
@@ -41,8 +40,8 @@ from app.utils.cache_keys import (
     invalidate_user_caches,
     set_cached_json,
 )
+from app.utils.kst import KST as _KST
 
-_KST = ZoneInfo("Asia/Seoul")
 _NUDGE_DAY_OF_MONTH = 20  # 이 날짜 이후부터 "이번 달 아직 적립 안 함"을 네비 배지로 노출
 
 

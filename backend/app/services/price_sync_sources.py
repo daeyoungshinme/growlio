@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING
 import structlog
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from app.utils.kst import today_kst
+
 if TYPE_CHECKING:
     from datetime import date
 
@@ -90,14 +92,14 @@ def sync_pykrx_price(ticker: str) -> float | None:
     """pykrx로 국내 종목 최근 종가 조회. KRX 로그인 불필요."""
     import contextlib
     import io
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     try:
         with _pykrx_lock:
             with contextlib.redirect_stdout(io.StringIO()):
                 from pykrx import stock
 
-            today = date.today()
+            today = today_kst()
             end = today.strftime("%Y%m%d")
             start = (today - timedelta(days=10)).strftime("%Y%m%d")
             df = stock.get_market_ohlcv_by_date(start, end, ticker)

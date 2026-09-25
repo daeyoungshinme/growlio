@@ -1,5 +1,5 @@
 import { Loader2, Trash2 } from "lucide-react";
-import { convertUsdToKrw, fmtKrwShort } from "@/utils/format";
+import { fmtKrwShort, formatUsdAsKrw } from "@/utils/format";
 import { isOverseasMarket } from "@/constants/markets";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { PnlCell, MarketSelect } from "./PositionHelpers";
@@ -112,9 +112,9 @@ export function EditableDesktopPositionRow({
                 step="0.01"
               />
             </div>
-            {convertUsdToKrw(row.avg_price_usd, usdRate) > 0 && (
+            {formatUsdAsKrw(row.avg_price_usd, usdRate) && (
               <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                ≈ ₩{convertUsdToKrw(row.avg_price_usd, usdRate).toLocaleString()}
+                {formatUsdAsKrw(row.avg_price_usd, usdRate)}
               </div>
             )}
           </div>
@@ -155,9 +155,9 @@ export function EditableDesktopPositionRow({
                 <Loader2 size={14} className="animate-spin text-blue-400" />
               </span>
             )}
-            {convertUsdToKrw(rawRow.current_price_usd, usdRate) > 0 && (
+            {formatUsdAsKrw(rawRow.current_price_usd, usdRate) && (
               <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                ≈ ₩{convertUsdToKrw(rawRow.current_price_usd, usdRate).toLocaleString()}
+                {formatUsdAsKrw(rawRow.current_price_usd, usdRate)}
               </div>
             )}
           </div>

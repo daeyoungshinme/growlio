@@ -1,6 +1,6 @@
 """포지션(종목) CRUD 및 현재가 동기화 라우터 — /assets/{account_id}/positions"""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -23,6 +23,7 @@ from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positi
 from app.utils.cache_keys import invalidate_asset_account_caches, sync_lock_key
 from app.utils.currency import fetch_usd_krw
 from app.utils.inproc_lock import inproc_lock
+from app.utils.kst import today_kst
 from app.utils.pnl import calc_position_pnl
 
 router = APIRouter(tags=["positions"])
@@ -135,7 +136,7 @@ async def save_positions(
             db,
             account_id=account.id,
             user_id=account.user_id,
-            snapshot_date=date.today(),
+            snapshot_date=today_kst(),
             amount_krw=(
                 float(total_value_dec) + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate
             ),
@@ -208,7 +209,7 @@ async def sync_position_prices(
             db,
             account_id=account.id,
             user_id=account.user_id,
-            snapshot_date=date.today(),
+            snapshot_date=today_kst(),
             amount_krw=(
                 float(total_value_dec)
                 + float(account.deposit_krw or 0)

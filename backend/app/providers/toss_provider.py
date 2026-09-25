@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from datetime import date
 from typing import TYPE_CHECKING
 
 import httpx
@@ -23,6 +22,7 @@ from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvid
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -144,5 +144,5 @@ class TossProvider(BrokerProvider):
             invested_krw=invested_krw,
             pnl_krw=stock_value_krw - invested_krw,
             usd_krw_rate=usd_krw_rate,
-            extra={"source": "TOSS_API", "snapshot_date": date.today()},
+            extra={"source": "TOSS_API", "snapshot_date": today_kst()},
         )
