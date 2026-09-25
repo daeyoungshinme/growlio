@@ -186,8 +186,8 @@ export default function InvestPlanPage() {
                   </div>
                   {isConfigured && (
                     <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1 mb-3">
-                      처음부터 다시 설정하면 투자성향·배당목표까지 다시 입력받습니다. 금액·날짜만
-                      고치려면 값만 빠르게 수정을 사용하세요.
+                      가이드로 설정은 투자성향·배당목표까지 처음부터 다시 입력받습니다. 금액·날짜만
+                      고치려면 설정 편집을 사용하세요.
                     </p>
                   )}
                   <div
@@ -213,7 +213,7 @@ export default function InvestPlanPage() {
                           priority: true,
                         },
                         {
-                          label: "연간 입금 목표 (대시보드 연동)",
+                          label: "연간 입금 목표",
                           value: settingsData?.annual_deposit_goal
                             ? fmtKrw(settingsData.annual_deposit_goal)
                             : null,
@@ -231,7 +231,7 @@ export default function InvestPlanPage() {
                           priority: false,
                         },
                         {
-                          label: "은퇴 목표시점 (대시보드 연동)",
+                          label: "은퇴 목표시점",
                           value: settingsData?.retirement_target_year
                             ? `${settingsData.retirement_target_year}년`
                             : null,
@@ -270,8 +270,7 @@ export default function InvestPlanPage() {
                     )}
                   </button>
                   <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                    연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 대시보드에서 확인할 수
-                    있습니다.
+                    연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 홈 탭에서 확인할 수 있습니다.
                   </p>
                   {data && !isConfigured && (
                     <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
@@ -387,7 +386,7 @@ export default function InvestPlanPage() {
                 label: "목표 연수익률 (%)",
                 key: "goal_annual_return_pct",
                 placeholder: "8",
-                hint: "대시보드 투자 목표 카드에 표시",
+                hint: "홈 탭 투자 목표 카드에 표시",
                 inputMode: "decimal",
               },
               {
@@ -415,7 +414,7 @@ export default function InvestPlanPage() {
                 label: "연간 입금 목표 (원)",
                 key: "annual_deposit_goal",
                 placeholder: "24000000",
-                hint: "대시보드 입금 달성률에 표시",
+                hint: "홈 탭 입금 달성률에 표시",
                 inputMode: "numeric",
                 isAmount: true,
               },
@@ -423,7 +422,7 @@ export default function InvestPlanPage() {
                 label: "은퇴 목표시점 (연도)",
                 key: "retirement_target_year",
                 placeholder: "2045",
-                hint: "대시보드 투자 목표 카드에 표시",
+                hint: "홈 탭 투자 목표 카드에 표시",
                 inputMode: "numeric",
               },
             ].map(({ label, key, placeholder, type, hint, inputMode, isAmount }) => {

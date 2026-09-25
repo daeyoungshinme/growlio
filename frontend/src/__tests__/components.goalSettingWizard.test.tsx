@@ -10,6 +10,12 @@ const fetchPortfolioOverviewLite = vi.fn();
 const fetchGoalFeasibility = vi.fn();
 const fetchOverallGoalRecommendation = vi.fn();
 const createPortfolio = vi.fn();
+const mockNavigate = vi.fn();
+
+vi.mock("react-router-dom", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router-dom")>()),
+  useNavigate: () => mockNavigate,
+}));
 
 vi.mock("@/api/portfolios", () => ({
   fetchPortfolioOverviewLite: (...args: unknown[]) => fetchPortfolioOverviewLite(...args),
@@ -283,6 +289,11 @@ describe("GoalSettingWizard", () => {
         }),
       );
     });
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith(
+        "/rebalancing?rtab=포트폴리오&portfolioId=new-portfolio",
+      ),
+    );
   });
 
   it("6단계: 완료 버튼을 누르면 onClose가 호출된다", () => {

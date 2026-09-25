@@ -163,16 +163,6 @@ export default function AssetManagementPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          계좌를 등록하고 입출금·배당 내역을 관리합니다.
-        </p>
-      </div>
-
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">
-        자산 <span className="mx-1">›</span> 계좌관리
-      </p>
-
       {assetComposition.totalKrw > 0 && (
         <div className="card mb-6">
           <div className="flex items-center justify-between mb-2">
@@ -295,7 +285,7 @@ export default function AssetManagementPage() {
             ) : currentBankOrStock.length === 0 ? (
               <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
                 <EmptyState
-                  title={`등록된 ${tab}이 없습니다.`}
+                  title={`등록된 ${tab}가 없습니다.`}
                   action={{
                     label: "+ 계좌 추가하기",
                     onClick: () =>

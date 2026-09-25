@@ -92,7 +92,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                   <TriangleAlert size={14} className="text-red-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-red-700 dark:text-red-400">
-                    금융소득(배당+해외차익)이 2,000만원 이상입니다. 금융소득 종합과세 대상이 될 수
+                    금융소득(이자·배당)이 2,000만원 이상입니다. 금융소득 종합과세 대상이 될 수
                     있습니다.
                   </p>
                 </div>
@@ -102,7 +102,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                   <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                     <TriangleAlert size={14} className="text-amber-500 mt-0.5 shrink-0" />
                     <p className="text-xs text-amber-700 dark:text-amber-400">
-                      금융소득(배당+해외차익)이 종합과세 기준(2,000만원)까지{" "}
+                      금융소득(이자·배당)이 종합과세 기준(2,000만원)까지{" "}
                       {fmtKrw(taxData.comprehensive_tax_remaining_krw)} 남았습니다.
                     </p>
                   </div>
@@ -150,7 +150,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 {fmtKrw(taxData.dividend_tax_krw)}
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                배당수령 {fmtKrw(taxData.dividend_income_krw)} ×{" "}
+                과세계좌 배당 {fmtKrw(taxData.dividend_income_krw)} ×{" "}
                 {taxData.rates.dividend_tax_rate_pct}%
               </p>
             </div>

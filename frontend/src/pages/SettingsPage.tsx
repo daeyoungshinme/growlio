@@ -19,6 +19,7 @@ import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { fetchSettings } from "@/api/settings";
+import { fetchAccounts } from "@/api/assets";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import {
@@ -143,6 +144,24 @@ export default function SettingsPage() {
       ? `목표 ${goalFieldsSetCount}개 설정됨`
       : "설정된 목표 없음";
 
+  // 키움·토스 API 키는 계좌 단위로 저장돼 has_kis(전역 KIS 키)만 보면 연결된 사용자도 "미연결"로 보였음
+  const { data: accountsRaw } = useQuery({
+    queryKey: QUERY_KEYS.accounts,
+    queryFn: fetchAccounts,
+    staleTime: STALE_TIME.EXCHANGE_RATE,
+  });
+  const apiLinkedCount = Array.isArray(accountsRaw)
+    ? accountsRaw.filter((a) => a.data_source !== "MANUAL").length
+    : 0;
+  const accountLinked = apiLinkedCount > 0 || Boolean(current?.has_kis);
+  const accountLinkSummary = !current
+    ? "불러오는 중..."
+    : apiLinkedCount > 0
+      ? `${apiLinkedCount}개 계좌 연결됨`
+      : current.has_kis
+        ? "연결됨"
+        : "미연결";
+
   const recommendationSummary = current
     ? `${RISK_TOLERANCE_LABELS[current.goal_risk_tolerance] ?? current.goal_risk_tolerance} · 후보 ${current.goal_candidate_tickers.length}개`
     : "불러오는 중...";
@@ -226,10 +245,10 @@ export default function SettingsPage() {
         <SettingsLinkRow
           to="/assets?tab=계좌관리"
           icon={<Landmark size={18} className="text-gray-400 dark:text-gray-500" />}
-          label="계좌 연동 (KIS/키움)"
-          status={!current ? "불러오는 중..." : current.has_kis ? "연결됨" : "미연결"}
+          label="계좌 연동 (KIS/키움/토스)"
+          status={accountLinkSummary}
           statusClassName={
-            current?.has_kis
+            accountLinked
               ? "text-green-600 dark:text-green-400"
               : "text-gray-400 dark:text-gray-500"
           }
