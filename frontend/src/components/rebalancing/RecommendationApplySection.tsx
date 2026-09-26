@@ -9,6 +9,8 @@ interface Props {
   targetPortfolios: Portfolio[];
   selectedTargetId: string;
   onSelectTarget: (id: string) => void;
+  /** "기준 포트폴리오"로 지정된 후보 — select 옵션에 표시만 한다(적용 대상 제한 아님). */
+  anchoredTargetIds?: string[];
   onApplyClick: () => void;
   applyPending: boolean;
   /** targetPortfolios가 비어있을 때 보여줄 안내 문구 — 탭마다 문구가 다르다. */
@@ -24,6 +26,7 @@ export default function RecommendationApplySection({
   targetPortfolios,
   selectedTargetId,
   onSelectTarget,
+  anchoredTargetIds,
   onApplyClick,
   applyPending,
   noTargetMessage,
@@ -39,6 +42,7 @@ export default function RecommendationApplySection({
         <div className="flex items-center gap-2 flex-wrap">
           {targetPortfolios.length > 1 && (
             <select
+              aria-label="적용할 포트폴리오"
               value={selectedTargetId}
               onChange={(e) => onSelectTarget(e.target.value)}
               className="text-xs border border-teal-200 dark:border-teal-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-2 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -46,7 +50,7 @@ export default function RecommendationApplySection({
               <option value="">포트폴리오 선택</option>
               {targetPortfolios.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {anchoredTargetIds?.includes(p.id) ? `${p.name} (기준)` : p.name}
                 </option>
               ))}
             </select>
@@ -60,7 +64,7 @@ export default function RecommendationApplySection({
             {applyPending ? <Loader2 size={12} className="animate-spin" /> : <Anchor size={12} />}
             {targetPortfolios.length === 1
               ? `${targetPortfolios[0].name}에 적용`
-              : "기준 포트폴리오에 적용"}
+              : "선택한 포트폴리오에 적용"}
           </button>
         </div>
       )}

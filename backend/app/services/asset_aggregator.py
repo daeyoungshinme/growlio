@@ -45,7 +45,7 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
     """first_snap_date + net_deposits_ytd + non_stock_first_total +
     non_stock_net_flows_after를 CTE 단일 쿼리로 조회.
 
-    non_stock_first_total/non_stock_net_flows_after: 주식 계좌(STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER)를
+    non_stock_first_total/non_stock_net_flows_after: 주식 계좌(constants.POSITION_STOCK_ASSET_TYPES)를
     제외한 계좌만의 첫 스냅샷 합계·순입금 — 주식은 매입원가(avg_price 기반 total_invested)로 별도
     계산하므로(get_dashboard_summary 참고) 여기서는 이중계산 방지를 위해 제외한다.
     first_snap_date는 연환산 기간 계산용으로 전체 계좌 기준을 유지한다.
@@ -75,7 +75,7 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
                     WHERE s.user_id = :uid
                       AND a.is_active = TRUE
                       AND a.include_in_total = TRUE
-                      AND a.asset_type NOT IN ('STOCK_KIS', 'STOCK_KIWOOM', 'STOCK_OTHER')
+                      AND a.asset_type NOT IN ('STOCK_KIS', 'STOCK_KIWOOM', 'STOCK_TOSS', 'STOCK_OTHER')
                     GROUP BY s.account_id
                   ),
                   fs_ns AS (

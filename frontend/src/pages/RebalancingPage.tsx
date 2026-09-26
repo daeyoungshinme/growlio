@@ -20,7 +20,6 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
 const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSignalBanner"));
-const InflationSummaryCard = lazy(() => import("../components/rebalancing/InflationSummaryCard"));
 const RecommendationCard = lazy(() => import("../components/rebalancing/RecommendationCard"));
 const PortfolioManageTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioManageTab"),
@@ -31,7 +30,8 @@ const PortfolioExecutionTab = lazy(
 const RebalancingHistoryTab = lazy(() => import("../components/rebalancing/RebalancingHistoryTab"));
 const BacktestTab = lazy(() => import("../components/rebalancing/BacktestTab"));
 
-const REBALANCING_PAGE_TABS = ["진단", "포트폴리오", "이력"] as const;
+// 추천은 목록·분석·실행과 역할이 달라 포트폴리오 탭에서 분리(계획 37 U6) — 포트폴리오 탭은 내 포트폴리오 전용
+const REBALANCING_PAGE_TABS = ["진단", "추천", "포트폴리오", "이력"] as const;
 type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];
 
 export default function RebalancingPage() {
@@ -92,6 +92,18 @@ export default function RebalancingPage() {
     [setSearchParams],
   );
 
+  // 설정탭 "목표 역산 추천 옵션" 딥링크(openRecOptions=1)로 열린 옵션 모달을 닫으면 파라미터 제거
+  const clearOpenRecOptions = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("openRecOptions");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
+
   const [prefillItems, setPrefillItems] = useState<PortfolioItem[] | null>(null);
   const [prefillName, setPrefillName] = useState("");
   const [prefillAccountIds, setPrefillAccountIds] = useState<string[] | null>(null);
@@ -99,7 +111,6 @@ export default function RebalancingPage() {
     false,
     "growlio:rebalancing:backtest-section-open",
   );
-  const [showBacktest] = useCollapsible(false, "growlio:settings:show-backtest");
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, REBALANCING_PAGE_TABS, localTab, handleTabChange);
@@ -195,14 +206,7 @@ export default function RebalancingPage() {
             {signal && (
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard rows={1} />}>
-                  <MarketSignalBanner signal={signal} />
-                </Suspense>
-              </ErrorBoundary>
-            )}
-            {inflationSummary && inflationSummary.length > 0 && (
-              <ErrorBoundary variant="section">
-                <Suspense fallback={<SkeletonCard rows={1} />}>
-                  <InflationSummaryCard data={inflationSummary} />
+                  <MarketSignalBanner signal={signal} inflation={inflationSummary} />
                 </Suspense>
               </ErrorBoundary>
             )}
@@ -216,21 +220,29 @@ export default function RebalancingPage() {
           </>
         )}
 
-        {/* ── 포트폴리오 탭: 목표 역산 추천 + 목록 관리 + 분석/실행 ── */}
+        {/* ── 추천 탭: 목표 역산 추천 비중(전체/연령대/기간별) → 포트폴리오 적용·생성 ── */}
+        {localTab === "추천" && (
+          <ErrorBoundary variant="section">
+            <Suspense fallback={<SkeletonCard />}>
+              <RecommendationCard
+                onApplied={(id) => handlePortfolioSelectFromDiagnosis(id)}
+                onCreatePortfolio={(items, name, accountIds) => {
+                  setPrefillItems(items);
+                  setPrefillName(name);
+                  setPrefillAccountIds(accountIds ?? null);
+                  // 포트폴리오 편집기는 포트폴리오 탭(PortfolioManageTab)이 prefill을 소비해 연다
+                  handleTabChange("포트폴리오");
+                }}
+                initialOptionsOpen={searchParams.get("openRecOptions") === "1"}
+                onOptionsClosed={clearOpenRecOptions}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+
+        {/* ── 포트폴리오 탭: 목록 관리 + 분석/실행 ── */}
         {localTab === "포트폴리오" && (
           <>
-            <ErrorBoundary variant="section">
-              <Suspense fallback={<SkeletonCard />}>
-                <RecommendationCard
-                  onApplied={(id) => handlePortfolioSelectFromDiagnosis(id)}
-                  onCreatePortfolio={(items, name, accountIds) => {
-                    setPrefillItems(items);
-                    setPrefillName(name);
-                    setPrefillAccountIds(accountIds ?? null);
-                  }}
-                />
-              </Suspense>
-            </ErrorBoundary>
             <Suspense fallback={<SkeletonCard />}>
               <PortfolioManageTab
                 selectedPortfolioId={portfolioId}
@@ -258,21 +270,20 @@ export default function RebalancingPage() {
                 </Suspense>
               </div>
             )}
-            {showBacktest && (
-              <ErrorBoundary variant="section">
-                <CollapsibleCard
-                  icon={ChartLine}
-                  title="백테스트"
-                  isOpen={isBacktestOpen}
-                  onToggle={toggleBacktestOpen}
-                  collapsedHint="과거 데이터로 포트폴리오 성과를 시뮬레이션해볼 수 있어요"
-                >
-                  <Suspense fallback={<SkeletonCard />}>
-                    <BacktestTab />
-                  </Suspense>
-                </CollapsibleCard>
-              </ErrorBoundary>
-            )}
+            {/* 설정탭 "백테스트 기능 표시" 플래그 뒤에 숨겨져 있던 것을 접힌 카드로 상시 노출(U15) */}
+            <ErrorBoundary variant="section">
+              <CollapsibleCard
+                icon={ChartLine}
+                title="백테스트"
+                isOpen={isBacktestOpen}
+                onToggle={toggleBacktestOpen}
+                collapsedHint="과거 데이터로 포트폴리오 성과를 시뮬레이션해볼 수 있어요"
+              >
+                <Suspense fallback={<SkeletonCard />}>
+                  <BacktestTab />
+                </Suspense>
+              </CollapsibleCard>
+            </ErrorBoundary>
           </>
         )}
 

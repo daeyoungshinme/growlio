@@ -389,7 +389,7 @@ export default function GoalSettingWizard({
               hint="계산된 필요 수익률이 기본값으로 채워집니다 — 직접 조정 가능"
             />
             <Link
-              to="/rebalancing?rtab=포트폴리오"
+              to="/rebalancing?rtab=추천"
               className="block text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
             >
               추천 포트폴리오 보러가기 →

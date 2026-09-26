@@ -25,6 +25,7 @@ EXPECTED_JOB_IDS = {
     "recommendation_drift_alert",
     "challenge_deposit_reminder",
     "challenge_monthly_wrap",
+    "dca_cash_shortfall_check",
     "cache_sweep",
 }
 

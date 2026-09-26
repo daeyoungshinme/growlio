@@ -24,6 +24,13 @@ interface Props {
   accounts: AssetAccount[];
 }
 
+const TYPE_FILTER_OPTIONS = [
+  { value: "", label: "전체" },
+  { value: "DEPOSIT", label: "입금" },
+  { value: "WITHDRAWAL", label: "출금" },
+  { value: "DIVIDEND", label: "배당" },
+] as const;
+
 export default function TransactionHistoryTab({ accounts }: Props) {
   const qc = useQueryClient();
   const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -138,11 +145,13 @@ export default function TransactionHistoryTab({ accounts }: Props) {
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="grid grid-cols-3 gap-2 sm:flex sm:w-auto">
+        {/* 모바일에서 드롭다운 3개가 한 줄에 몰려 계좌명이 잘리던 것 → 계좌·연도 드롭다운 + 유형 칩(U5a) */}
+        <div className="grid grid-cols-[1fr_auto] gap-2 sm:flex sm:w-auto">
           <select
             value={filterAccountId}
             onChange={(e) => setFilterAccountId(e.target.value)}
-            className={`${INPUT_SM} w-full sm:w-auto`}
+            aria-label="계좌 필터"
+            className={`${INPUT_SM} w-full sm:w-auto min-w-0`}
           >
             <option value="">전체 계좌</option>
             {accounts.map((a) => (
@@ -152,19 +161,10 @@ export default function TransactionHistoryTab({ accounts }: Props) {
             ))}
           </select>
           <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className={`${INPUT_SM} w-full sm:w-auto`}
-          >
-            <option value="">전체 유형</option>
-            <option value="DEPOSIT">입금</option>
-            <option value="WITHDRAWAL">출금</option>
-            <option value="DIVIDEND">배당</option>
-          </select>
-          <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className={`${INPUT_SM} w-full sm:w-auto`}
+            aria-label="연도 필터"
+            className={`${INPUT_SM} w-auto`}
           >
             {YEAR_OPTIONS.map((y) => (
               <option key={y} value={y}>
@@ -172,6 +172,23 @@ export default function TransactionHistoryTab({ accounts }: Props) {
               </option>
             ))}
           </select>
+        </div>
+        <div className="flex gap-1.5" role="group" aria-label="유형 필터">
+          {TYPE_FILTER_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setFilterType(o.value)}
+              aria-pressed={filterType === o.value}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                filterType === o.value
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}

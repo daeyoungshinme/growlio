@@ -150,7 +150,7 @@ API Request
         ├── stocks.py         # 종목 검색 + ETF 추종지수 지역 판별(GET /stocks/index-region)
         ├── tax.py            # 세금 추정 요약(GET /tax/summary?year=YYYY&account_id=) + 해외 포지션(GET /tax/overseas-positions?account_id=) + ISA 만기 현황(GET /tax/isa-status) + 연금 납입 현황(GET /tax/pension-contribution) — account_id 미지정 시 전체 계좌 통합
         ├── transactions.py   # 입출금/배당 내역 CRUD
-        ├── economic_indicators.py  # 미국 CPI/Core CPI 요약(GET /economic-indicators/inflation-summary) — 프론트 InflationSummaryCard 전용. 이 엔드포인트만 존재
+        ├── economic_indicators.py  # 미국 CPI/Core CPI 요약(GET /economic-indicators/inflation-summary) — 프론트 진단탭 MarketSignalBanner(InflationIndicatorList) 전용. 이 엔드포인트만 존재
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
         ├── market_signals.py       # VIX·미국 금리 커브·하이일드 스프레드 등 복합 신호 (/market-signals)
         ├── positions.py            # 포지션 CRUD + 현재가 sync (assets.py 하위, /assets/{id}/positions)
@@ -210,7 +210,7 @@ services/
   ├── goal_age_recommendation_service.py  # 연령대별 추천 진입점(`get_age_based_recommendation`) + `age_group_from_birth_year()` — goal_recommendation 서브모듈. 목표 역산 없이 `UserSettings.age_group`을 `_AGE_GROUP_PROFILE`로 조회해 risk_tolerance+주식비중 상하한+연령대 기본 배당수익률 하한(20~30대 0%, 40대 1.5%, 50대 2.5%, 60대+ 3.5%)으로 계산. `annual_dividend_goal` 명시 시 우선. 공유 헬퍼는 `_goal_recommendation_common.py`(`_grc`)에서 사용
   ├── goal_horizon_recommendation_service.py  # 투자기간별(단기/중기/장기 × 세제유형) 추천 진입점(`get_horizon_recommendations`/`_compute_horizon_recommendations`/`_build_horizon_result`) — goal_recommendation 서브모듈(2026-09-01 분리, age와 동일 패턴). 목표금액 역산 없이 기간별 리스크 성향(`_HORIZON_RISK_TOLERANCE`)+세제유형별 투자 가능 시장+규제(IRP 안전자산 30% 하한 `_DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT`, SHORT_TERM 주식 80% 하한 `_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT`)만으로 최대 15개 조합을 계산. 배당 목표는 전체 자산 기준과 동일 %를 전 조합에 적용. 공유 헬퍼는 `_goal_recommendation_common.py`(`_grc`)에서 사용, 소비자 `api/v1/rebalancing.py`·`alerts/recommendation_drift_alert_service.py`
   ├── goal_portfolio_optimizer.py  # 목표 역산 추천 전용 MVO 엔진(SLSQP, 순수 계산) — goal_recommendation_service.py 서브모듈. 기대수익률·공분산은 `estimation.py` 축소추정 적용. 자산군 비중 제약은 `asset_classes`(종목별 EQUITY/BOND/CASH 태그)+`class_bounds`(자산군별 (하한,상한))로 N개 자산군 일반화. **배당 목표 사전검증(`_dividend_floor_constraint`)은 `class_bounds`가 있으면 그 그룹 예산도 반영 필수** — 종목당 상한만 보면 자산군 하한과 충돌해 SLSQP 전체 실패(빈 추천) 가능. `compute_weighted_expected_metrics()`는 고정 비중 가중평균 버전
-  ├── goal_candidate_service.py  # 목표 역산 추천 후보 관리/영속화(세제유형별 필터, lost-update 방지 락) — goal_recommendation_service.py 서브모듈
+  ├── goal_candidate_service.py  # 목표 역산 추천 후보 관리/영속화(세제유형별 필터, lost-update 방지 락) — goal_recommendation_service.py 서브모듈. `pension_ineligibility_reason()`: 연금저축·IRP에서 매수 불가한 레버리지·인버스 ETF/ETN/개별종목을 기간별 조합·전체(단일 세제유형) 경로 후보에서 제외 + `pension_exclusion_note()` 안내(종목명 브랜드 기반 휴리스틱 `_KR_ETF_BRAND_PREFIXES` — 신규 ETF 브랜드는 여기 추가, 불확실하면 보수적 제외)
   ├── goal_return_solver.py   # 필요 연평균 수익률·월 적립액 역산 순수 함수 — goal_recommendation_service.py 서브모듈 + invest.py `GET /invest/goal-feasibility`(마법사 미리보기)가 직접 호출
   ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 + 자산군(AssetClass)/추종지수 지역(IndexRegion) 필터링
   ├── dividend/               # 배당 서비스 패키지
@@ -314,7 +314,8 @@ jobs/                         # APScheduler 정기 작업
   ├── market_signal_daily_digest.py  # 매일 08:30 KST — 등급 전환 여부와 무관하게 현재 시장 신호를 요약 발송(옵트인, 기본 OFF)
   ├── year_end_tax_reminder.py       # 11~12월 매주 월요일 09:00 KST — 손실수확 후보·연금공제 잔여한도·ISA 만기 현황 요약 발송(옵트인, 기본 OFF). 알릴 내용이 없으면 스킵
   ├── recommendation_drift_alert.py  # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오와 유의미하게 달라지면 이메일/푸시 발송(옵트인, 기본 OFF)
-  ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고)
+  ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고). **스케줄 준수**: BOTH는 매일, DRIFT_ONLY/SCHEDULE_ONLY는 `alerts/calculator.is_auto_schedule_day`(주말 지정일은 다음 평일로 이월)일 때만 — 2026-09-26 이전엔 이 체크가 없어 월간 AUTO(정기 적립식 자동매수 포함)가 매 거래일 실행될 수 있었음. SCHEDULE_ONLY는 스케줄일에 임계값 0으로 계획 생성(`plan_generation.build_pending_plan_for_alert`)
+  ├── dca_cash_shortfall.py   # 매일 18:30 KST — 정기 적립식 자동매수(AUTO·매월·SCHEDULE_ONLY·BUY_ONLY) 다음 실행일 1~3일 전, 실행 계좌 `deposit_krw`(해외 종목 있으면 `deposit_usd` 환산 합산)가 `monthly_deposit_amount`(미설정 시 1만원) 미만이면 이메일·푸시(`DCA_CASH_SHORTFALL`). 실행일 단위 durable dedup
   ├── rebalancing_plan_buy_execution.py  # 1분 간격 — 대기시간 지난 매수 leg 자동 실행. 실행 직전 시장신호 게이트를 재확인(대기 중 상황 악화 대응) — 차단되면 조용히 다음 tick 재시도
   ├── rebalancing_plan_sell_expiry.py  # 15분 간격(app/scheduler.py) — 당일 미응답 매도 승인 요청 만료 처리
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크

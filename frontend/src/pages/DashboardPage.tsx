@@ -196,7 +196,7 @@ export default function DashboardPage() {
               signalDisplay="badge"
               marketSignal={marketSignal}
               onPortfolioSelect={(id) => navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${id}`)}
-              storageKey="growlio:dashboard:rebalancingStatusOpen"
+              collapseWhenHealthy
             />
           </Suspense>
         </ErrorBoundary>

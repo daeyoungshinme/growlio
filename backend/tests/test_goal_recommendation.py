@@ -1871,6 +1871,55 @@ class TestGetGoalRecommendation:
         assert result.recommended_items
         assert all(item.weight <= 25.0 + 0.5 for item in result.recommended_items)
 
+    async def test_pension_uniform_tax_type_excludes_non_buyable_candidates(self):
+        """전체 탭: 활성 계좌가 전부 연금저축이면 레버리지 ETF·개별 종목을 후보에서 빼고 안내한다(계획 37 E1)."""
+        settings_row = SimpleNamespace(
+            user_id=uuid.uuid4(),
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=None,
+            goal_candidate_tickers=[
+                {"ticker": "133690", "name": "TIGER 미국나스닥100", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "409820", "name": "KODEX 미국나스닥100레버리지", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "asset_class": "EQUITY"},
+            ],
+        )
+        cagr_map = {("133690", "KOSPI"): {"cagr_pct": 14.0}, ("360750", "KOSPI"): {"cagr_pct": 9.0}}
+        random.seed(37)
+        returns_map = {sym: [random.gauss(0.0005, 0.01) for _ in range(252)] for sym in ["133690.KS", "360750.KS"]}
+        get_historical_returns_mock = AsyncMock(return_value=cagr_map)
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service._active_account_tax_types",
+                AsyncMock(return_value=["PENSION_SAVINGS"]),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                get_historical_returns_mock,
+            ),
+            patch(
+                "app.services._goal_recommendation_common._fetch_dividend_yields",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            mock_db = AsyncMock()
+            mock_db.scalar = AsyncMock(return_value=settings_row)
+            result = await get_goal_recommendation(None, 10_000_000.0, [], settings_row, mock_db)
+
+        queried_tickers = set(get_historical_returns_mock.call_args.args[0])
+        assert queried_tickers == {("133690", "KOSPI"), ("360750", "KOSPI")}
+        assert {item.ticker for item in result.recommended_items} <= {"133690", "360750"}
+        assert result.note is not None
+        assert "연금저축 계좌에서는" in result.note
+
     async def test_isa_uniform_tax_type_prefers_overseas_and_augments_with_curated_etfs(self):
         """전체 탭: 활성 계좌가 전부 ISA면 국내 개별주식(삼성전자 등) 대신 큐레이션 해외지수 ETF로 보강된다."""
         settings_row = SimpleNamespace(
@@ -3050,6 +3099,63 @@ class TestGetHorizonRecommendations:
         irp_equity_weight = sum(i.weight for i in irp_rec.recommended_items if i.ticker != "CASH_EQUIVALENT")
         assert irp_equity_weight <= 70.0 + 0.5
         assert irp_rec.includes_cash_equivalent is True
+
+    async def test_pension_savings_excludes_leveraged_and_individual_stock_candidates(self):
+        """연금저축 조합은 레버리지 ETF·개별 종목(보유종목 시드 포함)을 후보에서 빼고 사유를 안내한다(계획 37 E1)."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "133690", "name": "TIGER 미국나스닥100", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "409820", "name": "KODEX 미국나스닥100레버리지", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("LONG_TERM", "PENSION_SAVINGS", uuid.uuid4())]))
+        cagr_map = {
+            ("133690", "KOSPI"): {"cagr_pct": 8.0},
+            ("360750", "KOSPI"): {"cagr_pct": 7.0},
+            ("409820", "KOSPI"): {"cagr_pct": 20.0},
+            ("005930", "KOSPI"): {"cagr_pct": 12.0},
+        }
+        get_historical_returns_mock = AsyncMock(return_value=cagr_map)
+        random.seed(23)
+        returns_map = {
+            sym: [random.gauss(0.0004, 0.01) for _ in range(252)]
+            for sym in ["133690.KS", "360750.KS", "409820.KS", "005930.KS"]
+        }
+
+        with (
+            patch(
+                "app.services.goal_horizon_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_horizon_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 2_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_horizon_recommendation_service.get_historical_returns",
+                get_historical_returns_mock,
+            ),
+            patch(
+                "app.services.goal_horizon_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        for call in get_historical_returns_mock.call_args_list:
+            queried = set(call.args[0])
+            assert ("409820", "KOSPI") not in queried
+            assert ("005930", "KOSPI") not in queried
+        rec = result.recommendations[0]
+        assert {i.ticker for i in rec.recommended_items} <= {"133690", "360750"}
+        assert rec.note is not None
+        assert "연금저축 계좌에서는" in rec.note
+        assert "삼성전자" in rec.note
 
     async def test_irp_short_term_uses_safe_asset_floor_instead_of_equity_floor(self):
         """IRP는 단기 태그여도 기존 주식 최소 80% 규칙이 아니라 퇴직연금 규정상 안전자산

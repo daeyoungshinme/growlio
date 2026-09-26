@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import DOMESTIC_MARKETS
+from app.constants import DOMESTIC_MARKETS, POSITION_STOCK_ASSET_TYPES
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._account_queries import active_accounts_stmt
@@ -29,6 +29,8 @@ ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.BANK_ACCOUNT: "통장잔고",
     AssetType.DEPOSIT: "예금/적금",
     AssetType.STOCK_KIS: "주식(KIS)",
+    AssetType.STOCK_KIWOOM: "주식(키움)",
+    AssetType.STOCK_TOSS: "주식(토스)",
     AssetType.STOCK_OTHER: "주식(타증권)",
     AssetType.CASH_OTHER: "예수금(기타)",
     AssetType.CASH_STOCK: "예수금(증권계좌)",
@@ -36,12 +38,10 @@ ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.REAL_ESTATE: "부동산",
 }
 
-STOCK_TYPES: frozenset[str] = frozenset(
-    {AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER, AssetType.CASH_OTHER}
-)
+STOCK_TYPES: frozenset[str] = POSITION_STOCK_ASSET_TYPES | {AssetType.CASH_OTHER}
 
 # 전체 자산 구성 집계 시 포지션 평가금/예수금을 분리하는 대상 (composition_calculator._STOCK_TYPES와 동일)
-_EQUITY_TYPES: frozenset[str] = frozenset({AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER})
+_EQUITY_TYPES: frozenset[str] = POSITION_STOCK_ASSET_TYPES
 
 
 async def _fetch_latest_snapshots(acc_ids: list[uuid.UUID], db: AsyncSession) -> dict[str, AssetSnapshot]:

@@ -9,6 +9,12 @@ from __future__ import annotations
 DOMESTIC_MARKETS: frozenset[str] = frozenset({"KOSPI", "KOSDAQ", "KRX"})
 """국내 주식 시장 코드. 해외 vs 국내 분류 및 Yahoo Finance 심볼 변환에 사용."""
 
+POSITION_STOCK_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS", "STOCK_OTHER"})
+"""종목(Position) 단위로 평가금·매입원가를 추적하는 증권 계좌 asset_type. 브로커를 추가하면 여기에만
+추가한다 — 서비스마다 로컬 집합을 두던 시절 토스 연동(STOCK_TOSS)이 대시보드 주식평가액·자산구성·
+세금·자산추이·추천드리프트 집계에서 전부 누락됐던 사고가 있었다(2026-09-25).
+주문 실행 가능 집합은 별개 — rebalancing/order_builder.ORDER_EXECUTABLE_ASSET_TYPES(토스 제외)."""
+
 CASH_EQUIVALENT_TICKER: str = "CASH_EQUIVALENT"
 CASH_EQUIVALENT_NAME: str = "현금성 자산 (CMA·파킹통장 등)"
 CASH_EQUIVALENT_MARKET: str = "CASH"

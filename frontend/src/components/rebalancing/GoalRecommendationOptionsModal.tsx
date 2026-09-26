@@ -29,7 +29,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** 목표 역산 추천 엔진 튜닝 설정(리스크 성향/종목당 최대비중/CAGR 산출기간) — 후보 ETF 관리와는
+/** 목표 역산 추천 엔진 튜닝 설정(투자성향/종목당 최대비중/CAGR 산출기간) — 후보 ETF 관리와는
  * 별도 모달로 분리해 각 모달의 책임을 단순하게 유지한다. */
 export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   const queryClient = useQueryClient();
@@ -55,6 +55,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   const savedCagrLookbackYears = settingsData?.goal_cagr_lookback_years ?? 10;
   const savedShortTermEquityFloorPct = settingsData?.goal_short_term_equity_floor_pct ?? 80.0;
   const savedAgeGroup = settingsData?.age_group ?? null;
+  const birthYear = settingsData?.birth_year ?? null;
   const savedBondCeilingPct = settingsData?.goal_bond_ceiling_pct ?? null;
   const savedCashCeilingPct = settingsData?.goal_cash_ceiling_pct ?? null;
 
@@ -135,7 +136,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
 
         <div>
           <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            리스크 성향
+            투자성향
           </label>
           <select
             value={currentRiskTolerance}
@@ -271,21 +272,32 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
           <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             연령대 (연령대별 추천)
           </label>
-          <select
-            value={currentAgeGroup ?? ""}
-            onChange={(e) => setAgeGroupInput((e.target.value || "") as AgeGroup | "")}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            <option value="">선택 안 함</option>
-            {AGE_GROUP_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          {/* 출생연도가 있으면 서버가 연령대를 파생 저장하므로(PUT /settings/goal) 여기서 따로 고르면
+              다음 목표 저장 때 덮어써진다 — 입력을 한 곳(적립 계획 목표 설정)으로 모은다(U12). */}
+          {birthYear != null ? (
+            <p className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-lg px-2.5 py-2">
+              {birthYear}년생 ·{" "}
+              {AGE_GROUP_OPTIONS.find((o) => o.value === savedAgeGroup)?.label ?? "연령대 계산 중"}
+              <span className="block text-gray-400 mt-0.5">
+                출생연도는 계획 탭 › 적립 계획의 목표 설정에서 바꿀 수 있어요.
+              </span>
+            </p>
+          ) : (
+            <select
+              value={currentAgeGroup ?? ""}
+              onChange={(e) => setAgeGroupInput((e.target.value || "") as AgeGroup | "")}
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">선택 안 함</option>
+              {AGE_GROUP_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
           <p className="text-xs text-gray-400 mt-1">
-            선택하면 "연령대" 탭에서 해당 연령대에 맞는 리스크 성향과 주식비중으로 추천을 받을 수
-            있습니다.
+            "연령대" 탭에서 해당 연령대에 맞는 투자성향과 주식비중으로 추천을 받을 수 있습니다.
           </p>
         </div>
 

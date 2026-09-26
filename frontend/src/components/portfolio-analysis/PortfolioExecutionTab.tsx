@@ -5,7 +5,6 @@ import { fetchPortfolios } from "@/api/portfolios";
 import { fetchAccounts } from "@/api/assets";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import { AnalysisPanel } from "./AnalysisPanel";
-import RebalancingAlertModalRouter from "@/components/rebalancing/RebalancingAlertModalRouter";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -16,8 +15,6 @@ interface Props {
 }
 
 export default function PortfolioExecutionTab({ portfolioId }: Props) {
-  const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
-
   // 푸시 알림 딥링크에서 넘어온 경우 실행 모달을 자동으로 연다.
   const [searchParams, setSearchParams] = useSearchParams();
   const [autoOpenExecution] = useState(() => searchParams.get("openExecution") === "1");
@@ -60,6 +57,18 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
     return mergeAlertsByPortfolio(alerts);
   }, [rebalancingAlertsRaw]);
 
+  // 모달은 PortfolioManageTab이 단일 호스트로 띄운다 — 여기선 URL 파라미터로 요청만 보낸다(U8).
+  const openAlertModal = (id: string) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("portfolioId", id);
+        next.set("openAlert", "1");
+        return next;
+      },
+      { replace: true },
+    );
+
   const selectedIds = useMemo(
     () => (portfolioId ? new Set([portfolioId]) : new Set<string>()),
     [portfolioId],
@@ -88,28 +97,12 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
           selectedNames={selectedNames}
           portfolios={portfolios}
           activeAccounts={activeAccounts}
-          onOpenAlertModal={setAlertModalPortfolioId}
+          onOpenAlertModal={openAlertModal}
           autoAnalyzeId={portfolioId}
           alertByPortfolioId={alertByPortfolioId}
           autoOpenExecution={autoOpenExecution}
         />
       </ErrorBoundary>
-
-      {alertModalPortfolioId &&
-        (() => {
-          const alertPortfolio = portfolios.find((p) => p.id === alertModalPortfolioId);
-          return (
-            <RebalancingAlertModalRouter
-              key={alertModalPortfolioId}
-              portfolioId={alertModalPortfolioId}
-              portfolioName={alertPortfolio?.name ?? ""}
-              alertScope={alertPortfolio?.alert_scope}
-              accountIds={alertPortfolio?.account_ids ?? null}
-              accounts={accounts}
-              onClose={() => setAlertModalPortfolioId(null)}
-            />
-          );
-        })()}
     </div>
   );
 }

@@ -9,6 +9,7 @@ from datetime import date
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.enums import AssetType
 from app.utils.cache_keys import (
     TTL_ALLOC_HISTORY,
@@ -23,6 +24,7 @@ _EXTENDED_ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.DEPOSIT: "예금/적금",
     AssetType.STOCK_KIS: "주식",
     AssetType.STOCK_KIWOOM: "주식",
+    AssetType.STOCK_TOSS: "주식",
     AssetType.STOCK_OTHER: "주식",
     AssetType.CASH_OTHER: "예수금",
     AssetType.CASH_STOCK: "예수금",
@@ -32,7 +34,7 @@ _EXTENDED_ASSET_TYPE_LABELS: dict[str, str] = {
     "STOCK_FOREIGN": "해외주식",
 }
 
-_STOCK_ASSET_TYPES = ("STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER")
+_STOCK_ASSET_TYPES = tuple(sorted(POSITION_STOCK_ASSET_TYPES))
 
 
 def _months_ago_start_date(months: int, today: date | None = None) -> date:
@@ -104,7 +106,7 @@ async def _fetch_stock_breakdown_by_market(
                 WHERE s.user_id = :uid
                     AND a.is_active = TRUE
                     AND a.include_in_total = TRUE
-                    AND a.asset_type IN ('STOCK_KIS', 'STOCK_KIWOOM', 'STOCK_OTHER')
+                    AND a.asset_type IN ('STOCK_KIS', 'STOCK_KIWOOM', 'STOCK_TOSS', 'STOCK_OTHER')
                     AND s.snapshot_date >= :start_date
                     AND (CAST(:account_id AS uuid) IS NULL OR a.id = CAST(:account_id AS uuid))
             ),

@@ -1,5 +1,5 @@
-import { describe, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -16,6 +16,14 @@ vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
 
 vi.mock("@/components/portfolio-analysis/PortfolioManageTab", () => ({
   default: () => React.createElement("div", { "data-testid": "portfolio-manage-tab" }),
+}));
+
+vi.mock("@/components/rebalancing/RecommendationCard", () => ({
+  default: ({ initialOptionsOpen }: { initialOptionsOpen?: boolean }) =>
+    React.createElement("div", {
+      "data-testid": "recommendation-card",
+      "data-options-open": String(Boolean(initialOptionsOpen)),
+    }),
 }));
 
 vi.mock("@/components/portfolio-analysis/PortfolioExecutionTab", () => ({
@@ -48,5 +56,18 @@ describe("RebalancingPage", () => {
 
   it("portfolioId 쿼리 파라미터를 처리한다", () => {
     renderPage("?portfolioId=123");
+  });
+
+  it("추천은 독립 서브탭 — 포트폴리오 탭에는 추천 카드가 없다", async () => {
+    renderPage("?rtab=포트폴리오");
+    expect(await screen.findByTestId("portfolio-manage-tab")).toBeInTheDocument();
+    expect(screen.queryByTestId("recommendation-card")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "추천" })).toBeInTheDocument();
+  });
+
+  it("rtab=추천&openRecOptions=1 이면 추천 카드가 옵션 모달을 연 상태로 마운트된다", async () => {
+    renderPage("?rtab=추천&openRecOptions=1");
+    const card = await screen.findByTestId("recommendation-card");
+    expect(card).toHaveAttribute("data-options-open", "true");
   });
 });

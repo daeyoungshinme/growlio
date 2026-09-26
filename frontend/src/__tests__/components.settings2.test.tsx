@@ -322,7 +322,7 @@ describe("RebalancingAlertSummaryCard", () => {
     vi.mocked(fetchRebalancingAlerts).mockResolvedValueOnce([]);
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([mockPortfolio()]);
     renderCard();
-    expect(await screen.findByText(/아직 설정된 리밸런싱 알림이 없어요/)).toBeDefined();
+    expect(await screen.findByText(/아직 설정된 리밸런싱 자동화가 없어요/)).toBeDefined();
   });
 
   it("shows portfolio/alert counts when alerts exist", async () => {
@@ -332,7 +332,7 @@ describe("RebalancingAlertSummaryCard", () => {
       mockPortfolio({ id: "p2" }),
     ]);
     renderCard();
-    expect(await screen.findByText(/포트폴리오 2개 중 1개에 알림 설정됨/)).toBeDefined();
+    expect(await screen.findByText(/포트폴리오 2개 중 1개에 자동화 설정됨/)).toBeDefined();
   });
 
   it("mentions AUTO count when at least one merged alert is AUTO mode", async () => {
@@ -346,7 +346,7 @@ describe("RebalancingAlertSummaryCard", () => {
     vi.mocked(fetchRebalancingAlerts).mockResolvedValueOnce([]);
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([]);
     renderCard();
-    const link = await screen.findByText(/아직 설정된 리밸런싱 알림이 없어요/);
+    const link = await screen.findByText(/아직 설정된 리밸런싱 자동화가 없어요/);
     expect(link.closest("a")?.getAttribute("href")).toBe("/rebalancing?rtab=포트폴리오");
   });
 });

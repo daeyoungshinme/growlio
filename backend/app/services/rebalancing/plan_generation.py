@@ -322,7 +322,10 @@ async def build_pending_plan_for_alert(
     overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, cache=cache)
     analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
 
-    threshold = float(alert.threshold_pct)
+    # SCHEDULE_ONLY("스케줄일에 무조건")는 임계값과 무관하게 목표 비중 대비 차이가 있는 종목을 전부
+    # 대상으로 한다 — 정기 적립식 자동매수가 스케줄일에 쌓인 예수금을 목표 비중대로 매수하는 동작.
+    # (호출 시점이 스케줄일인지는 AUTO 잡이 is_auto_schedule_day로 이미 걸렀다)
+    threshold = 0.0 if getattr(alert, "trigger_condition", None) == "SCHEDULE_ONLY" else float(alert.threshold_pct)
     drifting = filter_drifting_items(analysis.items, threshold)
 
     if not drifting:

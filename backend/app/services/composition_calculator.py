@@ -8,6 +8,7 @@ import uuid
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._account_queries import active_accounts_stmt
@@ -18,7 +19,7 @@ from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount
 from app.utils.pnl import eval_value as _eval_value
 from app.utils.pnl import invested_value as _invested_value
 
-_STOCK_TYPES = {AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER}
+_STOCK_TYPES = POSITION_STOCK_ASSET_TYPES
 
 
 async def get_latest_snapshot_rows(user_id: uuid.UUID, db: AsyncSession) -> tuple[list, set]:

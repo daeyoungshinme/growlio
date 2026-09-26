@@ -371,7 +371,10 @@ export default function PortfolioListSection({
               설정됨
             </span>
           ) : (
-            <span>자동화 설정된 포트폴리오가 없습니다. 알림 버튼으로 설정하세요.</span>
+            <span>
+              자동화 설정된 포트폴리오가 없습니다. 각 포트폴리오의 '자동화 설정' 버튼으로
+              설정하세요.
+            </span>
           )}
         </div>
       )}

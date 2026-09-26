@@ -2,13 +2,17 @@ import { useState } from "react";
 import { Bell, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { MarketSignalResponse, MarketRiskLevel } from "@/api/marketSignals";
+import type { InflationIndicatorSummary } from "@/api/economicIndicators";
 import { buildSignalRows } from "@/utils/marketSignalRows";
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 import SignalRow from "./SignalRow";
+import InflationIndicatorList from "./InflationIndicatorList";
 
 interface Props {
   signal: MarketSignalResponse;
+  /** 미국 물가 지표 — 지정 시 상세 영역 하단에 함께 표시(별도 카드 대신, U9) */
+  inflation?: InflationIndicatorSummary[];
 }
 
 const BANNER_BG: Record<MarketRiskLevel, string> = {
@@ -29,7 +33,7 @@ function scoreColor(level: MarketRiskLevel): string {
   return "text-red-600 dark:text-red-400";
 }
 
-export default function MarketSignalBanner({ signal }: Props) {
+export default function MarketSignalBanner({ signal, inflation }: Props) {
   const { composite_level, composite_score, composite_score_max, data_freshness, signals } = signal;
   const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
 
@@ -94,6 +98,12 @@ export default function MarketSignalBanner({ signal }: Props) {
               {tierRest.map((row) => (
                 <SignalRow key={row.key} label={row.label} content={row.content} />
               ))}
+            </div>
+          )}
+
+          {inflation && inflation.length > 0 && (
+            <div className="pt-2.5 border-t border-inherit">
+              <InflationIndicatorList data={inflation} />
             </div>
           )}
         </div>

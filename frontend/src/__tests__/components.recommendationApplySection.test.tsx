@@ -62,7 +62,7 @@ describe("RecommendationApplySection", () => {
       />,
     );
     expect(screen.getByRole("combobox")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "기준 포트폴리오에 적용" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "선택한 포트폴리오에 적용" })).toBeDisabled();
   });
 
   it("적용 버튼 클릭 시 onApplyClick을 호출한다", () => {

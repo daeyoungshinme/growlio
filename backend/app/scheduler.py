@@ -36,6 +36,7 @@ def init_scheduler() -> None:
     from app.jobs.cache_sweep import run_cache_sweep
     from app.jobs.challenge_deposit_reminder import run_challenge_deposit_reminder
     from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
+    from app.jobs.dca_cash_shortfall import run_dca_cash_shortfall_check
     from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
     from app.jobs.goal_achievement import run_goal_achievement_check
     from app.jobs.market_signal_alert import run_market_signal_alert_check
@@ -75,6 +76,7 @@ def init_scheduler() -> None:
         (run_recommendation_drift_alert, kst(day_of_week="mon", hour=9, minute=15), "recommendation_drift_alert"),
         (run_challenge_deposit_reminder, kst(day=25, hour=9, minute=0), "challenge_deposit_reminder"),
         (run_challenge_monthly_wrap, kst(day=1, hour=9, minute=30), "challenge_monthly_wrap"),
+        (run_dca_cash_shortfall_check, kst(hour=18, minute=30), "dca_cash_shortfall_check"),
         (run_cache_sweep, IntervalTrigger(minutes=15), "cache_sweep"),
     ]
     for func, trigger, job_id in jobs:

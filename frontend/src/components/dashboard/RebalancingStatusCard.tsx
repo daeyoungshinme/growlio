@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, TriangleAlert, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
@@ -167,6 +167,10 @@ interface Props {
   /** 지정 시, 포트폴리오가 하나도 없을 때 `null` 대신 "포트폴리오 만들기" CTA 카드를 렌더한다.
    * 리밸런싱 진단 탭 전용(대시보드 인스턴스는 미지정 → 종전대로 아무것도 렌더하지 않음). */
   emptyStateCta?: () => void;
+  /** true면 펼침 상태를 저장하지 않고 드리프트 결과로 정한다 — 리밸런싱 필요 포트폴리오가 있으면
+   * 펼치고, 모두 정상이면 접은 채 "모두 목표 비중 이내" 힌트만 보인다(홈 카드 높이 절감, U2).
+   * 세션 중 사용자가 직접 토글한 상태는 유지한다. `storageKey`와 함께 쓰지 않는다. */
+  collapseWhenHealthy?: boolean;
 }
 
 const DASHBOARD_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
@@ -190,8 +194,9 @@ export default function RebalancingStatusCard({
   showCombinedNote = true,
   storageKey,
   emptyStateCta,
+  collapseWhenHealthy = false,
 }: Props) {
-  const [isOpen, toggleOpen] = useCollapsible(true, storageKey);
+  const [isOpen, toggleOpen, setIsOpen] = useCollapsible(!collapseWhenHealthy, storageKey);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
   const {
     data: portfoliosRaw,
@@ -234,6 +239,19 @@ export default function RebalancingStatusCard({
     return driftSummaries.filter((s) => s.needs_rebalancing).length;
   }, [driftSummaries]);
 
+  // collapseWhenHealthy: 드리프트 요약이 처음 도착했을 때 1회만 기본 펼침 여부를 결정(이후 토글은 사용자 몫)
+  const autoOpenDecidedRef = useRef(false);
+  useEffect(() => {
+    if (!collapseWhenHealthy || autoOpenDecidedRef.current || !driftSummaries) return;
+    autoOpenDecidedRef.current = true;
+    if (needsCount > 0) setIsOpen(true);
+  }, [collapseWhenHealthy, driftSummaries, needsCount, setIsOpen]);
+
+  const healthyHint =
+    collapseWhenHealthy && driftSummaries && driftSummaries.length > 0 && needsCount === 0
+      ? `포트폴리오 ${driftSummaries.length}개 모두 목표 비중 이내`
+      : undefined;
+
   const combinedStatusNote = useMemo(
     () => buildCombinedStatusNote(needsCount, marketSignal?.composite_level),
     [needsCount, marketSignal?.composite_level],
@@ -268,7 +286,7 @@ export default function RebalancingStatusCard({
           <div className="p-1.5 bg-blue-50 dark:bg-blue-950 rounded-lg shrink-0">
             <Shuffle size={16} className="text-blue-600 dark:text-blue-400" />
           </div>
-          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">투자 현황 진단</h2>
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">리밸런싱 점검</h2>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
           아직 등록된 포트폴리오가 없어 진단할 수 없습니다. 포트폴리오를 만들면 목표 비중 대비 이탈
@@ -294,7 +312,7 @@ export default function RebalancingStatusCard({
       icon={Shuffle}
       iconWrapClassName="bg-blue-50 dark:bg-blue-950"
       iconColorClassName="text-blue-600 dark:text-blue-400"
-      title="투자 현황 진단"
+      title="리밸런싱 점검"
       titleBadge={
         showHeaderBadge && needsCount > 0 ? (
           <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
@@ -324,6 +342,7 @@ export default function RebalancingStatusCard({
       }
       isOpen={isOpen}
       onToggle={toggleOpen}
+      collapsedHint={healthyHint}
       cardClassName={cardClass}
     >
       {/* 시장 신호 배너 */}

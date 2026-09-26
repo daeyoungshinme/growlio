@@ -7,14 +7,16 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import DOMESTIC_MARKETS
+from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
+from app.services.dividend.constants import is_korean_etf
 from app.services.recommendation_universe import (
     MAX_GOAL_CANDIDATE_TICKERS,
     RECOMMENDATION_UNIVERSE,
@@ -47,6 +49,91 @@ OVERSEAS_DEDICATED도 이 맵에 포함하는 이유는 선호 지역 좁히기�
 `preferred_equity` 계산에서 OVERSEAS_DEDICATED는 항상 상장거래소가 해외인 후보만 통과하도록 별도
 조건을 추가로 강제하므로(아래 `_apply_index_region_preference` 참고), KRX 상장·해외지수 추종 ETF가
 이 세제유형 후보로 섞여 들어가지는 않는다."""
+
+
+_PENSION_TAX_TYPES: frozenset[str] = frozenset({"PENSION_SAVINGS", "IRP"})
+"""연금저축·IRP — 세법/퇴직급여법상 매수 가능 상품이 제한되는 계좌."""
+
+_KR_ETF_BRAND_PREFIXES: tuple[str, ...] = (
+    "KODEX",
+    "TIGER",
+    "ACE",
+    "RISE",
+    "KBSTAR",
+    "SOL",
+    "HANARO",
+    "KOSEF",
+    "ARIRANG",
+    "PLUS",
+    "KIWOOM",
+    "TIMEFOLIO",
+    "WON",
+    "1Q",
+    "BNK",
+    "UNICORN",
+    "FOCUS",
+    "TRUSTON",
+    "KOACT",
+    "VITA",
+    "TREX",
+    "SMART",
+    "마이다스",
+    "에셋플러스",
+    "DAISHIN343",
+    "파워",
+    "히어로즈",
+    "마이티",
+)
+"""국내 ETF 운용사 브랜드(종목명 접두어). 종목코드엔 ETF 여부를 알려주는 체계가 없어(`dividend.constants.
+is_korean_etf`의 코드 prefix 판별은 일부만 커버) 이름 기반을 주 판별로 쓴다 — 신규 브랜드는 여기 추가."""
+
+_LEVERAGED_INVERSE_RE = re.compile(r"레버리지|인버스|곱버스|[23]X")
+"""레버리지·인버스 ETF 종목명 패턴(대문자 비교). 예: KODEX 레버리지, TIGER 인버스, KODEX 200선물인버스2X."""
+
+
+def _looks_like_korean_etf(c: dict[str, str]) -> bool:
+    name = (c.get("name") or "").strip().upper()
+    if name.startswith(_KR_ETF_BRAND_PREFIXES) or " ETF" in f" {name}":
+        return True
+    return is_korean_etf(c["ticker"], c["market"])
+
+
+def pension_ineligibility_reason(c: dict[str, str], tax_type_value: str) -> str | None:
+    """연금저축·IRP 계좌에서 매수할 수 없는 후보면 사유 라벨을, 가능하면 None을 반환한다.
+
+    - 레버리지·인버스 ETF: 연금저축·IRP 모두 편입 불가
+    - ETN: 연금 계좌 매수 대상 아님
+    - 개별 종목(ETF가 아닌 상장주식): 연금 계좌는 ETF·펀드만 매수 가능
+
+    해외상장 종목은 `_TAX_TYPE_MARKET_GROUP`(국내만)이 이미 거르므로 여기서 다루지 않는다. 종목명
+    기반 휴리스틱이라 판별이 불확실하면 보수적으로(=제외) 판단한다 — 추천이 실제로 살 수 없는 종목을
+    내놓는 것보다 후보가 줄어드는 편이 안전하다. 합성 현금성 자산 후보(`CASH_EQUIVALENT_MARKET`)는 제외 대상 아님.
+    """
+    if tax_type_value not in _PENSION_TAX_TYPES:
+        return None
+    if c["market"].upper() == CASH_EQUIVALENT_MARKET:
+        return None
+    name = (c.get("name") or "").upper()
+    if _LEVERAGED_INVERSE_RE.search(name):
+        return "레버리지·인버스 ETF"
+    if "ETN" in name:
+        return "ETN"
+    if not _looks_like_korean_etf(c):
+        return "개별 종목"
+    return None
+
+
+def pension_exclusion_note(excluded: list[dict[str, str]], tax_type_value: str) -> str | None:
+    """연금 규정으로 제외된 후보가 있으면 사용자 안내 문구를 만든다(없으면 None)."""
+    if not excluded:
+        return None
+    reasons = sorted({r for c in excluded if (r := pension_ineligibility_reason(c, tax_type_value))})
+    account_label = "IRP" if tax_type_value == "IRP" else "연금저축"
+    examples = ", ".join(c["name"] for c in excluded[:2])
+    more = f" 외 {len(excluded) - 2}개" if len(excluded) > 2 else ""
+    return (
+        f"{account_label} 계좌에서는 {'·'.join(reasons)}을(를) 매수할 수 없어 후보에서 제외했습니다({examples}{more})"
+    )
 
 
 def _matches_index_region_preference(c: dict[str, str], tax_type_value: str) -> bool:

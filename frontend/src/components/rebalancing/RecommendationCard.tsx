@@ -188,6 +188,10 @@ interface Props {
     suggestedName: string,
     accountIds?: string[],
   ) => void;
+  /** 마운트 시 "추천 설정" 옵션 모달을 바로 연다 — 설정탭 딥링크(openRecOptions=1)용 */
+  initialOptionsOpen?: boolean;
+  /** 옵션 모달이 닫힐 때 호출 — 부모가 딥링크 파라미터를 정리한다 */
+  onOptionsClosed?: () => void;
 }
 
 /** 목표 역산 추천("전체")과 투자기간별 추천("단기"/"중기"/"장기")을 하나의 탭 카드로 합쳐 보여준다.
@@ -195,7 +199,12 @@ interface Props {
  * 목표연도를 역산한 필요수익률 제약을, 기간별 탭은 계좌 태그 기반 고정 리스크 성향을 사용한다는
  * 점에서 서로 다른 API 응답(`GoalRecommendation`/`HorizonGoalRecommendation`)을 소비한다.
  * "전체" 탭은 목표 미설정 상태에서도 항상 노출해 설정 유도 문구를 보여준다. */
-export default function RecommendationCard({ onApplied, onCreatePortfolio }: Props) {
+export default function RecommendationCard({
+  onApplied,
+  onCreatePortfolio,
+  initialOptionsOpen = false,
+  onOptionsClosed,
+}: Props) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ActiveTab>("전체");
 
@@ -302,12 +311,19 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
         })
       : undefined;
 
-  const targetPortfolios = portfolios.filter(
-    (p) => getPortfolioTargetState(p, stockAccounts) !== "none",
+  // 전체/연령대 추천은 어느 포트폴리오에나 적용할 수 있다 — 예전엔 "기준 포트폴리오"로 지정된 것만
+  // 후보로 잡아 미지정 사용자는 안내문만 보고 적용 버튼을 못 찾았음(U7). 기준 포트폴리오를 앞에 두고 기본 선택.
+  const anchoredPortfolioIds = portfolios
+    .filter((p) => getPortfolioTargetState(p, stockAccounts) !== "none")
+    .map((p) => p.id);
+  const targetPortfolios = [...portfolios].sort(
+    (a, b) =>
+      Number(anchoredPortfolioIds.includes(b.id)) - Number(anchoredPortfolioIds.includes(a.id)),
   );
   const [selectedOverallTargetId, setSelectedOverallTargetId] = useState("");
+  const effectiveOverallTargetId = selectedOverallTargetId || anchoredPortfolioIds[0] || "";
   const overallConfirmTarget =
-    targetPortfolios.find((p) => p.id === selectedOverallTargetId) ?? targetPortfolios[0];
+    targetPortfolios.find((p) => p.id === effectiveOverallTargetId) ?? targetPortfolios[0];
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -343,7 +359,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
   );
 
   const [managerOpen, setManagerOpen] = useState(false);
-  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(initialOptionsOpen);
 
   // 최초 방문 시 백엔드가 후보를 시드하거나(seed) 세제유형 선호 지수에 맞는 큐레이션 ETF를 자동
   // 추가해 DB에 커밋할 수 있으므로, 이미 캐시된 settings 쿼리가 그 이전 값을 들고 있을 수 있다.
@@ -506,7 +522,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                 {overallData.note ?? "목표금액·목표연도를 설정하면 추천을 받을 수 있습니다"}
               </p>
               <Link
-                to="/invest-plan"
+                to="/invest-plan?tab=적립 계획&from=recommendation"
                 className="flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline shrink-0"
               >
                 목표 설정하러 가기 <ArrowRight size={12} />
@@ -542,12 +558,13 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                     addPending={addSuggestedMutation.isPending}
                     applySection={{
                       targetPortfolios,
-                      selectedTargetId: selectedOverallTargetId,
+                      selectedTargetId: effectiveOverallTargetId,
                       onSelectTarget: setSelectedOverallTargetId,
+                      anchoredTargetIds: anchoredPortfolioIds,
                       onApplyClick: () => setConfirmOpen(true),
                       applyPending: applyMutation.isPending,
                       noTargetMessage:
-                        "포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.",
+                        "아직 포트폴리오가 없어요. 아래 버튼으로 이 비중 그대로 새 포트폴리오를 만들 수 있어요.",
                       onCreatePortfolio: onCreatePortfolio
                         ? () =>
                             onCreatePortfolio(
@@ -588,7 +605,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
               {hasAgeRecommendation ? (
                 <>
                   <p className="text-xs text-gray-600 dark:text-gray-300">
-                    {ageData.age_bracket} 기준 리스크 성향{" "}
+                    {ageData.age_bracket} 기준 투자성향{" "}
                     {RISK_TOLERANCE_LABELS[ageData.risk_tolerance] ?? ageData.risk_tolerance}
                     {ageData.required_dividend_yield_pct != null &&
                       ` · 목표 배당수익률 연 ${ageData.required_dividend_yield_pct.toFixed(1)}%`}
@@ -618,12 +635,13 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                     addPending={addSuggestedMutation.isPending}
                     applySection={{
                       targetPortfolios,
-                      selectedTargetId: selectedOverallTargetId,
+                      selectedTargetId: effectiveOverallTargetId,
                       onSelectTarget: setSelectedOverallTargetId,
+                      anchoredTargetIds: anchoredPortfolioIds,
                       onApplyClick: () => setConfirmOpen(true),
                       applyPending: applyMutation.isPending,
                       noTargetMessage:
-                        "포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.",
+                        "아직 포트폴리오가 없어요. 아래 버튼으로 이 비중 그대로 새 포트폴리오를 만들 수 있어요.",
                       onCreatePortfolio: onCreatePortfolio
                         ? () =>
                             onCreatePortfolio(
@@ -646,7 +664,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
             <p className="text-xs text-gray-600 dark:text-gray-300">
               {INVESTMENT_HORIZON_LABELS[effectiveTab]} · {ACCOUNT_TAX_TYPE_LABELS[activeTaxType]}{" "}
               태그 계좌 {activeHorizonRec.account_count}개 · 자산총액{" "}
-              {fmtKrw(activeHorizonRec.base_krw)} · 리스크 성향{" "}
+              {fmtKrw(activeHorizonRec.base_krw)} · 투자성향{" "}
               {RISK_TOLERANCE_LABELS[activeHorizonRec.risk_tolerance] ??
                 activeHorizonRec.risk_tolerance}
               {activeHorizonRec.required_dividend_yield_pct != null &&
@@ -752,7 +770,14 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
       </div>
 
       {managerOpen && <GoalCandidateManagerModal onClose={() => setManagerOpen(false)} />}
-      {optionsOpen && <GoalRecommendationOptionsModal onClose={() => setOptionsOpen(false)} />}
+      {optionsOpen && (
+        <GoalRecommendationOptionsModal
+          onClose={() => {
+            setOptionsOpen(false);
+            onOptionsClosed?.();
+          }}
+        />
+      )}
 
       {confirmOpen && applyConfirm && (
         <ConfirmModal

@@ -1,5 +1,7 @@
+import { useState } from "react";
 import {
   ChartNoAxesColumn,
+  ChevronDown,
   Loader2,
   Pencil,
   Receipt,
@@ -56,6 +58,7 @@ export default function StockAccountCard({
   isSyncing,
   isDeleting,
 }: Props) {
+  const [showMoreStats, setShowMoreStats] = useState(false);
   const typeLabel = STOCK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
   const accountNo = account.kis_account_no ?? account.kiwoom_account_no ?? null;
   const hasStats =
@@ -205,18 +208,6 @@ export default function StockAccountCard({
             <p className={`text-xs font-medium ${pnlColor(pnl)}`}>({fmtPct(ret)})</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>
-            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
-              {fmtKrw(stats!.deposit_total)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">누적 배당</p>
-            <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
-              {fmtKrw(stats!.dividend_total)}
-            </p>
-          </div>
-          <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
             <div className="flex items-start gap-1 mt-0.5">
               <div className="flex-1 min-w-0">
@@ -251,6 +242,35 @@ export default function StockAccountCard({
               </button>
             </div>
           </div>
+          {/* 누적 입금·배당은 상단 증권계좌 요약 카드와 같은 지표라 기본은 접어 카드 높이를 줄인다(U4) */}
+          {showMoreStats && (
+            <>
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>
+                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                  {fmtKrw(stats!.deposit_total)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">누적 배당</p>
+                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
+                  {fmtKrw(stats!.dividend_total)}
+                </p>
+              </div>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowMoreStats((v) => !v)}
+            aria-expanded={showMoreStats}
+            className="col-span-3 flex items-center justify-center gap-1 py-1 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            {showMoreStats ? "접기" : "누적 입금·배당 보기"}
+            <ChevronDown
+              size={12}
+              className={`transition-transform ${showMoreStats ? "rotate-180" : ""}`}
+            />
+          </button>
         </div>
       )}
     </div>

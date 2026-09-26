@@ -14,7 +14,6 @@ import { useChallengeRemindersToggle } from "@/hooks/useChallengeRemindersToggle
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
-import { AutoRebalancingDailyCapSection } from "@/components/settings/AutoRebalancingDailyCapSection";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
@@ -42,6 +41,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   RECOMMENDATION_DRIFT: "추천 비중 변화 알림",
   CHALLENGE_REMINDER: "적립 챌린지 독려 알림",
   CHALLENGE_WRAPUP: "적립 챌린지 월간 결산",
+  DCA_CASH_SHORTFALL: "적립매수 예수금 부족",
 };
 
 const ALERT_HISTORY_PAGE_SIZE = 50;
@@ -202,134 +202,132 @@ export default function NotificationSettingsPage() {
         설정
       </Link>
 
-      <SectionCard title="알림 설정">
+      {/* 카드 중첩(외곽 SectionCard 안에 SectionCard 3개)을 평탄화 — 각 섹션이 최상위 카드(U14) */}
+      <SectionCard title="리밸런싱 자동화">
         <RebalancingAlertSummaryCard />
-
-        {/* AUTO 리밸런싱 유저 단위 하루 거래한도 — 리밸런싱 알림과 같은 맥락이라 바로 아래 배치 */}
-        <AutoRebalancingDailyCapSection />
-
-        {/* 공통 알림 수신 이메일 — 전체 알림 유형에 적용 */}
-        <NotificationEmailSection
-          userEmail={current?.user_email}
-          onSettingsChange={invalidateSettings}
-        />
-
-        <CollapsibleCard
-          icon={Mail}
-          title="정기 리포트·요약"
-          isOpen={isReportAlertsOpen}
-          onToggle={toggleReportAlertsOpen}
-          collapsedHint={`${REPORT_ALERT_FIELDS.length}개 중 ${reportAlertsEnabledCount}개 켜짐`}
-        >
-          <div>
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">월간 리포트</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              매월 1일 전월 포트폴리오 요약을 이메일로 보내드립니다.
-            </p>
-            <ToggleSwitch
-              checked={monthlyReportEnabled}
-              disabled={monthlyReportPending}
-              onChange={toggleMonthlyReport}
-              ariaLabel="월간 리포트"
-            />
-          </div>
-
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">연말 절세 리마인더</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              11~12월 매주 월요일, 활용 가능한 절세 방법(손실수확·공제한도)을 요약해 보내드립니다.
-            </p>
-            <ToggleSwitch
-              checked={yearEndTaxReminderEnabled}
-              disabled={yearEndTaxReminderPending}
-              onChange={toggleYearEndTaxReminder}
-              ariaLabel="연말 절세 리마인더"
-            />
-          </div>
-
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">추천 비중 변화 알림</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              매주 월요일, 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
-              달라지면 이메일/푸시로 알려드립니다.
-            </p>
-            <ToggleSwitch
-              checked={recommendationDriftAlertEnabled}
-              disabled={recommendationDriftAlertPending}
-              onChange={toggleRecommendationDriftAlert}
-              ariaLabel="추천 비중 변화 알림"
-            />
-          </div>
-
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">적립 챌린지 알림</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              매월 25일 이번 달 적립 독려, 매월 1일 지난달 결산·연속 적립 현황을 이메일/푸시로
-              알려드립니다.
-            </p>
-            <ToggleSwitch
-              checked={challengeRemindersEnabled}
-              disabled={challengeRemindersPending}
-              onChange={toggleChallengeReminders}
-              ariaLabel="적립 챌린지 알림"
-            />
-          </div>
-        </CollapsibleCard>
-
-        <CollapsibleCard
-          icon={TrendingUp}
-          title="즉시 알림"
-          isOpen={isGoalAlertsOpen}
-          onToggle={toggleGoalAlertsOpen}
-          collapsedHint={`${INSTANT_ALERT_FIELDS.length}개 중 ${instantAlertsEnabledCount}개 켜짐`}
-        >
-          <div>
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">목표 달성 알림</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              투자·입금·배당 목표를 달성하면 이메일·푸시로 알려드립니다.
-            </p>
-            <ToggleSwitch
-              checked={goalAlertsEnabled}
-              disabled={goalAlertsPending}
-              onChange={toggleGoalAlerts}
-              ariaLabel="목표 달성 알림"
-            />
-          </div>
-        </CollapsibleCard>
-
-        <CollapsibleCard
-          icon={Activity}
-          title="시장 모니터링"
-          isOpen={isMarketAlertsOpen}
-          onToggle={toggleMarketAlertsOpen}
-          collapsedHint="시장 위험 신호 등급 전환 알림 + 매일 아침 요약"
-        >
-          <MarketSignalAlertSection embedded />
-        </CollapsibleCard>
-
-        {/* 알림 탭 */}
-        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
-          {ALERT_TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setAlertTab(tab)}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${TOUCH_TARGET_MIN} ${
-                alertTab === tab
-                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div ref={alertTabContentRef}>
-          {alertTab === "환율 알림" && <ExchangeRateAlertSection />}
-          {alertTab === "주가 알림" && <StockPriceAlertSection />}
-          {alertTab === "발송 이력" && <AlertHistorySection />}
-        </div>
       </SectionCard>
+
+      {/* 공통 알림 수신 이메일 — 전체 알림 유형에 적용 */}
+      <NotificationEmailSection
+        userEmail={current?.user_email}
+        onSettingsChange={invalidateSettings}
+      />
+
+      <CollapsibleCard
+        icon={Mail}
+        title="정기 리포트·요약"
+        isOpen={isReportAlertsOpen}
+        onToggle={toggleReportAlertsOpen}
+        collapsedHint={`${REPORT_ALERT_FIELDS.length}개 중 ${reportAlertsEnabledCount}개 켜짐`}
+      >
+        <div>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">월간 리포트</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            매월 1일 전월 포트폴리오 요약을 이메일로 보내드립니다.
+          </p>
+          <ToggleSwitch
+            checked={monthlyReportEnabled}
+            disabled={monthlyReportPending}
+            onChange={toggleMonthlyReport}
+            ariaLabel="월간 리포트"
+          />
+        </div>
+
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">연말 절세 리마인더</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            11~12월 매주 월요일, 활용 가능한 절세 방법(손실수확·공제한도)을 요약해 보내드립니다.
+          </p>
+          <ToggleSwitch
+            checked={yearEndTaxReminderEnabled}
+            disabled={yearEndTaxReminderPending}
+            onChange={toggleYearEndTaxReminder}
+            ariaLabel="연말 절세 리마인더"
+          />
+        </div>
+
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">추천 비중 변화 알림</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            매주 월요일, 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
+            달라지면 이메일/푸시로 알려드립니다.
+          </p>
+          <ToggleSwitch
+            checked={recommendationDriftAlertEnabled}
+            disabled={recommendationDriftAlertPending}
+            onChange={toggleRecommendationDriftAlert}
+            ariaLabel="추천 비중 변화 알림"
+          />
+        </div>
+
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">적립 챌린지 알림</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            매월 25일 이번 달 적립 독려, 매월 1일 지난달 결산·연속 적립 현황을 이메일/푸시로
+            알려드립니다.
+          </p>
+          <ToggleSwitch
+            checked={challengeRemindersEnabled}
+            disabled={challengeRemindersPending}
+            onChange={toggleChallengeReminders}
+            ariaLabel="적립 챌린지 알림"
+          />
+        </div>
+      </CollapsibleCard>
+
+      <CollapsibleCard
+        icon={TrendingUp}
+        title="즉시 알림"
+        isOpen={isGoalAlertsOpen}
+        onToggle={toggleGoalAlertsOpen}
+        collapsedHint={`${INSTANT_ALERT_FIELDS.length}개 중 ${instantAlertsEnabledCount}개 켜짐`}
+      >
+        <div>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">목표 달성 알림</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            투자·입금·배당 목표를 달성하면 이메일·푸시로 알려드립니다.
+          </p>
+          <ToggleSwitch
+            checked={goalAlertsEnabled}
+            disabled={goalAlertsPending}
+            onChange={toggleGoalAlerts}
+            ariaLabel="목표 달성 알림"
+          />
+        </div>
+      </CollapsibleCard>
+
+      <CollapsibleCard
+        icon={Activity}
+        title="시장 모니터링"
+        isOpen={isMarketAlertsOpen}
+        onToggle={toggleMarketAlertsOpen}
+        collapsedHint="시장 위험 신호 등급 전환 알림 + 매일 아침 요약"
+      >
+        <MarketSignalAlertSection embedded />
+      </CollapsibleCard>
+
+      {/* 알림 탭 */}
+      <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+        {ALERT_TABS.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setAlertTab(tab)}
+            className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${TOUCH_TARGET_MIN} ${
+              alertTab === tab
+                ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <div ref={alertTabContentRef}>
+        {alertTab === "환율 알림" && <ExchangeRateAlertSection />}
+        {alertTab === "주가 알림" && <StockPriceAlertSection />}
+        {alertTab === "발송 이력" && <AlertHistorySection />}
+      </div>
     </div>
   );
 }

@@ -20,7 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.constants import CASH_EQUIVALENT_TICKER
+from app.constants import CASH_EQUIVALENT_TICKER, POSITION_STOCK_ASSET_TYPES
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.models.portfolio import Portfolio
 from app.schemas.backtest import (
@@ -308,7 +308,7 @@ async def run_backtest(
     # 2. 실제 포트폴리오 보유 종목 조회
     real_asset_types: list[str] | None = None
     if portfolios and all(p.base_type == "STOCK_ONLY" for p in portfolios):
-        real_asset_types = ["STOCK_KIS", "STOCK_OTHER", "STOCK_KIWOOM"]
+        real_asset_types = sorted(POSITION_STOCK_ASSET_TYPES)
 
     real_holdings: list[dict] | None = None
     if req.include_real_portfolio:

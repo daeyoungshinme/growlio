@@ -101,11 +101,12 @@ export default memo(function HeroSummaryCard({
               )}
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50">
+          {/* 원 단위 전체 금액은 같은 값의 이중 표기라 title로만 제공(U1) */}
+          <p
+            className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50"
+            title={`${Math.floor(data.total_assets_krw).toLocaleString()}원`}
+          >
             {fmtKrw(Math.floor(data.total_assets_krw))}
-          </p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 truncate">
-            {Math.floor(data.total_assets_krw).toLocaleString()}원
           </p>
           <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-1.5 sm:pt-2">
             <div>

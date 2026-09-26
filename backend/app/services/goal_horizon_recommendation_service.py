@@ -46,6 +46,8 @@ from app.services.goal_candidate_service import (
     _persist_added_candidates,
     detect_duplicate_tracking_index_note,
     existing_items_from_positions,
+    pension_exclusion_note,
+    pension_ineligibility_reason,
 )
 from app.services.goal_portfolio_optimizer import _MAX_WEIGHT, _MIN_CANDIDATES, _optimize_goal_portfolio
 from app.services.market_data_fetcher import fetch_yf_daily_returns
@@ -507,12 +509,15 @@ async def _compute_horizon_recommendations(
                 # LONG_TERM(원래 EQUITY만 허용)에서도 예외적으로 BOND/CASH 후보를 후보군에 포함시킨다.
                 eligible_classes = eligible_classes | {"BOND", "CASH"}
             market_group = _TAX_TYPE_MARKET_GROUP[tax_type.value]
-            eligible_candidates = [
+            market_eligible = [
                 c
                 for c in candidate_dicts
                 if c.get("asset_class", "EQUITY") in eligible_classes
                 and (c["market"].upper() in DOMESTIC_MARKETS) == (market_group == "DOMESTIC")
             ]
+            # 연금저축·IRP: 레버리지·인버스·ETN·개별종목은 매수 불가 — 추천에서 제외(계획 37 E1)
+            pension_excluded = [c for c in market_eligible if pension_ineligibility_reason(c, tax_type.value)]
+            eligible_candidates = [c for c in market_eligible if c not in pension_excluded]
             capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
             eligible_candidates, preference_fallback_note, added = _apply_index_region_preference(
                 eligible_candidates, tax_type.value, capacity_remaining
@@ -522,9 +527,16 @@ async def _compute_horizon_recommendations(
                 all_added.extend(added)
             duplicate_index_note = detect_duplicate_tracking_index_note(eligible_candidates, existing_items)
             preference_fallback_note = (
-                f"{preference_fallback_note} {duplicate_index_note}"
-                if preference_fallback_note and duplicate_index_note
-                else preference_fallback_note or duplicate_index_note
+                " ".join(
+                    n
+                    for n in (
+                        pension_exclusion_note(pension_excluded, tax_type.value),
+                        preference_fallback_note,
+                        duplicate_index_note,
+                    )
+                    if n
+                )
+                or None
             )
 
             def _market_filter(
@@ -537,6 +549,7 @@ async def _compute_horizon_recommendations(
                     c.get("asset_class", "EQUITY") in eligible_classes
                     and (c["market"].upper() in DOMESTIC_MARKETS) == (market_group == "DOMESTIC")
                     and _matches_index_region_preference(c, tax_type_value)
+                    and pension_ineligibility_reason(c, tax_type_value) is None
                 )
 
             combos.append(

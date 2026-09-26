@@ -31,6 +31,16 @@ describe("resolvePushDeepLink", () => {
     );
   });
 
+  it("routes DCA_CASH_SHORTFALL to the savings plan tab", () => {
+    expect(resolvePushDeepLink({ type: "DCA_CASH_SHORTFALL" })).toBe(
+      `/invest-plan?tab=${encodeURIComponent("적립 계획")}`,
+    );
+  });
+
+  it("routes RECOMMENDATION_DRIFT to the recommendation tab", () => {
+    expect(resolvePushDeepLink({ type: "RECOMMENDATION_DRIFT" })).toBe("/rebalancing?rtab=추천");
+  });
+
   it("routes MARKET_SIGNAL to the diagnosis tab", () => {
     expect(resolvePushDeepLink({ type: "MARKET_SIGNAL" })).toBe("/rebalancing?rtab=진단");
   });

@@ -365,13 +365,7 @@ describe("TransactionHistoryTab", () => {
 describe("StockHoldingsTable", () => {
   it("renders with empty positions", async () => {
     renderWithProviders(
-      <StockHoldingsTable
-        positions={[]}
-        totalStock={0}
-        dividendMap={{}}
-        divLoading={false}
-        divError={false}
-      />,
+      <StockHoldingsTable positions={[]} dividendMap={{}} divLoading={false} divError={false} />,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -382,7 +376,6 @@ describe("StockHoldingsTable", () => {
     renderWithProviders(
       <StockHoldingsTable
         positions={[mockPosition]}
-        totalStock={1700000}
         dividendMap={{}}
         divLoading={false}
         divError={false}
@@ -398,7 +391,6 @@ describe("StockHoldingsTable", () => {
     renderWithProviders(
       <StockHoldingsTable
         positions={[mockPosition]}
-        totalStock={1700000}
         dividendMap={{}}
         divLoading={true}
         divError={false}
@@ -407,11 +399,41 @@ describe("StockHoldingsTable", () => {
     expect(document.body).toBeDefined();
   });
 
+  it("모바일 정렬 선택으로 카드 순서를 바꿀 수 있다 (헤더 정렬은 데스크톱 전용)", () => {
+    const small: PortfolioPosition = {
+      ...mockPosition,
+      ticker: "SML",
+      name: "Small Co",
+      value_krw: 100000,
+      invested_krw: 50000,
+      pnl: 50000,
+      pnl_pct: 100,
+      weight_in_stock: 1,
+    };
+    renderWithProviders(
+      <StockHoldingsTable
+        positions={[mockPosition, small]}
+        dividendMap={{}}
+        divLoading={false}
+        divError={false}
+      />,
+    );
+    const firstIsApple = () =>
+      Boolean(
+        screen
+          .getAllByText("Apple Inc.")[0]
+          .compareDocumentPosition(screen.getAllByText("Small Co")[0]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    expect(firstIsApple()).toBe(true); // 기본: 평가금액순
+    fireEvent.change(screen.getByLabelText("보유 종목 정렬"), { target: { value: "pnl_pct" } });
+    expect(firstIsApple()).toBe(false);
+  });
+
   it("shows error state for dividends", () => {
     renderWithProviders(
       <StockHoldingsTable
         positions={[mockPosition]}
-        totalStock={1700000}
         dividendMap={{}}
         divLoading={false}
         divError={true}
@@ -596,7 +618,7 @@ describe("RebalancingStatusCard", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText("투자 현황 진단")).toBeInTheDocument();
+      expect(screen.getByText("리밸런싱 점검")).toBeInTheDocument();
     });
     expect(screen.getByRole("link", { name: /분석하기/ })).toBeInTheDocument();
   });
@@ -678,7 +700,7 @@ describe("RebalancingStatusCard", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText("투자 현황 진단")).toBeInTheDocument();
+      expect(screen.getByText("리밸런싱 점검")).toBeInTheDocument();
     });
     expect(
       screen.queryByText(/시장 위험 신호가 높은 국면에서 이탈 종목이 발견되었습니다/),
@@ -700,6 +722,33 @@ describe("RebalancingStatusCard", () => {
         screen.getByText(/시장 위험 신호가 높은 국면에서 이탈 종목이 발견되었습니다/),
       ).toBeInTheDocument();
     });
+  });
+
+  it("collapseWhenHealthy: 모든 포트폴리오가 정상이면 접힌 채 정상 힌트만 보인다", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
+    vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
+      { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 1, needs_rebalancing: false },
+    ] as never);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard showDriftRows collapseWhenHealthy />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("포트폴리오 1개 모두 목표 비중 이내")).toBeInTheDocument();
+    expect(screen.queryByText("포트폴리오 이탈 현황")).not.toBeInTheDocument();
+  });
+
+  it("collapseWhenHealthy: 리밸런싱 필요 포트폴리오가 있으면 펼쳐서 이탈 행을 보여준다", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
+    vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
+      { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
+    ] as never);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard showDriftRows collapseWhenHealthy />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("포트폴리오 이탈 현황")).toBeInTheDocument();
   });
 });
 

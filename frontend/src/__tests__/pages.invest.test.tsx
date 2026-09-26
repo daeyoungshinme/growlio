@@ -205,26 +205,18 @@ describe("InvestPlanPage", () => {
     expect(screen.getByTestId("goal-timeline")).toBeInTheDocument();
   });
 
-  it("목표 현황 서브탭이 기본으로 렌더링되고 저축 시뮬레이터는 숨겨진다", async () => {
+  it("저축 시뮬레이터는 2단 탭 대신 적립 계획 하단 접힘 카드로, 펼치면 렌더링된다", async () => {
     vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
     renderPage();
     await waitFor(() => {
       expect(screen.getByText("적립 계획 설정")).toBeInTheDocument();
     });
+    expect(screen.queryByRole("tab", { name: "저축 시뮬레이터" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("savings-simulator")).not.toBeInTheDocument();
-  });
-
-  it("'저축 시뮬레이터' 서브탭 클릭 시 SavingsSimulatorCard가 렌더링되고 설정 요약은 숨겨진다", async () => {
-    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText("적립 계획 설정")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("tab", { name: "저축 시뮬레이터" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("savings-simulator")).toBeInTheDocument();
-    });
-    expect(screen.queryByText("적립 계획 설정")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /절약 복리 시뮬레이터/ }));
+    expect(await screen.findByTestId("savings-simulator")).toBeInTheDocument();
+    // 설정 요약은 그대로 함께 보인다
+    expect(screen.getByText("적립 계획 설정")).toBeInTheDocument();
   });
 
   it("shows 미설정 for unconfigured fields", async () => {

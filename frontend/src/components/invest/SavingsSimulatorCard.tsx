@@ -35,6 +35,7 @@ const SAVINGS_MODES = ["적립식", "거치식"] as const;
 type SavingsMode = (typeof SAVINGS_MODES)[number];
 
 interface Props {
+  /** 접힘 카드 안에 임베드될 때 — 외곽 card 스타일과 제목을 생략(제목은 감싸는 카드 헤더가 담당) */
   flat?: boolean;
   /** 사용자가 설정한 실제 목표 연수익률(UserSettings.goal_annual_return_pct) — 있으면 초기 가정 수익률로 사용 */
   goalReturnPct?: number | null;
@@ -74,9 +75,11 @@ export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
 
   return (
     <div className={flat ? undefined : "card"}>
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">
-        절약 복리 시뮬레이터
-      </h3>
+      {!flat && (
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">
+          절약 복리 시뮬레이터
+        </h3>
+      )}
       <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
         {isLumpSum
           ? "받은 보너스나 목돈을 한 번에 투자하면 복리로 얼마나 커지는지 미리 확인해보세요."
