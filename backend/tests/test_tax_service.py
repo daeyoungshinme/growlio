@@ -287,9 +287,29 @@ class TestGetTaxSummary:
         ):
             result = await get_tax_summary(user_id, 2025, mock_db)
 
-        # total_financial_income = 5_000_000 + 3_000_000 = 8_000_000
+        # 해외 양도차익(3_000_000)은 양도소득 분류과세라 금융소득에 합산하지 않음 → 배당 5_000_000만
         assert result["comprehensive_tax_warning"] is False
-        assert result["comprehensive_tax_remaining_krw"] == 12_000_000.0
+        assert result["comprehensive_tax_remaining_krw"] == 15_000_000.0
+
+    @pytest.mark.asyncio
+    async def test_overseas_gains_do_not_trigger_comprehensive_tax_warning(self, mock_db, override_settings):
+        """해외 미실현 이익이 2000만원을 넘어도 배당이 적으면 금융소득 종합과세 경고가 뜨지 않는다."""
+        user_id = uuid.uuid4()
+
+        with (
+            patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=1_000_000.0),
+            patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
+            patch(
+                "app.services.tax_service._calc_stock_unrealized",
+                new_callable=AsyncMock,
+                return_value=(50_000_000.0, 0.0, 0.0, 0.0),
+            ),
+            patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
+        ):
+            result = await get_tax_summary(user_id, 2025, mock_db)
+
+        assert result["comprehensive_tax_warning"] is False
+        assert result["comprehensive_tax_remaining_krw"] == 19_000_000.0
 
     @pytest.mark.asyncio
     async def test_total_fees_included(self, mock_db, override_settings):
@@ -459,10 +479,30 @@ class TestCalcDividendIncomeDb:
         mock_db.execute = mock_execute
 
         await _calc_dividend_income(uuid.uuid4(), 2024, mock_db)
-        without_filter = str(captured["query"])
+        without_filter = str(captured["query"]).split("WHERE", 1)[1]
 
         await _calc_dividend_income(uuid.uuid4(), 2024, mock_db, account_id=uuid.uuid4())
-        with_filter = str(captured["query"])
+        with_filter = str(captured["query"]).split("WHERE", 1)[1]
 
         assert "transactions.account_id" not in without_filter
         assert "transactions.account_id" in with_filter
+
+    @pytest.mark.asyncio
+    async def test_excludes_tax_advantaged_account_dividends(self, mock_db, override_settings):
+        """ISA·연금저축·IRP 계좌 배당은 과세 배당소득에서 제외(계좌 미지정 배당은 과세로 간주)."""
+        captured = {}
+
+        async def mock_execute(query):
+            captured["query"] = query
+            result = MagicMock()
+            result.scalar.return_value = 0
+            return result
+
+        mock_db.execute = mock_execute
+
+        await _calc_dividend_income(uuid.uuid4(), 2024, mock_db)
+        sql = str(captured["query"])
+
+        assert "LEFT OUTER JOIN asset_accounts" in sql
+        assert "asset_accounts.tax_type IS NULL" in sql
+        assert "NOT IN" in sql

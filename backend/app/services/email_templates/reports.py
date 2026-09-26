@@ -12,6 +12,7 @@ _ASSET_TYPE_LABEL: dict[str, str] = {
     "DEPOSIT": "예치금",
     "STOCK_KIS": "주식(KIS)",
     "STOCK_KIWOOM": "주식(키움)",
+    "STOCK_TOSS": "주식(토스)",
     "STOCK_OTHER": "주식(기타)",
     "CASH_STOCK": "주식 현금",
     "CASH_OTHER": "현금(기타)",

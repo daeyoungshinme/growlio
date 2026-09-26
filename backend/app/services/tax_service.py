@@ -5,16 +5,17 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, TypedDict
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services._snapshot_queries import latest_snapshot_subquery
 
 _OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "SSE", "SGX", "LSE"}
 _DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}
-_DOMESTIC_STOCK_TYPES = {"STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"}
+_DOMESTIC_STOCK_TYPES = POSITION_STOCK_ASSET_TYPES
 # ISA/연금저축/IRP는 계좌 내 매도 시 즉시 양도세가 발생하지 않는 과세이연 계좌
 _TAX_DEFERRED_TYPES = {"ISA", "PENSION_SAVINGS", "IRP"}
 
@@ -200,10 +201,11 @@ async def get_tax_summary(
 ) -> dict[str, Any]:
     """연도별 세금 추정 요약. account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합).
 
-    - 배당소득세: 실수령 배당금 × 15.4% (정확)
+    - 배당소득세: 과세계좌 배당금 × 15.4% — ISA·연금저축·IRP 계좌 배당은 비과세/과세이연이라 제외
     - 해외 양도세: 미실현 손익 기준 추정치 (250만원 공제 후 22%)
     - 국내 양도세: 대주주 요건(10억) 초과 시 경고
-    - 금융소득 종합과세 경계(2000만원) 경고
+    - 금융소득 종합과세 경계(2000만원) 경고 — 이자·배당 기준. 해외주식 양도차익은 양도소득(분류과세)이라
+      금융소득에 합산하지 않는다(이전 구현은 해외 미실현 이익을 더해 경고를 과대 발생시켰음)
     - 건강보험 피부양자 자격상실 위험(배당소득 2000만원 기준) + 예상 월 보험료 참고 추정치
     - 연간 거래 수수료 합계 (fee 컬럼)
     """
@@ -223,7 +225,7 @@ async def get_tax_summary(
     domestic_large_holder_warning = domestic_stock_krw >= _DOMESTIC_LARGE_HOLDER_THRESHOLD
     domestic_large_holder_excess_krw = max(0.0, domestic_stock_krw - _DOMESTIC_LARGE_HOLDER_THRESHOLD)
 
-    total_financial_income = dividend_income + max(0.0, overseas_unrealized)
+    total_financial_income = dividend_income  # 이자소득은 추적하지 않음 — 배당만으로 근사
     comprehensive_tax_warning = total_financial_income >= _COMPREHENSIVE_TAX_THRESHOLD
     comprehensive_tax_remaining_krw = max(0.0, _COMPREHENSIVE_TAX_THRESHOLD - total_financial_income)
 
@@ -376,14 +378,22 @@ async def _calc_total_fees(
 async def _calc_dividend_income(
     user_id: uuid.UUID, year: int, db: AsyncSession, account_id: uuid.UUID | None = None
 ) -> float:
+    """과세 대상 배당소득 합계. 세제혜택 계좌(ISA·연금저축·IRP) 배당은 원천징수·금융소득 합산 대상이
+    아니므로 제외한다. 계좌 미지정(account_id NULL) 배당은 과세로 간주."""
     conditions = [
         Transaction.user_id == user_id,
         Transaction.transaction_type == "DIVIDEND",
         func.extract("year", Transaction.transaction_date) == year,
+        or_(AssetAccount.tax_type.is_(None), AssetAccount.tax_type.not_in(_TAX_DEFERRED_TYPES)),
     ]
     if account_id is not None:
         conditions.append(Transaction.account_id == account_id)
-    result = await db.execute(select(func.sum(Transaction.amount).label("total")).where(*conditions))
+    result = await db.execute(
+        select(func.sum(Transaction.amount).label("total"))
+        .select_from(Transaction)
+        .outerjoin(AssetAccount, AssetAccount.id == Transaction.account_id)
+        .where(*conditions)
+    )
     total = result.scalar()
     return float(total) if total else 0.0
 

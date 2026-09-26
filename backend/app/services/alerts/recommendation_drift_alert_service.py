@@ -26,6 +26,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.core.database import AsyncSessionLocal
 from app.models.alert import AlertHistory
 from app.models.asset import AssetAccount
@@ -48,7 +49,7 @@ from app.utils.kst import today_kst
 logger = structlog.get_logger()
 
 _ALERT_CONCURRENCY = 5
-_STOCK_ASSET_TYPES = ("STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER")
+_STOCK_ASSET_TYPES = tuple(sorted(POSITION_STOCK_ASSET_TYPES))
 
 
 async def _get_subscribers(db: AsyncSession) -> list[tuple[User, UserSettings]]:

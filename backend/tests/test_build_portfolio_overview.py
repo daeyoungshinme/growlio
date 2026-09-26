@@ -389,13 +389,15 @@ class TestBuildPortfolioOverviewWithAccounts:
         assert by_type["CASH_STOCK"] == pytest.approx(10_000_000 - 800_000)
 
     @pytest.mark.asyncio
-    async def test_kiwoom_stock_account_deposit_also_split(self, override_settings):
-        """키움 증권 계좌(STOCK_KIWOOM)도 동일하게 예수금이 CASH_STOCK으로 분리된다."""
+    @pytest.mark.parametrize("asset_type", ["STOCK_KIWOOM", "STOCK_TOSS"])
+    async def test_other_broker_stock_account_deposit_also_split(self, asset_type, override_settings):
+        """키움·토스 증권 계좌도 동일하게 예수금이 CASH_STOCK으로 분리되고 매입원가/손익이 집계된다.
+        (토스는 연동 초기에 서비스별 로컬 주식 집합에서 누락돼 주식평가액 0·손익 누락이던 회귀 방지)"""
         db = AsyncMock()
         acc_id = uuid.uuid4()
         snap_id = uuid.uuid4()
 
-        account = _make_account(acc_id=acc_id, asset_type="STOCK_KIWOOM")
+        account = _make_account(acc_id=acc_id, asset_type=asset_type)
         snapshot = _make_snapshot(snap_id, acc_id)  # amount_krw=10,000,000
         position = _make_position(snap_id, acc_id)  # 평가금 800,000
 
@@ -411,8 +413,10 @@ class TestBuildPortfolioOverviewWithAccounts:
         result = await build_portfolio_overview(uuid.uuid4(), db)
 
         by_type = {a["type"]: a["amount_krw"] for a in result["asset_type_allocation"]}
-        assert by_type["STOCK_KIWOOM"] == pytest.approx(800_000)
+        assert by_type[asset_type] == pytest.approx(800_000)
         assert by_type["CASH_STOCK"] == pytest.approx(10_000_000 - 800_000)
+        assert result["all_positions"], "종목 상세가 누락되면 안 된다"
+        assert result["total_stock_krw"] > 0
 
     @pytest.mark.asyncio
     async def test_total_deposit_krw_derived_from_snapshot_not_deposit_krw_column(self, override_settings):
