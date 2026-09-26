@@ -15,7 +15,7 @@ from app.core.database import AsyncSessionLocal
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
-from app.services.alerts.calculator import already_fired_today
+from app.services.alerts.calculator import already_fired_today, is_auto_schedule_day
 from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
@@ -84,6 +84,12 @@ async def _run_auto_execution() -> None:
             if not is_alert_execution_time(getattr(alert, "auto_execution_time", None)):
                 continue
             if already_fired_today(alert):
+                continue
+            # 스케줄 준수 — BOTH는 매일 드리프트 체크, DRIFT_ONLY/SCHEDULE_ONLY는 스케줄일에만(NOTIFY 경로
+            # alert_check._should_skip_by_schedule와 동일 규칙). 도입 시점부터 이 체크가 빠져 있어 "매월 25일"
+            # 정기 적립식 자동매수(임계값 0.5%)가 사실상 매 거래일 실행될 수 있었다(2026-09-26 수정).
+            trigger_condition = getattr(alert, "trigger_condition", None) or "DRIFT_ONLY"
+            if trigger_condition != "BOTH" and not is_auto_schedule_day(alert):
                 continue
 
             email = notification_email or user_email

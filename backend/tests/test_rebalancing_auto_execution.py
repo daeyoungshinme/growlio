@@ -51,6 +51,11 @@ def _make_alert(**kwargs) -> SimpleNamespace:
         "last_triggered_at": None,
         "mode": "AUTO",
         "is_active": True,
+        # 모델 기본값(DAILY/DRIFT_ONLY) — DAILY면 is_auto_schedule_day가 항상 True라 기존 테스트 의미 불변
+        "schedule_type": "DAILY",
+        "schedule_day_of_week": None,
+        "schedule_day_of_month": None,
+        "trigger_condition": "DRIFT_ONLY",
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
@@ -230,6 +235,57 @@ class TestRunAutoExecution:
             await _run_auto_execution()
 
         mock_gen.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("trigger_condition", ["SCHEDULE_ONLY", "DRIFT_ONLY"])
+    async def test_non_schedule_day_skips_scheduled_alert(self, trigger_condition):
+        """AUTO도 스케줄을 지킨다 — 매월 25일 정기 적립식 자동매수가 다른 거래일에 실행되던 버그 회귀 방지."""
+        mock_db = _make_mock_db()
+        alert = _make_alert(schedule_type="MONTHLY", schedule_day_of_month=25, trigger_condition=trigger_condition)
+        portfolio = _make_portfolio()
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            _patch_common(mock_db),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch("app.jobs.rebalancing_auto_execution.is_auto_schedule_day", return_value=False),
+            patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        mock_gen.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_both_trigger_checks_drift_every_day(self):
+        """BOTH는 스케줄일과 무관하게 매일 드리프트를 확인한다(NOTIFY 경로와 동일 규칙)."""
+        mock_db = _make_mock_db()
+        alert = _make_alert(schedule_type="MONTHLY", schedule_day_of_month=25, trigger_condition="BOTH")
+        portfolio = _make_portfolio()
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            _patch_common(mock_db),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch("app.jobs.rebalancing_auto_execution.is_auto_schedule_day", return_value=False),
+            patch(
+                "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock(return_value=None)
+            ) as mock_gen,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        mock_gen.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_already_fired_today_skips_alert(self):
@@ -704,6 +760,31 @@ class TestBuildPendingPlanForAlert:
 
         assert result is None
         mock_gen.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_schedule_only_ignores_threshold(self):
+        """SCHEDULE_ONLY(스케줄일에 무조건)는 임계값 미만 차이도 대상 — 정기 적립식 자동매수가 쌓인 예수금을 매수."""
+        alert = _make_alert(threshold_pct=5.0, trigger_condition="SCHEDULE_ONLY")
+        portfolio = _make_portfolio()
+        analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=2.0)], ticker_account_map={})
+        mock_db = _make_mock_db()
+        plan = _make_plan()
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_generation.refresh_live_prices", new=AsyncMock()),
+            patch(
+                "app.services.rebalancing.plan_generation.generate_pending_plan_for_alert",
+                new=AsyncMock(return_value=(plan, "buy-token", None)),
+            ) as mock_gen,
+        ):
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
+
+            result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        assert result == (plan, "buy-token", None)
+        mock_gen.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_returns_plan_when_drift_exceeds_threshold(self):
