@@ -57,21 +57,21 @@ export default function InvestmentSnapshotCard({ overview }: Props) {
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">평가액</p>
-          <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-50 tabular-nums">
+          <p
+            className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-50 tabular-nums"
+            title={`${Math.floor(overview.total_stock_krw).toLocaleString()}원`}
+          >
             {fmtKrwShort(overview.total_stock_krw)}원
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-            {Math.floor(overview.total_stock_krw).toLocaleString()}
           </p>
         </div>
 
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">투자원금</p>
-          <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-50 tabular-nums">
+          <p
+            className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-50 tabular-nums"
+            title={`${Math.floor(overview.total_invested_krw).toLocaleString()}원`}
+          >
             {fmtKrwShort(overview.total_invested_krw)}원
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-            {Math.floor(overview.total_invested_krw).toLocaleString()}
           </p>
         </div>
 
@@ -83,6 +83,7 @@ export default function InvestmentSnapshotCard({ overview }: Props) {
             className={`text-sm sm:text-base font-semibold tabular-nums ${
               pnl === 0 ? "text-gray-400 dark:text-gray-500" : pnlColor(pnl)
             }`}
+            title={`${pnl >= 0 ? "+" : ""}${Math.floor(pnl).toLocaleString()}원`}
           >
             {pnl >= 0 ? "+" : ""}
             {fmtKrwShort(pnl)}원
@@ -90,10 +91,6 @@ export default function InvestmentSnapshotCard({ overview }: Props) {
               ({pnlPct >= 0 ? "+" : ""}
               {pnlPct.toFixed(1)}%)
             </span>
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-            {pnl >= 0 ? "+" : ""}
-            {Math.floor(pnl).toLocaleString()}
           </p>
         </div>
       </div>

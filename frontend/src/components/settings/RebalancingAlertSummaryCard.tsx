@@ -36,8 +36,8 @@ export default function RebalancingAlertSummaryCard() {
     >
       <span className="flex-1 leading-relaxed">
         {alertedCount === 0
-          ? "아직 설정된 리밸런싱 알림이 없어요 — 리밸런싱 탭에서 포트폴리오별로 설정합니다."
-          : `포트폴리오 ${totalCount}개 중 ${alertedCount}개에 알림 설정됨${
+          ? "아직 설정된 리밸런싱 자동화가 없어요 — 리밸런싱 탭 포트폴리오의 '자동화 설정'에서 설정합니다."
+          : `포트폴리오 ${totalCount}개 중 ${alertedCount}개에 자동화 설정됨${
               autoCount > 0 ? ` (AUTO ${autoCount}개)` : ""
             } — 리밸런싱 탭에서 관리합니다.`}
       </span>

@@ -3,10 +3,11 @@ import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import { useAutoRebalancingDailyCap } from "@/hooks/useAutoRebalancingDailyCap";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { fmtKrw } from "@/utils/format";
-import { SectionCard, inputClass, labelClass } from "./shared";
+import { inputClass, labelClass } from "@/components/settings/shared";
 
-/** AUTO 리밸런싱 하루 합산 거래한도 — 유저 단위 안전장치. 비워 두면 무제한(기본값). */
-export function AutoRebalancingDailyCapSection() {
+/** AUTO 리밸런싱 하루 합산 거래한도 — 유저 단위(모든 포트폴리오 공통) 안전장치. 비워 두면 무제한(기본값).
+ * 알림이 아니라 매매 안전장치라 알림 설정 페이지에서 자동화 설정 모달의 AUTO 섹션으로 옮겼다(계획 37 U13). */
+export function AutoDailyCapEditor() {
   const { dailyCapKrw, maxOrderValueKrw, isLoading, save, isSaving } = useAutoRebalancingDailyCap();
 
   if (isLoading) return null;
@@ -37,7 +38,7 @@ function DailyCapForm({ dailyCapKrw, maxOrderValueKrw, onSave, isSaving }: FormP
   const unchanged = parsed === (dailyCapKrw != null ? Math.round(dailyCapKrw) : null);
 
   return (
-    <SectionCard title="AUTO 하루 거래한도">
+    <div className="space-y-3">
       <div>
         <label htmlFor="auto-daily-cap" className={labelClass}>
           하루 합산 최대 거래대금 (원)
@@ -87,6 +88,6 @@ function DailyCapForm({ dailyCapKrw, maxOrderValueKrw, onSave, isSaving }: FormP
           </button>
         )}
       </div>
-    </SectionCard>
+    </div>
   );
 }

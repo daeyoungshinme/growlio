@@ -104,13 +104,19 @@ function StockHoldingMobileCard({ agg, divData, divLoading, divError }: MobileCa
 
 interface Props {
   positions: PortfolioPosition[];
-  totalStock: number;
   dividendMap: Record<string, DividendYield>;
   divLoading: boolean;
   divError: boolean;
 }
 
-function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, divError }: Props) {
+const MOBILE_SORT_OPTIONS: { key: AggSortKey; label: string }[] = [
+  { key: "total_value_krw", label: "평가금액순" },
+  { key: "pnl_pct", label: "수익률순" },
+  { key: "total_pnl", label: "손익순" },
+  { key: "weight_in_stock", label: "비중순" },
+];
+
+function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Props) {
   const [sort, setSort] = useState<SortState>({ key: "total_value_krw", dir: "desc" });
   const [expandedSet, setExpandedSet] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
@@ -161,16 +167,15 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
     <div className="card-overflow">
       <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
         <h3 className="font-semibold text-gray-800 dark:text-gray-200">전체 보유 종목</h3>
-        <span className="text-xs text-gray-400 dark:text-gray-500">
-          {aggregated.length}종목 · 총 {fmtKrwShort(totalStock)}원
-        </span>
+        {/* 총 평가액은 바로 위 "주식 총평가액" 요약 카드와 같은 값이라 종목 수만 표시(U3) */}
+        <span className="text-xs text-gray-400 dark:text-gray-500">{aggregated.length}종목</span>
       </div>
       {aggregated.length === 0 ? (
         <EmptyState title="보유 종목이 없습니다" compact />
       ) : (
         <>
-          <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
-            <div className="relative">
+          <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-2">
+            <div className="relative flex-1 min-w-0">
               <Search
                 size={14}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
@@ -191,6 +196,19 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
                 </button>
               )}
             </div>
+            {/* 데스크톱은 테이블 헤더(SortTh)로 정렬 — 모바일 카드 뷰엔 헤더가 없어 정렬 수단이 없었음(U5b) */}
+            <select
+              value={sort.key}
+              onChange={(e) => setSort({ key: e.target.value as AggSortKey, dir: "desc" })}
+              aria-label="보유 종목 정렬"
+              className={`${INPUT_SM} w-auto shrink-0 sm:hidden`}
+            >
+              {MOBILE_SORT_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
           {filtered.length === 0 ? (
             <EmptyState title="검색 결과가 없습니다" compact />

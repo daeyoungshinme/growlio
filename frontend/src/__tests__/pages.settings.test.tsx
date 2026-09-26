@@ -143,7 +143,9 @@ describe("SettingsPage", () => {
   it("알림 설정 카드에 요약과 딥링크를 표시한다", async () => {
     renderSettings();
     await waitFor(() => {
-      expect(screen.getByText(/정기 \d+개 중 .+개 · 즉시 \d+개 중 .+개 켜짐/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/정기 \d+\/\d+ · 즉시 \d+\/\d+ · 시장 \d+\/2 켜짐/),
+      ).toBeInTheDocument();
     });
     const notificationLink = screen.getByText("알림 설정").closest("a");
     expect(notificationLink).toHaveAttribute("href", "/settings/notifications");
@@ -175,7 +177,7 @@ describe("SettingsPage", () => {
     expect(goalLink).toHaveAttribute("href", "/invest-plan?tab=적립 계획");
 
     const recommendationLink = screen.getByText("목표 역산 추천 옵션").closest("a");
-    expect(recommendationLink).toHaveAttribute("href", "/rebalancing?rtab=포트폴리오");
+    expect(recommendationLink).toHaveAttribute("href", "/rebalancing?rtab=추천&openRecOptions=1");
   });
 
   it("계좌 연동이 있고 목표가 설정된 경우 다른 설정 카드에 반영한다", async () => {

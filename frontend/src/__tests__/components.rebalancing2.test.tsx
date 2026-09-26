@@ -40,7 +40,7 @@ vi.mock("@/hooks/useRebalancingExecution", () => ({
 import { SideBadge, StatusBadge } from "@/components/rebalancing/RebalancingBadges";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 import MarketSignalBanner from "@/components/rebalancing/MarketSignalBanner";
-import InflationSummaryCard from "@/components/rebalancing/InflationSummaryCard";
+import InflationIndicatorList from "@/components/rebalancing/InflationIndicatorList";
 import { PriceCell } from "@/components/rebalancing/RebalancingPriceCell";
 import {
   DiffCell,
@@ -205,6 +205,16 @@ describe("MarketSignalBanner", () => {
     expect(screen.getByText(/일부 데이터 없음/)).toBeDefined();
   });
 
+  it("inflation prop이 있으면 상세 영역에 물가 지표를 함께 보여준다 (별도 카드 병합)", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <MarketSignalBanner signal={mockSignal} inflation={mockInflationSummary} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("물가 지표 (미국)")).toBeDefined();
+    expect(screen.getByText("미국 CPI")).toBeDefined();
+  });
+
   it("shows the on/off state text for the composite signal alert", async () => {
     renderBanner();
     expect(await screen.findByText("받는 중")).toBeDefined();
@@ -262,7 +272,7 @@ describe("MarketSignalBanner", () => {
   });
 });
 
-// ------- InflationSummaryCard -------
+// ------- InflationIndicatorList -------
 const mockInflationSummary: InflationIndicatorSummary[] = [
   {
     code: "CPI_US",
@@ -284,35 +294,35 @@ const mockInflationSummary: InflationIndicatorSummary[] = [
   },
 ];
 
-describe("InflationSummaryCard", () => {
-  it("renders the card title", () => {
-    render(<InflationSummaryCard data={mockInflationSummary} />);
+describe("InflationIndicatorList", () => {
+  it("renders the section title", () => {
+    render(<InflationIndicatorList data={mockInflationSummary} />);
     expect(screen.getByText("물가 지표 (미국)")).toBeDefined();
   });
 
   it("renders each indicator name and YoY change", () => {
-    render(<InflationSummaryCard data={mockInflationSummary} />);
+    render(<InflationIndicatorList data={mockInflationSummary} />);
     expect(screen.getByText("미국 CPI")).toBeDefined();
     expect(screen.getByText("+2.0% (전년比)")).toBeDefined();
   });
 
   it("shows next release date when available", () => {
-    render(<InflationSummaryCard data={mockInflationSummary} />);
+    render(<InflationIndicatorList data={mockInflationSummary} />);
     expect(screen.getByText("2월 13일 발표 예정")).toBeDefined();
   });
 
   it("falls back to a placeholder when release date is unknown", () => {
-    render(<InflationSummaryCard data={mockInflationSummary} />);
+    render(<InflationIndicatorList data={mockInflationSummary} />);
     expect(screen.getByText("발표일 미정")).toBeDefined();
   });
 
   it("shows a placeholder dash when yoy change is null", () => {
-    render(<InflationSummaryCard data={mockInflationSummary} />);
+    render(<InflationIndicatorList data={mockInflationSummary} />);
     expect(screen.getByText("— (전년比)")).toBeDefined();
   });
 
   it("renders nothing when data is empty", () => {
-    const { container } = render(<InflationSummaryCard data={[]} />);
+    const { container } = render(<InflationIndicatorList data={[]} />);
     expect(container.firstChild).toBeNull();
   });
 });

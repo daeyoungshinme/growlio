@@ -14,7 +14,7 @@ vi.mock("@/api/client", () => {
 });
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
 
-import { AutoRebalancingDailyCapSection } from "@/components/settings/AutoRebalancingDailyCapSection";
+import { AutoDailyCapEditor } from "@/components/rebalancing/alertModal/AutoDailyCapEditor";
 import { api } from "@/api/client";
 
 function renderWithSettings(dailyCap: number | null) {
@@ -28,12 +28,12 @@ function renderWithSettings(dailyCap: number | null) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <AutoRebalancingDailyCapSection />
+      <AutoDailyCapEditor />
     </QueryClientProvider>,
   );
 }
 
-describe("AutoRebalancingDailyCapSection", () => {
+describe("AutoDailyCapEditor", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("미설정이면 무제한으로 표시하고 해제 버튼을 숨긴다", async () => {

@@ -344,17 +344,22 @@ describe("RecommendationCard", () => {
       expect(await screen.findByText(/목표 배당수익률 연 5\.0%/)).toBeDefined();
     });
 
-    it("shows a hint instead of an apply control when no portfolio is set as a goal target", async () => {
+    it("offers applying to a portfolio even when none is set as the base (기준) portfolio", async () => {
       fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
       fetchPortfolios.mockResolvedValue([makePortfolio()]);
       fetchAccounts.mockResolvedValue([makeAccount({ target_portfolio_id: null })]);
       renderWithProviders(<RecommendationCard />);
 
-      expect(
-        await screen.findByText(
-          "포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.",
-        ),
-      ).toBeDefined();
+      expect(await screen.findByText("메인 포트폴리오에 적용")).toBeDefined();
+    });
+
+    it("shows a hint instead of an apply control when there is no portfolio at all", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchPortfolios.mockResolvedValue([]);
+      fetchAccounts.mockResolvedValue([makeAccount({ target_portfolio_id: null })]);
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText(/아직 포트폴리오가 없어요/)).toBeDefined();
       expect(screen.queryByText(/에 적용/)).toBeNull();
     });
 
@@ -498,7 +503,7 @@ describe("RecommendationCard", () => {
       expect(dialog.getByText("9.1%")).toBeDefined();
     });
 
-    it("requires selecting a target portfolio when multiple portfolios are goal targets", async () => {
+    it("preselects the base portfolio and lets the user switch the target when several exist", async () => {
       fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
       fetchPortfolios.mockResolvedValue([
         makePortfolio({ id: "target-1", name: "국내 포트폴리오" }),
@@ -513,13 +518,13 @@ describe("RecommendationCard", () => {
 
       renderWithProviders(<RecommendationCard onApplied={onApplied} />);
 
-      const applyButton = await screen.findByText("기준 포트폴리오에 적용");
-      expect(applyButton.closest("button")).toBeDisabled();
+      const applyButton = await screen.findByText("선택한 포트폴리오에 적용");
+      // 기준 포트폴리오(첫 번째)가 기본 선택돼 바로 적용 가능
+      expect(applyButton.closest("button")).not.toBeDisabled();
 
-      fireEvent.change(screen.getByDisplayValue("포트폴리오 선택"), {
+      fireEvent.change(screen.getByLabelText("적용할 포트폴리오"), {
         target: { value: "target-2" },
       });
-      expect(applyButton.closest("button")).not.toBeDisabled();
 
       fireEvent.click(applyButton);
       fireEvent.click(await screen.findByText("적용"));
@@ -845,12 +850,24 @@ describe("RecommendationCard", () => {
       ]);
     });
 
+    it("shows the age group read-only (from birth year) instead of a second age input", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchSettings.mockResolvedValue(
+        makeSettingsData({ birth_year: 1990, age_group: "THIRTIES" }),
+      );
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("추천 설정"));
+      expect(await screen.findByText(/1990년생/)).toBeDefined();
+      expect(screen.queryByDisplayValue("선택 안 함")).toBeNull();
+    });
+
     it("opens the recommendation-options modal and saves risk tolerance changes", async () => {
       fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
       renderWithProviders(<RecommendationCard />);
 
       fireEvent.click(await screen.findByText("추천 설정"));
-      expect(await screen.findByText("리스크 성향")).toBeDefined();
+      expect(await screen.findByText("투자성향")).toBeDefined();
 
       fireEvent.change(screen.getByDisplayValue("보수적 (목표치 그대로)"), {
         target: { value: "AGGRESSIVE" },

@@ -13,6 +13,9 @@ export const INSTANT_ALERT_FIELDS = [
   "goal_achievement_alerts_enabled",
 ] as const satisfies readonly (keyof SettingsData)[];
 
+/** "시장 모니터링" 그룹 — 등급 전환 알림(별도 API 상태)과 매일 요약(설정 필드) 2개 */
+export const MARKET_ALERT_COUNT = 2;
+
 export function countEnabled(values: readonly boolean[]): number {
   return values.filter(Boolean).length;
 }

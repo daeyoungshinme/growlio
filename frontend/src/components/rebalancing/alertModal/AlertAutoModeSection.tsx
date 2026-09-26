@@ -1,5 +1,5 @@
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
@@ -16,6 +16,7 @@ import {
 } from "@/constants/rebalancingConfig";
 import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
+import { AutoDailyCapEditor } from "./AutoDailyCapEditor";
 
 const inputClass = `w-full ${INPUT_SM}`;
 
@@ -38,6 +39,7 @@ export function AlertAutoModeSection({
   switchToPerAccountMut,
   marketSignal,
 }: Props) {
+  const [capEditOpen, setCapEditOpen] = useState(false);
   const { data: settingsData } = useQuery({
     queryKey: QUERY_KEYS.settings,
     queryFn: fetchSettings,
@@ -60,19 +62,26 @@ export function AlertAutoModeSection({
       </p>
       {settingsData && (
         <p className="text-xs text-orange-600 dark:text-orange-400">
-          하루 합산 거래한도:{" "}
+          하루 합산 거래한도(모든 포트폴리오 공통):{" "}
           <span className="font-medium">
             {settingsData.auto_rebalancing_daily_value_cap_krw != null
               ? fmtKrw(settingsData.auto_rebalancing_daily_value_cap_krw)
               : "미설정(무제한)"}
           </span>{" "}
-          <Link
-            to="/settings/notifications"
+          <button
+            type="button"
+            onClick={() => setCapEditOpen((v) => !v)}
+            aria-expanded={capEditOpen}
             className="underline underline-offset-2 hover:text-orange-800 dark:hover:text-orange-200"
           >
-            설정에서 변경
-          </Link>
+            {capEditOpen ? "닫기" : "변경"}
+          </button>
         </p>
+      )}
+      {capEditOpen && (
+        <div className="p-3 rounded-lg bg-white dark:bg-gray-900 border border-orange-200 dark:border-orange-800">
+          <AutoDailyCapEditor />
+        </div>
       )}
 
       <div>

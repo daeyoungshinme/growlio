@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, within } from "@testing-library/react";
 import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
@@ -144,6 +144,18 @@ describe("TransactionHistoryTab", () => {
       const zeros = screen.getAllByText("0원");
       expect(zeros.length).toBeGreaterThanOrEqual(2);
     });
+  });
+
+  it("유형 필터는 칩으로 전환된다", () => {
+    renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
+    const group = screen.getByRole("group", { name: "유형 필터" });
+    const dividendChip = within(group).getByRole("button", { name: "배당" });
+    expect(within(group).getByRole("button", { name: "전체" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(dividendChip);
+    expect(dividendChip).toHaveAttribute("aria-pressed", "true");
   });
 
   it("연도를 변경하면 해당 연도로 필터가 변경된다", async () => {

@@ -12,7 +12,6 @@ import {
   Sparkles,
   ChevronRight,
   KeyRound,
-  ChartLine,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
@@ -20,18 +19,19 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { fetchSettings } from "@/api/settings";
 import { fetchAccounts } from "@/api/assets";
+import { fetchCompositeSignalStatus } from "@/api/rebalancing";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import {
   REPORT_ALERT_FIELDS,
   INSTANT_ALERT_FIELDS,
+  MARKET_ALERT_COUNT,
   countEnabled,
 } from "@/utils/notificationAlertGroups";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useLogout } from "@/hooks/useLogout";
 import { useBiometric } from "@/hooks/useBiometric";
-import { useCollapsible } from "@/hooks/useCollapsible";
 import { retryPushRegistration, disablePushNotifications } from "@/hooks/usePushNotifications";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import DeleteAccountModal from "@/components/settings/DeleteAccountModal";
@@ -83,10 +83,6 @@ export default function SettingsPage() {
   const { isDark, toggle } = useThemeStore();
   const logout = useLogout();
   const { isAvailable, isEnabled, setEnabled } = useBiometric();
-  const [showBacktest, toggleShowBacktest] = useCollapsible(
-    false,
-    "growlio:settings:show-backtest",
-  );
   const pushStatus = usePushNotificationStore((s) => s.status);
   const qc = useQueryClient();
   const [dart, setDart] = useState({ api_key: "" });
@@ -172,14 +168,78 @@ export default function SettingsPage() {
   const instantAlertsEnabledCount = current
     ? countEnabled(INSTANT_ALERT_FIELDS.map((field) => Boolean(current[field])))
     : 0;
+  // 시장 모니터링 알림 2종도 요약에 포함 — 누락 시 켜둔 사용자에게도 "꺼짐"처럼 보였음
+  const { data: compositeSignalStatus } = useQuery({
+    queryKey: QUERY_KEYS.compositeSignalStatus,
+    queryFn: fetchCompositeSignalStatus,
+    staleTime: STALE_TIME.LONG,
+  });
+  const marketAlertsEnabledCount = current
+    ? countEnabled([
+        Boolean(compositeSignalStatus?.enabled),
+        Boolean(current.market_signal_daily_digest_enabled),
+      ])
+    : 0;
   const notificationSummary = !current
     ? "불러오는 중..."
-    : `정기 ${REPORT_ALERT_FIELDS.length}개 중 ${reportAlertsEnabledCount}개 · 즉시 ${INSTANT_ALERT_FIELDS.length}개 중 ${instantAlertsEnabledCount}개 켜짐`;
+    : `정기 ${reportAlertsEnabledCount}/${REPORT_ALERT_FIELDS.length} · 즉시 ${instantAlertsEnabledCount}/${INSTANT_ALERT_FIELDS.length} · 시장 ${marketAlertsEnabledCount}/${MARKET_ALERT_COUNT} 켜짐`;
 
   return (
     <div className="space-y-6 max-w-xl">
       <h1 className="sr-only">설정</h1>
-      {/* DART OpenAPI */}
+      {/* 계정 정보 */}
+      <SectionCard title="계정 정보">
+        <div>
+          <label className={labelClass}>로그인 이메일</label>
+          <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{authEmail ?? "—"}</p>
+        </div>
+        <button
+          onClick={() => setShowChangePassword(true)}
+          className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
+        >
+          <KeyRound size={18} />
+          비밀번호 변경
+        </button>
+      </SectionCard>
+
+      {/* 다른 설정 — 계좌 연동/목표/추천 옵션은 각 기능 페이지에서 편집, 여기서는 상태 요약 + 딥링크만 제공 */}
+      <SectionCard title="다른 설정">
+        <SettingsLinkRow
+          to="/assets?tab=계좌관리"
+          icon={<Landmark size={18} className="text-gray-400 dark:text-gray-500" />}
+          label="계좌 연동 (KIS/키움/토스)"
+          status={accountLinkSummary}
+          statusClassName={
+            accountLinked
+              ? "text-green-600 dark:text-green-400"
+              : "text-gray-400 dark:text-gray-500"
+          }
+        />
+        <SettingsLinkRow
+          to="/invest-plan?tab=적립 계획"
+          icon={<Target size={18} className="text-gray-400 dark:text-gray-500" />}
+          label="투자·입금·배당 목표"
+          status={goalSummary}
+        />
+        <SettingsLinkRow
+          to="/rebalancing?rtab=추천&openRecOptions=1"
+          icon={<Sparkles size={18} className="text-gray-400 dark:text-gray-500" />}
+          label="목표 역산 추천 옵션"
+          status={recommendationSummary}
+        />
+      </SectionCard>
+
+      {/* 알림 설정 — 실제 토글/이력은 별도 라우트(밀도가 높아 분리) */}
+      <SectionCard title="알림">
+        <SettingsLinkRow
+          to="/settings/notifications"
+          icon={<Bell size={18} className="text-gray-400 dark:text-gray-500" />}
+          label="알림 설정"
+          status={notificationSummary}
+        />
+      </SectionCard>
+
+      {/* DART OpenAPI — 공시 조회용 개발자성 설정이라 최상단에서 하단(앱 설정 위)으로 이동(U15) */}
       <SectionCard
         title="DART OpenAPI (금융감독원)"
         badge={current?.has_dart ? <ConnectedBadge /> : undefined}
@@ -225,58 +285,6 @@ export default function SettingsPage() {
         </div>
       </SectionCard>
 
-      {/* 계정 정보 */}
-      <SectionCard title="계정 정보">
-        <div>
-          <label className={labelClass}>로그인 이메일</label>
-          <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{authEmail ?? "—"}</p>
-        </div>
-        <button
-          onClick={() => setShowChangePassword(true)}
-          className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
-        >
-          <KeyRound size={18} />
-          비밀번호 변경
-        </button>
-      </SectionCard>
-
-      {/* 다른 설정 — 계좌 연동/목표/추천 옵션은 각 기능 페이지에서 편집, 여기서는 상태 요약 + 딥링크만 제공 */}
-      <SectionCard title="다른 설정">
-        <SettingsLinkRow
-          to="/assets?tab=계좌관리"
-          icon={<Landmark size={18} className="text-gray-400 dark:text-gray-500" />}
-          label="계좌 연동 (KIS/키움/토스)"
-          status={accountLinkSummary}
-          statusClassName={
-            accountLinked
-              ? "text-green-600 dark:text-green-400"
-              : "text-gray-400 dark:text-gray-500"
-          }
-        />
-        <SettingsLinkRow
-          to="/invest-plan?tab=적립 계획"
-          icon={<Target size={18} className="text-gray-400 dark:text-gray-500" />}
-          label="투자·입금·배당 목표"
-          status={goalSummary}
-        />
-        <SettingsLinkRow
-          to="/rebalancing?rtab=포트폴리오"
-          icon={<Sparkles size={18} className="text-gray-400 dark:text-gray-500" />}
-          label="목표 역산 추천 옵션"
-          status={recommendationSummary}
-        />
-      </SectionCard>
-
-      {/* 알림 설정 — 실제 토글/이력은 별도 라우트(밀도가 높아 분리) */}
-      <SectionCard title="알림">
-        <SettingsLinkRow
-          to="/settings/notifications"
-          icon={<Bell size={18} className="text-gray-400 dark:text-gray-500" />}
-          label="알림 설정"
-          status={notificationSummary}
-        />
-      </SectionCard>
-
       {/* 앱 설정 */}
       <div>
         <SectionCard title="앱 설정">
@@ -295,19 +303,6 @@ export default function SettingsPage() {
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
             {isDark ? "라이트 모드로 전환" : "다크 모드로 전환"}
-          </button>
-          <button
-            onClick={toggleShowBacktest}
-            className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
-            aria-pressed={showBacktest}
-          >
-            <ChartLine size={18} className={showBacktest ? "text-blue-500" : undefined} />
-            백테스트 기능 표시
-            <span
-              className={`ml-auto text-xs font-medium ${showBacktest ? "text-blue-500" : "text-gray-400"}`}
-            >
-              {showBacktest ? "켜짐" : "꺼짐"}
-            </span>
           </button>
           {isNativePlatform() && isAvailable && (
             <button

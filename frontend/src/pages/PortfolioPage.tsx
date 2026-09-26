@@ -379,7 +379,6 @@ export default function PortfolioPage() {
               return (
                 <StockHoldingsTable
                   positions={data.all_positions}
-                  totalStock={data.total_stock_krw}
                   dividendMap={dividendMap}
                   divLoading={divLoading}
                   divError={divError}
