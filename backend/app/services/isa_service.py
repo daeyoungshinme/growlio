@@ -200,3 +200,73 @@ async def _calc_dividend_total_by_account(
         .group_by(Transaction.account_id)
     )
     return {row[0]: float(row[1] or 0) for row in result.all()}
+
+
+# ISA 납입한도 — 연 2,000만원, 총 1억원, 미납입분은 다음 해로 이월(조세특례제한법 §91의18, 2026년 기준).
+# 한도 확대(연 4,000만/총 2억) 개정안은 2024·2025 세법개정안에 포함됐으나 기준연도 현재 미시행 — 시행 시 갱신.
+ISA_ANNUAL_CONTRIBUTION_LIMIT_KRW = 20_000_000
+ISA_TOTAL_CONTRIBUTION_LIMIT_KRW = 100_000_000
+
+
+class IsaContributionStatus(TypedDict):
+    account_id: str
+    account_name: str
+    year_deposit_krw: float
+    cumulative_deposit_krw: float
+    available_limit_krw: float
+    remaining_krw: float
+    carryover_applied: bool
+
+
+async def calc_isa_contribution_status(user_id: uuid.UUID, year: int, db: AsyncSession) -> list[IsaContributionStatus]:
+    """ISA 계좌별 올해 납입 가능 잔여한도.
+
+    가입일이 있으면 미납입분 이월을 반영해 `min(연 2,000만 × 가입 후 경과 연수, 1억) - 누적 납입액`으로,
+    가입일이 없으면 이월 없이 `연 2,000만 - 올해 납입액`으로 계산한다. 중도인출해도 납입한도는 복원되지
+    않으므로 DEPOSIT만 합산한다. 납입액은 입출금 내역(수기 입력) 기준 — 연금 납입 집계와 같은 한계.
+    """
+    accounts_result = await db.execute(active_accounts_stmt(user_id).where(AssetAccount.tax_type == "ISA"))
+    accounts = accounts_result.scalars().all()
+    if not accounts:
+        return []
+
+    result = await db.execute(
+        select(
+            Transaction.account_id,
+            func.sum(Transaction.amount),
+            func.sum(Transaction.amount).filter(func.extract("year", Transaction.transaction_date) == year),
+        )
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.account_id.in_([acc.id for acc in accounts]),
+            Transaction.transaction_type == "DEPOSIT",
+            func.extract("year", Transaction.transaction_date) <= year,
+        )
+        .group_by(Transaction.account_id)
+    )
+    sums = {row[0]: (float(row[1] or 0), float(row[2] or 0)) for row in result.all()}
+
+    statuses: list[IsaContributionStatus] = []
+    for acc in accounts:
+        cumulative, this_year = sums.get(acc.id, (0.0, 0.0))
+        if acc.isa_open_date is not None and acc.isa_open_date.year <= year:
+            years_open = year - acc.isa_open_date.year + 1
+            available = float(min(ISA_ANNUAL_CONTRIBUTION_LIMIT_KRW * years_open, ISA_TOTAL_CONTRIBUTION_LIMIT_KRW))
+            used = cumulative
+            carryover = years_open > 1
+        else:
+            available = float(ISA_ANNUAL_CONTRIBUTION_LIMIT_KRW)
+            used = this_year
+            carryover = False
+        statuses.append(
+            {
+                "account_id": str(acc.id),
+                "account_name": acc.name,
+                "year_deposit_krw": round(this_year, 0),
+                "cumulative_deposit_krw": round(cumulative, 0),
+                "available_limit_krw": available,
+                "remaining_krw": round(max(0.0, available - used), 0),
+                "carryover_applied": carryover,
+            }
+        )
+    return statuses

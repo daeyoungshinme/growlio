@@ -110,6 +110,7 @@ class TestGetSettings:
             goal_cash_ceiling_pct=None,
             age_group="TWENTIES",
             birth_year=1995,
+            income_bracket="UNDER_55M",
             auto_rebalancing_daily_value_cap_krw=None,
         )
         db.scalar = AsyncMock(return_value=settings)
@@ -128,6 +129,7 @@ class TestGetSettings:
             assert data["goal_max_weight_pct"] == 40.0
             assert data["goal_cagr_lookback_years"] == 10
             assert data["age_group"] == "TWENTIES"
+            assert data["income_bracket"] == "UNDER_55M"
             assert data["birth_year"] == 1995
             assert data["goal_short_term_equity_floor_pct"] == 80.0
             assert data["goal_bond_ceiling_pct"] is None
@@ -442,6 +444,60 @@ class TestUpdateAutoRebalancingDailyCap:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put("/api/v1/settings/auto-rebalancing-daily-cap", json={"daily_value_cap_krw": 100.0})
         assert resp.status_code == 401
+
+
+class TestUpdateIncomeBracket:
+    def test_put_income_bracket_sets_and_clears(self, override_settings):
+        """절세 액션 플랜의 연금 공제율 분기용 소득 구간 — 설정 후 null로 해제할 수 있다."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(income_bracket=None)
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/income-bracket",
+                    json={"income_bracket": "UNDER_55M"},
+                    headers={"Authorization": "Bearer fake"},
+                )
+                assert resp.status_code == 200
+                assert settings.income_bracket == "UNDER_55M"
+                resp = client.put(
+                    "/api/v1/settings/income-bracket",
+                    json={"income_bracket": None},
+                    headers={"Authorization": "Bearer fake"},
+                )
+                assert resp.status_code == 200
+                assert settings.income_bracket is None
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_income_bracket_rejects_unknown_value(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=SimpleNamespace(income_bracket=None))
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/income-bracket",
+                    json={"income_bracket": "70000000"},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 422
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
 
 
 class TestUpdateGoalAchievementAlerts:

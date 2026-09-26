@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.isa_service import calc_account_auto_pnl, get_isa_status_summary
+from app.services.isa_service import calc_account_auto_pnl, calc_isa_contribution_status, get_isa_status_summary
 from app.utils.kst import today_kst
 
 
@@ -473,3 +473,41 @@ class TestCalcAccountAutoPnl:
         result = await calc_account_auto_pnl(make_user_id, account_id, mock_db)
 
         assert result == pytest.approx(0.0)
+
+
+class TestCalcIsaContributionStatus:
+    @pytest.mark.asyncio
+    async def test_no_isa_accounts_returns_empty(self, mock_db):
+        mock_db.execute = AsyncMock(return_value=_accounts_result([]))
+        assert await calc_isa_contribution_status(uuid.uuid4(), 2026, mock_db) == []
+
+    @pytest.mark.asyncio
+    async def test_carryover_and_no_open_date(self, mock_db):
+        """가입일 있으면 미납입분 이월(연 2,000만 × 경과연수, 총 1억), 없으면 올해 2,000만만 기준."""
+        from datetime import date
+
+        opened = SimpleNamespace(id=uuid.uuid4(), name="ISA 이월", isa_open_date=date(2024, 3, 1))
+        capped = SimpleNamespace(id=uuid.uuid4(), name="ISA 총한도", isa_open_date=date(2019, 1, 1))
+        no_date = SimpleNamespace(id=uuid.uuid4(), name="ISA 가입일없음", isa_open_date=None)
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _accounts_result([opened, capped, no_date]),
+                _dividend_rows_result(
+                    [
+                        (opened.id, 25_000_000, 5_000_000),  # 누적 2,500만 / 올해 500만
+                        (capped.id, 95_000_000, 0),
+                        (no_date.id, 30_000_000, 12_000_000),
+                    ]
+                ),
+            ]
+        )
+
+        by_name = {s["account_name"]: s for s in await calc_isa_contribution_status(uuid.uuid4(), 2026, mock_db)}
+
+        assert by_name["ISA 이월"]["available_limit_krw"] == 60_000_000  # 2024~2026 3년
+        assert by_name["ISA 이월"]["remaining_krw"] == 35_000_000
+        assert by_name["ISA 이월"]["carryover_applied"] is True
+        assert by_name["ISA 총한도"]["available_limit_krw"] == 100_000_000  # 8년이지만 총 1억 상한
+        assert by_name["ISA 총한도"]["remaining_krw"] == 5_000_000
+        assert by_name["ISA 가입일없음"]["remaining_krw"] == 8_000_000  # 2,000만 - 올해 1,200만
+        assert by_name["ISA 가입일없음"]["carryover_applied"] is False

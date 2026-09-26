@@ -79,3 +79,26 @@
 | E8~E10 | 시장신호 국내지표·점수 게이트 / ETF 총보수 / 토스 주문 | 리서치·외부 API 의존 |
 | (E1 후속) | IRP 파생형 ETF 40% 규정, 연금계좌 주문 사전검증, 후보 관리 "연금 불가" 배지 | 계획 37 E1 결과 참고 |
 | (E5 후속) | KRX 공휴일 캘린더(AUTO 이월·주문 거부 방지) | `alerts/calculator.is_auto_schedule_day`는 주말만 이월 |
+
+## 8. 결과 (2026-09-26 구현 완료, 브랜치 `feat/tax-action-plan-e2`)
+
+§4 작업 순서 1~5를 한 브랜치에서 전부 구현.
+
+| 단계 | 구현 |
+|---|---|
+| 1·3 백엔드 | `app/services/tax_action_service.py` 신규 + `GET /tax/action-plan`(올해만, 다른 연도 400). A1~A6 전부. 계산은 기존 서비스에 위임하고 액션 빌더(`build_*_action(s)`)는 순수 함수로 분리. 세법 수치는 `_DEDUCTION_RULES`(2025/2026, 조특법 §59의3 16.5%/13.2%, ISA 이전 10%·최대 300만·60일) |
+| 3 A3 | `isa_service.calc_isa_contribution_status` — 가입일 있으면 `min(2,000만 × 경과연수, 1억) − 누적 DEPOSIT`(이월 반영), 없으면 `2,000만 − 올해 DEPOSIT`. 중도인출은 한도 복원 안 되므로 DEPOSIT만 합산. **한도 확대(4,000만/2억) 개정안은 미시행 기준으로 두고 상수 주석에 명시** |
+| 3 A4 | 과세계좌 해외 종목 중 **이익 종목 합계**(순손익 아님)로 `min(이익, 250만)` — 올해 실현손익 0 가정 문구 + 결제일 기준 12월 마지막 주 초 매도 안내. benefit은 향후 매도 시 절감액(취득가 상향) |
+| 2 스키마 | `UserSettings.income_bracket`(`UNDER_55M`/`OVER_55M`/NULL) + 마이그레이션 `tx1_add_income_bracket` + `PUT /settings/income-bracket` + `GET /settings` 노출 |
+| 4 프론트 | `components/tax/TaxActionPlanCard.tsx` — 한도 현황 탭 최상단, 3개 초과 시 "더 보기", 우선순위 배지·절세액·마감 D-day·CTA(44px). 연금 관련 액션이 있을 때만 소득 구간 2칩 인라인 입력. 홈 `TaxLimitsBanner`는 액션이 있으면 한도 요약 줄 대신 최우선 액션 1줄(높이 불변, 없으면 기존 요약) |
+| 5 리마인더 | `build_reminder_content`가 액션 플랜 상위 5건 재사용, 이메일 템플릿 액션 목록형으로 교체(title/detail HTML escape), 푸시 본문 = 최우선 액션 제목 + "외 N건" |
+
+부수 수정:
+- `tax_service.get_tax_summary`가 같은 AsyncSession을 `asyncio.gather`로 동시 사용하던 문제 → 순차 호출(09-17 대시보드와 같은 버그 부류). 기존 리마인더의 4중 gather도 재사용 전환으로 함께 제거.
+- 프론트 `invalidateTransactionData`가 연금 납입·세금 요약·액션 플랜을 무효화하지 않아 입금 기록 후 연금 카드가 갱신되지 않던 문제 → 무효화 추가(`pensionContributionBase` 키 신설).
+- 리마인더에서 "ISA 비과세 한도 초과 N건" 항목은 빠짐(실행 가능한 액션이 아니라 상태 정보 — 앱 ISA 카드에 그대로 있음).
+
+검증: 백엔드 2299 passed / 커버리지 89.59%, ruff·mypy 클린, alembic 단일 head. 프론트 1582 passed, tsc·eslint 클린.
+**미실시**: 실DB 마이그레이션 적용·실브라우저 모바일(390px) 확인 — 로컬 `.env`가 Supabase 풀러를 직접 가리키는 구성이라 이 세션에서 스키마 변경·테스트 계정 시딩을 하지 않음. 배포 시 Render `preDeployCommand`가 `alembic upgrade head` 수행.
+
+남은 후속: E6(해외 실현손익 자동 집계 → A4 "실현 0 가정" 제거), E7(이자소득 → A6 정확도), ISA 한도 확대 시행 시 `ISA_ANNUAL/TOTAL_CONTRIBUTION_LIMIT_KRW` 갱신, 2027년 세법 확인 후 `_DEDUCTION_RULES`/`_TAX_RATES`에 2027 추가.

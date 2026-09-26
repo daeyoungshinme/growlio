@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from html import escape
 from typing import Any
 
 from app.services.email_templates._shared import _email_div, _kv_table
@@ -178,56 +179,44 @@ def account_deletion_template() -> tuple[str, str]:
 def year_end_tax_reminder_template(content: Mapping[str, Any]) -> tuple[str, str]:
     """11~12월 매주 월요일 발송되는 연말 절세 리마인더 이메일.
 
-    content는 tax_reminder_service.build_reminder_content()의 반환값(TaxReminderContent).
+    content는 tax_reminder_service.build_reminder_content()의 반환값(TaxReminderContent) — 앱 세금 탭의
+    절세 액션 플랜(tax_action_service)과 같은 액션 목록이다.
     """
     subject = "[Growlio] 연말 절세 리마인더 — 지금 활용할 수 있는 절세 방법"
-    sections = ""
-
-    harvesting_top = content.get("harvesting_top") or []
-    if harvesting_top:
-        items_html = "".join(
-            f"<li style='margin-bottom:4px;'>{item['ticker']} — 손실 {abs(item['unrealized_loss_krw']):,.0f}원 "
-            f"매도 시 절세 약 {item['tax_saved_krw']:,.0f}원</li>"
-            for item in harvesting_top
+    items_html = ""
+    for action in content.get("actions") or []:
+        meta: list[str] = []
+        if action.get("benefit_krw"):
+            meta.append(f"예상 절세 약 {action['benefit_krw']:,.0f}원")
+        if action.get("deadline"):
+            meta.append(f"마감 {action['deadline']}")
+        meta_html = (
+            f"<div style='font-size:12px;color:#7c3aed;margin-top:2px;'>{' · '.join(meta)}</div>" if meta else ""
         )
-        sections += (
-            "<h3 style='margin:16px 0 4px;font-size:15px;color:#1e293b;'>해외주식 손실수확 후보</h3>"
-            f"<ul style='padding-left:20px;margin:0;font-size:13px;color:#374151;'>{items_html}</ul>"
-            f"<p style='font-size:13px;color:#64748b;margin-top:4px;'>합계 절세 가능 약 "
-            f"{content.get('harvesting_total_tax_saved_krw', 0):,.0f}원 (250만원 공제 활용 기준, 참고용 추정치)</p>"
+        items_html += (
+            "<li style='margin-bottom:10px;'>"
+            f"<div style='font-weight:bold;color:#1e293b;'>{escape(action['title'])}</div>"
+            f"<div style='color:#475569;margin-top:2px;'>{escape(action['detail'])}</div>{meta_html}</li>"
         )
-
-    pension_remaining = content.get("pension_remaining_krw", 0)
-    if pension_remaining > 0:
-        sections += (
-            "<h3 style='margin:16px 0 4px;font-size:15px;color:#1e293b;'>연금저축/IRP 세액공제 잔여한도</h3>"
-            f"<p style='font-size:13px;color:#374151;margin:0;'>올해 아직 {pension_remaining:,.0f}원의 "
-            "세액공제 여력이 남아 있습니다. 연말 전 추가 납입을 고려해보세요.</p>"
-        )
-
-    isa_near_maturity = content.get("isa_near_maturity") or []
-    isa_over_limit_count = content.get("isa_over_limit_count", 0)
-    if isa_near_maturity or isa_over_limit_count:
-        isa_lines = "".join(
-            f"<li style='margin-bottom:4px;'>{acc['account_name']} — 의무가입 만기까지 D-{acc['days_remaining']}</li>"
-            for acc in isa_near_maturity
-        )
-        over_limit_line = (
-            f"<li style='margin-bottom:4px;'>비과세 한도 초과 계좌 {isa_over_limit_count}건</li>"
-            if isa_over_limit_count
-            else ""
-        )
-        sections += (
-            "<h3 style='margin:16px 0 4px;font-size:15px;color:#1e293b;'>ISA 계좌 확인</h3>"
-            f"<ul style='padding-left:20px;margin:0;font-size:13px;color:#374151;'>{isa_lines}{over_limit_line}</ul>"
-        )
+    total_benefit = content.get("total_benefit_krw") or 0
+    total_html = (
+        f"<p style='font-size:13px;color:#64748b;margin-top:4px;'>위 항목 예상 절세 합계 약 {total_benefit:,.0f}원 "
+        "(참고용 추정치 — 이익실현 항목은 향후 매도 시 절감액)</p>"
+        if total_benefit
+        else ""
+    )
+    sections = (
+        "<h3 style='margin:16px 0 4px;font-size:15px;color:#1e293b;'>올해 남은 절세 액션</h3>"
+        f"<ul style='padding-left:20px;margin:0;font-size:13px;color:#374151;'>{items_html}</ul>{total_html}"
+    )
 
     html = _email_div(
         "연말 절세 리마인더",
         "#7c3aed",
         sections,
         "이 알림은 11~12월 매주 월요일 09:00 KST에 발송됩니다.<br>"
-        "Growlio 앱 자산 &gt; 투자현황 &gt; 세금 탭에서 상세 시뮬레이션을 확인하세요.<br>"
+        "Growlio 앱 자산 &gt; 투자현황 &gt; 세금 탭의 절세 액션 플랜에서 전체 목록을 확인하세요.<br>"
+        "매매 관련 항목은 정보 제공 목적이며 투자 권유가 아닙니다.<br>"
         "알림 설정은 설정 &gt; 알림 설정에서 변경하세요.",
     )
     return subject, html

@@ -113,6 +113,7 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     goal_cash_ceiling_pct: null,
     age_group: null,
     birth_year: null,
+    income_bracket: null,
     auto_rebalancing_max_order_value_krw: 50_000_000.0,
     auto_rebalancing_daily_value_cap_krw: null,
     ...overrides,

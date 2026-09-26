@@ -16,6 +16,9 @@ export type GoalRiskTolerance = "CONSERVATIVE" | "BALANCED" | "AGGRESSIVE";
 
 export type AgeGroup = "TWENTIES" | "THIRTIES" | "FORTIES" | "FIFTIES" | "SIXTIES_PLUS";
 
+/** 연금 세액공제율 분기 — 총급여 5,500만원 이하 16.5% / 초과 13.2% (금액은 저장하지 않음) */
+export type IncomeBracket = "UNDER_55M" | "OVER_55M";
+
 export interface GoalRecommendationOptions {
   risk_tolerance: GoalRiskTolerance;
   max_weight_pct: number;
@@ -54,6 +57,7 @@ export interface SettingsData {
   goal_cash_ceiling_pct: number | null;
   age_group: AgeGroup | null;
   birth_year: number | null;
+  income_bracket: IncomeBracket | null;
   auto_rebalancing_max_order_value_krw: number;
   auto_rebalancing_daily_value_cap_krw: number | null;
 }
@@ -72,6 +76,9 @@ export const updateMarketSignalDigest = (enabled: boolean) =>
 /** AUTO 리밸런싱 하루 합산 거래대금 상한(KRW). null이면 무제한. */
 export const updateAutoRebalancingDailyCap = (daily_value_cap_krw: number | null) =>
   apiPut("/settings/auto-rebalancing-daily-cap", { daily_value_cap_krw });
+
+export const updateIncomeBracket = (income_bracket: IncomeBracket | null) =>
+  apiPut("/settings/income-bracket", { income_bracket });
 
 export const updateYearEndTaxReminder = (enabled: boolean) =>
   apiPut("/settings/year-end-tax-reminder", { enabled });

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import uuid
 from datetime import UTC, datetime
 from typing import Any, TypedDict
@@ -210,10 +209,9 @@ async def get_tax_summary(
     - 연간 거래 수수료 합계 (fee 컬럼)
     """
     rates = _get_rates(year)
-    dividend_income, total_fees = await asyncio.gather(
-        _calc_dividend_income(user_id, year, db, account_id),
-        _calc_total_fees(user_id, year, db, account_id),
-    )
+    # 같은 AsyncSession을 asyncio.gather로 동시 사용하면 안 된다(세션은 동시 실행 불가) — 순차 호출
+    dividend_income = await _calc_dividend_income(user_id, year, db, account_id)
+    total_fees = await _calc_total_fees(user_id, year, db, account_id)
     dividend_tax = dividend_income * rates["dividend"]
 
     overseas_unrealized, domestic_stock_krw, domestic_unrealized, tax_deferred_value_krw = await _calc_stock_unrealized(

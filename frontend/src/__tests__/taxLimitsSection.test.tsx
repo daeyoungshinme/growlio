@@ -8,11 +8,18 @@ const fetchIsaStatus = vi.fn();
 const fetchPensionContribution = vi.fn();
 const fetchPortfolioOverviewLite = vi.fn();
 const fetchTaxSummary = vi.fn();
+const fetchTaxActionPlan = vi.fn().mockResolvedValue({
+  year: 2026,
+  income_bracket: null,
+  actions: [],
+  note: "",
+});
 
 vi.mock("@/api/tax", () => ({
   fetchIsaStatus: (...args: unknown[]) => fetchIsaStatus(...args),
   fetchPensionContribution: (...args: unknown[]) => fetchPensionContribution(...args),
   fetchTaxSummary: (...args: unknown[]) => fetchTaxSummary(...args),
+  fetchTaxActionPlan: (...args: unknown[]) => fetchTaxActionPlan(...args),
 }));
 
 vi.mock("@/api/portfolios", () => ({
@@ -144,5 +151,15 @@ describe("TaxLimitsSection", () => {
 
     renderWithProviders(<TaxLimitsSection />);
     expect(await screen.findByText(/연금저축·IRP 납입 현황/)).toBeInTheDocument();
+  });
+
+  it("한도 현황 최상단에 절세 액션 플랜을 렌더한다", async () => {
+    fetchIsaStatus.mockResolvedValue(emptyIsa);
+    fetchTaxSummary.mockResolvedValue(emptyTaxSummary);
+    fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([]));
+
+    renderWithProviders(<TaxLimitsSection />);
+    expect(await screen.findByText(/절세 액션 플랜/)).toBeInTheDocument();
+    expect(screen.getByText(/지금 챙길 절세 액션이 없어요/)).toBeInTheDocument();
   });
 });

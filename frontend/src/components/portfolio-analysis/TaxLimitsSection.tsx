@@ -6,8 +6,9 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import IsaMaturityCard from "@/components/dashboard/IsaMaturityCard";
 import PensionContributionCard from "@/components/dashboard/PensionContributionCard";
 import HealthInsuranceRiskCard from "@/components/dashboard/HealthInsuranceRiskCard";
+import TaxActionPlanCard from "@/components/tax/TaxActionPlanCard";
 
-/** ISA 만기·연금저축/IRP 납입 한도·건강보험 피부양자 기준 현황. 계좌 필터와 무관하게 항상 전체
+/** 절세 액션 플랜(최상단) + ISA 만기·연금저축/IRP 납입 한도·건강보험 피부양자 기준 현황. 계좌 필터와 무관하게 항상 전체
  * 계좌 기준으로 표시한다(ISA 비과세한도·연금 공제한도·배당소득은 계좌 단위로 축소해 볼 개념이 아님).
  * DashboardPage와 동일 queryKey를 공유해 캐시를 재사용한다. `TaxTabContainer`의 "한도 현황" 탭이
  * 항상 펼친 상태로 렌더하므로(2026-07-25 세금정보 3곳→2곳 통합) 자체 접기 카드는 두지 않는다.
@@ -32,6 +33,7 @@ export default function TaxLimitsSection() {
 
   return (
     <div className="space-y-4 divide-y divide-gray-100 dark:divide-gray-700 [&>*:not(:first-child)]:pt-4">
+      <TaxActionPlanCard />
       {hasIsa && <IsaMaturityCard />}
       {hasPension && <PensionContributionCard overview={overview} />}
       <HealthInsuranceRiskCard />

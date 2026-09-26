@@ -207,3 +207,36 @@ class TestPensionContribution:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/tax/pension-contribution?year=1999")
         assert resp.status_code == 400
+
+
+class TestTaxActionPlan:
+    def test_returns_200_with_mocked_service(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        mock_plan = {"year": 2026, "income_bracket": None, "actions": [], "note": "참고용"}
+        with (
+            patch("app.api.v1.tax.get_tax_action_plan", AsyncMock(return_value=mock_plan)) as mock_service,
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/tax/action-plan")
+        assert resp.status_code == 200
+        assert resp.json()["actions"] == []
+        mock_service.assert_awaited_once()
+
+    def test_returns_400_for_other_year(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/tax/action-plan?year=2020")
+        assert resp.status_code == 400
+
+    def test_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/tax/action-plan")
+        assert resp.status_code == 401

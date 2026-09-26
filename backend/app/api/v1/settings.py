@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.core.config import settings
-from app.enums import AgeGroup, AssetClass, GoalRiskTolerance, IndexRegion
+from app.enums import AgeGroup, AssetClass, GoalRiskTolerance, IncomeBracket, IndexRegion
 from app.limiter import limiter
 from app.models.user import User
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
@@ -154,6 +154,12 @@ class YearEndTaxReminderUpdate(BaseModel):
     enabled: bool
 
 
+class IncomeBracketUpdate(BaseModel):
+    """절세 액션 플랜의 연금 세액공제율 분기용 소득 구간. None이면 미입력(13.2% 하한값 추정)."""
+
+    income_bracket: IncomeBracket | None = None
+
+
 class GoalAchievementAlertsUpdate(BaseModel):
     enabled: bool
 
@@ -211,6 +217,7 @@ class SettingsResponse(BaseModel):
     goal_cash_ceiling_pct: float | None = None
     age_group: AgeGroup | None = None
     birth_year: int | None = None
+    income_bracket: IncomeBracket | None = None
     # 서버 전역 설정(env) — 유저별 조정 불가. 리밸런싱 알림 설정 화면에서 AUTO 모드의
     # 1건당 거래대금 안전장치 상한을 안내하기 위해 노출한다 (app/services/rebalancing/order_builder.py 참고).
     auto_rebalancing_max_order_value_krw: float = 50_000_000.0
@@ -272,6 +279,7 @@ async def get_settings(
         goal_cash_ceiling_pct=(float(row.goal_cash_ceiling_pct) if row.goal_cash_ceiling_pct is not None else None),
         age_group=AgeGroup(row.age_group) if row.age_group else None,
         birth_year=row.birth_year,
+        income_bracket=IncomeBracket(row.income_bracket) if row.income_bracket else None,
         auto_rebalancing_max_order_value_krw=settings.auto_rebalancing_max_order_value_krw,
         auto_rebalancing_daily_value_cap_krw=(
             float(row.auto_rebalancing_daily_value_cap_krw)
@@ -451,6 +459,21 @@ async def update_year_end_tax_reminder(
     row.year_end_tax_reminder_enabled = req.enabled
     await db.commit()
     return {"detail": "연말 절세 리마인더 설정이 저장되었습니다"}
+
+
+@router.put("/income-bracket")
+@limiter.limit("10/minute")
+async def update_income_bracket(
+    request: Request,
+    req: IncomeBracketUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """연금 세액공제율(16.5%/13.2%) 분기용 소득 구간 저장 — 총급여 금액 자체는 받지 않는다."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.income_bracket = req.income_bracket.value if req.income_bracket else None
+    await db.commit()
+    return {"detail": "소득 구간이 저장되었습니다"}
 
 
 @router.put("/goal-achievement-alerts")

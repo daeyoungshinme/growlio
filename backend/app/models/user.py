@@ -85,6 +85,8 @@ class UserSettings(Base):
     # 동작과 동일, 기본값). 주문 1건당 상한(auto_rebalancing_max_order_value_krw, env 설정)과 별개로,
     # PER_ACCOUNT 스코프에서 여러 알림이 같은 날 각각 개별 상한까지 트리거될 때 합산 노출을 제한한다.
     auto_rebalancing_daily_value_cap_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    # 절세 액션 플랜의 연금 세액공제율 분기(IncomeBracket: UNDER_55M/OVER_55M) — NULL이면 13.2% 하한값으로 추정
+    income_bracket: Mapped[str | None] = mapped_column(String(20), nullable=True)
     fcm_token: Mapped[str | None] = mapped_column(String(512))
 
     user: Mapped["User"] = relationship(back_populates="settings")
