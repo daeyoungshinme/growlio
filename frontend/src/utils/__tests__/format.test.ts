@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   clampPct,
+  daysUntilYmd,
+  parseYmd,
   convertUsdToKrw,
   formatUsdAsKrw,
   fmtKrw,
@@ -186,5 +188,23 @@ describe("relativeTime", () => {
 
   it("N개월 전 — 30일 이상", () => {
     expect(relativeTime(nowIso(60 * 86_400_000))).toBe("2개월 전");
+  });
+});
+
+describe("parseYmd / daysUntilYmd", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("YYYY-MM-DD를 숫자로 분해한다", () => {
+    expect(parseYmd("2026-01-09")).toEqual({ year: 2026, month: 1, day: 9 });
+  });
+
+  it("로컬 자정 기준 남은 일수 — 오늘 0, 지나면 음수", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 11, 20, 23, 30));
+    expect(daysUntilYmd("2026-12-20")).toBe(0);
+    expect(daysUntilYmd("2026-12-31")).toBe(11);
+    expect(daysUntilYmd("2026-12-19")).toBe(-1);
   });
 });

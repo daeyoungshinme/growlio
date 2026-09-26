@@ -42,14 +42,18 @@ _DEDUP_TTL = 40 * 24 * 3600
 _WEEKDAY_LABELS = "월화수목금토일"
 
 
+_DCA_AUTO_BUY_PRESET: dict[str, str] = {
+    "schedule_type": "MONTHLY",
+    "trigger_condition": "SCHEDULE_ONLY",
+    "mode": "AUTO",
+    "strategy": "BUY_ONLY",
+}
+"""정기 적립식 자동매수 프리셋 — 프론트 `utils/dcaAutoBuy.ts::isDcaAutoBuyPreset`과 같은 판정.
+잡 쿼리(`_run_dca_cash_shortfall_check`)와 `is_dca_auto_buy`가 이 한 곳을 공유한다."""
+
+
 def is_dca_auto_buy(alert: RebalancingAlert) -> bool:
-    """프론트 `utils/dcaAutoBuy.ts::isDcaAutoBuyPreset`과 같은 판정."""
-    return (
-        alert.schedule_type == "MONTHLY"
-        and alert.trigger_condition == "SCHEDULE_ONLY"
-        and alert.mode == "AUTO"
-        and alert.strategy == "BUY_ONLY"
-    )
+    return all(getattr(alert, field) == value for field, value in _DCA_AUTO_BUY_PRESET.items())
 
 
 def is_cash_short(cash_krw: float, expected_krw: float | None) -> bool:
@@ -95,10 +99,7 @@ async def _run_dca_cash_shortfall_check(db: AsyncSession, cache: CacheStoreType)
             .options(selectinload(Portfolio.items))
             .where(
                 RebalancingAlert.is_active == True,
-                RebalancingAlert.mode == "AUTO",
-                RebalancingAlert.trigger_condition == "SCHEDULE_ONLY",
-                RebalancingAlert.strategy == "BUY_ONLY",
-                RebalancingAlert.schedule_type == "MONTHLY",
+                *(getattr(RebalancingAlert, field) == value for field, value in _DCA_AUTO_BUY_PRESET.items()),
                 AssetAccount.is_active == True,
                 User.is_active == True,
             )

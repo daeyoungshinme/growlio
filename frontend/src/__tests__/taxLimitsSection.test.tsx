@@ -165,7 +165,8 @@ describe("TaxLimitsSection", () => {
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([]));
 
     renderWithProviders(<TaxLimitsSection />);
-    expect(await screen.findByText(/절세 액션 플랜/)).toBeInTheDocument();
-    expect(screen.getByText(/지금 챙길 절세 액션이 없어요/)).toBeInTheDocument();
+    // 헤더는 로딩 중에도 먼저 렌더되므로 본문(빈 상태 문구)까지 기다린다
+    expect(await screen.findByText(/지금 챙길 절세 액션이 없어요/)).toBeInTheDocument();
+    expect(screen.getByText(/절세 액션 플랜/)).toBeInTheDocument();
   });
 });

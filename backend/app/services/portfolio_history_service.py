@@ -6,7 +6,7 @@ import uuid
 from collections import defaultdict
 from datetime import date
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import POSITION_STOCK_ASSET_TYPES
@@ -106,7 +106,7 @@ async def _fetch_stock_breakdown_by_market(
                 WHERE s.user_id = :uid
                     AND a.is_active = TRUE
                     AND a.include_in_total = TRUE
-                    AND a.asset_type IN ('STOCK_KIS', 'STOCK_KIWOOM', 'STOCK_TOSS', 'STOCK_OTHER')
+                    AND a.asset_type IN :stock_types
                     AND s.snapshot_date >= :start_date
                     AND (CAST(:account_id AS uuid) IS NULL OR a.id = CAST(:account_id AS uuid))
             ),
@@ -126,8 +126,13 @@ async def _fetch_stock_breakdown_by_market(
             GROUP BY ls.month, asset_type
             HAVING SUM(COALESCE(p.value_krw, p.qty * p.current_price, p.qty * p.avg_price, 0)) > 0
             ORDER BY ls.month, asset_type
-        """),
-        {"uid": str(user_id), "start_date": start_date, "account_id": str(account_id) if account_id else None},
+        """).bindparams(bindparam("stock_types", expanding=True)),
+        {
+            "uid": str(user_id),
+            "start_date": start_date,
+            "account_id": str(account_id) if account_id else None,
+            "stock_types": sorted(POSITION_STOCK_ASSET_TYPES),
+        },
     )
     position_data: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for row in result.all():

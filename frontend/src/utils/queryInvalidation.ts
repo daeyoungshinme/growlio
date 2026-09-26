@@ -30,6 +30,7 @@ export function invalidateAccountData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.pensionContributionBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTickerBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummaryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPositionsBase }),
@@ -60,6 +61,7 @@ export function invalidateTransactionData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.pensionContributionBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
   ]);

@@ -27,6 +27,9 @@ def _c(ticker: str, name: str, market: str = "KOSPI") -> dict[str, str]:
         (_c("500001", "신한 WTI원유 선물 ETN"), "ETN"),
         (_c("005930", "삼성전자"), "개별 종목"),
         (_c("000660", "SK하이닉스"), "개별 종목"),
+        (_c("138930", "BNK금융지주"), "개별 종목"),
+        (_c("000001", "SOLUS첨단소재"), "개별 종목"),
+        (_c("000002", "BNK 주주가치액티브"), None),
         (_c("CASH_EQUIVALENT", "현금성 자산 (CMA·파킹통장 등)", "CASH"), None),
     ],
 )

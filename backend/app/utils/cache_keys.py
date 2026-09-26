@@ -498,8 +498,16 @@ async def invalidate_asset_account_caches(
         keys.append(account_detail_key(user_id, account_id))
     await invalidate_user_caches(cache, *keys)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
+    await invalidate_tax_overseas_caches(cache, user_id)
     await invalidate_portfolio_overview_cache(cache, user_id)
     await invalidate_rebalancing_analysis_cache_all(cache, user_id)
+
+
+async def invalidate_tax_overseas_caches(cache: CacheStoreType, user_id: uuid.UUID) -> None:
+    """해외주식 양도세(보유 포지션·실현손익) 캐시 삭제 — 계좌 sync뿐 아니라 계좌 CRUD(삭제·tax_type
+    변경·API 키 등록)도 과세 대상 계좌 집합을 바꾸므로 양쪽에서 호출한다."""
+    await _scan_unlink(cache, f"{_env_prefix()}tax:overseas:{user_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}tax:overseas_realized:{user_id}:*")
 
 
 async def invalidate_account_caches(
@@ -513,8 +521,7 @@ async def invalidate_account_caches(
     _year = year if year is not None else today_kst().year
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
-    await _scan_unlink(cache, f"{_env_prefix()}tax:overseas:{user_id}:*")
-    await _scan_unlink(cache, f"{_env_prefix()}tax:overseas_realized:{user_id}:*")
+    await invalidate_tax_overseas_caches(cache, user_id)
     await invalidate_user_caches(
         cache,
         monthly_trend_key(user_id),

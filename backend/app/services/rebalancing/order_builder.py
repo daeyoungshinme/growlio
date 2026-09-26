@@ -14,8 +14,8 @@ from typing import Any, Literal
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import CASH_EQUIVALENT_TICKER
-from app.services.tax_service import _OVERSEAS_MARKETS, _TAX_DEFERRED_TYPES
+from app.constants import CASH_EQUIVALENT_TICKER, TAX_DEFERRED_TAX_TYPES
+from app.services.tax_service import _OVERSEAS_MARKETS
 
 logger = structlog.get_logger()
 
@@ -53,7 +53,7 @@ def _build_sell_orders(
         if a.asset_type in ORDER_EXECUTABLE_ASSET_TYPES and a.quantity > 0
     ]
     # 과세이연 계좌(ISA/연금저축/IRP)는 최후순위로 매도해 절세 혜택을 보호한다 — 일반/해외전용 계좌를 먼저 소진.
-    holders.sort(key=lambda a: (a.tax_type in _TAX_DEFERRED_TYPES, -a.quantity))
+    holders.sort(key=lambda a: (a.tax_type in TAX_DEFERRED_TAX_TYPES, -a.quantity))
 
     orders: list[Any] = []
     remaining = qty
@@ -325,7 +325,7 @@ def build_rebalancing_orders(
 
         # ISA/연금저축/IRP 계좌는 해외 개별 종목을 직접 매수할 수 없다 — 실행 불가능한 주문 생성 방지.
         buy_account_tax_type = account_tax_type_map.get(buy_account_id, "GENERAL")
-        if item.market in _OVERSEAS_MARKETS and buy_account_tax_type in _TAX_DEFERRED_TYPES:
+        if item.market in _OVERSEAS_MARKETS and buy_account_tax_type in TAX_DEFERRED_TAX_TYPES:
             logger.info(
                 "rebalancing_auto_item_skipped",
                 alert_id=alert_id,

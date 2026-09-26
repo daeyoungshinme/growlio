@@ -43,6 +43,8 @@ describe("invalidateAccountData", () => {
     expect(keys).toContain("accounts");
     expect(keys).toContain("portfolio-overview");
     expect(keys).toContain("dashboard");
+    // 연금·IRP 계좌 추가/삭제·tax_type 변경은 연금 납입 현황을 바꾼다
+    expect(keys).toContain("pension-contribution");
   });
 });
 
@@ -54,6 +56,9 @@ describe("invalidateTransactionData", () => {
     expect(keys).toContain("transactions");
     expect(keys).toContain("dashboard");
     expect(keys).toContain("challenges");
+    // 백엔드 isa_service가 입금·배당 거래를 합산 — 절세 액션 플랜만 갱신되고 ISA 카드는 stale하던 버그
+    expect(keys).toContain("isa-status");
+    expect(keys).toContain("pension-contribution");
   });
 });
 

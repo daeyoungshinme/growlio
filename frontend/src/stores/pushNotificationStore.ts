@@ -1,13 +1,7 @@
 import { create } from "zustand";
 
 export type PushNotificationStatus =
-  | "idle"
-  | "unsupported"
-  | "requesting"
-  | "denied"
-  | "registered"
-  | "disabled"
-  | "error";
+  "idle" | "unsupported" | "requesting" | "denied" | "registered" | "disabled" | "error";
 
 interface PushNotificationState {
   status: PushNotificationStatus;

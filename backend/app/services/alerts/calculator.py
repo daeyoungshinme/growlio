@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from app.models.alert import ExchangeRateAlert, RebalancingAlert, StockPriceAlert
 from app.utils.kst import KST as _KST
+from app.utils.kst import today_kst
 
 _MULTI_TRIGGER_COOLDOWN = timedelta(hours=1)
 
@@ -20,7 +21,7 @@ _SCHEDULE_MIN_DAYS: dict[str, int] = {
 
 def should_fire_today(alert: RebalancingAlert) -> bool:
     """오늘이 해당 리밸런싱 알림의 발송일인지 확인."""
-    today = datetime.now(tz=_KST).date()
+    today = today_kst()
     schedule = alert.schedule_type or "DAILY"
 
     if schedule == "DAILY":
@@ -67,7 +68,7 @@ def is_auto_schedule_day(alert: RebalancingAlert, today: date | None = None) -> 
     돌기 때문에 지정일이 주말이면 다음 평일로 미룬다 — 그대로 두면 "매월 25일"이 토요일인 달은 실행이
     통째로 누락된다. 월말 지정일이 주말이라 다음 달 초로 밀리는 경우, 주말 요일을 지정한 주간 설정도 처리한다.
     """
-    today = today or datetime.now(tz=_KST).date()
+    today = today or today_kst()
     schedule = alert.schedule_type or "DAILY"
 
     if schedule == "DAILY":
@@ -98,7 +99,7 @@ def is_auto_schedule_day(alert: RebalancingAlert, today: date | None = None) -> 
 
 def next_auto_schedule_date(alert: RebalancingAlert, today: date | None = None, horizon_days: int = 400) -> date | None:
     """오늘 이후(오늘 제외) 첫 AUTO 스케줄일. `horizon_days` 안에 없으면 None."""
-    today = today or datetime.now(tz=_KST).date()
+    today = today or today_kst()
     for offset in range(1, horizon_days + 1):
         d = today + timedelta(days=offset)
         if is_auto_schedule_day(alert, d):
@@ -110,7 +111,7 @@ def already_fired_today(alert: RebalancingAlert) -> bool:
     """오늘 이미 발송됐는지 확인 (중복 방지)."""
     if not alert.last_triggered_at:
         return False
-    today = datetime.now(tz=_KST).date()
+    today = today_kst()
     fired_date = alert.last_triggered_at.astimezone(_KST).date()
     return fired_date == today
 

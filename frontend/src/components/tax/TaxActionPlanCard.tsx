@@ -11,7 +11,7 @@ import {
   TOUCH_TARGET_MIN_MOBILE_ONLY,
 } from "@/constants/uiSizes";
 import { invalidateIncomeBracketData } from "@/utils/queryInvalidation";
-import { fmtKrw } from "@/utils/format";
+import { daysUntilYmd, fmtKrw, parseYmd } from "@/utils/format";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 
@@ -37,19 +37,21 @@ const BRACKET_OPTIONS: { value: IncomeBracket; label: string }[] = [
   { value: "OVER_55M", label: "5,500만원 초과" },
 ];
 
-/** "YYYY-MM-DD" → 로컬 자정 기준 남은 일수 */
-function daysUntil(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
-  const target = new Date(y, m - 1, d);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+function deadlineLabel(iso: string): string {
+  const { month: m, day: d } = parseYmd(iso);
+  const days = daysUntilYmd(iso);
+  return days >= 0 ? `${m}/${d}까지 (D-${days})` : `${m}/${d} 마감`;
 }
 
-function deadlineLabel(iso: string): string {
-  const [, m, d] = iso.split("-").map(Number);
-  const days = daysUntil(iso);
-  return days >= 0 ? `${m}/${d}까지 (D-${days})` : `${m}/${d} 마감`;
+function ActionPlanHeader({ year }: { year?: number }) {
+  return (
+    <div className="flex items-center gap-1.5 mb-2">
+      <ListChecks size={13} className="text-blue-500 shrink-0" />
+      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase">
+        절세 액션 플랜{year ? ` (${year}년)` : ""}
+      </p>
+    </div>
+  );
 }
 
 function ActionRow({ action }: { action: TaxAction }) {
@@ -137,13 +139,43 @@ function IncomeBracketPicker({ value }: { value: IncomeBracket | null }) {
  * 소득 구간은 별도 설정 화면 없이 연금 관련 액션이 있을 때만 여기서 인라인으로 입력받는다. */
 export default function TaxActionPlanCard() {
   const [expanded, setExpanded] = useState(false);
-  const { data } = useQuery({
+  const { data, isError, refetch, isFetching } = useQuery({
     queryKey: QUERY_KEYS.taxActionPlan,
     queryFn: fetchTaxActionPlan,
     staleTime: STALE_TIME.MEDIUM,
   });
 
-  if (!data) return null;
+  // "한도 현황" 탭 최상단이라 로딩·실패 시 아무것도 안 보이면 기능이 없는 것처럼 보인다
+  if (!data) {
+    return (
+      <div>
+        <ActionPlanHeader />
+        {isError ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <span>절세 액션 플랜을 불러오지 못했어요.</span>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className={`text-blue-600 dark:text-blue-400 font-medium disabled:opacity-50 ${TOUCH_TARGET_COMPACT_MOBILE_ONLY}`}
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : (
+          <div
+            className="space-y-2"
+            role="status"
+            aria-label="절세 액션 플랜 로딩 중"
+            aria-busy="true"
+          >
+            <div className="h-4 w-4/5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-3/5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const { actions } = data;
   const visible = expanded ? actions : actions.slice(0, COLLAPSED_COUNT);
@@ -152,12 +184,7 @@ export default function TaxActionPlanCard() {
 
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-2">
-        <ListChecks size={13} className="text-blue-500 shrink-0" />
-        <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase">
-          절세 액션 플랜 ({data.year}년)
-        </p>
-      </div>
+      <ActionPlanHeader year={data.year} />
 
       {actions.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">

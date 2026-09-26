@@ -15,6 +15,15 @@ POSITION_STOCK_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIS", "STOCK_KIWO
 세금·자산추이·추천드리프트 집계에서 전부 누락됐던 사고가 있었다(2026-09-25).
 주문 실행 가능 집합은 별개 — rebalancing/order_builder.ORDER_EXECUTABLE_ASSET_TYPES(토스 제외)."""
 
+PENSION_TAX_TYPES: frozenset[str] = frozenset({"PENSION_SAVINGS", "IRP"})
+"""연금저축·IRP — 세법/퇴직급여법상 매수 가능 상품이 제한되고 납입액이 세액공제 대상인 계좌 tax_type."""
+
+TAX_DEFERRED_TAX_TYPES: frozenset[str] = PENSION_TAX_TYPES | {"ISA"}
+"""계좌 내 매도 시 즉시 양도세가 발생하지 않는 과세이연 계좌 tax_type(ISA·연금저축·IRP)."""
+
+COMPREHENSIVE_TAX_THRESHOLD_KRW: int = 20_000_000
+"""금융소득(이자+배당) 종합과세 기준 — 연 2,000만원 초과분이 다른 소득과 합산된다."""
+
 CASH_EQUIVALENT_TICKER: str = "CASH_EQUIVALENT"
 CASH_EQUIVALENT_NAME: str = "현금성 자산 (CMA·파킹통장 등)"
 CASH_EQUIVALENT_MARKET: str = "CASH"

@@ -52,6 +52,22 @@ describe("TaxActionPlanCard", () => {
     updateIncomeBracket.mockReset();
   });
 
+  it("로딩 중엔 헤더와 스켈레톤을 보여준다", () => {
+    fetchTaxActionPlan.mockReturnValue(new Promise(() => {}));
+    renderCard();
+    expect(screen.getByText("절세 액션 플랜")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "절세 액션 플랜 로딩 중" })).toBeInTheDocument();
+  });
+
+  it("조회 실패 시 안내와 다시 시도 버튼을 보여준다", async () => {
+    fetchTaxActionPlan.mockRejectedValueOnce(new Error("boom")).mockResolvedValue(makePlan([]));
+    renderCard();
+    const retry = await screen.findByRole("button", { name: "다시 시도" });
+    expect(screen.getByText("절세 액션 플랜을 불러오지 못했어요.")).toBeInTheDocument();
+    fireEvent.click(retry);
+    expect(await screen.findByText(/지금 챙길 절세 액션이 없어요/)).toBeInTheDocument();
+  });
+
   it("액션이 없으면 빈 상태 문구를 보여준다", async () => {
     fetchTaxActionPlan.mockResolvedValue(makePlan([]));
     renderCard();

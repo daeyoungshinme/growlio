@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.utils.kst import today_kst
 
 # ── _calc_returns (순수 함수) ─────────────────────────────────
@@ -279,9 +280,11 @@ class TestNonStockNetFlowsInvariant:
         await _get_scalar_init_data(uuid.uuid4(), mock_db)
 
         sql_text = str(mock_db.execute.call_args[0][0])
-        assert "STOCK_KIS" in sql_text
-        assert "STOCK_KIWOOM" in sql_text
-        assert "STOCK_OTHER" in sql_text
+        params = mock_db.execute.call_args[0][1]
+        # 주식 asset_type 목록은 constants.POSITION_STOCK_ASSET_TYPES 바인드(브로커 추가 시 SQL 수정 불필요)
+        assert "a.asset_type NOT IN (__[POSTCOMPILE_stock_types])" in sql_text
+        assert set(params["stock_types"]) == POSITION_STOCK_ASSET_TYPES
+        assert {"STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS", "STOCK_OTHER"} <= set(params["stock_types"])
 
         net_after_ns_start = sql_text.index("net_after_ns AS")
         net_after_ns_body = sql_text[net_after_ns_start:]

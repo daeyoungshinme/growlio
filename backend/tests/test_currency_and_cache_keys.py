@@ -231,6 +231,21 @@ class TestInvalidateDcaAnalysisCache:
         deleted_keys = cache.delete.call_args.args
         assert dca_analysis_key(user_id) in deleted_keys
 
+    @pytest.mark.asyncio
+    async def test_invalidate_asset_account_caches_scans_overseas_tax_keys(self, override_settings):
+        """계좌 CRUD(삭제·tax_type 변경)도 과세 대상 계좌 집합을 바꾸므로 해외 양도세 캐시를 지워야 한다
+        — 예전엔 sync 경로에서만 지워 최대 1시간 stale했다."""
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, []))
+        cache.unlink = AsyncMock()
+        user_id = uuid.uuid4()
+
+        await invalidate_asset_account_caches(cache, user_id)
+
+        patterns = [c.kwargs["match"] for c in cache.scan.call_args_list]
+        assert f"test:tax:overseas:{user_id}:*" in patterns
+        assert f"test:tax:overseas_realized:{user_id}:*" in patterns
+
 
 # ── currency ─────────────────────────────────────────────────────────────────
 

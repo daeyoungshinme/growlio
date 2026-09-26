@@ -42,6 +42,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   CHALLENGE_REMINDER: "적립 챌린지 독려 알림",
   CHALLENGE_WRAPUP: "적립 챌린지 월간 결산",
   DCA_CASH_SHORTFALL: "적립매수 예수금 부족",
+  YEAR_END_TAX_REMINDER: "연말 절세 리마인더",
 };
 
 const ALERT_HISTORY_PAGE_SIZE = 50;

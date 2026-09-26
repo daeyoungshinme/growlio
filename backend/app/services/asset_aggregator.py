@@ -7,9 +7,10 @@ from datetime import date
 from typing import Any
 
 import structlog
-from sqlalchemy import select, text
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.models.user import UserSettings
 from app.services.composition_calculator import (
     build_asset_totals,
@@ -75,7 +76,7 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
                     WHERE s.user_id = :uid
                       AND a.is_active = TRUE
                       AND a.include_in_total = TRUE
-                      AND a.asset_type NOT IN ('STOCK_KIS', 'STOCK_KIWOOM', 'STOCK_TOSS', 'STOCK_OTHER')
+                      AND a.asset_type NOT IN :stock_types
                     GROUP BY s.account_id
                   ),
                   fs_ns AS (
@@ -106,8 +107,8 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
                 SELECT fs.first_date, nd.net,
                        fs_ns.non_stock_first_total, net_after_ns.non_stock_net_flows_after
                 FROM fs, nd, fs_ns, net_after_ns
-            """),
-            {"uid": str(user_id), "year": year},
+            """).bindparams(bindparam("stock_types", expanding=True)),
+            {"uid": str(user_id), "year": year, "stock_types": sorted(POSITION_STOCK_ASSET_TYPES)},
         )
     ).first()
     first_snap = row.first_date if row else None
