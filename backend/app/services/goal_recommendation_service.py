@@ -75,6 +75,8 @@ from app.services.goal_candidate_service import (
     _matches_index_region_preference,
     _persist_added_candidates,
     detect_duplicate_tracking_index_note,
+    pension_exclusion_note,
+    pension_ineligibility_reason,
 )
 from app.services.goal_portfolio_optimizer import (
     _MAX_WEIGHT,
@@ -229,13 +231,17 @@ async def _apply_tax_type_preference_for_overall(
     if len(distinct_tax_types) != 1:
         return candidate_dicts, None, None
     single_tax_type = next(iter(distinct_tax_types))
+    # 전 계좌가 연금저축(또는 IRP)뿐이면 매수 불가 상품(레버리지·인버스·ETN·개별종목)을 먼저 제외(계획 37 E1)
+    pension_excluded = [c for c in candidate_dicts if pension_ineligibility_reason(c, single_tax_type)]
+    eligible = [c for c in candidate_dicts if c not in pension_excluded]
     capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
     computed_candidates, preference_fallback_note, added = _apply_index_region_preference(
-        candidate_dicts, single_tax_type, capacity_remaining
+        eligible, single_tax_type, capacity_remaining
     )
     if added:
         await _persist_added_candidates(db, user_id, added)
-    return computed_candidates, preference_fallback_note, single_tax_type
+    notes = [pension_exclusion_note(pension_excluded, single_tax_type), preference_fallback_note]
+    return computed_candidates, " ".join(n for n in notes if n) or None, single_tax_type
 
 
 async def _fetch_overall_candidate_data(
@@ -354,7 +360,12 @@ async def _compute_goal_recommendation(
     )
 
     overall_market_filter = (
-        (lambda c, tax_type_value=single_tax_type: _matches_index_region_preference(c, tax_type_value))
+        (
+            lambda c, tax_type_value=single_tax_type: (
+                _matches_index_region_preference(c, tax_type_value)
+                and pension_ineligibility_reason(c, tax_type_value) is None
+            )
+        )
         if single_tax_type is not None
         else None
     )
