@@ -7,16 +7,12 @@ from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
-from app.schemas.invest import DCAAnalysisResponse, DepositGuideItem, GoalFeasibilityPreview
+from app.schemas.invest import DCAAnalysisResponse, GoalFeasibilityPreview
 from app.services import dca_service
 from app.services.composition_calculator import build_asset_totals, exclude_real_estate
 from app.services.dividend import plan_service as dividend_plan_service
-from app.services.goal_return_solver import (
-    DEPOSIT_GUIDE_PRESET_RETURNS_PCT,
-    months_until_year_end,
-    solve_required_annual_return_pct,
-    solve_required_monthly_deposit,
-)
+from app.services.goal_feasibility import build_feasibility_preview
+from app.services.goal_return_solver import months_until_year_end
 
 router = APIRouter(prefix="/invest", tags=["invest"])
 
@@ -60,36 +56,12 @@ async def get_goal_feasibility(
         pv = exclude_real_estate(total_assets_krw, by_type)
 
     n_months = months_until_year_end(target_year)
-    if n_months <= 0:
-        return GoalFeasibilityPreview(
-            required_return_pct=None,
-            pv=pv,
-            n_months=n_months,
-            note="목표 연도가 이미 지났습니다 — 목표연도를 다시 설정해주세요",
-        )
-    if pv >= goal_amount:
-        return GoalFeasibilityPreview(
-            required_return_pct=None, pv=pv, n_months=n_months, note="이미 목표 금액을 달성했습니다"
-        )
-
-    required_return_pct = solve_required_annual_return_pct(pv, monthly_deposit_amount, n_months, goal_amount)
-    note = None if required_return_pct is not None else "현재 조건(적립액·기간)으로는 달성이 매우 어려운 목표입니다"
-    deposit_guide = []
-    for preset_pct in DEPOSIT_GUIDE_PRESET_RETURNS_PCT:
-        monthly = solve_required_monthly_deposit(pv, preset_pct, n_months, goal_amount)
-        deposit_guide.append(
-            DepositGuideItem(
-                annual_return_pct=preset_pct,
-                required_monthly_deposit=monthly,
-                required_annual_deposit=monthly * 12,
-            )
-        )
-    return GoalFeasibilityPreview(
-        required_return_pct=required_return_pct,
-        pv=pv,
-        n_months=n_months,
-        note=note,
-        deposit_guide=deposit_guide,
+    return build_feasibility_preview(
+        pv,
+        goal_amount,
+        n_months,
+        monthly_deposit_amount,
+        expired_note="목표 연도가 이미 지났습니다 — 목표연도를 다시 설정해주세요",
     )
 
 

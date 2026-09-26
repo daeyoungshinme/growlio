@@ -10,6 +10,12 @@ GET /real-estate는 부동산 계좌의 시세(market_value_krw)와 담보대출
 분리해서 반환한다 — GET /accounts는 부동산도 담보대출을 뺀 순액 하나만 주므로, nestlio가
 "자산 항목"과 "대출 항목"을 각각 등록하려면 이 엔드포인트가 필요하다.
 
+GET /performance는 growlio 대시보드가 계산한 수익률 KPI(XIRR·연환산·누적, 목표 수익률과의 차이, 연 납입
+달성률)를 읽기전용으로 노출하고, GET /goal-feasibility는 nestlio 재무목표 하나(현재 금액·목표 금액·남은 개월·월
+적립액)에 대해 필요 연수익률과 가정 수익률별 필요 월 적립액을 역산한다 — nestlio가 선형 계산만으로는 보여줄 수 없는
+"투자 수익을 반영하면 언제/얼마" 판단을 growlio의 계산으로 채우기 위함. GET /accounts는 스냅샷의 원금
+(invested_amount_krw)·평가손익(unrealized_pnl_krw)도 함께 준다(nestlio가 "모은 돈 vs 시장이 벌어준 돈"을 분리).
+
 GET /goal은 사용자가 growlio 설정에서 입력한 투자목표(목표금액/목표수익률/연 납입목표 등)를
 읽기전용으로 노출한다 — nestlio가 재무목표를 새로 만들 때 이 값으로 폼을 미리 채워준다.
 진행률 자체는 nestlio가 이미 가져온 growlio 연동 자산 잔액으로 스스로 계산하므로, 이
@@ -19,7 +25,7 @@ GET /goal은 사용자가 growlio 설정에서 입력한 투자목표(목표금�
 from datetime import UTC, date, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,8 +36,11 @@ from app.enums import AssetType, DataSource, TransactionType
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
+from app.schemas.invest import GoalFeasibilityPreview
 from app.services._settings_queries import get_settings_row
+from app.services.asset_aggregator import get_dashboard_summary
 from app.services.asset_service import list_accounts as _list_accounts
+from app.services.goal_feasibility import build_feasibility_preview
 from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot, get_latest_snapshot_with_positions
 from app.utils.cache_keys import (
     challenge_progress_key,
@@ -51,6 +60,9 @@ class ExternalAccountBalance(BaseModel):
     asset_type: AssetType
     current_value_krw: float
     as_of: date | None = None
+    # 최신 스냅샷의 투자 원금/평가손익 — 스냅샷이 없거나 원금을 추적하지 않는 계좌(예금 등)는 None.
+    invested_amount_krw: float | None = None
+    unrealized_pnl_krw: float | None = None
 
 
 @router.get("/accounts", response_model=list[ExternalAccountBalance])
@@ -70,9 +82,12 @@ async def list_account_balances(
     result: list[ExternalAccountBalance] = []
     for account in accounts:
         latest_snap = await get_latest_snapshot(db, account.id)
+        invested = pnl = None
         if latest_snap is not None:
             value = latest_snap.amount_krw
             as_of = latest_snap.snapshot_date
+            invested = getattr(latest_snap, "invested_amount", None)
+            pnl = getattr(latest_snap, "unrealized_pnl", None)
         else:
             value = account.manual_amount or 0
             as_of = None
@@ -83,9 +98,53 @@ async def list_account_balances(
                 asset_type=account.asset_type,
                 current_value_krw=value,
                 as_of=as_of,
+                invested_amount_krw=float(invested) if invested is not None else None,
+                unrealized_pnl_krw=float(pnl) if pnl is not None else None,
             )
         )
     return result
+
+
+class ExternalPerformance(BaseModel):
+    xirr_pct: float | None = None
+    annual_return_pct: float | None = None
+    cumulative_return_pct: float | None = None
+    goal_annual_return_pct: float | None = None
+    return_goal_gap_pct: float | None = None
+    annual_deposit_goal: float | None = None
+    annual_deposit_current: float | None = None
+    deposit_achievement_pct: float | None = None
+
+
+@router.get("/performance", response_model=ExternalPerformance)
+@limiter.limit("20/minute")
+async def get_performance(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """growlio 대시보드가 계산한 수익률 KPI만 추려 준다(대시보드 요약 캐시를 그대로 재사용 — 추가 계산 없음).
+    nestlio는 이 실적 수익률을 목표의 "필요 수익률"(GET /goal-feasibility)과 나란히 보여준다."""
+    cache = await get_cache_store()
+    summary = await get_dashboard_summary(current_user.id, db, cache)
+    return ExternalPerformance(**{field: summary.get(field) for field in ExternalPerformance.model_fields})
+
+
+@router.get("/goal-feasibility", response_model=GoalFeasibilityPreview)
+@limiter.limit("30/minute")
+async def get_external_goal_feasibility(
+    request: Request,
+    goal_amount: float = Query(..., gt=0),
+    current_amount: float = Query(..., ge=0),
+    n_months: int = Query(..., ge=0, le=600),
+    monthly_deposit_amount: float = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+):
+    """nestlio 재무목표 하나의 달성 가능성 — 현재 금액·목표 금액·남은 개월·월 적립액으로 필요 연수익률과
+    가정 수익률(보수/중립/공격)별 필요 월 적립액을 역산한다. `/invest/goal-feasibility`와 계산은 같고
+    (build_feasibility_preview), 현재 자산과 기간을 growlio 총자산·목표 연말 대신 호출자가 넘긴 값으로 쓴다.
+    아무것도 저장하지 않는다."""
+    return build_feasibility_preview(current_amount, goal_amount, n_months, monthly_deposit_amount)
 
 
 class ExternalRealEstateItem(BaseModel):
