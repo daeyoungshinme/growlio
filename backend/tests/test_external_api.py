@@ -384,3 +384,108 @@ class TestCreateExternalTransaction:
             )
 
         assert resp.status_code == 404
+
+
+class TestAccountInvestedAmount:
+    def test_exposes_invested_amount_and_pnl_from_latest_snapshot(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id, asset_type="STOCK_KIS")
+        app = _setup_app(user, AsyncMock())
+        snapshot = SimpleNamespace(
+            amount_krw=1_200_000.0,
+            snapshot_date=date(2026, 9, 1),
+            invested_amount=1_000_000.0,
+            unrealized_pnl=200_000.0,
+        )
+
+        with (
+            patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[account])),
+            patch("app.api.v1.external.get_latest_snapshot", AsyncMock(return_value=snapshot)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            body = client.get("/api/v1/external/accounts").json()
+
+        assert body[0]["invested_amount_krw"] == 1_000_000.0
+        assert body[0]["unrealized_pnl_krw"] == 200_000.0
+
+    def test_invested_amount_is_null_without_snapshot(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id)
+        app = _setup_app(user, AsyncMock())
+
+        with (
+            patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[account])),
+            patch("app.api.v1.external.get_latest_snapshot", AsyncMock(return_value=None)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            body = client.get("/api/v1/external/accounts").json()
+
+        assert body[0]["invested_amount_krw"] is None
+        assert body[0]["unrealized_pnl_krw"] is None
+
+
+class TestPerformance:
+    def test_returns_return_kpis_from_dashboard_summary(self, override_settings):
+        user = _make_user()
+        app = _setup_app(user, AsyncMock())
+        summary = {
+            "xirr_pct": 8.5,
+            "annual_return_pct": 7.2,
+            "cumulative_return_pct": 15.0,
+            "goal_annual_return_pct": 6.0,
+            "return_goal_gap_pct": 2.5,
+            "annual_deposit_goal": 12_000_000.0,
+            "annual_deposit_current": 9_000_000.0,
+            "deposit_achievement_pct": 75.0,
+            "total_assets_krw": 1.0,  # 노출하지 않는 필드
+        }
+
+        with (
+            patch("app.api.v1.external.get_dashboard_summary", AsyncMock(return_value=summary)),
+            patch("app.api.v1.external.get_cache_store", AsyncMock(return_value=None)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/external/performance")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["xirr_pct"] == 8.5
+        assert body["deposit_achievement_pct"] == 75.0
+        assert "total_assets_krw" not in body
+
+
+class TestExternalGoalFeasibility:
+    def test_returns_required_return_and_deposit_guide(self, override_settings):
+        app = _setup_app(_make_user(), AsyncMock())
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get(
+                "/api/v1/external/goal-feasibility",
+                params={
+                    "goal_amount": 30_000_000,
+                    "current_amount": 10_000_000,
+                    "n_months": 36,
+                    "monthly_deposit_amount": 500_000,
+                },
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["pv"] == 10_000_000
+        assert body["n_months"] == 36
+        assert body["required_return_pct"] is not None
+        assert [g["annual_return_pct"] for g in body["deposit_guide"]] == [4.0, 7.0, 10.0]
+
+    def test_already_achieved_and_expired(self, override_settings):
+        app = _setup_app(_make_user(), AsyncMock())
+        with TestClient(app, raise_server_exceptions=False) as client:
+            done = client.get(
+                "/api/v1/external/goal-feasibility",
+                params={"goal_amount": 1_000, "current_amount": 2_000, "n_months": 12},
+            ).json()
+            expired = client.get(
+                "/api/v1/external/goal-feasibility",
+                params={"goal_amount": 1_000, "current_amount": 0, "n_months": 0},
+            ).json()
+
+        assert done["note"] == "이미 목표 금액을 달성했습니다"
+        assert "이미 지났습니다" in expired["note"]

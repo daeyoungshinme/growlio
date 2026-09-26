@@ -157,7 +157,7 @@ API Request
         ├── exchange_rate_alerts.py # 환율 알림 CRUD (alerts.py 하위, /alerts/exchange-rate)
         ├── rebalancing_alerts.py   # 리밸런싱 드리프트 알림 (alerts.py 하위, /alerts/rebalancing)
         ├── stock_price_alerts.py   # 주가 알림 CRUD (alerts.py 하위, /alerts/stock-price)
-        ├── external.py              # 자매 앱(nestlio)이 같은 Supabase JWT로 호출하는 엔드포인트(growlio 프론트는 미사용): GET /external/accounts(계좌별 최신 스냅샷 평가액, 부동산은 담보대출 뺀 순액) + POST /external/transactions(nestlio 내역을 Transaction에 반영, MANUAL은 deposit_krw도 갱신) + GET /external/real-estate(시세·담보대출 분리 반환) + GET /external/goal(투자목표 설정값만 읽기전용, 계산값 미포함)
+        ├── external.py              # 자매 앱(nestlio)이 같은 Supabase JWT로 호출하는 엔드포인트(growlio 프론트는 미사용): GET /external/accounts(계좌별 최신 스냅샷 평가액 + 원금 `invested_amount_krw`·평가손익 `unrealized_pnl_krw`, 부동산은 담보대출 뺀 순액) + POST /external/transactions(nestlio 내역을 Transaction에 반영, MANUAL은 deposit_krw도 갱신) + GET /external/real-estate(시세·담보대출 분리 반환) + GET /external/goal(투자목표 설정값만 읽기전용, 계산값 미포함) + GET /external/performance(대시보드 요약의 수익률 KPI만 — XIRR/연환산/누적·목표 수익률 차이·연 납입 달성률) + GET /external/goal-feasibility(nestlio 목표의 현재금액·목표금액·남은 개월·월적립액 → 필요 연수익률·프리셋별 필요 적립액, `/invest/goal-feasibility`와 `services/goal_feasibility.build_feasibility_preview` 공유)
         ├── _account_deps.py        # 계좌 소유권 검증 헬퍼(get_owned_account) + api/deps.py의 get_owned_or_404 재노출
         └── _alert_crud.py          # 환율/주가 알림 라우터 공용 reactivate·delete 엔드포인트 팩토리(register_alert_reactivate_delete)
 
