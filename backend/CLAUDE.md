@@ -73,7 +73,8 @@ cd backend && uv run pytest --cov=app --cov-report=term-missing --cov-fail-under
 
 ### Lint & Type Check
 ```bash
-# Ruff 린터 (E/F/I/UP/B/SIM/C90/ASYNC/PT 규칙, E712·B008·SIM108·PT001 제외)
+# Ruff 린터 (E/F/I/UP/B/SIM/C90/ASYNC/PT/RUF100 규칙, E712·B008·SIM108·PT001 제외, max-complexity 15)
+# RUF100: 불필요한 `# noqa`도 오류 — 필요 없어진 noqa는 지울 것
 cd backend && uv run ruff check .
 
 # Mypy 타입 체크
@@ -85,7 +86,7 @@ cd backend && uv run mypy app/
 ### Environment
 `backend/.env` (`.env.example` 참고):
 - `APP_ENV=development` — `/docs` Swagger UI 활성화 여부 제어
-- `APP_SECRET_KEY` — JWT 서명 키
+- `APP_SECRET_KEY` — 필수(32자 이상, 미달 시 기동 실패). 인증은 Supabase JWKS 검증이라 JWT 서명에는 쓰이지 않음
 - `DATABASE_URL` — PostgreSQL asyncpg URL. Supabase 사용 시 **Transaction Pooler(6543) 권장** — Session Pooler(5432)는 프로젝트 전체에 걸쳐 동시 연결 15개 상한을 공유해 orphan 프로세스(비정상 종료된 `uvicorn --reload` 등) 하나만 남아도 쉽게 소진되어 `EMAXCONNSESSION` 오류가 발생함
 - `MIGRATION_DATABASE_URL` — Supabase 전용 마이그레이션 DB URL (로컬 Docker는 `DATABASE_URL`과 동일)
 - `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/키움 자격증명 AES-256 암호화 키
@@ -97,7 +98,7 @@ cd backend && uv run mypy app/
 
 **Supabase** (`supabase.com > Project Settings > API`):
 - `SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_JWT_SECRET` — Settings > API > JWT Settings
+- `SUPABASE_JWT_SECRET` — 선택. 현재 RS256 JWKS 검증 방식이라 불필요(레거시 설정)
 
 **외부 API**:
 - `DART_API_KEY` — opendart.fss.or.kr
@@ -120,7 +121,7 @@ cd backend && uv run mypy app/
 
 ### 데이터 모델
 
-- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_{KIS,KIWOOM,TOSS,OTHER}/CASH_OTHER/REAL_ESTATE/OTHER) × `data_source`(MANUAL/KIS_API/KIWOOM_API/TOSS_API) 조합으로 동작 결정. 토스: `toss_account_no`/`toss_client_id`/`toss_client_secret`(AES-256), 모의투자 없음. ISA: `isa_open_date`/`isa_type`(GENERAL/PREFERENTIAL)/`isa_manual_cumulative_pnl_krw`. `tax_type`(GENERAL/ISA/PENSION_SAVINGS/IRP/OVERSEAS_DEDICATED, 세금 계산·매도 우선순위)·`investment_horizon`(SHORT/MID/LONG_TERM/null, 투자기간 태그) — 둘 다 `Portfolio`에도 동일 컬럼, 목표 역산 추천이 (기간, 세제유형) 매칭에 사용
+- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_{KIS,KIWOOM,TOSS,OTHER}/CASH_OTHER/CASH_STOCK/REAL_ESTATE/OTHER — 정의는 `app/enums.py`의 `AssetType`) × `data_source`(MANUAL/KIS_API/KIWOOM_API/TOSS_API) 조합으로 동작 결정. 토스: `toss_account_no`/`toss_client_id`/`toss_client_secret`(AES-256), 모의투자 없음. ISA: `isa_open_date`/`isa_type`(GENERAL/PREFERENTIAL)/`isa_manual_cumulative_pnl_krw`. `tax_type`(GENERAL/ISA/PENSION_SAVINGS/IRP/OVERSEAS_DEDICATED, 세금 계산·매도 우선순위)·`investment_horizon`(SHORT/MID/LONG_TERM/null, 투자기간 태그) — 둘 다 `Portfolio`에도 동일 컬럼, 목표 역산 추천이 (기간, 세제유형) 매칭에 사용
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당/이자 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST. INTEREST(예금·CMA 이자)는 금융소득 종합과세 판정 전용 — 수익률·챌린지 등 입출금 흐름 집계는 DEPOSIT/WITHDRAWAL을 명시 필터하므로 새 집계 추가 시에도 이 관례 유지
@@ -133,7 +134,7 @@ cd backend && uv run mypy app/
 API Request
   └── api/v1/router.py        # 모든 라우터 등록
         ├── assets.py         # 계좌 CRUD + 동기화 트리거, ISA 누적손익 수동입력(PATCH /{account_id}/isa-pnl-override)
-        ├── auth.py           # 로그인/회원가입/토큰 refresh
+        ├── auth.py           # /me, /sync-profile(Supabase 유저→로컬 User 동기화), /find-account, /account/delete(비밀번호 재인증 후 탈퇴). 로그인·회원가입·토큰 refresh는 프론트가 Supabase에 직접 수행 — 백엔드엔 없음
         ├── alerts.py         # 알림 목록 + 읽음 처리
         ├── backtest.py       # 백테스트 실행
         ├── dashboard.py      # 대시보드 집계 라우터 (get_dashboard_summary 구현은 asset_aggregator.py)
@@ -168,9 +169,9 @@ services/
   ├── asset_service.py        # 계좌별 sync 함수 + sync_account_now(캐시 무효화·API 응답 포맷 포함, assets.py `/sync` 전용) — 대시보드 집계는 asset_aggregator.py로 분리됨
   ├── asset_credential_service.py  # 계좌 KIS/키움/토스 자격증명 검증(verify_kis_credentials/verify_toss_credentials)·삭제(delete_kis_credentials/delete_kiwoom_credentials/delete_toss_credentials) — assets.py 라우터에서 분리
   ├── sync_all_service.py     # "전체 갱신" 백그라운드 배치 동기화 — jobs/asset_sync.py의 _sync_accounts 재사용, in-memory 캐시(core/cache_store.py)로 락/진행상태 관리 (POST /assets/sync-all, GET /assets/sync-all/status). `_sync_accounts`는 계좌별로 짧게 스코프된 `AsyncSessionLocal()`을 새로 열어 처리 — 브로커 HTTP 응답을 기다리는 동안 요청 커넥션을 붙잡지 않기 위한 패턴(DB 커넥션 풀 슬롯 고갈 방지). 계좌 수만큼 동시에 짧은 sync 요청을 쏘는 유사 엔드포인트를 새로 만들 때 이 패턴을 참고할 것
-  ├── auth_service.py         # 회원가입/로그인/JWT 발급
+  ├── auth_service.py         # Supabase JWT 검증(`verify_supabase_token`, JWKS·aud=authenticated) + 탈퇴 재인증용 `verify_password`(Supabase password grant) + `delete_supabase_user`. 자체 JWT 발급 없음
   ├── alerts/                 # 범용 알림 도메인 패키지 (환율/주가/시장신호 체크 + 공통 이력)
-  │   ├── alert_service.py    # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 alerts/exchange_rate_service.py·alerts/stock_price_service.py·rebalancing/alert_check.py·rebalancing/alert_test.py·rebalancing/order_builder.py) — 의도된 설계, 제거 대상 아님
+  │   ├── alert_service.py    # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/notify_and_record_trigger/finalize_alert_batch/list_alert_history). 과거의 `__getattr__` re-export shim은 2026-09-15 제거됨 — 체크 함수는 실제 구현 모듈(alerts/exchange_rate_service.py 등)에서 직접 import
   │   ├── exchange_rate_service.py # 환율 알림 조건 체크
   │   ├── stock_price_service.py   # 주가 알림 조건 체크
   │   ├── market_signal_alert_service.py # 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 즉시 알림 + 매일 08:30 KST 요약(`send_market_signal_daily_digest`, 옵트인). `check_composite_signal`(리스크+시장신호 복합 판정)을 rebalancing/alert_check.py·diagnosis_service.py와 공유. 등급전환 발송 성공 시 alert_check.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신(같은 날 중복 발송 방지)
@@ -211,6 +212,7 @@ services/
   ├── goal_horizon_recommendation_service.py  # 투자기간별(단기/중기/장기 × 세제유형) 추천 진입점(`get_horizon_recommendations`/`_compute_horizon_recommendations`/`_build_horizon_result`) — goal_recommendation 서브모듈(2026-09-01 분리, age와 동일 패턴). 목표금액 역산 없이 기간별 리스크 성향(`_HORIZON_RISK_TOLERANCE`)+세제유형별 투자 가능 시장+규제(IRP 안전자산 30% 하한 `_DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT`, SHORT_TERM 주식 80% 하한 `_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT`)만으로 최대 15개 조합을 계산. 배당 목표는 전체 자산 기준과 동일 %를 전 조합에 적용. 공유 헬퍼는 `_goal_recommendation_common.py`(`_grc`)에서 사용, 소비자 `api/v1/rebalancing.py`·`alerts/recommendation_drift_alert_service.py`
   ├── goal_portfolio_optimizer.py  # 목표 역산 추천 전용 MVO 엔진(SLSQP, 순수 계산) — goal_recommendation_service.py 서브모듈. 기대수익률·공분산은 `estimation.py` 축소추정 적용. 자산군 비중 제약은 `asset_classes`(종목별 EQUITY/BOND/CASH 태그)+`class_bounds`(자산군별 (하한,상한))로 N개 자산군 일반화. **배당 목표 사전검증(`_dividend_floor_constraint`)은 `class_bounds`가 있으면 그 그룹 예산도 반영 필수** — 종목당 상한만 보면 자산군 하한과 충돌해 SLSQP 전체 실패(빈 추천) 가능. `compute_weighted_expected_metrics()`는 고정 비중 가중평균 버전
   ├── goal_candidate_service.py  # 목표 역산 추천 후보 관리/영속화(세제유형별 필터, lost-update 방지 락) — goal_recommendation_service.py 서브모듈. `pension_ineligibility_reason()`: 연금저축·IRP에서 매수 불가한 레버리지·인버스 ETF/ETN/개별종목을 기간별 조합·전체(단일 세제유형) 경로 후보에서 제외 + `pension_exclusion_note()` 안내(종목명 브랜드 기반 휴리스틱 `_KR_ETF_BRAND_PREFIXES` — 신규 ETF 브랜드는 여기 추가, 불확실하면 보수적 제외)
+  ├── goal_feasibility.py     # `build_feasibility_preview()` — 필요 연수익률 + 프리셋 수익률별 필요 적립액 미리보기. `/invest/goal-feasibility`(growlio 마법사)·`/external/goal-feasibility`(nestlio)가 공유 — 두 엔드포인트는 pv/기간 산정만 다름
   ├── goal_return_solver.py   # 필요 연평균 수익률·월 적립액 역산 순수 함수 — goal_recommendation_service.py 서브모듈 + invest.py `GET /invest/goal-feasibility`(마법사 미리보기)가 직접 호출
   ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 + 자산군(AssetClass)/추종지수 지역(IndexRegion) 필터링
   ├── dividend/               # 배당 서비스 패키지
@@ -278,6 +280,7 @@ schemas/                      # Pydantic 요청/응답 스키마
 core/                         # 설정·DB·in-memory 캐시 store
   ├── config.py                # Settings(pydantic-settings) — env var 로딩
   ├── database.py              # SQLAlchemy async engine/session, Base
+  ├── logging.py               # structlog 시크릿 redact 프로세서(`redact_secrets`, appkey/Bearer/password 등 마스킹) + yfinance 404 소음 필터 — `configure_logging()`
   └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 싱글톤, get_cache_store/close_cache_store. `sweep_expired()`를 `jobs/cache_sweep.py`가 15분마다 호출해 만료 키 능동 청소. 항목 수 상한(`_MAX_ENTRIES`=20,000, LRU 축출)으로 메모리 무한 증가 방지. **주의**: 워커/인스턴스 2개 이상으로 늘리면 캐시가 프로세스 로컬이라 적중률 급락 + 무효화 미전파 — 확장 시 공유 캐시(Redis) 재도입 필요(`render.yaml`은 단일 워커/단일 인스턴스 전제)
 kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote, realized — 해외 기간손익 TTTS3039R, 모의투자 미지원)
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants). `client.py`는 KIS와 동일 `AsyncRateLimiter`로 `kiwoom_rate_per_second`(기본 4.0) 제한 — http_client.py의 rate-limit 감지가 키움 `return_code=5`(=EGW00201) 대응
@@ -299,11 +302,16 @@ utils/
   ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom/Toss 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
   ├── currency.py             # USD/KRW 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
   ├── durable_state.py        # Postgres(`AppState` 테이블) 기반 key-value durable state — get_durable/set_durable/delete_durable. 재시작에도 유지돼야 하는 상태(시장신호 등급 마지막 값, 알림 dedup 플래그) 전용, cache_keys.py의 휘발성 캐시와는 별개
+  ├── kst.py                  # `today_kst()`/`now_kst()`/`KST` — 사용자 기준 "오늘" 계산 전용 (Absolute Rules "날짜/시각 기준" 참고)
   ├── inproc_lock.py          # 프로세스 내 락 — 동일 계좌 동시 sync 방지, 콜드 캐시 single-flight (단일 프로세스 배포 전제)
   ├── market_hours.py         # KRX/NYSE 개장 여부 판단
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등) — `/metrics` 엔드포인트로 노출
   └── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)
 limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수)
+enums.py                      # 도메인 StrEnum(AssetType/DataSource/TransactionType/AccountTaxType/InvestmentHorizon/AgeGroup 등) — 매직 스트링 대신 사용
+constants.py                  # 도메인 공통 상수 — `DOMESTIC_MARKETS`, `POSITION_STOCK_ASSET_TYPES`. **새 브로커 추가 시 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 집계 7곳 누락 사고)
+exceptions.py                 # `AppError` 계열(BadRequest/NotFound/ExternalAPI…, 전역 핸들러가 status_code/detail로 변환) + `SyncError` 계열(Provider{Credential,Token,Api,Network}Error)
+scheduler.py                  # APScheduler 초기화 — `init_scheduler()`의 jobs 스펙 리스트
 jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 15:30 KST intraday + 18:00 KST daily 전체 계좌 스냅샷
   ├── exchange_rate_alert.py  # 5분 간격 환율 알림 체크
@@ -343,9 +351,9 @@ jobs/                         # APScheduler 정기 작업
 
 **브로커 예수금 기준:** KIS/키움 sync가 `deposit_krw`에 담는 값은 **D+2 정산 후 예수금**(키움 `kt00001.d2_entra`, KIS `inquire-balance output2.prvs_rcdl_excc_amt`) — 당일 결제기준(D+0: 키움 `entr`, KIS `dnca_tot_amt`)을 쓰면 매도대금(T+2 결제)이 빠져 매매 직후 며칠간 예수금·총자산이 앱 값과 벌어진다. 각 필드 부재 시 D+0 값으로 폴백하며 `kiwoom_deposit_d2_missing_fallback_entr`/`kis_deposit_d2_missing_fallback_dnca` 경고 로그를 남긴다. 리밸런싱 FULL 매수 예산은 별도로 키움 `orderable_krw`(`100stk_ord_alow_amt`)/KIS `get_orderable_cash()`(`nrcvb_buy_amt`)를 쓴다. 해외 예수금(`deposit_usd`)은 해외 조회 실패 시 `BalanceResult.deposit_foreign=None`으로 표시돼 기존 DB 값을 유지하고, 확정된 `0.0`일 때만 갱신한다(수동계좌는 `deposit_foreign` 미세팅).
 
-**인증:** JWT Bearer 토큰. `api/deps.py`의 `get_current_user` 의존성 주입. Access 30분, Refresh 7일.
+**인증:** 백엔드는 토큰을 발급하지 않는다. 프론트가 Supabase에서 받은 access token을 `Authorization: Bearer`로 보내면 `api/deps.py`의 `get_current_user`가 `auth_service.verify_supabase_token()`(Supabase JWKS 공개키, `aud=authenticated`)으로 검증. 만료/갱신은 Supabase 세션 설정을 따른다. 자매 앱 nestlio도 같은 Supabase JWT로 `/external/*`를 호출.
 
-**미들웨어 스택 (`main.py` lifespan):** Request ID 주입 → 보안 헤더(X-Content-Type-Options, X-Frame-Options, X-XSS-Protection) → HTTP 요청 로깅 → slowapi 레이트 리미팅 → 예외 핸들러(자격증명 정보 자동 redact).
+**미들웨어/핸들러 (`main.py`):** slowapi 레이트 리미팅, CORS(`ALLOWED_ORIGINS`), GZip, Request ID 주입, 보안 헤더(X-Content-Type-Options·X-Frame-Options·X-XSS-Protection·CSP, production에선 HSTS 추가), HTTP 요청 로깅. 예외 핸들러: `AppError`·Provider*Error·`CircuitOpenError`·`KisApiError` → 한국어 detail 응답, 그 외 `Exception`은 `redact_secrets()`로 자격증명 마스킹 후 로깅하고 500. 백엔드 CSP는 API 응답용 — 실제 프론트 CSP는 `frontend/vercel.json`.
 ---
 
 ## Absolute Rules
@@ -391,14 +399,14 @@ db.add(obj); await db.commit(); await db.refresh(obj)
 
 **yfinance 비동기 호출**
 - yfinance는 동기 라이브러리. `asyncio.get_running_loop().run_in_executor(None, fn)` 패턴으로 실행.
-- 동시 호출은 `asyncio.Semaphore(5)` 제한.
+- 동시 호출은 `yahoo_price._yfinance_sem`(`settings.api_semaphore_limit`, 기본 5)으로 제한 — 새 세마포어 만들지 말고 재사용.
 
 **Pydantic v2 스타일**
 - ORM 모델 매핑 스키마는 `model_config = {"from_attributes": True}` 필수.
 - `Optional[X]` 대신 `X | None` 사용.
 
 **계좌 소유권 검증**
-- account_id를 받는 라우터는 직접 `select(AssetAccount).where(id==...)` 조회 금지 — `api/deps.py`/`api/v1/_account_deps.py`의 `get_owned_account`/`get_owned_or_404` 사용(10개 라우터 파일에 적용된 기존 관례). 타 유저 계좌 접근 시 404로 통일.
+- account_id를 받는 라우터는 직접 `select(AssetAccount).where(id==...)` 조회 금지 — `api/deps.py`/`api/v1/_account_deps.py`의 `get_owned_account`/`get_owned_or_404` 사용(라우터 전반의 기존 관례). 타 유저 계좌 접근 시 404로 통일.
 
 **새 라우터/모델 추가**
 - 새 라우터는 `api/v1/router.py`에 `include_router()`로 등록 필수.
