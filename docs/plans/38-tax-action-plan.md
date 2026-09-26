@@ -74,8 +74,8 @@
 |---|---|---|
 | E3 | 계좌 간 자산 배치(asset location) 최적화 | E1(연금 규정 필터, 완료) 위에 2단계 최적화 |
 | E4 | 기간별(단기/중기/장기) 목표 금액 + by-horizon 목표 역산 | 스키마 추가 |
-| E6 | 해외 실현손익 자동 집계(브로커 체결내역) | A4 정확도 향상 |
-| E7 | 이자소득 추적 → 금융소득 2,000만 판정 완성 | A6 정확도 향상 |
+| ~~E6~~ | 해외 실현손익 자동 집계(브로커 체결내역) | **완료(2026-09-26, §9)** — KIS 실전 계좌만 |
+| ~~E7~~ | 이자소득 추적 → 금융소득 2,000만 판정 완성 | **완료(2026-09-26, §9)** |
 | E8~E10 | 시장신호 국내지표·점수 게이트 / ETF 총보수 / 토스 주문 | 리서치·외부 API 의존 |
 | (E1 후속) | IRP 파생형 ETF 40% 규정, 연금계좌 주문 사전검증, 후보 관리 "연금 불가" 배지 | 계획 37 E1 결과 참고 |
 | (E5 후속) | KRX 공휴일 캘린더(AUTO 이월·주문 거부 방지) | `alerts/calculator.is_auto_schedule_day`는 주말만 이월 |
@@ -102,3 +102,19 @@
 **미실시**: 실DB 마이그레이션 적용·실브라우저 모바일(390px) 확인 — 로컬 `.env`가 Supabase 풀러를 직접 가리키는 구성이라 이 세션에서 스키마 변경·테스트 계정 시딩을 하지 않음. 배포 시 Render `preDeployCommand`가 `alembic upgrade head` 수행.
 
 남은 후속: E6(해외 실현손익 자동 집계 → A4 "실현 0 가정" 제거), E7(이자소득 → A6 정확도), ISA 한도 확대 시행 시 `ISA_ANNUAL/TOTAL_CONTRIBUTION_LIMIT_KRW` 갱신, 2027년 세법 확인 후 `_DEDUCTION_RULES`/`_TAX_RATES`에 2027 추가.
+
+## 9. 후속 E6·E7 결과 (2026-09-26, 같은 날 별도 세션)
+
+| 항목 | 구현 |
+|---|---|
+| E6 KIS 클라이언트 | `app/kis/realized.py` `get_overseas_realized_pnl` — 해외주식 기간손익 **TTTS3039R**(`/uapi/overseas-stock/v1/trading/inquire-period-profit`), `WCRC_FRCR_DVSN_CD=02`(원화), 전 거래소·통화. 합계 `ovrs_rlzt_pfls_tot_amt` 우선, 없으면 행(`ovrs_rlzt_pfls_amt`) 합산. 연속조회는 `ctx_area_nk200` + `tr_cont: N`, 키 반복·10페이지 상한. 필드명 출처 koreainvestment/open-trading-api `examples_llm/overseas_stock/inquire_period_profit`. **모의투자 서버 미지원이라 실전 계좌만 호출** |
+| E6 서비스 | `services/overseas_realized_service.py` `get_overseas_realized_summary` — 과세계좌(ISA/연금 제외) 중 KIS 실전+자격증명 계좌를 순차 조회해 합산. 키움·토스(기간손익 API 없음)·수기·KIS 모의 계좌는 **현재 해외 보유 중일 때만** `uncovered_accounts`(사유 포함)로 반환 — 올해 전량 매도해 보유가 없는 미지원 계좌는 감지 불가. 계좌 단위 실패 격리(사유 "조회 실패", 실패 시 캐시 안 함). 캐시 `tax:overseas_realized:{user}:{year}:{acct}` 1h + sync 시 무효화(`invalidate_account_caches`) |
+| E6 세금 요약 | `get_tax_summary(..., overseas_realized_krw=)` — 브로커 호출은 호출부(`api/v1/tax.py`·`tax_action_service`)가 해서 넘김(순환 import·외부 의존 분리). 해외 양도세 추정 = 실현 + 미실현 − 250만 × 22%(기존은 미실현만), 신규 필드 `overseas_realized_gain_krw`/`overseas_tax_free_room_krw`(= 250만 − 실현, 실현 손실이면 여유 증가)/`overseas_realized_tax_krw` — 실현 미확인이면 null. 손실수확 추천 기준도 실현 포함 과세이익으로 자동 반영 |
+| E6 API·액션 | `GET /tax/overseas-realized?year=&account_id=` 신규. A4 이익실현 여유 = 공제 − 실현손익(0 이하면 액션 제외), 문구가 "0 가정" ↔ "체결 기준 N원 반영"(+PARTIAL이면 미집계 계좌 안내)로 분기 |
+| E6 프론트 | 세금 추정 카드 해외 양도세 타일에 "실현 N + 미실현 M". 절세 플래너가 `/tax/overseas-realized`를 받아 **입력 전 기본값으로 자동값** 사용(자동 집계 계좌명·기준일 표시, 미집계 계좌·사유 목록), 직접 입력 시 덮어쓰기·지우면 자동값 복귀(`useTaxSimulation(positions, autoRealized)`) |
+| E7 | `TransactionType.INTEREST`(DB는 String(20)·CHECK 제약 없음 → **마이그레이션 불필요**). 입출금 흐름 집계(수익률·챌린지·asset_aggregator)는 전부 DEPOSIT/WITHDRAWAL 명시 필터라 영향 없음 확인. `_calc_interest_income`(과세계좌만, 배당과 같은 제외 규칙) → 금융소득 = 배당+이자로 종합과세 판정·건보 피부양자 추정, 이자소득세 15.4%(`_TAX_RATES.interest`)를 총 예상세금에 포함. 신규 필드 `interest_income_krw`/`interest_tax_krw`/`financial_income_krw`. A6는 금융소득 기준 + "배당 N + 이자 M" 내역, 이자 기록 없으면 기록 유도 문구 |
+| E7 프론트 | 거래 유형에 "이자"(폼·필터 칩·목록, `TX_TYPES` 단일 소스로 zod/폼 상태 훅 통일), 세금 카드 타일이 이자 있으면 "배당·이자소득세", 건보 경고 문구 금융소득 기준 |
+
+검증: 백엔드 2331 passed / 커버리지 89.68%, ruff·mypy 클린. 프론트 1587 passed, tsc·eslint 클린.
+**미실시**: KIS 실계좌로 TTTS3039R 실호출(응답 구조 output1/output2 판별은 방어적으로 구현) — 첫 운영 조회 시 `overseas_realized_fetch_failed` 로그와 플래너 자동값을 확인할 것. 실브라우저 모바일 확인도 미실시.
+남은 후속: 키움·토스가 기간손익 API를 열면 `overseas_realized_service._is_kis_auto` 분기에 추가, 12월 말 매매의 결제일(T+1~2) 귀속 연도 차이는 KIS 매매일 기준 그대로(참고용 명시).

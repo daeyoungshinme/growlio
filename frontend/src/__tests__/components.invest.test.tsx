@@ -605,6 +605,63 @@ describe("TaxPositionTable", () => {
 
 // ------- TaxPlannerSection -------
 describe("TaxPlannerSection", () => {
+  const realizedPos: OverseasPositionDetail = {
+    ticker: "AAPL",
+    name: "Apple Inc.",
+    market: "NASDAQ",
+    currency: "USD",
+    account_id: "acc1",
+    account_name: "테스트계좌",
+    qty: 10,
+    avg_price_krw: 1500000,
+    current_price_krw: 1700000,
+    avg_price_usd: 120,
+    value_krw: 17000000,
+    invested_krw: 15000000,
+    unrealized_pnl_krw: 2000000,
+    unrealized_pnl_pct: 13.3,
+  };
+
+  it("증권사 자동 집계 실현손익과 미지원 계좌를 보여준다", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxPlannerSection
+          positions={[realizedPos]}
+          realized={{
+            year: 2026,
+            realized_gain_krw: 1_200_000,
+            source: "PARTIAL",
+            covered_accounts: [
+              { account_id: "k1", account_name: "KIS 해외", realized_krw: 1_200_000 },
+            ],
+            uncovered_accounts: [
+              {
+                account_id: "w1",
+                account_name: "키움 계좌",
+                reason: "키움 API는 기간 실현손익 조회를 제공하지 않아요",
+              },
+            ],
+            as_of: "2026-09-26",
+          }}
+        />
+      </MemoryRouter>,
+    );
+    const box = screen.getByTestId("auto-realized");
+    expect(box.textContent).toContain("KIS 해외");
+    expect(box.textContent).toContain("키움 계좌");
+    expect(screen.getByLabelText("직접 입력 (자동값 대신)")).toBeDefined();
+  });
+
+  it("자동 집계가 없으면 수기 입력 안내를 보여준다", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxPlannerSection positions={[realizedPos]} realized={null} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("auto-realized")).toBeNull();
+    expect(screen.getByLabelText("올해 실현 손익 (원)")).toBeDefined();
+  });
+
   it("renders empty state when no positions", () => {
     renderWithProviders(<TaxPlannerSection positions={[]} />);
     expect(screen.getByText("해외 종목 보유 현황이 없습니다.")).toBeDefined();

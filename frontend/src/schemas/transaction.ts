@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { TX_TYPES } from "@/constants/transaction";
 
 export const transactionSchema = z.object({
-  transaction_type: z.enum(["DEPOSIT", "WITHDRAWAL", "DIVIDEND"]),
+  transaction_type: z.enum(TX_TYPES),
   amount: z.number({ error: "금액을 입력해주세요" }).positive("금액은 0보다 커야 합니다"),
   transaction_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식이 올바르지 않습니다"),
   ticker: z.string().optional(),

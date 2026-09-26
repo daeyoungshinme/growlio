@@ -64,7 +64,17 @@ export interface TaxSummary {
   year: number;
   dividend_income_krw: number;
   dividend_tax_krw: number;
+  /** 과세계좌 이자소득(사용자가 기록한 INTEREST 내역 기준) */
+  interest_income_krw: number;
+  interest_tax_krw: number;
+  /** 금융소득 = 배당 + 이자 (종합과세 2,000만원 판정 기준) */
+  financial_income_krw: number;
   overseas_unrealized_gain_krw: number;
+  /** 증권사 체결 기준 올해 해외 실현손익 — 자동 집계 가능한 계좌가 없으면 null */
+  overseas_realized_gain_krw: number | null;
+  /** 세금 없이 연내 추가 실현 가능한 해외 이익(250만 공제 − 실현손익) — 실현손익 미확인이면 null */
+  overseas_tax_free_room_krw: number | null;
+  overseas_realized_tax_krw: number | null;
   overseas_gain_deduction_krw: number;
   overseas_tax_estimated_krw: number;
   domestic_stock_value_krw: number;
@@ -81,9 +91,25 @@ export interface TaxSummary {
   note: string;
   rates: {
     dividend_tax_rate_pct: number;
+    interest_tax_rate_pct: number;
     overseas_tax_rate_pct: number;
   };
 }
+
+export interface OverseasRealizedSummary {
+  year: number;
+  realized_gain_krw: number | null;
+  /** BROKER=해외 보유 계좌 전부 자동 집계, PARTIAL=일부 계좌 미지원/실패, NONE=자동 집계 계좌 없음 */
+  source: "BROKER" | "PARTIAL" | "NONE";
+  covered_accounts: { account_id: string; account_name: string; realized_krw: number }[];
+  uncovered_accounts: { account_id: string; account_name: string; reason: string }[];
+  as_of: string;
+}
+
+export const fetchOverseasRealized = (year?: number, accountId?: string | null) =>
+  apiGet<OverseasRealizedSummary>("/tax/overseas-realized", {
+    params: { year: year || undefined, account_id: accountId || undefined },
+  });
 
 export const fetchTaxSummary = (year?: number, accountId?: string | null) =>
   apiGet<TaxSummary>("/tax/summary", {

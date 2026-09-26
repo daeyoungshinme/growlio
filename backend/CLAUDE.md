@@ -123,7 +123,7 @@ cd backend && uv run mypy app/
 - `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_{KIS,KIWOOM,TOSS,OTHER}/CASH_OTHER/REAL_ESTATE/OTHER) × `data_source`(MANUAL/KIS_API/KIWOOM_API/TOSS_API) 조합으로 동작 결정. 토스: `toss_account_no`/`toss_client_id`/`toss_client_secret`(AES-256), 모의투자 없음. ISA: `isa_open_date`/`isa_type`(GENERAL/PREFERENTIAL)/`isa_manual_cumulative_pnl_krw`. `tax_type`(GENERAL/ISA/PENSION_SAVINGS/IRP/OVERSEAS_DEDICATED, 세금 계산·매도 우선순위)·`investment_horizon`(SHORT/MID/LONG_TERM/null, 투자기간 태그) — 둘 다 `Portfolio`에도 동일 컬럼, 목표 역산 추천이 (기간, 세제유형) 매칭에 사용
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
-- `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
+- `Transaction` — 입출금/배당/이자 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST. INTEREST(예금·CMA 이자)는 금융소득 종합과세 판정 전용 — 수익률·챌린지 등 입출금 흐름 집계는 DEPOSIT/WITHDRAWAL을 명시 필터하므로 새 집계 추가 시에도 이 관례 유지
 - `InvestmentChallenge` — 적립식 투자 챌린지(매달 입금 습관/수익률/평가금액 목표). `challenge_type`(DEPOSIT/RETURN_PCT/TARGET_VALUE) × `target_amount`/`target_pct`/`target_months` 조합. `account_id`(DEPOSIT만 지정 허용, 나머지는 전체 투자자산). 진행률/스트릭은 저장 안 함
 - `UserSettings` — KIS/키움 자격증명(AES-256), 투자·입금 목표. `challenge_reminders_enabled`(적립 챌린지 독려/결산 알림 옵트인, 기본 OFF — 단 `challenge_service.create_challenge()`가 챌린지별 알림 토글 ON으로 첫 챌린지를 만들면 자동으로 True 전환, 이중 게이트로 알림이 조용히 안 나가는 것 방지). 목표 역산 추천 옵션: `goal_short_term_equity_floor_pct`, `goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`(nullable=상한 없음, `PUT /settings/goal-recommendation-options`), `age_group`(nullable, TWENTIES~SIXTIES_PLUS, `birth_year`로 자동 파생 가능). AUTO 하루 거래대금 상한: `auto_rebalancing_daily_value_cap_krw`(nullable=무제한, `PUT /settings/auto-rebalancing-daily-cap`)
 
@@ -148,7 +148,7 @@ API Request
         ├── rebalancing_plan_public.py  # 리밸런싱 대기 플랜 토큰 기반 액션 (인증 없음, 이메일 링크 전용 — `Depends(get_current_user)` 사용 금지)
         ├── settings.py       # DART API 키 + 목표/알림 설정 (KIS/키움 자격증명 검증·삭제는 assets.py 소관 — 이 라우터는 다루지 않음)
         ├── stocks.py         # 종목 검색 + ETF 추종지수 지역 판별(GET /stocks/index-region)
-        ├── tax.py            # 세금 추정 요약(GET /tax/summary?year=YYYY&account_id=) + 해외 포지션(GET /tax/overseas-positions?account_id=) + ISA 만기 현황(GET /tax/isa-status) + 연금 납입 현황(GET /tax/pension-contribution) — account_id 미지정 시 전체 계좌 통합
+        ├── tax.py            # 세금 추정 요약(GET /tax/summary?year=YYYY&account_id=, 해외 실현손익을 조회해 get_tax_summary에 전달) + 해외 포지션(GET /tax/overseas-positions?account_id=) + 해외 실현손익 자동 집계(GET /tax/overseas-realized?year=&account_id=) + ISA 만기 현황(GET /tax/isa-status) + 연금 납입 현황(GET /tax/pension-contribution) + 절세 액션 플랜(GET /tax/action-plan) — account_id 미지정 시 전체 계좌 통합
         ├── transactions.py   # 입출금/배당 내역 CRUD
         ├── economic_indicators.py  # 미국 CPI/Core CPI 요약(GET /economic-indicators/inflation-summary) — 프론트 진단탭 MarketSignalBanner(InflationIndicatorList) 전용. 이 엔드포인트만 존재
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
@@ -230,7 +230,8 @@ services/
   ├── portfolio_history_service.py  # 포트폴리오 월별 자산 배분 이력 (portfolio_service.py에서 분리)
   ├── price_service.py        # [현재가 조회 그룹] 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
   ├── stock_search_service.py # 종목명·티커 검색 — 네이버 금융(한글)/Yahoo Finance(영문·티커) 연동 (stocks.py 라우터에서 분리)
-  ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계·건강보험 피부양자 자격상실 위험(배당소득 2000만원 기준, 월 보험료는 참고 추정치). 연금 납입 현황은 pension_contribution_service.py
+  ├── tax_service.py          # 연도별 세금 추정: 배당·이자소득세·해외 양도세(실현+미실현)·종합과세 경계·건강보험 피부양자 자격상실 위험(금융소득=배당+이자 2000만원 기준, 월 보험료는 참고 추정치). 해외 실현손익은 브로커 호출이라 직접 조회하지 않고 `overseas_realized_krw` 인자로 받는다. 연금 납입 현황은 pension_contribution_service.py
+  ├── overseas_realized_service.py # 해외주식 올해 실현손익 자동 집계(250만 공제 잔여용) — KIS 실전 계좌만 `kis/realized.py`(TTTS3039R 기간손익, 원화)로 조회. 키움·토스(API 없음)·수기·KIS 모의 계좌는 현재 해외 보유 시 `uncovered_accounts`로 반환. 계좌 단위 실패 격리, 성공 시에만 1h 캐시(sync 시 무효화)
   ├── pension_contribution_service.py # 연금저축/IRP 계좌군 세액공제 한도(600만원/900만원) 납입 현황 — tax_service.py에서 분리
   ├── isa_service.py          # ISA 계좌 의무가입 3년 만기 현황 계산 — `isa_open_date` 기준, 수동입력 누적손익(`isa_manual_cumulative_pnl_krw`) 반영. `calc_isa_contribution_status`: 연 2,000만(미납입분 이월, 총 1억) 납입 잔여한도
   ├── tax_action_service.py   # 절세 액션 플랜(`GET /tax/action-plan`) — pension/isa/tax 서비스 결과를 조합만 해 액션(연금 공제·ISA 이전/납입·해외 250만 이익실현·손실수확·금융소득 2천만) 우선순위 목록 생성. 연금 공제율은 `UserSettings.income_bracket`(미입력 시 13.2%). 연말 리마인더(`alerts/tax_reminder_service`)도 이 목록 재사용. 세법 수치는 `_DEDUCTION_RULES` 연도별 테이블
@@ -278,7 +279,7 @@ core/                         # 설정·DB·in-memory 캐시 store
   ├── config.py                # Settings(pydantic-settings) — env var 로딩
   ├── database.py              # SQLAlchemy async engine/session, Base
   └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 싱글톤, get_cache_store/close_cache_store. `sweep_expired()`를 `jobs/cache_sweep.py`가 15분마다 호출해 만료 키 능동 청소. 항목 수 상한(`_MAX_ENTRIES`=20,000, LRU 축출)으로 메모리 무한 증가 방지. **주의**: 워커/인스턴스 2개 이상으로 늘리면 캐시가 프로세스 로컬이라 적중률 급락 + 무효화 미전파 — 확장 시 공유 캐시(Redis) 재도입 필요(`render.yaml`은 단일 워커/단일 인스턴스 전제)
-kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote)
+kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote, realized — 해외 기간손익 TTTS3039R, 모의투자 미지원)
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants). `client.py`는 KIS와 동일 `AsyncRateLimiter`로 `kiwoom_rate_per_second`(기본 4.0) 제한 — http_client.py의 rate-limit 감지가 키움 `return_code=5`(=EGW00201) 대응
 toss/                         # 토스증권 Open API 클라이언트 (auth, balance, client, constants). OAuth2 Client Credentials(form-encoded), 국내+미국 보유종목 `GET /api/v1/holdings` 통합, 예수금 `/api/v1/buying-power`. 샌드박스 없음, 토큰 ~1h(지연 갱신), **`Open API → IP 관리`에 서버 IP 등록 필수**(미등록 시 403 `edge-blocked`). `toss_rate_per_second`(기본 1.0) 제한 — http_client.py가 토스 `error.code=rate-limit-*` 감지
 providers/                    # 금융 데이터 provider

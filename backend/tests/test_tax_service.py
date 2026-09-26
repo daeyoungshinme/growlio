@@ -95,6 +95,74 @@ class TestBuildHarvestingRecommendations:
 class TestGetTaxSummary:
     """get_tax_summary: 연도별 세금 추정 요약."""
 
+    @pytest.fixture(autouse=True)
+    def interest_mock(self):
+        """이자소득 조회는 기본 0 — 이자 관련 테스트는 개별 patch로 덮어쓴다."""
+        with patch("app.services.tax_service._calc_interest_income", new_callable=AsyncMock, return_value=0.0) as m:
+            yield m
+
+    @staticmethod
+    def _base_patches(dividend: float = 0.0, overseas_unrealized: float = 0.0):
+        return (
+            patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=dividend),
+            patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
+            patch(
+                "app.services.tax_service._calc_stock_unrealized",
+                new_callable=AsyncMock,
+                return_value=(overseas_unrealized, 0.0, 0.0, 0.0),
+            ),
+            patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
+        )
+
+    @pytest.mark.asyncio
+    async def test_interest_income_counts_toward_financial_income(self, mock_db, override_settings, interest_mock):
+        """E7: 이자소득이 금융소득(종합과세 판정·건보 추정)에 합산되고 이자소득세가 총 세금에 포함된다."""
+        interest_mock.return_value = 6_000_000.0
+        p1, p2, p3, p4 = self._base_patches(dividend=15_000_000.0)
+        with p1, p2, p3, p4:
+            result = await get_tax_summary(uuid.uuid4(), 2026, mock_db)
+
+        assert result["interest_income_krw"] == 6_000_000
+        assert result["interest_tax_krw"] == round(6_000_000 * 0.154)
+        assert result["financial_income_krw"] == 21_000_000
+        assert result["comprehensive_tax_warning"] is True
+        assert result["comprehensive_tax_remaining_krw"] == 0
+        assert result["health_insurance_estimate"]["financial_income_for_health_insurance_krw"] == 21_000_000
+        assert result["total_estimated_tax_krw"] == round(15_000_000 * 0.154 + 6_000_000 * 0.154)
+
+    @pytest.mark.asyncio
+    async def test_realized_unknown_leaves_realized_fields_none(self, mock_db, override_settings):
+        p1, p2, p3, p4 = self._base_patches(overseas_unrealized=3_000_000.0)
+        with p1, p2, p3, p4:
+            result = await get_tax_summary(uuid.uuid4(), 2026, mock_db)
+
+        assert result["overseas_realized_gain_krw"] is None
+        assert result["overseas_tax_free_room_krw"] is None
+        assert result["overseas_realized_tax_krw"] is None
+        assert result["overseas_tax_estimated_krw"] == round(500_000 * 0.22)
+
+    @pytest.mark.asyncio
+    async def test_realized_gain_reduces_room_and_adds_to_estimate(self, mock_db, override_settings):
+        """E6: 실현 300만 → 공제 초과 50만 과세, 추가 무세 실현 여유 0, 추정세금은 실현+미실현 합산."""
+        p1, p2, p3, p4 = self._base_patches(overseas_unrealized=1_000_000.0)
+        with p1, p2, p3, p4:
+            result = await get_tax_summary(uuid.uuid4(), 2026, mock_db, overseas_realized_krw=3_000_000.0)
+
+        assert result["overseas_realized_gain_krw"] == 3_000_000
+        assert result["overseas_tax_free_room_krw"] == 0
+        assert result["overseas_realized_tax_krw"] == round(500_000 * 0.22)
+        assert result["overseas_tax_estimated_krw"] == round(1_500_000 * 0.22)
+
+    @pytest.mark.asyncio
+    async def test_realized_loss_expands_tax_free_room(self, mock_db, override_settings):
+        """실현 손실 100만이면 손익통산으로 350만까지 무세 실현 가능."""
+        p1, p2, p3, p4 = self._base_patches()
+        with p1, p2, p3, p4:
+            result = await get_tax_summary(uuid.uuid4(), 2026, mock_db, overseas_realized_krw=-1_000_000.0)
+
+        assert result["overseas_tax_free_room_krw"] == 3_500_000
+        assert result["overseas_realized_tax_krw"] == 0
+
     @pytest.mark.asyncio
     async def test_returns_required_fields(self, mock_db, override_settings):
         """반환 dict에 필수 키가 포함된다."""
@@ -506,3 +574,26 @@ class TestCalcDividendIncomeDb:
         assert "LEFT OUTER JOIN asset_accounts" in sql
         assert "asset_accounts.tax_type IS NULL" in sql
         assert "NOT IN" in sql
+
+
+class TestCalcInterestIncome:
+    @pytest.mark.asyncio
+    async def test_sums_interest_transactions(self, mock_db):
+        from app.services.tax_service import _calc_interest_income
+
+        result = MagicMock()
+        result.scalar.return_value = 123_456
+        mock_db.execute = AsyncMock(return_value=result)
+        assert await _calc_interest_income(uuid.uuid4(), 2026, mock_db) == 123_456.0
+        compiled = str(mock_db.execute.call_args.args[0].compile(compile_kwargs={"literal_binds": True}))
+        assert "'INTEREST'" in compiled
+        assert "tax_type" in compiled
+
+    @pytest.mark.asyncio
+    async def test_none_is_zero(self, mock_db):
+        from app.services.tax_service import _calc_interest_income
+
+        result = MagicMock()
+        result.scalar.return_value = None
+        mock_db.execute = AsyncMock(return_value=result)
+        assert await _calc_interest_income(uuid.uuid4(), 2026, mock_db) == 0.0

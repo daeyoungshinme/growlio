@@ -240,3 +240,46 @@ class TestTaxActionPlan:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/tax/action-plan")
         assert resp.status_code == 401
+
+
+_MOCK_REALIZED = {
+    "year": 2026,
+    "realized_gain_krw": 1_000_000.0,
+    "source": "BROKER",
+    "covered_accounts": [],
+    "uncovered_accounts": [],
+    "as_of": "2026-09-26",
+}
+
+
+class TestOverseasRealized:
+    def test_returns_200_with_mocked_service(self, override_settings):
+        user = _make_user()
+        app = _setup_app(user, _make_mock_db())
+        with (
+            patch("app.api.v1.tax.get_overseas_realized_summary", new=AsyncMock(return_value=_MOCK_REALIZED)),
+            TestClient(app) as client,
+        ):
+            resp = client.get("/api/v1/tax/overseas-realized")
+        assert resp.status_code == 200
+        assert resp.json()["realized_gain_krw"] == 1_000_000.0
+
+    def test_returns_400_for_future_year(self, override_settings):
+        user = _make_user()
+        app = _setup_app(user, _make_mock_db())
+        with TestClient(app) as client:
+            resp = client.get("/api/v1/tax/overseas-realized?year=2999")
+        assert resp.status_code == 400
+
+    def test_summary_passes_realized_gain(self, override_settings):
+        user = _make_user()
+        app = _setup_app(user, _make_mock_db())
+        summary_mock = AsyncMock(return_value=_MOCK_TAX_SUMMARY)
+        with (
+            patch("app.api.v1.tax.get_overseas_realized_summary", new=AsyncMock(return_value=_MOCK_REALIZED)),
+            patch("app.api.v1.tax.get_tax_summary", new=summary_mock),
+            TestClient(app) as client,
+        ):
+            resp = client.get("/api/v1/tax/summary")
+        assert resp.status_code == 200
+        assert summary_mock.call_args.kwargs["overseas_realized_krw"] == 1_000_000.0

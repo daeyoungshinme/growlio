@@ -175,7 +175,7 @@ class AssetSnapshot(Base):
 
 
 class Transaction(Base):
-    """입출금 및 배당금 내역."""
+    """입출금·배당금·이자 내역."""
 
     __tablename__ = "transactions"
 
@@ -186,7 +186,7 @@ class Transaction(Base):
     account_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="SET NULL"), nullable=True
     )
-    # DEPOSIT | WITHDRAWAL | DIVIDEND
+    # DEPOSIT | WITHDRAWAL | DIVIDEND | INTEREST (INTEREST는 금융소득 집계 전용 — 수익률 입출금 흐름 제외)
     transaction_type: Mapped[str] = mapped_column(String(20), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
