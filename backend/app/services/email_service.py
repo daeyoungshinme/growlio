@@ -26,6 +26,7 @@ from app.services.email_templates import (
     challenge_reminder_template,
     challenge_wrap_template,
     daily_value_cap_gate_blocked_template,
+    dca_cash_shortfall_template,
     exchange_rate_alert_template,
     goal_achievement_template,
     market_signal_change_template,
@@ -416,7 +417,7 @@ async def send_market_signal_daily_digest_alert(to_email: str, level: str, reaso
 
 async def send_recommendation_drift_alert_email(to_email: str, portfolio_names: list[str]) -> bool:
     """추천 비중 변화 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    app_link = f"{settings.frontend_url}/rebalancing?rtab={quote('포트폴리오')}"
+    app_link = f"{settings.frontend_url}/rebalancing?rtab={quote('추천')}"
     return await _send_templated(
         to_email,
         lambda: recommendation_drift_alert_template(portfolio_names, app_link),
@@ -464,4 +465,25 @@ async def send_challenge_wrap_email(
         ok_event="challenge_wrap_email_sent",
         fail_event="challenge_wrap_email_failed",
         title=title,
+    )
+
+
+async def send_dca_cash_shortfall_email(
+    to_email: str,
+    portfolio_name: str,
+    account_name: str,
+    run_date_label: str,
+    cash_krw: float,
+    expected_krw: float | None,
+    synced_label: str | None,
+) -> bool:
+    """정기 적립식 자동매수 예수금 부족 사전 알림 이메일. 발송 성공 시 True, 미설정/실패 시 False."""
+    return await _send_templated(
+        to_email,
+        lambda: dca_cash_shortfall_template(
+            portfolio_name, account_name, run_date_label, cash_krw, expected_krw, synced_label
+        ),
+        ok_event="dca_cash_shortfall_email_sent",
+        fail_event="dca_cash_shortfall_email_failed",
+        portfolio_name=portfolio_name,
     )

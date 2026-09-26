@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { isDcaAutoBuyPreset, describeDcaAutoBuy } from "@/utils/dcaAutoBuy";
+import {
+  isDcaAutoBuyPreset,
+  describeDcaAutoBuy,
+  dcaAccountCashKrw,
+  dcaCashShortfallKrw,
+} from "@/utils/dcaAutoBuy";
 import type { RebalancingAlert } from "@/api/alerts";
 
 const baseAlert: RebalancingAlert = {
@@ -74,5 +79,20 @@ describe("describeDcaAutoBuy", () => {
 
   it("alert가 없으면 빈 문자열을 반환한다", () => {
     expect(describeDcaAutoBuy(null)).toBe("");
+  });
+});
+
+describe("dcaAccountCashKrw / dcaCashShortfallKrw (E5)", () => {
+  it("해외 종목이 있을 때만 달러 예수금을 환산해 더한다", () => {
+    const account = { deposit_krw: 100_000, deposit_usd: 100 };
+    expect(dcaAccountCashKrw(account, ["KOSPI"], 1400)).toBe(100_000);
+    expect(dcaAccountCashKrw(account, ["KOSPI", "NASDAQ"], 1400)).toBe(240_000);
+    expect(dcaAccountCashKrw(account, ["NASDAQ"], null)).toBe(100_000);
+  });
+
+  it("월 적립액보다 적을 때만 부족분을 반환한다", () => {
+    expect(dcaCashShortfallKrw(300_000, 1_000_000)).toBe(700_000);
+    expect(dcaCashShortfallKrw(1_000_000, 1_000_000)).toBeNull();
+    expect(dcaCashShortfallKrw(0, null)).toBeNull();
   });
 });

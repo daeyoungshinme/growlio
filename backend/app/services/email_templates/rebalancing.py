@@ -471,3 +471,34 @@ def daily_value_cap_gate_blocked_template(
         "이 알림은 하루 1회만 발송됩니다.",
     )
     return subject, html
+
+
+def dca_cash_shortfall_template(
+    portfolio_name: str,
+    account_name: str,
+    run_date_label: str,
+    cash_krw: float,
+    expected_krw: float | None,
+    synced_label: str | None,
+) -> tuple[str, str]:
+    """정기 적립식 자동매수(AUTO·SCHEDULE_ONLY·BUY_ONLY) 실행 1~3일 전, 실행 계좌 예수금이 부족할 때 발송."""
+    subject = f"[Growlio] {run_date_label} 자동매수 전에 예수금을 채워주세요"
+    rows: list[tuple[str, str]] = [
+        ("포트폴리오", portfolio_name),
+        ("실행 계좌", account_name),
+        ("자동매수 예정일", run_date_label),
+        ("현재 예수금", f"{cash_krw:,.0f} 원" + (f" ({synced_label} 동기화 기준)" if synced_label else "")),
+    ]
+    if expected_krw:
+        shortfall = max(expected_krw - cash_krw, 0.0)
+        rows.append(("월 적립액", f"{expected_krw:,.0f} 원"))
+        rows.append(("부족 금액", f"<span style='font-weight:bold;color:#dc2626;'>{shortfall:,.0f} 원</span>"))
+    html = _email_div(
+        "자동매수 예정일 전에 예수금을 확인하세요",
+        "#d97706",
+        _kv_table(rows),
+        "정기 적립식 자동매수는 실행 계좌에 있는 예수금으로만 매수합니다 — 예정일 전에 증권 계좌로 "
+        "입금하지 않으면 이번 달 매수가 적거나 실행되지 않습니다. 월 적립액은 계획 &gt; 적립 계획에서 바꿀 수 "
+        "있습니다. 이 알림은 예정일마다 1회만 발송됩니다.",
+    )
+    return subject, html

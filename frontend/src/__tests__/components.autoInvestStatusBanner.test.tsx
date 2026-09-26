@@ -11,8 +11,16 @@ vi.mock("@/api/portfolios", () => ({
 vi.mock("@/api/alerts", () => ({
   fetchRebalancingAlerts: vi.fn(),
 }));
+vi.mock("@/api/assets", () => ({
+  fetchAccounts: vi.fn().mockResolvedValue([]),
+}));
+vi.mock("@/api/settings", () => ({
+  fetchSettings: vi.fn().mockResolvedValue({ monthly_deposit_amount: null }),
+}));
 
 import { fetchPortfolios } from "@/api/portfolios";
+import { fetchAccounts } from "@/api/assets";
+import { fetchSettings } from "@/api/settings";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import AutoInvestStatusBanner from "@/components/invest/AutoInvestStatusBanner";
 
@@ -96,5 +104,40 @@ describe("AutoInvestStatusBanner", () => {
     expect(screen.getByText("설정 관리").closest("a")?.getAttribute("href")).toContain(
       `portfolioId=${portfolio.id}&openAlert=1`,
     );
+  });
+
+  it("실행 계좌 예수금이 월 적립액보다 적으면 부족분 경고를 보여준다 (E5)", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValue([portfolio]);
+    vi.mocked(fetchRebalancingAlerts).mockResolvedValue([dcaAlert]);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "acc-1", deposit_krw: 300_000, deposit_usd: null },
+    ] as never);
+    vi.mocked(fetchSettings).mockResolvedValue({ monthly_deposit_amount: 1_000_000 } as never);
+
+    renderWithProviders(
+      <MemoryRouter>
+        <AutoInvestStatusBanner />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/월 적립액보다 70만원 부족/)).toBeInTheDocument();
+  });
+
+  it("예수금이 충분하면 경고를 보여주지 않는다", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValue([portfolio]);
+    vi.mocked(fetchRebalancingAlerts).mockResolvedValue([dcaAlert]);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "acc-1", deposit_krw: 1_500_000, deposit_usd: null },
+    ] as never);
+    vi.mocked(fetchSettings).mockResolvedValue({ monthly_deposit_amount: 1_000_000 } as never);
+
+    renderWithProviders(
+      <MemoryRouter>
+        <AutoInvestStatusBanner />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("정기 적립식 매월 25일 자동매수 중")).toBeInTheDocument();
+    expect(screen.queryByText(/부족/)).not.toBeInTheDocument();
   });
 });
