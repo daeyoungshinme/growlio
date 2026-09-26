@@ -16,10 +16,13 @@ from typing import Literal, TypedDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import COMPREHENSIVE_TAX_THRESHOLD_KRW
 from app.enums import IncomeBracket
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
 from app.services.isa_service import (
+    ISA_ANNUAL_CONTRIBUTION_LIMIT_KRW,
+    ISA_TOTAL_CONTRIBUTION_LIMIT_KRW,
     IsaAccountStatus,
     IsaContributionStatus,
     calc_isa_contribution_status,
@@ -27,7 +30,7 @@ from app.services.isa_service import (
 )
 from app.services.overseas_realized_service import get_overseas_realized_summary
 from app.services.pension_contribution_service import PensionContributionStatus, calc_pension_contribution_status
-from app.services.tax_service import get_overseas_positions_detail, get_tax_summary
+from app.services.tax_service import get_overseas_positions_detail, get_tax_summary, pick_year_rule
 from app.utils.kst import today_kst
 
 ActionCategory = Literal[
@@ -68,7 +71,7 @@ _DEDUCTION_RULES: dict[int, _DeductionRules] = {
 }
 
 _ISA_TRANSFER_LEAD_DAYS = 90  # 만기 D-90부터 이전 준비 안내
-_FINANCIAL_INCOME_WATCH_KRW = 15_000_000  # 금융소득 종합과세(2,000만) 접근 경고 시작선
+_FINANCIAL_INCOME_WATCH_KRW = 15_000_000  # 금융소득 종합과세(COMPREHENSIVE_TAX_THRESHOLD_KRW) 접근 경고 시작선
 _HARVESTING_TOP_N = 3
 _HIGH_PRIORITY_DAYS = 30
 _MEDIUM_PRIORITY_DAYS = 90
@@ -111,10 +114,7 @@ class TaxActionPlan(TypedDict):
 
 
 def _get_rules(year: int) -> _DeductionRules:
-    if year in _DEDUCTION_RULES:
-        return _DEDUCTION_RULES[year]
-    closest = min(_DEDUCTION_RULES.keys(), key=lambda y: abs(y - year))
-    return _DEDUCTION_RULES[closest]
+    return pick_year_rule(_DEDUCTION_RULES, year)
 
 
 def pension_credit_rate(income_bracket: str | None, rules: _DeductionRules) -> float:
@@ -164,6 +164,13 @@ def _make_action(
 
 def _fmt_won(amount: float) -> str:
     return f"{amount:,.0f}원"
+
+
+def _fmt_limit(amount: int) -> str:
+    """세법 한도 문구용 — 20_000_000 → "2,000만원", 100_000_000 → "1억원"."""
+    if amount % 100_000_000 == 0:
+        return f"{amount // 100_000_000:,}억원"
+    return f"{amount // 10_000:,}만원"
 
 
 def build_pension_action(
@@ -273,7 +280,9 @@ def build_isa_contribution_actions(isa_contrib: list[IsaContributionStatus], tod
                 category="ISA_CONTRIBUTION",
                 title=f"{acc['account_name']}에 올해 {_fmt_won(remaining)} 더 납입 가능",
                 detail=(
-                    f"ISA 납입한도는 연 2,000만원(총 1억원)이고 못 채운 한도는 다음 해로 이월돼요{carry}. "
+                    f"ISA 납입한도는 연 {_fmt_limit(ISA_ANNUAL_CONTRIBUTION_LIMIT_KRW)}"
+                    f"(총 {_fmt_limit(ISA_TOTAL_CONTRIBUTION_LIMIT_KRW)})이고 "
+                    f"못 채운 한도는 다음 해로 이월돼요{carry}. "
                     "ISA 안의 배당·매매이익은 비과세 한도 후 9.9% 분리과세라 과세계좌보다 유리해요. "
                     "입금 내역 기준 추정치예요."
                 ),
@@ -373,7 +382,8 @@ def build_financial_income_action(tax_summary: dict, today: date) -> TaxAction |
     if remaining > 0:
         title = f"금융소득 종합과세까지 {_fmt_won(remaining)} 남음"
         detail = (
-            f"올해 과세계좌 금융소득이 {_fmt_won(financial)}({breakdown})이에요. 2,000만원을 넘으면 초과분이 "
+            f"올해 과세계좌 금융소득이 {_fmt_won(financial)}({breakdown})이에요. "
+            f"{_fmt_limit(COMPREHENSIVE_TAX_THRESHOLD_KRW)}을 넘으면 초과분이 "
             "다른 소득과 합산돼 더 높은 세율이 적용될 수 있어요. 연내 추가 배당이 예상되는 고배당 종목은 "
             "ISA·연금계좌에서 보유하고, 예금 만기·이자 수령 시점을 내년으로 미루는 방법을 검토해 보세요."
             f"{interest_hint}"
@@ -381,7 +391,8 @@ def build_financial_income_action(tax_summary: dict, today: date) -> TaxAction |
     else:
         title = "금융소득 종합과세 대상 가능성"
         detail = (
-            f"올해 과세계좌 금융소득이 {_fmt_won(financial)}({breakdown})로 2,000만원 기준을 넘었어요. "
+            f"올해 과세계좌 금융소득이 {_fmt_won(financial)}({breakdown})로 "
+            f"{_fmt_limit(COMPREHENSIVE_TAX_THRESHOLD_KRW)} 기준을 넘었어요. "
             "내년부터 고배당 종목은 ISA·연금계좌로 옮겨 보유하고, 예금 이자 수령 시점을 분산하는 방법을 "
             f"검토해 보세요.{interest_hint}"
         )

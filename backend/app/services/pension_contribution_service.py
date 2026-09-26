@@ -8,11 +8,11 @@ from typing import TypedDict
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import PENSION_TAX_TYPES
 from app.models.asset import AssetAccount, Transaction
 
 _PENSION_SAVINGS_LIMIT_KRW = 6_000_000
 _PENSION_TOTAL_LIMIT_KRW = 9_000_000
-_PENSION_TAX_TYPES = ("PENSION_SAVINGS", "IRP")
 
 _PENSION_CONTRIBUTION_NOTE = (
     "연금저축/IRP 납입액은 계좌별 입출금 내역(수기 입력) 기준 합산입니다. "
@@ -47,7 +47,7 @@ async def calc_pension_contribution_status(
         .join(Transaction, Transaction.account_id == AssetAccount.id)
         .where(
             AssetAccount.user_id == user_id,
-            AssetAccount.tax_type.in_(_PENSION_TAX_TYPES),
+            AssetAccount.tax_type.in_(PENSION_TAX_TYPES),
             AssetAccount.is_active == True,
             Transaction.transaction_type == "DEPOSIT",
             func.extract("year", Transaction.transaction_date) == year,

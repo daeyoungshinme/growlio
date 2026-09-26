@@ -120,6 +120,8 @@ class TestBuildIsaContributionActions:
         assert actions[0]["amount_krw"] == 25_000_000
         assert actions[0]["benefit_krw"] is None
         assert "이월 포함" in actions[0]["detail"]
+        # 한도 문구는 isa_service 상수에서 파생 — 한도 개정 시 문구만 stale해지지 않게
+        assert "연 2,000만원(총 1억원)" in actions[0]["detail"]
 
 
 class TestBuildOverseasGainHarvestAction:
@@ -204,6 +206,7 @@ class TestBuildFinancialIncomeAction:
         assert action is not None
         assert action["amount_krw"] == 4_000_000
         assert "4,000,000원 남음" in action["title"]
+        assert "2,000만원을 넘으면" in action["detail"]
 
     def test_over_threshold(self):
         action = build_financial_income_action(
@@ -212,6 +215,7 @@ class TestBuildFinancialIncomeAction:
         assert action is not None
         assert action["amount_krw"] is None
         assert "대상 가능성" in action["title"]
+        assert "2,000만원 기준을 넘었어요" in action["detail"]
 
     def test_interest_counts_toward_watch_line(self):
         """E7: 배당만으론 경고선 미만이어도 이자를 합친 금융소득이 넘으면 액션 생성, 내역 표시."""

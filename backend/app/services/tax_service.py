@@ -2,24 +2,22 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any, TypedDict
+from typing import Any, TypedDict, TypeVar
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.constants import POSITION_STOCK_ASSET_TYPES
+from app.constants import COMPREHENSIVE_TAX_THRESHOLD_KRW, POSITION_STOCK_ASSET_TYPES, TAX_DEFERRED_TAX_TYPES
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services._snapshot_queries import latest_snapshot_subquery
 
+_T = TypeVar("_T")
+
 _OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "SSE", "SGX", "LSE"}
 _DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}
-_DOMESTIC_STOCK_TYPES = POSITION_STOCK_ASSET_TYPES
-# ISA/연금저축/IRP는 계좌 내 매도 시 즉시 양도세가 발생하지 않는 과세이연 계좌
-_TAX_DEFERRED_TYPES = {"ISA", "PENSION_SAVINGS", "IRP"}
 
 _DOMESTIC_LARGE_HOLDER_THRESHOLD = 1_000_000_000
-_COMPREHENSIVE_TAX_THRESHOLD = 20_000_000
 _GEUMT_EXCESS_THRESHOLD = 300_000_000  # 금투세 누진 구간 기준 3억
 
 _HEALTH_INSURANCE_DEPENDENT_THRESHOLD_KRW = 20_000_000  # 건강보험 피부양자 자격유지 금융소득 기준
@@ -65,12 +63,16 @@ _TAX_RATES: dict[int, _TaxRates] = {
 }
 
 
+def pick_year_rule(table: dict[int, _T], year: int) -> _T:
+    """연도별 세법 테이블에서 해당 연도 값을, 없으면 가장 가까운 연도 값을 반환한다."""
+    if year in table:
+        return table[year]
+    return table[min(table, key=lambda y: abs(y - year))]
+
+
 def _get_rates(year: int) -> _TaxRates:
     """연도별 세율 반환. 해당 연도가 없으면 가장 가까운 연도 사용."""
-    if year in _TAX_RATES:
-        return _TAX_RATES[year]
-    closest = min(_TAX_RATES.keys(), key=lambda y: abs(y - year))
-    return _TAX_RATES[closest]
+    return pick_year_rule(_TAX_RATES, year)
 
 
 class OverseasTransferTaxEstimate(TypedDict):
@@ -243,8 +245,8 @@ async def get_tax_summary(
 
     # 이자소득은 사용자가 기록한 INTEREST 내역 기준(예금·CMA 등) — 기록이 없으면 배당만으로 근사된다
     total_financial_income = dividend_income + interest_income
-    comprehensive_tax_warning = total_financial_income >= _COMPREHENSIVE_TAX_THRESHOLD
-    comprehensive_tax_remaining_krw = max(0.0, _COMPREHENSIVE_TAX_THRESHOLD - total_financial_income)
+    comprehensive_tax_warning = total_financial_income >= COMPREHENSIVE_TAX_THRESHOLD_KRW
+    comprehensive_tax_remaining_krw = max(0.0, COMPREHENSIVE_TAX_THRESHOLD_KRW - total_financial_income)
 
     positions = await get_overseas_positions_detail(user_id, db, account_id)
     harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable, rates)
@@ -299,7 +301,7 @@ async def get_overseas_positions_detail(
     subq = latest_snapshot_subquery(user_id=user_id)
     conditions = [
         AssetAccount.is_active == True,
-        AssetAccount.asset_type.in_(_DOMESTIC_STOCK_TYPES),
+        AssetAccount.asset_type.in_(POSITION_STOCK_ASSET_TYPES),
     ]
     if account_id is not None:
         conditions.append(AssetAccount.id == account_id)
@@ -317,7 +319,7 @@ async def get_overseas_positions_detail(
 
     positions: list[dict] = []
     for snap, acc in rows:
-        if acc.tax_type in _TAX_DEFERRED_TYPES:
+        if acc.tax_type in TAX_DEFERRED_TAX_TYPES:
             continue
         for pos in snap.position_items:
             if pos.market not in _OVERSEAS_MARKETS:
@@ -422,7 +424,7 @@ async def _calc_taxable_income_by_type(
         Transaction.user_id == user_id,
         Transaction.transaction_type == transaction_type,
         func.extract("year", Transaction.transaction_date) == year,
-        or_(AssetAccount.tax_type.is_(None), AssetAccount.tax_type.not_in(_TAX_DEFERRED_TYPES)),
+        or_(AssetAccount.tax_type.is_(None), AssetAccount.tax_type.not_in(TAX_DEFERRED_TAX_TYPES)),
     ]
     if account_id is not None:
         conditions.append(Transaction.account_id == account_id)
@@ -449,7 +451,7 @@ async def _calc_stock_unrealized(
     subq = latest_snapshot_subquery(user_id=user_id)
     conditions = [
         AssetAccount.is_active == True,
-        AssetAccount.asset_type.in_(_DOMESTIC_STOCK_TYPES),
+        AssetAccount.asset_type.in_(POSITION_STOCK_ASSET_TYPES),
     ]
     if account_id is not None:
         conditions.append(AssetAccount.id == account_id)
@@ -472,7 +474,7 @@ async def _calc_stock_unrealized(
     tax_deferred_value = 0.0
 
     for snap, acc in rows:
-        is_tax_deferred = acc.tax_type in _TAX_DEFERRED_TYPES
+        is_tax_deferred = acc.tax_type in TAX_DEFERRED_TAX_TYPES
         for pos in snap.position_items:
             market = pos.market
             qty = float(pos.qty or 0)

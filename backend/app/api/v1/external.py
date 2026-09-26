@@ -86,8 +86,8 @@ async def list_account_balances(
         if latest_snap is not None:
             value = latest_snap.amount_krw
             as_of = latest_snap.snapshot_date
-            invested = getattr(latest_snap, "invested_amount", None)
-            pnl = getattr(latest_snap, "unrealized_pnl", None)
+            invested = latest_snap.invested_amount
+            pnl = latest_snap.unrealized_pnl
         else:
             value = account.manual_amount or 0
             as_of = None

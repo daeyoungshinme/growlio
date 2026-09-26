@@ -13,7 +13,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS
+from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, PENSION_TAX_TYPES
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
 from app.services.dividend.constants import is_korean_etf
@@ -50,9 +50,6 @@ OVERSEAS_DEDICATED도 이 맵에 포함하는 이유는 선호 지역 좁히기�
 조건을 추가로 강제하므로(아래 `_apply_index_region_preference` 참고), KRX 상장·해외지수 추종 ETF가
 이 세제유형 후보로 섞여 들어가지는 않는다."""
 
-
-_PENSION_TAX_TYPES: frozenset[str] = frozenset({"PENSION_SAVINGS", "IRP"})
-"""연금저축·IRP — 세법/퇴직급여법상 매수 가능 상품이 제한되는 계좌."""
 
 _KR_ETF_BRAND_PREFIXES: tuple[str, ...] = (
     "KODEX",
@@ -110,7 +107,7 @@ def pension_ineligibility_reason(c: dict[str, str], tax_type_value: str) -> str 
     기반 휴리스틱이라 판별이 불확실하면 보수적으로(=제외) 판단한다 — 추천이 실제로 살 수 없는 종목을
     내놓는 것보다 후보가 줄어드는 편이 안전하다. 합성 현금성 자산 후보(`CASH_EQUIVALENT_MARKET`)는 제외 대상 아님.
     """
-    if tax_type_value not in _PENSION_TAX_TYPES:
+    if tax_type_value not in PENSION_TAX_TYPES:
         return None
     if c["market"].upper() == CASH_EQUIVALENT_MARKET:
         return None

@@ -20,7 +20,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import POSITION_STOCK_ASSET_TYPES
+from app.constants import POSITION_STOCK_ASSET_TYPES, TAX_DEFERRED_TAX_TYPES
 from app.core.cache_store import CacheStore, get_cache_store
 from app.kis.auth import get_access_token
 from app.kis.client import KisTokenExpiredError
@@ -28,7 +28,7 @@ from app.kis.realized import get_overseas_realized_pnl
 from app.models.asset import AssetAccount
 from app.providers._retry import with_token_refresh
 from app.services.credential_service import decrypt_kis_credentials
-from app.services.tax_service import _TAX_DEFERRED_TYPES, get_overseas_positions_detail
+from app.services.tax_service import get_overseas_positions_detail
 from app.utils.cache_keys import (
     TTL_TAX_OVERSEAS_REALIZED,
     get_cached_json,
@@ -145,7 +145,7 @@ async def get_overseas_realized_summary(
     accounts = [
         acc
         for acc in (await db.execute(select(AssetAccount).where(*conditions))).scalars().all()
-        if acc.tax_type not in _TAX_DEFERRED_TYPES
+        if acc.tax_type not in TAX_DEFERRED_TAX_TYPES
     ]
     positions = await get_overseas_positions_detail(user_id, db, account_id)
     holding_account_ids = {p["account_id"] for p in positions}

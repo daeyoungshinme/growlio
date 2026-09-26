@@ -71,7 +71,9 @@ class TestListAccountBalances:
         account = _make_account(user.id)
         db = AsyncMock()
         app = _setup_app(user, db)
-        snapshot = SimpleNamespace(amount_krw=1_234_000.0, snapshot_date=date(2026, 8, 1))
+        snapshot = SimpleNamespace(
+            amount_krw=1_234_000.0, snapshot_date=date(2026, 8, 1), invested_amount=None, unrealized_pnl=None
+        )
 
         with (
             patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[account])),

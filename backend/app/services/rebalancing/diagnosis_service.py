@@ -14,12 +14,12 @@ from typing import Any
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import CASH_EQUIVALENT_TICKER
+from app.constants import CASH_EQUIVALENT_TICKER, TAX_DEFERRED_TAX_TYPES
 from app.models.user import UserSettings
 from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxImpactItem
 from app.services.market_signal_service import get_market_signal
 from app.services.risk_service import get_portfolio_risk_metrics
-from app.services.tax_service import _OVERSEAS_MARKETS, _TAX_DEFERRED_TYPES, estimate_overseas_transfer_tax
+from app.services.tax_service import _OVERSEAS_MARKETS, estimate_overseas_transfer_tax
 from app.utils.cache_keys import CacheStoreType
 
 logger = structlog.get_logger()
@@ -58,7 +58,7 @@ def _aggregate_position_costs(overview: dict) -> dict[tuple[str, str], list[dict
         lots.setdefault(key, []).append(
             {
                 "account_id": p.get("account_id"),
-                "is_tax_deferred": tax_type in _TAX_DEFERRED_TYPES,
+                "is_tax_deferred": tax_type in TAX_DEFERRED_TAX_TYPES,
                 "qty": float(p.get("qty", 0)),
                 "value_krw": float(p.get("value_krw", 0)),
                 "invested_krw": float(p.get("invested_krw", 0)),
