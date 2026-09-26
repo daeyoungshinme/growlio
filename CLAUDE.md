@@ -47,16 +47,16 @@ bash dev.sh         # (또는 make dev)
 ```bash
 make up               # docker compose up -d db
 make down             # docker compose down
-make migrate          # cd backend && alembic upgrade head
-make migrate-down     # cd backend && alembic downgrade -1 (1단계 롤백)
-make install-backend  # cd backend && uv venv && uv pip install -e ".[dev]"
+make migrate          # cd backend && uv run alembic upgrade head
+make migrate-down     # cd backend && uv run alembic downgrade -1 (1단계 롤백)
+make install-backend  # cd backend && uv venv && uv pip install -e ".[dev]" + pre-commit install
 make install-frontend # cd frontend && npm install
 make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh) — Windows Git Bash 전용
 make dev-keep-port    # 위와 동일하되, 8000 포트가 이미 사용 중이면 강제 종료 대신 다음 빈 포트로 백엔드 구동
 make dev-backend      # 백엔드만 (localhost:8000)
 make dev-frontend     # 프론트엔드만 (localhost:5173)
-make test-backend     # cd backend && pytest (커버리지 없이 빠르게)
-make test-backend-cov # cd backend && pytest --cov=app --cov-fail-under=80 (로컬 커버리지 체크)
+make test-backend     # cd backend && uv run pytest (커버리지 없이 빠르게)
+make test-backend-cov # cd backend && uv run pytest --cov=app --cov-fail-under=80 (CI와 동일한 80% 게이트)
 make test-frontend    # cd frontend && npm run test
 make lint             # ruff (backend) + eslint (frontend)
 make typecheck        # mypy (backend) + tsc --noEmit (frontend)

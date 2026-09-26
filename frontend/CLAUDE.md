@@ -130,8 +130,8 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 **데이터 흐름:**
 
 ```
-api/client.ts (axios + JWT interceptor + 401 자동 refresh)
-  └── api/{alerts,assets,auth,backtest,dashboard,dividends,economicIndicators,
+api/client.ts (axios + Supabase access token 첨부 + 401 시 Supabase refreshSession 재시도)
+  └── api/{alerts,assets,auth,backtest,challenges,dashboard,dividends,economicIndicators,
            insights,invest,marketSignals,portfolios,rebalancing,rebalancingPlan,risk,settings,tax,transactions}.ts
         └── React Query useQuery/useMutation   # 자동 refetch (REFETCH_INTERVAL 상수 기준)
               └── Page 컴포넌트
@@ -165,7 +165,7 @@ _자산관리/대시보드_
 - `useStockAccountStats.ts` — 증권 계좌별 평가금액·투자원금·손익·입금액·배당액 통계 집계 (portfolio overview + 거래내역 조인)
 - `usePositionsEditor.ts` — 포지션(종목) 편집 폼 상태 관리
 - `usePortfolioItemsEditor.ts` — 포트폴리오 종목 편집 폼 상태 (종목 검색 연동)
-- `createCredentialVerify.ts` — 브로커 자격증명 "확인" 버튼용 상태 머신(idle→loading→ok/error) 제네릭 팩토리. `useKisCredentialVerify.ts`/`useTossCredentialVerify.ts`는 검증 API 호출부만 클로저로 넘겨 얹은 얇은 래퍼 (`components/assets/CredentialVerifyButton.tsx`가 결과 UI 공용)
+- `createCredentialVerify.ts` — 브로커 자격증명 "확인" 버튼용 상태 머신(idle→loading→ok/error) 제네릭 팩토리. `useKisCredentialVerify.ts`/`useKiwoomCredentialVerify.ts`/`useTossCredentialVerify.ts`는 검증 API 호출부만 클로저로 넘겨 얹은 얇은 래퍼 (`components/assets/CredentialVerifyButton.tsx`가 결과 UI 공용)
 
 _배당_
 
@@ -187,7 +187,7 @@ _리밸런싱/추천_
 
 _알림 토글_ (설정 페이지, `["settings"]` boolean 필드 조회/PUT 패턴)
 
-- `useSettingsToggle.ts` — 조회+뮤테이션+무효화+에러토스트 패턴을 통합한 제네릭 팩토리(`{ field, defaultValue, mutationFn, invalidate }`). 아래 4개 토글 훅이 필드명만 바꿔 얹어 씀. `useCompositeSignalToggle`/`useMarketSignalDigestToggle`은 전용 상태 조회 엔드포인트가 있어 이 팩토리 미사용
+- `useSettingsToggle.ts` — 조회+뮤테이션+무효화+에러토스트 패턴을 통합한 제네릭 팩토리(`{ field, defaultValue, mutationFn, invalidate }`). 아래 토글 훅 대부분이 필드명만 바꿔 얹어 씀. `useCompositeSignalToggle`/`useMarketSignalDigestToggle`은 전용 상태 조회 엔드포인트가 있어 이 팩토리 미사용
 - `useCompositeSignalToggle.ts` — 복합신호(시장/리스크) 등급 전환 시 즉시 알림 on/off. `MarketSignalAlertSection`(설정, 토글) + `MarketSignalBanner`(진단 탭, 읽기 전용) 공용
 - `useMarketSignalDigestToggle.ts` — 시장신호 매일 요약(08:30 KST) on/off. `["settings"]` 쿼리의 `market_signal_daily_digest_enabled` 직접 읽음. `MarketSignalAlertSection` 두 번째 토글
 - `useYearEndTaxReminderToggle.ts` — 연말 절세 리마인더 on/off. `year_end_tax_reminder_enabled` · `PUT /settings/year-end-tax-reminder`. 기본 `false`(옵트인)
@@ -195,6 +195,7 @@ _알림 토글_ (설정 페이지, `["settings"]` boolean 필드 조회/PUT 패�
 - `useMonthlyReportAlertsToggle.ts` — 월간 리포트 이메일 on/off. `monthly_report_enabled` · `PUT /settings/monthly-report-alerts`. 기본 `true`
 - `useRecommendationDriftAlertToggle.ts` — "추천 비중이 달라졌어요" 알림 on/off. `recommendation_drift_alert_enabled` · `PUT /settings/recommendation-drift-alert`. 기본 `false`(옵트인)
 - `useChallengeRemindersToggle.ts` — 적립 챌린지 독려(매월 25일)·월간 결산(매월 1일) 알림 on/off. `challenge_reminders_enabled` · `PUT /settings/challenge-reminders`. 기본 `false`(옵트인)
+- `useAutoRebalancingDailyCap.ts` — AUTO 리밸런싱 하루 거래대금 상한 조회/저장(`auto_rebalancing_daily_value_cap_krw` · `PUT /settings/auto-rebalancing-daily-cap`, null=무제한). 토글이 아닌 금액 입력이지만 같은 `["settings"]` 패턴
 
 _모바일/네이티브 (Capacitor)_
 
@@ -216,7 +217,7 @@ _기타_
 - `queryConfig.ts` — `STALE_TIME`, `REFETCH_INTERVAL` 상수. 매직 넘버 대신 이 상수 사용
 - `defaults.ts` — 백테스트 기본 날짜 상수 (`BACKTEST_DEFAULT_START_DATE` 등)
 - `tabs.ts` — 탭 배열 + 타입: `ASSETS_TOP_TABS`("투자현황"/"계좌관리", AssetsPage 상위 탭), `ASSET_MANAGEMENT_TABS`("은행계좌"/"증권계좌"/"부동산"/"입출금·배당", 계좌관리 내부 탭), `PORTFOLIO_TABS`
-- `transaction.ts` — 거래 유형 한국어 레이블 맵 (`TX_LABELS`: DEPOSIT/WITHDRAWAL/DIVIDEND)
+- `transaction.ts` — 거래 유형 상수 (`TX_TYPES`, `TX_LABELS`/`TX_COLORS`: DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST)
 - `validation.ts` — 포트폴리오 비중 허용 오차 (`PORTFOLIO_WEIGHT_TOLERANCE`)
 - `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`, `TAX_IMPACT_GATE_OPTIONS` — AUTO 모드 세금영향 게이트 on/off, `AlertAutoModeSection.tsx`가 소비)
 - `uiSizes.ts` — 모바일 터치 타겟 상수 (`TOUCH_TARGET_MIN`: `min-h-[44px] min-w-[44px]` + 가운데 정렬, `TOUCH_TARGET_MIN_MOBILE_ONLY`: 모바일에서만 44px 적용하고 `sm:` 이상에서 축소하는 변형, `TOUCH_TARGET_ROW`: 아이콘+레이블이 좌측 정렬인 메뉴 로우/링크용 변형(`justify-start`), `TOUCH_TARGET_COMPACT_MOBILE_ONLY`: 배지/탭/필터 칩처럼 조밀하게 나열되는 보조 요소용 절충 터치 타겟(36px, 모바일 전용). 인터랙티브 요소(버튼/입력 등)에 인라인 `min-h-[44px] min-w-[44px]` 재정의 금지, 이 상수들 사용
@@ -233,7 +234,7 @@ _기타_
 
 **Zod 스키마 (`src/schemas/`):**
 
-- `assets.ts`, `auth.ts`, `portfolios.ts`, `transaction.ts` — 폼 입력값 런타임 유효성 검사 (Zod). 새 폼 추가 시 이 디렉토리에 스키마 파일 추가.
+- `assets.ts`, `auth.ts`, `challenge.ts`, `portfolios.ts`, `transaction.ts` — 폼 입력값 런타임 유효성 검사 (Zod). 새 폼 추가 시 이 디렉토리에 스키마 파일 추가.
 
 **테스트 위치 (Vitest):**
 
@@ -251,11 +252,9 @@ _기타_
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시 — 포트폴리오 페이지는 주식 계좌 전용 뷰이므로 의도된 동작.
 
-**`src/lib/supabase.ts`** — `getSupabase()`(async 함수)를 통해 Supabase 클라이언트를 지연 초기화한다(env vars 필요). `@supabase/supabase-js`(약 200KB)를 top-level import하면 이 파일을 참조하는 모든 부팅 경로(authStore/api client)가 실제 렌더 전에 파싱·실행을 먼저 기다려야 해 모바일 저사양 기기에서 체감 로딩 지연을 유발했다 — 그래서 `await import("@supabase/supabase-js")`로 동적 로드하고 클라이언트를 메모이즈한다. 모든 소비 코드(`authStore.ts`, `api/client.ts`, `AuthCallbackPage.tsx` 등)는 `const supabase = await getSupabase();` 형태로 사용 — 동기 `supabase` export는 없음. 직접 확장 금지 — API 인증은 백엔드 JWT 담당. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장됨 — httpOnly 쿠키 전환은 Capacitor WebView SameSite 제약으로 보류, CSP + 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제로 경계강화만 적용(결정기록: `docs/plans/28-localstorage-token-decision.md`).
+**`src/lib/supabase.ts`** — `getSupabase()`(async 함수)를 통해 Supabase 클라이언트를 지연 초기화한다(env vars 필요). `@supabase/supabase-js`(약 200KB)를 top-level import하면 이 파일을 참조하는 모든 부팅 경로(authStore/api client)가 실제 렌더 전에 파싱·실행을 먼저 기다려야 해 모바일 저사양 기기에서 체감 로딩 지연을 유발했다 — 그래서 `await import("@supabase/supabase-js")`로 동적 로드하고 클라이언트를 메모이즈한다. 모든 소비 코드(`authStore.ts`, `api/client.ts`, `AuthCallbackPage.tsx` 등)는 `const supabase = await getSupabase();` 형태로 사용 — 동기 `supabase` export는 없음. 직접 확장 금지 — 토큰 첨부·갱신은 `api/client.ts` 인터셉터 소관. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장됨 — httpOnly 쿠키 전환은 Capacitor WebView SameSite 제약으로 보류, CSP + 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제로 경계강화만 적용(결정기록: `docs/plans/28-localstorage-token-decision.md`).
 
-> **인증 구조:** Supabase는 이메일 인증·OAuth 콜백(리다이렉트 URL) 처리에만 사용됨. 실제 API 인증은 백엔드(`auth.py`)가 발급한 JWT Bearer 토큰 사용. `api/client.ts`의 Axios 인터셉터가 토큰 관리. Supabase Session과 백엔드 JWT는 별개이므로 혼용 금지.
-
-> 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
+> **인증 구조:** 로그인·회원가입·토큰 갱신은 전부 Supabase Auth가 담당하고, 백엔드는 토큰을 발급하지 않는다. `api/client.ts`의 Axios 인터셉터가 Supabase 세션의 `access_token`을 `Authorization: Bearer`로 첨부하고(모듈 레벨 캐시), 401이면 `supabase.auth.refreshSession()` 후 대기 큐의 요청을 재시도, 갱신 실패 시 로그아웃. 백엔드는 이 토큰을 Supabase JWKS로 검증만 한다(`backend/app/services/auth_service.py`). 별도의 "백엔드 JWT"는 없다.
 
 **상태 관리 원칙:** 서버에서 오는 데이터 → React Query. 순수 클라이언트 전역 상태 → Zustand.
 
@@ -417,6 +416,14 @@ _기타_
 
 - `buildMetrics(m)` — `PortfolioRiskMetrics`를 `RiskMetricsCard` 표시용 `MetricConfig[]`로 변환.
 - `summarizeRiskLevel(...)` — 리스크 레벨(`RiskLevel`: low/medium/high) 판정 + `LEVEL_BADGE` 색상 매핑. `RiskMetricsCard.tsx`가 소비.
+
+**기타 계산 유틸 (`src/utils/`)** — 백엔드 공식을 포팅한 것은 양쪽을 함께 수정할 것
+
+- `dcaScenarioProjection.ts` — DCA 시나리오 비교 곡선. 백엔드 `dca_service.py`의 `_build_projection_curve()` 공식 포팅.
+- `savingsProjection.ts` — 계획탭 절약 복리 시뮬레이터(월복리 연금 미래가치).
+- `goalFeasibility.ts` — `classifyGoalFeasibility(requiredReturnPct)`: 필요 수익률을 달성 가능성 구간(밴드)으로 분류. `GoalSettingWizard` 사용.
+- `dcaAutoBuy.ts` — `isDcaAutoBuyPreset(alert)`: AUTO·매월·SCHEDULE_ONLY·BUY_ONLY 조합이면 "정기 적립식 자동매수"로 표시 판정.
+- `notificationAlertGroups.ts` — 알림 설정 페이지의 필드 그룹(`REPORT_ALERT_FIELDS`/`INSTANT_ALERT_FIELDS`).
 
 **배당 유틸리티 (`src/utils/dividendUtils.ts`)**
 
