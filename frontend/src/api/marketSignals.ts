@@ -4,10 +4,7 @@ export type MarketRiskLevel = "GREEN" | "YELLOW" | "RED";
 export type VixLevel = "LOW" | "MEDIUM" | "MEDIUM_HIGH" | "HIGH";
 export type YieldCurveState = "POSITIVE" | "FLAT" | "INVERTED" | "DEEPLY_INVERTED";
 export type RateCutExpectationLevel =
-  | "NEUTRAL"
-  | "MILD_CUT_EXPECTED"
-  | "CUT_EXPECTED"
-  | "DEEP_CUT_EXPECTED";
+  "NEUTRAL" | "MILD_CUT_EXPECTED" | "CUT_EXPECTED" | "DEEP_CUT_EXPECTED";
 
 export interface VixSignal {
   value: number;

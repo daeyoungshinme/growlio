@@ -20,9 +20,9 @@ export function useDividendData(enabled: boolean, accountId?: string | null) {
     queryKey: QUERY_KEYS.dividendPositions(accountId),
     queryFn: () =>
       api
-        .get<
-          DividendYield[]
-        >("/dividends/positions", { params: { account_id: accountId || undefined } })
+        .get<DividendYield[]>("/dividends/positions", {
+          params: { account_id: accountId || undefined },
+        })
         .then((r) => r.data),
     staleTime: STALE_TIME.LONG,
     enabled,
@@ -52,9 +52,9 @@ export function useDividendData(enabled: boolean, accountId?: string | null) {
     queryKey: QUERY_KEYS.dividendByTicker(accountId),
     queryFn: () =>
       api
-        .get<
-          DividendByTicker[]
-        >("/dividends/by-ticker", { params: { account_id: accountId || undefined } })
+        .get<DividendByTicker[]>("/dividends/by-ticker", {
+          params: { account_id: accountId || undefined },
+        })
         .then((r) => r.data),
     staleTime: STALE_TIME.LONG,
     enabled,

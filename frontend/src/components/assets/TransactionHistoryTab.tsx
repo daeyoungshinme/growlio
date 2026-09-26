@@ -12,9 +12,9 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { invalidateAccountData, invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { STOCK_TYPES } from "@/constants";
-import { TX_LABELS, TX_COLORS, type TxType } from "@/constants/transaction";
+import { TX_LABELS, TX_COLORS, TX_TYPES, type TxType } from "@/constants/transaction";
 import { INPUT_SM } from "@/constants/inputStyles";
-import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { extractErrorMessage } from "@/utils/error";
 
 const currentYear = new Date().getFullYear();
@@ -24,13 +24,11 @@ interface Props {
   accounts: AssetAccount[];
 }
 
-const TYPE_FILTER_OPTIONS = [
+// 거래 유형은 TX_TYPES/TX_LABELS 단일 출처 — 유형 추가 시 필터 칩이 자동으로 따라간다
+const TYPE_FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "전체" },
-  { value: "DEPOSIT", label: "입금" },
-  { value: "WITHDRAWAL", label: "출금" },
-  { value: "DIVIDEND", label: "배당" },
-  { value: "INTEREST", label: "이자" },
-] as const;
+  ...TX_TYPES.map((t) => ({ value: t, label: TX_LABELS[t] })),
+];
 
 export default function TransactionHistoryTab({ accounts }: Props) {
   const qc = useQueryClient();
@@ -93,6 +91,10 @@ export default function TransactionHistoryTab({ accounts }: Props) {
     () => txList.filter((t) => t.transaction_type === "DIVIDEND").reduce((s, t) => s + t.amount, 0),
     [txList],
   );
+  const yearInterest = useMemo(
+    () => txList.filter((t) => t.transaction_type === "INTEREST").reduce((s, t) => s + t.amount, 0),
+    [txList],
+  );
 
   const filtered = useMemo(
     () =>
@@ -142,6 +144,11 @@ export default function TransactionHistoryTab({ accounts }: Props) {
           <p className="text-xl font-bold text-green-600 dark:text-green-400">
             {fmtKrw(yearDividend)}
           </p>
+          {yearInterest > 0 && (
+            <p className="mt-0.5 text-xs text-teal-600 dark:text-teal-400">
+              이자 {fmtKrw(yearInterest)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -181,7 +188,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
               type="button"
               onClick={() => setFilterType(o.value)}
               aria-pressed={filterType === o.value}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 filterType === o.value
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"

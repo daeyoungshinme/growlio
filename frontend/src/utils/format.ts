@@ -81,6 +81,23 @@ export function fmtMonth(monthStr: string): string {
 }
 
 /**
+ * 백엔드 날짜 문자열 "YYYY-MM-DD"를 숫자로 분해한다. `new Date("YYYY-MM-DD")`는 UTC 자정으로 해석돼
+ * KST 외 타임존에서 하루 밀릴 수 있으므로, 로컬 날짜가 필요하면 이 값으로 `new Date(y, m - 1, d)`를 만든다.
+ */
+export function parseYmd(dateStr: string): { year: number; month: number; day: number } {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return { year, month, day };
+}
+
+/** "YYYY-MM-DD"까지 로컬 자정 기준 남은 일수 (지났으면 음수) */
+export function daysUntilYmd(dateStr: string): number {
+  const { year, month, day } = parseYmd(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((new Date(year, month - 1, day).getTime() - today.getTime()) / 86_400_000);
+}
+
+/**
  * 퍼센트 포맷 (양수는 "+" 접두사 포함)
  * 예: 5.23 → "+5.23%", -3.1 → "-3.10%"
  */

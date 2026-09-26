@@ -1,6 +1,6 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 import type { InflationIndicatorSummary } from "@/api/economicIndicators";
-import { fmtPct } from "@/utils/format";
+import { fmtPct, parseYmd } from "@/utils/format";
 
 interface Props {
   data: InflationIndicatorSummary[];
@@ -8,7 +8,7 @@ interface Props {
 
 function formatReleaseDate(dateStr: string | null): string {
   if (!dateStr) return "발표일 미정";
-  const [, month, day] = dateStr.split("-").map(Number);
+  const { month, day } = parseYmd(dateStr);
   return `${month}월 ${day}일 발표 예정`;
 }
 

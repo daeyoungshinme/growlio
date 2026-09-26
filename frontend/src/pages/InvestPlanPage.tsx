@@ -261,7 +261,7 @@ export default function InvestPlanPage() {
                 <button
                   type="button"
                   onClick={() => setShowAllStats((v) => !v)}
-                  className="sm:hidden mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400"
+                  className="sm:hidden mt-3 min-h-[44px] flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400"
                 >
                   {showAllStats ? (
                     <>

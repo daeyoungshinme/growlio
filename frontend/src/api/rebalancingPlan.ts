@@ -12,12 +12,7 @@ export interface RebalancingPlanItemOut {
 }
 
 export type RebalancingPlanLegStatus =
-  | "PENDING"
-  | "EXECUTED"
-  | "CANCELED"
-  | "REJECTED"
-  | "EXPIRED"
-  | "FAILED";
+  "PENDING" | "EXECUTED" | "CANCELED" | "REJECTED" | "EXPIRED" | "FAILED";
 
 export interface RebalancingPlanLegSummary {
   plan_id: string;
