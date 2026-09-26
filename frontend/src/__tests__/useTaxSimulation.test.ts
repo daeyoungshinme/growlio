@@ -169,3 +169,28 @@ describe("useTaxSimulation", () => {
     expect(result.current.simTaxDiff).toBe(550000 - 0);
   });
 });
+
+describe("useTaxSimulation — 증권사 자동 집계 실현손익(E6)", () => {
+  it("입력 전에는 자동값을 쓰고 공제 잔여를 계산한다", () => {
+    const { result } = renderHook(() => useTaxSimulation([], 2_000_000));
+    expect(result.current.isManualRealized).toBe(false);
+    expect(result.current.alreadyRealized).toBe(2_000_000);
+    expect(result.current.remainingDeduction).toBe(TAX_DEDUCTION - 2_000_000);
+  });
+
+  it("직접 입력하면 자동값 대신 입력값을 쓴다", () => {
+    const { result } = renderHook(() => useTaxSimulation([], 2_000_000));
+    act(() => result.current.setAlreadyRealizedInput("3,000,000"));
+    expect(result.current.isManualRealized).toBe(true);
+    expect(result.current.alreadyRealized).toBe(3_000_000);
+    expect(result.current.currentTax).toBe(Math.round(500_000 * TAX_RATE));
+  });
+
+  it("입력을 지우면 다시 자동값으로 돌아간다", () => {
+    const { result } = renderHook(() => useTaxSimulation([], -1_000_000));
+    act(() => result.current.setAlreadyRealizedInput("5"));
+    act(() => result.current.setAlreadyRealizedInput(""));
+    expect(result.current.alreadyRealized).toBe(-1_000_000);
+    expect(result.current.remainingDeduction).toBe(TAX_DEDUCTION + 1_000_000);
+  });
+});

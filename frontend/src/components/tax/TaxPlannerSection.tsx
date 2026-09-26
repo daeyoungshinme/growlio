@@ -1,5 +1,5 @@
-import { Info, TrendingUp, TrendingDown, Lightbulb } from "lucide-react";
-import type { OverseasPositionDetail } from "@/api/tax";
+import { BadgeCheck, Info, TrendingUp, TrendingDown, Lightbulb, TriangleAlert } from "lucide-react";
+import type { OverseasPositionDetail, OverseasRealizedSummary } from "@/api/tax";
 import { fmtKrw } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { useTaxSimulation, TAX_DEDUCTION } from "@/hooks/useTaxSimulation";
@@ -9,14 +9,18 @@ import { TaxRecommendationList } from "./TaxRecommendationList";
 
 interface Props {
   positions: OverseasPositionDetail[];
+  /** 증권사 체결 기준 올해 실현손익 자동 집계(E6) — 없거나 자동 집계 계좌가 없으면 수기 입력만 */
+  realized?: OverseasRealizedSummary | null;
 }
 
-export default function TaxPlannerSection({ positions }: Props) {
+export default function TaxPlannerSection({ positions, realized }: Props) {
+  const autoRealized = realized?.realized_gain_krw ?? null;
   const {
     alreadyRealizedInput,
     setAlreadyRealizedInput,
     sellQtyMap,
     alreadyRealized,
+    isManualRealized,
     profitPositions,
     lossPositions,
     totalLoss,
@@ -31,7 +35,7 @@ export default function TaxPlannerSection({ positions }: Props) {
     simTaxDiff,
     recommendations,
     handleQtyChange,
-  } = useTaxSimulation(positions);
+  } = useTaxSimulation(positions, autoRealized);
 
   if (positions.length === 0) {
     return (
@@ -63,27 +67,63 @@ export default function TaxPlannerSection({ positions }: Props) {
           </p>
         </div>
 
-        <div className="flex items-start gap-2">
-          <Info size={13} className="text-gray-400 mt-0.5 shrink-0" />
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            올해 이미 해외 주식을 매도해 실현한 손익이 있다면 입력하세요 (양도차익만, 배당금 제외).
-            없으면 0.
-          </p>
-        </div>
+        {autoRealized !== null && realized ? (
+          <div className="space-y-1.5" data-testid="auto-realized">
+            <div className="flex items-start gap-2">
+              <BadgeCheck size={13} className="text-emerald-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-gray-600 dark:text-gray-300">
+                증권사 체결 기준 올해 실현 손익{" "}
+                <span className={`font-semibold ${pnlColor(autoRealized)}`}>
+                  {fmtKrw(autoRealized)}
+                </span>
+                을 자동으로 불러왔어요 (
+                {realized.covered_accounts.map((a) => a.account_name).join(", ")}, {realized.as_of}{" "}
+                기준).
+              </p>
+            </div>
+            {realized.uncovered_accounts.length > 0 && (
+              <div className="flex items-start gap-2">
+                <TriangleAlert size={13} className="text-amber-500 mt-0.5 shrink-0" />
+                <div className="text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
+                  <p>아래 계좌의 실현 손익은 빠져 있어요 — 있다면 합계를 직접 입력하세요.</p>
+                  <ul className="list-disc pl-4">
+                    {realized.uncovered_accounts.map((a) => (
+                      <li key={a.account_id}>
+                        {a.account_name}: {a.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-start gap-2">
+            <Info size={13} className="text-gray-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              올해 이미 해외 주식을 매도해 실현한 손익이 있다면 입력하세요 (양도차익만, 배당금
+              제외). 없으면 0. 한국투자증권(KIS) 실전 계좌는 자동으로 불러와요.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-400 shrink-0">
-            올해 실현 손익 (원)
+          <label
+            htmlFor="tax-planner-realized"
+            className="text-xs font-medium text-gray-600 dark:text-gray-400 shrink-0"
+          >
+            {autoRealized !== null ? "직접 입력 (자동값 대신)" : "올해 실현 손익 (원)"}
           </label>
           <input
+            id="tax-planner-realized"
             type="text"
             inputMode="numeric"
             value={alreadyRealizedInput}
             onChange={(e) => setAlreadyRealizedInput(e.target.value)}
-            placeholder="0"
-            className="w-36 min-w-0 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder={autoRealized !== null ? String(Math.round(autoRealized)) : "0"}
+            className="w-36 min-w-0 min-h-[44px] border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          {alreadyRealized !== 0 && (
+          {isManualRealized && alreadyRealized !== 0 && (
             <span className={`text-xs font-medium ${pnlColor(alreadyRealized)}`}>
               {fmtKrw(alreadyRealized)}
             </span>

@@ -4,11 +4,9 @@ import { useForm } from "@/hooks/useForm";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import type { Transaction, TransactionCreate } from "@/api/transactions";
 import { convertUsdToKrw } from "@/utils/format";
+import { TX_TYPES, type TxType } from "@/constants/transaction";
 
-const VALID_TX_TYPES = ["DEPOSIT", "WITHDRAWAL", "DIVIDEND"] as const;
-type TxType = (typeof VALID_TX_TYPES)[number];
-
-const isValidTxType = (val: unknown): val is TxType => VALID_TX_TYPES.includes(val as TxType);
+const isValidTxType = (val: unknown): val is TxType => TX_TYPES.includes(val as TxType);
 
 const makeEmptyForm = (accountId: string): TransactionCreate => ({
   account_id: accountId,

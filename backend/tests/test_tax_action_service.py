@@ -139,6 +139,43 @@ class TestBuildOverseasGainHarvestAction:
     def test_none_without_gains(self):
         assert build_overseas_gain_harvest_action([{"unrealized_pnl_krw": -5}], 2_500_000, 0.22, TODAY) is None
 
+    def test_realized_gain_shrinks_room(self):
+        """E6: 올해 이미 200만 실현 → 남은 공제 50만까지만 제안, 실현손익 반영 문구."""
+        action = build_overseas_gain_harvest_action(
+            [{"unrealized_pnl_krw": 4_000_000}], 2_500_000, 0.22, TODAY, realized_krw=2_000_000
+        )
+        assert action is not None
+        assert action["amount_krw"] == 500_000
+        assert "실현손익 2,000,000원을 반영" in action["detail"]
+        assert "0 가정" not in action["detail"]
+
+    def test_realized_loss_expands_room(self):
+        action = build_overseas_gain_harvest_action(
+            [{"unrealized_pnl_krw": 4_000_000}], 2_500_000, 0.22, TODAY, realized_krw=-1_000_000
+        )
+        assert action is not None
+        assert action["amount_krw"] == 3_500_000
+
+    def test_none_when_deduction_used_up(self):
+        assert (
+            build_overseas_gain_harvest_action(
+                [{"unrealized_pnl_krw": 4_000_000}], 2_500_000, 0.22, TODAY, realized_krw=3_000_000
+            )
+            is None
+        )
+
+    def test_partial_coverage_note(self):
+        action = build_overseas_gain_harvest_action(
+            [{"unrealized_pnl_krw": 1_000_000}], 2_500_000, 0.22, TODAY, realized_krw=0, realized_partial=True
+        )
+        assert action is not None
+        assert "자동 집계가 안 되는 계좌" in action["detail"]
+
+    def test_unknown_realized_assumes_zero(self):
+        action = build_overseas_gain_harvest_action([{"unrealized_pnl_krw": 1_000_000}], 2_500_000, 0.22, TODAY)
+        assert action is not None
+        assert "0 가정" in action["detail"]
+
 
 class TestBuildLossHarvestActions:
     def test_top3(self):
@@ -175,6 +212,28 @@ class TestBuildFinancialIncomeAction:
         assert action is not None
         assert action["amount_krw"] is None
         assert "대상 가능성" in action["title"]
+
+    def test_interest_counts_toward_watch_line(self):
+        """E7: 배당만으론 경고선 미만이어도 이자를 합친 금융소득이 넘으면 액션 생성, 내역 표시."""
+        action = build_financial_income_action(
+            {
+                "dividend_income_krw": 10_000_000,
+                "interest_income_krw": 6_000_000,
+                "financial_income_krw": 16_000_000,
+                "comprehensive_tax_remaining_krw": 4_000_000,
+            },
+            TODAY,
+        )
+        assert action is not None
+        assert "배당 10,000,000원 + 이자 6,000,000원" in action["detail"]
+        assert "이자 내역을 기록" not in action["detail"]
+
+    def test_hints_to_record_interest_when_none(self):
+        action = build_financial_income_action(
+            {"dividend_income_krw": 16_000_000, "comprehensive_tax_remaining_krw": 4_000_000}, TODAY
+        )
+        assert action is not None
+        assert "이자 내역을 기록" in action["detail"]
 
 
 class TestPriorityAndSort:
@@ -216,7 +275,25 @@ _TAX_SUMMARY = {
 }
 
 
+_NO_REALIZED = {
+    "year": 2026,
+    "realized_gain_krw": None,
+    "source": "NONE",
+    "covered_accounts": [],
+    "uncovered_accounts": [],
+    "as_of": "2026-09-26",
+}
+
+
 class TestGetTaxActionPlan:
+    @pytest.fixture(autouse=True)
+    def realized_mock(self):
+        with patch(
+            "app.services.tax_action_service.get_overseas_realized_summary",
+            new=AsyncMock(return_value=_NO_REALIZED),
+        ) as m:
+            yield m
+
     @pytest.mark.asyncio
     async def test_combines_services_and_skips_absent_account_types(self, mock_db):
         """ISA 계좌가 없으면 ISA 서비스를 호출하지 않고, 연금 액션은 저장된 소득 구간 공제율을 쓴다."""
@@ -247,6 +324,25 @@ class TestGetTaxActionPlan:
         assert plan["income_bracket"] == "UNDER_55M"
         assert [a["category"] for a in plan["actions"]] == ["PENSION_DEDUCTION", "OVERSEAS_GAIN_HARVEST"]
         assert plan["actions"][0]["benefit_krw"] == 330_000  # 200만 × 16.5%
+
+    @pytest.mark.asyncio
+    async def test_passes_broker_realized_gain_to_summary_and_a4(self, mock_db, realized_mock):
+        """E6: 실현손익이 세금 요약과 A4에 전달된다 — 공제를 다 쓴 경우 A4가 빠진다."""
+        realized_mock.return_value = {**_NO_REALIZED, "realized_gain_krw": 2_600_000, "source": "BROKER"}
+        mock_db.execute = AsyncMock(side_effect=[_result(scalar=None), _result(rows=[("GENERAL",)])])
+        summary_mock = AsyncMock(return_value=_TAX_SUMMARY)
+        with (
+            patch("app.services.tax_action_service.today_kst", return_value=TODAY),
+            patch("app.services.tax_action_service.get_tax_summary", new=summary_mock),
+            patch(
+                "app.services.tax_action_service.get_overseas_positions_detail",
+                new=AsyncMock(return_value=[{"unrealized_pnl_krw": 1_000_000}]),
+            ),
+        ):
+            plan = await get_tax_action_plan(uuid.uuid4(), 2026, mock_db)
+
+        assert summary_mock.call_args.kwargs["overseas_realized_krw"] == 2_600_000
+        assert plan["actions"] == []
 
     @pytest.mark.asyncio
     async def test_empty_when_nothing_actionable(self, mock_db):

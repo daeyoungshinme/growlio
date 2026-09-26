@@ -1,9 +1,10 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "./client";
+import type { TxType } from "@/constants/transaction";
 
 export interface Transaction {
   id: string;
   account_id: string | null;
-  transaction_type: "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND";
+  transaction_type: TxType;
   amount: number;
   fee: number | null;
   transaction_date: string;
@@ -14,7 +15,7 @@ export interface Transaction {
 
 export interface TransactionCreate {
   account_id?: string;
-  transaction_type: "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND";
+  transaction_type: TxType;
   amount: number;
   fee?: number;
   transaction_date: string;

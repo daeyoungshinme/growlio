@@ -12,6 +12,7 @@ export function invalidateSyncData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPositionsBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasPositionsTaxBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasRealizedBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
@@ -34,6 +35,7 @@ export function invalidateAccountData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPositionsBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasPositionsTaxBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasRealizedBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
   ]);

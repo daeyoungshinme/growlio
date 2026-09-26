@@ -48,6 +48,12 @@ const emptyTaxSummary: TaxSummary = {
   year: 2026,
   dividend_income_krw: 0,
   dividend_tax_krw: 0,
+  interest_income_krw: 0,
+  interest_tax_krw: 0,
+  financial_income_krw: 0,
+  overseas_realized_gain_krw: null,
+  overseas_tax_free_room_krw: null,
+  overseas_realized_tax_krw: null,
   overseas_unrealized_gain_krw: 0,
   overseas_gain_deduction_krw: 0,
   overseas_tax_estimated_krw: 0,
@@ -70,7 +76,7 @@ const emptyTaxSummary: TaxSummary = {
     note: "참고용 추정치입니다.",
   },
   note: "",
-  rates: { dividend_tax_rate_pct: 15.4, overseas_tax_rate_pct: 22 },
+  rates: { dividend_tax_rate_pct: 15.4, interest_tax_rate_pct: 15.4, overseas_tax_rate_pct: 22 },
 };
 
 describe("TaxLimitsSection", () => {

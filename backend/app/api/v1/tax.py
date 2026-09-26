@@ -10,6 +10,7 @@ from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
 from app.services.isa_service import get_isa_status_summary
+from app.services.overseas_realized_service import get_overseas_realized_summary
 from app.services.pension_contribution_service import calc_pension_contribution_status
 from app.services.tax_action_service import get_tax_action_plan
 from app.services.tax_service import get_overseas_positions_detail, get_tax_summary
@@ -47,12 +48,44 @@ async def tax_summary(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """연도별 세금 추정 요약. account_id 미지정 시 전체 계좌 통합 기준."""
+    """연도별 세금 추정 요약. account_id 미지정 시 전체 계좌 통합 기준.
+
+    해외 양도세 추정에는 증권사 체결 기준 올해 실현손익(KIS 실전 계좌)을 합산한다 — 미지원 계좌는 0으로 본다.
+    """
     current_year = today_kst().year
     target_year = year if year is not None else current_year
     if target_year < 2000 or target_year > current_year + 1:
         raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
-    return await get_tax_summary(current_user.id, target_year, db, uuid.UUID(account_id) if account_id else None)
+    acct_uuid = uuid.UUID(account_id) if account_id else None
+    realized_krw: float | None = None
+    if target_year <= current_year:
+        realized = await get_overseas_realized_summary(current_user.id, target_year, db, acct_uuid)
+        realized_krw = realized["realized_gain_krw"]
+    return await get_tax_summary(current_user.id, target_year, db, acct_uuid, overseas_realized_krw=realized_krw)
+
+
+@router.get("/overseas-realized")
+@limiter.limit("20/minute")
+async def overseas_realized(
+    request: Request,
+    year: int | None = None,
+    account_id: str | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """해외주식 올해 실현손익(증권사 체결 기준 자동 집계) — 250만원 공제 잔여 계산용.
+
+    KIS 실전 계좌만 자동 집계되고, 해외 종목을 보유한 키움·토스·수기·모의 계좌는 `uncovered_accounts`로 반환한다.
+    """
+    current_year = today_kst().year
+    target_year = year if year is not None else current_year
+    if target_year < 2000 or target_year > current_year:
+        raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
+    return dict(
+        await get_overseas_realized_summary(
+            current_user.id, target_year, db, uuid.UUID(account_id) if account_id else None
+        )
+    )
 
 
 @router.get("/isa-status")

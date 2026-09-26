@@ -43,6 +43,9 @@ export const QUERY_KEYS = {
   overseasPositionsTaxBase: ["overseas-positions-tax"] as const,
   overseasPositionsTax: (accountId?: string | null) =>
     ["overseas-positions-tax", accountId ?? "all"] as const,
+  overseasRealizedBase: ["overseas-realized"] as const,
+  overseasRealized: (year: number, accountId?: string | null) =>
+    ["overseas-realized", year, accountId ?? "all"] as const,
   isaStatus: ["isa-status"] as const,
   pensionContributionBase: ["pension-contribution"] as const,
   pensionContribution: (year: number) => ["pension-contribution", year] as const,

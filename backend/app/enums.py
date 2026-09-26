@@ -27,6 +27,9 @@ class TransactionType(StrEnum):
     DEPOSIT = "DEPOSIT"
     WITHDRAWAL = "WITHDRAWAL"
     DIVIDEND = "DIVIDEND"
+    # 예금·적금·CMA·발행어음 등 이자 수령 — 금융소득 종합과세(2,000만) 판정용.
+    # 입출금 흐름(수익률 계산)에는 포함되지 않는다
+    INTEREST = "INTEREST"
 
 
 class PortfolioBaseType(StrEnum):

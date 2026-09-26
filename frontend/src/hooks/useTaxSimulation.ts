@@ -12,14 +12,22 @@ function calcTax(realizedGain: number): number {
   return Math.round(Math.max(0, realizedGain - TAX_DEDUCTION) * TAX_RATE);
 }
 
-export function useTaxSimulation(positions: OverseasPositionDetail[]) {
+/**
+ * @param autoRealized 증권사 체결 기준 자동 집계된 올해 실현손익(없으면 null) — 사용자가 직접 입력하기 전까지 기본값
+ */
+export function useTaxSimulation(
+  positions: OverseasPositionDetail[],
+  autoRealized: number | null = null,
+) {
   const [alreadyRealizedInput, setAlreadyRealizedInput] = useState("");
   const [sellQtyMap, setSellQtyMap] = useState<Record<string, number>>({});
 
+  const isManualRealized = alreadyRealizedInput.trim() !== "";
   const alreadyRealized = useMemo(() => {
+    if (!isManualRealized) return autoRealized ?? 0;
     const v = parseFloat(alreadyRealizedInput.replace(/,/g, ""));
     return isNaN(v) ? 0 : v;
-  }, [alreadyRealizedInput]);
+  }, [alreadyRealizedInput, isManualRealized, autoRealized]);
 
   const profitPositions = useMemo(
     () =>
@@ -102,6 +110,7 @@ export function useTaxSimulation(positions: OverseasPositionDetail[]) {
     setAlreadyRealizedInput,
     sellQtyMap,
     alreadyRealized,
+    isManualRealized,
     profitPositions,
     lossPositions,
     totalLoss,

@@ -12,7 +12,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { invalidateAccountData, invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { STOCK_TYPES } from "@/constants";
-import { TX_LABELS, TX_COLORS } from "@/constants/transaction";
+import { TX_LABELS, TX_COLORS, type TxType } from "@/constants/transaction";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { extractErrorMessage } from "@/utils/error";
@@ -29,6 +29,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: "DEPOSIT", label: "입금" },
   { value: "WITHDRAWAL", label: "출금" },
   { value: "DIVIDEND", label: "배당" },
+  { value: "INTEREST", label: "이자" },
 ] as const;
 
 export default function TransactionHistoryTab({ accounts }: Props) {
@@ -41,7 +42,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
   const [depositPrompt, setDepositPrompt] = useState<{
     accountId: string;
     amount: number;
-    txType: "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND";
+    txType: TxType;
     currentDeposit: number;
   } | null>(null);
 
@@ -63,7 +64,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
     setDepositPrompt({
       accountId: accId,
       amount: amt,
-      txType: txType as "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND",
+      txType: txType as TxType,
       currentDeposit: acc.deposit_krw ?? 0,
     });
   };
@@ -173,7 +174,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
             ))}
           </select>
         </div>
-        <div className="flex gap-1.5" role="group" aria-label="유형 필터">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="유형 필터">
           {TYPE_FILTER_OPTIONS.map((o) => (
             <button
               key={o.value}

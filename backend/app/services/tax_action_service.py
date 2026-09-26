@@ -25,6 +25,7 @@ from app.services.isa_service import (
     calc_isa_contribution_status,
     get_isa_status_summary,
 )
+from app.services.overseas_realized_service import get_overseas_realized_summary
 from app.services.pension_contribution_service import PensionContributionStatus, calc_pension_contribution_status
 from app.services.tax_service import get_overseas_positions_detail, get_tax_summary
 from app.utils.kst import today_kst
@@ -287,14 +288,33 @@ def build_isa_contribution_actions(isa_contrib: list[IsaContributionStatus], tod
     return actions
 
 
+def _realized_note(realized_krw: float | None, realized_partial: bool) -> str:
+    if realized_krw is None:
+        return "올해 이미 실현한 해외 손익이 있다면 그만큼 공제 여유가 줄어요(실현손익 0 가정). "
+    note = f"증권사 체결 기준 올해 실현손익 {_fmt_won(realized_krw)}을 반영했어요. "
+    if realized_partial:
+        note += "자동 집계가 안 되는 계좌(키움·토스·수기)의 실현손익은 빠져 있어요. "
+    return note
+
+
 def build_overseas_gain_harvest_action(
-    positions: list[dict], deduction_krw: float, gain_tax_rate: float, today: date
+    positions: list[dict],
+    deduction_krw: float,
+    gain_tax_rate: float,
+    today: date,
+    realized_krw: float | None = None,
+    realized_partial: bool = False,
 ) -> TaxAction | None:
-    """A4 — 해외주식 250만원 기본공제 범위 내 이익실현(취득가 상향). 올해 실현손익은 0으로 가정."""
+    """A4 — 해외주식 250만원 기본공제 범위 내 이익실현(취득가 상향).
+
+    `realized_krw`(증권사 체결 기준 올해 실현손익, E6)가 있으면 공제 여유 = 공제 − 실현손익(손실이면 여유 증가),
+    없으면 올해 실현손익 0으로 가정한다.
+    """
     gains = sum(p["unrealized_pnl_krw"] for p in positions if p["unrealized_pnl_krw"] > 0)
-    if gains <= 0:
+    room = max(0.0, deduction_krw - (realized_krw or 0.0))
+    if gains <= 0 or room <= 0:
         return None
-    amount = min(gains, deduction_krw)
+    amount = min(gains, room)
     return _make_action(
         action_id="overseas-gain-harvest",
         category="OVERSEAS_GAIN_HARVEST",
@@ -302,7 +322,7 @@ def build_overseas_gain_harvest_action(
         detail=(
             f"해외주식 양도차익은 연 {_fmt_won(deduction_krw)}까지 공제돼요. 공제 범위만큼 이익을 실현하고 "
             "다시 사면 취득가가 올라가 나중에 낼 양도세가 줄어요(아래 절감액은 향후 매도 시 기준). "
-            "올해 이미 실현한 해외 손익이 있다면 그만큼 공제 여유가 줄어요. 결제일 기준이라 12월 마지막 주 "
+            f"{_realized_note(realized_krw, realized_partial)}결제일 기준이라 12월 마지막 주 "
             "초까지 매도해야 올해 귀속돼요. 정보 제공 목적이며 매매 권유가 아닙니다."
         ),
         amount=amount,
@@ -337,23 +357,33 @@ def build_loss_harvest_actions(harvesting: list[dict], today: date) -> list[TaxA
 
 
 def build_financial_income_action(tax_summary: dict, today: date) -> TaxAction | None:
-    """A6 — 과세계좌 배당(금융소득)이 2,000만원 종합과세 기준에 근접/초과."""
+    """A6 — 과세계좌 금융소득(배당 + 기록된 이자, E7)이 2,000만원 종합과세 기준에 근접/초과."""
     dividend = float(tax_summary.get("dividend_income_krw") or 0)
-    if dividend < _FINANCIAL_INCOME_WATCH_KRW:
+    interest = float(tax_summary.get("interest_income_krw") or 0)
+    financial = float(tax_summary.get("financial_income_krw") or (dividend + interest))
+    if financial < _FINANCIAL_INCOME_WATCH_KRW:
         return None
     remaining = float(tax_summary.get("comprehensive_tax_remaining_krw") or 0)
+    breakdown = (
+        f"배당 {_fmt_won(dividend)} + 이자 {_fmt_won(interest)}"
+        if interest > 0
+        else f"배당 {_fmt_won(dividend)}, 기록된 이자 없음"
+    )
+    interest_hint = "" if interest > 0 else " 예금·CMA 이자가 있다면 이자 내역을 기록해야 정확해져요."
     if remaining > 0:
         title = f"금융소득 종합과세까지 {_fmt_won(remaining)} 남음"
         detail = (
-            f"올해 과세계좌 배당이 {_fmt_won(dividend)}이에요. 2,000만원을 넘으면 초과분이 다른 소득과 합산돼 "
-            "더 높은 세율이 적용될 수 있어요. 연내 추가 배당이 예상되는 고배당 종목은 ISA·연금계좌에서 "
-            "보유하는 방법을 검토해 보세요. 이자소득은 반영되지 않았어요."
+            f"올해 과세계좌 금융소득이 {_fmt_won(financial)}({breakdown})이에요. 2,000만원을 넘으면 초과분이 "
+            "다른 소득과 합산돼 더 높은 세율이 적용될 수 있어요. 연내 추가 배당이 예상되는 고배당 종목은 "
+            "ISA·연금계좌에서 보유하고, 예금 만기·이자 수령 시점을 내년으로 미루는 방법을 검토해 보세요."
+            f"{interest_hint}"
         )
     else:
         title = "금융소득 종합과세 대상 가능성"
         detail = (
-            f"올해 과세계좌 배당이 {_fmt_won(dividend)}로 2,000만원 기준을 넘었어요. 내년부터 고배당 종목은 "
-            "ISA·연금계좌로 옮겨 보유하는 방법을 검토해 보세요. 이자소득은 반영되지 않았어요."
+            f"올해 과세계좌 금융소득이 {_fmt_won(financial)}({breakdown})로 2,000만원 기준을 넘었어요. "
+            "내년부터 고배당 종목은 ISA·연금계좌로 옮겨 보유하고, 예금 이자 수령 시점을 분산하는 방법을 "
+            f"검토해 보세요.{interest_hint}"
         )
     return _make_action(
         action_id="financial-income-limit",
@@ -419,13 +449,16 @@ async def get_tax_action_plan(user_id: uuid.UUID, year: int, db: AsyncSession) -
         isa_contrib = await calc_isa_contribution_status(user_id, year, db)
         actions.extend(build_isa_contribution_actions(isa_contrib, today))
 
-    tax_summary = await get_tax_summary(user_id, year, db)
+    realized = await get_overseas_realized_summary(user_id, year, db)
+    tax_summary = await get_tax_summary(user_id, year, db, overseas_realized_krw=realized["realized_gain_krw"])
     positions = await get_overseas_positions_detail(user_id, db)
     gain_action = build_overseas_gain_harvest_action(
         positions,
         float(tax_summary["overseas_gain_deduction_krw"]),
         float(tax_summary["rates"]["overseas_tax_rate_pct"]) / 100,
         today,
+        realized_krw=realized["realized_gain_krw"],
+        realized_partial=realized["source"] == "PARTIAL",
     )
     if gain_action:
         actions.append(gain_action)

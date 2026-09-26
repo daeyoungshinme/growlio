@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { TriangleAlert, ChevronDown, ChevronUp, Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchOverseasPositionsTax, fetchTaxSummary } from "@/api/tax";
+import { fetchOverseasPositionsTax, fetchOverseasRealized, fetchTaxSummary } from "@/api/tax";
 import TaxPlannerSection from "@/components/tax/TaxPlannerSection";
 import { GeumtSimulationSection } from "@/components/tax/GeumtSimulationSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -43,6 +43,15 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
     staleTime: STALE_TIME.MEDIUM,
     enabled: plannerOpen,
   });
+
+  // 플래너는 올해 기준 — 증권사 체결 기준 올해 실현손익(KIS 실전 계좌 자동 집계)을 기본값으로 쓴다
+  const { data: realizedData, isLoading: realizedLoading } = useQuery({
+    queryKey: QUERY_KEYS.overseasRealized(currentYear, accountId),
+    queryFn: () => fetchOverseasRealized(currentYear, accountId),
+    staleTime: STALE_TIME.MEDIUM,
+    enabled: plannerOpen,
+  });
+  const interestIncome = taxData?.interest_income_krw ?? 0;
 
   return (
     <div className="card space-y-4">
@@ -119,8 +128,8 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                   <TriangleAlert size={14} className="text-red-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-red-700 dark:text-red-400">
-                    배당소득(2,000만원 기준)이 건강보험 피부양자 자격상실 기준을 초과했습니다.
-                    지역가입자 전환 시 예상 월 보험료는 약{" "}
+                    금융소득(배당·이자, 2,000만원 기준)이 건강보험 피부양자 자격상실 기준을
+                    초과했습니다. 지역가입자 전환 시 예상 월 보험료는 약{" "}
                     {fmtKrw(taxData.health_insurance_estimate.estimated_monthly_premium_krw ?? 0)}
                     입니다.
                   </p>
@@ -129,7 +138,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                   <TriangleAlert size={14} className="text-amber-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-amber-700 dark:text-amber-400">
-                    배당소득(건강보험 피부양자 기준)이 자격상실 기준(2,000만원)까지{" "}
+                    금융소득(배당·이자)이 건강보험 피부양자 자격상실 기준(2,000만원)까지{" "}
                     {fmtKrw(taxData.health_insurance_estimate.income_remaining_until_risk_krw)}{" "}
                     남았습니다.
                   </p>
@@ -144,14 +153,16 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
           <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden">
             <div className="min-w-0 px-3 py-2.5">
               <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
-                배당소득세
+                {interestIncome > 0 ? "배당·이자소득세" : "배당소득세"}
               </p>
               <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5 truncate">
-                {fmtKrw(taxData.dividend_tax_krw)}
+                {fmtKrw(taxData.dividend_tax_krw + (taxData.interest_tax_krw ?? 0))}
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                과세계좌 배당 {fmtKrw(taxData.dividend_income_krw)} ×{" "}
-                {taxData.rates.dividend_tax_rate_pct}%
+                {interestIncome > 0
+                  ? `배당 ${fmtKrw(taxData.dividend_income_krw)} + 이자 ${fmtKrw(interestIncome)}`
+                  : `과세계좌 배당 ${fmtKrw(taxData.dividend_income_krw)}`}{" "}
+                × {taxData.rates.dividend_tax_rate_pct}%
               </p>
             </div>
             <div className="min-w-0 px-3 py-2.5">
@@ -162,6 +173,8 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 {fmtKrw(taxData.overseas_tax_estimated_krw)}
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                {taxData.overseas_realized_gain_krw != null &&
+                  `실현 ${fmtKrw(taxData.overseas_realized_gain_krw)} + `}
                 미실현 {fmtKrw(taxData.overseas_unrealized_gain_krw)} (
                 {taxData.rates.overseas_tax_rate_pct}%)
               </p>
@@ -195,11 +208,11 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
           </button>
 
           {plannerOpen &&
-            (posLoading ? (
+            (posLoading || realizedLoading ? (
               <p className="text-sm text-gray-400 dark:text-gray-500">불러오는 중...</p>
             ) : positionsData ? (
               <ErrorBoundary variant="section">
-                <TaxPlannerSection positions={positionsData} />
+                <TaxPlannerSection positions={positionsData} realized={realizedData} />
               </ErrorBoundary>
             ) : null)}
 

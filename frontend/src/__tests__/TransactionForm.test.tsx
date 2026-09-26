@@ -79,6 +79,7 @@ describe("TransactionForm", () => {
     expect(screen.getByText("입금")).toBeInTheDocument();
     expect(screen.getByText("출금")).toBeInTheDocument();
     expect(screen.getByText("배당")).toBeInTheDocument();
+    expect(screen.getByText("이자")).toBeInTheDocument();
   });
 
   it("계좌 선택 드롭다운에 계좌 목록이 표시된다", () => {
