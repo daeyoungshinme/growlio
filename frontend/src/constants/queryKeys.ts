@@ -44,7 +44,9 @@ export const QUERY_KEYS = {
   overseasPositionsTax: (accountId?: string | null) =>
     ["overseas-positions-tax", accountId ?? "all"] as const,
   isaStatus: ["isa-status"] as const,
+  pensionContributionBase: ["pension-contribution"] as const,
   pensionContribution: (year: number) => ["pension-contribution", year] as const,
+  taxActionPlan: ["tax-action-plan"] as const,
   allocationHistoryBase: ["allocation-history"] as const,
   allocationHistory: (months: number, accountId?: string | null) =>
     ["allocation-history", months, accountId ?? "all"] as const,

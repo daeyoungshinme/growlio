@@ -16,143 +16,61 @@ from app.services.alerts.tax_reminder_service import (
 )
 
 
+def _action(action_id: str, benefit: float | None) -> dict:
+    return {
+        "id": action_id,
+        "category": "PENSION_DEDUCTION",
+        "title": f"{action_id} 제목",
+        "detail": "상세",
+        "amount_krw": 1_000_000.0,
+        "benefit_krw": benefit,
+        "deadline": "2026-12-31",
+        "priority": "HIGH",
+        "uses_income_bracket": False,
+        "cta": {"label": "보기", "link": "/assets"},
+    }
+
+
 class TestBuildReminderContent:
     @pytest.mark.asyncio
-    async def test_has_content_false_when_nothing_actionable(self, mock_db):
-        with (
-            patch(
-                "app.services.alerts.tax_reminder_service.get_tax_summary",
-                new=AsyncMock(return_value={"harvesting_recommendations": []}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service.calc_pension_contribution_status",
-                new=AsyncMock(return_value={"total_remaining_krw": 0.0}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service.get_isa_status_summary",
-                new=AsyncMock(return_value={"accounts": []}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service._has_pension_accounts",
-                new=AsyncMock(return_value=False),
-            ),
+    async def test_has_content_false_when_no_actions(self, mock_db):
+        with patch(
+            "app.services.alerts.tax_reminder_service.get_tax_action_plan",
+            new=AsyncMock(return_value={"actions": []}),
         ):
             content = await build_reminder_content(uuid.uuid4(), mock_db)
 
         assert content["has_content"] is False
-        assert content["harvesting_top"] == []
-        assert content["pension_remaining_krw"] == 0.0
+        assert content["actions"] == []
+        assert content["total_benefit_krw"] == 0
 
     @pytest.mark.asyncio
-    async def test_pension_remaining_ignored_without_pension_accounts(self, mock_db):
-        """연금 계좌가 없으면 calc_pension_contribution_status가 반환하는 잔여한도(기본 900만원)를 무시한다."""
-        with (
-            patch(
-                "app.services.alerts.tax_reminder_service.get_tax_summary",
-                new=AsyncMock(return_value={"harvesting_recommendations": []}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service.calc_pension_contribution_status",
-                new=AsyncMock(return_value={"total_remaining_krw": 9_000_000.0}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service.get_isa_status_summary",
-                new=AsyncMock(return_value={"accounts": []}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service._has_pension_accounts",
-                new=AsyncMock(return_value=False),
-            ),
+    async def test_reuses_action_plan_top_n_and_sums_benefit(self, mock_db):
+        """앱 세금 탭의 절세 액션 플랜을 그대로 재사용 — 상위 5건만, benefit None은 0으로 합산."""
+        actions = [_action(f"a{i}", 10_000.0 if i != 1 else None) for i in range(7)]
+        with patch(
+            "app.services.alerts.tax_reminder_service.get_tax_action_plan",
+            new=AsyncMock(return_value={"actions": actions}),
         ):
             content = await build_reminder_content(uuid.uuid4(), mock_db)
 
-        assert content["pension_remaining_krw"] == 0.0
-        assert content["has_content"] is False
-
-    @pytest.mark.asyncio
-    async def test_harvesting_top_capped_and_summed(self, mock_db):
-        def _make_rec(ticker: str, loss: int, tax_saved: int) -> dict:
-            return {
-                "ticker": ticker,
-                "name": f"{ticker} Corp",
-                "market": "NASDAQ",
-                "unrealized_loss_krw": loss,
-                "tax_saved_krw": tax_saved,
-                "qty": 1,
-            }
-
-        harvesting = [
-            _make_rec("A", -1000, 220),
-            _make_rec("B", -2000, 440),
-            _make_rec("C", -3000, 660),
-            _make_rec("D", -4000, 880),
-        ]
-        with (
-            patch(
-                "app.services.alerts.tax_reminder_service.get_tax_summary",
-                new=AsyncMock(return_value={"harvesting_recommendations": harvesting}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service.calc_pension_contribution_status",
-                new=AsyncMock(return_value={"total_remaining_krw": 0.0}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service.get_isa_status_summary",
-                new=AsyncMock(return_value={"accounts": []}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service._has_pension_accounts",
-                new=AsyncMock(return_value=False),
-            ),
-        ):
-            content = await build_reminder_content(uuid.uuid4(), mock_db)
-
-        assert len(content["harvesting_top"]) == 3  # _HARVESTING_TOP_N
-        assert content["harvesting_total_tax_saved_krw"] == 2200  # 전체 4건 합계
+        assert [a["id"] for a in content["actions"]] == ["a0", "a1", "a2", "a3", "a4"]
+        assert content["total_benefit_krw"] == 40_000.0
         assert content["has_content"] is True
 
-    @pytest.mark.asyncio
-    async def test_isa_near_maturity_and_over_limit_detected(self, mock_db):
-        isa_accounts = [
-            {
-                "account_name": "ISA계좌1",
-                "is_mature": False,
-                "needs_open_date": False,
-                "days_remaining": 10,
-                "taxable_excess_krw": 0.0,
-            },
-            {
-                "account_name": "ISA계좌2",
-                "is_mature": True,
-                "needs_open_date": False,
-                "days_remaining": 0,
-                "taxable_excess_krw": 500_000.0,
-            },
-        ]
-        with (
-            patch(
-                "app.services.alerts.tax_reminder_service.get_tax_summary",
-                new=AsyncMock(return_value={"harvesting_recommendations": []}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service.calc_pension_contribution_status",
-                new=AsyncMock(return_value={"total_remaining_krw": 0.0}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service.get_isa_status_summary",
-                new=AsyncMock(return_value={"accounts": isa_accounts}),
-            ),
-            patch(
-                "app.services.alerts.tax_reminder_service._has_pension_accounts",
-                new=AsyncMock(return_value=False),
-            ),
-        ):
-            content = await build_reminder_content(uuid.uuid4(), mock_db)
 
-        assert len(content["isa_near_maturity"]) == 1
-        assert content["isa_near_maturity"][0]["account_name"] == "ISA계좌1"
-        assert content["isa_over_limit_count"] == 1
-        assert content["has_content"] is True
+class TestReminderTemplate:
+    def test_renders_actions_escaped_with_benefit_and_deadline(self):
+        from app.services.email_templates import year_end_tax_reminder_template
+
+        action = _action("x", 99_000.0)
+        action["title"] = "<b>ISA</b> 이전"
+        subject, html = year_end_tax_reminder_template({"actions": [action], "total_benefit_krw": 99_000.0})
+
+        assert "연말 절세 리마인더" in subject
+        assert "&lt;b&gt;ISA&lt;/b&gt; 이전" in html
+        assert "예상 절세 약 99,000원" in html
+        assert "마감 2026-12-31" in html
 
 
 class TestGetReminderSubscribers:
@@ -250,11 +168,8 @@ class TestSendYearEndTaxReminder:
         per_user_session.__aexit__ = AsyncMock(return_value=None)
 
         content = {
-            "harvesting_top": [{"ticker": "AAPL", "unrealized_loss_krw": -100_000, "tax_saved_krw": 22_000}],
-            "harvesting_total_tax_saved_krw": 22_000,
-            "pension_remaining_krw": 1_000_000.0,
-            "isa_near_maturity": [],
-            "isa_over_limit_count": 0,
+            "actions": [_action("pension", 150_000.0), _action("isa", None)],
+            "total_benefit_krw": 150_000.0,
             "has_content": True,
         }
 
@@ -283,7 +198,7 @@ class TestSendYearEndTaxReminder:
         push_kwargs = mock_push.call_args.kwargs
         assert push_kwargs["fcm_token"] == "token-abc"
         assert push_kwargs["data"] == {"type": "YEAR_END_TAX_REMINDER"}
-        assert "손실수확 후보 1종목" in push_kwargs["body"]
+        assert push_kwargs["body"] == "pension 제목 외 1건"
         per_user_session.commit.assert_called_once()
 
     @pytest.mark.asyncio

@@ -63,6 +63,16 @@ class IsaType(StrEnum):
     PREFERENTIAL = "PREFERENTIAL"  # 서민형·농어민형 통합 — 비과세 한도 400만원
 
 
+class IncomeBracket(StrEnum):
+    """연금저축/IRP 세액공제율 분기용 소득 구간 — 금액 자체는 저장하지 않는다(민감정보 최소화).
+
+    총급여 5,500만원(종합소득 4,500만원) 이하 16.5%, 초과 13.2% (조세특례제한법 §59의3, 2023년 귀속~).
+    """
+
+    UNDER_55M = "UNDER_55M"
+    OVER_55M = "OVER_55M"
+
+
 class InvestmentHorizon(StrEnum):
     SHORT_TERM = "SHORT_TERM"
     MID_TERM = "MID_TERM"

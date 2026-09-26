@@ -1,7 +1,7 @@
 """연말(11~12월) 절세 리마인더 — 매주 월요일 09:00 KST, 옵트인(기본 OFF) 유저에게
 
-활용 가능한 절세 방법(해외주식 손실수확 후보, 연금저축/IRP 세액공제 잔여한도, ISA 만기/한도초과)을
-요약 발송한다. 알릴 내용이 하나도 없으면(전부 해당 없음) 발송을 건너뛴다 — 불필요한 알림 방지.
+절세 액션 플랜(tax_action_service — 연금 세액공제·ISA 이전/납입·해외 이익실현/손실수확·금융소득 한도)
+상위 항목을 요약 발송한다. 알릴 내용이 하나도 없으면(전부 해당 없음) 발송을 건너뛴다 — 불필요한 알림 방지.
 
 시장신호 매일 요약(market_signal_alert_service.send_market_signal_daily_digest)과 동일한
 유저별 AsyncSessionLocal + DB(AlertHistory) 기반 dedup(AlertHistory 당일 발송 여부) + 세마포어 패턴을 따른다.
@@ -13,7 +13,7 @@ import asyncio
 import uuid
 from datetime import UTC, datetime
 from functools import partial
-from typing import Any, TypedDict
+from typing import TypedDict
 
 import structlog
 from sqlalchemy import select
@@ -21,79 +21,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
 from app.models.alert import AlertHistory
-from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
-from app.services.isa_service import get_isa_status_summary
-from app.services.pension_contribution_service import calc_pension_contribution_status
-from app.services.tax_service import get_tax_summary
+from app.services.tax_action_service import TaxAction, get_tax_action_plan
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
 _REMINDER_CONCURRENCY = 5
-_HARVESTING_TOP_N = 3
-_ISA_MATURITY_WARNING_DAYS = 30
-_PENSION_TAX_TYPES = ("PENSION_SAVINGS", "IRP")
+_REMINDER_TOP_N = 5
 
 
 class TaxReminderContent(TypedDict):
-    harvesting_top: list[dict[str, Any]]
-    harvesting_total_tax_saved_krw: float
-    pension_remaining_krw: float
-    isa_near_maturity: list[dict[str, Any]]
-    isa_over_limit_count: int
+    actions: list[TaxAction]
+    total_benefit_krw: float
     has_content: bool
 
 
-async def _has_pension_accounts(user_id: uuid.UUID, db: AsyncSession) -> bool:
-    result = await db.execute(
-        select(AssetAccount.id)
-        .where(
-            AssetAccount.user_id == user_id,
-            AssetAccount.tax_type.in_(_PENSION_TAX_TYPES),
-            AssetAccount.is_active == True,
-        )
-        .limit(1)
-    )
-    return result.scalar() is not None
-
-
 async def build_reminder_content(user_id: uuid.UUID, db: AsyncSession) -> TaxReminderContent:
-    """세 도메인 서비스를 병렬 조회해 리마인더 콘텐츠로 조합한다."""
-    current_year = today_kst().year
-    tax_summary, pension, isa, has_pension_accounts = await asyncio.gather(
-        get_tax_summary(user_id, current_year, db),
-        calc_pension_contribution_status(user_id, current_year, db),
-        get_isa_status_summary(user_id, db),
-        _has_pension_accounts(user_id, db),
-    )
-
-    harvesting = tax_summary.get("harvesting_recommendations", [])
-    harvesting_top = harvesting[:_HARVESTING_TOP_N]
-    harvesting_total_tax_saved = sum(item["tax_saved_krw"] for item in harvesting)
-
-    pension_remaining = float(pension["total_remaining_krw"]) if has_pension_accounts else 0.0
-
-    isa_accounts = isa.get("accounts", [])
-    isa_near_maturity = [
-        acc
-        for acc in isa_accounts
-        if not acc["is_mature"]
-        and not acc["needs_open_date"]
-        and acc["days_remaining"] is not None
-        and acc["days_remaining"] <= _ISA_MATURITY_WARNING_DAYS
-    ]
-    isa_over_limit_count = sum(1 for acc in isa_accounts if acc["taxable_excess_krw"] > 0)
-
-    has_content = bool(harvesting_top) or pension_remaining > 0 or bool(isa_near_maturity) or isa_over_limit_count > 0
-
+    """절세 액션 플랜(tax_action_service)의 상위 액션을 리마인더 콘텐츠로 사용한다 — 앱 세금 탭과 같은 목록."""
+    plan = await get_tax_action_plan(user_id, today_kst().year, db)
+    actions = plan["actions"][:_REMINDER_TOP_N]
     return {
-        "harvesting_top": harvesting_top,
-        "harvesting_total_tax_saved_krw": harvesting_total_tax_saved,
-        "pension_remaining_krw": pension_remaining,
-        "isa_near_maturity": isa_near_maturity,
-        "isa_over_limit_count": isa_over_limit_count,
-        "has_content": has_content,
+        "actions": actions,
+        "total_benefit_krw": sum(a["benefit_krw"] or 0.0 for a in actions),
+        "has_content": bool(actions),
     }
 
 
@@ -142,13 +93,10 @@ async def _send_reminder_to_user(user: User, user_settings: UserSettings, sem: a
 
                 to_email = user_settings.notification_email or user.email
 
-                push_body_parts: list[str] = []
-                if content["harvesting_top"]:
-                    push_body_parts.append(f"손실수확 후보 {len(content['harvesting_top'])}종목")
-                if content["pension_remaining_krw"] > 0:
-                    push_body_parts.append(f"연금공제 잔여 {content['pension_remaining_krw']:,.0f}원")
-                if content["isa_near_maturity"] or content["isa_over_limit_count"]:
-                    push_body_parts.append("ISA 확인 필요")
+                top = content["actions"][0]
+                push_body = top["title"]
+                if len(content["actions"]) > 1:
+                    push_body += f" 외 {len(content['actions']) - 1}건"
 
                 await dispatch_dual_channel_alert(
                     db,
@@ -158,7 +106,7 @@ async def _send_reminder_to_user(user: User, user_settings: UserSettings, sem: a
                     history_message="연말 절세 리마인더 발송",
                     send_email=partial(send_year_end_tax_reminder_email, to_email, content),
                     push_title="연말 절세 리마인더",
-                    push_body=" · ".join(push_body_parts) or "활용 가능한 절세 방법을 확인해보세요.",
+                    push_body=push_body,
                     push_type="YEAR_END_TAX_REMINDER",
                     fcm_token=user_settings.fcm_token,
                 )

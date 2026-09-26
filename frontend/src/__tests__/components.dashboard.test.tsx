@@ -12,11 +12,18 @@ import type { PortfolioOverview } from "@/types";
 const fetchIsaStatus = vi.fn();
 const fetchPensionContribution = vi.fn();
 const fetchTaxSummary = vi.fn();
+const fetchTaxActionPlan = vi.fn().mockResolvedValue({
+  year: 2026,
+  income_bracket: null,
+  actions: [],
+  note: "",
+});
 
 vi.mock("@/api/tax", () => ({
   fetchIsaStatus: (...args: unknown[]) => fetchIsaStatus(...args),
   fetchPensionContribution: (...args: unknown[]) => fetchPensionContribution(...args),
   fetchTaxSummary: (...args: unknown[]) => fetchTaxSummary(...args),
+  fetchTaxActionPlan: (...args: unknown[]) => fetchTaxActionPlan(...args),
 }));
 
 const emptyIsa: IsaStatusSummary = { accounts: [], note: "" };

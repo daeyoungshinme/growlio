@@ -11,6 +11,7 @@ from app.limiter import limiter
 from app.models.user import User
 from app.services.isa_service import get_isa_status_summary
 from app.services.pension_contribution_service import calc_pension_contribution_status
+from app.services.tax_action_service import get_tax_action_plan
 from app.services.tax_service import get_overseas_positions_detail, get_tax_summary
 from app.utils.cache_keys import TTL_TAX_OVERSEAS, get_cached_json, set_cached_json, tax_overseas_key
 from app.utils.kst import today_kst
@@ -77,3 +78,21 @@ async def pension_contribution(
     if target_year < 2000 or target_year > current_year + 1:
         raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
     return dict(await calc_pension_contribution_status(current_user.id, target_year, db))
+
+
+@router.get("/action-plan")
+@limiter.limit("30/minute")
+async def tax_action_plan(
+    request: Request,
+    year: int | None = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """절세 액션 플랜 — 연금 세액공제·ISA 이전/납입·해외 이익실현/손실수확·금융소득 한도 액션 목록.
+
+    마감일이 올해 12/31 기준이라 올해만 지원한다.
+    """
+    current_year = today_kst().year
+    if year is not None and year != current_year:
+        raise HTTPException(status_code=400, detail="절세 액션 플랜은 올해만 조회할 수 있습니다.")
+    return dict(await get_tax_action_plan(current_user.id, current_year, db))

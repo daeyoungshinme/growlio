@@ -9,11 +9,18 @@ import { fmtKrw } from "@/utils/format";
 const fetchIsaStatus = vi.fn();
 const fetchPensionContribution = vi.fn();
 const fetchTaxSummary = vi.fn();
+const fetchTaxActionPlan = vi.fn().mockResolvedValue({
+  year: 2026,
+  income_bracket: null,
+  actions: [],
+  note: "",
+});
 
 vi.mock("@/api/tax", () => ({
   fetchIsaStatus: (...args: unknown[]) => fetchIsaStatus(...args),
   fetchPensionContribution: (...args: unknown[]) => fetchPensionContribution(...args),
   fetchTaxSummary: (...args: unknown[]) => fetchTaxSummary(...args),
+  fetchTaxActionPlan: (...args: unknown[]) => fetchTaxActionPlan(...args),
 }));
 
 import TaxLimitsBanner from "@/components/dashboard/TaxLimitsBanner";
@@ -208,5 +215,35 @@ describe("TaxLimitsBanner", () => {
     );
     expect(await screen.findByText(`예상세금 ${fmtKrw(500_000)}`)).toBeInTheDocument();
     expect(container).not.toBeEmptyDOMElement();
+  });
+
+  it("절세 액션이 있으면 한도 요약 대신 최우선 액션 1줄과 절세액을 보여준다", async () => {
+    fetchIsaStatus.mockResolvedValue(emptyIsa);
+    fetchTaxSummary.mockResolvedValue({ ...emptyTaxSummary, total_estimated_tax_krw: 500_000 });
+    fetchTaxActionPlan.mockResolvedValueOnce({
+      year: 2026,
+      income_bracket: null,
+      actions: [
+        {
+          id: "pension-deduction",
+          category: "PENSION_DEDUCTION",
+          title: "12/31까지 IRP에 3,000,000원 추가 납입",
+          detail: "",
+          amount_krw: 3_000_000,
+          benefit_krw: 396_000,
+          deadline: "2026-12-31",
+          priority: "HIGH",
+          uses_income_bracket: true,
+          cta: { label: "입금 내역 기록", link: "/assets?tab=계좌관리" },
+        },
+      ],
+      note: "",
+    });
+
+    renderBanner(<TaxLimitsBanner overview={makeOverview([])} />);
+    expect(await screen.findByText("12/31까지 IRP에 3,000,000원 추가 납입")).toBeInTheDocument();
+    expect(screen.getByText(`절세 약 ${fmtKrw(396_000)}`)).toBeInTheDocument();
+    expect(screen.getByText("절세 액션")).toBeInTheDocument();
+    expect(screen.queryByText(`예상세금 ${fmtKrw(500_000)}`)).toBeNull();
   });
 });

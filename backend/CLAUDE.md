@@ -232,7 +232,8 @@ services/
   ├── stock_search_service.py # 종목명·티커 검색 — 네이버 금융(한글)/Yahoo Finance(영문·티커) 연동 (stocks.py 라우터에서 분리)
   ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계·건강보험 피부양자 자격상실 위험(배당소득 2000만원 기준, 월 보험료는 참고 추정치). 연금 납입 현황은 pension_contribution_service.py
   ├── pension_contribution_service.py # 연금저축/IRP 계좌군 세액공제 한도(600만원/900만원) 납입 현황 — tax_service.py에서 분리
-  ├── isa_service.py          # ISA 계좌 의무가입 3년 만기 현황 계산 — `isa_open_date` 기준, 수동입력 누적손익(`isa_manual_cumulative_pnl_krw`) 반영
+  ├── isa_service.py          # ISA 계좌 의무가입 3년 만기 현황 계산 — `isa_open_date` 기준, 수동입력 누적손익(`isa_manual_cumulative_pnl_krw`) 반영. `calc_isa_contribution_status`: 연 2,000만(미납입분 이월, 총 1억) 납입 잔여한도
+  ├── tax_action_service.py   # 절세 액션 플랜(`GET /tax/action-plan`) — pension/isa/tax 서비스 결과를 조합만 해 액션(연금 공제·ISA 이전/납입·해외 250만 이익실현·손실수확·금융소득 2천만) 우선순위 목록 생성. 연금 공제율은 `UserSettings.income_bracket`(미입력 시 13.2%). 연말 리마인더(`alerts/tax_reminder_service`)도 이 목록 재사용. 세법 수치는 `_DEDUCTION_RULES` 연도별 테이블
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
   ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions, get_latest_snapshot_with_positions)
   ├── _snapshot_queries.py    # latest_snapshot_subquery() — account_id별 max(snapshot_date) SQLAlchemy 서브쿼리 헬퍼

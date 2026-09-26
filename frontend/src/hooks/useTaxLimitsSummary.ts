@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchIsaStatus, fetchPensionContribution, fetchTaxSummary } from "@/api/tax";
+import {
+  fetchIsaStatus,
+  fetchPensionContribution,
+  fetchTaxActionPlan,
+  fetchTaxSummary,
+  type TaxAction,
+} from "@/api/tax";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { fmtKrw } from "@/utils/format";
@@ -8,6 +14,8 @@ import type { PortfolioOverview } from "@/types";
 export interface TaxLimitsSummary {
   parts: string[];
   warningText: string | null;
+  /** 절세 액션 플랜의 최우선 액션 — 홈 배너가 한도 요약 대신 이 한 줄을 보여준다 */
+  topAction: TaxAction | null;
 }
 
 /** ISA 만기·연금 공제한도·세금 추정 현황을 한 줄 요약으로 압축한다.
@@ -35,6 +43,12 @@ export function useTaxLimitsSummary(overview: PortfolioOverview | undefined): Ta
     staleTime: STALE_TIME.LONG,
   });
 
+  const { data: actionPlan } = useQuery({
+    queryKey: QUERY_KEYS.taxActionPlan,
+    queryFn: fetchTaxActionPlan,
+    staleTime: STALE_TIME.MEDIUM,
+  });
+
   const isaAccounts = isaData?.accounts ?? [];
 
   const overLimitCount = isaAccounts.filter((a) => a.taxable_excess_krw > 0).length;
@@ -59,5 +73,5 @@ export function useTaxLimitsSummary(overview: PortfolioOverview | undefined): Ta
         ? `국내주식 대주주요건 주의 (${fmtKrw(taxData.domestic_large_holder_excess_krw)} 초과)`
         : null;
 
-  return { parts, warningText };
+  return { parts, warningText, topAction: actionPlan?.actions[0] ?? null };
 }

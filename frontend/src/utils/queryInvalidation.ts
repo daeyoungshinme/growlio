@@ -12,6 +12,7 @@ export function invalidateSyncData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPositionsBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasPositionsTaxBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk() }),
@@ -33,6 +34,7 @@ export function invalidateAccountData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPositionsBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasPositionsTaxBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
   ]);
 }
@@ -48,12 +50,16 @@ export function invalidateBrokerCredentialData(qc: QueryClient) {
   ]);
 }
 
-/** 거래내역 CUD 후 — transactions + dashboard + 적립 챌린지(입금이 스트릭에 영향) */
+/** 거래내역 CUD 후 — transactions + dashboard + 적립 챌린지(입금이 스트릭에 영향)
+ * + 연금/ISA 납입 현황·절세 액션 플랜(입금·배당 내역 기준 집계) */
 export function invalidateTransactionData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.pensionContributionBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
   ]);
 }
 
@@ -166,6 +172,14 @@ export function invalidateRecommendationDriftAlertData(qc: QueryClient) {
 export function invalidateGoalRecommendationData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
+  ]);
+}
+
+/** 소득 구간(연금 세액공제율) 변경 후 — 절세 액션 플랜 + settings */
+export function invalidateIncomeBracketData(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
   ]);
 }

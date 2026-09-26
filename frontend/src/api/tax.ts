@@ -1,4 +1,5 @@
 import { apiGet } from "./client";
+import type { IncomeBracket } from "./settings";
 
 export interface OverseasPositionDetail {
   ticker: string;
@@ -134,3 +135,39 @@ export const fetchPensionContribution = (year?: number) =>
   apiGet<PensionContributionStatus>("/tax/pension-contribution", {
     params: year ? { year } : undefined,
   });
+
+export type TaxActionCategory =
+  | "PENSION_DEDUCTION"
+  | "ISA_PENSION_TRANSFER"
+  | "ISA_CONTRIBUTION"
+  | "OVERSEAS_GAIN_HARVEST"
+  | "TAX_LOSS_HARVEST"
+  | "FINANCIAL_INCOME_LIMIT";
+
+export type TaxActionPriority = "HIGH" | "MEDIUM" | "LOW";
+
+export interface TaxAction {
+  id: string;
+  category: TaxActionCategory;
+  title: string;
+  detail: string;
+  amount_krw: number | null;
+  /** 예상 절세액 — 불확실하면 null */
+  benefit_krw: number | null;
+  /** YYYY-MM-DD (KST) */
+  deadline: string | null;
+  priority: TaxActionPriority;
+  /** 소득 구간(연금 세액공제율)에 따라 benefit이 달라지는 액션 */
+  uses_income_bracket: boolean;
+  cta: { label: string; link: string };
+}
+
+export interface TaxActionPlan {
+  year: number;
+  income_bracket: IncomeBracket | null;
+  /** 우선순위(HIGH→LOW) → 마감 임박 → 절세액 큰 순으로 정렬됨 */
+  actions: TaxAction[];
+  note: string;
+}
+
+export const fetchTaxActionPlan = () => apiGet<TaxActionPlan>("/tax/action-plan");
