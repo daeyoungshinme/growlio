@@ -275,17 +275,10 @@ def _optimize_goal_portfolio(
     생긴다(단기/IRP 추천에서 실제 재현됨).
     """
     import numpy as np
-    from scipy.optimize import minimize
 
-    from app.services.estimation import shrink_covariance, shrink_expected_returns
+    from app.services.estimation import shrink_expected_returns
 
-    asset_classes_in = asset_classes or ["EQUITY"] * len(symbols)
-    dividend_yields_in = dividend_yields or [0.0] * len(symbols)
-    valid = [
-        (s, tk, c, ac, dy)
-        for s, tk, c, ac, dy in zip(symbols, tickers, cagr_pct, asset_classes_in, dividend_yields_in, strict=False)
-        if s in returns_map and len(returns_map[s]) >= _MIN_RETURN_DAYS
-    ]
+    valid = _valid_optimizer_inputs(symbols, tickers, cagr_pct, returns_map, asset_classes, dividend_yields)
     if len(valid) < _MIN_CANDIDATES:
         return [], None, None, f"추천에 충분한 시세 데이터가 있는 종목이 {_MIN_CANDIDATES}개 미만입니다"
 
@@ -301,81 +294,25 @@ def _optimize_goal_portfolio(
     # "이론상 최선의 경우"를 봐야 하므로 축소 전 원본값을 쓰고, 이후 실제 최적화 입력으로는
     # 축소추정치를 쓴다.
     cagrs = shrink_expected_returns(cagrs_raw)
-
-    min_len = min(len(returns_map[s]) for s in syms)
-    rets = np.array([returns_map[s][:min_len] for s in syms])
-    cov_annual = np.cov(rets) * 252 if n > 1 else np.array([[float(np.var(rets[0])) * 252]])
-    cov_annual = shrink_covariance(rets, cov_annual)
+    cov_annual = _annualized_covariance(syms, returns_map)
 
     max_weight_used = max(max_weight, 1.0 / n)  # n이 작아 상한 합이 100%를 못 채우면 완화
 
     bounds, group_budget, active_classes = _resolve_class_bounds(classes, class_bounds, n, max_weight_used)
     x0 = np.full(n, 1.0 / n)
 
-    # 자산군별 예산(그리디 max_achievable_return·배당 달성가능성 검증 공용) — 명시적 상한이
-    # 없으면(기본 1.0) 무제한. 자산군 범위가 걸려 있으면 해당 그룹의 합산 상한도 함께 지켜야
-    # 한다. 그렇지 않으면 BALANCED/AGGRESSIVE 성향의 프론티어 목표(target)가 그 그룹 제약과
-    # 동시에 만족 불가능한 지점으로 계산돼 옵티마이저가 실패할 수 있다(예: IRP 안전자산 30%
-    # 하한 + LONG_TERM AGGRESSIVE 조합). 상한이 없다면 cagrs.max()겠지만, 캡이 있으면 고CAGR
-    # 종목에만 몰아줄 수 없으므로 그보다 낮을 수 있음.
-    group_used: dict[str, float] = dict.fromkeys(group_budget, 0.0)
-    max_achievable_return = 0.0
-    remaining = 1.0
-    for idx in np.argsort(-cagrs):
-        cls = classes[idx]
-        take = max(min(bounds[idx][1], remaining, group_budget[cls] - group_used[cls]), 0.0)
-        max_achievable_return += take * float(cagrs[idx])
-        remaining -= take
-        group_used[cls] += take
-        if remaining <= 1e-9:
-            break
-
-    note: str | None = None
-    frontier_frac = _RISK_TOLERANCE_FRONTIER_FRACTION.get(risk_tolerance, 0.0)
-    signal_dampening = _SIGNAL_FRONTIER_DAMPENING.get(market_signal_level or "", 1.0)
-    effective_frontier_frac = frontier_frac * signal_dampening
-    if signal_dampening < 1.0 and frontier_frac > 0.0:
-        note = f"시장 위험 신호({market_signal_level})를 반영해 추천 비중을 보수적으로 조정했습니다"
-
-    if effective_frontier_frac <= 0.0:
-        # CONSERVATIVE(또는 미인식 값) — 기존과 동일한 코드 경로, 순수 최소분산 + 부등식 제약
-        constraints = [
-            {"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0},
-            {"type": "ineq", "fun": lambda w: float(w @ cagrs) - required_return_pct},
-        ]
-    else:
-        baseline_res = minimize(
-            lambda w: float(w @ cov_annual @ w),
-            x0=x0,
-            method="SLSQP",
-            bounds=bounds,
-            constraints=[{"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0}],
-            options={"ftol": 1e-9, "maxiter": 500},
-        )
-        natural_return = float(baseline_res.x @ cagrs) if baseline_res.success else required_return_pct
-
-        frontier_low = max(natural_return, required_return_pct)
-        frontier_high = max_achievable_return
-        target = frontier_low + effective_frontier_frac * max(frontier_high - frontier_low, 0.0)
-        target = min(max(target, required_return_pct), frontier_high)
-
-        no_spread = frontier_high - frontier_low < 1e-6
-        if no_spread:
-            spread_note = "선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다"
-            note = f"{note} {spread_note}" if note else spread_note
-
-        # 후보 간 기대수익률 차이가 거의 없으면(no_spread) "가중평균 CAGR = target" 등식 제약의
-        # 그래디언트(cagrs 벡터)가 총합=1 제약의 그래디언트(전부 1인 벡터)와 사실상 평행해져
-        # SLSQP의 QP 서브문제 야코비안이 특이(singular)해져 최적화 전체가 실패한다 — 실제로
-        # 축소추정(James-Stein) 도입 후 유사한 CAGR을 가진 후보가 많은 경우(예: 10종목 큐레이션
-        # 유니버스) 흔하게 재현된다. 이 경우 부등식 제약(CONSERVATIVE와 동일)으로 대체해 등식
-        # 제약의 중복을 피한다 — 어차피 목표 지점 간 차이가 없어 등식으로 고정할 실익도 없다.
-        constraints = [
-            {"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0},
-            {"type": "ineq", "fun": lambda w: float(w @ cagrs) - required_return_pct}
-            if no_spread
-            else {"type": "eq", "fun": lambda w: float(w @ cagrs) - target},
-        ]
+    effective_frontier_frac, note = _signal_adjusted_frontier_fraction(risk_tolerance, market_signal_level)
+    constraints, note = _return_constraints(
+        cagrs,
+        cov_annual,
+        x0,
+        bounds,
+        classes,
+        group_budget,
+        required_return_pct,
+        effective_frontier_frac,
+        note,
+    )
     # 명시적으로 범위가 지정된 자산군만 실제 SLSQP 부등식 제약으로 추가한다 — 묵시적으로
     # 유도되는 범위는 `_resolve_class_bounds`가 이미 bounds(종목당 상한) 완화에 반영했으므로
     # 여기서 별도 제약으로 다시 추가하면 총합=1 제약과 선형종속돼 야코비안이 특이해질 위험이
@@ -415,8 +352,145 @@ def _optimize_goal_portfolio(
     weights = res.x
     expected_return = round(float(weights @ cagrs), 2)
     expected_volatility = round(float(np.sqrt(weights @ cov_annual @ weights)) * 100, 2)
+    return _weights_to_items(tks, weights), expected_return, expected_volatility, note
 
-    items = [
+
+def _valid_optimizer_inputs(
+    symbols: list[str],
+    tickers: list[tuple[str, str, str]],
+    cagr_pct: list[float],
+    returns_map: dict[str, list[float]],
+    asset_classes: list[str] | None,
+    dividend_yields: list[float] | None,
+) -> list[tuple[str, tuple[str, str, str], float, str, float]]:
+    """일별수익률이 `_MIN_RETURN_DAYS` 이상 확보된 후보만 (심볼, 티커, CAGR, 자산군, 배당수익률)로 묶는다.
+
+    자산군/배당수익률이 없으면 각각 전부 EQUITY / 0으로 본다."""
+    asset_classes_in = asset_classes or ["EQUITY"] * len(symbols)
+    dividend_yields_in = dividend_yields or [0.0] * len(symbols)
+    return [
+        (s, tk, c, ac, dy)
+        for s, tk, c, ac, dy in zip(symbols, tickers, cagr_pct, asset_classes_in, dividend_yields_in, strict=False)
+        if s in returns_map and len(returns_map[s]) >= _MIN_RETURN_DAYS
+    ]
+
+
+def _annualized_covariance(syms: tuple[str, ...], returns_map: dict[str, list[float]]):
+    """가장 짧은 시계열 길이에 맞춘 일별수익률의 연환산 공분산(Ledoit-Wolf 축소 적용)."""
+    import numpy as np
+
+    from app.services.estimation import shrink_covariance
+
+    min_len = min(len(returns_map[s]) for s in syms)
+    rets = np.array([returns_map[s][:min_len] for s in syms])
+    cov_annual = np.cov(rets) * 252 if len(syms) > 1 else np.array([[float(np.var(rets[0])) * 252]])
+    return shrink_covariance(rets, cov_annual)
+
+
+def _max_achievable_return(
+    cagrs,
+    bounds: list[tuple[float, float]],
+    classes: tuple[str, ...],
+    group_budget: dict[str, float],
+) -> float:
+    """종목당 상한·자산군 예산을 지키며 고CAGR 종목부터 그리디하게 채웠을 때의 최대 가중평균 CAGR.
+
+    자산군별 예산(그리디 max_achievable_return·배당 달성가능성 검증 공용) — 명시적 상한이
+    없으면(기본 1.0) 무제한. 자산군 범위가 걸려 있으면 해당 그룹의 합산 상한도 함께 지켜야
+    한다. 그렇지 않으면 BALANCED/AGGRESSIVE 성향의 프론티어 목표(target)가 그 그룹 제약과
+    동시에 만족 불가능한 지점으로 계산돼 옵티마이저가 실패할 수 있다(예: IRP 안전자산 30%
+    하한 + LONG_TERM AGGRESSIVE 조합). 상한이 없다면 cagrs.max()겠지만, 캡이 있으면 고CAGR
+    종목에만 몰아줄 수 없으므로 그보다 낮을 수 있음.
+    """
+    import numpy as np
+
+    group_used: dict[str, float] = dict.fromkeys(group_budget, 0.0)
+    max_achievable_return = 0.0
+    remaining = 1.0
+    for idx in np.argsort(-cagrs):
+        cls = classes[idx]
+        take = max(min(bounds[idx][1], remaining, group_budget[cls] - group_used[cls]), 0.0)
+        max_achievable_return += take * float(cagrs[idx])
+        remaining -= take
+        group_used[cls] += take
+        if remaining <= 1e-9:
+            break
+    return max_achievable_return
+
+
+def _signal_adjusted_frontier_fraction(
+    risk_tolerance: str, market_signal_level: str | None
+) -> tuple[float, str | None]:
+    """(리스크 성향 보간 비율 × 시장신호 감쇠, 감쇠가 실제로 적용됐으면 그 안내 문구)."""
+    frontier_frac = _RISK_TOLERANCE_FRONTIER_FRACTION.get(risk_tolerance, 0.0)
+    signal_dampening = _SIGNAL_FRONTIER_DAMPENING.get(market_signal_level or "", 1.0)
+    note = None
+    if signal_dampening < 1.0 and frontier_frac > 0.0:
+        note = f"시장 위험 신호({market_signal_level})를 반영해 추천 비중을 보수적으로 조정했습니다"
+    return frontier_frac * signal_dampening, note
+
+
+def _return_constraints(
+    cagrs,
+    cov_annual,
+    x0,
+    bounds: list[tuple[float, float]],
+    classes: tuple[str, ...],
+    group_budget: dict[str, float],
+    required_return_pct: float,
+    effective_frontier_frac: float,
+    note: str | None,
+) -> tuple[list[dict], str | None]:
+    """총합=1 + 수익률 제약을 만든다(자산군·배당 제약은 호출측이 뒤에 덧붙인다).
+
+    CONSERVATIVE(보간 비율 0)는 "필요수익률 이상" 부등식, BALANCED/AGGRESSIVE는 제약 없는 최소분산
+    포트폴리오의 자연 수익률과 달성 가능 최대 수익률 사이 보간 지점을 등식으로 고정한다.
+    """
+    import numpy as np
+    from scipy.optimize import minimize
+
+    sum_to_one = {"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0}
+    if effective_frontier_frac <= 0.0:
+        # CONSERVATIVE(또는 미인식 값) — 기존과 동일한 코드 경로, 순수 최소분산 + 부등식 제약
+        return [sum_to_one, {"type": "ineq", "fun": lambda w: float(w @ cagrs) - required_return_pct}], note
+
+    baseline_res = minimize(
+        lambda w: float(w @ cov_annual @ w),
+        x0=x0,
+        method="SLSQP",
+        bounds=bounds,
+        constraints=[{"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0}],
+        options={"ftol": 1e-9, "maxiter": 500},
+    )
+    natural_return = float(baseline_res.x @ cagrs) if baseline_res.success else required_return_pct
+
+    frontier_low = max(natural_return, required_return_pct)
+    frontier_high = _max_achievable_return(cagrs, bounds, classes, group_budget)
+    target = frontier_low + effective_frontier_frac * max(frontier_high - frontier_low, 0.0)
+    target = min(max(target, required_return_pct), frontier_high)
+
+    no_spread = frontier_high - frontier_low < 1e-6
+    if no_spread:
+        spread_note = "선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다"
+        note = f"{note} {spread_note}" if note else spread_note
+
+    # 후보 간 기대수익률 차이가 거의 없으면(no_spread) "가중평균 CAGR = target" 등식 제약의
+    # 그래디언트(cagrs 벡터)가 총합=1 제약의 그래디언트(전부 1인 벡터)와 사실상 평행해져
+    # SLSQP의 QP 서브문제 야코비안이 특이(singular)해져 최적화 전체가 실패한다 — 실제로
+    # 축소추정(James-Stein) 도입 후 유사한 CAGR을 가진 후보가 많은 경우(예: 10종목 큐레이션
+    # 유니버스) 흔하게 재현된다. 이 경우 부등식 제약(CONSERVATIVE와 동일)으로 대체해 등식
+    # 제약의 중복을 피한다 — 어차피 목표 지점 간 차이가 없어 등식으로 고정할 실익도 없다.
+    return_constraint = (
+        {"type": "ineq", "fun": lambda w: float(w @ cagrs) - required_return_pct}
+        if no_spread
+        else {"type": "eq", "fun": lambda w: float(w @ cagrs) - target}
+    )
+    return [sum_to_one, return_constraint], note
+
+
+def _weights_to_items(tks: tuple[tuple[str, str, str], ...], weights) -> list[dict]:
+    """0.5% 미만 비중은 버리고 % 단위(소수 1자리)로 반올림한 뒤, 반올림 오차를 첫 종목에 몰아 합계 100을 맞춘다."""
+    items: list[dict] = [
         {"ticker": tk[0], "name": tk[1], "market": tk[2], "weight": round(float(w) * 100, 1)}
         for tk, w in zip(tks, weights, strict=False)
         if w >= 0.005
@@ -424,8 +498,7 @@ def _optimize_goal_portfolio(
     total = sum(i["weight"] for i in items)
     if items and abs(total - 100) > 0.01:
         items[0]["weight"] = round(items[0]["weight"] + (100 - total), 1)
-
-    return items, expected_return, expected_volatility, note
+    return items
 
 
 def compute_weighted_expected_metrics(
