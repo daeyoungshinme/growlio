@@ -155,6 +155,14 @@ async def fetch_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
     return prices
 
 
+async def fetch_yahoo_returns_batch(items: list[tuple[str, str]], years: int) -> dict[tuple[str, str], dict]:
+    """여러 종목의 기간 수익률 {(ticker, market): {...}}. 실패·서킷 열림이면 빈 dict."""
+    if not items:
+        return {}
+    returns: dict[tuple[str, str], dict] = await _run_guarded(_sync_calc_returns_batch, items, years, fallback={})
+    return returns
+
+
 def _cagr_from_prices(start_price: float, end_price: float, start_date, end_date) -> dict | None:
     """시작/종료 시점 가격으로 누적수익률·CAGR을 계산한다. 공통 계산 로직(yfinance/pykrx 공용)."""
     if start_price <= 0:

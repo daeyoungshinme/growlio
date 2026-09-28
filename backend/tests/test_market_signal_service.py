@@ -227,11 +227,11 @@ class TestUsRateCurveSignal:
         }
         with (
             patch(
-                "app.services.market_signal_service.fetch_yield_curve_signal",
+                "app.services.market_signal_indicators.fetch_yield_curve_signal",
                 AsyncMock(return_value=yc_signal),
             ),
             patch(
-                "app.services.market_signal_service.fetch_rate_cut_expectation_signal",
+                "app.services.market_signal_indicators.fetch_rate_cut_expectation_signal",
                 AsyncMock(return_value=rate_signal),
             ),
         ):
@@ -244,9 +244,9 @@ class TestUsRateCurveSignal:
     @pytest.mark.asyncio
     async def test_returns_none_when_both_signals_unavailable(self):
         with (
-            patch("app.services.market_signal_service.fetch_yield_curve_signal", AsyncMock(return_value=None)),
+            patch("app.services.market_signal_indicators.fetch_yield_curve_signal", AsyncMock(return_value=None)),
             patch(
-                "app.services.market_signal_service.fetch_rate_cut_expectation_signal",
+                "app.services.market_signal_indicators.fetch_rate_cut_expectation_signal",
                 AsyncMock(return_value=None),
             ),
         ):
@@ -258,11 +258,11 @@ class TestUsRateCurveSignal:
         yc_signal = {"value": 0.6, "state": "POSITIVE", "date": "2026-07-03", "sub_score": 0}
         with (
             patch(
-                "app.services.market_signal_service.fetch_yield_curve_signal",
+                "app.services.market_signal_indicators.fetch_yield_curve_signal",
                 AsyncMock(return_value=yc_signal),
             ),
             patch(
-                "app.services.market_signal_service.fetch_rate_cut_expectation_signal",
+                "app.services.market_signal_indicators.fetch_rate_cut_expectation_signal",
                 AsyncMock(return_value=None),
             ),
         ):
@@ -312,9 +312,9 @@ class TestHighYieldSpreadSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_service
+        from app.services import market_signal_indicators
 
-        with patch.object(market_signal_service.fred_circuit, "is_available", return_value=False):
+        with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_high_yield_spread_signal()
         assert result is None
 
@@ -394,9 +394,9 @@ class TestRateCutExpectationSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_service
+        from app.services import market_signal_indicators
 
-        with patch.object(market_signal_service.fred_circuit, "is_available", return_value=False):
+        with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_rate_cut_expectation_signal()
         assert result is None
 
@@ -460,9 +460,9 @@ class TestExchangeRateSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_service
+        from app.services import market_signal_indicators
 
-        with patch.object(market_signal_service.fred_circuit, "is_available", return_value=False):
+        with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_exchange_rate_signal()
         assert result is None
 
@@ -526,9 +526,9 @@ class TestOilPriceSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_service
+        from app.services import market_signal_indicators
 
-        with patch.object(market_signal_service.fred_circuit, "is_available", return_value=False):
+        with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_oil_price_signal()
         assert result is None
 
@@ -595,11 +595,11 @@ class TestInflationSignal:
         pce_signal = {"yoy_change_pct": 6.0, "level": "BREAKOUT", "date": "2026-01-01", "sub_score": 3}
         with (
             patch(
-                "app.services.market_signal_service.fetch_cpi_inflation_signal",
+                "app.services.market_signal_indicators.fetch_cpi_inflation_signal",
                 AsyncMock(return_value=cpi_signal),
             ),
             patch(
-                "app.services.market_signal_service.fetch_pce_inflation_signal",
+                "app.services.market_signal_indicators.fetch_pce_inflation_signal",
                 AsyncMock(return_value=pce_signal),
             ),
         ):
@@ -612,8 +612,8 @@ class TestInflationSignal:
     @pytest.mark.asyncio
     async def test_merged_signal_returns_none_when_both_unavailable(self):
         with (
-            patch("app.services.market_signal_service.fetch_cpi_inflation_signal", AsyncMock(return_value=None)),
-            patch("app.services.market_signal_service.fetch_pce_inflation_signal", AsyncMock(return_value=None)),
+            patch("app.services.market_signal_indicators.fetch_cpi_inflation_signal", AsyncMock(return_value=None)),
+            patch("app.services.market_signal_indicators.fetch_pce_inflation_signal", AsyncMock(return_value=None)),
         ):
             result = await fetch_inflation_signal()
         assert result is None
@@ -677,9 +677,9 @@ class TestEmploymentSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_service
+        from app.services import market_signal_indicators
 
-        with patch.object(market_signal_service.fred_circuit, "is_available", return_value=False):
+        with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_employment_signal()
         assert result is None
 

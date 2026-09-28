@@ -25,11 +25,11 @@ from app.services._account_queries import active_accounts_stmt
 from app.services.credential_service import decrypt_kis_credentials
 from app.services.price_sync_sources import sync_naver_price, sync_pykrx_price
 from app.services.yahoo_price import (
-    _sync_calc_returns_batch,
     _sync_pykrx_returns_batch,
-    _sync_yahoo_batch,
-    _sync_yahoo_price,
     _yfinance_sem,
+    fetch_yahoo_batch,
+    fetch_yahoo_price,
+    fetch_yahoo_returns_batch,
 )
 from app.utils.cache_keys import (
     TTL_PRICE_CURRENT,
@@ -38,7 +38,7 @@ from app.utils.cache_keys import (
     current_price_key,
     price_return_key,
 )
-from app.utils.circuit_breaker import CircuitOpenError, kis_circuit, naver_circuit, yahoo_circuit
+from app.utils.circuit_breaker import CircuitOpenError, kis_circuit, naver_circuit
 from app.utils.currency import get_usd_krw_rate
 
 logger = structlog.get_logger()
@@ -81,13 +81,8 @@ async def fetch_current_price(
     if market.upper() in DOMESTIC_MARKETS:
         price = await domestic_price_fallback(ticker, loop)
 
-    if not price and yahoo_circuit.is_available():
-        async with _yfinance_sem:
-            price = await loop.run_in_executor(None, partial(_sync_yahoo_price, ticker, market))
-        if price:
-            yahoo_circuit.record_success()
-        else:
-            yahoo_circuit.record_failure()
+    if not price:
+        price = await fetch_yahoo_price(ticker, market)
 
     if not price:
         account = await _get_any_kis_account(user_id, db)
@@ -163,14 +158,7 @@ async def fetch_prices_batch(
                 price_map[ticker] = float(result)
 
     yahoo_targets = [(t, m) for t, m in remaining if t not in price_map]
-    if yahoo_targets and yahoo_circuit.is_available():
-        async with _yfinance_sem:
-            yahoo_map = await loop.run_in_executor(None, partial(_sync_yahoo_batch, yahoo_targets))
-        if yahoo_map:
-            yahoo_circuit.record_success()
-        else:
-            yahoo_circuit.record_failure()
-        price_map.update(yahoo_map)
+    price_map.update(await fetch_yahoo_batch(yahoo_targets))
 
     missing = [(t, m) for t, m in remaining if t not in price_map or price_map[t] == 0]
     if missing:
@@ -243,13 +231,8 @@ async def get_historical_returns(
 
     newly_fetched: dict[tuple[str, str], dict] = {}
 
-    if missing and yahoo_circuit.is_available():
-        async with _yfinance_sem:
-            batch_result = await loop.run_in_executor(None, partial(_sync_calc_returns_batch, missing, years))
-        if batch_result:
-            yahoo_circuit.record_success()
-        else:
-            yahoo_circuit.record_failure()
+    if missing:
+        batch_result = await fetch_yahoo_returns_batch(missing, years)
         newly_fetched.update(batch_result)
         missing = [tm for tm in missing if tm not in batch_result]
 

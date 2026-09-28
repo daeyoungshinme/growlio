@@ -403,6 +403,65 @@ class TestSyncAccountPositionReplacement:
         assert len(deletes) == 1
         assert "currency" in deletes[0]
 
+    @pytest.mark.parametrize("overseas_known", [False, True])
+    @pytest.mark.asyncio
+    async def test_overseas_unknown_snapshot_includes_preserved_overseas(
+        self, mock_db, override_settings, make_account, overseas_known
+    ):
+        """해외 조회 실패 시 스냅샷 금액·포지션에 보존된 해외 포지션과 기존 외화예수금을 합산한다.
+        확정(True)이면 balance 값 그대로."""
+        from app.providers.base import BalanceResult, Position
+        from app.services.asset_service import sync_account
+
+        account = make_account(data_source="KIS_API")
+        account.deposit_usd = 100.0
+        domestic = Position(
+            ticker="005930",
+            name="삼성전자",
+            market="KRX",
+            qty=10,
+            avg_price=80_000.0,
+            current_price=100_000.0,
+            currency="KRW",
+        )
+        balance = BalanceResult(
+            total_value_krw=1_000_000.0,
+            invested_krw=800_000.0,
+            pnl_krw=200_000.0,
+            positions=[domestic],
+            deposit_foreign=None if not overseas_known else 100.0,
+            overseas_known=overseas_known,
+            usd_krw_rate=1_400.0,
+        )
+        preserved = SimpleNamespace(ticker="AAPL", market="NASD", value_krw=500_000.0, avg_price=200_000.0, qty=2)
+
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(return_value=balance)
+        upsert = AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4()))
+        snap_positions = AsyncMock()
+        with (
+            patch("app.services.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.asset_service._CIRCUITS", {}),
+            patch("app.services.asset_service._upsert_snapshot", new=upsert),
+            patch("app.services.asset_service.sync_snapshot_positions", new=snap_positions),
+            patch("app.services.asset_service._preserved_overseas_positions", new=AsyncMock(return_value=[preserved])),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.broker_sync_duration"),
+        ):
+            await sync_account(account, mock_db, cache=MagicMock())
+
+        kwargs = upsert.call_args.kwargs
+        positions = snap_positions.call_args.kwargs["positions"]
+        if overseas_known:
+            assert kwargs["amount_krw"] == 1_000_000.0
+            assert kwargs["invested_amount"] == 800_000.0
+            assert positions == [domestic]
+        else:
+            assert kwargs["amount_krw"] == 1_000_000.0 + 500_000.0 + 100.0 * 1_400.0
+            assert kwargs["invested_amount"] == 800_000.0 + 400_000.0
+            assert kwargs["unrealized_pnl"] == 200_000.0 + 100_000.0
+            assert positions == [domestic, preserved]
+
     @pytest.mark.asyncio
     async def test_manual_empty_result_does_not_touch_positions(self, mock_db, override_settings, make_account):
         from app.providers.base import BalanceResult

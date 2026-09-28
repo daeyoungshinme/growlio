@@ -90,14 +90,23 @@ async def _wrap_user(user: User, settings_row: UserSettings, cache: CacheStoreTy
                     .all()
                 )
                 for challenge in challenges:
-                    await _wrap_one(db, user, settings_row, challenge, to_email, prev_month)
+                    # 챌린지 단위 savepoint — 한 챌린지의 예외가 같은 유저의 나머지 챌린지 결산을 막지 않게.
+                    # 내부 헬퍼는 전부 commit=False라 savepoint 해제 뒤 챌린지마다 커밋한다.
+                    try:
+                        async with db.begin_nested():
+                            await _wrap_one(db, user, settings_row, challenge, to_email, prev_month)
+                        await db.commit()
+                    except Exception as e:
+                        report_job_failure(
+                            "challenge_monthly_wrap_failed", e, user_id=str(user.id), challenge_id=str(challenge.id)
+                        )
         except Exception as e:
             report_job_failure("challenge_monthly_wrap_failed", e, user_id=str(user.id))
 
 
 async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month: str) -> None:
     key = _wrap_dedup_key(challenge.id, prev_month)
-    if await get_durable(db, key) is not None:
+    if await get_durable(db, key, commit=False) is not None:
         return
 
     progress = await challenge_service.compute_progress(challenge, user.id, db)
@@ -114,7 +123,7 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
         # RETURN_PCT / TARGET_VALUE — 목표 도달 시에만 발송
         completed = progress.progress_pct is not None and progress.progress_pct >= 100
         if not completed:
-            await set_durable(db, key, "1", ttl=_DEDUP_TTL)
+            await set_durable(db, key, "1", ttl=_DEDUP_TTL, commit=False)
             return
         prev_net = 0.0
         target_met = True
@@ -123,7 +132,7 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
     if completed and challenge.status != CHALLENGE_COMPLETED:
         challenge.status = CHALLENGE_COMPLETED
         challenge.completed_at = datetime.now(UTC)
-        await db.commit()  # 발송 성공 여부와 무관하게 완료 상태는 영속화
+        await db.flush()  # 발송 성공 여부와 무관하게 완료 상태는 영속화(챌린지 단위 커밋에 포함)
 
     await dispatch_dual_channel_alert(
         db,
@@ -146,7 +155,8 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
         push_body=f"{challenge.title} — {_month_label(prev_month)} 결산",
         push_type="CHALLENGE_WRAPUP",
         fcm_token=settings_row.fcm_token,
-        after_sent=lambda: set_durable(db, key, "1", ttl=_DEDUP_TTL),
+        commit=False,
+        after_sent=lambda: set_durable(db, key, "1", ttl=_DEDUP_TTL, commit=False),
     )
     logger.info("challenge_wrap_sent", user_id=str(user.id), challenge_id=str(challenge.id), completed=completed)
 

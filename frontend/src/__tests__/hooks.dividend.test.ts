@@ -7,7 +7,11 @@ import React from "react";
 
 vi.mock("@/api/client", () => {
   const mockApi = { get: vi.fn() };
-  return { api: mockApi };
+  return {
+    api: mockApi,
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+  };
 });
 
 // ── imports ───────────────────────────────────────────────────────────────────

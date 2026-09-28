@@ -78,7 +78,16 @@ async def _check_user(user: User, settings_row: UserSettings, cache: CacheStoreT
                     .all()
                 )
                 for challenge in challenges:
-                    await _remind_one(db, user, settings_row, challenge, to_email, month)
+                    # 챌린지 단위 savepoint — 한 챌린지의 예외가 같은 유저의 나머지 챌린지 발송을 막지 않게.
+                    # 내부 헬퍼는 전부 commit=False라 savepoint 해제 뒤 챌린지마다 커밋한다.
+                    try:
+                        async with db.begin_nested():
+                            await _remind_one(db, user, settings_row, challenge, to_email, month)
+                        await db.commit()
+                    except Exception as e:
+                        report_job_failure(
+                            "challenge_deposit_reminder_failed", e, user_id=str(user.id), challenge_id=str(challenge.id)
+                        )
         except Exception as e:
             report_job_failure("challenge_deposit_reminder_failed", e, user_id=str(user.id))
 
@@ -89,7 +98,7 @@ async def _remind_one(db, user, settings_row, challenge, to_email: str, month: s
     if done:
         return
     key = _reminder_dedup_key(challenge.id, month)
-    if await get_durable(db, key) is not None:
+    if await get_durable(db, key, commit=False) is not None:
         return
 
     target_amount = float(challenge.target_amount) if challenge.target_amount else None
@@ -112,6 +121,7 @@ async def _remind_one(db, user, settings_row, challenge, to_email: str, month: s
         push_body=f"{challenge.title} — {body}",
         push_type="CHALLENGE_REMINDER",
         fcm_token=settings_row.fcm_token,
-        after_sent=lambda: set_durable(db, key, "1", ttl=_DEDUP_TTL),
+        commit=False,
+        after_sent=lambda: set_durable(db, key, "1", ttl=_DEDUP_TTL, commit=False),
     )
     logger.info("challenge_reminder_sent", user_id=str(user.id), challenge_id=str(challenge.id))

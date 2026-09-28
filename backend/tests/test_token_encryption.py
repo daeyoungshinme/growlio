@@ -214,3 +214,60 @@ class TestPromoteUserTokenToAccount:
         assert stored_value != "legacy-plaintext-token"
         assert decrypt(stored_value) == "legacy-plaintext-token"
         assert cache.setex.await_args.args[2] == "legacy-plaintext-token"
+
+
+class TestStoreToken:
+    """app/providers/_token_cache.py::store_token — KIS/키움/토스 공용 발급 후 저장."""
+
+    @pytest.mark.asyncio
+    async def test_cache_ttl_subtracts_buffer_and_upsert_uses_conflict_target(self):
+        from sqlalchemy.dialects import postgresql
+
+        from app.constants import TOKEN_CACHE_TTL_BUFFER
+        from app.models.token import KisToken
+        from app.providers._token_cache import store_token
+        from app.services.credential_service import decrypt
+
+        cache = AsyncMock()
+        db = AsyncMock()
+        expires_at = datetime.now(UTC) + timedelta(hours=24)
+
+        await store_token(
+            cache,
+            db,
+            cache_key="k",
+            access_token="plain",
+            expires_at=expires_at,
+            model=KisToken,
+            values={"user_id": str(uuid.uuid4()), "account_id": None, "is_mock_mode": False},
+            index_elements=["user_id", "is_mock_mode"],
+            index_where=KisToken.account_id.is_(None),
+        )
+
+        key, ttl, value = cache.setex.await_args.args
+        assert (key, value) == ("k", "plain")
+        assert 86400 - TOKEN_CACHE_TTL_BUFFER - 2 <= ttl <= 86400 - TOKEN_CACHE_TTL_BUFFER
+
+        stmt = db.execute.await_args.args[0]
+        sql = str(stmt.compile(dialect=postgresql.dialect()))
+        assert "ON CONFLICT (user_id, is_mock_mode) WHERE" in sql
+        assert decrypt(stmt.compile().params["access_token"]) == "plain"
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_short_lived_token_ttl_floors_at_60(self):
+        from app.models.token import TossToken
+        from app.providers._token_cache import store_token
+
+        cache = AsyncMock()
+        await store_token(
+            cache,
+            AsyncMock(),
+            cache_key="k",
+            access_token="plain",
+            expires_at=datetime.now(UTC) + timedelta(seconds=30),
+            model=TossToken,
+            values={"user_id": str(uuid.uuid4()), "account_id": str(uuid.uuid4())},
+            index_elements=["account_id"],
+        )
+        assert cache.setex.await_args.args[1] == 60

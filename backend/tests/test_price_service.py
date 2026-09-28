@@ -43,7 +43,7 @@ class TestFetchCurrentPrice:
 
         with (
             patch("app.services.price_service.domestic_price_fallback", new=AsyncMock(return_value=None)),
-            patch("app.services.price_service._sync_yahoo_price", return_value=75000.0),
+            patch("app.services.yahoo_price._sync_yahoo_price", return_value=75000.0),
             patch("asyncio.get_event_loop") as mock_loop,
         ):
             mock_executor = AsyncMock(return_value=75000.0)
@@ -102,7 +102,7 @@ class TestFetchPricesBatch:
         user_id = uuid.uuid4()
         mock_db.scalar = AsyncMock(return_value=None)
 
-        with patch("app.services.price_service.yahoo_circuit") as mock_circuit:
+        with patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit:
             mock_circuit.is_available.return_value = False
 
             from app.services.price_service import fetch_prices_batch
@@ -121,7 +121,7 @@ class TestFetchPricesBatch:
         mock_db.scalar = AsyncMock(return_value=None)
 
         with (
-            patch("app.services.price_service.yahoo_circuit") as mock_circuit,
+            patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
             patch("app.services.price_service._yfinance_sem"),
         ):
             mock_circuit.is_available.return_value = True
@@ -147,7 +147,7 @@ class TestFetchPricesBatch:
 
         with (
             patch("app.services.price_service.sync_naver_price", return_value=286000.0),
-            patch("app.services.price_service._sync_yahoo_batch") as mock_yahoo_batch,
+            patch("app.services.yahoo_price._sync_yahoo_batch") as mock_yahoo_batch,
         ):
             from app.services.price_service import fetch_prices_batch
 
@@ -296,7 +296,7 @@ class TestGetHistoricalReturns:
         """회로 OPEN + 해외 종목(대체 소스 없음)이면 빈 결과."""
         from unittest.mock import patch
 
-        with patch("app.services.price_service.yahoo_circuit") as mock_circuit:
+        with patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit:
             mock_circuit.is_available.return_value = False
 
             from app.services.price_service import get_historical_returns
@@ -313,7 +313,7 @@ class TestGetHistoricalReturns:
         pykrx_data = {("005930", "KOSPI"): {"cumulative_return_pct": 50.0, "cagr_pct": 5.0, "actual_years": 10.0}}
 
         with (
-            patch("app.services.price_service.yahoo_circuit") as mock_circuit,
+            patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
         ):
             mock_circuit.is_available.return_value = False
 
@@ -335,7 +335,7 @@ class TestGetHistoricalReturns:
         batch_data = {("AAPL", "NASDAQ"): {"cumulative_pct": 200.0, "annual_pct": 10.0}}
 
         with (
-            patch("app.services.price_service.yahoo_circuit") as mock_circuit,
+            patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
             patch("app.services.price_service._yfinance_sem"),
         ):
             mock_circuit.is_available.return_value = True
@@ -356,10 +356,10 @@ class TestGetHistoricalReturns:
         from unittest.mock import AsyncMock, patch
 
         with (
-            patch("app.services.price_service.yahoo_circuit") as mock_circuit,
+            patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
             patch("app.services.price_service._yfinance_sem"),
             patch(
-                "app.services.price_service._sync_calc_returns_batch",
+                "app.services.yahoo_price._sync_calc_returns_batch",
                 return_value={},
             ),
             patch(
@@ -473,7 +473,7 @@ class TestFetchCurrentPriceDomesticPriority:
 
         with (
             patch("app.services.price_service.sync_naver_price", return_value=286000.0),
-            patch("app.services.price_service._sync_yahoo_price") as mock_yahoo,
+            patch("app.services.yahoo_price._sync_yahoo_price") as mock_yahoo,
         ):
             from app.services.price_service import fetch_current_price
 
@@ -493,7 +493,7 @@ class TestFetchCurrentPriceDomesticPriority:
 
         with (
             patch("app.services.price_service.domestic_price_fallback") as mock_domestic,
-            patch("app.services.price_service._sync_yahoo_price", return_value=180.0),
+            patch("app.services.yahoo_price._sync_yahoo_price", return_value=180.0),
         ):
             from app.services.price_service import fetch_current_price
 
