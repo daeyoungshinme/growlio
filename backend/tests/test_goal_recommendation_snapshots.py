@@ -194,7 +194,7 @@ def _write_updated_snapshots():
         merged = {**_load_snapshots(), **_UPDATED}
         _SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
         _SNAPSHOT_PATH.write_text(
-            json.dumps(merged, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            json.dumps(merged, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
         )
 
 
