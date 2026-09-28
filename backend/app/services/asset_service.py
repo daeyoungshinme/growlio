@@ -11,6 +11,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 from sqlalchemy import delete as sql_delete
@@ -94,6 +95,18 @@ async def _retry_provider_sync(
     return await provider.sync(account, db, cache)
 
 
+async def _preserved_overseas_positions(db: AsyncSession, account_id: uuid.UUID) -> list[Position]:
+    """해외 조회 실패 동기화에서 교체되지 않고 남은 현재 해외(비KRW) 포지션."""
+    result = await db.execute(
+        select(Position).where(
+            Position.account_id == account_id,
+            Position.snapshot_id.is_(None),
+            Position.currency != "KRW",
+        )
+    )
+    return list(result.scalars().all())
+
+
 async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStoreType) -> SyncAccountResult:
     """모든 데이터 소스를 통합 처리하는 계좌 동기화 진입점.
 
@@ -166,20 +179,35 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     today = balance.extra.get("snapshot_date", today_kst())
     source = balance.extra.get("source", account.data_source)
 
+    amount_krw = balance.total_value_krw
+    invested_krw = balance.invested_krw
+    pnl_krw = balance.pnl_krw
+    snapshot_positions: list[Any] = list(balance.positions)
+    if replace_positions and not balance.overseas_known:
+        # 해외 조회 실패 — balance 합계엔 해외 종목·외화예수금이 빠져 있다. 보존된 해외 포지션과 기존
+        # deposit_usd를 더하지 않으면 그날 스냅샷(월별 대표값 후보)이 해외분만큼 급락한다.
+        preserved = await _preserved_overseas_positions(db, account.id)
+        preserved_value = sum(float(p.value_krw or 0) for p in preserved)
+        preserved_invested = sum(float(p.avg_price or 0) * float(p.qty or 0) for p in preserved)
+        amount_krw += preserved_value + float(account.deposit_usd or 0) * balance.usd_krw_rate
+        invested_krw += preserved_invested
+        pnl_krw += preserved_value - preserved_invested
+        snapshot_positions = [*balance.positions, *preserved]
+
     snapshot = await _upsert_snapshot(
         db,
         account_id=account.id,
         user_id=account.user_id,
         snapshot_date=today,
-        amount_krw=balance.total_value_krw,
-        invested_amount=balance.invested_krw or None,
-        unrealized_pnl=balance.pnl_krw or None,
+        amount_krw=amount_krw,
+        invested_amount=invested_krw or None,
+        unrealized_pnl=pnl_krw or None,
         usd_krw_rate=(balance.usd_krw_rate if balance.usd_krw_rate != settings.usd_krw_fallback_rate else None),
         source=source,
     )
 
-    if balance.positions:
-        await sync_snapshot_positions(db, snapshot_id=snapshot.id, account_id=account.id, positions=balance.positions)
+    if snapshot_positions:
+        await sync_snapshot_positions(db, snapshot_id=snapshot.id, account_id=account.id, positions=snapshot_positions)
 
     account.last_synced_at = datetime.now(UTC)
     account.last_sync_error = None
