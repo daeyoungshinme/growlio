@@ -2,7 +2,10 @@ import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
 import type { PortfolioOverview } from "@/types";
 import type { AccountTaxType, InvestmentHorizon } from "@/api/assets";
 
-export const fetchPortfolioOverview = () => apiGet<PortfolioOverview>("/portfolio/overview");
+export const fetchPortfolioOverview = (accountId?: string | null) =>
+  accountId
+    ? apiGet<PortfolioOverview>("/portfolio/overview", { params: { account_id: accountId } })
+    : apiGet<PortfolioOverview>("/portfolio/overview");
 
 export const fetchPortfolioOverviewLite = () =>
   apiGet<PortfolioOverview>("/portfolio/overview", { params: { lite: true } });

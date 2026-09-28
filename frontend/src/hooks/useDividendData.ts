@@ -1,15 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/api/client";
+import {
+  fetchDividendByTicker,
+  fetchDividendPositions,
+  fetchDividendSummary,
+} from "@/api/dividends";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import type { DividendByTicker, DividendYield } from "@/types";
-
-export interface DividendSummary {
-  annual_received: number;
-  estimated_annual: number;
-  monthly_breakdown: { month: string; amount: number }[];
-  monthly_ticker_breakdown: { month: string; ticker: string | null; amount: number }[];
-}
 
 export function useDividendData(enabled: boolean, accountId?: string | null) {
   const {
@@ -18,12 +14,7 @@ export function useDividendData(enabled: boolean, accountId?: string | null) {
     isError: positionsError,
   } = useQuery({
     queryKey: QUERY_KEYS.dividendPositions(accountId),
-    queryFn: () =>
-      api
-        .get<DividendYield[]>("/dividends/positions", {
-          params: { account_id: accountId || undefined },
-        })
-        .then((r) => r.data),
+    queryFn: () => fetchDividendPositions(accountId),
     staleTime: STALE_TIME.LONG,
     enabled,
   });
@@ -34,12 +25,7 @@ export function useDividendData(enabled: boolean, accountId?: string | null) {
     isError: summaryError,
   } = useQuery({
     queryKey: QUERY_KEYS.dividendSummary(accountId),
-    queryFn: () =>
-      api
-        .get<DividendSummary>("/dividends/summary", {
-          params: { account_id: accountId || undefined },
-        })
-        .then((r) => r.data),
+    queryFn: () => fetchDividendSummary(accountId),
     staleTime: STALE_TIME.LONG,
     enabled,
   });
@@ -50,12 +36,7 @@ export function useDividendData(enabled: boolean, accountId?: string | null) {
     isError: byTickerError,
   } = useQuery({
     queryKey: QUERY_KEYS.dividendByTicker(accountId),
-    queryFn: () =>
-      api
-        .get<DividendByTicker[]>("/dividends/by-ticker", {
-          params: { account_id: accountId || undefined },
-        })
-        .then((r) => r.data),
+    queryFn: () => fetchDividendByTicker(accountId),
     staleTime: STALE_TIME.LONG,
     enabled,
   });

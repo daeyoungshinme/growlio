@@ -29,10 +29,9 @@ import {
   TOUCH_TARGET_COMPACT_MOBILE_ONLY,
 } from "@/constants/uiSizes";
 import { SELECT_SM } from "@/constants/inputStyles";
-import type { PortfolioOverview } from "@/types";
 import { isPortfolioAccount, isStockAccount, isSyncableAccount } from "@/utils/accounts";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/api/client";
+import { fetchPortfolioOverview } from "@/api/portfolios";
 const TaxTabContainer = lazy(() => import("../components/portfolio-analysis/TaxTabContainer"));
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
@@ -40,12 +39,6 @@ const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticFo
 
 const CHARTS_OPEN_KEY = "portfolio:chartsOpen";
 const SYNC_BUTTON_CLASS = `${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors`;
-const fetchOverview = (accountId?: string | null) =>
-  api
-    .get<PortfolioOverview>("/portfolio/overview", {
-      params: { account_id: accountId || undefined },
-    })
-    .then((r) => r.data);
 const TABS = PORTFOLIO_TABS;
 type Tab = (typeof TABS)[number];
 
@@ -121,7 +114,7 @@ export default function PortfolioPage() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview(selectedAccountId),
-    queryFn: () => fetchOverview(selectedAccountId),
+    queryFn: () => fetchPortfolioOverview(selectedAccountId),
     staleTime: STALE_TIME.EXCHANGE_RATE,
     refetchInterval: isNativePlatform() ? false : REFETCH_INTERVAL.PORTFOLIO,
   });

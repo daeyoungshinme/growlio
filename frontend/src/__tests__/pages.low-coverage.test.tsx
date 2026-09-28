@@ -497,6 +497,10 @@ const mockPortfolioOverview = {
 describe("PortfolioPage", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    const { fetchPortfolioOverview } = await import("@/api/portfolios");
+    vi.mocked(fetchPortfolioOverview).mockResolvedValue(
+      mockPortfolioOverview as unknown as Awaited<ReturnType<typeof fetchPortfolioOverview>>,
+    );
     const { api } = await import("@/api/client");
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioOverview });
@@ -547,8 +551,8 @@ describe("PortfolioPage", () => {
   });
 
   it("에러 시 다시 시도 버튼을 표시한다", async () => {
-    const { api } = await import("@/api/client");
-    vi.mocked(api.get).mockRejectedValue(new Error("Network Error"));
+    const { fetchPortfolioOverview } = await import("@/api/portfolios");
+    vi.mocked(fetchPortfolioOverview).mockRejectedValue(new Error("Network Error"));
     renderPage(<PortfolioPage />);
     await waitFor(() => {
       expect(screen.getByText("다시 시도")).toBeInTheDocument();

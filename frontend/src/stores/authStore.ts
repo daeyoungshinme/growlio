@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getSupabase } from "@/lib/supabase";
+// 인증 부트스트랩(세션 복원·프로필 동기화·401 재시도) 전용이라 도메인 api 모듈을 거치지 않고 client를 직접 쓴다.
 import { api } from "@/api/client";
 import { getHttpStatus } from "@/utils/error";
 import { BIOMETRIC_SESSION_KEY } from "@/hooks/useBiometric";
