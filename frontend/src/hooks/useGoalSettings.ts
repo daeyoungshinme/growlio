@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-import { api } from "@/api/client";
-import { fetchSettings, type GoalRiskTolerance } from "@/api/settings";
+import {
+  fetchSettings,
+  updateGoalRecommendationOptions,
+  updateGoalSettings,
+  type GoalRiskTolerance,
+} from "@/api/settings";
 import { fetchDCAAnalysis } from "@/api/invest";
 import { toast } from "@/utils/toast";
 import { invalidateDcaData, invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
@@ -142,7 +146,7 @@ export function useGoalSettings() {
   const saveSettings = async () => {
     setSaving(true);
     try {
-      await api.put("/settings/goal", {
+      await updateGoalSettings({
         monthly_deposit_amount: form.monthly_deposit_amount
           ? Number(form.monthly_deposit_amount)
           : null,
@@ -167,7 +171,7 @@ export function useGoalSettings() {
         // 리스크 성향은 전체교체 엔드포인트라 다른 필드(종목당 최대비중 등)를 덮어쓰지 않도록
         // 저장 직전 최신값을 조회해 리스크 성향만 갈아끼워 되돌려 보낸다.
         const current = await fetchSettings();
-        await api.put("/settings/goal-recommendation-options", {
+        await updateGoalRecommendationOptions({
           risk_tolerance: form.goal_risk_tolerance,
           max_weight_pct: current.goal_max_weight_pct,
           cagr_lookback_years: current.goal_cagr_lookback_years,

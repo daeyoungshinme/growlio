@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "@/api/client";
+import { sendTestEmail as requestTestEmail, updateNotificationEmail } from "@/api/settings";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { SectionCard, inputClass, labelClass } from "./shared";
@@ -16,9 +16,7 @@ export function NotificationEmailSection({ userEmail, onSettingsChange }: Props)
   const saveNotificationEmail = async () => {
     setSaving("notification-email");
     try {
-      await api.put("/settings/notification-email", {
-        notification_email: notificationEmail || null,
-      });
+      await updateNotificationEmail(notificationEmail || null);
       toast("알림 이메일이 저장되었습니다", "success");
       onSettingsChange();
     } catch (e) {
@@ -31,7 +29,7 @@ export function NotificationEmailSection({ userEmail, onSettingsChange }: Props)
   const sendTestEmail = async () => {
     setSaving("test-email");
     try {
-      await api.post("/settings/test-email");
+      await requestTestEmail();
       toast("테스트 이메일을 발송했습니다. 받은편지함을 확인하세요.", "success");
     } catch (e) {
       toast(extractErrorMessage(e, "이메일 발송에 실패했습니다. SMTP 설정을 확인하세요."), "error");

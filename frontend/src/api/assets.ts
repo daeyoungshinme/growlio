@@ -220,3 +220,31 @@ export const fetchStockPricesBatch = (
   items: { ticker: string; market: string; account_id?: string }[],
 ): Promise<Record<string, StockPrice>> =>
   apiPost<Record<string, StockPrice>>("/stocks/prices-batch", { items });
+
+// ── 계좌 보유 종목(수동 편집·현재가 동기화) ─────────────────────────────────
+
+export interface AccountPositionsSummary {
+  total_invested: number;
+  total_value: number;
+  total_pnl: number;
+  total_pnl_pct: number;
+}
+
+/** 필드 구성은 화면마다 필요한 만큼만 쓰므로 행 타입은 호출부가 지정한다(편집기는 `usePositionsEditor.Position`). */
+export interface AccountPositionsResponse<P = { ticker: string; name: string; qty: number }> {
+  positions: P[];
+  summary: AccountPositionsSummary;
+}
+
+export const fetchAccountPositions = <P = { ticker: string; name: string; qty: number }>(
+  accountId: string,
+): Promise<AccountPositionsResponse<P>> =>
+  apiGet<AccountPositionsResponse<P>>(`/assets/${accountId}/positions`);
+
+export const replaceAccountPositions = <P>(accountId: string, positions: P[]) =>
+  apiPut(`/assets/${accountId}/positions`, positions);
+
+export const syncAccountPositionPrices = <P>(
+  accountId: string,
+): Promise<AccountPositionsResponse<P>> =>
+  apiPost<AccountPositionsResponse<P>>(`/assets/${accountId}/positions/sync-prices`);

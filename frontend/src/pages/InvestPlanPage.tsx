@@ -12,8 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import { useDividendPlanSettings } from "@/hooks/useDividendPlanSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { api } from "@/api/client";
-import type { SettingsData } from "@/api/settings";
+import { fetchSettings } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -68,7 +67,7 @@ export default function InvestPlanPage() {
 
   const { data: settingsData } = useQuery({
     queryKey: QUERY_KEYS.settings,
-    queryFn: () => api.get<SettingsData>("/settings").then((r) => r.data),
+    queryFn: fetchSettings,
     staleTime: STALE_TIME.LONG,
   });
 

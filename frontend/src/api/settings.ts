@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "./client";
+import { apiDelete, apiGet, apiPost, apiPut } from "./client";
 
 export type AssetClass = "EQUITY" | "BOND" | "CASH";
 
@@ -63,6 +63,31 @@ export interface SettingsData {
 }
 
 export const fetchSettings = (): Promise<SettingsData> => apiGet<SettingsData>("/settings");
+
+/** 목표 설정 부분 갱신 — 보낸 필드만 바뀐다(배당 계획 화면은 annual_dividend_goal만 보냄). */
+export interface GoalSettingsPayload {
+  monthly_deposit_amount?: number | null;
+  goal_annual_return_pct?: number | null;
+  goal_amount?: number | null;
+  goal_start_date?: string | null;
+  goal_initial_amount?: number | null;
+  annual_deposit_goal?: number | null;
+  retirement_target_year?: number | null;
+  annual_dividend_goal?: number | null;
+  birth_year?: number | null;
+}
+
+export const updateGoalSettings = (payload: GoalSettingsPayload) =>
+  apiPut("/settings/goal", payload);
+
+export const saveDartApiKey = (api_key: string) => apiPut("/settings/dart", { api_key });
+
+export const deleteDartApiKey = () => apiDelete("/settings/dart");
+
+export const updateNotificationEmail = (notification_email: string | null) =>
+  apiPut("/settings/notification-email", { notification_email });
+
+export const sendTestEmail = () => apiPost("/settings/test-email");
 
 export const registerPushToken = (fcm_token: string | null) =>
   apiPut("/settings/push-token", { fcm_token });

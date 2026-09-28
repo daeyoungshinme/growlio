@@ -30,6 +30,8 @@ vi.mock("@/api/client", () => {
 
 vi.mock("@/api/settings", () => ({
   fetchSettings: vi.fn(),
+  updateGoalSettings: vi.fn(),
+  updateGoalRecommendationOptions: vi.fn(),
 }));
 
 vi.mock("@/api/invest", () => ({
@@ -121,7 +123,7 @@ vi.mock("@/components/common/ConfirmModal", () => ({
 
 import InvestPlanPage from "@/pages/InvestPlanPage";
 import { api } from "@/api/client";
-import { fetchSettings } from "@/api/settings";
+import { fetchSettings, updateGoalSettings } from "@/api/settings";
 import { fetchDCAAnalysis } from "@/api/invest";
 import { toast } from "@/utils/toast";
 
@@ -298,7 +300,7 @@ describe("InvestPlanPage", () => {
 
   it("saves settings successfully", async () => {
     vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
-    vi.mocked(api.put).mockResolvedValue({ data: {} });
+    vi.mocked(updateGoalSettings).mockResolvedValue(undefined);
     renderPage();
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /설정 편집/ })).toBeInTheDocument();
@@ -316,7 +318,7 @@ describe("InvestPlanPage", () => {
 
   it("shows error toast when save fails", async () => {
     vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
-    vi.mocked(api.put).mockRejectedValue(new Error("save failed"));
+    vi.mocked(updateGoalSettings).mockRejectedValue(new Error("save failed"));
     renderPage();
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /설정 편집/ })).toBeInTheDocument();

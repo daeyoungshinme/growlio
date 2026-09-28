@@ -16,8 +16,7 @@ import {
 import { Link } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/api/client";
-import { fetchSettings } from "@/api/settings";
+import { deleteDartApiKey, fetchSettings, saveDartApiKey } from "@/api/settings";
 import { fetchAccounts } from "@/api/assets";
 import { fetchCompositeSignalStatus } from "@/api/rebalancing";
 import { toast } from "@/utils/toast";
@@ -102,7 +101,7 @@ export default function SettingsPage() {
   const saveDart = async () => {
     setSaving("dart");
     try {
-      await api.put("/settings/dart", { api_key: dart.api_key });
+      await saveDartApiKey(dart.api_key);
       toast("DART API 키가 저장되었습니다", "success");
       void invalidateSettings();
     } catch (e) {
@@ -115,7 +114,7 @@ export default function SettingsPage() {
   const deleteDart = async () => {
     setSaving("dart-delete");
     try {
-      await api.delete("/settings/dart");
+      await deleteDartApiKey();
       toast("DART API 키가 삭제되었습니다", "success");
       void invalidateSettings();
     } catch (e) {

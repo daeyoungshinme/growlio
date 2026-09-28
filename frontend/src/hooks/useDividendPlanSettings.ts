@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@/api/client";
-import { fetchSettings } from "@/api/settings";
+import { fetchSettings, updateGoalSettings } from "@/api/settings";
 import { toast } from "@/utils/toast";
 import { invalidateDividendPlanData } from "@/utils/queryInvalidation";
 import { useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
@@ -41,7 +40,7 @@ export function useDividendPlanSettings() {
   const saveSettings = async () => {
     setSaving(true);
     try {
-      await api.put("/settings/goal", {
+      await updateGoalSettings({
         annual_dividend_goal: form.annual_dividend_goal ? Number(form.annual_dividend_goal) : null,
       });
       toast("설정이 저장되었습니다", "success");
