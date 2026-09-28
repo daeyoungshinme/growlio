@@ -7,6 +7,7 @@ credential_service.py(AES-256 암복호화 순수 유틸)와 책임 레벨이 �
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,59 +64,79 @@ async def verify_toss_credentials(toss_client_id: str, toss_client_secret: str) 
     await verify_credentials(toss_client_id, toss_client_secret)
 
 
-async def delete_toss_credentials(account: AssetAccount, db: AsyncSession, cache) -> None:
-    """계좌별 토스 Open API 자격증명을 삭제한다."""
-    await _delete_credentials(
-        account,
-        db,
-        cache,
-        app_key_attr="toss_client_id",
-        app_secret_attr="toss_client_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
-        token_model=TossToken,
-        cache_key=TOSS_TOKEN_CACHE_KEY.format(account_id=account.id),
+@dataclass(frozen=True)
+class BrokerCredentialSpec:
+    """브로커별 계좌 자격증명 스펙 — assets 라우터의 생성/수정/응답/삭제가 이 테이블만 보고 동작한다.
+
+    검증(verify)은 요청 스키마·함수 시그니처·브로커 고유 에러가 달라 브로커별 라우트로 남긴다.
+    """
+
+    data_source: str
+    key_attr: str  # AssetAccount/요청 스키마 공통 필드명 (암호화 저장)
+    secret_attr: str
+    has_own_attr: str  # AssetAccountResponse의 계좌별 키 보유 플래그
+    # 생성 시 라우터가 필수로 확인하는 계좌번호 필드. KIS는 스키마 validator가 형식까지 검증하므로 None.
+    required_account_no_attr: str | None
+    forced_asset_type: str | None  # 생성 시 강제 asset_type (KIS는 요청값 유지)
+    missing_detail: str  # 생성 시 필수값 누락 400 메시지
+    token_model: type[KisToken] | type[KiwoomToken] | type[TossToken]
+    token_cache_key: str  # "{account_id}" 템플릿
+
+    @property
+    def credential_attrs(self) -> tuple[str, str]:
+        return (self.key_attr, self.secret_attr)
+
+
+BROKER_CREDENTIAL_SPECS: dict[str, BrokerCredentialSpec] = {
+    spec.data_source: spec
+    for spec in (
+        BrokerCredentialSpec(
+            data_source="KIS_API",
+            key_attr="kis_app_key",
+            secret_attr="kis_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
+            has_own_attr="has_own_kis_credentials",
+            required_account_no_attr=None,
+            forced_asset_type=None,
+            missing_detail="KIS API 자격증명(App Key, App Secret)을 모두 입력하세요.",
+            token_model=KisToken,
+            token_cache_key=KIS_ACCOUNT_TOKEN_CACHE_KEY,
+        ),
+        BrokerCredentialSpec(
+            data_source="KIWOOM_API",
+            key_attr="kiwoom_app_key",
+            secret_attr="kiwoom_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
+            has_own_attr="has_own_kiwoom_credentials",
+            required_account_no_attr="kiwoom_account_no",
+            forced_asset_type="STOCK_KIWOOM",
+            missing_detail="키움 계좌번호와 API 자격증명(App Key, App Secret)을 모두 입력하세요.",
+            token_model=KiwoomToken,
+            token_cache_key=KIWOOM_TOKEN_CACHE_KEY,
+        ),
+        BrokerCredentialSpec(
+            data_source="TOSS_API",
+            key_attr="toss_client_id",
+            secret_attr="toss_client_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
+            has_own_attr="has_own_toss_credentials",
+            required_account_no_attr="toss_account_no",
+            forced_asset_type="STOCK_TOSS",
+            missing_detail="토스 계좌번호와 API 자격증명(Client ID, Client Secret)을 모두 입력하세요.",
+            token_model=TossToken,
+            token_cache_key=TOSS_TOKEN_CACHE_KEY,
+        ),
     )
+}
+
+# 요청 스키마에서 평문으로 들어오는 자격증명 필드 전체 — model_dump 시 제외하고 암호화해 따로 저장한다
+CREDENTIAL_FIELDS: set[str] = set(attr for spec in BROKER_CREDENTIAL_SPECS.values() for attr in spec.credential_attrs)
 
 
-async def delete_kis_credentials(account: AssetAccount, db: AsyncSession, cache) -> None:
-    """계좌별 KIS API 자격증명을 삭제한다. 이후 전역 자격증명으로 폴백된다."""
-    await _delete_credentials(
-        account,
-        db,
-        cache,
-        app_key_attr="kis_app_key",
-        app_secret_attr="kis_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
-        token_model=KisToken,
-        cache_key=KIS_ACCOUNT_TOKEN_CACHE_KEY.format(account_id=account.id),
-    )
-
-
-async def delete_kiwoom_credentials(account: AssetAccount, db: AsyncSession, cache) -> None:
-    """계좌별 키움 API 자격증명을 삭제한다."""
-    await _delete_credentials(
-        account,
-        db,
-        cache,
-        app_key_attr="kiwoom_app_key",
-        app_secret_attr="kiwoom_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
-        token_model=KiwoomToken,
-        cache_key=KIWOOM_TOKEN_CACHE_KEY.format(account_id=account.id),
-    )
-
-
-async def _delete_credentials(
-    account: AssetAccount,
-    db: AsyncSession,
-    cache,
-    *,
-    app_key_attr: str,
-    app_secret_attr: str,
-    token_model,
-    cache_key: str,
-) -> None:
-    setattr(account, app_key_attr, None)
-    setattr(account, app_secret_attr, None)
+async def delete_credentials(account: AssetAccount, db: AsyncSession, cache, spec: BrokerCredentialSpec) -> None:
+    """계좌별 브로커 자격증명과 발급 토큰(DB·캐시)을 삭제한다. KIS는 이후 전역 자격증명으로 폴백된다."""
+    setattr(account, spec.key_attr, None)
+    setattr(account, spec.secret_attr, None)
+    token_model = spec.token_model
     await db.execute(sql_delete(token_model).where(token_model.account_id == account.id))
     await db.commit()
 
-    await cache.delete(cache_key)
+    await cache.delete(spec.token_cache_key.format(account_id=account.id))
     await invalidate_user_caches(cache, account_detail_key(account.user_id, account.id))

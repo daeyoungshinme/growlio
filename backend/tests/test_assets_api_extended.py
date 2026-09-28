@@ -580,6 +580,23 @@ class TestDeleteCredentials:
         assert resp.status_code == 204
         assert account.kiwoom_app_key is None
 
+    def test_delete_toss_credentials_success(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id)
+        account.toss_client_id = "encrypted_id"
+        account.toss_client_secret = "encrypted_secret"
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.delete(f"/api/v1/assets/{account.id}/toss-credentials")
+        assert resp.status_code == 204
+        assert account.toss_client_id is None
+        assert account.toss_client_secret is None
+        # 토스 토큰 테이블 삭제가 실행됐는지
+        executed_sql = str(db.execute.await_args.args[0])
+        assert "toss_tokens" in executed_sql
+
 
 class TestVerifyKiwoomCredentials:
     _URL = "/api/v1/assets/verify-kiwoom-credentials"
