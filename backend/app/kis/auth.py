@@ -9,7 +9,7 @@ from app.kis.constants import (
     KIS_REAL_BASE_URL,
     TOKEN_CACHE_KEY,
 )
-from app.providers._token_cache import get_or_fetch_token
+from app.providers._token_cache import get_or_fetch_token, store_token
 from app.providers.http_client import _get_client
 from app.services.credential_service import decrypt, encrypt
 
@@ -104,49 +104,26 @@ async def _fetch_and_store_token(
     expires_in: int = int(data.get("expires_in", 86400))
     expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
-    # 캐시 저장
-    if account_id:
-        cache_key = ACCOUNT_TOKEN_CACHE_KEY.format(account_id=account_id)
-    else:
-        cache_key = TOKEN_CACHE_KEY.format(user_id=user_id, mode="mock" if is_mock else "real")
-    ttl = expires_in - TOKEN_CACHE_TTL_BUFFER
-    await cache.setex(cache_key, max(ttl, 60), access_token)
-
-    # DB upsert (DB에는 암호화된 값만 저장 — 캐시/반환값은 평문 유지)
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-
     from app.models.token import KisToken
 
-    encrypted_token = encrypt(access_token)
-
+    values = {"user_id": user_id, "account_id": account_id, "is_mock_mode": is_mock}
     if account_id:
-        stmt = pg_insert(KisToken).values(
-            user_id=user_id,
-            account_id=account_id,
-            access_token=encrypted_token,
-            expires_at=expires_at,
-            is_mock_mode=is_mock,
-        )
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["account_id"],
-            index_where=KisToken.account_id.is_not(None),
-            set_={"access_token": encrypted_token, "expires_at": expires_at},
-        )
+        cache_key = ACCOUNT_TOKEN_CACHE_KEY.format(account_id=account_id)
+        index_elements, index_where = ["account_id"], KisToken.account_id.is_not(None)
     else:
-        stmt = pg_insert(KisToken).values(
-            user_id=user_id,
-            account_id=None,
-            access_token=encrypted_token,
-            expires_at=expires_at,
-            is_mock_mode=is_mock,
-        )
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["user_id", "is_mock_mode"],
-            index_where=KisToken.account_id.is_(None),
-            set_={"access_token": encrypted_token, "expires_at": expires_at},
-        )
-    await db.execute(stmt)
-    await db.commit()
+        cache_key = TOKEN_CACHE_KEY.format(user_id=user_id, mode="mock" if is_mock else "real")
+        index_elements, index_where = ["user_id", "is_mock_mode"], KisToken.account_id.is_(None)
+    await store_token(
+        cache,
+        db,
+        cache_key=cache_key,
+        access_token=access_token,
+        expires_at=expires_at,
+        model=KisToken,
+        values=values,
+        index_elements=index_elements,
+        index_where=index_where,
+    )
 
     logger.info("kis_token_issued", user_id=user_id, account_id=account_id, is_mock=is_mock)
     return access_token

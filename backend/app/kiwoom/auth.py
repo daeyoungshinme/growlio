@@ -12,9 +12,8 @@ from app.kiwoom.constants import (
     KIWOOM_REAL_BASE_URL,
     KIWOOM_TOKEN_CACHE_KEY,
 )
-from app.providers._token_cache import get_or_fetch_token
+from app.providers._token_cache import get_or_fetch_token, store_token
 from app.providers.http_client import _get_client
-from app.services.credential_service import encrypt
 from app.utils.kst import KST as _KST  # 키움 expires_dt는 KST 벽시계 값 (구분자 없는 YYYYMMDDHHMMSS)
 
 logger = structlog.get_logger()
@@ -124,32 +123,18 @@ async def _fetch_and_store_token(
     else:
         expires_at = datetime.now(UTC) + timedelta(seconds=86400)
 
-    # 캐시 저장
-    cache_key = KIWOOM_TOKEN_CACHE_KEY.format(account_id=account_id)
-    remaining = int((expires_at - datetime.now(UTC)).total_seconds())
-    ttl = remaining - TOKEN_CACHE_TTL_BUFFER
-    await cache.setex(cache_key, max(ttl, 60), access_token)
-
-    # DB upsert (account_id unique 제약 기반, DB에는 암호화된 값만 저장 — 캐시/반환값은 평문 유지)
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-
     from app.models.token import KiwoomToken
 
-    encrypted_token = encrypt(access_token)
-
-    stmt = pg_insert(KiwoomToken).values(
-        user_id=user_id,
-        account_id=account_id,
-        access_token=encrypted_token,
+    await store_token(
+        cache,
+        db,
+        cache_key=KIWOOM_TOKEN_CACHE_KEY.format(account_id=account_id),
+        access_token=access_token,
         expires_at=expires_at,
-        is_mock_mode=is_mock,
-    )
-    stmt = stmt.on_conflict_do_update(
+        model=KiwoomToken,
+        values={"user_id": user_id, "account_id": account_id, "is_mock_mode": is_mock},
         index_elements=["account_id"],
-        set_={"access_token": encrypted_token, "expires_at": expires_at},
     )
-    await db.execute(stmt)
-    await db.commit()
 
     logger.info("kiwoom_token_issued", account_id=account_id, is_mock=is_mock)
     return access_token

@@ -12,9 +12,8 @@ from datetime import UTC, datetime, timedelta
 import structlog
 
 from app.constants import TOKEN_CACHE_TTL_BUFFER
-from app.providers._token_cache import get_or_fetch_token
+from app.providers._token_cache import get_or_fetch_token, store_token
 from app.providers.http_client import _get_client
-from app.services.credential_service import encrypt
 from app.toss.client import TossApiError
 from app.toss.constants import TOSS_BASE_URL, TOSS_TOKEN_CACHE_KEY, TOSS_TOKEN_PATH
 
@@ -109,27 +108,18 @@ async def _fetch_and_store_token(
     access_token, expires_in = await _request_token(client_id, client_secret)
     expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
-    cache_key = TOSS_TOKEN_CACHE_KEY.format(account_id=account_id)
-    ttl = expires_in - TOKEN_CACHE_TTL_BUFFER
-    await cache.setex(cache_key, max(ttl, 60), access_token)
-
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-
     from app.models.token import TossToken
 
-    encrypted_token = encrypt(access_token)
-    stmt = pg_insert(TossToken).values(
-        user_id=user_id,
-        account_id=account_id,
-        access_token=encrypted_token,
+    await store_token(
+        cache,
+        db,
+        cache_key=TOSS_TOKEN_CACHE_KEY.format(account_id=account_id),
+        access_token=access_token,
         expires_at=expires_at,
-    )
-    stmt = stmt.on_conflict_do_update(
+        model=TossToken,
+        values={"user_id": user_id, "account_id": account_id},
         index_elements=["account_id"],
-        set_={"access_token": encrypted_token, "expires_at": expires_at},
     )
-    await db.execute(stmt)
-    await db.commit()
 
     logger.info("toss_token_issued", account_id=account_id)
     return access_token
