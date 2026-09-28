@@ -63,6 +63,11 @@ def _session(users, challenges):
     session.get = AsyncMock(return_value=None)
     session.__aenter__ = AsyncMock(return_value=session)
     session.__aexit__ = AsyncMock(return_value=None)
+    # 챌린지 단위 savepoint — 예외는 그대로 전파(__aexit__ → None)
+    nested = MagicMock()
+    nested.__aenter__ = AsyncMock(return_value=nested)
+    nested.__aexit__ = AsyncMock(return_value=None)
+    session.begin_nested = MagicMock(return_value=nested)
     return session
 
 
@@ -175,6 +180,41 @@ class TestDepositReminderJob:
 
             await run_challenge_deposit_reminder()
         assert "challenge_reminders_enabled" in str(captured["stmt"])
+
+
+class TestPerChallengeIsolation:
+    """한 챌린지의 예외가 같은 유저의 나머지 챌린지 발송을 막지 않는다(챌린지 단위 savepoint)."""
+
+    @pytest.mark.asyncio
+    async def test_reminder_continues_after_one_challenge_fails(self):
+        user, settings = _user(), _settings()
+        failing, ok = _challenge(user_id=user.id, title="실패"), _challenge(user_id=user.id, title="정상")
+        session = _session([(user, settings)], [failing, ok])
+        with (
+            patch("app.jobs.challenge_deposit_reminder.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch(
+                "app.services.challenge_service.compute_progress",
+                new_callable=AsyncMock,
+                side_effect=[RuntimeError("boom"), _progress()],
+            ),
+            patch(
+                "app.jobs.challenge_deposit_reminder.dispatch_dual_channel_alert", new_callable=AsyncMock
+            ) as dispatch,
+            patch("app.jobs.challenge_deposit_reminder.report_job_failure") as report,
+        ):
+            from app.jobs.challenge_deposit_reminder import run_challenge_deposit_reminder
+
+            await run_challenge_deposit_reminder()
+
+        assert dispatch.await_count == 1
+        assert "정상" in dispatch.call_args.kwargs["history_message"]
+        # 내부 헬퍼는 커밋하지 않고(commit=False) 호출부가 savepoint 뒤에 커밋한다
+        assert dispatch.call_args.kwargs["commit"] is False
+        report.assert_called_once()
+        assert report.call_args.kwargs["challenge_id"] == str(failing.id)
+        assert session.begin_nested.call_count == 2
 
 
 class TestMonthlyWrapJob:

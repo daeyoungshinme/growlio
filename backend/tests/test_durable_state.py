@@ -60,3 +60,23 @@ class TestDeleteDurable:
         await delete_durable(mock_db, "some:key")
         mock_db.execute.assert_called_once()
         mock_db.commit.assert_called_once()
+
+
+class TestCommitFalse:
+    """savepoint 안에서 쓰는 경로 — commit=False면 execute/delete만 하고 커밋은 호출부에 위임."""
+
+    @pytest.mark.asyncio
+    async def test_get_expired_row_deletes_without_commit(self, mock_db):
+        row = AppState(key="k", value="v", expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        mock_db.get = AsyncMock(return_value=row)
+        mock_db.delete = AsyncMock()
+        assert await get_durable(mock_db, "k", commit=False) is None
+        mock_db.delete.assert_awaited_once_with(row)
+        mock_db.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_set_and_delete_without_commit(self, mock_db):
+        await set_durable(mock_db, "k", "v", ttl=60, commit=False)
+        await delete_durable(mock_db, "k", commit=False)
+        assert mock_db.execute.await_count == 2
+        mock_db.commit.assert_not_called()
