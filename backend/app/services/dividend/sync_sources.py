@@ -10,10 +10,11 @@ import statistics
 from datetime import timedelta
 
 import structlog
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry
 
 from app.utils.circuit_breaker import yahoo_circuit
 from app.utils.kst import today_kst
+from app.utils.naver_retry import NAVER_MOBILE_UA, NAVER_RETRY
 
 logger = structlog.get_logger()
 
@@ -59,14 +60,6 @@ def _exclude_capital_gain_outlier(ticker: object) -> float | None:
         # 보정 실패 시 None(=보정 없이 원본 배당률 사용)으로 폴백 — 배당 동기화 자체는 계속 진행
         logger.debug("capital_gain_outlier_check_failed", error=str(e), exc_type=type(e).__name__)
         return None
-
-
-_NAVER_RETRY = dict(
-    retry=retry_if_exception_type(Exception),
-    wait=wait_exponential(multiplier=1, min=1, max=8),
-    stop=stop_after_attempt(3),
-    reraise=True,
-)
 
 
 def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
@@ -210,20 +203,14 @@ def sync_fdr_etf_dividend_info(ticker: str) -> dict:
         return _zero_div()
 
 
-_NAVER_MOBILE_UA = (
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
-    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
-)
-
-
 def _fetch_naver_etf_analysis(ticker: str) -> dict:
     """Naver Finance 모바일 API(etfAnalysis) 원본 JSON 조회 — 배당·추종지수 판별이 공유하는 소스."""
     import requests as _req
 
-    @retry(**_NAVER_RETRY)  # type: ignore[call-overload]
+    @retry(**NAVER_RETRY)
     def _fetch() -> _req.Response:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/etfAnalysis"
-        r = _req.get(url, headers={"User-Agent": _NAVER_MOBILE_UA}, timeout=10)
+        r = _req.get(url, headers={"User-Agent": NAVER_MOBILE_UA}, timeout=10)
         r.raise_for_status()
         return r
 
@@ -314,15 +301,10 @@ def sync_naver_stock_dividend_info(ticker: str) -> dict:
     import requests as _req
     import requests.exceptions as _req_exc
 
-    _MOBILE_UA = (
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
-    )
-
-    @retry(**_NAVER_RETRY)  # type: ignore[call-overload]
+    @retry(**NAVER_RETRY)
     def _fetch() -> _req.Response:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/summary"
-        r = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
+        r = _req.get(url, headers={"User-Agent": NAVER_MOBILE_UA}, timeout=10)
         r.raise_for_status()
         return r
 

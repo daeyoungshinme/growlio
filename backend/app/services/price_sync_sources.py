@@ -13,9 +13,10 @@ import threading
 from typing import TYPE_CHECKING
 
 import structlog
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry
 
 from app.utils.kst import today_kst
+from app.utils.naver_retry import NAVER_MOBILE_UA, NAVER_RETRY
 
 if TYPE_CHECKING:
     from datetime import date
@@ -41,28 +42,15 @@ def yf_symbol_to_krx_ticker(symbol: str) -> str | None:
     return None
 
 
-_MOBILE_UA = (
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
-    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
-)
-
-_NAVER_RETRY = dict(
-    retry=retry_if_exception_type(Exception),
-    wait=wait_exponential(multiplier=1, min=1, max=8),
-    stop=stop_after_attempt(3),
-    reraise=True,
-)
-
-
 def sync_naver_price(ticker: str) -> float | None:
     """Naver Finance 모바일 API(basic)로 국내 종목 현재가(종가) 조회. 국내 종목 전용."""
     import requests as _req
     import requests.exceptions as _req_exc
 
-    @retry(**_NAVER_RETRY)  # type: ignore[call-overload]
+    @retry(**NAVER_RETRY)
     def _fetch() -> _req.Response:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/basic"
-        r = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
+        r = _req.get(url, headers={"User-Agent": NAVER_MOBILE_UA}, timeout=10)
         r.raise_for_status()
         return r
 
