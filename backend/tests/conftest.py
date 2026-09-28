@@ -6,9 +6,32 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import structlog
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import engine
 from app.utils.kst import today_kst
+
+# 실제 DB 접속 차단 가드 — 각 모듈이 AsyncSessionLocal을 import 시점에 바인딩하므로 patch를 빠뜨린 테스트는
+# 로컬 .env의 DB(개발자에 따라 Supabase 운영 풀러)에 그대로 붙는다(계획 40 N3-b). 엔진 레벨에서 막는다.
+# 잡 루프는 유저별 except Exception으로 예외를 삼키므로, 시도를 기록해 두고 테스트 종료 시 실패시킨다.
+_real_db_connect_attempts: list[str] = []
+
+
+@event.listens_for(engine.sync_engine, "do_connect")
+def _block_real_db_connect(dialect, conn_rec, cargs, cparams):
+    _real_db_connect_attempts.append("do_connect")
+    raise RuntimeError("테스트가 실제 DB에 접속하려 함 — 해당 모듈의 AsyncSessionLocal을 patch하세요")
+
+
+@pytest.fixture(autouse=True)
+def _fail_on_real_db_connect():
+    _real_db_connect_attempts.clear()
+    yield
+    if _real_db_connect_attempts:
+        _real_db_connect_attempts.clear()
+        pytest.fail("테스트가 실제 DB에 접속을 시도함 — 해당 모듈의 AsyncSessionLocal을 patch하세요")
+
 
 # GitHub Actions는 TTY가 감지되어 structlog가 Rich 렌더러를 기본 활성화함.
 # 복잡한 traceback(JWT 오류 체인 등)을 Rich가 렌더링하면 30초+ hang → timeout.

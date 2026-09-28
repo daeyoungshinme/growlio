@@ -65,14 +65,36 @@ def _get_app_with_auth(user=None):
 class TestHealth:
     """GET /health — 인증 불필요."""
 
-    def test_health_returns_200_or_503(self, override_settings):
-        """Cache 없이도 /health 엔드포인트 자체는 응답한다."""
+    @staticmethod
+    def _get_db_yielding(db):
+        async def _gen():
+            yield db
+
+        return _gen
+
+    def test_health_returns_200_when_db_ok(self, override_settings):
         from app.main import app
 
-        with TestClient(app, raise_server_exceptions=False) as client:
+        db = AsyncMock()
+        with (
+            patch("app.main.get_db", self._get_db_yielding(db)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/health")
-        # Cache 연결 불가 시 503, 가능 시 200
-        assert resp.status_code in (200, 503)
+        assert resp.status_code == 200
+        db.execute.assert_awaited_once()
+
+    def test_health_returns_503_when_db_fails(self, override_settings):
+        from app.main import app
+
+        db = AsyncMock()
+        db.execute.side_effect = ConnectionError("db down")
+        with (
+            patch("app.main.get_db", self._get_db_yielding(db)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/health")
+        assert resp.status_code == 503
 
 
 # ── /api/v1/auth/me ───────────────────────────────────────────
