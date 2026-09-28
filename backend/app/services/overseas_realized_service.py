@@ -127,8 +127,13 @@ async def get_overseas_realized_summary(
     db: AsyncSession,
     account_id: uuid.UUID | None = None,
     cache: CacheStore | None = None,
+    overseas_positions: list[dict] | None = None,
 ) -> OverseasRealizedSummary:
-    """올해(또는 지정 연도) 해외주식 실현손익 합계. 계좌 조회는 순차(같은 AsyncSession 동시 사용 금지)."""
+    """올해(또는 지정 연도) 해외주식 실현손익 합계. 계좌 조회는 순차(같은 AsyncSession 동시 사용 금지).
+
+    `overseas_positions`: 호출부가 이미 조회한 `get_overseas_positions_detail` 결과(같은 account_id 기준).
+    None이면 직접 조회한다.
+    """
     cache = cache if cache is not None else await get_cache_store()
     cache_key = tax_overseas_realized_key(user_id, year, str(account_id) if account_id else "all")
     cached = await get_cached_json(cache, cache_key)
@@ -147,7 +152,11 @@ async def get_overseas_realized_summary(
         for acc in (await db.execute(select(AssetAccount).where(*conditions))).scalars().all()
         if acc.tax_type not in TAX_DEFERRED_TAX_TYPES
     ]
-    positions = await get_overseas_positions_detail(user_id, db, account_id)
+    positions = (
+        overseas_positions
+        if overseas_positions is not None
+        else await get_overseas_positions_detail(user_id, db, account_id)
+    )
     holding_account_ids = {p["account_id"] for p in positions}
 
     today = today_kst()

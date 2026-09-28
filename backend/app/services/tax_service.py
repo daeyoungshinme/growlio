@@ -206,6 +206,7 @@ async def get_tax_summary(
     account_id: uuid.UUID | None = None,
     *,
     overseas_realized_krw: float | None = None,
+    overseas_positions: list[dict] | None = None,
 ) -> dict[str, Any]:
     """연도별 세금 추정 요약. account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합).
 
@@ -213,6 +214,8 @@ async def get_tax_summary(
     - 해외 양도세: 올해 실현손익(`overseas_realized_krw`, 증권사 체결 기준 — 모르면 0) + 미실현 손익을
       연내 전부 실현한다고 가정한 추정치 (250만원 공제 후 22%). 실현손익은 브로커 API 호출이 필요해
       이 함수가 직접 조회하지 않고 호출부(api/v1/tax.py, tax_action_service)가 넘긴다.
+    - `overseas_positions`: 호출부가 이미 조회한 `get_overseas_positions_detail` 결과(같은 account_id 기준).
+      실현손익·절세 액션과 한 요청에서 스냅샷·포지션을 여러 번 읽지 않도록 넘겨받는다 — None이면 직접 조회.
     - 국내 양도세: 대주주 요건(10억) 초과 시 경고
     - 금융소득 종합과세 경계(2000만원) 경고 — 이자·배당 기준. 해외주식 양도차익은 양도소득(분류과세)이라
       금융소득에 합산하지 않는다(이전 구현은 해외 미실현 이익을 더해 경고를 과대 발생시켰음)
@@ -248,7 +251,11 @@ async def get_tax_summary(
     comprehensive_tax_warning = total_financial_income >= COMPREHENSIVE_TAX_THRESHOLD_KRW
     comprehensive_tax_remaining_krw = max(0.0, COMPREHENSIVE_TAX_THRESHOLD_KRW - total_financial_income)
 
-    positions = await get_overseas_positions_detail(user_id, db, account_id)
+    positions = (
+        overseas_positions
+        if overseas_positions is not None
+        else await get_overseas_positions_detail(user_id, db, account_id)
+    )
     harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable, rates)
     geumt_simulation = _simulate_geumt_tax(overseas_unrealized, domestic_unrealized, rates)
     health_insurance_estimate = _calc_health_insurance_estimate(total_financial_income)
