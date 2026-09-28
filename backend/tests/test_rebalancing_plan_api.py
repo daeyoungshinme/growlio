@@ -113,6 +113,36 @@ class TestListPlans:
         assert body[0]["side"] == "BUY"
         assert body[0]["portfolio_name"] == "포트폴리오"
 
+    def test_marks_partially_executed_when_sibling_leg_executed(self):
+        """매도는 체결(EXECUTED, 목록에서 제외)됐는데 매수가 FAILED면 반쪽 실행으로 표시. PENDING은 진행 중이라 제외."""
+        user = _make_user()
+        db = _make_mock_db()
+        half_plan = SimpleNamespace(id=uuid.uuid4(), portfolio_id=uuid.uuid4(), account_id=None)
+        pending_plan = SimpleNamespace(id=uuid.uuid4(), portfolio_id=uuid.uuid4(), account_id=None)
+        clean_plan = SimpleNamespace(id=uuid.uuid4(), portfolio_id=uuid.uuid4(), account_id=None)
+        rows = [
+            (_make_leg(status="FAILED", plan_id=half_plan.id), half_plan, "P", None),
+            (_make_leg(status="PENDING", plan_id=pending_plan.id), pending_plan, "P", None),
+            (_make_leg(status="EXPIRED", plan_id=clean_plan.id), clean_plan, "P", None),
+        ]
+
+        with (
+            patch("app.api.v1.rebalancing_plan.list_recent_plan_legs", new=AsyncMock(return_value=rows)),
+            patch(
+                "app.api.v1.rebalancing_plan.executed_plan_ids",
+                new=AsyncMock(return_value={half_plan.id, pending_plan.id}),
+            ),
+        ):
+            app = _setup_authenticated_app(user, db)
+            client = TestClient(app)
+            try:
+                resp = client.get("/api/v1/rebalancing/plans")
+            finally:
+                _teardown_app()
+
+        assert resp.status_code == 200
+        assert [leg["partially_executed"] for leg in resp.json()] == [True, False, False]
+
 
 class TestCancelPlanLeg:
     def test_returns_404_when_not_owned(self):

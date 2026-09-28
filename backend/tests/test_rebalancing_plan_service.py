@@ -1155,3 +1155,26 @@ class TestListRecentPlanLegs:
         result = await svc.list_recent_plan_legs(uuid.uuid4(), mock_db, limit=10)
 
         assert result == rows
+
+
+class TestExecutedPlanIds:
+    @pytest.mark.asyncio
+    async def test_empty_input_skips_query(self, mock_db):
+        mock_db.execute = AsyncMock()
+
+        assert await svc.executed_plan_ids(set(), mock_db) == set()
+        mock_db.execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_returns_plan_ids_with_executed_leg(self, mock_db):
+        executed = uuid.uuid4()
+        result_mock = MagicMock()
+        result_mock.scalars.return_value.all.return_value = [executed]
+        mock_db.execute = AsyncMock(return_value=result_mock)
+
+        result = await svc.executed_plan_ids({executed, uuid.uuid4()}, mock_db)
+
+        assert result == {executed}
+        sql = str(mock_db.execute.call_args.args[0])
+        assert "status" in sql
+        assert "DISTINCT" in sql
