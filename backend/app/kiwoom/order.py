@@ -5,6 +5,8 @@
 
 from typing import Any
 
+import structlog
+
 from app.kiwoom.client import auth_headers, kiwoom_request
 from app.kiwoom.constants import (
     API_ID_DOMESTIC_BUY,
@@ -13,6 +15,8 @@ from app.kiwoom.constants import (
     API_ID_OVERSEAS_SELL,
     KIWOOM_OVERSEAS_MARKET_CODES,
 )
+
+logger = structlog.get_logger()
 
 
 async def place_domestic_order(
@@ -87,7 +91,11 @@ async def place_overseas_order(
     api_id = API_ID_OVERSEAS_BUY if side == "BUY" else API_ID_OVERSEAS_SELL
     headers = auth_headers(access_token, api_id)
 
-    exchange_cd = KIWOOM_OVERSEAS_MARKET_CODES.get(market.upper(), "ND")
+    exchange_cd = KIWOOM_OVERSEAS_MARKET_CODES.get(market.upper())
+    if exchange_cd is None:
+        # 시장 미확정 포지션이 주문까지 흘러온 경우 — NASDAQ으로 보내되 오라우팅 가능성을 기록한다
+        logger.warning("kiwoom_overseas_order_unknown_market", ticker=ticker, market=market)
+        exchange_cd = "ND"
 
     if order_type == "LIMIT" and limit_price is not None:
         trde_tp = "00"  # 지정가

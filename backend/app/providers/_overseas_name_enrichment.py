@@ -13,6 +13,10 @@
 NASDAQ을 폴백으로 쓴다 — `"US"` 센티널이 그대로 Position까지 흘러가면 `is_overseas_market()`
 이 국내로 오판(주문 실행 경로 오동작)하므로 항상 유효 미국 시장으로 확정한다.
 
+NASDAQ 폴백은 키움 해외 주문의 거래소 코드(`stex_tp`)로 그대로 쓰이므로 NYSE/AMEX 종목이면 오라우팅될
+수 있다(권위 있는 거래소 소스가 없어 완전 수정은 불가). 그래서 폴백 시 경고 로그를 남기고, 시장을 못 찾은
+부분 결과는 짧게(`TTL_OVERSEAS_STOCK_META_PARTIAL`)만 캐싱해 다음 동기화에서 재조회하게 한다.
+
 브로커가 이미 확정한 시장(KIS는 거래소별 조회라 NYSE/NASDAQ/AMEX가 정확)은 건드리지 않는다.
 """
 
@@ -21,9 +25,12 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.services.stock_search_service import resolve_ticker_meta
 from app.utils.cache_keys import (
     TTL_OVERSEAS_STOCK_META,
+    TTL_OVERSEAS_STOCK_META_PARTIAL,
     get_cached_json,
     overseas_stock_meta_key,
     set_cached_json,
@@ -31,6 +38,8 @@ from app.utils.cache_keys import (
 
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
+
+logger = structlog.get_logger()
 
 # 브로커가 해외 상장 시장을 확정하지 못했음을 나타내는 센티널 (키움 balance.py / 토스 balance.py).
 UNRESOLVED_MARKET = "US"
@@ -67,7 +76,8 @@ async def enrich_overseas_positions(positions: list[dict], cache: CacheStore) ->
             entry: dict[str, str | None] = {"name": name, "market": norm_market}
             meta[ticker] = entry
             if name or norm_market:
-                await set_cached_json(cache, overseas_stock_meta_key(ticker), entry, TTL_OVERSEAS_STOCK_META)
+                ttl = TTL_OVERSEAS_STOCK_META if norm_market else TTL_OVERSEAS_STOCK_META_PARTIAL
+                await set_cached_json(cache, overseas_stock_meta_key(ticker), entry, ttl)
 
     enriched: list[dict] = []
     for p in positions:
@@ -75,6 +85,8 @@ async def enrich_overseas_positions(positions: list[dict], cache: CacheStore) ->
         name = m.get("name") or p["name"]
         if _needs_market_resolution(p.get("market")):
             market = m.get("market") or _FALLBACK_MARKET
+            if not m.get("market"):
+                logger.warning("overseas_market_fallback", ticker=p["ticker"], fallback=_FALLBACK_MARKET)
         else:
             market = p["market"]
         enriched.append({**p, "name": name, "market": market})
