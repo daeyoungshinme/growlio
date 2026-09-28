@@ -31,6 +31,7 @@ from app.providers.manual_provider import ManualProvider
 from app.providers.toss_provider import TossProvider
 from app.services._account_queries import active_accounts_stmt
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
+from app.services.yahoo_price import fetch_yahoo_batch
 from app.utils.cache_keys import (
     CacheStoreType,
     invalidate_account_caches,
@@ -105,6 +106,28 @@ async def _preserved_overseas_positions(db: AsyncSession, account_id: uuid.UUID)
         )
     )
     return list(result.scalars().all())
+
+
+async def _revalue_preserved_overseas(preserved: list[Position], usd_krw_rate: float) -> None:
+    """보존된 해외 포지션을 Yahoo 현재가 × 이번 동기화 환율로 재평가한다(best-effort, 제자리 갱신).
+
+    보존분의 value_krw는 직전 성공 동기화 시점 값이라 그대로 쓰면 스냅샷이 stale해진다.
+    Yahoo 실패·서킷 열림·환율 폴백값이면 기존 값을 유지한다 — 폴백 환율로 재평가하면 오히려 부정확하다.
+    """
+    if not preserved or usd_krw_rate == settings.usd_krw_fallback_rate:
+        return
+    try:
+        price_map = await fetch_yahoo_batch([(p.ticker, p.market) for p in preserved])
+    except Exception as e:
+        logger.warning("preserved_overseas_revalue_failed", error=str(e))
+        return
+    for p in preserved:
+        price_usd = price_map.get(p.ticker)
+        if not price_usd:
+            continue
+        p.current_price = price_usd * usd_krw_rate
+        p.value_krw = p.current_price * float(p.qty or 0)
+        p.usd_rate = usd_krw_rate
 
 
 async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStoreType) -> SyncAccountResult:
@@ -187,6 +210,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         # 해외 조회 실패 — balance 합계엔 해외 종목·외화예수금이 빠져 있다. 보존된 해외 포지션과 기존
         # deposit_usd를 더하지 않으면 그날 스냅샷(월별 대표값 후보)이 해외분만큼 급락한다.
         preserved = await _preserved_overseas_positions(db, account.id)
+        await _revalue_preserved_overseas(preserved, balance.usd_krw_rate)
         preserved_value = sum(float(p.value_krw or 0) for p in preserved)
         preserved_invested = sum(float(p.avg_price or 0) * float(p.qty or 0) for p in preserved)
         amount_krw += preserved_value + float(account.deposit_usd or 0) * balance.usd_krw_rate

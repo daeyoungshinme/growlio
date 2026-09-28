@@ -19,3 +19,7 @@ async def run_cache_sweep() -> None:
     removed = await store.sweep_expired()
     if removed:
         logger.info("cache_sweep_done", removed=removed)
+    evicted = store.take_lru_evictions()
+    if evicted:
+        # 만료 전 항목(락·토큰 키 포함 가능)이 상한 때문에 밀려났다 — 반복되면 _MAX_ENTRIES 상향 검토
+        logger.warning("cache_lru_evictions", evicted=evicted, entries=len(store))

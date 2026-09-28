@@ -34,6 +34,8 @@ class RebalancingPlanLegSummary(BaseModel):
     execution_id: uuid.UUID | None
     error_message: str | None
     actionable: bool  # status == PENDING and now < deadline_at
+    # 이 leg는 실행되지 않고 끝났는데(FAILED/EXPIRED/REJECTED/CANCELED) 같은 플랜의 다른 leg는 체결된 "반쪽 실행"
+    partially_executed: bool = False
     items: list[RebalancingPlanItemOut]
 
 

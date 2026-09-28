@@ -27,9 +27,9 @@ from app.schemas.asset import (
 )
 from app.services._account_queries import portfolio_accounts_stmt
 from app.services.asset_credential_service import (
-    delete_kis_credentials,
-    delete_kiwoom_credentials,
-    delete_toss_credentials,
+    BROKER_CREDENTIAL_SPECS,
+    CREDENTIAL_FIELDS,
+    delete_credentials,
 )
 from app.services.asset_credential_service import (
     verify_kis_credentials as _verify_kis_credentials_service,
@@ -66,14 +66,6 @@ from app.utils.inproc_lock import inproc_lock
 from app.utils.kst import today_kst
 from app.utils.pnl import calc_net_asset_amount
 
-_CREDENTIAL_FIELDS: set[str] = {
-    "kis_app_key",
-    "kis_app_secret",
-    "kiwoom_app_key",
-    "kiwoom_app_secret",
-    "toss_client_id",
-    "toss_client_secret",
-}
 # 시장가 변동이 없는 순수 현금성 계좌 — 잔액 변경은 전액 입출금으로 간주
 _CASH_ASSET_TYPES: set[str] = {"BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER"}
 
@@ -81,9 +73,8 @@ _CASH_ASSET_TYPES: set[str] = {"BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER"}
 def _account_response(account: AssetAccount) -> AssetAccountResponse:
     """AssetAccount ORM 모델을 Response 스키마로 변환."""
     data = AssetAccountResponse.model_validate(account)
-    data.has_own_kis_credentials = bool(account.kis_app_key)
-    data.has_own_kiwoom_credentials = bool(account.kiwoom_app_key)
-    data.has_own_toss_credentials = bool(account.toss_client_id)
+    for spec in BROKER_CREDENTIAL_SPECS.values():
+        setattr(data, spec.has_own_attr, bool(getattr(account, spec.key_attr)))
     return data
 
 
@@ -203,40 +194,20 @@ async def create_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if req.data_source == "KIS_API":
-        if not req.kis_app_key or not req.kis_app_secret:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="KIS API 자격증명(App Key, App Secret)을 모두 입력하세요.",
-            )
-        req_data = req.model_dump(exclude=_CREDENTIAL_FIELDS)
-        req_data["kis_app_key"] = encrypt(req.kis_app_key)
-        req_data["kis_app_secret"] = encrypt(req.kis_app_secret)
-        account = AssetAccount(user_id=current_user.id, **req_data)
-    elif req.data_source == "KIWOOM_API":
-        if not req.kiwoom_account_no or not req.kiwoom_app_key or not req.kiwoom_app_secret:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="키움 계좌번호와 API 자격증명(App Key, App Secret)을 모두 입력하세요.",
-            )
-        req_data = req.model_dump(exclude=_CREDENTIAL_FIELDS)
-        req_data["kiwoom_app_key"] = encrypt(req.kiwoom_app_key)
-        req_data["kiwoom_app_secret"] = encrypt(req.kiwoom_app_secret)
-        req_data["asset_type"] = "STOCK_KIWOOM"
-        account = AssetAccount(user_id=current_user.id, **req_data)
-    elif req.data_source == "TOSS_API":
-        if not req.toss_account_no or not req.toss_client_id or not req.toss_client_secret:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="토스 계좌번호와 API 자격증명(Client ID, Client Secret)을 모두 입력하세요.",
-            )
-        req_data = req.model_dump(exclude=_CREDENTIAL_FIELDS)
-        req_data["toss_client_id"] = encrypt(req.toss_client_id)
-        req_data["toss_client_secret"] = encrypt(req.toss_client_secret)
-        req_data["asset_type"] = "STOCK_TOSS"
-        account = AssetAccount(user_id=current_user.id, **req_data)
-    else:
-        account = AssetAccount(user_id=current_user.id, **req.model_dump(exclude=_CREDENTIAL_FIELDS))
+    req_data = req.model_dump(exclude=CREDENTIAL_FIELDS)
+    spec = BROKER_CREDENTIAL_SPECS.get(req.data_source)
+    if spec is not None:
+        key, secret = getattr(req, spec.key_attr), getattr(req, spec.secret_attr)
+        account_no_missing = spec.required_account_no_attr is not None and not getattr(
+            req, spec.required_account_no_attr
+        )
+        if account_no_missing or not key or not secret:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=spec.missing_detail)
+        req_data[spec.key_attr] = encrypt(key)
+        req_data[spec.secret_attr] = encrypt(secret)
+        if spec.forced_asset_type is not None:
+            req_data["asset_type"] = spec.forced_asset_type
+    account = AssetAccount(user_id=current_user.id, **req_data)
     db.add(account)
     await db.commit()
     await db.refresh(account)
@@ -286,21 +257,15 @@ async def update_account(
 ):
     account = await _get_owned_account(account_id, current_user.id, db)
 
-    update_fields = req.model_dump(exclude_none=True, exclude=_CREDENTIAL_FIELDS)
+    update_fields = req.model_dump(exclude_none=True, exclude=CREDENTIAL_FIELDS)
     for field, value in update_fields.items():
         setattr(account, field, value)
 
-    if req.kis_app_key is not None:
-        account.kis_app_key = encrypt_if_present(req.kis_app_key)
-        account.kis_app_secret = encrypt_if_present(req.kis_app_secret)
-
-    if req.kiwoom_app_key is not None:
-        account.kiwoom_app_key = encrypt_if_present(req.kiwoom_app_key)
-        account.kiwoom_app_secret = encrypt_if_present(req.kiwoom_app_secret)
-
-    if req.toss_client_id is not None:
-        account.toss_client_id = encrypt_if_present(req.toss_client_id)
-        account.toss_client_secret = encrypt_if_present(req.toss_client_secret)
+    # 키가 전송된 브로커만 키·시크릿 쌍을 함께 교체 (시크릿만 단독 전송은 무시 — 기존 동작 유지)
+    for spec in BROKER_CREDENTIAL_SPECS.values():
+        if getattr(req, spec.key_attr) is not None:
+            setattr(account, spec.key_attr, encrypt_if_present(getattr(req, spec.key_attr)))
+            setattr(account, spec.secret_attr, encrypt_if_present(getattr(req, spec.secret_attr)))
 
     if (
         req.manual_amount is not None
@@ -377,6 +342,11 @@ async def update_account(
     return _account_response(account)
 
 
+async def _delete_own_credentials(account_id: UUID, user: User, db: AsyncSession, data_source: str) -> None:
+    account = await _get_owned_account(account_id, user.id, db)
+    await delete_credentials(account, db, await get_cache_store(), BROKER_CREDENTIAL_SPECS[data_source])
+
+
 @router.delete("/{account_id}/kis-credentials", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account_kis_credentials(
     account_id: UUID,
@@ -384,9 +354,7 @@ async def delete_account_kis_credentials(
     db: AsyncSession = Depends(get_db),
 ):
     """계좌별 KIS API 자격증명을 삭제한다. 이후 전역 자격증명으로 폴백된다."""
-    account = await _get_owned_account(account_id, current_user.id, db)
-    cache = await get_cache_store()
-    await delete_kis_credentials(account, db, cache)
+    await _delete_own_credentials(account_id, current_user, db, "KIS_API")
 
 
 @router.delete("/{account_id}/kiwoom-credentials", status_code=status.HTTP_204_NO_CONTENT)
@@ -396,9 +364,7 @@ async def delete_account_kiwoom_credentials(
     db: AsyncSession = Depends(get_db),
 ):
     """계좌별 키움 API 자격증명을 삭제한다."""
-    account = await _get_owned_account(account_id, current_user.id, db)
-    cache = await get_cache_store()
-    await delete_kiwoom_credentials(account, db, cache)
+    await _delete_own_credentials(account_id, current_user, db, "KIWOOM_API")
 
 
 @router.delete("/{account_id}/toss-credentials", status_code=status.HTTP_204_NO_CONTENT)
@@ -408,9 +374,7 @@ async def delete_account_toss_credentials(
     db: AsyncSession = Depends(get_db),
 ):
     """계좌별 토스 Open API 자격증명을 삭제한다."""
-    account = await _get_owned_account(account_id, current_user.id, db)
-    cache = await get_cache_store()
-    await delete_toss_credentials(account, db, cache)
+    await _delete_own_credentials(account_id, current_user, db, "TOSS_API")
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)

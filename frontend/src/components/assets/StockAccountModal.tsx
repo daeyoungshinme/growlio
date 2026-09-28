@@ -14,10 +14,9 @@ import { useTossCredentialVerify } from "@/hooks/useTossCredentialVerify";
 import { useKiwoomCredentialVerify } from "@/hooks/useKiwoomCredentialVerify";
 import { convertUsdToKrw } from "@/utils/format";
 import { STOCK_TYPE_LABELS } from "@/constants";
+import { type BrokerDataSource, isBrokerDataSource } from "@/constants/brokerCredentials";
 import StockDepositFields from "./StockDepositFields";
-import KisCredentialFields from "./KisCredentialFields";
-import KiwoomCredentialFields from "./KiwoomCredentialFields";
-import TossCredentialFields from "./TossCredentialFields";
+import BrokerCredentialFields from "./BrokerCredentialFields";
 import CredentialDisconnectButton from "./CredentialDisconnectButton";
 
 const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
@@ -131,6 +130,30 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
   const handleKiwoomVerify = async () => {
     if (!form.kiwoom_app_key || !form.kiwoom_app_secret) return;
     await kiwoomVerify(form.kiwoom_app_key, form.kiwoom_app_secret, form.is_mock_mode ?? true);
+  };
+
+  const brokerVerify: Record<
+    BrokerDataSource,
+    {
+      verifyState: typeof verifyState;
+      verifyError: string;
+      onVerify: () => void;
+      reset: () => void;
+    }
+  > = {
+    KIS_API: { verifyState, verifyError, onVerify: handleVerify, reset: resetVerify },
+    KIWOOM_API: {
+      verifyState: kiwoomVerifyState,
+      verifyError: kiwoomVerifyError,
+      onVerify: handleKiwoomVerify,
+      reset: resetKiwoomVerify,
+    },
+    TOSS_API: {
+      verifyState: tossVerifyState,
+      verifyError: tossVerifyError,
+      onVerify: handleTossVerify,
+      reset: resetTossVerify,
+    },
   };
 
   const handleSourceChange = (source: string) => {
@@ -472,51 +495,28 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
             )}
 
             {/* 계좌 연동 자격증명 */}
-            {(form.data_source === "KIS_API" ||
-              form.data_source === "KIWOOM_API" ||
-              form.data_source === "TOSS_API") && (
+            {isBrokerDataSource(form.data_source) && (
               <CollapsibleSection
                 label="계좌 연동 자격증명"
                 isOpen={credentialSectionOpen}
                 onToggle={toggleCredentialSection}
               >
                 <div className="space-y-3">
-                  {form.data_source === "KIS_API" && (
-                    <KisCredentialFields
-                      form={form}
-                      set={set}
-                      isEdit={isEdit}
-                      kisAccountNoValid={kisAccountNoValid}
-                      verifyState={verifyState}
-                      verifyError={verifyError}
-                      onVerify={handleVerify}
-                      onCredentialChange={resetVerify}
-                    />
-                  )}
-
-                  {form.data_source === "KIWOOM_API" && (
-                    <KiwoomCredentialFields
-                      form={form}
-                      set={set}
-                      isEdit={isEdit}
-                      verifyState={kiwoomVerifyState}
-                      verifyError={kiwoomVerifyError}
-                      onVerify={handleKiwoomVerify}
-                      onCredentialChange={resetKiwoomVerify}
-                    />
-                  )}
-
-                  {form.data_source === "TOSS_API" && (
-                    <TossCredentialFields
-                      form={form}
-                      set={set}
-                      isEdit={isEdit}
-                      verifyState={tossVerifyState}
-                      verifyError={tossVerifyError}
-                      onVerify={handleTossVerify}
-                      onCredentialChange={resetTossVerify}
-                    />
-                  )}
+                  <BrokerCredentialFields
+                    source={form.data_source}
+                    form={form}
+                    set={set}
+                    isEdit={isEdit}
+                    accountNoError={
+                      isKis && form.kis_account_no && !kisAccountNoValid
+                        ? "형식 오류: 12345678-01 형식으로 입력하세요"
+                        : undefined
+                    }
+                    verifyState={brokerVerify[form.data_source].verifyState}
+                    verifyError={brokerVerify[form.data_source].verifyError}
+                    onVerify={brokerVerify[form.data_source].onVerify}
+                    onCredentialChange={brokerVerify[form.data_source].reset}
+                  />
 
                   {initialAccount && (
                     <CredentialDisconnectSlot account={initialAccount} source={form.data_source} />

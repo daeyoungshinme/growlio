@@ -240,6 +240,49 @@ class TestCreateAccount:
             resp = client.post("/api/v1/assets", json=payload)
         assert resp.status_code in (200, 201)
 
+    def test_create_kiwoom_account_requires_account_no(self, override_settings):
+        """키움은 스키마 validator가 없어 라우터가 스펙 테이블로 필수값을 검증한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        payload = {
+            "name": "키움 계좌",
+            "asset_type": "STOCK_OTHER",
+            "data_source": "KIWOOM_API",
+            "kiwoom_app_key": "app-key",
+            "kiwoom_app_secret": "app-secret",
+        }
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post("/api/v1/assets", json=payload)
+        assert resp.status_code == 400
+        assert "키움 계좌번호" in resp.json()["detail"]
+        db.add.assert_not_called()
+
+    def test_create_kiwoom_account_encrypts_and_forces_asset_type(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        db.add = MagicMock()
+        app = _setup_app(user, db)
+        payload = {
+            "name": "키움 계좌",
+            "asset_type": "STOCK_OTHER",
+            "data_source": "KIWOOM_API",
+            "kiwoom_account_no": "12345678-01",
+            "kiwoom_app_key": "app-key",
+            "kiwoom_app_secret": "app-secret",
+        }
+        with TestClient(app, raise_server_exceptions=False) as client:
+            client.post("/api/v1/assets", json=payload)
+
+        from app.services.credential_service import decrypt
+
+        added = db.add.call_args.args[0]
+        assert added.asset_type == "STOCK_KIWOOM"
+        assert added.kiwoom_app_key != "app-key"
+        assert decrypt(added.kiwoom_app_key) == "app-key"
+        assert decrypt(added.kiwoom_app_secret) == "app-secret"
+        assert added.kis_app_key is None
+
 
 class TestDeleteAccount:
     def test_delete_returns_404_for_nonexistent(self, override_settings):

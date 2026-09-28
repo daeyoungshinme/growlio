@@ -28,6 +28,8 @@ export interface RebalancingPlanLegSummary {
   execution_id: string | null;
   error_message: string | null;
   actionable: boolean;
+  /** 이 leg는 실행되지 않고 끝났는데 같은 플랜의 다른 leg는 체결된 "반쪽 실행" 상태 */
+  partially_executed: boolean;
   items: RebalancingPlanItemOut[];
 }
 

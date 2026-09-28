@@ -445,6 +445,7 @@ class TestSyncAccountPositionReplacement:
             patch("app.services.asset_service._upsert_snapshot", new=upsert),
             patch("app.services.asset_service.sync_snapshot_positions", new=snap_positions),
             patch("app.services.asset_service._preserved_overseas_positions", new=AsyncMock(return_value=[preserved])),
+            patch("app.services.asset_service.fetch_yahoo_batch", new=AsyncMock(return_value={})),
             patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
@@ -461,6 +462,40 @@ class TestSyncAccountPositionReplacement:
             assert kwargs["invested_amount"] == 800_000.0 + 400_000.0
             assert kwargs["unrealized_pnl"] == 200_000.0 + 100_000.0
             assert positions == [domestic, preserved]
+
+    @pytest.mark.asyncio
+    async def test_revalue_preserved_overseas_uses_yahoo_price(self, override_settings):
+        """보존 해외 포지션은 Yahoo 현재가(USD) × 이번 환율로 재평가, 가격 없는 종목은 기존 값 유지."""
+        from app.services.asset_service import _revalue_preserved_overseas
+
+        aapl = SimpleNamespace(ticker="AAPL", market="NASD", qty=2, current_price=1.0, value_krw=2.0, usd_rate=1.0)
+        msft = SimpleNamespace(ticker="MSFT", market="NASD", qty=1, current_price=5.0, value_krw=5.0, usd_rate=1.0)
+        with patch("app.services.asset_service.fetch_yahoo_batch", new=AsyncMock(return_value={"AAPL": 300.0})):
+            await _revalue_preserved_overseas([aapl, msft], 1_400.0)
+
+        assert aapl.current_price == 420_000.0
+        assert aapl.value_krw == 840_000.0
+        assert aapl.usd_rate == 1_400.0
+        assert (msft.current_price, msft.value_krw) == (5.0, 5.0)
+
+    @pytest.mark.parametrize("failure", ["fallback_rate", "yahoo_error"])
+    @pytest.mark.asyncio
+    async def test_revalue_preserved_overseas_keeps_values_on_failure(self, override_settings, failure):
+        from app.core.config import settings
+        from app.services.asset_service import _revalue_preserved_overseas
+
+        pos = SimpleNamespace(ticker="AAPL", market="NASD", qty=2, current_price=1.0, value_krw=2.0, usd_rate=1.0)
+        if failure == "fallback_rate":
+            yahoo = AsyncMock(return_value={"AAPL": 300.0})
+        else:
+            yahoo = AsyncMock(side_effect=RuntimeError("boom"))
+        rate = settings.usd_krw_fallback_rate if failure == "fallback_rate" else 1_400.0
+        with patch("app.services.asset_service.fetch_yahoo_batch", new=yahoo):
+            await _revalue_preserved_overseas([pos], rate)
+
+        assert (pos.current_price, pos.value_krw) == (1.0, 2.0)
+        if failure == "fallback_rate":
+            yahoo.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_manual_empty_result_does_not_touch_positions(self, mock_db, override_settings, make_account):

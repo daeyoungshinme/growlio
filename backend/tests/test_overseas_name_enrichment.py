@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.providers._overseas_name_enrichment import enrich_overseas_positions
-from app.utils.cache_keys import TTL_OVERSEAS_STOCK_META, overseas_stock_meta_key
+from app.utils.cache_keys import TTL_OVERSEAS_STOCK_META, TTL_OVERSEAS_STOCK_META_PARTIAL, overseas_stock_meta_key
 
 
 def _position(ticker: str, name: str, market: str = "US") -> dict:
@@ -92,6 +92,24 @@ class TestEnrichOverseasPositions:
 
         assert result[0]["name"] == "Foo Corp"
         assert result[0]["market"] == "NASDAQ"
+        # 시장 미확정 부분 결과는 짧게만 캐싱 — NASDAQ 폴백이 7일간 고정되지 않게
+        mock_cache.setex.assert_any_call(
+            overseas_stock_meta_key("FOO"),
+            TTL_OVERSEAS_STOCK_META_PARTIAL,
+            json.dumps({"name": "Foo Corp", "market": None}, ensure_ascii=False, allow_nan=False),
+        )
+
+    @pytest.mark.asyncio
+    async def test_market_fallback_logs_warning(self, mock_cache):
+        mock_cache.get = AsyncMock(return_value=None)
+
+        with (
+            patch("app.providers._overseas_name_enrichment.resolve_ticker_meta", new=_meta_mock({})),
+            patch("app.providers._overseas_name_enrichment.logger") as logger,
+        ):
+            await enrich_overseas_positions([_position("XYZ", "x")], mock_cache)
+
+        logger.warning.assert_called_once_with("overseas_market_fallback", ticker="XYZ", fallback="NASDAQ")
 
     @pytest.mark.asyncio
     async def test_duplicate_tickers_looked_up_once(self, mock_cache):

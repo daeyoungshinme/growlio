@@ -325,6 +325,11 @@ function PendingPlanRow({
           >
             {sideLabel}
           </span>
+          {leg.partially_executed && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+              일부 실행
+            </span>
+          )}
           {leg.portfolio_name && (
             <span className="text-sm text-gray-800 dark:text-gray-200">{leg.portfolio_name}</span>
           )}
@@ -348,6 +353,12 @@ function PendingPlanRow({
         </p>
         {leg.error_message && (
           <p className="text-xs text-red-600 dark:text-red-400 mt-1">{leg.error_message}</p>
+        )}
+        {leg.partially_executed && (
+          <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+            같은 계획의 {leg.side === "BUY" ? "매도" : "매수"} 주문은 이미 체결됐어요. 비중이 한쪽만
+            조정된 상태일 수 있으니 진단 탭에서 다시 분석해 보세요.
+          </p>
         )}
 
         {open && <PendingPlanItemsDetail items={leg.items} />}

@@ -1,6 +1,6 @@
 """AUTO 리밸런싱 2단계 플랜(계획 생성 → 매수 대기/매도 승인 → 실행) 서비스 — API 진입점.
 
-책임별 서브모듈로 분리되어 있다(2026-08-20, 1025줄 → 이 파일은 조회 1종만 남음):
+책임별 서브모듈로 분리되어 있다(2026-08-20, 1025줄 → 이 파일은 조회 함수만 남음):
 - `plan_generation.py` — 드리프트 분석 → 게이트 판정 → BUY/SELL leg 생성
 - `plan_execution.py` — leg 잠금/실행/취소/만료 (앱 액션 + 스케줄러 job 진입점)
 - `plan_notifications.py` — 플랜 생성/게이트 차단/leg 실행 결과 이메일·푸시·이력 알림
@@ -66,6 +66,7 @@ __all__ = [
     "get_alert_ids_with_pending_plan",
     "get_plan_leg_by_token",
     "has_pending_plan_for_alert",
+    "executed_plan_ids",
     "list_recent_plan_legs",
     "notify_daily_value_cap_blocked",
     "notify_market_signal_gate_blocked",
@@ -89,3 +90,19 @@ async def list_recent_plan_legs(user_id: uuid.UUID, db: AsyncSession, limit: int
         .limit(limit)
     )
     return result.all()
+
+
+async def executed_plan_ids(plan_ids: set[uuid.UUID], db: AsyncSession) -> set[uuid.UUID]:
+    """주어진 플랜 중 EXECUTED leg가 하나라도 있는 플랜 id 집합.
+
+    `list_recent_plan_legs`는 EXECUTED leg를 빼고 돌려주므로, 매도는 체결됐는데 매수가 실패/만료된
+    "반쪽 실행" 플랜을 목록만으로는 알 수 없다 — 이 집합으로 형제 leg 체결 여부를 표시한다.
+    """
+    if not plan_ids:
+        return set()
+    result = await db.execute(
+        select(RebalancingPlanLeg.plan_id)
+        .where(RebalancingPlanLeg.plan_id.in_(plan_ids), RebalancingPlanLeg.status == "EXECUTED")
+        .distinct()
+    )
+    return set(result.scalars().all())

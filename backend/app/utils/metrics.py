@@ -45,6 +45,12 @@ cache_miss_count = Counter(
     labelnames=["cache_name"],
 )
 
+# in-memory 캐시(core/cache_store.py) 상한 초과로 만료 전 항목이 축출된 수 — 0이 아니면 상한 상향 검토
+cache_lru_eviction_count = Counter(
+    "cache_lru_eviction_total",
+    "in-memory 캐시 상한 초과로 만료 전 항목이 LRU 축출된 수",
+)
+
 # 느린 쿼리 카운터 (slow_query_ms 초과)
 slow_query_count = Counter(
     "slow_query_total",

@@ -38,6 +38,7 @@ function makePreview(leg: Partial<RebalancingPlanLegSummary>): PlanTokenPreview 
       execution_id: null,
       error_message: null,
       actionable: true,
+      partially_executed: false,
       items: [
         {
           ticker: "005930",

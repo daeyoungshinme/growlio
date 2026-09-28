@@ -534,6 +534,7 @@ describe("RebalancingHistoryTab", () => {
     execution_id: null,
     error_message: null,
     actionable: true,
+    partially_executed: false,
     items: [
       {
         ticker: "005930",
@@ -547,6 +548,33 @@ describe("RebalancingHistoryTab", () => {
       },
     ],
   };
+
+  it("marks a failed leg as partially executed when its sibling leg was filled", async () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([
+      { ...buyLeg, status: "FAILED" as const, actionable: false, partially_executed: true },
+    ]);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("일부 실행")).toBeDefined();
+    expect(screen.getByText(/같은 계획의 매도 주문은 이미 체결됐어요/)).toBeDefined();
+    expect(screen.queryByText("지금 매수 실행")).toBeNull();
+  });
+
+  it("does not show the partial badge for a normal pending leg", async () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([buyLeg]);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("매수 대기");
+    expect(screen.queryByText("일부 실행")).toBeNull();
+  });
 
   it("expands a pending plan row to show item detail", async () => {
     mockFetchRecentPlanLegs.mockResolvedValue([buyLeg]);
