@@ -442,6 +442,7 @@ describe("TaxSimulationCard", () => {
   it("renders no-tax scenario (simTax = 0)", () => {
     renderWithProviders(
       <TaxSimulationCard
+        taxDeduction={2_500_000}
         totalSimPnl={1000000}
         alreadyRealized={0}
         simTotalRealized={1000000}
@@ -457,6 +458,7 @@ describe("TaxSimulationCard", () => {
   it("renders tax scenario (simTax > 0)", () => {
     renderWithProviders(
       <TaxSimulationCard
+        taxDeduction={2_500_000}
         totalSimPnl={5000000}
         alreadyRealized={0}
         simTotalRealized={5000000}
@@ -471,6 +473,7 @@ describe("TaxSimulationCard", () => {
   it("shows existing realized pnl when non-zero", () => {
     renderWithProviders(
       <TaxSimulationCard
+        taxDeduction={2_500_000}
         totalSimPnl={3000000}
         alreadyRealized={1000000}
         simTotalRealized={4000000}
@@ -555,6 +558,7 @@ describe("TaxPositionTable", () => {
   it("renders profit table", () => {
     renderWithProviders(
       <TaxPositionTable
+        taxRate={0.22}
         kind="profit"
         positions={[mockPos]}
         sellQtyMap={{}}
@@ -570,6 +574,7 @@ describe("TaxPositionTable", () => {
   it("renders loss table", () => {
     renderWithProviders(
       <TaxPositionTable
+        taxRate={0.22}
         kind="loss"
         positions={[lossPos]}
         sellQtyMap={{}}
@@ -586,6 +591,7 @@ describe("TaxPositionTable", () => {
     const handleQtyChange = vi.fn();
     renderWithProviders(
       <TaxPositionTable
+        taxRate={0.22}
         kind="profit"
         positions={[mockPos]}
         sellQtyMap={{ "AAPL-NASDAQ": 5 }}

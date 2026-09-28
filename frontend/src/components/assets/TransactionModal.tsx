@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import Modal from "@/components/common/Modal";
-import { api } from "@/api/client";
+import { fetchAccountPositions } from "@/api/assets";
 import {
   createTransaction,
   deleteTransaction,
@@ -80,12 +80,7 @@ export default function TransactionModal({
     positions: Array<{ ticker: string; name: string; qty: number }>;
   }>({
     queryKey: QUERY_KEYS.accountPositions(accountId),
-    queryFn: () =>
-      api
-        .get<{
-          positions: Array<{ ticker: string; name: string; qty: number }>;
-        }>(`/assets/${accountId}/positions`)
-        .then((r) => r.data),
+    queryFn: () => fetchAccountPositions(accountId),
     enabled: !!accountId,
     staleTime: STALE_TIME.MEDIUM,
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // mocks
@@ -30,6 +30,8 @@ vi.mock("@/api/client", () => {
 
 vi.mock("@/api/settings", () => ({
   fetchSettings: vi.fn(),
+  updateGoalSettings: vi.fn(),
+  updateGoalRecommendationOptions: vi.fn(),
 }));
 
 vi.mock("@/api/invest", () => ({
@@ -121,7 +123,7 @@ vi.mock("@/components/common/ConfirmModal", () => ({
 
 import InvestPlanPage from "@/pages/InvestPlanPage";
 import { api } from "@/api/client";
-import { fetchSettings } from "@/api/settings";
+import { fetchSettings, updateGoalSettings } from "@/api/settings";
 import { fetchDCAAnalysis } from "@/api/invest";
 import { toast } from "@/utils/toast";
 
@@ -153,14 +155,20 @@ const mockUnconfiguredData = {
   yearly_achievements: [],
 };
 
-function renderPage() {
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-search">{location.search}</div>;
+}
+
+function renderPage(initialEntry = "/invest-plan") {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <InvestPlanPage />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -296,9 +304,20 @@ describe("InvestPlanPage", () => {
     expect(screen.getByText("500,000,000원 (5.00억원)")).toBeInTheDocument();
   });
 
+  it("추천에서 온 경우 배너를 띄우고 from 파라미터는 URL에서 지운다 (plans/39 N7)", async () => {
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage("/invest-plan?tab=적립 계획&from=recommendation");
+
+    expect(await screen.findByText(/목표에 맞춘 추천 비중 보러 가기/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("location-search").textContent).not.toContain("from="),
+    );
+    expect(screen.getByText(/목표에 맞춘 추천 비중 보러 가기/)).toBeInTheDocument();
+  });
+
   it("saves settings successfully", async () => {
     vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
-    vi.mocked(api.put).mockResolvedValue({ data: {} });
+    vi.mocked(updateGoalSettings).mockResolvedValue(undefined);
     renderPage();
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /설정 편집/ })).toBeInTheDocument();
@@ -316,7 +335,7 @@ describe("InvestPlanPage", () => {
 
   it("shows error toast when save fails", async () => {
     vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
-    vi.mocked(api.put).mockRejectedValue(new Error("save failed"));
+    vi.mocked(updateGoalSettings).mockRejectedValue(new Error("save failed"));
     renderPage();
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /설정 편집/ })).toBeInTheDocument();

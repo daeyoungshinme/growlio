@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from functools import partial
 from typing import TYPE_CHECKING
 
 import structlog
@@ -20,6 +21,7 @@ import structlog
 from app.constants import DOMESTIC_MARKETS
 from app.core.config import settings
 from app.services.price_sync_sources import sync_pykrx_close_series
+from app.utils.circuit_breaker import yahoo_circuit
 from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
@@ -113,6 +115,44 @@ def _sync_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
             if attempt < 2:
                 time.sleep(1)
     return {}
+
+
+# ── 비동기 진입점 — 모듈 밖에서는 `_sync_*`를 직접 부르지 말고 이것을 쓴다 ──────────────
+# 서킷 브레이커(yahoo_circuit)·동시성 세마포어(_yfinance_sem)를 거쳐 Yahoo 장애 시 요청이 쌓이지 않게 한다.
+# 서킷이 열려 있으면 조회 없이 실패값(0.0 / None / {})을 돌려주므로 호출부 폴백 경로를 그대로 탄다.
+
+
+async def _run_guarded(func, *args, fallback):
+    if not yahoo_circuit.is_available():
+        return fallback
+    loop = asyncio.get_running_loop()
+    async with _yfinance_sem:
+        result = await loop.run_in_executor(None, partial(func, *args))
+    if result:
+        yahoo_circuit.record_success()
+    else:
+        yahoo_circuit.record_failure()
+    return result or fallback
+
+
+async def fetch_usdkrw() -> float:
+    """USD/KRW 환율. 실패·서킷 열림이면 0.0."""
+    rate: float = await _run_guarded(_sync_usdkrw, fallback=0.0)
+    return rate
+
+
+async def fetch_yahoo_price(ticker: str, market: str) -> float | None:
+    """단일 종목 현재가(현지 통화). 실패·서킷 열림이면 None."""
+    price: float | None = await _run_guarded(_sync_yahoo_price, ticker, market, fallback=None)
+    return price
+
+
+async def fetch_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
+    """여러 종목 현재가 {ticker: price}. 실패·서킷 열림이면 빈 dict."""
+    if not items:
+        return {}
+    prices: dict[str, float] = await _run_guarded(_sync_yahoo_batch, items, fallback={})
+    return prices
 
 
 def _cagr_from_prices(start_price: float, end_price: float, start_date, end_date) -> dict | None:

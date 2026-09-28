@@ -212,7 +212,14 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
               <p className="text-sm text-gray-400 dark:text-gray-500">불러오는 중...</p>
             ) : positionsData ? (
               <ErrorBoundary variant="section">
-                <TaxPlannerSection positions={positionsData} realized={realizedData} />
+                <TaxPlannerSection
+                  positions={positionsData}
+                  realized={realizedData}
+                  taxRule={{
+                    deduction: taxData.overseas_gain_deduction_krw,
+                    rate: taxData.rates.overseas_tax_rate_pct / 100,
+                  }}
+                />
               </ErrorBoundary>
             ) : null)}
 

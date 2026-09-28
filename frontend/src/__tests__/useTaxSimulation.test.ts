@@ -194,3 +194,13 @@ describe("useTaxSimulation — 증권사 자동 집계 실현손익(E6)", () => 
     expect(result.current.remainingDeduction).toBe(TAX_DEDUCTION + 1_000_000);
   });
 });
+
+describe("useTaxSimulation — 백엔드 세금 요약의 공제·세율 사용 (plans/39 N4)", () => {
+  it("넘겨받은 공제·세율로 계산한다", () => {
+    const rule = { deduction: 5_000_000, rate: 0.2 };
+    const { result } = renderHook(() => useTaxSimulation([], 6_000_000, rule));
+    expect(result.current.taxDeduction).toBe(5_000_000);
+    expect(result.current.remainingDeduction).toBe(0);
+    expect(result.current.currentTax).toBe(200_000); // (600만 − 500만) × 20%
+  });
+});

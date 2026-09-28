@@ -12,6 +12,14 @@ from app.services.market_signal_service import get_last_composite_level, set_las
 from app.services.rebalancing.diagnosis_service import _MARKET_NOTES
 
 
+def _per_user_session() -> AsyncMock:
+    session = AsyncMock()
+    session.add = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=None)
+    return session
+
+
 class TestLastLevelRoundTrip:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_row(self, mock_db):
@@ -122,12 +130,14 @@ class TestCheckMarketSignalLevelChange:
         execute_result.all.return_value = [(user, user_settings)]
         mock_db.execute = AsyncMock(return_value=execute_result)
         mock_db.get = AsyncMock(return_value=AppState(key="last_level", value="GREEN", expires_at=None))
+        user_db = _per_user_session()
 
         with (
             patch(
                 "app.services.alerts.market_signal_alert_service.get_confirmed_composite_level",
                 new=AsyncMock(return_value=("RED", "LIVE")),
             ),
+            patch("app.services.alerts.market_signal_alert_service.AsyncSessionLocal", return_value=user_db),
             patch(
                 "app.services.email_service.send_market_signal_change_alert",
                 new=AsyncMock(return_value=True),
@@ -146,12 +156,45 @@ class TestCheckMarketSignalLevelChange:
         assert args[2] == "RED"
 
         mock_push.assert_called_once()
-        # db.execute 2회: (1) 구독자 쿼리 (2) 복합신호 dedup 플래그 저장(durable) —
-        # last_level 저장은 이제 get_confirmed_composite_level 내부 책임(모킹돼 여기선 발생 안 함).
-        # rebalancing_alert_service와 dedup 키를 공유해 같은 날 두 서비스가 중복 발송하지 않도록 함
-        assert mock_db.execute.call_count == 2
-        # commit 2회: dedup 저장(set_durable) + save_alert_history 이력 저장 후 outer commit
-        assert mock_db.commit.call_count == 2
+        # 공유 세션은 구독자 쿼리만 — last_level 저장은 get_confirmed_composite_level 내부 책임(모킹됨).
+        assert mock_db.execute.call_count == 1
+        mock_db.commit.assert_not_called()
+        # 유저 세션: 복합신호 dedup 플래그 저장(durable) — rebalancing/alert_check와 키를 공유해 같은 날 중복 발송 방지.
+        user_db.add.assert_called_once()  # AlertHistory
+        assert user_db.execute.call_count == 1
+        # commit 2회: dedup 저장(set_durable) + 이력 저장 후 dispatch commit
+        assert user_db.commit.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_level_change_one_user_failure_does_not_block_others(self, mock_db, mock_cache):
+        """유저마다 세션이 분리돼 한 유저의 DB 오류가 뒤 유저 발송을 막지 않는다 (docs/plans/39 N3)."""
+        from app.models.app_state import AppState
+        from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
+
+        users = [SimpleNamespace(id=uuid.uuid4(), email=f"u{i}@example.com", is_active=True) for i in range(2)]
+        user_settings = SimpleNamespace(notification_email=None, fcm_token=None)
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(u, user_settings) for u in users]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+        mock_db.get = AsyncMock(return_value=AppState(key="last_level", value="GREEN", expires_at=None))
+        broken, healthy = _per_user_session(), _per_user_session()
+        broken.commit = AsyncMock(side_effect=RuntimeError("db down"))
+
+        with (
+            patch(
+                "app.services.alerts.market_signal_alert_service.get_confirmed_composite_level",
+                new=AsyncMock(return_value=("RED", "LIVE")),
+            ),
+            patch(
+                "app.services.alerts.market_signal_alert_service.AsyncSessionLocal",
+                side_effect=[broken, healthy],
+            ),
+            patch("app.services.email_service.send_market_signal_change_alert", new=AsyncMock(return_value=True)),
+            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=False)),
+        ):
+            await check_market_signal_level_change(mock_db, mock_cache)
+
+        assert healthy.commit.call_count == 2
 
     @pytest.mark.asyncio
     async def test_no_subscribers_sends_nothing(self, mock_db, mock_cache):

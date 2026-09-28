@@ -79,31 +79,34 @@ async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreTy
     reason = _MARKET_NOTES.get(new_level)
     subscribers = await _get_composite_subscribers(db)
 
+    # 유저마다 새 세션 — 공유 세션이면 한 유저의 DB 오류가 뒤 유저 발송을 전부 막는다(docs/plans/39 N3).
     sent_count = 0
     for user, user_settings in subscribers:
         to_email = getattr(user_settings, "notification_email", None) or user.email
         fcm_token = getattr(user_settings, "fcm_token", None)
-
-        sent = await dispatch_dual_channel_alert(
-            db,
-            user.id,
-            event_prefix="market_signal_change",
-            alert_type="MARKET_SIGNAL",
-            history_message=f"시장 위험 신호: {old_level} → {new_level}",
-            send_email=partial(send_market_signal_change_alert, to_email, old_level, new_level, reason),
-            push_title="시장 위험 신호 변경",
-            push_body=f"시장 위험 신호가 {old_level} → {new_level}로 변경되었습니다.",
-            push_type="MARKET_SIGNAL",
-            fcm_token=fcm_token,
-            commit=False,  # 루프 후 일괄 커밋
-            # 같은 날 rebalancing/alert_check의 복합신호 알림과 중복 발송되지 않도록 dedup을 공유한다.
-            after_sent=partial(_mark_composite_alert_sent_today, db, user.id),
-        )
+        try:
+            async with AsyncSessionLocal() as user_db:
+                sent = await dispatch_dual_channel_alert(
+                    user_db,
+                    user.id,
+                    event_prefix="market_signal_change",
+                    alert_type="MARKET_SIGNAL",
+                    history_message=f"시장 위험 신호: {old_level} → {new_level}",
+                    send_email=partial(send_market_signal_change_alert, to_email, old_level, new_level, reason),
+                    push_title="시장 위험 신호 변경",
+                    push_body=f"시장 위험 신호가 {old_level} → {new_level}로 변경되었습니다.",
+                    push_type="MARKET_SIGNAL",
+                    fcm_token=fcm_token,
+                    # 같은 날 rebalancing/alert_check의 복합신호 알림과 중복 발송되지 않도록 dedup을 공유한다.
+                    after_sent=partial(_mark_composite_alert_sent_today, user_db, user.id),
+                )
+        except Exception as exc:
+            logger.error("market_signal_change_user_failed", user_id=str(user.id), error=str(exc))
+            continue
         if sent:
             sent_count += 1
 
     if sent_count:
-        await db.commit()
         logger.info(
             "market_signal_level_change_notified",
             old_level=old_level,

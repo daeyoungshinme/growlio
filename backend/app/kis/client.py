@@ -70,8 +70,13 @@ async def kis_request(
     json: dict[str, Any] | None = None,
     retries: int = 5,
     retry_on_request_error: bool = True,
+    retry_transient_rt_cd: bool = True,
 ) -> dict[str, Any]:
-    """KIS OpenAPI 기본 HTTP 클라이언트 — 속도제한 + 재시도 포함."""
+    """KIS OpenAPI 기본 HTTP 클라이언트 — 속도제한 + 재시도 포함.
+
+    `retry_transient_rt_cd=False`: rt_cd "1"(MCI 전송 오류) 재시도를 끈다. 주문 경로 전용 — 실패 응답이라도
+    KIS 문서로 "미접수" 보장이 확인되지 않아, 재전송이 중복 체결로 이어질 수 있다(docs/plans/39 N5).
+    """
     await _rate_limiter.acquire()  # broker_request 밖에서 호출 — 세마포어 취득 전 간격 보장
     for attempt in range(2):
         try:
@@ -93,7 +98,7 @@ async def kis_request(
                 retry_on_request_error=retry_on_request_error,
             )
         except KisApiError as e:
-            if e.rt_cd not in _TRANSIENT_RT_CD or attempt >= 1:
+            if not retry_transient_rt_cd or e.rt_cd not in _TRANSIENT_RT_CD or attempt >= 1:
                 raise
             logger.warning("kis_transient_error_retry", rt_cd=e.rt_cd, msg=e.msg, path=path, attempt=attempt)
             await asyncio.sleep(1.0)

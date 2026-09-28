@@ -8,6 +8,9 @@
   해외 종목이 있으면 `deposit_usd`를 환율로 환산해 더한다.
 - 기준 금액: `UserSettings.monthly_deposit_amount`. 미설정이면 "사실상 비어 있음"(`_MIN_CASH_KRW` 미만)일 때만 알린다.
 - 중복 방지: 실행일 단위 durable 키 — 알림 창을 1~3일로 둬 잡이 하루 누락돼도(Render 슬립 등) 다음 날 보완된다.
+- 알림별 DB 쓰기(dedup 조회·이력·플래그)는 알림마다 새 세션에서 한다 — 한 건의 DB 오류로 공유 세션이
+  rollback 대기 상태가 되면 이후 알림이 전부 실패하기 때문이다(docs/plans/39 N3). 조회한 ORM 객체는
+  `expire_on_commit=False`라 바깥 세션에서 그대로 읽힌다.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS
+from app.core.database import AsyncSessionLocal
 from app.jobs._job_helpers import report_job_failure, run_alert_job
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
@@ -118,10 +122,6 @@ async def _run_dca_cash_shortfall_check(db: AsyncSession, cache: CacheStoreType)
             days_until = (run_date - today).days
             if not (NOTICE_WINDOW_DAYS[0] <= days_until <= NOTICE_WINDOW_DAYS[1]):
                 continue
-            key = _dedup_key(alert.id, run_date)
-            if await get_durable(db, key) is not None:
-                continue
-
             if usd_krw is None and account.deposit_usd:
                 usd_krw = await fetch_usd_krw(cache)
             cash_krw = account_cash_krw(account, portfolio, usd_krw)
@@ -130,7 +130,13 @@ async def _run_dca_cash_shortfall_check(db: AsyncSession, cache: CacheStoreType)
             if not is_cash_short(cash_krw, expected_krw):
                 continue
 
-            await _notify(db, alert, portfolio, account, user, settings_row, run_date, cash_krw, expected_krw, key)
+            key = _dedup_key(alert.id, run_date)
+            async with AsyncSessionLocal() as item_db:
+                if await get_durable(item_db, key) is not None:
+                    continue
+                await _notify(
+                    item_db, alert, portfolio, account, user, settings_row, run_date, cash_krw, expected_krw, key
+                )
         except Exception as e:
             report_job_failure("dca_cash_shortfall_check_alert_failed", e, alert_id=str(alert.id))
 

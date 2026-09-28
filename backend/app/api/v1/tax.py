@@ -57,11 +57,16 @@ async def tax_summary(
     if target_year < 2000 or target_year > current_year + 1:
         raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
     acct_uuid = uuid.UUID(account_id) if account_id else None
+    positions = await get_overseas_positions_detail(current_user.id, db, acct_uuid)
     realized_krw: float | None = None
     if target_year <= current_year:
-        realized = await get_overseas_realized_summary(current_user.id, target_year, db, acct_uuid)
+        realized = await get_overseas_realized_summary(
+            current_user.id, target_year, db, acct_uuid, overseas_positions=positions
+        )
         realized_krw = realized["realized_gain_krw"]
-    return await get_tax_summary(current_user.id, target_year, db, acct_uuid, overseas_realized_krw=realized_krw)
+    return await get_tax_summary(
+        current_user.id, target_year, db, acct_uuid, overseas_realized_krw=realized_krw, overseas_positions=positions
+    )
 
 
 @router.get("/overseas-realized")

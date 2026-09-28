@@ -51,9 +51,22 @@ def _db(rows):
     return db
 
 
-async def _run(rows, today, *, durable=None, usd_krw=1400.0):
-    dispatch = AsyncMock(return_value=True)
+def _session_factory():
+    """알림별 `AsyncSessionLocal()` — async with 진입 시 새 세션 mock을 돌려준다."""
+
+    def _make():
+        cm = MagicMock()
+        cm.__aenter__ = AsyncMock(return_value=MagicMock())
+        cm.__aexit__ = AsyncMock(return_value=False)
+        return cm
+
+    return MagicMock(side_effect=_make)
+
+
+async def _run(rows, today, *, durable=None, usd_krw=1400.0, dispatch=None):
+    dispatch = dispatch or AsyncMock(return_value=True)
     with (
+        patch.object(job, "AsyncSessionLocal", new=_session_factory()),
         patch.object(job, "today_kst", return_value=today),
         patch.object(job, "get_durable", new=AsyncMock(return_value=durable)),
         patch.object(job, "set_durable", new=AsyncMock()),
@@ -98,6 +111,18 @@ async def test_dedup_skips_already_notified_run_date():
     rows = [(_alert(25), _portfolio(), _account(0), _user(), _settings())]
     dispatch = await _run(rows, date(2026, 11, 24), durable="1")
     dispatch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_one_alert_failure_does_not_block_following_alerts():
+    """알림마다 세션이 분리돼 한 건의 DB 오류가 뒤 알림을 막지 않는다 (docs/plans/39 N3)."""
+    rows = [(_alert(25), _portfolio(), _account(0), _user(), _settings()) for _ in range(2)]
+    dispatch = AsyncMock(side_effect=[RuntimeError("db down"), True])
+    with patch.object(job, "report_job_failure") as report:
+        await _run(rows, date(2026, 11, 24), dispatch=dispatch)
+
+    assert dispatch.await_count == 2
+    report.assert_called_once()
 
 
 @pytest.mark.asyncio

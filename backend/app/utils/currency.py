@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING
 
 from app.core.config import settings
@@ -39,10 +38,9 @@ async def fetch_usd_krw(cache: CacheStore | None, *, force_refresh: bool = False
     if not force_refresh:
         return await get_usd_krw_rate(cache)
 
-    from app.services.yahoo_price import _sync_usdkrw  # 순환 import 방지
+    from app.services.yahoo_price import fetch_usdkrw  # 순환 import 방지
 
-    loop = asyncio.get_running_loop()
-    fetched = await loop.run_in_executor(None, _sync_usdkrw)
+    fetched = await fetch_usdkrw()
     if fetched:
         await cache_usd_krw_rate(cache, fetched)
         return fetched

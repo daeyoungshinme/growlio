@@ -1,7 +1,6 @@
 import { Calculator } from "lucide-react";
 import { fmtKrw } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
-import { TAX_DEDUCTION } from "@/hooks/useTaxSimulation";
 
 interface Props {
   totalSimPnl: number;
@@ -10,6 +9,7 @@ interface Props {
   simTax: number;
   simTaxDiff: number;
   currentTax: number;
+  taxDeduction: number;
 }
 
 export function TaxSimulationCard({
@@ -19,6 +19,7 @@ export function TaxSimulationCard({
   simTax,
   simTaxDiff,
   currentTax,
+  taxDeduction,
 }: Props) {
   return (
     <div
@@ -55,7 +56,7 @@ export function TaxSimulationCard({
         </span>
         <span className="text-gray-500 dark:text-gray-400">250만원 공제</span>
         <span className="text-right text-gray-600 dark:text-gray-300">
-          −{fmtKrw(Math.min(TAX_DEDUCTION, Math.max(0, simTotalRealized)))}
+          −{fmtKrw(Math.min(taxDeduction, Math.max(0, simTotalRealized)))}
         </span>
         <span
           className={`font-semibold ${simTax === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"}`}

@@ -460,9 +460,12 @@ async def get_tax_action_plan(user_id: uuid.UUID, year: int, db: AsyncSession) -
         isa_contrib = await calc_isa_contribution_status(user_id, year, db)
         actions.extend(build_isa_contribution_actions(isa_contrib, today))
 
-    realized = await get_overseas_realized_summary(user_id, year, db)
-    tax_summary = await get_tax_summary(user_id, year, db, overseas_realized_krw=realized["realized_gain_krw"])
+    # 해외 포지션은 한 번만 읽어 실현손익·세금 요약에 넘긴다(스냅샷+포지션 로드 3회 → 1회)
     positions = await get_overseas_positions_detail(user_id, db)
+    realized = await get_overseas_realized_summary(user_id, year, db, overseas_positions=positions)
+    tax_summary = await get_tax_summary(
+        user_id, year, db, overseas_realized_krw=realized["realized_gain_krw"], overseas_positions=positions
+    )
     gain_action = build_overseas_gain_harvest_action(
         positions,
         float(tax_summary["overseas_gain_deduction_krw"]),

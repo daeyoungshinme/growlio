@@ -120,17 +120,20 @@ async def get_balance(access_token: str, *, account_id: str, account_no: str, ca
         qty = float(item.get("quantity") or 0)
         if qty <= 0:
             continue
+        currency = item.get("currency") or "KRW"
         positions.append(
             {
                 "ticker": item.get("symbol"),
                 "name": item.get("name"),
+                # 시장은 통화로 판정한다 — provider의 해외 보강(`currency == "USD"`)과 같은 기준이어야
+                # "US" 센티널이 보강 없이 남거나 달러 종목이 국내로 분류되지 않는다(docs/plans/39 #11).
                 # 토스 holdings는 미국 하위 거래소(NASDAQ/NYSE/AMEX)를 구분해 주지 않는다 —
                 # "US" 센티널로 두고 provider가 enrich_overseas_positions()로 확정한다.
-                "market": "KOSPI" if item.get("marketCountry") == "KR" else "US",
+                "market": "KOSPI" if currency == "KRW" else "US",
                 "qty": int(qty),
                 "avg_price": float(item.get("averagePurchasePrice") or 0),
                 "current_price": float(item.get("lastPrice") or 0),
-                "currency": item.get("currency") or "KRW",
+                "currency": currency,
             }
         )
 

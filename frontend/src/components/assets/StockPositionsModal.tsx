@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw, X } from "lucide-react";
-import { api } from "@/api/client";
+import {
+  fetchAccountPositions,
+  replaceAccountPositions,
+  syncAccountPositionPrices,
+  type AccountPositionsSummary,
+} from "@/api/assets";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { usePositionsEditor } from "@/hooks/usePositionsEditor";
 import { extractErrorMessage } from "@/utils/error";
@@ -14,17 +19,7 @@ import { PositionsTable } from "./PositionsTable";
 import type { Position } from "@/hooks/usePositionsEditor";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
-interface Summary {
-  total_invested: number;
-  total_value: number;
-  total_pnl: number;
-  total_pnl_pct: number;
-}
-
-interface PositionsResponse {
-  positions: Position[];
-  summary: Summary;
-}
+type Summary = AccountPositionsSummary;
 
 const EMPTY_ROW: Position = {
   ticker: "",
@@ -60,14 +55,13 @@ export default function StockPositionsModal({
   const editor = usePositionsEditor([], usdRate);
 
   useEffect(() => {
-    api
-      .get<PositionsResponse>(`/assets/${accountId}/positions`)
-      .then((r) => {
-        const positions = r.data.positions;
+    fetchAccountPositions<Position>(accountId)
+      .then((data) => {
+        const positions = data.positions;
         editor.setRows(
           editor.enrichRows(positions.length ? positions : readonly ? [] : [{ ...EMPTY_ROW }]),
         );
-        setSummary(r.data.summary);
+        setSummary(data.summary);
       })
       .catch((e) => {
         setError(extractErrorMessage(e, "포지션 조회에 실패했습니다"));
@@ -95,7 +89,7 @@ export default function StockPositionsModal({
     setSaving(true);
     setError(null);
     try {
-      await api.put(`/assets/${accountId}/positions`, valid);
+      await replaceAccountPositions(accountId, valid);
       void invalidateAccountData(queryClient);
       toast("저장되었습니다", "success");
       onClose();
@@ -110,9 +104,9 @@ export default function StockPositionsModal({
     setSyncing(true);
     setError(null);
     try {
-      const r = await api.post<PositionsResponse>(`/assets/${accountId}/positions/sync-prices`);
-      editor.setRows(editor.enrichRows(r.data.positions));
-      setSummary(r.data.summary);
+      const data = await syncAccountPositionPrices<Position>(accountId);
+      editor.setRows(editor.enrichRows(data.positions));
+      setSummary(data.summary);
       void invalidateAccountData(queryClient);
     } catch (e: unknown) {
       setError(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
