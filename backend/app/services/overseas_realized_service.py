@@ -107,12 +107,16 @@ async def _fetch_kis_realized(acc: AssetAccount, start: date, end: date, db: Asy
         )
 
     async def _fetch(token: str) -> float:
-        result = await get_overseas_realized_pnl(app_key, app_secret, token, account_no, start, end)
+        # 타임아웃은 순수 HTTP 조회에만 건다 — 토큰 발급(`store_token`)은 공유 세션에서 commit하므로
+        # wait_for 취소가 commit 도중에 떨어지면 세션이 깨진 채 다음 계좌 루프로 넘어간다.
+        # 토큰 발급 HTTP는 공용 httpx 클라이언트 타임아웃(30초)으로 이미 상한이 있다.
+        result = await asyncio.wait_for(
+            get_overseas_realized_pnl(app_key, app_secret, token, account_no, start, end),
+            timeout=_FETCH_TIMEOUT_SECONDS,
+        )
         return result["total_krw"]
 
-    return await asyncio.wait_for(
-        with_token_refresh(_fetch, _get_token, KisTokenExpiredError), timeout=_FETCH_TIMEOUT_SECONDS
-    )
+    return await with_token_refresh(_fetch, _get_token, KisTokenExpiredError)
 
 
 def resolve_source(covered: list[RealizedAccount], uncovered: list[UncoveredAccount]) -> RealizedSource:

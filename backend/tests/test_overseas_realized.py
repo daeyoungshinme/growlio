@@ -191,6 +191,37 @@ class TestGetOverseasRealizedSummary:
         assert token.call_args_list[1].kwargs["force_refresh"] is True
         assert pnl.call_args_list[1].args[2] == "new"
 
+    @pytest.mark.asyncio
+    async def test_fetch_timeout_does_not_cancel_token_issuance(self, make_account, mock_cache):
+        """토큰 발급(내부 commit)은 타임아웃 대상이 아니다 — 조회 HTTP에만 wait_for가 걸린다."""
+        import asyncio
+
+        from app.services.overseas_realized_service import _fetch_kis_realized
+
+        acc = _acc(make_account, "KIS")
+
+        async def slow_token(*args, **kwargs):
+            await asyncio.sleep(0.05)
+            return "tok"
+
+        async def slow_pnl(*args, **kwargs):
+            await asyncio.sleep(1)
+            return {"total_krw": 1.0, "trades": []}
+
+        with (
+            patch("app.services.overseas_realized_service.decrypt_kis_credentials", return_value=("k", "s")),
+            patch("app.services.overseas_realized_service._FETCH_TIMEOUT_SECONDS", 0.01),
+            patch("app.services.overseas_realized_service.get_access_token", new=slow_token),
+        ):
+            fast_pnl = AsyncMock(return_value={"total_krw": 7.0, "trades": []})
+            with patch("app.services.overseas_realized_service.get_overseas_realized_pnl", new=fast_pnl):
+                assert await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, MagicMock(), mock_cache) == 7.0
+            with (
+                patch("app.services.overseas_realized_service.get_overseas_realized_pnl", new=slow_pnl),
+                pytest.raises(TimeoutError),
+            ):
+                await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, MagicMock(), mock_cache)
+
 
 def test_resolve_source():
     covered = [{"account_id": "a", "account_name": "A", "realized_krw": 0.0}]
