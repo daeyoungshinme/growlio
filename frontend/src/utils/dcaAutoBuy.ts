@@ -35,6 +35,7 @@ export function dcaAccountCashKrw(
 }
 
 /** 월 적립액 대비 예수금 부족분(원). 부족하지 않거나 월 적립액 미설정이면 null.
+ * 백엔드 `jobs/dca_cash_shortfall.is_cash_short`와 같은 비교 규칙 — 한쪽을 바꾸면 함께 맞출 것.
  * (백엔드 사전 알림은 월 적립액 미설정 시 1만원 미만도 알리지만, 화면 경고는 비교 기준이 있을 때만 띄운다) */
 export function dcaCashShortfallKrw(
   cashKrw: number,

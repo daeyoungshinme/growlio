@@ -2,7 +2,7 @@ import { BadgeCheck, Info, TrendingUp, TrendingDown, Lightbulb, TriangleAlert } 
 import type { OverseasPositionDetail, OverseasRealizedSummary } from "@/api/tax";
 import { fmtKrw } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
-import { useTaxSimulation, TAX_DEDUCTION } from "@/hooks/useTaxSimulation";
+import { useTaxSimulation, type OverseasTaxRule } from "@/hooks/useTaxSimulation";
 import { TaxPositionTable } from "./TaxPositionTable";
 import { TaxSimulationCard } from "./TaxSimulationCard";
 import { TaxRecommendationList } from "./TaxRecommendationList";
@@ -11,11 +11,15 @@ interface Props {
   positions: OverseasPositionDetail[];
   /** 증권사 체결 기준 올해 실현손익 자동 집계(E6) — 없거나 자동 집계 계좌가 없으면 수기 입력만 */
   realized?: OverseasRealizedSummary | null;
+  /** 세금 요약 응답의 해외 양도세 공제·세율 — 없으면 훅의 폴백 상수 */
+  taxRule?: OverseasTaxRule;
 }
 
-export default function TaxPlannerSection({ positions, realized }: Props) {
+export default function TaxPlannerSection({ positions, realized, taxRule }: Props) {
   const autoRealized = realized?.realized_gain_krw ?? null;
   const {
+    taxDeduction,
+    taxRate,
     alreadyRealizedInput,
     setAlreadyRealizedInput,
     sellQtyMap,
@@ -35,7 +39,7 @@ export default function TaxPlannerSection({ positions, realized }: Props) {
     simTaxDiff,
     recommendations,
     handleQtyChange,
-  } = useTaxSimulation(positions, autoRealized);
+  } = useTaxSimulation(positions, autoRealized, taxRule);
 
   if (positions.length === 0) {
     return (
@@ -52,7 +56,9 @@ export default function TaxPlannerSection({ positions, realized }: Props) {
         <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
           해외 양도세 절세 플래너
         </span>
-        <span className="text-xs text-gray-400 dark:text-gray-500">250만원 공제 최대 활용</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">
+          {fmtKrw(taxDeduction)} 공제 최대 활용
+        </span>
       </div>
 
       {/* 올해 이미 실현한 손익 입력 + 공제 현황 */}
@@ -134,7 +140,7 @@ export default function TaxPlannerSection({ positions, realized }: Props) {
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500 dark:text-gray-400">공제 사용 현황</span>
             <span className="font-medium text-gray-700 dark:text-gray-300">
-              {fmtKrw(Math.max(0, alreadyRealized))} / {fmtKrw(TAX_DEDUCTION)}
+              {fmtKrw(Math.max(0, alreadyRealized))} / {fmtKrw(taxDeduction)}
             </span>
           </div>
           <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -151,7 +157,7 @@ export default function TaxPlannerSection({ positions, realized }: Props) {
           </div>
           <div className="flex flex-wrap items-start justify-between gap-y-1">
             <div className="flex-1 min-w-0">
-              {alreadyRealized < TAX_DEDUCTION ? (
+              {alreadyRealized < taxDeduction ? (
                 <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                   공제 잔여 {fmtKrw(remainingDeduction)} — 세금 없이 이만큼 더 수익 실현 가능
                 </span>
@@ -192,6 +198,7 @@ export default function TaxPlannerSection({ positions, realized }: Props) {
             totalLoss={totalLoss}
             hasAnyQtyInput={hasAnyQtyInput}
             handleQtyChange={handleQtyChange}
+            taxRate={taxRate}
           />
         </div>
       )}
@@ -218,6 +225,7 @@ export default function TaxPlannerSection({ positions, realized }: Props) {
             totalLoss={totalLoss}
             hasAnyQtyInput={hasAnyQtyInput}
             handleQtyChange={handleQtyChange}
+            taxRate={taxRate}
           />
         </div>
       )}
@@ -230,6 +238,7 @@ export default function TaxPlannerSection({ positions, realized }: Props) {
           simTax={simTax}
           simTaxDiff={simTaxDiff}
           currentTax={currentTax}
+          taxDeduction={taxDeduction}
         />
       )}
 

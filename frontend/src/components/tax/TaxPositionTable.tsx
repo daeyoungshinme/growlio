@@ -1,7 +1,7 @@
 import type { OverseasPositionDetail } from "@/api/tax";
 import { fmtKrw, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
-import { posKey, TAX_RATE } from "@/hooks/useTaxSimulation";
+import { posKey } from "@/hooks/useTaxSimulation";
 
 interface Props {
   kind: "profit" | "loss";
@@ -11,6 +11,8 @@ interface Props {
   totalLoss: number;
   hasAnyQtyInput: boolean;
   handleQtyChange: (pos: OverseasPositionDetail, val: string) => void;
+  /** 해외 양도세율(소수) — 손실 매도 시 절세액 표시에 쓴다 */
+  taxRate: number;
 }
 
 function QtyInput({
@@ -50,6 +52,7 @@ export function TaxPositionTable({
   totalLoss,
   hasAnyQtyInput,
   handleQtyChange,
+  taxRate,
 }: Props) {
   const isLoss = kind === "loss";
 
@@ -61,7 +64,7 @@ export function TaxPositionTable({
           const qty = sellQtyMap[posKey(pos)] ?? 0;
           const pnlPs = pos.qty > 0 ? pos.unrealized_pnl_krw / pos.qty : 0;
           const rowSimPnl = pnlPs * qty;
-          const taxSaved = isLoss ? Math.round(Math.abs(rowSimPnl) * TAX_RATE) : 0;
+          const taxSaved = isLoss ? Math.round(Math.abs(rowSimPnl) * taxRate) : 0;
           const isWithinBudget = !isLoss && pos.unrealized_pnl_krw <= maxTaxFreeProfit;
 
           return (
@@ -143,7 +146,7 @@ export function TaxPositionTable({
               const qty = sellQtyMap[posKey(pos)] ?? 0;
               const pnlPs = pos.qty > 0 ? pos.unrealized_pnl_krw / pos.qty : 0;
               const rowSimPnl = pnlPs * qty;
-              const taxSaved = isLoss ? Math.round(Math.abs(rowSimPnl) * TAX_RATE) : 0;
+              const taxSaved = isLoss ? Math.round(Math.abs(rowSimPnl) * taxRate) : 0;
               const isWithinBudget = !isLoss && pos.unrealized_pnl_krw <= maxTaxFreeProfit;
 
               return (
