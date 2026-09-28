@@ -117,6 +117,33 @@ class TestGetBalance:
         assert result["deposit_usd"] == 45.0
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("item", "market", "currency"),
+        [
+            ({"marketCountry": "KR", "currency": "KRW"}, "KOSPI", "KRW"),
+            ({"marketCountry": "US", "currency": "USD"}, "US", "USD"),
+            ({"currency": "USD"}, "US", "USD"),  # marketCountry 누락 — 통화 기준
+            ({"marketCountry": "US"}, "KOSPI", "KRW"),  # 통화 누락 → KRW로 보고 시장도 일치시킨다
+        ],
+    )
+    async def test_market_follows_currency(self, cache, item, market, currency):
+        """시장 판정이 provider 해외 보강 기준(currency)과 어긋나지 않는다 (docs/plans/39 #11)."""
+        holdings = {"result": {"items": [{"symbol": "X", "name": "x", "quantity": 1, **item}]}}
+
+        async def fake_request(method, path, **kwargs):
+            if path == toss_balance.TOSS_ACCOUNTS_PATH:
+                return {"result": [{"accountNo": "1", "accountSeq": 7, "accountType": "BROKERAGE"}]}
+            if path == toss_balance.TOSS_HOLDINGS_PATH:
+                return holdings
+            return {"result": {"cashBuyingPower": 0}}
+
+        with patch("app.toss.balance.toss_request", side_effect=fake_request):
+            result = await toss_balance.get_balance("t", account_id="a", account_no="1", cache=cache)
+
+        pos = result["positions"][0]
+        assert (pos["market"], pos["currency"]) == (market, currency)
+
+    @pytest.mark.asyncio
     async def test_buying_power_failure_falls_back_to_zero(self, cache):
         from app.toss.client import TossApiError
 
