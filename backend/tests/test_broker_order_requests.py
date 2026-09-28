@@ -118,6 +118,17 @@ class TestKisDomesticOrder:
             )
         assert len(httpx_mock.get_requests()) == 1
 
+    @pytest.mark.asyncio
+    async def test_transient_rt_cd_is_not_retried(self, httpx_mock: HTTPXMock):
+        """rt_cd "1"(MCI 전송 오류)은 조회 경로에선 1회 재시도하지만 주문은 재전송하지 않는다 (plans/39 N5)."""
+        httpx_mock.add_response(json={"rt_cd": "1", "msg1": "MCI 전송 오류"})
+
+        with pytest.raises(Exception, match="MCI"):
+            await kis_order.place_domestic_order(
+                "key", "secret", "tok", "12345678-01", side="BUY", ticker="069500", quantity=1, is_mock=False
+            )
+        assert len(httpx_mock.get_requests()) == 1
+
 
 # ── KIS 해외 ─────────────────────────────────────────────────────────────────
 
@@ -184,6 +195,24 @@ class TestKisOverseasOrder:
         assert body["OVRS_EXCG_CD"] == code
         assert body["ORD_DVSN"] == "00"
         assert body["OVRS_ORD_UNPR"] == "512.35"  # 달러는 소수 둘째 자리
+
+    @pytest.mark.asyncio
+    async def test_transient_rt_cd_is_not_retried(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(json={"rt_cd": "1", "msg1": "MCI 전송 오류"})
+
+        with pytest.raises(Exception, match="MCI"):
+            await kis_order.place_overseas_order(
+                "key",
+                "secret",
+                "tok",
+                "12345678-01",
+                side="BUY",
+                ticker="SPY",
+                market="NYSE",
+                quantity=1,
+                is_mock=False,
+            )
+        assert len(httpx_mock.get_requests()) == 1
 
 
 # ── 키움 국내 ────────────────────────────────────────────────────────────────

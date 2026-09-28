@@ -71,6 +71,7 @@ async def place_domestic_order(
         headers=headers,
         json=body,
         retry_on_request_error=False,
+        retry_transient_rt_cd=False,
     )
 
     if data.get("rt_cd") != "0":
@@ -135,6 +136,7 @@ async def place_overseas_order(
         headers=headers,
         json=body,
         retry_on_request_error=False,
+        retry_transient_rt_cd=False,
     )
 
     if data.get("rt_cd") != "0":
