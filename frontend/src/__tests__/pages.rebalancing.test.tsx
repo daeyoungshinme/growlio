@@ -10,6 +10,10 @@ vi.mock("@/api/marketSignals", () => ({
   fetchMarketSignal: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock("@/api/economicIndicators", () => ({
+  fetchInflationSummary: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
   default: () => React.createElement("div", { "data-testid": "rebalancing-status-card" }),
 }));
@@ -33,6 +37,8 @@ vi.mock("@/components/portfolio-analysis/PortfolioExecutionTab", () => ({
 // ── imports ───────────────────────────────────────────────────────────────────
 
 import RebalancingPage from "@/pages/RebalancingPage";
+import { fetchMarketSignal } from "@/api/marketSignals";
+import { fetchInflationSummary } from "@/api/economicIndicators";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -69,5 +75,22 @@ describe("RebalancingPage", () => {
     renderPage("?rtab=추천&openRecOptions=1");
     const card = await screen.findByTestId("recommendation-card");
     expect(card).toHaveAttribute("data-options-open", "true");
+  });
+
+  it("시장신호 조회가 실패해도 물가 지표는 단독으로 보여준다 (plans/39 N7)", async () => {
+    vi.mocked(fetchMarketSignal).mockRejectedValueOnce(new Error("signal down"));
+    vi.mocked(fetchInflationSummary).mockResolvedValueOnce([
+      {
+        code: "CPI_US",
+        name: "CPI",
+        latest_value: 320.1,
+        latest_date: "2026-08-01",
+        mom_change_pct: 0.2,
+        yoy_change_pct: 2.9,
+        next_release_date: null,
+      },
+    ]);
+    renderPage("?rtab=진단");
+    expect(await screen.findByText("물가 지표 (미국)")).toBeInTheDocument();
   });
 });

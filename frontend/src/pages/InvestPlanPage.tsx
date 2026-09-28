@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   ChevronDown,
@@ -58,6 +58,20 @@ export default function InvestPlanPage() {
       },
       { replace: true },
     );
+
+  // 리밸런싱 추천 탭 "목표 설정하러 가기"에서 왔는지(U16) — 진입 시 한 번만 읽고 URL에서는 지운다.
+  // 파라미터가 남아 있으면 새로고침·뒤로가기로 다시 들어와도 "추천 보러 가기" 배너가 계속 떴다(plans/39 N7).
+  const [fromRecommendation] = useState(() => searchParams.get("from") === "recommendation");
+  useEffect(() => {
+    if (!searchParams.has("from")) return;
+    setSearchParams(
+      (prev) => {
+        prev.delete("from");
+        return prev;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
 
   // 저축 시뮬레이터는 목표와 무관한 보조 도구라 2단 탭 대신 최하단 접힘 카드로 둔다(U11)
   const [isSimulatorOpen, toggleSimulatorOpen] = useCollapsible(
@@ -151,7 +165,7 @@ export default function InvestPlanPage() {
         {activeTab === "적립 계획" && (
           <div className="space-y-6">
             {/* 리밸런싱 추천 탭 "목표 설정하러 가기"에서 온 경우, 목표 저장 후 추천으로 돌아가는 길(U16) */}
-            {searchParams.get("from") === "recommendation" && isConfigured && (
+            {fromRecommendation && isConfigured && (
               <Link
                 to="/rebalancing?rtab=추천"
                 className="flex items-center justify-between gap-2 rounded-xl border border-teal-200 dark:border-teal-800/50 bg-teal-50 dark:bg-teal-950/30 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-300"

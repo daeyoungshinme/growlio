@@ -20,6 +20,9 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
 const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSignalBanner"));
+const InflationIndicatorList = lazy(
+  () => import("../components/rebalancing/InflationIndicatorList"),
+);
 const RecommendationCard = lazy(() => import("../components/rebalancing/RecommendationCard"));
 const PortfolioManageTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioManageTab"),
@@ -127,7 +130,7 @@ export default function RebalancingPage() {
     return () => clearTimeout(timer);
   }, [portfolioId, localTab]);
 
-  const { data: signal } = useQuery({
+  const { data: signal, isError: signalError } = useQuery({
     queryKey: QUERY_KEYS.marketSignal,
     queryFn: fetchMarketSignal,
     staleTime: STALE_TIME.MEDIUM,
@@ -207,6 +210,16 @@ export default function RebalancingPage() {
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard rows={1} />}>
                   <MarketSignalBanner signal={signal} inflation={inflationSummary} />
+                </Suspense>
+              </ErrorBoundary>
+            )}
+            {/* 물가 지표는 별도 조회라 시장신호 조회가 실패해도 단독 카드로 보여준다(plans/39 N7) */}
+            {!signal && signalError && inflationSummary && inflationSummary.length > 0 && (
+              <ErrorBoundary variant="section">
+                <Suspense fallback={<SkeletonCard rows={1} />}>
+                  <div className="card">
+                    <InflationIndicatorList data={inflationSummary} />
+                  </div>
                 </Suspense>
               </ErrorBoundary>
             )}
