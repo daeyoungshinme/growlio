@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 # ── _to_yahoo_symbol (순수 함수) ──────────────────────────────
 
@@ -337,3 +338,45 @@ class TestSyncPykrxReturnsBatch:
 
         assert ("005930", "KOSPI") in result
         assert ("AAPL", "NASDAQ") not in result
+
+
+# ── 비동기 진입점: 서킷·세마포어 경유 (docs/plans/39 #7) ─────────────────────
+
+
+class TestGuardedEntrypoints:
+    @pytest.mark.asyncio
+    async def test_circuit_open_skips_yahoo_and_returns_fallback(self):
+        from app.services import yahoo_price
+
+        with (
+            patch.object(yahoo_price.yahoo_circuit, "is_available", return_value=False),
+            patch.object(yahoo_price, "_sync_yahoo_price") as sync_price,
+            patch.object(yahoo_price, "_sync_usdkrw") as sync_fx,
+        ):
+            assert await yahoo_price.fetch_yahoo_price("AAPL", "NASDAQ") is None
+            assert await yahoo_price.fetch_usdkrw() == 0.0
+            assert await yahoo_price.fetch_yahoo_batch([("AAPL", "NASDAQ")]) == {}
+        sync_price.assert_not_called()
+        sync_fx.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_records_success_and_failure(self):
+        from app.services import yahoo_price
+
+        with (
+            patch.object(yahoo_price.yahoo_circuit, "record_success") as ok,
+            patch.object(yahoo_price.yahoo_circuit, "record_failure") as fail,
+            patch.object(yahoo_price, "_sync_yahoo_batch", side_effect=[{"AAPL": 180.0}, {}]),
+        ):
+            assert await yahoo_price.fetch_yahoo_batch([("AAPL", "NASDAQ")]) == {"AAPL": 180.0}
+            assert await yahoo_price.fetch_yahoo_batch([("AAPL", "NASDAQ")]) == {}
+        ok.assert_called_once()
+        fail.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_empty_batch_does_not_touch_circuit(self):
+        from app.services import yahoo_price
+
+        with patch.object(yahoo_price.yahoo_circuit, "record_failure") as fail:
+            assert await yahoo_price.fetch_yahoo_batch([]) == {}
+        fail.assert_not_called()

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from functools import partial
 
 import structlog
 from fastapi import APIRouter, Depends, Query, Request
@@ -93,13 +92,12 @@ async def get_index_region(
 @limiter.limit("10/minute")
 async def get_exchange_rate(request: Request, cache: CacheStore = Depends(get_cache_store)):
     """현재 USD/KRW 환율 조회 (캐시 → yfinance, ~15분 지연)."""
-    from app.services.yahoo_price import _sync_usdkrw
+    from app.services.yahoo_price import fetch_usdkrw
 
     cached = await cache.get(_USD_KRW_KEY)
     if cached:
         return {"usd_krw": float(cached)}
-    loop = asyncio.get_running_loop()
-    rate = await loop.run_in_executor(None, _sync_usdkrw)
+    rate = await fetch_usdkrw()
     if rate > 0:
         await cache_usd_krw_rate(cache, rate)
     else:
@@ -143,7 +141,7 @@ async def get_stock_price(
     그래도 없고 `account_id`(KIS 연동 보유 계좌)가 주어진 경우 최후로 KIS API를 시도한다.
     해외 종목은 USD → KRW 변환 후 반환. 캐시 TTL 900s.
     """
-    from app.services.yahoo_price import _sync_usdkrw, _sync_yahoo_price
+    from app.services.yahoo_price import fetch_usdkrw, fetch_yahoo_price
 
     cache_key = current_price_display_key(ticker, market)
     cached = await get_cached_json(cache, cache_key)
@@ -152,7 +150,7 @@ async def get_stock_price(
 
     loop = asyncio.get_running_loop()
     tried_stages = ["yahoo"]
-    price = await loop.run_in_executor(None, partial(_sync_yahoo_price, ticker, market))
+    price = await fetch_yahoo_price(ticker, market)
     if not price and market.upper() in DOMESTIC_MARKETS:
         tried_stages.append("domestic")
         price = await domestic_price_fallback(ticker, loop)
@@ -164,7 +162,7 @@ async def get_stock_price(
         return {"price_krw": None, "price_usd": None, "usd_rate": None}
 
     if market in OVERSEAS_MARKETS:
-        usd_rate = await loop.run_in_executor(None, _sync_usdkrw)
+        usd_rate = await fetch_usdkrw()
         if not usd_rate:
             usd_rate = await get_usd_krw_rate(cache)
         result = {
@@ -200,9 +198,9 @@ async def _resolve_batch_prices(
 ) -> dict[str, float]:
     """Yahoo 배치 조회로 먼저 채우고, 그중 국내 마켓이면서 여전히 없는 티커만 Naver/pykrx로 폴백한다.
     그래도 없고 `account_id`가 주어진 티커만 최후로 KIS API를 시도한다."""
-    from app.services.yahoo_price import _sync_yahoo_batch
+    from app.services.yahoo_price import fetch_yahoo_batch
 
-    price_map: dict[str, float] = await loop.run_in_executor(None, partial(_sync_yahoo_batch, to_fetch)) or {}
+    price_map: dict[str, float] = await fetch_yahoo_batch(to_fetch)
 
     domestic_missing = [(t, m) for t, m in to_fetch if t not in price_map and m.upper() in DOMESTIC_MARKETS]
     if domestic_missing:
@@ -274,9 +272,9 @@ async def get_stock_prices_batch(
     overseas_tickers = {t for t, m in to_fetch if m in OVERSEAS_MARKETS}
     usd_rate: float = 0.0
     if overseas_tickers:
-        from app.services.yahoo_price import _sync_usdkrw
+        from app.services.yahoo_price import fetch_usdkrw
 
-        usd_rate = await loop.run_in_executor(None, _sync_usdkrw)
+        usd_rate = await fetch_usdkrw()
         if not usd_rate:
             usd_rate = await get_usd_krw_rate(cache)
         if usd_rate:
