@@ -254,7 +254,7 @@ services/
   ├── factor_service.py             # 팩터 분석 (모멘텀·가치·품질)
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
   ├── market_data_fetcher.py        # [팩터·리스크용 배치 수익률 그룹] 시장 데이터 수집 유틸 (VIX, 금리차 등) — 개별 현재가 조회(price_service.py 등)와는 별개 책임
-  ├── market_signal_service.py      # 복합 시장 위험 신호 평가(VIX·미국 금리 커브·하이일드 스프레드·달러인덱스·환율·유가·인플레이션(CPI+PCE)·고용(실업률) 8종, 상한 27점). `get_confirmed_composite_level()`은 AUTO 게이트·등급전환 알림 전용 hysteresis(연속 2회 관측), raw(`get_market_signal`)는 배너 표시용으로 별개
+  ├── market_signal_service.py      # 복합 시장 위험 신호 평가(VIX·미국 금리 커브·하이일드 스프레드·달러인덱스·환율·유가·인플레이션(CPI+PCE)·고용(실업률) 8종, 상한 27점). `get_confirmed_composite_level()`은 AUTO 게이트·등급전환 알림 전용 hysteresis(연속 2회 관측), raw(`get_market_signal`)는 배너 표시용으로 별개. 캐시·single-flight 진입점+hysteresis만 담당하고 개별 지표 조회는 `market_signal_indicators.py`, 복합 점수 계산(순수 함수)은 `market_signal_scoring.py`로 분리 — 외부는 계속 `market_signal_service`에서 import(재노출). 지표 fetcher끼리 내부 호출(인플레이션→CPI/PCE, 금리커브→장단기/인하기대)하므로 그 patch는 `market_signal_indicators.*` 경로로
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어) — `estimation.py` 축소추정을 프론티어 곡선·포트폴리오 위치·종목 좌표에 일관 적용
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송
