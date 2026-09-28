@@ -12,11 +12,17 @@ import fnmatch
 import re
 import time
 
+from app.utils.metrics import cache_lru_eviction_count
+
 _MAX_ENTRIES = 20_000
 """Render free 인스턴스(512MB)에서 무제한 축적을 막기 위한 상한 — 7일짜리 TTL 캐시(배당/ETF 메타
 등)가 sweep 주기(15분) 안에 자연 만료되지 않는 채로 계속 쌓이는 것을 방어한다. 초과분은 set() 시점에
 가장 오래 안 쓰인(LRU) 항목부터 제거한다. 항목당 페이로드가 대체로 수백 바이트~수 KB인 JSON 문자열
-이므로 2만 건이면 최악의 경우에도 수십 MB 선으로 캡핑된다."""
+이므로 2만 건이면 최악의 경우에도 수십 MB 선으로 캡핑된다.
+
+상한 도달 시 만료된 항목부터 치우고, 그래도 넘칠 때만 살아 있는 항목을 LRU로 축출한다. 살아 있는
+항목 축출은 분산락(`set(nx=True)`)·토큰 캐시 키도 가리지 않으므로 `cache_lru_eviction_total` 메트릭과
+`cache_sweep` 잡의 경고 로그로 발생 여부를 감시한다 — 경고가 보이면 상한 상향을 검토할 것."""
 
 
 class CacheStore:
@@ -30,6 +36,7 @@ class CacheStore:
     def __init__(self) -> None:
         self._data: dict[str, tuple[str, float | None]] = {}
         self._lock = asyncio.Lock()
+        self._lru_evictions = 0
 
     def _is_expired(self, expires_at: float | None) -> bool:
         return expires_at is not None and expires_at <= time.monotonic()
@@ -56,10 +63,26 @@ class CacheStore:
             expires_at = time.monotonic() + ex if ex is not None else None
             self._data.pop(key, None)
             self._data[key] = (value, expires_at)
-            while len(self._data) > _MAX_ENTRIES:
-                oldest_key = next(iter(self._data))
-                del self._data[oldest_key]
+            if len(self._data) > _MAX_ENTRIES:
+                self._evict_over_capacity()
             return True
+
+    def _evict_over_capacity(self) -> None:
+        """상한 초과분 정리 — 만료 항목을 먼저 지우고, 부족하면 살아 있는 LRU 항목을 축출한다(락 보유 중 호출)."""
+        for key in [k for k, (_, exp) in self._data.items() if self._is_expired(exp)]:
+            del self._data[key]
+        while len(self._data) > _MAX_ENTRIES:
+            del self._data[next(iter(self._data))]
+            self._lru_evictions += 1
+            cache_lru_eviction_count.inc()
+
+    def take_lru_evictions(self) -> int:
+        """직전 호출 이후 살아 있는 항목이 LRU 축출된 횟수를 반환하고 0으로 되돌린다(`cache_sweep` 잡 감시용)."""
+        count, self._lru_evictions = self._lru_evictions, 0
+        return count
+
+    def __len__(self) -> int:
+        return len(self._data)
 
     async def setex(self, key: str, ttl: int, value: str) -> None:
         await self.set(key, value, ex=ttl)
