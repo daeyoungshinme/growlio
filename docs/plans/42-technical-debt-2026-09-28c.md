@@ -66,8 +66,16 @@
 **41번에서 유지**
 
 1. goal `_compute_*` 분해(스냅샷 하네스 선행), `create_rebalancing_execution_plan`, `_check_user_goals`(36 #4)
-2. 대형 컴포넌트 `RecommendationCard` 806줄 + 메이저 업그레이드 React 19, recharts 3, tailwind 4(36 #10).
-   `StockAccountModal`은 `a3f48bf`에서 일부 줄었으니 재측정할 것.
+2. ~~대형 컴포넌트 분해~~ **완료(후속 세션)** — 메이저 업그레이드 React 19, recharts 3, tailwind 4(36 #10)만 남음.
+   - `RecommendationCard` 806 → 413줄: 탭 본문 `RecommendationOverallTab`/`AgeTab`/`HorizonTab`,
+     `RecommendationComparisonPreview`, 순수 로직 `recommendationCardModel.ts`(`buildApplyConfirm`,
+     `buildOverallApplySection`, `significantDrift`)로 분리. `normalizeWeights`는 `utils/recommendationDrift.ts`로 이동.
+   - `StockAccountModal` 616 → 440줄(재측정 시 `a3f48bf` 후에도 616줄): `useBrokerCredentialVerify` 훅(검증 훅 3개 묶음),
+     `StockAccountTaxFields` 분리, 예수금 필드 2벌 → `mode` 1벌, 소스 전환 초기화를 `BROKER_CREDENTIAL_CONFIG` 루프로.
+   - 순수 이동·등가 치환이며 동작 변경 없음. 모달 테스트 4건(소스 전환 초기화·KIS 게이트·수동 제출·수정 페이로드) +
+     `normalizeWeights` 3건 추가. 프론트 1605 → 1612 tests.
+   - 관찰: `GoalSettingWizard`의 "이 추천으로 포트폴리오 만들기"는 `normalizeWeights`를 거치지 않고 원 비중을 그대로 보낸다
+     (반올림 합계가 100±0.01을 벗어나면 백엔드 검증 실패 가능). 동작 변경이라 이번엔 손대지 않음.
 3. 경쟁기능 격차(정기 자동매수, ETF TER). 로드맵 전용이다.
 4. 2-leg 확장 범위: 실패 leg 자동 재시도. 실거래 리스크가 있어 별도 설계가 필요하다.
 

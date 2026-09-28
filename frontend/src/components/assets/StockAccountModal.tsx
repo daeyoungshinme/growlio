@@ -1,20 +1,17 @@
-import { Info, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Modal from "@/components/common/Modal";
-import Tooltip from "@/components/common/Tooltip";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
-import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS, ISA_TYPE_LABELS } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
+import { useBrokerCredentialVerify } from "@/hooks/useBrokerCredentialVerify";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
-import { useKisCredentialVerify } from "@/hooks/useKisCredentialVerify";
-import { useTossCredentialVerify } from "@/hooks/useTossCredentialVerify";
-import { useKiwoomCredentialVerify } from "@/hooks/useKiwoomCredentialVerify";
 import { convertUsdToKrw } from "@/utils/format";
 import { STOCK_TYPE_LABELS } from "@/constants";
-import { type BrokerDataSource, isBrokerDataSource } from "@/constants/brokerCredentials";
+import { BROKER_CREDENTIAL_CONFIG, isBrokerDataSource } from "@/constants/brokerCredentials";
+import StockAccountTaxFields from "./StockAccountTaxFields";
 import StockDepositFields from "./StockDepositFields";
 import BrokerCredentialFields from "./BrokerCredentialFields";
 import CredentialDisconnectButton from "./CredentialDisconnectButton";
@@ -99,63 +96,13 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     isEdit ||
     (!!form.kiwoom_account_no?.trim() && !!form.kiwoom_app_key && !!form.kiwoom_app_secret);
 
-  const { verifyState, verifyError, verify, reset: resetVerify } = useKisCredentialVerify();
-  const {
-    verifyState: tossVerifyState,
-    verifyError: tossVerifyError,
-    verify: tossVerify,
-    reset: resetTossVerify,
-  } = useTossCredentialVerify();
-  const {
-    verifyState: kiwoomVerifyState,
-    verifyError: kiwoomVerifyError,
-    verify: kiwoomVerify,
-    reset: resetKiwoomVerify,
-  } = useKiwoomCredentialVerify();
+  const brokerVerify = useBrokerCredentialVerify(form);
 
   const [depositSectionOpen, toggleDepositSection] = useCollapsible(true);
   const [credentialSectionOpen, toggleCredentialSection] = useCollapsible(true);
   const [taxSectionOpen, toggleTaxSection] = useCollapsible(isEdit);
 
-  const handleVerify = async () => {
-    if (!form.kis_app_key || !form.kis_app_secret) return;
-    await verify(form.kis_app_key, form.kis_app_secret, form.is_mock_mode ?? true);
-  };
-
-  const handleTossVerify = async () => {
-    if (!form.toss_client_id || !form.toss_client_secret) return;
-    await tossVerify(form.toss_client_id, form.toss_client_secret);
-  };
-
-  const handleKiwoomVerify = async () => {
-    if (!form.kiwoom_app_key || !form.kiwoom_app_secret) return;
-    await kiwoomVerify(form.kiwoom_app_key, form.kiwoom_app_secret, form.is_mock_mode ?? true);
-  };
-
-  const brokerVerify: Record<
-    BrokerDataSource,
-    {
-      verifyState: typeof verifyState;
-      verifyError: string;
-      onVerify: () => void;
-      reset: () => void;
-    }
-  > = {
-    KIS_API: { verifyState, verifyError, onVerify: handleVerify, reset: resetVerify },
-    KIWOOM_API: {
-      verifyState: kiwoomVerifyState,
-      verifyError: kiwoomVerifyError,
-      onVerify: handleKiwoomVerify,
-      reset: resetKiwoomVerify,
-    },
-    TOSS_API: {
-      verifyState: tossVerifyState,
-      verifyError: tossVerifyError,
-      onVerify: handleTossVerify,
-      reset: resetTossVerify,
-    },
-  };
-
+  // 데이터 소스를 바꾸면 다른 브로커의 자격증명 입력값·검증 상태와(수동이 아니면) 예수금을 비운다
   const handleSourceChange = (source: string) => {
     set("data_source", source);
     set("asset_type", defaultAssetTypeForSource(source));
@@ -165,23 +112,12 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
       setDepositKrw(undefined);
       setDepositUsd(undefined);
     }
-    if (source !== "KIS_API") {
-      set("kis_account_no", undefined);
-      set("kis_app_key", undefined);
-      set("kis_app_secret", undefined);
-      resetVerify();
-    }
-    if (source !== "KIWOOM_API") {
-      set("kiwoom_account_no", undefined);
-      set("kiwoom_app_key", undefined);
-      set("kiwoom_app_secret", undefined);
-      resetKiwoomVerify();
-    }
-    if (source !== "TOSS_API") {
-      set("toss_account_no", undefined);
-      set("toss_client_id", undefined);
-      set("toss_client_secret", undefined);
-      resetTossVerify();
+    for (const [broker, config] of Object.entries(BROKER_CREDENTIAL_CONFIG)) {
+      if (broker === source) continue;
+      set(config.accountNo.field, undefined);
+      set(config.key.field, undefined);
+      set(config.secret.field, undefined);
+      brokerVerify[broker as keyof typeof brokerVerify].reset();
     }
   };
 
@@ -226,9 +162,9 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     !kisValid ||
     !tossValid ||
     !kiwoomValid ||
-    (isKis && !isEdit && verifyState !== "ok") ||
-    (isToss && !isEdit && tossVerifyState !== "ok") ||
-    (isKiwoom && !isEdit && kiwoomVerifyState !== "ok") ||
+    (!isEdit &&
+      isBrokerDataSource(form.data_source) &&
+      brokerVerify[form.data_source].verifyState !== "ok") ||
     (form.data_source === "MANUAL" && usdPending);
   const editDisabled = isLoading || !form.name || usdPending;
 
@@ -354,143 +290,31 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
               />
             </div>
 
-            <CollapsibleSection
-              label="세제·투자기간 설정(선택)"
+            <StockAccountTaxFields
+              form={form}
+              set={set}
               isOpen={taxSectionOpen}
               onToggle={toggleTaxSection}
-              collapsedHint="목표 역산 추천 매칭에 사용됩니다. 나중에 계좌 수정에서도 설정할 수 있어요."
-            >
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label
-                      htmlFor="stock-tax-type"
-                      className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      세제 유형
-                    </label>
-                    <select
-                      id="stock-tax-type"
-                      className={`mt-1 w-full ${INPUT_SM}`}
-                      value={form.tax_type ?? "GENERAL"}
-                      onChange={(e) =>
-                        set("tax_type", e.target.value as AssetAccountCreate["tax_type"])
-                      }
-                    >
-                      {Object.entries(ACCOUNT_TAX_TYPE_LABELS).map(([v, l]) => (
-                        <option key={v} value={v}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="stock-horizon"
-                      className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      투자 기간
-                      <Tooltip content="세제 유형과 함께 리밸런싱 탭의 기간별 목표 역산 추천이 어느 포트폴리오에 적용될지 매칭하는 데 사용됩니다.">
-                        <Info size={12} className="text-gray-400 cursor-help" />
-                      </Tooltip>
-                    </label>
-                    <select
-                      id="stock-horizon"
-                      className={`mt-1 w-full ${INPUT_SM}`}
-                      value={form.investment_horizon ?? ""}
-                      onChange={(e) =>
-                        set(
-                          "investment_horizon",
-                          (e.target.value || undefined) as AssetAccountCreate["investment_horizon"],
-                        )
-                      }
-                    >
-                      <option value="">미지정</option>
-                      {Object.entries(INVESTMENT_HORIZON_LABELS).map(([v, l]) => (
-                        <option key={v} value={v}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {form.tax_type === "ISA" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label
-                        htmlFor="stock-isa-open-date"
-                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >
-                        ISA 가입일
-                      </label>
-                      <input
-                        id="stock-isa-open-date"
-                        type="date"
-                        className={`mt-1 w-full ${INPUT_SM}`}
-                        value={form.isa_open_date ?? ""}
-                        onChange={(e) => set("isa_open_date", e.target.value || undefined)}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="stock-isa-type"
-                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >
-                        ISA 유형
-                      </label>
-                      <select
-                        id="stock-isa-type"
-                        className={`mt-1 w-full ${INPUT_SM}`}
-                        value={form.isa_type ?? "GENERAL"}
-                        onChange={(e) =>
-                          set("isa_type", e.target.value as AssetAccountCreate["isa_type"])
-                        }
-                      >
-                        {Object.entries(ISA_TYPE_LABELS).map(([v, l]) => (
-                          <option key={v} value={v}>
-                            {l}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CollapsibleSection>
+            />
 
             {/* 예수금 */}
-            {(form.data_source === "MANUAL" || (isEdit && form.data_source !== "MANUAL")) && (
+            {(form.data_source === "MANUAL" || isEdit) && (
               <CollapsibleSection
                 label="예수금"
                 isOpen={depositSectionOpen}
                 onToggle={toggleDepositSection}
               >
-                {form.data_source === "MANUAL" ? (
-                  <StockDepositFields
-                    mode="create"
-                    depositKrw={depositKrw}
-                    depositUsd={depositUsd}
-                    setDepositKrw={setDepositKrw}
-                    setDepositUsd={setDepositUsd}
-                    usdRate={usdRate}
-                    usdAsKrw={usdAsKrw}
-                    totalKrw={totalKrw}
-                    hasAnyDeposit={hasAnyDeposit}
-                  />
-                ) : (
-                  <StockDepositFields
-                    mode="edit"
-                    depositKrw={depositKrw}
-                    depositUsd={depositUsd}
-                    setDepositKrw={setDepositKrw}
-                    setDepositUsd={setDepositUsd}
-                    usdRate={usdRate}
-                    usdAsKrw={usdAsKrw}
-                    totalKrw={totalKrw}
-                    hasAnyDeposit={hasAnyDeposit}
-                  />
-                )}
+                <StockDepositFields
+                  mode={form.data_source === "MANUAL" ? "create" : "edit"}
+                  depositKrw={depositKrw}
+                  depositUsd={depositUsd}
+                  setDepositKrw={setDepositKrw}
+                  setDepositUsd={setDepositUsd}
+                  usdRate={usdRate}
+                  usdAsKrw={usdAsKrw}
+                  totalKrw={totalKrw}
+                  hasAnyDeposit={hasAnyDeposit}
+                />
               </CollapsibleSection>
             )}
 
@@ -530,8 +354,8 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                         checked={form.is_mock_mode ?? true}
                         onChange={(e) => {
                           set("is_mock_mode", e.target.checked);
-                          if (isKis) resetVerify();
-                          if (isKiwoom) resetKiwoomVerify();
+                          if (form.data_source === "KIS_API" || form.data_source === "KIWOOM_API")
+                            brokerVerify[form.data_source].reset();
                         }}
                         className="w-4 h-4 text-blue-600"
                       />

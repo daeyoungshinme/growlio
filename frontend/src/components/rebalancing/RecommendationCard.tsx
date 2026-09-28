@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight, Plus, Settings2, Target } from "lucide-react";
+import { Plus, Settings2, Target } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchAgeGoalRecommendation,
   fetchHorizonGoalRecommendations,
   fetchOverallGoalRecommendation,
-  fetchPortfolioExpectedMetrics,
   type GoalRecommendationItem,
 } from "@/api/rebalancing";
 import { fetchSettings } from "@/api/settings";
@@ -23,22 +21,25 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidatePortfolioData } from "@/utils/queryInvalidation";
 import { getPortfolioHorizonTaxType, getPortfolioTargetState } from "@/utils/portfolio";
 import { isBankAccount, isStockAccount } from "@/utils/accounts";
-import { fmtKrw } from "@/utils/format";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
+import { normalizeWeights } from "@/utils/recommendationDrift";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
-import RecommendationResultPanel from "@/components/rebalancing/RecommendationResultPanel";
-import PortfolioWeightChart from "@/components/portfolio-analysis/PortfolioWeightChart";
+import RecommendationAgeTab from "@/components/rebalancing/RecommendationAgeTab";
+import RecommendationComparisonPreview from "@/components/rebalancing/RecommendationComparisonPreview";
+import RecommendationHorizonTab from "@/components/rebalancing/RecommendationHorizonTab";
+import RecommendationOverallTab from "@/components/rebalancing/RecommendationOverallTab";
 import {
-  buildWeightDiffRows,
-  computeRecommendationDrift,
-  hasSignificantDrift,
-} from "@/utils/recommendationDrift";
+  buildApplyConfirm,
+  type CreatePortfolioHandler,
+  type OverallTargetSelection,
+  type RecommendationTabActions,
+} from "@/components/rebalancing/recommendationCardModel";
 
 const HORIZON_ORDER: InvestmentHorizon[] = ["SHORT_TERM", "MID_TERM", "LONG_TERM"];
 const TAX_TYPE_ORDER: AccountTaxType[] = [
@@ -49,145 +50,14 @@ const TAX_TYPE_ORDER: AccountTaxType[] = [
   "OVERSEAS_DEDICATED",
 ];
 
-const RISK_TOLERANCE_LABELS: Record<string, string> = {
-  CONSERVATIVE: "보수적",
-  BALANCED: "중립",
-  AGGRESSIVE: "공격적",
-};
-
 type ActiveTab = "전체" | "연령대" | InvestmentHorizon;
-
-function normalizeWeights(items: GoalRecommendationItem[]): PortfolioItem[] {
-  const normalized = items.map((i) => ({
-    ticker: i.ticker,
-    name: i.name,
-    market: i.market,
-    weight: Math.round(i.weight * 10) / 10,
-  }));
-  const diff = Math.round((100 - normalized.reduce((s, i) => s + i.weight, 0)) * 10) / 10;
-  if (normalized.length > 0 && diff !== 0) normalized[normalized.length - 1].weight += diff;
-  return normalized;
-}
-
-function MetricCompareCell({
-  label,
-  current,
-  recommended,
-  loading,
-}: {
-  label: string;
-  current: number | null | undefined;
-  recommended: number | null;
-  loading: boolean;
-}) {
-  return (
-    <div>
-      <p className="text-gray-400 dark:text-gray-500">{label}</p>
-      <p className="text-gray-700 dark:text-gray-300">
-        <span>{loading ? "…" : current != null ? `${current.toFixed(1)}%` : "—"}</span>
-        {" → "}
-        <span className="text-teal-600 dark:text-teal-400 font-medium">
-          {recommended != null ? `${recommended.toFixed(1)}%` : "—"}
-        </span>
-      </p>
-    </div>
-  );
-}
-
-/** "적용" 확인창에 표시되는 비교 미리보기 — 종목별 현재 vs 추천 비중 테이블 + 기대수익률/변동성/
- * 배당수익률 요약. 현재 포트폴리오 쪽 지표는 확인창이 열릴 때만 온디맨드로 조회한다(캐싱 없음). */
-function RecommendationComparisonPreview({
-  recommendedItems,
-  currentItems,
-  recommendedMetrics,
-  targetPortfolioId,
-}: {
-  recommendedItems: GoalRecommendationItem[];
-  currentItems: PortfolioItem[];
-  recommendedMetrics: {
-    expected_return_pct: number | null;
-    expected_dividend_yield_pct: number | null;
-    expected_volatility_pct: number | null;
-  };
-  targetPortfolioId: string;
-}) {
-  const { data: currentMetrics, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.portfolioExpectedMetrics(targetPortfolioId),
-    queryFn: () => fetchPortfolioExpectedMetrics(targetPortfolioId),
-  });
-
-  const rows = buildWeightDiffRows(recommendedItems, currentItems);
-
-  return (
-    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <p className="text-center text-xs text-gray-400 dark:text-gray-500">현재</p>
-          <PortfolioWeightChart items={currentItems} />
-        </div>
-        <div>
-          <p className="text-center text-xs text-teal-600 dark:text-teal-400 font-medium">추천</p>
-          <PortfolioWeightChart items={recommendedItems} />
-        </div>
-      </div>
-      <div className="max-h-40 overflow-y-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-gray-400 dark:text-gray-500">
-              <th className="text-left font-normal pb-1">종목</th>
-              <th className="text-right font-normal pb-1">현재</th>
-              <th className="text-right font-normal pb-1">추천</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.key} className="text-gray-700 dark:text-gray-300">
-                <td className="py-0.5 pr-2 truncate max-w-[140px]">{row.name}</td>
-                <td className="text-right py-0.5 text-gray-400 dark:text-gray-500">
-                  {row.currentWeight != null ? `${row.currentWeight.toFixed(1)}%` : "—"}
-                </td>
-                <td className="text-right py-0.5 font-medium text-teal-600 dark:text-teal-400">
-                  {row.recommendedWeight != null ? `${row.recommendedWeight.toFixed(1)}%` : "0%"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="pt-2 border-t border-gray-100 dark:border-gray-800 grid grid-cols-3 gap-2 text-xs">
-        <MetricCompareCell
-          label="기대수익률"
-          current={currentMetrics?.expected_return_pct}
-          recommended={recommendedMetrics.expected_return_pct}
-          loading={isLoading}
-        />
-        <MetricCompareCell
-          label="변동성"
-          current={currentMetrics?.expected_volatility_pct}
-          recommended={recommendedMetrics.expected_volatility_pct}
-          loading={isLoading}
-        />
-        <MetricCompareCell
-          label="배당수익률"
-          current={currentMetrics?.expected_dividend_yield_pct}
-          recommended={recommendedMetrics.expected_dividend_yield_pct}
-          loading={isLoading}
-        />
-      </div>
-    </div>
-  );
-}
 
 interface Props {
   /** 추천 비중을 기준 포트폴리오에 저장한 뒤 호출된다 — 부모가 화면 전환(포트폴리오 탭 이동 등)을 담당한다. */
   onApplied?: (portfolioId: string) => void;
   /** "이 비중으로 새 포트폴리오 만들기" 클릭 시 호출 — 부모가 포트폴리오 편집 모달을 해당 비중(+ 기간별 탭이면 태그
    * 매칭 계좌)으로 미리 채워 연다. */
-  onCreatePortfolio?: (
-    items: PortfolioItem[],
-    suggestedName: string,
-    accountIds?: string[],
-  ) => void;
+  onCreatePortfolio?: CreatePortfolioHandler;
   /** 마운트 시 "추천 설정" 옵션 모달을 바로 연다 — 설정탭 딥링크(openRecOptions=1)용 */
   initialOptionsOpen?: boolean;
   /** 옵션 모달이 닫힐 때 호출 — 부모가 딥링크 파라미터를 정리한다 */
@@ -389,87 +259,31 @@ export default function RecommendationCard({
     );
   }
 
-  const hasOverallRecommendation =
-    overallData.is_configured && overallData.recommended_items.length > 0;
-
-  const overallDrift =
-    hasOverallRecommendation && overallConfirmTarget
-      ? computeRecommendationDrift(overallData.recommended_items, overallConfirmTarget.items)
-      : null;
-  const horizonDrift =
-    activeHorizonRec && activeHorizonRec.recommended_items.length > 0 && horizonTargetPortfolio
-      ? computeRecommendationDrift(activeHorizonRec.recommended_items, horizonTargetPortfolio.items)
-      : null;
-  const hasAgeRecommendation =
-    !!ageData && ageData.is_configured && ageData.recommended_items.length > 0;
-  const ageDrift =
-    hasAgeRecommendation && ageData && overallConfirmTarget
-      ? computeRecommendationDrift(ageData.recommended_items, overallConfirmTarget.items)
-      : null;
-
-  // 전체/연령대/기간별 3개 탭이 각각 그리던 "적용" 확인창을 하나로 통합 — 현재 탭에 맞는
-  // 대상 포트폴리오/추천 데이터/안내 문구를 골라준다(null이면 확인창을 띄우지 않음).
-  const pickMetrics = (d: {
-    expected_return_pct: number | null;
-    expected_dividend_yield_pct: number | null;
-    expected_volatility_pct: number | null;
-  }) => ({
-    expected_return_pct: d.expected_return_pct,
-    expected_dividend_yield_pct: d.expected_dividend_yield_pct,
-    expected_volatility_pct: d.expected_volatility_pct,
+  const isHorizonTab = effectiveTab !== "전체" && effectiveTab !== "연령대";
+  const applyConfirm = buildApplyConfirm({
+    tab: isHorizonTab ? "기간별" : effectiveTab,
+    overallData,
+    ageData,
+    overallTarget: overallConfirmTarget,
+    horizonRec: activeHorizonRec,
+    horizonTarget: horizonTargetPortfolio,
+    cashEquivalentMatches,
   });
-  const applyConfirm: {
-    target: (typeof portfolios)[number];
-    items: GoalRecommendationItem[];
-    metrics: ReturnType<typeof pickMetrics>;
-    message: string;
-    accountIds?: string[];
-  } | null = (() => {
-    if (effectiveTab === "전체" && overallConfirmTarget) {
-      return {
-        target: overallConfirmTarget,
-        items: overallData.recommended_items,
-        metrics: pickMetrics(overallData),
-        message: `${overallConfirmTarget.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`,
-      };
-    }
-    if (effectiveTab === "연령대" && ageData && overallConfirmTarget) {
-      return {
-        target: overallConfirmTarget,
-        items: ageData.recommended_items,
-        metrics: pickMetrics(ageData),
-        message: `${overallConfirmTarget.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`,
-      };
-    }
-    if (
-      effectiveTab !== "전체" &&
-      effectiveTab !== "연령대" &&
-      horizonTargetPortfolio &&
-      activeHorizonRec
-    ) {
-      const withCash =
-        activeHorizonRec.includes_cash_equivalent && cashEquivalentMatches.length > 0;
-      const accountIds =
-        activeHorizonRec.includes_cash_equivalent && horizonTargetPortfolio.account_ids?.length
-          ? Array.from(
-              new Set([
-                ...horizonTargetPortfolio.account_ids,
-                ...cashEquivalentMatches.map((a) => a.id),
-              ]),
-            )
-          : undefined;
-      return {
-        target: horizonTargetPortfolio,
-        items: activeHorizonRec.recommended_items,
-        metrics: pickMetrics(activeHorizonRec),
-        accountIds,
-        message: withCash
-          ? `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 현금성 자산 반영을 위해 ${cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에 자동으로 연결됩니다. 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
-          : `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`,
-      };
-    }
-    return null;
-  })();
+
+  const tabActions: RecommendationTabActions = {
+    onAddSuggested: (candidates) => addSuggestedMutation.mutate(candidates),
+    addPending: addSuggestedMutation.isPending,
+    onApplyClick: () => setConfirmOpen(true),
+    applyPending: applyMutation.isPending,
+    onCreatePortfolio,
+  };
+  const overallSelection: OverallTargetSelection = {
+    targetPortfolios,
+    selectedTargetId: effectiveOverallTargetId,
+    onSelectTarget: setSelectedOverallTargetId,
+    anchoredTargetIds: anchoredPortfolioIds,
+    confirmTarget: overallConfirmTarget,
+  };
 
   return (
     <>
@@ -516,238 +330,31 @@ export default function RecommendationCard({
         )}
 
         {effectiveTab === "전체" ? (
-          !overallData.is_configured ? (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {overallData.note ?? "목표금액·목표연도를 설정하면 추천을 받을 수 있습니다"}
-              </p>
-              <Link
-                to="/invest-plan?tab=적립 계획&from=recommendation"
-                className="flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline shrink-0"
-              >
-                목표 설정하러 가기 <ArrowRight size={12} />
-              </Link>
-            </div>
-          ) : (
-            <>
-              {hasOverallRecommendation ? (
-                <>
-                  <p className="text-xs text-gray-600 dark:text-gray-300">
-                    목표 달성에 필요한 연 수익률 {overallData.required_return_pct?.toFixed(1)}%
-                    {overallData.required_dividend_yield_pct != null &&
-                      ` · 목표 배당수익률 연 ${overallData.required_dividend_yield_pct.toFixed(1)}%`}{" "}
-                    — 아래 비중으로 조정하면 기대수익률{" "}
-                    {overallData.expected_return_pct?.toFixed(1)}% (최근{" "}
-                    {overallData.cagr_lookback_years}년 CAGR 기준)
-                    {overallData.expected_dividend_yield_pct != null &&
-                      ` (배당수익률 약 ${overallData.expected_dividend_yield_pct.toFixed(1)}%)`}
-                    를 기대할 수 있습니다.
-                    {overallData.expected_volatility_pct != null &&
-                      ` 예상 변동성은 연 ${overallData.expected_volatility_pct.toFixed(1)}%입니다.`}
-                  </p>
-
-                  <RecommendationResultPanel
-                    drift={overallDrift && hasSignificantDrift(overallDrift) ? overallDrift : null}
-                    items={overallData.recommended_items}
-                    note={overallData.note}
-                    marketSignalLevel={overallData.market_signal_level}
-                    suggestedCandidates={overallData.suggested_candidates}
-                    onAddSuggested={() =>
-                      addSuggestedMutation.mutate(overallData.suggested_candidates)
-                    }
-                    addPending={addSuggestedMutation.isPending}
-                    applySection={{
-                      targetPortfolios,
-                      selectedTargetId: effectiveOverallTargetId,
-                      onSelectTarget: setSelectedOverallTargetId,
-                      anchoredTargetIds: anchoredPortfolioIds,
-                      onApplyClick: () => setConfirmOpen(true),
-                      applyPending: applyMutation.isPending,
-                      noTargetMessage:
-                        "아직 포트폴리오가 없어요. 아래 버튼으로 이 비중 그대로 새 포트폴리오를 만들 수 있어요.",
-                      onCreatePortfolio: onCreatePortfolio
-                        ? () =>
-                            onCreatePortfolio(
-                              normalizeWeights(overallData.recommended_items),
-                              "추천 포트폴리오",
-                            )
-                        : undefined,
-                    }}
-                  />
-                </>
-              ) : (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {overallData.note ?? "추천을 계산할 수 없습니다 — 후보 ETF를 등록해주세요"}
-                </p>
-              )}
-            </>
-          )
+          <RecommendationOverallTab
+            data={overallData}
+            selection={overallSelection}
+            actions={tabActions}
+          />
         ) : effectiveTab === "연령대" ? (
-          !ageData ? (
-            agePending ? (
-              <SkeletonCard rows={2} />
-            ) : null
-          ) : !ageData.is_configured ? (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {ageData.note ?? "연령대를 설정하면 연령대별 추천을 받을 수 있습니다"}
-              </p>
-              <button
-                type="button"
-                onClick={() => setOptionsOpen(true)}
-                className="flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline shrink-0"
-              >
-                연령대 설정하기 <ArrowRight size={12} />
-              </button>
-            </div>
-          ) : (
-            <>
-              {hasAgeRecommendation ? (
-                <>
-                  <p className="text-xs text-gray-600 dark:text-gray-300">
-                    {ageData.age_bracket} 기준 투자성향{" "}
-                    {RISK_TOLERANCE_LABELS[ageData.risk_tolerance] ?? ageData.risk_tolerance}
-                    {ageData.required_dividend_yield_pct != null &&
-                      ` · 목표 배당수익률 연 ${ageData.required_dividend_yield_pct.toFixed(1)}%`}
-                    {ageData.expected_return_pct != null &&
-                      ` · 기대수익률 ${ageData.expected_return_pct.toFixed(1)}%`}
-                    {ageData.expected_dividend_yield_pct != null &&
-                      ` · 배당수익률 약 ${ageData.expected_dividend_yield_pct.toFixed(1)}%`}
-                    {ageData.expected_volatility_pct != null &&
-                      ` · 예상 변동성 연 ${ageData.expected_volatility_pct.toFixed(1)}%`}
-                  </p>
-
-                  <RecommendationResultPanel
-                    drift={ageDrift && hasSignificantDrift(ageDrift) ? ageDrift : null}
-                    items={ageData.recommended_items}
-                    note={ageData.note}
-                    marketSignalLevel={ageData.market_signal_level}
-                    extraNoticeAfterWeightList={
-                      ageData.includes_cash_equivalent ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          현금성 자산(CMA·파킹통장 등) 합성 비중이 포함되어 있어요 — 실제 계좌와
-                          연결해 목표 비중에 반영해주세요.
-                        </p>
-                      ) : undefined
-                    }
-                    suggestedCandidates={ageData.suggested_candidates}
-                    onAddSuggested={() => addSuggestedMutation.mutate(ageData.suggested_candidates)}
-                    addPending={addSuggestedMutation.isPending}
-                    applySection={{
-                      targetPortfolios,
-                      selectedTargetId: effectiveOverallTargetId,
-                      onSelectTarget: setSelectedOverallTargetId,
-                      anchoredTargetIds: anchoredPortfolioIds,
-                      onApplyClick: () => setConfirmOpen(true),
-                      applyPending: applyMutation.isPending,
-                      noTargetMessage:
-                        "아직 포트폴리오가 없어요. 아래 버튼으로 이 비중 그대로 새 포트폴리오를 만들 수 있어요.",
-                      onCreatePortfolio: onCreatePortfolio
-                        ? () =>
-                            onCreatePortfolio(
-                              normalizeWeights(ageData.recommended_items),
-                              "연령대별 추천 포트폴리오",
-                            )
-                        : undefined,
-                    }}
-                  />
-                </>
-              ) : (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {ageData.note ?? "추천을 계산할 수 없습니다 — 후보 ETF를 등록해주세요"}
-                </p>
-              )}
-            </>
-          )
-        ) : activeHorizonRec ? (
-          <>
-            <p className="text-xs text-gray-600 dark:text-gray-300">
-              {INVESTMENT_HORIZON_LABELS[effectiveTab]} · {ACCOUNT_TAX_TYPE_LABELS[activeTaxType]}{" "}
-              태그 계좌 {activeHorizonRec.account_count}개 · 자산총액{" "}
-              {fmtKrw(activeHorizonRec.base_krw)} · 투자성향{" "}
-              {RISK_TOLERANCE_LABELS[activeHorizonRec.risk_tolerance] ??
-                activeHorizonRec.risk_tolerance}
-              {activeHorizonRec.required_dividend_yield_pct != null &&
-                ` · 목표 배당수익률 연 ${activeHorizonRec.required_dividend_yield_pct.toFixed(1)}%`}
-              {activeHorizonRec.recommended_items.length > 0 &&
-                activeHorizonRec.expected_return_pct != null &&
-                ` · 기대수익률 ${activeHorizonRec.expected_return_pct.toFixed(1)}%`}
-              {activeHorizonRec.recommended_items.length > 0 &&
-                activeHorizonRec.expected_dividend_yield_pct != null &&
-                ` · 배당수익률 약 ${activeHorizonRec.expected_dividend_yield_pct.toFixed(1)}%`}
-              {activeHorizonRec.recommended_items.length > 0 &&
-                activeHorizonRec.expected_volatility_pct != null &&
-                ` · 예상 변동성 연 ${activeHorizonRec.expected_volatility_pct.toFixed(1)}%`}
-            </p>
-
-            {activeHorizonRec.recommended_items.length > 0 ? (
-              <RecommendationResultPanel
-                drift={horizonDrift && hasSignificantDrift(horizonDrift) ? horizonDrift : null}
-                items={activeHorizonRec.recommended_items}
-                note={activeHorizonRec.note}
-                marketSignalLevel={activeHorizonRec.market_signal_level}
-                suggestedCandidates={activeHorizonRec.suggested_candidates}
-                onAddSuggested={() =>
-                  addSuggestedMutation.mutate(activeHorizonRec.suggested_candidates)
-                }
-                addPending={addSuggestedMutation.isPending}
-                extraNoticeBeforeApply={
-                  activeHorizonRec.includes_cash_equivalent &&
-                  cashEquivalentMatches.length === 0 ? (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-teal-200 dark:border-teal-800/50">
-                      현금성 자산(CMA·파킹통장 등)이 포함된 추천이에요 — 계좌 관리에서 CMA/파킹통장
-                      계좌에 "{INVESTMENT_HORIZON_LABELS[effectiveTab]}" 기간 태그를 지정하면 자동
-                      적용할 수 있어요.
-                    </p>
-                  ) : undefined
-                }
-                applySection={
-                  activeHorizonRec.includes_cash_equivalent && cashEquivalentMatches.length === 0
-                    ? null
-                    : {
-                        targetPortfolios: horizonTargetPortfolio ? [horizonTargetPortfolio] : [],
-                        selectedTargetId: horizonTargetPortfolio?.id ?? "",
-                        onSelectTarget: () => {},
-                        onApplyClick: () => setConfirmOpen(true),
-                        applyPending: applyMutation.isPending,
-                        noTargetMessage:
-                          "포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고 기준 포트폴리오로 지정하면 추천 비중을 바로 적용할 수 있어요.",
-                        extraCopyBeforeButtons: activeHorizonRec.includes_cash_equivalent ? (
-                          <p className="text-xs text-teal-600 dark:text-teal-500">
-                            현금성 자산 반영을 위해{" "}
-                            {cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가
-                            포트폴리오에 자동으로 연결됩니다.
-                          </p>
-                        ) : undefined,
-                        onCreatePortfolio: onCreatePortfolio
-                          ? () =>
-                              onCreatePortfolio(
-                                normalizeWeights(activeHorizonRec.recommended_items),
-                                `${INVESTMENT_HORIZON_LABELS[effectiveTab]} 추천 포트폴리오`,
-                                [
-                                  ...stockAccounts
-                                    .filter(
-                                      (a) =>
-                                        a.investment_horizon === effectiveTab &&
-                                        a.tax_type === activeTaxType,
-                                    )
-                                    .map((a) => a.id),
-                                  ...cashEquivalentMatches.map((a) => a.id),
-                                ],
-                              )
-                          : undefined,
-                      }
-                }
-              />
-            ) : (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {activeHorizonRec.note ?? "추천을 계산할 수 없습니다"}
-              </p>
-            )}
-          </>
-        ) : horizonFetching ? (
-          <SkeletonCard rows={2} />
-        ) : null}
+          <RecommendationAgeTab
+            data={ageData}
+            pending={agePending}
+            selection={overallSelection}
+            actions={tabActions}
+            onOpenOptions={() => setOptionsOpen(true)}
+          />
+        ) : (
+          <RecommendationHorizonTab
+            horizon={effectiveTab}
+            taxType={activeTaxType}
+            rec={activeHorizonRec}
+            fetching={horizonFetching}
+            targetPortfolio={horizonTargetPortfolio}
+            stockAccounts={stockAccounts}
+            cashEquivalentMatches={cashEquivalentMatches}
+            actions={tabActions}
+          />
+        )}
 
         <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 flex items-center gap-3">
           <button

@@ -95,3 +95,17 @@ export function buildWeightDiffRows(
     (a, b) => (b.recommendedWeight ?? 0) - (a.recommendedWeight ?? 0),
   );
 }
+
+/** 추천 비중을 포트폴리오 저장용 항목으로 변환한다 — 소수 첫째 자리로 반올림하고, 반올림 오차로
+ * 합계가 100에서 벗어나면 그 차이를 마지막 항목에 몰아 백엔드 합계=100 검증을 통과시킨다. */
+export function normalizeWeights(items: GoalRecommendationItem[]): PortfolioItem[] {
+  const normalized = items.map((i) => ({
+    ticker: i.ticker,
+    name: i.name,
+    market: i.market,
+    weight: Math.round(i.weight * 10) / 10,
+  }));
+  const diff = Math.round((100 - normalized.reduce((s, i) => s + i.weight, 0)) * 10) / 10;
+  if (normalized.length > 0 && diff !== 0) normalized[normalized.length - 1].weight += diff;
+  return normalized;
+}

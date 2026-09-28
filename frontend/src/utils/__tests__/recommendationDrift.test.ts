@@ -3,6 +3,7 @@ import {
   buildWeightDiffRows,
   computeRecommendationDrift,
   hasSignificantDrift,
+  normalizeWeights,
   RECOMMENDATION_DRIFT_THRESHOLD_PCT,
 } from "@/utils/recommendationDrift";
 import type { GoalRecommendationItem } from "@/api/rebalancing";
@@ -149,5 +150,28 @@ describe("buildWeightDiffRows", () => {
 
   it("returns an empty array when both lists are empty", () => {
     expect(buildWeightDiffRows([], [])).toEqual([]);
+  });
+});
+
+describe("normalizeWeights", () => {
+  it("rounds to one decimal and pushes the rounding remainder onto the last item", () => {
+    const result = normalizeWeights([
+      recItem({ ticker: "A", weight: 33.33 }),
+      recItem({ ticker: "B", weight: 33.33 }),
+      recItem({ ticker: "C", weight: 33.34 }),
+    ]);
+    expect(result[0].weight).toBe(33.3);
+    expect(result[1].weight).toBe(33.3);
+    expect(result[2].weight).toBeCloseTo(33.4, 5);
+    expect(result.reduce((s, i) => s + i.weight, 0)).toBeCloseTo(100, 5);
+  });
+
+  it("drops recommendation-only fields such as dividend_yield_pct", () => {
+    const [item] = normalizeWeights([recItem({ weight: 100, dividend_yield_pct: 2.5 })]);
+    expect(item).toEqual({ ticker: "AAPL", name: "Apple Inc.", market: "NASDAQ", weight: 100 });
+  });
+
+  it("returns an empty array for no items", () => {
+    expect(normalizeWeights([])).toEqual([]);
   });
 });
