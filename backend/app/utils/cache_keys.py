@@ -78,7 +78,7 @@ TTL_CHALLENGE_PROGRESS = 300  # 적립 챌린지 진행률(진행률/스트릭) 
 # 아래처럼 `_XXX_VERSION` 상수를 올려 키를 분리한다(구버전 캐시가 TTL 만료 전까지
 # 잘못된 값을 계속 서빙하는 것을 방지). **값 자체(문자열)는 여기서만 바꾸고,
 # 키 빌더 함수의 f-string 포맷은 그대로 유지할 것 — 무단으로 포맷을 바꾸면 캐시 미스가 폭증한다.**
-_ALLOC_HISTORY_VERSION = "v2"
+_ALLOC_HISTORY_VERSION = "v3"  # v3: 증권계좌 예수금(스냅샷−포지션 차액)을 CASH_STOCK으로 보존
 _MARKET_SIGNAL_VERSION = "v7"
 """v4: exchange_rate.value 산출 소스를 FRED 지연값 → 실시간 캐시(get_usd_krw_rate)로 변경
 (필드 구성은 동일하나 값 자체가 달라지므로, 기존 v3 캐시가 최대 1시간 TTL 동안

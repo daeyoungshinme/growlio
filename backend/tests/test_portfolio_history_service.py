@@ -94,6 +94,10 @@ class TestGetAllocationHistory:
         assert "STOCK_DOMESTIC" in alloc_types
         # STOCK_KIS should be replaced by STOCK_DOMESTIC
         assert "STOCK_KIS" not in alloc_types
+        # 스냅샷 500만 − 포지션 300만 = 증권 예수금 200만은 CASH_STOCK으로 보존, 월 합계 불변
+        by_type = {a["asset_type"]: a["amount_krw"] for a in result[0]["allocations"]}
+        assert by_type["CASH_STOCK"] == pytest.approx(2_000_000.0)
+        assert result[0]["total_krw"] == pytest.approx(5_000_000.0)
 
     @pytest.mark.asyncio
     async def test_result_stored_in_cache(self, mock_db, override_settings):
@@ -204,3 +208,73 @@ class TestGetAllocationHistory:
 
         result = await get_allocation_history(uuid.uuid4(), mock_db, months=3)
         assert result == []
+
+
+class TestMergeStockBreakdown:
+    """_merge_stock_breakdown — 증권계좌 예수금(스냅샷 − 포지션 합계) 보존."""
+
+    @staticmethod
+    def _monthly(amounts: dict[str, float]) -> dict[str, dict[str, float]]:
+        from collections import defaultdict
+
+        monthly: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        monthly["2024-01-01"].update(amounts)
+        return monthly
+
+    def test_residual_becomes_cash_stock(self):
+        from app.services.portfolio_history_service import _merge_stock_breakdown
+
+        monthly = self._monthly({"STOCK_KIS": 10_000_000.0})
+        _merge_stock_breakdown(monthly, {"2024-01-01": {"STOCK_DOMESTIC": 7_000_000.0}})
+
+        jan = monthly["2024-01-01"]
+        assert "STOCK_KIS" not in jan
+        assert jan["STOCK_DOMESTIC"] == pytest.approx(7_000_000.0)
+        assert jan["CASH_STOCK"] == pytest.approx(3_000_000.0)
+        assert sum(jan.values()) == pytest.approx(10_000_000.0)
+
+    def test_residual_added_to_existing_manual_cash_stock(self):
+        from app.services.portfolio_history_service import _merge_stock_breakdown
+
+        monthly = self._monthly({"STOCK_KIWOOM": 10_000_000.0, "CASH_STOCK": 1_000_000.0})
+        _merge_stock_breakdown(monthly, {"2024-01-01": {"STOCK_DOMESTIC": 7_000_000.0}})
+
+        assert monthly["2024-01-01"]["CASH_STOCK"] == pytest.approx(4_000_000.0)
+
+    def test_negative_residual_not_added(self):
+        from app.services.portfolio_history_service import _merge_stock_breakdown
+
+        monthly = self._monthly({"STOCK_TOSS": 5_000_000.0})
+        _merge_stock_breakdown(monthly, {"2024-01-01": {"STOCK_FOREIGN": 5_200_000.0}})
+
+        jan = monthly["2024-01-01"]
+        assert "CASH_STOCK" not in jan
+        assert jan["STOCK_FOREIGN"] == pytest.approx(5_200_000.0)
+
+    def test_sub_won_rounding_residual_ignored(self):
+        from app.services.portfolio_history_service import _merge_stock_breakdown
+
+        monthly = self._monthly({"STOCK_KIS": 5_000_000.4})
+        _merge_stock_breakdown(monthly, {"2024-01-01": {"STOCK_DOMESTIC": 5_000_000.0}})
+
+        assert "CASH_STOCK" not in monthly["2024-01-01"]
+
+    def test_cash_only_stock_account_preserved(self):
+        """포지션 없는(전액 현금) 증권계좌 금액이 다른 계좌 포지션 분해 때문에 사라지지 않는다."""
+        from app.services.portfolio_history_service import _merge_stock_breakdown
+
+        # KIS 800만(전부 포지션) + 토스 200만(전액 예수금, 포지션 0)
+        monthly = self._monthly({"STOCK_KIS": 8_000_000.0, "STOCK_TOSS": 2_000_000.0})
+        _merge_stock_breakdown(monthly, {"2024-01-01": {"STOCK_DOMESTIC": 8_000_000.0}})
+
+        jan = monthly["2024-01-01"]
+        assert jan["CASH_STOCK"] == pytest.approx(2_000_000.0)
+        assert sum(jan.values()) == pytest.approx(10_000_000.0)
+
+    def test_months_without_position_data_untouched(self):
+        from app.services.portfolio_history_service import _merge_stock_breakdown
+
+        monthly = self._monthly({"STOCK_KIS": 5_000_000.0})
+        _merge_stock_breakdown(monthly, {})
+
+        assert monthly["2024-01-01"] == {"STOCK_KIS": 5_000_000.0}
