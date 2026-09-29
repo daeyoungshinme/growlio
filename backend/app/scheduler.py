@@ -3,6 +3,8 @@ from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_MISSED, JobExecutionEv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from app.utils.kst import now_kst
+
 logger = structlog.get_logger()
 
 # misfire_grace_time: APScheduler 기본값(1초)이면 이벤트 루프가 동기 연산(pandas/MVO 등)으로 잠깐만 밀려도
@@ -50,6 +52,7 @@ def init_scheduler() -> None:
     from app.jobs.stock_price_alert import run_stock_price_alert_check
     from app.jobs.token_refresh import refresh_all_user_tokens
     from app.jobs.year_end_tax_reminder import run_year_end_tax_reminder
+    from app.services.yahoo_price import refresh_kosdaq_tickers
 
     def kst(**kwargs: str | int) -> CronTrigger:
         return CronTrigger(timezone="Asia/Seoul", **kwargs)
@@ -78,9 +81,12 @@ def init_scheduler() -> None:
         (run_challenge_monthly_wrap, kst(day=1, hour=9, minute=30), "challenge_monthly_wrap"),
         (run_dca_cash_shortfall_check, kst(hour=18, minute=30), "dca_cash_shortfall_check"),
         (run_cache_sweep, IntervalTrigger(minutes=15), "cache_sweep"),
+        (refresh_kosdaq_tickers, kst(hour=7, minute=0), "kosdaq_tickers_refresh"),
     ]
     for func, trigger, job_id in jobs:
         scheduler.add_job(func, trigger, id=job_id, replace_existing=True)
+    # 기동 직후 1회도 실행 — 07:00까지 비어 있으면 그동안 KOSDAQ 보유종목이 `.KS`로 조회돼 Yahoo 404가 난다
+    scheduler.modify_job("kosdaq_tickers_refresh", next_run_time=now_kst())
 
     scheduler.add_listener(_on_job_event, EVENT_JOB_ERROR | EVENT_JOB_MISSED)
     scheduler.start()

@@ -27,6 +27,7 @@ EXPECTED_JOB_IDS = {
     "challenge_monthly_wrap",
     "dca_cash_shortfall_check",
     "cache_sweep",
+    "kosdaq_tickers_refresh",
 }
 
 
