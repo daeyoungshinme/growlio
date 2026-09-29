@@ -244,7 +244,7 @@ services/
   ├── _position_queries.py    # 포지션 DB 쿼리 헬퍼
   ├── _settings_queries.py    # UserSettings 조회/get-or-create + has_active_kis_credentials 쿼리 헬퍼 (settings.py 라우터에서 분리)
   ├── _portfolio_queries.py   # 연결된 포트폴리오 목록·활성 알림 threshold 조회 헬퍼 (rebalancing.py 라우터에서 분리)
-  ├── yahoo_price.py          # [현재가 조회 그룹] Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
+  ├── yahoo_price.py          # [현재가 조회 그룹] Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산). **KIS/키움/토스 잔고는 국내 종목 market을 전부 "KOSPI"로 채움(KOSDAQ 미구분)** — `to_yf_symbol()`이 `_kosdaq_tickers`(FDR KOSDAQ 상장목록, 기동 시+매일 07:00 `kosdaq_tickers_refresh` 잡이 갱신, 실패 시 기존값 유지)로 `.KQ` 교정. 저장된 market은 `ticker-market` 매칭 키라 변경하지 않음. pykrx 상장목록은 KRX 로그인 요구로 깨져 사용 불가
   ├── backtest_metrics.py           # 백테스트 성과 지표 계산 (backtest_service.py 서브모듈)
   ├── composition_calculator.py     # 자산 구성 비중 계산. `exclude_real_estate()` — 목표 진행율·필요수익률 등 "투자자산" 기준 계산 전용(부동산 순자산 제외, 대시보드 총자산 표시엔 미적용). MVO·DCA 곡선이 부동산 가치 상승을 모델링하지 않아 부동산 포함 시 진행율 왜곡 — asset_aggregator/dca_service/invest.py 목표 계산이 호출
   ├── trend_calculator.py           # 월별 자산 추이 계산

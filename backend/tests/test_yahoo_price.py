@@ -41,6 +41,51 @@ class TestToYahooSymbol:
 
         assert _to_yahoo_symbol("005930", "kospi") == "005930.KS"
 
+    def test_kosdaq_code_labeled_kospi_uses_kq(self, override_settings, monkeypatch):
+        """브로커 잔고가 KOSDAQ 종목도 market="KOSPI"로 채우므로 상장 코드 집합으로 .KQ 교정."""
+        from app.services import yahoo_price
+
+        monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset({"039560"}))
+        assert yahoo_price.to_yf_symbol("039560", "KOSPI") == "039560.KQ"
+        assert yahoo_price.to_yf_symbol("39560", "KRX") == "039560.KQ"
+        assert yahoo_price.to_yf_symbol("005930", "KOSPI") == "005930.KS"
+
+
+class TestRefreshKosdaqTickers:
+    async def test_loads_listing(self, override_settings, monkeypatch):
+        from app.services import yahoo_price
+
+        monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset())
+        with patch.object(yahoo_price, "sync_fdr_kosdaq_tickers", return_value=frozenset({"039560"})):
+            await yahoo_price.refresh_kosdaq_tickers()
+        assert yahoo_price.to_yf_symbol("039560", "KOSPI") == "039560.KQ"
+
+    async def test_keeps_previous_set_on_failure(self, override_settings, monkeypatch):
+        from app.services import yahoo_price
+
+        monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset({"039560"}))
+        with patch.object(yahoo_price, "sync_fdr_kosdaq_tickers", return_value=None):
+            await yahoo_price.refresh_kosdaq_tickers()
+        assert yahoo_price._kosdaq_tickers == frozenset({"039560"})
+
+
+class TestSyncFdrKosdaqTickers:
+    def test_returns_zero_padded_codes(self):
+        from app.services.price_sync_sources import sync_fdr_kosdaq_tickers
+
+        fdr = MagicMock()
+        fdr.StockListing.return_value = pd.DataFrame({"Code": ["039560", "196170"]})
+        with patch.dict("sys.modules", {"FinanceDataReader": fdr}):
+            assert sync_fdr_kosdaq_tickers() == frozenset({"039560", "196170"})
+
+    def test_failure_returns_none(self):
+        from app.services.price_sync_sources import sync_fdr_kosdaq_tickers
+
+        fdr = MagicMock()
+        fdr.StockListing.side_effect = RuntimeError("blocked")
+        with patch.dict("sys.modules", {"FinanceDataReader": fdr}):
+            assert sync_fdr_kosdaq_tickers() is None
+
 
 # ── _sync_usdkrw (yfinance mocked) ───────────────────────────
 

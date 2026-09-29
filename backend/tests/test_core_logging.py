@@ -82,6 +82,14 @@ class TestDropBenignYFinance404:
         )
         assert f.filter(self._record(msg)) is False
 
+    def test_drops_quote_not_found_404_noise(self):
+        f = _DropBenignYFinance404()
+        msg = (
+            'HTTP Error 404: {"quoteSummary":{"result":null,"error":'
+            '{"code":"Not Found","description":"Quote not found for symbol: 039560.KS"}}}'
+        )
+        assert f.filter(self._record(msg)) is False
+
     def test_passes_through_other_yfinance_logs(self):
         f = _DropBenignYFinance404()
         assert f.filter(self._record("YFRateLimitError: Too Many Requests. Rate limited.")) is True

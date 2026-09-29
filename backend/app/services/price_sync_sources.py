@@ -42,6 +42,24 @@ def yf_symbol_to_krx_ticker(symbol: str) -> str | None:
     return None
 
 
+def sync_fdr_kosdaq_tickers() -> frozenset[str] | None:
+    """FinanceDataReader로 KOSDAQ 상장 종목 6자리 코드 집합 조회. 실패·빈 결과면 None.
+
+    pykrx `get_market_ticker_list`는 KRX 로그인 요구 이후 빈 결과로 깨져 쓰지 않는다.
+    """
+    try:
+        import FinanceDataReader as fdr
+
+        df = fdr.StockListing("KOSDAQ")
+        if df is None or df.empty or "Code" not in df.columns:
+            return None
+        codes = frozenset(str(c).zfill(6) for c in df["Code"] if c)
+        return codes or None
+    except Exception as e:
+        logger.warning("fdr_kosdaq_listing_failed", error=str(e))
+        return None
+
+
 def sync_naver_price(ticker: str) -> float | None:
     """Naver Finance 모바일 API(basic)로 국내 종목 현재가(종가) 조회. 국내 종목 전용."""
     import requests as _req

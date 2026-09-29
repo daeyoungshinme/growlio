@@ -20,7 +20,7 @@ import structlog
 
 from app.constants import DOMESTIC_MARKETS
 from app.core.config import settings
-from app.services.price_sync_sources import sync_pykrx_close_series
+from app.services.price_sync_sources import sync_fdr_kosdaq_tickers, sync_pykrx_close_series
 from app.utils.circuit_breaker import yahoo_circuit
 from app.utils.kst import today_kst
 
@@ -31,15 +31,34 @@ logger = structlog.get_logger()
 
 _yfinance_sem = asyncio.Semaphore(settings.api_semaphore_limit)
 
+_kosdaq_tickers: frozenset[str] = frozenset()
+"""KOSDAQ 상장 코드 집합 — KIS/키움/토스 잔고 파서가 국내 보유종목 market을 전부 "KOSPI"로 채워
+(KOSDAQ 미구분) KOSDAQ 종목이 `.KS`로 조회되어 Yahoo 404가 나던 문제를 심볼 변환 단계에서 교정한다.
+저장된 market은 `"{ticker}-{market}"` 매칭 키에 쓰이므로 건드리지 않는다. 비어 있으면(로드 전·실패)
+기존대로 `.KS`를 쓴다. `refresh_kosdaq_tickers()`가 기동 시 + 매일 갱신."""
+
 
 def to_yf_symbol(ticker: str, market: str) -> str:
-    """Yahoo Finance 심볼 변환 (KOSPI/KRX → .KS, KOSDAQ → .KQ, 해외 그대로)."""
+    """Yahoo Finance 심볼 변환 (KOSPI/KRX → .KS, KOSDAQ → .KQ, 해외 그대로).
+
+    market이 KOSPI/KRX여도 KOSDAQ 상장 코드면 `.KQ`로 보정한다(`_kosdaq_tickers` 참고)."""
     m = market.upper()
     if m in ("KOSPI", "KRX"):
-        return f"{ticker.zfill(6)}.KS"
+        code = ticker.zfill(6)
+        return f"{code}.KQ" if code in _kosdaq_tickers else f"{code}.KS"
     if m == "KOSDAQ":
         return f"{ticker.zfill(6)}.KQ"
     return ticker
+
+
+async def refresh_kosdaq_tickers() -> None:
+    """KOSDAQ 상장 코드 집합을 갱신한다. 실패 시 기존 집합 유지(fail-soft)."""
+    global _kosdaq_tickers
+    loop = asyncio.get_running_loop()
+    codes = await loop.run_in_executor(None, sync_fdr_kosdaq_tickers)
+    if codes:
+        _kosdaq_tickers = codes
+        logger.info("kosdaq_tickers_refreshed", count=len(codes))
 
 
 # 내부 별칭 (기존 코드 호환)
