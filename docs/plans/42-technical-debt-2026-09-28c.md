@@ -65,7 +65,7 @@
 
 **41번에서 유지**
 
-1. goal `_compute_*` 분해(스냅샷 하네스 선행), `create_rebalancing_execution_plan`, `_check_user_goals`(36 #4)
+1. ~~goal `_compute_*` 분해(스냅샷 하네스 선행)~~ **완료(계획 43)** — `create_rebalancing_execution_plan`, `_check_user_goals`(36 #4)만 남음
 2. ~~대형 컴포넌트 분해~~ **완료(후속 세션)** — 메이저 업그레이드 React 19, recharts 3, tailwind 4(36 #10)만 남음.
    - `RecommendationCard` 806 → 413줄: 탭 본문 `RecommendationOverallTab`/`AgeTab`/`HorizonTab`,
      `RecommendationComparisonPreview`, 순수 로직 `recommendationCardModel.ts`(`buildApplyConfirm`,

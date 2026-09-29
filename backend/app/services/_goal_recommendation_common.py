@@ -8,13 +8,21 @@
 어려웠다. 이 모듈이 유일한 소유자이므로 patch 경로도 `_goal_recommendation_common.*` 하나로 통일된다.
 
 역방향 의존 없음 — 이 모듈은 goal_recommendation_service/age/horizon 어느 것도 import하지 않는다.
+
+세 진입점의 공통 계산 골격(설정 파싱 → CAGR 확보 후보 필터링 → 일별수익률 조회 → MVO → 배당 제안 병합)도
+여기 있다(`_GoalCandidate`/`_candidates_with_cagr`/`_fetch_candidate_returns`/`_run_goal_optimizer`/
+`_apply_dividend_suggestions` 등). 단, `get_historical_returns`·`fetch_yf_daily_returns`·`build_portfolio_overview`
+같은 외부 조회는 각 진입점 모듈에서 호출한다 — 테스트가 그 이름을 진입점 모듈 경로로 patch하기 때문이다
+(`_fetch_candidate_returns`가 조회 함수를 인자로 받는 이유).
 """
 
 from __future__ import annotations
 
 import asyncio
+import functools
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import NamedTuple, TypeVar
 
 import structlog
 
@@ -24,17 +32,22 @@ from app.constants import (
     CASH_EQUIVALENT_TICKER,
     DOMESTIC_MARKETS,
 )
-from app.schemas.rebalancing import GoalRecommendation, GoalRecommendationItem
+from app.schemas.rebalancing import (
+    GoalRecommendation,
+    GoalRecommendationItem,
+    HorizonGoalRecommendation,
+    SuggestedGoalCandidate,
+)
 from app.services.dividend.constants import is_korean_etf
 from app.services.dividend.sync_sources import (
     sync_naver_etf_dividend_info,
     sync_naver_stock_dividend_info,
     sync_yahoo_dividend_info,
 )
-from app.services.goal_portfolio_optimizer import _dividend_floor_constraint
+from app.services.goal_portfolio_optimizer import _MAX_WEIGHT, _dividend_floor_constraint, _optimize_goal_portfolio
 from app.services.market_signal_service import get_market_signal
 from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
-from app.services.yahoo_price import to_yf_symbol
+from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_GOAL_CANDIDATE_DIVIDEND_YIELD,
     CacheStoreType,
@@ -314,3 +327,161 @@ def _equity_class_bounds(
     if equity_ceiling is not None:
         return {"EQUITY": (0.0, equity_ceiling)}
     return None
+
+
+# ── 세 진입점 공통 계산 골격 ───────────────────────────────────────────────────
+
+
+class _GoalCandidate(NamedTuple):
+    """CAGR이 확보된 옵티마이저 입력 후보 1개."""
+
+    symbol: str  # yfinance 심볼(합성 현금성 자산은 `_CASH_EQUIVALENT_TICKER`)
+    ticker: tuple[str, str, str]  # (ticker, name, market)
+    cagr_pct: float
+    asset_class: str  # `_optimize_goal_portfolio`의 `class_bounds` 키
+    dividend_yield_pct: float
+
+
+_ResultT = TypeVar("_ResultT", GoalRecommendation, HorizonGoalRecommendation)
+
+
+def _join_notes(*notes: str | None) -> str | None:
+    """비어 있지 않은 안내 문구를 순서대로 공백으로 잇는다(전부 비면 None)."""
+    return " ".join(n for n in notes if n) or None
+
+
+def _max_weight_from_settings(settings_row: object) -> float:
+    """`goal_max_weight_pct`(%) → 종목당 최대 비중(0~1). 미설정이면 `_MAX_WEIGHT`."""
+    max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
+    return float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
+
+
+def _cagr_lookback_years_from_settings(settings_row: object) -> int:
+    return int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
+
+
+def _required_dividend_yield_pct(annual_dividend_goal: float | None, total_assets_krw: float) -> float | None:
+    """연 배당목표(원) ÷ 기준 자산총액 → 필요 배당수익률(%). 목표가 없거나 자산이 0 이하면 None."""
+    if not annual_dividend_goal or total_assets_krw <= 0:
+        return None
+    return round(float(annual_dividend_goal) / total_assets_krw * 100, 2)
+
+
+def _candidates_with_cagr(
+    candidate_dicts: list[dict[str, str]],
+    cagr_map: dict[tuple[str, str], dict],
+    dividend_map: dict[tuple[str, str], float],
+    *,
+    equity_vs_other: bool,
+) -> list[_GoalCandidate]:
+    """CAGR 데이터가 확보된 후보만 남겨 옵티마이저 입력으로 묶는다.
+
+    `equity_vs_other=True`(연령대별·투자기간별)면 자산군을 EQUITY vs OTHER 이분법으로, False(전체 자산
+    기준)면 등록된 자산군(EQUITY/BOND/CASH) 그대로 둔다 — 전자는 주식비중 하한·상한만, 후자는 채권·현금성
+    상한을 자산군별로 걸기 때문이다.
+    """
+    result: list[_GoalCandidate] = []
+    for c in candidate_dicts:
+        t, m = c["ticker"], c["market"]
+        cagr = (cagr_map.get((t, m)) or {}).get("cagr_pct")
+        if cagr is None:
+            continue
+        asset_class = c.get("asset_class", "EQUITY")
+        if equity_vs_other:
+            asset_class = "EQUITY" if asset_class == "EQUITY" else "OTHER"
+        result.append(
+            _GoalCandidate(to_yf_symbol(t, m), (t, c["name"], m), cagr, asset_class, dividend_map.get((t, m), 0.0))
+        )
+    return result
+
+
+def _has_real_safe_asset(candidates: list[_GoalCandidate]) -> bool:
+    return any(c.asset_class != "EQUITY" for c in candidates)
+
+
+def _cash_equivalent_candidate() -> _GoalCandidate:
+    """시세 없는 합성 현금성 자산(CMA·파킹통장) 후보 — `_cash_equivalent_daily_returns()`와 짝."""
+    return _GoalCandidate(
+        _CASH_EQUIVALENT_TICKER,
+        (_CASH_EQUIVALENT_TICKER, _CASH_EQUIVALENT_NAME, _CASH_EQUIVALENT_MARKET),
+        _CASH_EQUIVALENT_CAGR_PCT,
+        "OTHER",
+        0.0,
+    )
+
+
+async def _fetch_candidate_returns(
+    fetch_daily_returns: Callable[[list[str]], dict[str, list[float]]],
+    candidates: list[_GoalCandidate],
+    include_cash_equivalent: bool,
+) -> dict[str, list[float]]:
+    """후보의 일별수익률을 조회하고, 합성 현금성 자산이 포함되면 그 합성 시계열을 더한다.
+
+    `fetch_daily_returns`는 호출 모듈의 `fetch_yf_daily_returns`를 넘긴다(모듈 docstring 참고).
+    """
+    real_symbols = [c.symbol for c in candidates if c.symbol != _CASH_EQUIVALENT_TICKER]
+    returns_map: dict[str, list[float]] = {}
+    if real_symbols:
+        loop = asyncio.get_running_loop()
+        async with _yfinance_sem:
+            returns_map = await loop.run_in_executor(None, fetch_daily_returns, real_symbols)
+    if include_cash_equivalent:
+        returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
+    return returns_map
+
+
+async def _run_goal_optimizer(
+    candidates: list[_GoalCandidate],
+    returns_map: dict[str, list[float]],
+    required_return_pct: float,
+    *,
+    max_weight: float,
+    risk_tolerance: str,
+    class_bounds: dict[str, tuple[float, float]] | None,
+    market_signal_level: str | None,
+    required_dividend_yield_pct: float | None,
+) -> tuple[list[dict], float | None, float | None, str | None]:
+    """`_optimize_goal_portfolio`(동기 SLSQP)를 executor에서 실행한다."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,
+        functools.partial(
+            _optimize_goal_portfolio,
+            [c.symbol for c in candidates],
+            [c.ticker for c in candidates],
+            [c.cagr_pct for c in candidates],
+            returns_map,
+            required_return_pct,
+            max_weight=max_weight,
+            risk_tolerance=risk_tolerance,
+            asset_classes=[c.asset_class for c in candidates],
+            class_bounds=class_bounds,
+            market_signal_level=market_signal_level,
+            dividend_yields=[c.dividend_yield_pct for c in candidates],
+            required_dividend_yield_pct=required_dividend_yield_pct,
+        ),
+    )
+
+
+def _weighted_dividend_yield(items: list[dict], dividend_map: dict[tuple[str, str], float]) -> float | None:
+    """추천 비중 기준 가중평균 배당수익률(%). 추천이 비었으면 None."""
+    if not items:
+        return None
+    return round(sum(i["weight"] * dividend_map.get((i["ticker"], i["market"]), 0.0) for i in items) / 100, 2)
+
+
+def _includes_cash_equivalent(items: list[dict]) -> bool:
+    return any(i["ticker"] == _CASH_EQUIVALENT_TICKER for i in items)
+
+
+def _apply_dividend_suggestions(
+    result: _ResultT,
+    suggestion: tuple[list[dict[str, object]], str | None, str | None],
+) -> _ResultT:
+    """`_suggest_for_dividend_goal()` 결과(제안 후보·안내·상태)를 추천 결과에 병합한다."""
+    suggested, dividend_note, dividend_goal_status = suggestion
+    result.suggested_candidates = [SuggestedGoalCandidate(**s) for s in suggested]
+    result.dividend_goal_status = dividend_goal_status
+    if dividend_note:
+        result.note = _join_notes(result.note, dividend_note)
+    return result

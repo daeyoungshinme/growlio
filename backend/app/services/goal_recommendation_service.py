@@ -53,8 +53,8 @@ MVO 최적화 엔진은 `goal_portfolio_optimizer.py`, 후보 종목 관리/영�
 from __future__ import annotations
 
 import asyncio
-import functools
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import structlog
@@ -62,11 +62,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AccountTaxType
 from app.models.user import UserSettings
-from app.schemas.rebalancing import (
-    GoalRecommendation,
-    PortfolioExpectedMetrics,
-    SuggestedGoalCandidate,
-)
+from app.schemas.rebalancing import GoalRecommendation, PortfolioExpectedMetrics
 from app.services import _goal_recommendation_common as _grc
 from app.services.goal_candidate_service import (
     _active_account_tax_types,
@@ -78,12 +74,7 @@ from app.services.goal_candidate_service import (
     pension_exclusion_note,
     pension_ineligibility_reason,
 )
-from app.services.goal_portfolio_optimizer import (
-    _MAX_WEIGHT,
-    _MIN_CANDIDATES,
-    _optimize_goal_portfolio,
-    compute_weighted_expected_metrics,
-)
+from app.services.goal_portfolio_optimizer import _MIN_CANDIDATES, compute_weighted_expected_metrics
 from app.services.goal_return_solver import months_until_year_end, solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.price_service import get_historical_returns
@@ -178,6 +169,25 @@ async def get_goal_recommendation(
     return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
 
 
+def _resolve_required_return(
+    settings_row: UserSettings,
+    has_asset_goal: bool,
+    pv: float,
+    required_dividend_yield_pct: float | None,
+) -> tuple[float | None, float, GoalRecommendation | None]:
+    """(화면용 `required_return_pct`, 옵티마이저에 넘길 수익률 하한, 조기 반환 결과 또는 None).
+
+    자산목표가 없으면(배당목표만) 필요수익률은 None이고 옵티마이저 하한은 `_NON_BINDING_RETURN_FLOOR`다.
+    """
+    if not has_asset_goal:
+        return None, _grc._NON_BINDING_RETURN_FLOOR, None
+    required_return_pct, early_result = _resolve_asset_goal_return_pct(settings_row, pv, required_dividend_yield_pct)
+    if early_result is not None:
+        return None, _grc._NON_BINDING_RETURN_FLOOR, early_result
+    assert required_return_pct is not None  # nosec B101 - early_result is None이면 항상 값이 있음
+    return required_return_pct, required_return_pct, None
+
+
 def _resolve_asset_goal_return_pct(
     settings_row: UserSettings,
     pv: float,
@@ -186,8 +196,7 @@ def _resolve_asset_goal_return_pct(
     """자산목표(`goal_amount`+`retirement_target_year`)를 필요 연평균 수익률로 역산한다.
 
     반환값: (`required_return_pct`, 조기 반환할 결과가 있으면 그 `GoalRecommendation`, 없으면 None).
-    `_compute_goal_recommendation()`의 분기 복잡도를 낮추기 위해 분리했다. 호출측이 `has_asset_goal`
-    (goal_amount·retirement_target_year 둘 다 설정됨)을 이미 확인했다고 전제한다.
+    호출측이 `has_asset_goal`(goal_amount·retirement_target_year 둘 다 설정됨)을 이미 확인했다고 전제한다.
     """
     if settings_row.goal_amount is None or settings_row.retirement_target_year is None:
         raise ValueError("_resolve_asset_goal_return_pct는 has_asset_goal 확인 후에만 호출해야 합니다")
@@ -257,17 +266,18 @@ async def _fetch_overall_candidate_data(
     )
 
 
-def _filter_candidates_with_cagr(
-    candidates: list[tuple[str, str, str, str]],
-    cagr_map: dict[tuple[str, str], dict],
-    dividend_map: dict[tuple[str, str], float],
-) -> list[tuple[str, tuple[str, str, str], float, float, str]]:
-    """CAGR 데이터가 확보된 후보만 남기고, yfinance 심볼·배당수익률·자산군을 함께 묶는다."""
-    return [
-        (to_yf_symbol(t, m), (t, name, m), cagr_map[(t, m)]["cagr_pct"], dividend_map.get((t, m), 0.0), asset_class)
-        for t, name, m, asset_class in candidates
-        if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
-    ]
+def _overall_market_filter(single_tax_type: str | None) -> Callable[[dict[str, str]], bool] | None:
+    """배당 제안 후보 필터 — 전 계좌가 단일 세제유형일 때만 그 유형의 지역 선호·연금 매수가능 여부를 적용."""
+    if single_tax_type is None:
+        return None
+
+    def _market_filter(c: dict[str, str]) -> bool:
+        return (
+            _matches_index_region_preference(c, single_tax_type)
+            and pension_ineligibility_reason(c, single_tax_type) is None
+        )
+
+    return _market_filter
 
 
 def _compute_overall_class_bounds(settings_row: UserSettings | None) -> dict[str, tuple[float, float]] | None:
@@ -309,26 +319,14 @@ async def _compute_goal_recommendation(
     if not settings_row or not (has_asset_goal or has_dividend_goal):
         return _grc._not_configured("목표금액·목표연도 또는 배당목표를 설정하면 추천을 받을 수 있습니다")
 
-    pv = base_krw
-    required_dividend_yield_pct = (
-        round(float(settings_row.annual_dividend_goal) / pv * 100, 2)
-        if settings_row.annual_dividend_goal and pv > 0
-        else None
+    required_dividend_yield_pct = _grc._required_dividend_yield_pct(settings_row.annual_dividend_goal, base_krw)
+    required_return_pct, optimizer_return_floor, early_result = _resolve_required_return(
+        settings_row, has_asset_goal, base_krw, required_dividend_yield_pct
     )
-
-    required_return_pct: float | None = None
-    required_return_pct_for_optimizer = _grc._NON_BINDING_RETURN_FLOOR
-    if has_asset_goal:
-        required_return_pct, early_result = _resolve_asset_goal_return_pct(
-            settings_row, pv, required_dividend_yield_pct
-        )
-        if early_result is not None:
-            return early_result
-        assert required_return_pct is not None  # nosec B101 - early_result is None이면 항상 값이 있음
-        required_return_pct_for_optimizer = required_return_pct
+    if early_result is not None:
+        return early_result
 
     candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
-
     if not candidate_dicts:
         return _grc._no_recommendation(
             "등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요",
@@ -340,35 +338,13 @@ async def _compute_goal_recommendation(
     computed_candidates, preference_fallback_note, single_tax_type = await _apply_tax_type_preference_for_overall(
         db, candidate_dicts, user_id
     )
-    duplicate_index_note = detect_duplicate_tracking_index_note(computed_candidates, existing_items)
-    preference_fallback_note = (
-        f"{preference_fallback_note} {duplicate_index_note}"
-        if preference_fallback_note and duplicate_index_note
-        else preference_fallback_note or duplicate_index_note
+    preference_fallback_note = _grc._join_notes(
+        preference_fallback_note, detect_duplicate_tracking_index_note(computed_candidates, existing_items)
     )
-
-    def _combine_note(msg: str | None) -> str | None:
-        if preference_fallback_note and msg:
-            return f"{preference_fallback_note} {msg}"
-        return preference_fallback_note or msg
 
     risk_tolerance = getattr(settings_row, "goal_risk_tolerance", None) or "CONSERVATIVE"
-    max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
-    max_weight = float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
-    cagr_lookback_years = int(
-        getattr(settings_row, "goal_cagr_lookback_years", None) or _grc._DEFAULT_CAGR_LOOKBACK_YEARS
-    )
-
-    overall_market_filter = (
-        (
-            lambda c, tax_type_value=single_tax_type: (
-                _matches_index_region_preference(c, tax_type_value)
-                and pension_ineligibility_reason(c, tax_type_value) is None
-            )
-        )
-        if single_tax_type is not None
-        else None
-    )
+    max_weight = _grc._max_weight_from_settings(settings_row)
+    cagr_lookback_years = _grc._cagr_lookback_years_from_settings(settings_row)
     dividend_capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
 
     async def _suggest_dividend_candidates(
@@ -383,72 +359,37 @@ async def _compute_goal_recommendation(
             expected_dividend_yield_pct,
             max_weight,
             capacity_remaining=dividend_capacity_remaining,
-            market_filter=overall_market_filter,
+            market_filter=_overall_market_filter(single_tax_type),
         )
 
-    candidates = [(c["ticker"], c["name"], c["market"], c.get("asset_class", "EQUITY")) for c in computed_candidates]
-    tickers_only = [(t, m) for t, _, m, _ in candidates]
-
+    tickers_only = [(c["ticker"], c["market"]) for c in computed_candidates]
     cagr_map, dividend_map, market_signal_level = await _fetch_overall_candidate_data(
         cache, tickers_only, cagr_lookback_years
     )
-    filtered = _filter_candidates_with_cagr(candidates, cagr_map, dividend_map)
+    filtered = _grc._candidates_with_cagr(computed_candidates, cagr_map, dividend_map, equity_vs_other=False)
     if len(filtered) < _MIN_CANDIDATES:
-        suggested_candidates, dividend_note, dividend_goal_status = await _suggest_dividend_candidates(None)
         result = _grc._no_recommendation(
             "추천에 필요한 수익률 데이터를 가져오지 못했습니다",
             required_return_pct,
             required_dividend_yield_pct,
         )
-        result.note = _combine_note(result.note)
-        if dividend_note:
-            result.note = f"{result.note} {dividend_note}" if result.note else dividend_note
-        result.suggested_candidates = [SuggestedGoalCandidate(**s) for s in suggested_candidates]
-        result.dividend_goal_status = dividend_goal_status
-        return result
+        result.note = _grc._join_notes(preference_fallback_note, result.note)
+        return _grc._apply_dividend_suggestions(result, await _suggest_dividend_candidates(None))
 
-    f_symbols = [f[0] for f in filtered]
-    f_tickers = [f[1] for f in filtered]
-    f_cagrs = [f[2] for f in filtered]
-    f_dividends = [f[3] for f in filtered]
-    f_asset_classes = [f[4] for f in filtered]
-
-    loop = asyncio.get_running_loop()
-    async with _yfinance_sem:
-        returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, f_symbols)
-    items, expected_return_pct, expected_volatility_pct, opt_note = await loop.run_in_executor(
-        None,
-        functools.partial(
-            _optimize_goal_portfolio,
-            f_symbols,
-            f_tickers,
-            f_cagrs,
-            returns_map,
-            required_return_pct_for_optimizer,
-            max_weight=max_weight,
-            risk_tolerance=risk_tolerance,
-            asset_classes=f_asset_classes,
-            class_bounds=_compute_overall_class_bounds(settings_row),
-            market_signal_level=market_signal_level,
-            dividend_yields=f_dividends,
-            required_dividend_yield_pct=required_dividend_yield_pct,
-        ),
+    returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent=False)
+    items, expected_return_pct, expected_volatility_pct, opt_note = await _grc._run_goal_optimizer(
+        filtered,
+        returns_map,
+        optimizer_return_floor,
+        max_weight=max_weight,
+        risk_tolerance=risk_tolerance,
+        class_bounds=_compute_overall_class_bounds(settings_row),
+        market_signal_level=market_signal_level,
+        required_dividend_yield_pct=required_dividend_yield_pct,
     )
+    expected_dividend_yield_pct = _grc._weighted_dividend_yield(items, dividend_map)
 
-    expected_dividend_yield_pct = None
-    if items:
-        expected_dividend_yield_pct = round(
-            sum(i["weight"] * dividend_map.get((i["ticker"], i["market"]), 0.0) for i in items) / 100, 2
-        )
-
-    suggested_candidates, dividend_note, dividend_goal_status = await _suggest_dividend_candidates(
-        expected_dividend_yield_pct
-    )
-    note = _combine_note(opt_note)
-    if dividend_note:
-        note = f"{note} {dividend_note}" if note else dividend_note
-
-    return GoalRecommendation(
+    result = GoalRecommendation(
         generated_at=datetime.now(UTC).isoformat(),
         is_configured=True,
         required_return_pct=required_return_pct,
@@ -457,14 +398,13 @@ async def _compute_goal_recommendation(
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=expected_dividend_yield_pct,
         expected_volatility_pct=expected_volatility_pct,
-        note=note,
+        note=_grc._join_notes(preference_fallback_note, opt_note),
         cagr_lookback_years=cagr_lookback_years,
         risk_tolerance=risk_tolerance,
         max_weight_pct=round(max_weight * 100, 2),
         market_signal_level=market_signal_level,
-        suggested_candidates=[SuggestedGoalCandidate(**s) for s in suggested_candidates],
-        dividend_goal_status=dividend_goal_status,
     )
+    return _grc._apply_dividend_suggestions(result, await _suggest_dividend_candidates(expected_dividend_yield_pct))
 
 
 async def compute_portfolio_expected_metrics(

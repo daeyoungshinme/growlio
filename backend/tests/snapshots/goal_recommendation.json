@@ -1,0 +1,2613 @@
+{
+  "age_fifties_explicit_dividend_goal": {
+    "age_bracket": "50대",
+    "cagr_lookback_years": 10,
+    "dividend_goal_status": "optimal",
+    "expected_dividend_yield_pct": 2.62,
+    "expected_return_pct": 7.64,
+    "expected_volatility_pct": 2.29,
+    "includes_cash_equivalent": false,
+    "is_configured": true,
+    "market_signal_level": "GREEN",
+    "max_weight_pct": 50.0,
+    "note": "TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요",
+    "recommended_items": [
+      {
+        "dividend_yield_pct": 1.1,
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750",
+        "weight": 12.1
+      },
+      {
+        "dividend_yield_pct": 0.5,
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690",
+        "weight": 12.7
+      },
+      {
+        "dividend_yield_pct": 3.6,
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730",
+        "weight": 6.2
+      },
+      {
+        "dividend_yield_pct": 3.3,
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130",
+        "weight": 43.4
+      },
+      {
+        "dividend_yield_pct": 3.0,
+        "market": "KOSPI",
+        "name": "KODEX 국고채3년",
+        "ticker": "114260",
+        "weight": 25.6
+      }
+    ],
+    "required_dividend_yield_pct": 2.0,
+    "required_return_pct": null,
+    "risk_tolerance": "BALANCED",
+    "suggested_candidates": []
+  },
+  "age_forties_default_dividend_floor": {
+    "age_bracket": "40대",
+    "cagr_lookback_years": 10,
+    "dividend_goal_status": "optimal",
+    "expected_dividend_yield_pct": 2.65,
+    "expected_return_pct": 6.72,
+    "expected_volatility_pct": 4.0,
+    "includes_cash_equivalent": false,
+    "is_configured": true,
+    "market_signal_level": "YELLOW",
+    "max_weight_pct": 40.0,
+    "note": "TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 40대 연령대 기본 배당목표(연 1.5%↑)를 반영했습니다 시장 위험 신호(YELLOW)를 반영해 추천 비중을 보수적으로 조정했습니다 선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다",
+    "recommended_items": [
+      {
+        "dividend_yield_pct": 1.8,
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500",
+        "weight": 12.3
+      },
+      {
+        "dividend_yield_pct": 1.1,
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750",
+        "weight": 24.5
+      },
+      {
+        "dividend_yield_pct": 3.6,
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730",
+        "weight": 18.2
+      },
+      {
+        "dividend_yield_pct": 3.3,
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130",
+        "weight": 22.6
+      },
+      {
+        "dividend_yield_pct": 3.4,
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870",
+        "weight": 22.4
+      }
+    ],
+    "required_dividend_yield_pct": 1.5,
+    "required_return_pct": null,
+    "risk_tolerance": "BALANCED",
+    "suggested_candidates": []
+  },
+  "age_insufficient_data": {
+    "age_bracket": "30대",
+    "cagr_lookback_years": 10,
+    "dividend_goal_status": null,
+    "expected_dividend_yield_pct": null,
+    "expected_return_pct": null,
+    "expected_volatility_pct": null,
+    "includes_cash_equivalent": false,
+    "is_configured": true,
+    "market_signal_level": "GREEN",
+    "max_weight_pct": 40.0,
+    "note": "제약 조건을 만족하는 포트폴리오를 찾지 못했습니다",
+    "recommended_items": [],
+    "required_dividend_yield_pct": null,
+    "required_return_pct": null,
+    "risk_tolerance": "AGGRESSIVE",
+    "suggested_candidates": []
+  },
+  "age_no_candidates": {
+    "age_bracket": "40대",
+    "cagr_lookback_years": 10,
+    "dividend_goal_status": "unreachable",
+    "expected_dividend_yield_pct": null,
+    "expected_return_pct": null,
+    "expected_volatility_pct": null,
+    "includes_cash_equivalent": false,
+    "is_configured": true,
+    "market_signal_level": null,
+    "max_weight_pct": 40.0,
+    "note": "등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요 등록된 후보로는 배당 목표(연 1.5%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+    "recommended_items": [],
+    "required_dividend_yield_pct": 1.5,
+    "required_return_pct": null,
+    "risk_tolerance": "CONSERVATIVE",
+    "suggested_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "dividend_yield_pct": 9.9,
+        "market": "NASDAQ",
+        "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+        "ticker": "JEPQ"
+      }
+    ]
+  },
+  "age_not_configured": {
+    "age_bracket": null,
+    "cagr_lookback_years": 10,
+    "dividend_goal_status": null,
+    "expected_dividend_yield_pct": null,
+    "expected_return_pct": null,
+    "expected_volatility_pct": null,
+    "includes_cash_equivalent": false,
+    "is_configured": false,
+    "market_signal_level": null,
+    "max_weight_pct": 40.0,
+    "note": "연령대를 설정하면 연령대별 추천을 받을 수 있습니다",
+    "recommended_items": [],
+    "required_dividend_yield_pct": null,
+    "required_return_pct": null,
+    "risk_tolerance": "CONSERVATIVE",
+    "suggested_candidates": []
+  },
+  "age_sixties_unreachable_dividend_suggests": {
+    "age_bracket": "60대 이상",
+    "cagr_lookback_years": 3,
+    "dividend_goal_status": "unreachable",
+    "expected_dividend_yield_pct": 2.33,
+    "expected_return_pct": 6.5,
+    "expected_volatility_pct": 3.88,
+    "includes_cash_equivalent": false,
+    "is_configured": true,
+    "market_signal_level": "GREEN",
+    "max_weight_pct": 40.0,
+    "note": "SPDR S&P 500 ETF(SPY)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 배당 목표(연 6.0%)를 충족하는 조합을 찾지 못해 자산 목표 기준으로만 계산했습니다 등록된 후보로는 배당 목표(연 6.0%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+    "recommended_items": [
+      {
+        "dividend_yield_pct": 1.3,
+        "market": "NYSE",
+        "name": "SPDR S&P 500 ETF",
+        "ticker": "SPY",
+        "weight": 6.3
+      },
+      {
+        "dividend_yield_pct": 0.6,
+        "market": "NASDAQ",
+        "name": "Invesco QQQ Trust",
+        "ticker": "QQQ",
+        "weight": 28.7
+      },
+      {
+        "dividend_yield_pct": 3.2,
+        "market": "NASDAQ",
+        "name": "Vanguard Total Bond Market ETF",
+        "ticker": "BND",
+        "weight": 65.0
+      }
+    ],
+    "required_dividend_yield_pct": 6.0,
+    "required_return_pct": null,
+    "risk_tolerance": "CONSERVATIVE",
+    "suggested_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "dividend_yield_pct": 9.9,
+        "market": "NASDAQ",
+        "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+        "ticker": "JEPQ"
+      },
+      {
+        "asset_class": "EQUITY",
+        "dividend_yield_pct": 8.1,
+        "market": "NYSE",
+        "name": "JPMorgan Equity Premium Income ETF",
+        "ticker": "JEPI"
+      }
+    ]
+  },
+  "age_twenties_equity_only_cash_equivalent": {
+    "age_bracket": "20대",
+    "cagr_lookback_years": 10,
+    "dividend_goal_status": null,
+    "expected_dividend_yield_pct": 0.72,
+    "expected_return_pct": 10.45,
+    "expected_volatility_pct": 6.34,
+    "includes_cash_equivalent": true,
+    "is_configured": true,
+    "market_signal_level": "GREEN",
+    "max_weight_pct": 40.0,
+    "note": "TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요",
+    "recommended_items": [
+      {
+        "dividend_yield_pct": 1.8,
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500",
+        "weight": 6.8
+      },
+      {
+        "dividend_yield_pct": 1.1,
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750",
+        "weight": 36.9
+      },
+      {
+        "dividend_yield_pct": 0.5,
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690",
+        "weight": 39.0
+      },
+      {
+        "dividend_yield_pct": null,
+        "market": "CASH",
+        "name": "현금성 자산 (CMA·파킹통장 등)",
+        "ticker": "CASH_EQUIVALENT",
+        "weight": 17.3
+      }
+    ],
+    "required_dividend_yield_pct": null,
+    "required_return_pct": null,
+    "risk_tolerance": "AGGRESSIVE",
+    "suggested_candidates": []
+  },
+  "horizon_all_combos_custom_options_yellow": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      },
+      {
+        "asset_class": "CASH",
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "삼성전자",
+        "ticker": "005930"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 레버리지",
+        "ticker": "122630"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NYSE",
+        "name": "SPDR S&P 500 ETF",
+        "ticker": "SPY"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NASDAQ",
+        "name": "Invesco QQQ Trust",
+        "ticker": "QQQ"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NYSE",
+        "name": "Schwab US Dividend Equity ETF",
+        "ticker": "SCHD"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "NASDAQ",
+        "name": "Vanguard Total Bond Market ETF",
+        "ticker": "BND"
+      }
+    ],
+    "result": {
+      "recommendations": [
+        {
+          "account_count": 1,
+          "base_krw": 8000000.0,
+          "dividend_goal_status": null,
+          "expected_dividend_yield_pct": 0.69,
+          "expected_return_pct": 5.18,
+          "expected_volatility_pct": 5.92,
+          "includes_cash_equivalent": true,
+          "investment_horizon": "SHORT_TERM",
+          "market_signal_level": "YELLOW",
+          "max_weight_pct": 50.0,
+          "note": "단기(최대 3년) 목표는 안정적인 주식 위주로 최소 70%까지 배분하고, 안전자산은 30% 이내로 제한합니다.",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.8,
+              "market": "KOSPI",
+              "name": "KODEX 200",
+              "ticker": "069500",
+              "weight": 20.8
+            },
+            {
+              "dividend_yield_pct": 2.1,
+              "market": "KOSPI",
+              "name": "삼성전자",
+              "ticker": "005930",
+              "weight": 15.0
+            },
+            {
+              "dividend_yield_pct": null,
+              "market": "KOSPI",
+              "name": "KODEX 레버리지",
+              "ticker": "122630",
+              "weight": 34.2
+            },
+            {
+              "dividend_yield_pct": null,
+              "market": "CASH",
+              "name": "현금성 자산 (CMA·파킹통장 등)",
+              "ticker": "CASH_EQUIVALENT",
+              "weight": 30.0
+            }
+          ],
+          "required_dividend_yield_pct": null,
+          "risk_tolerance": "CONSERVATIVE",
+          "suggested_candidates": [],
+          "tax_type": "GENERAL"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 4000000.0,
+          "dividend_goal_status": null,
+          "expected_dividend_yield_pct": 3.27,
+          "expected_return_pct": 5.79,
+          "expected_volatility_pct": 1.08,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "SHORT_TERM",
+          "market_signal_level": "YELLOW",
+          "max_weight_pct": 50.0,
+          "note": "IRP 계좌에서는 개별 종목·레버리지·인버스 ETF을(를) 매수할 수 없어 후보에서 제외했습니다(삼성전자, KODEX 레버리지) TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 IRP(개인형퇴직연금) 계좌는 퇴직연금 규정에 따라 위험자산(주식)을 최대 70%로 제한하고, 안전자산(채권·현금성)을 최소 30% 이상 배분합니다.",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.1,
+              "market": "KOSPI",
+              "name": "TIGER 미국S&P500",
+              "ticker": "360750",
+              "weight": 1.9
+            },
+            {
+              "dividend_yield_pct": 0.5,
+              "market": "KOSPI",
+              "name": "TIGER 미국나스닥100",
+              "ticker": "133690",
+              "weight": 1.5
+            },
+            {
+              "dividend_yield_pct": 3.6,
+              "market": "KOSPI",
+              "name": "TIGER 미국배당다우존스",
+              "ticker": "458730",
+              "weight": 1.5
+            },
+            {
+              "dividend_yield_pct": 3.3,
+              "market": "KOSPI",
+              "name": "KODEX 단기채권",
+              "ticker": "153130",
+              "weight": 50.0
+            },
+            {
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870",
+              "weight": 45.1
+            }
+          ],
+          "required_dividend_yield_pct": null,
+          "risk_tolerance": "CONSERVATIVE",
+          "suggested_candidates": [],
+          "tax_type": "IRP"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 12000000.0,
+          "dividend_goal_status": null,
+          "expected_dividend_yield_pct": 2.68,
+          "expected_return_pct": 6.9,
+          "expected_volatility_pct": 2.36,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "MID_TERM",
+          "market_signal_level": "YELLOW",
+          "max_weight_pct": 50.0,
+          "note": "TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 시장 위험 신호(YELLOW)를 반영해 추천 비중을 보수적으로 조정했습니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.1,
+              "market": "KOSPI",
+              "name": "TIGER 미국S&P500",
+              "ticker": "360750",
+              "weight": 13.3
+            },
+            {
+              "dividend_yield_pct": 0.5,
+              "market": "KOSPI",
+              "name": "TIGER 미국나스닥100",
+              "ticker": "133690",
+              "weight": 13.7
+            },
+            {
+              "dividend_yield_pct": 3.6,
+              "market": "KOSPI",
+              "name": "TIGER 미국배당다우존스",
+              "ticker": "458730",
+              "weight": 7.3
+            },
+            {
+              "dividend_yield_pct": 3.3,
+              "market": "KOSPI",
+              "name": "KODEX 단기채권",
+              "ticker": "153130",
+              "weight": 33.0
+            },
+            {
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870",
+              "weight": 32.7
+            }
+          ],
+          "required_dividend_yield_pct": null,
+          "risk_tolerance": "BALANCED",
+          "suggested_candidates": [],
+          "tax_type": "ISA"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 9000000.0,
+          "dividend_goal_status": null,
+          "expected_dividend_yield_pct": 2.68,
+          "expected_return_pct": 6.9,
+          "expected_volatility_pct": 2.36,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "MID_TERM",
+          "market_signal_level": "YELLOW",
+          "max_weight_pct": 50.0,
+          "note": "연금저축 계좌에서는 개별 종목·레버리지·인버스 ETF을(를) 매수할 수 없어 후보에서 제외했습니다(삼성전자, KODEX 레버리지) TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 시장 위험 신호(YELLOW)를 반영해 추천 비중을 보수적으로 조정했습니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.1,
+              "market": "KOSPI",
+              "name": "TIGER 미국S&P500",
+              "ticker": "360750",
+              "weight": 13.3
+            },
+            {
+              "dividend_yield_pct": 0.5,
+              "market": "KOSPI",
+              "name": "TIGER 미국나스닥100",
+              "ticker": "133690",
+              "weight": 13.7
+            },
+            {
+              "dividend_yield_pct": 3.6,
+              "market": "KOSPI",
+              "name": "TIGER 미국배당다우존스",
+              "ticker": "458730",
+              "weight": 7.3
+            },
+            {
+              "dividend_yield_pct": 3.3,
+              "market": "KOSPI",
+              "name": "KODEX 단기채권",
+              "ticker": "153130",
+              "weight": 33.0
+            },
+            {
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870",
+              "weight": 32.7
+            }
+          ],
+          "required_dividend_yield_pct": null,
+          "risk_tolerance": "BALANCED",
+          "suggested_candidates": [],
+          "tax_type": "PENSION_SAVINGS"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 7000000.0,
+          "dividend_goal_status": null,
+          "expected_dividend_yield_pct": 2.37,
+          "expected_return_pct": 8.71,
+          "expected_volatility_pct": 4.7,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "MID_TERM",
+          "market_signal_level": "YELLOW",
+          "max_weight_pct": 50.0,
+          "note": "SPDR S&P 500 ETF(SPY)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 시장 위험 신호(YELLOW)를 반영해 추천 비중을 보수적으로 조정했습니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.3,
+              "market": "NYSE",
+              "name": "SPDR S&P 500 ETF",
+              "ticker": "SPY",
+              "weight": 3.8
+            },
+            {
+              "dividend_yield_pct": 0.6,
+              "market": "NASDAQ",
+              "name": "Invesco QQQ Trust",
+              "ticker": "QQQ",
+              "weight": 31.9
+            },
+            {
+              "dividend_yield_pct": 3.5,
+              "market": "NYSE",
+              "name": "Schwab US Dividend Equity ETF",
+              "ticker": "SCHD",
+              "weight": 25.3
+            },
+            {
+              "dividend_yield_pct": 3.2,
+              "market": "NASDAQ",
+              "name": "Vanguard Total Bond Market ETF",
+              "ticker": "BND",
+              "weight": 39.0
+            }
+          ],
+          "required_dividend_yield_pct": null,
+          "risk_tolerance": "BALANCED",
+          "suggested_candidates": [],
+          "tax_type": "OVERSEAS_DEDICATED"
+        },
+        {
+          "account_count": 2,
+          "base_krw": 8000000.0,
+          "dividend_goal_status": null,
+          "expected_dividend_yield_pct": 0.98,
+          "expected_return_pct": 7.83,
+          "expected_volatility_pct": 8.48,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "LONG_TERM",
+          "market_signal_level": "YELLOW",
+          "max_weight_pct": 50.0,
+          "note": "시장 위험 신호(YELLOW)를 반영해 추천 비중을 보수적으로 조정했습니다 선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.8,
+              "market": "KOSPI",
+              "name": "KODEX 200",
+              "ticker": "069500",
+              "weight": 29.7
+            },
+            {
+              "dividend_yield_pct": 2.1,
+              "market": "KOSPI",
+              "name": "삼성전자",
+              "ticker": "005930",
+              "weight": 21.3
+            },
+            {
+              "dividend_yield_pct": null,
+              "market": "KOSPI",
+              "name": "KODEX 레버리지",
+              "ticker": "122630",
+              "weight": 49.0
+            }
+          ],
+          "required_dividend_yield_pct": null,
+          "risk_tolerance": "AGGRESSIVE",
+          "suggested_candidates": [],
+          "tax_type": "GENERAL"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 6000000.0,
+          "dividend_goal_status": null,
+          "expected_dividend_yield_pct": 2.39,
+          "expected_return_pct": 7.46,
+          "expected_volatility_pct": 3.3,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "LONG_TERM",
+          "market_signal_level": "YELLOW",
+          "max_weight_pct": 50.0,
+          "note": "IRP 계좌에서는 개별 종목·레버리지·인버스 ETF을(를) 매수할 수 없어 후보에서 제외했습니다(삼성전자, KODEX 레버리지) TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 시장 위험 신호(YELLOW)를 반영해 추천 비중을 보수적으로 조정했습니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.1,
+              "market": "KOSPI",
+              "name": "TIGER 미국S&P500",
+              "ticker": "360750",
+              "weight": 19.0
+            },
+            {
+              "dividend_yield_pct": 0.5,
+              "market": "KOSPI",
+              "name": "TIGER 미국나스닥100",
+              "ticker": "133690",
+              "weight": 19.7
+            },
+            {
+              "dividend_yield_pct": 3.6,
+              "market": "KOSPI",
+              "name": "TIGER 미국배당다우존스",
+              "ticker": "458730",
+              "weight": 10.2
+            },
+            {
+              "dividend_yield_pct": 3.3,
+              "market": "KOSPI",
+              "name": "KODEX 단기채권",
+              "ticker": "153130",
+              "weight": 20.1
+            },
+            {
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870",
+              "weight": 31.0
+            }
+          ],
+          "required_dividend_yield_pct": null,
+          "risk_tolerance": "AGGRESSIVE",
+          "suggested_candidates": [],
+          "tax_type": "IRP"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 15000000.0,
+          "dividend_goal_status": null,
+          "expected_dividend_yield_pct": 1.92,
+          "expected_return_pct": 11.78,
+          "expected_volatility_pct": 7.58,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "LONG_TERM",
+          "market_signal_level": "YELLOW",
+          "max_weight_pct": 50.0,
+          "note": "SPDR S&P 500 ETF(SPY)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 시장 위험 신호(YELLOW)를 반영해 추천 비중을 보수적으로 조정했습니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.3,
+              "market": "NYSE",
+              "name": "SPDR S&P 500 ETF",
+              "ticker": "SPY",
+              "weight": 6.1
+            },
+            {
+              "dividend_yield_pct": 0.6,
+              "market": "NASDAQ",
+              "name": "Invesco QQQ Trust",
+              "ticker": "QQQ",
+              "weight": 49.9
+            },
+            {
+              "dividend_yield_pct": 3.5,
+              "market": "NYSE",
+              "name": "Schwab US Dividend Equity ETF",
+              "ticker": "SCHD",
+              "weight": 44.0
+            }
+          ],
+          "required_dividend_yield_pct": null,
+          "risk_tolerance": "AGGRESSIVE",
+          "suggested_candidates": [],
+          "tax_type": "OVERSEAS_DEDICATED"
+        }
+      ]
+    }
+  },
+  "horizon_all_combos_with_dividend_goal": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      },
+      {
+        "asset_class": "CASH",
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "삼성전자",
+        "ticker": "005930"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 레버리지",
+        "ticker": "122630"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NYSE",
+        "name": "SPDR S&P 500 ETF",
+        "ticker": "SPY"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NASDAQ",
+        "name": "Invesco QQQ Trust",
+        "ticker": "QQQ"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NYSE",
+        "name": "Schwab US Dividend Equity ETF",
+        "ticker": "SCHD"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "NASDAQ",
+        "name": "Vanguard Total Bond Market ETF",
+        "ticker": "BND"
+      }
+    ],
+    "result": {
+      "recommendations": [
+        {
+          "account_count": 1,
+          "base_krw": 8000000.0,
+          "dividend_goal_status": "optimal",
+          "expected_dividend_yield_pct": 2.0,
+          "expected_return_pct": 6.02,
+          "expected_volatility_pct": 8.17,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "SHORT_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "단기(최대 3년) 목표는 안정적인 주식 위주로 최소 80%까지 배분하고, 안전자산은 20% 이내로 제한합니다.",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.8,
+              "market": "KOSPI",
+              "name": "KODEX 200",
+              "ticker": "069500",
+              "weight": 37.5
+            },
+            {
+              "dividend_yield_pct": 2.1,
+              "market": "KOSPI",
+              "name": "삼성전자",
+              "ticker": "005930",
+              "weight": 30.7
+            },
+            {
+              "dividend_yield_pct": null,
+              "market": "KOSPI",
+              "name": "KODEX 레버리지",
+              "ticker": "122630",
+              "weight": 11.8
+            },
+            {
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870",
+              "weight": 20.0
+            }
+          ],
+          "required_dividend_yield_pct": 2.0,
+          "risk_tolerance": "CONSERVATIVE",
+          "suggested_candidates": [],
+          "tax_type": "GENERAL"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 4000000.0,
+          "dividend_goal_status": "optimal",
+          "expected_dividend_yield_pct": 3.01,
+          "expected_return_pct": 7.31,
+          "expected_volatility_pct": 1.5,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "SHORT_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "IRP 계좌에서는 개별 종목·레버리지·인버스 ETF을(를) 매수할 수 없어 후보에서 제외했습니다(삼성전자, KODEX 레버리지) TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 IRP(개인형퇴직연금) 계좌는 퇴직연금 규정에 따라 위험자산(주식)을 최대 70%로 제한하고, 안전자산(채권·현금성)을 최소 30% 이상 배분합니다.",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.1,
+              "market": "KOSPI",
+              "name": "TIGER 미국S&P500",
+              "ticker": "360750",
+              "weight": 8.0
+            },
+            {
+              "dividend_yield_pct": 0.5,
+              "market": "KOSPI",
+              "name": "TIGER 미국나스닥100",
+              "ticker": "133690",
+              "weight": 6.0
+            },
+            {
+              "dividend_yield_pct": 3.6,
+              "market": "KOSPI",
+              "name": "TIGER 미국배당다우존스",
+              "ticker": "458730",
+              "weight": 6.0
+            },
+            {
+              "dividend_yield_pct": 3.3,
+              "market": "KOSPI",
+              "name": "KODEX 단기채권",
+              "ticker": "153130",
+              "weight": 40.0
+            },
+            {
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870",
+              "weight": 40.0
+            }
+          ],
+          "required_dividend_yield_pct": 2.0,
+          "risk_tolerance": "CONSERVATIVE",
+          "suggested_candidates": [],
+          "tax_type": "IRP"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 12000000.0,
+          "dividend_goal_status": "optimal",
+          "expected_dividend_yield_pct": 2.35,
+          "expected_return_pct": 8.54,
+          "expected_volatility_pct": 3.45,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "MID_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.1,
+              "market": "KOSPI",
+              "name": "TIGER 미국S&P500",
+              "ticker": "360750",
+              "weight": 19.8
+            },
+            {
+              "dividend_yield_pct": 0.5,
+              "market": "KOSPI",
+              "name": "TIGER 미국나스닥100",
+              "ticker": "133690",
+              "weight": 20.6
+            },
+            {
+              "dividend_yield_pct": 3.6,
+              "market": "KOSPI",
+              "name": "TIGER 미국배당다우존스",
+              "ticker": "458730",
+              "weight": 10.7
+            },
+            {
+              "dividend_yield_pct": 3.3,
+              "market": "KOSPI",
+              "name": "KODEX 단기채권",
+              "ticker": "153130",
+              "weight": 18.4
+            },
+            {
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870",
+              "weight": 30.5
+            }
+          ],
+          "required_dividend_yield_pct": 2.0,
+          "risk_tolerance": "BALANCED",
+          "suggested_candidates": [],
+          "tax_type": "ISA"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 9000000.0,
+          "dividend_goal_status": "optimal",
+          "expected_dividend_yield_pct": 2.35,
+          "expected_return_pct": 8.54,
+          "expected_volatility_pct": 3.45,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "MID_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "연금저축 계좌에서는 개별 종목·레버리지·인버스 ETF을(를) 매수할 수 없어 후보에서 제외했습니다(삼성전자, KODEX 레버리지) TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.1,
+              "market": "KOSPI",
+              "name": "TIGER 미국S&P500",
+              "ticker": "360750",
+              "weight": 19.8
+            },
+            {
+              "dividend_yield_pct": 0.5,
+              "market": "KOSPI",
+              "name": "TIGER 미국나스닥100",
+              "ticker": "133690",
+              "weight": 20.6
+            },
+            {
+              "dividend_yield_pct": 3.6,
+              "market": "KOSPI",
+              "name": "TIGER 미국배당다우존스",
+              "ticker": "458730",
+              "weight": 10.7
+            },
+            {
+              "dividend_yield_pct": 3.3,
+              "market": "KOSPI",
+              "name": "KODEX 단기채권",
+              "ticker": "153130",
+              "weight": 18.4
+            },
+            {
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870",
+              "weight": 30.5
+            }
+          ],
+          "required_dividend_yield_pct": 2.0,
+          "risk_tolerance": "BALANCED",
+          "suggested_candidates": [],
+          "tax_type": "PENSION_SAVINGS"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 7000000.0,
+          "dividend_goal_status": "optimal",
+          "expected_dividend_yield_pct": 2.25,
+          "expected_return_pct": 10.28,
+          "expected_volatility_pct": 5.4,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "MID_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "SPDR S&P 500 ETF(SPY)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.3,
+              "market": "NYSE",
+              "name": "SPDR S&P 500 ETF",
+              "ticker": "SPY",
+              "weight": 4.3
+            },
+            {
+              "dividend_yield_pct": 0.6,
+              "market": "NASDAQ",
+              "name": "Invesco QQQ Trust",
+              "ticker": "QQQ",
+              "weight": 36.9
+            },
+            {
+              "dividend_yield_pct": 3.5,
+              "market": "NYSE",
+              "name": "Schwab US Dividend Equity ETF",
+              "ticker": "SCHD",
+              "weight": 29.2
+            },
+            {
+              "dividend_yield_pct": 3.2,
+              "market": "NASDAQ",
+              "name": "Vanguard Total Bond Market ETF",
+              "ticker": "BND",
+              "weight": 29.6
+            }
+          ],
+          "required_dividend_yield_pct": 2.0,
+          "risk_tolerance": "BALANCED",
+          "suggested_candidates": [],
+          "tax_type": "OVERSEAS_DEDICATED"
+        },
+        {
+          "account_count": 2,
+          "base_krw": 8000000.0,
+          "dividend_goal_status": "unreachable",
+          "expected_dividend_yield_pct": 1.16,
+          "expected_return_pct": 8.83,
+          "expected_volatility_pct": 8.61,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "LONG_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다 배당 목표(연 2.0%)를 충족하는 조합을 찾지 못해 자산 목표 기준으로만 계산했습니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.8,
+              "market": "KOSPI",
+              "name": "KODEX 200",
+              "ticker": "069500",
+              "weight": 34.9
+            },
+            {
+              "dividend_yield_pct": 2.1,
+              "market": "KOSPI",
+              "name": "삼성전자",
+              "ticker": "005930",
+              "weight": 25.1
+            },
+            {
+              "dividend_yield_pct": null,
+              "market": "KOSPI",
+              "name": "KODEX 레버리지",
+              "ticker": "122630",
+              "weight": 40.0
+            }
+          ],
+          "required_dividend_yield_pct": 2.0,
+          "risk_tolerance": "AGGRESSIVE",
+          "suggested_candidates": [],
+          "tax_type": "GENERAL"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 6000000.0,
+          "dividend_goal_status": "optimal",
+          "expected_dividend_yield_pct": 2.03,
+          "expected_return_pct": 9.15,
+          "expected_volatility_pct": 4.54,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "LONG_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "IRP 계좌에서는 개별 종목·레버리지·인버스 ETF을(를) 매수할 수 없어 후보에서 제외했습니다(삼성전자, KODEX 레버리지) TIGER 미국S&P500(360750)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 IRP(개인형퇴직연금) 계좌는 퇴직연금 규정에 따라 위험자산(주식)을 최대 70%로 제한하고, 안전자산(채권·현금성)을 최소 30% 이상 배분합니다.",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.1,
+              "market": "KOSPI",
+              "name": "TIGER 미국S&P500",
+              "ticker": "360750",
+              "weight": 25.9
+            },
+            {
+              "dividend_yield_pct": 0.5,
+              "market": "KOSPI",
+              "name": "TIGER 미국나스닥100",
+              "ticker": "133690",
+              "weight": 27.3
+            },
+            {
+              "dividend_yield_pct": 3.6,
+              "market": "KOSPI",
+              "name": "TIGER 미국배당다우존스",
+              "ticker": "458730",
+              "weight": 13.9
+            },
+            {
+              "dividend_yield_pct": 3.3,
+              "market": "KOSPI",
+              "name": "KODEX 단기채권",
+              "ticker": "153130",
+              "weight": 6.0
+            },
+            {
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870",
+              "weight": 26.9
+            }
+          ],
+          "required_dividend_yield_pct": 2.0,
+          "risk_tolerance": "AGGRESSIVE",
+          "suggested_candidates": [],
+          "tax_type": "IRP"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 15000000.0,
+          "dividend_goal_status": "unreachable",
+          "expected_dividend_yield_pct": 1.55,
+          "expected_return_pct": 12.73,
+          "expected_volatility_pct": 10.54,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "LONG_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "SPDR S&P 500 ETF(SPY)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 배당 목표(연 2.0%)를 다른 조건과 함께 만족하는 포트폴리오를 찾지 못해 자산 목표 기준으로만 계산했습니다 등록된 후보로는 배당 목표(연 2.0%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": 1.3,
+              "market": "NYSE",
+              "name": "SPDR S&P 500 ETF",
+              "ticker": "SPY",
+              "weight": 36.0
+            },
+            {
+              "dividend_yield_pct": 0.6,
+              "market": "NASDAQ",
+              "name": "Invesco QQQ Trust",
+              "ticker": "QQQ",
+              "weight": 40.0
+            },
+            {
+              "dividend_yield_pct": 3.5,
+              "market": "NYSE",
+              "name": "Schwab US Dividend Equity ETF",
+              "ticker": "SCHD",
+              "weight": 24.0
+            }
+          ],
+          "required_dividend_yield_pct": 2.0,
+          "risk_tolerance": "AGGRESSIVE",
+          "suggested_candidates": [
+            {
+              "asset_class": "EQUITY",
+              "dividend_yield_pct": 9.9,
+              "market": "NASDAQ",
+              "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+              "ticker": "JEPQ"
+            }
+          ],
+          "tax_type": "OVERSEAS_DEDICATED"
+        }
+      ]
+    }
+  },
+  "horizon_no_tagged_accounts": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NYSE",
+        "name": "SPDR S&P 500 ETF",
+        "ticker": "SPY"
+      }
+    ],
+    "result": {
+      "recommendations": []
+    }
+  },
+  "horizon_sparse_candidates": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NYSE",
+        "name": "SPDR S&P 500 ETF",
+        "ticker": "SPY"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "데이터없음A",
+        "ticker": "999990"
+      }
+    ],
+    "result": {
+      "recommendations": [
+        {
+          "account_count": 1,
+          "base_krw": 8000000.0,
+          "dividend_goal_status": "unreachable",
+          "expected_dividend_yield_pct": null,
+          "expected_return_pct": 3.0,
+          "expected_volatility_pct": null,
+          "includes_cash_equivalent": true,
+          "investment_horizon": "SHORT_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "채권/현금성 ETF 후보가 등록되어 있지 않아 현금성 자산(CMA·파킹통장 등)으로 전액 배분을 권장합니다. 후보 ETF 관리에서 채권/현금성 ETF를 등록하면 함께 분석해 비중을 조정합니다. 등록된 후보로는 배당 목표(연 1.0%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": null,
+              "market": "CASH",
+              "name": "현금성 자산 (CMA·파킹통장 등)",
+              "ticker": "CASH_EQUIVALENT",
+              "weight": 100.0
+            }
+          ],
+          "required_dividend_yield_pct": 1.0,
+          "risk_tolerance": "CONSERVATIVE",
+          "suggested_candidates": [
+            {
+              "asset_class": "CASH",
+              "dividend_yield_pct": 3.4,
+              "market": "KOSPI",
+              "name": "TIGER CD금리투자KIS(합성)",
+              "ticker": "357870"
+            }
+          ],
+          "tax_type": "GENERAL"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 4000000.0,
+          "dividend_goal_status": "unreachable",
+          "expected_dividend_yield_pct": null,
+          "expected_return_pct": 3.0,
+          "expected_volatility_pct": null,
+          "includes_cash_equivalent": true,
+          "investment_horizon": "SHORT_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "IRP 계좌에서는 개별 종목을(를) 매수할 수 없어 후보에서 제외했습니다(데이터없음A) 채권/현금성 ETF 후보가 등록되어 있지 않아 현금성 자산(CMA·파킹통장 등)으로 전액 배분을 권장합니다. 후보 ETF 관리에서 채권/현금성 ETF를 등록하면 함께 분석해 비중을 조정합니다. 등록된 후보로는 배당 목표(연 1.0%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+          "recommended_items": [
+            {
+              "dividend_yield_pct": null,
+              "market": "CASH",
+              "name": "현금성 자산 (CMA·파킹통장 등)",
+              "ticker": "CASH_EQUIVALENT",
+              "weight": 100.0
+            }
+          ],
+          "required_dividend_yield_pct": 1.0,
+          "risk_tolerance": "CONSERVATIVE",
+          "suggested_candidates": [
+            {
+              "asset_class": "EQUITY",
+              "dividend_yield_pct": 3.6,
+              "market": "KOSPI",
+              "name": "TIGER 미국배당다우존스",
+              "ticker": "458730"
+            }
+          ],
+          "tax_type": "IRP"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 7000000.0,
+          "dividend_goal_status": "unreachable",
+          "expected_dividend_yield_pct": null,
+          "expected_return_pct": null,
+          "expected_volatility_pct": null,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "MID_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "SPDR S&P 500 ETF(SPY)은 이미 보유 중인 KODEX 미국S&P500TR(379800)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 이 기간에 적합한 후보가 부족합니다 — 후보 ETF 관리에서 채권/현금성 ETF를 추가해주세요 등록된 후보로는 배당 목표(연 1.0%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+          "recommended_items": [],
+          "required_dividend_yield_pct": 1.0,
+          "risk_tolerance": "BALANCED",
+          "suggested_candidates": [
+            {
+              "asset_class": "EQUITY",
+              "dividend_yield_pct": 9.9,
+              "market": "NASDAQ",
+              "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+              "ticker": "JEPQ"
+            }
+          ],
+          "tax_type": "OVERSEAS_DEDICATED"
+        },
+        {
+          "account_count": 1,
+          "base_krw": 3000000.0,
+          "dividend_goal_status": "unreachable",
+          "expected_dividend_yield_pct": null,
+          "expected_return_pct": null,
+          "expected_volatility_pct": null,
+          "includes_cash_equivalent": false,
+          "investment_horizon": "LONG_TERM",
+          "market_signal_level": "GREEN",
+          "max_weight_pct": 40.0,
+          "note": "이 기간에 적합한 후보가 부족합니다 — 후보 ETF를 추가해주세요",
+          "recommended_items": [],
+          "required_dividend_yield_pct": 1.0,
+          "risk_tolerance": "AGGRESSIVE",
+          "suggested_candidates": [],
+          "tax_type": "GENERAL"
+        }
+      ]
+    }
+  },
+  "opt_aggressive_ceiling_dividend": [
+    [
+      {
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500",
+        "weight": 4.8
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750",
+        "weight": 25.3
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690",
+        "weight": 26.8
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730",
+        "weight": 13.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130",
+        "weight": 4.8
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870",
+        "weight": 25.3
+      }
+    ],
+    8.61,
+    4.58,
+    "배당 목표(연 2.5%)를 다른 조건과 함께 만족하는 포트폴리오를 찾지 못해 자산 목표 기준으로만 계산했습니다"
+  ],
+  "opt_aggressive_dividend_fallback": [
+    [
+      {
+        "market": "NYSE",
+        "name": "SPDR S&P 500 ETF",
+        "ticker": "SPY",
+        "weight": 4.7
+      },
+      {
+        "market": "NASDAQ",
+        "name": "Invesco QQQ Trust",
+        "ticker": "QQQ",
+        "weight": 20.8
+      },
+      {
+        "market": "NYSE",
+        "name": "Schwab US Dividend Equity ETF",
+        "ticker": "SCHD",
+        "weight": 40.0
+      },
+      {
+        "market": "NASDAQ",
+        "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+        "ticker": "JEPQ",
+        "weight": 34.5
+      }
+    ],
+    11.75,
+    6.9,
+    "선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다"
+  ],
+  "opt_balanced_equity_floor": [
+    [
+      {
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500",
+        "weight": 24.9
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750",
+        "weight": 23.3
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690",
+        "weight": 4.8
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730",
+        "weight": 27.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130",
+        "weight": 20.0
+      }
+    ],
+    8.24,
+    5.56,
+    null
+  ],
+  "opt_bond_cash_ceilings_red": [
+    [
+      {
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500",
+        "weight": 29.1
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750",
+        "weight": 14.2
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730",
+        "weight": 26.7
+      },
+      {
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130",
+        "weight": 20.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870",
+        "weight": 10.0
+      }
+    ],
+    7.95,
+    5.67,
+    "시장 위험 신호(RED)를 반영해 추천 비중을 보수적으로 조정했습니다"
+  ],
+  "opt_conservative_basic": [
+    [
+      {
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500",
+        "weight": 3.4
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750",
+        "weight": 6.6
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690",
+        "weight": 5.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730",
+        "weight": 5.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130",
+        "weight": 40.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870",
+        "weight": 40.0
+      }
+    ],
+    7.51,
+    1.47,
+    null
+  ],
+  "opt_insufficient_returns": [
+    [],
+    null,
+    null,
+    "추천에 충분한 시세 데이터가 있는 종목이 2개 미만입니다"
+  ],
+  "opt_no_spread_balanced": [
+    [
+      {
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500",
+        "weight": 3.4
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750",
+        "weight": 6.6
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690",
+        "weight": 5.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730",
+        "weight": 5.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130",
+        "weight": 40.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870",
+        "weight": 40.0
+      }
+    ],
+    8.0,
+    1.47,
+    "선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다"
+  ],
+  "opt_unreachable_dividend": [
+    [
+      {
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500",
+        "weight": 3.4
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750",
+        "weight": 6.6
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690",
+        "weight": 5.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730",
+        "weight": 5.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130",
+        "weight": 40.0
+      },
+      {
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870",
+        "weight": 40.0
+      }
+    ],
+    7.51,
+    1.47,
+    "배당 목표(연 12.0%)를 충족하는 조합을 찾지 못해 자산 목표 기준으로만 계산했습니다"
+  ],
+  "opt_unreachable_return": [
+    [],
+    null,
+    null,
+    "큐레이션 종목만으로는 목표 수익률(연 40.0%)을 달성하기 어렵습니다"
+  ],
+  "overall_aggressive_dividend_only_red": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NYSE",
+        "name": "SPDR S&P 500 ETF",
+        "ticker": "SPY"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NASDAQ",
+        "name": "Invesco QQQ Trust",
+        "ticker": "QQQ"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "NYSE",
+        "name": "Schwab US Dividend Equity ETF",
+        "ticker": "SCHD"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "NASDAQ",
+        "name": "Vanguard Total Bond Market ETF",
+        "ticker": "BND"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": "unreachable",
+      "expected_dividend_yield_pct": 2.34,
+      "expected_return_pct": 9.88,
+      "expected_volatility_pct": 4.91,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": "RED",
+      "max_weight_pct": 40.0,
+      "note": "시장 위험 신호(RED)를 반영해 추천 비중을 보수적으로 조정했습니다 배당 목표(연 3.0%)를 충족하는 조합을 찾지 못해 자산 목표 기준으로만 계산했습니다 등록된 후보로는 배당 목표(연 3.0%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+      "recommended_items": [
+        {
+          "dividend_yield_pct": 1.3,
+          "market": "NYSE",
+          "name": "SPDR S&P 500 ETF",
+          "ticker": "SPY",
+          "weight": 3.9
+        },
+        {
+          "dividend_yield_pct": 0.6,
+          "market": "NASDAQ",
+          "name": "Invesco QQQ Trust",
+          "ticker": "QQQ",
+          "weight": 33.4
+        },
+        {
+          "dividend_yield_pct": 3.5,
+          "market": "NYSE",
+          "name": "Schwab US Dividend Equity ETF",
+          "ticker": "SCHD",
+          "weight": 26.5
+        },
+        {
+          "dividend_yield_pct": 3.2,
+          "market": "NASDAQ",
+          "name": "Vanguard Total Bond Market ETF",
+          "ticker": "BND",
+          "weight": 36.2
+        }
+      ],
+      "required_dividend_yield_pct": 3.0,
+      "required_return_pct": null,
+      "risk_tolerance": "AGGRESSIVE",
+      "suggested_candidates": [
+        {
+          "asset_class": "EQUITY",
+          "dividend_yield_pct": 9.9,
+          "market": "NASDAQ",
+          "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+          "ticker": "JEPQ"
+        }
+      ]
+    }
+  },
+  "overall_already_achieved": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      },
+      {
+        "asset_class": "CASH",
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": null,
+      "expected_dividend_yield_pct": null,
+      "expected_return_pct": null,
+      "expected_volatility_pct": null,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": null,
+      "max_weight_pct": 40.0,
+      "note": "이미 목표 금액을 달성했습니다",
+      "recommended_items": [],
+      "required_dividend_yield_pct": 1.0,
+      "required_return_pct": null,
+      "risk_tolerance": "CONSERVATIVE",
+      "suggested_candidates": []
+    }
+  },
+  "overall_balanced_ceilings_yellow_general": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "삼성전자",
+        "ticker": "005930"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      },
+      {
+        "asset_class": "CASH",
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 5,
+      "dividend_goal_status": "improvable",
+      "expected_dividend_yield_pct": 2.37,
+      "expected_return_pct": 4.9,
+      "expected_volatility_pct": 8.26,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": "YELLOW",
+      "max_weight_pct": 30.0,
+      "note": "시장 위험 신호(YELLOW)를 반영해 추천 비중을 보수적으로 조정했습니다 선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다 이미 배당 목표를 달성했지만, 아래 후보를 추가하면 배당수익률을 더 높일 수 있습니다",
+      "recommended_items": [
+        {
+          "dividend_yield_pct": 1.8,
+          "market": "KOSPI",
+          "name": "KODEX 200",
+          "ticker": "069500",
+          "weight": 35.0
+        },
+        {
+          "dividend_yield_pct": 2.1,
+          "market": "KOSPI",
+          "name": "삼성전자",
+          "ticker": "005930",
+          "weight": 35.0
+        },
+        {
+          "dividend_yield_pct": 3.3,
+          "market": "KOSPI",
+          "name": "KODEX 단기채권",
+          "ticker": "153130",
+          "weight": 20.0
+        },
+        {
+          "dividend_yield_pct": 3.4,
+          "market": "KOSPI",
+          "name": "TIGER CD금리투자KIS(합성)",
+          "ticker": "357870",
+          "weight": 10.0
+        }
+      ],
+      "required_dividend_yield_pct": 2.0,
+      "required_return_pct": 4.64,
+      "risk_tolerance": "BALANCED",
+      "suggested_candidates": [
+        {
+          "asset_class": "BOND",
+          "dividend_yield_pct": 3.2,
+          "market": "NASDAQ",
+          "name": "Vanguard Total Bond Market ETF",
+          "ticker": "BND"
+        }
+      ]
+    }
+  },
+  "overall_conservative_asset_goal": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      },
+      {
+        "asset_class": "CASH",
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": null,
+      "expected_dividend_yield_pct": 3.02,
+      "expected_return_pct": 7.51,
+      "expected_volatility_pct": 1.47,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": "GREEN",
+      "max_weight_pct": 40.0,
+      "note": null,
+      "recommended_items": [
+        {
+          "dividend_yield_pct": 1.8,
+          "market": "KOSPI",
+          "name": "KODEX 200",
+          "ticker": "069500",
+          "weight": 3.4
+        },
+        {
+          "dividend_yield_pct": 1.1,
+          "market": "KOSPI",
+          "name": "TIGER 미국S&P500",
+          "ticker": "360750",
+          "weight": 6.6
+        },
+        {
+          "dividend_yield_pct": 0.5,
+          "market": "KOSPI",
+          "name": "TIGER 미국나스닥100",
+          "ticker": "133690",
+          "weight": 5.0
+        },
+        {
+          "dividend_yield_pct": 3.6,
+          "market": "KOSPI",
+          "name": "TIGER 미국배당다우존스",
+          "ticker": "458730",
+          "weight": 5.0
+        },
+        {
+          "dividend_yield_pct": 3.3,
+          "market": "KOSPI",
+          "name": "KODEX 단기채권",
+          "ticker": "153130",
+          "weight": 40.0
+        },
+        {
+          "dividend_yield_pct": 3.4,
+          "market": "KOSPI",
+          "name": "TIGER CD금리투자KIS(합성)",
+          "ticker": "357870",
+          "weight": 40.0
+        }
+      ],
+      "required_dividend_yield_pct": null,
+      "required_return_pct": 4.64,
+      "risk_tolerance": "CONSERVATIVE",
+      "suggested_candidates": []
+    }
+  },
+  "overall_insufficient_cagr_with_suggestions": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "데이터없음A",
+        "ticker": "999990"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "데이터없음B",
+        "ticker": "999991"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": "unreachable",
+      "expected_dividend_yield_pct": null,
+      "expected_return_pct": null,
+      "expected_volatility_pct": null,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": null,
+      "max_weight_pct": 40.0,
+      "note": "추천에 필요한 수익률 데이터를 가져오지 못했습니다 등록된 후보로는 배당 목표(연 5.0%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+      "recommended_items": [],
+      "required_dividend_yield_pct": 5.0,
+      "required_return_pct": 4.64,
+      "risk_tolerance": "CONSERVATIVE",
+      "suggested_candidates": [
+        {
+          "asset_class": "EQUITY",
+          "dividend_yield_pct": 9.9,
+          "market": "NASDAQ",
+          "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+          "ticker": "JEPQ"
+        },
+        {
+          "asset_class": "EQUITY",
+          "dividend_yield_pct": 8.1,
+          "market": "NYSE",
+          "name": "JPMorgan Equity Premium Income ETF",
+          "ticker": "JEPI"
+        }
+      ]
+    }
+  },
+  "overall_isa_curated_fallback": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "삼성전자",
+        "ticker": "005930"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": null,
+      "expected_dividend_yield_pct": 2.32,
+      "expected_return_pct": 9.46,
+      "expected_volatility_pct": 3.98,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": "GREEN",
+      "max_weight_pct": 40.0,
+      "note": "등록된 후보 중 해외지수 추종 ETF가 없어 큐레이션 ETF를 후보 목록에 자동 등록했습니다 — 후보 ETF 관리에서 확인·삭제할 수 있습니다",
+      "recommended_items": [
+        {
+          "dividend_yield_pct": 1.1,
+          "market": "KOSPI",
+          "name": "TIGER 미국S&P500",
+          "ticker": "360750",
+          "weight": 24.0
+        },
+        {
+          "dividend_yield_pct": 0.5,
+          "market": "KOSPI",
+          "name": "TIGER 미국나스닥100",
+          "ticker": "133690",
+          "weight": 18.0
+        },
+        {
+          "dividend_yield_pct": 3.6,
+          "market": "KOSPI",
+          "name": "TIGER 미국배당다우존스",
+          "ticker": "458730",
+          "weight": 18.0
+        },
+        {
+          "dividend_yield_pct": 3.3,
+          "market": "KOSPI",
+          "name": "KODEX 단기채권",
+          "ticker": "153130",
+          "weight": 40.0
+        }
+      ],
+      "required_dividend_yield_pct": null,
+      "required_return_pct": 4.64,
+      "risk_tolerance": "CONSERVATIVE",
+      "suggested_candidates": []
+    }
+  },
+  "overall_no_candidates": {
+    "persisted_candidates": [],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": null,
+      "expected_dividend_yield_pct": null,
+      "expected_return_pct": null,
+      "expected_volatility_pct": null,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": null,
+      "max_weight_pct": 40.0,
+      "note": "등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요",
+      "recommended_items": [],
+      "required_dividend_yield_pct": null,
+      "required_return_pct": 4.64,
+      "risk_tolerance": "CONSERVATIVE",
+      "suggested_candidates": []
+    }
+  },
+  "overall_not_configured": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      },
+      {
+        "asset_class": "CASH",
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": null,
+      "expected_dividend_yield_pct": null,
+      "expected_return_pct": null,
+      "expected_volatility_pct": null,
+      "includes_cash_equivalent": false,
+      "is_configured": false,
+      "market_signal_level": null,
+      "max_weight_pct": 40.0,
+      "note": "목표금액·목표연도 또는 배당목표를 설정하면 추천을 받을 수 있습니다",
+      "recommended_items": [],
+      "required_dividend_yield_pct": null,
+      "required_return_pct": null,
+      "risk_tolerance": "CONSERVATIVE",
+      "suggested_candidates": []
+    }
+  },
+  "overall_pension_single_tax_type": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "삼성전자",
+        "ticker": "005930"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 레버리지",
+        "ticker": "122630"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "KODEX 미국S&P500TR",
+        "ticker": "379800"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": "unreachable",
+      "expected_dividend_yield_pct": 1.28,
+      "expected_return_pct": 11.01,
+      "expected_volatility_pct": 5.24,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": "GREEN",
+      "max_weight_pct": 40.0,
+      "note": "연금저축 계좌에서는 개별 종목·레버리지·인버스 ETF을(를) 매수할 수 없어 후보에서 제외했습니다(삼성전자, KODEX 레버리지) KODEX 미국S&P500TR(379800)은 이미 보유 중인 TIGER 미국S&P500(360750)과 동일 지수를 추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요 배당 목표(연 1.5%)를 다른 조건과 함께 만족하는 포트폴리오를 찾지 못해 자산 목표 기준으로만 계산했습니다 등록된 후보로는 배당 목표(연 1.5%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+      "recommended_items": [
+        {
+          "dividend_yield_pct": 1.1,
+          "market": "KOSPI",
+          "name": "TIGER 미국S&P500",
+          "ticker": "360750",
+          "weight": 29.1
+        },
+        {
+          "dividend_yield_pct": 0.5,
+          "market": "KOSPI",
+          "name": "TIGER 미국나스닥100",
+          "ticker": "133690",
+          "weight": 30.4
+        },
+        {
+          "dividend_yield_pct": null,
+          "market": "KOSPI",
+          "name": "KODEX 미국S&P500TR",
+          "ticker": "379800",
+          "weight": 15.9
+        },
+        {
+          "dividend_yield_pct": 3.3,
+          "market": "KOSPI",
+          "name": "KODEX 단기채권",
+          "ticker": "153130",
+          "weight": 24.6
+        }
+      ],
+      "required_dividend_yield_pct": 1.5,
+      "required_return_pct": 4.64,
+      "risk_tolerance": "BALANCED",
+      "suggested_candidates": [
+        {
+          "asset_class": "EQUITY",
+          "dividend_yield_pct": 9.9,
+          "market": "NASDAQ",
+          "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+          "ticker": "JEPQ"
+        }
+      ]
+    }
+  },
+  "overall_required_return_unsolvable": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      },
+      {
+        "asset_class": "CASH",
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": null,
+      "expected_dividend_yield_pct": null,
+      "expected_return_pct": null,
+      "expected_volatility_pct": null,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": null,
+      "max_weight_pct": 40.0,
+      "note": "현재 조건(적립액·기간)으로는 달성이 매우 어려운 목표입니다",
+      "recommended_items": [],
+      "required_dividend_yield_pct": null,
+      "required_return_pct": null,
+      "risk_tolerance": "CONSERVATIVE",
+      "suggested_candidates": []
+    }
+  },
+  "overall_target_year_passed": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      },
+      {
+        "asset_class": "CASH",
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": null,
+      "expected_dividend_yield_pct": null,
+      "expected_return_pct": null,
+      "expected_volatility_pct": null,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": null,
+      "max_weight_pct": 40.0,
+      "note": "목표 연도가 이미 지났습니다 — 목표연도를 다시 설정해주세요",
+      "recommended_items": [],
+      "required_dividend_yield_pct": null,
+      "required_return_pct": null,
+      "risk_tolerance": "CONSERVATIVE",
+      "suggested_candidates": []
+    }
+  },
+  "overall_unreachable_dividend": {
+    "persisted_candidates": [
+      {
+        "asset_class": "EQUITY",
+        "index_region": "DOMESTIC",
+        "market": "KOSPI",
+        "name": "KODEX 200",
+        "ticker": "069500"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국S&P500",
+        "ticker": "360750"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국나스닥100",
+        "ticker": "133690"
+      },
+      {
+        "asset_class": "EQUITY",
+        "index_region": "OVERSEAS",
+        "market": "KOSPI",
+        "name": "TIGER 미국배당다우존스",
+        "ticker": "458730"
+      },
+      {
+        "asset_class": "BOND",
+        "market": "KOSPI",
+        "name": "KODEX 단기채권",
+        "ticker": "153130"
+      },
+      {
+        "asset_class": "CASH",
+        "market": "KOSPI",
+        "name": "TIGER CD금리투자KIS(합성)",
+        "ticker": "357870"
+      }
+    ],
+    "result": {
+      "age_bracket": null,
+      "cagr_lookback_years": 10,
+      "dividend_goal_status": "unreachable",
+      "expected_dividend_yield_pct": 3.02,
+      "expected_return_pct": 7.51,
+      "expected_volatility_pct": 1.47,
+      "includes_cash_equivalent": false,
+      "is_configured": true,
+      "market_signal_level": "GREEN",
+      "max_weight_pct": 40.0,
+      "note": "배당 목표(연 10.0%)를 충족하는 조합을 찾지 못해 자산 목표 기준으로만 계산했습니다 등록된 후보로는 배당 목표(연 10.0%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+      "recommended_items": [
+        {
+          "dividend_yield_pct": 1.8,
+          "market": "KOSPI",
+          "name": "KODEX 200",
+          "ticker": "069500",
+          "weight": 3.4
+        },
+        {
+          "dividend_yield_pct": 1.1,
+          "market": "KOSPI",
+          "name": "TIGER 미국S&P500",
+          "ticker": "360750",
+          "weight": 6.6
+        },
+        {
+          "dividend_yield_pct": 0.5,
+          "market": "KOSPI",
+          "name": "TIGER 미국나스닥100",
+          "ticker": "133690",
+          "weight": 5.0
+        },
+        {
+          "dividend_yield_pct": 3.6,
+          "market": "KOSPI",
+          "name": "TIGER 미국배당다우존스",
+          "ticker": "458730",
+          "weight": 5.0
+        },
+        {
+          "dividend_yield_pct": 3.3,
+          "market": "KOSPI",
+          "name": "KODEX 단기채권",
+          "ticker": "153130",
+          "weight": 40.0
+        },
+        {
+          "dividend_yield_pct": 3.4,
+          "market": "KOSPI",
+          "name": "TIGER CD금리투자KIS(합성)",
+          "ticker": "357870",
+          "weight": 40.0
+        }
+      ],
+      "required_dividend_yield_pct": 10.0,
+      "required_return_pct": 4.64,
+      "risk_tolerance": "CONSERVATIVE",
+      "suggested_candidates": [
+        {
+          "asset_class": "EQUITY",
+          "dividend_yield_pct": 9.9,
+          "market": "NASDAQ",
+          "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+          "ticker": "JEPQ"
+        },
+        {
+          "asset_class": "EQUITY",
+          "dividend_yield_pct": 8.1,
+          "market": "NYSE",
+          "name": "JPMorgan Equity Premium Income ETF",
+          "ticker": "JEPI"
+        },
+        {
+          "asset_class": "EQUITY",
+          "dividend_yield_pct": 3.5,
+          "market": "NYSE",
+          "name": "Schwab US Dividend Equity ETF",
+          "ticker": "SCHD"
+        },
+        {
+          "asset_class": "BOND",
+          "dividend_yield_pct": 3.2,
+          "market": "NASDAQ",
+          "name": "Vanguard Total Bond Market ETF",
+          "ticker": "BND"
+        }
+      ]
+    }
+  }
+}

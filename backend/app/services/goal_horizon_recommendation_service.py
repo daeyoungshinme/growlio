@@ -18,10 +18,10 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any, NamedTuple
 
 import structlog
 from sqlalchemy import select
@@ -35,7 +35,6 @@ from app.schemas.rebalancing import (
     GoalRecommendationItem,
     HorizonGoalRecommendation,
     HorizonRecommendationResponse,
-    SuggestedGoalCandidate,
 )
 from app.services import _goal_recommendation_common as _grc
 from app.services.goal_candidate_service import (
@@ -49,7 +48,7 @@ from app.services.goal_candidate_service import (
     pension_exclusion_note,
     pension_ineligibility_reason,
 )
-from app.services.goal_portfolio_optimizer import _MAX_WEIGHT, _MIN_CANDIDATES, _optimize_goal_portfolio
+from app.services.goal_portfolio_optimizer import _MIN_CANDIDATES
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import (
     build_portfolio_overview,
@@ -59,7 +58,6 @@ from app.services.portfolio_service import (
 from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
 from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
-from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
     CacheStoreType,
@@ -96,21 +94,31 @@ _DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT = 30.0
 최소 80%)와 정면 충돌하므로 IRP가 우선하고 단기 주식 하한 규칙은 적용하지 않는다."""
 
 
+class _HorizonCombo(NamedTuple):
+    """1단계(후보 필터링)에서 확정된 (기간, 세제유형) 조합 하나 — 2단계(최적화)와 배당 제안의 입력."""
+
+    horizon: str
+    tax_type: str
+    account_ids: list[uuid.UUID]
+    base_krw: float
+    eligible_candidates: list[dict[str, str]]
+    preference_fallback_note: str | None
+    market_filter: Callable[[dict[str, str]], bool]
+
+
 async def _build_horizon_candidate_universe(
     cache: CacheStoreType,
     eligible_candidates: list[dict[str, str]],
     cagr_lookback_years: int,
     is_irp: bool,
     horizon: str,
-) -> tuple[list[tuple[str, tuple[str, str, str], float, bool, float]], dict[tuple[str, str], float], bool]:
+) -> tuple[list[_grc._GoalCandidate], dict[tuple[str, str], float], bool]:
     """(기간, 세제유형) 조합의 후보 유니버스를 구성한다.
 
     CAGR 데이터가 확보된 후보만 남기고, IRP는 실보유 안전자산 후보가 하나도 없을 때만,
     SHORT_TERM은 항상 현금성 자산 합성 후보를 포함시킨다(`_build_horizon_result` 독스트링 참고).
     """
-    candidates = [(c["ticker"], c["name"], c["market"], c.get("asset_class", "EQUITY")) for c in eligible_candidates]
-    tickers_only = [(t, m) for t, _, m, _ in candidates]
-
+    tickers_only = [(c["ticker"], c["market"]) for c in eligible_candidates]
     cagr_map, dividend_map = (
         await asyncio.gather(
             get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
@@ -119,67 +127,36 @@ async def _build_horizon_candidate_universe(
         if tickers_only
         else ({}, {})
     )
-    filtered = [
-        (
-            to_yf_symbol(t, m),
-            (t, name, m),
-            cagr_map[(t, m)]["cagr_pct"],
-            asset_class == "EQUITY",
-            dividend_map.get((t, m), 0.0),
-        )
-        for t, name, m, asset_class in candidates
-        if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
-    ]
-    has_real_safe_asset = any(not is_eq for _, _, _, is_eq, _ in filtered)
+    filtered = _grc._candidates_with_cagr(eligible_candidates, cagr_map, dividend_map, equity_vs_other=True)
+    has_real_safe_asset = _grc._has_real_safe_asset(filtered)
     include_cash_equivalent = (not has_real_safe_asset) if is_irp else (horizon == "SHORT_TERM")
     if include_cash_equivalent:
-        filtered.append(
-            (
-                _grc._CASH_EQUIVALENT_TICKER,
-                (_grc._CASH_EQUIVALENT_TICKER, _grc._CASH_EQUIVALENT_NAME, _grc._CASH_EQUIVALENT_MARKET),
-                _grc._CASH_EQUIVALENT_CAGR_PCT,
-                False,
-                0.0,
-            )
-        )
+        filtered.append(_grc._cash_equivalent_candidate())
     return filtered, dividend_map, include_cash_equivalent
 
 
 def _single_candidate_horizon_result(
-    single: tuple[str, tuple[str, str, str], float, bool, float],
-    horizon: str,
-    tax_type: str,
-    base_krw: float,
-    account_count: int,
-    risk_tolerance: str,
-    max_weight: float,
-    market_signal_level: str | None,
+    single: _grc._GoalCandidate,
+    common: dict[str, Any],
     combine_note: Callable[[str | None], str | None],
-    required_dividend_yield_pct: float | None = None,
 ) -> HorizonGoalRecommendation:
     """유효 후보가 1개뿐일 때 옵티마이저 없이 전액 배분하는 조기 반환 결과를 만든다.
 
     현금성 자산 합성 후보만 남았을 수도(등록 후보 없음/시세 미확보) 있고, 실보유 안전자산 후보
     하나만 유효했을 수도 있다 — `is_synthetic`으로 구분해 안내 문구를 다르게 붙인다.
     """
-    _, (tk, name, mk), cagr, _, dividend = single
+    tk, name, mk = single.ticker
+    dividend = single.dividend_yield_pct
     is_synthetic = tk == _grc._CASH_EQUIVALENT_TICKER
     return HorizonGoalRecommendation(
-        investment_horizon=horizon,
-        tax_type=tax_type,
-        base_krw=base_krw,
-        account_count=account_count,
+        **common,
         recommended_items=[
             GoalRecommendationItem(
                 ticker=tk, name=name, market=mk, weight=100.0, dividend_yield_pct=dividend if dividend > 0 else None
             )
         ],
-        required_dividend_yield_pct=required_dividend_yield_pct,
-        expected_return_pct=cagr,
+        expected_return_pct=single.cagr_pct,
         expected_dividend_yield_pct=dividend if dividend > 0 else None,
-        risk_tolerance=risk_tolerance,
-        max_weight_pct=round(max_weight * 100, 2),
-        market_signal_level=market_signal_level,
         includes_cash_equivalent=is_synthetic,
         note=combine_note(
             (
@@ -190,6 +167,36 @@ def _single_candidate_horizon_result(
             else None
         ),
     )
+
+
+def _horizon_equity_bounds(
+    is_irp: bool,
+    include_cash_equivalent: bool,
+    candidates: list[_grc._GoalCandidate],
+    short_term_equity_floor: float,
+) -> tuple[float | None, float | None]:
+    """(주식 비중 하한, 상한) — IRP는 안전자산 하한(=주식 상한), 현금성 합성 후보가 들어간 단기는 주식 하한."""
+    if is_irp:
+        return None, 1.0 - _DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT / 100
+    if include_cash_equivalent and any(c.asset_class == "EQUITY" for c in candidates):
+        return short_term_equity_floor, None
+    return None, None
+
+
+def _horizon_policy_note(equity_floor: float | None, equity_ceiling: float | None) -> str | None:
+    """옵티마이저 안내가 없을 때 대신 붙이는 단기 주식하한 / IRP 주식상한 설명."""
+    if equity_floor is not None:
+        return (
+            f"단기(최대 3년) 목표는 안정적인 주식 위주로 최소 {equity_floor * 100:.0f}%까지 배분하고, "
+            f"안전자산은 {100 - equity_floor * 100:.0f}% 이내로 제한합니다."
+        )
+    if equity_ceiling is not None:
+        return (
+            f"IRP(개인형퇴직연금) 계좌는 퇴직연금 규정에 따라 위험자산(주식)을 최대 "
+            f"{equity_ceiling * 100:.0f}%로 제한하고, 안전자산(채권·현금성)을 최소 "
+            f"{100 - equity_ceiling * 100:.0f}% 이상 배분합니다."
+        )
+    return None
 
 
 async def _build_horizon_result(
@@ -234,142 +241,64 @@ async def _build_horizon_result(
     """
     is_irp = tax_type == AccountTaxType.IRP.value
     safety_net_horizon = horizon == "SHORT_TERM" or is_irp
+    common: dict[str, Any] = {
+        "investment_horizon": horizon,
+        "tax_type": tax_type,
+        "base_krw": base_krw,
+        "account_count": len(account_ids),
+        "required_dividend_yield_pct": required_dividend_yield_pct,
+        "risk_tolerance": risk_tolerance,
+        "max_weight_pct": round(max_weight * 100, 2),
+        "market_signal_level": market_signal_level,
+    }
 
     def _combine_note(msg: str | None) -> str | None:
-        if preference_fallback_note and msg:
-            return f"{preference_fallback_note} {msg}"
-        return preference_fallback_note or msg
+        return _grc._join_notes(preference_fallback_note, msg)
 
     if not safety_net_horizon and len(eligible_candidates) < _MIN_CANDIDATES:
-        needs_conservative = horizon == "MID_TERM"
         note = (
             "이 기간에 적합한 후보가 부족합니다 — 후보 ETF 관리에서 채권/현금성 ETF를 추가해주세요"
-            if needs_conservative
+            if horizon == "MID_TERM"
             else "이 기간에 적합한 후보가 부족합니다 — 후보 ETF를 추가해주세요"
         )
-        return HorizonGoalRecommendation(
-            investment_horizon=horizon,
-            tax_type=tax_type,
-            base_krw=base_krw,
-            account_count=len(account_ids),
-            required_dividend_yield_pct=required_dividend_yield_pct,
-            risk_tolerance=risk_tolerance,
-            max_weight_pct=round(max_weight * 100, 2),
-            market_signal_level=market_signal_level,
-            note=_combine_note(note),
-        )
+        return HorizonGoalRecommendation(**common, note=_combine_note(note))
 
     filtered, dividend_map, include_cash_equivalent = await _build_horizon_candidate_universe(
         cache, eligible_candidates, cagr_lookback_years, is_irp, horizon
     )
-
     if not filtered:
         return HorizonGoalRecommendation(
-            investment_horizon=horizon,
-            tax_type=tax_type,
-            base_krw=base_krw,
-            account_count=len(account_ids),
-            required_dividend_yield_pct=required_dividend_yield_pct,
-            risk_tolerance=risk_tolerance,
-            max_weight_pct=round(max_weight * 100, 2),
-            market_signal_level=market_signal_level,
-            note=_combine_note("추천에 필요한 수익률 데이터를 가져오지 못했습니다"),
+            **common, note=_combine_note("추천에 필요한 수익률 데이터를 가져오지 못했습니다")
         )
-
     if len(filtered) == 1:
-        return _single_candidate_horizon_result(
-            filtered[0],
-            horizon,
-            tax_type,
-            base_krw,
-            len(account_ids),
-            risk_tolerance,
-            max_weight,
-            market_signal_level,
-            _combine_note,
-            required_dividend_yield_pct=required_dividend_yield_pct,
-        )
+        return _single_candidate_horizon_result(filtered[0], common, _combine_note)
 
-    f_symbols = [f[0] for f in filtered]
-    f_tickers = [f[1] for f in filtered]
-    f_cagrs = [f[2] for f in filtered]
-    f_is_equity = [f[3] for f in filtered]
-    f_asset_classes = ["EQUITY" if is_eq else "OTHER" for is_eq in f_is_equity]
-    f_dividends = [f[4] for f in filtered]
-
-    loop = asyncio.get_running_loop()
-    real_symbols = [s for s in f_symbols if s != _grc._CASH_EQUIVALENT_TICKER]
-    if real_symbols:
-        async with _yfinance_sem:
-            returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, real_symbols)
-    else:
-        returns_map = {}
-    if include_cash_equivalent:
-        returns_map[_grc._CASH_EQUIVALENT_TICKER] = _grc._cash_equivalent_daily_returns()
-
-    equity_floor: float | None = None
-    equity_ceiling: float | None = None
-    if is_irp:
-        equity_ceiling = 1.0 - _DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT / 100
-    elif include_cash_equivalent and any(f_is_equity):
-        equity_floor = short_term_equity_floor
-
-    # 자산군 단위 비중 제약 일반화(`_optimize_goal_portfolio`의 `class_bounds`) — 이 경로는
-    # EQUITY vs 그 외(OTHER)의 기존 이분법 그대로 매핑한다(단기 주식 하한 / IRP 주식 상한).
-    class_bounds = _grc._equity_class_bounds(equity_floor, equity_ceiling)
-
-    items, expected_return_pct, expected_volatility_pct, opt_note = await loop.run_in_executor(
-        None,
-        functools.partial(
-            _optimize_goal_portfolio,
-            f_symbols,
-            f_tickers,
-            f_cagrs,
-            returns_map,
-            _grc._NON_BINDING_RETURN_FLOOR,
-            max_weight=max_weight,
-            risk_tolerance=risk_tolerance,
-            asset_classes=f_asset_classes,
-            class_bounds=class_bounds,
-            market_signal_level=market_signal_level,
-            dividend_yields=f_dividends,
-            required_dividend_yield_pct=required_dividend_yield_pct,
-        ),
+    returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent)
+    equity_floor, equity_ceiling = _horizon_equity_bounds(
+        is_irp, include_cash_equivalent, filtered, short_term_equity_floor
     )
-
-    includes_cash_equivalent = any(i["ticker"] == _grc._CASH_EQUIVALENT_TICKER for i in items)
-    expected_dividend_yield_pct = None
-    if items:
-        expected_dividend_yield_pct = round(
-            sum(i["weight"] * dividend_map.get((i["ticker"], i["market"]), 0.0) for i in items) / 100, 2
-        )
-
-    if opt_note is None and equity_floor is not None:
-        opt_note = (
-            f"단기(최대 3년) 목표는 안정적인 주식 위주로 최소 {equity_floor * 100:.0f}%까지 배분하고, "
-            f"안전자산은 {100 - equity_floor * 100:.0f}% 이내로 제한합니다."
-        )
-    elif opt_note is None and equity_ceiling is not None:
-        opt_note = (
-            f"IRP(개인형퇴직연금) 계좌는 퇴직연금 규정에 따라 위험자산(주식)을 최대 "
-            f"{equity_ceiling * 100:.0f}%로 제한하고, 안전자산(채권·현금성)을 최소 "
-            f"{100 - equity_ceiling * 100:.0f}% 이상 배분합니다."
-        )
+    items, expected_return_pct, expected_volatility_pct, opt_note = await _grc._run_goal_optimizer(
+        filtered,
+        returns_map,
+        _grc._NON_BINDING_RETURN_FLOOR,
+        max_weight=max_weight,
+        risk_tolerance=risk_tolerance,
+        # 자산군 단위 비중 제약 일반화(`_optimize_goal_portfolio`의 `class_bounds`) — 이 경로는
+        # EQUITY vs 그 외(OTHER)의 기존 이분법 그대로 매핑한다(단기 주식 하한 / IRP 주식 상한).
+        class_bounds=_grc._equity_class_bounds(equity_floor, equity_ceiling),
+        market_signal_level=market_signal_level,
+        required_dividend_yield_pct=required_dividend_yield_pct,
+    )
+    if opt_note is None:
+        opt_note = _horizon_policy_note(equity_floor, equity_ceiling)
 
     return HorizonGoalRecommendation(
-        investment_horizon=horizon,
-        tax_type=tax_type,
-        base_krw=base_krw,
-        account_count=len(account_ids),
+        **common,
         recommended_items=_grc._attach_dividend_yield(items, dividend_map),
-        required_dividend_yield_pct=required_dividend_yield_pct,
         expected_return_pct=expected_return_pct,
-        expected_dividend_yield_pct=expected_dividend_yield_pct,
+        expected_dividend_yield_pct=_grc._weighted_dividend_yield(items, dividend_map),
         expected_volatility_pct=expected_volatility_pct,
-        risk_tolerance=risk_tolerance,
-        max_weight_pct=round(max_weight * 100, 2),
-        includes_cash_equivalent=includes_cash_equivalent,
-        market_signal_level=market_signal_level,
+        includes_cash_equivalent=_grc._includes_cash_equivalent(items),
         note=_combine_note(opt_note),
     )
 
@@ -417,47 +346,27 @@ async def get_horizon_recommendations(
     return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
 
 
-async def _compute_horizon_recommendations(
-    cache: CacheStoreType,
-    db: AsyncSession,
-    user_id: uuid.UUID,
-    settings_row: UserSettings,
-) -> HorizonRecommendationResponse:
-    """투자기간(단기/중기/장기) × 세제유형(ISA/연금저축/IRP/일반/해외전용) 조합별로 계좌를 묶어
-    기간별 리스크 성향 + 세제유형별 투자 가능 시장에 맞는 추천을 계산한다.
+def _short_term_equity_floor_from_settings(settings_row: UserSettings) -> float:
+    raw = getattr(settings_row, "goal_short_term_equity_floor_pct", None)
+    return (float(raw) if raw is not None else _DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT) / 100
 
-    목표금액/목표연도 역산은 하지 않는다 — `_NON_BINDING_RETURN_FLOOR`로 required_return_pct 제약을
-    사실상 무효화하고, 오직 기간별 리스크 성향(단기=보수/중기=중립/장기=공격)만으로 결과를 결정한다.
-    태그된 계좌가 하나도 없는 (기간, 세제유형) 조합은 결과에서 생략한다.
-    """
-    max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
-    max_weight = float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
-    cagr_lookback_years = int(
-        getattr(settings_row, "goal_cagr_lookback_years", None) or _grc._DEFAULT_CAGR_LOOKBACK_YEARS
-    )
-    short_term_equity_floor_pct_raw = getattr(settings_row, "goal_short_term_equity_floor_pct", None)
-    short_term_equity_floor = (
-        float(short_term_equity_floor_pct_raw)
-        if short_term_equity_floor_pct_raw is not None
-        else _DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT
-    ) / 100
 
-    all_pos_map = await query_latest_position_map(user_id, db, include_name=True)
-    existing_items = existing_items_from_positions(all_pos_map)
-    candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
-
-    # 배당목표(annual_dividend_goal)가 있으면 전체 자산 기준(오버롤 경로)과 동일한 필요배당수익률(%)을
-    # 계산해 모든 (기간,세제유형) 조합에 동일하게 적용한다 — 조합별 자산총액으로 비례배분해도 결과가
-    # 같은 퍼센트로 나오므로(목표배당금 × 조합비중 ÷ 조합자산 = 목표배당금 ÷ 전체자산) 조합마다
-    # 다시 계산할 필요가 없다.
-    required_dividend_yield_pct: float | None = None
+async def _horizon_required_dividend_yield_pct(
+    cache: CacheStoreType, db: AsyncSession, user_id: uuid.UUID, settings_row: UserSettings
+) -> float | None:
+    """배당목표(annual_dividend_goal)가 있으면 전체 자산 기준(오버롤 경로)과 동일한 필요배당수익률(%)을
+    계산한다 — 모든 (기간,세제유형) 조합에 동일하게 적용한다. 조합별 자산총액으로 비례배분해도 결과가
+    같은 퍼센트로 나오므로(목표배당금 × 조합비중 ÷ 조합자산 = 목표배당금 ÷ 전체자산) 조합마다
+    다시 계산할 필요가 없다."""
     annual_dividend_goal = getattr(settings_row, "annual_dividend_goal", None)
-    if annual_dividend_goal:
-        overall_overview = await build_portfolio_overview(user_id, db, account_ids=None, cache=cache)
-        total_assets_krw = float(overall_overview.get("total_assets_krw", 0))
-        if total_assets_krw > 0:
-            required_dividend_yield_pct = round(float(annual_dividend_goal) / total_assets_krw * 100, 2)
+    if not annual_dividend_goal:
+        return None
+    overall_overview = await build_portfolio_overview(user_id, db, account_ids=None, cache=cache)
+    return _grc._required_dividend_yield_pct(annual_dividend_goal, float(overall_overview.get("total_assets_krw", 0)))
 
+
+async def _accounts_by_horizon_tax_pair(db: AsyncSession, user_id: uuid.UUID) -> dict[tuple[str, str], list[uuid.UUID]]:
+    """투자기간이 태그된 활성 계좌를 (기간, 세제유형) 조합별로 묶는다(세제유형 미지정은 GENERAL)."""
     rows = (
         await db.execute(
             select(AssetAccount.investment_horizon, AssetAccount.tax_type, AssetAccount.id).where(
@@ -471,6 +380,90 @@ async def _compute_horizon_recommendations(
     for horizon_value, tax_type_value, account_id in rows:
         key = (horizon_value, tax_type_value or AccountTaxType.GENERAL.value)
         accounts_by_pair.setdefault(key, []).append(account_id)
+    return accounts_by_pair
+
+
+def _combo_eligible_classes(horizon: str, tax_type: str) -> set[str]:
+    eligible_classes = _HORIZON_ELIGIBLE_ASSET_CLASSES[horizon]
+    if tax_type == AccountTaxType.IRP.value:
+        # IRP는 퇴직연금 규제상 안전자산 최소 30% 하한이 투자기간과 무관하게 적용되므로,
+        # LONG_TERM(원래 EQUITY만 허용)에서도 예외적으로 BOND/CASH 후보를 후보군에 포함시킨다.
+        eligible_classes = eligible_classes | {"BOND", "CASH"}
+    return eligible_classes
+
+
+def _in_combo_market(c: dict[str, str], eligible_classes: set[str], tax_type: str) -> bool:
+    """자산군이 기간에 맞고, 상장시장이 세제유형의 투자 가능 시장(국내/해외)에 맞는지."""
+    market_group = _TAX_TYPE_MARKET_GROUP[tax_type]
+    return c.get("asset_class", "EQUITY") in eligible_classes and (c["market"].upper() in DOMESTIC_MARKETS) == (
+        market_group == "DOMESTIC"
+    )
+
+
+def _combo_market_filter(horizon: str, tax_type: str) -> Callable[[dict[str, str]], bool]:
+    """배당 제안 후보 필터 — 조합의 시장·자산군·지역 선호·연금 매수가능 규칙을 그대로 적용한다."""
+    eligible_classes = _combo_eligible_classes(horizon, tax_type)
+
+    def _market_filter(c: dict[str, str]) -> bool:
+        return (
+            _in_combo_market(c, eligible_classes, tax_type)
+            and _matches_index_region_preference(c, tax_type)
+            and pension_ineligibility_reason(c, tax_type) is None
+        )
+
+    return _market_filter
+
+
+def _select_combo_candidates(
+    candidate_dicts: list[dict[str, str]],
+    horizon: str,
+    tax_type: str,
+    existing_items: list[tuple[str, str, str]],
+) -> tuple[list[dict[str, str]], str | None, list[dict[str, str]]]:
+    """조합 하나의 후보를 고른다 — (적합 후보, 안내 문구, 큐레이션에서 자동 보강한 후보).
+
+    `capacity_remaining`은 **지금까지 누적된** 전체 등록 후보 수 기준이다 — 앞선 조합이 보강한 후보가
+    호출측에서 `candidate_dicts`에 이미 합쳐져 있어야 한다(`_compute_horizon_recommendations` 참고).
+    """
+    eligible_classes = _combo_eligible_classes(horizon, tax_type)
+    market_eligible = [c for c in candidate_dicts if _in_combo_market(c, eligible_classes, tax_type)]
+    # 연금저축·IRP: 레버리지·인버스·ETN·개별종목은 매수 불가 — 추천에서 제외(계획 37 E1)
+    pension_excluded = [c for c in market_eligible if pension_ineligibility_reason(c, tax_type)]
+    eligible_candidates = [c for c in market_eligible if c not in pension_excluded]
+    capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
+    eligible_candidates, preference_fallback_note, added = _apply_index_region_preference(
+        eligible_candidates, tax_type, capacity_remaining
+    )
+    note = _grc._join_notes(
+        pension_exclusion_note(pension_excluded, tax_type),
+        preference_fallback_note,
+        detect_duplicate_tracking_index_note(eligible_candidates, existing_items),
+    )
+    return eligible_candidates, note, added
+
+
+async def _compute_horizon_recommendations(
+    cache: CacheStoreType,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    settings_row: UserSettings,
+) -> HorizonRecommendationResponse:
+    """투자기간(단기/중기/장기) × 세제유형(ISA/연금저축/IRP/일반/해외전용) 조합별로 계좌를 묶어
+    기간별 리스크 성향 + 세제유형별 투자 가능 시장에 맞는 추천을 계산한다.
+
+    목표금액/목표연도 역산은 하지 않는다 — `_NON_BINDING_RETURN_FLOOR`로 required_return_pct 제약을
+    사실상 무효화하고, 오직 기간별 리스크 성향(단기=보수/중기=중립/장기=공격)만으로 결과를 결정한다.
+    태그된 계좌가 하나도 없는 (기간, 세제유형) 조합은 결과에서 생략한다.
+    """
+    max_weight = _grc._max_weight_from_settings(settings_row)
+    cagr_lookback_years = _grc._cagr_lookback_years_from_settings(settings_row)
+    short_term_equity_floor = _short_term_equity_floor_from_settings(settings_row)
+
+    all_pos_map = await query_latest_position_map(user_id, db, include_name=True)
+    existing_items = existing_items_from_positions(all_pos_map)
+    candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
+    required_dividend_yield_pct = await _horizon_required_dividend_yield_pct(cache, db, user_id, settings_row)
+    accounts_by_pair = await _accounts_by_horizon_tax_pair(db, user_id)
 
     # 1단계: 후보 필터링(`candidate_dicts` 누적)은 조합 간 상태 의존(`_apply_index_region_preference`가
     # 앞선 조합에서 추가한 큐레이션 후보를 뒤따르는 조합의 capacity_remaining에 반영)이 있어 순차 계산이
@@ -482,85 +475,29 @@ async def _compute_horizon_recommendations(
         all_account_ids, db
     )
 
-    combos: list[
-        tuple[
-            str,
-            str,
-            list[uuid.UUID],
-            float,
-            list[dict[str, str]],
-            str | None,
-            Callable[[dict[str, str]], bool],
-        ]
-    ] = []
+    combos: list[_HorizonCombo] = []
     all_added: list[dict[str, str]] = []
     for horizon in InvestmentHorizon:
         for tax_type in AccountTaxType:
             account_ids = accounts_by_pair.get((horizon.value, tax_type.value))
             if not account_ids:
                 continue
-
             combo_accounts = [accounts_by_id[acc_id] for acc_id in account_ids if acc_id in accounts_by_id]
-            base_krw = compute_total_assets_krw(combo_accounts, snap_by_acc, snap_pos_map, cur_pos_map)
-
-            eligible_classes = _HORIZON_ELIGIBLE_ASSET_CLASSES[horizon.value]
-            if tax_type.value == AccountTaxType.IRP.value:
-                # IRP는 퇴직연금 규제상 안전자산 최소 30% 하한이 투자기간과 무관하게 적용되므로,
-                # LONG_TERM(원래 EQUITY만 허용)에서도 예외적으로 BOND/CASH 후보를 후보군에 포함시킨다.
-                eligible_classes = eligible_classes | {"BOND", "CASH"}
-            market_group = _TAX_TYPE_MARKET_GROUP[tax_type.value]
-            market_eligible = [
-                c
-                for c in candidate_dicts
-                if c.get("asset_class", "EQUITY") in eligible_classes
-                and (c["market"].upper() in DOMESTIC_MARKETS) == (market_group == "DOMESTIC")
-            ]
-            # 연금저축·IRP: 레버리지·인버스·ETN·개별종목은 매수 불가 — 추천에서 제외(계획 37 E1)
-            pension_excluded = [c for c in market_eligible if pension_ineligibility_reason(c, tax_type.value)]
-            eligible_candidates = [c for c in market_eligible if c not in pension_excluded]
-            capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
-            eligible_candidates, preference_fallback_note, added = _apply_index_region_preference(
-                eligible_candidates, tax_type.value, capacity_remaining
+            eligible_candidates, preference_fallback_note, added = _select_combo_candidates(
+                candidate_dicts, horizon.value, tax_type.value, existing_items
             )
             if added:
                 candidate_dicts.extend(added)
                 all_added.extend(added)
-            duplicate_index_note = detect_duplicate_tracking_index_note(eligible_candidates, existing_items)
-            preference_fallback_note = (
-                " ".join(
-                    n
-                    for n in (
-                        pension_exclusion_note(pension_excluded, tax_type.value),
-                        preference_fallback_note,
-                        duplicate_index_note,
-                    )
-                    if n
-                )
-                or None
-            )
-
-            def _market_filter(
-                c: dict[str, str],
-                market_group: str = market_group,
-                eligible_classes: set[str] = eligible_classes,
-                tax_type_value: str = tax_type.value,
-            ) -> bool:
-                return (
-                    c.get("asset_class", "EQUITY") in eligible_classes
-                    and (c["market"].upper() in DOMESTIC_MARKETS) == (market_group == "DOMESTIC")
-                    and _matches_index_region_preference(c, tax_type_value)
-                    and pension_ineligibility_reason(c, tax_type_value) is None
-                )
-
             combos.append(
-                (
-                    horizon.value,
-                    tax_type.value,
-                    account_ids,
-                    base_krw,
-                    eligible_candidates,
-                    preference_fallback_note,
-                    _market_filter,
+                _HorizonCombo(
+                    horizon=horizon.value,
+                    tax_type=tax_type.value,
+                    account_ids=account_ids,
+                    base_krw=compute_total_assets_krw(combo_accounts, snap_by_acc, snap_pos_map, cur_pos_map),
+                    eligible_candidates=eligible_candidates,
+                    preference_fallback_note=preference_fallback_note,
+                    market_filter=_combo_market_filter(horizon.value, tax_type.value),
                 )
             )
 
@@ -576,28 +513,20 @@ async def _compute_horizon_recommendations(
         *(
             _build_horizon_result(
                 cache,
-                horizon_value,
-                tax_type_value,
-                account_ids,
-                base_krw,
-                eligible_candidates,
-                _HORIZON_RISK_TOLERANCE[horizon_value],
+                combo.horizon,
+                combo.tax_type,
+                combo.account_ids,
+                combo.base_krw,
+                combo.eligible_candidates,
+                _HORIZON_RISK_TOLERANCE[combo.horizon],
                 max_weight,
                 cagr_lookback_years,
                 short_term_equity_floor,
                 market_signal_level=market_signal_level,
-                preference_fallback_note=preference_fallback_note,
+                preference_fallback_note=combo.preference_fallback_note,
                 required_dividend_yield_pct=required_dividend_yield_pct,
             )
-            for (
-                horizon_value,
-                tax_type_value,
-                account_ids,
-                base_krw,
-                eligible_candidates,
-                preference_fallback_note,
-                _market_filter,
-            ) in combos
+            for combo in combos
         )
     )
 
@@ -606,21 +535,16 @@ async def _compute_horizon_recommendations(
     # (`_suggest_for_dividend_goal` 참고). capacity는 전체 등록 후보 수(최종, 조합 간 공유) 기준.
     dividend_capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
     for result, combo in zip(results, combos, strict=True):
-        eligible_candidates = combo[4]
-        market_filter = combo[6]
-        suggested, dividend_note, dividend_goal_status = await _grc._suggest_for_dividend_goal(
+        suggestion = await _grc._suggest_for_dividend_goal(
             cache,
-            eligible_candidates,
+            combo.eligible_candidates,
             required_dividend_yield_pct,
             result.expected_dividend_yield_pct,
             max_weight,
             capacity_remaining=dividend_capacity_remaining,
-            market_filter=market_filter,
+            market_filter=combo.market_filter,
         )
-        result.suggested_candidates = [SuggestedGoalCandidate(**s) for s in suggested]
-        result.dividend_goal_status = dividend_goal_status
-        if dividend_note:
-            result.note = f"{result.note} {dividend_note}" if result.note else dividend_note
+        _grc._apply_dividend_suggestions(result, suggestion)
 
     return HorizonRecommendationResponse(
         generated_at=datetime.now(UTC).isoformat(),

@@ -22,12 +22,11 @@ from app.services.goal_candidate_service import (
     existing_items_from_positions,
 )
 from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
-from app.services.goal_portfolio_optimizer import compute_weighted_expected_metrics
+from app.services.goal_portfolio_optimizer import _optimize_goal_portfolio, compute_weighted_expected_metrics
 from app.services.goal_recommendation_service import (
     _apply_index_region_preference,
     _compute_overall_class_bounds,
     _matches_index_region_preference,
-    _optimize_goal_portfolio,
     _persist_added_candidates,
     compute_portfolio_expected_metrics,
     compute_recommendation_drift,

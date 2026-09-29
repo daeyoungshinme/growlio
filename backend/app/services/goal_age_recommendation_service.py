@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import uuid
 from datetime import UTC, datetime
 
@@ -22,20 +21,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AgeGroup
 from app.models.user import UserSettings
-from app.schemas.rebalancing import GoalRecommendation, SuggestedGoalCandidate
+from app.schemas.rebalancing import GoalRecommendation
 from app.services import _goal_recommendation_common as _grc
 from app.services.goal_candidate_service import (
     _get_or_seed_candidates,
     detect_duplicate_tracking_index_note,
     existing_items_from_positions,
 )
-from app.services.goal_portfolio_optimizer import _MAX_WEIGHT, _MIN_CANDIDATES, _optimize_goal_portfolio
+from app.services.goal_portfolio_optimizer import _MIN_CANDIDATES
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
 from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
-from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
     CacheStoreType,
@@ -153,29 +151,11 @@ async def _compute_age_based_recommendation(
     age_bracket, risk_tolerance, equity_floor, equity_ceiling, default_dividend_floor_pct = _AGE_GROUP_PROFILE[
         settings_row.age_group
     ]
-
-    # 명시적 배당목표(annual_dividend_goal)가 있으면 그 값을 우선 반영하고, 없을 때만 연령대
-    # 기본 배당수익률 하한(_AGE_GROUP_PROFILE)을 폴백으로 적용한다 — 전체 자산 기준 경로
-    # (_compute_horizon_recommendations)와 동일한 annual_dividend_goal → 필요배당수익률 변환 패턴.
-    required_dividend_yield_pct: float | None = None
-    age_default_dividend_note: str | None = None
-    annual_dividend_goal = getattr(settings_row, "annual_dividend_goal", None)
-    if annual_dividend_goal:
-        overall_overview = await build_portfolio_overview(user_id, db, account_ids=None, cache=cache)
-        total_assets_krw = float(overall_overview.get("total_assets_krw", 0))
-        if total_assets_krw > 0:
-            required_dividend_yield_pct = round(float(annual_dividend_goal) / total_assets_krw * 100, 2)
-    if required_dividend_yield_pct is None and default_dividend_floor_pct > 0:
-        required_dividend_yield_pct = default_dividend_floor_pct
-        age_default_dividend_note = (
-            f"{age_bracket} 연령대 기본 배당목표(연 {default_dividend_floor_pct:.1f}%↑)를 반영했습니다"
-        )
-
-    max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
-    max_weight = float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
-    cagr_lookback_years = int(
-        getattr(settings_row, "goal_cagr_lookback_years", None) or _grc._DEFAULT_CAGR_LOOKBACK_YEARS
+    required_dividend_yield_pct, age_default_dividend_note = await _resolve_age_dividend_target(
+        cache, db, user_id, settings_row, age_bracket, default_dividend_floor_pct
     )
+    max_weight = _grc._max_weight_from_settings(settings_row)
+    cagr_lookback_years = _grc._cagr_lookback_years_from_settings(settings_row)
 
     all_pos_map = await query_latest_position_map(user_id, db, include_name=True)
     existing_items = existing_items_from_positions(all_pos_map)
@@ -183,16 +163,11 @@ async def _compute_age_based_recommendation(
     dividend_capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
     duplicate_index_note = detect_duplicate_tracking_index_note(candidate_dicts, existing_items)
 
-    def _combine_age_note(msg: str | None) -> str | None:
-        if duplicate_index_note and msg:
-            return f"{duplicate_index_note} {msg}"
-        return duplicate_index_note or msg
-
     async def _with_bracket(res: GoalRecommendation, expected_dividend_yield_pct: float | None) -> GoalRecommendation:
         """배당 제안 판정은 최적화 결과(`expected_dividend_yield_pct`)가 필요하므로 각 반환 지점에서
         호출한다 — 조기 반환 지점은 `None`(미최적화)을 넘긴다."""
         res.age_bracket = age_bracket
-        suggested, dividend_note, dividend_goal_status = await _grc._suggest_for_dividend_goal(
+        suggestion = await _grc._suggest_for_dividend_goal(
             cache,
             candidate_dicts,
             required_dividend_yield_pct,
@@ -200,11 +175,7 @@ async def _compute_age_based_recommendation(
             max_weight,
             capacity_remaining=dividend_capacity_remaining,
         )
-        res.suggested_candidates = [SuggestedGoalCandidate(**s) for s in suggested]
-        res.dividend_goal_status = dividend_goal_status
-        if dividend_note:
-            res.note = f"{res.note} {dividend_note}" if res.note else dividend_note
-        return res
+        return _grc._apply_dividend_suggestions(res, suggestion)
 
     if not candidate_dicts:
         return await _with_bracket(
@@ -217,100 +188,37 @@ async def _compute_age_based_recommendation(
 
     market_signal_level = await _grc._fetch_market_signal_level(cache)
 
-    candidates = [(c["ticker"], c["name"], c["market"], c.get("asset_class", "EQUITY")) for c in candidate_dicts]
-    tickers_only = [(t, m) for t, _, m, _ in candidates]
-
+    tickers_only = [(c["ticker"], c["market"]) for c in candidate_dicts]
     cagr_map, dividend_map = await asyncio.gather(
         get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
         _grc._fetch_dividend_yields(cache, tickers_only),
     )
-    filtered = [
-        (
-            to_yf_symbol(t, m),
-            (t, name, m),
-            cagr_map[(t, m)]["cagr_pct"],
-            asset_class == "EQUITY",
-            dividend_map.get((t, m), 0.0),
-        )
-        for t, name, m, asset_class in candidates
-        if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
-    ]
-
-    has_real_safe_asset = any(not is_eq for _, _, _, is_eq, _ in filtered)
-    include_cash_equivalent = equity_floor is not None and not has_real_safe_asset
+    filtered = _grc._candidates_with_cagr(candidate_dicts, cagr_map, dividend_map, equity_vs_other=True)
+    include_cash_equivalent = equity_floor is not None and not _grc._has_real_safe_asset(filtered)
     if include_cash_equivalent:
-        filtered.append(
-            (
-                _grc._CASH_EQUIVALENT_TICKER,
-                (_grc._CASH_EQUIVALENT_TICKER, _grc._CASH_EQUIVALENT_NAME, _grc._CASH_EQUIVALENT_MARKET),
-                _grc._CASH_EQUIVALENT_CAGR_PCT,
-                False,
-                0.0,
-            )
-        )
+        filtered.append(_grc._cash_equivalent_candidate())
 
     if len(filtered) < _MIN_CANDIDATES:
         no_data_result = _grc._no_recommendation(
             "추천에 필요한 수익률 데이터를 가져오지 못했습니다",
             required_dividend_yield_pct=required_dividend_yield_pct,
         )
-        no_data_result.note = _combine_age_note(no_data_result.note)
+        no_data_result.note = _grc._join_notes(duplicate_index_note, no_data_result.note)
         return await _with_bracket(no_data_result, None)
 
-    f_symbols = [f[0] for f in filtered]
-    f_tickers = [f[1] for f in filtered]
-    f_cagrs = [f[2] for f in filtered]
-    f_is_equity = [f[3] for f in filtered]
-    f_asset_classes = ["EQUITY" if is_eq else "OTHER" for is_eq in f_is_equity]
-    f_dividends = [f[4] for f in filtered]
-
-    loop = asyncio.get_running_loop()
-    real_symbols = [s for s in f_symbols if s != _grc._CASH_EQUIVALENT_TICKER]
-    if real_symbols:
-        async with _yfinance_sem:
-            returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, real_symbols)
-    else:
-        returns_map = {}
-    if include_cash_equivalent:
-        returns_map[_grc._CASH_EQUIVALENT_TICKER] = _grc._cash_equivalent_daily_returns()
-
-    # `_AGE_GROUP_PROFILE`은 구간마다 equity_floor/equity_ceiling 중 하나만 설정한다(docstring 참고).
-    class_bounds = _grc._equity_class_bounds(equity_floor, equity_ceiling)
-
-    items, expected_return_pct, expected_volatility_pct, opt_note = await loop.run_in_executor(
-        None,
-        functools.partial(
-            _optimize_goal_portfolio,
-            f_symbols,
-            f_tickers,
-            f_cagrs,
-            returns_map,
-            _grc._NON_BINDING_RETURN_FLOOR,
-            max_weight=max_weight,
-            risk_tolerance=risk_tolerance,
-            asset_classes=f_asset_classes,
-            class_bounds=class_bounds,
-            market_signal_level=market_signal_level,
-            dividend_yields=f_dividends,
-            required_dividend_yield_pct=required_dividend_yield_pct,
-        ),
+    returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent)
+    items, expected_return_pct, expected_volatility_pct, opt_note = await _grc._run_goal_optimizer(
+        filtered,
+        returns_map,
+        _grc._NON_BINDING_RETURN_FLOOR,
+        max_weight=max_weight,
+        risk_tolerance=risk_tolerance,
+        # `_AGE_GROUP_PROFILE`은 구간마다 equity_floor/equity_ceiling 중 하나만 설정한다(docstring 참고).
+        class_bounds=_grc._equity_class_bounds(equity_floor, equity_ceiling),
+        market_signal_level=market_signal_level,
+        required_dividend_yield_pct=required_dividend_yield_pct,
     )
-
-    includes_cash_equivalent = any(i["ticker"] == _grc._CASH_EQUIVALENT_TICKER for i in items)
-    expected_dividend_yield_pct = None
-    if items:
-        expected_dividend_yield_pct = round(
-            sum(i["weight"] * dividend_map.get((i["ticker"], i["market"]), 0.0) for i in items) / 100, 2
-        )
-
-    # age_default_dividend_note(명시적 목표가 아닌 연령대 기본값을 적용한 경우에만 존재)는
-    # opt_note(옵티마이저의 배당 목표 달성 불가 fail-soft 안내)보다 앞에 붙인다.
-    note = (
-        f"{age_default_dividend_note} {opt_note}"
-        if age_default_dividend_note and opt_note
-        else (age_default_dividend_note or opt_note)
-    )
-    note = _combine_age_note(note)
+    expected_dividend_yield_pct = _grc._weighted_dividend_yield(items, dividend_map)
 
     return await _with_bracket(
         GoalRecommendation(
@@ -321,12 +229,42 @@ async def _compute_age_based_recommendation(
             expected_return_pct=expected_return_pct,
             expected_dividend_yield_pct=expected_dividend_yield_pct,
             expected_volatility_pct=expected_volatility_pct,
-            note=note,
+            # age_default_dividend_note(명시적 목표가 아닌 연령대 기본값을 적용한 경우에만 존재)는
+            # opt_note(옵티마이저의 배당 목표 달성 불가 fail-soft 안내)보다 앞에 붙인다.
+            note=_grc._join_notes(duplicate_index_note, age_default_dividend_note, opt_note),
             cagr_lookback_years=cagr_lookback_years,
             risk_tolerance=risk_tolerance,
             max_weight_pct=round(max_weight * 100, 2),
             market_signal_level=market_signal_level,
-            includes_cash_equivalent=includes_cash_equivalent,
+            includes_cash_equivalent=_grc._includes_cash_equivalent(items),
         ),
         expected_dividend_yield_pct,
     )
+
+
+async def _resolve_age_dividend_target(
+    cache: CacheStoreType,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    settings_row: UserSettings,
+    age_bracket: str,
+    default_dividend_floor_pct: float,
+) -> tuple[float | None, str | None]:
+    """(필요 배당수익률 %, 연령대 기본값을 적용했다는 안내 문구 또는 None).
+
+    명시적 배당목표(annual_dividend_goal)가 있으면 그 값을 우선 반영하고, 없을 때만 연령대
+    기본 배당수익률 하한(_AGE_GROUP_PROFILE)을 폴백으로 적용한다 — 투자기간별 경로
+    (_compute_horizon_recommendations)와 동일한 annual_dividend_goal → 필요배당수익률 변환 패턴.
+    """
+    required_dividend_yield_pct: float | None = None
+    annual_dividend_goal = getattr(settings_row, "annual_dividend_goal", None)
+    if annual_dividend_goal:
+        overall_overview = await build_portfolio_overview(user_id, db, account_ids=None, cache=cache)
+        required_dividend_yield_pct = _grc._required_dividend_yield_pct(
+            annual_dividend_goal, float(overall_overview.get("total_assets_krw", 0))
+        )
+    if required_dividend_yield_pct is None and default_dividend_floor_pct > 0:
+        return default_dividend_floor_pct, (
+            f"{age_bracket} 연령대 기본 배당목표(연 {default_dividend_floor_pct:.1f}%↑)를 반영했습니다"
+        )
+    return required_dividend_yield_pct, None
