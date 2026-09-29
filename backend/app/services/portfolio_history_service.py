@@ -26,8 +26,8 @@ _EXTENDED_ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.STOCK_KIWOOM: "주식",
     AssetType.STOCK_TOSS: "주식",
     AssetType.STOCK_OTHER: "주식",
-    AssetType.CASH_OTHER: "예수금",
-    AssetType.CASH_STOCK: "예수금",
+    AssetType.CASH_OTHER: "예수금(기타)",
+    AssetType.CASH_STOCK: "예수금(증권계좌)",
     AssetType.OTHER: "기타자산",
     AssetType.REAL_ESTATE: "부동산",
     "STOCK_DOMESTIC": "국내주식",
@@ -35,6 +35,8 @@ _EXTENDED_ASSET_TYPE_LABELS: dict[str, str] = {
 }
 
 _STOCK_ASSET_TYPES = tuple(sorted(POSITION_STOCK_ASSET_TYPES))
+# 스냅샷 금액 − 포지션 분해 합계 차액이 이 값 이하면 부동소수점 오차로 보고 예수금으로 잡지 않는다.
+_RESIDUAL_EPSILON_KRW = 1.0
 
 
 def _months_ago_start_date(months: int, today: date | None = None) -> date:
@@ -141,12 +143,19 @@ async def _fetch_stock_breakdown_by_market(
 
 
 def _merge_stock_breakdown(monthly: dict[str, dict[str, float]], position_data: dict[str, dict[str, float]]) -> None:
-    """포지션 데이터가 있는 월의 STOCK_* 항목을 STOCK_DOMESTIC/STOCK_FOREIGN으로 교체한다 (in-place)."""
+    """포지션 데이터가 있는 월의 STOCK_* 항목을 STOCK_DOMESTIC/STOCK_FOREIGN으로 교체한다 (in-place).
+
+    증권계좌 스냅샷 금액에는 예수금이 포함되지만 포지션 분해 합계에는 없으므로, 둘의 차액을
+    CASH_STOCK("예수금(증권계좌)")으로 보존한다 — 버리면 증권 예수금이 차트에서 사라지고 월 합계가 과소 표시된다.
+    차액에는 포지션이 없는(전액 현금) 증권계좌 금액과 market 미지정 포지션 평가액도 함께 흡수된다.
+    """
     for month_str, asset_amounts in position_data.items():
-        for stock_type in _STOCK_ASSET_TYPES:
-            monthly[month_str].pop(stock_type, None)
+        stock_total = sum(monthly[month_str].pop(stock_type, 0.0) for stock_type in _STOCK_ASSET_TYPES)
         for asset_type, amount in asset_amounts.items():
             monthly[month_str][asset_type] += amount
+        residual = stock_total - sum(asset_amounts.values())
+        if residual > _RESIDUAL_EPSILON_KRW:
+            monthly[month_str][AssetType.CASH_STOCK] += residual
 
 
 def _build_allocation_output(monthly: dict[str, dict[str, float]]) -> list[dict]:
@@ -190,6 +199,7 @@ async def get_allocation_history(
     각 월의 마지막 스냅샷 기준으로 asset_type별 금액/비중을 반환한다.
     주식 계좌는 positions.market으로 국내/해외 분리를 시도하고,
     포지션 데이터가 없는 월은 원래 asset_type으로 fallback한다.
+    분리 시 스냅샷에 포함된 증권 예수금(스냅샷 − 포지션 합계 차액)은 CASH_STOCK("예수금(증권계좌)")으로 보존한다.
     is_active = TRUE 필터 필수 — 비활성 계좌 스냅샷 합산 방지.
     account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합).
     """
