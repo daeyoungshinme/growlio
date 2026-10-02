@@ -16,6 +16,7 @@ const fetchOverallGoalRecommendation = vi.fn();
 const fetchHorizonGoalRecommendations = vi.fn();
 const fetchAgeGoalRecommendation = vi.fn();
 const fetchPortfolioExpectedMetrics = vi.fn();
+const analyzeCandidateOverlap = vi.fn();
 const fetchSettings = vi.fn();
 const updateGoalCandidateTickers = vi.fn();
 const updateGoalRecommendationOptions = vi.fn();
@@ -30,6 +31,7 @@ vi.mock("@/api/rebalancing", () => ({
   fetchHorizonGoalRecommendations: (...args: unknown[]) => fetchHorizonGoalRecommendations(...args),
   fetchAgeGoalRecommendation: (...args: unknown[]) => fetchAgeGoalRecommendation(...args),
   fetchPortfolioExpectedMetrics: (...args: unknown[]) => fetchPortfolioExpectedMetrics(...args),
+  analyzeCandidateOverlap: (...args: unknown[]) => analyzeCandidateOverlap(...args),
   CASH_EQUIVALENT_TICKER: "CASH_EQUIVALENT",
 }));
 
@@ -266,6 +268,12 @@ function makeHorizonResponse(
 describe("RecommendationCard", () => {
   beforeEach(() => {
     fetchOverallGoalRecommendation.mockReset();
+    analyzeCandidateOverlap.mockReset();
+    analyzeCandidateOverlap.mockResolvedValue({
+      groups: [],
+      profiles: [],
+      price_data_available: true,
+    });
     fetchHorizonGoalRecommendations.mockReset();
     fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([]));
     fetchAgeGoalRecommendation.mockReset();
@@ -795,6 +803,116 @@ describe("RecommendationCard", () => {
       await screen.findByText(/KODEX 단기채권/);
 
       expect(screen.queryByText(/추천 비중이 달라졌어요/)).toBeNull();
+    });
+  });
+
+  describe("후보 ETF 중복·총보수 비교", () => {
+    const spyOverlap = {
+      groups: [
+        {
+          reasons: ["SAME_INDEX"],
+          max_correlation: null,
+          members: [
+            {
+              ticker: "SPY",
+              name: "SPDR S&P 500 ETF",
+              market: "NYSE",
+              held: false,
+              candidate: true,
+              ter_pct: 0.0945,
+              base_index: null,
+            },
+            {
+              ticker: "VOO",
+              name: "Vanguard S&P 500 ETF",
+              market: "NYSE",
+              held: true,
+              candidate: false,
+              ter_pct: 0.03,
+              base_index: null,
+            },
+          ],
+          cheapest_ticker: "VOO",
+          cheapest_market: "NYSE",
+          ter_gap_pct: 0.0645,
+        },
+      ],
+      profiles: [
+        {
+          ticker: "SPY",
+          market: "NYSE",
+          ter_pct: 0.0945,
+          base_index: null,
+          issuer: null,
+          tracking_error_pct: null,
+        },
+        {
+          ticker: "VOO",
+          market: "NYSE",
+          ter_pct: 0.03,
+          base_index: null,
+          issuer: null,
+          tracking_error_pct: null,
+        },
+      ],
+      price_data_available: true,
+    };
+
+    it("shows per-item fees, the weighted average and an overlap group touching a recommended item", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      analyzeCandidateOverlap.mockResolvedValue(spyOverlap);
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText(/· 보수 0.0945%/)).toBeDefined();
+      // SCHD는 보수 미확인 → 확인된 비중(SPY 60%) 기준 평균
+      expect(screen.getByText(/평균 총보수 연 0.0945%/)).toBeDefined();
+      expect(screen.getByText(/보수 확인된 비중 60% 기준/)).toBeDefined();
+
+      fireEvent.click(screen.getByText(/중복 투자 점검 · 1개 묶음/));
+      expect(await screen.findByText(/보유 중/)).toBeDefined();
+      expect(screen.getByText(/보수 0.03% · 최저/)).toBeDefined();
+      expect(screen.getByText(/1,000만원 보유 시 연 약 6,450원/)).toBeDefined();
+      // 추천 결과 화면은 저장된 후보 기준 호출(인자 없음)
+      expect(analyzeCandidateOverlap).toHaveBeenCalledWith(undefined);
+    });
+
+    it("hides the overlap block when no group touches a recommended item", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      analyzeCandidateOverlap.mockResolvedValue({
+        ...spyOverlap,
+        groups: [
+          {
+            ...spyOverlap.groups[0],
+            members: spyOverlap.groups[0].members.map((m, i) => ({ ...m, ticker: `X${i}` })),
+          },
+        ],
+      });
+      renderWithProviders(<RecommendationCard />);
+
+      await screen.findByText(/· 보수 0.0945%/);
+      expect(screen.queryByText(/중복 투자 점검/)).toBeNull();
+    });
+
+    it("warns on a candidate chip in the manager modal using the draft list", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchSettings.mockResolvedValue(
+        makeSettingsData({
+          goal_candidate_tickers: [
+            { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", asset_class: "EQUITY" },
+          ],
+        }),
+      );
+      analyzeCandidateOverlap.mockResolvedValue(spyOverlap);
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText(/후보 ETF 관리/));
+
+      expect(
+        await screen.findByText(/보유 중인 Vanguard S&P 500 ETF와\(과\) 같은 지수/),
+      ).toBeDefined();
+      expect(analyzeCandidateOverlap).toHaveBeenCalledWith([
+        { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", asset_class: "EQUITY" },
+      ]);
     });
   });
 

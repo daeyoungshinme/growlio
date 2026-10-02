@@ -221,7 +221,7 @@ _TRACKING_INDEX_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # 다우존스 배당 지수는 이름에 "배당"도 함께 들어가므로 고배당 패턴보다 먼저 검사해야 한다.
     (re.compile(r"다우존스|다우\s*배당|Dow\s*Jones", re.IGNORECASE), "US_DIV_DOWJONES100"),
     (re.compile(r"S&P\s*500", re.IGNORECASE), "US_SP500"),
-    (re.compile(r"나스닥\s*100|NASDAQ\s*100", re.IGNORECASE), "US_NASDAQ100"),
+    (re.compile(r"나스닥[\s-]*100|NASDAQ[\s-]*100", re.IGNORECASE), "US_NASDAQ100"),
     (re.compile(r"코스피\s*200|KOSPI\s*200", re.IGNORECASE), "KR_KOSPI200"),
     (re.compile(r"고배당|High\s*Dividend", re.IGNORECASE), "US_HIGH_DIVIDEND"),
     (re.compile(r"전체\s*시장|Total\s*(Stock\s*)?Market", re.IGNORECASE), "US_TOTAL_MARKET"),

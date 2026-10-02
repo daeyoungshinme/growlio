@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import { useMemo, type ComponentProps, type ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
 import type { GoalRecommendationItem, SuggestedGoalCandidate } from "@/api/rebalancing";
 import type { MarketRiskLevel } from "@/api/marketSignals";
@@ -7,6 +7,15 @@ import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBa
 import RecommendationApplySection from "@/components/rebalancing/RecommendationApplySection";
 import RecommendationWeightList from "@/components/rebalancing/RecommendationWeightList";
 import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
+import OverlapGroupsBlock from "@/components/rebalancing/OverlapGroupsBlock";
+import { useCandidateOverlap } from "@/hooks/useCandidateOverlap";
+import {
+  buildTerMap,
+  formatTerPct,
+  groupsTouchingItems,
+  itemKey,
+  weightedTerPct,
+} from "@/utils/etfOverlap";
 import PortfolioWeightChart from "@/components/portfolio-analysis/PortfolioWeightChart";
 
 function driftBadgeLabel(drift: RecommendationDrift): string {
@@ -33,8 +42,9 @@ interface Props {
   applySection: ComponentProps<typeof RecommendationApplySection> | null;
 }
 
-/** 전체/연령대/기간별 3개 탭이 공유하는 추천 결과 렌더링 — 드리프트 배지 → 비중 목록 → 안내문구
- * (+시장신호 배지) → 미등록 후보 제안 → 적용 섹션 순서를 한 곳에서 조립한다. */
+/** 전체/연령대/기간별 3개 탭이 공유하는 추천 결과 렌더링 — 드리프트 배지 → 비중 목록(+총보수) →
+ * 평균 보수 → 안내문구(+시장신호 배지) → 중복 투자 점검 → 미등록 후보 제안 → 적용 섹션 순서를
+ * 한 곳에서 조립한다. 총보수·중복 정보는 저장된 후보 목록 기준 쿼리 하나를 3개 탭이 공유한다. */
 export default function RecommendationResultPanel({
   drift,
   items,
@@ -47,6 +57,18 @@ export default function RecommendationResultPanel({
   extraNoticeBeforeApply,
   applySection,
 }: Props) {
+  const { data: overlap } = useCandidateOverlap();
+  const terMap = useMemo(() => buildTerMap(overlap), [overlap]);
+  const avgTer = weightedTerPct(items, terMap);
+  const overlapGroups = useMemo(
+    () => groupsTouchingItems(overlap?.groups ?? [], items),
+    [overlap, items],
+  );
+  const weightByKey = useMemo(
+    () => new Map(items.map((i) => [itemKey(i.ticker, i.market), i.weight])),
+    [items],
+  );
+
   return (
     <>
       {drift && (
@@ -56,7 +78,15 @@ export default function RecommendationResultPanel({
         </p>
       )}
 
-      <RecommendationWeightList items={items} />
+      <RecommendationWeightList items={items} terMap={terMap} />
+
+      {avgTer && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          평균 총보수 연 {formatTerPct(avgTer.pct)}
+          {avgTer.coveragePct < 99.5 &&
+            ` (보수 확인된 비중 ${avgTer.coveragePct.toFixed(0)}% 기준)`}
+        </p>
+      )}
 
       <PortfolioWeightChart items={items} />
 
@@ -70,6 +100,8 @@ export default function RecommendationResultPanel({
           {note}
         </p>
       )}
+
+      <OverlapGroupsBlock groups={overlapGroups} weightByKey={weightByKey} />
 
       <SuggestedCandidatesBlock
         candidates={suggestedCandidates}

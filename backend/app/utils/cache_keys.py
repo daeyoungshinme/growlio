@@ -62,6 +62,9 @@ TTL_MARKET_SIGNAL_GATE_ALERT_SENT = 86400  # 시장신호 게이트로 AUTO 계�
 TTL_DAILY_VALUE_CAP_ALERT_SENT = 86400  # 하루 합산 거래한도 게이트로 AUTO 계획 생성 보류 알림, 유저당 1일 1회
 TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
 TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7일 — 사실상 불변 데이터
+TTL_ETF_PROFILE = 7 * 24 * 3600  # ETF 총보수·기초지수·운용사 7일 — 보수 인하는 드물고 참고 정보라 허용
+TTL_ETF_PROFILE_MISSING = 86400  # ETF 아님/데이터 없음 확정 1일 — 신규 상장 ETF가 데이터 생기면 다음날 반영
+TTL_CANDIDATE_OVERLAP = 86400  # 후보·보유 ETF 중복 분석 1일 — 입력 목록 해시가 키라 목록이 바뀌면 자동으로 새 키
 TTL_GOAL_RECOMMENDATION = 3600  # 목표 역산 추천(전체/기간별) 1시간 — 프론트 staleTime과 정합, 설정 변경 시 무효화됨
 TTL_GOAL_CANDIDATE_DIVIDEND_YIELD = 3600  # 목표 역산 추천 후보 배당수익률 1시간 — ticker+market 전역 공유(유저 무관)
 TTL_REBALANCING_ANALYSIS = 90  # 리밸런싱 진단(analyze) 응답 90초 — 포트폴리오 선택 시 자동 실행되어 재방문마다
@@ -116,6 +119,16 @@ def price_return_key(years: int, ticker: str, market: str) -> str:
 
 def etf_index_region_key(ticker: str) -> str:
     return f"{_env_prefix()}etf:index_region:{ticker}"
+
+
+def etf_profile_key(ticker: str, market: str) -> str:
+    return f"{_env_prefix()}etf:profile:{ticker}:{market}"
+
+
+def candidate_overlap_key(digest: str) -> str:
+    """후보·보유 ETF 중복 분석 결과 — 입력(종목 목록+보유 여부)의 해시 단위 전역 캐시(유저 무관).
+    목록이 바뀌면 다른 키가 되므로 별도 무효화가 필요 없다."""
+    return f"{_env_prefix()}candidate_overlap:{digest}"
 
 
 def dashboard_summary_key(user_id: uuid.UUID) -> str:

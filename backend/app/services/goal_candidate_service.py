@@ -84,11 +84,11 @@ _KR_ETF_BRAND_PREFIXES: tuple[str, ...] = (
 """국내 ETF 운용사 브랜드(종목명 접두어). 종목코드엔 ETF 여부를 알려주는 체계가 없어(`dividend.constants.
 is_korean_etf`의 코드 prefix 판별은 일부만 커버) 이름 기반을 주 판별로 쓴다 — 신규 브랜드는 여기 추가."""
 
-_LEVERAGED_INVERSE_RE = re.compile(r"레버리지|인버스|곱버스|[23]X")
+LEVERAGED_INVERSE_RE = re.compile(r"레버리지|인버스|곱버스|[23]X")
 """레버리지·인버스 ETF 종목명 패턴(대문자 비교). 예: KODEX 레버리지, TIGER 인버스, KODEX 200선물인버스2X."""
 
 
-def _looks_like_korean_etf(c: dict[str, str]) -> bool:
+def looks_like_korean_etf(c: dict[str, str]) -> bool:
     name = (c.get("name") or "").strip().upper()
     # 브랜드 뒤 공백까지 확인 — 접두어만 보면 "BNK금융지주"(일반주)가 브랜드 "BNK"에 걸려 ETF로 오판된다.
     if any(name == p or name.startswith(p + " ") for p in _KR_ETF_BRAND_PREFIXES) or " ETF" in f" {name}":
@@ -112,11 +112,11 @@ def pension_ineligibility_reason(c: dict[str, str], tax_type_value: str) -> str 
     if c["market"].upper() == CASH_EQUIVALENT_MARKET:
         return None
     name = (c.get("name") or "").upper()
-    if _LEVERAGED_INVERSE_RE.search(name):
+    if LEVERAGED_INVERSE_RE.search(name):
         return "레버리지·인버스 ETF"
     if "ETN" in name:
         return "ETN"
-    if not _looks_like_korean_etf(c):
+    if not looks_like_korean_etf(c):
         return "개별 종목"
     return None
 

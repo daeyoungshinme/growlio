@@ -66,6 +66,10 @@ export const QUERY_KEYS = {
   goalRecommendationOverall: ["goal-recommendation", "overall"] as const,
   goalRecommendationByHorizon: ["goal-recommendation", "by-horizon"] as const,
   goalRecommendationByAge: ["goal-recommendation", "by-age"] as const,
+  /** goalRecommendationBase 하위 — 후보 저장 시 `invalidateGoalRecommendationData`로 함께 갱신된다.
+   * `signature`는 편집 중 목록의 식별자("saved"면 저장된 목록 기준). */
+  candidateOverlap: (signature: string) =>
+    ["goal-recommendation", "candidate-overlap", signature] as const,
   portfolioExpectedMetrics: (portfolioId: string) =>
     ["portfolio-expected-metrics", portfolioId] as const,
   goalFeasibility: (

@@ -1,6 +1,8 @@
 """목표 역산 추천 및 복합신호 배너 스키마."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
 
 
 class GoalRecommendationItem(BaseModel):
@@ -99,6 +101,57 @@ class PortfolioExpectedMetrics(BaseModel):
     expected_return_pct: float | None = None
     expected_dividend_yield_pct: float | None = None
     expected_volatility_pct: float | None = None
+
+
+class EtfProfileOut(BaseModel):
+    """ETF 기본 정보 — 국내는 Naver etfAnalysis, 해외는 yfinance. 값은 모두 참고용(조회 실패 시 None)."""
+
+    ticker: str
+    market: str
+    ter_pct: float | None = None  # 연 총보수(%)
+    base_index: str | None = None  # 기초지수명(국내 ETF만)
+    issuer: str | None = None  # 운용사
+    tracking_error_pct: float | None = None  # 추적오차(%, 국내 ETF만)
+
+
+class OverlapMember(BaseModel):
+    ticker: str
+    name: str
+    market: str
+    held: bool  # 실제 보유 중
+    candidate: bool  # 후보 ETF로 등록됨(요청에 포함된 후보 목록 기준)
+    ter_pct: float | None = None
+    base_index: str | None = None
+
+
+class OverlapGroup(BaseModel):
+    """같은 지수를 추종하거나(SAME_INDEX) 사실상 같이 움직이는(HIGH_CORR) 종목 묶음."""
+
+    reasons: list[str]  # "SAME_INDEX" | "HIGH_CORR"
+    max_correlation: float | None = None  # HIGH_CORR일 때 그룹 내 최대 주간 수익률 상관계수
+    members: list[OverlapMember]
+    cheapest_ticker: str | None = None  # 보수 확인된 멤버가 2개 이상이고 차이가 있을 때만
+    cheapest_market: str | None = None
+    ter_gap_pct: float | None = None  # 그룹 내 최고-최저 보수 차이(%p)
+
+
+class OverlapCandidateIn(BaseModel):
+    ticker: str = Field(min_length=1, max_length=20)
+    name: str = Field(max_length=100)
+    market: str = Field(min_length=1, max_length=20)
+    asset_class: str = "EQUITY"
+
+
+class CandidateOverlapRequest(BaseModel):
+    """`candidates`를 생략하면 저장된 후보 목록을 쓴다. 후보 관리 모달은 저장 전 편집 중 목록을 보낸다."""
+
+    candidates: list[OverlapCandidateIn] | None = Field(default=None, max_length=MAX_GOAL_CANDIDATE_TICKERS)
+
+
+class CandidateOverlapResponse(BaseModel):
+    groups: list[OverlapGroup] = []
+    profiles: list[EtfProfileOut] = []  # 후보·관련 보유 ETF의 보수 등(ETF가 아니거나 조회 실패면 목록에서 빠짐)
+    price_data_available: bool = True  # False면 시세 조회 실패로 HIGH_CORR 판정을 못 함(SAME_INDEX만)
 
 
 class CompositeSignalStatus(BaseModel):
