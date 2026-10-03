@@ -724,3 +724,76 @@ class TestPortfolioExpectedMetricsEndpoint:
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
+
+
+class TestCandidateOverlap:
+    def _post(self, app, body, settings_row=None, pos_map=None):
+        with (
+            patch("app.api.v1.rebalancing.get_cache_store", new_callable=AsyncMock, return_value=None),
+            patch("app.api.v1.rebalancing.get_settings_row", new_callable=AsyncMock, return_value=settings_row),
+            patch(
+                "app.api.v1.rebalancing.query_latest_position_map",
+                new_callable=AsyncMock,
+                return_value=pos_map or {},
+            ),
+            patch(
+                "app.api.v1.rebalancing.analyze_candidate_overlap",
+                new_callable=AsyncMock,
+                return_value={"groups": [], "profiles": [], "price_data_available": True},
+            ) as mock_analyze,
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/rebalancing/candidates/overlap", json=body, headers={"Authorization": "Bearer fake"}
+            )
+        return resp, mock_analyze
+
+    def test_uses_draft_candidates_when_given(self, override_settings):
+        app = _setup_app(_make_user(), _make_mock_db())
+        try:
+            pos_map = {"a": {"ticker": "360200", "name": "ACE 미국S&P500", "market": "KOSPI"}}
+            resp, mock_analyze = self._post(
+                app,
+                {"candidates": [{"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI"}]},
+                pos_map=pos_map,
+            )
+            assert resp.status_code == 200
+            _cache, candidates, existing = mock_analyze.call_args.args
+            assert candidates == [
+                {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"}
+            ]
+            assert existing == [("360200", "ACE 미국S&P500", "KOSPI")]
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_falls_back_to_saved_candidates(self, override_settings):
+        app = _setup_app(_make_user(), _make_mock_db())
+        saved = [{"ticker": "SPY", "name": "SPDR S&P 500", "market": "NYSE", "asset_class": "EQUITY"}]
+        try:
+            resp, mock_analyze = self._post(app, {}, settings_row=SimpleNamespace(goal_candidate_tickers=saved))
+            assert resp.status_code == 200
+            assert mock_analyze.call_args.args[1] == saved
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_rejects_more_than_max_candidates(self, override_settings):
+        app = _setup_app(_make_user(), _make_mock_db())
+        try:
+            too_many = [{"ticker": f"T{i}", "name": "x", "market": "NYSE"} for i in range(21)]
+            resp, mock_analyze = self._post(app, {"candidates": too_many})
+            assert resp.status_code == 422
+            mock_analyze.assert_not_called()
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)

@@ -33,11 +33,15 @@ from app.schemas.rebalancing.execution import (
     RebalancingExecutionSummary,
 )
 from app.schemas.rebalancing.goal import (
+    CandidateOverlapResponse,
     CompositeSignalStatus,
+    EtfProfileOut,
     GoalRecommendation,
     GoalRecommendationItem,
     HorizonGoalRecommendation,
     HorizonRecommendationResponse,
+    OverlapGroup,
+    OverlapMember,
     PortfolioExpectedMetrics,
     SuggestedGoalCandidate,
 )
@@ -51,10 +55,12 @@ from app.schemas.rebalancing.plan import (
 
 __all__ = [
     "AlertScopeUpdate",
+    "CandidateOverlapResponse",
     "CompositeSignalStatus",
     "CurrentHolding",
     "DiagnosisContext",
     "DriftedItem",
+    "EtfProfileOut",
     "ExecutionOrderItem",
     "ExecutionPlanOverride",
     "ExecutionPlanResult",
@@ -68,6 +74,8 @@ __all__ = [
     "KisBalanceResponse",
     "KiwoomBalanceResponse",
     "OrderResult",
+    "OverlapGroup",
+    "OverlapMember",
     "PlanActionResponse",
     "PlanTokenPreview",
     "PortfolioDriftSummary",

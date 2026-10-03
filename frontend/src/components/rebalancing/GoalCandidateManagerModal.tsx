@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, Loader2, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchIndexRegion } from "@/api/assets";
 import {
@@ -14,6 +14,8 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { useStockSearch } from "@/hooks/useStockSearch";
+import { useCandidateOverlap } from "@/hooks/useCandidateOverlap";
+import { formatTerPct, itemKey, overlapWarningFor } from "@/utils/etfOverlap";
 import { invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
@@ -53,6 +55,15 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
 
   const savedCandidates = settingsData?.goal_candidate_tickers ?? [];
   const candidates = pendingCandidates ?? savedCandidates;
+  // 편집 중 목록 기준 — 새 후보를 넣자마자 보유 종목·다른 후보와 겹치는지, 보수가 얼마인지 보여준다.
+  const { data: overlap, isFetching: isCheckingOverlap } = useCandidateOverlap(
+    candidates,
+    settingsData !== undefined,
+  );
+  const profileByKey = useMemo(
+    () => new Map((overlap?.profiles ?? []).map((p) => [itemKey(p.ticker, p.market), p])),
+    [overlap],
+  );
 
   const saveMutation = useMutation({
     mutationFn: updateGoalCandidateTickers,
@@ -138,38 +149,48 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
             {candidates.map((c) => (
               <li
                 key={`${c.ticker}-${c.market}`}
-                className="flex items-center gap-1.5 text-xs bg-purple-50 dark:bg-gray-800 border border-purple-200 dark:border-purple-800/50 rounded-full pl-2 pr-1 py-0.5"
+                className="text-xs bg-purple-50 dark:bg-gray-800 border border-purple-200 dark:border-purple-800/50 rounded-2xl pl-2 pr-1 py-0.5"
               >
-                <span className="text-gray-700 dark:text-gray-300 truncate">
-                  {c.name} <span className="text-gray-400">({c.ticker})</span>
-                </span>
-                <div className="ml-auto flex items-center gap-1 shrink-0">
-                  <select
-                    value={c.asset_class ?? "EQUITY"}
-                    onChange={(e) =>
-                      changeAssetClass(c.ticker, c.market, e.target.value as AssetClass)
-                    }
-                    aria-label={`${c.name} 자산군`}
-                    className="shrink-0 text-xs bg-transparent border border-purple-200 dark:border-purple-800/50 rounded-full px-1.5 py-0.5 text-purple-600 dark:text-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-700 dark:text-gray-300 truncate">
+                    {c.name} <span className="text-gray-400">({c.ticker})</span>
+                  </span>
+                  <div className="ml-auto flex items-center gap-1 shrink-0">
+                    <select
+                      value={c.asset_class ?? "EQUITY"}
+                      onChange={(e) =>
+                        changeAssetClass(c.ticker, c.market, e.target.value as AssetClass)
+                      }
+                      aria-label={`${c.name} 자산군`}
+                      className="shrink-0 text-xs bg-transparent border border-purple-200 dark:border-purple-800/50 rounded-full px-1.5 py-0.5 text-purple-600 dark:text-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    >
+                      {Object.entries(ASSET_CLASS_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeCandidate(c.ticker, c.market)}
+                    className="p-0.5 text-gray-400 hover:text-red-500 rounded-full shrink-0"
+                    aria-label={`${c.name} 제거`}
                   >
-                    {Object.entries(ASSET_CLASS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                    <X size={10} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeCandidate(c.ticker, c.market)}
-                  className="p-0.5 text-gray-400 hover:text-red-500 rounded-full shrink-0"
-                  aria-label={`${c.name} 제거`}
-                >
-                  <X size={10} />
-                </button>
+                <CandidateOverlapInfo
+                  ter={profileByKey.get(itemKey(c.ticker, c.market))?.ter_pct ?? null}
+                  baseIndex={profileByKey.get(itemKey(c.ticker, c.market))?.base_index ?? null}
+                  warning={overlapWarningFor(overlap, c.ticker, c.market)}
+                />
               </li>
             ))}
           </ul>
+        )}
+        {isCheckingOverlap && candidates.length > 0 && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">중복·보수 확인 중...</p>
         )}
 
         <div className="relative">
@@ -249,5 +270,34 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+function CandidateOverlapInfo({
+  ter,
+  baseIndex,
+  warning,
+}: {
+  ter: number | null;
+  baseIndex: string | null;
+  warning: string | null;
+}) {
+  if (ter == null && !baseIndex && !warning) return null;
+  return (
+    <div className="pb-0.5 pr-1 space-y-0.5">
+      {(ter != null || baseIndex) && (
+        <p className="text-gray-400 dark:text-gray-500">
+          {[ter != null ? `보수 ${formatTerPct(ter)}` : null, baseIndex]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      )}
+      {warning && (
+        <p className="flex items-start gap-1 text-amber-600 dark:text-amber-500">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
+          {warning}
+        </p>
+      )}
+    </div>
   );
 }

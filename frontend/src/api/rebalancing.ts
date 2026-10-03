@@ -327,6 +327,74 @@ export interface GoalRecommendation {
 export const fetchOverallGoalRecommendation = (): Promise<GoalRecommendation> =>
   apiGet<GoalRecommendation>(`/rebalancing/goal-recommendation`);
 
+// ── 후보 ETF 중복·총보수 비교 — 정보 제공 전용(후보 목록·추천 비중 불변) ──────
+
+/** 국내는 Naver, 해외는 yfinance 기준. 모든 값은 참고용이며 조회 실패 시 null. */
+export interface EtfProfile {
+  ticker: string;
+  market: string;
+  /** 연 총보수(%) — 예: 0.0068 = 0.0068% */
+  ter_pct: number | null;
+  base_index: string | null;
+  issuer: string | null;
+  tracking_error_pct: number | null;
+}
+
+export interface OverlapMember {
+  ticker: string;
+  name: string;
+  market: string;
+  held: boolean;
+  candidate: boolean;
+  ter_pct: number | null;
+  base_index: string | null;
+}
+
+/** SAME_INDEX: 같은 지수 추종 / HIGH_CORR: 최근 1년 주간 수익률 상관 0.97 이상(사실상 같은 움직임) */
+export type OverlapReason = "SAME_INDEX" | "HIGH_CORR";
+
+export interface OverlapGroup {
+  reasons: OverlapReason[];
+  max_correlation: number | null;
+  members: OverlapMember[];
+  cheapest_ticker: string | null;
+  cheapest_market: string | null;
+  /** 그룹 내 최고-최저 총보수 차이(%p) */
+  ter_gap_pct: number | null;
+}
+
+export interface CandidateOverlap {
+  groups: OverlapGroup[];
+  profiles: EtfProfile[];
+  /** false면 시세 조회 실패로 "움직임 유사" 판정을 못 함(같은 지수 판정만) */
+  price_data_available: boolean;
+}
+
+export interface OverlapCandidateInput {
+  ticker: string;
+  name: string;
+  market: string;
+  asset_class?: AssetClass;
+}
+
+/** `candidates` 생략 시 저장된 후보 목록 기준. 후보 관리 모달은 저장 전 편집 중 목록을 보낸다. */
+export const analyzeCandidateOverlap = (
+  candidates?: OverlapCandidateInput[],
+): Promise<CandidateOverlap> =>
+  apiPost<CandidateOverlap>(
+    `/rebalancing/candidates/overlap`,
+    candidates
+      ? {
+          candidates: candidates.map(({ ticker, name, market, asset_class }) => ({
+            ticker,
+            name,
+            market,
+            asset_class,
+          })),
+        }
+      : {},
+  );
+
 // ── 투자기간별(단기/중기/장기) 추천 — 목표 역산이 아닌 리스크 성향 재배분 ──────
 
 /** 단일 소스는 @/constants/assets — 포트폴리오 편집기의 CASH_EQUIVALENT 항목과 동일 식별자를 공유한다. */

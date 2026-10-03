@@ -1,8 +1,16 @@
 import { CASH_EQUIVALENT_TICKER, type GoalRecommendationItem } from "@/api/rebalancing";
+import { formatTerPct, itemKey } from "@/utils/etfOverlap";
 
-/** 전체/연령대/기간별 3개 탭이 공유하는 추천 비중 목록 렌더링 — 종목명(+티커)·배당수익률·비중.
- * 합성 현금성 자산 항목(`CASH_EQUIVALENT_TICKER`)은 실제 매매 가능한 티커가 아니므로 괄호 표기를 생략한다. */
-export default function RecommendationWeightList({ items }: { items: GoalRecommendationItem[] }) {
+/** 전체/연령대/기간별 3개 탭이 공유하는 추천 비중 목록 렌더링 — 종목명(+티커)·배당수익률·총보수·비중.
+ * 합성 현금성 자산 항목(`CASH_EQUIVALENT_TICKER`)은 실제 매매 가능한 티커가 아니므로 괄호 표기를 생략한다.
+ * 총보수는 `terMap`(ticker:market → %)에 있는 종목만 표시한다(ETF가 아니거나 조회 실패면 생략). */
+export default function RecommendationWeightList({
+  items,
+  terMap,
+}: {
+  items: GoalRecommendationItem[];
+  terMap?: Map<string, number>;
+}) {
   return (
     <ul className="space-y-1">
       {items.map((item) => (
@@ -19,6 +27,12 @@ export default function RecommendationWeightList({ items }: { items: GoalRecomme
               <span className="text-gray-400 dark:text-gray-500">
                 {" "}
                 · 배당 {item.dividend_yield_pct.toFixed(1)}%
+              </span>
+            )}
+            {terMap?.has(itemKey(item.ticker, item.market)) && (
+              <span className="text-gray-400 dark:text-gray-500">
+                {" "}
+                · 보수 {formatTerPct(terMap.get(itemKey(item.ticker, item.market)) as number)}
               </span>
             )}
           </span>
