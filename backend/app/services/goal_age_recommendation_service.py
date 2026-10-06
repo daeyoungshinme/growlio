@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import MAX_GOAL_CANDIDATE_TICKERS
 from app.enums import AgeGroup
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation
@@ -33,7 +34,6 @@ from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
-from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
     CacheStoreType,

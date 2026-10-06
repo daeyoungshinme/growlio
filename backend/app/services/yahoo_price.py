@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import structlog
 
@@ -28,6 +29,8 @@ if TYPE_CHECKING:
     from datetime import date
 
 logger = structlog.get_logger()
+
+_T = TypeVar("_T")
 
 _yfinance_sem = asyncio.Semaphore(settings.api_semaphore_limit)
 
@@ -51,17 +54,27 @@ def to_yf_symbol(ticker: str, market: str) -> str:
     return ticker
 
 
-async def refresh_kosdaq_tickers() -> None:
+_KOSDAQ_RETRY_DELAY_SECONDS = 300.0
+"""집합이 비어 있는 상태(기동 직후 첫 로드 실패)에서만 쓰는 1회 재시도 지연 — 다음 정기 실행(07:00)까지
+KOSDAQ 보유종목이 `.KS`로 조회되는 구간을 줄인다. 이미 로드된 집합이 있으면 재시도하지 않는다(전일 값으로 충분)."""
+
+
+async def refresh_kosdaq_tickers(retry_delay: float = _KOSDAQ_RETRY_DELAY_SECONDS) -> None:
     """KOSDAQ 상장 코드 집합을 갱신한다. 실패 시 기존 집합 유지(fail-soft)."""
     global _kosdaq_tickers
     loop = asyncio.get_running_loop()
-    codes = await loop.run_in_executor(None, sync_fdr_kosdaq_tickers)
-    if codes:
-        _kosdaq_tickers = codes
-        logger.info("kosdaq_tickers_refreshed", count=len(codes))
+    for attempt in range(2):
+        codes = await loop.run_in_executor(None, sync_fdr_kosdaq_tickers)
+        if codes:
+            _kosdaq_tickers = codes
+            logger.info("kosdaq_tickers_refreshed", count=len(codes), attempt=attempt + 1)
+            return
+        logger.warning("kosdaq_tickers_refresh_empty", attempt=attempt + 1, loaded=len(_kosdaq_tickers))
+        if _kosdaq_tickers or attempt == 1:
+            return
+        await asyncio.sleep(retry_delay)
 
 
-# 내부 별칭 (기존 코드 호환)
 def _sync_usdkrw() -> float:
     """동기 함수 — run_in_executor로 호출. 실패 시 0.0 반환."""
     import yfinance as yf
@@ -141,12 +154,20 @@ def _sync_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
 # 서킷이 열려 있으면 조회 없이 실패값(0.0 / None / {})을 돌려주므로 호출부 폴백 경로를 그대로 탄다.
 
 
+async def run_yf_bounded(func: Callable[..., _T], *args: Any) -> _T:
+    """동기 Yahoo/pykrx 조회를 공유 동시성 슬롯(`_yfinance_sem`) 안에서 executor로 실행한다.
+
+    서킷 브레이커는 다루지 않는다 — `fetch_yf_close_series`/`fetch_yf_info`처럼 스스로 서킷을 기록하는
+    함수용이다. 실패를 서킷에 반영해야 하는 단건 조회는 `_run_guarded`를 쓴다."""
+    loop = asyncio.get_running_loop()
+    async with _yfinance_sem:
+        return await loop.run_in_executor(None, partial(func, *args))
+
+
 async def _run_guarded(func, *args, fallback):
     if not yahoo_circuit.is_available():
         return fallback
-    loop = asyncio.get_running_loop()
-    async with _yfinance_sem:
-        result = await loop.run_in_executor(None, partial(func, *args))
+    result = await run_yf_bounded(func, *args)
     if result:
         yahoo_circuit.record_success()
     else:

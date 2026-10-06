@@ -47,7 +47,7 @@ from app.services.dividend.sync_sources import (
 from app.services.goal_portfolio_optimizer import _MAX_WEIGHT, _dividend_floor_constraint, _optimize_goal_portfolio
 from app.services.market_signal_service import get_market_signal
 from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
-from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
+from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_GOAL_CANDIDATE_DIVIDEND_YIELD,
     CacheStoreType,
@@ -422,9 +422,7 @@ async def _fetch_candidate_returns(
     real_symbols = [c.symbol for c in candidates if c.symbol != _CASH_EQUIVALENT_TICKER]
     returns_map: dict[str, list[float]] = {}
     if real_symbols:
-        loop = asyncio.get_running_loop()
-        async with _yfinance_sem:
-            returns_map = await loop.run_in_executor(None, fetch_daily_returns, real_symbols)
+        returns_map = await run_yf_bounded(fetch_daily_returns, real_symbols)
     if include_cash_equivalent:
         returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
     return returns_map

@@ -195,6 +195,24 @@ class TestBuildItems:
         assert by_key[("005930", "KOSPI")].held
         assert not by_key[("005930", "KOSPI")].candidate
 
+    def test_distribution_frequency_resolved_from_universe(self):
+        """요청 바디(`OverlapCandidateIn`)·저장된 후보·보유 종목에는 distribution_frequency가 없다 —
+        큐레이션 유니버스에서 조회해 월/분기배당 쌍이 SAME_INDEX로 묶이지 않아야 한다."""
+        for candidates, held in (
+            (
+                [{"ticker": "446720", "name": "SOL 미국배당다우존스", "market": "KOSPI", "asset_class": "EQUITY"}],
+                [("458730", "TIGER 미국배당다우존스", "KOSPI")],
+            ),
+            (
+                [{"ticker": "458730", "name": "TIGER 미국배당다우존스", "market": "KOSPI", "asset_class": "EQUITY"}],
+                [("446720", "SOL 미국배당다우존스", "KOSPI")],
+            ),
+        ):
+            items = build_items(candidates, held)
+            by_key = {i.key: i for i in items}
+            assert by_key[("446720", "KOSPI")].distribution_frequency == "MONTHLY"
+            assert find_overlap_groups(items, None) == []
+
 
 class TestAnalyze:
     @pytest.mark.asyncio
@@ -243,4 +261,23 @@ class TestAnalyze:
             await svc.analyze_candidate_overlap(cache, candidates, held)
         assert not first.price_data_available
         assert len(first.groups) == 1  # SAME_INDEX는 시세 없이도 판정
+        assert mock_close.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_partial_price_result_not_cached(self, base_returns):
+        """Yahoo 서킷이 열려 국내 심볼만 pykrx로 채워진 부분 결과는 해외 상관 판정이 빠져 있으므로 캐싱하지 않는다."""
+        cache = CacheStore()
+        candidates = [
+            {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI"},
+            {"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "market": "NYSE"},
+        ]
+        held = [("360200", "ACE 미국S&P500", "KOSPI"), ("SPY", "SPDR S&P 500 ETF", "NYSE")]
+        partial = {"360750.KS": _series(base_returns), "360200.KS": _series(base_returns)}
+        with (
+            patch.object(svc, "get_etf_profiles", AsyncMock(return_value={})),
+            patch.object(svc, "fetch_yf_close_series", return_value=partial) as mock_close,
+        ):
+            first = await svc.analyze_candidate_overlap(cache, candidates, held)
+            await svc.analyze_candidate_overlap(cache, candidates, held)
+        assert first.price_data_available
         assert mock_close.call_count == 2

@@ -85,6 +85,7 @@ async def _fred_get_observations(series_id: str, limit: int = 36) -> list[dict[s
         "file_type": "json",
         "sort_order": "desc",
         "limit": limit,
+        # 조회 하한(limit×35일)이라 KST/UTC 하루 차이는 무관 — 서버 date.today() 그대로 둔다
         "observation_start": (date.today() - timedelta(days=limit * 35)).isoformat(),
     }
     try:
@@ -181,6 +182,7 @@ _CALENDAR_DAYS_AHEAD = 90
 
 async def _fetch_fred_calendar_events(days_ahead: int = _CALENDAR_DAYS_AHEAD) -> list[dict[str, Any]]:
     """FRED에서 각 지표의 향후 발표 예정일을 병렬로 조회해 캘린더 형식으로 반환한다."""
+    # FRED 발표일은 미국 기준 날짜 — realtime_start(`_fred_get_release_dates`)와 같은 이유로 today_kst()를 쓰지 않는다
     today = date.today()
     cutoff = today + timedelta(days=days_ahead)
 

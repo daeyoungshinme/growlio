@@ -64,6 +64,8 @@ TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴�
 TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7일 — 사실상 불변 데이터
 TTL_ETF_PROFILE = 7 * 24 * 3600  # ETF 총보수·기초지수·운용사 7일 — 보수 인하는 드물고 참고 정보라 허용
 TTL_ETF_PROFILE_MISSING = 86400  # ETF 아님/데이터 없음 확정 1일 — 신규 상장 ETF가 데이터 생기면 다음날 반영
+# Yahoo가 quoteType으로 "ETF 아님"(개별주 등)을 명시한 해외 종목은 바뀔 일이 없어
+# 프로필과 같은 7일(TTL_ETF_PROFILE)을 쓴다
 TTL_CANDIDATE_OVERLAP = 86400  # 후보·보유 ETF 중복 분석 1일 — 입력 목록 해시가 키라 목록이 바뀌면 자동으로 새 키
 TTL_GOAL_RECOMMENDATION = 3600  # 목표 역산 추천(전체/기간별) 1시간 — 프론트 staleTime과 정합, 설정 변경 시 무효화됨
 TTL_GOAL_CANDIDATE_DIVIDEND_YIELD = 3600  # 목표 역산 추천 후보 배당수익률 1시간 — ticker+market 전역 공유(유저 무관)
@@ -82,6 +84,7 @@ TTL_CHALLENGE_PROGRESS = 300  # 적립 챌린지 진행률(진행률/스트릭) 
 # 잘못된 값을 계속 서빙하는 것을 방지). **값 자체(문자열)는 여기서만 바꾸고,
 # 키 빌더 함수의 f-string 포맷은 그대로 유지할 것 — 무단으로 포맷을 바꾸면 캐시 미스가 폭증한다.**
 _ALLOC_HISTORY_VERSION = "v3"  # v3: 증권계좌 예수금(스냅샷−포지션 차액)을 CASH_STOCK으로 보존
+_ETF_PROFILE_VERSION = "v1"  # v1: 첫 버전 태깅 — EtfProfile TypedDict 필드가 바뀌면 올릴 것
 _MARKET_SIGNAL_VERSION = "v7"
 """v4: exchange_rate.value 산출 소스를 FRED 지연값 → 실시간 캐시(get_usd_krw_rate)로 변경
 (필드 구성은 동일하나 값 자체가 달라지므로, 기존 v3 캐시가 최대 1시간 TTL 동안
@@ -122,7 +125,7 @@ def etf_index_region_key(ticker: str) -> str:
 
 
 def etf_profile_key(ticker: str, market: str) -> str:
-    return f"{_env_prefix()}etf:profile:{ticker}:{market}"
+    return f"{_env_prefix()}etf:profile:{_ETF_PROFILE_VERSION}:{ticker}:{market}"
 
 
 def candidate_overlap_key(digest: str) -> str:

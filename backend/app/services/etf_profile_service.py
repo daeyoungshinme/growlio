@@ -15,15 +15,15 @@ ETF가 아닌 종목(개별주)·데이터 없음은 `None` 프로필로 확정�
 from __future__ import annotations
 
 import asyncio
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import structlog
 
 from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS
-from app.services.dividend.sync_sources import _fetch_naver_etf_analysis
+from app.services.dividend.sync_sources import fetch_naver_etf_analysis
 from app.services.goal_candidate_service import looks_like_korean_etf
 from app.services.market_data_fetcher import fetch_yf_info
-from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
+from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_ETF_PROFILE,
     TTL_ETF_PROFILE_MISSING,
@@ -36,6 +36,9 @@ from app.utils.cache_keys import (
 logger = structlog.get_logger()
 
 _NAVER_FETCH_CONCURRENCY = 6
+_FETCH_DEADLINE_SECONDS = 20.0
+"""프로필 조회 전체 상한 — Naver 최대 20건 × (10초 타임아웃 + 재시도)가 엔드포인트를 붙잡지 않게 한다.
+초과하면 그때까지 받은 프로필만 쓰고 나머지는 None(캐싱 안 함 → 다음 요청에 재시도)."""
 
 
 class EtfProfile(TypedDict):
@@ -46,9 +49,9 @@ class EtfProfile(TypedDict):
     tracking_error_pct: float | None  # 추적오차(%, 국내만)
 
 
-def _as_float(v: object) -> float | None:
+def _as_float(v: Any) -> float | None:
     try:
-        f = float(v)  # type: ignore[arg-type]
+        f = float(v)
     except (TypeError, ValueError):
         return None
     return f if f >= 0 else None
@@ -88,7 +91,7 @@ def parse_yahoo_etf_profile(info: dict) -> EtfProfile | None:
 
 def _sync_naver_profile(ticker: str) -> EtfProfile | None:
     """네트워크 오류는 그대로 raise한다(호출측이 캐싱하지 않도록) — 파싱 결과 없음만 None."""
-    return parse_naver_etf_profile(_fetch_naver_etf_analysis(ticker))
+    return parse_naver_etf_profile(fetch_naver_etf_analysis(ticker))
 
 
 async def get_etf_profiles(
@@ -132,23 +135,29 @@ async def get_etf_profiles(
             return
         await _store(ticker, market, profile)
 
-    async def _store(ticker: str, market: str, profile: EtfProfile | None) -> None:
+    async def _store(ticker: str, market: str, profile: EtfProfile | None, *, definitive: bool = False) -> None:
+        """`definitive`: 소스가 "ETF 아님"을 명시한 경우(Yahoo quoteType) — 프로필과 같은 장기 TTL로 캐싱한다."""
         result[(ticker, market)] = profile
-        ttl = TTL_ETF_PROFILE if profile is not None else TTL_ETF_PROFILE_MISSING
+        ttl = TTL_ETF_PROFILE if profile is not None or definitive else TTL_ETF_PROFILE_MISSING
         await set_cached_json(cache, etf_profile_key(ticker, market), {"profile": profile}, ttl)
 
     async def _fetch_overseas() -> None:
         if not overseas:
             return
         symbol_to_key = {to_yf_symbol(t, m): (t, m) for t, m in overseas}
-        async with _yfinance_sem:
-            info_map = await loop.run_in_executor(None, fetch_yf_info, list(symbol_to_key))
+        info_map = await run_yf_bounded(fetch_yf_info, list(symbol_to_key))
         for symbol, (t, m) in symbol_to_key.items():
             info = info_map.get(symbol)
             if not info:
                 # 빈 응답은 조회 실패(서킷브레이커·네트워크)와 구분되지 않으므로 캐싱하지 않는다.
                 continue
-            await _store(t, m, parse_yahoo_etf_profile(info))
+            await _store(t, m, parse_yahoo_etf_profile(info), definitive=bool(info.get("quoteType")))
 
-    await asyncio.gather(_fetch_overseas(), *[_fetch_domestic(t, m) for t, m in domestic])
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(_fetch_overseas(), *[_fetch_domestic(t, m) for t, m in domestic]),
+            timeout=_FETCH_DEADLINE_SECONDS,
+        )
+    except TimeoutError:
+        logger.warning("etf_profile_fetch_deadline", domestic=len(domestic), overseas=len(overseas))
     return result

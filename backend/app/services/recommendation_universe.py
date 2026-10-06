@@ -30,9 +30,6 @@ import re
 
 from app.constants import DOMESTIC_MARKETS
 
-MAX_GOAL_CANDIDATE_TICKERS = 20
-"""사용자가 등록 가능한 목표 역산 추천 후보 종목 최대 개수 (`api/v1/settings.py` 검증에서 공유)."""
-
 RECOMMENDATION_UNIVERSE: list[dict[str, str]] = [
     {
         "ticker": "SPY",
@@ -216,6 +213,21 @@ _UNIVERSE_TRACKING_INDEX_BY_KEY: dict[tuple[str, str], str] = {
 }
 """큐레이션 유니버스의 (ticker, market) → tracking_index 조회 맵. `resolve_tracking_index()`가
 큐레이션 항목을 명시적 태그 다음 우선순위로 조회하는 데 사용한다."""
+
+_UNIVERSE_DISTRIBUTION_FREQUENCY_BY_KEY: dict[tuple[str, str], str] = {
+    (c["ticker"], c["market"]): c["distribution_frequency"]
+    for c in RECOMMENDATION_UNIVERSE
+    if "distribution_frequency" in c
+}
+"""큐레이션 유니버스의 (ticker, market) → distribution_frequency 조회 맵. 저장된 후보·요청 바디·보유
+종목에는 이 필드가 없으므로(`GoalCandidateTicker`가 저장하지 않음) `resolve_distribution_frequency()`로
+조회해야 한다."""
+
+
+def resolve_distribution_frequency(ticker: str, market: str, explicit: str | None = None) -> str | None:
+    """배당주기 태그를 판별한다. 우선순위: 명시적 태그 > 큐레이션 유니버스 매칭(ticker+market)."""
+    return explicit or _UNIVERSE_DISTRIBUTION_FREQUENCY_BY_KEY.get((ticker, market))
+
 
 _TRACKING_INDEX_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # 다우존스 배당 지수는 이름에 "배당"도 함께 들어가므로 고배당 패턴보다 먼저 검사해야 한다.

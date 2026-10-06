@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.constants import MAX_GOAL_CANDIDATE_TICKERS
 from app.services._goal_recommendation_common import _fetch_dividend_yields, _suggest_for_dividend_goal
 from app.services.goal_age_recommendation_service import (
     _AGE_GROUP_PROFILE,
@@ -38,7 +39,6 @@ from app.services.goal_return_solver import (
     solve_required_monthly_deposit,
 )
 from app.services.recommendation_universe import (
-    MAX_GOAL_CANDIDATE_TICKERS,
     RECOMMENDATION_UNIVERSE,
     guess_asset_class,
     guess_tracking_index,
@@ -947,6 +947,25 @@ class TestDetectDuplicateTrackingIndexNote:
         existing_items = [("360200", "ACE 미국S&P500", "KOSPI")]
         candidates = [{"ticker": "360200", "name": "ACE 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"}]
         assert detect_duplicate_tracking_index_note(candidates, existing_items) is None
+
+    def test_no_note_for_frequency_companion_from_saved_candidates(self):
+        """저장된 후보(`GoalCandidateTicker`)에는 distribution_frequency 필드가 없다 — 큐레이션
+        유니버스에서 (ticker, market)로 조회해야 446720/458730 쌍을 중복으로 안내하지 않는다.
+        보유 측이 월배당(446720)이고 후보가 분기배당(458730)인 반대 방향도 같다."""
+        saved_446720 = {"ticker": "446720", "name": "SOL 미국배당다우존스", "market": "KOSPI", "asset_class": "EQUITY"}
+        saved_458730 = {
+            "ticker": "458730",
+            "name": "TIGER 미국배당다우존스",
+            "market": "KOSPI",
+            "asset_class": "EQUITY",
+        }
+        assert (
+            detect_duplicate_tracking_index_note([saved_446720], [("458730", "TIGER 미국배당다우존스", "KOSPI")])
+            is None
+        )
+        assert (
+            detect_duplicate_tracking_index_note([saved_458730], [("446720", "SOL 미국배당다우존스", "KOSPI")]) is None
+        )
 
     def test_no_note_for_dividend_frequency_differentiated_companion(self):
         """458730(분기배당)을 보유 중이어도, 배당주기가 다른 446720(월배당)은 실질적으로

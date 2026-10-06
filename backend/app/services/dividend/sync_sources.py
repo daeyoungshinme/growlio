@@ -203,7 +203,7 @@ def sync_fdr_etf_dividend_info(ticker: str) -> dict:
         return _zero_div()
 
 
-def _fetch_naver_etf_analysis(ticker: str) -> dict:
+def fetch_naver_etf_analysis(ticker: str) -> dict:
     """Naver Finance 모바일 API(etfAnalysis) 원본 JSON 조회 — 배당·추종지수 판별이 공유하는 소스."""
     import requests as _req
 
@@ -222,7 +222,7 @@ def sync_naver_etf_dividend_info(ticker: str) -> dict:
     import requests.exceptions as _req_exc
 
     try:
-        data = _fetch_naver_etf_analysis(ticker)
+        data = fetch_naver_etf_analysis(ticker)
         div = data.get("dividend") or {}
         if not div:
             return _zero_div_with_months()
@@ -270,7 +270,7 @@ def sync_naver_etf_index_region(ticker: str) -> str | None:
     import requests.exceptions as _req_exc
 
     try:
-        data = _fetch_naver_etf_analysis(ticker)
+        data = fetch_naver_etf_analysis(ticker)
         countries = data.get("countryPortfolioList") or []
         if not countries:
             return None

@@ -3,12 +3,37 @@
 from __future__ import annotations
 
 import asyncio
-import time
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
+from app.utils import circuit_breaker as cb_module
 from app.utils.circuit_breaker import CircuitBreaker, CircuitOpenError
+
+
+class _FakeClock:
+    """`time.monotonic` 대체 — reset_timeout 경과를 실제 sleep 없이 결정적으로 만든다.
+
+    0.01초 reset_timeout + sleep 조합은 느린 CI에서 재오픈 직후 검증 전에 다시 HALF_OPEN으로 넘어가는
+    타이밍 플레이크가 있었다(계획 42 관찰)."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
+@pytest.fixture
+def fake_clock(monkeypatch):
+    clock = _FakeClock()
+    # 전역 time.monotonic을 바꾸면 asyncio 이벤트 루프 시계까지 멈추므로 모듈의 `time` 이름만 교체한다
+    monkeypatch.setattr(cb_module, "time", SimpleNamespace(monotonic=clock))
+    return clock
 
 
 class TestCircuitBreakerStates:
@@ -47,26 +72,26 @@ class TestCircuitBreakerStates:
         cb.record_failure()
         assert cb.is_available()
 
-    def test_open_transitions_to_half_open_after_timeout(self, override_settings):
-        cb = CircuitBreaker("test", fail_max=1, reset_timeout=0.01)
+    def test_open_transitions_to_half_open_after_timeout(self, override_settings, fake_clock):
+        cb = CircuitBreaker("test", fail_max=1, reset_timeout=60)
         cb.record_failure()
         assert not cb.is_available()
-        time.sleep(0.05)
+        fake_clock.advance(61)
         # After timeout, state property transitions to HALF_OPEN → is_available = True
         assert cb.is_available()
 
-    def test_half_open_failure_reopens_circuit(self, override_settings):
-        cb = CircuitBreaker("test", fail_max=1, reset_timeout=0.01)
+    def test_half_open_failure_reopens_circuit(self, override_settings, fake_clock):
+        cb = CircuitBreaker("test", fail_max=1, reset_timeout=60)
         cb.record_failure()
-        time.sleep(0.05)
+        fake_clock.advance(61)
         cb.is_available()  # trigger HALF_OPEN transition
         cb.record_failure()  # fail in HALF_OPEN → OPEN again
         assert not cb.is_available()
 
-    def test_half_open_success_closes_circuit(self, override_settings):
-        cb = CircuitBreaker("test", fail_max=1, reset_timeout=0.01)
+    def test_half_open_success_closes_circuit(self, override_settings, fake_clock):
+        cb = CircuitBreaker("test", fail_max=1, reset_timeout=60)
         cb.record_failure()
-        time.sleep(0.05)
+        fake_clock.advance(61)
         cb.is_available()  # trigger HALF_OPEN
         cb.record_success()
         assert cb.is_available()
@@ -116,10 +141,10 @@ class TestCircuitBreakerHalfOpenProbeGating:
     계속 열린 채로 "플래핑"할 수 있다."""
 
     @pytest.mark.asyncio
-    async def test_only_one_concurrent_call_attempts_the_probe(self, override_settings):
-        cb = CircuitBreaker("test", fail_max=1, reset_timeout=0.01)
+    async def test_only_one_concurrent_call_attempts_the_probe(self, override_settings, fake_clock):
+        cb = CircuitBreaker("test", fail_max=1, reset_timeout=60)
         cb.record_failure()
-        await asyncio.sleep(0.05)  # reset_timeout 경과 → 다음 접근 시 HALF_OPEN 전환
+        fake_clock.advance(61)  # reset_timeout 경과 → 다음 접근 시 HALF_OPEN 전환
 
         attempted = []
 
@@ -142,10 +167,10 @@ class TestCircuitBreakerHalfOpenProbeGating:
         assert cb._failures == 0
 
     @pytest.mark.asyncio
-    async def test_probe_failure_reopens_circuit_without_letting_others_retry(self, override_settings):
-        cb = CircuitBreaker("test", fail_max=1, reset_timeout=0.01)
+    async def test_probe_failure_reopens_circuit_without_letting_others_retry(self, override_settings, fake_clock):
+        cb = CircuitBreaker("test", fail_max=1, reset_timeout=60)
         cb.record_failure()
-        await asyncio.sleep(0.05)
+        fake_clock.advance(61)
 
         attempted = []
 
@@ -164,12 +189,12 @@ class TestCircuitBreakerHalfOpenProbeGating:
         assert not cb.is_available()
 
     @pytest.mark.asyncio
-    async def test_bypass_exception_during_probe_releases_slot_for_next_call(self, override_settings):
+    async def test_bypass_exception_during_probe_releases_slot_for_next_call(self, override_settings, fake_clock):
         from app.exceptions import ProviderCredentialError
 
-        cb = CircuitBreaker("test", fail_max=1, reset_timeout=0.01)
+        cb = CircuitBreaker("test", fail_max=1, reset_timeout=60)
         cb.record_failure()
-        await asyncio.sleep(0.05)
+        fake_clock.advance(61)
 
         cred_error = AsyncMock(side_effect=ProviderCredentialError("bad cred"))
         with pytest.raises(ProviderCredentialError):

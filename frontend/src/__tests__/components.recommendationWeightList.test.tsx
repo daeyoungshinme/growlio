@@ -49,4 +49,18 @@ describe("RecommendationWeightList", () => {
     );
     expect(screen.queryByText(/배당/)).toBeNull();
   });
+
+  it("terMap에 있는 종목만 총보수를 표시한다", () => {
+    renderWithProviders(
+      <RecommendationWeightList
+        items={[
+          makeItem({ ticker: "360750", name: "TIGER 미국S&P500" }),
+          makeItem({ ticker: "005930", name: "삼성전자" }),
+        ]}
+        terMap={new Map([["360750:KOSPI", 0.0068]])}
+      />,
+    );
+    expect(screen.getByText(/보수 0\.0068%/)).toBeInTheDocument();
+    expect(screen.getAllByText(/· 보수/)).toHaveLength(1);
+  });
 });

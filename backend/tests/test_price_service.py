@@ -122,7 +122,6 @@ class TestFetchPricesBatch:
 
         with (
             patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
-            patch("app.services.price_service._yfinance_sem"),
         ):
             mock_circuit.is_available.return_value = True
 
@@ -336,7 +335,6 @@ class TestGetHistoricalReturns:
 
         with (
             patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
-            patch("app.services.price_service._yfinance_sem"),
         ):
             mock_circuit.is_available.return_value = True
 
@@ -357,7 +355,6 @@ class TestGetHistoricalReturns:
 
         with (
             patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
-            patch("app.services.price_service._yfinance_sem"),
             patch(
                 "app.services.yahoo_price._sync_calc_returns_batch",
                 return_value={},

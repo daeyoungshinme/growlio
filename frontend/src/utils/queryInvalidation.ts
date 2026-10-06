@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
-/** 계좌 sync 후 — accounts(last_synced_at/last_sync_error·예수금 등 갱신) + portfolio + dashboard + 배당 데이터 + 인사이트 + 드리프트 */
+/** 계좌 sync 후 — accounts(last_synced_at/last_sync_error·예수금 등 갱신) + portfolio + dashboard + 배당 데이터 + 인사이트 + 드리프트 + 목표 추천 */
 export function invalidateSyncData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
@@ -18,10 +18,12 @@ export function invalidateSyncData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk() }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
+    // 목표 역산 추천·후보 중복 점검("보유 중" 표시)이 보유 포지션 기준 — 백엔드 sync도 같은 캐시를 지운다
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
   ]);
 }
 
-/** 계좌 CUD 후 — accounts + portfolio + dashboard + transactions
+/** 계좌 CUD 후 — accounts + portfolio + dashboard + transactions + 목표 추천
  * (현금성 계좌 잔액 수정 시 백엔드가 입출금 거래를 자동 생성할 수 있음) */
 export function invalidateAccountData(qc: QueryClient) {
   return Promise.all([
@@ -39,6 +41,7 @@ export function invalidateAccountData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasRealizedBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
   ]);
 }
 

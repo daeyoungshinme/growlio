@@ -2,7 +2,18 @@
 
 from pydantic import BaseModel, Field
 
-from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
+from app.constants import MAX_GOAL_CANDIDATE_TICKERS
+from app.enums import AssetClass, IndexRegion
+
+
+class GoalCandidateTicker(BaseModel):
+    """사용자가 등록한 목표 역산 추천 후보 종목 — `UserSettings.goal_candidate_tickers` JSONB 1건."""
+
+    ticker: str
+    name: str
+    market: str
+    asset_class: AssetClass = AssetClass.EQUITY
+    index_region: IndexRegion | None = None
 
 
 class GoalRecommendationItem(BaseModel):
@@ -135,11 +146,13 @@ class OverlapGroup(BaseModel):
     ter_gap_pct: float | None = None  # 그룹 내 최고-최저 보수 차이(%p)
 
 
-class OverlapCandidateIn(BaseModel):
+class OverlapCandidateIn(GoalCandidateTicker):
+    """후보 관리 모달의 저장 전 편집 목록 1건 — 저장 형식과 같고 입력 길이만 제한한다
+    (저장된 기존 값 응답에도 쓰이는 `GoalCandidateTicker`에 제약을 걸면 레거시 행 조회가 깨질 수 있다)."""
+
     ticker: str = Field(min_length=1, max_length=20)
     name: str = Field(max_length=100)
     market: str = Field(min_length=1, max_length=20)
-    asset_class: str = "EQUITY"
 
 
 class CandidateOverlapRequest(BaseModel):

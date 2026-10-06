@@ -730,14 +730,16 @@ class TestCandidateOverlap:
     def _post(self, app, body, settings_row=None, pos_map=None):
         with (
             patch("app.api.v1.rebalancing.get_cache_store", new_callable=AsyncMock, return_value=None),
-            patch("app.api.v1.rebalancing.get_settings_row", new_callable=AsyncMock, return_value=settings_row),
             patch(
-                "app.api.v1.rebalancing.query_latest_position_map",
+                "app.services.etf_overlap_service.get_settings_row", new_callable=AsyncMock, return_value=settings_row
+            ),
+            patch(
+                "app.services.etf_overlap_service.query_latest_position_map",
                 new_callable=AsyncMock,
                 return_value=pos_map or {},
             ),
             patch(
-                "app.api.v1.rebalancing.analyze_candidate_overlap",
+                "app.services.etf_overlap_service.analyze_candidate_overlap",
                 new_callable=AsyncMock,
                 return_value={"groups": [], "profiles": [], "price_data_available": True},
             ) as mock_analyze,

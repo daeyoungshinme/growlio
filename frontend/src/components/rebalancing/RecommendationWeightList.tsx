@@ -13,34 +13,37 @@ export default function RecommendationWeightList({
 }) {
   return (
     <ul className="space-y-1">
-      {items.map((item) => (
-        <li
-          key={`${item.ticker}-${item.market}`}
-          className="flex items-center justify-between text-xs"
-        >
-          <span className="text-gray-700 dark:text-gray-300">
-            {item.name}
-            {item.ticker !== CASH_EQUIVALENT_TICKER && (
-              <span className="text-gray-400 dark:text-gray-500"> ({item.ticker})</span>
-            )}
-            {item.dividend_yield_pct != null && (
-              <span className="text-gray-400 dark:text-gray-500">
-                {" "}
-                · 배당 {item.dividend_yield_pct.toFixed(1)}%
-              </span>
-            )}
-            {terMap?.has(itemKey(item.ticker, item.market)) && (
-              <span className="text-gray-400 dark:text-gray-500">
-                {" "}
-                · 보수 {formatTerPct(terMap.get(itemKey(item.ticker, item.market)) as number)}
-              </span>
-            )}
-          </span>
-          <span className="font-medium text-teal-600 dark:text-teal-400">
-            {item.weight.toFixed(1)}%
-          </span>
-        </li>
-      ))}
+      {items.map((item) => {
+        const ter = terMap?.get(itemKey(item.ticker, item.market));
+        return (
+          <li
+            key={`${item.ticker}-${item.market}`}
+            className="flex items-center justify-between text-xs"
+          >
+            <span className="text-gray-700 dark:text-gray-300">
+              {item.name}
+              {item.ticker !== CASH_EQUIVALENT_TICKER && (
+                <span className="text-gray-400 dark:text-gray-500"> ({item.ticker})</span>
+              )}
+              {item.dividend_yield_pct != null && (
+                <span className="text-gray-400 dark:text-gray-500">
+                  {" "}
+                  · 배당 {item.dividend_yield_pct.toFixed(1)}%
+                </span>
+              )}
+              {ter != null && (
+                <span className="text-gray-400 dark:text-gray-500">
+                  {" "}
+                  · 보수 {formatTerPct(ter)}
+                </span>
+              )}
+            </span>
+            <span className="font-medium text-teal-600 dark:text-teal-400">
+              {item.weight.toFixed(1)}%
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }

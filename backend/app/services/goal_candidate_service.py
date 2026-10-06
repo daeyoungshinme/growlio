@@ -13,14 +13,14 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, PENSION_TAX_TYPES
+from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, MAX_GOAL_CANDIDATE_TICKERS, PENSION_TAX_TYPES
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
 from app.services.dividend.constants import is_korean_etf
 from app.services.recommendation_universe import (
-    MAX_GOAL_CANDIDATE_TICKERS,
     RECOMMENDATION_UNIVERSE,
     guess_asset_class,
+    resolve_distribution_frequency,
     resolve_index_region,
     resolve_tracking_index,
 )
@@ -234,12 +234,16 @@ def detect_duplicate_tracking_index_note(
     held_index_labels: dict[str, tuple[str, str]] = {}
     held_keys = {(t, m) for t, _, m in existing_items}
     for t, name, m in existing_items:
+        if resolve_distribution_frequency(t, m):
+            continue
         idx = resolve_tracking_index(t, m, name, None)
         if idx is not None:
             held_index_labels.setdefault(idx, (t, name))
 
     for c in candidates:
-        if (c["ticker"], c["market"]) in held_keys or c.get("distribution_frequency"):
+        if (c["ticker"], c["market"]) in held_keys or resolve_distribution_frequency(
+            c["ticker"], c["market"], c.get("distribution_frequency")
+        ):
             continue
         idx = resolve_tracking_index(c["ticker"], c["market"], c["name"], c.get("tracking_index"))
         if idx is None:
