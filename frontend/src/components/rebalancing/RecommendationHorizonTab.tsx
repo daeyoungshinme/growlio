@@ -11,7 +11,9 @@ import { fmtKrw } from "@/utils/format";
 import { normalizeWeights } from "@/utils/recommendationDrift";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import RecommendationResultPanel from "@/components/rebalancing/RecommendationResultPanel";
+import { RecommendationNoItems } from "@/components/rebalancing/RecommendationEmptyStates";
 import {
+  formatRecMetricParts,
   RISK_TOLERANCE_LABELS,
   significantDrift,
   type RecommendationTabActions,
@@ -25,7 +27,7 @@ interface Props {
   fetching: boolean;
   /** 태그 매칭으로 확정된 적용 대상 포트폴리오(없으면 안내 문구만) */
   targetPortfolio: Portfolio | undefined;
-  /** 같은 기간·세제유형 태그의 주식 계좌 — "새 포트폴리오 만들기" 시 함께 연결 */
+  /** 전체 주식 계좌 — "새 포트폴리오 만들기" 시 이 탭의 기간·세제유형 태그로 필터해 함께 연결 */
   stockAccounts: AssetAccount[];
   /** 같은 기간·세제유형 태그의 CMA/파킹통장 — 현금성 자산 추천의 실제 근거 계좌 */
   cashEquivalentMatches: AssetAccount[];
@@ -53,20 +55,13 @@ export default function RecommendationHorizonTab({
   return (
     <>
       <p className="text-xs text-gray-600 dark:text-gray-300">
-        {INVESTMENT_HORIZON_LABELS[horizon]} · {ACCOUNT_TAX_TYPE_LABELS[taxType]} 태그 계좌{" "}
-        {rec.account_count}개 · 자산총액 {fmtKrw(rec.base_krw)} · 투자성향{" "}
-        {RISK_TOLERANCE_LABELS[rec.risk_tolerance] ?? rec.risk_tolerance}
-        {rec.required_dividend_yield_pct != null &&
-          ` · 목표 배당수익률 연 ${rec.required_dividend_yield_pct.toFixed(1)}%`}
-        {hasItems &&
-          rec.expected_return_pct != null &&
-          ` · 기대수익률 ${rec.expected_return_pct.toFixed(1)}%`}
-        {hasItems &&
-          rec.expected_dividend_yield_pct != null &&
-          ` · 배당수익률 약 ${rec.expected_dividend_yield_pct.toFixed(1)}%`}
-        {hasItems &&
-          rec.expected_volatility_pct != null &&
-          ` · 예상 변동성 연 ${rec.expected_volatility_pct.toFixed(1)}%`}
+        {[
+          INVESTMENT_HORIZON_LABELS[horizon],
+          `${ACCOUNT_TAX_TYPE_LABELS[taxType]} 태그 계좌 ${rec.account_count}개`,
+          `자산총액 ${fmtKrw(rec.base_krw)}`,
+          `투자성향 ${RISK_TOLERANCE_LABELS[rec.risk_tolerance] ?? rec.risk_tolerance}`,
+          ...formatRecMetricParts(rec, hasItems),
+        ].join(" · ")}
       </p>
 
       {hasItems ? (
@@ -122,9 +117,7 @@ export default function RecommendationHorizonTab({
           }
         />
       ) : (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {rec.note ?? "추천을 계산할 수 없습니다"}
-        </p>
+        <RecommendationNoItems note={rec.note} fallback="추천을 계산할 수 없습니다" />
       )}
     </>
   );

@@ -61,6 +61,34 @@ export function significantDrift(
   return hasSignificantDrift(drift) ? drift : null;
 }
 
+/** 추천 탭 설정 유도 액션(`RecommendationSetupCta`의 `<Link>`/`<button>`) 공통 스타일. */
+export const SETUP_CTA_ACTION_CLASS =
+  "flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline shrink-0";
+
+type RecMetrics = Pick<
+  GoalRecommendation,
+  | "required_dividend_yield_pct"
+  | "expected_return_pct"
+  | "expected_dividend_yield_pct"
+  | "expected_volatility_pct"
+>;
+
+/** 연령대/기간별 탭 요약문의 지표 조각(" · "로 이어 붙임). 목표 배당수익률은 입력값이라 항상,
+ * 기대 지표 3종은 `includeExpected`일 때만(추천 결과가 비어 있으면 의미 없음) 넣는다. */
+export function formatRecMetricParts(rec: RecMetrics, includeExpected = true): string[] {
+  const parts: string[] = [];
+  if (rec.required_dividend_yield_pct != null)
+    parts.push(`목표 배당수익률 연 ${rec.required_dividend_yield_pct.toFixed(1)}%`);
+  if (!includeExpected) return parts;
+  if (rec.expected_return_pct != null)
+    parts.push(`기대수익률 ${rec.expected_return_pct.toFixed(1)}%`);
+  if (rec.expected_dividend_yield_pct != null)
+    parts.push(`배당수익률 약 ${rec.expected_dividend_yield_pct.toFixed(1)}%`);
+  if (rec.expected_volatility_pct != null)
+    parts.push(`예상 변동성 연 ${rec.expected_volatility_pct.toFixed(1)}%`);
+  return parts;
+}
+
 /** 전체/연령대 탭의 적용 섹션 — 대상 선택 + 적용 + "새 포트폴리오 만들기"(계좌 연결 없음). */
 export function buildOverallApplySection(
   selection: OverallTargetSelection,

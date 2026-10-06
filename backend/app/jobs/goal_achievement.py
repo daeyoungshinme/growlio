@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import structlog
@@ -63,132 +64,104 @@ async def run_goal_achievement_check() -> None:
     await run_alert_job(_run_goal_achievement_check, "goal_achievement_check_job", needs_cache=True)
 
 
+@dataclass(frozen=True)
+class _GoalSpec:
+    """목표 유형 1개의 알림 규칙 — 설정값 필드·대시보드 달성률 키·문구·이벤트명."""
+
+    goal_type: str  # send_goal_achievement_email의 goal_type
+    goal_attr: str  # UserSettings 필드
+    pct_key: str  # get_dashboard_summary 응답 키
+    label: str  # 메시지 접두 ("총 자산 목표")
+    push_title: str
+    # True면 현재 금액을 대시보드 총자산에서, False면 목표 × 달성률로 역산
+    current_from_total_assets: bool = False
+
+    @property
+    def alert_type(self) -> str:
+        return f"GOAL_{self.goal_type}"
+
+    @property
+    def log_prefix(self) -> str:
+        return f"goal_{self.goal_type.lower()}_alert"
+
+
+_GOAL_SPECS: tuple[_GoalSpec, ...] = (
+    _GoalSpec(
+        goal_type="ASSET",
+        goal_attr="goal_amount",
+        pct_key="goal_achievement_pct",
+        label="총 자산 목표",
+        push_title="자산 목표 달성",
+        current_from_total_assets=True,
+    ),
+    _GoalSpec(
+        goal_type="DEPOSIT",
+        goal_attr="annual_deposit_goal",
+        pct_key="deposit_achievement_pct",
+        label="연간 입금 목표",
+        push_title="입금 목표 달성",
+    ),
+    _GoalSpec(
+        goal_type="DIVIDEND",
+        goal_attr="annual_dividend_goal",
+        pct_key="dividend_goal_achievement_pct",
+        label="연간 배당 목표",
+        push_title="배당 목표 달성",
+    ),
+)
+
+
+async def _notify_goal(
+    db: AsyncSession,
+    user: User,
+    settings_row: UserSettings,
+    spec: _GoalSpec,
+    summary: dict,
+    to_email: str,
+) -> None:
+    """목표 1개가 100% 이상이고 이번 달 미발송이면 이메일 → (성공 시) 이력 저장 → 푸시."""
+    goal_raw = getattr(settings_row, spec.goal_attr)
+    pct: float | None = summary.get(spec.pct_key)
+    if not goal_raw or pct is None or pct < 100:
+        return
+    if await _already_notified_this_month(db, user.id, spec.alert_type):
+        return
+
+    goal = float(goal_raw)
+    current = float(summary.get("total_assets_krw") or 0) if spec.current_from_total_assets else goal * pct / 100
+    sent = await send_goal_achievement_email(
+        to_email=to_email,
+        goal_type=spec.goal_type,
+        goal_amount=goal,
+        current_amount=current,
+        achievement_pct=pct,
+    )
+    if not sent:
+        return
+
+    msg = f"{spec.label} 달성 {pct:.1f}% — {current:,.0f}원 / {goal:,.0f}원"
+    db.add(AlertHistory(user_id=user.id, alert_type=spec.alert_type, message=msg))
+    await db.commit()
+    logger.info(f"{spec.log_prefix}_sent", user_id=str(user.id), pct=pct)
+    try:
+        await send_push_to_user(
+            user_id=user.id,
+            title=spec.push_title,
+            body=msg,
+            fcm_token=settings_row.fcm_token,
+            data={"type": spec.alert_type},
+        )
+    except Exception as exc:
+        logger.warning(f"{spec.log_prefix}_push_failed", user_id=str(user.id), error=str(exc))
+
+
 async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: asyncio.Semaphore) -> None:
     async with sem:
         to_email = settings_row.notification_email or user.email
         try:
             async with AsyncSessionLocal() as db:
                 summary = await get_dashboard_summary(user.id, db, cache)
-
-                total_assets = float(summary.get("total_assets_krw") or 0)
-                goal_pct: float | None = summary.get("goal_achievement_pct")
-                deposit_pct: float | None = summary.get("deposit_achievement_pct")
-                dividend_pct: float | None = summary.get("dividend_goal_achievement_pct")
-
-                if (
-                    settings_row.goal_amount
-                    and goal_pct is not None
-                    and goal_pct >= 100
-                    and not await _already_notified_this_month(db, user.id, "GOAL_ASSET")
-                ):
-                    goal_amount = float(settings_row.goal_amount)
-                    sent = await send_goal_achievement_email(
-                        to_email=to_email,
-                        goal_type="ASSET",
-                        goal_amount=goal_amount,
-                        current_amount=total_assets,
-                        achievement_pct=goal_pct,
-                    )
-                    if sent:
-                        msg = f"총 자산 목표 달성 {goal_pct:.1f}% — {total_assets:,.0f}원 / {goal_amount:,.0f}원"
-                        db.add(
-                            AlertHistory(
-                                user_id=user.id,
-                                alert_type="GOAL_ASSET",
-                                message=msg,
-                            )
-                        )
-                        await db.commit()
-                        logger.info("goal_asset_alert_sent", user_id=str(user.id), pct=goal_pct)
-                        try:
-                            await send_push_to_user(
-                                user_id=user.id,
-                                title="자산 목표 달성",
-                                body=msg,
-                                fcm_token=settings_row.fcm_token,
-                                data={"type": "GOAL_ASSET"},
-                            )
-                        except Exception as exc:
-                            logger.warning("goal_asset_alert_push_failed", user_id=str(user.id), error=str(exc))
-
-                if (
-                    settings_row.annual_deposit_goal
-                    and deposit_pct is not None
-                    and deposit_pct >= 100
-                    and not await _already_notified_this_month(db, user.id, "GOAL_DEPOSIT")
-                ):
-                    deposit_goal = float(settings_row.annual_deposit_goal)
-                    current_deposit = deposit_goal * deposit_pct / 100
-                    sent = await send_goal_achievement_email(
-                        to_email=to_email,
-                        goal_type="DEPOSIT",
-                        goal_amount=deposit_goal,
-                        current_amount=current_deposit,
-                        achievement_pct=deposit_pct,
-                    )
-                    if sent:
-                        msg = (
-                            f"연간 입금 목표 달성 {deposit_pct:.1f}% — {current_deposit:,.0f}원 / {deposit_goal:,.0f}원"
-                        )
-                        db.add(
-                            AlertHistory(
-                                user_id=user.id,
-                                alert_type="GOAL_DEPOSIT",
-                                message=msg,
-                            )
-                        )
-                        await db.commit()
-                        logger.info("goal_deposit_alert_sent", user_id=str(user.id), pct=deposit_pct)
-                        try:
-                            await send_push_to_user(
-                                user_id=user.id,
-                                title="입금 목표 달성",
-                                body=msg,
-                                fcm_token=settings_row.fcm_token,
-                                data={"type": "GOAL_DEPOSIT"},
-                            )
-                        except Exception as exc:
-                            logger.warning("goal_deposit_alert_push_failed", user_id=str(user.id), error=str(exc))
-
-                if (
-                    settings_row.annual_dividend_goal
-                    and dividend_pct is not None
-                    and dividend_pct >= 100
-                    and not await _already_notified_this_month(db, user.id, "GOAL_DIVIDEND")
-                ):
-                    dividend_goal = float(settings_row.annual_dividend_goal)
-                    current_dividend = dividend_goal * dividend_pct / 100
-                    sent = await send_goal_achievement_email(
-                        to_email=to_email,
-                        goal_type="DIVIDEND",
-                        goal_amount=dividend_goal,
-                        current_amount=current_dividend,
-                        achievement_pct=dividend_pct,
-                    )
-                    if sent:
-                        msg = (
-                            f"연간 배당 목표 달성 {dividend_pct:.1f}% — "
-                            f"{current_dividend:,.0f}원 / {dividend_goal:,.0f}원"
-                        )
-                        db.add(
-                            AlertHistory(
-                                user_id=user.id,
-                                alert_type="GOAL_DIVIDEND",
-                                message=msg,
-                            )
-                        )
-                        await db.commit()
-                        logger.info("goal_dividend_alert_sent", user_id=str(user.id), pct=dividend_pct)
-                        try:
-                            await send_push_to_user(
-                                user_id=user.id,
-                                title="배당 목표 달성",
-                                body=msg,
-                                fcm_token=settings_row.fcm_token,
-                                data={"type": "GOAL_DIVIDEND"},
-                            )
-                        except Exception as exc:
-                            logger.warning("goal_dividend_alert_push_failed", user_id=str(user.id), error=str(exc))
-
+                for spec in _GOAL_SPECS:
+                    await _notify_goal(db, user, settings_row, spec, summary, to_email)
         except Exception as e:
             report_job_failure("goal_achievement_check_failed", e, user_id=str(user.id))

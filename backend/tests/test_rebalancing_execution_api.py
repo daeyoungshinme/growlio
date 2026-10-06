@@ -41,8 +41,11 @@ class TestExecutionPlanGates:
 
         mock_build_plan = AsyncMock()
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=True)),
-            patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=mock_build_plan),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=True),
+            ),
+            patch("app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert", new=mock_build_plan),
         ):
             result = await create_rebalancing_execution_plan(
                 request=mock_request,
@@ -73,12 +76,15 @@ class TestExecutionPlanGates:
 
         mock_build_plan = AsyncMock()
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
             patch(
                 "app.services.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "RED"}),
             ),
-            patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=mock_build_plan),
+            patch("app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert", new=mock_build_plan),
         ):
             result = await create_rebalancing_execution_plan(
                 request=mock_request,
@@ -113,12 +119,15 @@ class TestExecutionPlanGates:
 
         mock_build_plan = AsyncMock()
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
             patch(
                 "app.services.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "STALE"}),
             ),
-            patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=mock_build_plan),
+            patch("app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert", new=mock_build_plan),
         ):
             result = await create_rebalancing_execution_plan(
                 request=mock_request,
@@ -148,12 +157,18 @@ class TestExecutionPlanGates:
         mock_db.scalar = AsyncMock(side_effect=[portfolio, alert_row])
 
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
             patch(
                 "app.services.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
-            patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=AsyncMock(return_value=None)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert",
+                new=AsyncMock(return_value=None),
+            ),
         ):
             result = await create_rebalancing_execution_plan(
                 request=mock_request,
@@ -184,13 +199,16 @@ class TestExecutionPlanGates:
         blocked = TaxGateBlocked(estimated_tax_krw=600_000.0, max_tax_impact_krw=500_000.0)
 
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
             patch(
                 "app.services.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
-                "app.api.v1.rebalancing_execution.build_pending_plan_for_alert",
+                "app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=blocked),
             ),
         ):
@@ -229,13 +247,16 @@ class TestExecutionPlanGates:
         )
 
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
             patch(
                 "app.services.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
-                "app.api.v1.rebalancing_execution.build_pending_plan_for_alert",
+                "app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=blocked),
             ),
         ):
@@ -272,13 +293,16 @@ class TestExecutionPlanGates:
         mock_db.scalar = AsyncMock(side_effect=[portfolio, alert_row])
 
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
             patch(
                 "app.services.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
-                "app.api.v1.rebalancing_execution.build_pending_plan_for_alert",
+                "app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=PlanGenerationInProgress()),
             ),
         ):
@@ -315,16 +339,21 @@ class TestExecutionPlanGenerated:
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
             patch(
                 "app.services.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
-                "app.api.v1.rebalancing_execution.build_pending_plan_for_alert",
+                "app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=(plan, "buy-token", "sell-token")),
             ),
-            patch("app.api.v1.rebalancing_execution.notify_plan_generated", new=AsyncMock(return_value=True)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.notify_plan_generated", new=AsyncMock(return_value=True)
+            ),
         ):
             result = await create_rebalancing_execution_plan(
                 request=mock_request,
@@ -365,16 +394,22 @@ class TestExecutionPlanGenerated:
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
             patch(
                 "app.services.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
-                "app.api.v1.rebalancing_execution.build_pending_plan_for_alert",
+                "app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=(plan, "buy-token", None)),
             ),
-            patch("app.api.v1.rebalancing_execution.notify_plan_generated", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.notify_plan_generated",
+                new=AsyncMock(return_value=False),
+            ),
         ):
             result = await create_rebalancing_execution_plan(
                 request=mock_request,
@@ -411,13 +446,19 @@ class TestExecutionPlanGenerated:
 
         mock_build_plan = AsyncMock(return_value=(plan, None, None))
         with (
-            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.rebalancing.quick_execute_service.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
             patch(
                 "app.services.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
-            patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=mock_build_plan),
-            patch("app.api.v1.rebalancing_execution.notify_plan_generated", new=AsyncMock(return_value=False)),
+            patch("app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert", new=mock_build_plan),
+            patch(
+                "app.services.rebalancing.quick_execute_service.notify_plan_generated",
+                new=AsyncMock(return_value=False),
+            ),
         ):
             await create_rebalancing_execution_plan(
                 request=mock_request,

@@ -49,3 +49,31 @@ describe("useCandidateOverlap", () => {
     expect(analyzeCandidateOverlap).toHaveBeenCalledWith(draft);
   });
 });
+
+describe("useCandidateOverlap 디바운스", () => {
+  beforeEach(() => {
+    analyzeCandidateOverlap.mockReset();
+    analyzeCandidateOverlap.mockResolvedValue(EMPTY);
+  });
+
+  it("연달아 편집하면 중간 목록은 조회하지 않고 마지막 목록만 조회한다", async () => {
+    const first = [{ ticker: "SPY", name: "SPDR", market: "NYSE" }];
+    const middle = [...first, { ticker: "QQQ", name: "Invesco", market: "NASDAQ" }];
+    const last = [...middle, { ticker: "VTI", name: "Vanguard", market: "NYSE" }];
+
+    const { result, rerender } = renderHook(({ c }) => useCandidateOverlap(c), {
+      wrapper,
+      initialProps: { c: first },
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(analyzeCandidateOverlap).toHaveBeenCalledTimes(1);
+
+    rerender({ c: middle });
+    rerender({ c: last });
+    expect(analyzeCandidateOverlap).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => expect(analyzeCandidateOverlap).toHaveBeenCalledWith(last));
+    expect(analyzeCandidateOverlap).not.toHaveBeenCalledWith(middle);
+    expect(analyzeCandidateOverlap).toHaveBeenCalledTimes(2);
+  });
+});

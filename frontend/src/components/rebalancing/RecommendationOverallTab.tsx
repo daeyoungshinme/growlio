@@ -3,7 +3,12 @@ import { ArrowRight } from "lucide-react";
 import type { GoalRecommendation } from "@/api/rebalancing";
 import RecommendationResultPanel from "@/components/rebalancing/RecommendationResultPanel";
 import {
+  RecommendationNoItems,
+  RecommendationSetupCta,
+} from "@/components/rebalancing/RecommendationEmptyStates";
+import {
   buildOverallApplySection,
+  SETUP_CTA_ACTION_CLASS,
   significantDrift,
   type OverallTargetSelection,
   type RecommendationTabActions,
@@ -19,27 +24,22 @@ interface Props {
 export default function RecommendationOverallTab({ data, selection, actions }: Props) {
   if (!data.is_configured) {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {data.note ?? "목표금액·목표연도를 설정하면 추천을 받을 수 있습니다"}
-        </p>
-        <Link
-          to="/invest-plan?tab=적립 계획&from=recommendation"
-          className="flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline shrink-0"
-        >
-          목표 설정하러 가기 <ArrowRight size={12} />
-        </Link>
-      </div>
+      <RecommendationSetupCta
+        note={data.note}
+        fallback="목표금액·목표연도를 설정하면 추천을 받을 수 있습니다"
+        action={
+          <Link
+            to="/invest-plan?tab=적립 계획&from=recommendation"
+            className={SETUP_CTA_ACTION_CLASS}
+          >
+            목표 설정하러 가기 <ArrowRight size={12} />
+          </Link>
+        }
+      />
     );
   }
 
-  if (data.recommended_items.length === 0) {
-    return (
-      <p className="text-xs text-gray-500 dark:text-gray-400">
-        {data.note ?? "추천을 계산할 수 없습니다 — 후보 ETF를 등록해주세요"}
-      </p>
-    );
-  }
+  if (data.recommended_items.length === 0) return <RecommendationNoItems note={data.note} />;
 
   return (
     <>

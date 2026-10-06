@@ -3,8 +3,14 @@ import type { GoalRecommendation } from "@/api/rebalancing";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import RecommendationResultPanel from "@/components/rebalancing/RecommendationResultPanel";
 import {
+  RecommendationNoItems,
+  RecommendationSetupCta,
+} from "@/components/rebalancing/RecommendationEmptyStates";
+import {
   buildOverallApplySection,
+  formatRecMetricParts,
   RISK_TOLERANCE_LABELS,
+  SETUP_CTA_ACTION_CLASS,
   significantDrift,
   type OverallTargetSelection,
   type RecommendationTabActions,
@@ -31,42 +37,27 @@ export default function RecommendationAgeTab({
 
   if (!data.is_configured) {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {data.note ?? "연령대를 설정하면 연령대별 추천을 받을 수 있습니다"}
-        </p>
-        <button
-          type="button"
-          onClick={onOpenOptions}
-          className="flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline shrink-0"
-        >
-          연령대 설정하기 <ArrowRight size={12} />
-        </button>
-      </div>
+      <RecommendationSetupCta
+        note={data.note}
+        fallback="연령대를 설정하면 연령대별 추천을 받을 수 있습니다"
+        action={
+          <button type="button" onClick={onOpenOptions} className={SETUP_CTA_ACTION_CLASS}>
+            연령대 설정하기 <ArrowRight size={12} />
+          </button>
+        }
+      />
     );
   }
 
-  if (data.recommended_items.length === 0) {
-    return (
-      <p className="text-xs text-gray-500 dark:text-gray-400">
-        {data.note ?? "추천을 계산할 수 없습니다 — 후보 ETF를 등록해주세요"}
-      </p>
-    );
-  }
+  if (data.recommended_items.length === 0) return <RecommendationNoItems note={data.note} />;
 
   return (
     <>
       <p className="text-xs text-gray-600 dark:text-gray-300">
-        {data.age_bracket} 기준 투자성향{" "}
-        {RISK_TOLERANCE_LABELS[data.risk_tolerance] ?? data.risk_tolerance}
-        {data.required_dividend_yield_pct != null &&
-          ` · 목표 배당수익률 연 ${data.required_dividend_yield_pct.toFixed(1)}%`}
-        {data.expected_return_pct != null &&
-          ` · 기대수익률 ${data.expected_return_pct.toFixed(1)}%`}
-        {data.expected_dividend_yield_pct != null &&
-          ` · 배당수익률 약 ${data.expected_dividend_yield_pct.toFixed(1)}%`}
-        {data.expected_volatility_pct != null &&
-          ` · 예상 변동성 연 ${data.expected_volatility_pct.toFixed(1)}%`}
+        {[
+          `${data.age_bracket} 기준 투자성향 ${RISK_TOLERANCE_LABELS[data.risk_tolerance] ?? data.risk_tolerance}`,
+          ...formatRecMetricParts(data),
+        ].join(" · ")}
       </p>
 
       <RecommendationResultPanel

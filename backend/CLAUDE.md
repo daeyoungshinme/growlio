@@ -190,6 +190,7 @@ services/
   │   ├── plan_generation.py  # AUTO 대기 플랜 생성: 드리프트 분석→게이트 판정→BUY/SELL leg 생성. `build_pending_plan_for_alert()`가 세금영향·시장신호·하루 거래한도(`UserSettings.auto_rebalancing_daily_value_cap_krw`) 게이트에 걸리면 `TaxGateBlocked`/`MarketSignalGateBlocked`/`DailyValueCapBlocked` sentinel 반환(플랜 미생성)
   │   ├── plan_execution.py   # AUTO 플랜 leg 잠금/실행/취소/만료 — 매수는 대기시간 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 미응답 시 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지. `execute_due_buy_legs()`는 실행 직전 시장신호 게이트 재확인(차단 시 다음 tick 재시도)
   │   ├── plan_notifications.py # AUTO 플랜 이메일/푸시/이력 알림 — 생성 안내, 게이트 차단 보류 안내(`notify_*_blocked()`가 하루 1회 durable_state dedup), leg 실행 완료/실패 결과
+  │   ├── quick_execute_service.py # "지금 테스트 실행"(`POST /rebalancing/portfolios/{id}/quick-execute`) 유스케이스 — 알림 행 조회→pending/시장신호 게이트→`build_pending_plan_for_alert`→계획 안내 발송. `QuickExecuteStatus` enum+원자료(`QuickExecuteOutcome`)만 반환하고 사용자 문구는 라우터 `_QUICK_EXECUTE_MESSAGES`가 조립. override 계좌 소유권 검증은 라우터가 콜백(`verify_account_owned`)으로 주입(서비스→API 계층 import 금지)
   │   ├── execution_service.py # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis/_kiwoom_order_executor.py로 분리
   │   ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE/FULL 주문 실행. FULL 매수도 실행 직전 `get_orderable_cash()`로 예산 clamp(매도 부족·실패 시 매수가 가용 현금 초과 방지, AUTO leg도 공유)
   │   ├── _kiwoom_order_executor.py # Kiwoom 국내/해외 단일 주문 실행 + FULL 매수 예산 clamp(`get_domestic_balance()`가 kt00001에서 함께 반환하는 `orderable_krw`=100stk_ord_alow_amt 사용, 없으면 `deposit_krw`=D+2 예수금 폴백 — KIS `get_orderable_cash()`와 대칭)
