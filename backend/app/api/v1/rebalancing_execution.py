@@ -2,6 +2,7 @@
 
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -13,10 +14,9 @@ from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.api.v1._account_deps import get_owned_account
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
-from app.models.alert import RebalancingAlert
 from app.models.asset import RebalancingExecution
 from app.models.portfolio import Portfolio
-from app.models.user import User, UserSettings
+from app.models.user import User
 from app.schemas.rebalancing import (
     ExecutionPlanOverride,
     ExecutionPlanResult,
@@ -27,18 +27,60 @@ from app.schemas.rebalancing import (
     RebalancingExecutionSummary,
 )
 from app.services.rebalancing.execution_service import execute_rebalancing
-from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
-from app.services.rebalancing.plan_service import (
-    DailyValueCapBlocked,
-    PlanGenerationInProgress,
-    TaxGateBlocked,
-    build_pending_plan_for_alert,
-    has_pending_plan_for_alert,
-    notify_plan_generated,
+from app.services.rebalancing.quick_execute_service import (
+    QuickExecuteOutcome,
+    QuickExecuteStatus,
+    quick_execute_plan,
 )
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
 logger = structlog.get_logger()
+
+
+def _plan_generated_message(o: QuickExecuteOutcome) -> str:
+    if o.email_sent:
+        message = f"계획이 생성되어 이메일로 발송되었습니다 — 매수 {o.buy_count}건"
+    elif o.has_email:
+        message = f"계획이 생성되었지만 이메일 발송에 실패했습니다 — 매수 {o.buy_count}건"
+    else:
+        message = f"계획이 생성되었습니다 (등록된 이메일이 없어 알림은 발송되지 않았습니다) — 매수 {o.buy_count}건"
+    if o.sell_count:
+        message += f", 매도 승인대기 {o.sell_count}건"
+    return message
+
+
+def _tax_blocked_message(o: QuickExecuteOutcome) -> str:
+    assert o.tax_gate is not None
+    return (
+        f"매도로 인한 추정 양도세(약 {o.tax_gate.estimated_tax_krw:,.0f}원)가 설정하신 상한"
+        f"({o.tax_gate.max_tax_impact_krw:,.0f}원)을 초과해 실행이 보류됩니다. "
+        "자동화 설정의 세금영향 상한을 확인해주세요."
+    )
+
+
+def _daily_cap_blocked_message(o: QuickExecuteOutcome) -> str:
+    assert o.daily_cap is not None
+    return (
+        f"오늘 자동 실행된 금액(약 {o.daily_cap.today_total_krw:,.0f}원)에 이번 계획 예상 금액"
+        f"(약 {o.daily_cap.attempted_value_krw:,.0f}원)을 더하면 설정하신 하루 합산 상한"
+        f"({o.daily_cap.cap_krw:,.0f}원)을 초과해 실행이 보류됩니다."
+    )
+
+
+_QUICK_EXECUTE_MESSAGES: dict[QuickExecuteStatus, Callable[[QuickExecuteOutcome], str]] = {
+    QuickExecuteStatus.ALREADY_PENDING: lambda _o: (
+        "이미 대기중인 계획이 있습니다. 리밸런싱 계획 목록에서 확인해주세요."
+    ),
+    QuickExecuteStatus.MARKET_BLOCKED: lambda o: (
+        f"현재 시장 위험 신호({o.composite_level})로 인해 실행이 보류됩니다. "
+        "자동화 설정의 시장 상황 조건을 확인해주세요."
+    ),
+    QuickExecuteStatus.TAX_BLOCKED: _tax_blocked_message,
+    QuickExecuteStatus.DAILY_CAP_BLOCKED: _daily_cap_blocked_message,
+    QuickExecuteStatus.GENERATION_IN_PROGRESS: lambda _o: "다른 요청이 이미 처리 중입니다. 잠시 후 다시 시도해주세요.",
+    QuickExecuteStatus.NO_DRIFT: lambda _o: "포트폴리오가 이미 균형을 이루고 있거나 실행할 주문이 없습니다.",
+    QuickExecuteStatus.PLAN_GENERATED: _plan_generated_message,
+}
 
 
 @router.post("/portfolios/{portfolio_id}/execute", response_model=list[ExecutionResult])
@@ -92,149 +134,22 @@ async def create_rebalancing_execution_plan(
     `alert_scope == PER_ACCOUNT`인 포트폴리오는 쿼리파라미터 `account_id`로 어느 계좌 전용
     알림 행을 실행할지 반드시 지정해야 한다.
     """
-    from app.services.market_signal_service import get_confirmed_composite_level
-
-    portfolio = await db.scalar(
-        select(Portfolio)
-        .options(
-            selectinload(Portfolio.linked_accounts),
-            selectinload(Portfolio.items),
-        )
-        .where(
-            Portfolio.id == portfolio_id,
-            Portfolio.user_id == current_user.id,
-        )
-    )
-    if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
-
-    is_per_account = getattr(portfolio, "alert_scope", "AGGREGATE") == "PER_ACCOUNT"
-    if is_per_account and account_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="계좌별 독립 설정 포트폴리오는 account_id를 지정해야 합니다",
-        )
-
-    account_filter = (
-        (RebalancingAlert.alert_scope == "PER_ACCOUNT") & (RebalancingAlert.account_id == account_id)
-        if is_per_account
-        else RebalancingAlert.alert_scope == "AGGREGATE"
-    )
-    alert_row = await db.scalar(
-        select(RebalancingAlert).where(
-            RebalancingAlert.portfolio_id == portfolio_id,
-            RebalancingAlert.user_id == current_user.id,
-            RebalancingAlert.is_active == True,
-            account_filter,
-        )
-    )
-    if not alert_row or not alert_row.account_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이 포트폴리오에 자동 실행 계좌가 설정되지 않았습니다. 자동화 설정에서 계좌를 선택해주세요.",
-        )
-
-    if body and body.account_id and body.account_id != alert_row.account_id:
-        await get_owned_account(body.account_id, current_user.id, db)
-
-    if await has_pending_plan_for_alert(alert_row.id, db):
-        return ExecutionPlanResult(
-            status="ALREADY_PENDING",
-            message="이미 대기중인 계획이 있습니다. 리밸런싱 계획 목록에서 확인해주세요.",
-        )
-
-    try:
-        composite_level, data_freshness = await get_confirmed_composite_level(cache, db)
-    except Exception as exc:
-        logger.warning("market_signal_fetch_failed_in_quick_execute", error=str(exc))
-        composite_level = "GREEN"
-        data_freshness = "STALE"
-
-    market_mode = getattr(alert_row, "market_condition_mode", "DISABLED")
-    blocked = is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness)
-    if blocked:
-        return ExecutionPlanResult(
-            status="MARKET_BLOCKED",
-            message=f"현재 시장 위험 신호({composite_level})로 인해 실행이 보류됩니다. "
-            "자동화 설정의 시장 상황 조건을 확인해주세요.",
-        )
-
-    generated = await build_pending_plan_for_alert(
-        alert_row,
-        portfolio,
+    outcome = await quick_execute_plan(
+        portfolio_id,
+        account_id,
+        body,
+        current_user.id,
         db,
-        composite_level,
-        strategy_override=body.strategy if body else None,
-        order_type_override=body.order_type if body else None,
-        account_id_override=body.account_id if body else None,
-        cache=cache,
+        cache,
+        verify_account_owned=lambda acc_id: get_owned_account(acc_id, current_user.id, db),
     )
-    if isinstance(generated, TaxGateBlocked):
-        return ExecutionPlanResult(
-            status="TAX_BLOCKED",
-            message=f"매도로 인한 추정 양도세(약 {generated.estimated_tax_krw:,.0f}원)가 설정하신 상한"
-            f"({generated.max_tax_impact_krw:,.0f}원)을 초과해 실행이 보류됩니다. "
-            "자동화 설정의 세금영향 상한을 확인해주세요.",
-        )
-    if isinstance(generated, DailyValueCapBlocked):
-        return ExecutionPlanResult(
-            status="DAILY_CAP_BLOCKED",
-            message=f"오늘 자동 실행된 금액(약 {generated.today_total_krw:,.0f}원)에 이번 계획 예상 금액"
-            f"(약 {generated.attempted_value_krw:,.0f}원)을 더하면 설정하신 하루 합산 상한"
-            f"({generated.cap_krw:,.0f}원)을 초과해 실행이 보류됩니다.",
-        )
-    if isinstance(generated, PlanGenerationInProgress):
-        return ExecutionPlanResult(
-            status="GENERATION_IN_PROGRESS",
-            message="다른 요청이 이미 처리 중입니다. 잠시 후 다시 시도해주세요.",
-        )
-    if generated is None:
-        return ExecutionPlanResult(
-            status="NO_DRIFT",
-            message="포트폴리오가 이미 균형을 이루고 있거나 실행할 주문이 없습니다.",
-        )
-    plan, buy_tokens, sell_tokens = generated
-
-    settings_row = await db.execute(
-        select(User.email, UserSettings.notification_email, UserSettings.fcm_token)
-        .select_from(User)
-        .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .where(User.id == current_user.id)
-    )
-    user_email, notification_email, fcm_token = settings_row.first() or (None, None, None)
-    email = notification_email or user_email
-
-    email_sent = await notify_plan_generated(
-        plan,
-        alert_row,
-        portfolio,
-        buy_tokens,
-        sell_tokens,
-        email,
-        fcm_token,
-        composite_level,
-        db,
-        note="수동 테스트",
-    )
-    await db.commit()
-
-    buy_count = sum(len(leg.items) for leg in plan.legs if leg.side == "BUY")
-    sell_count = sum(len(leg.items) for leg in plan.legs if leg.side == "SELL")
-    if email_sent:
-        message = f"계획이 생성되어 이메일로 발송되었습니다 — 매수 {buy_count}건"
-    elif email:
-        message = f"계획이 생성되었지만 이메일 발송에 실패했습니다 — 매수 {buy_count}건"
-    else:
-        message = f"계획이 생성되었습니다 (등록된 이메일이 없어 알림은 발송되지 않았습니다) — 매수 {buy_count}건"
-    if sell_count:
-        message += f", 매도 승인대기 {sell_count}건"
     return ExecutionPlanResult(
-        status="PLAN_GENERATED",
-        message=message,
-        email_sent=email_sent,
-        plan_id=plan.id,
-        buy_count=buy_count,
-        sell_count=sell_count,
+        status=outcome.status.value,
+        message=_QUICK_EXECUTE_MESSAGES[outcome.status](outcome),
+        email_sent=outcome.email_sent,
+        plan_id=outcome.plan_id,
+        buy_count=outcome.buy_count,
+        sell_count=outcome.sell_count,
     )
 
 
