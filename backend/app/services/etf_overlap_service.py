@@ -26,10 +26,10 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import re
+import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import TYPE_CHECKING
@@ -43,15 +43,17 @@ from app.schemas.rebalancing.goal import (
     OverlapGroup,
     OverlapMember,
 )
+from app.services._settings_queries import get_settings_row
 from app.services.etf_profile_service import EtfProfile, get_etf_profiles
-from app.services.goal_candidate_service import LEVERAGED_INVERSE_RE
+from app.services.goal_candidate_service import LEVERAGED_INVERSE_RE, existing_items_from_positions
 from app.services.market_data_fetcher import fetch_yf_close_series
+from app.services.position_aggregator import query_latest_position_map
 from app.services.recommendation_universe import (
     guess_tracking_index,
     resolve_distribution_frequency,
     resolve_tracking_index,
 )
-from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
+from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_CANDIDATE_OVERLAP,
     CacheStoreType,
@@ -63,6 +65,7 @@ from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     import pandas as pd
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
@@ -287,6 +290,23 @@ def _is_relevant_held(item: _Item) -> bool:
     return item.candidate or item.profile is not None or resolve_index_key(item) is not None
 
 
+async def analyze_candidate_overlap_for_user(
+    cache: CacheStoreType,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    draft_candidates: list[dict] | None,
+) -> CandidateOverlapResponse:
+    """사용자 단위 진입점 — 편집 중 목록(`draft_candidates`)이 없으면 저장된 후보 목록을, 보유 종목은
+    전체 계좌 최신 포지션을 쓴다. 후보를 한 번도 등록하지 않았으면(시딩 전) 빈 결과."""
+    if draft_candidates is not None:
+        candidates = draft_candidates
+    else:
+        settings_row = await get_settings_row(db, user_id)
+        candidates = list(getattr(settings_row, "goal_candidate_tickers", None) or [])
+    pos_map = await query_latest_position_map(user_id, db, include_name=True)
+    return await analyze_candidate_overlap(cache, candidates, existing_items_from_positions(pos_map))
+
+
 async def analyze_candidate_overlap(
     cache: CacheStoreType,
     candidates: list[dict],
@@ -339,10 +359,8 @@ async def _fetch_weekly_returns(items: list[_Item]) -> tuple[pd.DataFrame | None
         return None, True
     end = today_kst()
     start = end - timedelta(days=_LOOKBACK_DAYS)
-    loop = asyncio.get_running_loop()
     try:
-        async with _yfinance_sem:
-            close_series = await loop.run_in_executor(None, fetch_yf_close_series, symbols, start, end)
+        close_series = await run_yf_bounded(fetch_yf_close_series, symbols, start, end)
     except Exception as e:
         logger.warning("candidate_overlap_price_fetch_failed", error=str(e))
         return None, False

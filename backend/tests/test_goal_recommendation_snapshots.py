@@ -21,14 +21,12 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 import json
 import os
 import random
 import uuid
 import zlib
 from collections.abc import Callable
-from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -220,11 +218,8 @@ def market_signal_level():
 def _fresh_yfinance_semaphore():
     """모듈 전역 `_yfinance_sem`은 처음 대기가 걸린 이벤트 루프에 묶인다 — 투자기간별 조합이 5개를 넘어
     실제로 대기하면 다음 테스트(새 루프)에서 RuntimeError가 나므로 테스트마다 새 세마포어로 바꾼다."""
-    with ExitStack() as stack:
-        for module_path in (_GRS, _AGE, _HOR, _GRC):
-            module = importlib.import_module(module_path)
-            if hasattr(module, "_yfinance_sem"):
-                stack.enter_context(patch.object(module, "_yfinance_sem", asyncio.Semaphore(5)))
+    # 호출부는 모두 `yahoo_price.run_yf_bounded`를 거치므로 세마포어 소유 모듈 하나만 교체하면 된다
+    with patch("app.services.yahoo_price._yfinance_sem", asyncio.Semaphore(5)):
         yield
 
 

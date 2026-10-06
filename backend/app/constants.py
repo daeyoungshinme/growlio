@@ -15,6 +15,10 @@ POSITION_STOCK_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIS", "STOCK_KIWO
 세금·자산추이·추천드리프트 집계에서 전부 누락됐던 사고가 있었다(2026-09-25).
 주문 실행 가능 집합은 별개 — rebalancing/order_builder.ORDER_EXECUTABLE_ASSET_TYPES(토스 제외)."""
 
+MAX_GOAL_CANDIDATE_TICKERS = 20
+"""사용자가 등록 가능한 목표 역산 추천 후보 종목 최대 개수 — 설정 저장 검증(`GoalCandidateTickersUpdate`)·
+중복 점검 요청 검증(`CandidateOverlapRequest`)·추천 서비스의 잔여 슬롯 계산이 공유한다."""
+
 PENSION_TAX_TYPES: frozenset[str] = frozenset({"PENSION_SAVINGS", "IRP"})
 """연금저축·IRP — 세법/퇴직급여법상 매수 가능 상품이 제한되고 납입액이 세액공제 대상인 계좌 tax_type."""
 

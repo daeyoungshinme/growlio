@@ -60,6 +60,7 @@ from datetime import UTC, datetime
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import MAX_GOAL_CANDIDATE_TICKERS
 from app.enums import AccountTaxType
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation, PortfolioExpectedMetrics
@@ -78,8 +79,7 @@ from app.services.goal_portfolio_optimizer import _MIN_CANDIDATES, compute_weigh
 from app.services.goal_return_solver import months_until_year_end, solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.price_service import get_historical_returns
-from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
-from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
+from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
     CacheStoreType,
@@ -435,9 +435,7 @@ async def compute_portfolio_expected_metrics(
     }
     dividend_by_symbol = {to_yf_symbol(t, m): dividend_map.get((t, m), 0.0) for t, m in tickers_only}
 
-    loop = asyncio.get_running_loop()
-    async with _yfinance_sem:
-        returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, symbols)
+    returns_map = await run_yf_bounded(fetch_yf_daily_returns, symbols)
 
     expected_return_pct, expected_dividend_yield_pct, expected_volatility_pct = compute_weighted_expected_metrics(
         symbols, weights_pct, cagr_by_symbol, dividend_by_symbol, returns_map

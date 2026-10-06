@@ -68,6 +68,26 @@ class TestRefreshKosdaqTickers:
             await yahoo_price.refresh_kosdaq_tickers()
         assert yahoo_price._kosdaq_tickers == frozenset({"039560"})
 
+    async def test_retries_once_when_never_loaded(self, override_settings, monkeypatch):
+        """기동 직후 첫 로드가 실패해 집합이 비어 있으면 1회 재시도한다."""
+        from app.services import yahoo_price
+
+        monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset())
+        with patch.object(
+            yahoo_price, "sync_fdr_kosdaq_tickers", side_effect=[None, frozenset({"039560"})]
+        ) as mock_fdr:
+            await yahoo_price.refresh_kosdaq_tickers(retry_delay=0)
+        assert mock_fdr.call_count == 2
+        assert yahoo_price._kosdaq_tickers == frozenset({"039560"})
+
+    async def test_no_retry_when_previous_set_exists(self, override_settings, monkeypatch):
+        from app.services import yahoo_price
+
+        monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset({"039560"}))
+        with patch.object(yahoo_price, "sync_fdr_kosdaq_tickers", return_value=None) as mock_fdr:
+            await yahoo_price.refresh_kosdaq_tickers(retry_delay=0)
+        assert mock_fdr.call_count == 1
+
 
 class TestSyncFdrKosdaqTickers:
     def test_returns_zero_padded_codes(self):

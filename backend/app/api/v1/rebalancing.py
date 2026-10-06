@@ -31,7 +31,7 @@ from app.services._account_queries import active_broker_accounts_stmt, get_accou
 from app.services._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
 from app.services._settings_queries import get_or_create_settings, get_settings_row
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
-from app.services.etf_overlap_service import analyze_candidate_overlap
+from app.services.etf_overlap_service import analyze_candidate_overlap_for_user
 from app.services.goal_age_recommendation_service import get_age_based_recommendation
 from app.services.goal_candidate_service import existing_items_from_positions
 from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
@@ -235,13 +235,10 @@ async def analyze_candidate_overlap_endpoint(
     정보 제공 전용 — 후보 목록·추천 비중을 바꾸지 않는다. `candidates`를 생략하면 저장된 후보 목록을,
     후보 관리 모달은 저장 전 편집 중 목록을 보낸다. 후보를 한 번도 등록하지 않았으면(시딩 전) 빈 결과.
     """
-    if body.candidates is not None:
-        candidates: list[dict] = [c.model_dump() for c in body.candidates]
-    else:
-        settings_row = await get_settings_row(db, current_user.id)
-        candidates = list(getattr(settings_row, "goal_candidate_tickers", None) or [])
-    pos_map = await query_latest_position_map(current_user.id, db, include_name=True)
-    return await analyze_candidate_overlap(cache, candidates, existing_items_from_positions(pos_map))
+    draft = (
+        [c.model_dump(mode="json", exclude_none=True) for c in body.candidates] if body.candidates is not None else None
+    )
+    return await analyze_candidate_overlap_for_user(cache, db, current_user.id, draft)
 
 
 @router.get("/portfolios/{portfolio_id}/expected-metrics", response_model=PortfolioExpectedMetrics)

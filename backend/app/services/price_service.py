@@ -26,10 +26,10 @@ from app.services.credential_service import decrypt_kis_credentials
 from app.services.price_sync_sources import sync_naver_price, sync_pykrx_price
 from app.services.yahoo_price import (
     _sync_pykrx_returns_batch,
-    _yfinance_sem,
     fetch_yahoo_batch,
     fetch_yahoo_price,
     fetch_yahoo_returns_batch,
+    run_yf_bounded,
 )
 from app.utils.cache_keys import (
     TTL_PRICE_CURRENT,
@@ -215,7 +215,6 @@ async def get_historical_returns(
     if not tickers:
         return {}
 
-    loop = asyncio.get_running_loop()
     return_map: dict[tuple[str, str], dict] = {}
     missing: list[tuple[str, str]] = []
 
@@ -241,8 +240,7 @@ async def get_historical_returns(
         # pykrx는 스레드 안전성이 보장되지 않아(동시 호출 시 프로세스 크래시 관측됨) Yahoo와
         # 동일한 세마포어로 동시 실행 개수를 제한한다 — 목표 역산 기간별 추천처럼 여러 조합이
         # asyncio.gather로 병렬 호출하는 경로에서 특히 중요하다.
-        async with _yfinance_sem:
-            pykrx_result = await loop.run_in_executor(None, partial(_sync_pykrx_returns_batch, domestic_missing, years))
+        pykrx_result = await run_yf_bounded(_sync_pykrx_returns_batch, domestic_missing, years)
         newly_fetched.update(pykrx_result)
 
     return_map.update(newly_fetched)

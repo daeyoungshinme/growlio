@@ -13,12 +13,11 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, PENSION_TAX_TYPES
+from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, MAX_GOAL_CANDIDATE_TICKERS, PENSION_TAX_TYPES
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
 from app.services.dividend.constants import is_korean_etf
 from app.services.recommendation_universe import (
-    MAX_GOAL_CANDIDATE_TICKERS,
     RECOMMENDATION_UNIVERSE,
     guess_asset_class,
     resolve_distribution_frequency,

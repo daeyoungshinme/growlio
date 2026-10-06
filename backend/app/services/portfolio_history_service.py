@@ -9,7 +9,7 @@ from datetime import date
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import POSITION_STOCK_ASSET_TYPES
+from app.constants import DOMESTIC_MARKETS, POSITION_STOCK_ASSET_TYPES
 from app.enums import AssetType
 from app.utils.cache_keys import (
     TTL_ALLOC_HISTORY,
@@ -118,7 +118,7 @@ async def _fetch_stock_breakdown_by_market(
             SELECT
                 ls.month,
                 CASE
-                    WHEN p.market IN ('KOSPI', 'KOSDAQ', 'KRX') THEN 'STOCK_DOMESTIC'
+                    WHEN p.market IN :domestic_markets THEN 'STOCK_DOMESTIC'
                     ELSE 'STOCK_FOREIGN'
                 END AS asset_type,
                 SUM(COALESCE(p.value_krw, p.qty * p.current_price, p.qty * p.avg_price, 0)) AS amount_krw
@@ -128,12 +128,13 @@ async def _fetch_stock_breakdown_by_market(
             GROUP BY ls.month, asset_type
             HAVING SUM(COALESCE(p.value_krw, p.qty * p.current_price, p.qty * p.avg_price, 0)) > 0
             ORDER BY ls.month, asset_type
-        """).bindparams(bindparam("stock_types", expanding=True)),
+        """).bindparams(bindparam("stock_types", expanding=True), bindparam("domestic_markets", expanding=True)),
         {
             "uid": str(user_id),
             "start_date": start_date,
             "account_id": str(account_id) if account_id else None,
             "stock_types": sorted(POSITION_STOCK_ASSET_TYPES),
+            "domestic_markets": sorted(DOMESTIC_MARKETS),
         },
     )
     position_data: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))

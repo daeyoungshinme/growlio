@@ -9,15 +9,16 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.constants import MAX_GOAL_CANDIDATE_TICKERS
 from app.core.cache_store import get_cache_store
 from app.core.config import settings
-from app.enums import AgeGroup, AssetClass, GoalRiskTolerance, IncomeBracket, IndexRegion
+from app.enums import AgeGroup, GoalRiskTolerance, IncomeBracket
 from app.limiter import limiter
 from app.models.user import User
+from app.schemas.rebalancing.goal import GoalCandidateTicker
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
 from app.services.goal_age_recommendation_service import age_group_from_birth_year
-from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
 from app.utils.cache_keys import (
     challenge_progress_key,
     dashboard_summary_key,
@@ -74,14 +75,6 @@ class GoalUpdate(BaseModel):
         if v is not None and not (1900 <= v <= today_kst().year):
             raise ValueError("출생연도가 올바르지 않습니다")
         return v
-
-
-class GoalCandidateTicker(BaseModel):
-    ticker: str
-    name: str
-    market: str
-    asset_class: AssetClass = AssetClass.EQUITY
-    index_region: IndexRegion | None = None
 
 
 class GoalCandidateTickersUpdate(BaseModel):

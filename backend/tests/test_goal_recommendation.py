@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.constants import MAX_GOAL_CANDIDATE_TICKERS
 from app.services._goal_recommendation_common import _fetch_dividend_yields, _suggest_for_dividend_goal
 from app.services.goal_age_recommendation_service import (
     _AGE_GROUP_PROFILE,
@@ -38,7 +39,6 @@ from app.services.goal_return_solver import (
     solve_required_monthly_deposit,
 )
 from app.services.recommendation_universe import (
-    MAX_GOAL_CANDIDATE_TICKERS,
     RECOMMENDATION_UNIVERSE,
     guess_asset_class,
     guess_tracking_index,

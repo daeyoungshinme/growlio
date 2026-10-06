@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+import time
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import requests
@@ -67,7 +68,7 @@ class TestGetProfiles:
             ("SPY", "SPDR S&P 500", "NYSE"),
         ]
         with (
-            patch.object(svc, "_fetch_naver_etf_analysis", return_value=_NAVER_360750) as mock_naver,
+            patch.object(svc, "fetch_naver_etf_analysis", return_value=_NAVER_360750) as mock_naver,
             patch.object(
                 svc, "fetch_yf_info", return_value={"SPY": {"quoteType": "ETF", "netExpenseRatio": 0.0945}}
             ) as mock_yf,
@@ -87,7 +88,7 @@ class TestGetProfiles:
         cache = CacheStore()
         items = [("360750", "TIGER 미국S&P500", "KOSPI"), ("SPY", "SPDR S&P 500", "NYSE")]
         with (
-            patch.object(svc, "_fetch_naver_etf_analysis", side_effect=requests.ConnectionError("down")) as mock_naver,
+            patch.object(svc, "fetch_naver_etf_analysis", side_effect=requests.ConnectionError("down")) as mock_naver,
             patch.object(svc, "fetch_yf_info", return_value={}) as mock_yf,
         ):
             first = await svc.get_etf_profiles(cache, items)
@@ -105,3 +106,31 @@ class TestGetProfiles:
             result = await svc.get_etf_profiles(cache, items)
         assert result == {("AAPL", "NASDAQ"): None}
         assert mock_yf.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_definitive_non_etf_uses_long_ttl(self):
+        """Yahoo가 quoteType으로 ETF 아님을 명시하면 바뀔 일이 없어 프로필과 같은 장기 TTL로 캐싱한다."""
+        with (
+            patch.object(svc, "fetch_yf_info", return_value={"AAPL": {"quoteType": "EQUITY"}}),
+            patch.object(svc, "set_cached_json", AsyncMock()) as mock_set,
+        ):
+            await svc.get_etf_profiles(CacheStore(), [("AAPL", "Apple", "NASDAQ")])
+        assert mock_set.await_args.args[3] == svc.TTL_ETF_PROFILE
+
+    @pytest.mark.asyncio
+    async def test_deadline_keeps_partial_results(self):
+        """전체 상한을 넘기면 그때까지 받은 프로필만 반환한다 — 느린 소스가 엔드포인트를 붙잡지 않는다."""
+
+        def slow_info(_symbols):
+            time.sleep(0.3)
+            return {"SPY": {"quoteType": "ETF", "netExpenseRatio": 0.0945}}
+
+        items = [("360750", "TIGER 미국S&P500", "KOSPI"), ("SPY", "SPDR S&P 500", "NYSE")]
+        with (
+            patch.object(svc, "_FETCH_DEADLINE_SECONDS", 0.1),
+            patch.object(svc, "fetch_naver_etf_analysis", return_value=_NAVER_360750),
+            patch.object(svc, "fetch_yf_info", side_effect=slow_info),
+        ):
+            result = await svc.get_etf_profiles(CacheStore(), items)
+        assert result[("360750", "KOSPI")]["ter_pct"] == 0.0068
+        assert result[("SPY", "NYSE")] is None
