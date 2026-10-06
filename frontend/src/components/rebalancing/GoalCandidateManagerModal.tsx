@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Loader2, X } from "lucide-react";
+import { Loader2, TriangleAlert, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchIndexRegion } from "@/api/assets";
 import {
@@ -12,6 +12,7 @@ import {
 import { DOMESTIC_MARKETS } from "@/constants";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { useCandidateOverlap } from "@/hooks/useCandidateOverlap";
@@ -146,47 +147,50 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
 
         {candidates.length > 0 && (
           <ul className="space-y-1">
-            {candidates.map((c) => (
-              <li
-                key={`${c.ticker}-${c.market}`}
-                className="text-xs bg-purple-50 dark:bg-gray-800 border border-purple-200 dark:border-purple-800/50 rounded-2xl pl-2 pr-1 py-0.5"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-700 dark:text-gray-300 truncate">
-                    {c.name} <span className="text-gray-400">({c.ticker})</span>
-                  </span>
-                  <div className="ml-auto flex items-center gap-1 shrink-0">
-                    <select
-                      value={c.asset_class ?? "EQUITY"}
-                      onChange={(e) =>
-                        changeAssetClass(c.ticker, c.market, e.target.value as AssetClass)
-                      }
-                      aria-label={`${c.name} 자산군`}
-                      className="shrink-0 text-xs bg-transparent border border-purple-200 dark:border-purple-800/50 rounded-full px-1.5 py-0.5 text-purple-600 dark:text-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            {candidates.map((c) => {
+              const profile = profileByKey.get(itemKey(c.ticker, c.market));
+              return (
+                <li
+                  key={`${c.ticker}-${c.market}`}
+                  className="text-xs bg-purple-50 dark:bg-gray-800 border border-purple-200 dark:border-purple-800/50 rounded-2xl pl-2 pr-1 py-0.5"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-gray-700 dark:text-gray-300 truncate">
+                      {c.name} <span className="text-gray-400">({c.ticker})</span>
+                    </span>
+                    <div className="ml-auto flex items-center gap-1 shrink-0">
+                      <select
+                        value={c.asset_class ?? "EQUITY"}
+                        onChange={(e) =>
+                          changeAssetClass(c.ticker, c.market, e.target.value as AssetClass)
+                        }
+                        aria-label={`${c.name} 자산군`}
+                        className="shrink-0 min-h-9 sm:min-h-0 text-xs bg-transparent border border-purple-200 dark:border-purple-800/50 rounded-full px-1.5 py-0.5 text-purple-600 dark:text-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      >
+                        {Object.entries(ASSET_CLASS_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeCandidate(c.ticker, c.market)}
+                      className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} sm:p-0.5 text-gray-400 hover:text-red-500 rounded-full shrink-0`}
+                      aria-label={`${c.name} 제거`}
                     >
-                      {Object.entries(ASSET_CLASS_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                      <X size={12} aria-hidden="true" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeCandidate(c.ticker, c.market)}
-                    className="p-0.5 text-gray-400 hover:text-red-500 rounded-full shrink-0"
-                    aria-label={`${c.name} 제거`}
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
-                <CandidateOverlapInfo
-                  ter={profileByKey.get(itemKey(c.ticker, c.market))?.ter_pct ?? null}
-                  baseIndex={profileByKey.get(itemKey(c.ticker, c.market))?.base_index ?? null}
-                  warning={overlapWarningFor(overlap, c.ticker, c.market)}
-                />
-              </li>
-            ))}
+                  <CandidateOverlapInfo
+                    ter={profile?.ter_pct ?? null}
+                    baseIndex={profile?.base_index ?? null}
+                    warning={overlapWarningFor(overlap, c.ticker, c.market)}
+                  />
+                </li>
+              );
+            })}
           </ul>
         )}
         {isCheckingOverlap && candidates.length > 0 && (
@@ -294,7 +298,7 @@ function CandidateOverlapInfo({
       )}
       {warning && (
         <p className="flex items-start gap-1 text-amber-600 dark:text-amber-500">
-          <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
+          <TriangleAlert size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
           {warning}
         </p>
       )}

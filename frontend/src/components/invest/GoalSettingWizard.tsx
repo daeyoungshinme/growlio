@@ -18,6 +18,7 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData } from "@/utils/queryInvalidation";
 import type { GoalForm } from "@/hooks/useGoalSettings";
+import { normalizeWeights } from "@/utils/recommendationDrift";
 
 const STEP_TITLES = [
   "현재 자산 확인",
@@ -162,12 +163,8 @@ export default function GoalSettingWizard({
     mutationFn: () =>
       createPortfolio({
         name: "추천 포트폴리오",
-        items: (recommendation?.recommended_items ?? []).map((item) => ({
-          ticker: item.ticker,
-          name: item.name,
-          market: item.market,
-          weight: item.weight,
-        })),
+        // 반올림 합계가 100±0.01을 벗어나면 백엔드 검증에 걸리므로 추천 카드와 같은 정규화를 거친다
+        items: normalizeWeights(recommendation?.recommended_items ?? []),
       }),
     // 생성만 하고 계획탭에 머물면 계좌 미연결 고아 포트폴리오로 남기 쉬움 — 바로 해당 포트폴리오로
     // 이동시켜 계좌 연결·드리프트 진단으로 이어지게 한다.

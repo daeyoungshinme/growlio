@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { OverlapGroup } from "@/api/rebalancing";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { fmtKrwPrice } from "@/utils/format";
 import {
   annualCostGapPer10M,
   formatTerPct,
@@ -83,7 +84,7 @@ export default function OverlapGroupsBlock({ groups, weightByKey }: Props) {
             {g.ter_gap_pct != null && (
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 보수 차이 최대 {formatTerPct(g.ter_gap_pct)}p — 1,000만원 보유 시 연 약{" "}
-                {annualCostGapPer10M(g.ter_gap_pct).toLocaleString()}원
+                {fmtKrwPrice(annualCostGapPer10M(g.ter_gap_pct))}
                 {isMixedListing(g) &&
                   " (국내·해외 상장이 섞여 있어 세금·환전 비용은 별도로 비교해야 해요)"}
               </p>
