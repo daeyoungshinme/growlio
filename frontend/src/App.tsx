@@ -1,5 +1,6 @@
 import { lazy, LazyExoticComponent, Suspense, useCallback, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import * as Sentry from "@sentry/react";
 import { useQueryClient } from "@tanstack/react-query";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -19,6 +20,9 @@ import { fetchPortfolioOverviewLite } from "./api/portfolios";
 import { fetchDCAAnalysis } from "./api/invest";
 import { fetchSettings } from "./api/settings";
 import { QUERY_KEYS } from "./constants/queryKeys";
+/** Sentry 라우터 v7 통합용 — 트랜잭션을 라우트 패턴 단위로 묶는다(DSN 미설정 시 그대로 `Routes`). */
+const SentryRoutes = Sentry.withSentryReactRouterV7Routing(Routes);
+
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const FindAccountPage = lazy(() => import("./pages/FindAccountPage"));
@@ -59,7 +63,7 @@ function AppRoutes() {
   return (
     <>
       <TopLoadingBar isVisible={isAuthChecking || isPageLoading} />
-      <Routes>
+      <SentryRoutes>
         <Route path="/login" element={<LazyRoute Component={LoginPage} />} />
         <Route path="/register" element={<LazyRoute Component={RegisterPage} />} />
         <Route path="/find-account" element={<LazyRoute Component={FindAccountPage} />} />
@@ -95,7 +99,7 @@ function AppRoutes() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      </SentryRoutes>
     </>
   );
 }
