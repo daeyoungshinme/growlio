@@ -50,7 +50,8 @@ def _plan_generated_message(o: QuickExecuteOutcome) -> str:
 
 
 def _tax_blocked_message(o: QuickExecuteOutcome) -> str:
-    assert o.tax_gate is not None
+    if o.tax_gate is None:
+        raise RuntimeError("TAX_BLOCKED outcome without tax_gate")
     return (
         f"매도로 인한 추정 양도세(약 {o.tax_gate.estimated_tax_krw:,.0f}원)가 설정하신 상한"
         f"({o.tax_gate.max_tax_impact_krw:,.0f}원)을 초과해 실행이 보류됩니다. "
@@ -59,7 +60,8 @@ def _tax_blocked_message(o: QuickExecuteOutcome) -> str:
 
 
 def _daily_cap_blocked_message(o: QuickExecuteOutcome) -> str:
-    assert o.daily_cap is not None
+    if o.daily_cap is None:
+        raise RuntimeError("DAILY_CAP_BLOCKED outcome without daily_cap")
     return (
         f"오늘 자동 실행된 금액(약 {o.daily_cap.today_total_krw:,.0f}원)에 이번 계획 예상 금액"
         f"(약 {o.daily_cap.attempted_value_krw:,.0f}원)을 더하면 설정하신 하루 합산 상한"
