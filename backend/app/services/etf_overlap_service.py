@@ -46,7 +46,11 @@ from app.schemas.rebalancing.goal import (
 from app.services.etf_profile_service import EtfProfile, get_etf_profiles
 from app.services.goal_candidate_service import LEVERAGED_INVERSE_RE
 from app.services.market_data_fetcher import fetch_yf_close_series
-from app.services.recommendation_universe import guess_tracking_index, resolve_tracking_index
+from app.services.recommendation_universe import (
+    guess_tracking_index,
+    resolve_distribution_frequency,
+    resolve_tracking_index,
+)
 from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_CANDIDATE_OVERLAP,
@@ -249,14 +253,22 @@ def build_items(candidates: list[dict], existing_items: list[tuple[str, str, str
             asset_class=c.get("asset_class") or "EQUITY",
             candidate=True,
             tracking_index=c.get("tracking_index"),
-            distribution_frequency=c.get("distribution_frequency"),
+            distribution_frequency=resolve_distribution_frequency(
+                c["ticker"], c["market"], c.get("distribution_frequency")
+            ),
         )
     for ticker, name, market in existing_items:
         item = by_key.get((ticker, market))
         if item is not None:
             item.held = True
         else:
-            by_key[(ticker, market)] = _Item(ticker=ticker, name=name, market=market, held=True)
+            by_key[(ticker, market)] = _Item(
+                ticker=ticker,
+                name=name,
+                market=market,
+                held=True,
+                distribution_frequency=resolve_distribution_frequency(ticker, market),
+            )
     return list(by_key.values())
 
 
@@ -295,7 +307,7 @@ async def analyze_candidate_overlap(
         i.profile = profiles.get(i.key)
     items = [i for i in items if _is_relevant_held(i)]
 
-    weekly = await _fetch_weekly_returns(items)
+    weekly, prices_complete = await _fetch_weekly_returns(items)
     groups = find_overlap_groups(items, weekly)
     result = CandidateOverlapResponse(
         groups=groups,
@@ -313,16 +325,18 @@ async def analyze_candidate_overlap(
         ],
         price_data_available=weekly is not None,
     )
-    # 시세 조회가 실패한 결과(상관 판정 누락)는 캐싱하지 않는다 — 일시 장애를 하루 동안 고정하지 않기 위함
-    if weekly is not None:
+    # 시세 조회가 전부/일부 실패한 결과(상관 판정 누락)는 캐싱하지 않는다 — 일시 장애를 하루 동안 고정하지 않기 위함.
+    # Yahoo 서킷이 열리면 국내 심볼만 pykrx로 채워진 부분 결과가 오므로 "비어 있지 않음"만으로는 부족하다.
+    if weekly is not None and prices_complete:
         await set_cached_json(cache, cache_key, result.model_dump(mode="json"), TTL_CANDIDATE_OVERLAP)
     return result
 
 
-async def _fetch_weekly_returns(items: list[_Item]) -> pd.DataFrame | None:
+async def _fetch_weekly_returns(items: list[_Item]) -> tuple[pd.DataFrame | None, bool]:
+    """(주간 수익률 프레임, 요청 심볼 전부의 시세를 받았는지)를 반환한다."""
     symbols = sorted({to_yf_symbol(i.ticker, i.market) for i in items})
     if len(symbols) < 2:
-        return None
+        return None, True
     end = today_kst()
     start = end - timedelta(days=_LOOKBACK_DAYS)
     loop = asyncio.get_running_loop()
@@ -331,7 +345,7 @@ async def _fetch_weekly_returns(items: list[_Item]) -> pd.DataFrame | None:
             close_series = await loop.run_in_executor(None, fetch_yf_close_series, symbols, start, end)
     except Exception as e:
         logger.warning("candidate_overlap_price_fetch_failed", error=str(e))
-        return None
+        return None, False
     if not close_series:
-        return None
-    return weekly_returns_frame(close_series)
+        return None, False
+    return weekly_returns_frame(close_series), set(symbols) <= set(close_series)
