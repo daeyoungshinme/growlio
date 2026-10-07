@@ -2,48 +2,9 @@
 
 import uuid
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import date
 
 from pydantic import BaseModel, ValidationInfo, field_validator
-
-from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
-
-
-class HoldingItem(BaseModel):
-    ticker: str
-    market: str
-    weight: float  # 0~100, 합계 = 100
-
-
-class BacktestPortfolioCreate(BaseModel):
-    name: str
-    holdings: list[HoldingItem]
-
-    @field_validator("holdings")
-    @classmethod
-    def validate_holdings(cls, v: list[HoldingItem]) -> list[HoldingItem]:
-        return validate_portfolio_weights(v)
-
-
-class BacktestPortfolioUpdate(BaseModel):
-    name: str | None = None
-    holdings: list[HoldingItem] | None = None
-
-    @field_validator("holdings")
-    @classmethod
-    def validate_holdings(cls, v: list[HoldingItem] | None) -> list[HoldingItem] | None:
-        return validate_portfolio_weights_optional(v)
-
-
-class BacktestPortfolioResponse(BaseModel):
-    model_config = {"from_attributes": True}
-
-    id: uuid.UUID
-    name: str
-    holdings: list[HoldingItem]
-    created_at: datetime
-    updated_at: datetime
-
 
 # ── 백테스팅 실행 ─────────────────────────────────────────
 
@@ -84,22 +45,3 @@ class BacktestResult(BaseModel):
     dates: list[str]  # "YYYY-MM-DD" 목록
     series: list[SeriesData]
     metrics: list[PortfolioMetrics]
-
-
-class CorrelationRequest(BaseModel):
-    portfolio_ids: list[uuid.UUID]
-    start_date: date
-    end_date: date
-
-    @field_validator("end_date")
-    @classmethod
-    def validate_dates(cls, v: date, info: ValidationInfo) -> date:
-        start = info.data.get("start_date")
-        if start and v <= start:
-            raise ValueError("end_date는 start_date 이후여야 합니다.")
-        return v
-
-
-class CorrelationResult(BaseModel):
-    labels: list[str]
-    matrix: list[list[float | None]]

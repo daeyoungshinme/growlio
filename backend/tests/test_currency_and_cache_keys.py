@@ -11,7 +11,6 @@ from app.utils.cache_keys import (
     alloc_history_key,
     backtest_key,
     composite_alert_sent_key,
-    correlation_key,
     current_price_display_key,
     current_price_key,
     dca_analysis_key,
@@ -81,11 +80,6 @@ class TestCacheKeyBuilders:
         uid = uuid.uuid4()
         key = backtest_key(uid, "abc123")
         assert "abc123" in key
-
-    def test_correlation_key(self, override_settings):
-        uid = uuid.uuid4()
-        key = correlation_key(uid, "hash42")
-        assert "hash42" in key
 
     def test_alloc_history_key(self, override_settings):
         uid = uuid.uuid4()

@@ -449,51 +449,6 @@ class TestDeleteAccount:
         assert resp.status_code == 204
 
 
-class TestSetTargetPortfolio:
-    def test_set_target_portfolio_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.patch(
-                f"/api/v1/assets/{uuid.uuid4()}/target-portfolio",
-                json={"target_portfolio_id": str(uuid.uuid4())},
-            )
-        assert resp.status_code == 404
-
-    def test_set_target_portfolio_success(self, override_settings):
-        user = _make_user()
-        account = _make_account(user.id)
-        db = _make_mock_db()
-        db.scalar = AsyncMock(return_value=account)
-        db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
-        portfolio_id = uuid.uuid4()
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.patch(
-                f"/api/v1/assets/{account.id}/target-portfolio",
-                json={"target_portfolio_id": str(portfolio_id)},
-            )
-        assert resp.status_code == 200
-        assert account.target_portfolio_id == portfolio_id
-
-    def test_set_target_portfolio_clear(self, override_settings):
-        user = _make_user()
-        account = _make_account(user.id)
-        db = _make_mock_db()
-        db.scalar = AsyncMock(return_value=account)
-        db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.patch(
-                f"/api/v1/assets/{account.id}/target-portfolio",
-                json={"target_portfolio_id": None},
-            )
-        assert resp.status_code == 200
-        assert account.target_portfolio_id is None
-
-
 class TestBatchSetTargetPortfolio:
     def test_batch_set_empty_ids_returns_empty(self, override_settings):
         user = _make_user()
@@ -531,8 +486,9 @@ class TestBatchSetTargetPortfolio:
         result.scalars.return_value.all.return_value = [account1, account2]
         db.execute = AsyncMock(return_value=result)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
         portfolio_id = uuid.uuid4()
+        db.scalar = AsyncMock(return_value=MagicMock(id=portfolio_id, user_id=user.id))  # 소유 포트폴리오
+        app = _setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 "/api/v1/assets/batch-target-portfolio",
@@ -541,6 +497,21 @@ class TestBatchSetTargetPortfolio:
         assert resp.status_code == 200
         assert account1.target_portfolio_id == portfolio_id
         assert account2.target_portfolio_id == portfolio_id
+
+    def test_batch_set_rejects_portfolio_not_owned(self, override_settings):
+        """다른 사용자의 포트폴리오 id는 지정할 수 없다 — 계좌 소유만 보고 포트폴리오 소유는 안 보던 허점."""
+        user = _make_user()
+        account = _make_account(user.id)
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=None)  # 본인 소유 포트폴리오 아님
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.patch(
+                "/api/v1/assets/batch-target-portfolio",
+                json={"portfolio_id": str(uuid.uuid4()), "account_ids": [str(account.id)]},
+            )
+        assert resp.status_code == 404
+        db.commit.assert_not_awaited()
 
 
 class TestDeleteCredentials:

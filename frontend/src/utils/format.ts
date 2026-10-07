@@ -19,14 +19,6 @@ export function fmtKrwPrice(n: number): string {
 }
 
 /**
- * null/undefined를 허용하는 금액 포맷 — null이면 "—" 반환
- */
-export function fmtKrwNullable(n: number | null | undefined): string {
-  if (n == null) return "—";
-  return fmtKrw(n);
-}
-
-/**
  * 차트 레이블용 간략 포맷 (단위 없이 짧게)
  * 예: 150_000_000 → "1.5억", 50_000 → "5만"
  */

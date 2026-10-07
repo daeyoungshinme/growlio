@@ -167,10 +167,6 @@ def backtest_key(user_id: uuid.UUID, param_hash: str) -> str:
     return f"{_env_prefix()}backtest:{user_id}:{param_hash}"
 
 
-def correlation_key(user_id: uuid.UUID, param_hash: str) -> str:
-    return f"{_env_prefix()}correlation:{user_id}:{param_hash}"
-
-
 def alloc_history_key(user_id: uuid.UUID, months: int, acct_suffix: str = "all") -> str:
     return f"{_env_prefix()}alloc_history_{_ALLOC_HISTORY_VERSION}:{user_id}:{months}:{acct_suffix}"
 

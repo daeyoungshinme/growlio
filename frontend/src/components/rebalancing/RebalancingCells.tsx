@@ -46,20 +46,6 @@ export function WeightBar({ current, target }: { current: number; target: number
   );
 }
 
-export function SharesCell({ item }: { item: RebalancingItem }) {
-  if (item.ticker === CASH_TICKER || item.shares_to_trade === null)
-    return <span className="text-gray-500 dark:text-gray-400">-</span>;
-  const shares = item.shares_to_trade;
-  if (shares === 0) return <span className="text-gray-500 dark:text-gray-400">0</span>;
-  const isBuy = shares > 0;
-  return (
-    <span className={`font-medium text-xs ${isBuy ? PROFIT_COLOR : LOSS_COLOR}`}>
-      {isBuy ? "+" : ""}
-      {shares.toFixed(0)}주
-    </span>
-  );
-}
-
 export function QuantityCell({ item }: { item: RebalancingItem }) {
   if (item.ticker === CASH_TICKER || item.shares_to_trade === null)
     return <span className="text-gray-500 dark:text-gray-400">-</span>;

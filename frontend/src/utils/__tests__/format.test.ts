@@ -6,7 +6,6 @@ import {
   convertUsdToKrw,
   formatUsdAsKrw,
   fmtKrw,
-  fmtKrwNullable,
   fmtKrwPrice,
   fmtKrwPreview,
   fmtKrwShort,
@@ -55,17 +54,6 @@ describe("fmtKrw", () => {
   it("음수 처리", () => {
     expect(fmtKrw(-150_000_000)).toBe("-1.50억원");
     expect(fmtKrw(-50_000)).toBe("-5만원");
-  });
-});
-
-describe("fmtKrwNullable", () => {
-  it("null이면 대시 반환", () => {
-    expect(fmtKrwNullable(null)).toBe("—");
-    expect(fmtKrwNullable(undefined)).toBe("—");
-  });
-
-  it("숫자는 fmtKrw와 동일", () => {
-    expect(fmtKrwNullable(50_000)).toBe("5만원");
   });
 });
 

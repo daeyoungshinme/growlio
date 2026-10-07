@@ -68,24 +68,6 @@ export function getPortfolioTargetState(
 }
 
 /**
- * 포트폴리오에 명시적으로 지정된 investment_horizon 태그가 있으면 그 값을 우선 사용한다.
- * 없으면(과거 생성된 포트폴리오 등) "기준 포트폴리오"로 지정된 계좌들이 전부 동일한 태그를
- * 가질 때만 역으로 추론한다 — 기간별 추천(RecommendationCard) 적용 시 어느 포트폴리오가 어느
- * 기간(단기/중기/장기) 담당인지 판별하는 데 쓰인다. 명시값도 추론값도 없으면 null.
- */
-export function getPortfolioHorizon(
-  portfolio: Portfolio,
-  stockAccounts: AssetAccount[],
-): InvestmentHorizon | null {
-  if (portfolio.investment_horizon) return portfolio.investment_horizon;
-  const assigned = stockAccounts.filter((a) => a.target_portfolio_id === portfolio.id);
-  if (assigned.length === 0) return null;
-  const horizon = assigned[0].investment_horizon;
-  if (!horizon) return null;
-  return assigned.every((a) => a.investment_horizon === horizon) ? horizon : null;
-}
-
-/**
  * 포트폴리오에 명시적으로 지정된 investment_horizon **및** tax_type 태그가 모두 있으면 그 조합을
  * 우선 사용한다. 없으면 "기준 포트폴리오"로 지정된 계좌들이 전부 동일한 두 태그를 가질 때만
  * 역으로 추론한다 — 계좌 세제유형까지 반영된 기간별 추천(RecommendationCard)을 적용할 때 어느

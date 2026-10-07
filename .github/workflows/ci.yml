@@ -120,6 +120,7 @@ jobs:
   frontend:
     name: Frontend — lint, typecheck, build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     defaults:
       run:
@@ -144,7 +145,7 @@ jobs:
         run: npm run typecheck
 
       - name: Test (vitest + coverage)
-        run: npm run test -- --run --coverage
+        run: npm run test -- --coverage
 
       - name: Build + typecheck (tsc + vite)
         run: npm run build

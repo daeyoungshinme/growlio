@@ -46,7 +46,6 @@ import {
   DiffCell,
   WeightDiffBadge,
   WeightBar,
-  SharesCell,
   DividendDiffCell,
   Return10yCell,
   CagrCard,
@@ -444,23 +443,6 @@ const mockRebalancingItem: RebalancingItem = {
   return_10y_pct: 224.0,
   actual_years_10y: 10,
 };
-
-describe("SharesCell", () => {
-  it("renders positive shares to trade", () => {
-    render(<SharesCell item={mockRebalancingItem} />);
-    expect(screen.getByText("+3주")).toBeDefined();
-  });
-
-  it("renders zero shares", () => {
-    render(<SharesCell item={{ ...mockRebalancingItem, shares_to_trade: 0 }} />);
-    expect(screen.getByText("0")).toBeDefined();
-  });
-
-  it("renders null shares", () => {
-    render(<SharesCell item={{ ...mockRebalancingItem, shares_to_trade: null }} />);
-    expect(screen.getByText("-")).toBeDefined();
-  });
-});
 
 describe("DividendDiffCell", () => {
   it("renders positive diff", () => {

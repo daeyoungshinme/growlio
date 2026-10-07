@@ -1,4 +1,4 @@
-"""backtest_service.py/correlation_service.py 추가 단위 테스트 — _sync_download_history, _sync_compute_correlation."""
+"""backtest_service.py 추가 단위 테스트 — _sync_download_history."""
 
 from __future__ import annotations
 
@@ -81,76 +81,3 @@ class TestFetchPricesSync:
 
         assert "005930.KS" in result
         assert len(result["005930.KS"]) == 3
-
-
-class TestComputeCorrelationSync:
-    def test_empty_symbols_returns_empty(self, override_settings):
-        from app.services.correlation_service import _sync_compute_correlation
-
-        labels, matrix = _sync_compute_correlation([], [], date(2020, 1, 1), date(2021, 1, 1))
-        assert labels == []
-        assert matrix == []
-
-    def test_yfinance_exception_returns_empty(self, override_settings):
-        from app.services.correlation_service import _sync_compute_correlation
-
-        with patch("yfinance.download", side_effect=Exception("error")):
-            labels, matrix = _sync_compute_correlation(["AAPL"], ["Apple"], date(2020, 1, 1), date(2021, 1, 1))
-
-        assert labels == []
-        assert matrix == []
-
-    def test_empty_dataframe_returns_empty(self, override_settings):
-        import pandas as pd
-
-        from app.services.correlation_service import _sync_compute_correlation
-
-        with patch("yfinance.download", return_value=pd.DataFrame()):
-            labels, matrix = _sync_compute_correlation(["AAPL"], ["Apple"], date(2020, 1, 1), date(2021, 1, 1))
-
-        assert labels == []
-        assert matrix == []
-
-    def test_insufficient_data_returns_empty(self, override_settings):
-        import pandas as pd
-
-        from app.services.correlation_service import _sync_compute_correlation
-
-        # Only 3 months of data (< 6 required)
-        idx = pd.date_range("2020-01-01", periods=3, freq="ME")
-        df = pd.DataFrame({"AAPL": [150.0, 155.0, 160.0]}, index=idx)
-
-        with patch("yfinance.download", return_value=df):
-            labels, matrix = _sync_compute_correlation(["AAPL"], ["Apple"], date(2020, 1, 1), date(2020, 3, 31))
-
-        assert labels == []
-        assert matrix == []
-
-    def test_sufficient_data_returns_correlation_matrix(self, override_settings):
-        import pandas as pd
-
-        from app.services.correlation_service import _sync_compute_correlation
-
-        # 12 months of data
-        idx = pd.date_range("2020-01-01", periods=12, freq="ME")
-        aapl = [150 + i for i in range(12)]
-        tsla = [300 + i * 2 for i in range(12)]
-
-        columns = pd.MultiIndex.from_tuples([("Close", "AAPL"), ("Close", "TSLA")])
-        df = pd.DataFrame(
-            list(zip(aapl, tsla, strict=False)),
-            columns=columns,
-            index=idx,
-        )
-
-        with patch("yfinance.download", return_value=df):
-            labels, matrix = _sync_compute_correlation(
-                ["AAPL", "TSLA"],
-                ["Apple", "Tesla"],
-                date(2020, 1, 1),
-                date(2020, 12, 31),
-            )
-
-        # May or may not have sufficient data depending on dropna behavior
-        assert isinstance(labels, list)
-        assert isinstance(matrix, list)

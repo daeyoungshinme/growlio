@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
 from app.core.cache_store import get_cache_store
@@ -13,6 +13,7 @@ from app.kis.auth import promote_user_token_to_account
 from app.kiwoom.client import KiwoomTokenIssueError
 from app.limiter import limiter
 from app.models.asset import AssetAccount, Transaction
+from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.asset import (
     AssetAccountCreate,
@@ -22,7 +23,6 @@ from app.schemas.asset import (
     IsaPnlOverrideUpdate,
     KisCredentialVerifyRequest,
     KiwoomCredentialVerifyRequest,
-    SetTargetPortfolioRequest,
     TossCredentialVerifyRequest,
 )
 from app.services._account_queries import portfolio_accounts_stmt
@@ -462,6 +462,8 @@ async def batch_set_target_portfolio(
     """
     if not body.account_ids:
         return []
+    if body.portfolio_id is not None:
+        await get_owned_or_404(db, Portfolio, body.portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
     accounts = await _list_accounts_by_ids(body.account_ids, current_user.id, db)
     if len(accounts) != len(body.account_ids):
         raise HTTPException(status_code=403, detail="접근 권한이 없는 계좌가 포함되어 있습니다")
@@ -471,23 +473,6 @@ async def batch_set_target_portfolio(
     for account in accounts:
         await db.refresh(account)
     return [_account_response(a) for a in accounts]
-
-
-@router.patch("/{account_id}/target-portfolio", response_model=AssetAccountResponse)
-@limiter.limit("30/minute")
-async def set_target_portfolio(
-    request: Request,
-    account_id: UUID,
-    body: SetTargetPortfolioRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """계좌의 목표 포트폴리오를 지정하거나 해제한다."""
-    account = await _get_owned_account(account_id, current_user.id, db)
-    account.target_portfolio_id = body.target_portfolio_id
-    await db.commit()
-    await db.refresh(account)
-    return _account_response(account)
 
 
 @router.patch("/{account_id}/isa-pnl-override", response_model=AssetAccountResponse)

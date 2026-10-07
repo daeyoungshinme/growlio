@@ -40,6 +40,7 @@ vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
 
 vi.mock("@/utils/queryInvalidation", () => ({
   invalidateSyncData: vi.fn().mockResolvedValue(undefined),
+  invalidateRebalancingHistoryData: vi.fn().mockResolvedValue(undefined),
   invalidateAccountData: vi.fn(),
 }));
 
@@ -809,6 +810,33 @@ describe("useRebalancingExecution", () => {
     expect(result.current.state.phase).toBe("confirm");
     expect(result.current.state.orderType).toBe("MARKET");
     expect(result.current.tradableAccounts).toHaveLength(1);
+  });
+
+  it("handleExecute — 주문 실행 후 동기화 데이터와 실행 이력을 함께 무효화한다", async () => {
+    const { fetchAllBrokerBalances, executeRebalancing } = await import("@/api/rebalancing");
+    const { invalidateSyncData, invalidateRebalancingHistoryData } =
+      await import("@/utils/queryInvalidation");
+    vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
+    vi.mocked(executeRebalancing).mockResolvedValue([]);
+
+    const { result } = renderHook(
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: mockAnalysis,
+          accounts: mockKisAccounts,
+        }),
+      { wrapper: createWrapper() },
+    );
+    expect(result.current.orders.length).toBeGreaterThan(0);
+
+    await act(async () => {
+      await result.current.handleExecute();
+    });
+
+    expect(executeRebalancing).toHaveBeenCalledTimes(1);
+    expect(invalidateSyncData).toHaveBeenCalledTimes(1);
+    expect(invalidateRebalancingHistoryData).toHaveBeenCalledTimes(1);
   });
 
   it("actionableItems에서 거래 가능한 아이템만 반환한다", async () => {

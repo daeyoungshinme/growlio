@@ -30,7 +30,6 @@ import {
   updateAccount,
   deleteAccount,
   syncAccount,
-  setAccountTargetPortfolio,
   batchSetTargetPortfolio,
   verifyKisCredentials,
   verifyTossCredentials,
@@ -85,23 +84,6 @@ describe("api/assets", () => {
     vi.mocked(api.post).mockResolvedValue({ data: {} });
     await syncAccount("acc-1");
     expect(api.post).toHaveBeenCalledWith("/assets/acc-1/sync");
-  });
-
-  it("setAccountTargetPortfolio calls PATCH", async () => {
-    vi.mocked(api.patch).mockResolvedValue({ data: mockAccount });
-    const result = await setAccountTargetPortfolio("acc-1", "port-1");
-    expect(api.patch).toHaveBeenCalledWith("/assets/acc-1/target-portfolio", {
-      target_portfolio_id: "port-1",
-    });
-    expect(result).toEqual(mockAccount);
-  });
-
-  it("setAccountTargetPortfolio accepts null portfolioId", async () => {
-    vi.mocked(api.patch).mockResolvedValue({ data: mockAccount });
-    await setAccountTargetPortfolio("acc-1", null);
-    expect(api.patch).toHaveBeenCalledWith("/assets/acc-1/target-portfolio", {
-      target_portfolio_id: null,
-    });
   });
 
   it("batchSetTargetPortfolio calls PATCH /assets/batch-target-portfolio", async () => {
