@@ -11,6 +11,18 @@ for _arg in "$@"; do
 done
 unset _arg
 
+# 로그인 셸이 아닌 Git의 usr/bin/bash.exe로 직접 실행되면 /usr/bin이 PATH에 없어
+# tr/sleep/seq와 npm 래퍼 스크립트(dirname/sed/uname)가 실패한다 — npm은 즉시 죽고
+# 백엔드만 살아남아 "서버는 도는데 5173 연결 불가" 상태가 됨. Git Bash 기본 경로 보장.
+for _BIN in /usr/bin /mingw64/bin; do
+  case ":$PATH:" in
+    *":$_BIN:"*) ;;
+    *) [ -d "$_BIN" ] && PATH="$_BIN:$PATH" ;;
+  esac
+done
+export PATH
+unset _BIN
+
 # Windows Git Bash: Node.js PATH 보장
 for _NODE_DIR in \
   "/c/Program Files/nodejs" \
@@ -25,6 +37,14 @@ for _NODE_DIR in \
   fi
 done
 unset _NODE_DIR
+
+for _CMD in npm tr curl powershell.exe; do
+  if ! command -v "$_CMD" &>/dev/null; then
+    echo "오류: '$_CMD' 명령을 찾을 수 없습니다. Git Bash 터미널에서 실행하세요 (PATH: $PATH)."
+    exit 1
+  fi
+done
+unset _CMD
 
 if [ ! -f "backend/.venv/Scripts/uvicorn" ]; then
   echo "오류: backend/.venv가 없습니다. 먼저 'make install-backend'를 실행하세요."
@@ -101,8 +121,33 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+# 프론트엔드가 기동 직후 죽으면(npm 실패 등) 백엔드만 남은 채 조용히 대기하던 문제 —
+# 실제로 5173이 응답하는지 확인하고, 그 전에 프로세스가 사라지면 즉시 실패 처리
+echo "프론트엔드 시작 대기 중... (포트 5173)"
+FRONTEND_UP=0
+for i in $(seq 1 40); do
+  if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
+    echo "오류: 프론트엔드(npm run dev)가 시작 직후 종료됐습니다. 위 로그를 확인하세요."
+    exit 1
+  fi
+  if curl -s -o /dev/null "http://localhost:5173/" 2>/dev/null; then
+    FRONTEND_UP=1
+    break
+  fi
+  sleep 0.5
+done
+if [ "$FRONTEND_UP" -eq 0 ]; then
+  echo "경고: 20초 내에 프론트엔드(5173) 응답이 없습니다. 계속 대기합니다."
+fi
+
 echo "백엔드:    http://localhost:${BACKEND_PORT}"
 echo "프론트엔드: http://localhost:5173"
 echo "Ctrl+C로 두 서버 모두 종료됩니다."
 
-wait "$BACKEND_PID" "$FRONTEND_PID"
+# 한쪽만 종료돼도 나머지를 정리하고 끝냄 — 반쪽만 살아 있는 상태 방지
+wait -n "$BACKEND_PID" "$FRONTEND_PID"
+if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
+  echo "프론트엔드가 종료되어 백엔드도 함께 종료합니다."
+else
+  echo "백엔드가 종료되어 프론트엔드도 함께 종료합니다."
+fi
