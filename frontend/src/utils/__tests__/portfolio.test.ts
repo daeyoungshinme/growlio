@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  getPortfolioHorizon,
   getPortfolioHorizonTaxType,
   groupPositionsByTicker,
   inferHorizonTaxTypeFromAccounts,
@@ -208,48 +207,6 @@ function makeAccount(overrides: Partial<AssetAccount> = {}): AssetAccount {
     ...overrides,
   };
 }
-
-describe("getPortfolioHorizon", () => {
-  it("기준 지정된 계좌가 없으면 null", () => {
-    const portfolio = makePortfolio();
-    const accounts = [makeAccount({ id: "acc-1", investment_horizon: "SHORT_TERM" })];
-    expect(getPortfolioHorizon(portfolio, accounts)).toBeNull();
-  });
-
-  it("기준 지정된 계좌가 전부 같은 기간이면 그 기간을 반환", () => {
-    const portfolio = makePortfolio({ id: "p1" });
-    const accounts = [
-      makeAccount({ id: "acc-1", target_portfolio_id: "p1", investment_horizon: "SHORT_TERM" }),
-      makeAccount({ id: "acc-2", target_portfolio_id: "p1", investment_horizon: "SHORT_TERM" }),
-    ];
-    expect(getPortfolioHorizon(portfolio, accounts)).toBe("SHORT_TERM");
-  });
-
-  it("기준 지정된 계좌의 기간이 섞여 있으면 null", () => {
-    const portfolio = makePortfolio({ id: "p1" });
-    const accounts = [
-      makeAccount({ id: "acc-1", target_portfolio_id: "p1", investment_horizon: "SHORT_TERM" }),
-      makeAccount({ id: "acc-2", target_portfolio_id: "p1", investment_horizon: "LONG_TERM" }),
-    ];
-    expect(getPortfolioHorizon(portfolio, accounts)).toBeNull();
-  });
-
-  it("기준 지정된 계좌에 기간 태그가 없으면 null", () => {
-    const portfolio = makePortfolio({ id: "p1" });
-    const accounts = [
-      makeAccount({ id: "acc-1", target_portfolio_id: "p1", investment_horizon: null }),
-    ];
-    expect(getPortfolioHorizon(portfolio, accounts)).toBeNull();
-  });
-
-  it("다른 포트폴리오를 기준으로 지정한 계좌는 무시", () => {
-    const portfolio = makePortfolio({ id: "p1" });
-    const accounts = [
-      makeAccount({ id: "acc-1", target_portfolio_id: "p2", investment_horizon: "SHORT_TERM" }),
-    ];
-    expect(getPortfolioHorizon(portfolio, accounts)).toBeNull();
-  });
-});
 
 describe("getPortfolioHorizonTaxType", () => {
   it("기준 지정된 계좌가 없으면 null", () => {

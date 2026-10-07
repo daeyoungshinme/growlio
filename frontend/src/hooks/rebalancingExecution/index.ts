@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer } from "react
 import { useQueryClient } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
 import { extractErrorMessage } from "@/utils/error";
-import { invalidateSyncData } from "@/utils/queryInvalidation";
+import { invalidateRebalancingHistoryData, invalidateSyncData } from "@/utils/queryInvalidation";
 import { isOrderExecutableAccount } from "@/utils/accounts";
 import { triggerHaptic } from "../useHaptic";
 import { isOverseasMarket } from "@/constants/markets";
@@ -471,7 +471,10 @@ export function useRebalancingExecution({
       });
       dispatch({ type: "EXECUTE_SUCCESS", results: res });
       void triggerHaptic("success");
-      await invalidateSyncData(queryClient);
+      await Promise.all([
+        invalidateSyncData(queryClient),
+        invalidateRebalancingHistoryData(queryClient),
+      ]);
       onExecuted?.(res);
     } catch (e: unknown) {
       void triggerHaptic("error");

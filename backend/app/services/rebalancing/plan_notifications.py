@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
@@ -19,7 +18,7 @@ from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.plan_generation import DailyValueCapBlocked, MarketSignalGateBlocked, TaxGateBlocked
-from app.utils.kst import KST as _KST
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -123,7 +122,7 @@ async def notify_tax_gate_blocked(
     from app.utils.cache_keys import TTL_TAX_IMPACT_GATE_ALERT_SENT, tax_impact_gate_alert_sent_key
     from app.utils.durable_state import get_durable, set_durable
 
-    today = datetime.now(tz=UTC).date().isoformat()
+    today = today_kst().isoformat()
     dedup_key = tax_impact_gate_alert_sent_key(alert.id, today)
     if await get_durable(db, dedup_key):
         return
@@ -175,7 +174,7 @@ async def notify_market_signal_gate_blocked(
     from app.utils.cache_keys import TTL_MARKET_SIGNAL_GATE_ALERT_SENT, market_signal_gate_alert_sent_key
     from app.utils.durable_state import get_durable, set_durable
 
-    today = datetime.now(tz=UTC).date().isoformat()
+    today = today_kst().isoformat()
     dedup_key = market_signal_gate_alert_sent_key(alert.id, today)
     if await get_durable(db, dedup_key):
         return
@@ -226,7 +225,7 @@ async def notify_daily_value_cap_blocked(
     from app.utils.cache_keys import TTL_DAILY_VALUE_CAP_ALERT_SENT, daily_value_cap_gate_alert_sent_key
     from app.utils.durable_state import get_durable, set_durable
 
-    today = datetime.now(tz=_KST).date().isoformat()
+    today = today_kst().isoformat()
     dedup_key = daily_value_cap_gate_alert_sent_key(alert.user_id, today)
     if await get_durable(db, dedup_key):
         return

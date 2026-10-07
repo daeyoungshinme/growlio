@@ -138,11 +138,6 @@ export const syncAllAccounts = () => apiPost<{ total: number; status: string }>(
 
 export const getSyncAllStatus = () => apiGet<SyncAllStatus>("/assets/sync-all/status");
 
-export const setAccountTargetPortfolio = (accountId: string, portfolioId: string | null) =>
-  apiPatch<AssetAccount>(`/assets/${accountId}/target-portfolio`, {
-    target_portfolio_id: portfolioId,
-  });
-
 export const updateIsaPnlOverride = (accountId: string, cumulativePnlKrw: number | null) =>
   apiPatch<AssetAccount>(`/assets/${accountId}/isa-pnl-override`, {
     cumulative_pnl_krw: cumulativePnlKrw,

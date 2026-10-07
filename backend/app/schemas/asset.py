@@ -285,7 +285,3 @@ class TossCredentialVerifyRequest(BaseModel):
 class BatchSetTargetPortfolioRequest(BaseModel):
     portfolio_id: UUID | None
     account_ids: list[UUID]
-
-
-class SetTargetPortfolioRequest(BaseModel):
-    target_portfolio_id: UUID | None

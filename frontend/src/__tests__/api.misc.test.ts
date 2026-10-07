@@ -27,14 +27,7 @@ import { api } from "@/api/client";
 import { fetchSettings, registerPushToken, updateGoalCandidateTickers } from "@/api/settings";
 import { fetchDCAAnalysis, fetchDividendPlan } from "@/api/invest";
 import { fetchOverseasPositionsTax, fetchTaxSummary } from "@/api/tax";
-import {
-  fetchBacktestPortfolios,
-  createBacktestPortfolio,
-  updateBacktestPortfolio,
-  deleteBacktestPortfolio,
-  runBacktest,
-  runCorrelation,
-} from "@/api/backtest";
+import { runBacktest } from "@/api/backtest";
 import { fetchMonthlyOptimization } from "@/api/dividends";
 import { fetchInsights } from "@/api/insights";
 import { fetchPortfolioRisk, fetchRebalancingStrategy } from "@/api/risk";
@@ -116,31 +109,6 @@ describe("api/tax", () => {
 describe("api/backtest", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("fetchBacktestPortfolios calls GET /backtest/portfolios", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: [] });
-    await fetchBacktestPortfolios();
-    expect(api.get).toHaveBeenCalledWith("/backtest/portfolios");
-  });
-
-  it("createBacktestPortfolio calls POST /backtest/portfolios", async () => {
-    vi.mocked(api.post).mockResolvedValue({ data: {} });
-    const body = { name: "테스트", holdings: [{ ticker: "005930", market: "KOSPI", weight: 100 }] };
-    await createBacktestPortfolio(body);
-    expect(api.post).toHaveBeenCalledWith("/backtest/portfolios", body);
-  });
-
-  it("updateBacktestPortfolio calls PUT /backtest/portfolios/:id", async () => {
-    vi.mocked(api.put).mockResolvedValue({ data: {} });
-    await updateBacktestPortfolio("port-1", { name: "업데이트" });
-    expect(api.put).toHaveBeenCalledWith("/backtest/portfolios/port-1", { name: "업데이트" });
-  });
-
-  it("deleteBacktestPortfolio calls DELETE /backtest/portfolios/:id", async () => {
-    vi.mocked(api.delete).mockResolvedValue({});
-    await deleteBacktestPortfolio("port-1");
-    expect(api.delete).toHaveBeenCalledWith("/backtest/portfolios/port-1");
-  });
-
   it("runBacktest calls POST /backtest/run", async () => {
     vi.mocked(api.post).mockResolvedValue({ data: {} });
     const req = {
@@ -153,13 +121,6 @@ describe("api/backtest", () => {
     };
     await runBacktest(req);
     expect(api.post).toHaveBeenCalledWith("/backtest/run", req);
-  });
-
-  it("runCorrelation calls POST /backtest/correlation", async () => {
-    vi.mocked(api.post).mockResolvedValue({ data: {} });
-    const req = { portfolio_ids: ["port-1"], start_date: "2020-01-01", end_date: "2023-12-31" };
-    await runCorrelation(req);
-    expect(api.post).toHaveBeenCalledWith("/backtest/correlation", req);
   });
 });
 

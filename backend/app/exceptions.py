@@ -19,11 +19,6 @@ class BadRequestError(AppError):
     detail = "잘못된 요청입니다."
 
 
-class NotFoundError(AppError):
-    status_code = 404
-    detail = "리소스를 찾을 수 없습니다."
-
-
 class ExternalAPIError(AppError):
     status_code = 502
     detail = "외부 API 오류가 발생했습니다"

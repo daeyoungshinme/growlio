@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from typing import Any, TypedDict, TypeVar
 
 from sqlalchemy import func, or_, select
@@ -11,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.constants import COMPREHENSIVE_TAX_THRESHOLD_KRW, POSITION_STOCK_ASSET_TYPES, TAX_DEFERRED_TAX_TYPES
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services._snapshot_queries import latest_snapshot_subquery
+from app.utils.kst import today_kst
 
 _T = TypeVar("_T")
 
@@ -88,7 +88,7 @@ def estimate_overseas_transfer_tax(realized_gain_krw: float, year: int | None = 
     리밸런싱 진단의 "세금 영향 미리보기"에서 재사용하는 참고용 근사치 —
     연간 다른 매매손익과 합산되는 정확한 세액은 get_tax_summary()의 연간 집계를 따른다.
     """
-    yr = year if year is not None else datetime.now(UTC).year
+    yr = year if year is not None else today_kst().year
     rates = _get_rates(yr)
     taxable = max(0.0, realized_gain_krw - rates["overseas_deduction"])
     tax = taxable * rates["overseas_gain"]

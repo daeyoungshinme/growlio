@@ -24,7 +24,7 @@ Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.11+, Node 22+, [uv
 docker compose up -d db
 
 # 2. 의존성 설치
-make install-backend   # backend uv venv + pip install + pre-commit install (최초 1회)
+make install-backend   # backend uv sync(uv.lock 기준, CI와 동일) + pre-commit install (최초 1회)
 make install-frontend  # npm install
 
 # 3. 환경 변수 설정
@@ -49,7 +49,7 @@ make up               # docker compose up -d db
 make down             # docker compose down
 make migrate          # cd backend && uv run alembic upgrade head
 make migrate-down     # cd backend && uv run alembic downgrade -1 (1단계 롤백)
-make install-backend  # cd backend && uv venv && uv pip install -e ".[dev]" + pre-commit install
+make install-backend  # cd backend && uv sync --extra dev (uv.lock 기준) + pre-commit install
 make install-frontend # cd frontend && npm install
 make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh) — Windows Git Bash 전용
 make dev-keep-port    # 위와 동일하되, 8000 포트가 이미 사용 중이면 강제 종료 대신 다음 빈 포트로 백엔드 구동
@@ -58,7 +58,7 @@ make dev-frontend     # 프론트엔드만 (localhost:5173)
 make test-backend     # cd backend && uv run pytest (커버리지 없이 빠르게)
 make test-backend-cov # cd backend && uv run pytest --cov=app --cov-fail-under=80 (CI와 동일한 80% 게이트)
 make test-frontend    # cd frontend && npm run test
-make lint             # ruff (backend) + eslint (frontend)
+make lint             # ruff check + format --check (backend) + eslint --max-warnings 0 (frontend) — CI와 같은 기준
 make typecheck        # mypy (backend) + tsc --noEmit (frontend)
 make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
 make format           # ruff format + ruff --fix (backend) + prettier --write (frontend)

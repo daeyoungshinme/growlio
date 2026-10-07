@@ -200,8 +200,7 @@ services/
   │   ├── overview_enrichment.py # 목표 포트폴리오 미보유 종목의 배당수익률·현재가 보완 — rebalancing.py analyze_portfolio 전용
   │   ├── broker_balance_service.py # 브로커(KIS/키움/토스) 실시간 잔고 조회 — rebalancing.py broker-balance 엔드포인트 전용. 세 브로커 모두 도달(잔고·진단). 단 주문 실행은 execution_service.py/order_builder.py가 KIS/키움만 통과(토스 주문 API 미구현)
   │   └── _alert_queries.py   # RebalancingAlert portfolio_id+user_id 조회 헬퍼
-  ├── backtest_service.py     # 백테스트 엔진 (상관관계 분석은 correlation_service.py로 분리됨)
-  ├── correlation_service.py  # 종목 간 월별 수익률 상관관계 분석 — backtest_service.py에서 분리 (CorrelationRequest/Result 스키마)
+  ├── backtest_service.py     # 백테스트 엔진
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend/fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인

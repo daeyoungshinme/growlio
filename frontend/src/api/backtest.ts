@@ -1,18 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from "./client";
-
-export interface HoldingItem {
-  ticker: string;
-  market: string;
-  weight: number;
-}
-
-export interface BacktestPortfolioConfig {
-  id: string;
-  name: string;
-  holdings: HoldingItem[];
-  created_at: string;
-  updated_at: string;
-}
+import { apiPost } from "./client";
 
 export interface BacktestRunRequest {
   portfolio_ids: string[];
@@ -44,32 +30,5 @@ export interface BacktestResult {
   metrics: PortfolioMetrics[];
 }
 
-export const fetchBacktestPortfolios = () =>
-  apiGet<BacktestPortfolioConfig[]>("/backtest/portfolios");
-
-export const createBacktestPortfolio = (body: { name: string; holdings: HoldingItem[] }) =>
-  apiPost<BacktestPortfolioConfig>("/backtest/portfolios", body);
-
-export const updateBacktestPortfolio = (
-  id: string,
-  body: { name?: string; holdings?: HoldingItem[] },
-) => apiPut<BacktestPortfolioConfig>(`/backtest/portfolios/${id}`, body);
-
-export const deleteBacktestPortfolio = (id: string) => apiDelete(`/backtest/portfolios/${id}`);
-
 export const runBacktest = (req: BacktestRunRequest) =>
   apiPost<BacktestResult>("/backtest/run", req);
-
-export interface CorrelationRequest {
-  portfolio_ids: string[];
-  start_date: string;
-  end_date: string;
-}
-
-export interface CorrelationResult {
-  labels: string[];
-  matrix: (number | null)[][];
-}
-
-export const runCorrelation = (req: CorrelationRequest) =>
-  apiPost<CorrelationResult>("/backtest/correlation", req);

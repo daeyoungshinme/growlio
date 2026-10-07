@@ -1,6 +1,6 @@
 .PHONY: up down migrate migrate-down install-backend install-frontend dev dev-keep-port dev-backend dev-frontend \
-        test-backend test-frontend lint typecheck \
-        clean format db-reset \
+        test-backend test-backend-cov test-frontend lint typecheck \
+        clean format format-backend db-reset \
         build-android-debug build-android-release
 
 up:
@@ -16,7 +16,7 @@ migrate-down:
 	cd backend && uv run alembic downgrade -1
 
 install-backend:
-	cd backend && uv venv && uv pip install -e ".[dev]"
+	cd backend && uv sync --extra dev
 	pre-commit install
 
 format-backend:
@@ -47,8 +47,8 @@ test-frontend:
 	cd frontend && npm run test
 
 lint:
-	cd backend && uv run ruff check . && \
-	cd ../frontend && npm run lint
+	cd backend && uv run ruff check . && uv run ruff format --check . && \
+	cd ../frontend && npm run lint -- --max-warnings 0
 
 typecheck:
 	cd backend && uv run mypy app/ && \
@@ -57,8 +57,7 @@ typecheck:
 clean:
 	rm -rf frontend/dist backend/.pytest_cache backend/.ruff_cache
 
-format:
-	cd backend && uv run ruff format . && uv run ruff check . --fix
+format: format-backend
 	cd frontend && npm run format
 
 db-reset:

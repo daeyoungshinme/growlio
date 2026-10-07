@@ -44,6 +44,7 @@ vi.mock("@/api/rebalancing", () => ({
 vi.mock("@/utils/queryInvalidation", () => ({
   invalidateAccountData: vi.fn().mockResolvedValue(undefined),
   invalidateSyncData: vi.fn().mockResolvedValue(undefined),
+  invalidateRebalancingHistoryData: vi.fn().mockResolvedValue(undefined),
   invalidatePortfolioData: vi.fn().mockResolvedValue(undefined),
   invalidateDcaData: vi.fn().mockResolvedValue(undefined),
   invalidateTransactionData: vi.fn().mockResolvedValue(undefined),

@@ -89,7 +89,7 @@ class TestGetSettings:
             goal_amount=100_000_000,
             goal_annual_return_pct=7.0,
             annual_deposit_goal=10_000_000,
-            monthly_deposit_amount=None,
+            monthly_deposit_amount=0,
             retirement_target_year=2045,
             annual_dividend_goal=None,
             notification_email=None,
@@ -123,6 +123,9 @@ class TestGetSettings:
             data = resp.json()
             assert data["has_dart"] is True
             assert data["goal_amount"] == 100_000_000
+            # 저장된 0은 0으로 돌려준다(검증기가 0을 허용) — 미설정(NULL)만 None
+            assert data["monthly_deposit_amount"] == 0
+            assert data["annual_dividend_goal"] is None
             assert data["goal_candidate_tickers"] == []
             # 신규 추천 설정 컬럼이 NULL이면 기존 하드코딩 기본값과 동일하게 echo된다
             assert data["goal_risk_tolerance"] == "CONSERVATIVE"

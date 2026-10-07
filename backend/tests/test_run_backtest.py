@@ -1,4 +1,4 @@
-"""backtest_service.run_backtest 및 compute_correlation 통합 테스트."""
+"""backtest_service.run_backtest 통합 테스트."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.schemas.backtest import BacktestRunRequest, CorrelationRequest
+from app.schemas.backtest import BacktestRunRequest
 
 
 def _exec_result(items):
@@ -264,45 +264,3 @@ class TestRunBacktestWithPortfolio:
             await run_backtest(uuid.uuid4(), req, mock_db)
 
         assert "CASH" not in captured_symbols
-
-
-class TestComputeCorrelation:
-    @pytest.mark.asyncio
-    async def test_empty_portfolios_returns_empty(self, mock_db, override_settings):
-        """포트폴리오 없으면 빈 결과."""
-        from app.services.correlation_service import compute_correlation
-
-        mock_db.execute = AsyncMock(return_value=_exec_result([]))
-
-        req = CorrelationRequest(
-            portfolio_ids=[uuid.uuid4()],
-            start_date=date(2023, 1, 1),
-            end_date=date(2023, 12, 31),
-        )
-
-        result = await compute_correlation(uuid.uuid4(), req, mock_db)
-        assert result.labels == []
-        assert result.matrix == []
-
-    @pytest.mark.asyncio
-    async def test_portfolio_with_items_calls_executor(self, mock_db, override_settings):
-        """종목이 있으면 executor를 통해 상관관계 계산."""
-        from app.services.correlation_service import compute_correlation
-
-        port = _make_portfolio()
-        exec_res = MagicMock()
-        exec_res.scalars.return_value.all.return_value = [port]
-        mock_db.execute = AsyncMock(return_value=exec_res)
-
-        req = CorrelationRequest(
-            portfolio_ids=[port.id],
-            start_date=date(2023, 1, 1),
-            end_date=date(2023, 12, 31),
-        )
-
-        with patch("app.services.backtest_service.asyncio.get_running_loop") as mock_loop:
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=(["AAPL"], [[1.0]]))
-            result = await compute_correlation(uuid.uuid4(), req, mock_db)
-
-        assert result.labels == ["AAPL"]
-        assert result.matrix == [[1.0]]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
@@ -22,6 +22,7 @@ from app.utils.cache_keys import (
     get_cached_json,
     set_cached_json,
 )
+from app.utils.kst import today_kst
 
 _DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50년)
 
@@ -82,7 +83,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
         start_date: date = start_dt.date()
     else:
         start_date = start_dt
-    today = datetime.now(UTC).date()
+    today = today_kst()
     r = annual_return_pct / 12 / 100
 
     if manual_initial is not None:
@@ -282,7 +283,7 @@ def _calc_goal_timeline(
     months_to_goal: int | None,
     annual_return_pct: float,
 ) -> dict[str, Any]:
-    today = datetime.now(UTC).date()
+    today = today_kst()
     elapsed = _elapsed_months(start_date, today)
 
     # 이론 곡선에서 현재 월의 이론값

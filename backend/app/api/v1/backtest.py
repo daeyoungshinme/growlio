@@ -2,108 +2,19 @@
 
 import hashlib
 import json
-import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db, get_owned_or_404
+from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
-from app.models.backtest import BacktestPortfolio
 from app.models.user import User
-from app.schemas.backtest import (
-    BacktestPortfolioCreate,
-    BacktestPortfolioResponse,
-    BacktestPortfolioUpdate,
-    BacktestResult,
-    BacktestRunRequest,
-    CorrelationRequest,
-    CorrelationResult,
-)
+from app.schemas.backtest import BacktestResult, BacktestRunRequest
 from app.services.backtest_service import run_backtest
-from app.services.correlation_service import compute_correlation
-from app.utils.cache_keys import TTL_BACKTEST, backtest_key, correlation_key
+from app.utils.cache_keys import TTL_BACKTEST, backtest_key
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])
-
-
-@router.get("/portfolios", response_model=list[BacktestPortfolioResponse])
-@limiter.limit("30/minute")
-async def list_portfolios(
-    request: Request,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """저장된 백테스팅 포트폴리오 목록."""
-    rows = await db.execute(
-        select(BacktestPortfolio)
-        .where(BacktestPortfolio.user_id == current_user.id)
-        .order_by(BacktestPortfolio.created_at)
-    )
-    return rows.scalars().all()
-
-
-@router.post("/portfolios", response_model=BacktestPortfolioResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("30/minute")
-async def create_portfolio(
-    request: Request,
-    body: BacktestPortfolioCreate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """새 백테스팅 포트폴리오 생성."""
-    portfolio = BacktestPortfolio(
-        user_id=current_user.id,
-        name=body.name,
-        holdings=[h.model_dump() for h in body.holdings],
-    )
-    db.add(portfolio)
-    await db.commit()
-    await db.refresh(portfolio)
-    return portfolio
-
-
-@router.put("/portfolios/{portfolio_id}", response_model=BacktestPortfolioResponse)
-@limiter.limit("30/minute")
-async def update_portfolio(
-    request: Request,
-    portfolio_id: uuid.UUID,
-    body: BacktestPortfolioUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """백테스팅 포트폴리오 수정."""
-    portfolio = await get_owned_or_404(
-        db, BacktestPortfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다"
-    )
-
-    if body.name is not None:
-        portfolio.name = body.name
-    if body.holdings is not None:
-        portfolio.holdings = [h.model_dump() for h in body.holdings]
-
-    await db.commit()
-    await db.refresh(portfolio)
-    return portfolio
-
-
-@router.delete("/portfolios/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("30/minute")
-async def delete_portfolio(
-    request: Request,
-    portfolio_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """백테스팅 포트폴리오 삭제."""
-    portfolio = await get_owned_or_404(
-        db, BacktestPortfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다"
-    )
-
-    await db.delete(portfolio)
-    await db.commit()
 
 
 @router.post("/run", response_model=BacktestResult)
@@ -131,34 +42,5 @@ async def run_backtest_endpoint(
         return BacktestResult.model_validate_json(cached)
 
     result = await run_backtest(current_user.id, body, db)
-    await cache.setex(cache_key, TTL_BACKTEST, result.model_dump_json())
-    return result
-
-
-@router.post("/correlation", response_model=CorrelationResult)
-@limiter.limit("5/minute")
-async def run_correlation_endpoint(
-    request: Request,
-    body: CorrelationRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """선택된 포트폴리오 종목 간 월별 수익률 상관관계 분석."""
-    if not body.portfolio_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="최소 1개의 포트폴리오를 선택해주세요.",
-        )
-
-    cache = await get_cache_store()
-    payload = json.dumps(body.model_dump(), sort_keys=True, default=str).encode()
-    param_hash = hashlib.md5(payload, usedforsecurity=False).hexdigest()
-    cache_key = correlation_key(current_user.id, param_hash)
-
-    cached = await cache.get(cache_key)
-    if cached:
-        return CorrelationResult.model_validate_json(cached)
-
-    result = await compute_correlation(current_user.id, body, db)
     await cache.setex(cache_key, TTL_BACKTEST, result.model_dump_json())
     return result
