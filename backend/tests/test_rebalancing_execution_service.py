@@ -572,3 +572,33 @@ class TestRebalancingSchemaValidators:
         order = _make_order()
         req = ExecutionRequest(orders=[order])
         assert len(req.orders) == 1
+
+
+class TestBuildFailedGroupResult:
+    """계좌 그룹 실패 로그 — 예상 밖 예외는 error 레벨+예외 타입, 자격증명 노출 우려로 exc_info는 남기지 않는다."""
+
+    def test_unexpected_error_logs_error_with_type(self):
+        from app.services.rebalancing import execution_service
+
+        with patch.object(execution_service, "logger") as mock_logger:
+            result = execution_service._build_failed_group_result(
+                uuid.uuid4(), "acc-1", [_make_order()], KeyError("output1")
+            )
+
+        mock_logger.error.assert_called_once()
+        kwargs = mock_logger.error.call_args.kwargs
+        assert kwargs["error_type"] == "KeyError"
+        assert "exc_info" not in kwargs
+        assert [o.status for o in result.orders] == ["FAILED"]
+
+    def test_expected_error_logs_warning_with_detail(self):
+        from app.services.rebalancing import execution_service
+
+        with patch.object(execution_service, "logger") as mock_logger:
+            result = execution_service._build_failed_group_result(
+                uuid.uuid4(), "acc-1", [_make_order()], HTTPException(status_code=400, detail="잔고 부족")
+            )
+
+        mock_logger.warning.assert_called_once()
+        mock_logger.error.assert_not_called()
+        assert result.orders[0].error_msg == "잔고 부족"

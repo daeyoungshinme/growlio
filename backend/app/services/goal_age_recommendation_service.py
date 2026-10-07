@@ -42,6 +42,7 @@ from app.utils.cache_keys import (
     set_cached_json,
 )
 from app.utils.inproc_lock import single_flight_fetch
+from app.utils.kst import today_kst
 
 _AGE_GROUP_PROFILE: dict[str, tuple[str, str, float | None, float | None, float]] = {
     # age_group → (구간 라벨, risk_tolerance, equity_floor, equity_ceiling, 기본 배당수익률 하한%)
@@ -81,7 +82,7 @@ def age_group_from_birth_year(birth_year: int) -> AgeGroup:
     매핑해 저장한다 — `get_age_based_recommendation` 등 기존 연령대 기반 로직을 그대로 재사용하기
     위함(신규 계산 경로를 만들지 않음). 20세 미만은 TWENTIES로, 60세 이상은 SIXTIES_PLUS로 clamp한다.
     """
-    age = datetime.now(UTC).year - birth_year
+    age = today_kst().year - birth_year
     if age < 30:
         return AgeGroup.TWENTIES
     if age < 40:

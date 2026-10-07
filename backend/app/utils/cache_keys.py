@@ -495,7 +495,11 @@ async def invalidate_asset_account_caches(
     *,
     positions_changed: bool = True,
 ) -> None:
-    """계좌 생성/수정/삭제/동기화 후 관련 캐시 일괄 무효화.
+    """계좌 생성/수정/삭제/동기화·포지션 수정 후 관련 캐시 일괄 무효화.
+
+    계좌 삭제(is_active=False)·포지션 수정도 월별 추이·배분 이력(둘 다 is_active 필터)에 반영돼야
+    하므로 sync와 똑같이 두 캐시를 지운다 — 예전엔 sync 전용 함수에서만 지워 계좌 삭제 후 배분
+    이력에 최대 하루 남았다.
 
     계좌 수정에는 investment_horizon/tax_type 태그 변경(목표 역산 추천의 조합 구성에 직접
     영향)도 포함되므로 goal_recommendation 캐시도 함께 무효화한다.
@@ -506,6 +510,7 @@ async def invalidate_asset_account_caches(
 
     _year = year if year is not None else today_kst().year
     keys = [
+        monthly_trend_key(user_id),
         dashboard_summary_key(user_id),
         dca_analysis_key(user_id),
         goal_recommendation_key(user_id),
@@ -515,6 +520,7 @@ async def invalidate_asset_account_caches(
     if account_id is not None:
         keys.append(account_detail_key(user_id, account_id))
     await invalidate_user_caches(cache, *keys)
+    await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
     await invalidate_tax_overseas_caches(cache, user_id)
     await invalidate_portfolio_overview_cache(cache, user_id)
@@ -531,23 +537,9 @@ async def invalidate_tax_overseas_caches(cache: CacheStoreType, user_id: uuid.UU
 async def invalidate_account_caches(
     cache: CacheStoreType, user_id: uuid.UUID, year: int | None = None, *, positions_changed: bool = True
 ) -> None:
-    """계좌 싱크 완료 후 관련 캐시 일괄 무효화.
+    """계좌 싱크 완료 후 관련 캐시 일괄 무효화 — `invalidate_asset_account_caches`의 계좌 상세 키 없는 형태.
 
+    두 함수가 따로 키 목록을 들고 있다가 어긋난 적이 있어(CRUD 쪽만 추이·배분이력 누락) 하나로 합쳤다.
     `positions_changed` — `invalidate_dividend_caches` 참고.
     """
-
-    _year = year if year is not None else today_kst().year
-    await _invalidate_alloc_history(cache, user_id)
-    await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
-    await invalidate_tax_overseas_caches(cache, user_id)
-    await invalidate_user_caches(
-        cache,
-        monthly_trend_key(user_id),
-        dashboard_summary_key(user_id),
-        dca_analysis_key(user_id),
-        goal_recommendation_key(user_id),
-        goal_recommendation_horizon_key(user_id),
-        goal_recommendation_age_key(user_id),
-    )
-    await invalidate_portfolio_overview_cache(cache, user_id)
-    await invalidate_rebalancing_analysis_cache_all(cache, user_id)
+    await invalidate_asset_account_caches(cache, user_id, None, year, positions_changed=positions_changed)

@@ -8,6 +8,7 @@ import structlog
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import AppError, SyncError
 from app.kis.auth import get_access_token
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
@@ -86,8 +87,18 @@ def _build_failed_group_result(
     user_id: uuid.UUID, acc_id_str: str, group_orders: list[ExecutionOrderItem], error: Exception
 ) -> ExecutionResult:
     """계좌 그룹 실행 중 예외 발생 시 해당 그룹의 전체 주문을 FAILED로 표시한 ExecutionResult를 만든다."""
-    detail = error.detail if isinstance(error, HTTPException) else str(error)
-    logger.warning("rebalancing_group_failed", user_id=str(user_id), account_id=acc_id_str, error=detail)
+    detail = error.detail if isinstance(error, HTTPException | AppError) else str(error)
+    # 예상 밖 예외는 원인 추적용으로 예외 타입을 남기고 error로 올린다. exc_info/Sentry 전송은 하지 않는다 —
+    # 이 경로의 프레임 지역변수에 복호화된 증권사 자격증명이 있다(_job_helpers.report_job_failure 참고).
+    expected = isinstance(error, HTTPException | AppError | SyncError)
+    log = logger.warning if expected else logger.error
+    log(
+        "rebalancing_group_failed",
+        user_id=str(user_id),
+        account_id=acc_id_str,
+        error=detail,
+        error_type=type(error).__name__,
+    )
     fail_orders = [
         OrderResult(
             ticker=o.ticker,

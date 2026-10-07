@@ -246,6 +246,21 @@ class TestInvalidateDcaAnalysisCache:
         assert f"test:tax:overseas:{user_id}:*" in patterns
         assert f"test:tax:overseas_realized:{user_id}:*" in patterns
 
+    @pytest.mark.asyncio
+    async def test_invalidate_asset_account_caches_clears_trend_and_alloc_history(self, override_settings):
+        """계좌 삭제(is_active=False)·포지션 수정 후에도 월별 추이·배분 이력이 갱신돼야 한다
+        — 예전엔 sync 전용 함수에서만 지워 계좌 삭제 후 배분 이력에 최대 하루 남았다."""
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, []))
+        cache.unlink = AsyncMock()
+        user_id = uuid.uuid4()
+
+        await invalidate_asset_account_caches(cache, user_id, uuid.uuid4())
+
+        assert monthly_trend_key(user_id) in cache.delete.call_args.args
+        patterns = [c.kwargs["match"] for c in cache.scan.call_args_list]
+        assert any(p.startswith("test:alloc_history_") and str(user_id) in p for p in patterns)
+
 
 # ── currency ─────────────────────────────────────────────────────────────────
 

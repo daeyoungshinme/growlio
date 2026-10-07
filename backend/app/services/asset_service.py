@@ -34,8 +34,9 @@ from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positi
 from app.services.yahoo_price import fetch_yahoo_batch
 from app.utils.cache_keys import (
     CacheStoreType,
+    account_detail_key,
     invalidate_account_caches,
-    invalidate_asset_account_caches,
+    invalidate_user_caches,
 )
 from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit, toss_circuit
 from app.utils.kst import today_kst
@@ -263,7 +264,8 @@ async def sync_account_now(account: AssetAccount, user_id: uuid.UUID, cache: Cac
         merged_account = await db.merge(account)
         sync_result = await sync_account(merged_account, db, cache)
 
-    await invalidate_asset_account_caches(cache, user_id, account.id, positions_changed=sync_result.positions_changed)
+    # 계좌 단위 캐시 전체는 sync_account()가 이미 지웠다 — 계좌 상세 키만 추가로 지운다.
+    await invalidate_user_caches(cache, account_detail_key(user_id, account.id))
     return {
         "detail": "동기화 완료",
         "snapshot_date": str(sync_result.snapshot.snapshot_date),
