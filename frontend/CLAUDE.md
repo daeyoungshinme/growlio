@@ -116,7 +116,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드. `PortfolioPage`(자산탭 투자현황 › 세금 서브탭)의 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드. 마찬가지로 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/HealthInsuranceRiskCard.tsx`** — 배당소득 기준 건보 피부양자 자격상실 위험 상시 카드(진행률 바 + 초과 시 예상 월 보험료). `TaxLimitsSection`이 계좌 유무와 무관하게 항상 렌더(배당소득은 전체 수령액 기준). `TaxOptimizationCard`의 조건부 경고 배너와 상호 보완.
-- **`components/dashboard/ActionItemsCard.tsx`** — 홈 "지금 할 일"(Hero 바로 아래, lazy). `GET /dashboard/action-items`(백엔드 `action_items_service`가 리밸런싱 필요·자동매수 예수금 부족·세금 경고·절세 1순위·챌린지 미입금을 우선순위·마감 순 최대 5건으로 집계)를 행 단위 링크로 렌더. 0건이면 한 줄 안내, 조회 실패 시 렌더 안 함. 세금 한도 요약/경고는 예전엔 `InvestmentSnapshotCard`의 `TaxLimitsBanner`였음(2026-10-08 삭제 — 스냅샷 카드는 주식 3수치만). 우선순위 배지·마감 라벨은 `utils/actionPriority.ts`(`TaxActionPlanCard`와 공용).
+- **`components/dashboard/ActionItemsCard.tsx`** — 홈 "지금 할 일"(Hero 바로 아래, lazy). `GET /dashboard/action-items`(백엔드 `action_items_service`가 리밸런싱 필요·자동매수 예수금 부족·세금 경고·절세 1순위·챌린지 미입금을 우선순위·마감 순 최대 5건으로 집계)를 행 단위 링크로 렌더. 0건이면 한 줄 안내, 조회 실패 시 렌더 안 함. 홈에서 "리밸런싱 필요" 신호의 단일 표면 — 바로 아래 `RebalancingStatusCard`(`statusOnly`)는 상태 확인용으로만 남김. 세금 한도 요약/경고는 예전엔 `InvestmentSnapshotCard`의 `TaxLimitsBanner`였음(2026-10-08 삭제 — 스냅샷 카드는 주식 3수치만). 우선순위 배지·마감 라벨은 `utils/actionPriority.ts`(`TaxActionPlanCard`와 공용).
 - **`components/portfolio-analysis/TaxTabContainer.tsx`** — 자산탭 세금 서브탭 진입점(lazy). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`·`TaxOptimizationCard`를 묶음. 탭 상태 `?taxTab=` 영속화. `taxTab` 미지정 딥링크는 "한도 현황" 랜딩.
 - **`components/portfolio-analysis/TaxLimitsSection.tsx`** — "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`(계좌 조건부) + `HealthInsuranceRiskCard`(항상)를 감싸는 순수 프레젠테이션. 항상 전체 계좌 기준(`accountId` prop 없음). 항상 렌더 카드가 있어 empty-state 없음.
 - **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드(lazy). 리밸런싱 페이지 **"추천" 서브탭**(진단/추천/포트폴리오/이력, `rtab=추천`) 전용 — 추천 관련 딥링크는 `rtab=추천`, 포트폴리오 생성·관리·실행은 `rtab=포트폴리오`. `openRecOptions=1`이면 옵션 모달을 연 채 마운트. 전체/연령대/기간별 3탭. 적용 대상은 모든 포트폴리오(기준 포트폴리오 우선 선택). 결과 렌더는 `RecommendationResultPanel.tsx`로 통합, 탭별 문구·`useMutation`·전환 상태머신은 이 파일.
@@ -478,8 +478,9 @@ _기타_
 - 예외: `RebalancingPage.tsx` "포트폴리오" 탭의 백테스트 카드와 계획탭 "절약 복리 시뮬레이터" 카드는
   보조 도구라 **기본 접힘**(`growlio:rebalancing:backtest-section-open`, `growlio:invest:savingsSimulatorOpen`).
   (과거 백테스트는 설정탭 "백테스트 기능 표시" 플래그 뒤에 숨겨져 있었으나 2026-09-25 제거 — 계획 37 U15)
-- 예외: 홈의 `RebalancingStatusCard`는 `collapseWhenHealthy` — 펼침 상태를 저장하지 않고 리밸런싱 필요
-  포트폴리오가 있을 때만 펼친다(모두 정상이면 접힌 채 "N개 모두 목표 비중 이내" 힌트). 진단탭 인스턴스는 항상 펼침.
+- 예외: 홈의 `RebalancingStatusCard`는 `statusOnly` — 상태 확인용으로 **기본 접힘**(`growlio:dashboard:rebalancingStatusOpen`)
+  + 한 줄 힌트("N개 모두 목표 비중 이내" / "N개 중 M개 이탈 · 지금 할 일 참고"). "리밸런싱 필요" 신호(헤더 배지·빨간 테두리·
+  결합 안내)는 홈 `ActionItemsCard`가 단독 담당 — 두 카드가 같은 drift-summary를 중복 표시하지 않게. 진단탭 인스턴스는 항상 펼침.
 
 **마켓 유틸리티 (`src/constants/markets.ts`)**
 

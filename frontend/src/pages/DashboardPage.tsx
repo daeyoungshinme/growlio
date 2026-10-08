@@ -195,7 +195,7 @@ export default function DashboardPage() {
           </Suspense>
         </ErrorBoundary>
 
-        {/* 오늘의 진단: 리밸런싱 필요 여부 + 시장 신호 — 포트폴리오별 이탈 상세 */}
+        {/* 리밸런싱 점검: 상태 확인용(기본 접힘) — "필요" 신호·행동 유도는 위 지금 할 일이 담당 (M5) */}
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard rows={2} />}>
             <RebalancingStatusCard
@@ -205,7 +205,8 @@ export default function DashboardPage() {
               signalDisplay="badge"
               marketSignal={marketSignal}
               onPortfolioSelect={(id) => navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${id}`)}
-              collapseWhenHealthy
+              statusOnly
+              storageKey="growlio:dashboard:rebalancingStatusOpen"
             />
           </Suspense>
         </ErrorBoundary>

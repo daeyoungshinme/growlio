@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, TriangleAlert, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
@@ -168,10 +168,10 @@ interface Props {
   /** 지정 시, 포트폴리오가 하나도 없을 때 `null` 대신 "포트폴리오 만들기" CTA 카드를 렌더한다.
    * 리밸런싱 진단 탭 전용(대시보드 인스턴스는 미지정 → 종전대로 아무것도 렌더하지 않음). */
   emptyStateCta?: () => void;
-  /** true면 펼침 상태를 저장하지 않고 드리프트 결과로 정한다 — 리밸런싱 필요 포트폴리오가 있으면
-   * 펼치고, 모두 정상이면 접은 채 "모두 목표 비중 이내" 힌트만 보인다(홈 카드 높이 절감, U2).
-   * 세션 중 사용자가 직접 토글한 상태는 유지한다. `storageKey`와 함께 쓰지 않는다. */
-  collapseWhenHealthy?: boolean;
+  /** 홈 전용 상태 확인 모드 — "리밸런싱 필요" 신호와 행동 유도는 홈 "지금 할 일"(`ActionItemsCard`)이
+   * 맡으므로, 이 카드는 기본 접힘 + 한 줄 상태 힌트만 보이고 헤더 "N개 필요" 배지·빨간 테두리·결합 안내
+   * 문구를 끈다(같은 drift-summary를 두 카드가 중복 표시하던 문제). 펼치면 전체 이탈 행·집중도는 그대로. */
+  statusOnly?: boolean;
 }
 
 // 손실수확(TAX_LOSS_HARVEST)은 홈 "지금 할 일"(절세 액션 플랜 1순위)이 담당해 홈 인스턴스에선 뺀다 (docs/plans/50 M5)
@@ -196,9 +196,9 @@ export default function RebalancingStatusCard({
   showCombinedNote = true,
   storageKey,
   emptyStateCta,
-  collapseWhenHealthy = false,
+  statusOnly = false,
 }: Props) {
-  const [isOpen, toggleOpen, setIsOpen] = useCollapsible(!collapseWhenHealthy, storageKey);
+  const [isOpen, toggleOpen] = useCollapsible(!statusOnly, storageKey);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
   const {
     data: portfoliosRaw,
@@ -241,18 +241,13 @@ export default function RebalancingStatusCard({
     return driftSummaries.filter((s) => s.needs_rebalancing).length;
   }, [driftSummaries]);
 
-  // collapseWhenHealthy: 드리프트 요약이 처음 도착했을 때 1회만 기본 펼침 여부를 결정(이후 토글은 사용자 몫)
-  const autoOpenDecidedRef = useRef(false);
-  useEffect(() => {
-    if (!collapseWhenHealthy || autoOpenDecidedRef.current || !driftSummaries) return;
-    autoOpenDecidedRef.current = true;
-    if (needsCount > 0) setIsOpen(true);
-  }, [collapseWhenHealthy, driftSummaries, needsCount, setIsOpen]);
-
-  const healthyHint =
-    collapseWhenHealthy && driftSummaries && driftSummaries.length > 0 && needsCount === 0
-      ? `포트폴리오 ${driftSummaries.length}개 모두 목표 비중 이내`
-      : undefined;
+  let statusHint: string | undefined;
+  if (statusOnly && driftSummaries && driftSummaries.length > 0) {
+    statusHint =
+      needsCount === 0
+        ? `포트폴리오 ${driftSummaries.length}개 모두 목표 비중 이내`
+        : `포트폴리오 ${driftSummaries.length}개 중 ${needsCount}개 이탈 · 지금 할 일 참고`;
+  }
 
   const combinedStatusNote = useMemo(
     () => buildCombinedStatusNote(needsCount, marketSignal?.composite_level),
@@ -305,7 +300,7 @@ export default function RebalancingStatusCard({
   }
 
   const cardClass =
-    needsCount > 0
+    needsCount > 0 && !statusOnly
       ? "card border-red-300 dark:border-red-700/60 ring-1 ring-red-200 dark:ring-red-800/40"
       : "card";
 
@@ -316,7 +311,7 @@ export default function RebalancingStatusCard({
       iconColorClassName="text-blue-600 dark:text-blue-400"
       title="리밸런싱 점검"
       titleBadge={
-        showHeaderBadge && needsCount > 0 ? (
+        showHeaderBadge && !statusOnly && needsCount > 0 ? (
           <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
             {needsCount}개 필요
           </span>
@@ -344,7 +339,7 @@ export default function RebalancingStatusCard({
       }
       isOpen={isOpen}
       onToggle={toggleOpen}
-      collapsedHint={healthyHint}
+      collapsedHint={statusHint}
       cardClassName={cardClass}
     >
       {/* 시장 신호 배너 */}
@@ -368,7 +363,7 @@ export default function RebalancingStatusCard({
       )}
 
       {/* 이탈 종목 + 시장상황 결합 안내 */}
-      {showCombinedNote && combinedStatusNote && (
+      {showCombinedNote && !statusOnly && combinedStatusNote && (
         <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
           {combinedStatusNote}
         </p>
