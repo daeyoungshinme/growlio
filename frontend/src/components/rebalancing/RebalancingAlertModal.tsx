@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/common/Modal";
 import { updateAlertScope } from "@/api/alerts";
@@ -31,6 +31,9 @@ interface Props {
   canSwitchToPerAccount?: boolean;
   /** "계좌별로 독립 설정하기" 클릭 후 스코프 전환 성공 시 호출 — 부모가 계좌별 목록 화면으로 전환한다. */
   onSwitchToPerAccount?: () => void;
+  /** "dca"면 신규 AGGREGATE 알림일 때 선택 화면을 건너뛰고 정기 적립식 자동매수 프리셋으로 바로 연다
+   * (계획탭 "자동매수 설정" → `openAlert=dca`). 기존 알림·계좌별 설정에서는 무시된다. */
+  initialPreset?: "dca";
   onClose: () => void;
 }
 
@@ -42,6 +45,7 @@ export default function RebalancingAlertModal({
   targetAccountName,
   canSwitchToPerAccount,
   onSwitchToPerAccount,
+  initialPreset,
   onClose,
 }: Props) {
   const {
@@ -83,6 +87,7 @@ export default function RebalancingAlertModal({
             targetAccountInvestmentHorizon={targetAccountInvestmentHorizon}
             canSwitchToPerAccount={canSwitchToPerAccount}
             onSwitchToPerAccount={onSwitchToPerAccount}
+            initialPreset={initialPreset}
             onClose={onClose}
             marketSignal={marketSignal}
           />
@@ -107,6 +112,7 @@ function AlertFormBody({
   targetAccountInvestmentHorizon,
   canSwitchToPerAccount,
   onSwitchToPerAccount,
+  initialPreset,
   onClose,
   marketSignal,
 }: {
@@ -120,6 +126,7 @@ function AlertFormBody({
   targetAccountInvestmentHorizon?: InvestmentHorizon | null;
   canSwitchToPerAccount?: boolean;
   onSwitchToPerAccount?: () => void;
+  initialPreset?: "dca";
   onClose: () => void;
   marketSignal?: MarketSignalResponse;
 }) {
@@ -160,18 +167,39 @@ function AlertFormBody({
   // 신규 알림을 AGGREGATE 스코프로 만드는 경우에만 "빠른 설정" 선택지를 먼저 보여준다 —
   // 기존 알림 편집·PER_ACCOUNT 계좌별 설정(targetAccountId 지정)은 바로 상세 화면으로 간다.
   const canQuickSetup = !hasAlert && !targetAccountId;
+  const startWithDcaPreset = canQuickSetup && initialPreset === "dca";
   const [setupMode, setSetupMode] = useState<"choose" | "quick" | "advanced">(
-    canQuickSetup ? "choose" : "advanced",
+    startWithDcaPreset ? "quick" : canQuickSetup ? "choose" : "advanced",
   );
 
+  const { setScheduleType, setTriggerCondition, setMode, setStrategy, setThreshold } = form;
   function applyDcaAutoBuyPreset() {
-    form.setScheduleType("MONTHLY");
-    form.setTriggerCondition("SCHEDULE_ONLY");
-    form.setMode("AUTO");
-    form.setStrategy("BUY_ONLY");
-    form.setThreshold(DCA_AUTO_BUY_THRESHOLD_PCT);
+    setScheduleType("MONTHLY");
+    setTriggerCondition("SCHEDULE_ONLY");
+    setMode("AUTO");
+    setStrategy("BUY_ONLY");
+    setThreshold(DCA_AUTO_BUY_THRESHOLD_PCT);
     setSetupMode("quick");
   }
+
+  // 딥링크 프리셋 진입 — 폼 값은 첫 렌더 직후 1회만 채운다(이후 사용자가 바꾼 값은 유지)
+  const dcaPresetApplied = useRef(false);
+  useEffect(() => {
+    if (!startWithDcaPreset || dcaPresetApplied.current) return;
+    dcaPresetApplied.current = true;
+    setScheduleType("MONTHLY");
+    setTriggerCondition("SCHEDULE_ONLY");
+    setMode("AUTO");
+    setStrategy("BUY_ONLY");
+    setThreshold(DCA_AUTO_BUY_THRESHOLD_PCT);
+  }, [
+    startWithDcaPreset,
+    setScheduleType,
+    setTriggerCondition,
+    setMode,
+    setStrategy,
+    setThreshold,
+  ]);
 
   if (setupMode === "choose") {
     return (

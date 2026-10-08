@@ -307,22 +307,22 @@ class TestDriftSummary:
         try:
             with (
                 patch(
-                    "app.api.v1.rebalancing.get_linked_portfolios",
+                    "app.services.rebalancing.drift_summary_service.get_linked_portfolios",
                     new_callable=AsyncMock,
                     return_value=[portfolio],
                 ),
                 patch(
-                    "app.api.v1.rebalancing.get_active_alert_thresholds",
+                    "app.services.rebalancing.drift_summary_service.get_active_alert_thresholds",
                     new_callable=AsyncMock,
                     return_value={},
                 ),
                 patch(
-                    "app.api.v1.rebalancing.build_portfolio_overview",
+                    "app.services.rebalancing.drift_summary_service.build_portfolio_overview",
                     new_callable=AsyncMock,
                     return_value={"all_positions": [], "total_assets_krw": 0, "total_stock_krw": 0},
                 ),
                 patch(
-                    "app.api.v1.rebalancing.fetch_market_and_risk_signal",
+                    "app.services.rebalancing.drift_summary_service.fetch_market_and_risk_signal",
                     new_callable=AsyncMock,
                 ) as mock_fetch,
                 TestClient(app, raise_server_exceptions=False) as client,

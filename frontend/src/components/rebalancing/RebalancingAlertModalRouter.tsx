@@ -9,6 +9,8 @@ interface Props {
   alertScope?: "AGGREGATE" | "PER_ACCOUNT";
   accountIds: string[] | null;
   accounts: AssetAccount[];
+  /** "dca"면 아직 알림이 없을 때 정기 적립식 자동매수 프리셋을 적용한 채 연다(AGGREGATE 전용) */
+  initialPreset?: "dca";
   onClose: () => void;
 }
 
@@ -21,6 +23,7 @@ export default function RebalancingAlertModalRouter({
   alertScope,
   accountIds,
   accounts,
+  initialPreset,
   onClose,
 }: Props) {
   if (alertScope === "PER_ACCOUNT") {
@@ -45,6 +48,7 @@ export default function RebalancingAlertModalRouter({
       portfolioName={portfolioName}
       accountIds={accountIds}
       canSwitchToPerAccount={(accountIds?.length ?? 0) >= 2}
+      initialPreset={initialPreset}
       onClose={onClose}
     />
   );

@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import uuid
+from dataclasses import dataclass
 from datetime import date
 
 import structlog
@@ -92,53 +94,101 @@ async def run_dca_cash_shortfall_check() -> None:
     await run_alert_job(_run_dca_cash_shortfall_check, "dca_cash_shortfall_check_job", needs_cache=True)
 
 
-async def _run_dca_cash_shortfall_check(db: AsyncSession, cache: CacheStoreType) -> None:
-    rows = (
-        await db.execute(
-            select(RebalancingAlert, Portfolio, AssetAccount, User, UserSettings)
-            .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
-            .join(AssetAccount, AssetAccount.id == RebalancingAlert.account_id)
-            .join(User, User.id == RebalancingAlert.user_id)
-            .outerjoin(UserSettings, UserSettings.user_id == User.id)
-            .options(selectinload(Portfolio.items))
-            .where(
-                RebalancingAlert.is_active == True,
-                *(getattr(RebalancingAlert, field) == value for field, value in _DCA_AUTO_BUY_PRESET.items()),
-                AssetAccount.is_active == True,
-                User.is_active == True,
-            )
+@dataclass(frozen=True)
+class DcaShortfall:
+    """정기 적립식 자동매수 1건의 예수금 부족 판정 결과 — 잡 알림과 홈 "지금 할 일"이 공유한다."""
+
+    alert: RebalancingAlert
+    portfolio: Portfolio
+    account: AssetAccount
+    user: User
+    settings_row: UserSettings | None
+    run_date: date
+    days_until: int
+    cash_krw: float
+    expected_krw: float | None
+
+
+async def find_dca_cash_shortfalls(
+    db: AsyncSession,
+    cache: CacheStoreType,
+    *,
+    user_id: uuid.UUID | None = None,
+    notice_window: tuple[int, int] | None = None,
+) -> list[DcaShortfall]:
+    """활성 정기 적립식 자동매수 중 다음 실행일 기준 예수금이 부족한 건.
+
+    `notice_window`가 주어지면 실행일까지 남은 일수가 그 범위(포함)인 건만 판정한다(잡 알림 창).
+    한 건의 판정 오류는 기록만 하고 나머지를 계속 본다.
+    """
+    stmt = (
+        select(RebalancingAlert, Portfolio, AssetAccount, User, UserSettings)
+        .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
+        .join(AssetAccount, AssetAccount.id == RebalancingAlert.account_id)
+        .join(User, User.id == RebalancingAlert.user_id)
+        .outerjoin(UserSettings, UserSettings.user_id == User.id)
+        .options(selectinload(Portfolio.items))
+        .where(
+            RebalancingAlert.is_active == True,
+            *(getattr(RebalancingAlert, field) == value for field, value in _DCA_AUTO_BUY_PRESET.items()),
+            AssetAccount.is_active == True,
+            User.is_active == True,
         )
-    ).all()
+    )
+    if user_id is not None:
+        stmt = stmt.where(RebalancingAlert.user_id == user_id)
+    rows = (await db.execute(stmt)).all()
     if not rows:
-        return
+        return []
 
     today = today_kst()
     usd_krw: float | None = None
+    shortfalls: list[DcaShortfall] = []
     for alert, portfolio, account, user, settings_row in rows:
         try:
             run_date = next_auto_schedule_date(alert, today)
             if run_date is None:
                 continue
             days_until = (run_date - today).days
-            if not (NOTICE_WINDOW_DAYS[0] <= days_until <= NOTICE_WINDOW_DAYS[1]):
+            if notice_window is not None and not (notice_window[0] <= days_until <= notice_window[1]):
                 continue
             if usd_krw is None and account.deposit_usd:
                 usd_krw = await fetch_usd_krw(cache)
             cash_krw = account_cash_krw(account, portfolio, usd_krw)
             expected_raw = settings_row.monthly_deposit_amount if settings_row else None
             expected_krw = float(expected_raw) if expected_raw else None
-            if not is_cash_short(cash_krw, expected_krw):
-                continue
+            if is_cash_short(cash_krw, expected_krw):
+                shortfalls.append(
+                    DcaShortfall(
+                        alert, portfolio, account, user, settings_row, run_date, days_until, cash_krw, expected_krw
+                    )
+                )
+        except Exception as e:
+            report_job_failure("dca_cash_shortfall_evaluate_failed", e, alert_id=str(alert.id))
+    return shortfalls
 
-            key = _dedup_key(alert.id, run_date)
+
+async def _run_dca_cash_shortfall_check(db: AsyncSession, cache: CacheStoreType) -> None:
+    for sf in await find_dca_cash_shortfalls(db, cache, notice_window=NOTICE_WINDOW_DAYS):
+        try:
+            key = _dedup_key(sf.alert.id, sf.run_date)
             async with AsyncSessionLocal() as item_db:
                 if await get_durable(item_db, key) is not None:
                     continue
                 await _notify(
-                    item_db, alert, portfolio, account, user, settings_row, run_date, cash_krw, expected_krw, key
+                    item_db,
+                    sf.alert,
+                    sf.portfolio,
+                    sf.account,
+                    sf.user,
+                    sf.settings_row,
+                    sf.run_date,
+                    sf.cash_krw,
+                    sf.expected_krw,
+                    key,
                 )
         except Exception as e:
-            report_job_failure("dca_cash_shortfall_check_alert_failed", e, alert_id=str(alert.id))
+            report_job_failure("dca_cash_shortfall_check_alert_failed", e, alert_id=str(sf.alert.id))
 
 
 async def _notify(

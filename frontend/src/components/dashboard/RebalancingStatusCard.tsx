@@ -174,7 +174,8 @@ interface Props {
   collapseWhenHealthy?: boolean;
 }
 
-const DASHBOARD_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
+// 손실수확(TAX_LOSS_HARVEST)은 홈 "지금 할 일"(절세 액션 플랜 1순위)이 담당해 홈 인스턴스에선 뺀다 (docs/plans/50 M5)
+const DASHBOARD_TYPES: InsightType[] = ["CONCENTRATION"];
 const ALL_INSIGHT_TYPES: InsightType[] = [
   "CONCENTRATION",
   "UNDERPERFORMANCE",

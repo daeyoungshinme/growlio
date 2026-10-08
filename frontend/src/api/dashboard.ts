@@ -70,3 +70,20 @@ export const updateTickerDividendMonths = (
 
 export const deleteTickerDividendMonths = (ticker: string, market: string) =>
   apiDelete(`/dividends/ticker-settings/${encodeURIComponent(ticker)}`, { params: { market } });
+
+export type ActionItemKind =
+  "REBALANCE" | "DCA_SHORTFALL" | "TAX_WARNING" | "TAX_ACTION" | "CHALLENGE";
+
+/** 홈 "지금 할 일" 1행 — 백엔드 `action_items_service`가 우선순위·마감 순으로 최대 5건 반환 */
+export interface ActionItem {
+  id: string;
+  kind: ActionItemKind;
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  title: string;
+  detail: string;
+  cta_label: string;
+  link: string;
+  deadline: string | null;
+}
+
+export const fetchActionItems = () => apiGet<ActionItem[]>("/dashboard/action-items");

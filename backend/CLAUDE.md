@@ -138,7 +138,7 @@ API Request
         ├── auth.py           # /me, /sync-profile(Supabase 유저→로컬 User 동기화), /find-account, /account/delete(비밀번호 재인증 후 탈퇴). 로그인·회원가입·토큰 refresh는 프론트가 Supabase에 직접 수행 — 백엔드엔 없음
         ├── alerts.py         # 알림 목록 + 읽음 처리
         ├── backtest.py       # 백테스트 실행
-        ├── dashboard.py      # 대시보드 집계 라우터 (get_dashboard_summary 구현은 asset_aggregator.py)
+        ├── dashboard.py      # 대시보드 집계 라우터 (get_dashboard_summary 구현은 asset_aggregator.py) + 홈 "지금 할 일"(GET /dashboard/action-items → action_items_service.py)
         ├── dividends.py      # 배당금 요약 + 예상 배당금 + 월별 균등화 제안 — /summary, /positions, /by-ticker 모두 ?account_id= 옵션 지원(미지정 시 전체 계좌 통합)
         ├── invest.py         # DCA 분석 + 목표 설정 마법사용 필요수익률·적립액 프리뷰(GET /invest/goal-feasibility, 저장 없음)
         ├── challenges.py     # 적립식 투자 챌린지 CRUD + 진행률/스트릭 조회(GET /challenges, /challenges/summary는 네비 배지용 경량)
@@ -183,6 +183,7 @@ services/
   │   └── recommendation_drift_alert_service.py # 매주 월 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오 현재 목표와 유의미하게(3%p↑ 또는 신규 후보) 달라지면 이메일/푸시(옵트인). `compute_recommendation_drift()`(goal_recommendation_service.py)는 프론트 `recommendationDrift.ts`와 동일 로직 — 임계값 항상 함께 맞출 것
   ├── rebalancing/            # 리밸런싱 도메인 패키지 (분석·실행·계획·전략·알림)
   │   ├── service.py          # 리밸런싱 추천
+  │   ├── drift_summary_service.py # 포트폴리오별 비중 이탈 요약(`get_drift_summaries`) — `GET /rebalancing/drift-summary`와 `action_items_service`가 공유. 같은 AsyncSession이라 포트폴리오 루프는 순차
   │   ├── strategy_service.py # 리밸런싱 전략 로직 (service.py에서 분리)
   │   ├── order_builder.py    # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices/filter_drifting_items). `clamp_orders_to_max_value()`는 1건당 거래대금을 `settings.auto_rebalancing_max_order_value_krw`(기본 5천만) 이하로 축소. `is_{market_signal,tax_impact,daily_value_cap}_blocking_auto_mode()`는 각 AUTO 게이트 판정 순수 함수(plan_service.py가 계획 생성+매수 실행 직전 호출) — 시장신호는 `market_signal_service.get_confirmed_composite_level()`(hysteresis) 사용, 방법론 `docs/plans/21-market-signal-methodology.md`
   │   ├── alert_check.py      # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH, 10분 job 메인 루프). 시장신호 게이팅은 market_signal_alert_service.py의 `check_composite_signal` 재사용. 복합신호 알림 on/off는 **유저 단위** 설정. AUTO 알림이 시장신호 게이트로 NOTIFY 강등되면 사유를 `automation_note`로 이메일·이력에 노출
@@ -261,6 +262,7 @@ services/
   ├── email_templates/              # 이메일 HTML 템플릿 패키지 — `_shared.py`(공용), `alerts.py`(환율/주가), `rebalancing.py`(드리프트·자동실행·AUTO 게이트), `market_signal.py`(등급전환·매일요약), `reports.py`(월간·목표달성·연말절세·추천변화·탈퇴). `__init__.py`가 전체 재노출
   ├── factor_service.py             # 팩터 분석 (모멘텀·가치·품질)
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
+  ├── action_items_service.py       # 홈 "지금 할 일"(`get_action_items`) — 리밸런싱 필요(drift_summary_service)·자동매수 예수금 부족(jobs/dca_cash_shortfall.`find_dca_cash_shortfalls`)·세금 경고+절세 1순위(`tax_action_service.get_tax_action_plan_with_summary` — 요약 재계산 없음)·챌린지 미입금(`get_challenge_summary`)을 `ActionItem` 한 모양으로 모아 우선순위→마감 순 최대 5건. 소스는 순차 호출·개별 실패 격리(실패 시 rollback), 결과 캐시 없음(각 소스 캐시 사용). 추천 비중 변화는 MVO 비용 때문에 제외. E12(일일 요약 알림)가 재사용할 집계 함수
   ├── market_data_fetcher.py        # [팩터·리스크용 배치 수익률 그룹] 시장 데이터 수집 유틸 (VIX, 금리차 등) — 개별 현재가 조회(price_service.py 등)와는 별개 책임
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가(VIX·미국 금리 커브·하이일드 스프레드·달러인덱스·환율·유가·인플레이션(CPI+PCE)·고용(실업률) 8종, 상한 27점). `get_confirmed_composite_level()`은 AUTO 게이트·등급전환 알림 전용 hysteresis(연속 2회 관측), raw(`get_market_signal`)는 배너 표시용으로 별개. 캐시·single-flight 진입점+hysteresis만 담당하고 개별 지표 조회는 `market_signal_indicators.py`, 복합 점수 계산(순수 함수)은 `market_signal_scoring.py`로 분리 — 외부는 계속 `market_signal_service`에서 import(재노출). 지표 fetcher끼리 내부 호출(인플레이션→CPI/PCE, 금리커브→장단기/인하기대)하므로 그 patch는 `market_signal_indicators.*` 경로로
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어) — `estimation.py` 축소추정을 프론티어 곡선·포트폴리오 위치·종목 좌표에 일관 적용
@@ -334,7 +336,7 @@ jobs/                         # APScheduler 정기 작업
   ├── year_end_tax_reminder.py       # 11~12월 매주 월요일 09:00 KST — 손실수확 후보·연금공제 잔여한도·ISA 만기 현황 요약 발송(옵트인, 기본 OFF). 알릴 내용이 없으면 스킵
   ├── recommendation_drift_alert.py  # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오와 유의미하게 달라지면 이메일/푸시 발송(옵트인, 기본 OFF)
   ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고). **스케줄 준수**: BOTH는 매일, DRIFT_ONLY/SCHEDULE_ONLY는 `alerts/calculator.is_auto_schedule_day`(주말 지정일은 다음 평일로 이월)일 때만 — 2026-09-26 이전엔 이 체크가 없어 월간 AUTO(정기 적립식 자동매수 포함)가 매 거래일 실행될 수 있었음. SCHEDULE_ONLY는 스케줄일에 임계값 0으로 계획 생성(`plan_generation.build_pending_plan_for_alert`)
-  ├── dca_cash_shortfall.py   # 매일 18:30 KST — 정기 적립식 자동매수(AUTO·매월·SCHEDULE_ONLY·BUY_ONLY) 다음 실행일 1~3일 전, 실행 계좌 `deposit_krw`(해외 종목 있으면 `deposit_usd` 환산 합산)가 `monthly_deposit_amount`(미설정 시 1만원) 미만이면 이메일·푸시(`DCA_CASH_SHORTFALL`). 실행일 단위 durable dedup
+  ├── dca_cash_shortfall.py   # 매일 18:30 KST — 정기 적립식 자동매수(AUTO·매월·SCHEDULE_ONLY·BUY_ONLY) 다음 실행일 1~3일 전, 실행 계좌 `deposit_krw`(해외 종목 있으면 `deposit_usd` 환산 합산)가 `monthly_deposit_amount`(미설정 시 1만원) 미만이면 이메일·푸시(`DCA_CASH_SHORTFALL`). 실행일 단위 durable dedup. 판정부는 `find_dca_cash_shortfalls(user_id=, notice_window=)`로 분리돼 홈 "지금 할 일"이 날짜 창 없이 재사용
   ├── rebalancing_plan_buy_execution.py  # 1분 간격 — 대기시간 지난 매수 leg 자동 실행. 실행 직전 시장신호 게이트를 재확인(대기 중 상황 악화 대응) — 차단되면 조용히 다음 tick 재시도
   ├── rebalancing_plan_sell_expiry.py  # 15분 간격(app/scheduler.py) — 당일 미응답 매도 승인 요청 만료 처리
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크

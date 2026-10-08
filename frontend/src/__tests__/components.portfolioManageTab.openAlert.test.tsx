@@ -25,10 +25,22 @@ vi.mock("@/components/portfolio-analysis/PortfolioListSection", () => ({
   default: () => React.createElement("div", { "data-testid": "portfolio-list" }),
 }));
 vi.mock("@/components/rebalancing/RebalancingAlertModalRouter", () => ({
-  default: ({ portfolioId, onClose }: { portfolioId: string; onClose: () => void }) =>
+  default: ({
+    portfolioId,
+    initialPreset,
+    onClose,
+  }: {
+    portfolioId: string;
+    initialPreset?: string;
+    onClose: () => void;
+  }) =>
     React.createElement(
       "div",
-      { "data-testid": "alert-modal", "data-portfolio-id": portfolioId },
+      {
+        "data-testid": "alert-modal",
+        "data-portfolio-id": portfolioId,
+        "data-initial-preset": initialPreset ?? "",
+      },
       React.createElement("button", { onClick: onClose }, "close-modal"),
     ),
 }));
@@ -87,5 +99,18 @@ describe("PortfolioManageTab — 자동화 설정 모달 단일 호스트(openAl
 
     requestOpenAlert();
     expect(await screen.findByTestId("alert-modal")).toBeInTheDocument();
+  });
+
+  it("openAlert=dca면 정기 적립식 프리셋으로 열고, openAlert=1이면 프리셋 없이 연다 (계획탭 자동매수 설정, M6)", async () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={["/rebalancing?portfolioId=p1&openAlert=dca"]}>
+        <Harness />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("alert-modal")).toHaveAttribute("data-initial-preset", "dca");
+
+    act(() => screen.getByText("close-modal").click());
+    requestOpenAlert();
+    expect(await screen.findByTestId("alert-modal")).toHaveAttribute("data-initial-preset", "");
   });
 });

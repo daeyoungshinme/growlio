@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { screen, render, fireEvent, waitFor } from "@testing-library/react";
+import { screen, render, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
@@ -356,39 +356,8 @@ describe("InvestmentSnapshotCard", () => {
     expect(screen.queryByText("예상 연간")).not.toBeInTheDocument();
   });
 
-  it("ISA/연금/세금 추정 정보가 전혀 없으면 세금 한도 요약 섹션을 표시하지 않는다", async () => {
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
-    await waitFor(() => expect(fetchIsaStatus).toHaveBeenCalled());
-    expect(screen.queryByText(/ISA|연금공제|예상세금/)).not.toBeInTheDocument();
-  });
-
-  it("ISA 만기가 임박하면 세금 한도 요약이 카드 안에 임베드된다", async () => {
-    fetchIsaStatus.mockResolvedValue({
-      accounts: [
-        {
-          account_id: "acc1",
-          account_name: "일반형 ISA",
-          isa_type: "GENERAL",
-          isa_open_date: "2023-01-01",
-          maturity_date: "2026-09-01",
-          is_mature: false,
-          days_remaining: 45,
-          needs_open_date: false,
-          estimated_cumulative_pnl_krw: 500_000,
-          is_manual_override: false,
-          tax_free_limit_krw: 2_000_000,
-          taxable_excess_krw: 0,
-          estimated_tax_krw: 0,
-        },
-      ],
-      note: "",
-    } as IsaStatusSummary);
-
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
-    expect(await screen.findByText("ISA D-45")).toBeInTheDocument();
-  });
-
-  it("종합과세 경고가 있으면 카드 헤더에 경고 배지가 뜨고, 카드를 접어도 유지된다", async () => {
+  it("세금 한도 요약·경고 배지는 표시하지 않는다 (홈 '지금 할 일' 카드로 이동, docs/plans/50 M5)", async () => {
+    fetchIsaStatus.mockResolvedValue({ ...emptyIsa });
     fetchTaxSummary.mockResolvedValue({
       ...emptyTaxSummary,
       comprehensive_tax_warning: true,
@@ -396,25 +365,12 @@ describe("InvestmentSnapshotCard", () => {
     });
 
     renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
-    expect(await screen.findByLabelText("금융소득 종합과세 대상 가능")).toBeInTheDocument();
-    expect(screen.getByText("주의")).toBeInTheDocument();
+    expect(screen.getByText("평가액")).toBeInTheDocument();
+    expect(screen.queryByText("주의")).not.toBeInTheDocument();
+    expect(screen.queryByText(/ISA|연금공제|예상세금/)).not.toBeInTheDocument();
+    expect(fetchTaxSummary).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: /주식 투자 현황/ }));
-    expect(screen.queryByText("평가액")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("금융소득 종합과세 대상 가능")).toBeInTheDocument();
-    expect(screen.getByText("주의")).toBeInTheDocument();
-  });
-
-  it("접힘 상태의 힌트에 평가액과 함께 세금 한도 요약이 표시된다", async () => {
-    fetchTaxSummary.mockResolvedValue({
-      ...emptyTaxSummary,
-      total_estimated_tax_krw: 500_000,
-    });
-
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
-    await screen.findByText(/예상세금/);
-
-    fireEvent.click(screen.getByRole("button", { name: /주식 투자 현황/ }));
-    expect(screen.getByText(/평가액 .*원 · 예상세금/)).toBeInTheDocument();
+    expect(screen.getByText(/^평가액 .*원$/)).toBeInTheDocument();
   });
 });

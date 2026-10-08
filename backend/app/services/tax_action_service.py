@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, timedelta
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -438,6 +438,15 @@ async def _get_income_bracket(user_id: uuid.UUID, db: AsyncSession) -> str | Non
 
 async def get_tax_action_plan(user_id: uuid.UUID, year: int, db: AsyncSession) -> TaxActionPlan:
     """연도별 절세 액션 플랜. 도메인 서비스를 순차 호출한다(같은 AsyncSession 동시 사용 금지)."""
+    plan, _ = await get_tax_action_plan_with_summary(user_id, year, db)
+    return plan
+
+
+async def get_tax_action_plan_with_summary(
+    user_id: uuid.UUID, year: int, db: AsyncSession
+) -> tuple[TaxActionPlan, dict[str, Any]]:
+    """액션 플랜 + 그 계산에 쓴 세금 추정 요약(`get_tax_summary`) — 홈 "지금 할 일"이 세금 경고를 위해
+    요약을 다시 계산하지 않도록 함께 돌려준다."""
     today = today_kst()
     rules = _get_rules(year)
     income_bracket = await _get_income_bracket(user_id, db)
@@ -481,9 +490,10 @@ async def get_tax_action_plan(user_id: uuid.UUID, year: int, db: AsyncSession) -
     if financial_action:
         actions.append(financial_action)
 
-    return {
+    plan: TaxActionPlan = {
         "year": year,
         "income_bracket": income_bracket,
         "actions": _sort_actions(actions),
         "note": _ACTION_PLAN_NOTE,
     }
+    return plan, tax_summary

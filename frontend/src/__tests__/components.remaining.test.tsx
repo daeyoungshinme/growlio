@@ -423,6 +423,22 @@ describe("RebalancingAlertModal", () => {
     expect(screen.queryByText("실행 조건")).not.toBeInTheDocument();
   });
 
+  it("initialPreset=dca면 선택 화면 없이 정기 적립식 축약 폼으로 바로 연다 (openAlert=dca, M6)", async () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingAlertModal
+          portfolioId="p1"
+          portfolioName="테스트 포트폴리오"
+          initialPreset="dca"
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("매수 일자")).toBeInTheDocument();
+    expect(screen.queryByText("정기 적립식 자동매수로 빠르게 설정")).not.toBeInTheDocument();
+    expect(screen.queryByText("실행 조건")).not.toBeInTheDocument();
+  });
+
   it("직접 설정을 선택하면 기존 전체 섹션을 그대로 보여준다", async () => {
     renderWithProviders(
       <MemoryRouter>
