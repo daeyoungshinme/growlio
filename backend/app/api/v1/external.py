@@ -16,6 +16,12 @@ GET /performance는 growlio 대시보드가 계산한 수익률 KPI(XIRR·연환
 "투자 수익을 반영하면 언제/얼마" 판단을 growlio의 계산으로 채우기 위함. GET /accounts는 스냅샷의 원금
 (invested_amount_krw)·평가손익(unrealized_pnl_krw)도 함께 준다(nestlio가 "모은 돈 vs 시장이 벌어준 돈"을 분리).
 
+POST /transactions는 `external_ref`(nestlio가 거래·동작마다 만든 키)를 받으면 멱등이다 — 같은 키로 다시 보내면 새로
+기록하지 않고 기존 내역을 `duplicate=True`로 돌려준다(nestlio의 재전송 큐가 안전하게 재시도하도록).
+GET /net-deposits는 계좌별 월 순입금에서 nestlio가 넣은 내역(external_ref 접두사)을 빼, 증권사에서 growlio로 직접
+들어온 입금만 돌려준다. GET /net-worth-history는 대시보드 월별 총자산 추이(최근 12개월)를, GET /account-performance는
+지정한 계좌만의 XIRR을 준다 — /performance는 사용자 전체 계좌 기준이다.
+
 GET /goal은 사용자가 growlio 설정에서 입력한 투자목표(목표금액/목표수익률/연 납입목표 등)를
 읽기전용으로 노출한다 — nestlio가 재무목표를 새로 만들 때 이 값으로 폼을 미리 채워준다.
 진행률 자체는 nestlio가 이미 가져온 growlio 연동 자산 잔액으로 스스로 계산하므로, 이
@@ -26,7 +32,8 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
@@ -40,8 +47,14 @@ from app.schemas.invest import GoalFeasibilityPreview
 from app.services._settings_queries import get_settings_row
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.asset_service import list_accounts as _list_accounts
+from app.services.external_queries import (
+    account_scoped_performance,
+    find_by_external_ref,
+    monthly_net_deposits_by_account,
+)
 from app.services.goal_feasibility import build_feasibility_preview
 from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot, get_latest_snapshot_with_positions
+from app.services.trend_calculator import get_monthly_trend
 from app.utils.cache_keys import (
     challenge_progress_key,
     invalidate_asset_account_caches,
@@ -239,12 +252,20 @@ class ExternalTransactionCreate(BaseModel):
     amount: float
     transaction_date: date
     notes: str | None = None
+    # 멱등 키 — 같은 사용자가 같은 키로 다시 보내면 새로 기록하지 않는다(nestlio: "nestlio:{거래id}:{동작}").
+    external_ref: str | None = Field(default=None, min_length=1, max_length=100)
 
 
 class ExternalTransactionResult(BaseModel):
     transaction_id: str
     deposit_krw_adjusted: bool
     deposit_krw: float | None = None
+    # True면 같은 external_ref로 이미 기록돼 있어 아무것도 바꾸지 않았다.
+    duplicate: bool = False
+
+
+def _duplicate_result(tx: Transaction) -> ExternalTransactionResult:
+    return ExternalTransactionResult(transaction_id=str(tx.id), deposit_krw_adjusted=False, duplicate=True)
 
 
 @router.post("/transactions", response_model=ExternalTransactionResult, status_code=status.HTTP_201_CREATED)
@@ -266,6 +287,10 @@ async def create_external_transaction(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "transaction_type은 DEPOSIT 또는 WITHDRAWAL만 허용합니다.")
 
     account = await _get_owned_account(req.account_id, current_user.id, db)
+    if req.external_ref is not None:
+        existing = await find_by_external_ref(db, current_user.id, req.external_ref)
+        if existing is not None:
+            return _duplicate_result(existing)
 
     tx = Transaction(
         user_id=current_user.id,
@@ -274,6 +299,7 @@ async def create_external_transaction(
         amount=req.amount,
         transaction_date=req.transaction_date,
         notes=req.notes or "nestlio 가계부 저축/투자 내역에서 자동 기록",
+        external_ref=req.external_ref,
     )
     db.add(tx)
 
@@ -304,7 +330,17 @@ async def create_external_transaction(
             source="MANUAL",
         )
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # 같은 키가 동시에 두 번 들어온 경우 — 늦게 온 쪽은 예수금 변경까지 통째로 되돌리고 먼저 기록된 행을 돌려준다.
+        await db.rollback()
+        if req.external_ref is None:
+            raise
+        existing = await find_by_external_ref(db, current_user.id, req.external_ref)
+        if existing is None:
+            raise
+        return _duplicate_result(existing)
     await db.refresh(tx)
 
     cache = await get_cache_store()
@@ -316,3 +352,66 @@ async def create_external_transaction(
         deposit_krw_adjusted=deposit_krw_adjusted,
         deposit_krw=account.deposit_krw if deposit_krw_adjusted else None,
     )
+
+
+class ExternalNetDeposit(BaseModel):
+    account_id: str
+    month: str
+    net_deposit_krw: float
+
+
+@router.get("/net-deposits", response_model=list[ExternalNetDeposit])
+@limiter.limit("20/minute")
+async def list_net_deposits(
+    request: Request,
+    account_ids: list[UUID] = Query(..., min_length=1, max_length=50),
+    start_month: str = Query(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    exclude_ref_prefix: str | None = Query("nestlio:", max_length=30),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """계좌별 월 순입금(DEPOSIT − WITHDRAWAL), start_month 이후. 기본으로 nestlio가 POST /transactions로 넣은 내역
+    (external_ref가 "nestlio:"로 시작)은 뺀다 — nestlio는 그 거래를 이미 자기 가계부로 집계하므로, 이 응답을 더하면
+    증권사 자동이체 등 growlio에만 있는 입금까지 목표 실적에 잡힌다. 빈 문자열을 넘기면 거르지 않는다."""
+    return await monthly_net_deposits_by_account(
+        db, current_user.id, account_ids, start_month, exclude_ref_prefix or None
+    )
+
+
+class ExternalNetWorthPoint(BaseModel):
+    month: str
+    total_krw: float
+
+
+@router.get("/net-worth-history", response_model=list[ExternalNetWorthPoint])
+@limiter.limit("20/minute")
+async def get_net_worth_history(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """최근 12개월 월말 총자산(대시보드 월별 추이와 같은 값·캐시) — nestlio가 월초 스냅샷이 오래된 잔액으로 찍힌
+    달의 투자분을 보정하는 데 쓴다. month는 "YYYY-MM-01"이 아니라 "YYYY-MM"으로 준다."""
+    cache = await get_cache_store()
+    trend = await get_monthly_trend(current_user.id, db, cache)
+    return [ExternalNetWorthPoint(month=row["month"][:7], total_krw=row["total_krw"]) for row in trend]
+
+
+class ExternalAccountPerformance(BaseModel):
+    xirr_pct: float | None = None
+    current_value_krw: float
+    net_invested_krw: float
+    account_count: int
+
+
+@router.get("/account-performance", response_model=ExternalAccountPerformance)
+@limiter.limit("20/minute")
+async def get_account_performance(
+    request: Request,
+    account_ids: list[UUID] = Query(..., min_length=1, max_length=50),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """지정 계좌만의 XIRR·현재 평가액·순투자금 — nestlio 목표에 연동된 계좌들의 실제 수익률을 예상 달성월 계산의
+    기본 수익률로 쓰기 위함. 호출자 소유·활성 계좌만 집계한다."""
+    return ExternalAccountPerformance(**await account_scoped_performance(db, current_user.id, account_ids))
