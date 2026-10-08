@@ -188,7 +188,7 @@ describe("PortfolioPage", () => {
     expect(screen.getByText("+25.00%")).toBeInTheDocument();
   });
 
-  it("요약 카드에 평가손익·수익률·투자원금·전체 자산 중 비중을 따로 보여준다", async () => {
+  it("요약 카드에 평가손익 문장과 전체 자산 중 비중·별도 자산을 보여준다", async () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview")
         return Promise.resolve({
@@ -203,12 +203,10 @@ describe("PortfolioPage", () => {
     });
     renderPortfolio();
     await waitFor(() => {
-      expect(screen.getByText("투자원금")).toBeInTheDocument();
+      expect(screen.getByText(/전체 자산 중 50\.0%/)).toBeInTheDocument();
     });
-    expect(screen.getByText("수익률")).toBeInTheDocument();
-    expect(screen.getByText("4,000만원")).toBeInTheDocument();
-    expect(screen.getByText("50.0%")).toBeInTheDocument();
-    expect(screen.getByText(/현금·부동산 등 5,000만원은 별도/)).toBeInTheDocument();
+    expect(screen.getByText(/현금·부동산 등 5,000만원 별도/)).toBeInTheDocument();
+    expect(screen.queryByText("투자원금")).not.toBeInTheDocument();
   });
 
   it("unrealized_pnl_krw가 음수일 때 - 기호를 표시한다", async () => {

@@ -228,77 +228,57 @@ export default function PortfolioPage() {
     <div className="space-y-6">
       {/* 상단 요약 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">
             주식 총평가액
           </p>
-          <button
-            onClick={syncAction.onClick}
-            disabled={syncAction.disabled}
-            title={syncAction.title}
-            aria-label={syncAction.label}
-            className={SYNC_BUTTON_CLASS}
-          >
-            <RefreshCw size={14} className={syncAction.spinning ? "animate-spin" : ""} />
-            <span className="sm:hidden">{syncAction.shortLabel}</span>
-            <span className="hidden sm:inline">{syncAction.label}</span>
-          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            {accountOptions.length > 0 && (
+              <select
+                value={selectedAccountId ?? ""}
+                onChange={(e) => handleAccountChange(e.target.value)}
+                className={`${SELECT_SM} min-w-0 max-w-[10rem] sm:max-w-none truncate`}
+                aria-label="계좌 선택"
+              >
+                <option value="">전체 계좌 ({stockAccounts.length}개)</option>
+                {accountOptions.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={syncAction.onClick}
+              disabled={syncAction.disabled}
+              title={syncAction.title}
+              aria-label={syncAction.label}
+              className={`${SYNC_BUTTON_CLASS} shrink-0`}
+            >
+              <RefreshCw size={14} className={syncAction.spinning ? "animate-spin" : ""} />
+              <span className="sm:hidden">{syncAction.shortLabel}</span>
+              <span className="hidden sm:inline">{syncAction.label}</span>
+            </button>
+          </div>
         </div>
-        {accountOptions.length > 0 && (
-          <select
-            value={selectedAccountId ?? ""}
-            onChange={(e) => handleAccountChange(e.target.value)}
-            className={`${SELECT_SM} mt-2 block w-full sm:w-auto`}
-            aria-label="계좌 선택"
-          >
-            <option value="">전체 계좌 ({stockAccounts.length}개)</option>
-            {accountOptions.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        )}
-        <p className="text-2xl sm:text-3xl font-bold mt-2 leading-tight tabular-nums text-blue-600 dark:text-blue-400">
+        <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight tabular-nums text-blue-600 dark:text-blue-400">
           {fmtKrw(data.total_stock_krw)}
         </p>
-        <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 min-w-0">
-            <dt className="text-xs text-gray-500 dark:text-gray-400">평가손익</dt>
-            <dd
-              className={`text-base font-semibold tabular-nums truncate ${pnlColor(data.unrealized_pnl_krw)}`}
-            >
-              {pnlSign}
-              {fmtKrw(data.unrealized_pnl_krw)}
-            </dd>
-          </div>
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 min-w-0">
-            <dt className="text-xs text-gray-500 dark:text-gray-400">수익률</dt>
-            <dd
-              className={`text-base font-semibold tabular-nums ${pnlColor(data.stock_return_pct)}`}
-            >
-              {returnSign}
-              {data.stock_return_pct.toFixed(2)}%
-            </dd>
-          </div>
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 min-w-0">
-            <dt className="text-xs text-gray-500 dark:text-gray-400">투자원금</dt>
-            <dd className="text-base font-semibold tabular-nums truncate text-gray-800 dark:text-gray-100">
-              {fmtKrw(data.total_invested_krw)}
-            </dd>
-          </div>
-          {stockSharePct !== null && (
-            <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 min-w-0">
-              <dt className="text-xs text-gray-500 dark:text-gray-400">전체 자산 중</dt>
-              <dd className="text-base font-semibold tabular-nums text-gray-800 dark:text-gray-100">
-                {stockSharePct.toFixed(1)}%
-              </dd>
-            </div>
-          )}
-        </dl>
-        {data.total_non_stock_krw > 0 && (
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            현금·부동산 등 {fmtKrw(data.total_non_stock_krw)}은 별도예요
+        <p
+          className={`mt-2 text-sm font-semibold tabular-nums ${pnlColor(data.unrealized_pnl_krw)}`}
+        >
+          평가손익 <span>{`${pnlSign}${fmtKrw(data.unrealized_pnl_krw)}`}</span> (
+          <span>{`${returnSign}${data.stock_return_pct.toFixed(2)}%`}</span>)
+        </p>
+        {(stockSharePct !== null || data.total_non_stock_krw > 0) && (
+          <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+            {[
+              stockSharePct !== null && `전체 자산 중 ${stockSharePct.toFixed(1)}%`,
+              data.total_non_stock_krw > 0 &&
+                `현금·부동산 등 ${fmtKrw(data.total_non_stock_krw)} 별도`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         )}
         {/* 특정 계좌 선택 시 overview.accounts가 해당 계좌 1건으로 축소되어
