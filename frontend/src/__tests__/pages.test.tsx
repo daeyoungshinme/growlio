@@ -169,6 +169,9 @@ vi.mock("../components/portfolio/TreemapChart", () => ({
 vi.mock("../components/portfolio/AllocationCard", () => ({
   default: () => <div data-testid="allocation-card" />,
 }));
+vi.mock("@/components/assets/PeriodPurchasesTab", () => ({
+  default: () => <div>기간별 매수 콘텐츠</div>,
+}));
 vi.mock("../components/invest/DCAProjectionChart", () => ({
   default: () => <div data-testid="dca-chart">DCA Chart</div>,
 }));
@@ -399,6 +402,26 @@ describe("AssetManagementPage", () => {
         expect(document.body).toBeDefined();
       }
     });
+  });
+
+  it("기간별 매수 탭에는 증권계좌 목록(계좌 추가·빈 상태)이 섞이지 않는다", async () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={["/?atab=기간별 매수"]}>
+        <AssetManagementPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("기간별 매수 콘텐츠")).toBeInTheDocument();
+    expect(screen.queryByText("계좌 추가")).not.toBeInTheDocument();
+    expect(screen.queryByText(/등록된.*없습니다/)).not.toBeInTheDocument();
+  });
+
+  it("증권계좌 탭에는 계좌 추가 버튼이 표시된다", async () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={["/?atab=증권계좌"]}>
+        <AssetManagementPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("계좌 추가")).toBeInTheDocument();
   });
 
   it("shows empty state when no accounts", async () => {

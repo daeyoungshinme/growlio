@@ -267,7 +267,7 @@ export default function AssetManagementPage() {
           </>
         )}
 
-        {tab !== "입출금·배당" && tab !== "부동산" && (
+        {(tab === "은행계좌" || tab === "증권계좌") && (
           <>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
