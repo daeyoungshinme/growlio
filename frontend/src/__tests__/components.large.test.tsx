@@ -430,6 +430,34 @@ describe("StockHoldingsTable", () => {
     expect(firstIsApple()).toBe(false);
   });
 
+  it("모바일 카드를 탭하면 평단가·계좌별 보유가 펼쳐진다", () => {
+    const otherAccount: PortfolioPosition = {
+      ...mockPosition,
+      account_id: "acc-other",
+      account_name: "다른 계좌",
+    };
+    renderWithProviders(
+      <StockHoldingsTable
+        positions={[mockPosition, otherAccount]}
+        dividendMap={{}}
+        divLoading={false}
+        divError={false}
+      />,
+    );
+    const cardButton = screen
+      .getAllByRole("button")
+      .find(
+        (b) => b.getAttribute("aria-expanded") === "false" && b.textContent?.includes("Apple Inc."),
+      );
+    expect(cardButton).toBeDefined();
+    expect(screen.queryByText("다른 계좌")).not.toBeInTheDocument();
+    fireEvent.click(cardButton!);
+    expect(cardButton).toHaveAttribute("aria-expanded", "true");
+    // 데스크톱 표의 하위 행과 모바일 펼침 영역에 모두 나타난다
+    expect(screen.getAllByText("다른 계좌").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("평단가").length).toBeGreaterThan(1);
+  });
+
   it("shows error state for dividends", () => {
     renderWithProviders(
       <StockHoldingsTable

@@ -184,7 +184,31 @@ describe("PortfolioPage", () => {
       expect(screen.getByText(/평가손익/)).toBeInTheDocument();
     });
     // Positive pnl shows + sign
-    expect(screen.getByText(/\+/)).toBeInTheDocument();
+    expect(screen.getByText("+1,000만원")).toBeInTheDocument();
+    expect(screen.getByText("+25.00%")).toBeInTheDocument();
+  });
+
+  it("요약 카드에 평가손익·수익률·투자원금·전체 자산 중 비중을 따로 보여준다", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview")
+        return Promise.resolve({
+          data: {
+            ...mockPortfolioData,
+            total_assets_krw: 100_000_000,
+            total_non_stock_krw: 50_000_000,
+          },
+        });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio();
+    await waitFor(() => {
+      expect(screen.getByText("투자원금")).toBeInTheDocument();
+    });
+    expect(screen.getByText("수익률")).toBeInTheDocument();
+    expect(screen.getByText("4,000만원")).toBeInTheDocument();
+    expect(screen.getByText("50.0%")).toBeInTheDocument();
+    expect(screen.getByText(/현금·부동산 등 5,000만원은 별도/)).toBeInTheDocument();
   });
 
   it("unrealized_pnl_krw가 음수일 때 - 기호를 표시한다", async () => {
@@ -202,7 +226,7 @@ describe("PortfolioPage", () => {
     await waitFor(() => {
       expect(screen.getByText(/평가손익/)).toBeInTheDocument();
     });
-    expect(screen.getByText(/-1.25%\)/)).toBeInTheDocument();
+    expect(screen.getByText("-1.25%")).toBeInTheDocument();
   });
 
   it("'배당' 탭을 선택하면 DividendTab이 렌더링된다", async () => {
