@@ -150,12 +150,13 @@ describe("queryConfig constants", () => {
 // tabs
 // ────────────────────────────────────────────
 describe("tabs constants", () => {
-  it("ASSET_MANAGEMENT_TABS는 4개 탭을 포함한다", () => {
-    expect(ASSET_MANAGEMENT_TABS).toHaveLength(4);
+  it("ASSET_MANAGEMENT_TABS는 5개 탭을 포함한다", () => {
+    expect(ASSET_MANAGEMENT_TABS).toHaveLength(5);
     expect(ASSET_MANAGEMENT_TABS).toContain("은행계좌");
     expect(ASSET_MANAGEMENT_TABS).toContain("증권계좌");
     expect(ASSET_MANAGEMENT_TABS).toContain("부동산");
     expect(ASSET_MANAGEMENT_TABS).toContain("입출금·배당");
+    expect(ASSET_MANAGEMENT_TABS).toContain("기간별 매수");
   });
 
   it("PORTFOLIO_TABS는 3개 탭을 포함한다", () => {

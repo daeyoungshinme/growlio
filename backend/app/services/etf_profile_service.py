@@ -102,7 +102,17 @@ async def get_etf_profiles(
     국내 개별주(ETF로 보이지 않는 종목)와 합성 현금성 자산은 조회하지 않고 None으로 둔다.
     ticker+market 단위 전역 캐시(`TTL_ETF_PROFILE` 7일 — 보수·기초지수는 사실상 불변)를 공유한다.
     """
+    profiles, _unresolved = await get_etf_profiles_with_status(cache, items)
+    return profiles
+
+
+async def get_etf_profiles_with_status(
+    cache: CacheStoreType, items: list[tuple[str, str, str]]
+) -> tuple[dict[tuple[str, str], EtfProfile | None], set[tuple[str, str]]]:
+    """`get_etf_profiles`와 같되, 조회 대상이었지만 응답을 받지 못한(네트워크 오류·서킷·데드라인) 키 집합도
+    함께 반환한다 — 프로필 None이 "ETF 아님(확정)"인지 "이번엔 모름"인지 호출측이 구분해야 할 때 사용."""
     result: dict[tuple[str, str], EtfProfile | None] = {}
+    resolved: set[tuple[str, str]] = set()
     domestic: list[tuple[str, str]] = []
     overseas: list[tuple[str, str]] = []
 
@@ -138,6 +148,7 @@ async def get_etf_profiles(
     async def _store(ticker: str, market: str, profile: EtfProfile | None, *, definitive: bool = False) -> None:
         """`definitive`: 소스가 "ETF 아님"을 명시한 경우(Yahoo quoteType) — 프로필과 같은 장기 TTL로 캐싱한다."""
         result[(ticker, market)] = profile
+        resolved.add((ticker, market))
         ttl = TTL_ETF_PROFILE if profile is not None or definitive else TTL_ETF_PROFILE_MISSING
         await set_cached_json(cache, etf_profile_key(ticker, market), {"profile": profile}, ttl)
 
@@ -160,4 +171,4 @@ async def get_etf_profiles(
         )
     except TimeoutError:
         logger.warning("etf_profile_fetch_deadline", domestic=len(domestic), overseas=len(overseas))
-    return result
+    return result, {k for k in (*domestic, *overseas) if k not in resolved}

@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -77,3 +78,45 @@ class PortfolioResponse(BaseModel):
     sort_order: int = 0
     created_at: datetime
     updated_at: datetime
+
+
+class IndexExposureMember(BaseModel):
+    ticker: str
+    name: str
+    market: str
+    listing: Literal["DOMESTIC", "OVERSEAS"]
+    value_krw: float
+    hedged: bool = False
+    pct_of_stock: float
+    region: Literal["DOMESTIC", "OVERSEAS"] | None = None  # 실제 투자지역(판별 불가면 None)
+
+
+class IndexExposureGroup(BaseModel):
+    key: str
+    label: str
+    kind: Literal["INDEX", "LEVERAGED", "OTHER_ETF", "STOCK"]
+    value_krw: float
+    pct_of_stock: float
+    pct_of_etf: float | None  # STOCK 그룹은 None
+    has_hedged: bool = False
+    domestic_krw: float
+    overseas_krw: float
+    members: list[IndexExposureMember]
+
+
+class RegionExposure(BaseModel):
+    """실제 투자지역 기준 국내/해외 합계 — 국내상장 미국 ETF는 해외로 계산. 세 값의 합 = total_stock_krw."""
+
+    domestic_krw: float = 0.0
+    overseas_krw: float = 0.0
+    unknown_krw: float = 0.0
+
+
+class IndexExposureResponse(BaseModel):
+    """추종 지수별 비중(`GET /portfolio/index-exposure`)."""
+
+    total_stock_krw: float = 0.0
+    total_etf_krw: float = 0.0
+    groups: list[IndexExposureGroup] = []
+    region_exposure: RegionExposure = RegionExposure()
+    profiles_complete: bool = True  # False면 일부 종목의 ETF 정보 조회 실패 — 분류가 부정확할 수 있음

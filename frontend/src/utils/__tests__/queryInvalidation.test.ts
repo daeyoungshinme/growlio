@@ -13,6 +13,7 @@ import {
   invalidateGoalRecommendationData,
   invalidateChallengeData,
   invalidateChallengeRemindersData,
+  invalidateTradeData,
 } from "../queryInvalidation";
 
 function makeQueryClient() {
@@ -159,5 +160,23 @@ describe("invalidateGoalRecommendationData", () => {
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
     expect(keys).toContain("goal-recommendation");
     expect(keys).toContain("settings");
+  });
+});
+
+describe("invalidateTradeData", () => {
+  it("trades + period-purchases 무효화", async () => {
+    const qc = makeQueryClient();
+    await invalidateTradeData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toEqual(["trades", "period-purchases"]);
+  });
+
+  it("계좌 sync·CUD도 기간별 매수(스냅샷 추정)를 갱신", async () => {
+    for (const fn of [invalidateSyncData, invalidateAccountData]) {
+      const qc = makeQueryClient();
+      await fn(qc as any);
+      const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+      expect(keys).toContain("period-purchases");
+    }
   });
 });

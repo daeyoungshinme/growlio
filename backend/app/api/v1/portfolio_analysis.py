@@ -8,9 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.api.v1._account_deps import get_owned_account
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
+from app.schemas.portfolio import IndexExposureResponse
+from app.services.index_exposure_service import get_index_exposure
 from app.services.portfolio_history_service import get_allocation_history
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.rebalancing.strategy_service import get_rebalancing_strategy
@@ -52,6 +55,22 @@ async def portfolio_overview(
     cache = await get_cache_store()
     account_ids = [uuid.UUID(account_id)] if account_id else None
     return await build_portfolio_overview(current_user.id, db, account_ids=account_ids, cache=cache, lite=lite)
+
+
+@router.get("/index-exposure", response_model=IndexExposureResponse)
+@limiter.limit("10/minute")
+async def portfolio_index_exposure(
+    request: Request,
+    account_id: uuid.UUID | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> IndexExposureResponse:
+    """추종 지수별 비중 — 같은 지수를 추종하는 국내·해외 ETF를 합산. account_id 미지정 시 전체 계좌 통합."""
+    if account_id is not None:
+        await get_owned_account(account_id, current_user.id, db)
+    cache = await get_cache_store()
+    account_ids = [account_id] if account_id else None
+    return await get_index_exposure(cache, db, current_user.id, account_ids)
 
 
 # ---------------------------------------------------------------------------

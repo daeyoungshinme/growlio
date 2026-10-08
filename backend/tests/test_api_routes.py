@@ -200,6 +200,50 @@ class TestPortfolioRoutes:
             app.dependency_overrides.pop(get_current_user, None)
 
 
+class TestPortfolioIndexExposureRoutes:
+    """GET /api/v1/portfolio/index-exposure — 추종 지수별 비중."""
+
+    def test_returns_200_with_mocked_service(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.schemas.portfolio import IndexExposureResponse
+
+        app, user, _db = _get_app_with_auth()
+        mock_service = AsyncMock(return_value=IndexExposureResponse(total_stock_krw=100.0))
+        try:
+            with (
+                patch("app.api.v1.portfolio_analysis.get_cache_store", new_callable=AsyncMock),
+                patch("app.api.v1.portfolio_analysis.get_index_exposure", mock_service),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get("/api/v1/portfolio/index-exposure", headers={"Authorization": "Bearer fake"})
+            assert resp.status_code == 200
+            assert resp.json()["total_stock_krw"] == 100.0
+            assert mock_service.await_args.args[2] == user.id
+            assert mock_service.await_args.args[3] is None
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+
+    def test_returns_404_for_account_not_owned(self, override_settings):
+        from app.api.deps import get_current_user
+
+        app, _user, db = _get_app_with_auth()
+        db.scalar = AsyncMock(return_value=None)  # 소유 계좌 조회 실패
+        mock_service = AsyncMock()
+        try:
+            with (
+                patch("app.api.v1.portfolio_analysis.get_index_exposure", mock_service),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    f"/api/v1/portfolio/index-exposure?account_id={uuid.uuid4()}",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 404
+            mock_service.assert_not_awaited()
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+
+
 # ── /api/v1/dividends/summary ─────────────────────────────────
 
 

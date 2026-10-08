@@ -134,3 +134,21 @@ class TestGetProfiles:
             result = await svc.get_etf_profiles(CacheStore(), items)
         assert result[("360750", "KOSPI")]["ter_pct"] == 0.0068
         assert result[("SPY", "NYSE")] is None
+
+    @pytest.mark.asyncio
+    async def test_with_status_reports_unresolved_keys(self):
+        """네트워크 실패 키만 unresolved — 조회 생략(국내 개별주)·확정 non-ETF·캐시 적중은 포함하지 않는다."""
+        cache = CacheStore()
+        items = [
+            ("360750", "TIGER 미국S&P500", "KOSPI"),  # Naver 실패
+            ("005930", "삼성전자", "KOSPI"),  # 조회 생략
+            ("AAPL", "Apple", "NASDAQ"),  # 확정 non-ETF
+            ("SPY", "SPDR S&P 500", "NYSE"),  # Yahoo 빈 응답
+        ]
+        with (
+            patch.object(svc, "fetch_naver_etf_analysis", side_effect=requests.ConnectionError("down")),
+            patch.object(svc, "fetch_yf_info", return_value={"AAPL": {"quoteType": "EQUITY"}}),
+        ):
+            profiles, unresolved = await svc.get_etf_profiles_with_status(cache, items)
+        assert unresolved == {("360750", "KOSPI"), ("SPY", "NYSE")}
+        assert all(v is None for v in profiles.values())

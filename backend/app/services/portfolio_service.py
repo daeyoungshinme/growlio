@@ -122,7 +122,7 @@ def _build_stock_allocation(all_positions: list[dict], stock_total_krw: float) -
     for p in all_positions:
         key = f"{p['ticker']}-{p['market']}"
         if key not in ticker_merged:
-            ticker_merged[key] = {"ticker": p["ticker"], "name": p["name"], "value_krw": 0.0}
+            ticker_merged[key] = {"ticker": p["ticker"], "name": p["name"], "market": p.get("market"), "value_krw": 0.0}
         ticker_merged[key]["value_krw"] += p["value_krw"]
 
     sorted_merged = sorted(ticker_merged.values(), key=lambda x: -x["value_krw"])
@@ -131,6 +131,7 @@ def _build_stock_allocation(all_positions: list[dict], stock_total_krw: float) -
         {
             "ticker": p["ticker"],
             "name": p["name"],
+            "market": p["market"],
             "value_krw": p["value_krw"],
             "pct": round(p["value_krw"] / stock_total_krw * 100, 2) if stock_total_krw else 0,
         }
@@ -142,6 +143,7 @@ def _build_stock_allocation(all_positions: list[dict], stock_total_krw: float) -
             {
                 "ticker": "ETC",
                 "name": f"기타 {len(rest)}종목",
+                "market": None,
                 "value_krw": rest_value,
                 "pct": round(rest_value / stock_total_krw * 100, 2) if stock_total_krw else 0,
             }

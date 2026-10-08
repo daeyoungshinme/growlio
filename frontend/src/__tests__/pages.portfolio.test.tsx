@@ -51,8 +51,8 @@ vi.mock("@/utils/toast", () => ({
 vi.mock("../components/portfolio/TreemapChart", () => ({
   default: () => <div data-testid="treemap-chart">TreemapChart</div>,
 }));
-vi.mock("../components/portfolio/DomesticForeignBar", () => ({
-  default: () => <div data-testid="domestic-foreign-bar">DomesticForeignBar</div>,
+vi.mock("../components/portfolio/AllocationCard", () => ({
+  default: () => <div data-testid="allocation-card">AllocationCard</div>,
 }));
 vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({
   default: () => <div data-testid="tax-optimization">TaxOptimizationCard</div>,
@@ -260,7 +260,7 @@ describe("PortfolioPage", () => {
     });
   });
 
-  it("국내/해외 포지션이 있을 때 marketChartData를 계산한다", async () => {
+  it("종목 현황 탭에 비중 분석 카드를 렌더링한다", async () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
@@ -268,11 +268,11 @@ describe("PortfolioPage", () => {
     });
     renderPortfolio();
     await waitFor(() => {
-      expect(screen.getByTestId("domestic-foreign-bar")).toBeInTheDocument();
+      expect(screen.getByTestId("allocation-card")).toBeInTheDocument();
     });
   });
 
-  it("포지션이 없으면 빈 marketChartData가 되고 여전히 렌더링된다", async () => {
+  it("포지션이 없어도 여전히 렌더링된다", async () => {
     const emptyPositions = { ...mockPortfolioData, all_positions: [] };
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: emptyPositions });

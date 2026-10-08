@@ -14,6 +14,7 @@ const StockPositionsModal = lazy(() => import("@/components/assets/StockPosition
 const TransactionModal = lazy(() => import("@/components/assets/TransactionModal"));
 const BankAccountModal = lazy(() => import("@/components/assets/BankAccountModal"));
 const StockAccountModal = lazy(() => import("@/components/assets/StockAccountModal"));
+const PeriodPurchasesTab = lazy(() => import("@/components/assets/PeriodPurchasesTab"));
 import StockAccountCard from "@/components/assets/StockAccountCard";
 import StockAccountSummaryCard from "@/components/assets/StockAccountSummaryCard";
 import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
@@ -213,6 +214,12 @@ export default function AssetManagementPage() {
 
       <div ref={tabContentRef}>
         {tab === "입출금·배당" && <TransactionHistoryTab accounts={accounts} />}
+
+        {tab === "기간별 매수" && (
+          <Suspense fallback={<SkeletonCard rows={3} />}>
+            <PeriodPurchasesTab accounts={accounts} />
+          </Suspense>
+        )}
 
         {tab === "부동산" && (
           <>

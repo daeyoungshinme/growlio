@@ -205,6 +205,11 @@ class TestBuildStockAllocation:
         tickers = [r["ticker"] for r in result]
         assert "ETC" in tickers
         assert len(result) == 11  # top 10 + ETC
+        assert result[-1]["market"] is None
+
+    def test_includes_market_for_listing_badge(self, override_settings):
+        result = _build_stock_allocation([self._make_pos("AAPL", market="NASDAQ")], 1_000_000)
+        assert result[0]["market"] == "NASDAQ"
 
     def test_zero_total_gives_zero_pct(self, override_settings):
         positions = [self._make_pos("AAPL", value_krw=1_000_000)]

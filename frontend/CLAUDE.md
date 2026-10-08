@@ -216,7 +216,7 @@ _기타_
 - `queryKeys.ts` — React Query queryKey 상수 (`QUERY_KEYS` 객체). 모든 queryKey는 여기서 import
 - `queryConfig.ts` — `STALE_TIME`, `REFETCH_INTERVAL` 상수. 매직 넘버 대신 이 상수 사용
 - `defaults.ts` — 백테스트 기본 날짜 상수 (`BACKTEST_DEFAULT_START_DATE` 등)
-- `tabs.ts` — 탭 배열 + 타입: `ASSETS_TOP_TABS`("투자현황"/"계좌관리", AssetsPage 상위 탭), `ASSET_MANAGEMENT_TABS`("은행계좌"/"증권계좌"/"부동산"/"입출금·배당", 계좌관리 내부 탭), `PORTFOLIO_TABS`
+- `tabs.ts` — 탭 배열 + 타입: `ASSETS_TOP_TABS`("투자현황"/"계좌관리", AssetsPage 상위 탭), `ASSET_MANAGEMENT_TABS`("은행계좌"/"증권계좌"/"부동산"/"입출금·배당"/"기간별 매수", 계좌관리 내부 탭 — "기간별 매수"는 `components/assets/PeriodPurchasesTab.tsx`(lazy, 월/연 매수 종목·수익률, 스냅샷 추정 `추정`/수기 `기록` 배지) + `TradeFormModal.tsx`(매수/매도 기록, 해외 USD→KRW 환산)), `PORTFOLIO_TABS`
 - `transaction.ts` — 거래 유형 상수 (`TX_TYPES`, `TX_LABELS`/`TX_COLORS`: DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST)
 - `validation.ts` — 포트폴리오 비중 허용 오차 (`PORTFOLIO_WEIGHT_TOLERANCE`)
 - `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`, `TAX_IMPACT_GATE_OPTIONS` — AUTO 모드 세금영향 게이트 on/off, `AlertAutoModeSection.tsx`가 소비)
@@ -274,53 +274,56 @@ _기타_
 
 **React Query queryKey 규칙**
 
-| 데이터                                                          | queryKey                                                                                                               |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| 대시보드 집계                                                   | `["dashboard"]`                                                                                                        |
-| 포트폴리오 overview (accountId 지정 시 계좌별, 미지정 시 "all") | `["portfolio-overview", accountId]` — `portfolioOverviewBase`(`["portfolio-overview"]`)는 무효화 프리픽스 전용         |
-| 포트폴리오 overview (경량)                                      | `["portfolio-overview", "lite"]`                                                                                       |
-| 포트폴리오/백테스트/리밸런싱 탭                                 | `["portfolios"]`                                                                                                       |
-| 전체 계좌 목록                                                  | `["accounts"]`                                                                                                         |
-| 계좌별 포지션                                                   | `["account-positions", accountId]`                                                                                     |
-| 계좌별 거래내역                                                 | `["transactions", accountId]`                                                                                          |
-| 전체 거래내역 (무기간)                                          | `["transactions", "all"]`                                                                                              |
-| 연도별 거래내역                                                 | `["transactions", "all", year]`                                                                                        |
-| 배당금 티커별 (accountId 지정 시 계좌별)                        | `["dividend-by-ticker", accountId]` — `dividendByTickerBase` 무효화 전용                                               |
-| 배당금 요약 (accountId 지정 시 계좌별)                          | `["dividend-summary", accountId]` — `dividendSummaryBase` 무효화 전용                                                  |
-| 배당금 포지션 (accountId 지정 시 계좌별)                        | `["dividend-positions", accountId]` — `dividendPositionsBase` 무효화 전용                                              |
-| DCA 분석 (InvestPlanPage + DashboardPage)                       | `["dca-analysis"]`                                                                                                     |
-| 적립 챌린지 목록 + 진행률 (계획 탭 · 대시보드)                  | `["challenges"]`                                                                                                       |
-| 적립 챌린지 넛지 요약 (하단 네비 배지)                          | `["challenges", "summary"]`                                                                                            |
-| 배당 계획 (연/월배당)                                           | `["dividend-plan"]`                                                                                                    |
-| 배당 월별 균등화 제안                                           | `["monthly-optimization"]`                                                                                             |
-| 설정                                                            | `["settings"]`                                                                                                         |
-| 현재 환율                                                       | `["exchange-rate"]`                                                                                                    |
-| 환율 알림 목록                                                  | `["exchange-rate-alerts"]`                                                                                             |
-| 주가 알림 목록                                                  | `["stock-price-alerts"]`                                                                                               |
-| 리밸런싱 알림 목록                                              | `["rebalancing-alerts"]`                                                                                               |
-| 포트폴리오별 리밸런싱 알림                                      | `["rebalancing-alert", portfolioId]`                                                                                   |
-| 포트폴리오 내 계좌별 알림 목록                                  | `["rebalancing-alert", portfolioId, "accounts"]`                                                                       |
-| 계좌별 개별 알림                                                | `["rebalancing-alert", portfolioId, "accounts", accountId]`                                                            |
-| 리밸런싱 실행 이력                                              | `["rebalancing-history"]`                                                                                              |
-| 리밸런싱 대기 플랜 목록                                         | `["rebalancing-plans"]`                                                                                                |
-| 리밸런싱 전략                                                   | `["rebalancing-strategy", portfolioId]` — `rebalancingStrategyBase`(`["rebalancing-strategy"]`)는 무효화 프리픽스 전용 |
-| 드리프트 경량 요약 (대시보드)                                   | `["drift-summary"]`                                                                                                    |
-| 세금 추정 요약 (accountId 지정 시 계좌별)                       | `["tax-summary", year, accountId]` — `taxSummaryBase` 무효화 전용                                                      |
-| 해외 포지션 양도세 계획 (accountId 지정 시 계좌별)              | `["overseas-positions-tax", accountId]` — `overseasPositionsTaxBase` 무효화 전용                                       |
-| ISA 만기 현황                                                   | `["isa-status"]`                                                                                                       |
-| 연금 납입 현황                                                  | `["pension-contribution", year]`                                                                                       |
-| 자산배분 이력 (DashboardPage 전용, accountId 지정 시 계좌별)    | `["allocation-history", months, accountId]` — `allocationHistoryBase` 무효화 전용                                      |
-| 알림 발송 이력                                                  | `["alert-history"]`                                                                                                    |
-| 인사이트/진단                                                   | `["insights"]`                                                                                                         |
-| 포트폴리오 리스크 지표                                          | `["portfolio-risk", id]`                                                                                               |
-| 시장 위험 신호                                                  | `["market-signal"]`                                                                                                    |
-| 복합신호 (시장/리스크) 상태                                     | `["composite-signal-status"]`                                                                                          |
-| 목표 역산 추천 (전체 자산)                                      | `["goal-recommendation", "overall"]`                                                                                   |
-| 목표 역산 추천 (투자기간별)                                     | `["goal-recommendation", "by-horizon"]`                                                                                |
-| 목표 역산 추천 (연령대별)                                       | `["goal-recommendation", "by-age"]`                                                                                    |
-| 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표)       | `["portfolio-expected-metrics", portfolioId]`                                                                          |
-| 목표 설정 마법사 필요수익률·적립액 가이드 프리뷰                | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]`                                    |
-| CPI/Core CPI 인플레이션 요약                                    | `["inflation-summary"]`                                                                                                |
+| 데이터                                                             | queryKey                                                                                                                    |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| 대시보드 집계                                                      | `["dashboard"]`                                                                                                             |
+| 포트폴리오 overview (accountId 지정 시 계좌별, 미지정 시 "all")    | `["portfolio-overview", accountId]` — `portfolioOverviewBase`(`["portfolio-overview"]`)는 무효화 프리픽스 전용              |
+| 포트폴리오 overview (경량)                                         | `["portfolio-overview", "lite"]`                                                                                            |
+| 추종 지수별 비중 (자산탭 비중 분석 카드, accountId 지정 시 계좌별) | `["index-exposure", accountId]` — `indexExposureBase`(`["index-exposure"]`)는 무효화 프리픽스 전용(sync·계좌 CUD 시 무효화) |
+| 포트폴리오/백테스트/리밸런싱 탭                                    | `["portfolios"]`                                                                                                            |
+| 전체 계좌 목록                                                     | `["accounts"]`                                                                                                              |
+| 계좌별 포지션                                                      | `["account-positions", accountId]`                                                                                          |
+| 계좌별 거래내역                                                    | `["transactions", accountId]`                                                                                               |
+| 전체 거래내역 (무기간)                                             | `["transactions", "all"]`                                                                                                   |
+| 연도별 거래내역                                                    | `["transactions", "all", year]`                                                                                             |
+| 기간별 매수 (계좌관리 › 기간별 매수)                               | `["period-purchases", period, year, month, accountId]` — `periodPurchasesBase` 무효화 전용(sync·계좌 CUD·매매기록 CUD 시)    |
+| 수기 매매 기록 (종목별)                                            | `["trades", accountId, ticker, market]` — `trades` 프리픽스로 무효화                                                        |
+| 배당금 티커별 (accountId 지정 시 계좌별)                           | `["dividend-by-ticker", accountId]` — `dividendByTickerBase` 무효화 전용                                                    |
+| 배당금 요약 (accountId 지정 시 계좌별)                             | `["dividend-summary", accountId]` — `dividendSummaryBase` 무효화 전용                                                       |
+| 배당금 포지션 (accountId 지정 시 계좌별)                           | `["dividend-positions", accountId]` — `dividendPositionsBase` 무효화 전용                                                   |
+| DCA 분석 (InvestPlanPage + DashboardPage)                          | `["dca-analysis"]`                                                                                                          |
+| 적립 챌린지 목록 + 진행률 (계획 탭 · 대시보드)                     | `["challenges"]`                                                                                                            |
+| 적립 챌린지 넛지 요약 (하단 네비 배지)                             | `["challenges", "summary"]`                                                                                                 |
+| 배당 계획 (연/월배당)                                              | `["dividend-plan"]`                                                                                                         |
+| 배당 월별 균등화 제안                                              | `["monthly-optimization"]`                                                                                                  |
+| 설정                                                               | `["settings"]`                                                                                                              |
+| 현재 환율                                                          | `["exchange-rate"]`                                                                                                         |
+| 환율 알림 목록                                                     | `["exchange-rate-alerts"]`                                                                                                  |
+| 주가 알림 목록                                                     | `["stock-price-alerts"]`                                                                                                    |
+| 리밸런싱 알림 목록                                                 | `["rebalancing-alerts"]`                                                                                                    |
+| 포트폴리오별 리밸런싱 알림                                         | `["rebalancing-alert", portfolioId]`                                                                                        |
+| 포트폴리오 내 계좌별 알림 목록                                     | `["rebalancing-alert", portfolioId, "accounts"]`                                                                            |
+| 계좌별 개별 알림                                                   | `["rebalancing-alert", portfolioId, "accounts", accountId]`                                                                 |
+| 리밸런싱 실행 이력                                                 | `["rebalancing-history"]`                                                                                                   |
+| 리밸런싱 대기 플랜 목록                                            | `["rebalancing-plans"]`                                                                                                     |
+| 리밸런싱 전략                                                      | `["rebalancing-strategy", portfolioId]` — `rebalancingStrategyBase`(`["rebalancing-strategy"]`)는 무효화 프리픽스 전용      |
+| 드리프트 경량 요약 (대시보드)                                      | `["drift-summary"]`                                                                                                         |
+| 세금 추정 요약 (accountId 지정 시 계좌별)                          | `["tax-summary", year, accountId]` — `taxSummaryBase` 무효화 전용                                                           |
+| 해외 포지션 양도세 계획 (accountId 지정 시 계좌별)                 | `["overseas-positions-tax", accountId]` — `overseasPositionsTaxBase` 무효화 전용                                            |
+| ISA 만기 현황                                                      | `["isa-status"]`                                                                                                            |
+| 연금 납입 현황                                                     | `["pension-contribution", year]`                                                                                            |
+| 자산배분 이력 (DashboardPage 전용, accountId 지정 시 계좌별)       | `["allocation-history", months, accountId]` — `allocationHistoryBase` 무효화 전용                                           |
+| 알림 발송 이력                                                     | `["alert-history"]`                                                                                                         |
+| 인사이트/진단                                                      | `["insights"]`                                                                                                              |
+| 포트폴리오 리스크 지표                                             | `["portfolio-risk", id]`                                                                                                    |
+| 시장 위험 신호                                                     | `["market-signal"]`                                                                                                         |
+| 복합신호 (시장/리스크) 상태                                        | `["composite-signal-status"]`                                                                                               |
+| 목표 역산 추천 (전체 자산)                                         | `["goal-recommendation", "overall"]`                                                                                        |
+| 목표 역산 추천 (투자기간별)                                        | `["goal-recommendation", "by-horizon"]`                                                                                     |
+| 목표 역산 추천 (연령대별)                                          | `["goal-recommendation", "by-age"]`                                                                                         |
+| 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표)          | `["portfolio-expected-metrics", portfolioId]`                                                                               |
+| 목표 설정 마법사 필요수익률·적립액 가이드 프리뷰                   | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]`                                         |
+| CPI/Core CPI 인플레이션 요약                                       | `["inflation-summary"]`                                                                                                     |
 
 > 모든 키는 `src/constants/queryKeys.ts`의 `QUERY_KEYS` 상수에서 import. 문자열 하드코딩 금지. 새 키 추가 시 이 표도 함께 갱신.
 
@@ -504,6 +507,7 @@ _기타_
 - 계좌 sync 후: `invalidateSyncData(queryClient)` — portfolio-overview + dashboard + dividend 등 무효화.
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 등 무효화.
 - 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions-all + dashboard 무효화.
+- 수기 매매 기록 CUD 후: `invalidateTradeData(queryClient)` — trades + period-purchases 무효화.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + challenges 무효화.
 - 적립 챌린지 CUD 후: `invalidateChallengeData(queryClient)` — challenges(+summary 프리픽스) + dashboard 무효화.
