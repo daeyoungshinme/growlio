@@ -195,6 +195,10 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     fee: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    # 외부 앱(nestlio)이 POST /external/transactions로 넣은 내역의 멱등 키(예: "nestlio:123:d1"). 같은 사용자가 같은
+    # 키로 다시 보내면 새로 만들지 않는다(재전송 안전). nestlio 경유가 아닌 내역은 NULL — 그래서 GET
+    # /external/net-deposits가 "nestlio가 이미 아는 입금"을 접두사로 걸러 증권사 직접 입금만 돌려줄 수 있다.
+    external_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     account: Mapped["AssetAccount | None"] = relationship(back_populates="transactions")
 
@@ -211,6 +215,13 @@ class Transaction(Base):
             "transaction_date",
             unique=True,
             postgresql_where=text("transaction_type = 'DIVIDEND' AND account_id IS NOT NULL AND ticker IS NOT NULL"),
+        ),
+        Index(
+            "uq_transactions_user_external_ref",
+            "user_id",
+            "external_ref",
+            unique=True,
+            postgresql_where=text("external_ref IS NOT NULL"),
         ),
     )
 
