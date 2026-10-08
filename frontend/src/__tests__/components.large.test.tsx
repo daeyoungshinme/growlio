@@ -752,30 +752,42 @@ describe("RebalancingStatusCard", () => {
     });
   });
 
-  it("collapseWhenHealthy: 모든 포트폴리오가 정상이면 접힌 채 정상 힌트만 보인다", async () => {
+  it("statusOnly: 모든 포트폴리오가 정상이면 접힌 채 정상 힌트만 보인다", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
       { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 1, needs_rebalancing: false },
     ] as never);
     renderWithProviders(
       <MemoryRouter>
-        <RebalancingStatusCard showDriftRows collapseWhenHealthy />
+        <RebalancingStatusCard showDriftRows statusOnly />
       </MemoryRouter>,
     );
     expect(await screen.findByText("포트폴리오 1개 모두 목표 비중 이내")).toBeInTheDocument();
     expect(screen.queryByText("포트폴리오 이탈 현황")).not.toBeInTheDocument();
   });
 
-  it("collapseWhenHealthy: 리밸런싱 필요 포트폴리오가 있으면 펼쳐서 이탈 행을 보여준다", async () => {
+  it("statusOnly: 리밸런싱 필요 포트폴리오가 있어도 접힌 채 힌트만 — 필요 배지·결합 안내는 지금 할 일 몫", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
       { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
     ] as never);
     renderWithProviders(
       <MemoryRouter>
-        <RebalancingStatusCard showDriftRows collapseWhenHealthy />
+        <RebalancingStatusCard
+          showDriftRows
+          statusOnly
+          marketSignal={{ composite_level: "RED" } as never}
+        />
       </MemoryRouter>,
     );
+    expect(
+      await screen.findByText("포트폴리오 1개 중 1개 이탈 · 지금 할 일 참고"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("포트폴리오 이탈 현황")).not.toBeInTheDocument();
+    expect(screen.queryByText("1개 필요")).not.toBeInTheDocument();
+    expect(screen.queryByText(/이탈 종목이 발견되었습니다/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("리밸런싱 점검"));
     expect(await screen.findByText("포트폴리오 이탈 현황")).toBeInTheDocument();
   });
 });
