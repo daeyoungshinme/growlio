@@ -170,7 +170,7 @@ describe("SettingsPage", () => {
     expect(screen.getByText("설정된 목표 없음")).toBeInTheDocument();
     expect(screen.getByText("중립 · 후보 0개")).toBeInTheDocument();
 
-    const kisLink = screen.getByText("계좌 연동 (KIS/키움/토스)").closest("a");
+    const kisLink = screen.getByText("계좌 연동 (KIS·키움 / 토스 조회 전용)").closest("a");
     expect(kisLink).toHaveAttribute("href", "/assets?tab=계좌관리");
 
     const goalLink = screen.getByText("투자·입금·배당 목표").closest("a");

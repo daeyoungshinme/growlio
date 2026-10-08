@@ -38,7 +38,7 @@ class TaxReminderContent(TypedDict):
 
 
 async def build_reminder_content(user_id: uuid.UUID, db: AsyncSession) -> TaxReminderContent:
-    """절세 액션 플랜(tax_action_service)의 상위 액션을 리마인더 콘텐츠로 사용한다 — 앱 세금 탭과 같은 목록."""
+    """절세 액션 플랜(tax_action_service)의 상위 액션을 리마인더 콘텐츠로 사용한다 — 앱 계획 › 절세 탭과 같은 목록."""
     plan = await get_tax_action_plan(user_id, today_kst().year, db)
     actions = plan["actions"][:_REMINDER_TOP_N]
     return {

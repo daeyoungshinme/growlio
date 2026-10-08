@@ -3,12 +3,13 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import TradeFormModal from "@/components/assets/TradeFormModal";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
-import { createTrade, fetchTrades } from "@/api/trades";
+import { createTrade, fetchTrades, updateTrade } from "@/api/trades";
 
 vi.mock("../api/trades", () => ({
   createTrade: vi.fn(),
   deleteTrade: vi.fn(),
   fetchTrades: vi.fn(),
+  updateTrade: vi.fn(),
 }));
 
 vi.mock("../context/ExchangeRateContext", () => ({
@@ -89,5 +90,44 @@ describe("TradeFormModal", () => {
     );
     expect(await screen.findByText("이 종목의 기록")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "2026-10-05 기록 삭제" })).toBeInTheDocument();
+  });
+
+  it("기존 기록을 수정하면 원화 단가 그대로 updateTrade를 호출한다 (해외도 USD 역환산 없음)", async () => {
+    vi.mocked(updateTrade)
+      .mockReset()
+      .mockResolvedValue({} as never);
+    vi.mocked(fetchTrades).mockResolvedValue([
+      {
+        id: "t9",
+        account_id: "acc-1",
+        side: "BUY",
+        ticker: "AAPL",
+        market: "NASDAQ",
+        name: "Apple",
+        qty: 2,
+        price_krw: 280_000,
+        fee: 100,
+        trade_date: "2026-10-01",
+        notes: null,
+        created_at: "2026-10-01T00:00:00Z",
+      },
+    ]);
+    renderWithProviders(
+      <TradeFormModal
+        accounts={accounts}
+        prefill={{ account_id: "acc-1", ticker: "AAPL", market: "NASDAQ", name: "Apple" }}
+        onClose={() => {}}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "2026-10-01 기록 수정" }));
+    expect(screen.getByLabelText("단가 (원)")).toHaveValue(280000);
+    fireEvent.change(screen.getByLabelText("수량"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "기록 수정" }));
+    await waitFor(() => expect(vi.mocked(updateTrade)).toHaveBeenCalled());
+    expect(vi.mocked(updateTrade).mock.calls[0]).toEqual([
+      "t9",
+      expect.objectContaining({ side: "BUY", qty: 3, price_krw: 280_000, fee: 100 }),
+    ]);
+    expect(vi.mocked(createTrade)).not.toHaveBeenCalled();
   });
 });

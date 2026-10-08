@@ -91,7 +91,7 @@ export default function RecommendationHorizonTab({
                   onApplyClick: actions.onApplyClick,
                   applyPending: actions.applyPending,
                   noTargetMessage:
-                    "포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고 기준 포트폴리오로 지정하면 추천 비중을 바로 적용할 수 있어요.",
+                    '이 기간·계좌유형에 연결된 포트폴리오가 아직 없어요. 아래 "새 포트폴리오 만들기"로 이 태그의 계좌를 연결한 포트폴리오를 바로 만들 수 있어요.',
                   extraCopyBeforeButtons: rec.includes_cash_equivalent ? (
                     <p className="text-xs text-teal-600 dark:text-teal-500">
                       현금성 자산 반영을 위해 {cashEquivalentMatches.map((a) => a.name).join(", ")}{" "}

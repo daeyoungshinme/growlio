@@ -13,6 +13,7 @@ import { useRecommendationDriftAlertToggle } from "@/hooks/useRecommendationDrif
 import { useChallengeRemindersToggle } from "@/hooks/useChallengeRemindersToggle";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
+import Tabs from "@/components/common/Tabs";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
@@ -26,7 +27,7 @@ import {
 } from "@/utils/notificationAlertGroups";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { TOUCH_TARGET_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -101,7 +102,7 @@ function AlertHistorySection() {
             <button
               onClick={() => setLimit((l) => l + ALERT_HISTORY_PAGE_SIZE)}
               disabled={isFetching}
-              className="w-full mt-2 py-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors disabled:opacity-50"
+              className="w-full mt-2 min-h-[44px] text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors disabled:opacity-50"
             >
               {isFetching ? "불러오는 중..." : "더 보기"}
             </button>
@@ -250,7 +251,7 @@ export default function NotificationSettingsPage() {
         <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">추천 비중 변화 알림</p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            매주 월요일, 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
+            매주 월요일, 목표 역산 추천 비중이 기준 포트폴리오의 현재 목표 비중과 유의미하게
             달라지면 이메일/푸시로 알려드립니다.
           </p>
           <ToggleSwitch
@@ -308,21 +309,13 @@ export default function NotificationSettingsPage() {
       </CollapsibleCard>
 
       {/* 알림 탭 */}
-      <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
-        {ALERT_TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setAlertTab(tab)}
-            className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${TOUCH_TARGET_MIN} ${
-              alertTab === tab
-                ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={ALERT_TABS}
+        activeTab={alertTab}
+        onChange={setAlertTab}
+        variant="pill"
+        fullWidth
+      />
 
       <div ref={alertTabContentRef}>
         {alertTab === "환율 알림" && <ExchangeRateAlertSection />}

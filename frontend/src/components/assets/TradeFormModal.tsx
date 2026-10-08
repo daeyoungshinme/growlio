@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import Modal from "@/components/common/Modal";
 import type { AssetAccount } from "@/api/assets";
 import {
   createTrade,
   deleteTrade,
   fetchTrades,
+  updateTrade,
   type TradeRecord,
   type TradeSide,
+  type TradeUpdate,
 } from "@/api/trades";
 import { tradeSchema } from "@/schemas/trade";
 import { useStockSearch } from "@/hooks/useStockSearch";
@@ -67,9 +69,12 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
   const [tradeDate, setTradeDate] = useState(localToday());
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // 기존 기록 수정 중이면 그 기록 — 수정 시 단가는 저장된 원화 그대로 다룬다(해외도 USD 역환산 없음)
+  const [editing, setEditing] = useState<TradeRecord | null>(null);
   const { suggestions, isSearching, search, clearSuggestions } = useStockSearch();
 
   const overseas = stock ? isOverseasMarket(stock.market) : false;
+  const priceInUsd = overseas && !editing;
 
   const { data: records = [] } = useQuery<TradeRecord[]>({
     queryKey: QUERY_KEYS.tradesFor(accountId, stock?.ticker ?? "", stock?.market ?? ""),
@@ -91,6 +96,41 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
     onError: (e) => setError(extractErrorMessage(e, "저장에 실패했습니다")),
   });
 
+  const resetFields = () => {
+    setQty("");
+    setPrice("");
+    setFee("");
+    setNotes("");
+    setSide("BUY");
+    setTradeDate(localToday());
+  };
+
+  const startEdit = (r: TradeRecord) => {
+    setEditing(r);
+    setError(null);
+    setSide(r.side);
+    setQty(String(r.qty));
+    setPrice(String(r.price_krw));
+    setFee(r.fee != null ? String(r.fee) : "");
+    setTradeDate(r.trade_date);
+    setNotes(r.notes ?? "");
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    resetFields();
+  };
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: TradeUpdate }) => updateTrade(id, data),
+    onSuccess: () => {
+      void invalidateTradeData(qc);
+      toast("매매 기록을 수정했습니다", "success");
+      cancelEdit();
+    },
+    onError: (e) => setError(extractErrorMessage(e, "수정에 실패했습니다")),
+  });
+
   const deleteMut = useMutation({
     mutationFn: deleteTrade,
     onSuccess: () => void invalidateTradeData(qc),
@@ -101,11 +141,11 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
     e.preventDefault();
     setError(null);
     const rawPrice = Number(price);
-    if (overseas && !rate) {
+    if (priceInUsd && !rate) {
       setError("환율 정보를 불러오지 못해 해외 종목 단가를 원화로 환산할 수 없습니다");
       return;
     }
-    const priceKrw = overseas ? convertUsdToKrw(rawPrice, rate) : rawPrice;
+    const priceKrw = priceInUsd ? convertUsdToKrw(rawPrice, rate) : rawPrice;
     const parsed = tradeSchema.safeParse({
       account_id: accountId,
       side,
@@ -119,6 +159,14 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "입력값을 확인해주세요");
+      return;
+    }
+    if (editing) {
+      const { side: s2, qty: q, price_krw, fee: f, trade_date, notes: n } = parsed.data;
+      updateMut.mutate({
+        id: editing.id,
+        data: { side: s2, qty: q, price_krw, fee: f, trade_date, notes: n },
+      });
       return;
     }
     createMut.mutate({ ...parsed.data, name: stock?.name ?? "" });
@@ -251,7 +299,7 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
           </div>
           <div>
             <label htmlFor="trade-price" className={FORM_LABEL}>
-              단가 ({overseas ? "USD" : "원"})
+              단가 ({priceInUsd ? "USD" : "원"})
             </label>
             <input
               id="trade-price"
@@ -263,7 +311,7 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
               onChange={(e) => setPrice(e.target.value)}
               className={`${INPUT_SM} w-full`}
             />
-            {overseas && rate && price !== "" && (
+            {priceInUsd && rate && price !== "" && (
               <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                 ≈ {fmtKrwPrice(convertUsdToKrw(Number(price), rate))} (현재 환율)
               </p>
@@ -317,13 +365,28 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={createMut.isPending}
-          className={`${TOUCH_TARGET_MIN} w-full bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
-        >
-          {createMut.isPending ? "저장 중..." : "기록 추가"}
-        </button>
+        <div className="flex gap-2">
+          {editing && (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className={`${TOUCH_TARGET_MIN} flex-1 px-5 py-2 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300`}
+            >
+              수정 취소
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={createMut.isPending || updateMut.isPending}
+            className={`${TOUCH_TARGET_MIN} flex-1 bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+          >
+            {createMut.isPending || updateMut.isPending
+              ? "저장 중..."
+              : editing
+                ? "기록 수정"
+                : "기록 추가"}
+          </button>
+        </div>
       </form>
 
       {stock && records.length > 0 && (
@@ -349,15 +412,29 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
                   </span>
                   <p className="text-xs text-gray-400 dark:text-gray-500">{r.trade_date}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => deleteMut.mutate(r.id)}
-                  disabled={deleteMut.isPending}
-                  aria-label={`${r.trade_date} 기록 삭제`}
-                  className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div className="flex items-center shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(r)}
+                    aria-label={`${r.trade_date} 기록 수정`}
+                    aria-pressed={editing?.id === r.id}
+                    className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editing?.id === r.id) cancelEdit();
+                      deleteMut.mutate(r.id);
+                    }}
+                    disabled={deleteMut.isPending}
+                    aria-label={`${r.trade_date} 기록 삭제`}
+                    className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

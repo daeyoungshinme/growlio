@@ -21,6 +21,7 @@ import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
 const DividendPlanSection = lazy(() => import("../components/invest/DividendPlanSection"));
 const ChallengeSection = lazy(() => import("../components/invest/ChallengeSection"));
+const TaxTabContainer = lazy(() => import("../components/portfolio-analysis/TaxTabContainer"));
 const SavingsSimulatorCard = lazy(() => import("../components/invest/SavingsSimulatorCard"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
@@ -38,7 +39,8 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import GoalSettingWizard from "@/components/invest/GoalSettingWizard";
 import Tabs from "@/components/common/Tabs";
 
-const TABS = ["적립 계획", "챌린지", "배당 계획"] as const;
+// 절세는 자산 › 투자현황 › 세금에서 이동(plans/50 M1) — 목표·배당·절세 "계획"을 한 탭에 모은다
+const TABS = ["적립 계획", "배당 계획", "절세", "챌린지"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function InvestPlanPage() {
@@ -331,7 +333,7 @@ export default function InvestPlanPage() {
                           label="월별 상세 보기"
                           collapsedHint={
                             latestMonth
-                              ? `최근 달(${latestMonth.month}) 달성율 ${latestMonth.achievement_pct !== null ? `${latestMonth.achievement_pct.toFixed(1)}%` : "—"}`
+                              ? `최근 달(${latestMonth.month}) 달성률 ${latestMonth.achievement_pct !== null ? `${latestMonth.achievement_pct.toFixed(1)}%` : "—"}`
                               : undefined
                           }
                         >
@@ -376,6 +378,15 @@ export default function InvestPlanPage() {
           <ErrorBoundary variant="section">
             <Suspense fallback={<SkeletonCard rows={5} height="h-5" />}>
               <DividendPlanSection onOpenSettings={openDividendEdit} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+
+        {/* 절세 탭 */}
+        {activeTab === "절세" && (
+          <ErrorBoundary variant="section">
+            <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
+              <TaxTabContainer />
             </Suspense>
           </ErrorBoundary>
         )}

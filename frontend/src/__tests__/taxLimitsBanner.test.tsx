@@ -168,10 +168,7 @@ describe("TaxLimitsBanner", () => {
 
     renderBanner(<TaxLimitsBanner overview={makeOverview([{ tax_type: "PENSION_SAVINGS" }])} />);
     expect(await screen.findByText("연금공제 62% 달성")).toBeInTheDocument();
-    expect(screen.getByRole("link")).toHaveAttribute(
-      "href",
-      "/assets?tab=투자현황&portfolioTab=세금",
-    );
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/invest-plan?tab=절세");
   });
 
   it("금융소득 종합과세 경고가 있으면 경고 문구를 표시한다", async () => {
@@ -185,10 +182,7 @@ describe("TaxLimitsBanner", () => {
     renderBanner(<TaxLimitsBanner overview={makeOverview([])} />);
     expect(await screen.findByText("금융소득 종합과세 대상 가능")).toBeInTheDocument();
     expect(screen.getByText(`예상세금 ${fmtKrw(1_320_000)}`)).toBeInTheDocument();
-    expect(screen.getByRole("link")).toHaveAttribute(
-      "href",
-      "/assets?tab=투자현황&portfolioTab=세금",
-    );
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/invest-plan?tab=절세");
   });
 
   it("건강보험 피부양자 자격상실 위험이 있으면 종합과세 경고보다 우선 표시한다", async () => {

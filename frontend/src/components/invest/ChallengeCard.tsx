@@ -1,4 +1,4 @@
-import { Flame, Pencil, Archive, Trash2 } from "lucide-react";
+import { Flame, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import type { Challenge } from "@/api/challenges";
 import AccountActionsMenu from "@/components/common/AccountActionsMenu";
 import ChallengeMonthGrid from "@/components/invest/ChallengeMonthGrid";
@@ -19,6 +19,7 @@ const STATUS_LABEL: Record<Challenge["status"], string> = {
 interface Props {
   challenge: Challenge;
   onEdit: () => void;
+  /** 보관 중이면 "보관 해제", 아니면 "보관" 메뉴로 노출된다 */
   onArchive: () => void;
   onDelete: () => void;
 }
@@ -72,7 +73,9 @@ export default function ChallengeCard({ challenge, onEdit, onArchive, onDelete }
           ariaLabel="챌린지 메뉴"
           items={[
             { icon: <Pencil size={15} />, label: "편집", onClick: onEdit },
-            { icon: <Archive size={15} />, label: "보관", onClick: onArchive },
+            challenge.status === "ARCHIVED"
+              ? { icon: <ArchiveRestore size={15} />, label: "보관 해제", onClick: onArchive }
+              : { icon: <Archive size={15} />, label: "보관", onClick: onArchive },
             { icon: <Trash2 size={15} />, label: "삭제", onClick: onDelete, variant: "danger" },
           ]}
         />

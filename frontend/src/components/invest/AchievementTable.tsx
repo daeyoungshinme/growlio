@@ -104,7 +104,7 @@ export default function AchievementTable({
               <th className="text-left py-2 pr-3 font-medium">기간</th>
               <th className="text-right py-2 px-3 font-medium">{projectedLabel}</th>
               <th className="text-right py-2 px-3 font-medium">{actualLabel}</th>
-              <th className="text-right py-2 px-3 font-medium">계획 대비 달성율</th>
+              <th className="text-right py-2 px-3 font-medium">계획 대비 달성률</th>
               <th className="text-right py-2 pl-3 font-medium">차이</th>
             </tr>
           </thead>

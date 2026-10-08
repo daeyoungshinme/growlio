@@ -20,9 +20,11 @@ export function useAssetManagementData(tab: Tab) {
     queryFn: fetchAccounts,
   });
 
+  // 증권계좌 카드의 계좌별 평가 통계에만 쓰인다(전체 자산 구성 카드는 plans/50 M3에서 제거)
   const { data: overview } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverviewLite,
     queryFn: fetchPortfolioOverviewLite,
+    enabled: isStockTab,
   });
 
   const { data: allTx = [] } = useQuery({

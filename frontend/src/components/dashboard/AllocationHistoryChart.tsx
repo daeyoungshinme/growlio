@@ -18,6 +18,7 @@ import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 import { useAllocationHistory } from "@/hooks/useAllocationHistory";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
 const TYPE_COLORS: Record<string, string> = {
   STOCK_DOMESTIC: "#2563EB",
@@ -84,7 +85,7 @@ function AllocationHistoryChart({
               <button
                 key={m}
                 onClick={() => setMonths(m)}
-                className={`text-xs px-2 py-0.5 rounded-md transition-colors ${
+                className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-xs px-2 py-0.5 rounded-md transition-colors ${
                   months === m
                     ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300"
                     : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"

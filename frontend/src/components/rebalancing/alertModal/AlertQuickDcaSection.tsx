@@ -1,6 +1,7 @@
 import type { AssetAccount } from "@/api/assets";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { INPUT_SM } from "@/constants/inputStyles";
+import NoTradableAccountNotice from "./NoTradableAccountNotice";
 
 const inputClass = `w-full ${INPUT_SM}`;
 
@@ -46,9 +47,7 @@ export function AlertQuickDcaSection({ form, autoExecutionAccounts, onSwitchToAd
           실행 계좌
         </label>
         {autoExecutionAccounts.length === 0 ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            KIS/키움 연동 계좌가 없습니다. 자산관리에서 계좌를 추가해주세요.
-          </p>
+          <NoTradableAccountNotice />
         ) : autoExecutionAccounts.length === 1 ? (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
             <span>{autoExecutionAccounts[0].name}</span>

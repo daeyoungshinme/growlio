@@ -37,10 +37,10 @@ export default function DiagnosisInsightList({ context }: Props) {
             {note.text}
             {note.isTaxLossOpportunity && (
               <Link
-                to="/assets?tab=투자현황&portfolioTab=세금"
+                to="/invest-plan?tab=절세"
                 className="ml-1.5 inline-block text-blue-600 dark:text-blue-400 hover:underline font-medium"
               >
-                세금 탭에서 확인 →
+                절세 탭에서 확인 →
               </Link>
             )}
           </span>

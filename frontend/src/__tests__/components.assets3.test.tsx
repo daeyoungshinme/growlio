@@ -3,7 +3,6 @@ import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
 import type { Transaction } from "@/api/transactions";
-import type { PortfolioOverview } from "@/types";
 
 vi.mock("@/context/ExchangeRateContext", () => ({
   useExchangeRateContext: vi.fn(() => ({ rate: 1350 })),
@@ -99,13 +98,7 @@ const mockRealEstate: AssetAccount = {
 
 // ------- StockAccountSummaryCard -------
 describe("StockAccountSummaryCard", () => {
-  it("renders with overview data", () => {
-    const overview = {
-      total_stock_krw: 10000000,
-      unrealized_pnl_krw: 500000,
-      stock_return_pct: 5.0,
-    } as unknown as PortfolioOverview;
-
+  it("renders account totals without duplicating 평가금액/평가손익", () => {
     renderWithProviders(
       <StockAccountSummaryCard
         perAccountStats={[
@@ -120,33 +113,19 @@ describe("StockAccountSummaryCard", () => {
             },
           },
         ]}
-        overview={overview}
         usdRate={1350}
       />,
     );
-    expect(screen.getByText("증권계좌 전체 요약")).toBeDefined();
-    expect(screen.getByText("평가금액")).toBeDefined();
-    expect(screen.getByText("평가손익")).toBeDefined();
+    expect(screen.getByText("증권계좌 합계")).toBeDefined();
+    expect(screen.getByText("누적 입금")).toBeDefined();
+    expect(screen.getByText("누적 배당")).toBeDefined();
+    expect(screen.queryByText("평가금액")).toBeNull();
+    expect(screen.queryByText("평가손익")).toBeNull();
   });
 
-  it("renders with undefined overview", () => {
-    renderWithProviders(
-      <StockAccountSummaryCard perAccountStats={[]} overview={undefined} usdRate={1350} />,
-    );
-    expect(screen.getByText("증권계좌 전체 요약")).toBeDefined();
-  });
-
-  it("shows negative pnl color", () => {
-    const overview = {
-      total_stock_krw: 9000000,
-      unrealized_pnl_krw: -500000,
-      stock_return_pct: -5.0,
-    } as unknown as PortfolioOverview;
-
-    renderWithProviders(
-      <StockAccountSummaryCard perAccountStats={[]} overview={overview} usdRate={null} />,
-    );
-    expect(document.body).toBeDefined();
+  it("renders with no accounts", () => {
+    renderWithProviders(<StockAccountSummaryCard perAccountStats={[]} usdRate={null} />);
+    expect(screen.getByText("증권계좌 합계")).toBeDefined();
   });
 });
 

@@ -110,7 +110,12 @@ export default memo(function HeroSummaryCard({
           </p>
           <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-1.5 sm:pt-2">
             <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
+              <p
+                className="text-xs text-gray-400 dark:text-gray-500 font-medium"
+                title="현금·부동산을 포함한 전체 자산 기준 누적 수익률(추적 시작 이후). 주식 평가손익률·목표 연수익률(XIRR)과는 기준이 다릅니다."
+              >
+                전체 누적 수익률
+              </p>
               <p
                 className={`text-sm sm:text-lg font-bold ${
                   data.cumulative_return_pct == null

@@ -91,4 +91,29 @@ describe("ChallengeSection", () => {
     expect(await screen.findByRole("button", { name: "만들기" })).toBeInTheDocument();
     expect(screen.getByText("유형")).toBeInTheDocument();
   });
+
+  it("보관한 챌린지는 진행 중 목록이 아니라 접힌 보관함에 둔다", async () => {
+    fetchChallenges.mockResolvedValue([
+      makeChallenge(),
+      makeChallenge({ id: "c2", title: "작년 챌린지", status: "ARCHIVED" }),
+    ]);
+    render(<ChallengeSection />);
+    await waitFor(() => expect(screen.getByText("매달 50만원 적립")).toBeInTheDocument());
+    expect(screen.queryByText("작년 챌린지")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /보관함 \(1\)/ }));
+    expect(screen.getByText("작년 챌린지")).toBeInTheDocument();
+  });
+
+  it("보관은 확인 후에만 요청한다", async () => {
+    fetchChallenges.mockResolvedValue([makeChallenge()]);
+    updateChallenge.mockResolvedValue(makeChallenge({ status: "ARCHIVED" }));
+    render(<ChallengeSection />);
+    await waitFor(() => screen.getByText("매달 50만원 적립"));
+    fireEvent.click(screen.getByRole("button", { name: "챌린지 메뉴" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /보관/ }));
+    expect(updateChallenge).not.toHaveBeenCalled();
+    expect(await screen.findByText(/보관함으로 옮겨지고/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "보관" }));
+    await waitFor(() => expect(updateChallenge).toHaveBeenCalledWith("c1", { status: "ARCHIVED" }));
+  });
 });

@@ -122,6 +122,26 @@ function makeDcaData(expectedGoalDate: string | null): DCAAnalysisData {
 }
 
 describe("InvestmentGoalCard", () => {
+  it("모바일: 가장 뒤처진 목표만 기본 노출하고 나머지는 '더 보기'로 접는다 (plans/50 M7)", () => {
+    localStorage.removeItem("growlio:goalCard:showAllGoalsMobile");
+    const data = {
+      ...baseDashboard,
+      annual_dividend_goal: 3_000_000,
+      dividend_goal_achievement_pct: 30,
+      estimated_annual_dividends: 900_000,
+    };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
+    // 입금 75% vs 배당 30% → 배당이 가장 뒤처짐
+    const lagLabel = screen.getByText("가장 뒤처진 목표");
+    expect(lagLabel.parentElement).toHaveTextContent("배당 목표");
+    const depositCell = screen.getByText("연간 입금").parentElement!;
+    expect(depositCell.className).toContain("hidden sm:block");
+    const more = screen.getByRole("button", { name: /목표 3개 더 보기/ });
+    fireEvent.click(more);
+    expect(screen.getByText("연간 입금").parentElement!.className).not.toContain("hidden");
+    localStorage.removeItem("growlio:goalCard:showAllGoalsMobile");
+  });
+
   it("목표가 없으면 설정 안내 메시지를 표시한다", () => {
     const data = {
       ...baseDashboard,
@@ -147,7 +167,7 @@ describe("InvestmentGoalCard", () => {
     expect(screen.getAllByText("100.0%")[0]).toBeInTheDocument();
   });
 
-  it("전체 진행율 섹션에 자산 목표 달성률과 목표까지 남은 금액을 표시한다 (자산 목표 칩은 제거됨)", () => {
+  it("전체 진행률 섹션에 자산 목표 달성률과 목표까지 남은 금액을 표시한다 (자산 목표 칩은 제거됨)", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
     expect(screen.getAllByText("15.0%")[0]).toBeInTheDocument();
     expect(screen.getAllByText(/목표까지 8\.50억원 남음/)[0]).toBeInTheDocument();
@@ -257,7 +277,7 @@ describe("InvestmentGoalCard", () => {
 
   it("모바일 DCA 상세는 기본 접힘 상태이며, 토글 클릭 시 펼쳐진다", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} dcaData={makeDcaData("2045-03")} />);
-    // 헤드라인(진행율)은 접힘 상태에도 모바일+데스크탑 양쪽에 항상 보인다
+    // 헤드라인(진행률)은 접힘 상태에도 모바일+데스크탑 양쪽에 항상 보인다
     expect(screen.getAllByText("15.0%").length).toBeGreaterThanOrEqual(2);
     // 접힘 상태: "실제 달성 예상"은 데스크탑 블록에만 존재(1개) — 모바일 상세는 아직 숨김
     expect(screen.getAllByText("실제 달성 예상")).toHaveLength(1);

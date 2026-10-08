@@ -6,6 +6,7 @@ import type { MarketSignalResponse } from "@/api/marketSignals";
 import { fetchSettings } from "@/api/settings";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { INPUT_SM } from "@/constants/inputStyles";
+import NoTradableAccountNotice from "./NoTradableAccountNotice";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import {
@@ -72,7 +73,7 @@ export function AlertAutoModeSection({
             type="button"
             onClick={() => setCapEditOpen((v) => !v)}
             aria-expanded={capEditOpen}
-            className="underline underline-offset-2 hover:text-orange-800 dark:hover:text-orange-200"
+            className="inline-flex items-center min-h-9 px-1.5 underline underline-offset-2 hover:text-orange-800 dark:hover:text-orange-200"
           >
             {capEditOpen ? "닫기" : "변경"}
           </button>
@@ -96,9 +97,7 @@ export function AlertAutoModeSection({
             </span>
           </div>
         ) : autoExecutionAccounts.length === 0 ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            KIS/키움 연동 계좌가 없습니다. 자산관리에서 계좌를 추가해주세요.
-          </p>
+          <NoTradableAccountNotice />
         ) : autoExecutionAccounts.length === 1 ? (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
             <span>{autoExecutionAccounts[0].name}</span>

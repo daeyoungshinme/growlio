@@ -84,7 +84,7 @@ describe("TaxActionPlanCard", () => {
           title: "AAPL 손실 1,000,000원 실현 검토",
           benefit_krw: 220_000,
           priority: "HIGH",
-          cta: { label: "손실수확 보기", link: "/assets?tab=투자현황&portfolioTab=세금" },
+          cta: { label: "손실수확 보기", link: "/invest-plan?tab=절세" },
         }),
       ]),
     );
@@ -94,7 +94,7 @@ describe("TaxActionPlanCard", () => {
     expect(screen.getByText(`절세 약 ${fmtKrw(220_000)}`)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /손실수확 보기/ })).toHaveAttribute(
       "href",
-      "/assets?tab=투자현황&portfolioTab=세금",
+      "/invest-plan?tab=절세",
     );
   });
 

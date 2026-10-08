@@ -22,7 +22,7 @@ export default function ChallengeEmptyStateCard() {
       </p>
       <Link
         to="/invest-plan?tab=챌린지"
-        className="shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
       >
         만들기 →
       </Link>

@@ -31,7 +31,6 @@ import { SELECT_SM } from "@/constants/inputStyles";
 import { isPortfolioAccount, isStockAccount, isSyncableAccount } from "@/utils/accounts";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPortfolioOverview } from "@/api/portfolios";
-const TaxTabContainer = lazy(() => import("../components/portfolio-analysis/TaxTabContainer"));
 
 const AllocationCard = lazy(() => import("../components/portfolio/AllocationCard"));
 
@@ -369,14 +368,6 @@ export default function PortfolioPage() {
               dividendByTicker={dividendByTicker}
               totalInvestedKrw={data?.total_invested_krw}
             />
-          </ErrorBoundary>
-        )}
-
-        {tab === "세금" && (
-          <ErrorBoundary variant="section">
-            <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
-              <TaxTabContainer accountId={selectedAccountId} />
-            </Suspense>
           </ErrorBoundary>
         )}
       </div>
