@@ -9,7 +9,7 @@ import { useDividendData } from "@/hooks/useDividendData";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import HorizonSummaryCard from "@/components/dashboard/HorizonSummaryCard";
 import DividendTab from "@/components/portfolio/DividendTab";
-import { fmtKrw, fmtKrwPrice } from "@/utils/format";
+import { fmtKrw } from "@/utils/format";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
@@ -200,66 +200,107 @@ export default function PortfolioPage() {
     );
 
   const hasHorizonTags = data.accounts.some((a) => a.investment_horizon);
+  const pnlSign = data.unrealized_pnl_krw >= 0 ? "+" : "";
+  const returnSign = data.stock_return_pct >= 0 ? "+" : "";
+  const stockSharePct =
+    data.total_assets_krw > 0 ? (data.total_stock_krw / data.total_assets_krw) * 100 : null;
+
+  // 모바일은 좁은 헤더에 맞춰 짧은 라벨을 보이고, 접근 이름(aria-label)은 전체 문구를 유지한다.
+  const syncAction = selectedAccount
+    ? {
+        onClick: handleSyncSelected,
+        disabled: isSyncingSelected || !canSyncSelected,
+        title: canSyncSelected ? undefined : "수동 계좌는 갱신할 수 없습니다",
+        spinning: isSyncingSelected,
+        label: isSyncingSelected ? "갱신 중..." : "선택 계좌 갱신",
+        shortLabel: isSyncingSelected ? "갱신 중" : "갱신",
+      }
+    : {
+        onClick: handleSyncAll,
+        disabled: isSyncingAll,
+        title: undefined,
+        spinning: isSyncingAll,
+        label: isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신",
+        shortLabel: isSyncingAll ? `${syncDone}/${syncTotal}` : "갱신",
+      };
 
   return (
     <div className="space-y-6">
       {/* 상단 요약 */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-2">
           <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">
             주식 총평가액
           </p>
-          <div className="flex items-center gap-2">
-            {accountOptions.length > 0 && (
-              <select
-                value={selectedAccountId ?? ""}
-                onChange={(e) => handleAccountChange(e.target.value)}
-                className={SELECT_SM}
-                aria-label="계좌 선택"
-              >
-                <option value="">전체 계좌 ({stockAccounts.length}개)</option>
-                {accountOptions.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            {selectedAccount ? (
-              <button
-                onClick={handleSyncSelected}
-                disabled={isSyncingSelected || !canSyncSelected}
-                title={canSyncSelected ? undefined : "수동 계좌는 갱신할 수 없습니다"}
-                className={SYNC_BUTTON_CLASS}
-              >
-                <RefreshCw size={14} className={isSyncingSelected ? "animate-spin" : ""} />
-                {isSyncingSelected ? "갱신 중..." : "선택 계좌 갱신"}
-              </button>
-            ) : (
-              <button onClick={handleSyncAll} disabled={isSyncingAll} className={SYNC_BUTTON_CLASS}>
-                <RefreshCw size={14} className={isSyncingAll ? "animate-spin" : ""} />
-                {isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신"}
-              </button>
-            )}
-          </div>
+          <button
+            onClick={syncAction.onClick}
+            disabled={syncAction.disabled}
+            title={syncAction.title}
+            aria-label={syncAction.label}
+            className={SYNC_BUTTON_CLASS}
+          >
+            <RefreshCw size={14} className={syncAction.spinning ? "animate-spin" : ""} />
+            <span className="sm:hidden">{syncAction.shortLabel}</span>
+            <span className="hidden sm:inline">{syncAction.label}</span>
+          </button>
         </div>
-        <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600 dark:text-blue-400">
+        {accountOptions.length > 0 && (
+          <select
+            value={selectedAccountId ?? ""}
+            onChange={(e) => handleAccountChange(e.target.value)}
+            className={`${SELECT_SM} mt-2 block w-full sm:w-auto`}
+            aria-label="계좌 선택"
+          >
+            <option value="">전체 계좌 ({stockAccounts.length}개)</option>
+            {accountOptions.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <p className="text-2xl sm:text-3xl font-bold mt-2 leading-tight tabular-nums text-blue-600 dark:text-blue-400">
           {fmtKrw(data.total_stock_krw)}
         </p>
-        <div className="mt-2 flex items-center flex-wrap gap-x-2 gap-y-1">
-          <span className={`text-sm font-semibold ${pnlColor(data.unrealized_pnl_krw)}`}>
-            평가손익 {data.unrealized_pnl_krw >= 0 ? "+" : ""}
-            {fmtKrwPrice(data.unrealized_pnl_krw)}({data.stock_return_pct >= 0 ? "+" : ""}
-            {data.stock_return_pct.toFixed(2)}%)
-          </span>
-          {data.total_assets_krw > 0 && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              · 전체 자산 중 {((data.total_stock_krw / data.total_assets_krw) * 100).toFixed(1)}%
-              {data.total_non_stock_krw > 0 &&
-                ` · 현금/부동산 등 ${fmtKrw(data.total_non_stock_krw)} 별도`}
-            </span>
+        <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 min-w-0">
+            <dt className="text-xs text-gray-500 dark:text-gray-400">평가손익</dt>
+            <dd
+              className={`text-base font-semibold tabular-nums truncate ${pnlColor(data.unrealized_pnl_krw)}`}
+            >
+              {pnlSign}
+              {fmtKrw(data.unrealized_pnl_krw)}
+            </dd>
+          </div>
+          <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 min-w-0">
+            <dt className="text-xs text-gray-500 dark:text-gray-400">수익률</dt>
+            <dd
+              className={`text-base font-semibold tabular-nums ${pnlColor(data.stock_return_pct)}`}
+            >
+              {returnSign}
+              {data.stock_return_pct.toFixed(2)}%
+            </dd>
+          </div>
+          <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 min-w-0">
+            <dt className="text-xs text-gray-500 dark:text-gray-400">투자원금</dt>
+            <dd className="text-base font-semibold tabular-nums truncate text-gray-800 dark:text-gray-100">
+              {fmtKrw(data.total_invested_krw)}
+            </dd>
+          </div>
+          {stockSharePct !== null && (
+            <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 min-w-0">
+              <dt className="text-xs text-gray-500 dark:text-gray-400">전체 자산 중</dt>
+              <dd className="text-base font-semibold tabular-nums text-gray-800 dark:text-gray-100">
+                {stockSharePct.toFixed(1)}%
+              </dd>
+            </div>
           )}
-        </div>
+        </dl>
+        {data.total_non_stock_krw > 0 && (
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            현금·부동산 등 {fmtKrw(data.total_non_stock_krw)}은 별도예요
+          </p>
+        )}
         {/* 특정 계좌 선택 시 overview.accounts가 해당 계좌 1건으로 축소되어
             상단 "주식 총평가액"과 동일한 값만 나오므로 전체 계좌 뷰에서만 표시 */}
         {!selectedAccountId && hasHorizonTags && (
@@ -313,7 +354,8 @@ export default function PortfolioPage() {
 
       {/* 탭 */}
       <div>
-        <Tabs tabs={TABS} activeTab={tab} onChange={handleTabChange} variant="pill" />
+        {/* 상위 "투자현황/계좌관리"가 pill이라 하위 탭은 밑줄형으로 위계를 구분한다 */}
+        <Tabs tabs={TABS} activeTab={tab} onChange={handleTabChange} variant="underline" />
       </div>
 
       <div ref={tabContentRef}>

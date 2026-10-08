@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtKrwShort } from "@/utils/format";
 import SegmentedControl from "./SegmentedControl";
 
 export type RegionBasis = "exposure" | "listing";
@@ -99,8 +99,10 @@ export default function RegionAllocationView({ basis, onBasisChange, amounts, fa
                     <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 tabular-nums">
                       {pctOf(s.value).toFixed(1)}%
                     </div>
+                    {/* 3칸 범례(판별 불가 포함)는 모바일에서 "1.23억원"이 잘려 축약 금액을 쓴다 */}
                     <div className="text-xs text-gray-500 dark:text-gray-400 tabular-nums truncate">
-                      {fmtKrw(s.value)}
+                      <span className="sm:hidden">{fmtKrwShort(s.value)}원</span>
+                      <span className="hidden sm:inline">{fmtKrw(s.value)}</span>
                     </div>
                   </div>
                 </li>
