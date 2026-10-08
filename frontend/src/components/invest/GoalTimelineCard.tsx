@@ -77,7 +77,7 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
       </p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">현재 진행율</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">현재 진행률</p>
           <p className="text-xl font-bold text-gray-900 dark:text-gray-50">
             {current_progress_pct !== null ? `${current_progress_pct.toFixed(1)}%` : "—"}
           </p>

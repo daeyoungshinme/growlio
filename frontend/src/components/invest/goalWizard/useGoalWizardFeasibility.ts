@@ -19,7 +19,7 @@ export function useGoalWizardFeasibility(
     staleTime: STALE_TIME.MEDIUM,
   });
   // 부동산은 목표 역산 추천/DCA 복리 곡선이 성장을 모델링하지 않으므로 투자자산
-  // 초기값에서 제외 — 목표 진행율 추적 기준(dca_service.py)과 일치시킨다.
+  // 초기값에서 제외 — 목표 진행률 추적 기준(dca_service.py)과 일치시킨다.
   const realEstateKrw =
     overview?.asset_type_allocation?.find((a) => a.type === "REAL_ESTATE")?.amount_krw ?? 0;
   const currentAssets = overview ? overview.total_assets_krw - realEstateKrw : null;

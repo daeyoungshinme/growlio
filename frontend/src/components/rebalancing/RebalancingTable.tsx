@@ -42,6 +42,18 @@ export default function RebalancingTable({
     }
   }, [analysis]);
 
+  // 모바일 하단 고정 실행 버튼은 분석 결과가 화면에 있을 때만 띄운다 — 아래 백테스트·동기화 섹션까지
+  // 스크롤해도 버튼이 남아 콘텐츠를 가리던 문제(plans/50 X7). IntersectionObserver가 없으면 항상 노출.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [resultsInView, setResultsInView] = useState(true);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setResultsInView(entry.isIntersecting));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const [now] = useState(() => Date.now());
   const minutesOld = (now - new Date(analysis.analyzed_at).getTime()) / 60000;
   const isStale = minutesOld > 10;
@@ -57,7 +69,7 @@ export default function RebalancingTable({
   const estFee = (totalBuySummary + totalSellSummary) * TRADING_FEE_RATE;
 
   return (
-    <div className="space-y-4">
+    <div ref={rootRef} className="space-y-4">
       {/* 리밸런싱 진단 요약 카드 */}
       <RebalancingDiagnosisCard
         analysis={analysis}
@@ -86,7 +98,9 @@ export default function RebalancingTable({
             disabled={tradableAccounts.length === 0}
             className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
             title={
-              tradableAccounts.length === 0 ? "자산관리에서 KIS·키움 증권계좌를 연동하세요" : ""
+              tradableAccounts.length === 0
+                ? "자산 › 계좌관리에서 KIS·키움 증권계좌를 연동하세요"
+                : ""
             }
           >
             <Zap size={14} /> 리밸런싱 실행
@@ -150,9 +164,9 @@ export default function RebalancingTable({
         })}
       </div>
 
-      {/* 모바일: 하단 고정 실행 버튼 */}
+      {/* 모바일: 하단 고정 실행 버튼 (분석 결과가 보일 때만) */}
       <div
-        className="sm:hidden fixed bottom-16 left-0 right-0 px-4 z-20"
+        className={`sm:hidden fixed bottom-16 left-0 right-0 px-4 z-20 ${resultsInView ? "" : "hidden"}`}
         style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }}
       >
         {tradableAccounts.length === 0 && (
@@ -164,7 +178,11 @@ export default function RebalancingTable({
           onClick={() => setExecutionOpen(true)}
           disabled={tradableAccounts.length === 0}
           className="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-sm font-semibold shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          title={tradableAccounts.length === 0 ? "자산관리에서 KIS·키움 증권계좌를 연동하세요" : ""}
+          title={
+            tradableAccounts.length === 0
+              ? "자산 › 계좌관리에서 KIS·키움 증권계좌를 연동하세요"
+              : ""
+          }
         >
           <Zap size={16} /> 리밸런싱 실행
         </button>

@@ -16,6 +16,7 @@ import {
   describeDcaAutoBuy,
   isDcaAutoBuyPreset,
 } from "@/utils/dcaAutoBuy";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 /** "정기 적립식 자동매수"(리밸런싱 AUTO의 SCHEDULE_ONLY+BUY_ONLY 프리셋) 설정 여부를 한 줄로
  * 보여주고, /rebalancing 실행 화면으로 딥링크한다. 적립 계획 탭에서 이 기능의 존재를 알리는
@@ -105,7 +106,7 @@ export default function AutoInvestStatusBanner() {
       </div>
       <Link
         to={linkTo}
-        className="shrink-0 flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 hover:underline"
+        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 hover:underline`}
       >
         {activeEntry ? "설정 관리" : "설정하기"} <ArrowRight size={11} />
       </Link>

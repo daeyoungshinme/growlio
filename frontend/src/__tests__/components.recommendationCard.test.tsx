@@ -1205,7 +1205,7 @@ describe("RecommendationCard", () => {
       await screen.findByText(/KODEX 단기채권/);
 
       expect(
-        await screen.findByText(/포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고/),
+        await screen.findByText(/이 기간·계좌유형에 연결된 포트폴리오가 아직 없어요/),
       ).toBeDefined();
       expect(screen.queryByText(/에 적용/)).toBeNull();
     });

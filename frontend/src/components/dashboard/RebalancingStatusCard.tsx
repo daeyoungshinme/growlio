@@ -15,6 +15,7 @@ import type { MarketSignalResponse } from "@/api/marketSignals";
 import { buildCombinedStatusNote } from "@/utils/diagnosisInsights";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 
 const OTHER_INSIGHTS_VISIBLE_LIMIT = 3;
 
@@ -86,7 +87,7 @@ function PortfolioDriftRow({
               e.stopPropagation();
               onClick?.(summary.portfolio_id, true);
             }}
-            className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 rounded-full px-1.5 py-0.5 shrink-0 transition-colors"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1 text-xs font-medium text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 rounded-full px-1.5 py-0.5 shrink-0 transition-colors`}
             aria-label={`${summary.portfolio_name} 자동화 설정하기`}
           >
             <BellOff size={11} />
@@ -139,7 +140,7 @@ function InsightRow({ insight }: { insight: Insight }) {
         {insight.action_label && insight.action_url && (
           <button
             onClick={() => navigate(insight.action_url!)}
-            className="mt-1.5 block py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline active:opacity-70"
+            className={`${TOUCH_TARGET_ROW} text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline active:opacity-70`}
           >
             {insight.action_label} →
           </button>
@@ -406,7 +407,7 @@ export default function RebalancingStatusCard({
           {otherInsights.length > OTHER_INSIGHTS_VISIBLE_LIMIT && (
             <button
               onClick={toggleShowAllOtherInsights}
-              className="flex items-center gap-1 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              className={`${TOUCH_TARGET_ROW} gap-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors`}
               aria-expanded={showAllOtherInsights}
             >
               {showAllOtherInsights

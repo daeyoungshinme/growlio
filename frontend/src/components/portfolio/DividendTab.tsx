@@ -8,7 +8,6 @@ import Tabs from "@/components/common/Tabs";
 const TreemapChart = lazy(() => import("./TreemapChart"));
 const MonthlyDividendChart = lazy(() => import("./MonthlyDividendChart"));
 import MonthlyTickerDetail from "./MonthlyTickerDetail";
-import MonthlyOptimizationCard from "./MonthlyOptimizationCard";
 import type { DividendByTicker, DividendYield } from "@/types";
 import {
   MONTH_LABELS,
@@ -17,6 +16,7 @@ import {
   yieldBadgeClass,
 } from "@/utils/dividendUtils";
 import EmptyState from "@/components/common/EmptyState";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface DividendSummary {
   annual_received: number;
@@ -219,7 +219,7 @@ export default function DividendTab({
         <Tabs tabs={DIV_SUBTABS} activeTab={divSubTab} onChange={setDivSubTab} variant="pill" />
         <Link
           to="/invest-plan?tab=배당 계획"
-          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
         >
           배당 목표 달성 현황 보기
         </Link>
@@ -430,12 +430,12 @@ export default function DividendTab({
             monthlyEstimate={monthlyEstimateByMonth[selectedMonth - 1]}
             monthTickerActualMap={monthTickerActualMap}
           />
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">
-              월별 균등화 추천
-            </h3>
-            <MonthlyOptimizationCard />
-          </div>
+          <Link
+            to="/invest-plan?tab=배당 계획"
+            className="flex items-center min-h-[44px] text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            배당이 적은 달을 채우려면 계획 › 배당 계획의 월별 균등화 추천을 확인하세요 →
+          </Link>
         </div>
       )}
     </div>

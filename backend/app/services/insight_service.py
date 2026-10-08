@@ -285,7 +285,7 @@ async def _check_tax_loss_harvest(
                 "세금 상세 페이지에서 확인하세요."
             ),
             action_label="세금 계획 보기",
-            action_url="/assets?tab=투자현황&portfolioTab=세금",
+            action_url="/invest-plan?tab=절세",
             metric_value=round(tax_saved, 0),
         )
     ]

@@ -19,7 +19,7 @@ export default function YearlyAchievementTable({ data, flat }: Props) {
 
   return (
     <AchievementTable
-      title="연별 계획 대비 달성율"
+      title="연별 계획 대비 달성률"
       subtitle="이론값(복리 계획 곡선) 대비 실제 자산 비율입니다"
       emptyTitle="스냅샷 데이터가 없습니다."
       projectedLabel="이론 연말값"

@@ -599,7 +599,7 @@ describe("RebalancingHistoryTab", () => {
     await waitFor(() => expect(mockApprovePlanLeg).toHaveBeenCalledWith("plan-1", "leg-1"));
   });
 
-  it("cancels a pending buy leg immediately without a confirm modal", async () => {
+  it("cancels a pending buy leg only after confirming", async () => {
     mockFetchRecentPlanLegs.mockResolvedValue([buyLeg]);
     mockCancelPlanLeg.mockResolvedValue({
       status: "CANCELED",
@@ -614,7 +614,11 @@ describe("RebalancingHistoryTab", () => {
     const cancelButton = await screen.findByText("매수 취소");
     fireEvent.click(cancelButton);
 
-    expect(screen.queryByRole("dialog")).toBeNull();
+    // 실자금 계획 취소는 확인 모달을 거친다 — 모달이 뜨기만 해서는 호출되지 않는다
+    expect(await screen.findByRole("dialog")).toBeDefined();
+    expect(mockCancelPlanLeg).not.toHaveBeenCalled();
+    const confirmButtons = screen.getAllByRole("button", { name: "매수 취소" });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]);
     await waitFor(() => expect(mockCancelPlanLeg).toHaveBeenCalledWith("plan-1", "leg-1"));
   });
 });

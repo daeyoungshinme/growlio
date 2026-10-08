@@ -54,12 +54,6 @@ vi.mock("../components/portfolio/TreemapChart", () => ({
 vi.mock("../components/portfolio/AllocationCard", () => ({
   default: () => <div data-testid="allocation-card">AllocationCard</div>,
 }));
-vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({
-  default: () => <div data-testid="tax-optimization">TaxOptimizationCard</div>,
-}));
-vi.mock("../components/portfolio-analysis/TaxLimitsSection", () => ({
-  default: () => <div data-testid="tax-limits-section">TaxLimitsSection</div>,
-}));
 
 vi.mock("@/components/assets/StockHoldingsTable", () => ({
   default: () => <div data-testid="stock-holdings-table">StockHoldingsTable</div>,
@@ -238,35 +232,6 @@ describe("PortfolioPage", () => {
     renderPortfolio("?portfolioTab=배당");
     await waitFor(() => {
       expect(screen.getByTestId("dividend-tab")).toBeInTheDocument();
-    });
-  });
-
-  it("'세금' 탭을 선택하면 기본으로 TaxLimitsSection(한도 현황)이 렌더링된다", async () => {
-    vi.mocked(api.get).mockImplementation((url: string) => {
-      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
-      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
-      return Promise.resolve({ data: {} });
-    });
-    renderPortfolio("?portfolioTab=세금");
-    await waitFor(() => {
-      expect(screen.getByTestId("tax-limits-section")).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId("tax-optimization")).not.toBeInTheDocument();
-  });
-
-  it("'세금' 탭에서 '세금 추정' 서브탭을 클릭하면 TaxOptimizationCard가 렌더링된다", async () => {
-    vi.mocked(api.get).mockImplementation((url: string) => {
-      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
-      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
-      return Promise.resolve({ data: {} });
-    });
-    renderPortfolio("?portfolioTab=세금");
-    await waitFor(() => {
-      expect(screen.getByTestId("tax-limits-section")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("tab", { name: "세금 추정" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("tax-optimization")).toBeInTheDocument();
     });
   });
 

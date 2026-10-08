@@ -66,8 +66,11 @@ function SettingsLinkRow({
       className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
     >
       {icon}
-      <span className="flex-1 min-w-0 truncate">{label}</span>
-      <span className={`text-xs shrink-0 ${statusClassName ?? "text-gray-400 dark:text-gray-500"}`}>
+      <span className="flex-1 min-w-0 leading-snug break-keep">{label}</span>
+      <span
+        title={status}
+        className={`text-xs min-w-0 max-w-[50%] truncate text-right ${statusClassName ?? "text-gray-400 dark:text-gray-500"}`}
+      >
         {status}
       </span>
       <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 shrink-0" />
@@ -206,7 +209,7 @@ export default function SettingsPage() {
         <SettingsLinkRow
           to="/assets?tab=계좌관리"
           icon={<Landmark size={18} className="text-gray-400 dark:text-gray-500" />}
-          label="계좌 연동 (KIS/키움/토스)"
+          label="계좌 연동 (KIS·키움 / 토스 조회 전용)"
           status={accountLinkSummary}
           statusClassName={
             accountLinked
@@ -268,7 +271,7 @@ export default function SettingsPage() {
           <button
             onClick={saveDart}
             disabled={saving === "dart"}
-            className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="min-h-[44px] bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {saving === "dart" ? "저장 중..." : "저장"}
           </button>
@@ -276,7 +279,7 @@ export default function SettingsPage() {
             <button
               onClick={deleteDart}
               disabled={saving === "dart-delete"}
-              className="px-5 py-2 text-sm border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
+              className="min-h-[44px] px-5 py-2 text-sm border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
             >
               {saving === "dart-delete" ? "삭제 중..." : "삭제"}
             </button>

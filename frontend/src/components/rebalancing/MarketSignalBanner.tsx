@@ -8,6 +8,7 @@ import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 import SignalRow from "./SignalRow";
 import InflationIndicatorList from "./InflationIndicatorList";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 
 interface Props {
   signal: MarketSignalResponse;
@@ -62,7 +63,7 @@ export default function MarketSignalBanner({ signal, inflation }: Props) {
         </span>
         <button
           onClick={() => setIsOpen((v) => !v)}
-          className="flex items-center gap-0.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 shrink-0 transition-colors ml-1"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-0.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 shrink-0 transition-colors ml-1`}
           aria-expanded={isOpen}
           aria-label="시장 신호 상세 보기"
         >
@@ -83,7 +84,7 @@ export default function MarketSignalBanner({ signal, inflation }: Props) {
 
           <button
             onClick={() => setMacroOpen((v) => !v)}
-            className="flex items-center gap-0.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            className={`${TOUCH_TARGET_ROW} gap-0.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors`}
             aria-expanded={macroOpen}
           >
             매크로 지표 {tierRest.length}개 {macroOpen ? "접기" : "더보기"}

@@ -1,9 +1,10 @@
 import { lazy, Suspense, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import PageLoader from "@/components/common/PageLoader";
 import Tabs from "@/components/common/Tabs";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { ASSETS_TOP_TABS, type AssetsTopTab } from "@/constants/tabs";
+import { legacyAssetsTaxRedirect } from "@/utils/legacyTabRedirect";
 
 const AssetManagementContent = lazy(() => import("./AssetManagementPage"));
 const PortfolioContent = lazy(() => import("./PortfolioPage"));
@@ -28,6 +29,10 @@ export default function AssetsPage() {
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, ASSETS_TOP_TABS, activeTab, handleTabChange);
+
+  // 세금은 계획 › 절세로 이동(plans/50 M1) — 옛 링크는 그쪽으로 보낸다
+  const taxRedirect = legacyAssetsTaxRedirect(searchParams);
+  if (taxRedirect) return <Navigate to={taxRedirect} replace />;
 
   return (
     <div>

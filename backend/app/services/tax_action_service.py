@@ -80,7 +80,7 @@ _MEDIUM_PRIORITY_BENEFIT_KRW = 100_000
 _PRIORITY_ORDER: dict[ActionPriority, int] = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
 _LINK_ACCOUNTS = "/assets?tab=계좌관리"
-_LINK_TAX_ESTIMATE = "/assets?tab=투자현황&portfolioTab=세금&taxTab=세금 추정"
+_LINK_TAX_ESTIMATE = "/invest-plan?tab=절세&taxTab=세금 추정"
 
 _ACTION_PLAN_NOTE = (
     "입출금·배당 내역(수기 입력 포함)과 최신 스냅샷 기준 참고용 추정치입니다. "

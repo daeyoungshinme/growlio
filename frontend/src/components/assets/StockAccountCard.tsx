@@ -16,7 +16,7 @@ import {
 } from "@/api/assets";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useHaptic } from "@/hooks/useHaptic";
-import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime } from "@/utils/format";
+import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime, fmtKrwShort } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { isSyncableAccount } from "@/utils/accounts";
@@ -195,15 +195,21 @@ export default function StockAccountCard({
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-3 gap-x-4 gap-y-2">
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
-            <p className="text-xs font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
-              {fmtKrw(stats!.amount_krw)}
+            <p
+              className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5 truncate"
+              title={fmtKrw(stats!.amount_krw)}
+            >
+              {fmtKrwShort(stats!.amount_krw)}원
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
-            <p className={`text-xs font-semibold mt-0.5 ${pnlColor(pnl)}`}>
+            <p
+              className={`text-sm font-semibold mt-0.5 truncate ${pnlColor(pnl)}`}
+              title={fmtKrw(pnl)}
+            >
               {pnl >= 0 ? "+" : ""}
-              {fmtKrw(pnl)}
+              {fmtKrwShort(pnl)}원
             </p>
             <p className={`text-xs font-medium ${pnlColor(pnl)}`}>({fmtPct(ret)})</p>
           </div>
@@ -219,8 +225,11 @@ export default function StockAccountCard({
                   const total = krw + usdAsKrw;
                   return (
                     <>
-                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                        {fmtKrw(hasUsd && usdRate ? total : krw)}
+                      <p
+                        className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate"
+                        title={fmtKrw(hasUsd && usdRate ? total : krw)}
+                      >
+                        {fmtKrwShort(hasUsd && usdRate ? total : krw)}원
                       </p>
                       {hasUsd && (
                         <p className="text-xs text-gray-400 dark:text-gray-500">
@@ -263,7 +272,7 @@ export default function StockAccountCard({
             type="button"
             onClick={() => setShowMoreStats((v) => !v)}
             aria-expanded={showMoreStats}
-            className="col-span-3 flex items-center justify-center gap-1 py-1 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+            className="col-span-3 flex items-center justify-center gap-1 min-h-[44px] text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
           >
             {showMoreStats ? "접기" : "누적 입금·배당 보기"}
             <ChevronDown

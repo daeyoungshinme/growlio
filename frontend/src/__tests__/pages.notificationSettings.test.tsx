@@ -118,7 +118,7 @@ describe("NotificationSettingsPage", () => {
     });
     expect(screen.getByText("설정").closest("a")).toHaveAttribute("href", "/settings");
     expect(screen.getByTestId("exchange-rate-alert-section")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "주가 알림" }));
+    fireEvent.click(screen.getByRole("tab", { name: "주가 알림" }));
     await waitFor(() => {
       expect(screen.getByTestId("stock-price-alert-section")).toBeInTheDocument();
     });
@@ -200,7 +200,7 @@ describe("NotificationSettingsPage", () => {
   it("알림 이력이 없을 때 '발송된 알림 이력이 없습니다' 텍스트를 표시한다", async () => {
     vi.mocked(fetchAlertHistory).mockResolvedValue([]);
     renderNotificationSettings();
-    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
+    fireEvent.click(screen.getByRole("tab", { name: "발송 이력" }));
     await waitFor(() => {
       expect(screen.getByText("발송된 알림 이력이 없습니다.")).toBeInTheDocument();
     });
@@ -223,7 +223,7 @@ describe("NotificationSettingsPage", () => {
     ];
     vi.mocked(fetchAlertHistory).mockResolvedValue(historyItems as never);
     renderNotificationSettings();
-    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
+    fireEvent.click(screen.getByRole("tab", { name: "발송 이력" }));
     await waitFor(() => {
       expect(screen.getByText("환율이 1300원 이하로 떨어졌습니다")).toBeInTheDocument();
     });
@@ -242,7 +242,7 @@ describe("NotificationSettingsPage", () => {
     ];
     vi.mocked(fetchAlertHistory).mockResolvedValue(historyItems as never);
     renderNotificationSettings();
-    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
+    fireEvent.click(screen.getByRole("tab", { name: "발송 이력" }));
     await waitFor(() => {
       expect(screen.getByText("UNKNOWN_TYPE")).toBeInTheDocument();
     });

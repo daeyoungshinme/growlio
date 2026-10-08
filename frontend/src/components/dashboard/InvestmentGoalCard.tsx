@@ -7,6 +7,7 @@ import SkeletonCard from "@/components/common/SkeletonCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 
 function achievementColor(pct: number): string {
   if (pct >= 80) return "text-green-600 dark:text-green-400";
@@ -27,7 +28,7 @@ interface GapBadgeOptions {
   behindLabel: string;
 }
 
-/** "전체 진행율" 헤드라인 — 모바일 헤더/데스크탑 3열 그리드 양쪽에서 값·서식이 동일해야 하므로
+/** "전체 진행률" 헤드라인 — 모바일 헤더/데스크탑 3열 그리드 양쪽에서 값·서식이 동일해야 하므로
  * 텍스트 크기만 파라미터화해 하나로 공유한다 (예전엔 sm:hidden/hidden sm:block 두 벌로 복붙되어 있었음). */
 function ProgressHeadline({
   size,
@@ -47,7 +48,7 @@ function ProgressHeadline({
       <p
         className={`text-xs text-gray-400 dark:text-gray-500 mb-0.5 ${size === "lg" ? "font-medium" : ""}`}
       >
-        전체 진행율
+        전체 진행률
       </p>
       <p
         className={`font-bold text-gray-900 dark:text-gray-50 ${size === "lg" ? "text-lg" : "text-base"}`}
@@ -91,6 +92,10 @@ function gapBadge(gap: number, { unit, decimals = 1, aheadLabel, behindLabel }: 
 
 export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) {
   const [dcaDetailOpen, toggleDcaDetail] = useCollapsible(false, "growlio:goalCard:dcaDetailOpen");
+  const [showAllGoals, toggleShowAllGoals] = useCollapsible(
+    false,
+    "growlio:goalCard:showAllGoalsMobile",
+  );
 
   if (isLoading) {
     return <SkeletonCard rows={4} />;
@@ -269,6 +274,20 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
     },
   ];
 
+  // 모바일은 목표 진행률의 권위 표면이 계획 탭이므로(plans/50 M7) "가장 뒤처진 목표" 1개만 기본 노출한다.
+  // 점수가 낮을수록 뒤처짐 — 달성률형은 %, 수익률·은퇴는 미달/지연이면 50으로 본다. 100 이상이면 순항.
+  const lagScore: Record<string, number | null> = {
+    deposit: hasDepositGoal ? (data?.deposit_achievement_pct ?? null) : null,
+    dividend: hasDividendGoal ? (data?.dividend_goal_achievement_pct ?? null) : null,
+    return: canShowReturnGap ? (data!.return_goal_gap_pct! < 0 ? 50 : 100) : null,
+    retirement: retirementGapYears != null ? (retirementGapYears < 0 ? 50 : 100) : null,
+  };
+  const laggingKey =
+    Object.entries(lagScore)
+      .filter((e): e is [string, number] => e[1] != null && e[1] < 100)
+      .sort((a, b) => a[1] - b[1])[0]?.[0] ?? null;
+  const hiddenOnMobileCount = goalChips.filter((c) => c.key !== laggingKey).length;
+
   if (
     !isLoading &&
     !hasDepositGoal &&
@@ -288,7 +307,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           </h2>
           <Link
             to="/invest-plan"
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
           >
             목표 설정
           </Link>
@@ -311,119 +330,152 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         </h2>
         <Link
           to="/invest-plan"
-          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
         >
           자세히 보기
         </Link>
       </div>
 
-      {/* 목표 항목 — 4개 항목 항상 표시, 미설정은 안내 CTA로 대체. 파티션(hairline)으로만 구분 */}
-      <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700">
-        {goalChips.map((chip) => (
-          <div key={chip.key} className="min-w-0 bg-white dark:bg-gray-900 p-2">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 truncate">{chip.label}</p>
-            {chip.isSet ? (
-              <>
-                {chip.content}
-                {chip.barPct != null && (
-                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
-                    <div
-                      className={`h-full rounded-full ${chip.barColorClass}`}
-                      style={{ width: `${clampPct(chip.barPct)}%` }}
-                    />
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-gray-300 dark:text-gray-600">미설정</p>
-                <Link
-                  to={chip.setupHref}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  설정하기
-                </Link>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* 모바일 DCA 달성 전망 — 헤드라인(진행율+금액)은 항상 노출, 예상일/배지/진행바는 접기 뒤로 */}
-      <div className="sm:hidden border-t border-gray-100 dark:border-gray-700 pt-1.5 mt-1.5">
-        {currentProgressPct != null || timeline ? (
-          <>
-            <ProgressHeadline
-              size="sm"
-              currentProgressPct={currentProgressPct}
-              goalAmountDisplay={goalAmountDisplay}
-              goalGapAmount={goalGapAmount}
-              hasData={data != null}
-            />
-            <CollapsibleSection
-              isOpen={dcaDetailOpen}
-              onToggle={toggleDcaDetail}
-              label="달성 예상일 · 진행 상세"
-              buttonClassName="mt-2 w-full flex items-center justify-between py-1.5 text-xs text-gray-400 dark:text-gray-500 font-medium"
+      <div className="flex flex-col">
+        {/* 목표 항목 — 데스크탑은 4개 항상 표시(미설정은 안내 CTA). 모바일은 가장 뒤처진 목표만 기본 노출 */}
+        <div
+          className={`order-2 sm:order-1 grid gap-px bg-gray-100 dark:bg-gray-700 ${
+            showAllGoals ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2"
+          }`}
+        >
+          {goalChips.map((chip) => (
+            <div
+              key={chip.key}
+              className={`min-w-0 bg-white dark:bg-gray-900 p-2 ${
+                showAllGoals || chip.key === laggingKey ? "" : "hidden sm:block"
+              }`}
             >
-              <div className="flex items-end justify-between">
-                <p className="text-xs text-gray-400 dark:text-gray-500">실제 달성 예상</p>
-                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                  {timeline?.actual_expected_goal_date
-                    ? fmtMonth(timeline.actual_expected_goal_date)
-                    : timeline?.expected_goal_date
-                      ? fmtMonth(timeline.expected_goal_date)
-                      : "—"}
+              {chip.key === laggingKey && !showAllGoals && (
+                <p className="sm:hidden text-xs font-medium text-amber-600 dark:text-amber-400 mb-0.5">
+                  가장 뒤처진 목표
                 </p>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                {timeline?.lead_lag_months != null && timeline.lead_lag_months !== 0 ? (
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      timeline.lead_lag_months > 0
-                        ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
-                        : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-                    }`}
-                  >
-                    {timeline.lead_lag_months > 0 ? (
-                      <>
-                        <TrendingUp size={10} />
-                        {timeline.lead_lag_months}개월 앞서
-                      </>
-                    ) : (
-                      <>
-                        <TrendingDown size={10} />
-                        {Math.abs(timeline.lead_lag_months)}개월 지연
-                      </>
-                    )}
-                  </span>
-                ) : (
-                  <span />
-                )}
-                {timeline?.expected_goal_date &&
-                  timeline?.lead_lag_months != null &&
-                  timeline.lead_lag_months !== 0 && (
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                      계획: {fmtMonth(timeline.expected_goal_date)}
-                    </span>
+              )}
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 truncate">
+                {chip.label}
+              </p>
+              {chip.isSet ? (
+                <>
+                  {chip.content}
+                  {chip.barPct != null && (
+                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
+                      <div
+                        className={`h-full rounded-full ${chip.barColorClass}`}
+                        style={{ width: `${clampPct(chip.barPct)}%` }}
+                      />
+                    </div>
                   )}
-              </div>
-              <div className="h-2.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mt-1">
-                <div
-                  className="h-full bg-blue-500 rounded-full transition-all"
-                  style={{ width: `${Math.min(currentProgressPct ?? 0, 100)}%` }}
-                />
-              </div>
-            </CollapsibleSection>
-          </>
-        ) : (
-          <Link
-            to="/invest-plan"
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-300 dark:text-gray-600">미설정</p>
+                  <Link
+                    to={chip.setupHref}
+                    className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
+                  >
+                    설정하기
+                  </Link>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {hiddenOnMobileCount > 0 && (
+          <button
+            type="button"
+            onClick={toggleShowAllGoals}
+            aria-expanded={showAllGoals}
+            className={`sm:hidden order-3 ${TOUCH_TARGET_ROW} w-full justify-center text-xs font-medium text-gray-500 dark:text-gray-400`}
           >
-            DCA 투자 계획 설정하기 →
-          </Link>
+            {showAllGoals
+              ? "접기"
+              : laggingKey
+                ? `목표 ${hiddenOnMobileCount}개 더 보기`
+                : `모든 목표 순항 중 · 목표 ${hiddenOnMobileCount}개 보기`}
+          </button>
         )}
+
+        {/* 모바일 DCA 달성 전망 — 헤드라인(진행률+금액)은 항상 맨 위, 예상일/배지/진행바는 접기 뒤로 */}
+        <div className="sm:hidden order-1 pb-1.5 mb-1.5 border-b border-gray-100 dark:border-gray-700">
+          {currentProgressPct != null || timeline ? (
+            <>
+              <ProgressHeadline
+                size="sm"
+                currentProgressPct={currentProgressPct}
+                goalAmountDisplay={goalAmountDisplay}
+                goalGapAmount={goalGapAmount}
+                hasData={data != null}
+              />
+              <CollapsibleSection
+                isOpen={dcaDetailOpen}
+                onToggle={toggleDcaDetail}
+                label="달성 예상일 · 진행 상세"
+                buttonClassName="mt-2 w-full flex items-center justify-between py-1.5 text-xs text-gray-400 dark:text-gray-500 font-medium"
+              >
+                <div className="flex items-end justify-between">
+                  <p className="text-xs text-gray-400 dark:text-gray-500">실제 달성 예상</p>
+                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                    {timeline?.actual_expected_goal_date
+                      ? fmtMonth(timeline.actual_expected_goal_date)
+                      : timeline?.expected_goal_date
+                        ? fmtMonth(timeline.expected_goal_date)
+                        : "—"}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  {timeline?.lead_lag_months != null && timeline.lead_lag_months !== 0 ? (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        timeline.lead_lag_months > 0
+                          ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
+                          : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+                      }`}
+                    >
+                      {timeline.lead_lag_months > 0 ? (
+                        <>
+                          <TrendingUp size={10} />
+                          {timeline.lead_lag_months}개월 앞서
+                        </>
+                      ) : (
+                        <>
+                          <TrendingDown size={10} />
+                          {Math.abs(timeline.lead_lag_months)}개월 지연
+                        </>
+                      )}
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+                  {timeline?.expected_goal_date &&
+                    timeline?.lead_lag_months != null &&
+                    timeline.lead_lag_months !== 0 && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        계획: {fmtMonth(timeline.expected_goal_date)}
+                      </span>
+                    )}
+                </div>
+                <div className="h-2.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mt-1">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all"
+                    style={{ width: `${Math.min(currentProgressPct ?? 0, 100)}%` }}
+                  />
+                </div>
+              </CollapsibleSection>
+            </>
+          ) : (
+            <Link
+              to="/invest-plan"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
+            >
+              DCA 투자 계획 설정하기 →
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* 데스크탑 DCA 달성 전망 — 부각 PRIMARY */}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Archive, Plus } from "lucide-react";
 import type { Challenge, ChallengeCreatePayload } from "@/api/challenges";
 import { fetchAccounts } from "@/api/assets";
 import type { SettingsData } from "@/api/settings";
@@ -13,6 +13,8 @@ import ChallengeFormModal from "@/components/invest/ChallengeFormModal";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import CollapsibleCard from "@/components/common/CollapsibleCard";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
@@ -31,6 +33,8 @@ export default function ChallengeSection({ settings }: Props) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Challenge | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Challenge | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Challenge | null>(null);
+  const [archiveOpen, toggleArchiveOpen] = useCollapsible(false);
 
   const openCreate = () => {
     setEditing(null);
@@ -77,6 +81,13 @@ export default function ChallengeSection({ settings }: Props) {
     );
 
   const list = challenges ?? [];
+  // 보관한 챌린지는 진행 중 목록에서 빼고 접힌 보관함으로 — 예전엔 "보관됨" 배지만 달고 섞여 있었다
+  const activeList = list.filter((c) => c.status !== "ARCHIVED");
+  const archivedList = list.filter((c) => c.status === "ARCHIVED");
+  const handleArchiveToggle = (c: Challenge) => {
+    if (c.status === "ARCHIVED") update.mutate({ id: c.id, payload: { status: "ACTIVE" } });
+    else setArchiveTarget(c);
+  };
 
   return (
     <div className="space-y-4">
@@ -91,7 +102,7 @@ export default function ChallengeSection({ settings }: Props) {
         </button>
       </div>
 
-      {list.length === 0 ? (
+      {activeList.length === 0 ? (
         <div className="card">
           <EmptyState
             title="아직 만든 챌린지가 없어요"
@@ -101,16 +112,38 @@ export default function ChallengeSection({ settings }: Props) {
         </div>
       ) : (
         <div className="space-y-4">
-          {list.map((c) => (
+          {activeList.map((c) => (
             <ChallengeCard
               key={c.id}
               challenge={c}
               onEdit={() => openEdit(c)}
-              onArchive={() => update.mutate({ id: c.id, payload: { status: "ARCHIVED" } })}
+              onArchive={() => handleArchiveToggle(c)}
               onDelete={() => setDeleteTarget(c)}
             />
           ))}
         </div>
+      )}
+
+      {archivedList.length > 0 && (
+        <CollapsibleCard
+          icon={Archive}
+          title={`보관함 (${archivedList.length})`}
+          isOpen={archiveOpen}
+          onToggle={toggleArchiveOpen}
+          collapsedHint="보관한 챌린지는 메뉴에서 보관 해제할 수 있어요"
+        >
+          <div className="space-y-4">
+            {archivedList.map((c) => (
+              <ChallengeCard
+                key={c.id}
+                challenge={c}
+                onEdit={() => openEdit(c)}
+                onArchive={() => handleArchiveToggle(c)}
+                onDelete={() => setDeleteTarget(c)}
+              />
+            ))}
+          </div>
+        </CollapsibleCard>
       )}
 
       {formOpen && (
@@ -121,6 +154,19 @@ export default function ChallengeSection({ settings }: Props) {
           submitting={create.isPending || update.isPending}
           onClose={closeForm}
           onSubmit={handleSubmit}
+        />
+      )}
+
+      {archiveTarget && (
+        <ConfirmModal
+          message={`"${archiveTarget.title}" 챌린지를 보관할까요? 보관함으로 옮겨지고 홈 카드·독려 알림에서 빠져요. 언제든 보관 해제할 수 있어요.`}
+          confirmLabel="보관"
+          danger={false}
+          onConfirm={() => {
+            update.mutate({ id: archiveTarget.id, payload: { status: "ARCHIVED" } });
+            setArchiveTarget(null);
+          }}
+          onCancel={() => setArchiveTarget(null)}
         />
       )}
 

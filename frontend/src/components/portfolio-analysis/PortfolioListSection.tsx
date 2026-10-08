@@ -395,7 +395,7 @@ export default function PortfolioListSection({
             </p>
           </div>
           <div className="flex flex-col gap-1.5 text-left">
-            {(["① 종목·비중 입력", "② 리밸런싱 분석 확인", "③ 이메일 알림 설정"] as const).map(
+            {(["① 종목·비중 입력", "② 리밸런싱 분석 확인", "③ 자동화 설정"] as const).map(
               (step) => (
                 <div
                   key={step}

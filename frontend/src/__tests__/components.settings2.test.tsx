@@ -339,7 +339,7 @@ describe("RebalancingAlertSummaryCard", () => {
     vi.mocked(fetchRebalancingAlerts).mockResolvedValueOnce([mockAlert({ mode: "AUTO" })]);
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([mockPortfolio()]);
     renderCard();
-    expect(await screen.findByText(/AUTO 1개/)).toBeDefined();
+    expect(await screen.findByText(/자동 실행 1개/)).toBeDefined();
   });
 
   it("links to the rebalancing portfolio tab", async () => {

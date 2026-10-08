@@ -404,7 +404,7 @@ describe("AssetManagementPage", () => {
     });
   });
 
-  it("기간별 매수 탭에는 증권계좌 목록(계좌 추가·빈 상태)이 섞이지 않는다", async () => {
+  it("옛 기간별 매수 링크는 내역 › 매수 내역으로 열리고 증권계좌 목록이 섞이지 않는다", async () => {
     renderWithProviders(
       <MemoryRouter initialEntries={["/?atab=기간별 매수"]}>
         <AssetManagementPage />

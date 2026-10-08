@@ -7,6 +7,7 @@ import { useTaxLimitsSummary } from "@/hooks/useTaxLimitsSummary";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import TaxLimitsBanner from "@/components/dashboard/TaxLimitsBanner";
 import type { PortfolioOverview } from "@/types";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   overview: PortfolioOverview | undefined;
@@ -44,7 +45,7 @@ export default function InvestmentSnapshotCard({ overview }: Props) {
       headerRight={
         <Link
           to="/assets?tab=투자현황"
-          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
         >
           자세히 보기
         </Link>
@@ -95,7 +96,7 @@ export default function InvestmentSnapshotCard({ overview }: Props) {
         </div>
       </div>
 
-      {/* 세금 한도 요약 (ISA 만기/연금 공제한도/예상세금) — 니치 정보라 하단 배치, 상세는 자산탭 세금 서브탭 참고 */}
+      {/* 세금 한도 요약 (ISA 만기/연금 공제한도/예상세금) — 니치 정보라 하단 배치, 상세는 계획 › 절세 탭 참고 */}
       {(taxParts.length > 0 || taxWarningText) && (
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
           <TaxLimitsBanner overview={overview} />

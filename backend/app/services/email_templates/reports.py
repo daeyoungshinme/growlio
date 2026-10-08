@@ -179,7 +179,7 @@ def account_deletion_template() -> tuple[str, str]:
 def year_end_tax_reminder_template(content: Mapping[str, Any]) -> tuple[str, str]:
     """11~12월 매주 월요일 발송되는 연말 절세 리마인더 이메일.
 
-    content는 tax_reminder_service.build_reminder_content()의 반환값(TaxReminderContent) — 앱 세금 탭의
+    content는 tax_reminder_service.build_reminder_content()의 반환값(TaxReminderContent) — 앱 계획 › 절세 탭의
     절세 액션 플랜(tax_action_service)과 같은 액션 목록이다.
     """
     subject = "[Growlio] 연말 절세 리마인더 — 지금 활용할 수 있는 절세 방법"
@@ -215,7 +215,7 @@ def year_end_tax_reminder_template(content: Mapping[str, Any]) -> tuple[str, str
         "#7c3aed",
         sections,
         "이 알림은 11~12월 매주 월요일 09:00 KST에 발송됩니다.<br>"
-        "Growlio 앱 자산 &gt; 투자현황 &gt; 세금 탭의 절세 액션 플랜에서 전체 목록을 확인하세요.<br>"
+        "Growlio 앱 계획 &gt; 절세 탭의 절세 액션 플랜에서 전체 목록을 확인하세요.<br>"
         "매매 관련 항목은 정보 제공 목적이며 투자 권유가 아닙니다.<br>"
         "알림 설정은 설정 &gt; 알림 설정에서 변경하세요.",
     )

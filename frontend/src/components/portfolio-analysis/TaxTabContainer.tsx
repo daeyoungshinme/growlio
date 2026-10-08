@@ -1,5 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { fetchAccounts } from "@/api/assets";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { SELECT_SM } from "@/constants/inputStyles";
+import { isStockAccount } from "@/utils/accounts";
 import Tabs from "@/components/common/Tabs";
 import TaxLimitsSection from "@/components/portfolio-analysis/TaxLimitsSection";
 import TaxOptimizationCard from "@/components/portfolio-analysis/TaxOptimizationCard";
@@ -7,28 +13,26 @@ import TaxOptimizationCard from "@/components/portfolio-analysis/TaxOptimization
 const TAX_TABS = ["한도 현황", "세금 추정"] as const;
 type TaxTab = (typeof TAX_TABS)[number];
 
-interface Props {
-  /** 특정 계좌만 필터링해 조회 (미지정 시 전체 계좌 통합) — "세금 추정" 탭에만 적용된다. */
-  accountId?: string | null;
-}
-
-/** 자산탭 세금 서브탭 — "한도 현황"(ISA 만기·연금 공제한도)과 "세금 추정"(배당세·해외 양도세 +
- * 절세 플래너/금투세 시뮬레이션)을 탭으로 묶는다. 기존에는 두 카드가 각각 접기 카드로 쌓여 3중
- * 중첩(세금 서브탭 → 카드 펼치기 → 카드 내부 섹션 펼치기)이었던 것을 탭 전환 1단계로 단순화
- * (2026-07-25 세금정보 3곳→2곳 통합). Home 배너(`TaxLimitsBanner`)의 `?portfolioTab=세금` 딥링크는
- * 기본 탭("한도 현황")으로 랜딩해 배너가 요약하는 내용과 자연스럽게 일치한다. */
-export default function TaxTabContainer({ accountId }: Props) {
+/** 계획 › 절세 탭 — "한도 현황"(절세 액션 플랜·ISA 만기·연금 공제한도)과 "세금 추정"(배당세·해외 양도세 +
+ * 절세 플래너/금투세 시뮬레이션)을 탭으로 묶는다. 2026-10-08(plans/50 M1) 자산 › 투자현황 › 세금에서 이동 —
+ * 요구사항상 "절세 계획"이라 계획 탭이 제자리이고, 자산 탭 중첩이 한 단 준다. 옛 링크(`?portfolioTab=세금`)는
+ * `AssetsPage`가 이 탭으로 리다이렉트한다(`utils/legacyTabRedirect`).
+ *
+ * "세금 추정"의 계좌 필터는 예전엔 투자현황 상단 계좌 선택(`?account=`)을 따랐으나, 이제 자체 선택(`?taxAccount=`)을 갖는다. */
+export default function TaxTabContainer() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTaxTab = searchParams.get("taxTab");
   const taxTab: TaxTab = (TAX_TABS as readonly string[]).includes(rawTaxTab ?? "")
     ? (rawTaxTab as TaxTab)
     : "한도 현황";
+  const accountId = searchParams.get("taxAccount") || null;
 
-  const handleTaxTabChange = useCallback(
-    (next: TaxTab) => {
+  const setParam = useCallback(
+    (key: string, value: string | null) => {
       setSearchParams(
         (prev) => {
-          prev.set("taxTab", next);
+          if (value) prev.set(key, value);
+          else prev.delete(key);
           return prev;
         },
         { replace: true },
@@ -37,11 +41,46 @@ export default function TaxTabContainer({ accountId }: Props) {
     [setSearchParams],
   );
 
+  const { data: accountsList } = useQuery({
+    queryKey: QUERY_KEYS.accounts,
+    queryFn: fetchAccounts,
+    staleTime: STALE_TIME.LONG,
+    enabled: taxTab === "세금 추정",
+  });
+  const stockAccounts = useMemo(
+    () => (accountsList ?? []).filter((a) => isStockAccount(a.asset_type)),
+    [accountsList],
+  );
+
   return (
     <div className="space-y-4">
-      <Tabs tabs={TAX_TABS} activeTab={taxTab} onChange={handleTaxTabChange} variant="pill" />
+      <Tabs
+        tabs={TAX_TABS}
+        activeTab={taxTab}
+        onChange={(next) => setParam("taxTab", next)}
+        variant="underline"
+      />
       {taxTab === "한도 현황" && <TaxLimitsSection />}
-      {taxTab === "세금 추정" && <TaxOptimizationCard accountId={accountId} />}
+      {taxTab === "세금 추정" && (
+        <>
+          {stockAccounts.length > 1 && (
+            <select
+              value={accountId ?? ""}
+              onChange={(e) => setParam("taxAccount", e.target.value || null)}
+              className={`${SELECT_SM} w-full sm:w-auto`}
+              aria-label="세금 추정 계좌 선택"
+            >
+              <option value="">전체 계좌 ({stockAccounts.length}개)</option>
+              {stockAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <TaxOptimizationCard accountId={accountId} />
+        </>
+      )}
     </div>
   );
 }

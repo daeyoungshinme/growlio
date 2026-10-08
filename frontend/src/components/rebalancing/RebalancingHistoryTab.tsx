@@ -14,7 +14,7 @@ import {
   type RebalancingPlanLegSummary,
 } from "@/api/rebalancingPlan";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
@@ -306,6 +306,7 @@ function PendingPlanRow({
 }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const countdown = useCountdownLabel(leg.deadline_at);
   const sideLabel = leg.side === "BUY" ? "매수 대기" : "매도 승인대기";
   const sideColor =
@@ -368,14 +369,14 @@ function PendingPlanRow({
             <button
               onClick={() => setConfirming(true)}
               disabled={isPending}
-              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 disabled:opacity-50`}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 disabled:opacity-50`}
             >
               {leg.side === "BUY" ? "지금 매수 실행" : "매도 실행"}
             </button>
             <button
-              onClick={onCancel}
+              onClick={() => setConfirmingCancel(true)}
               disabled={isPending}
-              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 disabled:opacity-50`}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 text-sm text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 disabled:opacity-50`}
             >
               {leg.side === "BUY" ? "매수 취소" : "매도 거부"}
             </button>
@@ -393,6 +394,17 @@ function PendingPlanRow({
             onApprove();
           }}
           onCancel={() => setConfirming(false)}
+        />
+      )}
+      {confirmingCancel && (
+        <ConfirmModal
+          message={`이 ${sideKrLabel} 계획 ${leg.items.length}건을 ${leg.side === "BUY" ? "취소" : "거부"}하시겠습니까? 다시 실행하려면 새 계획이 생성될 때까지 기다려야 합니다.`}
+          confirmLabel={leg.side === "BUY" ? "매수 취소" : "매도 거부"}
+          onConfirm={() => {
+            setConfirmingCancel(false);
+            onCancel();
+          }}
+          onCancel={() => setConfirmingCancel(false)}
         />
       )}
     </div>

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from "recharts";
-import { ArrowRight, Settings2, TrendingUp } from "lucide-react";
+import { ArrowRight, CalendarRange, Settings2, TrendingUp } from "lucide-react";
 import { fetchDividendPlan } from "@/api/invest";
 import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
 import { fetchSettings } from "@/api/settings";
@@ -14,6 +14,9 @@ import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
 import { MONTH_LABELS } from "@/utils/dividendUtils";
+import { useCollapsible } from "@/hooks/useCollapsible";
+import CollapsibleCard from "@/components/common/CollapsibleCard";
+import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
 
 interface Props {
   onOpenSettings: () => void;
@@ -42,6 +45,11 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
   });
   const addSuggestedMutation = useAddSuggestedCandidates(
     settingsData?.goal_candidate_tickers ?? [],
+  );
+  // 월별 균등화 추천은 실적(자산 › 배당)이 아니라 계획 행동이라 여기 둔다. 접힌 동안엔 조회하지 않는다.
+  const [optimizationOpen, toggleOptimization] = useCollapsible(
+    false,
+    "growlio:dividendPlan:monthlyOptimizationOpen",
   );
 
   if (isLoading) return <SkeletonCard rows={5} height="h-5" />;
@@ -464,6 +472,16 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
           </div>
         </div>
       )}
+
+      <CollapsibleCard
+        icon={CalendarRange}
+        title="월별 균등화 추천"
+        isOpen={optimizationOpen}
+        onToggle={toggleOptimization}
+        collapsedHint="배당이 적은 달을 채워줄 종목 조합을 추천해요"
+      >
+        <MonthlyOptimizationCard />
+      </CollapsibleCard>
     </div>
   );
 }

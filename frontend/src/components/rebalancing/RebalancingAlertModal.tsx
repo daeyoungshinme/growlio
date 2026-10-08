@@ -62,8 +62,9 @@ export default function RebalancingAlertModal({
     ? `리밸런싱 자동화 — ${portfolioName} · ${targetAccountName}`
     : `리밸런싱 자동화 — ${portfolioName}`;
 
+  // 입력 섹션이 많아 백드롭 오탭으로 작성 중 설정이 사라지지 않도록 닫기는 X/ESC로만 허용한다.
   return (
-    <Modal title={title} onClose={onClose} size="md" closeOnBackdrop>
+    <Modal title={title} onClose={onClose} size="md">
       <div className="flex-1 overflow-y-auto overscroll-contain">
         {isLoading ? (
           <div className="flex justify-center py-4">

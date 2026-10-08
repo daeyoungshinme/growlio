@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Building2, TrendingUp, Home } from "lucide-react";
@@ -14,10 +14,10 @@ const StockPositionsModal = lazy(() => import("@/components/assets/StockPosition
 const TransactionModal = lazy(() => import("@/components/assets/TransactionModal"));
 const BankAccountModal = lazy(() => import("@/components/assets/BankAccountModal"));
 const StockAccountModal = lazy(() => import("@/components/assets/StockAccountModal"));
-const PeriodPurchasesTab = lazy(() => import("@/components/assets/PeriodPurchasesTab"));
 import StockAccountCard from "@/components/assets/StockAccountCard";
 import StockAccountSummaryCard from "@/components/assets/StockAccountSummaryCard";
-import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
+import AccountHistoryTab from "@/components/assets/AccountHistoryTab";
+import { legacyHistorySegment } from "@/utils/legacyTabRedirect";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import EmptyState from "@/components/common/EmptyState";
@@ -34,7 +34,6 @@ import { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import Tabs from "@/components/common/Tabs";
-import { fmtKrw, fmtPct } from "@/utils/format";
 
 const TABS = ASSET_MANAGEMENT_TABS;
 type Tab = (typeof TABS)[number];
@@ -44,7 +43,24 @@ export default function AssetManagementPage() {
   // 있도록 URL 쿼리로 동기화한다(PortfolioPage의 `portfolioTab` 패턴과 동일).
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("atab");
-  const tab: Tab = TABS.includes(rawTab as Tab) ? (rawTab as Tab) : "은행계좌";
+  // 입출금·배당/기간별 매수는 "내역" 탭 세그먼트로 통합(plans/50 M2) — 옛 링크는 URL을 새 형태로 고쳐 쓴다
+  const legacySegment = legacyHistorySegment(rawTab);
+  useEffect(() => {
+    if (!legacySegment) return;
+    setSearchParams(
+      (prev) => {
+        prev.set("atab", "내역");
+        prev.set("history", legacySegment);
+        return prev;
+      },
+      { replace: true },
+    );
+  }, [legacySegment, setSearchParams]);
+  const tab: Tab = legacySegment
+    ? "내역"
+    : TABS.includes(rawTab as Tab)
+      ? (rawTab as Tab)
+      : "은행계좌";
   const setTab = useCallback(
     (next: Tab) => {
       setSearchParams(
@@ -130,25 +146,6 @@ export default function AssetManagementPage() {
 
   const stockAccountStats = useStockAccountStats(stockAccounts, overview, allTx);
 
-  const assetComposition = useMemo(() => {
-    const allocation = overview?.asset_type_allocation ?? [];
-    const totalKrw = overview?.total_assets_krw ?? 0;
-    const sumFor = (types: string[]) =>
-      allocation
-        .filter((a) => types.includes(a.type ?? ""))
-        .reduce((s, a) => s + (a.amount_krw ?? 0), 0);
-    const stockKrw = sumFor(STOCK_TYPES);
-    const cashKrw = sumFor(BANK_TYPES);
-    const realEstateKrw = sumFor(REAL_ESTATE_TYPES);
-    const pct = (v: number) => (totalKrw > 0 ? (v / totalKrw) * 100 : 0);
-    return {
-      totalKrw,
-      stock: { amount: stockKrw, pct: pct(stockKrw) },
-      cash: { amount: cashKrw, pct: pct(cashKrw) },
-      realEstate: { amount: realEstateKrw, pct: pct(realEstateKrw) },
-    };
-  }, [overview]);
-
   if (error)
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -164,62 +161,11 @@ export default function AssetManagementPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      {assetComposition.totalKrw > 0 && (
-        <div className="card mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산 구성</p>
-            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              {fmtKrw(assetComposition.totalKrw)}
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-x-4 gap-y-2">
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500">주식</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
-                {fmtPct(assetComposition.stock.pct)}
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                {fmtKrw(assetComposition.stock.amount)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500">현금</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
-                {fmtPct(assetComposition.cash.pct)}
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                {fmtKrw(assetComposition.cash.amount)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500">부동산</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
-                {fmtPct(assetComposition.realEstate.pct)}
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                {fmtKrw(assetComposition.realEstate.amount)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <Tabs
-        tabs={TABS}
-        activeTab={tab}
-        onChange={setTab}
-        variant="pill"
-        className="w-full sm:w-fit mb-6"
-      />
+      <Tabs tabs={TABS} activeTab={tab} onChange={setTab} variant="underline" className="mb-6" />
 
       <div ref={tabContentRef}>
-        {tab === "입출금·배당" && <TransactionHistoryTab accounts={accounts} />}
-
-        {tab === "기간별 매수" && (
-          <Suspense fallback={<SkeletonCard rows={3} />}>
-            <PeriodPurchasesTab accounts={accounts} />
-          </Suspense>
-        )}
+        {/* 옛 링크는 URL을 고쳐 쓴 다음 렌더 — 그 전에 그리면 기본 세그먼트가 한 번 깜빡인다 */}
+        {tab === "내역" && !legacySegment && <AccountHistoryTab accounts={accounts} />}
 
         {tab === "부동산" && (
           <>
@@ -232,7 +178,7 @@ export default function AssetManagementPage() {
               </div>
               <button
                 onClick={() => setShowRealEstateModal(true)}
-                className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors`}
               >
                 <Plus size={16} />
                 부동산 추가
@@ -280,7 +226,7 @@ export default function AssetManagementPage() {
                 onClick={() =>
                   tab === "은행계좌" ? setShowBankModal(true) : setShowStockModal(true)
                 }
-                className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors`}
               >
                 <Plus size={16} />
                 계좌 추가
@@ -318,12 +264,8 @@ export default function AssetManagementPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* 증권계좌 전체 요약 */}
-                <StockAccountSummaryCard
-                  perAccountStats={stockAccountStats}
-                  overview={overview}
-                  usdRate={usdRate}
-                />
+                {/* 증권계좌 합계(누적 입금·배당·예수금) — 평가액은 투자현황이 권위 표면 */}
+                <StockAccountSummaryCard perAccountStats={stockAccountStats} usdRate={usdRate} />
                 {/* 계좌별 카드 */}
                 {stockAccountStats.map(({ account, stats }) => (
                   <StockAccountCard

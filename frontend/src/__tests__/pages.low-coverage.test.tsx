@@ -303,7 +303,7 @@ describe("AssetManagementPage", () => {
     expect(screen.getByText("등록된 은행계좌가 없습니다.")).toBeInTheDocument();
   });
 
-  it("증권계좌 예수금(CASH_STOCK)을 주식이 아닌 현금으로 집계한다", () => {
+  it("계좌관리에는 홈 Hero와 중복되는 전체 자산 구성 카드를 두지 않는다", () => {
     vi.mocked(useAssetManagementData).mockReturnValue({
       accounts: [],
       isLoading: false,
@@ -341,8 +341,7 @@ describe("AssetManagementPage", () => {
 
     renderPage(<AssetManagementPage />);
 
-    expect(screen.getByText("주식").nextElementSibling).toHaveTextContent("+60.00%");
-    expect(screen.getByText("현금").nextElementSibling).toHaveTextContent("+40.00%");
+    expect(screen.queryByText("전체 자산 구성")).toBeNull();
   });
 });
 
@@ -477,7 +476,7 @@ describe("NotificationSettingsPage", () => {
 
   it("알림 발송 이력 섹션이 표시된다", () => {
     renderPage(<NotificationSettingsPage />);
-    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
+    fireEvent.click(screen.getByRole("tab", { name: "발송 이력" }));
     expect(screen.getByText("알림 발송 이력")).toBeInTheDocument();
   });
 });
