@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ListChecks } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchTaxActionPlan, type TaxAction, type TaxActionPriority } from "@/api/tax";
+import { fetchTaxActionPlan, type TaxAction } from "@/api/tax";
 import { updateIncomeBracket, type IncomeBracket } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -11,37 +11,17 @@ import {
   TOUCH_TARGET_MIN_MOBILE_ONLY,
 } from "@/constants/uiSizes";
 import { invalidateIncomeBracketData } from "@/utils/queryInvalidation";
-import { daysUntilYmd, fmtKrw, parseYmd } from "@/utils/format";
+import { fmtKrw } from "@/utils/format";
+import { ACTION_PRIORITY_STYLE, deadlineLabel } from "@/utils/actionPriority";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 
 const COLLAPSED_COUNT = 3;
 
-const PRIORITY_STYLE: Record<TaxActionPriority, { label: string; className: string }> = {
-  HIGH: {
-    label: "우선",
-    className: "bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400",
-  },
-  MEDIUM: {
-    label: "권장",
-    className: "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400",
-  },
-  LOW: {
-    label: "참고",
-    className: "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400",
-  },
-};
-
 const BRACKET_OPTIONS: { value: IncomeBracket; label: string }[] = [
   { value: "UNDER_55M", label: "5,500만원 이하" },
   { value: "OVER_55M", label: "5,500만원 초과" },
 ];
-
-function deadlineLabel(iso: string): string {
-  const { month: m, day: d } = parseYmd(iso);
-  const days = daysUntilYmd(iso);
-  return days >= 0 ? `${m}/${d}까지 (D-${days})` : `${m}/${d} 마감`;
-}
 
 function ActionPlanHeader({ year }: { year?: number }) {
   return (
@@ -55,7 +35,7 @@ function ActionPlanHeader({ year }: { year?: number }) {
 }
 
 function ActionRow({ action }: { action: TaxAction }) {
-  const priority = PRIORITY_STYLE[action.priority];
+  const priority = ACTION_PRIORITY_STYLE[action.priority];
   return (
     <li className="py-3 first:pt-0 last:pb-0">
       <div className="flex items-start gap-2">

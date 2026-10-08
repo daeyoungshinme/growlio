@@ -83,9 +83,9 @@ describe("AutoInvestStatusBanner", () => {
     );
 
     expect(await screen.findByText("정기 적립식 자동매수를 설정해보세요")).toBeInTheDocument();
-    // 포트폴리오가 1개뿐이면 알림 설정 모달까지 바로 연다
-    expect(screen.getByText("설정하기").closest("a")?.getAttribute("href")).toContain(
-      "openAlert=1",
+    // 포트폴리오가 1개뿐이면 정기 적립식 프리셋이 적용된 알림 설정 모달까지 바로 연다 (M6)
+    expect(screen.getByText("자동매수 설정").closest("a")?.getAttribute("href")).toContain(
+      "openAlert=dca",
     );
   });
 

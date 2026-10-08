@@ -1,6 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
+// actionItems(홈 "지금 할 일")는 드리프트·예수금·세금·챌린지·알림 설정을 모두 읽으므로 그 원천 무효화 함수마다 함께 지운다.
+
 /** 계좌 sync 후 — accounts(last_synced_at/last_sync_error·예수금 등 갱신) + portfolio + dashboard + 배당 데이터 + 인사이트 + 드리프트 + 목표 추천 */
 export function invalidateSyncData(qc: QueryClient) {
   return Promise.all([
@@ -23,6 +25,7 @@ export function invalidateSyncData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
     // 목표 역산 추천·후보 중복 점검("보유 중" 표시)이 보유 포지션 기준 — 백엔드 sync도 같은 캐시를 지운다
     qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
 
@@ -48,6 +51,7 @@ export function invalidateAccountData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
 
@@ -73,6 +77,7 @@ export function invalidateTransactionData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
 
@@ -89,6 +94,7 @@ export function invalidateChallengeData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
 
@@ -104,6 +110,7 @@ export function invalidatePortfolioData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingStrategyBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
 
@@ -115,6 +122,7 @@ export function invalidateDcaData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
 
@@ -139,6 +147,7 @@ export function invalidateRebalancingAlertData(qc: QueryClient, portfolioId: str
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlert(portfolioId) }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlertsByAccount(portfolioId) }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
 
@@ -202,5 +211,6 @@ export function invalidateIncomeBracketData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }

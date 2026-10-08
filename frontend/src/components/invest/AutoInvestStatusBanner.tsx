@@ -68,11 +68,12 @@ export default function AutoInvestStatusBanner() {
   const shortfallKrw =
     cashKrw != null ? dcaCashShortfallKrw(cashKrw, settings?.monthly_deposit_amount) : null;
 
-  // 대상 포트폴리오가 하나로 정해지면(DCA 설정된 포트폴리오, 또는 포트폴리오가 1개뿐) openAlert=1로
-  // 알림 설정 모달까지 바로 연다. 여러 개 중 고르는 경우만 목록으로 보낸다.
+  // 대상 포트폴리오가 하나로 정해지면(DCA 설정된 포트폴리오, 또는 포트폴리오가 1개뿐) 알림 설정 모달까지
+  // 바로 연다 — 미설정이면 `openAlert=dca`로 정기 적립식 프리셋 화면에 직행(M6), 설정돼 있으면 편집 화면.
+  // 여러 개 중 고르는 경우만 목록으로 보낸다.
   const targetId = activeEntry?.portfolio.id ?? (portfolios.length === 1 ? portfolios[0].id : null);
   const linkTo = targetId
-    ? `/rebalancing?rtab=포트폴리오&portfolioId=${targetId}&openAlert=1`
+    ? `/rebalancing?rtab=포트폴리오&portfolioId=${targetId}&openAlert=${activeEntry ? "1" : "dca"}`
     : `/rebalancing?rtab=포트폴리오`;
 
   return (
@@ -108,7 +109,7 @@ export default function AutoInvestStatusBanner() {
         to={linkTo}
         className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 hover:underline`}
       >
-        {activeEntry ? "설정 관리" : "설정하기"} <ArrowRight size={11} />
+        {activeEntry ? "설정 관리" : "자동매수 설정"} <ArrowRight size={11} />
       </Link>
     </div>
   );

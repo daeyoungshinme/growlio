@@ -135,3 +135,54 @@ class TestDashboardApi:
         finally:
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
+
+
+class TestActionItemsApi:
+    def test_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/dashboard/action-items")
+        assert resp.status_code == 401
+
+    def test_returns_items_from_service(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.core.database import get_db
+        from app.main import app
+        from app.schemas.action_items import ActionItem
+
+        user = _make_user()
+        db = _make_mock_db()
+
+        async def override_auth():
+            return user
+
+        async def override_db():
+            yield db
+
+        app.dependency_overrides[get_current_user] = override_auth
+        app.dependency_overrides[get_db] = override_db
+        item = ActionItem(
+            id="challenge:this-month",
+            kind="CHALLENGE",
+            priority="MEDIUM",
+            title="이번 달 적립 챌린지 입금 전",
+            detail="아직 입금하지 않은 챌린지 1개",
+            cta_label="챌린지 보기",
+            link="/invest-plan?tab=챌린지",
+            deadline="2026-10-31",
+        )
+        try:
+            with (
+                patch("app.api.v1.dashboard.get_action_items", new=AsyncMock(return_value=[item])) as mock_get,
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get("/api/v1/dashboard/action-items", headers={"Authorization": "Bearer fake"})
+            assert resp.status_code == 200
+            assert resp.json() == [item.model_dump()]
+            assert mock_get.await_args.args[0] == user.id
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)

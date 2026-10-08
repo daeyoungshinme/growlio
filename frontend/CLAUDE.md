@@ -116,11 +116,11 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드. `PortfolioPage`(자산탭 투자현황 › 세금 서브탭)의 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드. 마찬가지로 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/HealthInsuranceRiskCard.tsx`** — 배당소득 기준 건보 피부양자 자격상실 위험 상시 카드(진행률 바 + 초과 시 예상 월 보험료). `TaxLimitsSection`이 계좌 유무와 무관하게 항상 렌더(배당소득은 전체 수령액 기준). `TaxOptimizationCard`의 조건부 경고 배너와 상호 보완.
-- **`components/dashboard/TaxLimitsBanner.tsx`** — `InvestmentSnapshotCard` 안 4번째 하위 섹션으로 임베드되는 세금 한도 요약 행. ISA 임박 만기/한도초과·연금공제 달성률을 한 줄로 + `/assets?tab=투자현황&portfolioTab=세금` 딥링크. 계산은 `useTaxLimitsSummary` 훅 — `InvestmentSnapshotCard`가 헤더 경고 배지·collapsedHint에도 재사용(캐시 공유).
-- **`components/portfolio-analysis/TaxTabContainer.tsx`** — 자산탭 세금 서브탭 진입점(lazy). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`·`TaxOptimizationCard`를 묶음. 탭 상태 `?taxTab=` 영속화. `TaxLimitsBanner` 딥링크는 `taxTab` 미지정 → "한도 현황" 랜딩.
+- **`components/dashboard/ActionItemsCard.tsx`** — 홈 "지금 할 일"(Hero 바로 아래, lazy). `GET /dashboard/action-items`(백엔드 `action_items_service`가 리밸런싱 필요·자동매수 예수금 부족·세금 경고·절세 1순위·챌린지 미입금을 우선순위·마감 순 최대 5건으로 집계)를 행 단위 링크로 렌더. 0건이면 한 줄 안내, 조회 실패 시 렌더 안 함. 세금 한도 요약/경고는 예전엔 `InvestmentSnapshotCard`의 `TaxLimitsBanner`였음(2026-10-08 삭제 — 스냅샷 카드는 주식 3수치만). 우선순위 배지·마감 라벨은 `utils/actionPriority.ts`(`TaxActionPlanCard`와 공용).
+- **`components/portfolio-analysis/TaxTabContainer.tsx`** — 자산탭 세금 서브탭 진입점(lazy). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`·`TaxOptimizationCard`를 묶음. 탭 상태 `?taxTab=` 영속화. `taxTab` 미지정 딥링크는 "한도 현황" 랜딩.
 - **`components/portfolio-analysis/TaxLimitsSection.tsx`** — "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`(계좌 조건부) + `HealthInsuranceRiskCard`(항상)를 감싸는 순수 프레젠테이션. 항상 전체 계좌 기준(`accountId` prop 없음). 항상 렌더 카드가 있어 empty-state 없음.
 - **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드(lazy). 리밸런싱 페이지 **"추천" 서브탭**(진단/추천/포트폴리오/이력, `rtab=추천`) 전용 — 추천 관련 딥링크는 `rtab=추천`, 포트폴리오 생성·관리·실행은 `rtab=포트폴리오`. `openRecOptions=1`이면 옵션 모달을 연 채 마운트. 전체/연령대/기간별 3탭. 적용 대상은 모든 포트폴리오(기준 포트폴리오 우선 선택). 결과 렌더는 `RecommendationResultPanel.tsx`로 통합, 탭별 문구·`useMutation`·전환 상태머신은 이 파일.
-- **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 곳(분석/실행 패널, 진단탭 CTA, 계획탭 배너)은 `portfolioId=<id>&openAlert=1` URL 파라미터로 요청한다. 새 진입점도 모달을 직접 마운트하지 말고 이 파라미터를 쓸 것(2026-09-25 이전엔 호스트가 2개였음).
+- **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 곳(분석/실행 패널, 진단탭 CTA, 계획탭 배너)은 `portfolioId=<id>&openAlert=1` URL 파라미터로 요청한다(`openAlert=dca`는 신규 알림일 때 정기 적립식 자동매수 프리셋 화면으로 바로 연다 — 계획탭 `AutoInvestStatusBanner`의 "자동매수 설정"). 새 진입점도 모달을 직접 마운트하지 말고 이 파라미터를 쓸 것(2026-09-25 이전엔 호스트가 2개였음).
 - **`components/rebalancing/RecommendationResultPanel.tsx`** — 3탭 공유 추천 결과 프레젠테이션(드리프트 배지·`RecommendationWeightList`·`MarketSignalLevelBadge`·`SuggestedCandidatesBlock`·`RecommendationApplySection`). `applySection===null`이면 적용 섹션 생략(현금성 자동 연결 계좌 없을 때).
 - **`components/invest/ChallengeSection.tsx`** — 계획 탭 "챌린지" 서브탭(lazy). `useChallenges`+`useChallengeMutations`, `ChallengeCard` 리스트, `ChallengeFormModal`(생성/편집), `ChallengeMonthGrid`(적립 습관 캘린더). 스트릭 기준은 백엔드가 "월 순입금>0"으로 계산 — 목표액 수정해도 과거 스트릭 불변. `components/dashboard/ChallengeProgressCard.tsx`가 홈에서 진행 중 챌린지 요약(입금 스트릭 우선), `BottomNav`가 `useChallengeNudge`로 계획 탭 아이콘에 빨간 점.
 - **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정 6단계 마법사(자산 확인→금액/시점→월 적립액→결과→투자성향·배당목표→추천 포트폴리오). `GET /invest/goal-feasibility`로 프리셋별 필요 적립액 역산, 6단계에서 `GET /rebalancing/goal-recommendation` → "이 추천으로 포트폴리오 만들기"로 신규 `Portfolio` 생성(계좌 미연결). `InvestPlanPage.tsx`의 플랫 편집 모달(재설정 전용)과 별개. 상태: `useGoalSettings.ts`.
@@ -154,7 +154,6 @@ _공통/입력_
 _세금_
 
 - `useTaxSimulation.ts` — 세금 시뮬레이션 로직 (해외 양도세 계획)
-- `useTaxLimitsSummary.ts` — ISA 만기·연금 공제한도·세금 추정 현황을 한 줄 요약(`parts`/`warningText`)으로 계산. `TaxLimitsBanner.tsx`(본문)와 `InvestmentSnapshotCard.tsx`(헤더 경고 배지·collapsedHint) 양쪽에서 호출
 
 _자산관리/대시보드_
 
@@ -308,6 +307,7 @@ _기타_
 | 리밸런싱 대기 플랜 목록                                            | `["rebalancing-plans"]`                                                                                                     |
 | 리밸런싱 전략                                                      | `["rebalancing-strategy", portfolioId]` — `rebalancingStrategyBase`(`["rebalancing-strategy"]`)는 무효화 프리픽스 전용      |
 | 드리프트 경량 요약 (대시보드)                                      | `["drift-summary"]`                                                                                                         |
+| 홈 "지금 할 일" (행동 신호 집계)                                  | `["action-items"]`                                                                                                          |
 | 세금 추정 요약 (accountId 지정 시 계좌별)                          | `["tax-summary", year, accountId]` — `taxSummaryBase` 무효화 전용                                                           |
 | 해외 포지션 양도세 계획 (accountId 지정 시 계좌별)                 | `["overseas-positions-tax", accountId]` — `overseasPositionsTaxBase` 무효화 전용                                            |
 | ISA 만기 현황                                                      | `["isa-status"]`                                                                                                            |
@@ -426,6 +426,7 @@ _기타_
 - `savingsProjection.ts` — 계획탭 절약 복리 시뮬레이터(월복리 연금 미래가치).
 - `goalFeasibility.ts` — `classifyGoalFeasibility(requiredReturnPct)`: 필요 수익률을 달성 가능성 구간(밴드)으로 분류. `GoalSettingWizard` 사용.
 - `dcaAutoBuy.ts` — `isDcaAutoBuyPreset(alert)`: AUTO·매월·SCHEDULE_ONLY·BUY_ONLY 조합이면 "정기 적립식 자동매수"로 표시 판정.
+- `actionPriority.ts` — 행동 항목 우선순위 배지 스타일(`ACTION_PRIORITY_STYLE`: HIGH 우선/MEDIUM 권장/LOW 참고)·마감 라벨(`deadlineLabel`). `TaxActionPlanCard`·`ActionItemsCard` 공용
 - `notificationAlertGroups.ts` — 알림 설정 페이지의 필드 그룹(`REPORT_ALERT_FIELDS`/`INSTANT_ALERT_FIELDS`).
 
 **배당 유틸리티 (`src/utils/dividendUtils.ts`)**

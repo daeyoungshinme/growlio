@@ -136,22 +136,30 @@ export default function PortfolioManageTab({
 
   // 자동화 설정 모달의 유일한 호스트(U8) — 진단 탭 CTA·계획탭 배너 딥링크(마운트 시)와 아래 분석/실행
   // 패널(PortfolioExecutionTab, 마운트 이후)이 모두 `openAlert=1` URL 파라미터로 이 모달을 연다.
+  // `openAlert=dca`는 같은 모달을 정기 적립식 자동매수 프리셋이 적용된 상태로 연다(계획탭 "자동매수 설정", M6).
   const [searchParams, setSearchParams] = useSearchParams();
+  const openAlertParam = searchParams.get("openAlert");
+  const openAlertRequested = openAlertParam === "1" || openAlertParam === "dca";
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(() =>
-    searchParams.get("openAlert") === "1" && selectedPortfolioId ? selectedPortfolioId : null,
+    openAlertRequested && selectedPortfolioId ? selectedPortfolioId : null,
+  );
+  const [alertInitialPreset, setAlertInitialPreset] = useState<"dca" | undefined>(() =>
+    openAlertParam === "dca" ? "dca" : undefined,
   );
   // 마운트 이후 들어온 요청은 openAlert 파라미터의 false→true 전환으로 감지(렌더 중 파생 상태 갱신 —
   // effect 내 setState 회피). 아래 effect가 파라미터를 지우면 true→false로 돌아가 같은 포트폴리오도 재요청 가능.
-  const openAlertRequested = searchParams.get("openAlert") === "1";
   const [prevOpenAlertRequested, setPrevOpenAlertRequested] = useState(openAlertRequested);
   if (openAlertRequested !== prevOpenAlertRequested) {
     setPrevOpenAlertRequested(openAlertRequested);
     const target = searchParams.get("portfolioId");
-    if (openAlertRequested && target) setAlertModalPortfolioId(target);
+    if (openAlertRequested && target) {
+      setAlertModalPortfolioId(target);
+      setAlertInitialPreset(openAlertParam === "dca" ? "dca" : undefined);
+    }
   }
 
   useEffect(() => {
-    if (searchParams.get("openAlert") !== "1") return;
+    if (!searchParams.has("openAlert")) return;
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -346,7 +354,11 @@ export default function PortfolioManageTab({
               alertScope={alertPortfolio?.alert_scope}
               accountIds={alertPortfolio?.account_ids ?? null}
               accounts={accounts}
-              onClose={() => setAlertModalPortfolioId(null)}
+              initialPreset={alertInitialPreset}
+              onClose={() => {
+                setAlertModalPortfolioId(null);
+                setAlertInitialPreset(undefined);
+              }}
             />
           );
         })()}

@@ -8,7 +8,7 @@ import FormInput from "@/components/common/FormInput";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import { challengeFormSchema } from "@/schemas/challenge";
 import { isStockAccount } from "@/utils/accounts";
-import { fmtKrwPreview } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import { toast } from "@/utils/toast";
 import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -53,10 +53,21 @@ export default function ChallengeFormModal({
   onSubmit,
 }: Props) {
   const isEdit = !!challenge;
+  // "매달 적립"의 단일 출처는 적립 계획의 월 적립액 — 새 DEPOSIT 챌린지는 이 값으로 시작한다(docs/plans/50 M6).
+  // 저장 시점 값으로 고정되며, 이후 적립 계획 금액을 바꿔도 기존 챌린지는 따라가지 않는다.
+  const monthlyDefault =
+    settings?.monthly_deposit_amount && settings.monthly_deposit_amount > 0
+      ? String(settings.monthly_deposit_amount)
+      : "";
   const [form, setForm] = useState<FormState>(() => ({
     title: challenge?.title ?? "",
     challenge_type: challenge?.challenge_type ?? "DEPOSIT",
-    target_amount: challenge?.target_amount != null ? String(challenge.target_amount) : "",
+    target_amount:
+      challenge?.target_amount != null
+        ? String(challenge.target_amount)
+        : isEdit
+          ? ""
+          : monthlyDefault,
     target_pct: challenge?.target_pct != null ? String(challenge.target_pct) : "",
     target_months: challenge?.target_months != null ? String(challenge.target_months) : "",
     account_id: challenge?.account_id ?? "",
@@ -79,12 +90,34 @@ export default function ChallengeFormModal({
   };
 
   const isDeposit = form.challenge_type === "DEPOSIT";
+  const usingMonthlyDefault =
+    isDeposit && !!monthlyDefault && form.target_amount === monthlyDefault;
+
+  // settings가 모달보다 늦게 도착한 경우 — 사용자가 아직 아무것도 건드리지 않았을 때만 기본값을 채운다
+  // (렌더 중 파생 상태 갱신 — effect 내 setState 회피)
+  const [prevMonthlyDefault, setPrevMonthlyDefault] = useState(monthlyDefault);
+  if (monthlyDefault !== prevMonthlyDefault) {
+    setPrevMonthlyDefault(monthlyDefault);
+    if (!isEdit && !dirty && monthlyDefault && isDeposit && form.target_amount === "") {
+      setForm((f) => ({ ...f, target_amount: monthlyDefault }));
+    }
+  }
+
+  const changeType = (type: ChallengeType) => {
+    // target_amount는 DEPOSIT(월 목표액)·TARGET_VALUE(목표 평가금액)가 같이 쓰는 칸이라,
+    // 유형을 바꿀 때 월 적립 기본값이 평가금액으로 넘어가지 않게 정리한다
+    setForm((f) => {
+      let target = f.target_amount;
+      if (type === "DEPOSIT" && target === "") target = monthlyDefault;
+      else if (type !== "DEPOSIT" && monthlyDefault && target === monthlyDefault) target = "";
+      return { ...f, challenge_type: type, target_amount: target };
+    });
+    setDirty(true);
+  };
 
   const prefillFromGoal = () => {
     if (!settings) return;
-    if (isDeposit && settings.monthly_deposit_amount) {
-      set("target_amount", String(settings.monthly_deposit_amount));
-    } else if (form.challenge_type === "RETURN_PCT" && settings.goal_annual_return_pct) {
+    if (form.challenge_type === "RETURN_PCT" && settings.goal_annual_return_pct) {
       set("target_pct", String(settings.goal_annual_return_pct));
     } else if (form.challenge_type === "TARGET_VALUE" && settings.goal_amount) {
       set("target_amount", String(settings.goal_amount));
@@ -132,7 +165,7 @@ export default function ChallengeFormModal({
                   <button
                     key={o.value}
                     type="button"
-                    onClick={() => set("challenge_type", o.value)}
+                    onClick={() => changeType(o.value)}
                     className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 py-2 text-sm rounded-lg border transition-colors ${
                       form.challenge_type === o.value
                         ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
@@ -155,11 +188,11 @@ export default function ChallengeFormModal({
             error={errors.title}
           />
 
-          {settings && (
+          {settings && !isDeposit && (
             <button
               type="button"
               onClick={prefillFromGoal}
-              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline`}
             >
               적립 계획 목표에서 가져오기
             </button>
@@ -174,10 +207,23 @@ export default function ChallengeFormModal({
                 value={form.target_amount}
                 onChange={(e) => set("target_amount", e.target.value)}
                 placeholder="500000"
-                hint="비워두면 매달 입금만 해도 달성으로 인정돼요"
+                hint={
+                  usingMonthlyDefault
+                    ? `적립 계획의 월 적립액(${fmtKrw(Number(monthlyDefault))})을 쓰고 있어요 — 바꾸면 이 챌린지에만 적용돼요`
+                    : "비워두면 매달 입금만 해도 달성으로 인정돼요"
+                }
                 preview={form.target_amount ? fmtKrwPreview(Number(form.target_amount)) : undefined}
                 error={errors.target_amount}
               />
+              {monthlyDefault && !usingMonthlyDefault && (
+                <button
+                  type="button"
+                  onClick={() => set("target_amount", monthlyDefault)}
+                  className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -mt-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline`}
+                >
+                  적립 계획 금액으로 되돌리기
+                </button>
+              )}
               <FormInput
                 label="연속 목표 개월수 (선택)"
                 type="number"

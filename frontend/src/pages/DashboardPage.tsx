@@ -16,6 +16,8 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 
+const ActionItemsCard = lazy(() => import("../components/dashboard/ActionItemsCard"));
+
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 
 const InvestmentSnapshotCard = lazy(() => import("../components/dashboard/InvestmentSnapshotCard"));
@@ -186,7 +188,14 @@ export default function DashboardPage() {
           />
         </ErrorBoundary>
 
-        {/* 오늘의 진단: 리밸런싱 필요 여부 + 시장 신호 — 가장 액션 지향적인 정보라 Hero 다음으로 승격 */}
+        {/* 지금 할 일: 리밸런싱·자동매수 예수금·세금·챌린지 행동 신호를 우선순위 1장으로 (docs/plans/50 M5) */}
+        <ErrorBoundary variant="section">
+          <Suspense fallback={<SkeletonCard rows={2} />}>
+            <ActionItemsCard />
+          </Suspense>
+        </ErrorBoundary>
+
+        {/* 오늘의 진단: 리밸런싱 필요 여부 + 시장 신호 — 포트폴리오별 이탈 상세 */}
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard rows={2} />}>
             <RebalancingStatusCard
@@ -215,7 +224,7 @@ export default function DashboardPage() {
           )}
         </ErrorBoundary>
 
-        {/* 주식 투자 현황 (평가액·원금·손익 + 세금 한도 요약) */}
+        {/* 주식 투자 현황 (평가액·원금·손익) */}
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard />}>
             <InvestmentSnapshotCard overview={overview} />

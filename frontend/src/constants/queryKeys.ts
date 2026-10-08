@@ -75,6 +75,7 @@ export const QUERY_KEYS = {
   rebalancingStrategy: (portfolioId: string) => ["rebalancing-strategy", portfolioId] as const,
   rebalancingStrategyBase: ["rebalancing-strategy"] as const,
   driftSummary: ["drift-summary"] as const,
+  actionItems: ["action-items"] as const,
   compositeSignalStatus: ["composite-signal-status"] as const,
   goalRecommendationBase: ["goal-recommendation"] as const,
   goalRecommendationOverall: ["goal-recommendation", "overall"] as const,
