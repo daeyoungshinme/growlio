@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
-import { RefreshCw, ChevronDown, ChevronUp, X } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
 import { fetchAccounts, syncAccount, syncAllAccounts } from "@/api/assets";
 import { useSyncStore } from "@/stores/syncStore";
@@ -12,7 +12,6 @@ import DividendTab from "@/components/portfolio/DividendTab";
 import { fmtKrw, fmtKrwPrice } from "@/utils/format";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
-import { useCollapsible } from "@/hooks/useCollapsible";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
@@ -34,10 +33,8 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchPortfolioOverview } from "@/api/portfolios";
 const TaxTabContainer = lazy(() => import("../components/portfolio-analysis/TaxTabContainer"));
 
-const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
-const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
+const AllocationCard = lazy(() => import("../components/portfolio/AllocationCard"));
 
-const CHARTS_OPEN_KEY = "portfolio:chartsOpen";
 const SYNC_BUTTON_CLASS = `${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors`;
 const TABS = PORTFOLIO_TABS;
 type Tab = (typeof TABS)[number];
@@ -92,7 +89,6 @@ export default function PortfolioPage() {
   const dismissFailedAccounts = useSyncStore((s) => s.dismissFailedAccounts);
   const [retryingAccountId, setRetryingAccountId] = useState<string | null>(null);
   const [isSyncingSelected, setIsSyncingSelected] = useState(false);
-  const [chartsOpen, handleChartsToggle] = useCollapsible(true, CHARTS_OPEN_KEY);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, tab, handleTabChange);
@@ -166,31 +162,6 @@ export default function PortfolioPage() {
 
   const stockAccounts = useMemo(
     () => data?.accounts.filter((a) => isPortfolioAccount(a.asset_type)) ?? [],
-    [data],
-  );
-
-  const marketChartData = useMemo(() => {
-    if (!data) return [];
-    const domestic = data.domestic_stock_krw ?? 0;
-    const foreign = data.foreign_stock_krw ?? 0;
-    const total = domestic + foreign;
-    if (total === 0) return [];
-    const items = [];
-    if (domestic > 0)
-      items.push({ name: "국내 주식", value: domestic, pct: (domestic / total) * 100 });
-    if (foreign > 0)
-      items.push({ name: "해외 주식", value: foreign, pct: (foreign / total) * 100 });
-    return items;
-  }, [data]);
-
-  const stockChartData = useMemo(
-    () =>
-      (data?.stock_allocation ?? []).map((a) => ({
-        name: a.name,
-        ticker: a.ticker,
-        value: a.value_krw ?? 0,
-        pct: a.pct,
-      })),
     [data],
   );
 
@@ -348,23 +319,9 @@ export default function PortfolioPage() {
       <div ref={tabContentRef}>
         {tab === "종목 현황" && (
           <ErrorBoundary variant="section">
-            {chartsOpen && (
-              <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
-                <div className="card space-y-3 sm:space-y-6">
-                  <DomesticForeignBar items={marketChartData} bare />
-                  <div className="border-t border-gray-100 dark:border-gray-700 pt-3 sm:pt-6">
-                    <TreemapChart data={stockChartData} title="종목별 비중" bare />
-                  </div>
-                </div>
-              </Suspense>
-            )}
-            <button
-              onClick={handleChartsToggle}
-              className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mt-2"
-            >
-              {chartsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-              비중 차트 {chartsOpen ? "접기" : "펼치기"}
-            </button>
+            <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
+              <AllocationCard overview={data} accountId={selectedAccountId} />
+            </Suspense>
             {(() => {
               const dividendMap = Object.fromEntries(
                 dividendData.map((d) => [`${d.ticker}-${d.market}`, d]),

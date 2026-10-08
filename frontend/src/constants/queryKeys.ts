@@ -5,12 +5,26 @@ export const QUERY_KEYS = {
   portfolioOverview: (accountId?: string | null) =>
     ["portfolio-overview", accountId ?? "all"] as const,
   portfolioOverviewLite: ["portfolio-overview", "lite"] as const,
+  // indexExposureBase: 무효화 프리픽스 전용 — 계좌 필터(전체/개별) 전 변형 포함
+  indexExposureBase: ["index-exposure"] as const,
+  indexExposure: (accountId?: string | null) => ["index-exposure", accountId ?? "all"] as const,
   portfolios: ["portfolios"] as const,
   accounts: ["accounts"] as const,
   accountPositions: (accountId: string) => ["account-positions", accountId] as const,
   transactions: (accountId: string) => ["transactions", accountId] as const,
   transactionsAll: ["transactions", "all"] as const,
   allTransactions: (year: number) => ["transactions", "all", year] as const,
+  // 기간별 매수(계좌관리 › 기간별 매수). periodPurchasesBase는 무효화 프리픽스 전용
+  periodPurchasesBase: ["period-purchases"] as const,
+  periodPurchases: (
+    period: "month" | "year",
+    year: number,
+    month: number | null,
+    accountId?: string | null,
+  ) => ["period-purchases", period, year, month ?? 0, accountId ?? "all"] as const,
+  trades: ["trades"] as const,
+  tradesFor: (accountId: string, ticker: string, market: string) =>
+    ["trades", accountId, ticker, market] as const,
   dividendByTickerBase: ["dividend-by-ticker"] as const,
   dividendByTicker: (accountId?: string | null) =>
     ["dividend-by-ticker", accountId ?? "all"] as const,

@@ -31,41 +31,10 @@ vi.mock("@/api/dividends", () => ({
   fetchMonthlyOptimization: vi.fn().mockResolvedValue([]),
 }));
 
-import DomesticForeignBar from "@/components/portfolio/DomesticForeignBar";
 import TreemapChart from "@/components/portfolio/TreemapChart";
 import MonthlyTickerDetail from "@/components/portfolio/MonthlyTickerDetail";
 import MonthlyDividendChart from "@/components/portfolio/MonthlyDividendChart";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
-
-// ------- DomesticForeignBar -------
-describe("DomesticForeignBar", () => {
-  it("renders with empty items", () => {
-    renderWithProviders(<DomesticForeignBar items={[]} />);
-    expect(screen.getByText("국내/해외 비중")).toBeDefined();
-    expect(screen.getByText("데이터 없음")).toBeDefined();
-  });
-
-  it("renders with domestic and foreign data", () => {
-    const items = [
-      { name: "국내 주식", value: 5000000, pct: 60 },
-      { name: "해외 주식", value: 3000000, pct: 40 },
-    ];
-    renderWithProviders(<DomesticForeignBar items={items} />);
-    expect(screen.getByText("국내 주식")).toBeDefined();
-    expect(screen.getByText("해외 주식")).toBeDefined();
-  });
-
-  it("shows percentage values", () => {
-    const items = [
-      { name: "국내 주식", value: 5000000, pct: 60 },
-      { name: "해외 주식", value: 3000000, pct: 40 },
-    ];
-    renderWithProviders(<DomesticForeignBar items={items} />);
-    // pct values shown in label
-    expect(screen.getAllByText("60.0%").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("40.0%").length).toBeGreaterThan(0);
-  });
-});
 
 // ------- TreemapChart -------
 describe("TreemapChart", () => {

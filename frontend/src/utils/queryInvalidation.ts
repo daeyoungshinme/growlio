@@ -6,6 +6,9 @@ export function invalidateSyncData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.indexExposureBase }),
+    // 기간별 매수 추정은 스냅샷 포지션 기준 — sync·계좌 수정 시 함께 갱신
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.periodPurchasesBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTickerBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummaryBase }),
@@ -29,6 +32,9 @@ export function invalidateAccountData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.indexExposureBase }),
+    // 기간별 매수 추정은 스냅샷 포지션 기준 — sync·계좌 수정 시 함께 갱신
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.periodPurchasesBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
@@ -67,6 +73,14 @@ export function invalidateTransactionData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
+  ]);
+}
+
+/** 수기 매매 기록 CUD 후 — 기록 목록 + 기간별 매수 현황(수기 기록이 추정을 대체) */
+export function invalidateTradeData(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.trades }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.periodPurchasesBase }),
   ]);
 }
 

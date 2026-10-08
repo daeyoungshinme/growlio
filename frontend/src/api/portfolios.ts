@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
-import type { PortfolioOverview } from "@/types";
+import type { IndexExposure, PortfolioOverview } from "@/types";
 import type { AccountTaxType, InvestmentHorizon } from "@/api/assets";
 
 export const fetchPortfolioOverview = (accountId?: string | null) =>
@@ -9,6 +9,12 @@ export const fetchPortfolioOverview = (accountId?: string | null) =>
 
 export const fetchPortfolioOverviewLite = () =>
   apiGet<PortfolioOverview>("/portfolio/overview", { params: { lite: true } });
+
+export const fetchIndexExposure = (accountId?: string | null) =>
+  apiGet<IndexExposure>(
+    "/portfolio/index-exposure",
+    accountId ? { params: { account_id: accountId } } : undefined,
+  );
 
 export interface AllocationTypeItem {
   asset_type: string;

@@ -22,6 +22,7 @@ from app.api.v1 import (
     settings,
     stocks,
     tax,
+    trades,
     transactions,
 )
 
@@ -35,6 +36,7 @@ router.include_router(portfolios.router)
 router.include_router(settings.router)
 router.include_router(stocks.router)
 router.include_router(transactions.router)
+router.include_router(trades.router)
 router.include_router(dividends.router)
 router.include_router(insights.router)
 router.include_router(invest.router)

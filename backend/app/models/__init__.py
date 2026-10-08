@@ -18,6 +18,7 @@ from app.models.challenge import InvestmentChallenge
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.models.token import KisToken, KiwoomToken, TossToken
+from app.models.trade import TradeRecord
 from app.models.user import User, UserSettings
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "AssetSnapshot",
     "Position",
     "Transaction",
+    "TradeRecord",
     "UserTickerSettings",
     "RebalancingExecution",
     "RebalancingExecutionResult",

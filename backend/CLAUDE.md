@@ -125,6 +125,7 @@ cd backend && uv run mypy app/
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당/이자 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST. INTEREST(예금·CMA 이자)는 금융소득 종합과세 판정 전용 — 수익률·챌린지 등 입출금 흐름 집계는 DEPOSIT/WITHDRAWAL을 명시 필터하므로 새 집계 추가 시에도 이 관례 유지
+- `TradeRecord` — 사용자가 직접 입력한 매수/매도(`side`=BUY/SELL, `qty`, `price_krw`(KRW), `trade_date`). 기간별 매수 수익률 계산 전용 — `Transaction`(현금흐름)과 의도적으로 분리(BUY/SELL을 섞으면 유형 필터 없는 입출금 집계 오염), 보유 Position은 이 기록으로 자동 수정하지 않음. 브로커 sync는 체결내역을 가져오지 않음
 - `InvestmentChallenge` — 적립식 투자 챌린지(매달 입금 습관/수익률/평가금액 목표). `challenge_type`(DEPOSIT/RETURN_PCT/TARGET_VALUE) × `target_amount`/`target_pct`/`target_months` 조합. `account_id`(DEPOSIT만 지정 허용, 나머지는 전체 투자자산). 진행률/스트릭은 저장 안 함
 - `UserSettings` — KIS/키움 자격증명(AES-256), 투자·입금 목표. `challenge_reminders_enabled`(적립 챌린지 독려/결산 알림 옵트인, 기본 OFF — 단 `challenge_service.create_challenge()`가 챌린지별 알림 토글 ON으로 첫 챌린지를 만들면 자동으로 True 전환, 이중 게이트로 알림이 조용히 안 나가는 것 방지). 목표 역산 추천 옵션: `goal_short_term_equity_floor_pct`, `goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`(nullable=상한 없음, `PUT /settings/goal-recommendation-options`), `age_group`(nullable, TWENTIES~SIXTIES_PLUS, `birth_year`로 자동 파생 가능). AUTO 하루 거래대금 상한: `auto_rebalancing_daily_value_cap_krw`(nullable=무제한, `PUT /settings/auto-rebalancing-daily-cap`)
 
@@ -142,7 +143,7 @@ API Request
         ├── invest.py         # DCA 분석 + 목표 설정 마법사용 필요수익률·적립액 프리뷰(GET /invest/goal-feasibility, 저장 없음)
         ├── challenges.py     # 적립식 투자 챌린지 CRUD + 진행률/스트릭 조회(GET /challenges, /challenges/summary는 네비 배지용 경량)
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
-        ├── portfolio_analysis.py  # 포트폴리오 분석 (prefix: /portfolio) — /overview, /allocation-history, /risk, /rebalancing-strategy. /overview·/allocation-history는 ?account_id= 옵션(미지정 시 전체 통합)
+        ├── portfolio_analysis.py  # 포트폴리오 분석 (prefix: /portfolio) — /overview, /allocation-history, /risk, /rebalancing-strategy, /index-exposure(추종 지수별 ETF 비중). /overview·/allocation-history·/index-exposure는 ?account_id= 옵션(미지정 시 전체 통합)
         ├── rebalancing.py    # 리밸런싱 추천 + 목표 역산 추천(GET /rebalancing/goal-recommendation/{by-horizon,by-age}) + 적용 전 비교 미리보기(GET /rebalancing/portfolios/{id}/expected-metrics)
         ├── rebalancing_execution.py  # 리밸런싱 실행 API — 주문 실행·이력 조회
         ├── rebalancing_plan.py       # 리밸런싱 대기 플랜 조회/취소/승인 (인증 필요, 앱 내 사용)
@@ -151,6 +152,7 @@ API Request
         ├── stocks.py         # 종목 검색 + ETF 추종지수 지역 판별(GET /stocks/index-region)
         ├── tax.py            # 세금 추정 요약(GET /tax/summary?year=YYYY&account_id=, 해외 실현손익을 조회해 get_tax_summary에 전달) + 해외 포지션(GET /tax/overseas-positions?account_id=) + 해외 실현손익 자동 집계(GET /tax/overseas-realized?year=&account_id=) + ISA 만기 현황(GET /tax/isa-status) + 연금 납입 현황(GET /tax/pension-contribution) + 절세 액션 플랜(GET /tax/action-plan) — account_id 미지정 시 전체 계좌 통합
         ├── transactions.py   # 입출금/배당 내역 CRUD
+        ├── trades.py         # 수기 매매 기록 CRUD(/trades) + 기간별 매수 종목·수익률(GET /trades/period-summary?period=month|year&year=&month=&account_id=, 기본 KST 이번 달, 미래 기간 400)
         ├── economic_indicators.py  # 미국 CPI/Core CPI 요약(GET /economic-indicators/inflation-summary) — 프론트 진단탭 MarketSignalBanner(InflationIndicatorList) 전용. 이 엔드포인트만 존재
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
         ├── market_signals.py       # VIX·미국 금리 커브·하이일드 스프레드 등 복합 신호 (/market-signals)
@@ -204,6 +206,7 @@ services/
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend/fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
+  ├── period_purchase_service.py # 기간별(월/연) 매수 종목·수익률(`GET /trades/period-summary`) — 기본은 일별 스냅샷 수량·평단 변화로 추정(`estimate_lots`, 이동평균 평단 역산; **해외는 원화 평단이 당일 환율로 매일 재환산되므로 `avg_price_usd`로 역산 후 그 스냅샷 `usd_rate`로 환산**), 기간 내 `TradeRecord`가 있는 (계좌, 종목)은 기록 우선(`lots_from_trades`). 매수는 기간 내만, 매도는 오늘까지 반영. 기간 시작 전 스냅샷 없는 계좌는 첫 스냅샷을 기존 보유로 보고 `tracking_started` 반환. 응답 캐시 없음
   ├── challenge_service.py    # 적립식 투자 챌린지 진행률/스트릭 계산 + CRUD — 스트릭 기본단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변). DEPOSIT/RETURN_PCT/TARGET_VALUE 타입, 진행률은 저장 안 하고 매 조회 시 transactions/스냅샷에서 재계산
   ├── estimation.py           # MVO 입력 축소추정 유틸 — Ledoit-Wolf 공분산 축소(`shrink_covariance`) + James-Stein류 기대수익률 축소(`shrink_expected_returns`, 고정 가정 노이즈분산 사용 — 표본분산 재사용 시 축소강도 상쇄 버그 주의). 순수 계산, `goal_portfolio_optimizer.py`/`portfolio_optimizer.py` 공용
   ├── goal_recommendation_service.py  # 전체 자산 기준 목표 역산 추천 API 진입점(`get_goal_recommendation`) — 목표금액/월적립액/목표연도 → 필요수익률 역산 → MVO 최적화로 최소분산 포트폴리오 추천. 배당 목표(`annual_dividend_goal`)는 필요 배당수익률 제약으로 전달(달성 불가 시 fail-soft). `_suggest_for_dividend_goal()`은 등록 후보로 배당 목표가 어려우면 큐레이션 유니버스(`recommendation_universe.py`)에서 고배당 미등록 후보를 `suggested_candidates`로 제안(DB·계산 미반영, 사용자가 "후보에 추가"로 승인 → `PUT /settings/goal-candidate-tickers` 저장 → 다음 추천부터 반영). `_get_or_seed_candidates()`는 최초 1회만 시딩(자동 병합 없음). `compute_portfolio_expected_metrics()`(적용 전 비교), `compute_recommendation_drift()`(프론트 `recommendationDrift.ts` 포팅, 주간 job 전용). 추천은 자동 반영 안 됨 — 수동 적용
@@ -214,6 +217,8 @@ services/
   ├── goal_candidate_service.py  # 목표 역산 추천 후보 관리/영속화(세제유형별 필터, lost-update 방지 락) — goal_recommendation_service.py 서브모듈. `pension_ineligibility_reason()`: 연금저축·IRP에서 매수 불가한 레버리지·인버스 ETF/ETN/개별종목을 기간별 조합·전체(단일 세제유형) 경로 후보에서 제외 + `pension_exclusion_note()` 안내(종목명 브랜드 기반 휴리스틱 `_KR_ETF_BRAND_PREFIXES` — 신규 ETF 브랜드는 여기 추가, 불확실하면 보수적 제외)
   ├── etf_profile_service.py  # ETF 총보수·기초지수·운용사 조회 — 국내 Naver etfAnalysis(`totalFee`는 이미 % 단위), 해외 yfinance `.info`(`netExpenseRatio` % 단위). ticker+market 전역 캐시 7일, 네트워크 오류는 캐싱 안 함
   ├── etf_overlap_service.py  # 후보 ETF ↔ 보유·다른 후보 중복 분석(`POST /rebalancing/candidates/overlap`, 정보 제공 전용): SAME_INDEX(추종지수 키) + HIGH_CORR(주간 수익률 상관 ≥0.97 & 변동성비 ≤1.5 — 레버리지 오판 방지). 일별 수익률 목록(`fetch_yf_daily_returns`)은 날짜가 없어 정렬 불가 → `fetch_yf_close_series`를 주간 리샘플링. 상장시장(국내/해외)이 다른 후보끼리는 보유 종목이 끼지 않으면 비교 안 함(계좌 유형별 의도된 병존)
+  ├── etf_index_classifier.py  # 보유 종목 → 추종 지수 분류(순수, `classify_holding` → INDEX/LEVERAGED/OTHER_ETF/STOCK + 지수 키·라벨·hedged). 해외 ticker 맵·큐레이션 > Naver 기초지수명 > 종목명 > 해외 정식명칭. 환헤지(H)는 원 지수에 합산, 커버드콜은 별도 키, 레버리지·인버스는 별도 묶음. 지수 패턴 자체는 `recommendation_universe.py`(`guess_tracking_index`/`overseas_ticker_tracking_index`)와 공유 — 패턴 수정 시 중복 분석·후보 dedup에도 반영됨
+  ├── index_exposure_service.py # 추종 지수별 비중(`GET /portfolio/index-exposure`, 정보 제공 전용) — `build_portfolio_overview`(비-lite, 캐시 공유) 포지션을 ticker+market 합산 → `get_etf_profiles_with_status`(조회 실패 키 구분 → `profiles_complete`) → 분류 → 그룹 집계(주식 전체/ETF 대비 % 동시 반환). 응답 캐시 없음
   ├── goal_feasibility.py     # `build_feasibility_preview()` — 필요 연수익률 + 프리셋 수익률별 필요 적립액 미리보기. `/invest/goal-feasibility`(growlio 마법사)·`/external/goal-feasibility`(nestlio)가 공유 — 두 엔드포인트는 pv/기간 산정만 다름
   ├── goal_return_solver.py   # 필요 연평균 수익률·월 적립액 역산 순수 함수 — goal_recommendation_service.py 서브모듈 + invest.py `GET /invest/goal-feasibility`(마법사 미리보기)가 직접 호출
   ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 + 자산군(AssetClass)/추종지수 지역(IndexRegion) 필터링
@@ -269,6 +274,7 @@ schemas/                      # Pydantic 요청/응답 스키마
   ├── asset.py / auth.py / backtest.py / invest.py / portfolio.py
   ├── challenge.py             # 적립식 투자 챌린지 스키마 (challenges.py 전용) — ChallengeCreate/Update/Response/Progress/Month/Summary
   ├── transaction.py           # 입출금/배당 내역 스키마 (transactions.py 전용)
+  ├── trade.py                 # 수기 매매 기록 + 기간별 매수 현황 스키마 (trades.py 전용)
   ├── dashboard.py              # 대시보드 응답 스키마 (dashboard.py 전용)
   ├── rebalancing/             # 리밸런싱 스키마 패키지 — `__init__.py`가 전체 재노출하므로 `from app.schemas.rebalancing import X`는 무변경
   │   ├── analysis.py          # 분석 결과: TickerAccountInfo/RebalancingItem/CurrentHolding/TaxImpactItem/DiagnosisContext/RebalancingAnalysis

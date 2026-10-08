@@ -88,8 +88,8 @@ vi.mock("recharts", () => ({
 vi.mock("../components/portfolio/TreemapChart", () => ({
   default: () => <div data-testid="treemap" />,
 }));
-vi.mock("../components/portfolio/DomesticForeignBar", () => ({
-  default: () => <div data-testid="domestic-bar" />,
+vi.mock("../components/portfolio/AllocationCard", () => ({
+  default: () => <div data-testid="allocation-card" />,
 }));
 vi.mock("../components/portfolio-analysis/PortfolioManageTab", () => ({
   default: () => <div data-testid="portfolio-manage" />,

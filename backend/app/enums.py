@@ -32,6 +32,13 @@ class TransactionType(StrEnum):
     INTEREST = "INTEREST"
 
 
+class TradeSide(StrEnum):
+    """수기 매매 기록(TradeRecord) 방향 — 현금흐름 TransactionType과 별개."""
+
+    BUY = "BUY"
+    SELL = "SELL"
+
+
 class PortfolioBaseType(StrEnum):
     STOCK_ONLY = "STOCK_ONLY"
     TOTAL_ASSETS = "TOTAL_ASSETS"

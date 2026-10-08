@@ -37,6 +37,7 @@ export interface AllocationItem {
   type?: string;
   ticker?: string;
   name: string;
+  market?: string | null; // stock_allocation 전용 — "기타 N종목"은 null
   label?: string;
   account_name?: string;
   amount_krw?: number;
@@ -75,6 +76,50 @@ export interface PortfolioOverview {
   stock_allocation: AllocationItem[];
   all_positions: PortfolioPosition[];
   accounts: AccountRow[];
+}
+
+// 추종 지수별 비중 (API: /portfolio/index-exposure)
+export type IndexExposureKind = "INDEX" | "LEVERAGED" | "OTHER_ETF" | "STOCK";
+
+export interface IndexExposureMember {
+  ticker: string;
+  name: string;
+  market: string;
+  listing: "DOMESTIC" | "OVERSEAS";
+  value_krw: number;
+  hedged: boolean;
+  pct_of_stock: number;
+  region?: ExposureRegion | null;
+}
+
+export interface IndexExposureGroup {
+  key: string;
+  label: string;
+  kind: IndexExposureKind;
+  value_krw: number;
+  pct_of_stock: number;
+  pct_of_etf: number | null;
+  has_hedged: boolean;
+  domestic_krw: number;
+  overseas_krw: number;
+  members: IndexExposureMember[];
+}
+
+/** 실제 투자지역 — 국내상장 미국 ETF는 OVERSEAS. 판별 불가면 null. */
+export type ExposureRegion = "DOMESTIC" | "OVERSEAS";
+
+export interface RegionExposure {
+  domestic_krw: number;
+  overseas_krw: number;
+  unknown_krw: number;
+}
+
+export interface IndexExposure {
+  total_stock_krw: number;
+  total_etf_krw: number;
+  groups: IndexExposureGroup[];
+  region_exposure: RegionExposure;
+  profiles_complete: boolean;
 }
 
 // 종목별 배당 수익률 (API: /dividends/positions)
