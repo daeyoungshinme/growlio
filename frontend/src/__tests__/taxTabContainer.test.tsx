@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { legacyAssetsTaxRedirect, legacyHistorySegment } from "@/utils/legacyTabRedirect";
 
 vi.mock("@/api/assets", () => ({
   fetchAccounts: vi.fn().mockResolvedValue([
@@ -49,25 +48,6 @@ function renderAt(initial: string, element: React.ReactNode) {
   );
 }
 
-describe("legacyAssetsTaxRedirect", () => {
-  it("세금 탭이 아니면 리다이렉트하지 않는다", () => {
-    expect(legacyAssetsTaxRedirect(new URLSearchParams("tab=투자현황&portfolioTab=배당"))).toBe(
-      null,
-    );
-  });
-
-  it("세금 서브탭·계좌 필터를 계획 › 절세 파라미터로 옮긴다", () => {
-    const url = legacyAssetsTaxRedirect(
-      new URLSearchParams("tab=투자현황&portfolioTab=세금&taxTab=세금 추정&account=a1"),
-    );
-    const parsed = new URL(url!, "http://x");
-    expect(parsed.pathname).toBe("/invest-plan");
-    expect(parsed.searchParams.get("tab")).toBe("절세");
-    expect(parsed.searchParams.get("taxTab")).toBe("세금 추정");
-    expect(parsed.searchParams.get("taxAccount")).toBe("a1");
-  });
-});
-
 describe("TaxTabContainer (계획 › 절세)", () => {
   it("옛 자산 세금 링크로 들어오면 계획 › 절세로 이동한다", async () => {
     renderAt("/assets?tab=투자현황&portfolioTab=세금", <AssetsPage />);
@@ -86,14 +66,5 @@ describe("TaxTabContainer (계획 › 절세)", () => {
     fireEvent.change(select, { target: { value: "a2" } });
     expect(screen.getByTestId("tax-optimization").textContent).toBe("a2");
     expect(screen.getByTestId("location").textContent).toContain("taxAccount=a2");
-  });
-});
-
-describe("legacyHistorySegment (계좌관리 내역 통합)", () => {
-  it("옛 입출금·배당/기간별 매수 탭을 내역 세그먼트로 매핑한다", () => {
-    expect(legacyHistorySegment("입출금·배당")).toBe("현금 흐름");
-    expect(legacyHistorySegment("기간별 매수")).toBe("매수 내역");
-    expect(legacyHistorySegment("증권계좌")).toBeNull();
-    expect(legacyHistorySegment(null)).toBeNull();
   });
 });

@@ -3,7 +3,7 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import TradeFormModal from "@/components/assets/TradeFormModal";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
-import { createTrade, fetchTrades, updateTrade } from "@/api/trades";
+import { createTrade, deleteTrade, fetchTrades, updateTrade } from "@/api/trades";
 
 vi.mock("../api/trades", () => ({
   createTrade: vi.fn(),
@@ -129,5 +129,56 @@ describe("TradeFormModal", () => {
       expect.objectContaining({ side: "BUY", qty: 3, price_krw: 280_000, fee: 100 }),
     ]);
     expect(vi.mocked(createTrade)).not.toHaveBeenCalled();
+  });
+
+  const feeRecord = {
+    id: "t5",
+    account_id: "acc-1",
+    side: "BUY" as const,
+    ticker: "005930",
+    market: "KOSPI",
+    name: "삼성전자",
+    qty: 1,
+    price_krw: 70_000,
+    fee: 300,
+    trade_date: "2026-10-03",
+    notes: "메모",
+    created_at: "2026-10-03T00:00:00Z",
+  };
+  const renderWithRecord = () =>
+    renderWithProviders(
+      <TradeFormModal
+        accounts={accounts}
+        prefill={{ account_id: "acc-1", ticker: "005930", market: "KOSPI", name: "삼성전자" }}
+        onClose={() => {}}
+      />,
+    );
+
+  it("수정에서 수수료·메모를 비우면 null로 보내 기존 값을 지운다", async () => {
+    vi.mocked(updateTrade)
+      .mockReset()
+      .mockResolvedValue({} as never);
+    vi.mocked(fetchTrades).mockResolvedValue([feeRecord]);
+    renderWithRecord();
+    fireEvent.click(await screen.findByRole("button", { name: "2026-10-03 기록 수정" }));
+    fireEvent.change(screen.getByLabelText("수수료 (원, 선택)"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText(/메모/), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "기록 수정" }));
+    await waitFor(() => expect(vi.mocked(updateTrade)).toHaveBeenCalled());
+    expect(vi.mocked(updateTrade).mock.calls[0][1]).toMatchObject({ fee: null, notes: null });
+  });
+
+  it("수정 중인 기록을 삭제하면 deleteTrade 호출 + 수정 모드 해제", async () => {
+    vi.mocked(deleteTrade)
+      .mockReset()
+      .mockResolvedValue(undefined as never);
+    vi.mocked(fetchTrades).mockResolvedValue([feeRecord]);
+    renderWithRecord();
+    fireEvent.click(await screen.findByRole("button", { name: "2026-10-03 기록 수정" }));
+    expect(screen.getByRole("button", { name: "기록 수정" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "2026-10-03 기록 삭제" }));
+    await waitFor(() => expect(vi.mocked(deleteTrade)).toHaveBeenCalled());
+    expect(vi.mocked(deleteTrade).mock.calls[0][0]).toBe("t5");
+    expect(screen.getByRole("button", { name: "기록 추가" })).toBeInTheDocument();
   });
 });
