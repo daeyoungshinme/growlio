@@ -157,7 +157,8 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
       const { side: s2, qty: q, price_krw, fee: f, trade_date, notes: n } = parsed.data;
       updateMut.mutate({
         id: editing.id,
-        data: { side: s2, qty: q, price_krw, fee: f, trade_date, notes: n },
+        // 비운 수수료·메모는 null로 보내야 기존 값이 지워진다(undefined면 JSON에서 빠져 유지됨)
+        data: { side: s2, qty: q, price_krw, fee: f ?? null, trade_date, notes: n ?? null },
       });
       return;
     }

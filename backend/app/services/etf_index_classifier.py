@@ -23,7 +23,9 @@ from app.services.etf_profile_service import EtfProfile
 from app.services.goal_candidate_service import LEVERAGED_INVERSE_RE, looks_like_korean_etf
 from app.services.recommendation_universe import (
     COVERED_CALL_RE,
+    RAW_INDEX_KEY_PREFIX,
     guess_tracking_index,
+    index_key_from_base_index,
     resolve_tracking_index,
 )
 
@@ -51,7 +53,7 @@ INDEX_LABELS: dict[str, str] = {
 }
 
 _COVERED_CALL_PREFIX = "COVERED_CALL:"
-_RAW_PREFIX = "RAW:"
+_RAW_PREFIX = RAW_INDEX_KEY_PREFIX
 
 _US_LEVERAGED_TICKERS: frozenset[str] = frozenset(
     {
@@ -96,10 +98,6 @@ class IndexClass:
 
 def is_domestic_listed(market: str) -> bool:
     return market.upper() in DOMESTIC_MARKETS
-
-
-def _normalize_index_name(raw: str) -> str:
-    return re.sub(r"[\s\-_.()]", "", raw).upper()
 
 
 def index_label(key: str, base_index: str | None = None) -> str:
@@ -147,7 +145,7 @@ def _resolve_index_key(ticker: str, market: str, name: str, profile: EtfProfile 
     if any(COVERED_CALL_RE.search(n) for n in names):
         return _covered_call_key(names)
     if base_index:
-        return guess_tracking_index(base_index) or f"{_RAW_PREFIX}{_normalize_index_name(base_index)}"
+        return index_key_from_base_index(base_index)
     for n in (name, long_name):
         if n:
             guessed = guess_tracking_index(n)

@@ -7,6 +7,14 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.enums import TradeSide
 from app.schemas._validators import validate_non_negative_amount, validate_positive_amount
+from app.utils.kst import today_kst
+
+
+def _not_future(v: date | None) -> date | None:
+    # 미래 날짜 기록은 기간별 매수(오늘까지만 집계)에 영영 잡히지 않으므로 입력 단계에서 막는다
+    if v is not None and v > today_kst():
+        raise ValueError("미래 날짜는 기록할 수 없습니다")
+    return v
 
 
 class TradeCreate(BaseModel):
@@ -31,6 +39,16 @@ class TradeCreate(BaseModel):
     def fee_non_negative(cls, v: float | None) -> float | None:
         return validate_non_negative_amount(v)
 
+    @field_validator("trade_date")
+    @classmethod
+    def trade_date_not_future(cls, v: date) -> date:
+        _not_future(v)
+        return v
+
+
+# 수정 시 명시적 null로 비울 수 있는 선택 필드 — 나머지(side·qty·price_krw·trade_date)의 null은 "변경 없음"
+TRADE_CLEARABLE_FIELDS = frozenset({"fee", "notes"})
+
 
 class TradeUpdate(BaseModel):
     side: TradeSide | None = None
@@ -49,6 +67,11 @@ class TradeUpdate(BaseModel):
     @classmethod
     def fee_non_negative(cls, v: float | None) -> float | None:
         return validate_non_negative_amount(v)
+
+    @field_validator("trade_date")
+    @classmethod
+    def trade_date_not_future(cls, v: date | None) -> date | None:
+        return _not_future(v)
 
 
 class TradeResponse(BaseModel):

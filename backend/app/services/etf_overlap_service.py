@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -50,6 +49,7 @@ from app.services.market_data_fetcher import fetch_yf_close_series
 from app.services.position_aggregator import query_latest_position_map
 from app.services.recommendation_universe import (
     guess_tracking_index,
+    index_key_from_base_index,
     resolve_distribution_frequency,
     resolve_tracking_index,
 )
@@ -100,10 +100,6 @@ class _Item:
         return self.market.upper() in DOMESTIC_MARKETS
 
 
-def _normalize_index_name(raw: str) -> str:
-    return re.sub(r"[\s\-_.()]", "", raw).upper()
-
-
 def resolve_index_key(item: _Item) -> str | None:
     """추종 지수 비교 키. 판별 불가면 None(`SAME_INDEX` 판정 안 함)."""
     known = resolve_tracking_index(item.ticker, item.market, "", item.tracking_index)
@@ -111,7 +107,7 @@ def resolve_index_key(item: _Item) -> str | None:
         return known
     base_index = item.profile.get("base_index") if item.profile else None
     if base_index:
-        return guess_tracking_index(base_index) or f"RAW:{_normalize_index_name(base_index)}"
+        return index_key_from_base_index(base_index)
     guessed = guess_tracking_index(item.name)
     if guessed:
         return guessed

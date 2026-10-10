@@ -10,18 +10,18 @@ import {
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronRight, Search, X } from "lucide-react";
-import { clampPct, fmtKrwShort } from "@/utils/format";
+import { clampPct, fmtKrwShort, fmtPct } from "@/utils/format";
 import { groupPositionsByTicker } from "@/utils/portfolio";
 import { pnlColor } from "@/utils/colors";
 import { weightBarColor } from "@/utils/dividendUtils";
 import type { PortfolioPosition, DividendYield } from "@/types";
 import EmptyState from "@/components/common/EmptyState";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { DOMESTIC_MARKETS } from "@/constants/markets";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 const MOBILE_CARD_VIRTUALIZE_THRESHOLD = 10;
 const MOBILE_CARD_HEIGHT = 96; // 접힌 카드 추정 높이 (px) — 실제 높이는 measureElement로 실측
-const DOMESTIC_DIVIDEND_MARKETS = ["KOSPI", "KOSDAQ", "KRX"];
 
 type AggSortKey = "total_value_krw" | "pnl_pct" | "total_pnl" | "weight_in_stock";
 type SortDir = "asc" | "desc";
@@ -70,7 +70,7 @@ type Agg = ReturnType<typeof groupPositionsByTicker>[number];
 function annualDividendLabel(divData: DividendYield, qty: number): string | null {
   if (divData.dps <= 0) return null;
   const total = divData.dps * qty;
-  return DOMESTIC_DIVIDEND_MARKETS.includes(divData.market)
+  return DOMESTIC_MARKETS.includes(divData.market)
     ? `${Math.round(total).toLocaleString()}원`
     : `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
@@ -158,8 +158,7 @@ function StockHoldingMobileCard({
           </p>
           <p className={`shrink-0 font-medium tabular-nums ${pnlColor(agg.total_pnl)}`}>
             {agg.total_pnl >= 0 ? "+" : ""}
-            {fmtKrwShort(agg.total_pnl)}원 · {agg.pnl_pct >= 0 ? "+" : ""}
-            {agg.pnl_pct.toFixed(2)}%
+            {fmtKrwShort(agg.total_pnl)}원 · {fmtPct(agg.pnl_pct)}
           </p>
         </div>
         <div className="mt-2 flex items-center gap-2 text-xs">
@@ -220,10 +219,7 @@ function StockHoldingMobileCard({
                   </span>
                   <span className="shrink-0 tabular-nums text-gray-700 dark:text-gray-300">
                     {fmtKrwShort(sub.value_krw)}원
-                    <span className={`ml-1.5 ${pnlColor(sub.pnl)}`}>
-                      {sub.pnl_pct >= 0 ? "+" : ""}
-                      {sub.pnl_pct.toFixed(2)}%
-                    </span>
+                    <span className={`ml-1.5 ${pnlColor(sub.pnl)}`}>{fmtPct(sub.pnl_pct)}</span>
                   </span>
                 </li>
               ))}
@@ -543,17 +539,14 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
                             >
                               {agg.total_pnl >= 0 ? "+" : ""}
                               {fmtKrwShort(agg.total_pnl)}원
-                              <span className="font-bold">
-                                ({agg.pnl_pct >= 0 ? "+" : ""}
-                                {agg.pnl_pct.toFixed(2)}%)
-                              </span>
+                              <span className="font-bold">({fmtPct(agg.pnl_pct)})</span>
                             </td>
                             <td className="py-3 px-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 <div className="w-16 bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                                   <div
                                     className="bg-blue-500 h-full rounded-full"
-                                    style={{ width: `${Math.min(agg.weight_in_stock, 100)}%` }}
+                                    style={{ width: `${clampPct(agg.weight_in_stock)}%` }}
                                   />
                                 </div>
                                 <span className="text-xs text-indigo-500 dark:text-indigo-400 w-10 text-right">
@@ -635,10 +628,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
                                     {sub.pnl >= 0 ? "+" : ""}
                                     {fmtKrwShort(sub.pnl)}원
                                   </div>
-                                  <div className="font-medium">
-                                    {sub.pnl_pct >= 0 ? "+" : ""}
-                                    {sub.pnl_pct.toFixed(2)}%
-                                  </div>
+                                  <div className="font-medium">{fmtPct(sub.pnl_pct)}</div>
                                 </td>
                                 <td className="py-2 px-4" />
                                 <td className="py-2 px-4" />

@@ -1,4 +1,5 @@
 import { apiGet } from "./client";
+import type { ActionPriority } from "@/utils/actionPriority";
 import type { IncomeBracket } from "./settings";
 
 export interface OverseasPositionDetail {
@@ -170,8 +171,6 @@ export type TaxActionCategory =
   | "TAX_LOSS_HARVEST"
   | "FINANCIAL_INCOME_LIMIT";
 
-export type TaxActionPriority = "HIGH" | "MEDIUM" | "LOW";
-
 export interface TaxAction {
   id: string;
   category: TaxActionCategory;
@@ -182,7 +181,7 @@ export interface TaxAction {
   benefit_krw: number | null;
   /** YYYY-MM-DD (KST) */
   deadline: string | null;
-  priority: TaxActionPriority;
+  priority: ActionPriority;
   /** 소득 구간(연금 세액공제율)에 따라 benefit이 달라지는 액션 */
   uses_income_bracket: boolean;
   cta: { label: string; link: string };

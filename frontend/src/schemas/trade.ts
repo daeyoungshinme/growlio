@@ -11,5 +11,3 @@ export const tradeSchema = z.object({
   trade_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식이 올바르지 않습니다"),
   notes: z.string().max(500, "메모는 500자 이하여야 합니다").optional(),
 });
-
-export type TradeFormData = z.infer<typeof tradeSchema>;

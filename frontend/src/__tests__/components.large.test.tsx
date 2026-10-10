@@ -746,17 +746,14 @@ describe("RebalancingStatusCard", () => {
     expect(onCreate).toHaveBeenCalled();
   });
 
-  it("showCombinedNote=false이면 결합 안내 문구를 숨긴다", async () => {
+  it("statusOnly면 결합 안내 문구를 숨긴다", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
       { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
     ] as never);
     renderWithProviders(
       <MemoryRouter>
-        <RebalancingStatusCard
-          marketSignal={{ composite_level: "RED" } as never}
-          showCombinedNote={false}
-        />
+        <RebalancingStatusCard marketSignal={{ composite_level: "RED" } as never} statusOnly />
       </MemoryRouter>,
     );
     await waitFor(() => {
@@ -767,7 +764,7 @@ describe("RebalancingStatusCard", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("showCombinedNote 기본값(true)이면 결합 안내 문구를 표시한다", async () => {
+  it("기본(진단탭)이면 결합 안내 문구를 표시한다", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
       { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
