@@ -38,16 +38,18 @@ async def monthly_net_deposits_by_account(
     start_month: str,
     exclude_ref_prefix: str | None,
 ) -> list[dict]:
-    """[{account_id, month: "YYYY-MM", net_deposit_krw}] — 순입금이 있는 (계좌, 월)만. 호출자 소유 계좌만 집계한다
-    (user_id 조건 — 남의 계좌 id를 넘겨도 빈 결과)."""
+    """[{account_id, month: "YYYY-MM", net_deposit_krw}] — 순입금이 있는 (계좌, 월)만. 호출자 소유·활성 계좌만
+    집계한다(남의 계좌나 삭제(`is_active=False`)된 계좌 id를 넘기면 그 계좌는 빈 결과)."""
     if not account_ids:
         return []
     month = func.to_char(Transaction.transaction_date, "YYYY-MM")
     net = func.sum(case((Transaction.transaction_type == "DEPOSIT", Transaction.amount), else_=-Transaction.amount))
     query = (
         select(Transaction.account_id, month.label("month"), net.label("net"))
+        .join(AssetAccount, AssetAccount.id == Transaction.account_id)
         .where(
             Transaction.user_id == user_id,
+            AssetAccount.is_active.is_(True),
             Transaction.account_id.in_(account_ids),
             Transaction.transaction_type.in_(_FLOW_TYPES),
             month >= start_month,

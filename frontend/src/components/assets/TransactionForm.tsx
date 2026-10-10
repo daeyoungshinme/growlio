@@ -10,7 +10,7 @@ import {
 } from "@/api/transactions";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useForm } from "@/hooks/useForm";
-import { formatUsdAsKrw, fmtKrwPreview } from "@/utils/format";
+import { formatUsdAsKrw, fmtKrwPreview, localToday } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
@@ -21,17 +21,16 @@ import { TickerSearchField } from "./TickerSearchField";
 import { extractErrorMessage } from "@/utils/error";
 import { transactionSchema, type TransactionFormData } from "@/schemas/transaction";
 
-const today = new Date().toISOString().slice(0, 10);
-
-const EMPTY_FORM: TransactionCreate = {
+// 모듈 로드 시점에 고정하면 자정을 넘긴 세션에서 어제 날짜가 남는다 — 폼을 열 때마다 계산
+const makeEmptyForm = (): TransactionCreate => ({
   account_id: "",
   transaction_type: "DEPOSIT",
   amount: 0,
   fee: undefined,
-  transaction_date: today,
+  transaction_date: localToday(),
   ticker: "",
   notes: "",
-};
+});
 
 interface Props {
   accounts: AssetAccount[];
@@ -54,7 +53,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
         ticker: editingTx.ticker ?? "",
         notes: editingTx.notes ?? "",
       }
-    : EMPTY_FORM;
+    : makeEmptyForm();
 
   const { form, set: setField } = useForm<TransactionCreate>(initial);
   const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");

@@ -458,6 +458,38 @@ describe("StockHoldingsTable", () => {
     expect(screen.getAllByText("평단가").length).toBeGreaterThan(1);
   });
 
+  it("데스크톱 계좌별 하위 행은 헤더와 같은 열에 맞춰진다 (계좌명=종목 열, 수량=수량 열)", () => {
+    const otherAccount: PortfolioPosition = {
+      ...mockPosition,
+      account_id: "acc-other",
+      account_name: "다른 계좌",
+      qty: 7,
+    };
+    renderWithProviders(
+      <StockHoldingsTable
+        positions={[mockPosition, otherAccount]}
+        dividendMap={{}}
+        divLoading={false}
+        divError={false}
+      />,
+    );
+    const cardButton = screen
+      .getAllByRole("button")
+      .find(
+        (b) => b.getAttribute("aria-expanded") === "false" && b.textContent?.includes("Apple Inc."),
+      );
+    fireEvent.click(cardButton!);
+    const subRow = screen
+      .getAllByText("다른 계좌")
+      .map((el) => el.closest("tr"))
+      .find((tr): tr is HTMLTableRowElement => tr !== null)!;
+    const headerCount = subRow.closest("table")!.querySelectorAll("thead th").length;
+    const cells = subRow.querySelectorAll("td");
+    expect(cells).toHaveLength(headerCount);
+    expect(cells[0].textContent).toContain("다른 계좌");
+    expect(cells[1].textContent).toBe("7");
+  });
+
   it("shows error state for dividends", () => {
     renderWithProviders(
       <StockHoldingsTable
@@ -714,17 +746,14 @@ describe("RebalancingStatusCard", () => {
     expect(onCreate).toHaveBeenCalled();
   });
 
-  it("showCombinedNote=false이면 결합 안내 문구를 숨긴다", async () => {
+  it("statusOnly면 결합 안내 문구를 숨긴다", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
       { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
     ] as never);
     renderWithProviders(
       <MemoryRouter>
-        <RebalancingStatusCard
-          marketSignal={{ composite_level: "RED" } as never}
-          showCombinedNote={false}
-        />
+        <RebalancingStatusCard marketSignal={{ composite_level: "RED" } as never} statusOnly />
       </MemoryRouter>,
     );
     await waitFor(() => {
@@ -735,7 +764,7 @@ describe("RebalancingStatusCard", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("showCombinedNote 기본값(true)이면 결합 안내 문구를 표시한다", async () => {
+  it("기본(진단탭)이면 결합 안내 문구를 표시한다", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
       { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },

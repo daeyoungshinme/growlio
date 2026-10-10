@@ -3,7 +3,7 @@ import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useForm } from "@/hooks/useForm";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import type { Transaction, TransactionCreate } from "@/api/transactions";
-import { convertUsdToKrw } from "@/utils/format";
+import { convertUsdToKrw, localToday } from "@/utils/format";
 import { TX_TYPES, type TxType } from "@/constants/transaction";
 
 const isValidTxType = (val: unknown): val is TxType => TX_TYPES.includes(val as TxType);
@@ -12,7 +12,7 @@ const makeEmptyForm = (accountId: string): TransactionCreate => ({
   account_id: accountId,
   transaction_type: "DEPOSIT",
   amount: 0,
-  transaction_date: new Date().toISOString().slice(0, 10),
+  transaction_date: localToday(),
   ticker: "",
   notes: "",
 });

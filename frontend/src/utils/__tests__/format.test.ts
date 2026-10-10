@@ -11,6 +11,7 @@ import {
   fmtKrwShort,
   fmtMonth,
   fmtPct,
+  localToday,
   relativeTime,
 } from "@/utils/format";
 
@@ -194,5 +195,24 @@ describe("parseYmd / daysUntilYmd", () => {
     expect(daysUntilYmd("2026-12-20")).toBe(0);
     expect(daysUntilYmd("2026-12-31")).toBe(11);
     expect(daysUntilYmd("2026-12-19")).toBe(-1);
+  });
+});
+
+describe("localToday", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("로컬 날짜 기준 YYYY-MM-DD (UTC 날짜가 아니다)", () => {
+    vi.useFakeTimers();
+    // 로컬 자정 직후 — UTC 기준(KST)이면 전날이 되는 시각
+    vi.setSystemTime(new Date(2026, 9, 10, 0, 30));
+    expect(localToday()).toBe("2026-10-10");
+  });
+
+  it("월·일 두 자리 패딩", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 5, 12, 0));
+    expect(localToday()).toBe("2026-01-05");
   });
 });

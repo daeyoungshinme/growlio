@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { loginSchema, registerSchema, resetPasswordSchema } from "@/schemas/auth";
 import { transactionSchema } from "@/schemas/transaction";
+import { tradeSchema } from "@/schemas/trade";
 import { portfolioItemSchema, portfolioCreateSchema } from "@/schemas/portfolios";
 import {
   realEstateDetailsSchema,
@@ -597,5 +598,48 @@ describe("manualPositionSchema", () => {
 
   it("환율이 null이면 수락한다", () => {
     expect(manualPositionSchema.safeParse({ ...valid, usd_rate: null }).success).toBe(true);
+  });
+});
+
+// ────────────────────────────────────────────
+// trade schema (수기 매매 기록)
+// ────────────────────────────────────────────
+describe("tradeSchema", () => {
+  const valid = {
+    account_id: "acc-1",
+    side: "BUY" as const,
+    ticker: "005930",
+    market: "KOSPI",
+    qty: 10,
+    price_krw: 70000,
+    trade_date: "2026-10-02",
+  };
+
+  it("필수값이 모두 있으면 통과", () => {
+    expect(tradeSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("종목 미선택(공백 ticker)은 거부", () => {
+    const r = tradeSchema.safeParse({ ...valid, ticker: "  " });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0].message).toBe("종목을 선택해주세요");
+  });
+
+  it("수량·단가 미입력은 입력 안내 메시지", () => {
+    const r = tradeSchema.safeParse({ ...valid, qty: undefined, price_krw: undefined });
+    expect(r.success).toBe(false);
+    const messages = r.error?.issues.map((i) => i.message);
+    expect(messages).toContain("수량을 입력해주세요");
+    expect(messages).toContain("단가를 입력해주세요");
+  });
+
+  it("0 이하 수량·음수 수수료는 거부", () => {
+    expect(tradeSchema.safeParse({ ...valid, qty: 0 }).success).toBe(false);
+    expect(tradeSchema.safeParse({ ...valid, fee: -1 }).success).toBe(false);
+  });
+
+  it("날짜 형식과 메모 길이를 검사한다", () => {
+    expect(tradeSchema.safeParse({ ...valid, trade_date: "2026/10/02" }).success).toBe(false);
+    expect(tradeSchema.safeParse({ ...valid, notes: "a".repeat(501) }).success).toBe(false);
   });
 });

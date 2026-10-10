@@ -156,11 +156,13 @@ export function invalidateRebalancingHistoryData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingHistory });
 }
 
-/** 리밸런싱 대기 플랜 취소/승인 후 — 대기 플랜 목록 + 실행 이력(승인 시 새 이력 생성) */
-export function invalidateRebalancingPlanData(qc: QueryClient) {
+/** 리밸런싱 대기 플랜 취소/승인 후 — 대기 플랜 목록 + 실행 이력(승인 시 새 이력 생성).
+ * 승인은 즉시 체결하므로(`status === "EXECUTED"`) 수동 실행 경로처럼 보유·드리프트·지금 할 일까지 갱신한다. */
+export function invalidateRebalancingPlanData(qc: QueryClient, opts: { executed?: boolean } = {}) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingPlans }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingHistory }),
+    ...(opts.executed ? [invalidateSyncData(qc)] : []),
   ]);
 }
 

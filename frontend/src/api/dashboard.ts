@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPut } from "./client";
+import type { ActionPriority } from "@/utils/actionPriority";
 
 export interface DashboardAllocationItem {
   type: string;
@@ -78,7 +79,7 @@ export type ActionItemKind =
 export interface ActionItem {
   id: string;
   kind: ActionItemKind;
-  priority: "HIGH" | "MEDIUM" | "LOW";
+  priority: ActionPriority;
   title: string;
   detail: string;
   cta_label: string;

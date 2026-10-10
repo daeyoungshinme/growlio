@@ -141,6 +141,10 @@ jobs:
       - name: Lint (eslint)
         run: npm run lint -- --max-warnings 0
 
+      # pre-commit 훅은 --write로 고치기만 해서, 훅을 건너뛴 커밋의 포맷 위반은 여기서만 잡힌다
+      - name: Format check (prettier)
+        run: npm run format:check
+
       - name: Typecheck (tsc --noEmit)
         run: npm run typecheck
 

@@ -58,7 +58,7 @@ make dev-frontend     # 프론트엔드만 (localhost:5173)
 make test-backend     # cd backend && uv run pytest (커버리지 없이 빠르게)
 make test-backend-cov # cd backend && uv run pytest --cov=app --cov-fail-under=80 (CI와 동일한 80% 게이트)
 make test-frontend    # cd frontend && npm run test
-make lint             # ruff check + format --check (backend) + eslint --max-warnings 0 (frontend) — CI와 같은 기준
+make lint             # ruff check + format --check (backend) + eslint --max-warnings 0 + prettier --check (frontend) — CI와 같은 기준
 make typecheck        # mypy (backend) + tsc --noEmit (frontend)
 make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
 make format           # ruff format + ruff --fix (backend) + prettier --write (frontend)

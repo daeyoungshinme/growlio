@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/common/Modal";
 import { updateAlertScope } from "@/api/alerts";
@@ -173,12 +173,16 @@ function AlertFormBody({
   );
 
   const { setScheduleType, setTriggerCondition, setMode, setStrategy, setThreshold } = form;
-  function applyDcaAutoBuyPreset() {
+  const applyDcaPresetValues = useCallback(() => {
     setScheduleType("MONTHLY");
     setTriggerCondition("SCHEDULE_ONLY");
     setMode("AUTO");
     setStrategy("BUY_ONLY");
     setThreshold(DCA_AUTO_BUY_THRESHOLD_PCT);
+  }, [setScheduleType, setTriggerCondition, setMode, setStrategy, setThreshold]);
+
+  function applyDcaAutoBuyPreset() {
+    applyDcaPresetValues();
     setSetupMode("quick");
   }
 
@@ -187,19 +191,8 @@ function AlertFormBody({
   useEffect(() => {
     if (!startWithDcaPreset || dcaPresetApplied.current) return;
     dcaPresetApplied.current = true;
-    setScheduleType("MONTHLY");
-    setTriggerCondition("SCHEDULE_ONLY");
-    setMode("AUTO");
-    setStrategy("BUY_ONLY");
-    setThreshold(DCA_AUTO_BUY_THRESHOLD_PCT);
-  }, [
-    startWithDcaPreset,
-    setScheduleType,
-    setTriggerCondition,
-    setMode,
-    setStrategy,
-    setThreshold,
-  ]);
+    applyDcaPresetValues();
+  }, [startWithDcaPreset, applyDcaPresetValues]);
 
   if (setupMode === "choose") {
     return (

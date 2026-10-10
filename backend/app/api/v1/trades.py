@@ -14,7 +14,13 @@ from app.api.v1._account_deps import get_owned_account
 from app.limiter import limiter
 from app.models.trade import TradeRecord
 from app.models.user import User
-from app.schemas.trade import PeriodPurchaseSummary, TradeCreate, TradeResponse, TradeUpdate
+from app.schemas.trade import (
+    TRADE_CLEARABLE_FIELDS,
+    PeriodPurchaseSummary,
+    TradeCreate,
+    TradeResponse,
+    TradeUpdate,
+)
 from app.services.period_purchase_service import get_period_purchases, resolve_period
 from app.utils.kst import today_kst
 
@@ -110,7 +116,7 @@ async def update_trade(
 ):
     trade = await get_owned_or_404(db, TradeRecord, trade_id, current_user.id, "매매 기록을 찾을 수 없습니다")
     for field_name, value in req.model_dump(exclude_unset=True).items():
-        if value is not None:
+        if value is not None or field_name in TRADE_CLEARABLE_FIELDS:
             setattr(trade, field_name, value)
     await db.commit()
     await db.refresh(trade)

@@ -157,11 +157,6 @@ interface Props {
   signalDisplay?: "none" | "badge" | "banner";
   showDriftRows?: boolean;
   maxDriftRows?: number;
-  /** false면 헤더의 "N개 필요" 배지를 숨긴다 — 상위에 동일 정보를 보여주는 통합 헤더가 있을 때
-   * 중복 표시를 피하기 위함 (기본값 true — 홈·진단 탭 모두 이 카드가 드리프트 개수의 권위 표면). */
-  showHeaderBadge?: boolean;
-  /** false면 "이탈 종목 + 시장상황" 결합 안내 문구를 숨긴다 (기본값 true). */
-  showCombinedNote?: boolean;
   /** 접기/펼치기 상태 localStorage 키 — 미지정 시 저장하지 않음(RebalancingPage 진단탭처럼
    * 같은 컴포넌트를 다른 맥락으로 재사용할 때 대시보드와 상태가 뒤섞이지 않도록 기본값 없음). */
   storageKey?: string;
@@ -192,8 +187,6 @@ export default function RebalancingStatusCard({
   signalDisplay = "banner",
   showDriftRows = false,
   maxDriftRows,
-  showHeaderBadge = true,
-  showCombinedNote = true,
   storageKey,
   emptyStateCta,
   statusOnly = false,
@@ -311,7 +304,7 @@ export default function RebalancingStatusCard({
       iconColorClassName="text-blue-600 dark:text-blue-400"
       title="리밸런싱 점검"
       titleBadge={
-        showHeaderBadge && !statusOnly && needsCount > 0 ? (
+        !statusOnly && needsCount > 0 ? (
           <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
             {needsCount}개 필요
           </span>
@@ -363,7 +356,7 @@ export default function RebalancingStatusCard({
       )}
 
       {/* 이탈 종목 + 시장상황 결합 안내 */}
-      {showCombinedNote && !statusOnly && combinedStatusNote && (
+      {!statusOnly && combinedStatusNote && (
         <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
           {combinedStatusNote}
         </p>

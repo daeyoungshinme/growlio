@@ -43,6 +43,7 @@ cd frontend && npm run test    # Vitest (vitest run)
 cd frontend && npm run test -- src/utils/__tests__/format.test.ts  # 단일 파일
 cd frontend && npm run test:watch                                  # 워치 모드
 cd frontend && npm run format  # Prettier (prettier --write src)
+cd frontend && npm run format:check  # Prettier 검사만 (CI·make lint와 동일)
 ```
 
 ### Android 빌드 (Capacitor)
@@ -86,7 +87,7 @@ make build-android-release         # APK Release 빌드
 - `/rebalancing/plan-confirm?token=` — 리밸런싱 자동화 매수 취소/매도 승인 (RebalancingPlanConfirmPage, 이메일 링크 전용, 인증 불필요)
 - `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
 - `/assets` — **자산 관리 허브** 단일 라우트. `AssetsPage`가 내부적으로 "투자현황"(조회 전용 PortfolioContent)/"계좌관리"(CRUD AssetManagementContent) 2개 탭으로 분기 (`ASSETS_TOP_TABS`, `?tab=` 쿼리 파라미터)
-- `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 + 적립 챌린지 (InvestPlanPage, 상단 탭: 적립 계획/챌린지/배당 계획)
+- `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 + 절세 + 적립 챌린지 (InvestPlanPage, 상단 탭: 적립 계획/배당 계획/절세/챌린지)
 - `/settings` — DART API 키, 계정 정보(비밀번호 변경), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). 계좌 연동·목표·DCA·추천 옵션·알림 설정은 각 페이지에 실제 편집 UI가 있고 설정 탭엔 상태 요약 + 딥링크만
 - `/settings/notifications` — 알림 설정 상세(`NotificationSettingsPage`, `/settings`에서 딥링크). 공통 수신 이메일(`NotificationEmailSection`) + `CollapsibleCard` 3개("정기 리포트·요약"/"즉시 알림"/"시장 모니터링") + 환율/주가/발송이력 탭. `MarketSignalBanner.tsx`/`RebalancingHistoryTab.tsx`의 `?atab=` 딥링크가 이 경로를 가리킴
 - `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
@@ -113,11 +114,13 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 
 - **`BiometricGuard.tsx`** — `App.tsx`에서 `AppLayout` 전체를 감싸는 게이트 컴포넌트. Android 네이티브 빌드에서 생체 인증 미통과 시 하위 라우트 렌더링 차단 (`useBiometric.ts`와 연동). **UI 레벨 게이트일 뿐** — 통과 못 해도 캐시된 JWT로 API 호출 자체는 막히지 않는다. 실제 접근 통제는 백엔드 JWT 인증이 담당하며, 이 컴포넌트를 보안 경계로 의존하는 설계는 하지 말 것.
 - **`OfflineBanner.tsx`** — `useOnlineStatus.ts`로 네트워크 상태 감지 + PWA 오프라인 캐싱(`vite.config.ts`의 VitePWA/Workbox `StaleWhileRevalidate`, 대상: dashboard/portfolio-overview/accounts 엔드포인트)과 함께 오프라인 상태를 안내.
-- **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드. `PortfolioPage`(자산탭 투자현황 › 세금 서브탭)의 `TaxLimitsSection`이 `embedded` 모드로 렌더.
+- **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드. 계획탭 › 절세(`TaxTabContainer`)의 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드. 마찬가지로 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/HealthInsuranceRiskCard.tsx`** — 배당소득 기준 건보 피부양자 자격상실 위험 상시 카드(진행률 바 + 초과 시 예상 월 보험료). `TaxLimitsSection`이 계좌 유무와 무관하게 항상 렌더(배당소득은 전체 수령액 기준). `TaxOptimizationCard`의 조건부 경고 배너와 상호 보완.
 - **`components/dashboard/ActionItemsCard.tsx`** — 홈 "지금 할 일"(Hero 바로 아래, lazy). `GET /dashboard/action-items`(백엔드 `action_items_service`가 리밸런싱 필요·자동매수 예수금 부족·세금 경고·절세 1순위·챌린지 미입금을 우선순위·마감 순 최대 5건으로 집계)를 행 단위 링크로 렌더. 0건이면 한 줄 안내, 조회 실패 시 렌더 안 함. 홈에서 "리밸런싱 필요" 신호의 단일 표면 — 바로 아래 `RebalancingStatusCard`(`statusOnly`)는 상태 확인용으로만 남김. 세금 한도 요약/경고는 예전엔 `InvestmentSnapshotCard`의 `TaxLimitsBanner`였음(2026-10-08 삭제 — 스냅샷 카드는 주식 3수치만). 우선순위 배지·마감 라벨은 `utils/actionPriority.ts`(`TaxActionPlanCard`와 공용).
-- **`components/portfolio-analysis/TaxTabContainer.tsx`** — 자산탭 세금 서브탭 진입점(lazy). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`·`TaxOptimizationCard`를 묶음. 탭 상태 `?taxTab=` 영속화. `taxTab` 미지정 딥링크는 "한도 현황" 랜딩.
+- **`components/portfolio-analysis/TaxTabContainer.tsx`** — 계획탭 "절세" 서브탭 진입점(lazy, `InvestPlanPage`). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`·`TaxOptimizationCard`를 묶음. 탭 상태 `?taxTab=`, 세금 추정 계좌 `?taxAccount=` 영속화. `taxTab` 미지정 딥링크는 "한도 현황" 랜딩. 옛 `/assets?portfolioTab=세금` 링크는 `utils/legacyTabRedirect.ts`가 이쪽으로 옮김.
+- **`components/portfolio/AllocationCard.tsx`** — 자산탭 투자현황의 비중 분석 카드(lazy). 국내/해외(상장시장 ↔ 실제 투자지역 토글)·종목·지수별 비중을 탭 1개 카드로 통합. 하위 뷰는 `components/portfolio/allocation/`(`RegionAllocationView`/`StockAllocationView`/`IndexAllocationView` + 공용 `WeightBarRow`·`ListingBadge`·`SegmentedControl`).
+- **`components/assets/AccountHistoryTab.tsx`** — 계좌관리 "내역" 탭. 세그먼트 "현금 흐름"(입출금·배당 `TransactionHistoryTab`) / "매수 내역"(`PeriodPurchasesTab` — 월/연 매수 종목·수익률, 스냅샷 추정 `추정`/수기 `기록` 배지 + `TradeFormModal`로 매수/매도 기록, 해외 USD→KRW 환산). 세그먼트는 `?history=` 영속. 옛 `atab=입출금·배당`/`기간별 매수`는 `legacyHistorySegment()`로 변환.
 - **`components/portfolio-analysis/TaxLimitsSection.tsx`** — "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`(계좌 조건부) + `HealthInsuranceRiskCard`(항상)를 감싸는 순수 프레젠테이션. 항상 전체 계좌 기준(`accountId` prop 없음). 항상 렌더 카드가 있어 empty-state 없음.
 - **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드(lazy). 리밸런싱 페이지 **"추천" 서브탭**(진단/추천/포트폴리오/이력, `rtab=추천`) 전용 — 추천 관련 딥링크는 `rtab=추천`, 포트폴리오 생성·관리·실행은 `rtab=포트폴리오`. `openRecOptions=1`이면 옵션 모달을 연 채 마운트. 전체/연령대/기간별 3탭. 적용 대상은 모든 포트폴리오(기준 포트폴리오 우선 선택). 결과 렌더는 `RecommendationResultPanel.tsx`로 통합, 탭별 문구·`useMutation`·전환 상태머신은 이 파일.
 - **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 곳(분석/실행 패널, 진단탭 CTA, 계획탭 배너)은 `portfolioId=<id>&openAlert=1` URL 파라미터로 요청한다(`openAlert=dca`는 신규 알림일 때 정기 적립식 자동매수 프리셋 화면으로 바로 연다 — 계획탭 `AutoInvestStatusBanner`의 "자동매수 설정"). 새 진입점도 모달을 직접 마운트하지 말고 이 파라미터를 쓸 것(2026-09-25 이전엔 호스트가 2개였음).
@@ -215,7 +218,7 @@ _기타_
 - `queryKeys.ts` — React Query queryKey 상수 (`QUERY_KEYS` 객체). 모든 queryKey는 여기서 import
 - `queryConfig.ts` — `STALE_TIME`, `REFETCH_INTERVAL` 상수. 매직 넘버 대신 이 상수 사용
 - `defaults.ts` — 백테스트 기본 날짜 상수 (`BACKTEST_DEFAULT_START_DATE` 등)
-- `tabs.ts` — 탭 배열 + 타입: `ASSETS_TOP_TABS`("투자현황"/"계좌관리", AssetsPage 상위 탭), `ASSET_MANAGEMENT_TABS`("은행계좌"/"증권계좌"/"부동산"/"입출금·배당"/"기간별 매수", 계좌관리 내부 탭 — "기간별 매수"는 `components/assets/PeriodPurchasesTab.tsx`(lazy, 월/연 매수 종목·수익률, 스냅샷 추정 `추정`/수기 `기록` 배지) + `TradeFormModal.tsx`(매수/매도 기록, 해외 USD→KRW 환산)), `PORTFOLIO_TABS`
+- `tabs.ts` — 탭 배열 + 타입: `ASSETS_TOP_TABS`("투자현황"/"계좌관리", AssetsPage 상위 탭), `ASSET_MANAGEMENT_TABS`("은행계좌"/"증권계좌"/"부동산"/"내역", 계좌관리 내부 탭 — "내역"은 `AccountHistoryTab`), `PORTFOLIO_TABS`("종목 현황"/"배당", 세금은 계획탭 › 절세로 이동)
 - `transaction.ts` — 거래 유형 상수 (`TX_TYPES`, `TX_LABELS`/`TX_COLORS`: DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST)
 - `validation.ts` — 포트폴리오 비중 허용 오차 (`PORTFOLIO_WEIGHT_TOLERANCE`)
 - `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`, `TAX_IMPACT_GATE_OPTIONS` — AUTO 모드 세금영향 게이트 on/off, `AlertAutoModeSection.tsx`가 소비)
@@ -237,7 +240,7 @@ _기타_
 
 **테스트 위치 (Vitest):**
 
-- `src/utils/__tests__/*.test.ts` — 순수 유틸 함수 단위 테스트 (`format.test.ts`, `error.test.ts`, `colors.test.ts`, `chart.test.ts`, `dividendUtils.test.ts`, `portfolio.test.ts`, `queryInvalidation.test.ts`, `accounts.test.ts`, `diagnosisInsights.test.ts`, `platform.test.ts`, `toast.test.ts` 등)
+- `src/utils/__tests__/*.test.ts` — 순수 유틸 함수 단위 테스트 (`format.test.ts`, `error.test.ts`, `colors.test.ts`, `chart.test.ts`, `dividendUtils.test.ts`, `portfolio.test.ts`, `queryInvalidation.test.ts`, `accounts.test.ts`, `diagnosisInsights.test.ts`, `platform.test.ts`, `toast.test.ts`, `actionPriority.test.ts`, `legacyTabRedirect.test.ts` 등)
 - `src/__tests__/components.*.test.tsx` — 컴포넌트 테스트
 - `src/__tests__/pages.*.test.tsx` — 페이지 테스트
 - `src/__tests__/hooks.*.test.ts(x)` — 커스텀 훅 테스트
@@ -285,7 +288,7 @@ _기타_
 | 계좌별 거래내역                                                    | `["transactions", accountId]`                                                                                               |
 | 전체 거래내역 (무기간)                                             | `["transactions", "all"]`                                                                                                   |
 | 연도별 거래내역                                                    | `["transactions", "all", year]`                                                                                             |
-| 기간별 매수 (계좌관리 › 기간별 매수)                               | `["period-purchases", period, year, month, accountId]` — `periodPurchasesBase` 무효화 전용(sync·계좌 CUD·매매기록 CUD 시)    |
+| 기간별 매수 (계좌관리 › 내역 › 매수 내역)                          | `["period-purchases", period, year, month, accountId]` — `periodPurchasesBase` 무효화 전용(sync·계좌 CUD·매매기록 CUD 시)    |
 | 수기 매매 기록 (종목별)                                            | `["trades", accountId, ticker, market]` — `trades` 프리픽스로 무효화                                                        |
 | 배당금 티커별 (accountId 지정 시 계좌별)                           | `["dividend-by-ticker", accountId]` — `dividendByTickerBase` 무효화 전용                                                    |
 | 배당금 요약 (accountId 지정 시 계좌별)                             | `["dividend-summary", accountId]` — `dividendSummaryBase` 무효화 전용                                                       |
@@ -349,6 +352,7 @@ _기타_
 - `fmtMonth(str)` — "YYYY-MM" → "YYYY년 M월".
 - `fmtPct(n)` — "+5.23%" 형식. null이면 "—".
 - `clampPct(pct)` — 진행률 바 렌더링용 0~100 클램프. 프로그레스 바 `style={{ width }}`에 값 그대로 넣지 말 것.
+- `localToday()` — 사용자 로컬(KST) 기준 오늘 "YYYY-MM-DD". 날짜 입력 기본값에 `new Date().toISOString().slice(0, 10)`를 쓰지 말 것 — UTC라 KST 오전 9시 전엔 전날이 된다. 모듈 최상위 상수로 고정하지 말고 폼을 열 때 호출(자정을 넘긴 세션 대응).
 - `convertUsdToKrw(usd, rate)` / `formatUsdAsKrw(usd, rate)` — USD → KRW 환산·포맷.
 - `relativeTime(date)` — "3분 전" 등 상대 시간 표시.
 - 차트 X축은 `"YY.M"` 형식 (`"25.1"` 등) — 직접 문자열 파싱으로 타임존 이슈 방지
@@ -427,6 +431,7 @@ _기타_
 - `goalFeasibility.ts` — `classifyGoalFeasibility(requiredReturnPct)`: 필요 수익률을 달성 가능성 구간(밴드)으로 분류. `GoalSettingWizard` 사용.
 - `dcaAutoBuy.ts` — `isDcaAutoBuyPreset(alert)`: AUTO·매월·SCHEDULE_ONLY·BUY_ONLY 조합이면 "정기 적립식 자동매수"로 표시 판정.
 - `actionPriority.ts` — 행동 항목 우선순위 배지 스타일(`ACTION_PRIORITY_STYLE`: HIGH 우선/MEDIUM 권장/LOW 참고)·마감 라벨(`deadlineLabel`). `TaxActionPlanCard`·`ActionItemsCard` 공용
+- `legacyTabRedirect.ts` — 탭 재편(plans/50)으로 옮겨진 옛 딥링크 변환: `legacyAssetsTaxRedirect()`(자산 세금 → 계획 › 절세), `legacyHistorySegment()`(계좌관리 옛 하위탭 → 내역 세그먼트). 이메일·푸시에 저장된 링크 호환용이라 지우지 말 것
 - `notificationAlertGroups.ts` — 알림 설정 페이지의 필드 그룹(`REPORT_ALERT_FIELDS`/`INSTANT_ALERT_FIELDS`).
 
 **배당 유틸리티 (`src/utils/dividendUtils.ts`)**
@@ -511,7 +516,8 @@ _기타_
 - 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions-all + dashboard 무효화.
 - 수기 매매 기록 CUD 후: `invalidateTradeData(queryClient)` — trades + period-purchases 무효화.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
-- DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + challenges 무효화.
+- DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + dividend-plan + challenges + action-items 무효화.
+- 소득 구간 변경 후: `invalidateIncomeBracketData(queryClient)` — tax-action-plan + settings + action-items 무효화.
 - 적립 챌린지 CUD 후: `invalidateChallengeData(queryClient)` — challenges(+summary 프리픽스) + dashboard 무효화.
 - 적립 챌린지 알림 설정 변경 후: `invalidateChallengeRemindersData(queryClient)` — settings 무효화.
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
@@ -519,7 +525,7 @@ _기타_
 - 배당 계획 변경 후: `invalidateDividendPlanData(queryClient)`.
 - 주가 알림 CUD 후: `invalidateStockPriceAlertData(queryClient)`.
 - 리밸런싱 주문 실행 후: `invalidateRebalancingHistoryData(queryClient)`.
-- 리밸런싱 대기 플랜 취소/승인 후: `invalidateRebalancingPlanData(queryClient)` — 대기 플랜 목록 + 실행 이력 무효화.
+- 리밸런싱 대기 플랜 취소/승인 후: `invalidateRebalancingPlanData(queryClient, { executed })` — 대기 플랜 목록 + 실행 이력 무효화. 승인은 즉시 체결하므로 응답 `status === "EXECUTED"`면 `executed: true`로 넘겨 `invalidateSyncData`(보유·드리프트·지금 할 일)까지 갱신.
 - 복합신호(시장/리스크) 알림 설정 변경 후: `invalidateCompositeSignalData(queryClient)`.
 - 시장신호 매일 요약 알림 설정 변경 후: `invalidateMarketSignalDigestData(queryClient)`.
 - 연말 절세 리마인더 설정 변경 후: `invalidateYearEndTaxReminderData(queryClient)`.

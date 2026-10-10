@@ -444,7 +444,7 @@ export default function RebalancingHistoryTab() {
     mutationFn: (leg: RebalancingPlanLegSummary) => approvePlanLeg(leg.plan_id, leg.leg_id),
     onSuccess: (res) => {
       toast(res.message, res.status === "EXECUTED" ? "success" : "error");
-      void invalidateRebalancingPlanData(qc);
+      void invalidateRebalancingPlanData(qc, { executed: res.status === "EXECUTED" });
     },
     onError: (e) => toast(extractErrorMessage(e, "처리 중 오류가 발생했습니다"), "error"),
   });

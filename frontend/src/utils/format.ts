@@ -81,6 +81,14 @@ export function parseYmd(dateStr: string): { year: number; month: number; day: n
   return { year, month, day };
 }
 
+/** 사용자 로컬(KST) 기준 오늘 "YYYY-MM-DD" — `toISOString()`은 UTC라 KST 오전 9시 전엔 전날이 된다 */
+export function localToday(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 /** "YYYY-MM-DD"까지 로컬 자정 기준 남은 일수 (지났으면 음수) */
 export function daysUntilYmd(dateStr: string): number {
   const { year, month, day } = parseYmd(dateStr);

@@ -293,6 +293,19 @@ def guess_tracking_index(name: str) -> str | None:
     return None
 
 
+RAW_INDEX_KEY_PREFIX = "RAW:"
+_INDEX_NAME_NOISE_RE = re.compile(r"[\s\-_.()]")
+
+
+def index_key_from_base_index(base_index: str) -> str:
+    """ETF 프로필의 기초지수명 → 지수 비교 키. 알려진 지수면 라벨, 아니면 공백·기호를 지운 원문 키(`RAW:`).
+
+    중복 분석(`etf_overlap_service`)과 지수별 비중(`etf_index_classifier`)이 같은 키로 묶여야 하므로 한 곳에 둔다.
+    """
+    raw = _INDEX_NAME_NOISE_RE.sub("", base_index).upper()
+    return guess_tracking_index(base_index) or f"{RAW_INDEX_KEY_PREFIX}{raw}"
+
+
 def resolve_tracking_index(ticker: str, market: str, name: str, explicit: str | None) -> str | None:
     """후보 종목이 추종하는 지수 라벨을 판별한다.
 

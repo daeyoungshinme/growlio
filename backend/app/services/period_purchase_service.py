@@ -10,9 +10,10 @@
 - 매수는 기간 안에서만 집계하고, 매도는 기간 이후(오늘까지)도 반영한다. "이번 기간에 산 것이 지금
   어떻게 됐나"를 보여주기 위해서다.
 
-사용자가 `TradeRecord`로 기간 내 매매를 직접 기록한 (계좌, ticker, market)은 추정 대신 기록으로
-계산한다(source=MANUAL). 수기 매도는 이번 기간 매수분에서 차감한다. 기록상 남은 수량이 현재 보유
-수량보다 많으면 현재 보유 수량으로 맞추고 `partially_sold`로 표시한다.
+사용자가 `TradeRecord`로 기간 내 매수를 직접 기록한 (계좌, ticker, market)은 추정 대신 기록으로
+계산한다(source=MANUAL). 기간 밖 기록만 있는 종목은 추정을 그대로 쓴다. 수기 매도는 이번 기간
+매수분에서 차감한다. 기록상 남은 수량이 현재 보유 수량보다 많으면 현재 보유 수량으로 맞추고
+`partially_sold`로 표시한다.
 
 계좌의 기간 시작 이전 스냅샷이 없으면(기간 중 등록), 첫 스냅샷 보유분을 기존 보유로 간주하고
 `tracking_started`에 기록한다. 그날 이전 매수는 보이지 않는다.
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
@@ -29,7 +31,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import POSITION_STOCK_ASSET_TYPES
+from app.constants import DOMESTIC_MARKETS, POSITION_STOCK_ASSET_TYPES
 from app.enums import TradeSide
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.models.trade import TradeRecord
@@ -150,11 +152,17 @@ def estimate_lots(
     return lots
 
 
-def lots_from_trades(trades: list[Any], start: date, end: date) -> dict[Key, Lot]:
+def _trade_key(t: Any) -> Key:
+    return (t.ticker, t.market)
+
+
+def lots_from_trades(
+    trades: list[Any], start: date, end: date, key_of: Callable[[Any], Key] = _trade_key
+) -> dict[Key, Lot]:
     """수기 매매 기록으로 lot 계산(순수 함수). BUY는 기간 내만, SELL은 기간 시작 이후 전부 반영."""
     lots: dict[Key, Lot] = {}
     for t in sorted(trades, key=lambda t: (t.trade_date, 0 if t.side == TradeSide.BUY else 1)):
-        key = (t.ticker, t.market)
+        key = key_of(t)
         qty = float(t.qty)
         price = float(t.price_krw)
         fee = float(t.fee or 0)
@@ -231,6 +239,29 @@ def _summarize(items: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _region(market: str) -> str:
+    return "DOMESTIC" if market.upper() in DOMESTIC_MARKETS else "OVERSEAS"
+
+
+def _position_key_aligner(state_maps: list[dict[Key, PosState]]) -> Callable[[Any], Key]:
+    """수기 기록의 market을 같은 종목 포지션의 market으로 맞추는 key 함수.
+
+    기록의 market은 종목 검색(네이버 typeCode·Yahoo 거래소)에서 오고, 포지션의 market은 브로커가
+    정한다(국내는 코스닥도 "KOSPI", 토스 해외는 "US", Arca ETF는 NYSE/AMEX 혼재). 정확 일치로
+    매칭하면 같은 종목이 추정·기록으로 이중 집계되거나 현재 보유 0으로 잘린다. 그래서 ticker와
+    국내/해외 구분이 같으면 포지션 쪽 market을 쓴다(뒤 스냅샷 우선).
+    """
+    known: dict[tuple[str, str], str] = {}
+    for states in state_maps:
+        for ticker, market in states:
+            known[(ticker, _region(market))] = market
+
+    def key_of(t: Any) -> Key:
+        return (t.ticker, known.get((t.ticker, _region(t.market)), t.market))
+
+    return key_of
+
+
 def _to_state(p: Position) -> PosState:
     return PosState(
         qty=float(p.qty or 0),
@@ -255,6 +286,9 @@ def _merge_state(states: dict[Key, PosState], p: Position) -> None:
         existing.avg_price = (existing.avg_price * existing.qty + s.avg_price * s.qty) / total
         if existing.avg_price_usd is not None and s.avg_price_usd is not None:
             existing.avg_price_usd = (existing.avg_price_usd * existing.qty + s.avg_price_usd * s.qty) / total
+        else:
+            # 한쪽에만 USD 평단이 있으면 합산 수량과 짝이 맞는 USD 평단이 없다 → KRW 역산으로 폴백
+            existing.avg_price_usd = None
     existing.qty = total
     existing.current_price = existing.current_price or s.current_price
 
@@ -286,17 +320,10 @@ async def _load_series(
 
     states_by_snap: dict[uuid.UUID, dict[Key, PosState]] = defaultdict(dict)
     if snap_meta:
-        pos_rows = await db.execute(
-            select(Position)
-            .join(AssetSnapshot, Position.snapshot_id == AssetSnapshot.id)
-            .where(
-                AssetSnapshot.account_id.in_(account_ids),
-                AssetSnapshot.snapshot_date >= lower,
-                AssetSnapshot.snapshot_date <= today,
-            )
-        )
+        # 계좌마다 하한(기준일)이 달라 날짜 범위로 거르면 가장 오래된 기준일 이후 전 계좌 포지션을 읽는다
+        pos_rows = await db.execute(select(Position).where(Position.snapshot_id.in_(list(snap_meta))))
         for p in pos_rows.scalars().all():
-            if p.snapshot_id in snap_meta:
+            if p.snapshot_id is not None:
                 _merge_state(states_by_snap[p.snapshot_id], p)
 
     series: dict[uuid.UUID, list[tuple[date, dict[Key, PosState]]]] = defaultdict(list)
@@ -365,20 +392,21 @@ async def get_period_purchases(
         acc_series = series.get(account.id, [])
         current_states = acc_series[-1][1] if acc_series else current_fallback.get(account.id, {})
         estimated = estimate_lots(acc_series, start, end)
-        manual = lots_from_trades(trades_by_account.get(account.id, []), start, end)
-        manual_keys = {(t.ticker, t.market) for t in trades_by_account.get(account.id, [])}
+        acc_trades = trades_by_account.get(account.id, [])
+        key_of = _position_key_aligner([states for _, states in acc_series] + [current_states])
+        manual = lots_from_trades(acc_trades, start, end, key_of)
 
+        # 기간 내 수기 BUY로 lot이 생긴 종목만 추정을 대체한다. 기간 밖 기록(이후 SELL, end 뒤 BUY)만
+        # 있는 종목까지 건너뛰면 추정 매수가 결과에서 통째로 사라진다.
         for key, lot in estimated.items():
-            if key in manual_keys:
+            if key in manual:
                 continue
             current = current_states.get(key)
             name = _name_for(key, current, acc_series)
             items.append(_build_item(account, key, lot, current, SOURCE_ESTIMATED, name))
         for key, lot in manual.items():
             current = current_states.get(key)
-            trade_name = next(
-                (t.name for t in trades_by_account[account.id] if (t.ticker, t.market) == key and t.name), ""
-            )
+            trade_name = next((t.name for t in acc_trades if key_of(t) == key and t.name), "")
             name = trade_name or _name_for(key, current, acc_series)
             items.append(_build_item(account, key, lot, current, SOURCE_MANUAL, name))
 

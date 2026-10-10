@@ -48,7 +48,7 @@ test-frontend:
 
 lint:
 	cd backend && uv run ruff check . && uv run ruff format --check . && \
-	cd ../frontend && npm run lint -- --max-warnings 0
+	cd ../frontend && npm run lint -- --max-warnings 0 && npm run format:check
 
 typecheck:
 	cd backend && uv run mypy app/ && \

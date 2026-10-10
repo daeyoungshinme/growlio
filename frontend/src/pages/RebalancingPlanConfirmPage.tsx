@@ -91,7 +91,7 @@ export default function RebalancingPlanConfirmPage() {
     onSuccess: (res) => {
       setResultMessage(res.message);
       void refetch();
-      void invalidateRebalancingPlanData(qc);
+      void invalidateRebalancingPlanData(qc, { executed: res.status === "EXECUTED" });
     },
     onError: (e) => setResultMessage(extractErrorMessage(e, "처리 중 오류가 발생했습니다")),
   });

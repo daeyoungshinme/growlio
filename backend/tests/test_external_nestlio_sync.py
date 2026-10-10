@@ -250,3 +250,35 @@ class TestAccountCashflows:
             [(date(2025, 10, 1), "DEPOSIT", 1_000_000.0)], 1_100_000.0, date(2026, 10, 1)
         )
         assert xirr(cashflows) == 10.0
+
+
+async def test_monthly_net_deposits_query_scopes_user_active_and_prefix():
+    """라우터 테스트는 이 함수를 통째로 mock하므로, 실제 SQL 조건(소유자·활성 계좌·접두사 제외)을 여기서 고정한다."""
+    from sqlalchemy.dialects import postgresql
+
+    from app.services.external_queries import monthly_net_deposits_by_account
+
+    db = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = [
+        SimpleNamespace(account_id=uuid.uuid4(), month="2026-09", net=100_000),
+        SimpleNamespace(account_id=uuid.uuid4(), month="2026-10", net=0),  # 순입금 0은 제외
+    ]
+    db.execute = AsyncMock(return_value=result)
+
+    out = await monthly_net_deposits_by_account(db, uuid.uuid4(), [uuid.uuid4()], "2026-01", "nestlio:")
+
+    assert [r["month"] for r in out] == ["2026-09"]
+    sql = str(db.execute.call_args.args[0].compile(dialect=postgresql.dialect()))
+    assert "JOIN asset_accounts ON asset_accounts.id = transactions.account_id" in sql
+    assert "asset_accounts.is_active IS true" in sql
+    assert "transactions.user_id =" in sql
+    assert "transactions.external_ref IS NULL" in sql
+
+
+async def test_monthly_net_deposits_empty_ids_skips_query():
+    from app.services.external_queries import monthly_net_deposits_by_account
+
+    db = AsyncMock()
+    assert await monthly_net_deposits_by_account(db, uuid.uuid4(), [], "2026-01", None) == []
+    db.execute.assert_not_called()

@@ -32,9 +32,13 @@ export interface TradeCreate {
   notes?: string;
 }
 
+/** fee·notes는 null을 보내면 비운다(키를 빼면 기존 값 유지) */
 export type TradeUpdate = Partial<
-  Pick<TradeCreate, "side" | "qty" | "price_krw" | "fee" | "trade_date" | "notes">
->;
+  Pick<TradeCreate, "side" | "qty" | "price_krw" | "trade_date">
+> & {
+  fee?: number | null;
+  notes?: string | null;
+};
 
 /** ESTIMATED: 일별 스냅샷 보유수량·평단 변화로 추정 / MANUAL: 사용자가 기록한 매매로 계산 */
 export type PurchaseSource = "ESTIMATED" | "MANUAL";

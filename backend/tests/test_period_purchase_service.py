@@ -245,3 +245,86 @@ async def test_get_period_purchases_no_accounts():
     out = await get_period_purchases(db, uuid.uuid4(), START, END, date(2026, 10, 8))
     assert out["items"] == []
     assert out["summary"]["return_pct"] is None
+
+
+async def test_get_period_purchases_out_of_period_manual_keeps_estimate(account):
+    """기간 밖 수기 기록(이후 매도·end 뒤 매수)만 있으면 추정 매수가 사라지면 안 된다."""
+    base_id, s1_id = uuid.uuid4(), uuid.uuid4()
+    later = [
+        _trade("SELL", 5, 80_000, date(2026, 11, 5)),
+        _trade("BUY", 3, 75_000, date(2026, 11, 6)),
+    ]
+    for t in later:
+        t.account_id = account.id
+    db = AsyncMock()
+    db.execute = AsyncMock(
+        side_effect=[
+            _result(scalars=[account]),
+            _result(rows=[(account.id, date(2026, 9, 30))]),
+            _result(rows=[(base_id, account.id, date(2026, 9, 30)), (s1_id, account.id, date(2026, 10, 7))]),
+            _result(scalars=[_pos(s1_id, account.id, 10, 70_000, 77_000)]),
+            _result(scalars=later),
+        ]
+    )
+    out = await get_period_purchases(db, uuid.uuid4(), START, END, date(2026, 11, 10))
+    [item] = out["items"]
+    assert item["source"] == SOURCE_ESTIMATED
+    assert item["bought_amount_krw"] == 700_000
+
+
+class TestMergeState:
+    def test_usd_avg_dropped_when_only_one_row_has_it(self):
+        from app.services.period_purchase_service import _merge_state
+
+        states: dict = {}
+        a = _pos(None, None, 10, 1_300_000, None, ticker="AAPL", market="NASDAQ")
+        a.avg_price_usd, a.usd_rate = 1000.0, 1300.0
+        b = _pos(None, None, 10, 1_400_000, None, ticker="AAPL", market="NASDAQ")
+        _merge_state(states, a)
+        _merge_state(states, b)
+        merged = states[US_KEY]
+        assert merged.qty == 20
+        assert merged.avg_price == 1_350_000
+        # 10주분 USD 평단이 20주에 붙으면 역산이 틀어진다 → KRW 폴백
+        assert merged.avg_price_usd is None
+
+    def test_usd_avg_weighted_when_both_rows_have_it(self):
+        from app.services.period_purchase_service import _merge_state
+
+        states: dict = {}
+        for qty, usd in ((10, 100.0), (30, 200.0)):
+            p = _pos(None, None, qty, usd * 1300, None, ticker="AAPL", market="NASDAQ")
+            p.avg_price_usd, p.usd_rate = usd, 1300.0
+            _merge_state(states, p)
+        assert states[US_KEY].avg_price_usd == pytest.approx(175.0)
+
+
+@pytest.mark.parametrize(
+    ("trade_market", "pos_market", "ticker"),
+    [
+        ("KOSDAQ", "KOSPI", "247540"),  # 브로커는 코스닥 종목도 "KOSPI"로 저장
+        ("NYSE", "US", "SPY"),  # 토스 해외 센티널
+    ],
+)
+async def test_get_period_purchases_manual_matches_position_market(account, trade_market, pos_market, ticker):
+    """검색에서 온 market과 브로커 포지션 market이 달라도 같은 종목으로 매칭한다."""
+    base_id, s1_id = uuid.uuid4(), uuid.uuid4()
+    trade = _trade("BUY", 10, 60_000, date(2026, 10, 3), ticker=ticker, market=trade_market, name="종목")
+    trade.account_id = account.id
+    db = AsyncMock()
+    db.execute = AsyncMock(
+        side_effect=[
+            _result(scalars=[account]),
+            _result(rows=[(account.id, date(2026, 9, 30))]),
+            _result(rows=[(base_id, account.id, date(2026, 9, 30)), (s1_id, account.id, date(2026, 10, 7))]),
+            _result(scalars=[_pos(s1_id, account.id, 10, 60_000, 66_000, ticker=ticker, market=pos_market)]),
+            _result(scalars=[trade]),
+        ]
+    )
+    out = await get_period_purchases(db, uuid.uuid4(), START, END, date(2026, 10, 8))
+    # 추정·기록 이중 집계 없이 기록 1건, 현재 보유(10주)로 평가
+    [item] = out["items"]
+    assert item["source"] == SOURCE_MANUAL
+    assert item["market"] == pos_market
+    assert item["held_qty"] == 10
+    assert item["return_pct"] == 10.0

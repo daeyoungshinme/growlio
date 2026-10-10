@@ -189,6 +189,31 @@ class TestTradeCrud:
         assert resp.status_code == 200
         assert trade.qty == 5
 
+    def test_create_rejects_future_date(self, client_ctx):
+        client, _, _ = client_ctx
+        body = {
+            "account_id": str(uuid.uuid4()),
+            "side": "BUY",
+            "ticker": "005930",
+            "market": "KOSPI",
+            "qty": 1,
+            "price_krw": 70000,
+            "trade_date": "2026-10-09",
+        }
+        with patch("app.schemas.trade.today_kst", return_value=date(2026, 10, 8)):
+            assert client.post("/api/v1/trades", json=body, headers=AUTH).status_code == 422
+
+    def test_update_null_clears_fee_and_notes_but_keeps_required(self, client_ctx):
+        client, user, db = client_ctx
+        trade = _trade(user.id)
+        trade.fee, trade.notes = 500, "메모"
+        db.scalar = AsyncMock(return_value=trade)
+        resp = client.put(f"/api/v1/trades/{trade.id}", json={"fee": None, "notes": None, "qty": None}, headers=AUTH)
+        assert resp.status_code == 200
+        assert trade.fee is None
+        assert trade.notes is None
+        assert trade.qty == 10  # 필수 필드의 null은 "변경 없음"
+
     def test_delete_404(self, client_ctx):
         client, _, db = client_ctx
         db.scalar = AsyncMock(return_value=None)
