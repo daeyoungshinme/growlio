@@ -610,8 +610,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
                                 key={`${sub.account_id}-${sub.ticker}`}
                                 className="bg-gray-50/70 dark:bg-gray-800/50 border-t border-gray-100/80 dark:border-gray-700/80"
                               >
-                                <td className="py-2 px-4" />
-                                <td className="py-2 px-5">
+                                <td className="py-2 px-5 sticky left-0 z-10 bg-gray-50 dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700">
                                   <div className="flex items-center gap-2 pl-6">
                                     <span className="text-gray-300 dark:text-gray-600">·</span>
                                     <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -643,6 +642,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
                                 </td>
                                 <td className="py-2 px-4" />
                                 <td className="py-2 px-4" />
+                                <td className="py-2 px-3" />
                               </tr>
                             ))}
                         </Fragment>

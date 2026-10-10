@@ -14,6 +14,7 @@ import {
   invalidateChallengeData,
   invalidateChallengeRemindersData,
   invalidateTradeData,
+  invalidateRebalancingPlanData,
 } from "../queryInvalidation";
 
 function makeQueryClient() {
@@ -178,5 +179,25 @@ describe("invalidateTradeData", () => {
       const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
       expect(keys).toContain("period-purchases");
     }
+  });
+});
+
+describe("invalidateRebalancingPlanData", () => {
+  it("취소·실패는 대기 플랜·이력만 무효화", async () => {
+    const qc = makeQueryClient();
+    await invalidateRebalancingPlanData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toContain("rebalancing-plans");
+    expect(keys).toContain("rebalancing-history");
+    expect(keys).not.toContain("drift-summary");
+  });
+
+  it("승인 즉시 체결(executed)이면 보유·드리프트·지금 할 일까지 무효화", async () => {
+    const qc = makeQueryClient();
+    await invalidateRebalancingPlanData(qc as any, { executed: true });
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toContain("drift-summary");
+    expect(keys).toContain("action-items");
+    expect(keys).toContain("dashboard");
   });
 });

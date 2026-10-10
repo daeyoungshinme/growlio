@@ -24,7 +24,7 @@ import {
   TOUCH_TARGET_ROW,
 } from "@/constants/uiSizes";
 import { invalidateTradeData } from "@/utils/queryInvalidation";
-import { convertUsdToKrw, fmtKrwPrice } from "@/utils/format";
+import { convertUsdToKrw, fmtKrwPrice, localToday } from "@/utils/format";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 
@@ -39,14 +39,6 @@ interface Props {
   accounts: AssetAccount[];
   prefill?: TradePrefill | null;
   onClose: () => void;
-}
-
-/** 사용자 로컬(KST) 기준 오늘 — toISOString()은 UTC라 오전 9시 전엔 전날이 된다 */
-function localToday(): string {
-  const d = new Date();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 const SIDE_OPTIONS: { value: TradeSide; label: string }[] = [

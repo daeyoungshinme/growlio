@@ -458,6 +458,38 @@ describe("StockHoldingsTable", () => {
     expect(screen.getAllByText("평단가").length).toBeGreaterThan(1);
   });
 
+  it("데스크톱 계좌별 하위 행은 헤더와 같은 열에 맞춰진다 (계좌명=종목 열, 수량=수량 열)", () => {
+    const otherAccount: PortfolioPosition = {
+      ...mockPosition,
+      account_id: "acc-other",
+      account_name: "다른 계좌",
+      qty: 7,
+    };
+    renderWithProviders(
+      <StockHoldingsTable
+        positions={[mockPosition, otherAccount]}
+        dividendMap={{}}
+        divLoading={false}
+        divError={false}
+      />,
+    );
+    const cardButton = screen
+      .getAllByRole("button")
+      .find(
+        (b) => b.getAttribute("aria-expanded") === "false" && b.textContent?.includes("Apple Inc."),
+      );
+    fireEvent.click(cardButton!);
+    const subRow = screen
+      .getAllByText("다른 계좌")
+      .map((el) => el.closest("tr"))
+      .find((tr): tr is HTMLTableRowElement => tr !== null)!;
+    const headerCount = subRow.closest("table")!.querySelectorAll("thead th").length;
+    const cells = subRow.querySelectorAll("td");
+    expect(cells).toHaveLength(headerCount);
+    expect(cells[0].textContent).toContain("다른 계좌");
+    expect(cells[1].textContent).toBe("7");
+  });
+
   it("shows error state for dividends", () => {
     renderWithProviders(
       <StockHoldingsTable
