@@ -34,6 +34,7 @@ import { useBiometric } from "@/hooks/useBiometric";
 import { retryPushRegistration, disablePushNotifications } from "@/hooks/usePushNotifications";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import DeleteAccountModal from "@/components/settings/DeleteAccountModal";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -91,6 +92,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [confirmingDartDelete, setConfirmingDartDelete] = useState(false);
   const authEmail = useAuthStore((s) => s.email);
 
   const { data: current } = useQuery({
@@ -277,7 +279,7 @@ export default function SettingsPage() {
           </button>
           {current?.has_dart && (
             <button
-              onClick={deleteDart}
+              onClick={() => setConfirmingDartDelete(true)}
               disabled={saving === "dart-delete"}
               className="min-h-[44px] px-5 py-2 text-sm border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
             >
@@ -286,6 +288,17 @@ export default function SettingsPage() {
           )}
         </div>
       </SectionCard>
+      {confirmingDartDelete && (
+        <ConfirmModal
+          message="저장된 DART API 키를 삭제할까요? 삭제하면 공시 조회가 멈추고, 다시 쓰려면 키를 새로 입력해야 해요."
+          confirmLabel="삭제"
+          onConfirm={() => {
+            setConfirmingDartDelete(false);
+            void deleteDart();
+          }}
+          onCancel={() => setConfirmingDartDelete(false)}
+        />
+      )}
 
       {/* 앱 설정 */}
       <div>

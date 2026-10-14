@@ -10,6 +10,7 @@ import {
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import { invalidateAlertData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
@@ -26,6 +27,7 @@ export function ExchangeRateAlertSection() {
     max_trigger_count: "1",
   });
 
+  const [pendingDelete, setPendingDelete] = useState<ExchangeRateAlert | null>(null);
   const {
     items: alerts,
     reactivateMutation: reactivateAlertMutation,
@@ -153,10 +155,10 @@ export function ExchangeRateAlertSection() {
                   </button>
                 )}
                 <button
-                  onClick={() => deleteAlertMutation.mutate(alert.id)}
+                  onClick={() => setPendingDelete(alert)}
                   disabled={deleteAlertMutation.isPending}
                   className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
-                  title="삭제"
+                  aria-label="환율 알림 삭제"
                 >
                   <DeleteIcon />
                 </button>
@@ -164,6 +166,17 @@ export function ExchangeRateAlertSection() {
             </div>
           ))}
         </div>
+      )}
+      {pendingDelete && (
+        <ConfirmModal
+          message={`환율 ${Number(pendingDelete.target_rate).toLocaleString("ko-KR")}원 ${pendingDelete.direction === "BELOW" ? "이하" : "이상"} 알림을 삭제할까요?`}
+          confirmLabel="삭제"
+          onConfirm={() => {
+            deleteAlertMutation.mutate(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </SectionCard>
   );

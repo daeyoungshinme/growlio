@@ -1,8 +1,10 @@
 import { BadgeCheck, Info, TrendingUp, TrendingDown, Lightbulb, TriangleAlert } from "lucide-react";
 import type { OverseasPositionDetail, OverseasRealizedSummary } from "@/api/tax";
+import { useState } from "react";
 import { fmtKrw } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { useTaxSimulation, type OverseasTaxRule } from "@/hooks/useTaxSimulation";
+import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
 import { TaxPositionTable } from "./TaxPositionTable";
 import { TaxSimulationCard } from "./TaxSimulationCard";
 import { TaxRecommendationList } from "./TaxRecommendationList";
@@ -40,6 +42,14 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
     recommendations,
     handleQtyChange,
   } = useTaxSimulation(positions, autoRealized, taxRule);
+
+  // 숫자 키패드(inputMode=numeric)엔 마이너스 키가 없어 손실을 입력할 수 없다 — 부호는 토글로 받고 칸엔 절댓값만
+  const [realizedSign, setRealizedSign] = useState<"GAIN" | "LOSS">(() =>
+    alreadyRealizedInput.trim().startsWith("-") ? "LOSS" : "GAIN",
+  );
+  const realizedAbsInput = alreadyRealizedInput.replace(/^\s*-/, "");
+  const applyRealized = (abs: string, sign: "GAIN" | "LOSS") =>
+    setAlreadyRealizedInput(abs && sign === "LOSS" ? `-${abs}` : abs);
 
   if (positions.length === 0) {
     return (
@@ -120,12 +130,24 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
           >
             {autoRealized !== null ? "직접 입력 (자동값 대신)" : "올해 실현 손익 (원)"}
           </label>
+          <SegmentedControl
+            ariaLabel="실현 손익 부호"
+            options={[
+              { value: "GAIN", label: "이익" },
+              { value: "LOSS", label: "손실" },
+            ]}
+            value={realizedSign}
+            onChange={(next) => {
+              setRealizedSign(next);
+              applyRealized(realizedAbsInput, next);
+            }}
+          />
           <input
             id="tax-planner-realized"
             type="text"
             inputMode="numeric"
-            value={alreadyRealizedInput}
-            onChange={(e) => setAlreadyRealizedInput(e.target.value)}
+            value={realizedAbsInput}
+            onChange={(e) => applyRealized(e.target.value.replace(/-/g, ""), realizedSign)}
             placeholder={autoRealized !== null ? String(Math.round(autoRealized)) : "0"}
             className="w-36 min-w-0 min-h-[44px] border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />

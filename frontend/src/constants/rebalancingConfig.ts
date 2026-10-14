@@ -100,3 +100,17 @@ export const TAX_IMPACT_GATE_OPTIONS: { value: TaxImpactGateMode; label: string;
  * 스케줄일에 예수금이 조금이라도 쌓여 있으면 거의 항상 목표 비중대로 매수되게 한다.
  * 사용자에게는 노출하지 않고 내부적으로만 사용 (AlertQuickDcaSection.tsx 참고). */
 export const DCA_AUTO_BUY_THRESHOLD_PCT = 0.5;
+
+/**
+ * 대기 플랜 leg 상태 라벨 — 백엔드 `RebalancingPlanLeg.status`
+ * (PENDING | EXECUTED | CANCELED | REJECTED | EXPIRED | FAILED) 전부를 덮어 영문 코드가 노출되지 않게 한다.
+ * 이력 탭과 이메일·푸시 승인 페이지가 공유.
+ */
+export const PLAN_LEG_STATUS_LABEL: Record<string, string> = {
+  PENDING: "대기 중",
+  EXECUTED: "실행됨",
+  CANCELED: "취소됨",
+  REJECTED: "거부됨",
+  EXPIRED: "만료됨",
+  FAILED: "실패",
+};

@@ -7,6 +7,7 @@ import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { REDIRECT_DELAY_MS } from "@/constants/timers";
 import { toast } from "@/utils/toast";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -146,6 +147,7 @@ export default function ResetPasswordPage() {
               </label>
               <input
                 id="reset-new-password"
+                autoComplete="new-password"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -170,6 +172,7 @@ export default function ResetPasswordPage() {
               </label>
               <input
                 id="reset-confirm-password"
+                autoComplete="new-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -191,7 +194,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className={`${TOUCH_TARGET_MIN} w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
             >
               {loading ? "변경 중..." : "비밀번호 변경"}
             </button>

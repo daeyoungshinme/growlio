@@ -1,10 +1,11 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Pencil, Trash2 } from "lucide-react";
 import { Transaction, TransactionCreate } from "@/api/transactions";
 import { fmtKrw } from "@/utils/format";
-import { TX_LABELS, TX_COLORS } from "@/constants/transaction";
+import { TX_LABELS, TX_COLORS, txDeleteConfirmMessage } from "@/constants/transaction";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import ConfirmModal from "@/components/common/ConfirmModal";
 
 interface TransactionListProps {
   txList: Transaction[] | undefined;
@@ -24,6 +25,8 @@ export function TransactionList({
   onDelete,
 }: TransactionListProps) {
   const filtered = (txList ?? []).filter((t) => t.transaction_type === activeType);
+  // 휴지통 아이콘이 수정 아이콘 바로 옆이라 오탭이 잦다 — 금융 기록은 확인 후 삭제
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -86,7 +89,7 @@ export function TransactionList({
                   <Pencil size={13} />
                 </button>
                 <button
-                  onClick={() => onDelete(tx.id)}
+                  onClick={() => setPendingDelete(tx)}
                   disabled={isDeleting}
                   aria-label="삭제"
                   className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors`}
@@ -168,7 +171,7 @@ export function TransactionList({
                         <Pencil size={13} />
                       </button>
                       <button
-                        onClick={() => onDelete(tx.id)}
+                        onClick={() => setPendingDelete(tx)}
                         disabled={isDeleting}
                         aria-label="삭제"
                         className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors`}
@@ -188,6 +191,17 @@ export function TransactionList({
           </tbody>
         </table>
       </div>
+      {pendingDelete && (
+        <ConfirmModal
+          message={txDeleteConfirmMessage(pendingDelete)}
+          confirmLabel="삭제"
+          onConfirm={() => {
+            onDelete(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </>
   );
 }
