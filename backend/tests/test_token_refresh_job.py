@@ -82,7 +82,14 @@ class TestRefreshAllUserTokens:
             patch("app.jobs.token_refresh.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.token_refresh.decrypt_kis_credentials", return_value=("decrypted", "decrypted")),
             patch("app.jobs.token_refresh.get_access_token", side_effect=fail_token),
+            patch("app.jobs.token_refresh.sentry_sdk") as mock_sentry,
         ):
             from app.jobs.token_refresh import refresh_all_user_tokens
 
             await refresh_all_user_tokens()  # 예외 전파 없어야 함
+
+        # 실패는 Sentry로 가되, 자격증명 지역변수가 실리는 capture_exception이 아니라 스택 없는 메시지로
+        mock_sentry.capture_exception.assert_not_called()
+        mock_sentry.capture_message.assert_called_once()
+        assert "Exception" in mock_sentry.capture_message.call_args.args[0]
+        assert "decrypted" not in mock_sentry.capture_message.call_args.args[0]

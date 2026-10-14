@@ -132,6 +132,83 @@ class TestExternalTransactionIdempotency:
         assert resp.json()["duplicate"] is True
         db.rollback.assert_awaited_once()
 
+    def test_retry_after_account_deleted_returns_duplicate_not_404(self, override_settings):
+        # 첫 요청 뒤 계좌가 삭제(비활성)되면 소유 계좌 확인은 404 — 멱등 조회가 먼저라 중복 응답이어야 한다.
+        from fastapi import HTTPException
+
+        user = _make_user()
+        account = _auto_account(user.id)
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        existing = SimpleNamespace(id=uuid.uuid4())
+
+        with ExitStack() as stack:
+            _common_tx_patches(stack, account)
+            stack.enter_context(
+                patch("app.api.v1.external._get_owned_account", AsyncMock(side_effect=HTTPException(404, "없음")))
+            )
+            stack.enter_context(patch("app.api.v1.external.find_by_external_ref", AsyncMock(return_value=existing)))
+            client = stack.enter_context(TestClient(app, raise_server_exceptions=False))
+            resp = client.post("/api/v1/external/transactions", json=_tx_body(account.id))
+
+        assert resp.status_code == 201
+        assert resp.json()["duplicate"] is True
+        assert resp.json()["transaction_id"] == str(existing.id)
+
+    def test_same_key_with_different_payload_warns_but_keeps_contract(self, override_settings):
+        from app.enums import TransactionType
+
+        user = _make_user()
+        account = _auto_account(user.id)
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        existing = SimpleNamespace(
+            id=uuid.uuid4(),
+            account_id=account.id,
+            transaction_type=TransactionType.DEPOSIT,
+            amount=100_000,  # 요청은 300_000
+            transaction_date=date(2026, 10, 8),
+        )
+
+        with ExitStack() as stack:
+            _common_tx_patches(stack, account)
+            stack.enter_context(patch("app.api.v1.external.find_by_external_ref", AsyncMock(return_value=existing)))
+            logger = stack.enter_context(patch("app.api.v1.external.logger"))
+            client = stack.enter_context(TestClient(app, raise_server_exceptions=False))
+            resp = client.post("/api/v1/external/transactions", json=_tx_body(account.id))
+
+        assert resp.status_code == 201
+        assert resp.json()["duplicate"] is True
+        logger.warning.assert_called_once()
+        assert logger.warning.call_args.args[0] == "external_tx_idempotency_payload_mismatch"
+        assert logger.warning.call_args.kwargs["fields"] == ["amount"]
+        db.add.assert_not_called()
+
+    def test_same_key_with_same_payload_does_not_warn(self, override_settings):
+        from app.enums import TransactionType
+
+        user = _make_user()
+        account = _auto_account(user.id)
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        existing = SimpleNamespace(
+            id=uuid.uuid4(),
+            account_id=account.id,
+            transaction_type=TransactionType.DEPOSIT,
+            amount=300_000.0,
+            transaction_date=date(2026, 10, 8),
+        )
+
+        with ExitStack() as stack:
+            _common_tx_patches(stack, account)
+            stack.enter_context(patch("app.api.v1.external.find_by_external_ref", AsyncMock(return_value=existing)))
+            logger = stack.enter_context(patch("app.api.v1.external.logger"))
+            client = stack.enter_context(TestClient(app, raise_server_exceptions=False))
+            resp = client.post("/api/v1/external/transactions", json=_tx_body(account.id))
+
+        assert resp.json()["duplicate"] is True
+        logger.warning.assert_not_called()
+
     def test_rejects_overlong_external_ref(self, override_settings):
         user = _make_user()
         app = _setup_app(user, _make_mock_db())

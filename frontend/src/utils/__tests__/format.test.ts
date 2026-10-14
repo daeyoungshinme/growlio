@@ -11,6 +11,7 @@ import {
   fmtKrwShort,
   fmtMonth,
   fmtPct,
+  localMonth,
   localToday,
   relativeTime,
 } from "@/utils/format";
@@ -214,5 +215,23 @@ describe("localToday", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 5, 12, 0));
     expect(localToday()).toBe("2026-01-05");
+  });
+});
+
+describe("localMonth", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("매월 1일 로컬 자정 직후에도 이번 달 (UTC 기준이면 전월)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 1, 0, 30));
+    expect(localMonth()).toBe("2026-11");
+  });
+
+  it("1월 두 자리 패딩", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 1, 8, 59));
+    expect(localMonth()).toBe("2026-01");
   });
 });

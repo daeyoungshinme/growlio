@@ -1,5 +1,6 @@
 import asyncio
 
+import sentry_sdk
 import structlog
 from sqlalchemy import select
 
@@ -12,6 +13,18 @@ from app.services.credential_service import decrypt_kis_credentials
 logger = structlog.get_logger()
 
 _TOKEN_REFRESH_CONCURRENCY = 3
+
+
+def _report_refresh_failure(account_id: str, exc: BaseException) -> None:
+    """Sentry에 실패를 알린다 — `report_job_failure`(capture_exception)는 쓰지 않는다.
+
+    이 잡은 복호화된 app_key/app_secret을 지역변수로 들고 있어, 스택 프레임과 지역변수를 함께 보내는
+    capture_exception 대신 스택 없는 capture_message로 예외 타입명과 계좌 id만 보낸다.
+    """
+    with sentry_sdk.new_scope() as scope:
+        scope.set_tag("job", "token_refresh")
+        scope.set_tag("account_id", account_id)
+        sentry_sdk.capture_message(f"kis_account_token_refresh_failed: {type(exc).__name__}", level="error")
 
 
 async def refresh_all_user_tokens() -> None:
@@ -55,5 +68,6 @@ async def refresh_all_user_tokens() -> None:
                 logger.info("kis_account_token_refreshed", account_id=str(account.id))
             except Exception as e:
                 logger.error("kis_account_token_refresh_failed", account_id=str(account.id), error=str(e))
+                _report_refresh_failure(str(account.id), e)
 
     await asyncio.gather(*(_refresh_one(account) for account in accounts_with_creds))

@@ -1,5 +1,15 @@
 name: Android APK Build
 
+# Gradle은 `npx cap sync android`가 생성하는 파일(capacitor.settings.gradle의 플러그인 항목,
+# capacitor-cordova-android-plugins/)과 node_modules/@capacitor/* 소스를 직접 참조한다 —
+# 웹 빌드·cap sync·Gradle은 반드시 같은 잡(같은 체크아웃) 안에서 실행해야 한다.
+#
+# 필요한 저장소 설정 (Settings › Secrets and variables › Actions):
+#   Variables: VITE_API_DOMAIN, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_REDIRECT_URL,
+#              VITE_SENTRY_DSN(선택)
+#   Secrets(release만): ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+#              ANDROID_KEY_PASSWORD
+
 on:
   workflow_dispatch:
     inputs:
@@ -16,12 +26,12 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-web:
-    name: Build Web Assets
+  build-apk:
+    name: Build APK
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
+    env:
+      BUILD_DEBUG: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == 'both') }}
+      BUILD_RELEASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both')) }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
@@ -31,42 +41,45 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Build web assets
-        run: npm run build
-
-      - name: Sync Capacitor
-        run: npx cap sync android
-
-      - name: Upload web dist
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: web-dist-${{ github.sha }}
-          path: frontend/android/app/src/main/assets/public
-          retention-days: 1
-
-  build-debug:
-    name: Build Debug APK
-    runs-on: ubuntu-latest
-    needs: build-web
-    if: >
-      github.event_name == 'workflow_dispatch' &&
-      (github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == 'both')
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v5
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Download web dist
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: web-dist-${{ github.sha }}
-          path: frontend/android/app/src/main/assets/public
+      - name: Check build-time variables
+        env:
+          VITE_API_DOMAIN: ${{ vars.VITE_API_DOMAIN }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        # 비어 있으면 앱이 localhost:8000 / 빈 Supabase를 가리키는 APK가 조용히 만들어진다
+        run: |
+          missing=""
+          for name in VITE_API_DOMAIN VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::저장소 Variables 누락:$missing"
+            exit 1
+          fi
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build web assets
+        working-directory: frontend
+        env:
+          VITE_API_DOMAIN: ${{ vars.VITE_API_DOMAIN }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_REDIRECT_URL: ${{ vars.VITE_REDIRECT_URL }}
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
+        run: npm run build
+
+      - name: Sync Capacitor
+        working-directory: frontend
+        run: npx cap sync android
 
       - name: Cache Gradle
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
@@ -82,59 +95,27 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
+        if: env.BUILD_DEBUG == 'true'
         working-directory: frontend/android
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload Debug APK
+        if: env.BUILD_DEBUG == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: growlio-debug-${{ github.sha }}
           path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
-  build-release:
-    name: Build Release APK
-    runs-on: ubuntu-latest
-    needs: build-web
-    # 버전 태그 push 또는 release/both 빌드 요청 시 실행
-    if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' &&
-       (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both'))
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v5
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-
-      - name: Download web dist
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: web-dist-${{ github.sha }}
-          path: frontend/android/app/src/main/assets/public
-
       - name: Decode Keystore
+        if: env.BUILD_RELEASE == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > /tmp/growlio.keystore
 
-      - name: Cache Gradle
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('frontend/android/**/*.gradle*', 'frontend/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-
-
-      - name: Make gradlew executable
-        working-directory: frontend/android
-        run: chmod +x gradlew
-
       - name: Build Release APK
+        if: env.BUILD_RELEASE == 'true'
         working-directory: frontend/android
         env:
           KEYSTORE_PATH: /tmp/growlio.keystore
@@ -144,6 +125,7 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Upload Release APK
+        if: env.BUILD_RELEASE == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: growlio-release-${{ github.ref_name }}-${{ github.sha }}

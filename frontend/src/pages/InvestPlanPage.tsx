@@ -28,7 +28,7 @@ import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
 import AutoInvestStatusBanner from "@/components/invest/AutoInvestStatusBanner";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
-import { fmtKrw, fmtKrwPreview } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview, localMonth } from "@/utils/format";
 import { invalidateDcaData } from "@/utils/queryInvalidation";
 import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
@@ -125,7 +125,7 @@ export default function InvestPlanPage() {
 
   const s = data?.settings;
   const isConfigured = data?.is_configured;
-  const today = new Date().toISOString().slice(0, 7);
+  const today = localMonth();
   const latestMonth = data?.projection_months
     .filter((d) => d.month <= today && d.has_data)
     .slice(-1)[0];

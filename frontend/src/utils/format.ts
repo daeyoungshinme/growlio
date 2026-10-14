@@ -89,6 +89,11 @@ export function localToday(): string {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
+/** 사용자 로컬(KST) 기준 이번 달 "YYYY-MM" — `toISOString()`은 UTC라 매월 1일 오전 9시 전엔 전월이 된다 */
+export function localMonth(): string {
+  return localToday().slice(0, 7);
+}
+
 /** "YYYY-MM-DD"까지 로컬 자정 기준 남은 일수 (지났으면 음수) */
 export function daysUntilYmd(dateStr: string): number {
   const { year, month, day } = parseYmd(dateStr);

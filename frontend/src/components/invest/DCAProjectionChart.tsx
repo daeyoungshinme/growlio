@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import type { DCAProjectionPoint } from "@/api/invest";
 import { useThemeStore } from "@/stores/themeStore";
-import { fmtKrw, fmtKrwShort } from "@/utils/format";
+import { fmtKrw, fmtKrwShort, localMonth } from "@/utils/format";
 import { chartTooltipStyle } from "@/utils/chart";
 import { buildScenarioCurve } from "@/utils/dcaScenarioProjection";
 import { SAVINGS_RETURN_PRESETS } from "@/constants/savingsPresets";
@@ -28,7 +28,7 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const [showScenarios, setShowScenarios] = useState(false);
   const canShowScenarios = !!monthlyDepositAmount && monthlyDepositAmount > 0;
-  const today = new Date().toISOString().slice(0, 7);
+  const today = localMonth();
   const pastPoints = data.filter((d) => d.month <= today);
   const futurePoints = data.filter((d) => d.month > today);
   const recentPast = pastPoints.slice(-24);

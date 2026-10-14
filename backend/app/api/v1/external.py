@@ -31,6 +31,7 @@ GET /goal은 사용자가 growlio 설정에서 입력한 투자목표(목표금�
 from datetime import UTC, date, datetime
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
@@ -65,6 +66,7 @@ from app.utils.currency import fetch_usd_krw
 from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/external", tags=["external"])
+logger = structlog.get_logger()
 
 
 class ExternalAccountBalance(BaseModel):
@@ -264,7 +266,27 @@ class ExternalTransactionResult(BaseModel):
     duplicate: bool = False
 
 
-def _duplicate_result(tx: Transaction) -> ExternalTransactionResult:
+def _duplicate_result(tx: Transaction, req: ExternalTransactionCreate) -> ExternalTransactionResult:
+    # 응답 규약(201·duplicate=True)은 유지하되, 같은 키에 다른 내용이 오면 호출측 키 생성 버그일 수 있어 흔적을 남긴다.
+    mismatched = [
+        name
+        for name, stored, sent in (
+            ("account_id", getattr(tx, "account_id", None), req.account_id),
+            ("transaction_type", getattr(tx, "transaction_type", None), req.transaction_type),
+            ("transaction_date", getattr(tx, "transaction_date", None), req.transaction_date),
+        )
+        if stored is not None and stored != sent
+    ]
+    stored_amount = getattr(tx, "amount", None)
+    if stored_amount is not None and float(stored_amount) != req.amount:
+        mismatched.append("amount")
+    if mismatched:
+        logger.warning(
+            "external_tx_idempotency_payload_mismatch",
+            transaction_id=str(tx.id),
+            external_ref=req.external_ref,
+            fields=mismatched,
+        )
     return ExternalTransactionResult(transaction_id=str(tx.id), deposit_krw_adjusted=False, duplicate=True)
 
 
@@ -286,11 +308,12 @@ async def create_external_transaction(
     if req.transaction_type not in (TransactionType.DEPOSIT, TransactionType.WITHDRAWAL):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "transaction_type은 DEPOSIT 또는 WITHDRAWAL만 허용합니다.")
 
-    account = await _get_owned_account(req.account_id, current_user.id, db)
+    # 멱등 조회가 계좌 확인보다 먼저다 — 첫 요청 뒤 계좌가 삭제(비활성)돼도 재시도는 404가 아니라 중복 응답이어야 한다.
     if req.external_ref is not None:
         existing = await find_by_external_ref(db, current_user.id, req.external_ref)
         if existing is not None:
-            return _duplicate_result(existing)
+            return _duplicate_result(existing, req)
+    account = await _get_owned_account(req.account_id, current_user.id, db)
 
     tx = Transaction(
         user_id=current_user.id,
@@ -340,7 +363,7 @@ async def create_external_transaction(
         existing = await find_by_external_ref(db, current_user.id, req.external_ref)
         if existing is None:
             raise
-        return _duplicate_result(existing)
+        return _duplicate_result(existing, req)
     await db.refresh(tx)
 
     cache = await get_cache_store()

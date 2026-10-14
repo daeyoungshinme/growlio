@@ -42,6 +42,7 @@ async def test_run_exchange_rate_alert_check_handles_exception():
     mock_cache = MagicMock()
 
     with (
+        patch("app.jobs._job_helpers.report_job_failure") as mock_report,
         patch("app.jobs._job_helpers.get_cache_store", new=AsyncMock(return_value=mock_cache)),
         patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch(
@@ -52,6 +53,9 @@ async def test_run_exchange_rate_alert_check_handles_exception():
         from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
 
         await run_exchange_rate_alert_check()  # 예외 전파 없어야 함
+
+    mock_report.assert_called_once()
+    assert isinstance(mock_report.call_args.args[1], RuntimeError)
 
 
 @pytest.mark.asyncio
@@ -76,6 +80,7 @@ async def test_run_rebalancing_alert_check_handles_exception():
     mock_db = _make_mock_db()
 
     with (
+        patch("app.jobs._job_helpers.report_job_failure") as mock_report,
         patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch(
             "app.jobs.rebalancing_alert.check_rebalancing_alerts",
@@ -85,6 +90,9 @@ async def test_run_rebalancing_alert_check_handles_exception():
         from app.jobs.rebalancing_alert import run_rebalancing_alert_check
 
         await run_rebalancing_alert_check()  # 예외 전파 없어야 함
+
+    mock_report.assert_called_once()
+    assert isinstance(mock_report.call_args.args[1], ValueError)
 
 
 @pytest.mark.asyncio
@@ -130,6 +138,7 @@ async def test_run_market_signal_daily_digest_handles_exception():
     mock_cache = MagicMock()
 
     with (
+        patch("app.jobs._job_helpers.report_job_failure") as mock_report,
         patch("app.jobs._job_helpers.get_cache_store", new=AsyncMock(return_value=mock_cache)),
         patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch(
@@ -140,3 +149,6 @@ async def test_run_market_signal_daily_digest_handles_exception():
         from app.jobs.market_signal_daily_digest import run_market_signal_daily_digest
 
         await run_market_signal_daily_digest()  # 예외 전파 없어야 함
+
+    mock_report.assert_called_once()
+    assert isinstance(mock_report.call_args.args[1], RuntimeError)

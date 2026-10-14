@@ -34,7 +34,8 @@ def report_job_failure(event: str, exc: BaseException, **context: str) -> None:
     잡지 못하고, 잡 함수가 예외를 삼키므로 APScheduler의 에러 로그도 남지 않는다 — 명시적으로
     capture한다(Sentry 미초기화 시 no-op). 로그 쪽은 redact 프로세서가 문자열만 마스킹하므로
     traceback(exc_info) 대신 error=str(e)만 남긴다. 자격증명을 지역변수로 다루는 잡(token_refresh)은
-    Sentry 스택 로컬 전송을 피하려고 이 헬퍼를 쓰지 않는다.
+    Sentry 스택 로컬 전송을 피하려고 이 헬퍼를 쓰지 않고 스택 없는 capture_message를 쓴다
+    (`token_refresh._report_refresh_failure`).
     """
     logger.error(event, error=str(exc), **context)
     sentry_sdk.capture_exception(exc)
