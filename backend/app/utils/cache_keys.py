@@ -38,7 +38,6 @@ TTL_HAS_OVERSEAS_FALSE = 900  # 해외 없음 15분 (신규 매수 시 빠른 �
 TTL_DIVIDEND_SUMMARY = 3600  # 배당 집계 1시간
 TTL_PORTFOLIO_OVERVIEW = 1800  # 포트폴리오 overview 30분
 TTL_PORTFOLIO_LIST = 300  # 포트폴리오 목록 5분
-TTL_ACCOUNT_DETAIL = 300  # 계좌 상세 5분
 TTL_EXCHANGE_RATE_ALERTS = 300  # 환율 알림 목록 5분
 TTL_INDICATOR_HISTORY = 21600  # 경제지표 시계열 6시간
 TTL_INDICATOR_CALENDAR = 86400  # 경제지표 발표 일정 24시간
@@ -202,10 +201,6 @@ def portfolio_overview_acct_suffix(account_ids: list[uuid.UUID] | None) -> str:
 
 def portfolio_list_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}portfolio_list:{user_id}"
-
-
-def account_detail_key(user_id: uuid.UUID, account_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}account_detail:{user_id}:{account_id}"
 
 
 def sync_all_status_key(user_id: uuid.UUID) -> str:
@@ -492,7 +487,6 @@ async def invalidate_rebalancing_analysis_cache_all(cache: CacheStoreType, user_
 async def invalidate_asset_account_caches(
     cache: CacheStoreType,
     user_id: uuid.UUID,
-    account_id: uuid.UUID | None = None,
     year: int | None = None,
     *,
     positions_changed: bool = True,
@@ -519,8 +513,6 @@ async def invalidate_asset_account_caches(
         goal_recommendation_horizon_key(user_id),
         goal_recommendation_age_key(user_id),
     ]
-    if account_id is not None:
-        keys.append(account_detail_key(user_id, account_id))
     await invalidate_user_caches(cache, *keys)
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
@@ -534,14 +526,3 @@ async def invalidate_tax_overseas_caches(cache: CacheStoreType, user_id: uuid.UU
     변경·API 키 등록)도 과세 대상 계좌 집합을 바꾸므로 양쪽에서 호출한다."""
     await _scan_unlink(cache, f"{_env_prefix()}tax:overseas:{user_id}:*")
     await _scan_unlink(cache, f"{_env_prefix()}tax:overseas_realized:{user_id}:*")
-
-
-async def invalidate_account_caches(
-    cache: CacheStoreType, user_id: uuid.UUID, year: int | None = None, *, positions_changed: bool = True
-) -> None:
-    """계좌 싱크 완료 후 관련 캐시 일괄 무효화 — `invalidate_asset_account_caches`의 계좌 상세 키 없는 형태.
-
-    두 함수가 따로 키 목록을 들고 있다가 어긋난 적이 있어(CRUD 쪽만 추이·배분이력 누락) 하나로 합쳤다.
-    `positions_changed` — `invalidate_dividend_caches` 참고.
-    """
-    await invalidate_asset_account_caches(cache, user_id, None, year, positions_changed=positions_changed)

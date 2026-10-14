@@ -33,7 +33,7 @@ class TestCrossUserAccess:
     """다른 유저의 계좌에 접근하면 404를 반환한다."""
 
     def test_get_other_users_account_returns_404(self):
-        """User A가 User B 소유 account_id로 GET 요청 → 404."""
+        """User A가 User B 소유 account_id로 계좌 하위 리소스(GET positions) 요청 → 404."""
         from app.api.deps import get_current_user
         from app.core.database import get_db
         from app.main import app
@@ -55,7 +55,7 @@ class TestCrossUserAccess:
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get(
-                    f"/api/v1/assets/{uuid.uuid4()}",
+                    f"/api/v1/assets/{uuid.uuid4()}/positions",
                     headers={"Authorization": "Bearer faketoken"},
                 )
             assert resp.status_code == 404
@@ -116,9 +116,12 @@ class TestCrossUserAccess:
         app.dependency_overrides[get_current_user] = override_user
         app.dependency_overrides[get_db] = override_db
         try:
-            with TestClient(app, raise_server_exceptions=False) as client:
+            with (
+                patch("app.api.v1.positions.fetch_manual_positions", new=AsyncMock(return_value=[])),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
                 resp = client.get(
-                    f"/api/v1/assets/{account_id}",
+                    f"/api/v1/assets/{account_id}/positions",
                     headers={"Authorization": "Bearer faketoken"},
                 )
             assert resp.status_code == 200

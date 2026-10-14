@@ -64,7 +64,7 @@ class TestSyncAccount:
         with (
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             result = await sync_account(account, mock_db, cache=MagicMock())
@@ -93,7 +93,7 @@ class TestSyncAccount:
         with (
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
@@ -121,7 +121,7 @@ class TestSyncAccount:
         with (
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
@@ -150,7 +150,7 @@ class TestSyncAccount:
                 "app.services.asset_service._upsert_snapshot",
                 new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
@@ -177,7 +177,7 @@ class TestSyncAccount:
                 "app.services.asset_service._upsert_snapshot",
                 new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
@@ -214,7 +214,7 @@ class TestSyncAccount:
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
@@ -250,7 +250,7 @@ class TestSyncAccount:
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()) as mock_invalidate,
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()) as mock_invalidate,
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             result = await sync_account(account, mock_db, cache=MagicMock())
@@ -291,7 +291,7 @@ class TestSyncAccount:
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()) as mock_invalidate,
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()) as mock_invalidate,
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             result = await sync_account(account, mock_db, cache=MagicMock())
@@ -317,7 +317,7 @@ class TestSyncAccount:
         with (
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
@@ -373,7 +373,7 @@ class TestSyncAccountPositionReplacement:
                 new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
             patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
@@ -446,7 +446,7 @@ class TestSyncAccountPositionReplacement:
             patch("app.services.asset_service.sync_snapshot_positions", new=snap_positions),
             patch("app.services.asset_service._preserved_overseas_positions", new=AsyncMock(return_value=[preserved])),
             patch("app.services.asset_service.fetch_yahoo_batch", new=AsyncMock(return_value={})),
-            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
@@ -513,7 +513,6 @@ class TestSyncAccountNow:
         """요청 세션이 아닌 AsyncSessionLocal()로 연 별도 세션을 사용하고, account를 merge해야 한다
         (커넥션 풀 슬롯을 브로커 HTTP 호출 동안 오래 붙잡지 않기 위한 구조 — QueuePool 고갈 수정)."""
         from app.services.asset_service import sync_account_now
-        from app.utils.cache_keys import account_detail_key
 
         account = make_account(data_source="MANUAL")
         fake_snapshot = SimpleNamespace(id=uuid.uuid4(), snapshot_date="2026-09-12", amount_krw=1_000_000.0)
@@ -529,14 +528,11 @@ class TestSyncAccountNow:
         with (
             patch("app.services.asset_service.AsyncSessionLocal", return_value=mock_db),
             patch("app.services.asset_service.sync_account", new=AsyncMock(return_value=fake_result)) as mock_sync,
-            patch("app.services.asset_service.invalidate_user_caches", new=AsyncMock()) as mock_invalidate,
         ):
-            result = await sync_account_now(account, account.user_id, cache=cache)
+            result = await sync_account_now(account, cache=cache)
 
         mock_db.merge.assert_awaited_once_with(account)
         mock_sync.assert_awaited_once_with(account, mock_db, cache)
-        # 계좌 단위 캐시는 sync_account()가 이미 지우므로 여기선 계좌 상세 키만 — 이중 무효화 방지
-        mock_invalidate.assert_awaited_once_with(cache, account_detail_key(account.user_id, account.id))
         assert result == {
             "detail": "동기화 완료",
             "snapshot_date": "2026-09-12",

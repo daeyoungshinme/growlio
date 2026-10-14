@@ -34,9 +34,7 @@ from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positi
 from app.services.yahoo_price import fetch_yahoo_batch
 from app.utils.cache_keys import (
     CacheStoreType,
-    account_detail_key,
-    invalidate_account_caches,
-    invalidate_user_caches,
+    invalidate_asset_account_caches,
 )
 from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit, toss_circuit
 from app.utils.kst import today_kst
@@ -239,7 +237,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     await db.commit()
 
     # sync 완료 후 관련 캐시 즉시 무효화 — sync 직후에도 최신 데이터 표시
-    await invalidate_account_caches(cache, account.user_id, positions_changed=positions_changed)
+    await invalidate_asset_account_caches(cache, account.user_id, positions_changed=positions_changed)
 
     broker_sync_duration.labels(data_source=account.data_source, status="success").observe(
         time.monotonic() - _sync_start
@@ -253,7 +251,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     return SyncAccountResult(snapshot=snapshot, positions_changed=positions_changed)
 
 
-async def sync_account_now(account: AssetAccount, user_id: uuid.UUID, cache: CacheStoreType) -> dict[str, str | float]:
+async def sync_account_now(account: AssetAccount, cache: CacheStoreType) -> dict[str, str | float]:
     """계좌 동기화 실행 + 관련 캐시 무효화 + API 응답 dict 반환 (assets.py `/sync` 엔드포인트 전용).
 
     요청 스코프 세션이 아닌 별도의 짧게 스코프된 세션을 사용한다 — 브로커 HTTP 호출(재시도 포함)
@@ -264,8 +262,7 @@ async def sync_account_now(account: AssetAccount, user_id: uuid.UUID, cache: Cac
         merged_account = await db.merge(account)
         sync_result = await sync_account(merged_account, db, cache)
 
-    # 계좌 단위 캐시 전체는 sync_account()가 이미 지웠다 — 계좌 상세 키만 추가로 지운다.
-    await invalidate_user_caches(cache, account_detail_key(user_id, account.id))
+    # 계좌 단위 캐시 무효화는 sync_account()가 이미 한다.
     return {
         "detail": "동기화 완료",
         "snapshot_date": str(sync_result.snapshot.snapshot_date),

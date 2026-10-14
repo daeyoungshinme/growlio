@@ -38,9 +38,9 @@ class AssetAccount(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    # BANK_ACCOUNT | DEPOSIT | STOCK_KIS | STOCK_KIWOOM | STOCK_OTHER | CASH_OTHER | OTHER | REAL_ESTATE
+    # app.enums.AssetType 값
     asset_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    # MANUAL | KIS_API | KIWOOM_API
+    # app.enums.DataSource 값
     data_source: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
     institution: Mapped[str | None] = mapped_column(String(100))
     # GENERAL | ISA | PENSION_SAVINGS | IRP | OVERSEAS_DEDICATED — 세제 성격 (리밸런싱 세금 계산·매도 우선순위에 사용)
@@ -61,7 +61,7 @@ class AssetAccount(Base):
 
     # KIS 계좌 (STOCK_KIS)
     kis_account_no: Mapped[str | None] = mapped_column(String(20))
-    # 계좌별 KIS 자격증명 (AES-256 암호화) — 없으면 UserSettings 전역 자격증명 사용
+    # 계좌별 KIS 자격증명 (AES-256 암호화) — 없으면 이 계좌는 동기화·주문 불가
     kis_app_key: Mapped[str | None] = mapped_column(String(512))
     kis_app_secret: Mapped[str | None] = mapped_column(String(512))
     is_mock_mode: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -143,7 +143,7 @@ class AssetSnapshot(Base):
     invested_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     unrealized_pnl: Mapped[float | None] = mapped_column(Numeric(18, 2))
 
-    # MANUAL | KIS_API | KIWOOM_API
+    # app.enums.DataSource 값
     source: Mapped[str] = mapped_column(String(20), default="MANUAL", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

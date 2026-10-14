@@ -3,8 +3,7 @@
 import uuid
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, field_validator
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import PaginationDep, get_current_user, get_db
@@ -14,11 +13,6 @@ from app.models.user import User
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.dividend.drip_service import calc_monthly_optimization
 from app.services.dividend.orchestrator import get_position_dividend_yields, get_ticker_dividend_summary
-from app.services.dividend.ticker_settings_service import (
-    delete_ticker_settings,
-    get_ticker_settings,
-    upsert_ticker_settings,
-)
 from app.utils.cache_keys import (
     TTL_DIVIDENDS_POSITIONS,
     dividends_positions_key,
@@ -78,60 +72,6 @@ async def ticker_dividend_summary(
     """종목별 실수령(올해) + 예상 배당금 통합 (24h 캐시). account_id 미지정 시 전체 계좌 통합 기준."""
     result = await get_ticker_dividend_summary(current_user.id, db, account_ids=[account_id] if account_id else None)
     return result[pagination.skip : pagination.skip + pagination.limit]
-
-
-class TickerSettingsRequest(BaseModel):
-    market: str
-    dividend_months: list[int]
-
-    @field_validator("dividend_months")
-    @classmethod
-    def months_valid(cls, v: list[int]) -> list[int]:
-        if not v:
-            raise ValueError("배당월을 하나 이상 입력하세요")
-        invalid = [m for m in v if not (1 <= m <= 12)]
-        if invalid:
-            raise ValueError(f"배당월은 1~12 범위여야 합니다: {invalid}")
-        return sorted(set(v))
-
-
-@router.get("/ticker-settings/{ticker}")
-async def get_ticker_setting(
-    ticker: str,
-    market: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """종목 설정 조회 (배당월 override 여부 포함)."""
-    result = await get_ticker_settings(current_user.id, ticker, market, db)
-    if not result:
-        return {"ticker": ticker, "market": market, "dividend_months": [], "is_manual": False}
-    return result
-
-
-@router.put("/ticker-settings/{ticker}")
-async def put_ticker_setting(
-    ticker: str,
-    body: TickerSettingsRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """배당월 수동 override 저장."""
-    return await upsert_ticker_settings(current_user.id, ticker, body.market, body.dividend_months, db)
-
-
-@router.delete("/ticker-settings/{ticker}")
-async def del_ticker_setting(
-    ticker: str,
-    market: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """배당월 override 삭제 (자동 감지로 복구)."""
-    deleted = await delete_ticker_settings(current_user.id, ticker, market, db)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="설정이 존재하지 않습니다")
-    return {"deleted": True}
 
 
 # ---------------------------------------------------------------------------

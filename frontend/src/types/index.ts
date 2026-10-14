@@ -132,7 +132,6 @@ export interface DividendYield {
   estimated_annual_krw: number;
   estimated_monthly_krw: number;
   dividend_months: number[];
-  dividend_months_is_manual: boolean;
   investment_yield: number;
 }
 
@@ -147,7 +146,6 @@ export interface DividendByTicker {
   dividend_yield: number;
   dps: number;
   dividend_months: number[];
-  dividend_months_is_manual: boolean;
   investment_yield: number;
   currency: string;
   estimated_monthly_usd: number | null;

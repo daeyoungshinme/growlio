@@ -344,7 +344,7 @@ async def create_external_transaction(
     await db.refresh(tx)
 
     cache = await get_cache_store()
-    await invalidate_asset_account_caches(cache, current_user.id, account_id=account.id)
+    await invalidate_asset_account_caches(cache, current_user.id)
     await invalidate_user_caches(cache, monthly_trend_key(current_user.id), challenge_progress_key(current_user.id))
 
     return ExternalTransactionResult(

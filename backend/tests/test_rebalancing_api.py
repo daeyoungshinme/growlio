@@ -586,11 +586,6 @@ class TestCollectDividendMap:
                 return_value="",
             ),
             patch(
-                "app.services.rebalancing.overview_enrichment.load_user_dividend_overrides",
-                new_callable=AsyncMock,
-                return_value={},
-            ),
-            patch(
                 "app.services.rebalancing.overview_enrichment.fetch_ticker_dividend_info", new_callable=AsyncMock
             ) as mock_fetch,
         ):
@@ -605,7 +600,6 @@ class TestCollectDividendMap:
         portfolio = self._make_portfolio([{"ticker": "SPY", "market": "NYSE"}])
         kis_creds = {"app_key": "x"}
         dart_key = "dart-key"
-        overrides = {("SPY", "NYSE"): [3, 6, 9, 12]}
 
         with (
             patch(
@@ -617,11 +611,6 @@ class TestCollectDividendMap:
                 "app.services.rebalancing.overview_enrichment.fetch_dart_api_key",
                 new_callable=AsyncMock,
                 return_value=dart_key,
-            ),
-            patch(
-                "app.services.rebalancing.overview_enrichment.load_user_dividend_overrides",
-                new_callable=AsyncMock,
-                return_value=overrides,
             ),
             patch(
                 "app.services.rebalancing.overview_enrichment.fetch_ticker_dividend_info",
@@ -639,7 +628,7 @@ class TestCollectDividendMap:
         assert call_args[2] is cache
         assert call_args[4] == kis_creds
         assert call_args[5] == dart_key
-        assert call_args[6] == overrides
+        assert len(call_args) == 6
         assert result[("SPY", "NYSE")]["dividend_yield"] == 1.5
 
 

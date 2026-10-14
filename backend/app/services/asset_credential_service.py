@@ -18,7 +18,6 @@ from app.kiwoom.constants import KIWOOM_TOKEN_CACHE_KEY
 from app.models.asset import AssetAccount
 from app.models.token import KisToken, KiwoomToken, TossToken
 from app.toss.constants import TOSS_TOKEN_CACHE_KEY
-from app.utils.cache_keys import account_detail_key, invalidate_user_caches
 
 
 async def verify_kis_credentials(
@@ -131,7 +130,7 @@ CREDENTIAL_FIELDS: set[str] = set(attr for spec in BROKER_CREDENTIAL_SPECS.value
 
 
 async def delete_credentials(account: AssetAccount, db: AsyncSession, cache, spec: BrokerCredentialSpec) -> None:
-    """계좌별 브로커 자격증명과 발급 토큰(DB·캐시)을 삭제한다. KIS는 이후 전역 자격증명으로 폴백된다."""
+    """계좌별 브로커 자격증명과 발급 토큰(DB·캐시)을 삭제한다."""
     setattr(account, spec.key_attr, None)
     setattr(account, spec.secret_attr, None)
     token_model = spec.token_model
@@ -139,4 +138,3 @@ async def delete_credentials(account: AssetAccount, db: AsyncSession, cache, spe
     await db.commit()
 
     await cache.delete(spec.token_cache_key.format(account_id=account.id))
-    await invalidate_user_caches(cache, account_detail_key(account.user_id, account.id))

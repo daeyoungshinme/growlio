@@ -64,22 +64,6 @@ async def create_challenge(
     return await challenge_service.get_challenge_response(challenge, current_user.id, db, cache)
 
 
-@router.get("/{challenge_id}", response_model=ChallengeResponse)
-@limiter.limit("60/minute")
-async def get_challenge(
-    request: Request,
-    challenge_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """챌린지 상세 (월별 그리드 포함)."""
-    challenge = await get_owned_or_404(
-        db, InvestmentChallenge, challenge_id, current_user.id, "챌린지를 찾을 수 없습니다"
-    )
-    cache = await get_cache_store()
-    return await challenge_service.get_challenge_response(challenge, current_user.id, db, cache)
-
-
 @router.patch("/{challenge_id}", response_model=ChallengeResponse)
 @limiter.limit("20/minute")
 async def update_challenge(

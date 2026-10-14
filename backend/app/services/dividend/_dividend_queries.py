@@ -8,7 +8,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.asset import UserTickerSettings
 from app.models.user import UserSettings
 from app.services.credential_service import decrypt
 
@@ -19,10 +18,3 @@ async def fetch_dart_api_key(user_id: uuid.UUID, db: AsyncSession) -> str:
     if row and row.dart_api_key:
         return decrypt(row.dart_api_key)
     return settings.dart_api_key
-
-
-async def load_user_dividend_overrides(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], list[int]]:
-    """사용자 ticker 설정에서 배당월 override map을 로드한다."""
-    result = await db.execute(select(UserTickerSettings).where(UserTickerSettings.user_id == user_id))
-    rows = result.scalars().all()
-    return {(row.ticker, row.market): list(row.dividend_months) for row in rows if row.dividend_months}

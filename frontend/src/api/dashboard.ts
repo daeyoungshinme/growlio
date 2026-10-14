@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPut } from "./client";
+import { apiGet } from "./client";
 import type { ActionPriority } from "@/utils/actionPriority";
 
 export interface DashboardAllocationItem {
@@ -43,34 +43,6 @@ export interface DashboardData {
 }
 
 export const fetchDashboard = () => apiGet<DashboardData>("/dashboard");
-
-export interface TickerDividendItem {
-  ticker: string | null;
-  name: string;
-  market: string | null;
-  received_krw: number;
-  estimated_annual_krw: number;
-  estimated_monthly_krw: number;
-  dividend_yield: number;
-  dps: number;
-  dividend_months: number[];
-  dividend_months_is_manual: boolean;
-  investment_yield: number;
-  currency: string;
-  estimated_monthly_usd: number | null;
-}
-
-export const fetchDividendByTicker = () => apiGet<TickerDividendItem[]>("/dividends/by-ticker");
-
-export const updateTickerDividendMonths = (
-  ticker: string,
-  market: string,
-  dividend_months: number[],
-) =>
-  apiPut(`/dividends/ticker-settings/${encodeURIComponent(ticker)}`, { market, dividend_months });
-
-export const deleteTickerDividendMonths = (ticker: string, market: string) =>
-  apiDelete(`/dividends/ticker-settings/${encodeURIComponent(ticker)}`, { params: { market } });
 
 export type ActionItemKind =
   "REBALANCE" | "DCA_SHORTFALL" | "TAX_WARNING" | "TAX_ACTION" | "CHALLENGE";

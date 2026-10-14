@@ -81,18 +81,6 @@ async def create_transaction(
     return tx
 
 
-@router.get("/{tx_id}", response_model=TransactionResponse)
-@limiter.limit("60/minute")
-async def get_transaction(
-    request: Request,
-    tx_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    tx = await _get_owned_tx(tx_id, current_user.id, db)
-    return tx
-
-
 @router.put("/{tx_id}", response_model=TransactionResponse)
 @limiter.limit("30/minute")
 async def update_transaction(

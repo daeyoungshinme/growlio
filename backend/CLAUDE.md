@@ -62,7 +62,7 @@ cd backend && uv run pytest --tb=short         # 짧은 트레이스백 (출력 
 cd backend && uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=80
 ```
 
-> 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`tests/conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `tests/conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
+> 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`tests/conftest.py`). `KIS_CRED_ENCRYPTION_KEY` 등 환경변수는 `tests/conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
 > **Windows 주의:** 전체 `pytest` 실행 시 모든 테스트가 통과(`N passed`)한 뒤 인터프리터 종료 단계에서 access violation(exit `-1073741819` / `0xC0000005`)으로 비정상 종료 코드가 나올 수 있다 — 네이티브 확장(numpy/cryptography 등) teardown 이슈로, **테스트 실패가 아니다**. 단일 파일 실행과 Linux CI는 정상이므로 판정은 `N passed` 출력과 CI 결과를 기준으로 한다.
 > **주요 fixtures:** `mock_db` (AsyncSession mock, scalars/execute/commit/get 포함), `mock_cache` (in-memory 캐시 store mock — get/set/setex), `make_account` (AssetAccount stub), `make_snapshot` (AssetSnapshot stub), `make_user_settings` (UserSettings stub).
 
@@ -83,10 +83,9 @@ cd backend && uv run mypy app/
 ### Environment
 `backend/.env` (`.env.example` 참고):
 - `APP_ENV=development` — `/docs` Swagger UI 활성화 여부 제어
-- `APP_SECRET_KEY` — 필수(32자 이상, 미달 시 기동 실패). 인증은 Supabase JWKS 검증이라 JWT 서명에는 쓰이지 않음
 - `DATABASE_URL` — PostgreSQL asyncpg URL. Supabase 사용 시 **Transaction Pooler(6543) 권장** — Session Pooler(5432)는 프로젝트 전체에 걸쳐 동시 연결 15개 상한을 공유해 orphan 프로세스(비정상 종료된 `uvicorn --reload` 등) 하나만 남아도 쉽게 소진되어 `EMAXCONNSESSION` 오류가 발생함
 - `MIGRATION_DATABASE_URL` — Supabase 전용 마이그레이션 DB URL (로컬 Docker는 `DATABASE_URL`과 동일)
-- `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/키움 자격증명 AES-256 암호화 키
+- `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/키움/토스 자격증명 AES-256 암호화 키
 - `ALLOWED_ORIGINS` — CORS 허용 출처 (쉼표 구분, 예: `http://localhost:5173`)
 - `FRONTEND_URL` — 이메일 링크 생성용 프론트엔드 URL
 - `API_SEMAPHORE_LIMIT` — 외부 API 동시 호출 제한 세마포어 크기
@@ -95,12 +94,10 @@ cd backend && uv run mypy app/
 
 **Supabase** (`supabase.com > Project Settings > API`):
 - `SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_JWT_SECRET` — 선택. 현재 RS256 JWKS 검증 방식이라 불필요(레거시 설정)
 
 **외부 API**:
 - `DART_API_KEY` — opendart.fss.or.kr
 - `FRED_API_KEY` — fred.stlouisfed.org (미국 경제지표)
-- `FMP_API_KEY` — financialmodelingprep.com (증시 캘린더, 현재 코드에서 미사용 — 예약된 설정)
 
 **이메일 알림** (Resend HTTP API — Render 등 클라우드의 outbound SMTP 포트 차단을 피하기 위해 SMTP 대신 HTTPS API 사용):
 - `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_TIMEOUT`
@@ -227,7 +224,6 @@ services/
   │   ├── fetcher.py          # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
   │   ├── calculator.py       # 순수 계산 함수 — DB·외부 API 의존 없음
   │   ├── orchestrator.py     # DB·캐시·외부 fetch 조율, get_dividend_data() 구현
-  │   ├── ticker_settings_service.py # 사용자별 배당월 수동 설정(UserTickerSettings) CRUD
   │   ├── aggregator.py       # 트랜잭션 기반 배당금 집계 (get_dividend_summary)
   │   ├── plan_service.py     # 연배당/월배당 계획 및 목표 달성 현황
   │   ├── drip_service.py     # 배당 월별 균등화 제안 (calc_monthly_optimization) — 순수 함수

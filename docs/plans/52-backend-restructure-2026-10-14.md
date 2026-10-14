@@ -70,6 +70,20 @@
 - **stale 주석:** `models/asset.py:42-44,65`(TOSS 누락, 전역 자격증명 언급)
 - **프론트 중복 클라이언트:** `/dividends/by-ticker` 2개, `/portfolio/overview` 래퍼 3개를 1개씩으로 줄인다.
 
+### 배치 A 구현 결과 (2026-10-14, 같은 브랜치)
+
+| 항목 | 결과 |
+|---|---|
+| 고아 GET 3개 | **삭제**. 계좌 상세 캐시(`account_detail_key`, `TTL_ACCOUNT_DETAIL`)는 지우기만 하는 키가 되므로 함께 제거했다(자격증명 삭제·계좌 동기화 쪽 무효화 포함). 그 결과 `invalidate_asset_account_caches`의 `account_id` 인자와 `sync_account_now`의 `user_id` 인자가 쓰이지 않게 돼 함께 뺐다. 소유권 테스트 3개(챌린지, 보안 2)는 DELETE·`GET /assets/{id}/positions`로 대상을 옮겨 유지했다 |
+| 배당월 override | **전체 제거**: 라우트 3개, `ticker_settings_service.py`, `load_user_dividend_overrides`, fetcher·calculator·orchestrator·overview_enrichment의 `overrides`/`override_months`, 응답 필드 `dividend_months_is_manual`. 프론트에서는 래퍼 2개, 타입 필드, "수동/자동" 배지(모바일)와 "배당월 설정" 열(데스크톱), 칩 파란 톤, `dividendFreqInfo`의 `isManual` 인자를 제거했다. PUT은 저장 후 24시간 배당 캐시도 비우지 않는 반쯤 연결된 상태였다. **`UserTickerSettings` 모델과 테이블은 배치 G에서 드롭한다** |
+| 미사용 config 3개 | **삭제**: `config.py`, `render.yaml`, CI, `.env.example` 2개, conftest, `backend/CLAUDE.md`. 설정이 `extra="ignore"`이므로 Render에 남은 환경변수는 무해하다 |
+| 호환 별칭·잔재 | **삭제**: `asset_aggregator` 별칭 5개(운영 코드도 별칭으로 호출하고 있었다. 테스트 patch는 같은 모듈의 공개 이름으로, import는 정의 모듈 `composition_calculator`로 옮겼다), `invalidate_account_caches`, `cache_store.ping`, `sync_calendar_to_cache`(`get_calendar_events`에 흡수) |
+| stale 주석 | **수정**: 값 목록 대신 `app.enums.AssetType`/`DataSource`를 가리키게 했다. "전역 자격증명 폴백" 문구 3곳도 고쳤다 |
+| 프론트 중복 클라이언트 | `api/dashboard.ts`의 `fetchDividendByTicker`/`TickerDividendItem`(테스트만 사용)을 **삭제**했다. `/portfolio/overview` 래퍼 3개는 일반·계좌별·`lite`로 용도가 달라 **유지(정정)** |
+| KIS 사용자 단위 토큰 promote | **제외(정정)**. 살아 있는 기능이다. 자격증명 확인 단계에서 발급한 토큰을 계좌 생성 시 옮겨 KIS 토큰 발급 속도 제한을 피한다(`assets.py` create_account) |
+
+검증: 백엔드 **2607 passed**(삭제 기능 테스트 17개 제거), 커버리지 91.13%. ruff·format·mypy 클린. 프론트 **127 files / 1667 passed**, tsc·eslint·prettier·build 클린.
+
 ## 배치 B — 중복 병합 (같은 로직 단일 출처화)
 
 | # | 중복 | 통합 방향 |

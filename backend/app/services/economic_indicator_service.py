@@ -226,22 +226,15 @@ async def _fetch_fred_calendar_events(days_ahead: int = _CALENDAR_DAYS_AHEAD) ->
     return events
 
 
-async def sync_calendar_to_cache(cache) -> list[dict[str, Any]]:
-    """FRED에서 캘린더 이벤트를 조회해 캐시에 저장한다."""
+async def get_calendar_events(cache) -> list[dict[str, Any]]:
+    """캘린더 이벤트를 반환한다. 캐시 hit 시 캐시값, miss 시 FRED에서 조회해 캐시에 저장한다."""
+    if (hit := await get_cached_json(cache, economic_indicator_calendar_key())) is not None:
+        return hit
     events = await _fetch_fred_calendar_events()
-
     if cache and events:
         await set_cached_json(cache, economic_indicator_calendar_key(), events, TTL_INDICATOR_CALENDAR)
         logger.info("fred_calendar_synced", count=len(events))
-
     return events
-
-
-async def get_calendar_events(cache) -> list[dict[str, Any]]:
-    """캘린더 이벤트를 반환한다. 캐시 hit 시 캐시값, miss 시 FRED 직접 조회."""
-    if (hit := await get_cached_json(cache, economic_indicator_calendar_key())) is not None:
-        return hit
-    return await sync_calendar_to_cache(cache)
 
 
 # ---------------------------------------------------------------------------

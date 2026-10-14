@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.portfolio import Portfolio
 from app.services.credential_service import get_kis_user_credentials
-from app.services.dividend._dividend_queries import fetch_dart_api_key, load_user_dividend_overrides
+from app.services.dividend._dividend_queries import fetch_dart_api_key
 from app.services.dividend.fetcher import fetch_ticker_dividend_info
 from app.services.price_service import fetch_prices_batch_krw
 from app.services.rebalancing.service import _item_attr
@@ -40,7 +40,6 @@ async def collect_dividend_map(
     sem = asyncio.Semaphore(_DIVIDEND_FETCH_CONCURRENCY)
     kis_creds = await get_kis_user_credentials(user_id, db)
     dart_key = await fetch_dart_api_key(user_id, db)
-    overrides = await load_user_dividend_overrides(user_id, db)
 
     async def _fetch_one(raw_item) -> None:
         ticker = str(_item_attr(raw_item, "ticker"))
@@ -52,7 +51,7 @@ async def collect_dividend_map(
             return
         try:
             yield_decimal, _dps, _months, _ex_dividend_date = await fetch_ticker_dividend_info(
-                ticker, market, cache, sem, kis_creds, dart_key, overrides
+                ticker, market, cache, sem, kis_creds, dart_key
             )
             if yield_decimal > 0:
                 dividend_map[key] = {

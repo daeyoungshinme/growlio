@@ -150,13 +150,13 @@ class TestCreateChallenge:
 
 
 class TestGetUpdateDelete:
-    def test_get_404_for_other_user(self, override_settings):
+    def test_delete_404_for_other_user(self, override_settings):
         user = _make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
         app = _setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get(f"/api/v1/challenges/{uuid.uuid4()}")
+            resp = client.delete(f"/api/v1/challenges/{uuid.uuid4()}")
         assert resp.status_code == 404
 
     def test_delete_204(self, override_settings):

@@ -54,11 +54,7 @@ from app.services.isa_service import calc_account_auto_pnl
 from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot_with_positions, sync_snapshot_positions
 from app.services.sync_all_service import get_sync_all_status, is_sync_all_running, run_sync_all
 from app.utils.cache_keys import (
-    TTL_ACCOUNT_DETAIL,
-    account_detail_key,
-    get_cached_json,
     invalidate_asset_account_caches,
-    set_cached_json,
     sync_lock_key,
 )
 from app.utils.currency import fetch_usd_krw
@@ -228,26 +224,8 @@ async def create_account(
         )
         await db.commit()
     # 새 계좌(특히 수동 금액 스냅샷)가 대시보드·월별 추이·추천 집계에 바로 반영되도록
-    await invalidate_asset_account_caches(await get_cache_store(), current_user.id, account.id)
+    await invalidate_asset_account_caches(await get_cache_store(), current_user.id)
     return _account_response(account)
-
-
-@router.get("/{account_id}", response_model=AssetAccountResponse)
-async def get_account(
-    account_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    cache = await get_cache_store()
-    cache_key = account_detail_key(current_user.id, account_id)
-    cached = await get_cached_json(cache, cache_key)
-    if cached is not None:
-        return cached
-
-    account = await _get_owned_account(account_id, current_user.id, db)
-    response = _account_response(account)
-    await set_cached_json(cache, cache_key, response.model_dump(mode="json"), TTL_ACCOUNT_DETAIL)
-    return response
 
 
 @router.put("/{account_id}", response_model=AssetAccountResponse)
@@ -340,7 +318,7 @@ async def update_account(
         await db.commit()
 
     _cache = await get_cache_store()
-    await invalidate_asset_account_caches(_cache, account.user_id, account.id)
+    await invalidate_asset_account_caches(_cache, account.user_id)
     return _account_response(account)
 
 
@@ -355,7 +333,7 @@ async def delete_account_kis_credentials(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """계좌별 KIS API 자격증명을 삭제한다. 이후 전역 자격증명으로 폴백된다."""
+    """계좌별 KIS API 자격증명과 발급 토큰을 삭제한다."""
     await _delete_own_credentials(account_id, current_user, db, "KIS_API")
 
 
@@ -388,7 +366,7 @@ async def delete_account(
     account = await _get_owned_account(account_id, current_user.id, db)
     account.is_active = False
     await db.commit()
-    await invalidate_asset_account_caches(await get_cache_store(), current_user.id, account_id)
+    await invalidate_asset_account_caches(await get_cache_store(), current_user.id)
 
 
 @router.post("/{account_id}/sync")
@@ -410,7 +388,7 @@ async def sync_account(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="이미 동기화가 진행 중입니다. 잠시 후 다시 시도하세요.",
             )
-        return await _sync_account_now(account, current_user.id, cache)
+        return await _sync_account_now(account, cache)
 
 
 @router.post("/sync-all")
@@ -504,5 +482,5 @@ async def update_isa_pnl_override(
     await db.commit()
     await db.refresh(account)
     cache = await get_cache_store()
-    await invalidate_asset_account_caches(cache, current_user.id, account.id)
+    await invalidate_asset_account_caches(cache, current_user.id)
     return _account_response(account)

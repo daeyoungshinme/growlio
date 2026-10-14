@@ -2,7 +2,6 @@
 
 # (ticker, market.upper()) → 확정 배당지급월 리스트
 # yfinance는 배당락일 기준이라 지급월과 다를 수 있으므로, 알려진 종목은 여기서 고정값 사용.
-# 사용자 수동 override(UserTickerSettings)가 항상 최우선임.
 KNOWN_DIVIDEND_SCHEDULES: dict[tuple[str, str], list[int]] = {
     # 한국 종목
     ("005930", "KOSPI"): [4, 5, 8, 11],  # 삼성전자

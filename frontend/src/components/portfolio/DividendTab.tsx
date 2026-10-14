@@ -246,7 +246,7 @@ export default function DividendTab({
                     ? posDiv.investment_yield
                     : (d.investment_yield ?? 0);
                 const barColor = weightBarColor(pct);
-                const freqInfo = dividendFreqInfo(d.dividend_months, d.dividend_months_is_manual);
+                const freqInfo = dividendFreqInfo(d.dividend_months);
                 return (
                   <div key={rowKey} className="px-4 py-3">
                     {/* Row 1: 종목명 + 연간 배당액 */}
@@ -339,10 +339,7 @@ export default function DividendTab({
                         ? posDiv.investment_yield
                         : (d.investment_yield ?? 0);
                     const barColor = weightBarColor(pct);
-                    const freqInfo = dividendFreqInfo(
-                      d.dividend_months,
-                      d.dividend_months_is_manual,
-                    );
+                    const freqInfo = dividendFreqInfo(d.dividend_months);
                     return (
                       <tr
                         key={rowKey}

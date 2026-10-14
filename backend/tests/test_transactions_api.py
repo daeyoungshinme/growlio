@@ -264,39 +264,6 @@ class TestCreateTransaction:
             _cleanup_app()
 
 
-class TestGetTransaction:
-    def test_returns_404_for_nonexistent(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
-        try:
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get(
-                    f"/api/v1/transactions/{uuid.uuid4()}",
-                    headers={"Authorization": "Bearer fake"},
-                )
-            assert resp.status_code == 404
-        finally:
-            _cleanup_app()
-
-    def test_returns_200_when_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        tx = _make_tx(user_id=user.id)
-        db.scalar = AsyncMock(return_value=tx)
-        app = _setup_app(user, db)
-        try:
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get(
-                    f"/api/v1/transactions/{tx.id}",
-                    headers={"Authorization": "Bearer fake"},
-                )
-            assert resp.status_code == 200
-        finally:
-            _cleanup_app()
-
-
 class TestUpdateTransaction:
     def test_returns_404_for_nonexistent(self, override_settings):
         user = _make_user()

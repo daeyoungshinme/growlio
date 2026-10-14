@@ -15,9 +15,6 @@ from app.models.user import UserSettings
 from app.services.composition_calculator import (
     build_asset_totals,
     exclude_real_estate,
-    fetch_position_maps,
-    get_latest_snapshot_rows,
-    get_no_snap_accounts,
 )
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.returns_calculator import calc_returns
@@ -31,13 +28,6 @@ from app.utils.cache_keys import (
     set_cached_json,
 )
 from app.utils.kst import today_kst
-
-# 기존 테스트 임포트 호환 별칭
-_get_latest_snapshot_rows = get_latest_snapshot_rows
-_get_no_snap_accounts = get_no_snap_accounts
-_fetch_position_maps = fetch_position_maps
-_build_asset_totals = build_asset_totals
-_get_monthly_trend = get_monthly_trend
 
 logger = structlog.get_logger()
 
@@ -139,11 +129,11 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache: Cac
         non_stock_net_flows_after,
     ) = await _get_scalar_init_data(user_id, db)
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-    monthly_trend = await _get_monthly_trend(user_id, db, cache)
+    monthly_trend = await get_monthly_trend(user_id, db, cache)
     div_summary = await get_dividend_summary(user_id, db, cache)
 
     # 2단계: 내부에서 4개 쿼리를 실행하므로 1단계와 분리해 session 충돌 방지
-    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db, cache)
+    total_assets_krw, total_invested, stock_value, by_type = await build_asset_totals(user_id, db, cache)
 
     # 3단계: total_assets_krw에 의존
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)

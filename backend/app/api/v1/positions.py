@@ -149,7 +149,7 @@ async def save_positions(
             db.add(_build(p, snap.id))
 
         await db.commit()
-        await invalidate_asset_account_caches(cache, account.user_id, account.id)
+        await invalidate_asset_account_caches(cache, account.user_id)
         raw = [p.model_dump() for p in positions]
         return _enrich_positions(raw)
 
@@ -221,6 +221,6 @@ async def sync_position_prices(
         )
         await sync_snapshot_positions(db, snapshot_id=snap.id, account_id=account.id, positions=list(pos_objs))
         await db.commit()
-        await invalidate_asset_account_caches(cache, account.user_id, account.id)
+        await invalidate_asset_account_caches(cache, account.user_id)
 
         return _enrich_positions(updated_dicts)

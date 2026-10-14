@@ -17,7 +17,6 @@ class TestCalculatePositionDividend:
             value_krw=1_000_000.0,
             invested_krw=900_000.0,
             qty=100.0,
-            override_months=None,
         )
         assert result["estimated_annual_krw"] == round(1416.0 * 100)
         assert result["currency"] == "KRW"
@@ -34,7 +33,6 @@ class TestCalculatePositionDividend:
             value_krw=2_000_000.0,
             invested_krw=1_800_000.0,
             qty=10.0,
-            override_months=None,
             usd_krw_rate=1300.0,
         )
         annual = 2_000_000.0 * 0.005
@@ -53,40 +51,9 @@ class TestCalculatePositionDividend:
             value_krw=1_500_000.0,
             invested_krw=1_400_000.0,
             qty=5.0,
-            override_months=None,
             usd_krw_rate=0.0,
         )
         assert result["estimated_monthly_usd"] is None
-
-    def test_override_months_sets_is_manual_true(self, override_settings):
-        """override_months 지정 시 dividend_months_is_manual=True."""
-        result = calculate_position_dividend(
-            ticker="005930",
-            market="KOSPI",
-            yield_decimal=0.02,
-            dps=0.0,
-            months=[4],
-            value_krw=500_000.0,
-            invested_krw=450_000.0,
-            qty=50.0,
-            override_months=[3, 6, 9, 12],
-        )
-        assert result["dividend_months_is_manual"] is True
-
-    def test_no_override_months_sets_is_manual_false(self, override_settings):
-        """override_months=None이면 dividend_months_is_manual=False."""
-        result = calculate_position_dividend(
-            ticker="AAPL",
-            market="NASDAQ",
-            yield_decimal=0.01,
-            dps=0.5,
-            months=[2, 8],
-            value_krw=500_000.0,
-            invested_krw=450_000.0,
-            qty=5.0,
-            override_months=None,
-        )
-        assert result["dividend_months_is_manual"] is False
 
     def test_zero_yield_and_dps_returns_zero_estimated(self, override_settings):
         """yield_decimal=0, dps=0이면 예상 배당금 0."""
@@ -99,7 +66,6 @@ class TestCalculatePositionDividend:
             value_krw=1_000_000.0,
             invested_krw=900_000.0,
             qty=10.0,
-            override_months=None,
         )
         assert result["estimated_annual_krw"] == 0
         assert result["estimated_monthly_krw"] == 0
@@ -115,7 +81,6 @@ class TestCalculatePositionDividend:
             value_krw=100_000.0,
             invested_krw=10_000.0,  # cost_per_share=10000, dps/cost_per_share=100% > 50%
             qty=1.0,
-            override_months=None,
         )
         assert result["investment_yield"] == round(0.05 * 100, 2)
 
@@ -130,7 +95,6 @@ class TestCalculatePositionDividend:
             value_krw=1_500_000.0,
             invested_krw=1_400_000.0,
             qty=5.0,
-            override_months=None,
         )
         assert result["ticker"] == "MSFT"
         assert result["market"] == "NASDAQ"
@@ -146,7 +110,6 @@ class TestCalculatePositionDividend:
             value_krw=1_000_000.0,
             invested_krw=950_000.0,
             qty=10.0,
-            override_months=None,
         )
         # ETF는 yield 기반: 1_000_000 * 0.03 = 30_000
         assert result["estimated_annual_krw"] == round(1_000_000.0 * 0.03)
@@ -162,7 +125,6 @@ class TestCalculatePositionDividend:
             value_krw=1_000_000.0,
             invested_krw=900_000.0,
             qty=5.0,
-            override_months=None,
         )
         assert result["dividend_yield"] == round(0.0075 * 100, 2)
 
@@ -177,7 +139,6 @@ class TestCalculatePositionDividend:
             value_krw=1_200_000.0,
             invested_krw=1_000_000.0,
             qty=10.0,
-            override_months=None,
         )
         annual = round(1_200_000.0 * 0.02)
         assert result["estimated_monthly_krw"] == round(annual / 12)

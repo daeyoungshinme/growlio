@@ -249,7 +249,6 @@ async def fetch_ticker_dividend_info(
     sem: asyncio.Semaphore,
     kis_creds: dict | None,
     dart_key: str,
-    overrides: dict[tuple[str, str], list[int]],
 ) -> tuple[float, float, list[int], str | None]:
     """배당 수익률, DPS, 배당월, 배당락일을 멀티소스 폴백 체인으로 조회한다.
 
@@ -264,15 +263,10 @@ async def fetch_ticker_dividend_info(
     dps = 0.0
     ex_dividend_date = None
 
-    # 배당월: override > 정적 스케줄 > 캐시 > 네트워크
-    override_months = overrides.get((ticker, market))
-    if override_months is not None:
-        months: list[int] = override_months
-        need_months_fetch = False
-    else:
-        known = KNOWN_DIVIDEND_SCHEDULES.get((ticker, market.upper()))
-        months = known if known is not None else []
-        need_months_fetch = known is None
+    # 배당월: 정적 스케줄 > 캐시 > 네트워크
+    known = KNOWN_DIVIDEND_SCHEDULES.get((ticker, market.upper()))
+    months: list[int] = known if known is not None else []
+    need_months_fetch = known is None
 
     months_cache_key = dividend_months_key(ticker, market)
     info_cache_key = dividend_info_key(ticker, market)
