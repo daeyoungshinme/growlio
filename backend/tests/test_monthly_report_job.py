@@ -1,6 +1,7 @@
 """monthly_report Job 테스트."""
 
 import uuid
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -99,6 +100,7 @@ class TestRunMonthlyReport:
         mock_session.execute = AsyncMock(return_value=execute_result)
         mock_session.add = MagicMock()
         mock_session.commit = AsyncMock()
+        mock_session.get = AsyncMock(return_value=None)  # dedup 키 없음 → 발송
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -130,6 +132,7 @@ class TestRunMonthlyReport:
         mock_session.execute = AsyncMock(return_value=execute_result)
         mock_session.add = MagicMock()
         mock_session.commit = AsyncMock()
+        mock_session.get = AsyncMock(return_value=None)  # dedup 키 없음 → 발송
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -162,6 +165,7 @@ class TestRunMonthlyReport:
         mock_session.execute = AsyncMock(return_value=execute_result)
         mock_session.add = MagicMock()
         mock_session.commit = AsyncMock()
+        mock_session.get = AsyncMock(return_value=None)  # dedup 키 없음 → 발송
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -184,6 +188,68 @@ class TestRunMonthlyReport:
             await run_monthly_report()
 
         assert call_count[0] == 2
+
+    @pytest.mark.asyncio
+    async def test_skips_when_already_sent_this_month(self):
+        """재시작·misfire로 같은 달 잡이 다시 돌면 이미 보낸 유저에겐 다시 보내지 않는다."""
+        user = _make_user()
+        settings = _make_settings(enabled=True)
+
+        mock_session = AsyncMock()
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(user, settings)]
+        mock_session.execute = AsyncMock(return_value=execute_result)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.monthly_report.get_durable", new_callable=AsyncMock, return_value="1"),
+            patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock) as mock_summary,
+            patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
+        ):
+            from app.jobs.monthly_report import run_monthly_report
+
+            await run_monthly_report()
+
+        mock_summary.assert_not_called()
+        mock_email.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_marks_sent_after_success(self):
+        """발송 성공 시 유저+대상월 dedup 키를 이력과 같은 커밋으로 기록한다."""
+        user = _make_user()
+        settings = _make_settings(enabled=True)
+
+        mock_session = AsyncMock()
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(user, settings)]
+        mock_session.execute = AsyncMock(return_value=execute_result)
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.monthly_report.get_durable", new_callable=AsyncMock, return_value=None),
+            patch("app.jobs.monthly_report.set_durable", new_callable=AsyncMock) as mock_set,
+            patch("app.jobs.monthly_report.today_kst", return_value=date(2026, 1, 1)),
+            patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
+            patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock, return_value=True),
+        ):
+            from app.jobs.monthly_report import run_monthly_report
+
+            await run_monthly_report()
+
+        mock_set.assert_awaited_once()
+        key = mock_set.await_args.args[1]
+        assert key.endswith(f"monthly_report:sent:{user.id}:2025-12")
+        assert mock_set.await_args.kwargs["commit"] is False
 
 
 class TestPrevMonthLabel:

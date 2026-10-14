@@ -217,33 +217,6 @@ class TestFetchReceivedDividendsByTicker:
         assert captured["params"]["account_ids"] == [str(a) for a in ids]
 
 
-class TestLoadUserOverrides:
-    @pytest.mark.asyncio
-    async def test_returns_empty_when_no_settings(self, mock_db, override_settings):
-        from app.services.dividend._dividend_queries import load_user_dividend_overrides
-
-        exec_result = MagicMock()
-        exec_result.scalars.return_value.all.return_value = []
-        mock_db.execute = AsyncMock(return_value=exec_result)
-
-        result = await load_user_dividend_overrides(uuid.uuid4(), mock_db)
-        assert result == {}
-
-    @pytest.mark.asyncio
-    async def test_returns_dividend_months_map(self, mock_db, override_settings):
-        from app.services.dividend._dividend_queries import load_user_dividend_overrides
-
-        row = SimpleNamespace(ticker="AAPL", market="NASDAQ", dividend_months=[3, 6, 9, 12])
-        exec_result = MagicMock()
-        exec_result.scalars.return_value.all.return_value = [row]
-        mock_db.execute = AsyncMock(return_value=exec_result)
-
-        result = await load_user_dividend_overrides(uuid.uuid4(), mock_db)
-
-        assert ("AAPL", "NASDAQ") in result
-        assert result[("AAPL", "NASDAQ")] == [3, 6, 9, 12]
-
-
 class TestBuildTickerOutputEntry:
     def test_with_empty_est_keys_returns_zero_values(self, override_settings):
         from app.services.dividend.orchestrator import _build_ticker_output_entry
@@ -275,7 +248,6 @@ class TestBuildTickerOutputEntry:
                 "yield_decimal": 0.02,
                 "dps": 100.0,
                 "investment_yield": 0.018,
-                "dividend_months_is_manual": False,
                 "currency": "USD",
                 "estimated_monthly_usd": 5.0,
             }
@@ -347,7 +319,6 @@ class TestGetTickerDividendSummary:
         with (
             patch("app.services.dividend.orchestrator.get_cache_store", new=AsyncMock(return_value=mock_cache)),
             patch("app.services.dividend.orchestrator._collect_positions", new=AsyncMock(return_value={})),
-            patch("app.services.dividend.orchestrator.load_user_dividend_overrides", new=AsyncMock(return_value={})),
             patch("app.services.dividend.orchestrator.fetch_dart_api_key", new=AsyncMock(return_value="key")),
             patch("app.services.dividend.orchestrator.get_kis_user_credentials", new=AsyncMock(return_value=None)),
             patch("app.services.dividend.orchestrator.get_usd_krw_rate", new=AsyncMock(return_value=1350.0)),

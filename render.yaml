@@ -12,8 +12,6 @@ services:
     envVars:
       - key: APP_ENV
         value: production
-      - key: APP_SECRET_KEY
-        sync: false
       - key: KIS_CRED_ENCRYPTION_KEY
         sync: false
       - key: DATABASE_URL
@@ -26,8 +24,6 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: SUPABASE_JWT_SECRET
-        sync: false
       - key: DART_API_KEY
         sync: false
       - key: RESEND_API_KEY
@@ -39,6 +35,4 @@ services:
       - key: METRICS_TOKEN
         sync: false
       - key: FRED_API_KEY
-        sync: false
-      - key: FMP_API_KEY
         sync: false

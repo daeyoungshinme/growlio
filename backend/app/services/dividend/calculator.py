@@ -23,7 +23,6 @@ def calculate_position_dividend(
     value_krw: float,
     invested_krw: float,
     qty: float,
-    override_months: list[int] | None,
     usd_krw_rate: float = 0.0,
     ex_dividend_date: str | None = None,
 ) -> dict:
@@ -75,7 +74,6 @@ def calculate_position_dividend(
         "estimated_annual_krw": round(annual),
         "estimated_monthly_krw": round(annual / 12),
         "dividend_months": months,
-        "dividend_months_is_manual": override_months is not None,
         "investment_yield": investment_yield,
         "currency": "USD" if is_usd else "KRW",
         "estimated_monthly_usd": estimated_monthly_usd,

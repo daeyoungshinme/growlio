@@ -20,10 +20,7 @@ export function yieldBadgeClass(y: number): string {
   return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-300";
 }
 
-export function dividendFreqInfo(
-  months: number[],
-  isManual: boolean,
-): { label: string; cls: string } {
+export function dividendFreqInfo(months: number[]): { label: string; cls: string } {
   const n = months.length;
   if (n === 0)
     return {
@@ -49,11 +46,6 @@ export function dividendFreqInfo(
     return {
       label: "연배당",
       cls: "bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400",
-    };
-  if (isManual)
-    return {
-      label: `${n}회/년(수동)`,
-      cls: "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400",
     };
   return {
     label: `${n}회/년`,

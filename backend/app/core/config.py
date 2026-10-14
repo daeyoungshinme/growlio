@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 
     app_env: str = "development"
-    app_secret_key: str
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/growlio"
 
     kis_cred_encryption_key: str  # 32-byte hex (64자), AES-256 암호화 키
@@ -22,7 +21,6 @@ class Settings(BaseSettings):
     supabase_project_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
-    supabase_jwt_secret: str = ""
 
     # 외부 API 동시 호출 제한 및 캐시 설정
     api_semaphore_limit: int = 5
@@ -63,7 +61,6 @@ class Settings(BaseSettings):
     dart_api_key: str = ""  # .env의 DART_API_KEY로 설정 (opendart.fss.or.kr)
 
     fred_api_key: str = ""  # fred.stlouisfed.org — 미국 경제지표 (무료 API 키)
-    fmp_api_key: str = ""  # financialmodelingprep.com — 증시 캘린더 (무료 API 키)
 
     # 이메일 알림 (Resend HTTP API)
     resend_api_key: str = ""
@@ -94,8 +91,6 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_secrets(self) -> "Settings":
-        if not self.app_secret_key or len(self.app_secret_key) < 32:
-            raise ValueError("APP_SECRET_KEY must be at least 32 characters")
         if not re.fullmatch(r"[0-9a-fA-F]{64}", self.kis_cred_encryption_key):
             raise ValueError("KIS_CRED_ENCRYPTION_KEY must be exactly 64 hex characters")
         if all(c == "0" for c in self.kis_cred_encryption_key):
@@ -103,7 +98,6 @@ class Settings(BaseSettings):
                 "KIS_CRED_ENCRYPTION_KEY must not be all zeros — "
                 'generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'
             )
-        # supabase_jwt_secret은 RS256 JWKS 방식 사용 시 불필요 (선택적)
         if self.app_env == "production" and not self.frontend_url.startswith("https://"):
             raise ValueError(
                 "FRONTEND_URL must be set to the production HTTPS frontend URL when "

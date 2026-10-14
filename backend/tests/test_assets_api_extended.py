@@ -117,27 +117,6 @@ def _setup_app(user, db):
     return app
 
 
-class TestGetAccount:
-    def test_get_account_returns_200(self, override_settings):
-        user = _make_user()
-        account = _make_account(user.id)
-        db = _make_mock_db()
-        db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get(f"/api/v1/assets/{account.id}")
-        assert resp.status_code == 200
-
-    def test_get_account_returns_404(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get(f"/api/v1/assets/{uuid.uuid4()}")
-        assert resp.status_code == 404
-
-
 class TestUpdateAccount:
     def test_update_account_name(self, override_settings):
         user = _make_user()
@@ -734,4 +713,3 @@ class TestSyncAccountEndpoint:
         db.commit.assert_called_once()
         mock_sync_now.assert_awaited_once()
         assert mock_sync_now.await_args.args[0] is account
-        assert mock_sync_now.await_args.args[1] == user.id

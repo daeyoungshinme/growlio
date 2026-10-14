@@ -75,11 +75,9 @@ function annualDividendLabel(divData: DividendYield, qty: number): string | null
     : `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
-/** 배당월 칩 — 12개월이면 "월배당" 하나로, 수동 지정 월은 파란 톤으로 구분한다. */
+/** 배당월 칩 — 12개월이면 "월배당" 하나로 묶는다. */
 function DividendMonthsChips({ divData }: { divData: DividendYield }) {
-  const chipTone = divData.dividend_months_is_manual
-    ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
-    : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
+  const chipTone = "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
   if (divData.dividend_months.length === 12) {
     return <span className={`text-xs px-2 py-0.5 rounded-full ${chipTone}`}>월배당</span>;
   }

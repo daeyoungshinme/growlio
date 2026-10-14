@@ -44,42 +44,42 @@ describe("yieldBadgeClass", () => {
 
 describe("dividendFreqInfo", () => {
   it("빈 배열이면 미설정", () => {
-    const { label } = dividendFreqInfo([], false);
+    const { label } = dividendFreqInfo([]);
     expect(label).toBe("미설정");
   });
 
   it("12개월이면 월배당", () => {
-    const { label } = dividendFreqInfo([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], false);
+    const { label } = dividendFreqInfo([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(label).toBe("월배당");
   });
 
   it("4개월이면 분기배당", () => {
-    const { label } = dividendFreqInfo([3, 6, 9, 12], false);
+    const { label } = dividendFreqInfo([3, 6, 9, 12]);
     expect(label).toBe("분기배당");
   });
 
   it("2개월이면 반기배당", () => {
-    const { label } = dividendFreqInfo([6, 12], false);
+    const { label } = dividendFreqInfo([6, 12]);
     expect(label).toBe("반기배당");
   });
 
   it("1개월이면 연배당", () => {
-    const { label } = dividendFreqInfo([12], false);
+    const { label } = dividendFreqInfo([12]);
     expect(label).toBe("연배당");
   });
 
-  it("수동 입력이면 n회/년(수동)", () => {
-    const { label } = dividendFreqInfo([1, 5, 9], true);
-    expect(label).toBe("3회/년(수동)");
+  it("그 외 횟수는 n회/년", () => {
+    const { label } = dividendFreqInfo([1, 5, 9]);
+    expect(label).toBe("3회/년");
   });
 
   it("자동 비표준 횟수이면 n회/년", () => {
-    const { label } = dividendFreqInfo([1, 5, 9], false);
+    const { label } = dividendFreqInfo([1, 5, 9]);
     expect(label).toBe("3회/년");
   });
 
   it("결과에 cls 포함", () => {
-    const { cls } = dividendFreqInfo([3, 6, 9, 12], false);
+    const { cls } = dividendFreqInfo([3, 6, 9, 12]);
     expect(typeof cls).toBe("string");
     expect(cls.length).toBeGreaterThan(0);
   });

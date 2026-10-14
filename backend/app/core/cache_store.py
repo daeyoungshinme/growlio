@@ -128,9 +128,6 @@ class CacheStore:
                 del self._data[key]
             return len(expired_keys)
 
-    async def ping(self) -> bool:
-        return True
-
     async def aclose(self) -> None:
         async with self._lock:
             self._data.clear()

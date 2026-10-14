@@ -92,15 +92,6 @@ export default function MonthlyTickerDetail({
                       ) : (
                         <p className="text-sm text-gray-300 dark:text-gray-600">—</p>
                       )}
-                      <span
-                        className={`text-xs px-1.5 py-0 rounded-full ${
-                          d.dividend_months_is_manual
-                            ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
-                        }`}
-                      >
-                        {d.dividend_months_is_manual ? "수동" : "자동"}
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -119,11 +110,8 @@ export default function MonthlyTickerDetail({
                   <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
                     투자배당수익율
                   </th>
-                  <th className="py-2 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
-                    배당금
-                  </th>
                   <th className="py-2 px-5 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
-                    배당월 설정
+                    배당금
                   </th>
                 </tr>
               </thead>
@@ -150,7 +138,7 @@ export default function MonthlyTickerDetail({
                       <td className="py-2 px-3 text-right font-medium text-green-600 dark:text-green-400">
                         {d.investment_yield > 0 ? `${d.investment_yield.toFixed(2)}%` : "—"}
                       </td>
-                      <td className="py-2 px-4 text-right">
+                      <td className="py-2 px-5 text-right">
                         {actualAmt && actualAmt > 0 ? (
                           <span className="font-medium text-green-600 dark:text-green-400">
                             수령 {fmtKrw(actualAmt)}
@@ -166,17 +154,6 @@ export default function MonthlyTickerDetail({
                         ) : (
                           <span className="text-gray-300 dark:text-gray-600">—</span>
                         )}
-                      </td>
-                      <td className="py-2 px-5 text-right">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            d.dividend_months_is_manual
-                              ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
-                              : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
-                          }`}
-                        >
-                          {d.dividend_months_is_manual ? "수동" : "자동"}
-                        </span>
                       </td>
                     </tr>
                   );

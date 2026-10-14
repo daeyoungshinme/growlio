@@ -91,7 +91,6 @@ const mockDividendByTicker: DividendByTicker[] = [
     estimated_monthly_usd: 30,
     investment_yield: 2.5,
     dividend_months: [3, 6, 9, 12],
-    dividend_months_is_manual: false,
   } as DividendByTicker,
 ];
 

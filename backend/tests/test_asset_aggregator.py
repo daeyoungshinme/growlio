@@ -151,24 +151,24 @@ class TestCalcXirr:
         assert xirr_pct is not None
 
 
-# ── _get_monthly_trend 캐시 테스트 ─────────────────────────
+# ── get_monthly_trend 캐시 테스트 ─────────────────────────
 
 
 class TestGetMonthlyTrend:
-    """_get_monthly_trend: Cache 캐시 히트/미스 동작."""
+    """get_monthly_trend: Cache 캐시 히트/미스 동작."""
 
     @pytest.mark.asyncio
     async def test_cache_hit_skips_db(self, mock_db, mock_cache):
         """Cache 캐시 히트 시 DB 쿼리 없이 반환."""
         import json
 
-        from app.services.asset_aggregator import _get_monthly_trend
+        from app.services.asset_aggregator import get_monthly_trend
 
         user_id = uuid.uuid4()
         cached_data = [{"month": "2025-01-01", "total_krw": 10_000_000.0}]
         mock_cache.get = AsyncMock(return_value=json.dumps(cached_data).encode())
 
-        result = await _get_monthly_trend(user_id, mock_db, mock_cache)
+        result = await get_monthly_trend(user_id, mock_db, mock_cache)
 
         assert result == cached_data
         mock_db.execute.assert_not_called()
@@ -176,7 +176,7 @@ class TestGetMonthlyTrend:
     @pytest.mark.asyncio
     async def test_cache_miss_queries_db(self, mock_db, mock_cache):
         """Cache 캐시 미스 시 DB 쿼리 후 캐시 저장."""
-        from app.services.asset_aggregator import _get_monthly_trend
+        from app.services.asset_aggregator import get_monthly_trend
 
         user_id = uuid.uuid4()
         mock_cache.get = AsyncMock(return_value=None)
@@ -188,7 +188,7 @@ class TestGetMonthlyTrend:
         db_result.__iter__ = MagicMock(return_value=iter([row]))
         mock_db.execute = AsyncMock(return_value=db_result)
 
-        result = await _get_monthly_trend(user_id, mock_db, mock_cache)
+        result = await get_monthly_trend(user_id, mock_db, mock_cache)
 
         mock_db.execute.assert_called_once()
         mock_cache.setex.assert_called_once()
@@ -198,7 +198,7 @@ class TestGetMonthlyTrend:
     @pytest.mark.asyncio
     async def test_no_cache_queries_db_directly(self, mock_db):
         """cache=None이면 캐시 없이 DB 직접 조회."""
-        from app.services.asset_aggregator import _get_monthly_trend
+        from app.services.asset_aggregator import get_monthly_trend
 
         user_id = uuid.uuid4()
 
@@ -207,27 +207,27 @@ class TestGetMonthlyTrend:
         db_result.__iter__ = MagicMock(return_value=iter([row]))
         mock_db.execute = AsyncMock(return_value=db_result)
 
-        result = await _get_monthly_trend(user_id, mock_db, cache=None)
+        result = await get_monthly_trend(user_id, mock_db, cache=None)
 
         mock_db.execute.assert_called_once()
         assert result[0]["month"] == "2025-06-01"
 
 
-# ── _get_no_snap_accounts SQL 필터 테스트 ─────────────────
+# ── get_no_snap_accounts SQL 필터 테스트 ─────────────────
 
 
 class TestGetNoSnapAccounts:
-    """_get_no_snap_accounts: snapped_ids SQL 필터 검증."""
+    """get_no_snap_accounts: snapped_ids SQL 필터 검증."""
 
     @pytest.mark.asyncio
     async def test_empty_snapped_ids_no_not_in_clause(self, mock_db):
         """snapped_ids가 비어있으면 NOT IN 조건 없이 쿼리."""
-        from app.services.asset_aggregator import _get_no_snap_accounts
+        from app.services.composition_calculator import get_no_snap_accounts
 
         user_id = uuid.uuid4()
         mock_db.execute.return_value.scalars.return_value.all.return_value = []
 
-        result = await _get_no_snap_accounts(user_id, mock_db, set())
+        result = await get_no_snap_accounts(user_id, mock_db, set())
 
         mock_db.execute.assert_called_once()
         assert result == []
@@ -235,7 +235,7 @@ class TestGetNoSnapAccounts:
     @pytest.mark.asyncio
     async def test_snapped_ids_excluded_via_sql(self, mock_db):
         """snapped_ids가 있으면 SQL NOT IN으로 처리 후 모두 반환."""
-        from app.services.asset_aggregator import _get_no_snap_accounts
+        from app.services.composition_calculator import get_no_snap_accounts
 
         user_id = uuid.uuid4()
         acc_id = uuid.uuid4()
@@ -244,7 +244,7 @@ class TestGetNoSnapAccounts:
         mock_db.execute.return_value.scalars.return_value.all.return_value = [acc]
 
         snapped = {uuid.uuid4()}  # 다른 계좌 ID
-        result = await _get_no_snap_accounts(user_id, mock_db, snapped)
+        result = await get_no_snap_accounts(user_id, mock_db, snapped)
 
         # SQL 레벨에서 필터됐으므로 반환된 acc를 그대로 사용
         assert len(result) == 1

@@ -18,7 +18,7 @@ def mock_cache():
     return cache
 
 
-async def _call_fetcher(ticker, market, cache, kis_creds=None, overrides=None, dart_key="test"):
+async def _call_fetcher(ticker, market, cache, kis_creds=None, dart_key="test"):
     """fetch_ticker_dividend_info 호출 헬퍼."""
     from app.services.dividend.fetcher import fetch_ticker_dividend_info
 
@@ -30,7 +30,6 @@ async def _call_fetcher(ticker, market, cache, kis_creds=None, overrides=None, d
         sem=sem,
         kis_creds=kis_creds,
         dart_key=dart_key,
-        overrides=overrides or {},
     )
 
 
@@ -52,29 +51,6 @@ class TestFetchTickerDividendInfo:
         mock_yahoo.assert_not_called()
         assert result[0] == pytest.approx(0.025)  # yield_decimal
         assert result[1] == pytest.approx(500.0)  # dps
-
-    @pytest.mark.asyncio
-    async def test_override_months_used_directly(self, mock_cache, override_settings):
-        """overrides에 배당월이 있으면 캐시/네트워크 조회 없이 사용."""
-        mock_cache.get = AsyncMock(return_value=None)
-
-        overrides = {("AAPL", "NASDAQ"): [3, 6, 9, 12]}
-
-        with (
-            patch(
-                "app.services.dividend.fetcher.sync_yahoo_dividend_info",
-                return_value={"dividend_yield": 0.02, "dps": 1.5, "ex_dividend_date": None},
-            ),
-            patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[]) as mock_months,
-        ):
-            loop_mock = MagicMock()
-            loop_mock.run_in_executor = AsyncMock(side_effect=lambda _, fn, *args: fn(*args) if callable(fn) else None)
-
-            with patch("asyncio.get_running_loop", return_value=loop_mock):
-                result = await _call_fetcher("AAPL", "NASDAQ", mock_cache, overrides=overrides)
-
-        mock_months.assert_not_called()
-        assert result[2] == [3, 6, 9, 12]
 
     @pytest.mark.asyncio
     async def test_foreign_ticker_yahoo_used(self, mock_cache, override_settings):

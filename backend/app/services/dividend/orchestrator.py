@@ -20,7 +20,7 @@ from app.core.config import settings
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.credential_service import get_kis_user_credentials
-from app.services.dividend._dividend_queries import fetch_dart_api_key, load_user_dividend_overrides
+from app.services.dividend._dividend_queries import fetch_dart_api_key
 from app.services.dividend.calculator import calculate_position_dividend
 from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES
 from app.services.dividend.fetcher import fetch_ticker_dividend_info
@@ -112,7 +112,6 @@ def _build_ticker_output_entry(
         yield_decimal = primary.get("yield_decimal", 0.0)
         dps = primary.get("dps", 0.0)
         investment_yield = primary.get("investment_yield", 0.0)
-        is_manual = primary.get("dividend_months_is_manual", False)
         currency = primary.get("currency", "KRW")
         combined_monthly_usd = (
             round(sum(estimated_map[k].get("estimated_monthly_usd") or 0 for k in est_keys), 2)
@@ -124,7 +123,6 @@ def _build_ticker_output_entry(
         combined_months = []
         market_val = None
         yield_decimal = dps = investment_yield = 0.0
-        is_manual = False
         currency = "KRW"
         combined_monthly_usd = None
 
@@ -138,7 +136,6 @@ def _build_ticker_output_entry(
         "dividend_yield": round(yield_decimal * 100, 2),
         "dps": dps,
         "dividend_months": combined_months,
-        "dividend_months_is_manual": is_manual,
         "investment_yield": investment_yield,
         "currency": currency,
         "estimated_monthly_usd": combined_monthly_usd,
@@ -192,15 +189,13 @@ async def _fetch_estimated_dividend_map(
     cache,
     kis_creds,
     dart_key,
-    overrides: dict,
     usd_krw_rate: float,
 ) -> dict[tuple[str, str], dict]:
     """보유 포지션별 예상 배당금을 동시 조회해 (ticker, market) → 집계 dict로 병합한다."""
 
     async def _fetch_estimated(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
-        override_months = overrides.get((ticker, market))
         yield_decimal, dps, months, _ = await fetch_ticker_dividend_info(
-            ticker, market, cache, _DIVIDEND_FETCH_SEM, kis_creds, dart_key, overrides
+            ticker, market, cache, _DIVIDEND_FETCH_SEM, kis_creds, dart_key
         )
         return calculate_position_dividend(
             ticker=ticker,
@@ -212,7 +207,6 @@ async def _fetch_estimated_dividend_map(
             invested_krw=invested_krw,
             qty=qty,
             usd_krw_rate=usd_krw_rate,
-            override_months=override_months,
         )
 
     tasks = [
@@ -271,7 +265,6 @@ def _assemble_ticker_dividend_output(
                     "dividend_yield": 0.0,
                     "dps": 0.0,
                     "dividend_months": [],
-                    "dividend_months_is_manual": False,
                     "investment_yield": 0.0,
                     "currency": "KRW",
                     "estimated_monthly_usd": None,
@@ -313,12 +306,11 @@ async def get_ticker_dividend_summary(
     positions = await _collect_positions(user_id, db, account_ids)
     received_map = _normalize_received_map_by_ticker(received_map, positions)
 
-    overrides = await load_user_dividend_overrides(user_id, db)
     dart_key = await fetch_dart_api_key(user_id, db)
     kis_creds = await get_kis_user_credentials(user_id, db)
     usd_krw_rate: float = await get_usd_krw_rate(cache)
 
-    estimated_map = await _fetch_estimated_dividend_map(positions, cache, kis_creds, dart_key, overrides, usd_krw_rate)
+    estimated_map = await _fetch_estimated_dividend_map(positions, cache, kis_creds, dart_key, usd_krw_rate)
 
     output = _assemble_ticker_dividend_output(received_map, estimated_map, positions)
 
@@ -334,16 +326,14 @@ async def get_position_dividend_yields(
 ) -> list[dict]:
     """보유 종목별 배당수익률과 예상 배당금을 반환한다. account_id 지정 시 해당 계좌만 집계."""
     positions = await _collect_positions(user_id, db, [account_id] if account_id else None)
-    overrides = await load_user_dividend_overrides(user_id, db)
     dart_key = await fetch_dart_api_key(user_id, db)
     kis_creds = await get_kis_user_credentials(user_id, db)
 
     cache = await get_cache_store()
 
     async def fetch_one(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
-        override_months = overrides.get((ticker, market))
         yield_decimal, dps, months, ex_dividend_date = await fetch_ticker_dividend_info(
-            ticker, market, cache, _DIVIDEND_FETCH_SEM, kis_creds, dart_key, overrides
+            ticker, market, cache, _DIVIDEND_FETCH_SEM, kis_creds, dart_key
         )
         return calculate_position_dividend(
             ticker=ticker,
@@ -354,7 +344,6 @@ async def get_position_dividend_yields(
             value_krw=value_krw,
             invested_krw=invested_krw,
             qty=qty,
-            override_months=override_months,
             ex_dividend_date=ex_dividend_date,
         )
 

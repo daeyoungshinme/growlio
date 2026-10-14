@@ -38,7 +38,6 @@ TTL_HAS_OVERSEAS_FALSE = 900  # 해외 없음 15분 (신규 매수 시 빠른 �
 TTL_DIVIDEND_SUMMARY = 3600  # 배당 집계 1시간
 TTL_PORTFOLIO_OVERVIEW = 1800  # 포트폴리오 overview 30분
 TTL_PORTFOLIO_LIST = 300  # 포트폴리오 목록 5분
-TTL_ACCOUNT_DETAIL = 300  # 계좌 상세 5분
 TTL_EXCHANGE_RATE_ALERTS = 300  # 환율 알림 목록 5분
 TTL_INDICATOR_HISTORY = 21600  # 경제지표 시계열 6시간
 TTL_INDICATOR_CALENDAR = 86400  # 경제지표 발표 일정 24시간
@@ -60,6 +59,7 @@ TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저
 TTL_TAX_IMPACT_GATE_ALERT_SENT = 86400  # 세금영향 게이트로 AUTO 계획 생성이 보류됐다는 알림, 알림당 1일 1회 제한 플래그
 TTL_MARKET_SIGNAL_GATE_ALERT_SENT = 86400  # 시장신호 게이트로 AUTO 계획 생성 보류 알림, 알림당 1일 1회 제한 플래그
 TTL_DAILY_VALUE_CAP_ALERT_SENT = 86400  # 하루 합산 거래한도 게이트로 AUTO 계획 생성 보류 알림, 유저당 1일 1회
+TTL_MONTHLY_REPORT_SENT = 45 * 24 * 3600  # 월간 리포트 유저+대상월 1회 발송 플래그 (다음 달 실행 전까지 유지)
 TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
 TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7일 — 사실상 불변 데이터
 TTL_ETF_PROFILE = 7 * 24 * 3600  # ETF 총보수·기초지수·운용사 7일 — 보수 인하는 드물고 참고 정보라 허용
@@ -201,10 +201,6 @@ def portfolio_overview_acct_suffix(account_ids: list[uuid.UUID] | None) -> str:
 
 def portfolio_list_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}portfolio_list:{user_id}"
-
-
-def account_detail_key(user_id: uuid.UUID, account_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}account_detail:{user_id}:{account_id}"
 
 
 def sync_all_status_key(user_id: uuid.UUID) -> str:
@@ -351,6 +347,11 @@ def daily_value_cap_gate_alert_sent_key(user_id: uuid.UUID, day: str) -> str:
     return f"{_env_prefix()}rebalancing:daily_cap_gate_sent:{user_id}:{day}"
 
 
+def monthly_report_sent_key(user_id: uuid.UUID, report_month: str) -> str:
+    """월간 리포트가 발송된 유저+대상월(YYYY-MM)을 기록하는 키 — 재시작·misfire 재실행 시 중복 발송 억제."""
+    return f"{_env_prefix()}monthly_report:sent:{user_id}:{report_month}"
+
+
 async def get_cached_json(cache: CacheStoreType, key: str) -> Any:
     """캐시에서 JSON을 조회한다. 캐시 미스나 파싱 오류 시 None 반환."""
     if cache is None:
@@ -486,7 +487,6 @@ async def invalidate_rebalancing_analysis_cache_all(cache: CacheStoreType, user_
 async def invalidate_asset_account_caches(
     cache: CacheStoreType,
     user_id: uuid.UUID,
-    account_id: uuid.UUID | None = None,
     year: int | None = None,
     *,
     positions_changed: bool = True,
@@ -513,8 +513,6 @@ async def invalidate_asset_account_caches(
         goal_recommendation_horizon_key(user_id),
         goal_recommendation_age_key(user_id),
     ]
-    if account_id is not None:
-        keys.append(account_detail_key(user_id, account_id))
     await invalidate_user_caches(cache, *keys)
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
@@ -528,14 +526,3 @@ async def invalidate_tax_overseas_caches(cache: CacheStoreType, user_id: uuid.UU
     변경·API 키 등록)도 과세 대상 계좌 집합을 바꾸므로 양쪽에서 호출한다."""
     await _scan_unlink(cache, f"{_env_prefix()}tax:overseas:{user_id}:*")
     await _scan_unlink(cache, f"{_env_prefix()}tax:overseas_realized:{user_id}:*")
-
-
-async def invalidate_account_caches(
-    cache: CacheStoreType, user_id: uuid.UUID, year: int | None = None, *, positions_changed: bool = True
-) -> None:
-    """계좌 싱크 완료 후 관련 캐시 일괄 무효화 — `invalidate_asset_account_caches`의 계좌 상세 키 없는 형태.
-
-    두 함수가 따로 키 목록을 들고 있다가 어긋난 적이 있어(CRUD 쪽만 추이·배분이력 누락) 하나로 합쳤다.
-    `positions_changed` — `invalidate_dividend_caches` 참고.
-    """
-    await invalidate_asset_account_caches(cache, user_id, None, year, positions_changed=positions_changed)

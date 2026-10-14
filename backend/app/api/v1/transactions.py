@@ -9,6 +9,7 @@ from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import PaginationDep, get_current_user, get_db, get_owned_or_404
+from app.api.v1._account_deps import get_owned_account
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.asset import Transaction
@@ -61,6 +62,8 @@ async def create_transaction(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if req.account_id is not None:
+        await get_owned_account(req.account_id, current_user.id, db)
     tx = Transaction(
         user_id=current_user.id,
         account_id=req.account_id,
@@ -75,18 +78,6 @@ async def create_transaction(
     await db.commit()
     await db.refresh(tx)
     await _invalidate_tx_caches(current_user.id)
-    return tx
-
-
-@router.get("/{tx_id}", response_model=TransactionResponse)
-@limiter.limit("60/minute")
-async def get_transaction(
-    request: Request,
-    tx_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    tx = await _get_owned_tx(tx_id, current_user.id, db)
     return tx
 
 

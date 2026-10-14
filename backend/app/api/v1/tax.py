@@ -24,17 +24,17 @@ router = APIRouter(prefix="/tax", tags=["tax"])
 @limiter.limit("30/minute")
 async def overseas_positions_tax(
     request: Request,
-    account_id: str | None = Query(default=None),
+    account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
     """해외 종목별 미실현 손익 목록. account_id 미지정 시 전체 계좌 통합 기준."""
     cache = await get_cache_store()
-    cache_key = tax_overseas_key(current_user.id, account_id or "all")
+    cache_key = tax_overseas_key(current_user.id, str(account_id) if account_id else "all")
     cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
-    result = await get_overseas_positions_detail(current_user.id, db, uuid.UUID(account_id) if account_id else None)
+    result = await get_overseas_positions_detail(current_user.id, db, account_id)
     await set_cached_json(cache, cache_key, result, TTL_TAX_OVERSEAS)
     return result
 
@@ -44,7 +44,7 @@ async def overseas_positions_tax(
 async def tax_summary(
     request: Request,
     year: int | None = None,
-    account_id: str | None = Query(default=None),
+    account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -56,16 +56,15 @@ async def tax_summary(
     target_year = year if year is not None else current_year
     if target_year < 2000 or target_year > current_year + 1:
         raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
-    acct_uuid = uuid.UUID(account_id) if account_id else None
-    positions = await get_overseas_positions_detail(current_user.id, db, acct_uuid)
+    positions = await get_overseas_positions_detail(current_user.id, db, account_id)
     realized_krw: float | None = None
     if target_year <= current_year:
         realized = await get_overseas_realized_summary(
-            current_user.id, target_year, db, acct_uuid, overseas_positions=positions
+            current_user.id, target_year, db, account_id, overseas_positions=positions
         )
         realized_krw = realized["realized_gain_krw"]
     return await get_tax_summary(
-        current_user.id, target_year, db, acct_uuid, overseas_realized_krw=realized_krw, overseas_positions=positions
+        current_user.id, target_year, db, account_id, overseas_realized_krw=realized_krw, overseas_positions=positions
     )
 
 
@@ -74,7 +73,7 @@ async def tax_summary(
 async def overseas_realized(
     request: Request,
     year: int | None = None,
-    account_id: str | None = Query(default=None),
+    account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -86,11 +85,7 @@ async def overseas_realized(
     target_year = year if year is not None else current_year
     if target_year < 2000 or target_year > current_year:
         raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
-    return dict(
-        await get_overseas_realized_summary(
-            current_user.id, target_year, db, uuid.UUID(account_id) if account_id else None
-        )
-    )
+    return dict(await get_overseas_realized_summary(current_user.id, target_year, db, account_id))
 
 
 @router.get("/isa-status")
