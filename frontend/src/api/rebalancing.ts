@@ -185,7 +185,7 @@ export const fetchBrokerBalance = (accountId: string): Promise<KisBalanceRespons
 export const fetchAllBrokerBalances = (): Promise<KisBalanceResponse[]> =>
   apiGet<KisBalanceResponse[]>(`/rebalancing/broker-balance-all`);
 
-// ── 지금 테스트 실행 (대기 플랜 생성 + 이메일 발송, AUTO와 동일 파이프라인) ──────────
+// ── 지금 계획 생성 (대기 플랜 생성 + 이메일 발송, AUTO와 동일 파이프라인) ──────────
 
 export interface ExecutionPlanOverride {
   account_id?: string | null;

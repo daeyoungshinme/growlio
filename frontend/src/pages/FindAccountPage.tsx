@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export default function FindAccountPage() {
   const [displayName, setDisplayName] = useState("");
@@ -52,6 +53,7 @@ export default function FindAccountPage() {
               onChange={(e) => setDisplayName(e.target.value)}
               required
               placeholder="가입 시 사용한 이름"
+              autoComplete="name"
               className={`w-full ${INPUT_SM}`}
             />
           </div>
@@ -61,7 +63,7 @@ export default function FindAccountPage() {
           <button
             type="submit"
             disabled={loading || !displayName.trim()}
-            className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className={`${TOUCH_TARGET_MIN} w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
           >
             {loading ? "조회 중..." : "이메일 확인"}
           </button>

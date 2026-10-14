@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
 import Modal from "@/components/common/Modal";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import type { AssetAccount } from "@/api/assets";
 import {
   createTrade,
@@ -63,6 +64,8 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   // 기존 기록 수정 중이면 그 기록 — 수정 시 단가는 저장된 원화 그대로 다룬다(해외도 USD 역환산 없음)
   const [editing, setEditing] = useState<TradeRecord | null>(null);
+  // 휴지통이 수정 아이콘 바로 옆이라 오탭이 잦다 — 매매 기록은 확인 후 삭제
+  const [pendingDelete, setPendingDelete] = useState<TradeRecord | null>(null);
   const { suggestions, isSearching, search, clearSuggestions } = useStockSearch();
 
   const overseas = stock ? isOverseasMarket(stock.market) : false;
@@ -417,10 +420,7 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (editing?.id === r.id) cancelEdit();
-                      deleteMut.mutate(r.id);
-                    }}
+                    onClick={() => setPendingDelete(r)}
                     disabled={deleteMut.isPending}
                     aria-label={`${r.trade_date} 기록 삭제`}
                     className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
@@ -432,6 +432,18 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
             ))}
           </ul>
         </div>
+      )}
+      {pendingDelete && (
+        <ConfirmModal
+          message={`${pendingDelete.trade_date} ${pendingDelete.name} ${pendingDelete.side === "BUY" ? "매수" : "매도"} ${pendingDelete.qty.toLocaleString()}주 기록을 삭제할까요? 삭제하면 되돌릴 수 없어요.`}
+          confirmLabel="삭제"
+          onConfirm={() => {
+            if (editing?.id === pendingDelete.id) cancelEdit();
+            deleteMut.mutate(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </Modal>
   );

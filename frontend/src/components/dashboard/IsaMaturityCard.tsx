@@ -11,6 +11,7 @@ import { pnlColor } from "@/utils/colors";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
 
 function fmtMonthDay(iso: string): string {
   const d = new Date(iso);
@@ -42,7 +43,12 @@ function MaturityBadge({ status }: { status: IsaAccountStatus }) {
 function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(String(status.estimated_cumulative_pnl_krw));
+  // 숫자 키패드엔 마이너스 키가 없어 손실을 입력할 수 없다 — 부호는 토글로 받고 칸엔 절댓값만
+  const [pnlSign, setPnlSign] = useState<"GAIN" | "LOSS">(
+    status.estimated_cumulative_pnl_krw < 0 ? "LOSS" : "GAIN",
+  );
+  const [value, setValue] = useState(String(Math.abs(status.estimated_cumulative_pnl_krw)));
+  const signedValue = (Number(value) || 0) * (pnlSign === "LOSS" ? -1 : 1);
 
   const mutation = useMutation({
     mutationFn: (pnl: number | null) => updateIsaPnlOverride(status.account_id, pnl),
@@ -101,17 +107,33 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
       <div className="mt-1.5">
         {editing ? (
           <div>
-            <div className="flex items-center gap-2">
+            <label
+              htmlFor={`isa-pnl-${status.account_id}`}
+              className="block text-xs text-gray-500 dark:text-gray-400 mb-1"
+            >
+              오늘 기준 누적손익 (원)
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <SegmentedControl
+                ariaLabel="누적손익 부호"
+                options={[
+                  { value: "GAIN", label: "이익" },
+                  { value: "LOSS", label: "손실" },
+                ]}
+                value={pnlSign}
+                onChange={setPnlSign}
+              />
               <input
-                type="number"
-                inputMode="decimal"
-                className={`${INPUT_SM} w-32`}
+                id={`isa-pnl-${status.account_id}`}
+                type="text"
+                inputMode="numeric"
+                className={`${INPUT_SM} w-36 min-w-0`}
                 value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder="오늘 기준 누적손익(원)"
+                onChange={(e) => setValue(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="0"
               />
               <button
-                onClick={() => mutation.mutate(Number(value) || 0)}
+                onClick={() => mutation.mutate(signedValue)}
                 disabled={mutation.isPending}
                 className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50`}
               >
@@ -126,7 +148,7 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
             </div>
             {value !== "" && !Number.isNaN(Number(value)) && (
               <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
-                {fmtKrwPreview(Number(value))}
+                {fmtKrwPreview(signedValue)}
               </p>
             )}
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">

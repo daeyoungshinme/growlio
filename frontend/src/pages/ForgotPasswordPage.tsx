@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -56,6 +57,7 @@ export default function ForgotPasswordPage() {
               </label>
               <input
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -69,7 +71,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className={`${TOUCH_TARGET_MIN} w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
             >
               {loading ? "전송 중..." : "재설정 링크 발송"}
             </button>

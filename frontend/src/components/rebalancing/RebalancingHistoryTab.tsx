@@ -16,6 +16,7 @@ import {
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { PLAN_LEG_STATUS_LABEL } from "@/constants/rebalancingConfig";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
@@ -206,13 +207,6 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
   );
 }
 
-const LEG_STATUS_LABEL: Record<string, string> = {
-  CANCELED: "취소됨",
-  REJECTED: "거부됨",
-  EXPIRED: "만료됨",
-  FAILED: "실패",
-};
-
 function useCountdownLabel(deadlineAt: string): string {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -339,7 +333,7 @@ function PendingPlanRow({
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {leg.status === "PENDING" && leg.actionable
               ? countdown
-              : (LEG_STATUS_LABEL[leg.status] ?? leg.status)}
+              : (PLAN_LEG_STATUS_LABEL[leg.status] ?? leg.status)}
           </span>
           {open ? (
             <ChevronUp size={14} className="text-gray-500 dark:text-gray-400" />

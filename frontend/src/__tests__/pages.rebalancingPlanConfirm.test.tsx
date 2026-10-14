@@ -101,6 +101,9 @@ describe("RebalancingPlanConfirmPage", () => {
     const { invalidateSpy } = renderPage();
 
     fireEvent.click(await screen.findByRole("button", { name: "승인 (매도 실행)" }));
+    // 실주문이라 확인 단계를 거친다 — 확인 전엔 API 미호출
+    expect(decideSellPlanByToken).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "매도 실행" }));
 
     expect(await screen.findByText("승인되었습니다")).toBeInTheDocument();
     expect(decideSellPlanByToken).toHaveBeenCalledWith("tok", "APPROVE");
@@ -108,6 +111,16 @@ describe("RebalancingPlanConfirmPage", () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.rebalancingPlans }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.rebalancingHistory });
+  });
+
+  it("매도 승인 확인에서 취소하면 결정 API를 호출하지 않는다", async () => {
+    vi.mocked(fetchPlanPreview).mockResolvedValue(makePreview({ side: "SELL" }));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "승인 (매도 실행)" }));
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(screen.queryByRole("button", { name: "매도 실행" })).not.toBeInTheDocument();
+    expect(decideSellPlanByToken).not.toHaveBeenCalled();
   });
 
   it("매도 거부는 REJECT로 호출", async () => {

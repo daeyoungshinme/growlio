@@ -88,6 +88,33 @@ describe("FormInput", () => {
   });
 });
 
+describe("ConfirmModal — 모달 공통 동작", () => {
+  it("Escape(=Android 뒤로가기)로 onCancel을 호출한다", () => {
+    const onCancel = vi.fn();
+    renderWithProviders(<ConfirmModal message="메시지" onConfirm={vi.fn()} onCancel={onCancel} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("열리면 취소 버튼에 포커스가 간다 (위험 동작의 안전한 기본값)", () => {
+    renderWithProviders(<ConfirmModal message="메시지" onConfirm={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByText("취소")).toHaveFocus();
+  });
+
+  it("다른 모달 위에 떠 있으면 Escape는 맨 위 확인창만 닫는다", () => {
+    const onModalClose = vi.fn();
+    const onCancel = vi.fn();
+    renderWithProviders(
+      <Modal title="편집" onClose={onModalClose}>
+        <ConfirmModal message="삭제할까요?" onConfirm={vi.fn()} onCancel={onCancel} />
+      </Modal>,
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onModalClose).not.toHaveBeenCalled();
+  });
+});
+
 describe("Modal", () => {
   it("title이 있으면 헤더를 렌더링한다", () => {
     renderWithProviders(

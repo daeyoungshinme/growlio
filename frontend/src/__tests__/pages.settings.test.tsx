@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -289,6 +289,9 @@ describe("SettingsPage", () => {
       expect(screen.getByRole("button", { name: "삭제" })).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole("button", { name: "삭제" }));
+    // 확인 단계 — 다이얼로그 안의 "삭제"를 눌러야 실제 삭제
+    expect(api.delete).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "삭제" }));
     await waitFor(() => {
       expect(api.delete).toHaveBeenCalledWith("/settings/dart");
     });
@@ -303,6 +306,7 @@ describe("SettingsPage", () => {
       expect(screen.getByRole("button", { name: "삭제" })).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole("button", { name: "삭제" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "삭제" }));
     await waitFor(() => {
       expect(toast).toHaveBeenCalledWith("server error", "error");
     });

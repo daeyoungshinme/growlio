@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { sendTestAccountRebalancingAlert, sendTestRebalancingAlert } from "@/api/alerts";
 import { createRebalancingExecutionPlan } from "@/api/rebalancing";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
@@ -18,6 +19,8 @@ interface Props {
 export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccountId }: Props) {
   const queryClient = useQueryClient();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // "지금 계획 생성"은 실제 대기 플랜을 만든다(매수는 대기시간 후 자동 체결) — 한 번 탭으로 실행되지 않게 확인
+  const [confirmingQuickExecute, setConfirmingQuickExecute] = useState(false);
 
   const testMut = useMutation({
     mutationFn: () =>
@@ -32,7 +35,7 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
     },
   });
 
-  // "지금 테스트 실행" — 저장된(또는 화면에 입력된 미저장) 자동화 설정값으로 실제 스케줄 AUTO와
+  // "지금 계획 생성" — 저장된(또는 화면에 입력된 미저장) 자동화 설정값으로 실제 스케줄 AUTO와
   // 동일한 파이프라인(드리프트 분석 → 대기 플랜 생성 → 계획 안내 이메일 발송)을 지금 바로 태운다.
   // 즉시 체결이 아니라 매수는 대기시간 후 자동 실행, 매도는 이메일 승인이 필요하다.
   const quickExecuteMut = useMutation({
@@ -85,11 +88,11 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
         </button>
       )}
 
-      {/* ── 지금 테스트 실행 (AUTO 모드 전용) — 지금 바로 계획을 생성해 이메일로 보낸다.
+      {/* ── 지금 계획 생성 (AUTO 모드 전용) — 지금 바로 계획을 생성해 이메일로 보낸다.
            매수는 대기 후 자동 실행, 매도는 이메일 승인이 필요하다 (즉시 체결 아님). ── */}
       {hasAlert && form.mode === "AUTO" && form.accountId && (
         <button
-          onClick={() => quickExecuteMut.mutate()}
+          onClick={() => setConfirmingQuickExecute(true)}
           disabled={quickExecuteMut.isPending}
           className="w-full flex items-center justify-center gap-2 py-2 text-sm border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-950 disabled:opacity-50 transition-colors"
         >
@@ -98,8 +101,19 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
           ) : (
             <CirclePlay size={14} />
           )}
-          지금 테스트 실행
+          지금 계획 생성
         </button>
+      )}
+      {confirmingQuickExecute && (
+        <ConfirmModal
+          message="지금 바로 리밸런싱 계획을 만들어 이메일로 보내요. 매수는 설정된 대기시간이 지나면 자동으로 실행되고(그 전에 취소 가능), 매도는 이메일 승인이 필요해요."
+          confirmLabel="계획 생성"
+          onConfirm={() => {
+            setConfirmingQuickExecute(false);
+            quickExecuteMut.mutate();
+          }}
+          onCancel={() => setConfirmingQuickExecute(false)}
+        />
       )}
 
       {/* ── 저장/삭제 ── */}
