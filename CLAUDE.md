@@ -97,7 +97,7 @@ growlio/
 
 ## 배포 & CI
 
-- **실제 운영 배포**: 백엔드는 `render.yaml`(Render, Docker runtime) — 프론트엔드는 `frontend/vercel.json`(Vercel)이 실제 배포 경로. `vercel.json`이 `/api/*` → Render 백엔드로 rewrite하고, CSP를 포함한 보안 헤더도 여기서 설정됨(`nginx.conf`가 아님 — 과거 이 구분이 문서화돼 있지 않아 "nginx가 CSP를 처리한다"고 오인해 실제 배포에는 CSP가 미적용이던 사고가 있었음). 새 API prefix 추가 시 `frontend/vercel.json`의 `rewrites`도 함께 확인.
+- **실제 운영 배포**: 백엔드는 `render.yaml`(Render, Docker runtime) — 프론트엔드는 `frontend/vercel.json`(Vercel)이 실제 배포 경로. `vercel.json`이 `/api/*` → Render 백엔드로 rewrite하고, CSP를 포함한 보안 헤더도 여기서 설정됨(**`nginx.conf`가 아님** — 보안 헤더 수정은 반드시 `vercel.json`에). 새 API prefix 추가 시 `frontend/vercel.json`의 `rewrites`도 함께 확인.
 - `nginx/` + `docker-compose.yml` — 위 Render/Vercel 조합을 쓰지 않고 자체 서버에 통째로 호스팅할 때를 위한 대안 구성(포트 80 리버스 프록시, `/api/*` → backend:8000, 그 외 → frontend 정적파일). 현재 운영에서는 사용하지 않음. 이 경로를 실제로 쓰게 되면 `nginx/nginx.conf`의 `location` 블록도 새 API prefix에 맞춰 수정 필요.
 - `monitoring/` — Prometheus 설정(`prometheus.yml`) + Grafana 대시보드. `docker compose --profile monitoring up -d` 로 실행 (Prometheus `:9090`, Grafana `:3000`).
 - `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build, push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행), `keep-alive.yml` (10분마다 운영 백엔드 `/health` 호출).
@@ -119,13 +119,29 @@ growlio/
 
 ---
 
+## 작업 마무리 전 검증
+
+CI(`ci.yml`)와 같은 기준 — 커밋/PR 전에 변경 영역에 맞춰 실행:
+
+```bash
+make lint            # ruff + eslint --max-warnings 0
+make typecheck       # mypy + tsc --noEmit
+make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-cov (80% 게이트)
+make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.config.ts
+```
+
+- Windows에서 전체 pytest가 `N passed` 후 종료 코드 `-1073741819`로 끝나는 건 테스트 실패가 아님 (`backend/CLAUDE.md` Tests 참고).
+- 파일 추가·삭제·이동 시 `backend/CLAUDE.md`·`frontend/CLAUDE.md`의 해당 목록(라우터·서비스·훅·유틸·queryKey 표 등)도 함께 갱신 — 각 목록이 "추가/삭제 시 갱신"을 전제로 유지됨.
+
+---
+
 ## 자주 막히는 문제
 
 - `make up` 후 DB 연결 실패: PostgreSQL 준비 대기 필요 — `docker compose logs db` 로 상태 확인 후 재시도
 - `EMAXCONNSESSION`/`max clients reached` 오류: `backend/.env`의 `DATABASE_URL`이 로컬 Docker Postgres가 아니라 Supabase 풀러를 직접 가리키는 구성일 수 있음(개발자별로 다를 수 있으니 먼저 `.env` 확인) — 이 경우 Session Pooler(5432) 대신 Transaction Pooler(6543) 사용 권장, 상세는 `backend/CLAUDE.md` Environment 섹션 참고
 - `make migrate`가 Supabase(nestlio와 `public` 스키마 공유) DB에서 버전 충돌/실패: growlio는 alembic 버전 포인터를 기본 `alembic_version`이 아닌 `growlio_alembic_version`에 저장함(`backend/alembic/env.py`의 `VERSION_TABLE`). 전환 이전부터 있던 기존 DB라면 `alembic upgrade head` 전에 `python backend/scripts/bootstrap_alembic.py` 1회 실행 필요(멱등, 신규 DB는 무동작) — `render.yaml`의 `preDeployCommand`도 이 순서. 상세는 `backend/CLAUDE.md` 참고
 - `dev.sh`는 기본적으로 8000/5173 포트를 점유한 이전(좀비) 프로세스를 강제 종료 후 재기동함. 다른 세션에서 의도적으로 띄워둔 백엔드까지 종료되는 게 문제라면 `bash dev.sh --keep-port`(또는 `make dev-keep-port`) 사용 — 8000이 사용 중이면 종료하지 않고 다음 빈 포트로 대신 구동, 프론트엔드 Vite 프록시도 자동으로 그 포트를 따라감
-- 백엔드(8000)는 떠 있는데 `localhost:5173` 연결 불가: dev.sh가 로그인 셸이 아닌 `Git\usr\bin\bash.exe`로 직접 실행되면 `/usr/bin`이 PATH에 없어 npm 래퍼가 실패(WSL `bash.exe`로 잘못 해석)하고 백엔드만 남음 — dev.sh가 이제 PATH를 자동 보정하고, 프론트가 죽으면 즉시 에러로 종료함
+- 백엔드(8000)만 뜨고 `localhost:5173` 연결 불가: dev.sh를 `Git\usr\bin\bash.exe`로 직접 실행하면 `/usr/bin`이 PATH에 없어 npm이 실패함 — dev.sh가 PATH를 자동 보정하므로, 재발 시 dev.sh 상단의 PATH 보정 블록을 먼저 확인
 - alembic revision 생성 후 반드시 `alembic/env.py`에 새 모델 import 추가 (누락 시 autogenerate에서 모델 인식 못함)
 - pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인
 - **동시 세션 작업**: 이 저장소는 여러 창/세션에서 병행 작업되는 경우가 잦음 — 계획 수립·구현 도중 `git status`가 대화 시작 시점과 달라져 있다면 다른 세션의 진행 중 작업일 가능성이 높음. 무시하거나 되돌리지 말고 먼저 `git diff`로 변경 내용을 확인할 것

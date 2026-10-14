@@ -31,7 +31,7 @@ cd frontend && npm run typecheck   # npx tsc --noEmit 과 동일
 # 백엔드 서버(localhost:8000) 실행 중인 상태에서 실행
 cd frontend && npm run generate:api-types
 # → src/types/api.generated.ts 생성 (gitignore 대상 — CI 빌드에서 자동 생성 안 됨. 백엔드 실행 중일 때 수동 실행 필요)
-# 생성된 타입 사용법: import type { paths, components } from "../types/api.generated";
+# 생성된 타입 사용법: import type { paths, components } from "@/types/api.generated";
 # 예: components["schemas"]["DashboardSummary"]
 ```
 
@@ -123,7 +123,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/assets/AccountHistoryTab.tsx`** — 계좌관리 "내역" 탭. 세그먼트 "현금 흐름"(입출금·배당 `TransactionHistoryTab`) / "매수 내역"(`PeriodPurchasesTab` — 월/연 매수 종목·수익률, 스냅샷 추정 `추정`/수기 `기록` 배지 + `TradeFormModal`로 매수/매도 기록, 해외 USD→KRW 환산). 세그먼트는 `?history=` 영속. 옛 `atab=입출금·배당`/`기간별 매수`는 `legacyHistorySegment()`로 변환.
 - **`components/portfolio-analysis/TaxLimitsSection.tsx`** — "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`(계좌 조건부) + `HealthInsuranceRiskCard`(항상)를 감싸는 순수 프레젠테이션. 항상 전체 계좌 기준(`accountId` prop 없음). 항상 렌더 카드가 있어 empty-state 없음.
 - **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드(lazy). 리밸런싱 페이지 **"추천" 서브탭**(진단/추천/포트폴리오/이력, `rtab=추천`) 전용 — 추천 관련 딥링크는 `rtab=추천`, 포트폴리오 생성·관리·실행은 `rtab=포트폴리오`. `openRecOptions=1`이면 옵션 모달을 연 채 마운트. 전체/연령대/기간별 3탭. 적용 대상은 모든 포트폴리오(기준 포트폴리오 우선 선택). 결과 렌더는 `RecommendationResultPanel.tsx`로 통합, 탭별 문구·`useMutation`·전환 상태머신은 이 파일.
-- **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 곳(분석/실행 패널, 진단탭 CTA, 계획탭 배너)은 `portfolioId=<id>&openAlert=1` URL 파라미터로 요청한다(`openAlert=dca`는 신규 알림일 때 정기 적립식 자동매수 프리셋 화면으로 바로 연다 — 계획탭 `AutoInvestStatusBanner`의 "자동매수 설정"). 새 진입점도 모달을 직접 마운트하지 말고 이 파라미터를 쓸 것(2026-09-25 이전엔 호스트가 2개였음).
+- **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 곳(분석/실행 패널, 진단탭 CTA, 계획탭 배너)은 `portfolioId=<id>&openAlert=1` URL 파라미터로 요청한다(`openAlert=dca`는 신규 알림일 때 정기 적립식 자동매수 프리셋 화면으로 바로 연다 — 계획탭 `AutoInvestStatusBanner`의 "자동매수 설정"). 새 진입점도 모달을 직접 마운트하지 말고 이 파라미터를 쓸 것.
 - **`components/rebalancing/RecommendationResultPanel.tsx`** — 3탭 공유 추천 결과 프레젠테이션(드리프트 배지·`RecommendationWeightList`·`MarketSignalLevelBadge`·`SuggestedCandidatesBlock`·`RecommendationApplySection`). `applySection===null`이면 적용 섹션 생략(현금성 자동 연결 계좌 없을 때).
 - **`components/invest/ChallengeSection.tsx`** — 계획 탭 "챌린지" 서브탭(lazy). `useChallenges`+`useChallengeMutations`, `ChallengeCard` 리스트, `ChallengeFormModal`(생성/편집), `ChallengeMonthGrid`(적립 습관 캘린더). 스트릭 기준은 백엔드가 "월 순입금>0"으로 계산 — 목표액 수정해도 과거 스트릭 불변. `components/dashboard/ChallengeProgressCard.tsx`가 홈에서 진행 중 챌린지 요약(입금 스트릭 우선), `BottomNav`가 `useChallengeNudge`로 계획 탭 아이콘에 빨간 점.
 - **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정 6단계 마법사(자산 확인→금액/시점→월 적립액→결과→투자성향·배당목표→추천 포트폴리오). `GET /invest/goal-feasibility`로 프리셋별 필요 적립액 역산, 6단계에서 `GET /rebalancing/goal-recommendation` → "이 추천으로 포트폴리오 만들기"로 신규 `Portfolio` 생성(계좌 미연결). `InvestPlanPage.tsx`의 플랫 편집 모달(재설정 전용)과 별개. 상태: `useGoalSettings.ts`.
@@ -135,12 +135,12 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 ```
 api/client.ts (axios + Supabase access token 첨부 + 401 시 Supabase refreshSession 재시도)
   └── api/{alerts,assets,auth,backtest,challenges,dashboard,dividends,economicIndicators,
-           insights,invest,marketSignals,portfolios,rebalancing,rebalancingPlan,risk,settings,tax,transactions}.ts
+           insights,invest,marketSignals,portfolios,rebalancing,rebalancingPlan,risk,settings,tax,trades,transactions}.ts
         └── React Query useQuery/useMutation   # 자동 refetch (REFETCH_INTERVAL 상수 기준)
               └── Page 컴포넌트
 ```
 
-> `api/economicIndicators.ts`는 백엔드 `/economic-indicators/inflation-summary`(CPI·Core CPI 요약)만 호출 — `RebalancingPage` 진단탭 `MarketSignalBanner`의 상세 영역(`InflationIndicatorList`)이 소비. 백엔드에는 이 엔드포인트만 존재함(과거 프론트 미연동이던 지표 목록·구독·캘린더 엔드포인트는 제거됨).
+> `api/economicIndicators.ts`는 백엔드 `/economic-indicators/inflation-summary`(CPI·Core CPI 요약)만 호출 — `RebalancingPage` 진단탭 `MarketSignalBanner`의 상세 영역(`InflationIndicatorList`)이 소비. 백엔드에는 이 엔드포인트만 존재함.
 
 **hooks/** (도메인별로 그룹핑 — 새 훅 추가/삭제 시 해당 그룹에 함께 갱신)
 
@@ -167,7 +167,7 @@ _자산관리/대시보드_
 - `useStockAccountStats.ts` — 증권 계좌별 평가금액·투자원금·손익·입금액·배당액 통계 집계 (portfolio overview + 거래내역 조인)
 - `usePositionsEditor.ts` — 포지션(종목) 편집 폼 상태 관리
 - `usePortfolioItemsEditor.ts` — 포트폴리오 종목 편집 폼 상태 (종목 검색 연동)
-- `createCredentialVerify.ts` — 브로커 자격증명 "확인" 버튼용 상태 머신(idle→loading→ok/error) 제네릭 팩토리. `useKisCredentialVerify.ts`/`useKiwoomCredentialVerify.ts`/`useTossCredentialVerify.ts`는 검증 API 호출부만 클로저로 넘겨 얹은 얇은 래퍼 (`components/assets/CredentialVerifyButton.tsx`가 결과 UI 공용)
+- `createCredentialVerify.ts` — 브로커 자격증명 "확인" 버튼용 상태 머신(idle→loading→ok/error) 제네릭 팩토리. `useKisCredentialVerify.ts`/`useKiwoomCredentialVerify.ts`/`useTossCredentialVerify.ts`는 검증 API 호출부만 클로저로 넘겨 얹은 얇은 래퍼 (`components/assets/CredentialVerifyButton.tsx`가 결과 UI 공용). `useBrokerCredentialVerify.ts`는 이 3개를 브로커(`BrokerDataSource`)별 핸들로 묶어 폼에 제공 — 입력 필드 정의는 `constants/brokerCredentials.ts`
 
 _배당_
 
@@ -185,6 +185,7 @@ _리밸런싱/추천_
 - `useGoalSettings.ts` — 투자 목표 설정 폼 상태
 - `useChallenges.ts` / `useChallengeMutations.ts` / `useChallengeNudge.ts` — 적립 챌린지 목록 조회 / 생성·수정·삭제 뮤테이션 / 하단 네비 배지용 넛지 요약
 - `useAddSuggestedCandidates.ts` — 목표 역산 추천의 `suggested_candidates`(고배당 미등록 후보 제안)를 "후보에 추가" 클릭으로 승인하는 뮤테이션. `RecommendationCard.tsx`/`DividendPlanSection.tsx` 공용
+- `useCandidateOverlap.ts` — 추천 후보 ETF 중복·총보수 분석(`POST /rebalancing/candidates/overlap`) 조회. 후보 편집 연타 시 요청 폭주를 막는 디바운스(`CANDIDATE_OVERLAP_DEBOUNCE_MS`) 포함. 표시 헬퍼는 `utils/etfOverlap.ts`
 - `usePortfolioTabFetching.ts` — 포트폴리오 탭 데이터 프리패치
 
 _알림 토글_ (설정 페이지, `["settings"]` boolean 필드 조회/PUT 패턴)
@@ -227,6 +228,7 @@ _기타_
 - `assets.ts` — 자산 유형 관련 상수 (`CASH_TICKER`, `REAL_ESTATE_ASSET_TYPE`, `KR_PROPERTY_MARKET`, `BASE_TYPE_STOCK_ONLY`, `BASE_TYPE_TOTAL_ASSETS`, `CASH_EQUIVALENT_TICKER`/`CASH_EQUIVALENT_MARKET`/`CASH_EQUIVALENT_NAME`)
 - `goalRiskTolerance.ts` — 목표 설정 마법사/옵션 모달 공용 리스크 성향 옵션 레이블 (`GoalSettingWizard`, `GoalRecommendationOptionsModal`)
 - `savingsPresets.ts` — 계획탭 저축 시뮬레이터 가정 수익률 프리셋
+- `brokerCredentials.ts` — KIS/키움/토스 자격증명 입력 폼 설정 테이블(`BrokerDataSource`) — `BrokerCredentialFields`가 이 테이블만 보고 렌더. 새 브로커는 여기 추가
 - `nav.ts` — `BottomNav` 탭 정의 (홈/자산/리밸런싱/계획/설정 5탭)
 - `markets.ts` — 해외거래소 판별 상수 (상세는 하단 "마켓 유틸리티" 참고)
 - `inputStyles.ts` — 공통 입력 필드 Tailwind 스타일 상수 (상세는 하단 "입력 스타일 상수" 참고)
@@ -236,7 +238,7 @@ _기타_
 
 **Zod 스키마 (`src/schemas/`):**
 
-- `assets.ts`, `auth.ts`, `challenge.ts`, `portfolios.ts`, `transaction.ts` — 폼 입력값 런타임 유효성 검사 (Zod). 새 폼 추가 시 이 디렉토리에 스키마 파일 추가.
+- `assets.ts`, `auth.ts`, `challenge.ts`, `portfolios.ts`, `trade.ts`, `transaction.ts` — 폼 입력값 런타임 유효성 검사 (Zod). 새 폼 추가 시 이 디렉토리에 스키마 파일 추가.
 
 **테스트 위치 (Vitest):**
 
@@ -395,6 +397,10 @@ _기타_
 - `hasSignificantDrift(drift)` — `RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3%p) 이상 차이 나거나 신규 후보가 있으면 true. `RecommendationCard.tsx`가 "추천이 달라졌어요" 배지 노출 여부 판단에 사용.
 - `buildWeightDiffRows(recommended, current)` — 두 목록을 합쳐 종목별 (현재 비중, 추천 비중) 전체 비교 행을 만든다(추천 비중 내림차순 정렬) — "적용" 확인 모달의 비교 미리보기(`RecommendationComparisonPreview`, `RecommendationCard.tsx`)에서 사용.
 
+**ETF 중복 표시 유틸리티 (`src/utils/etfOverlap.ts`)**
+
+- `formatTerPct(pct)` — 총보수(%)를 유효숫자 3자리로 표시(0.0068% 같은 초저보수도 뭉개지지 않게). `annualCostGapPer10M(gapPct)` — 보수 차이 → 1,000만원 보유 시 연간 비용 차이(원). `useCandidateOverlap` 결과 렌더용.
+
 **진단 인사이트 유틸리티 (`src/utils/diagnosisInsights.ts`)**
 
 - `buildDiagnosisNotes(ctx)` — `DiagnosisContext`(시장상황/리스크/세금영향)를 화면 표시용 조건부 문구 리스트로 변환.
@@ -451,7 +457,7 @@ _기타_
     LABEL_MD,
     SELECT_SM,
     TEXTAREA_SM,
-  } from "../constants/inputStyles";
+  } from "@/constants/inputStyles";
   ```
 - `INPUT_SM` / `INPUT_MD` — `text-sm` / `text-base` 입력 필드 (border, bg, focus ring 포함)
 - `LABEL_SM` / `LABEL_MD` — `text-xs` / `text-sm font-medium` 레이블
@@ -482,7 +488,6 @@ _기타_
 - 새 카드 추가 시 이 규칙을 따를 것.
 - 예외: `RebalancingPage.tsx` "포트폴리오" 탭의 백테스트 카드와 계획탭 "절약 복리 시뮬레이터" 카드는
   보조 도구라 **기본 접힘**(`growlio:rebalancing:backtest-section-open`, `growlio:invest:savingsSimulatorOpen`).
-  (과거 백테스트는 설정탭 "백테스트 기능 표시" 플래그 뒤에 숨겨져 있었으나 2026-09-25 제거 — 계획 37 U15)
 - 예외: 홈의 `RebalancingStatusCard`는 `statusOnly` — 상태 확인용으로 **기본 접힘**(`growlio:dashboard:rebalancingStatusOpen`)
   + 한 줄 힌트("N개 모두 목표 비중 이내" / "N개 중 M개 이탈 · 지금 할 일 참고"). "리밸런싱 필요" 신호(헤더 배지·빨간 테두리·
   결합 안내)는 홈 `ActionItemsCard`가 단독 담당 — 두 카드가 같은 drift-summary를 중복 표시하지 않게. 진단탭 인스턴스는 항상 펼침.
@@ -491,7 +496,7 @@ _기타_
 
 - `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.
   ```ts
-  import { isOverseasMarket } from "../constants/markets";
+  import { isOverseasMarket } from "@/constants/markets";
   // isOverseasMarket("NYSE") → true, isOverseasMarket("KOSPI") → false
   ```
 
@@ -505,7 +510,7 @@ _기타_
 
 - `chartTooltipStyle(isDark)` — Recharts `<Tooltip>` 다크모드 스타일 반환. 인라인 스타일 객체 중복 작성 금지.
   ```ts
-  import { chartTooltipStyle } from "../utils/chart";
+  import { chartTooltipStyle } from "@/utils/chart";
   const { contentStyle, labelStyle, itemStyle } = chartTooltipStyle(isDark);
   ```
 
