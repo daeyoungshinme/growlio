@@ -59,6 +59,12 @@ describe("LoginPage", () => {
     expect(screen.getByRole("button", { name: "로그인" })).toBeInTheDocument();
   });
 
+  it("비밀번호 관리자·자동완성이 동작하도록 autoComplete를 지정한다", () => {
+    renderWithRouter(<LoginPage />);
+    expect(screen.getByLabelText("이메일")).toHaveAttribute("autocomplete", "email");
+    expect(screen.getByLabelText("비밀번호")).toHaveAttribute("autocomplete", "current-password");
+  });
+
   it("Growlio 로고 텍스트를 표시한다", () => {
     renderWithRouter(<LoginPage />);
     expect(screen.getByText("Growlio")).toBeInTheDocument();

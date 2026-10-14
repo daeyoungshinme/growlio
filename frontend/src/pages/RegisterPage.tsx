@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { toast } from "@/utils/toast";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -102,6 +103,7 @@ export default function RegisterPage() {
             </label>
             <input
               id="register-email"
+              autoComplete="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -119,6 +121,7 @@ export default function RegisterPage() {
             </label>
             <input
               id="register-display-name"
+              autoComplete="name"
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -135,6 +138,7 @@ export default function RegisterPage() {
             </label>
             <input
               id="register-password"
+              autoComplete="new-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -159,6 +163,7 @@ export default function RegisterPage() {
             </label>
             <input
               id="register-password-confirm"
+              autoComplete="new-password"
               type="password"
               value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
@@ -188,7 +193,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className={`${TOUCH_TARGET_MIN} w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
           >
             {loading ? "가입 중..." : "회원가입"}
           </button>

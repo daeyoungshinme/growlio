@@ -6,6 +6,27 @@ const FOCUSABLE =
 // 모달이 겹쳐 열릴 수 있으므로(예: 계좌별 자동화 목록 위에 편집 모달) 참조 카운트로 body 스크롤 잠금 관리
 let bodyLockCount = 0;
 let savedBodyOverflow = "";
+// 열린 모달 목록 — Escape/포커스 트랩은 맨 위 모달만 처리한다.
+// (Android 뒤로가기는 Escape를 dispatch하므로, 이게 없으면 확인창 위에서 한 번 눌러도 아래 모달까지 함께 닫힘)
+interface ModalEntry {
+  overlay: () => HTMLElement | null;
+}
+const openModals: ModalEntry[] = [];
+
+// 맨 위 판정: DOM상 다른 열린 모달을 품고 있으면 아래층(같이 마운트되면 자식 effect가 먼저 돌아 등록 순서가 뒤집힘),
+// 서로 품지 않는 형제 모달끼리는 나중에 열린 쪽이 위.
+function isTopModal(me: ModalEntry): boolean {
+  const myEl = me.overlay();
+  return openModals.every((other) => {
+    if (other === me) return true;
+    const otherEl = other.overlay();
+    if (myEl && otherEl) {
+      if (myEl.contains(otherEl)) return false;
+      if (otherEl.contains(myEl)) return true;
+    }
+    return openModals.indexOf(other) < openModals.indexOf(me);
+  });
+}
 
 export function useModalBehavior(onClose: () => void) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -45,6 +66,8 @@ export function useModalBehavior(onClose: () => void) {
   }, []);
 
   useEffect(() => {
+    const entry: ModalEntry = { overlay: () => overlayRef.current };
+    openModals.push(entry);
     const prevFocus = document.activeElement as HTMLElement | null;
     const dialog = dialogRef.current;
     if (dialog) {
@@ -53,6 +76,7 @@ export function useModalBehavior(onClose: () => void) {
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isTopModal(entry)) return;
       if (e.key === "Escape") {
         onCloseRef.current();
         return;
@@ -76,6 +100,8 @@ export function useModalBehavior(onClose: () => void) {
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      const idx = openModals.indexOf(entry);
+      if (idx !== -1) openModals.splice(idx, 1);
       prevFocus?.focus();
     };
   }, []);

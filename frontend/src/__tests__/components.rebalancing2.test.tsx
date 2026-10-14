@@ -531,6 +531,20 @@ describe("RebalancingHistoryTab", () => {
     ],
   };
 
+  it("실행 완료 leg는 영문 상태 코드 대신 한글 라벨을 보여준다", async () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([
+      { ...buyLeg, status: "EXECUTED" as const, actionable: false },
+    ]);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("실행됨")).toBeDefined();
+    expect(screen.queryByText("EXECUTED")).toBeNull();
+  });
+
   it("marks a failed leg as partially executed when its sibling leg was filled", async () => {
     mockFetchRecentPlanLegs.mockResolvedValue([
       { ...buyLeg, status: "FAILED" as const, actionable: false, partially_executed: true },

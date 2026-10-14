@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import EmptyState from "@/components/common/EmptyState";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import { updateAccount, type AssetAccount } from "@/api/assets";
 import { fetchTransactions, deleteTransaction, type Transaction } from "@/api/transactions";
 import { TransactionForm } from "./TransactionForm";
@@ -12,7 +13,13 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { invalidateAccountData, invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { STOCK_TYPES } from "@/constants";
-import { TX_LABELS, TX_COLORS, TX_TYPES, type TxType } from "@/constants/transaction";
+import {
+  TX_LABELS,
+  TX_COLORS,
+  TX_TYPES,
+  txDeleteConfirmMessage,
+  type TxType,
+} from "@/constants/transaction";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { extractErrorMessage } from "@/utils/error";
@@ -37,6 +44,8 @@ export default function TransactionHistoryTab({ accounts }: Props) {
   const [filterType, setFilterType] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  // 휴지통이 수정 아이콘 바로 옆이라 오탭이 잦다 — 금융 기록은 확인 후 삭제
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [depositPrompt, setDepositPrompt] = useState<{
     accountId: string;
     amount: number;
@@ -278,7 +287,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                         <Pencil size={14} />
                       </button>
                       <button
-                        onClick={() => deleteMut.mutate(tx.id)}
+                        onClick={() => setPendingDelete(tx)}
                         disabled={deleteMut.isPending}
                         aria-label="삭제"
                         className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
@@ -368,7 +377,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                               <Pencil size={15} />
                             </button>
                             <button
-                              onClick={() => deleteMut.mutate(tx.id)}
+                              onClick={() => setPendingDelete(tx)}
                               disabled={deleteMut.isPending}
                               aria-label="삭제"
                               className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
@@ -391,6 +400,17 @@ export default function TransactionHistoryTab({ accounts }: Props) {
           </>
         )}
       </div>
+      {pendingDelete && (
+        <ConfirmModal
+          message={txDeleteConfirmMessage(pendingDelete)}
+          confirmLabel="삭제"
+          onConfirm={() => {
+            deleteMut.mutate(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

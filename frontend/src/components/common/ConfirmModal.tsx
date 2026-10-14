@@ -2,6 +2,7 @@ import { TriangleAlert } from "lucide-react";
 import { useId, type ReactNode } from "react";
 import { triggerHaptic } from "@/hooks/useHaptic";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 interface Props {
   message: string;
@@ -24,17 +25,21 @@ export default function ConfirmModal({
   children,
 }: Props) {
   const msgId = useId();
+  // 포커스 트랩·Escape·Android 뒤로가기(=Escape)로 닫기 + body 잠금 — 다른 모달 위에 떠도 맨 위만 닫힌다
+  const { dialogRef, overlayRef } = useModalBehavior(onCancel);
 
   return (
     <div
+      ref={overlayRef}
       className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[70] sm:p-4"
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={msgId}
-        className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6"
+        className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm max-h-[85dvh] overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3 mb-5">

@@ -177,8 +177,24 @@ describe("TradeFormModal", () => {
     fireEvent.click(await screen.findByRole("button", { name: "2026-10-03 기록 수정" }));
     expect(screen.getByRole("button", { name: "기록 수정" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "2026-10-03 기록 삭제" }));
+    // 확인 단계 — 삭제 전엔 API가 호출되지 않는다
+    expect(screen.getByText(/기록을 삭제할까요\?/)).toBeInTheDocument();
+    expect(vi.mocked(deleteTrade)).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "삭제" }));
     await waitFor(() => expect(vi.mocked(deleteTrade)).toHaveBeenCalled());
     expect(vi.mocked(deleteTrade).mock.calls[0][0]).toBe("t5");
     expect(screen.getByRole("button", { name: "기록 추가" })).toBeInTheDocument();
+  });
+
+  it("삭제 확인에서 취소하면 deleteTrade를 호출하지 않는다", async () => {
+    vi.mocked(deleteTrade)
+      .mockReset()
+      .mockResolvedValue(undefined as never);
+    vi.mocked(fetchTrades).mockResolvedValue([feeRecord]);
+    renderWithRecord();
+    fireEvent.click(await screen.findByRole("button", { name: "2026-10-03 기록 삭제" }));
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(screen.queryByText(/기록을 삭제할까요\?/)).not.toBeInTheDocument();
+    expect(vi.mocked(deleteTrade)).not.toHaveBeenCalled();
   });
 });

@@ -668,6 +668,24 @@ describe("TaxPlannerSection", () => {
     expect(screen.getByLabelText("올해 실현 손익 (원)")).toBeDefined();
   });
 
+  it("손실 토글로 음수 실현 손익을 입력한다 (숫자 키패드엔 마이너스 키가 없음)", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxPlannerSection positions={[realizedPos]} realized={null} />
+      </MemoryRouter>,
+    );
+    const input = screen.getByLabelText("올해 실현 손익 (원)") as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "손실" }));
+    fireEvent.change(input, { target: { value: "1000000" } });
+    // 칸엔 절댓값, 계산엔 음수가 반영된다
+    expect(input.value).toBe("1000000");
+    expect(screen.getByText(/^-.*100만/)).toBeDefined();
+    // 이익으로 되돌리면 부호만 바뀐다
+    fireEvent.click(screen.getByRole("button", { name: "이익" }));
+    expect(input.value).toBe("1000000");
+    expect(screen.queryByText(/^-.*100만/)).toBeNull();
+  });
+
   it("renders empty state when no positions", () => {
     renderWithProviders(<TaxPlannerSection positions={[]} />);
     expect(screen.getByText("해외 종목 보유 현황이 없습니다.")).toBeDefined();

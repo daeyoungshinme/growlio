@@ -10,6 +10,7 @@ import { fetchAccounts, fetchExchangeRate } from "@/api/assets";
 import { fetchPortfolioOverviewLite } from "@/api/portfolios";
 import { fetchDCAAnalysis } from "@/api/invest";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -69,6 +70,7 @@ export default function LoginPage() {
             </label>
             <input
               id="login-email"
+              autoComplete="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -86,6 +88,7 @@ export default function LoginPage() {
             </label>
             <input
               id="login-password"
+              autoComplete="current-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -105,7 +108,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className={`${TOUCH_TARGET_MIN} w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
           >
             {loading ? "로그인 중..." : "로그인"}
           </button>

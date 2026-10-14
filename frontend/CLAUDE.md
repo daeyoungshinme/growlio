@@ -151,7 +151,7 @@ _공통/입력_
 - `useStockSearch.ts` — 종목 검색
 - `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
-- `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용
+- `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`·`common/ConfirmModal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용. Escape·포커스 트랩은 **맨 위 모달만** 처리(DOM상 다른 열린 모달을 품은 쪽은 아래층, 형제끼리는 나중에 열린 쪽이 위) — Android 뒤로가기가 Escape를 dispatch하므로 확인창 위에서 한 번 눌러 아래 모달까지 닫히지 않게 함
 - `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용
 
 _세금_
@@ -220,9 +220,9 @@ _기타_
 - `queryConfig.ts` — `STALE_TIME`, `REFETCH_INTERVAL` 상수. 매직 넘버 대신 이 상수 사용
 - `defaults.ts` — 백테스트 기본 날짜 상수 (`BACKTEST_DEFAULT_START_DATE` 등)
 - `tabs.ts` — 탭 배열 + 타입: `ASSETS_TOP_TABS`("투자현황"/"계좌관리", AssetsPage 상위 탭), `ASSET_MANAGEMENT_TABS`("은행계좌"/"증권계좌"/"부동산"/"내역", 계좌관리 내부 탭 — "내역"은 `AccountHistoryTab`), `PORTFOLIO_TABS`("종목 현황"/"배당", 세금은 계획탭 › 절세로 이동)
-- `transaction.ts` — 거래 유형 상수 (`TX_TYPES`, `TX_LABELS`/`TX_COLORS`: DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST)
+- `transaction.ts` — 거래 유형 상수 (`TX_TYPES`, `TX_LABELS`/`TX_COLORS`: DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST) + `txDeleteConfirmMessage()`(입출금 기록 삭제 확인 문구)
 - `validation.ts` — 포트폴리오 비중 허용 오차 (`PORTFOLIO_WEIGHT_TOLERANCE`)
-- `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`, `TAX_IMPACT_GATE_OPTIONS` — AUTO 모드 세금영향 게이트 on/off, `AlertAutoModeSection.tsx`가 소비)
+- `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`, `TAX_IMPACT_GATE_OPTIONS` — AUTO 모드 세금영향 게이트 on/off, `AlertAutoModeSection.tsx`가 소비) + `PLAN_LEG_STATUS_LABEL`(대기 플랜 leg 상태 6종 한글 라벨 — 이력 탭·승인 페이지 공용)
 - `uiSizes.ts` — 모바일 터치 타겟 상수 (`TOUCH_TARGET_MIN`: `min-h-[44px] min-w-[44px]` + 가운데 정렬, `TOUCH_TARGET_MIN_MOBILE_ONLY`: 모바일에서만 44px 적용하고 `sm:` 이상에서 축소하는 변형, `TOUCH_TARGET_ROW`: 아이콘+레이블이 좌측 정렬인 메뉴 로우/링크용 변형(`justify-start`), `TOUCH_TARGET_COMPACT_MOBILE_ONLY`: 배지/탭/필터 칩처럼 조밀하게 나열되는 보조 요소용 절충 터치 타겟(36px, 모바일 전용). 인터랙티브 요소(버튼/입력 등)에 인라인 `min-h-[44px] min-w-[44px]` 재정의 금지, 이 상수들 사용
 - `timers.ts` — UI 타이밍 상수 (`SEARCH_DROPDOWN_HIDE_DELAY`: 150ms blur 후 드롭다운 지연, `REDIRECT_DELAY_MS`: 3000ms, `FOCUS_SETTLE_DELAY`: 0ms)
 - `assets.ts` — 자산 유형 관련 상수 (`CASH_TICKER`, `REAL_ESTATE_ASSET_TYPE`, `KR_PROPERTY_MARKET`, `BASE_TYPE_STOCK_ONLY`, `BASE_TYPE_TOTAL_ASSETS`, `CASH_EQUIVALENT_TICKER`/`CASH_EQUIVALENT_MARKET`/`CASH_EQUIVALENT_NAME`)
@@ -469,6 +469,8 @@ _기타_
 - 인터랙티브 요소(버튼/입력 등) 터치 영역은 `src/constants/uiSizes.ts`의 `TOUCH_TARGET_MIN`(`min-h-[44px] min-w-[44px]`) 사용.
 - 단, 배지/탭/필터 칩/보조 링크/카드 내부 아이콘 버튼처럼 여러 개가 조밀하게 나열되는 요소는 44px 강제 시 시각적으로 뭉툭해져 오히려 가독성이 떨어질 수 있다 — 이 경우 `TOUCH_TARGET_COMPACT_MOBILE_ONLY`(36px, WCAG AA 24px 이상 충족)를 사용해도 된다.
 - 단, `StockAccountCard.tsx`/`BankAccountCard.tsx`/`PortfolioItemRow.tsx`의 삭제 버튼처럼 이미 앱 전역에 44px로 정착된 아이콘 버튼 패턴은 개별 화면에서 임의로 축소하지 말 것 — 화면 간 일관성이 깨짐.
+- 금융 기록 삭제·실주문/실계획 생성처럼 되돌릴 수 없는 동작은 한 번 탭으로 실행하지 말고 `ConfirmModal`(무엇이 지워지는지/실행되는지 문구 포함)을 거친다 — 휴지통이 수정 아이콘 바로 옆이라 모바일 오탭이 잦다.
+- 음수가 가능한 숫자 입력(실현 손익·누적손익 등)은 `inputMode="numeric"/"decimal"` 키패드에 마이너스 키가 없으므로 이익/손실 `SegmentedControl` 토글 + 절댓값 입력으로 받는다(`TaxPlannerSection`·`IsaMaturityCard` 참고).
 
 **탭/서브패널 지연 로딩 규칙**
 

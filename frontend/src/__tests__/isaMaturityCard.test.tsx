@@ -76,13 +76,29 @@ describe("IsaMaturityCard", () => {
     await waitFor(() => expect(screen.getByText("직접 입력")).toBeInTheDocument());
 
     fireEvent.click(screen.getByText("직접 입력"));
-    const input = screen.getByPlaceholderText("오늘 기준 누적손익(원)");
+    const input = screen.getByLabelText("오늘 기준 누적손익 (원)");
     fireEvent.change(input, { target: { value: "5000000" } });
     expect(screen.getByText("5,000,000원 (500만원)")).toBeInTheDocument();
     expect(screen.getByText(/이후 가격변동·배당은 자동으로 반영됩니다/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("저장"));
 
     await waitFor(() => expect(updateIsaPnlOverride).toHaveBeenCalledWith("acc1", 5_000_000));
+  });
+
+  it("손실 토글로 음수 누적손익을 저장한다 (숫자 키패드엔 마이너스 키가 없음)", async () => {
+    fetchIsaStatus.mockResolvedValue(makeSummary([makeStatus()]));
+    updateIsaPnlOverride.mockResolvedValue({});
+    renderWithProviders(<IsaMaturityCard />);
+    await waitFor(() => expect(screen.getByText("직접 입력")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("직접 입력"));
+    fireEvent.click(screen.getByRole("button", { name: "손실" }));
+    fireEvent.change(screen.getByLabelText("오늘 기준 누적손익 (원)"), {
+      target: { value: "-300000" },
+    });
+    fireEvent.click(screen.getByText("저장"));
+
+    await waitFor(() => expect(updateIsaPnlOverride).toHaveBeenCalledWith("acc1", -300_000));
   });
 
   it("수동 입력값이 있으면 자동 추정 되돌리기 버튼을 표시한다", async () => {

@@ -22,10 +22,20 @@ vi.mock("../utils/toast", () => ({
   toast: vi.fn(),
 }));
 
+// 기본 0행(기존 테스트) — 행 렌더가 필요한 테스트만 virtualCount를 올린다
+let virtualCount = 0;
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: () => ({
-    getVirtualItems: () => [],
-    getTotalSize: () => 0,
+    getVirtualItems: () =>
+      Array.from({ length: virtualCount }, (_, i) => ({
+        index: i,
+        key: i,
+        start: i * 48,
+        end: (i + 1) * 48,
+        size: 48,
+      })),
+    getTotalSize: () => virtualCount * 48,
+    measureElement: () => {},
   }),
 }));
 
@@ -86,6 +96,53 @@ const mockAccounts: AssetAccount[] = [
 describe("TransactionHistoryTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    virtualCount = 0;
+  });
+
+  describe("삭제 확인", () => {
+    const tx = {
+      id: "tx-1",
+      account_id: "acc-1",
+      transaction_type: "DEPOSIT" as const,
+      amount: 500_000,
+      fee: null,
+      transaction_date: "2026-10-01",
+      ticker: null,
+      notes: null,
+      created_at: "2026-10-01T00:00:00Z",
+    };
+
+    it("휴지통을 눌러도 바로 삭제하지 않고 확인 후 삭제한다", async () => {
+      const { fetchTransactions, deleteTransaction } = await import("../api/transactions");
+      vi.mocked(fetchTransactions).mockResolvedValue([tx]);
+      virtualCount = 1;
+      renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
+
+      const [trash] = await screen.findAllByRole("button", { name: "삭제" });
+      fireEvent.click(trash);
+      const dialog = screen.getByRole("dialog");
+      expect(
+        within(dialog).getByText(/2026-10-01 입금 50만원 기록을 삭제할까요\?/),
+      ).toBeInTheDocument();
+      expect(vi.mocked(deleteTransaction)).not.toHaveBeenCalled();
+
+      fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
+      await waitFor(() => expect(vi.mocked(deleteTransaction)).toHaveBeenCalled());
+      expect(vi.mocked(deleteTransaction).mock.calls[0][0]).toBe("tx-1");
+    });
+
+    it("확인창에서 취소하면 삭제하지 않는다", async () => {
+      const { fetchTransactions, deleteTransaction } = await import("../api/transactions");
+      vi.mocked(fetchTransactions).mockResolvedValue([tx]);
+      virtualCount = 1;
+      renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
+
+      const [trash] = await screen.findAllByRole("button", { name: "삭제" });
+      fireEvent.click(trash);
+      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "취소" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(vi.mocked(deleteTransaction)).not.toHaveBeenCalled();
+    });
   });
 
   it("연도 선택 드롭다운이 현재 연도로 초기화된다", () => {

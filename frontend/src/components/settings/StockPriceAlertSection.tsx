@@ -11,6 +11,7 @@ import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -28,6 +29,7 @@ export function StockPriceAlertSection() {
   const { suggestions, isSearching, search: runSearch, clearSuggestions } = useStockSearch();
   const [selectedStock, setSelectedStock] = useState<StockSuggestion | null>(null);
 
+  const [pendingDelete, setPendingDelete] = useState<StockPriceAlert | null>(null);
   const {
     items: stockAlerts,
     reactivateMutation,
@@ -194,9 +196,10 @@ export function StockPriceAlertSection() {
                   </button>
                 )}
                 <button
-                  onClick={() => deleteMutation.mutate(alert.id)}
+                  onClick={() => setPendingDelete(alert)}
                   disabled={deleteMutation.isPending}
                   className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
+                  aria-label={`${alert.name} 주가 알림 삭제`}
                 >
                   <DeleteIcon />
                 </button>
@@ -204,6 +207,17 @@ export function StockPriceAlertSection() {
             </div>
           ))}
         </div>
+      )}
+      {pendingDelete && (
+        <ConfirmModal
+          message={`${pendingDelete.name} ${Number(pendingDelete.target_price).toLocaleString("ko-KR")}원 ${pendingDelete.direction === "BELOW" ? "이하" : "이상"} 알림을 삭제할까요?`}
+          confirmLabel="삭제"
+          onConfirm={() => {
+            deleteMutation.mutate(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </SectionCard>
   );
