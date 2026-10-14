@@ -4,11 +4,8 @@
 
 ### 설치
 ```bash
-# Python 3.11+ required
-# 가상환경 생성 (최초 1회)
-cd backend && uv venv
-
-uv pip install -e ".[dev]"
+# Python 3.11+ required. uv.lock 기준 설치 — CI와 동일 (.venv 자동 생성)
+cd backend && uv sync --extra dev   # = 루트 `make install-backend` (pre-commit install 포함)
 ```
 
 ### 실행
@@ -173,7 +170,7 @@ services/
   ├── sync_all_service.py     # "전체 갱신" 백그라운드 배치 동기화 — jobs/asset_sync.py의 _sync_accounts 재사용, in-memory 캐시(core/cache_store.py)로 락/진행상태 관리 (POST /assets/sync-all, GET /assets/sync-all/status). `_sync_accounts`는 계좌별로 짧게 스코프된 `AsyncSessionLocal()`을 새로 열어 처리 — 브로커 HTTP 응답을 기다리는 동안 요청 커넥션을 붙잡지 않기 위한 패턴(DB 커넥션 풀 슬롯 고갈 방지). 계좌 수만큼 동시에 짧은 sync 요청을 쏘는 유사 엔드포인트를 새로 만들 때 이 패턴을 참고할 것
   ├── auth_service.py         # Supabase JWT 검증(`verify_supabase_token`, JWKS·aud=authenticated) + 탈퇴 재인증용 `verify_password`(Supabase password grant) + `delete_supabase_user`. 자체 JWT 발급 없음
   ├── alerts/                 # 범용 알림 도메인 패키지 (환율/주가/시장신호 체크 + 공통 이력)
-  │   ├── alert_service.py    # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/notify_and_record_trigger/finalize_alert_batch/list_alert_history). 과거의 `__getattr__` re-export shim은 2026-09-15 제거됨 — 체크 함수는 실제 구현 모듈(alerts/exchange_rate_service.py 등)에서 직접 import
+  │   ├── alert_service.py    # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/notify_and_record_trigger/finalize_alert_batch/list_alert_history). 체크 함수 re-export 없음 — 실제 구현 모듈(alerts/exchange_rate_service.py 등)에서 직접 import
   │   ├── exchange_rate_service.py # 환율 알림 조건 체크
   │   ├── stock_price_service.py   # 주가 알림 조건 체크
   │   ├── market_signal_alert_service.py # 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 즉시 알림 + 매일 08:30 KST 요약(`send_market_signal_daily_digest`, 옵트인). `check_composite_signal`(리스크+시장신호 복합 판정)을 rebalancing/alert_check.py·diagnosis_service.py와 공유. 등급전환 발송 성공 시 alert_check.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신(같은 날 중복 발송 방지)
@@ -211,7 +208,7 @@ services/
   ├── challenge_service.py    # 적립식 투자 챌린지 진행률/스트릭 계산 + CRUD — 스트릭 기본단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변). DEPOSIT/RETURN_PCT/TARGET_VALUE 타입, 진행률은 저장 안 하고 매 조회 시 transactions/스냅샷에서 재계산
   ├── estimation.py           # MVO 입력 축소추정 유틸 — Ledoit-Wolf 공분산 축소(`shrink_covariance`) + James-Stein류 기대수익률 축소(`shrink_expected_returns`, 고정 가정 노이즈분산 사용 — 표본분산 재사용 시 축소강도 상쇄 버그 주의). 순수 계산, `goal_portfolio_optimizer.py`/`portfolio_optimizer.py` 공용
   ├── goal_recommendation_service.py  # 전체 자산 기준 목표 역산 추천 API 진입점(`get_goal_recommendation`) — 목표금액/월적립액/목표연도 → 필요수익률 역산 → MVO 최적화로 최소분산 포트폴리오 추천. 배당 목표(`annual_dividend_goal`)는 필요 배당수익률 제약으로 전달(달성 불가 시 fail-soft). `_suggest_for_dividend_goal()`은 등록 후보로 배당 목표가 어려우면 큐레이션 유니버스(`recommendation_universe.py`)에서 고배당 미등록 후보를 `suggested_candidates`로 제안(DB·계산 미반영, 사용자가 "후보에 추가"로 승인 → `PUT /settings/goal-candidate-tickers` 저장 → 다음 추천부터 반영). `_get_or_seed_candidates()`는 최초 1회만 시딩(자동 병합 없음). `compute_portfolio_expected_metrics()`(적용 전 비교), `compute_recommendation_drift()`(프론트 `recommendationDrift.ts` 포팅, 주간 job 전용). 추천은 자동 반영 안 됨 — 수동 적용
-  ├── _goal_recommendation_common.py  # goal_recommendation/age/horizon 세 진입점이 공유하는 헬퍼 소유 모듈 — 배당수익률 조회(`_fetch_dividend_yields`, ticker+market 전역 캐시)·시장신호(`_fetch_market_signal_level`)·MVO 결과 조합(`_attach_dividend_yield`)·배당목표 후보제안(`_suggest_for_dividend_goal`)·자산군 bounds 변환(`_equity_class_bounds`)·현금성 합성수익률(`_cash_equivalent_daily_returns`) + `_CASH_EQUIVALENT_*`/`_NON_BINDING_RETURN_FLOOR`/`_DEFAULT_CAGR_LOOKBACK_YEARS` 상수. 세 소비 모듈이 `import _goal_recommendation_common as _grc` 후 `_grc.fn()` 모듈 참조로 호출 — 테스트 patch 경로도 `_goal_recommendation_common.*` 하나로 통일(과거 3경로 patch). 역방향 의존 없음. 세 진입점의 공통 계산 골격도 소유(`_GoalCandidate`·`_candidates_with_cagr`·`_fetch_candidate_returns`·`_run_goal_optimizer`·`_apply_dividend_suggestions`·`_join_notes` 등) — 단 `get_historical_returns`/`fetch_yf_daily_returns`/`build_portfolio_overview` 같은 외부 조회는 테스트가 **진입점 모듈 경로로 patch**하므로 각 진입점에 남기고 `_fetch_candidate_returns`에는 조회 함수를 인자로 넘긴다(공통 모듈로 옮기면 patch 수백 곳 무효화). 추천 출력 전체는 `tests/test_goal_recommendation_snapshots.py`(+`tests/snapshots/goal_recommendation.json`)가 고정 — 계산 경로 리팩터링 후 반드시 통과, 의도적 동작 변경 시에만 `UPDATE_GOAL_SNAPSHOTS=1`로 갱신
+  ├── _goal_recommendation_common.py  # goal_recommendation/age/horizon 세 진입점이 공유하는 헬퍼 소유 모듈 — 배당수익률 조회(`_fetch_dividend_yields`, ticker+market 전역 캐시)·시장신호(`_fetch_market_signal_level`)·MVO 결과 조합(`_attach_dividend_yield`)·배당목표 후보제안(`_suggest_for_dividend_goal`)·자산군 bounds 변환(`_equity_class_bounds`)·현금성 합성수익률(`_cash_equivalent_daily_returns`) + `_CASH_EQUIVALENT_*`/`_NON_BINDING_RETURN_FLOOR`/`_DEFAULT_CAGR_LOOKBACK_YEARS` 상수. 세 소비 모듈이 `import _goal_recommendation_common as _grc` 후 `_grc.fn()` 모듈 참조로 호출 — 테스트 patch 경로도 `_goal_recommendation_common.*` 하나로 통일. 역방향 의존 없음. 세 진입점의 공통 계산 골격도 소유(`_GoalCandidate`·`_candidates_with_cagr`·`_fetch_candidate_returns`·`_run_goal_optimizer`·`_apply_dividend_suggestions`·`_join_notes` 등) — 단 `get_historical_returns`/`fetch_yf_daily_returns`/`build_portfolio_overview` 같은 외부 조회는 테스트가 **진입점 모듈 경로로 patch**하므로 각 진입점에 남기고 `_fetch_candidate_returns`에는 조회 함수를 인자로 넘긴다(공통 모듈로 옮기면 patch 수백 곳 무효화). 추천 출력 전체는 `tests/test_goal_recommendation_snapshots.py`(+`tests/snapshots/goal_recommendation.json`)가 고정 — 계산 경로 리팩터링 후 반드시 통과, 의도적 동작 변경 시에만 `UPDATE_GOAL_SNAPSHOTS=1`로 갱신
   ├── goal_age_recommendation_service.py  # 연령대별 추천 진입점(`get_age_based_recommendation`) + `age_group_from_birth_year()` — goal_recommendation 서브모듈. 목표 역산 없이 `UserSettings.age_group`을 `_AGE_GROUP_PROFILE`로 조회해 risk_tolerance+주식비중 상하한+연령대 기본 배당수익률 하한(20~30대 0%, 40대 1.5%, 50대 2.5%, 60대+ 3.5%)으로 계산. `annual_dividend_goal` 명시 시 우선. 공유 헬퍼는 `_goal_recommendation_common.py`(`_grc`)에서 사용
   ├── goal_horizon_recommendation_service.py  # 투자기간별(단기/중기/장기 × 세제유형) 추천 진입점(`get_horizon_recommendations`/`_compute_horizon_recommendations`/`_build_horizon_result`) — goal_recommendation 서브모듈(2026-09-01 분리, age와 동일 패턴). 목표금액 역산 없이 기간별 리스크 성향(`_HORIZON_RISK_TOLERANCE`)+세제유형별 투자 가능 시장+규제(IRP 안전자산 30% 하한 `_DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT`, SHORT_TERM 주식 80% 하한 `_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT`)만으로 최대 15개 조합을 계산. 배당 목표는 전체 자산 기준과 동일 %를 전 조합에 적용. 공유 헬퍼는 `_goal_recommendation_common.py`(`_grc`)에서 사용, 소비자 `api/v1/rebalancing.py`·`alerts/recommendation_drift_alert_service.py`
   ├── goal_portfolio_optimizer.py  # 목표 역산 추천 전용 MVO 엔진(SLSQP, 순수 계산) — goal_recommendation_service.py 서브모듈. 기대수익률·공분산은 `estimation.py` 축소추정 적용. 자산군 비중 제약은 `asset_classes`(종목별 EQUITY/BOND/CASH 태그)+`class_bounds`(자산군별 (하한,상한))로 N개 자산군 일반화. **배당 목표 사전검증(`_dividend_floor_constraint`)은 `class_bounds`가 있으면 그 그룹 예산도 반영 필수** — 종목당 상한만 보면 자산군 하한과 충돌해 SLSQP 전체 실패(빈 추천) 가능. `compute_weighted_expected_metrics()`는 고정 비중 가중평균 버전
@@ -316,6 +313,7 @@ utils/
   ├── kst.py                  # `today_kst()`/`now_kst()`/`KST` — 사용자 기준 "오늘" 계산 전용 (Absolute Rules "날짜/시각 기준" 참고)
   ├── inproc_lock.py          # 프로세스 내 락 — 동일 계좌 동시 sync 방지, 콜드 캐시 single-flight (단일 프로세스 배포 전제)
   ├── market_hours.py         # KRX/NYSE 개장 여부 판단
+  ├── naver_retry.py          # Naver Finance 모바일 API 공용 재시도 정책·User-Agent — `price_sync_sources`·`dividend/sync_sources` 공유. 일시 장애(연결·타임아웃·429·5xx)만 재시도, 404 등 4xx는 즉시 실패시켜 호출부 폴백으로
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등) — `/metrics` 엔드포인트로 노출
   └── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)
 limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수)
@@ -335,7 +333,7 @@ jobs/                         # APScheduler 정기 작업
   ├── market_signal_daily_digest.py  # 매일 08:30 KST — 등급 전환 여부와 무관하게 현재 시장 신호를 요약 발송(옵트인, 기본 OFF)
   ├── year_end_tax_reminder.py       # 11~12월 매주 월요일 09:00 KST — 손실수확 후보·연금공제 잔여한도·ISA 만기 현황 요약 발송(옵트인, 기본 OFF). 알릴 내용이 없으면 스킵
   ├── recommendation_drift_alert.py  # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오와 유의미하게 달라지면 이메일/푸시 발송(옵트인, 기본 OFF)
-  ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고). **스케줄 준수**: BOTH는 매일, DRIFT_ONLY/SCHEDULE_ONLY는 `alerts/calculator.is_auto_schedule_day`(주말 지정일은 다음 평일로 이월)일 때만 — 2026-09-26 이전엔 이 체크가 없어 월간 AUTO(정기 적립식 자동매수 포함)가 매 거래일 실행될 수 있었음. SCHEDULE_ONLY는 스케줄일에 임계값 0으로 계획 생성(`plan_generation.build_pending_plan_for_alert`)
+  ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고). **스케줄 준수**: BOTH는 매일, DRIFT_ONLY/SCHEDULE_ONLY는 `alerts/calculator.is_auto_schedule_day`(주말 지정일은 다음 평일로 이월)일 때만 — 이 체크가 빠지면 월간 AUTO(정기 적립식 자동매수 포함)가 매 거래일 실행됨. SCHEDULE_ONLY는 스케줄일에 임계값 0으로 계획 생성(`plan_generation.build_pending_plan_for_alert`)
   ├── dca_cash_shortfall.py   # 매일 18:30 KST — 정기 적립식 자동매수(AUTO·매월·SCHEDULE_ONLY·BUY_ONLY) 다음 실행일 1~3일 전, 실행 계좌 `deposit_krw`(해외 종목 있으면 `deposit_usd` 환산 합산)가 `monthly_deposit_amount`(미설정 시 1만원) 미만이면 이메일·푸시(`DCA_CASH_SHORTFALL`). 실행일 단위 durable dedup. 판정부는 `find_dca_cash_shortfalls(user_id=, notice_window=)`로 분리돼 홈 "지금 할 일"이 날짜 창 없이 재사용
   ├── rebalancing_plan_buy_execution.py  # 1분 간격 — 대기시간 지난 매수 leg 자동 실행. 실행 직전 시장신호 게이트를 재확인(대기 중 상황 악화 대응) — 차단되면 조용히 다음 tick 재시도
   ├── rebalancing_plan_sell_expiry.py  # 15분 간격(app/scheduler.py) — 당일 미응답 매도 승인 요청 만료 처리
