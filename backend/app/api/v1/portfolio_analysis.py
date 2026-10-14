@@ -27,7 +27,7 @@ router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 async def portfolio_allocation_history(
     request: Request,
     months: int = Query(default=12, ge=3, le=36),
-    account_id: str | None = Query(default=None),
+    account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -38,7 +38,7 @@ async def portfolio_allocation_history(
         db,
         months=months,
         cache=cache,
-        account_id=uuid.UUID(account_id) if account_id else None,
+        account_id=account_id,
     )
 
 
@@ -47,13 +47,13 @@ async def portfolio_allocation_history(
 async def portfolio_overview(
     request: Request,
     lite: bool = Query(default=False),
-    account_id: str | None = Query(default=None),
+    account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """계좌 자산을 통합해 포트폴리오 현황을 반환한다. account_id 미지정 시 전체 계좌 통합 기준."""
     cache = await get_cache_store()
-    account_ids = [uuid.UUID(account_id)] if account_id else None
+    account_ids = [account_id] if account_id else None
     return await build_portfolio_overview(current_user.id, db, account_ids=account_ids, cache=cache, lite=lite)
 
 

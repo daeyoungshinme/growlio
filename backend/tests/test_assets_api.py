@@ -146,6 +146,34 @@ class TestCreateAccount:
             resp = client.post("/api/v1/assets", json=payload)
         assert resp.status_code in (200, 201)
 
+    def test_create_account_invalidates_asset_caches(self, override_settings, monkeypatch):
+        """계좌 생성 후 대시보드·추이 캐시가 남으면 새 계좌가 TTL 동안 안 보인다."""
+        user = _make_user()
+        db = _make_mock_db()
+        account = _make_account_orm(user.id)
+
+        async def mock_refresh(obj):
+            for k, v in vars(account).items():
+                if not k.startswith("_"):
+                    with contextlib.suppress(Exception):
+                        setattr(obj, k, v)
+
+        db.refresh = AsyncMock(side_effect=mock_refresh)
+        invalidate = AsyncMock()
+        monkeypatch.setattr("app.api.v1.assets.invalidate_asset_account_caches", invalidate)
+        app = _setup_app(user, db)
+        payload = {
+            "name": "테스트 수동 계좌",
+            "asset_type": "STOCK_OTHER",
+            "data_source": "MANUAL",
+            "manual_amount": 1000000,
+        }
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post("/api/v1/assets", json=payload)
+        assert resp.status_code == 201
+        invalidate.assert_awaited_once()
+        assert invalidate.await_args.args[1] == user.id
+
     def test_create_manual_account_ignores_stray_kis_account_no(self, override_settings):
         """브라우저 자동완성 등으로 kis_account_no에 형식이 안 맞는 값이 남아있어도
         data_source가 MANUAL이면 무시되고 정상 생성되어야 한다."""

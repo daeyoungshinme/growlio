@@ -227,6 +227,8 @@ async def create_account(
             source="MANUAL",
         )
         await db.commit()
+    # 새 계좌(특히 수동 금액 스냅샷)가 대시보드·월별 추이·추천 집계에 바로 반영되도록
+    await invalidate_asset_account_caches(await get_cache_store(), current_user.id, account.id)
     return _account_response(account)
 
 

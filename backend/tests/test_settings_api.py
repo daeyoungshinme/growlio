@@ -325,6 +325,32 @@ class TestUpdateCompositeSignalAlerts:
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
+    def test_put_composite_signal_alerts_invalidates_analysis_cache(self, override_settings, monkeypatch):
+        """진단 캐시의 diagnosis_context가 이 설정으로 계산되므로 토글 즉시 비워야 한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=SimpleNamespace(composite_signal_alerts_enabled=True))
+        invalidate = AsyncMock()
+        monkeypatch.setattr("app.api.v1.settings.invalidate_rebalancing_analysis_cache_all", invalidate)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/composite-signal-alerts",
+                    json={"enabled": False},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            invalidate.assert_awaited_once()
+            assert invalidate.await_args.args[1] == user.id
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
     def test_put_composite_signal_alerts_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app

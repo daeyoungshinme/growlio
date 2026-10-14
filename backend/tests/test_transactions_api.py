@@ -163,6 +163,72 @@ class TestCreateTransaction:
         finally:
             _cleanup_app()
 
+    def test_rejects_account_not_owned(self, override_settings):
+        """다른 사용자(또는 없는) 계좌 ID로는 거래를 만들 수 없다 — 404, 저장 안 함."""
+        user = _make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=None)  # 소유 계좌 조회 실패
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.post(
+                    "/api/v1/transactions",
+                    json={
+                        "account_id": str(uuid.uuid4()),
+                        "transaction_type": "DEPOSIT",
+                        "amount": 1000000,
+                        "transaction_date": "2026-01-01",
+                    },
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 404
+            db.add.assert_not_called()
+            db.commit.assert_not_awaited()
+        finally:
+            _cleanup_app()
+
+    def test_creates_with_owned_account(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        account_id = uuid.uuid4()
+        db.scalar = AsyncMock(return_value=SimpleNamespace(id=account_id, user_id=user.id, is_active=True))
+
+        def _fill(obj):
+            obj.id = uuid.uuid4()
+            obj.created_at = "2026-01-01T00:00:00"
+
+        db.refresh = AsyncMock(side_effect=_fill)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.transactions.get_cache_store",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(
+                        delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
+                    ),
+                ),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.post(
+                    "/api/v1/transactions",
+                    json={
+                        "account_id": str(account_id),
+                        "transaction_type": "DEPOSIT",
+                        "amount": 1000000,
+                        "transaction_date": "2026-01-01",
+                    },
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 201
+            added = db.add.call_args.args[0]
+            assert added.account_id == account_id
+            assert added.user_id == user.id
+        finally:
+            _cleanup_app()
+
     def test_rejects_invalid_transaction_type(self, override_settings):
         user = _make_user()
         db = _make_mock_db()

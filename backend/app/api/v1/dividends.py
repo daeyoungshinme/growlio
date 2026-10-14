@@ -34,15 +34,13 @@ logger = structlog.get_logger()
 @limiter.limit("10/minute")
 async def dividend_summary(
     request: Request,
-    account_id: str | None = Query(default=None),
+    account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     cache: CacheStore = Depends(get_cache_store),
 ):
     """연간 배당 요약. account_id 미지정 시 전체 계좌 통합 기준."""
-    return await get_dividend_summary(
-        current_user.id, db, cache, account_id=uuid.UUID(account_id) if account_id else None
-    )
+    return await get_dividend_summary(current_user.id, db, cache, account_id=account_id)
 
 
 @router.get("/positions")
@@ -51,19 +49,18 @@ async def position_dividend_yields(
     request: Request,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=200, ge=1, le=500),
-    account_id: str | None = Query(default=None),
+    account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """보유 종목별 배당수익률 및 예상 배당금 (yfinance, 비실시간). account_id 미지정 시 전체 계좌 통합 기준."""
     cache = await get_cache_store()
-    acct_uuid = uuid.UUID(account_id) if account_id else None
-    cache_key = dividends_positions_key(current_user.id, account_id or "all")
+    cache_key = dividends_positions_key(current_user.id, str(account_id) if account_id else "all")
     if skip == 0:
         cached = await get_cached_json(cache, cache_key)
         if cached is not None:
             return cached[:limit]
-    result = await get_position_dividend_yields(current_user.id, db, acct_uuid)
+    result = await get_position_dividend_yields(current_user.id, db, account_id)
     if skip == 0:
         await set_cached_json(cache, cache_key, result, TTL_DIVIDENDS_POSITIONS)
     return result[skip : skip + limit]
@@ -74,14 +71,12 @@ async def position_dividend_yields(
 async def ticker_dividend_summary(
     request: Request,
     pagination: PaginationDep,
-    account_id: str | None = Query(default=None),
+    account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """종목별 실수령(올해) + 예상 배당금 통합 (24h 캐시). account_id 미지정 시 전체 계좌 통합 기준."""
-    result = await get_ticker_dividend_summary(
-        current_user.id, db, account_ids=[uuid.UUID(account_id)] if account_id else None
-    )
+    result = await get_ticker_dividend_summary(current_user.id, db, account_ids=[account_id] if account_id else None)
     return result[pagination.skip : pagination.skip + pagination.limit]
 
 

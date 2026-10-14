@@ -24,6 +24,7 @@ from app.utils.cache_keys import (
     dashboard_summary_key,
     dca_analysis_key,
     invalidate_goal_recommendation_caches,
+    invalidate_rebalancing_analysis_cache_all,
     invalidate_user_caches,
 )
 from app.utils.kst import today_kst
@@ -421,6 +422,8 @@ async def update_composite_signal_alerts(
     row = await get_or_create_settings(db, current_user.id)
     row.composite_signal_alerts_enabled = req.enabled
     await db.commit()
+    # 진단 결과(diagnosis_context)가 이 설정으로 계산돼 캐시되므로 함께 비운다
+    await invalidate_rebalancing_analysis_cache_all(await get_cache_store(), current_user.id)
     return {"detail": "복합신호 알림 설정이 저장되었습니다"}
 
 

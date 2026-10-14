@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date
+from datetime import date, timedelta
 
 import structlog
 from sqlalchemy import select
@@ -15,7 +15,8 @@ from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_monthly_report_email
-from app.utils.cache_keys import CacheStoreType
+from app.utils.cache_keys import TTL_MONTHLY_REPORT_SENT, CacheStoreType, monthly_report_sent_key
+from app.utils.durable_state import get_durable, set_durable
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -29,8 +30,14 @@ def _prev_month_label(today: date) -> str:
     return f"{today.year}년 {today.month - 1}월"
 
 
+def _prev_month_key(today: date) -> str:
+    return (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+
+
 async def _run_monthly_report(db: AsyncSession, cache: CacheStoreType) -> None:
-    report_month = _prev_month_label(today_kst())
+    today = today_kst()
+    report_month = _prev_month_label(today)
+    month_key = _prev_month_key(today)
 
     result = await db.execute(
         select(User, UserSettings).join(UserSettings, User.id == UserSettings.user_id).where(User.is_active == True)
@@ -39,7 +46,10 @@ async def _run_monthly_report(db: AsyncSession, cache: CacheStoreType) -> None:
 
     sem = asyncio.Semaphore(_MONTHLY_REPORT_CONCURRENCY)
     await asyncio.gather(
-        *(_send_report_for_user(user, settings_row, cache, report_month, sem) for user, settings_row in users)
+        *(
+            _send_report_for_user(user, settings_row, cache, report_month, month_key, sem)
+            for user, settings_row in users
+        )
     )
 
 
@@ -49,7 +59,7 @@ async def run_monthly_report() -> None:
 
 
 async def _send_report_for_user(
-    user: User, settings_row: UserSettings, cache, report_month: str, sem: asyncio.Semaphore
+    user: User, settings_row: UserSettings, cache, report_month: str, month_key: str, sem: asyncio.Semaphore
 ) -> None:
     async with sem:
         # monthly_report_enabled=False이면 이메일 및 인앱 알림 건너뜀
@@ -58,8 +68,13 @@ async def _send_report_for_user(
             return
 
         to_email = settings_row.notification_email or user.email
+        dedup_key = monthly_report_sent_key(user.id, month_key)
         try:
             async with AsyncSessionLocal() as db:
+                # 재시작·misfire로 같은 달 잡이 다시 돌아도 한 번만 보낸다
+                if await get_durable(db, dedup_key) is not None:
+                    logger.info("monthly_report_skipped_already_sent", user_id=str(user.id), month=month_key)
+                    return
                 summary = await get_dashboard_summary(user.id, db, cache)
 
             monthly_trend: list[dict] = summary.get("monthly_trend") or []
@@ -98,6 +113,7 @@ async def _send_report_for_user(
                         message=f"{report_month} 월간 포트폴리오 리포트가 발송되었습니다.",
                     )
                 )
+                await set_durable(db, dedup_key, "1", ttl=TTL_MONTHLY_REPORT_SENT, commit=False)
                 await db.commit()
 
             logger.info(

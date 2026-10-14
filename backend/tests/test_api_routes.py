@@ -9,6 +9,7 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 # ── 공통 헬퍼 ─────────────────────────────────────────────────
@@ -355,3 +356,33 @@ class TestAlertsRoutes:
             assert isinstance(resp.json(), list)
         finally:
             app.dependency_overrides.pop(get_current_user, None)
+
+
+class TestMalformedAccountIdQuery:
+    """`account_id` 쿼리가 UUID가 아니면 핸들러 안 `uuid.UUID()` 500이 아니라 422로 거절한다."""
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/v1/portfolio/allocation-history",
+            "/api/v1/portfolio/overview",
+            "/api/v1/dividends/summary",
+            "/api/v1/dividends/positions",
+            "/api/v1/dividends/by-ticker",
+            "/api/v1/tax/overseas-positions",
+            "/api/v1/tax/summary",
+            "/api/v1/tax/overseas-realized",
+        ],
+    )
+    def test_returns_422(self, override_settings, path):
+        app, _, _ = _get_app_with_auth()
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.get(path, params={"account_id": "not-a-uuid"})
+            assert resp.status_code == 422
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
