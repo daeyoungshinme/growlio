@@ -56,16 +56,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0.0",
+    "pytest>=8.0.0,<10.0.0",
     "pytest-asyncio>=0.23.0,<2.0.0",
     # pytest-httpx는 httpx 마이너 버전에 강하게 묶여 있어 상한 필요
     "pytest-httpx>=0.30.0,<0.37.0",
-    "pytest-timeout>=2.3.0",
+    "pytest-timeout>=2.3.0,<3.0.0",
     "ruff>=0.15.13,<0.16.0",
-    "mypy>=1.10.0",
-    "bandit>=1.7.0",
-    "pip-audit>=2.7.0",
-    "pytest-cov>=5.0.0",
+    "mypy>=1.10.0,<3.0.0",
+    "bandit>=1.7.0,<2.0.0",
+    "pip-audit>=2.7.0,<3.0.0",
+    "pytest-cov>=5.0.0,<8.0.0",
 ]
 
 [build-system]

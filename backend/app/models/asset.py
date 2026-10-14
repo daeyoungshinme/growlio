@@ -283,7 +283,10 @@ class RebalancingExecutionResult(Base):
 
 
 class UserTickerSettings(Base):
-    """사용자별 종목 설정 — 배당월 수동 override."""
+    """사용자별 종목 설정 — 배당월 수동 override였으나 기능은 plans/52 배치 A에서 제거됐다(읽고 쓰는 코드 없음).
+
+    테이블 드롭은 plans/52 배치 G에서 한다. 그때까지 모델만 남겨 alembic autogenerate가 드롭을 만들지 않게 한다.
+    """
 
     __tablename__ = "user_ticker_settings"
 

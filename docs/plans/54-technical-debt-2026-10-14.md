@@ -19,7 +19,7 @@
 - Docker 자체 호스팅 프론트 경로는 이번에 손대지 않고 이관한다
 - 외부 API 멱등키는 처리 순서만 고치고 응답 규약(201·`duplicate=True`)은 유지한다
 
-**실행 첫 단계**
+**실행 첫 단계** (완료 — 브랜치 `fix/tech-debt-2026-10-14`, 커밋 3개)
 1. 이 계획을 `docs/plans/54-technical-debt-2026-10-14.md`로 옮기고 `docs/plans/README.md`에 행을 추가한다.
 2. 브랜치 `fix/tech-debt-2026-10-14`를 origin/main 기준으로 만든다. 현재 브랜치 `refactor/backend-plan52-batch0-a`는 머지된 상태다.
 3. 시작 전에 `git status`/`git diff`로 동시 세션 변경이 있는지 확인한다.
@@ -84,7 +84,28 @@
   - `@typescript-eslint/parser`를 eslint-plugin(8.71)에 맞춘다.
   - 백엔드 dev 의존성(pytest·pytest-timeout·mypy·bandit·pip-audit·pytest-cov)에 상한을 추가한다(기존 런타임 의존성 상한 관례).
 
-## 이관 (문서 54 "이관" 절에 기록, 이번 미구현)
+## 구현 결과 (2026-10-14, 같은 세션)
+
+| # | 결과 |
+|---|---|
+| A1 | **수정**. `build-web` 잡과 artifact 전달을 없애고 `build-apk` 한 잡에서 처리한다(debug/release는 step `if`). 추가 발견 1: 이 워크플로에는 빌드 시점 `VITE_*` 주입이 없었다. 그래서 고쳐도 `localhost:8000`·빈 Supabase를 가리키는 APK가 조용히 나왔을 것이다. 저장소 Variables에서 주입하고, 필수 3개가 비면 실패하게 했다. 추가 발견 2: 저장소에 Variables·Secrets가 하나도 없다. APK는 지금까지 로컬 `make build-android-*`로만 빌드된 것으로 보인다. 로컬에서 같은 순서(`npm run build` → `cap sync` → `gradlew assembleDebug`)로 APK를 만드는 데 성공했고(10.6MB), `cap sync`가 생성한 최신 `capacitor.settings.gradle`·`capacitor.build.gradle`(플러그인 4종)도 커밋했다. **실제 워크플로 실행은 Variables 설정 후 사용자 확인이 필요하다** |
+| A2 | **수정**. `localMonth()`를 추가하고 4곳을 교체했다. 테스트는 KST 11월 1일 00:30 기준이다. 원래 구현이면 `2026-10`이 나와 실패한다 |
+| A3 | **수정**. 멱등 조회를 소유 계좌 확인 앞으로 옮겼다. 페이로드 불일치(`account_id`·`transaction_type`·`amount`·`transaction_date`)는 `external_tx_idempotency_payload_mismatch` 경고 로그만 남긴다. 회귀 테스트 3개는 원래 코드에서 실패한다. 스냅샷 재계산 블록(52 B5)은 건드리지 않았다 |
+| A4 | **계획 정정 후 수정**. `report_job_failure` docstring은 이 잡을 **명시적으로 제외**하고 있었다. `capture_exception`이 스택 지역변수(복호화된 app_key/secret)를 보내기 때문이다(`sentry_sdk.init` 기본값 `include_local_variables=True`). 그래서 계획대로 헬퍼를 쓰지 않았다. 대신 스택이 없는 `capture_message`로 예외 타입명과 계좌 id만 보낸다(`token_refresh._report_refresh_failure`). 테스트는 `capture_exception` 미호출과 메시지에 자격증명이 없음을 단언한다. 약한 잡 테스트 4개에는 `report_job_failure` 호출 단언을 추가했다. `test_rebalancing_auto_execution.py:1040`은 이번 범위에서 제외했다 |
+| B1 | **수정**. `utils/safeStorage.ts`를 만들고 9개 파일을 전환했다. `authStore`도 포함한다. 기존에도 try 블록 안이어서 동작이 같다. `useCollapsible` setter를 `useCallback`으로 고정하고 `NotificationSettingsPage`의 억제 주석을 제거했다 |
+| B2 | **수정**. `transactionsBase`·`portfolioRiskBase` 키를 추가했다. 기존 mock 테스트는 키 첫 원소만 봐서 이 누락을 못 잡았다. 그래서 실제 `QueryClient`로 `isInvalidated`를 확인하는 테스트 3개를 추가했다(원래 코드에서 실패). **직접 `invalidateQueries` 7곳은 4곳만 교체(정정)**: settings 4곳(`SettingsPage`·`NotificationSettingsPage`·`useAutoRebalancingDailyCap`·`RecommendationCard`)은 `invalidateSettingsData`(신설), `PortfolioManageTab` 당겨서 새로고침은 같은 컴포넌트 `useQuery`의 `refetch`, 잔고 404는 `invalidateAccountData`. `PortfolioPage` 재시도 버튼은 다른 재시도 버튼 2곳처럼 유지했다 |
+| B3 | **삭제**. 스키마 3개와 테스트 65개를 지웠다 |
+| B4 | **수정**. 별칭 조건으로는 속성 narrowing이 안 돼서 4개 값을 지역 객체 `frontier`로 꺼냈다 |
+| B5 | `fmtDateTime`을 추가했다. 옵션 없는 동일 호출 4곳만 교체했다(`NotificationSettingsPage`는 옵션이 달라 유지). **인라인 원화·손익 색상 치환은 제외(정정)**: `fmtKrw`는 만원/억원으로 축약하고 `fmtKrwPrice`는 소수점을 버린다. 그래서 환율(1,380.5원)·목표가 표시와 출력이 달라져 "출력 동일" 기준에 맞지 않는다 |
+| B6 | **수정**. WHERE 절만 `transaction_date >= 월 1일`로 바꿨다(SELECT·GROUP BY의 `to_char`는 그대로). `(user_id, transaction_date)` 등 기존 인덱스를 탄다. 두 조건이 같은 뜻인지 확인했다. 테스트 2개는 원래 코드에서 실패한다 |
+| B7 | **삭제**. `uv lock`을 다시 돌리면 로컬 uv가 google-api 계열 marker를 재계산해 63줄 잡음이 생겼다. 그래서 `uv.lock`에서 python-multipart 항목만 손으로 지우고 `uv lock --check`로 검증했다. lifespan 없이 앱을 기동해 `/health`가 200인지 확인했다 |
+| C1 | `__tests__/hooks.uiState.test.tsx`(10개): `useCollapsible`(참조 고정·저장소 차단, 이전 구현에서 2개 실패), `useModalBehavior`(body 잠금 참조 카운트·Tab 순환·포커스 복원 — Escape 스택은 `components.misc.test.tsx`에 이미 있음), `useSettingsToggle`, `useChallengeMutations` |
+| C2 | `frontend/CLAUDE.md`(tsconfig·Zod·포맷 유틸·계좌/시장 유틸·safeStorage·queryKey 표 8행·무효화 목록), `backend/CLAUDE.md`(멱등 순서·토큰 갱신 Sentry), 루트 CLAUDE.md(APK 워크플로 Variables), `UserTickerSettings` docstring, 52 브랜치명을 고쳤다 |
+| C3 | pre-commit 설정: ruff `v0.15.22`, pre-commit-hooks `v6.0.0`. `@typescript-eslint/parser`를 `^8.71.0`으로 맞췄다(설치본은 이미 8.71.0이라 lock은 명세 1줄만 바뀜). dev 의존성 6개에 다음 메이저 상한을 추가했다(lock은 `requires-dist` 명세만 바뀜) |
+
+부수 사항: `uv sync --frozen`은 lock에 없는 pre-commit을 venv에서 지운다. pre-commit은 `pyproject` 의존성이 아니라 venv에 따로 설치돼 있었다. `uv pip install pre-commit`으로 복구했다.
+
+## 이관 (이번 미구현)
 
 - **Docker 자체 호스팅 경로**(사용자 결정)
   - `frontend/Dockerfile`의 컨텍스트 불일치: compose `context: ./frontend`인데 `COPY frontend/…`·`COPY nginx/…`를 한다.
@@ -106,6 +127,11 @@
 - Sentry DSN이 EU 리전이면 CSP `connect-src`(`vercel.json:22`) 보강. DSN 리전을 확인해야 한다.
 - `render.yaml`에 `SENTRY_DSN`·`FIREBASE_CREDENTIALS_JSON` 등 대시보드 전용 env 목록을 주석으로 기록
 - 메이저 업그레이드(React 19 / recharts 3 / Tailwind 4): 기존 이관 유지
+- (신규) settings 알림 토글별 무효화 함수 6개(몸체 동일)를 `invalidateSettingsData`로 합치기 — 52 D와 같이
+- (신규) `PortfolioPage`·`AssetManagementPage`·`DashboardPage` 재시도 버튼의 직접 `invalidateQueries` → `refetch` 전환 여부
+- (신규) 인라인 원화 포맷(환율·목표가 소수점 표기)을 위한 별도 포맷 함수 필요 여부, 인라인 손익 색상 → `pnlColor`(색 규칙 대조 필요)
+- (신규) `test_rebalancing_auto_execution.py:1040` "크래시 안 남" 테스트 단언 보강
+- (신규) Android APK 워크플로를 실제로 쓰려면 저장소 Variables·키스토어 Secrets 설정 후 `workflow_dispatch`로 확인
 
 ## 검증
 
@@ -125,3 +151,9 @@ cd frontend && npm run build
 - B7은 의존성 제거 후 `uv run uvicorn app.main:app` 기동을 스모크로 확인한다.
 - Windows pytest가 `N passed` 후 `-1073741819`로 끝나는 것은 실패가 아니다.
 - 완료 후 README 상태와 메모리(`project_tech_debt_2026-10-14.md`)를 갱신한다.
+
+## 검증 결과
+
+- 백엔드: **2612 passed, 커버리지 91.12%**(기준선 2607 → +5). ruff·format·mypy 클린.
+- 프론트: **129 files / 1631 passed**. HEAD 기준선은 1680(main)이다. 53 문서의 1683은 그 브랜치 단독 수치다. 1680 + 2(A2) − 65(B3 삭제) + 3(B2) + 10(C1) + 1(fmtDateTime) = 1631. tsc·eslint(max-warnings 0)·prettier `format:check` 클린.
+- 실브라우저 확인은 하지 않았다. Android는 로컬 Gradle 디버그 빌드 성공까지 확인했다.

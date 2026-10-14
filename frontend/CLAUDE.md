@@ -74,7 +74,7 @@ make build-android-release         # APK Release 빌드
 
 ## Architecture (`frontend/src/`)
 
-> **Import 규칙:** 새 코드는 `@/` alias 사용 (예: `import { fmtKrw } from "@/utils/format"`). `vite.config.ts`/`tsconfig.app.json`에 `@/* → src/*` 설정됨.
+> **Import 규칙:** 새 코드는 `@/` alias 사용 (예: `import { fmtKrw } from "@/utils/format"`). `vite.config.ts`/`tsconfig.json`에 `@/* → src/*` 설정됨.
 
 **페이지 구성** (실제 라우트는 `src/App.tsx` 참고 — 인증 필요 라우트는 `/` 하위 `PrivateRoute`로 감싸짐):
 
@@ -150,7 +150,7 @@ _공통/입력_
 - `useForm.ts` — 폼 상태 관리
 - `useStockSearch.ts` — 종목 검색
 - `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
-- `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
+- `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼(setter 참조 고정 — effect 의존성에 넣어도 됨). `CollapsibleCard`/`CollapsibleSection`과 함께 사용
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`·`common/ConfirmModal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용. Escape·포커스 트랩은 **맨 위 모달만** 처리(DOM상 다른 열린 모달을 품은 쪽은 아래층, 형제끼리는 나중에 열린 쪽이 위) — Android 뒤로가기가 Escape를 dispatch하므로 확인창 위에서 한 번 눌러 아래 모달까지 닫히지 않게 함
 - `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용
 
@@ -238,7 +238,7 @@ _기타_
 
 **Zod 스키마 (`src/schemas/`):**
 
-- `assets.ts`, `auth.ts`, `challenge.ts`, `portfolios.ts`, `trade.ts`, `transaction.ts` — 폼 입력값 런타임 유효성 검사 (Zod). 새 폼 추가 시 이 디렉토리에 스키마 파일 추가.
+- `challenge.ts`, `trade.ts`, `transaction.ts` — 폼 입력값 런타임 유효성 검사 (Zod). 실제 폼이 쓰는 스키마만 둔다(폼 없이 테스트만 쓰던 auth·assets·portfolios는 plans/54에서 삭제). 새 폼 추가 시 이 디렉토리에 스키마 파일 추가.
 
 **테스트 위치 (Vitest):**
 
@@ -287,7 +287,7 @@ _기타_
 | 포트폴리오/백테스트/리밸런싱 탭                                    | `["portfolios"]`                                                                                                            |
 | 전체 계좌 목록                                                     | `["accounts"]`                                                                                                              |
 | 계좌별 포지션                                                      | `["account-positions", accountId]`                                                                                          |
-| 계좌별 거래내역                                                    | `["transactions", accountId]`                                                                                               |
+| 계좌별 거래내역                                                    | `["transactions", accountId]` — `transactionsBase`(`["transactions"]`)는 무효화 프리픽스 전용(전체·연도별·계좌별 함께)      |
 | 전체 거래내역 (무기간)                                             | `["transactions", "all"]`                                                                                                   |
 | 연도별 거래내역                                                    | `["transactions", "all", year]`                                                                                             |
 | 기간별 매수 (계좌관리 › 내역 › 매수 내역)                          | `["period-purchases", period, year, month, accountId]` — `periodPurchasesBase` 무효화 전용(sync·계좌 CUD·매매기록 CUD 시)    |
@@ -305,27 +305,31 @@ _기타_
 | 환율 알림 목록                                                     | `["exchange-rate-alerts"]`                                                                                                  |
 | 주가 알림 목록                                                     | `["stock-price-alerts"]`                                                                                                    |
 | 리밸런싱 알림 목록                                                 | `["rebalancing-alerts"]`                                                                                                    |
-| 포트폴리오별 리밸런싱 알림                                         | `["rebalancing-alert", portfolioId]`                                                                                        |
+| 포트폴리오별 리밸런싱 알림                                         | `["rebalancing-alert", portfolioId]` — `rebalancingAlertBase`(`["rebalancing-alert"]`)는 무효화 프리픽스 전용               |
 | 포트폴리오 내 계좌별 알림 목록                                     | `["rebalancing-alert", portfolioId, "accounts"]`                                                                            |
 | 계좌별 개별 알림                                                   | `["rebalancing-alert", portfolioId, "accounts", accountId]`                                                                 |
 | 리밸런싱 실행 이력                                                 | `["rebalancing-history"]`                                                                                                   |
 | 리밸런싱 대기 플랜 목록                                            | `["rebalancing-plans"]`                                                                                                     |
+| 이메일·푸시 승인 페이지 플랜 미리보기                              | `["rebalancing-plan-preview", token]`                                                                                       |
 | 리밸런싱 전략                                                      | `["rebalancing-strategy", portfolioId]` — `rebalancingStrategyBase`(`["rebalancing-strategy"]`)는 무효화 프리픽스 전용      |
 | 드리프트 경량 요약 (대시보드)                                      | `["drift-summary"]`                                                                                                         |
 | 홈 "지금 할 일" (행동 신호 집계)                                  | `["action-items"]`                                                                                                          |
 | 세금 추정 요약 (accountId 지정 시 계좌별)                          | `["tax-summary", year, accountId]` — `taxSummaryBase` 무효화 전용                                                           |
 | 해외 포지션 양도세 계획 (accountId 지정 시 계좌별)                 | `["overseas-positions-tax", accountId]` — `overseasPositionsTaxBase` 무효화 전용                                            |
 | ISA 만기 현황                                                      | `["isa-status"]`                                                                                                            |
-| 연금 납입 현황                                                     | `["pension-contribution", year]`                                                                                            |
+| 연금 납입 현황                                                     | `["pension-contribution", year]` — `pensionContributionBase` 무효화 전용                                                    |
+| 해외 실현손익 (KIS 기간손익, accountId 지정 시 계좌별)             | `["overseas-realized", year, accountId]` — `overseasRealizedBase` 무효화 전용                                               |
+| 절세 액션 플랜                                                     | `["tax-action-plan"]`                                                                                                       |
 | 자산배분 이력 (DashboardPage 전용, accountId 지정 시 계좌별)       | `["allocation-history", months, accountId]` — `allocationHistoryBase` 무효화 전용                                           |
 | 알림 발송 이력                                                     | `["alert-history"]`                                                                                                         |
 | 인사이트/진단                                                      | `["insights"]`                                                                                                              |
-| 포트폴리오 리스크 지표                                             | `["portfolio-risk", id]`                                                                                                    |
+| 포트폴리오 리스크 지표                                             | `["portfolio-risk", id]` — `portfolioRiskBase` 무효화 전용                                                                  |
 | 시장 위험 신호                                                     | `["market-signal"]`                                                                                                         |
 | 복합신호 (시장/리스크) 상태                                        | `["composite-signal-status"]`                                                                                               |
-| 목표 역산 추천 (전체 자산)                                         | `["goal-recommendation", "overall"]`                                                                                        |
+| 목표 역산 추천 (전체 자산)                                         | `["goal-recommendation", "overall"]` — `goalRecommendationBase`(`["goal-recommendation"]`)는 무효화 프리픽스 전용           |
 | 목표 역산 추천 (투자기간별)                                        | `["goal-recommendation", "by-horizon"]`                                                                                     |
 | 목표 역산 추천 (연령대별)                                          | `["goal-recommendation", "by-age"]`                                                                                         |
+| 추천 후보 ETF 중복·유사 점검                                       | `["goal-recommendation", "candidate-overlap", signature]` — goal-recommendation 프리픽스로 함께 무효화                      |
 | 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표)          | `["portfolio-expected-metrics", portfolioId]`                                                                               |
 | 목표 설정 마법사 필요수익률·적립액 가이드 프리뷰                   | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]`                                         |
 | CPI/Core CPI 인플레이션 요약                                       | `["inflation-summary"]`                                                                                                     |
@@ -345,16 +349,19 @@ _기타_
 
 - 모든 포맷 함수는 `src/utils/format.ts`에서 import. 로컬 재정의 금지.
   ```ts
-  import { fmtKrw, fmtKrwNullable, fmtKrwShort, fmtMonth, fmtPct } from "@/utils/format";
+  import { fmtKrw, fmtKrwShort, fmtMonth, fmtPct } from "@/utils/format";
   ```
 - `fmtKrw(n)` — 억원/만원/원 (음수 포함). 일반 텍스트 표시용.
-- `fmtKrwNullable(n)` — null/undefined이면 "—" 반환. 테이블 셀 등.
+- `fmtKrwPreview(n)` — 입력 중 금액 확인용 "5,000,000원 (500만원)" (콤마 + 억/만원 병기).
 - `fmtKrwShort(n)` — "억"/"만" (단위 없음). 차트 레이블용.
 - `fmtKrwPrice(n)` — 소수점 없는 원화 가격 표시.
 - `fmtMonth(str)` — "YYYY-MM" → "YYYY년 M월".
 - `fmtPct(n)` — "+5.23%" 형식. null이면 "—".
 - `clampPct(pct)` — 진행률 바 렌더링용 0~100 클램프. 프로그레스 바 `style={{ width }}`에 값 그대로 넣지 말 것.
 - `localToday()` — 사용자 로컬(KST) 기준 오늘 "YYYY-MM-DD". 날짜 입력 기본값에 `new Date().toISOString().slice(0, 10)`를 쓰지 말 것 — UTC라 KST 오전 9시 전엔 전날이 된다. 모듈 최상위 상수로 고정하지 말고 폼을 열 때 호출(자정을 넘긴 세션 대응).
+- `localMonth()` — 같은 기준의 이번 달 "YYYY-MM". `new Date().toISOString().slice(0, 7)` 금지(매월 1일 오전 9시 전엔 전월).
+- `parseYmd(str)` / `daysUntilYmd(str)` — "YYYY-MM-DD" 분해 / 로컬 자정 기준 남은 일수(지났으면 음수).
+- `fmtDateTime(iso)` — ISO 시각 → `toLocaleString("ko-KR")` 날짜·시각 표기. 옵션이 다른 표기(시각 생략 등)는 인라인 유지.
 - `convertUsdToKrw(usd, rate)` / `formatUsdAsKrw(usd, rate)` — USD → KRW 환산·포맷.
 - `relativeTime(date)` — "3분 전" 등 상대 시간 표시.
 - 차트 X축은 `"YY.M"` 형식 (`"25.1"` 등) — 직접 문자열 파싱으로 타임존 이슈 방지
@@ -415,6 +422,9 @@ _기타_
 **계좌 유틸리티 (`src/utils/accounts.ts`)**
 
 - `isPortfolioAccount(assetType)` / `isStockAccount(assetType)` / `isBankAccount(assetType)` — `asset_type` 문자열을 받아 계좌 유형 판별(계좌 객체가 아닌 `account.asset_type` 전달). 인라인 `asset_type` 비교 금지.
+- `isSyncableAccount(dataSource)` — KIS/키움/토스 API 연동 계좌(`data_source`)라 브로커 동기화 가능한지.
+- `isBrokerBalanceAccount(assetType)` — 실시간 잔고·리밸런싱 진단 대상 브로커 계좌(KIS·키움·토스, `BROKER_BALANCE_ASSET_TYPES`).
+- `isOrderExecutableAccount(assetType)` — 주문 실행 가능 계좌(KIS·키움, `ORDER_EXECUTABLE_ASSET_TYPES` — 토스는 주문 API 미구현). 백엔드 `order_builder.ORDER_EXECUTABLE_ASSET_TYPES`와 같은 집합.
 
 **색상 유틸리티 (`src/utils/colors.ts`)**
 
@@ -438,12 +448,13 @@ _기타_
 - `dcaAutoBuy.ts` — `isDcaAutoBuyPreset(alert)`: AUTO·매월·SCHEDULE_ONLY·BUY_ONLY 조합이면 "정기 적립식 자동매수"로 표시 판정.
 - `actionPriority.ts` — 행동 항목 우선순위 배지 스타일(`ACTION_PRIORITY_STYLE`: HIGH 우선/MEDIUM 권장/LOW 참고)·마감 라벨(`deadlineLabel`). `TaxActionPlanCard`·`ActionItemsCard` 공용
 - `legacyTabRedirect.ts` — 탭 재편(plans/50)으로 옮겨진 옛 딥링크 변환: `legacyAssetsTaxRedirect()`(자산 세금 → 계획 › 절세), `legacyHistorySegment()`(계좌관리 옛 하위탭 → 내역 세그먼트). 이메일·푸시에 저장된 링크 호환용이라 지우지 말 것
+- `safeStorage.ts` — `storageGet`/`storageSet`/`storageRemove`. 저장소가 막힌 환경(사생활 보호 모드 등)에서 예외를 삼키는 localStorage 래퍼 — `localStorage` 직접 접근 금지.
 - `notificationAlertGroups.ts` — 알림 설정 페이지의 필드 그룹(`REPORT_ALERT_FIELDS`/`INSTANT_ALERT_FIELDS`).
 
 **배당 유틸리티 (`src/utils/dividendUtils.ts`)**
 
 - `yieldBadgeClass(yield)` — 배당수익률에 따른 Tailwind 뱃지 클래스 반환 (≥7%: 초록, ≥4%: 에메랄드, ≥2%: 황색).
-- `dividendFreqInfo(months, isManual)` — 월 배열로 배당 주기 레이블·색상 반환 (월배당/분기배당/반기배당/연배당).
+- `dividendFreqInfo(months)` — 월 배열로 배당 주기 레이블·색상 반환 (월배당/분기배당/반기배당/연배당).
 - `weightBarColor(pct)` — 포트폴리오 비중 막대 색상 반환. 인라인 클래스 직접 작성 금지.
 
 **입력 스타일 상수 (`src/constants/inputStyles.ts`)**
@@ -496,6 +507,8 @@ _기타_
 
 **마켓 유틸리티 (`src/constants/markets.ts`)**
 
+- `DOMESTIC_MARKETS` — 국내 시장 코드(KOSPI·KOSDAQ·KRX). 비교 전 `.toUpperCase()`. 토스 해외 포지션은 `"US"`라 `isOverseasMarket`이 해외로 못 잡으므로, 국내/해외 이분은 `DOMESTIC_MARKETS.includes`로 한다.
+- `POSITION_MARKETS` — 포지션 편집 드롭다운용 시장 목록.
 - `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.
   ```ts
   import { isOverseasMarket } from "@/constants/markets";
@@ -520,7 +533,8 @@ _기타_
 
 - 계좌 sync 후: `invalidateSyncData(queryClient)` — portfolio-overview + dashboard + dividend 등 무효화.
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 등 무효화.
-- 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions-all + dashboard 무효화.
+- 브로커 API 키 삭제(연동 해제) 후: `invalidateBrokerCredentialData(queryClient)` — 계좌 데이터 + 리밸런싱 알림·대기 플랜 무효화.
+- 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions(전체·계좌별 프리픽스) + dashboard 무효화.
 - 수기 매매 기록 CUD 후: `invalidateTradeData(queryClient)` — trades + period-purchases 무효화.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + dividend-plan + challenges + action-items 무효화.
@@ -540,6 +554,8 @@ _기타_
 - 월간 리포트 설정 변경 후: `invalidateMonthlyReportAlertsData(queryClient)`.
 - 추천 비중 변화 알림 설정 변경 후: `invalidateRecommendationDriftAlertData(queryClient)`.
 - 목표 역산 추천 후보 변경 후: `invalidateGoalRecommendationData(queryClient)`.
+- 다른 화면에 영향 없는 설정 저장 후(또는 백엔드가 설정을 바꿨을 수 있을 때): `invalidateSettingsData(queryClient)` — settings만 재조회. 위의 알림 토글별 함수들(몸체 동일)은 plans/52 D(`PATCH /settings`)에서 이것으로 합친다.
+- 당겨서 새로고침처럼 화면 자신의 쿼리 하나만 다시 받을 때는 그 `useQuery`의 `refetch`를 쓴다.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 
 > **새 invalidation 함수 추가 시:** 이 파일에 `invalidate<Domain>Data(queryClient)` 형태로 추가하고, 관련 mutation의 `onSuccess`에서 호출. 컴포넌트·훅 내부에서 직접 `queryClient.invalidateQueries()` 호출 금지.
