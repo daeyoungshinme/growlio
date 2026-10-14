@@ -26,6 +26,8 @@ export const BANK_TYPE_LABELS: Record<string, string> = {
 };
 
 export const STOCK_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS", "STOCK_OTHER"];
+/** 실시간 잔고 조회·리밸런싱 진단 대상 브로커 계좌 asset_type (주문 실행은 아래 ORDER_EXECUTABLE_ASSET_TYPES) */
+export const BROKER_BALANCE_ASSET_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS"];
 /** 리밸런싱 주문을 실제로 실행할 수 있는 브로커 계좌 asset_type — 토스 제외(주문 API 미구현).
  * 백엔드 order_builder.ORDER_EXECUTABLE_ASSET_TYPES와 동일 집합 유지. */
 export const ORDER_EXECUTABLE_ASSET_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM"];

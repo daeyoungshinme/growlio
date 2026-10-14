@@ -83,9 +83,10 @@ async def _monthly_net_deposits(
         FROM transactions
         WHERE user_id = :user_id
           AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
-          AND to_char(transaction_date, 'YYYY-MM') >= :start_month
+          AND transaction_date >= :start_date
     """
-    params: dict[str, Any] = {"user_id": str(user_id), "start_month": start_month}
+    # 월 문자열 비교(to_char) 대신 날짜 비교 — transaction_date 인덱스를 탄다
+    params: dict[str, Any] = {"user_id": str(user_id), "start_date": date.fromisoformat(f"{start_month}-01")}
     if account_id is not None:
         base_sql += " AND account_id = :account_id"
         params["account_id"] = str(account_id)

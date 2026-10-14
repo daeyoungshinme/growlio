@@ -1,6 +1,7 @@
 import type { RebalancingAlert } from "@/api/alerts";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { buildAlertDescription } from "@/utils/rebalancingAlertDescription";
+import { fmtDateTime } from "@/utils/format";
 
 interface Props {
   form: RebalancingAlertFormState;
@@ -30,7 +31,7 @@ export function AlertSummarySection({ form, alert }: Props) {
           현재 설정이 활성화되어 있습니다.
           {alert.last_triggered_at && (
             <span className="block mt-0.5 text-blue-500">
-              마지막 트리거: {new Date(alert.last_triggered_at).toLocaleString("ko-KR")}
+              마지막 트리거: {fmtDateTime(alert.last_triggered_at)}
             </span>
           )}
         </div>

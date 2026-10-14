@@ -70,7 +70,7 @@ type Agg = ReturnType<typeof groupPositionsByTicker>[number];
 function annualDividendLabel(divData: DividendYield, qty: number): string | null {
   if (divData.dps <= 0) return null;
   const total = divData.dps * qty;
-  return DOMESTIC_MARKETS.includes(divData.market)
+  return DOMESTIC_MARKETS.includes(divData.market.toUpperCase())
     ? `${Math.round(total).toLocaleString()}원`
     : `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }

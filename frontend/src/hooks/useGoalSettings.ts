@@ -15,6 +15,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { useQuery } from "@tanstack/react-query";
 import { useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
+import { storageGet, storageSet } from "@/utils/safeStorage";
 
 export interface GoalForm {
   monthly_deposit_amount: string;
@@ -128,7 +129,7 @@ export function useGoalSettings() {
   }, [location.state, isLoading, data, openEdit]);
 
   useEffect(() => {
-    const alreadyShown = localStorage.getItem("growlio:goal-wizard-auto-shown") === "true";
+    const alreadyShown = storageGet("growlio:goal-wizard-auto-shown") === "true";
     if (
       !isLoading &&
       !autoOpenTriggeredRef.current &&
@@ -137,7 +138,7 @@ export function useGoalSettings() {
       !alreadyShown
     ) {
       autoOpenTriggeredRef.current = true;
-      localStorage.setItem("growlio:goal-wizard-auto-shown", "true");
+      storageSet("growlio:goal-wizard-auto-shown", "true");
       void openWizard();
     }
   }, [isLoading, data, openWizard]);

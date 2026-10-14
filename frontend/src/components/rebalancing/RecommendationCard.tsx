@@ -18,7 +18,7 @@ import {
 } from "@/api/assets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { invalidatePortfolioData } from "@/utils/queryInvalidation";
+import { invalidatePortfolioData, invalidateSettingsData } from "@/utils/queryInvalidation";
 import { getPortfolioHorizonTaxType, getPortfolioTargetState } from "@/utils/portfolio";
 import { isBankAccount, isStockAccount } from "@/utils/accounts";
 import { toast } from "@/utils/toast";
@@ -238,7 +238,7 @@ export default function RecommendationCard({
   useEffect(() => {
     if ((overallData || horizonData || ageData) && !settingsSyncedRef.current) {
       settingsSyncedRef.current = true;
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings });
+      void invalidateSettingsData(queryClient);
     }
   }, [overallData, horizonData, ageData, queryClient]);
 

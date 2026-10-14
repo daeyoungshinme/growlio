@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -84,6 +85,25 @@ class TestComputeStreaks:
 
     def test_empty_window(self):
         assert cs._compute_streaks({}, "2026-05", "2026-03") == (0, 0)
+
+
+class TestMonthlyNetDepositsQuery:
+    @pytest.mark.asyncio
+    async def test_filters_by_first_day_date_not_to_char(self):
+        """월 필터는 월 1일 날짜 비교(transaction_date 인덱스 사용) — to_char 문자열 비교가 아니다."""
+        db = AsyncMock()
+        result = MagicMock()
+        result.all.return_value = [SimpleNamespace(month="2026-03", net=100.0)]
+        db.execute = AsyncMock(return_value=result)
+
+        out = await cs._monthly_net_deposits(uuid.uuid4(), db, "2026-03", None)
+
+        sql, params = db.execute.call_args.args
+        where = str(sql).split("WHERE", 1)[1]
+        assert "to_char" not in where
+        assert "transaction_date >= :start_date" in where
+        assert params["start_date"] == date(2026, 3, 1)
+        assert out == {"2026-03": 100.0}
 
 
 class TestBuildMonths:

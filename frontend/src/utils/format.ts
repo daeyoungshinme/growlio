@@ -81,6 +81,11 @@ export function parseYmd(dateStr: string): { year: number; month: number; day: n
   return { year, month, day };
 }
 
+/** ISO 시각 → 로컬 날짜·시각 표기 (예: "2026. 10. 14. 오후 5:30:00") */
+export function fmtDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("ko-KR");
+}
+
 /** 사용자 로컬(KST) 기준 오늘 "YYYY-MM-DD" — `toISOString()`은 UTC라 KST 오전 9시 전엔 전날이 된다 */
 export function localToday(): string {
   const d = new Date();

@@ -60,7 +60,13 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
 
   const { factor_changes, frontier_changes, trade_recommendations, overall_direction, summary } =
     data;
-  const hasFrontier = frontier_changes.current_risk != null && frontier_changes.target_risk != null;
+  // 4개 값이 모두 있을 때만 리스크·수익 변화 블록을 그린다(백엔드는 현재·목표 위치 중 하나라도 없으면 전부 null)
+  const { current_risk, target_risk, current_return, target_return } = frontier_changes;
+  const frontier =
+    current_risk != null && target_risk != null && current_return != null && target_return != null
+      ? { current_risk, target_risk, current_return, target_return }
+      : null;
+  const hasFrontier = frontier != null;
 
   return (
     <div className="card space-y-5">
@@ -117,7 +123,7 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
         </div>
 
         {/* 리스크·수익 변화 */}
-        {hasFrontier && (
+        {frontier && (
           <div className="space-y-2">
             <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
               리스크·수익 변화
@@ -126,8 +132,7 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
               <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-2.5 text-xs">
                 <p className="text-gray-400 dark:text-gray-500 mb-0.5">변동성</p>
                 <p className="font-semibold text-gray-700 dark:text-gray-300">
-                  {frontier_changes.current_risk!.toFixed(2)}% →{" "}
-                  {frontier_changes.target_risk!.toFixed(2)}%
+                  {frontier.current_risk.toFixed(2)}% → {frontier.target_risk.toFixed(2)}%
                 </p>
                 <p
                   className={`text-xs font-medium mt-0.5 ${
@@ -141,10 +146,9 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
               <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-2.5 text-xs">
                 <p className="text-gray-400 dark:text-gray-500 mb-0.5">기대수익</p>
                 <p className="font-semibold text-gray-700 dark:text-gray-300">
-                  {frontier_changes.current_return! >= 0 ? "+" : ""}
-                  {frontier_changes.current_return!.toFixed(2)}% →{" "}
-                  {frontier_changes.target_return! >= 0 ? "+" : ""}
-                  {frontier_changes.target_return!.toFixed(2)}%
+                  {frontier.current_return >= 0 ? "+" : ""}
+                  {frontier.current_return.toFixed(2)}% → {frontier.target_return >= 0 ? "+" : ""}
+                  {frontier.target_return.toFixed(2)}%
                 </p>
                 <p
                   className={`text-xs font-medium mt-0.5 ${

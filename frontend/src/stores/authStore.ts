@@ -4,6 +4,7 @@ import { getSupabase } from "@/lib/supabase";
 import { api } from "@/api/client";
 import { getHttpStatus } from "@/utils/error";
 import { BIOMETRIC_SESSION_KEY } from "@/hooks/useBiometric";
+import { storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
 
 export const AUTH_ME_CACHE_KEY = "growlio:auth-me";
 const AUTH_ME_TTL = 30 * 60 * 1000;
@@ -46,7 +47,7 @@ function getOptimisticAuthState(): OptimisticAuth {
     needsPasswordReset: false,
   };
   try {
-    const raw = localStorage.getItem(AUTH_ME_CACHE_KEY);
+    const raw = storageGet(AUTH_ME_CACHE_KEY);
     if (!raw) return fallback;
     const cached: AuthMeCache = JSON.parse(raw);
     if (Date.now() - cached.cachedAt >= AUTH_ME_TTL) return fallback;
@@ -105,7 +106,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         try {
           const res = await api.get("/auth/me");
           if (!res?.data) return;
-          localStorage.setItem(
+          storageSet(
             AUTH_ME_CACHE_KEY,
             JSON.stringify({
               userId,
@@ -141,7 +142,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     logout: async () => {
       set({ isAuthenticated: false, userId: null, email: null, needsPasswordReset: false });
-      localStorage.removeItem(AUTH_ME_CACHE_KEY);
+      storageRemove(AUTH_ME_CACHE_KEY);
       const supabase = await getSupabase();
       await supabase.auth.signOut();
     },
@@ -165,7 +166,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
         // AUTH_ME_TTL(30분) 이내 동일 유저 캐시가 있으면 네트워크 요청 생략
         try {
-          const raw = localStorage.getItem(AUTH_ME_CACHE_KEY);
+          const raw = storageGet(AUTH_ME_CACHE_KEY);
           if (raw) {
             const cached: AuthMeCache = JSON.parse(raw);
             if (cached.userId === session.user.id && Date.now() - cached.cachedAt < AUTH_ME_TTL) {
@@ -180,7 +181,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         try {
           const { data } = await api.get("/auth/me");
           const needsPasswordReset = data.needs_password_reset ?? false;
-          localStorage.setItem(
+          storageSet(
             AUTH_ME_CACHE_KEY,
             JSON.stringify({
               userId: session.user.id,
@@ -197,7 +198,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
               await api.post("/auth/sync-profile", { display_name: null });
               const { data } = await api.get("/auth/me");
               const needsPasswordReset = data.needs_password_reset ?? false;
-              localStorage.setItem(
+              storageSet(
                 AUTH_ME_CACHE_KEY,
                 JSON.stringify({
                   userId: session.user.id,

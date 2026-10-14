@@ -13,6 +13,8 @@ export const QUERY_KEYS = {
   accountPositions: (accountId: string) => ["account-positions", accountId] as const,
   transactions: (accountId: string) => ["transactions", accountId] as const,
   transactionsAll: ["transactions", "all"] as const,
+  /** 무효화 프리픽스 전용 — 전체(`transactionsAll`·`allTransactions`)와 계좌별(`transactions(id)`)을 함께 지운다 */
+  transactionsBase: ["transactions"] as const,
   allTransactions: (year: number) => ["transactions", "all", year] as const,
   // 기간별 매수(계좌관리 › 기간별 매수). periodPurchasesBase는 무효화 프리픽스 전용
   periodPurchasesBase: ["period-purchases"] as const,
@@ -71,6 +73,8 @@ export const QUERY_KEYS = {
   insights: ["insights"] as const,
   monthlyOptimization: ["monthly-optimization"] as const,
   portfolioRisk: (id?: string) => ["portfolio-risk", id] as const,
+  /** 무효화 프리픽스 전용 */
+  portfolioRiskBase: ["portfolio-risk"] as const,
   marketSignal: ["market-signal"] as const,
   rebalancingStrategy: (portfolioId: string) => ["rebalancing-strategy", portfolioId] as const,
   rebalancingStrategyBase: ["rebalancing-strategy"] as const,

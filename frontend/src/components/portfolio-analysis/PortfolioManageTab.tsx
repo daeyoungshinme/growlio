@@ -55,14 +55,18 @@ export default function PortfolioManageTab({
 }: Props) {
   const qc = useQueryClient();
 
-  const { data: portfoliosRaw, isLoading } = useQuery({
+  const {
+    data: portfoliosRaw,
+    isLoading,
+    refetch: refetchPortfolios,
+  } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
   });
 
   const handleRefresh = useCallback(async () => {
-    await qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
-  }, [qc]);
+    await refetchPortfolios();
+  }, [refetchPortfolios]);
   useRegisterRefresh(handleRefresh);
   const portfolios = useMemo(
     () => (Array.isArray(portfoliosRaw) ? portfoliosRaw : []),

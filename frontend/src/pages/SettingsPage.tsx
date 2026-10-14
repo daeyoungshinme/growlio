@@ -41,6 +41,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { invalidateSettingsData } from "@/utils/queryInvalidation";
 
 const RISK_TOLERANCE_LABELS: Record<string, string> = {
   CONSERVATIVE: "보수적",
@@ -101,7 +102,7 @@ export default function SettingsPage() {
     staleTime: STALE_TIME.LONG,
   });
 
-  const invalidateSettings = () => qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
+  const invalidateSettings = () => invalidateSettingsData(qc);
 
   const saveDart = async () => {
     setSaving("dart");

@@ -13,6 +13,7 @@ import SegmentedControl from "./allocation/SegmentedControl";
 import RegionAllocationView, { type RegionBasis } from "./allocation/RegionAllocationView";
 import StockAllocationView from "./allocation/StockAllocationView";
 import IndexAllocationView from "./allocation/IndexAllocationView";
+import { storageGet, storageSet } from "@/utils/safeStorage";
 
 type View = "region" | "stock" | "index";
 
@@ -26,12 +27,8 @@ const OPEN_KEY = "growlio:portfolio:allocationOpen";
 const VIEW_KEY = "growlio:portfolio:allocationView";
 
 function readStoredView(): View {
-  try {
-    const v = localStorage.getItem(VIEW_KEY);
-    return VIEW_OPTIONS.some((o) => o.value === v) ? (v as View) : "region";
-  } catch {
-    return "region";
-  }
+  const v = storageGet(VIEW_KEY);
+  return VIEW_OPTIONS.some((o) => o.value === v) ? (v as View) : "region";
 }
 
 interface Props {
@@ -47,11 +44,7 @@ export default function AllocationCard({ overview, accountId }: Props) {
 
   const setView = (next: View) => {
     setViewState(next);
-    try {
-      localStorage.setItem(VIEW_KEY, next);
-    } catch {
-      // 저장 실패(사생활 보호 모드 등)는 무시 — 다음 방문 시 기본 탭
-    }
+    storageSet(VIEW_KEY, next);
   };
 
   // 지수 분류 결과는 "지수" 탭과 "실제 투자지역" 기준에서만 필요 — 다른 뷰에선 ETF 프로필 조회를 하지 않는다.

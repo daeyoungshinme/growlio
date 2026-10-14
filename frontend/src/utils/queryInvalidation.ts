@@ -21,7 +21,7 @@ export function invalidateSyncData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk() }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRiskBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
     // 목표 역산 추천·후보 중복 점검("보유 중" 표시)이 보유 포지션 기준 — 백엔드 sync도 같은 캐시를 지운다
     qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
@@ -39,7 +39,7 @@ export function invalidateAccountData(qc: QueryClient) {
     // 기간별 매수 추정은 스냅샷 포지션 기준 — sync·계좌 수정 시 함께 갱신
     qc.invalidateQueries({ queryKey: QUERY_KEYS.periodPurchasesBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.pensionContributionBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTickerBase }),
@@ -70,7 +70,7 @@ export function invalidateBrokerCredentialData(qc: QueryClient) {
  * + 연금/ISA 납입 현황·절세 액션 플랜(입금·배당 내역 기준 집계) */
 export function invalidateTransactionData(qc: QueryClient) {
   return Promise.all([
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.pensionContributionBase }),
@@ -96,6 +96,11 @@ export function invalidateChallengeData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
+}
+
+/** settings 단일 재조회 — 다른 화면 데이터에 영향이 없는 설정 저장 후, 또는 백엔드가 설정을 바꿨을 수 있을 때 */
+export function invalidateSettingsData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 }
 
 /** 적립 챌린지 알림 수신 여부 설정 변경 후 */

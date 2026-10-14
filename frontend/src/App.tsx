@@ -20,6 +20,7 @@ import { fetchPortfolioOverviewLite } from "./api/portfolios";
 import { fetchDCAAnalysis } from "./api/invest";
 import { fetchSettings } from "./api/settings";
 import { QUERY_KEYS } from "./constants/queryKeys";
+import { storageRemove } from "./utils/safeStorage";
 /** Sentry 라우터 v7 통합용 — 트랜잭션을 라우트 패턴 단위로 묶는다(DSN 미설정 시 그대로 `Routes`). */
 const SentryRoutes = Sentry.withSentryReactRouterV7Routing(Routes);
 
@@ -141,7 +142,7 @@ export default function App() {
       queryClient.clear();
       // persist 캐시는 세션 만료 시 보존 — 재로그인 후 이전 데이터를 즉시 표시하고 백그라운드에서 갱신됨
       // 명시적 로그아웃 시에만 삭제 (useLogout.ts 참고)
-      window.localStorage.removeItem(AUTH_ME_CACHE_KEY);
+      storageRemove(AUTH_ME_CACHE_KEY);
       void logout();
     };
     window.addEventListener("growlio:session-expired", handleSessionExpired);

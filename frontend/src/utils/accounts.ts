@@ -3,6 +3,7 @@ import {
   BANK_TYPES,
   SYNCABLE_DATA_SOURCES,
   ORDER_EXECUTABLE_ASSET_TYPES,
+  BROKER_BALANCE_ASSET_TYPES,
 } from "@/constants";
 
 /** 주식 계좌 포트폴리오 뷰에 포함되는 계좌 유형 (예수금 포함) */
@@ -28,7 +29,7 @@ export function isSyncableAccount(dataSource: string): boolean {
 /** 실시간 잔고 조회·리밸런싱 진단 대상 브로커 계좌 유형인지 판별 (account.asset_type 전달).
  *  주문 실행은 별개 — 토스는 주문 API 미구현이라 실행 경로는 KIS/키움만. */
 export function isBrokerBalanceAccount(assetType: string): boolean {
-  return assetType === "STOCK_KIS" || assetType === "STOCK_KIWOOM" || assetType === "STOCK_TOSS";
+  return BROKER_BALANCE_ASSET_TYPES.includes(assetType);
 }
 
 /** 리밸런싱 주문을 실제로 실행할 수 있는 브로커 계좌인지 판별 (account.asset_type 전달).

@@ -353,6 +353,26 @@ async def test_monthly_net_deposits_query_scopes_user_active_and_prefix():
     assert "transactions.external_ref IS NULL" in sql
 
 
+async def test_monthly_net_deposits_filters_by_date_from_first_of_month():
+    """월 필터는 to_char 문자열 비교가 아니라 월 1일 날짜 비교(인덱스 사용) — 1일 거래는 포함된다."""
+    from sqlalchemy.dialects import postgresql
+
+    from app.services.external_queries import monthly_net_deposits_by_account
+
+    db = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    db.execute = AsyncMock(return_value=result)
+
+    await monthly_net_deposits_by_account(db, uuid.uuid4(), [uuid.uuid4()], "2026-03", None)
+
+    compiled = db.execute.call_args.args[0].compile(dialect=postgresql.dialect())
+    where = str(compiled).split("WHERE", 1)[1]
+    assert "to_char" not in where.split("GROUP BY", 1)[0]
+    assert "transactions.transaction_date >=" in where
+    assert date(2026, 3, 1) in compiled.params.values()
+
+
 async def test_monthly_net_deposits_empty_ids_skips_query():
     from app.services.external_queries import monthly_net_deposits_by_account
 
