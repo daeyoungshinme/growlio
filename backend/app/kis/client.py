@@ -71,6 +71,7 @@ async def kis_request(
     retries: int = 5,
     retry_on_request_error: bool = True,
     retry_transient_rt_cd: bool = True,
+    response_headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """KIS OpenAPI 기본 HTTP 클라이언트 — 속도제한 + 재시도 포함.
 
@@ -96,6 +97,7 @@ async def kis_request(
                 check_api_error=_check_kis_api_error,
                 token_expired_exc=KisTokenExpiredError,
                 retry_on_request_error=retry_on_request_error,
+                response_headers=response_headers,
             )
         except KisApiError as e:
             if not retry_transient_rt_cd or e.rt_cd not in _TRANSIENT_RT_CD or attempt >= 1:

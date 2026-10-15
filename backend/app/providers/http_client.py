@@ -124,6 +124,7 @@ async def broker_request(
     token_expired_exc: type[Exception],
     post_request_delay: float = 0.05,
     retry_on_request_error: bool = True,
+    response_headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """KIS/Kiwoom/Toss 공통 HTTP 요청 함수 — 속도제한(429) 지수 백오프 + 재시도 포함.
 
@@ -137,6 +138,8 @@ async def broker_request(
             (KIS/키움 API는 클라이언트 지정 idempotency key를 지원하지 않음). False면 HTTP 5xx도
             재시도하지 않는다(접수 후 게이트웨이 오류일 수 있음). 429/rate-limit 본문은 미접수가
             확실하므로 계속 재시도한다. 조회성 호출은 재시도해도 안전하므로 기본값 True를 유지한다.
+        response_headers: 넘기면 성공 응답의 헤더(소문자 키)를 채운다 — 연속조회 여부가 본문이 아니라
+            헤더에 오는 API(KIS `tr_cont`, 키움 `cont-yn`/`next-key`)용.
     """
     client = _get_client(ssl_verify)
     async with semaphore:
@@ -154,6 +157,8 @@ async def broker_request(
                     response.raise_for_status()
                 data = response.json()
                 check_api_error(data, path)
+                if response_headers is not None:
+                    response_headers.update({k.lower(): v for k, v in response.headers.items()})
                 await asyncio.sleep(post_request_delay)
                 return data
 

@@ -270,3 +270,49 @@ class TestGetDomesticBalance:
 
         assert result["deposit_krw"] == 0.0
         mock_logger.warning.assert_called_once_with("kiwoom_deposit_field_missing", response_keys=["return_code"])
+
+
+class TestKiwoomBalancePagination:
+    """실계좌 미검증 — 키움 문서 규약(응답 헤더 cont-yn=Y + next-key, 다음 요청 헤더에 그대로) 기반."""
+
+    @pytest.mark.asyncio
+    async def test_domestic_follows_cont_yn_to_next_page(self):
+        kt00018_calls: list[dict] = []
+        row = _evaluation_response()["acnt_evlt_remn_indv_tot"][0]
+
+        async def _fake_request(method, path, *, is_mock, headers, json=None, response_headers=None, **kwargs):
+            if headers["api-id"] == "kt00001":
+                return _deposit_response()
+            kt00018_calls.append(headers)
+            if len(kt00018_calls) == 1:
+                response_headers.update({"cont-yn": "Y", "next-key": "NEXT1"})
+                return {**_evaluation_response(), "acnt_evlt_remn_indv_tot": [row]}
+            response_headers.update({"cont-yn": "N", "next-key": ""})
+            return {"acnt_evlt_remn_indv_tot": [{**row, "stk_cd": "A000660"}]}
+
+        with patch("app.kiwoom.balance.kiwoom_request", side_effect=_fake_request):
+            result = await get_domestic_balance("token", "1234567890", is_mock=True)
+
+        assert [p["ticker"] for p in result["positions"]] == ["005930", "000660"]
+        assert kt00018_calls[1]["cont-yn"] == "Y"
+        assert kt00018_calls[1]["next-key"] == "NEXT1"
+        assert result["total_value_krw"] == 950000.0  # 합계는 첫 페이지 기준
+
+    @pytest.mark.asyncio
+    async def test_overseas_follows_cont_yn_to_next_page(self):
+        ust21070_calls = 0
+
+        async def _dispatch(method, path, *, is_mock, headers, json=None, response_headers=None, **kwargs):
+            nonlocal ust21070_calls
+            if headers["api-id"] == "ust21110":
+                return _ust21110_response()
+            ust21070_calls += 1
+            if ust21070_calls == 1:
+                response_headers.update({"cont-yn": "Y", "next-key": "K"})
+                return {"result_list": [_ust21070_item("QQQ")]}
+            return {"result_list": [_ust21070_item("SPY", name="SPDR S&P 500")]}
+
+        with patch("app.kiwoom.balance.kiwoom_request", side_effect=_dispatch):
+            result = await get_overseas_balance("token", "1234567890", is_mock=True)
+
+        assert sorted(p["ticker"] for p in result["positions"]) == ["QQQ", "SPY"]

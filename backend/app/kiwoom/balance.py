@@ -31,6 +31,46 @@ _OVERSEAS_ACCOUNT_PATH = "/api/us/acnt"
 # NASDAQ/NYSE/AMEX를 확정한다. providers._overseas_name_enrichment.UNRESOLVED_MARKET와 동일 값.
 _UNRESOLVED_MARKET = "US"
 
+# 잔고 연속조회 상한 — 응답 헤더 cont-yn=Y면 next-key로 다음 페이지를 받는다
+_MAX_PAGES = 20
+
+
+async def _fetch_list_pages(
+    path: str,
+    *,
+    is_mock: bool,
+    headers: dict[str, str],
+    body: dict[str, Any],
+    list_key: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """연속조회를 끝까지 따라가 (첫 페이지 응답, 전 페이지 list_key 행 합본)을 돌려준다.
+
+    한 번만 호출하면 첫 페이지를 넘는 보유종목이 빠지고, 동기화가 그 종목을 "매도됨"으로 지운다.
+    다음 페이지 여부는 응답 헤더 `cont-yn`(Y)로, 다음 요청은 헤더 `cont-yn: Y` + `next-key`로 보낸다.
+    """
+    first: dict[str, Any] | None = None
+    rows: list[dict[str, Any]] = []
+    next_key = ""
+    for page in range(_MAX_PAGES):
+        resp_headers: dict[str, str] = {}
+        data = await kiwoom_request(
+            "POST",
+            path,
+            is_mock=is_mock,
+            headers={**headers, "cont-yn": "Y", "next-key": next_key} if page > 0 else headers,
+            json=body,
+            response_headers=resp_headers,
+        )
+        if first is None:
+            first = data
+        rows.extend(data.get(list_key) or [])
+        next_key = resp_headers.get("next-key", "")
+        if resp_headers.get("cont-yn") != "Y" or not next_key.strip():
+            break
+    else:
+        logger.warning("kiwoom_balance_page_limit", path=path, pages=_MAX_PAGES)
+    return first or {}, rows
+
 
 def _parse_num(raw: Any) -> float:
     """키움 숫자 필드는 0-padding("000061300")·부호 접두("+61300"/"-00013000")·쉼표
@@ -135,19 +175,19 @@ async def get_domestic_balance(
     """
     headers = auth_headers(access_token, API_ID_DOMESTIC_BALANCE)
 
-    data, deposit_info = await asyncio.gather(
-        kiwoom_request(
-            "POST",
+    (data, rows), deposit_info = await asyncio.gather(
+        _fetch_list_pages(
             "/api/dostk/acnt",
             is_mock=is_mock,
             headers=headers,
-            json={"qry_tp": "1", "dmst_stex_tp": "KRX"},  # qry_tp 1: 합산
+            body={"qry_tp": "1", "dmst_stex_tp": "KRX"},  # qry_tp 1: 합산
+            list_key="acnt_evlt_remn_indv_tot",
         ),
         _get_deposit_info(access_token, is_mock=is_mock),
     )
 
     positions = []
-    for item in data.get("acnt_evlt_remn_indv_tot", []):
+    for item in rows:
         qty = int(_parse_num(item.get("rmnd_qty")))
         if qty <= 0:
             continue
@@ -181,14 +221,10 @@ async def _fetch_overseas_all(access_token: str, *, is_mock: bool) -> list[dict[
     이 응답의 stex_nm은 항상 "미국"만 반환되어 거래소 구분에는 쓸 수 없다(market은 provider의
     enrich_overseas_positions()가 별도로 판별)."""
     headers = auth_headers(access_token, API_ID_OVERSEAS_BALANCE)
-    data = await kiwoom_request(
-        "POST",
-        _OVERSEAS_ACCOUNT_PATH,
-        is_mock=is_mock,
-        headers=headers,
-        json={},
+    _first, rows = await _fetch_list_pages(
+        _OVERSEAS_ACCOUNT_PATH, is_mock=is_mock, headers=headers, body={}, list_key="result_list"
     )
-    return data.get("result_list", [])
+    return rows
 
 
 async def get_overseas_balance(

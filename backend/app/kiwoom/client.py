@@ -74,6 +74,7 @@ async def kiwoom_request(
     json: dict[str, Any] | None = None,
     retries: int | None = None,
     retry_on_request_error: bool = True,
+    response_headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """키움 OpenAPI+ 기본 HTTP 클라이언트."""
     await _rate_limiter.acquire()  # broker_request 밖에서 호출 — 세마포어 취득 전 간격 보장
@@ -92,4 +93,5 @@ async def kiwoom_request(
         check_api_error=_check_kiwoom_api_error,
         token_expired_exc=KiwoomTokenExpiredError,
         retry_on_request_error=retry_on_request_error,
+        response_headers=response_headers,
     )
