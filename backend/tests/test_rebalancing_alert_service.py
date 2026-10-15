@@ -1779,3 +1779,32 @@ class TestSwitchAlertScope:
         assert mock_db.delete.await_count == 2
         assert portfolio.alert_scope == "AGGREGATE"
         mock_db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_check_rebalancing_alerts_isolates_failing_alert(mock_db, override_settings):
+    """알림 하나가 예외를 내도 나머지 알림은 처리된다 — rollback 후 남은 행은 다시 읽는다(계획 57 C3)."""
+    from app.services.rebalancing import alert_check
+
+    rows = [(SimpleNamespace(id=uuid.uuid4()),) for _ in range(3)]
+    reloaded = [(SimpleNamespace(id=rows[1][0].id),), (SimpleNamespace(id=rows[2][0].id),)]
+    load = AsyncMock(side_effect=[rows, reloaded])
+    seen: list[uuid.UUID] = []
+
+    async def _check(row, *args):
+        seen.append(row[0].id)
+        if row is rows[0]:
+            raise RuntimeError("db connection lost")
+        return True
+
+    with (
+        patch.object(alert_check, "_get_composite_level", new=AsyncMock(return_value=("GREEN", "LIVE"))),
+        patch.object(alert_check, "_load_active_alert_rows", new=load),
+        patch.object(alert_check, "_check_one_rebalancing_alert", new=_check),
+    ):
+        await alert_check.check_rebalancing_alerts(mock_db)
+
+    assert seen == [rows[0][0].id, rows[1][0].id, rows[2][0].id]
+    mock_db.rollback.assert_awaited_once()
+    # 재조회는 실패한 알림 뒤의 id만으로 — 실패한 알림을 같은 tick에 다시 돌리지 않는다
+    assert load.await_args_list[1].args[1] == [rows[1][0].id, rows[2][0].id]

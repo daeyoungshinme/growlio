@@ -1,4 +1,5 @@
 import hmac
+import math
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -6,6 +7,8 @@ from contextlib import asynccontextmanager
 import sentry_sdk
 import structlog
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -151,6 +154,23 @@ async def log_requests(request: Request, call_next):
         status_class=status_class,
     ).observe(elapsed)
     return response
+
+
+def _json_safe(value: object) -> object:
+    """NaN/Infinity를 None으로 — JSON 응답 직렬화가 ValueError를 내지 않게."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_safe(v) for v in value]
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # 기본 핸들러는 오류의 `input`을 그대로 되돌려, 본문에 NaN이 있으면 422 대신 직렬화 실패 500이 났다
+    return JSONResponse(status_code=422, content={"detail": _json_safe(jsonable_encoder(exc.errors()))})
 
 
 @app.exception_handler(AppError)

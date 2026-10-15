@@ -6,6 +6,9 @@ import { toast } from "@/utils/toast";
 import type { ExecutionAction } from "./useRebalancingExecution";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
 
+const OVERSEAS_UNKNOWN_MSG =
+  "해외 잔고를 불러오지 못해 해외 종목은 마지막 동기화 수량으로 표시합니다. 매도 전 수량을 확인하세요.";
+
 export function useRebalancingBalances(
   dispatch: React.Dispatch<ExecutionAction>,
   tradableAccounts: AssetAccount[],
@@ -22,7 +25,9 @@ export function useRebalancingBalances(
         positions: res.positions,
         deposit: res.deposit_krw,
         orderable: res.orderable_krw,
+        overseasUnknown: res.overseas_known === false,
       });
+      if (res.overseas_known === false) toast(OVERSEAS_UNKNOWN_MSG, "info");
     } catch (err: unknown) {
       const is404 = getHttpStatus(err) === 404;
       dispatch({ type: "BALANCE_ERROR", accountId, is404 });
@@ -43,6 +48,7 @@ export function useRebalancingBalances(
       const balances: Record<string, import("../api/rebalancing").KisBalancePosition[]> = {};
       const deposits: Record<string, number> = {};
       const orderables: Record<string, number> = {};
+      const overseasUnknown: Record<string, boolean> = {};
       const states: Record<string, import("./useRebalancingExecution").BalanceLoadState> = {};
       responses.forEach((res) => {
         if (res.error) {
@@ -53,10 +59,19 @@ export function useRebalancingBalances(
           if (res.orderable_krw !== null && res.orderable_krw !== undefined) {
             orderables[res.account_id] = res.orderable_krw;
           }
+          overseasUnknown[res.account_id] = res.overseas_known === false;
           states[res.account_id] = "loaded";
         }
       });
-      dispatch({ type: "BALANCES_LOADED", balances, deposits, orderables, states });
+      dispatch({
+        type: "BALANCES_LOADED",
+        balances,
+        deposits,
+        orderables,
+        overseasUnknown,
+        states,
+      });
+      if (Object.values(overseasUnknown).some(Boolean)) toast(OVERSEAS_UNKNOWN_MSG, "info");
     } catch {
       dispatch({ type: "BALANCES_ERROR", accountIds: tradableAccounts.map((a) => a.id) });
     }

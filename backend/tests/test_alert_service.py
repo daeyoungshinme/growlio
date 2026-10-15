@@ -453,3 +453,30 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_cache):
         await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
 
     mock_db.commit.assert_not_called()
+
+
+# ── run_isolated_alert_loop (계획 57 C3) ─────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_isolated_alert_loop_continues_after_item_failure_and_refreshes(mock_db):
+    from types import SimpleNamespace
+
+    from app.services.alerts.alert_service import run_isolated_alert_loop
+
+    rows = [(SimpleNamespace(id=i),) for i in range(3)]
+    handled: list[int] = []
+
+    async def _handle(row) -> bool:
+        handled.append(row[0].id)
+        if row[0].id == 0:
+            raise RuntimeError("commit failed")
+        return True
+
+    count = await run_isolated_alert_loop(mock_db, rows, _handle, "test_item_failed")
+
+    assert count == 2
+    assert handled == [0, 1, 2]
+    mock_db.rollback.assert_awaited_once()
+    # rollback 이후 행의 알림 객체는 expire됐으므로 쓰기 전에 refresh한다
+    assert [c.args[0].id for c in mock_db.refresh.await_args_list] == [1, 2]

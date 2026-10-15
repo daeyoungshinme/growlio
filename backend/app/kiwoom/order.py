@@ -7,6 +7,7 @@ from typing import Any
 
 import structlog
 
+from app.exceptions import BrokerOrderRejectedError
 from app.kiwoom.client import auth_headers, kiwoom_request
 from app.kiwoom.constants import (
     API_ID_DOMESTIC_BUY,
@@ -64,7 +65,7 @@ async def place_domestic_order(
     )
 
     if str(data.get("return_code", "0")) != "0":
-        raise RuntimeError(data.get("return_msg") or "키움 국내주식 주문 실패")
+        raise BrokerOrderRejectedError(data.get("return_msg") or "키움 국내주식 주문 실패")
 
     return {"order_no": data.get("ord_no"), "raw": data}
 
@@ -123,6 +124,6 @@ async def place_overseas_order(
     )
 
     if str(data.get("return_code", "0")) != "0":
-        raise RuntimeError(data.get("return_msg") or "키움 해외주식 주문 실패")
+        raise BrokerOrderRejectedError(data.get("return_msg") or "키움 해외주식 주문 실패")
 
     return {"order_no": data.get("ord_no"), "raw": data}

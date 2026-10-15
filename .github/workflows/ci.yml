@@ -97,8 +97,9 @@ jobs:
       - name: Security scan (bandit)
         run: .venv/bin/bandit -r app/ -l -q
 
+      # 차단 단계 — continue-on-error로 두었을 때 69건이 쌓여도 아무도 보지 못했다(계획 57).
+      # 수정 버전이 아직 없는 항목은 `--ignore-vuln <ID>`로 사유와 함께 명시적으로 제외한다.
       - name: Dependency vulnerability check (pip-audit)
-        continue-on-error: true
         run: .venv/bin/pip-audit --skip-editable
 
   secret-scan:

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_token_payload
 from app.core.cache_store import get_cache_store
-from app.limiter import ip_rate_limit_key, limiter
+from app.limiter import ip_rate_limit_key, limiter, peer_rate_limit_key
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
 from app.schemas.auth import (
@@ -103,6 +103,7 @@ async def sync_profile(
 
 @router.post("/find-account", response_model=FindAccountResponse)
 @limiter.limit("3/hour", key_func=ip_rate_limit_key)
+@limiter.limit("30/hour", key_func=peer_rate_limit_key)
 async def find_account(request: Request, req: FindAccountRequest):
     # 계정 존재 여부를 응답에서 노출하지 않음 (사용자 열거 방지)
     msg = "가입 시 사용하신 이름과 이메일로 로그인을 시도해 보세요."

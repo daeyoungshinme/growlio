@@ -48,7 +48,7 @@ vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
 vi.mock("@/hooks/useRegisterRefresh", () => ({ useRegisterRefresh: vi.fn() }));
 
 vi.mock("@/lib/supabase", () => ({
-  wasPasswordRecoveryDetected: vi.fn(() => false),
+  consumePasswordRecovery: vi.fn(() => false),
   getSupabase: async () => ({
     auth: {
       onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),

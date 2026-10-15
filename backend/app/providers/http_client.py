@@ -42,7 +42,15 @@ async def close_http_client() -> None:
         _nossl_client = None
 
 
-class MaxRetriesExceededError(RuntimeError):
+class BrokerRequestError(RuntimeError):
+    """broker_request가 직접 만든 실패 — 메시지는 우리가 쓴 문장이라 사용자에게 그대로 보여도 된다.
+
+    RuntimeError 하위라 기존 `except RuntimeError` 호출부와 호환된다. httpx 예외 원문은 요청 URL(쿼리스트링의
+    계좌번호)을 담을 수 있어 메시지에 넣지 않고 타입명만 남긴다.
+    """
+
+
+class MaxRetriesExceededError(BrokerRequestError):
     """broker_request 모든 재시도 소진 시 발생."""
 
 
@@ -177,7 +185,7 @@ async def broker_request(
                 elif not retry_on_request_error:
                     # 5xx(502/504 등)는 브로커가 이미 접수한 뒤 게이트웨이에서 날 수도 있다 — 뮤테이션은
                     # 재전송하면 중복 주문이 되므로 전송 오류와 똑같이 "처리 여부 불명"으로 즉시 실패시킨다.
-                    raise RuntimeError(
+                    raise BrokerRequestError(
                         f"{log_prefix} API 서버 오류 {e.response.status_code}(재시도 비활성화 — 실제 접수 여부 불명)"
                     ) from e
                 elif attempt < retries - 1:
@@ -186,12 +194,13 @@ async def broker_request(
                     raise
             except httpx.RequestError as e:
                 if not retry_on_request_error:
-                    raise RuntimeError(
-                        f"{log_prefix} API 요청 실패(재시도 비활성화 — 응답 유실 시 실제 처리 여부 불명): {e}"
+                    raise BrokerRequestError(
+                        f"{log_prefix} API 요청 실패(재시도 비활성화 — 응답 유실 시 실제 처리 여부 불명): "
+                        f"{type(e).__name__}"
                     ) from e
                 if attempt < retries - 1:
                     await asyncio.sleep(1)
                 else:
-                    raise RuntimeError(f"{log_prefix} API 요청 실패: {e}") from e
+                    raise BrokerRequestError(f"{log_prefix} API 요청 실패: {type(e).__name__}") from e
 
     raise MaxRetriesExceededError(f"{log_prefix} API 최대 재시도 초과")

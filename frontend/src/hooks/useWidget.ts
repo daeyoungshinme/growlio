@@ -4,6 +4,7 @@ import { fetchDashboard } from "@/api/dashboard";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { fmtKrwShort, fmtPct } from "@/utils/format";
 import { isNativePlatform } from "@/utils/platform";
+import { STALE_TIME } from "@/constants/queryConfig";
 
 // 앱 데이터가 갱신될 때마다 Android 홈 화면 위젯 데이터를 SharedPreferences로 동기화한다.
 // 위젯은 GrowlioWidget.java (AppWidgetProvider)가 직접 읽어 렌더링한다.
@@ -14,7 +15,7 @@ export function useWidget() {
     queryKey: QUERY_KEYS.dashboard,
     queryFn: fetchDashboard,
     enabled: native,
-    staleTime: 5 * 60 * 1000,
+    staleTime: STALE_TIME.FIVE_MINUTES,
   });
 
   useEffect(() => {

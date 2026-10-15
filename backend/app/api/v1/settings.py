@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
@@ -15,6 +15,8 @@ from app.core.config import settings
 from app.enums import AgeGroup, GoalRiskTolerance, IncomeBracket
 from app.limiter import limiter
 from app.models.user import User
+from app.schemas._validators import validate_non_negative_amount, validate_positive_amount
+from app.schemas.asset import MAX_CREDENTIAL_LENGTH
 from app.schemas.rebalancing.goal import GoalCandidateTicker
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
@@ -32,8 +34,12 @@ from app.utils.kst import today_kst
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
+# 목표 연도 상한(현재 연도 기준) — 은퇴 목표도 충분히 담는 값
+MAX_GOAL_YEARS_AHEAD = 100
+
+
 class DartApiKeyUpdate(BaseModel):
-    api_key: str
+    api_key: str = Field(min_length=1, max_length=MAX_CREDENTIAL_LENGTH)  # 암호화 후 String(512)
 
 
 class GoalUpdate(BaseModel):
@@ -52,9 +58,7 @@ class GoalUpdate(BaseModel):
     )
     @classmethod
     def validate_positive(cls, v: float | None) -> float | None:
-        if v is not None and v < 0:
-            raise ValueError("금액은 0 이상이어야 합니다")
-        return v
+        return validate_non_negative_amount(v)
 
     @field_validator("goal_annual_return_pct")
     @classmethod
@@ -68,6 +72,9 @@ class GoalUpdate(BaseModel):
     def validate_target_year(cls, v: int | None) -> int | None:
         if v is not None and v < today_kst().year:
             raise ValueError("목표 연도는 현재 연도 이상이어야 합니다")
+        # 상한이 없으면 10000이 저장돼 목표 추천의 date(target_year, 12, 31)이 매번 500을 냈다(계획 57 C4)
+        if v is not None and v > today_kst().year + MAX_GOAL_YEARS_AHEAD:
+            raise ValueError(f"목표 연도는 {MAX_GOAL_YEARS_AHEAD}년 이내여야 합니다")
         return v
 
     @field_validator("birth_year")
@@ -133,7 +140,7 @@ class NotificationEmailUpdate(BaseModel):
 
 
 class PushTokenUpdate(BaseModel):
-    fcm_token: str | None = None
+    fcm_token: str | None = Field(default=None, max_length=512)
 
 
 class CompositeSignalAlertsUpdate(BaseModel):
@@ -180,7 +187,7 @@ class AutoRebalancingDailyCapUpdate(BaseModel):
     def validate_positive(cls, v: float | None) -> float | None:
         if v is not None and v <= 0:
             raise ValueError("하루 합산 거래한도는 0보다 커야 합니다")
-        return v
+        return validate_positive_amount(v)
 
 
 class SettingsResponse(BaseModel):

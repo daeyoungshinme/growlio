@@ -144,17 +144,10 @@ describe("api/risk", () => {
     note: "",
   };
 
-  it("fetchPortfolioRisk calls GET /portfolio/risk without portfolioId", async () => {
+  it("fetchPortfolioRisk calls GET /portfolio/risk", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: mockRisk });
     const result = await fetchPortfolioRisk();
     expect(api.get).toHaveBeenCalledWith("/portfolio/risk");
-    expect(result).toEqual(mockRisk);
-  });
-
-  it("fetchPortfolioRisk calls GET /portfolio/risk with portfolio_id param when portfolioId given", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: mockRisk });
-    const result = await fetchPortfolioRisk("p123");
-    expect(api.get).toHaveBeenCalledWith("/portfolio/risk", { params: { portfolio_id: "p123" } });
     expect(result).toEqual(mockRisk);
   });
 });

@@ -74,3 +74,16 @@ class TestGoalUpdate:
 
         obj = GoalUpdate(retirement_target_year=2040)
         assert obj.retirement_target_year == 2040
+
+    def test_rejects_retirement_year_too_far(self):
+        # 10000을 저장하면 목표 추천의 date(target_year, 12, 31)이 매번 500을 냈다(계획 57 C4)
+        from app.api.v1.settings import GoalUpdate
+
+        with pytest.raises(ValidationError):
+            GoalUpdate(retirement_target_year=10000)
+
+    def test_rejects_goal_amount_above_cap(self):
+        from app.api.v1.settings import GoalUpdate
+
+        with pytest.raises(ValidationError):
+            GoalUpdate(goal_amount=1e17)

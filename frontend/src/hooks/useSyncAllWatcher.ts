@@ -7,6 +7,8 @@ import { toast } from "@/utils/toast";
 import { SYNC_ALL_POLL_INTERVAL } from "@/constants/timers";
 
 const MAX_NAMES_IN_TOAST = 2;
+// 상태 조회가 이만큼 연속 실패해야 진행 표시를 끝낸다 — 일시적 네트워크 오류 1번에 진행 중인 동기화를 놓치지 않게
+const MAX_CONSECUTIVE_POLL_ERRORS = 3;
 
 function buildFailedAccountsMessage(
   failedAccounts: FailedSyncAccount[],
@@ -37,11 +39,17 @@ export function useSyncAllWatcher() {
     if (!isSyncingAll) return;
 
     let cancelled = false;
+    let inFlight = false;
+    let consecutiveErrors = 0;
 
     const poll = async () => {
+      // 응답이 폴링 간격보다 늦으면 요청이 겹쳐 완료 처리(토스트·무효화)가 두 번 날 수 있다
+      if (inFlight) return;
+      inFlight = true;
       try {
         const status = await getSyncAllStatus();
         if (cancelled) return;
+        consecutiveErrors = 0;
 
         if (status.status === "running") {
           updateProgress(status.done ?? 0, status.total ?? 0, status.failed ?? 0);
@@ -63,7 +71,10 @@ export function useSyncAllWatcher() {
           }
         }
       } catch {
-        if (!cancelled) finishSyncAll(0);
+        consecutiveErrors += 1;
+        if (!cancelled && consecutiveErrors >= MAX_CONSECUTIVE_POLL_ERRORS) finishSyncAll(0);
+      } finally {
+        inFlight = false;
       }
     };
 

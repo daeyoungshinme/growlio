@@ -85,7 +85,7 @@ async def _load_alert_row(
     is_per_account = getattr(portfolio, "alert_scope", "AGGREGATE") == "PER_ACCOUNT"
     if is_per_account and account_id is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="계좌별 독립 설정 포트폴리오는 account_id를 지정해야 합니다",
         )
 

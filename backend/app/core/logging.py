@@ -36,6 +36,37 @@ def format_sync_error(error: BaseException | str) -> str:
     return redact_secrets(str(error))[:SYNC_ERROR_MESSAGE_MAX_LENGTH]
 
 
+def public_error_message(error: BaseException) -> str:
+    """응답·DB·알림에 남길 예외 사유 — 우리가 쓴 메시지만 노출하고 나머지는 타입명으로 대체한다.
+
+    SQLAlchemy 오류 문자열에는 SQL과 바인드 파라미터(토큰 등)가, httpx 오류에는 쿼리스트링(계좌번호)이 담긴
+    URL이 들어 있어 `str(e)`를 그대로 내보내면 안 된다. 원문은 로그(redact 적용)에만 남긴다.
+    """
+    from fastapi import HTTPException
+
+    from app.exceptions import AppError, BalancePaginationError, BrokerOrderRejectedError, SyncError
+    from app.kis.client import KisApiError
+    from app.kiwoom.client import KiwoomApiError, KiwoomTokenIssueError
+    from app.providers.http_client import BrokerRequestError
+
+    if isinstance(error, HTTPException):
+        return format_sync_error(str(error.detail))
+    if isinstance(
+        error,
+        AppError
+        | SyncError
+        | BalancePaginationError
+        | BrokerOrderRejectedError
+        | BrokerRequestError
+        | KisApiError
+        | KiwoomApiError
+        | KiwoomTokenIssueError
+        | ValueError,
+    ):
+        return format_sync_error(error)
+    return f"내부 오류가 발생했습니다({type(error).__name__})"
+
+
 # dict 키 이름만으로 값을 통째로 가린다 — 브로커 응답 본문(body=error_body, response=data)처럼
 # 구조화된 값은 "키=값" 문자열 패턴이 없어 _SECRET_PATTERN에 걸리지 않는다.
 _SENSITIVE_KEY_PATTERN = re.compile(r"token|secret|appkey|app_key|password|authorization|api_key", re.IGNORECASE)

@@ -61,7 +61,7 @@ async def _validate_auto_execution_account(db: AsyncSession, account_id: uuid.UU
     )
     if not exec_account or exec_account.asset_type not in _AUTO_EXECUTION_ASSET_TYPES:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="자동 실행 계좌는 KIS/키움 연동 계좌만 사용할 수 있습니다",
         )
 
@@ -71,7 +71,7 @@ def _validate_tax_gate_fields(body: RebalancingAlertCreate) -> None:
     금액 임계값이라 "켜져 있는데 상한 없음"은 항상 설정 실수다."""
     if body.tax_impact_gate_mode == "ENABLED" and body.max_tax_impact_krw is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="세금영향 게이트를 켜려면 상한 금액을 입력해야 합니다",
         )
 
@@ -183,7 +183,7 @@ async def upsert_rebalancing_alert(
     if body.mode == "AUTO":
         if body.account_id is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="자동 실행 모드에는 KIS/키움 연동 계좌를 선택해야 합니다",
             )
         await _validate_auto_execution_account(db, body.account_id, current_user.id)
@@ -309,7 +309,7 @@ async def upsert_account_rebalancing_alert(
     linked_account_ids = {pa.account_id for pa in portfolio.linked_accounts}
     if account_id not in linked_account_ids:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="이 계좌는 포트폴리오에 연결되어 있지 않습니다",
         )
 

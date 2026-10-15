@@ -265,7 +265,10 @@ describe("usePositionsEditor", () => {
 
       act(() => result.current.handleSelectSuggestion(1, suggestion("000660")));
       act(() => result.current.removeRow(0));
+      // 스피너도 인덱스가 아니라 행을 따라간다 — 삭제로 0번이 된 원래 행에 떠야 한다
+      expect([...result.current.priceLoadingRows]).toEqual([0]);
       await act(async () => d.resolve(price(200000)));
+      expect(result.current.priceLoadingRows.size).toBe(0);
 
       expect(result.current.rows).toHaveLength(1);
       expect(result.current.rows[0].ticker).toBe("000660");

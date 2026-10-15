@@ -95,6 +95,23 @@ describe("api client 401 refresh queue", () => {
     expect(refreshSession).toHaveBeenCalledTimes(1);
   });
 
+  it("대기열에서 재시도한 요청이 다시 401이면 갱신을 또 시작하지 않는다", async () => {
+    installAdapter();
+    let resolveRefresh: (v: unknown) => void = () => {};
+    refreshSession.mockReturnValue(new Promise((r) => (resolveRefresh = r)));
+
+    const first = api.get("/a");
+    const second = api.get("/b");
+    await vi.waitFor(() => expect(refreshSession).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 0));
+    // 갱신된 토큰도 서버가 거부하는 경우(유효 토큰과 다른 값)
+    resolveRefresh({ data: { session: { access_token: "still-rejected" } } });
+
+    const results = await Promise.allSettled([first, second]);
+    expect(results.map((r) => r.status)).toEqual(["rejected", "rejected"]);
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+  });
+
   it("갱신 결과 세션이 없으면 세션 만료 이벤트를 보내고 요청을 실패시킨다", async () => {
     installAdapter();
     refreshSession.mockResolvedValue({ data: { session: null } });

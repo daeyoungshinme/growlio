@@ -2,6 +2,7 @@ from typing import Any
 
 import structlog
 
+from app.exceptions import BalancePaginationError
 from app.kis.client import KisTokenExpiredError, auth_headers, kis_request, split_account_no
 from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
@@ -57,11 +58,11 @@ async def _fetch_balance_pages(
             break
         if (fk, nk) == prev:
             # 같은 키를 반복하면 같은 페이지가 쌓여 수량이 부풀려진다
-            raise RuntimeError(f"KIS 잔고 연속조회 키가 반복됩니다({path})")
+            raise BalancePaginationError(f"KIS 잔고 연속조회 키가 반복됩니다({path})")
     else:
         # 부분 목록을 돌려주면 동기화가 나머지 보유종목을 지우므로 실패로 처리해 기존 포지션을 보존한다
         logger.warning("kis_balance_page_limit", path=path, pages=_MAX_PAGES)
-        raise RuntimeError(f"KIS 잔고 연속조회가 {_MAX_PAGES}페이지를 넘었습니다({path})")
+        raise BalancePaginationError(f"KIS 잔고 연속조회가 {_MAX_PAGES}페이지를 넘었습니다({path})")
     return pages
 
 

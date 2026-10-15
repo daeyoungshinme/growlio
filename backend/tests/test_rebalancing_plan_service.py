@@ -677,8 +677,11 @@ class TestApproveSellLeg:
 
         assert result is None
         assert locked_leg.status == "FAILED"
-        assert locked_leg.error_message == "broker error"
-        mock_notify_failed.assert_awaited_once_with(plan, "SELL", "broker error", mock_db)
+        # 예상 밖 예외의 원문(SQL·URL이 섞일 수 있음)은 DB·알림에 남기지 않는다(계획 57 D1)
+        assert locked_leg.error_message == "내부 오류가 발생했습니다(RuntimeError)"
+        mock_notify_failed.assert_awaited_once_with(plan, "SELL", locked_leg.error_message, mock_db)
+        # 실패 기록 전에 세션을 되돌려야 DB 오류가 원인일 때도 FAILED가 커밋된다(계획 57 C2)
+        mock_db.rollback.assert_awaited()
 
     @pytest.mark.asyncio
     async def test_rejects_buy_side_leg(self, mock_db):
@@ -1062,7 +1065,13 @@ class TestExpireDueSellLegs:
         due_result = MagicMock()
         due_result.all.return_value = [(leg_id,)]
         locked_leg = SimpleNamespace(
-            id=leg_id, plan_id=plan_id, side="SELL", status="PENDING", decided_at=None, decided_by=None
+            id=leg_id,
+            plan_id=plan_id,
+            side="SELL",
+            status="PENDING",
+            decided_at=None,
+            decided_by=None,
+            token_consumed_at=None,
         )
         plan = SimpleNamespace(id=plan_id, user_id=uuid.uuid4())
 
@@ -1103,7 +1112,14 @@ class TestExpireDueSellLegs:
         due_result = MagicMock()
         due_result.all.return_value = [(leg_id,)]
         locked_leg = SimpleNamespace(
-            id=leg_id, plan_id=plan_id, side="SELL", market="US", status="PENDING", decided_at=None, decided_by=None
+            id=leg_id,
+            plan_id=plan_id,
+            side="SELL",
+            market="US",
+            status="PENDING",
+            decided_at=None,
+            decided_by=None,
+            token_consumed_at=None,
         )
         plan = SimpleNamespace(id=plan_id, user_id=uuid.uuid4())
 
@@ -1230,3 +1246,111 @@ class TestRebuildOrdersOverseasLimitCurrency:
             orders = await _rebuild_orders_from_items([item], "BUY", uuid.uuid4(), mock_db, None)
 
         assert orders[0].limit_price == 70000.0
+
+
+# ── 계획 57 C2: leg별 격리·실행 중 상태 유실 sweep ─────────────────
+
+
+class TestPlanLegFailureIsolation:
+    @pytest.mark.asyncio
+    async def test_one_buy_leg_error_does_not_block_remaining_legs(self, mock_db):
+        bad_id, good_id = uuid.uuid4(), uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(bad_id,), (good_id,)]
+        good_leg = SimpleNamespace(
+            id=good_id,
+            side="BUY",
+            market="KR",
+            status="PENDING",
+            decided_at=None,
+            decided_by=None,
+            error_message=None,
+            token_consumed_at=None,
+        )
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(side_effect=[RuntimeError("db connection lost"), good_leg])
+
+        with patch("app.utils.market_hours.is_korean_market_open", return_value=False):
+            count = await svc.execute_due_buy_legs(mock_db, MagicMock())
+
+        assert count == 1
+        assert good_leg.status == "EXPIRED"
+        mock_db.rollback.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_one_sell_expiry_error_does_not_block_remaining_legs(self, mock_db):
+        bad_id, good_id = uuid.uuid4(), uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(bad_id,), (good_id,)]
+        good_leg = SimpleNamespace(
+            id=good_id, plan_id=uuid.uuid4(), side="SELL", status="PENDING", token_consumed_at=None
+        )
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(side_effect=[RuntimeError("db connection lost"), good_leg])
+
+        count = await svc.expire_due_sell_legs(mock_db)
+
+        assert count == 1
+        assert good_leg.status == "EXPIRED"
+
+    @pytest.mark.asyncio
+    async def test_sell_expiry_skips_leg_being_executed(self, mock_db):
+        # 승인 직후 실행 중(토큰 소비)인 매도를 '미응답 만료'로 덮어쓰지 않는다
+        leg_id = uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(leg_id,)]
+        locked_leg = SimpleNamespace(
+            id=leg_id, plan_id=uuid.uuid4(), side="SELL", status="PENDING", token_consumed_at=datetime.now(tz=UTC)
+        )
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(return_value=locked_leg)
+
+        assert await svc.expire_due_sell_legs(mock_db) == 0
+        assert locked_leg.status == "PENDING"
+
+
+class TestFailStuckConsumedLegs:
+    @pytest.mark.asyncio
+    async def test_marks_stuck_leg_failed_and_notifies_without_reexecuting(self, mock_db):
+        leg_id, plan_id = uuid.uuid4(), uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(leg_id,)]
+        locked_leg = SimpleNamespace(
+            id=leg_id,
+            plan_id=plan_id,
+            side="BUY",
+            status="PENDING",
+            token_consumed_at=datetime.now(tz=UTC) - timedelta(hours=1),
+            error_message=None,
+            decided_at=None,
+            decided_by=None,
+        )
+        plan = SimpleNamespace(id=plan_id, user_id=uuid.uuid4())
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(return_value=locked_leg)
+        mock_db.get = AsyncMock(return_value=plan)
+
+        notify = AsyncMock()
+        with (
+            patch("app.services.rebalancing.plan_execution.save_alert_history", new=AsyncMock()) as mock_save,
+            patch("app.services.rebalancing.plan_execution._notify_leg_execution_failed", new=notify),
+            patch("app.services.rebalancing.execution_service.execute_rebalancing", new=AsyncMock()) as mock_exec,
+        ):
+            count = await svc.fail_stuck_consumed_legs(mock_db)
+
+        assert count == 1
+        assert locked_leg.status == "FAILED"
+        assert "체결 내역을 확인" in locked_leg.error_message
+        mock_save.assert_awaited_once()
+        notify.assert_awaited_once_with(plan, "BUY", locked_leg.error_message, mock_db)
+        mock_exec.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_skips_leg_resolved_concurrently(self, mock_db):
+        leg_id = uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(leg_id,)]
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(return_value=SimpleNamespace(id=leg_id, status="EXECUTED"))
+
+        assert await svc.fail_stuck_consumed_legs(mock_db) == 0

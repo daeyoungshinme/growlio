@@ -8,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import StockPriceAlert
 from app.models.user import User, UserSettings
-from app.services.alerts.alert_service import finalize_alert_batch, notify_and_record_trigger
+from app.services.alerts.alert_service import (
+    finalize_alert_batch,
+    notify_and_record_trigger,
+    run_isolated_alert_loop,
+)
 from app.services.alerts.calculator import should_trigger_stock_price
 
 logger = structlog.get_logger()
@@ -38,13 +42,13 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, cache) -> None:
     unique_tickers = list({(a.ticker, a.market) for a, _, _, _ in rows})
     price_map = await fetch_prices_batch(sample_user_id, unique_tickers, db, cache)
 
-    triggered_count = 0
-    for alert, user_email, notification_email, fcm_token in rows:
+    async def _handle(row) -> bool:
+        alert, user_email, notification_email, fcm_token = row
         price = price_map.get(alert.ticker)
         if not price:
-            continue
+            return False
         if not should_trigger_stock_price(alert, price):
-            continue
+            return False
 
         email = notification_email or user_email
         target = float(alert.target_price)
@@ -57,7 +61,7 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, cache) -> None:
             direction=alert.direction,
         )
         if not sent:
-            continue
+            return False
 
         direction_label = "이하" if alert.direction == "BELOW" else "이상"
         await notify_and_record_trigger(
@@ -70,6 +74,7 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, cache) -> None:
             f"{price:,.0f}원 (목표 {target:,.0f}원 {direction_label})",
             fcm_token,
         )
-        triggered_count += 1
+        return True
 
+    triggered_count = await run_isolated_alert_loop(db, rows, _handle, "stock_price_alert_item_failed")
     await finalize_alert_batch(db, "stock_price", triggered_count)

@@ -102,4 +102,5 @@ async def fetch_broker_balance(
         positions=positions,
         deposit_krw=result.deposit_krw,
         orderable_krw=orderable_krw,
+        overseas_known=result.overseas_known,
     )

@@ -176,6 +176,8 @@ export interface KisBalanceResponse {
   positions: KisBalancePosition[];
   deposit_krw: number;
   orderable_krw: number | null;
+  /** false면 해외 잔고 조회 실패로 positions에 해외 보유분이 빠져 있다 */
+  overseas_known?: boolean;
   error?: string | null;
 }
 

@@ -105,9 +105,8 @@ async def get_portfolio_risk_metrics(
     user_id: uuid.UUID,
     db: AsyncSession,
     cache: CacheStoreType = None,
-    portfolio_id: str | None = None,
 ) -> dict:
-    cache_key = risk_key(user_id, portfolio_id)
+    cache_key = risk_key(user_id)
 
     async def _read_cache() -> dict | None:
         return await get_cached_json(cache, cache_key)

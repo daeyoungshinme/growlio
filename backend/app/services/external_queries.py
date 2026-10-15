@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount, Transaction
 from app.services.returns_calculator import xirr
-from app.services.snapshot_service import get_latest_snapshot
+from app.services.snapshot_service import get_latest_snapshots_by_account
 from app.utils.kst import today_kst
 
 _FLOW_TYPES = ("DEPOSIT", "WITHDRAWAL")
@@ -93,11 +93,8 @@ async def account_scoped_performance(db: AsyncSession, user_id: uuid.UUID, accou
     if not owned:
         return {"xirr_pct": None, "current_value_krw": 0.0, "net_invested_krw": 0.0, "account_count": 0}
 
-    current_value = 0.0
-    for account_id in owned:
-        snapshot = await get_latest_snapshot(db, account_id)
-        if snapshot is not None:
-            current_value += float(snapshot.amount_krw)
+    latest_by_account = await get_latest_snapshots_by_account(db, list(owned))
+    current_value = sum(float(snap.amount_krw) for snap in latest_by_account.values())
 
     rows = (
         await db.execute(

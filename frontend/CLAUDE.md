@@ -563,7 +563,7 @@ _기타_
 
 **쿼리 설정 상수 (`src/constants/queryConfig.ts`)**
 
-- `STALE_TIME.SHORT` (30s, 기본값), `STALE_TIME.MEDIUM` (60s), `STALE_TIME.LONG` (1h), `STALE_TIME.EXCHANGE_RATE` (5m)
+- `STALE_TIME.NONE` (0, 열 때마다 최신), `STALE_TIME.VERY_SHORT` (15s), `STALE_TIME.SHORT` (30s, 기본값), `STALE_TIME.MEDIUM` (60s), `STALE_TIME.FIVE_MINUTES`·`STALE_TIME.EXCHANGE_RATE` (5m), `STALE_TIME.LONG` (1h)
 - `REFETCH_INTERVAL.DASHBOARD` (5분), `REFETCH_INTERVAL.PORTFOLIO` (5분)
 - staleTime/refetchInterval 매직 넘버 직접 작성 금지. 상수 import해 사용.
 

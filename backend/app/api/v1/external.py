@@ -33,7 +33,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,6 +44,7 @@ from app.enums import AssetType, DataSource, TransactionType
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
+from app.schemas._validators import validate_positive_amount
 from app.schemas.invest import GoalFeasibilityPreview
 from app.services._settings_queries import get_settings_row
 from app.services.asset_aggregator import get_dashboard_summary
@@ -54,7 +55,11 @@ from app.services.external_queries import (
     monthly_net_deposits_by_account,
 )
 from app.services.goal_feasibility import build_feasibility_preview
-from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot, get_latest_snapshot_with_positions
+from app.services.snapshot_service import (
+    _upsert_snapshot,
+    get_latest_snapshot_with_positions,
+    get_latest_snapshots_by_account,
+)
 from app.services.trend_calculator import get_monthly_trend
 from app.utils.cache_keys import (
     challenge_progress_key,
@@ -94,9 +99,11 @@ async def list_account_balances(
     외부 서비스가 자유 빈도로 호출할 수 있어야 하므로 평가 비용이 드는 실시간 재계산을 피한다.
     """
     accounts = await _list_accounts(current_user.id, db, skip=0, limit=200)
+    # 외부 서비스가 자유 빈도로 부르는 엔드포인트라 계좌 수만큼 쿼리하지 않는다(최대 200)
+    latest_by_account = await get_latest_snapshots_by_account(db, [a.id for a in accounts])
     result: list[ExternalAccountBalance] = []
     for account in accounts:
-        latest_snap = await get_latest_snapshot(db, account.id)
+        latest_snap = latest_by_account.get(account.id)
         invested = pnl = None
         if latest_snap is not None:
             value = latest_snap.amount_krw
@@ -253,9 +260,15 @@ class ExternalTransactionCreate(BaseModel):
     transaction_type: TransactionType
     amount: float
     transaction_date: date
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=1000)
     # 멱등 키 — 같은 사용자가 같은 키로 다시 보내면 새로 기록하지 않는다(nestlio: "nestlio:{거래id}:{동작}").
     external_ref: str | None = Field(default=None, min_length=1, max_length=100)
+
+    # 내부 TransactionCreate와 같은 규칙 — 음수 DEPOSIT이 MANUAL 계좌 예수금을 깎거나 Numeric 오버플로로 500이 나지 않게
+    @field_validator("amount")
+    @classmethod
+    def amount_positive(cls, v: float) -> float:
+        return validate_positive_amount(v)  # type: ignore[return-value]
 
 
 class ExternalTransactionResult(BaseModel):

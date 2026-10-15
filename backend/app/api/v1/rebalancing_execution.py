@@ -159,7 +159,7 @@ async def create_rebalancing_execution_plan(
 @limiter.limit("20/minute")
 async def get_rebalancing_history(
     request: Request,
-    limit: int = Query(default=20, le=100),
+    limit: int = Query(default=20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

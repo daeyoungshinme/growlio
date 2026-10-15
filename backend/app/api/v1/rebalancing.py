@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
+from app.core.logging import public_error_message
 from app.limiter import limiter
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -70,7 +71,7 @@ logger = structlog.get_logger()
 async def analyze_portfolio(
     request: Request,
     portfolio_id: uuid.UUID,
-    account_ids: list[uuid.UUID] | None = Query(default=None),
+    account_ids: list[uuid.UUID] | None = Query(default=None, max_length=50),
     deposit_krw_override: float | None = Query(default=None, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -341,7 +342,7 @@ async def get_all_broker_balances(
             is_mock=acc.is_mock_mode,
             positions=[],
             deposit_krw=0.0,
-            error=str(r),
+            error=public_error_message(r),
         )
         for acc, r in zip(accounts, results, strict=False)
     ]

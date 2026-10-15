@@ -4,14 +4,15 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ExecutionOrderItem(BaseModel):
     ticker: str
     name: str
     market: str
-    side: str  # "BUY" | "SELL"
+    # str이면 오타("buy")가 통과한 뒤 SELL/BUY 필터에서 조용히 빠졌다(계획 57 C5)
+    side: Literal["BUY", "SELL"]
     quantity: int  # 양수 (방향은 side로)
     account_id: str | None = None  # 실행할 KIS 계좌 ID (None이면 default_account_id 사용)
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
@@ -27,7 +28,7 @@ class ExecutionOrderItem(BaseModel):
 
 class ExecutionRequest(BaseModel):
     account_id: uuid.UUID | None = None  # 기본 KIS 계좌 (order에 account_id 없을 때 폴백)
-    orders: list[ExecutionOrderItem]
+    orders: list[ExecutionOrderItem] = Field(max_length=200)
     strategy: Literal["FULL", "BUY_ONLY", "TWO_PHASE"] = "FULL"
 
     @field_validator("orders")
@@ -82,6 +83,8 @@ class KisBalanceResponse(BaseModel):
     positions: list[KisBalancePosition]
     deposit_krw: float
     orderable_krw: float | None = None  # KIS만 지원 (nrcvb_buy_amt), 키움=None
+    # False면 해외 잔고 조회가 실패해 positions에 해외 보유분이 빠져 있다 — 해외 매도 수량을 0으로 오인하지 않게
+    overseas_known: bool = True
     error: str | None = None  # 일괄 조회 시 계좌별 오류 메시지
 
 

@@ -30,6 +30,7 @@ from app.services.rebalancing.plan_execution import (
     cancel_buy_leg,
     execute_due_buy_legs,
     expire_due_sell_legs,
+    fail_stuck_consumed_legs,
     get_plan_leg_by_token,
     reject_sell_leg,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "cancel_buy_leg",
     "execute_due_buy_legs",
     "expire_due_sell_legs",
+    "fail_stuck_consumed_legs",
     "generate_pending_plan_for_alert",
     "get_alert_ids_with_pending_plan",
     "get_plan_leg_by_token",

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import httpx
 import structlog
 
-from app.exceptions import ProviderApiError, ProviderCredentialError, ProviderNetworkError
+from app.exceptions import BalancePaginationError, ProviderApiError, ProviderCredentialError, ProviderNetworkError
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisApiError, KisTokenExpiredError
@@ -114,6 +114,9 @@ class KISProvider(BrokerProvider):
             ) from e
         except MaxRetriesExceededError as e:
             raise ProviderApiError("KIS API 속도 제한 초과. 잠시 후 다시 시도하세요.", http_status=429) from e
+        except BalancePaginationError as e:
+            # 키움은 RuntimeError 일반 분기로 같은 502를 낸다 — 매핑이 없으면 전역 500 "서버 오류"로 떨어진다
+            raise ProviderApiError(str(e), http_status=502) from e
         except httpx.HTTPStatusError as e:
             raise map_http_status_error(e, broker_name="KIS", message_key="msg1") from e
         except (httpx.ConnectError, httpx.TimeoutException) as e:

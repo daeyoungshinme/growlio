@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 
 import structlog
 
+from app.core.logging import public_error_message, redact_secrets
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
 
 logger = structlog.get_logger()
@@ -66,7 +67,8 @@ async def execute_single_order(
             ticker=order.ticker,
             side=order.side,
             quantity=order.quantity,
-            error=str(e),
+            error=redact_secrets(str(e)),
+            error_type=type(e).__name__,
         )
         return OrderResult(
             ticker=order.ticker,
@@ -75,7 +77,7 @@ async def execute_single_order(
             side=order.side,
             quantity=order.quantity,
             status="FAILED",
-            error_msg=str(e),
+            error_msg=public_error_message(e),
             order_type=order.order_type,
             price=price,
         )

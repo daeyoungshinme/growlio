@@ -265,7 +265,7 @@ async def fetch_market_and_risk_signal(
     """
     market_signal_result, risk_result = await asyncio.gather(
         get_market_signal(cache),
-        get_portfolio_risk_metrics(user_id, db, cache, portfolio_id=None),
+        get_portfolio_risk_metrics(user_id, db, cache),
         return_exceptions=True,
     )
 

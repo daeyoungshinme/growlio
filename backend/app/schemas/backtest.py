@@ -4,14 +4,18 @@ import uuid
 from collections.abc import Sequence
 from datetime import date
 
-from pydantic import BaseModel, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 # ── 백테스팅 실행 ─────────────────────────────────────────
 
 
+# 백테스트는 시작일부터 일 단위로 순회한다 — 하한이 없으면 1900년 같은 값으로 요청 하나가 수십만 회 루프를 돈다
+MIN_BACKTEST_START = date(1990, 1, 1)
+
+
 class BacktestRunRequest(BaseModel):
-    portfolio_ids: list[uuid.UUID]
-    start_date: date
+    portfolio_ids: list[uuid.UUID] = Field(max_length=30)  # 빈 목록 허용 — SPY·실포트폴리오만 비교
+    start_date: date = Field(ge=MIN_BACKTEST_START)
     end_date: date
     include_spy: bool = True
     include_real_portfolio: bool = True
