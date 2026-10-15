@@ -1,4 +1,5 @@
 import httpx
+import sentry_sdk
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -16,8 +17,9 @@ from app.schemas.auth import (
     SyncProfileRequest,
     UserResponse,
 )
-from app.services.auth_service import delete_supabase_user, verify_password
+from app.services.auth_service import delete_supabase_user, supabase_user_exists, verify_password
 from app.utils.cache_keys import invalidate_all_user_caches, invalidate_user_caches
+from app.utils.masking import mask_email
 
 logger = structlog.get_logger()
 
@@ -52,11 +54,34 @@ async def sync_profile(
     # (같은 이메일로 재가입 시 Supabase가 새 sub를 발급하므로 위 id 조회로는 찾을 수 없음)
     orphan = await db.scalar(select(User).where(User.email == email))
     if orphan:
+        # 이메일만 보고 지우면, 같은 이메일이 다른 sub로 들어오는 경로(nestlio와 공유하는 Supabase의
+        # 미연결 OAuth identity·이메일 확인 설정 변경 등)에서 살아 있는 사용자의 데이터가 CASCADE로
+        # 지워진다. 옛 sub가 Supabase Auth에서 실제로 사라졌을 때만 고아로 보고 정리한다.
+        try:
+            still_exists = await supabase_user_exists(str(orphan.id))
+        except httpx.HTTPError as e:
+            logger.error("sync_profile_orphan_check_failed", old_user_id=str(orphan.id), error=str(e))
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="계정 확인에 실패했습니다. 잠시 후 다시 시도해주세요.",
+            ) from e
+        if still_exists:
+            logger.error(
+                "sync_profile_email_conflict",
+                old_user_id=str(orphan.id),
+                new_user_id=user_id,
+                email=mask_email(email),
+            )
+            sentry_sdk.capture_message("sync_profile_email_conflict: live user shares email", level="error")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="이미 다른 계정에서 사용 중인 이메일입니다. 고객센터로 문의해주세요.",
+            )
         logger.warning(
             "sync_profile_orphan_email_cleanup",
             old_user_id=str(orphan.id),
             new_user_id=user_id,
-            email=email,
+            email=mask_email(email),
         )
         await db.delete(orphan)
         await db.flush()

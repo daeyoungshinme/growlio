@@ -18,6 +18,7 @@ from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
 from app.utils.kst import today_kst
+from app.utils.masking import mask_account_no
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,7 +50,7 @@ class KiwoomProvider(BrokerProvider):
         app_key = decrypt(account.kiwoom_app_key)
         app_secret = decrypt(account.kiwoom_app_secret)
         is_mock = account.is_mock_mode
-        logger.info("kiwoom_sync_start", account_no=account_no, is_mock=is_mock)
+        logger.info("kiwoom_sync_start", account_no=mask_account_no(account_no), is_mock=is_mock)
 
         async def _get_token(force_refresh: bool) -> str:
             return await kiwoom_get_access_token(
@@ -80,13 +81,15 @@ class KiwoomProvider(BrokerProvider):
                 _fetch,
                 _get_token,
                 KiwoomTokenExpiredError,
-                on_expired=lambda: logger.warning("kiwoom_token_expired_refreshing", account_no=account_no),
+                on_expired=lambda: logger.warning(
+                    "kiwoom_token_expired_refreshing", account_no=mask_account_no(account_no)
+                ),
             )
 
         try:
             domestic, overseas = await asyncio.wait_for(_do(), timeout=SYNC_TIMEOUT_SECONDS)
         except TimeoutError as e:
-            logger.error("kiwoom_sync_timeout", account_no=account.kiwoom_account_no)
+            logger.error("kiwoom_sync_timeout", account_no=mask_account_no(account.kiwoom_account_no))
             raise ProviderNetworkError(
                 f"키움 API 응답 시간 초과 (약 {int(SYNC_TIMEOUT_SECONDS)}초). 잠시 후 다시 시도하세요."
             ) from e

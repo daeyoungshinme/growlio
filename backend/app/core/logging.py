@@ -14,7 +14,8 @@ import structlog
 _SECRET_PATTERN = re.compile(
     r"(appkey|appsecret|secretkey|access_token|refresh_token|Bearer|password|Authorization"
     r"|api_key|apikey|dart_api_key|encryption_key|jwt_secret|supabase_key|database_url)"
-    r"[=:\s\"']+[A-Za-z0-9+/=_\-\.]{4,}",
+    # "Authorization: Bearer <토큰>"은 "Bearer"만 값으로 잡혀 토큰이 남았다 — Bearer 접두를 건너뛴다
+    r"[=:\s\"']+(?:Bearer\s+)?[A-Za-z0-9+/=_\-\.]{4,}",
     re.IGNORECASE,
 )
 
@@ -35,10 +36,30 @@ def format_sync_error(error: BaseException | str) -> str:
     return redact_secrets(str(error))[:SYNC_ERROR_MESSAGE_MAX_LENGTH]
 
 
+# dict 키 이름만으로 값을 통째로 가린다 — 브로커 응답 본문(body=error_body, response=data)처럼
+# 구조화된 값은 "키=값" 문자열 패턴이 없어 _SECRET_PATTERN에 걸리지 않는다.
+_SENSITIVE_KEY_PATTERN = re.compile(r"token|secret|appkey|app_key|password|authorization|api_key", re.IGNORECASE)
+_MAX_REDACT_DEPTH = 6
+
+
+def _redact_value(value, depth: int = 0):
+    if isinstance(value, str):
+        return redact_secrets(value)
+    if depth >= _MAX_REDACT_DEPTH:
+        return value
+    if isinstance(value, dict):
+        return {
+            k: "[REDACTED]" if isinstance(k, str) and _SENSITIVE_KEY_PATTERN.search(k) else _redact_value(v, depth + 1)
+            for k, v in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return type(value)(_redact_value(v, depth + 1) for v in value)
+    return value
+
+
 def _redact_processor(logger, method_name, event_dict):
     for key, value in event_dict.items():
-        if isinstance(value, str):
-            event_dict[key] = redact_secrets(value)
+        event_dict[key] = _redact_value(value)
     return event_dict
 
 

@@ -71,6 +71,22 @@ async def verify_password(email: str, password: str) -> bool:
     return resp.status_code == 200
 
 
+async def supabase_user_exists(user_id: str) -> bool:
+    """Supabase Admin API로 Auth 유저 존재 여부를 확인한다 (200 → True, 404 → False, 그 외 예외 전파)."""
+    async with httpx.AsyncClient(timeout=_SUPABASE_TIMEOUT) as client:
+        resp = await client.get(
+            f"{settings.supabase_project_url}/auth/v1/admin/users/{user_id}",
+            headers={
+                "apikey": settings.supabase_service_role_key,
+                "Authorization": f"Bearer {settings.supabase_service_role_key}",
+            },
+        )
+    if resp.status_code == 404:
+        return False
+    resp.raise_for_status()
+    return True
+
+
 async def delete_supabase_user(user_id: str) -> None:
     """Supabase Admin API로 Auth 유저(이메일/비밀번호 아이덴티티)를 삭제한다.
 

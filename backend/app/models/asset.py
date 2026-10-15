@@ -118,6 +118,9 @@ class AssetAccount(Base):
         Index("idx_asset_accounts_user_active_include", "user_id", "is_active", "include_in_total"),
         Index("idx_asset_accounts_user_active_type", "user_id", "is_active", "asset_type"),
         Index("idx_asset_accounts_data_source", "user_id", "data_source"),
+        # FK(ON DELETE SET NULL) — 포트폴리오 삭제 시 계좌 전체 스캔 방지. 모델에 없어서 a64e36a53a40
+        # autogenerate가 지웠던 것을 복구(plans/55 C6).
+        Index("ix_asset_accounts_target_portfolio_id", "target_portfolio_id"),
     )
 
 

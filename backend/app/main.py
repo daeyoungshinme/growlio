@@ -72,7 +72,10 @@ app = FastAPI(
     title="Growlio — 자산관리 + 적립식 자동매매",
     version="1.0.0",
     lifespan=lifespan,
+    # 개발 환경에서만 API 문서 노출 — docs_url만 끄면 /redoc·/openapi.json은 운영에서도 열려 있었다
     docs_url="/docs" if settings.app_env == "development" else None,
+    redoc_url="/redoc" if settings.app_env == "development" else None,
+    openapi_url="/openapi.json" if settings.app_env == "development" else None,
 )
 
 app.state.limiter = limiter
