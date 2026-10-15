@@ -66,3 +66,37 @@ cd backend && uv run alembic check   # A5 후 빈 diff
 - A1·A2·A3·B1~B4는 수정 전 코드에서 실패하는 테스트를 먼저 확인
 - B3은 가능하면 Playwright로 재설정 링크 흐름 스모크(실 이메일 링크 불가 시 단위 테스트+코드 리딩으로 기록)
 - 마지막에 `backend/CLAUDE.md`(레이트리밋 키 규칙), `docs/plans/README.md` 56행 갱신
+
+## 실행 결과 (2026-10-15, 브랜치 `fix/tech-debt-2026-10-15b`)
+
+A·B·C·D 전부 구현했다. 실버그는 회귀 테스트를 붙였고 **수정 전 코드에서 실패하는 것을 확인**했다(A1·A2·A4·B1·B3·B4·B6).
+
+| # | 결과 / 계획 대비 조정 |
+|---|---|
+| A1 | `KisBalancePosition.quantity: float`. 프론트는 `toLocaleString`이라 소수점이 그대로 보인다 |
+| A2 | 상한 도달·연속키 반복 모두 `RuntimeError` → 동기화 실패 경로(기존 포지션 보존). `realized.py`에 재사용할 반복 키 검사는 없어서 루프 안에 직접 넣었다 |
+| A3 | 인증 없는 rate-limited 라우트 7개(`find_account`, 공개 토큰 3, 종목 검색·지수지역·환율)에 `key_func=ip_rate_limit_key`. `sync_profile`은 내부에서 토큰을 검증하므로 사용자 키 유지. payload 4KB 상한, `RecursionError` 처리. **남은 한계**: 데코레이터 없는 인증 라우트의 기본 120/min은 피해자 UUID를 알면 위조 토큰으로 소진 가능(UUID 비노출·일시 429라 서명 검증 비용 대신 감수, docstring 명시) |
+| A4 | tuple 서브클래스는 일반 tuple로 돌려준다 |
+| A5 | **범위 확대**. 읽기 전용 `compare_metadata`로 실제 diff를 확인했더니 계획에 적은 1개 외에 `idx_positions_snapshot_ticker`(ab1)도 모델에 없었고 `trade_records.created_at` nullable 드리프트도 있었다. 두 인덱스를 모델에 선언, DESC 인덱스 3개는 `include_object`로 비교 제외, `created_at`은 모델을 DB(nullable)에 맞췄다. 남은 diff는 아직 배포 전인 55 `ix1` 1건뿐. `alembic check`는 DB가 head가 아니라 실행 불가(공유 DB라 올리지 않음) |
+| B1 | `PortfolioItem`은 응답 직렬화에도 쓰여 필드 제약 대신 요청 전용 `validate_portfolio_weights`에 개별 0~100·빈 종목 검사를 넣었다(기존 저장 데이터 응답 보호). 편집기는 `getPortfolioItemsError`로 저장 차단+문구, 종목 없는 0% 행은 전송 제외 |
+| B2 | `findMissingLimitPriceTickers`로 확인·최종 실행 버튼 모두 차단+종목명 안내, `handleExecute`에도 가드 |
+| B3 | **방식 조정**. `getSession()` 폴백은 로그인 상태만으로 재설정 화면이 열리므로 쓰지 않았다. `lib/supabase.ts`가 클라이언트 생성 직후 동기적으로 리스너를 달아 `PASSWORD_RECOVERY`를 기록하고(`wasPasswordRecoveryDetected`), 페이지가 구독 후 확인한다. 타임아웃 안내는 넣지 않았다(대기 화면에 이미 "비밀번호 찾기로 돌아가기" 링크가 있음). 실 이메일 링크 스모크는 못 했다 |
+| B4 | 응답 시점에 `_rowKey`(없으면 인덱스)+ticker 일치 행에만 반영 |
+| B5 | 빈 입력 → NaN(무효)로 저장 버튼 비활성. 이 필드는 저장값이 non-null이라 다른 필드처럼 null로 둘 수 없다 |
+| B6 | 중단된 요청은 상태를 건드리지 않고, finally는 현재 컨트롤러일 때만 스피너를 끈다 |
+| B7 | 저장 전 수량 0 이하 행을 종목명과 함께 안내 |
+| C1~C3 | 그대로. XIRR는 결과가 % 단위라 NPV 독립 검증식도 %로 |
+| C4 | `RebalancingExecutionModal` 게이트 테스트 4개(훅·하위 컴포넌트 mock). `RebalancingConfirmStep`·`RebalancingOrderTable` 렌더 테스트는 이관 |
+| D1 | `hooks/useTimeout.ts` 신설(언마운트 해제·재예약 시 이전 취소), 5곳 적용, `frontend/CLAUDE.md` 훅 목록 추가 |
+| D2 | **조치 없음**. 계획 36에서 "frontend/CLAUDE.md에 문서화된 수동 워크플로라 유지"로 이미 결정된 항목 |
+| D3 | 이관 그대로 |
+
+검증: 백엔드 2652 passed, 커버리지 91.13%. 프론트 135 files / 1653 tests(coverage 임계값 통과). ruff·format·mypy·eslint `src --max-warnings 0`·prettier `src`·tsc 모두 클린. alembic 단일 head.
+
+배포 후 확인할 것(55와 합쳐서):
+- 55 목록 4건(SERVICE_ROLE_KEY, 레이트리밋 분리, 키움 해외 매도, 잔고 누락)
+- 잔고 동기화가 "연속조회" 오류로 실패하는 계좌가 없는가(A2 — 실계좌 미검증, 나타나면 상한/키 규약 재확인)
+- 배포 후 `alembic check`가 빈 diff인가(A5)
+
+이관(추가):
+- `RebalancingConfirmStep`·`RebalancingOrderTable` 렌더 테스트, 백엔드 신규 축 감사(중단분), `plan_execution` 해외 지정가 1개 실패 시 leg 전체 FAILED 설계
