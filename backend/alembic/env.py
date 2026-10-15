@@ -24,6 +24,18 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def include_name(name, type_, parent_names):
+    """autogenerate 비교 대상을 growlio 모델 테이블로 한정한다.
+
+    public 스키마를 nestlio와 공유하므로 필터가 없으면 autogenerate가 nestlio 테이블 드롭을 제안하고,
+    모델에 선언하지 않은 인덱스도 드롭 대상으로 잡힌다(a64e36a53a40이 그렇게 인덱스 2개를 지웠다).
+    대가: 모델에서 지운 growlio 테이블도 비교에서 빠지므로 테이블 드롭은 마이그레이션을 직접 쓴다.
+    """
+    if type_ == "table":
+        return name in target_metadata.tables
+    return True
+
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -31,6 +43,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         version_table=VERSION_TABLE,
+        include_name=include_name,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -41,6 +54,7 @@ def do_run_migrations(connection):
         connection=connection,
         target_metadata=target_metadata,
         version_table=VERSION_TABLE,
+        include_name=include_name,
     )
     with context.begin_transaction():
         context.run_migrations()

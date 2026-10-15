@@ -130,7 +130,7 @@ async def get_balance(access_token: str, *, account_id: str, account_no: str, ca
                 # 토스 holdings는 미국 하위 거래소(NASDAQ/NYSE/AMEX)를 구분해 주지 않는다 —
                 # "US" 센티널로 두고 provider가 enrich_overseas_positions()로 확정한다.
                 "market": "KOSPI" if currency == "KRW" else "US",
-                "qty": int(qty),
+                "qty": qty,
                 "avg_price": float(item.get("averagePurchasePrice") or 0),
                 "current_price": float(item.get("lastPrice") or 0),
                 "currency": currency,

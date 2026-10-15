@@ -15,6 +15,49 @@ from app.kis.constants import (
 
 logger = structlog.get_logger()
 
+# 잔고 연속조회 상한 — KIS 실전 국내잔고는 페이지당 약 50행이라 20페이지면 1,000종목
+_MAX_PAGES = 20
+_TR_CONT_MORE = {"F", "M"}  # 응답 헤더 tr_cont: F/M=다음 페이지 있음, D/E=마지막
+
+
+async def _fetch_balance_pages(
+    path: str,
+    *,
+    is_mock: bool,
+    headers: dict[str, str],
+    params: dict[str, str],
+    ctx_size: int,
+) -> list[dict[str, Any]]:
+    """잔고 TR을 연속조회 끝까지 호출해 페이지 응답 목록을 돌려준다.
+
+    한 번만 호출하면 첫 페이지(국내 약 50행)를 넘는 보유종목이 빠지고, 동기화가 그 종목을 "매도됨"으로
+    지운다. 다음 페이지 여부는 응답 헤더 `tr_cont`로 판정한다(본문 연속키만 보면 마지막 페이지를 다시
+    받아 수량이 이중 집계될 수 있음). 다음 요청은 헤더 `tr_cont=N` + 본문의 CTX_AREA 키를 그대로 보낸다.
+    """
+    fk_param, nk_param = f"CTX_AREA_FK{ctx_size}", f"CTX_AREA_NK{ctx_size}"
+    pages: list[dict[str, Any]] = []
+    fk = nk = ""
+    for page in range(_MAX_PAGES):
+        resp_headers: dict[str, str] = {}
+        data = await kis_request(
+            "GET",
+            path,
+            is_mock=is_mock,
+            headers={**headers, "tr_cont": "N"} if page > 0 else headers,
+            params={**params, fk_param: fk, nk_param: nk},
+            response_headers=resp_headers,
+        )
+        pages.append(data)
+        if resp_headers.get("tr_cont") not in _TR_CONT_MORE:
+            break
+        fk = str(data.get(fk_param.lower()) or "")
+        nk = str(data.get(nk_param.lower()) or "")
+        if not nk.strip():
+            break
+    else:
+        logger.warning("kis_balance_page_limit", path=path, pages=_MAX_PAGES)
+    return pages
+
 
 async def get_domestic_balance(
     app_key: str,
@@ -29,8 +72,7 @@ async def get_domestic_balance(
     tr_id = TR_DOMESTIC_BALANCE_MOCK if is_mock else TR_DOMESTIC_BALANCE_REAL
     headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
-    data = await kis_request(
-        "GET",
+    pages = await _fetch_balance_pages(
         "/uapi/domestic-stock/v1/trading/inquire-balance",
         is_mock=is_mock,
         headers=headers,
@@ -44,13 +86,13 @@ async def get_domestic_balance(
             "FUND_STTL_ICLD_YN": "N",
             "FNCG_AMT_AUTO_RDPT_YN": "N",
             "PRCS_DVSN": "01",
-            "CTX_AREA_FK100": "",
-            "CTX_AREA_NK100": "",
         },
+        ctx_size=100,
     )
+    data = pages[0]  # 계좌 합계(output2)는 페이지와 무관하게 같다
 
     positions = []
-    for item in data.get("output1", []):
+    for item in (row for page_data in pages for row in page_data.get("output1", [])):
         qty = int(item.get("hldg_qty", 0))
         if qty <= 0:
             continue
@@ -145,8 +187,7 @@ async def get_overseas_balance(
     # "NASD"만 조회하면 NYSE·AMEX 보유 종목이 누락됨.
     for market_name, exchange_code in OVERSEAS_MARKET_CODES.items():
         try:
-            data = await kis_request(
-                "GET",
+            pages = await _fetch_balance_pages(
                 "/uapi/overseas-stock/v1/trading/inquire-balance",
                 is_mock=is_mock,
                 headers=headers,
@@ -155,9 +196,8 @@ async def get_overseas_balance(
                     "ACNT_PRDT_CD": acnt_prdt_cd,
                     "OVRS_EXCG_CD": exchange_code,
                     "TR_CRCY_CD": "USD",
-                    "CTX_AREA_FK200": "",
-                    "CTX_AREA_NK200": "",
                 },
+                ctx_size=200,
             )
         except KisTokenExpiredError:
             raise
@@ -168,7 +208,8 @@ async def get_overseas_balance(
             failed_exchanges.append(exchange_code)
             continue
 
-        for item in data.get("output1", []):
+        data = pages[0]
+        for item in (row for page_data in pages for row in page_data.get("output1", [])):
             qty = int(item.get("ovrs_cblc_qty", 0))
             if qty <= 0:
                 continue

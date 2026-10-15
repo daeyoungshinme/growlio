@@ -106,3 +106,82 @@ class TestKisOverseasBalance:
             pytest.raises(KisTokenExpiredError),
         ):
             await get_overseas_balance("k", "s", "t", "12345678", is_mock=False)
+
+
+def _domestic_row(ticker: str) -> dict:
+    return {
+        "pdno": ticker,
+        "prdt_name": ticker,
+        "hldg_qty": "1",
+        "pchs_avg_pric": "100",
+        "prpr": "100",
+        "evlu_amt": "100",
+        "evlu_pfls_amt": "0",
+        "evlu_pfls_rt": "0",
+    }
+
+
+class TestKisBalancePagination:
+    """실계좌 미검증 — KIS 문서 규약(응답 헤더 tr_cont F/M=다음 있음, 요청 헤더 tr_cont=N + CTX_AREA 키) 기반."""
+
+    @pytest.mark.asyncio
+    async def test_domestic_follows_tr_cont_to_next_page(self):
+        calls: list[dict] = []
+
+        async def _fake(*args, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:
+                kwargs["response_headers"]["tr_cont"] = "M"
+                return {
+                    "output1": [_domestic_row("005930")],
+                    "output2": [{"prvs_rcdl_excc_amt": "1"}],
+                    "ctx_area_fk100": "FK1",
+                    "ctx_area_nk100": "NK1",
+                }
+            kwargs["response_headers"]["tr_cont"] = "D"
+            return {"output1": [_domestic_row("000660")], "output2": [{"prvs_rcdl_excc_amt": "1"}]}
+
+        with patch("app.kis.balance.kis_request", side_effect=_fake):
+            result = await get_domestic_balance("k", "s", "t", "12345678", is_mock=False)
+
+        assert [p["ticker"] for p in result["positions"]] == ["005930", "000660"]
+        assert calls[1]["headers"]["tr_cont"] == "N"
+        assert calls[1]["params"]["CTX_AREA_NK100"] == "NK1"
+        assert calls[1]["params"]["CTX_AREA_FK100"] == "FK1"
+
+    @pytest.mark.asyncio
+    async def test_domestic_stops_on_last_page_even_with_ctx_key(self):
+        """마지막 페이지(tr_cont=D)도 본문에 연속키가 남을 수 있다 — 헤더 기준으로 멈춰야 이중 집계가 없다."""
+        calls = 0
+
+        async def _fake(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            kwargs["response_headers"]["tr_cont"] = "D"
+            return {"output1": [_domestic_row("005930")], "output2": [{}], "ctx_area_nk100": "NK1"}
+
+        with patch("app.kis.balance.kis_request", side_effect=_fake):
+            result = await get_domestic_balance("k", "s", "t", "12345678", is_mock=False)
+
+        assert calls == 1
+        assert len(result["positions"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_overseas_follows_tr_cont_per_exchange(self):
+        from app.kis.balance import get_overseas_balance
+
+        seen: dict[str, int] = {}
+
+        async def _fake(*args, **kwargs):
+            exch = kwargs["params"]["OVRS_EXCG_CD"]
+            seen[exch] = seen.get(exch, 0) + 1
+            if exch == "NASD" and seen[exch] == 1:
+                kwargs["response_headers"]["tr_cont"] = "F"
+                return {**_overseas_response("AAPL"), "ctx_area_nk200": "NK"}
+            return _overseas_response("MSFT" if exch == "NASD" else exch)
+
+        with patch("app.kis.balance.kis_request", side_effect=_fake):
+            result = await get_overseas_balance("k", "s", "t", "12345678", is_mock=False)
+
+        tickers = sorted(p["ticker"] for p in result["positions"])
+        assert tickers == ["AAPL", "AMEX", "MSFT", "NYSE"]

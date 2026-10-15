@@ -101,10 +101,9 @@ async def analyze_portfolio(
     if cached is not None:
         return RebalancingAnalysis.model_validate(cached)
 
-    overview, base_dividend_items = await asyncio.gather(
-        build_portfolio_overview(current_user.id, db, account_ids=effective_ids, cache=cache),
-        get_ticker_dividend_summary(current_user.id, db, account_ids=effective_ids),
-    )
+    # 같은 AsyncSession을 쓰는 호출은 동시 실행 불가(SQLAlchemy) — 순차 실행한다.
+    overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids, cache=cache)
+    base_dividend_items = await get_ticker_dividend_summary(current_user.id, db, account_ids=effective_ids)
     base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
 
     target_tickers = [
@@ -118,11 +117,17 @@ async def analyze_portfolio(
         if p.get("ticker") and p.get("ticker") != "CASH"
     ]
 
-    dividend_map, returns_map, overview = await asyncio.gather(
-        collect_dividend_map(current_user.id, db, cache, portfolio, base_dividend_map),
-        get_historical_returns(list(set(target_tickers) | set(current_tickers)), cache=cache),
-        enrich_overview_with_prices(portfolio, overview, current_user.id, db, cache),
+    # 과거 수익률은 세션을 쓰지 않으니 병렬로 돌리고, 세션을 쓰는 두 호출은 순차 실행한다.
+    returns_task = asyncio.create_task(
+        get_historical_returns(list(set(target_tickers) | set(current_tickers)), cache=cache)
     )
+    try:
+        dividend_map = await collect_dividend_map(current_user.id, db, cache, portfolio, base_dividend_map)
+        overview = await enrich_overview_with_prices(portfolio, overview, current_user.id, db, cache)
+    except BaseException:
+        returns_task.cancel()
+        raise
+    returns_map = await returns_task
 
     if deposit_krw_override is not None:
         old_deposit = float(overview.get("total_deposit_krw") or 0)

@@ -144,6 +144,29 @@ class TestGetBalance:
         assert (pos["market"], pos["currency"]) == (market, currency)
 
     @pytest.mark.asyncio
+    async def test_fractional_quantity_preserved(self, cache):
+        """토스는 소수점 주식을 판다 — int로 자르면 0.5주가 0주(평가액 0)가 된다."""
+        holdings = {
+            "result": {
+                "items": [
+                    {"symbol": "AAPL", "name": "Apple", "quantity": "0.5", "currency": "USD", "lastPrice": 200},
+                ]
+            }
+        }
+
+        async def fake_request(method, path, **kwargs):
+            if path == toss_balance.TOSS_ACCOUNTS_PATH:
+                return {"result": [{"accountNo": "1", "accountSeq": 7, "accountType": "BROKERAGE"}]}
+            if path == toss_balance.TOSS_HOLDINGS_PATH:
+                return holdings
+            return {"result": {"cashBuyingPower": 0}}
+
+        with patch("app.toss.balance.toss_request", side_effect=fake_request):
+            result = await toss_balance.get_balance("t", account_id="a", account_no="1", cache=cache)
+
+        assert result["positions"][0]["qty"] == 0.5
+
+    @pytest.mark.asyncio
     async def test_buying_power_failure_falls_back_to_zero(self, cache):
         from app.toss.client import TossApiError
 
@@ -160,3 +183,23 @@ class TestGetBalance:
         assert result["deposit_krw"] == 0.0
         assert result["deposit_usd"] == 0.0
         assert result["positions"] == []
+
+
+class TestRawPositionFractionalQty:
+    def test_usd_position_keeps_fractional_qty_and_value(self):
+        from app.providers.base import raw_to_position
+
+        pos = raw_to_position(
+            {
+                "ticker": "AAPL",
+                "name": "Apple",
+                "market": "NASDAQ",
+                "currency": "USD",
+                "qty": 0.5,
+                "current_price": 200,
+            },
+            usd_krw_rate=1400.0,
+        )
+
+        assert pos.qty == 0.5
+        assert pos.value_krw == 0.5 * 200 * 1400.0

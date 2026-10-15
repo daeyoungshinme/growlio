@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from dataclasses import asdict, dataclass
 from enum import StrEnum
@@ -74,19 +73,18 @@ async def generate_insights(
         logger.warning("insight_dashboard_summary_failed", user_id=str(user_id), error=str(e))
         dashboard = {}
 
-    results = await asyncio.gather(
-        _check_concentration(dashboard),
-        _check_rebalancing_opportunity(user_id, db, cache),
-        _check_tax_loss_harvest(user_id, db),
-        return_exceptions=True,
+    # 체커 2개가 같은 AsyncSession을 쓰므로 순차 실행한다(동시 사용 불가). 체커 하나의 실패는 나머지에 영향 없음.
+    checkers = (
+        lambda: _check_concentration(dashboard),
+        lambda: _check_rebalancing_opportunity(user_id, db, cache),
+        lambda: _check_tax_loss_harvest(user_id, db),
     )
-
     insights: list[Insight] = []
-    for res in results:
-        if isinstance(res, BaseException):
+    for run_checker in checkers:
+        try:
+            insights.extend(await run_checker())
+        except Exception as res:
             logger.warning("insight_checker_failed", error=str(res))
-        elif isinstance(res, list):
-            insights.extend(res)
 
     # 심각도 순 정렬: ALERT → WARNING → INFO
     _severity_order = {InsightSeverity.ALERT: 0, InsightSeverity.WARNING: 1, InsightSeverity.INFO: 2}

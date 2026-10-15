@@ -22,6 +22,7 @@ from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 from app.utils.kst import today_kst
+from app.utils.masking import mask_account_no
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,7 +53,7 @@ class KISProvider(BrokerProvider):
         account_id_str = str(account.id)
         user_id_str = str(account.user_id)
 
-        logger.info("kis_sync_start", account_no=account_no, is_mock=is_mock)
+        logger.info("kis_sync_start", account_no=mask_account_no(account_no), is_mock=is_mock)
 
         last_token: str | None = None
 
@@ -96,12 +97,14 @@ class KISProvider(BrokerProvider):
                     _fetch,
                     _get_token,
                     KisTokenExpiredError,
-                    on_expired=lambda: logger.warning("kis_token_expired_refreshing", account_no=account_no),
+                    on_expired=lambda: logger.warning(
+                        "kis_token_expired_refreshing", account_no=mask_account_no(account_no)
+                    ),
                 ),
                 timeout=SYNC_TIMEOUT_SECONDS,
             )
         except TimeoutError as e:
-            logger.error("kis_sync_timeout", account_no=account_no)
+            logger.error("kis_sync_timeout", account_no=mask_account_no(account_no))
             raise ProviderNetworkError(
                 f"KIS API 응답 시간 초과 (약 {int(SYNC_TIMEOUT_SECONDS)}초). 잠시 후 다시 시도하세요."
             ) from e

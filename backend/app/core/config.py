@@ -103,6 +103,19 @@ class Settings(BaseSettings):
                 "FRONTEND_URL must be set to the production HTTPS frontend URL when "
                 "APP_ENV=production (e.g. https://your-app.vercel.app) — used for email action links"
             )
+        if self.app_env == "production":
+            # 비어 있으면 앱은 뜨지만 JWKS URL이 "/auth/v1/..."가 되어 모든 요청이 401 — 기동 시점에 실패시킨다
+            missing = [
+                name
+                for name, value in (
+                    ("SUPABASE_PROJECT_URL", self.supabase_project_url),
+                    ("SUPABASE_ANON_KEY", self.supabase_anon_key),
+                    ("SUPABASE_SERVICE_ROLE_KEY", self.supabase_service_role_key),
+                )
+                if not value
+            ]
+            if missing:
+                raise ValueError(f"{', '.join(missing)} must be set when APP_ENV=production")
         return self
 
 

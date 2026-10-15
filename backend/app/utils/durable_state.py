@@ -49,3 +49,14 @@ async def delete_durable(db: AsyncSession, key: str, *, commit: bool = True) -> 
     await db.execute(delete(AppState).where(AppState.key == key))
     if commit:
         await db.commit()
+
+
+async def purge_expired_durable(db: AsyncSession) -> int:
+    """만료된 row를 일괄 삭제하고 삭제 건수를 돌려준다.
+
+    get_durable은 같은 키를 다시 읽을 때만 만료 row를 지우는데, 날짜가 들어간 dedup 키
+    (composite_alert_sent_key 등)는 다음 날부터 다시 읽히지 않아 영원히 남는다.
+    """
+    result = await db.execute(delete(AppState).where(AppState.expires_at <= datetime.now(UTC)))
+    await db.commit()
+    return int(getattr(result, "rowcount", 0) or 0)

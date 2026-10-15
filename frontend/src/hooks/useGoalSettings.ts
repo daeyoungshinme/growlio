@@ -110,15 +110,25 @@ export function useGoalSettings() {
     };
   }, [data]);
 
+  // buildCurrentForm은 설정을 다시 조회하므로 실패할 수 있다 — 호출부가 `void`로 부르므로
+  // 여기서 잡지 않으면 unhandled rejection이 되고 모달이 아무 안내 없이 열리지 않는다.
   const openEdit = useCallback(async () => {
     setWizardMode(false);
-    startEditing(await buildCurrentForm());
+    try {
+      startEditing(await buildCurrentForm());
+    } catch {
+      toast("설정을 불러오지 못했습니다", "error");
+    }
   }, [buildCurrentForm, startEditing]);
 
   const openWizard = useCallback(async () => {
     setWizardMode(true);
     setWizardStep(1);
-    startEditing(await buildCurrentForm());
+    try {
+      startEditing(await buildCurrentForm());
+    } catch {
+      toast("설정을 불러오지 못했습니다", "error");
+    }
   }, [buildCurrentForm, startEditing]);
 
   useEffect(() => {
@@ -144,8 +154,9 @@ export function useGoalSettings() {
   }, [isLoading, data, openWizard]);
 
   /** wizardMode에서는 5단계(투자성향·배당목표) 저장 후 6단계(추천 포트폴리오)로 넘어가므로
-   * 모달을 닫지 않는다 — 플랫 편집 모달(!wizardMode)만 저장 즉시 닫힌다. */
-  const saveSettings = async () => {
+   * 모달을 닫지 않는다 — 플랫 편집 모달(!wizardMode)만 저장 즉시 닫힌다.
+   * 성공 여부를 돌려준다 — 마법사 6단계가 실패 시 이전 설정 기준 추천을 보여주지 않도록. */
+  const saveSettings = async (): Promise<boolean> => {
     setSaving(true);
     try {
       await updateGoalSettings({
@@ -187,8 +198,10 @@ export function useGoalSettings() {
       toast("설정이 저장되었습니다", "success");
       if (!wizardMode) setEditing(false);
       await invalidateDcaData(queryClient);
+      return true;
     } catch {
       toast("저장에 실패했습니다", "error");
+      return false;
     } finally {
       setSaving(false);
     }

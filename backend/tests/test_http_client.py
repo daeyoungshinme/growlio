@@ -204,6 +204,63 @@ class TestBrokerRequest:
         mock_sleep.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_fills_response_headers_lowercased(self, override_settings):
+        """연속조회(KIS tr_cont, 키움 cont-yn/next-key)는 헤더로 오므로 호출부가 받을 수 있어야 한다."""
+        mock_resp = self._make_mock_response({"result": "ok"})
+        mock_resp.headers = httpx.Headers({"TR_CONT": "M", "Next-Key": "abc"})
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=mock_resp)
+        captured: dict[str, str] = {}
+
+        with patch("app.providers.http_client._get_client", return_value=mock_client):
+            await broker_request(
+                "GET",
+                "/test",
+                base_url="https://api.example.com",
+                headers={},
+                semaphore=self._make_semaphore(),
+                log_prefix="test",
+                check_token_expired=lambda data, status: False,
+                check_api_error=lambda data, path: None,
+                token_expired_exc=RuntimeError,
+                response_headers=captured,
+            )
+
+        assert captured["tr_cont"] == "M"
+        assert captured["next-key"] == "abc"
+
+    @pytest.mark.asyncio
+    async def test_server_error_no_retry_when_disabled(self, override_settings):
+        """5xx(502/504)는 브로커가 주문을 이미 접수한 뒤에도 올 수 있다 — 뮤테이션은 재전송하면 중복 주문."""
+        mock_resp = self._make_mock_response({"msg": "bad gateway"}, status_code=502)
+        mock_resp.raise_for_status = MagicMock(
+            side_effect=httpx.HTTPStatusError("502", request=MagicMock(), response=mock_resp)
+        )
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=mock_resp)
+
+        with (
+            patch("app.providers.http_client._get_client", return_value=mock_client),
+            patch("asyncio.sleep", AsyncMock()) as mock_sleep,
+            pytest.raises(RuntimeError, match="접수 여부"),
+        ):
+            await broker_request(
+                "POST",
+                "/test",
+                base_url="https://api.example.com",
+                headers={},
+                retries=3,
+                semaphore=self._make_semaphore(),
+                log_prefix="test",
+                check_token_expired=lambda data, status: False,
+                check_api_error=lambda data, path: None,
+                token_expired_exc=RuntimeError,
+                retry_on_request_error=False,
+            )
+        assert mock_client.request.call_count == 1
+        mock_sleep.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_raises_token_expired(self, override_settings):
         class MyTokenExpiredError(Exception):
             pass

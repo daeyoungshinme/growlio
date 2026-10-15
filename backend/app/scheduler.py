@@ -34,6 +34,7 @@ def _on_job_event(event: JobExecutionEvent) -> None:
 def init_scheduler() -> None:
     from apscheduler.triggers.interval import IntervalTrigger
 
+    from app.jobs.app_state_sweep import run_app_state_sweep
     from app.jobs.asset_sync import run_daily_asset_sync, run_intraday_asset_sync
     from app.jobs.cache_sweep import run_cache_sweep
     from app.jobs.challenge_deposit_reminder import run_challenge_deposit_reminder
@@ -81,6 +82,7 @@ def init_scheduler() -> None:
         (run_challenge_monthly_wrap, kst(day=1, hour=9, minute=30), "challenge_monthly_wrap"),
         (run_dca_cash_shortfall_check, kst(hour=18, minute=30), "dca_cash_shortfall_check"),
         (run_cache_sweep, IntervalTrigger(minutes=15), "cache_sweep"),
+        (run_app_state_sweep, kst(hour=4, minute=10), "app_state_sweep"),
         (refresh_kosdaq_tickers, kst(hour=7, minute=0), "kosdaq_tickers_refresh"),
     ]
     for func, trigger, job_id in jobs:

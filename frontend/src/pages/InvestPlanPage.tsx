@@ -399,7 +399,6 @@ export default function InvestPlanPage() {
           setForm={setForm}
           step={wizardStep}
           setStep={setWizardStep}
-          saving={saving}
           onSave={saveSettings}
           onClose={handleCloseModal}
         />

@@ -96,6 +96,30 @@ class TestCheckAndTriggerAlerts:
         assert alert.is_active is True  # max_trigger_count=3 이므로 유지
 
     @pytest.mark.asyncio
+    async def test_each_sent_alert_committed_before_next_send(self, mock_db):
+        """루프 끝 일괄 commit이면 두 번째 발송 중 DB 오류 시 첫 알림 갱신까지 롤백돼 중복 메일이 간다."""
+        first = _make_alert(target_rate=1300.0, direction="BELOW", max_trigger_count=3)
+        second = _make_alert(target_rate=1300.0, direction="BELOW", max_trigger_count=3)
+        mock_db.execute.return_value.all.return_value = [_make_db_row(first), _make_db_row(second)]
+        commits_at_send: list[int] = []
+
+        async def _send(**_kwargs):
+            commits_at_send.append(mock_db.commit.call_count)
+            return True
+
+        with (
+            patch(_FETCH_RATE, new_callable=AsyncMock, return_value=1280.0),
+            patch(_SEND_EMAIL, side_effect=_send),
+            patch(_SEND_PUSH, new_callable=AsyncMock),
+            patch(_SAVE_HIST, new_callable=AsyncMock),
+        ):
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
+
+            await check_and_trigger_alerts(mock_db)
+
+        assert commits_at_send == [0, 1]
+
+    @pytest.mark.asyncio
     async def test_alert_deactivated_when_max_reached(self, mock_db):
         """trigger_count가 max에 도달하면 is_active를 False로 변경한다."""
         alert = _make_alert(target_rate=1300.0, direction="BELOW", trigger_count=0, max_trigger_count=1)

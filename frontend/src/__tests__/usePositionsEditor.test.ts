@@ -215,4 +215,23 @@ describe("usePositionsEditor", () => {
     expect(result.current.suggestIdx).toBeNull();
     vi.useRealTimers();
   });
+
+  it("blur 지연 중 다른 행으로 포커스가 옮겨가면 그 행의 제안은 지우지 않는다", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => usePositionsEditor([makePos(), makePos()], null));
+    act(() => {
+      result.current.setSuggestIdx(0);
+    });
+    act(() => {
+      result.current.handleNameBlur(0);
+    });
+    act(() => {
+      result.current.setSuggestIdx(1);
+    });
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(result.current.suggestIdx).toBe(1);
+    vi.useRealTimers();
+  });
 });

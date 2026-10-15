@@ -418,9 +418,11 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         # 여기서 갱신하면 already_fired_today()가 True → 당일 자동 실행 차단됨.
         if getattr(alert, "mode", "NOTIFY") != "AUTO":
             alert.last_triggered_at = datetime.now(tz=UTC)
+        # 발송 직후 항목별 commit — 루프 끝 일괄 commit은 중간 DB 오류 시 이미 보낸 알림의
+        # last_triggered_at까지 롤백해 다음 실행에 중복 발송한다(expire_on_commit=False라 안전).
+        await db.commit()
         triggered_count += 1
 
     if triggered_count:
-        await db.commit()
         alert_trigger_count.labels(alert_type="rebalancing").inc(triggered_count)
         logger.info("rebalancing_alerts_triggered", count=triggered_count)

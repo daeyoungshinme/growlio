@@ -296,7 +296,19 @@ def build_rebalancing_orders(
                 shares_to_trade=item.shares_to_trade,
             )
             continue
-        side = "BUY" if item.diff_krw > 0 else "SELL"
+        # 방향은 수량과 같은 필드(shares_to_trade 부호)에서 정한다. diff_krw는 value_krw 기준이라
+        # 가격 갱신이 일부 실패하면 기준 시점이 달라 부호가 어긋날 수 있다 — 어긋나면 주문하지 않는다.
+        side = "BUY" if item.shares_to_trade > 0 else "SELL"
+        if (item.diff_krw > 0) != (side == "BUY"):
+            logger.warning(
+                "rebalancing_auto_item_skipped",
+                alert_id=alert_id,
+                ticker=item.ticker,
+                reason="direction_mismatch",
+                shares_to_trade=item.shares_to_trade,
+                diff_krw=item.diff_krw,
+            )
+            continue
         if strategy == "BUY_ONLY" and side == "SELL":
             logger.info(
                 "rebalancing_auto_item_skipped",

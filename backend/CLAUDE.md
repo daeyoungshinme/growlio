@@ -23,7 +23,7 @@ cd backend && uv run alembic upgrade head
 cd backend && uv run alembic revision --autogenerate -m "description"
 ```
 
-> **주의:** autogenerate는 `alembic/env.py`에 모델 import 필요. 새 모델 추가 시 env.py 확인.
+> **주의:** autogenerate는 `alembic/env.py`에 모델 import 필요. 새 모델 추가 시 env.py 확인. `env.py`의 `include_name`이 비교 대상을 growlio 모델 테이블로 한정한다(nestlio와 `public` 공유 — 필터 없으면 nestlio 테이블 드롭 제안). 그래서 모델에서 지운 테이블의 드롭은 autogenerate가 못 잡으니 직접 쓴다. 인덱스는 반드시 모델 `__table_args__`에도 선언 — 마이그레이션에만 있으면 다음 autogenerate가 드롭을 제안한다(a64e36a53a40 사고).
 
 > **버전 테이블 분리:** growlio는 자매 앱 nestlio와 같은 Supabase DB의 `public` 스키마를
 > 공유하므로, alembic 버전 포인터를 기본 `alembic_version`이 아닌 **`growlio_alembic_version`**
@@ -284,14 +284,14 @@ schemas/                      # Pydantic 요청/응답 스키마
 core/                         # 설정·DB·in-memory 캐시 store
   ├── config.py                # Settings(pydantic-settings) — env var 로딩
   ├── database.py              # SQLAlchemy async engine/session, Base
-  ├── logging.py               # structlog 시크릿 redact 프로세서(`redact_secrets`, appkey/Bearer/password 등 마스킹) + yfinance 404 소음 필터 — `configure_logging()`
+  ├── logging.py               # structlog 시크릿 redact 프로세서(`redact_secrets`, appkey/Bearer/password 등 마스킹 — dict/list 값은 재귀로 돌며 token/secret/password 등 민감 키 값을 통째로 가림) + yfinance 404 소음 필터 — `configure_logging()`. 계좌번호·이메일을 로그에 남길 땐 `utils/masking.py` 사용
   └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 싱글톤, get_cache_store/close_cache_store. `sweep_expired()`를 `jobs/cache_sweep.py`가 15분마다 호출해 만료 키 능동 청소. 항목 수 상한(`_MAX_ENTRIES`=20,000, LRU 축출)으로 메모리 무한 증가 방지. **주의**: 워커/인스턴스 2개 이상으로 늘리면 캐시가 프로세스 로컬이라 적중률 급락 + 무효화 미전파 — 확장 시 공유 캐시(Redis) 재도입 필요(`render.yaml`은 단일 워커/단일 인스턴스 전제)
 kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote, realized — 해외 기간손익 TTTS3039R, 모의투자 미지원)
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants). `client.py`는 KIS와 동일 `AsyncRateLimiter`로 `kiwoom_rate_per_second`(기본 4.0) 제한 — http_client.py의 rate-limit 감지가 키움 `return_code=5`(=EGW00201) 대응
 toss/                         # 토스증권 Open API 클라이언트 (auth, balance, client, constants). OAuth2 Client Credentials(form-encoded), 국내+미국 보유종목 `GET /api/v1/holdings` 통합, 예수금 `/api/v1/buying-power`. 샌드박스 없음, 토큰 ~1h(지연 갱신), **`Open API → IP 관리`에 서버 IP 등록 필수**(미등록 시 403 `edge-blocked`). `toss_rate_per_second`(기본 1.0) 제한 — http_client.py가 토스 `error.code=rate-limit-*` 감지
 providers/                    # 금융 데이터 provider
   ├── base.py                 # Provider 추상 베이스
-  ├── http_client.py          # 공통 HTTP 클라이언트. `broker_request(retry_on_request_error=False)`는 `httpx.RequestError` 시 재시도 없이 즉시 실패 — 주문 접수(`kis/order.py`·`kiwoom/order.py`의 `place_*_order` 4개)만 False로 호출해 응답 유실 시 중복 주문 방지(브로커 API가 idempotency key 미지원). 조회성 호출은 기본값(재시도) 유지
+  ├── http_client.py          # 공통 HTTP 클라이언트. `broker_request(retry_on_request_error=False)`는 `httpx.RequestError` 시 재시도 없이 즉시 실패 — 주문 접수(`kis/order.py`·`kiwoom/order.py`의 `place_*_order` 4개)만 False로 호출해 응답 유실 시 중복 주문 방지(브로커 API가 idempotency key 미지원). 조회성 호출은 기본값(재시도) 유지. False면 HTTP 5xx도 재시도하지 않는다(접수 후 게이트웨이 오류일 수 있음). `response_headers=`(dict)를 넘기면 응답 헤더(소문자 키)를 채운다 — 잔고 연속조회(KIS `tr_cont`, 키움 `cont-yn`/`next-key`)가 헤더로 오기 때문(`kis/balance.py`·`kiwoom/balance.py`가 상한 20페이지로 끝까지 따라감, 실계좌 미검증)
   ├── kis_provider.py         # KIS API provider
   ├── kiwoom_provider.py      # 키움증권 API provider
   ├── toss_provider.py        # 토스증권 Open API provider (holdings 통합 조회 — 키움보다 단순, `_overseas_cache` 미사용)
@@ -305,14 +305,15 @@ utils/
   ├── cache_keys.py           # 캐시 키 빌더 + TTL 상수 (`dividend_ticker_summary_key` 등) — Tier1(휘발성) 캐시 전용, get_cached_json/set_cached_json/invalidate_* 포함
   ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom/Toss 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
   ├── currency.py             # USD/KRW 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
-  ├── durable_state.py        # Postgres(`AppState` 테이블) 기반 key-value durable state — get_durable/set_durable/delete_durable. 재시작에도 유지돼야 하는 상태(시장신호 등급 마지막 값, 알림 dedup 플래그) 전용, cache_keys.py의 휘발성 캐시와는 별개
+  ├── durable_state.py        # Postgres(`AppState` 테이블) 기반 key-value durable state — get_durable/set_durable/delete_durable. 재시작에도 유지돼야 하는 상태(시장신호 등급 마지막 값, 알림 dedup 플래그) 전용, cache_keys.py의 휘발성 캐시와는 별개. 만료 row는 `purge_expired_durable()`을 `jobs/app_state_sweep.py`가 매일 청소(날짜 포함 dedup 키는 다시 읽히지 않아 opportunistic 삭제가 안 일어남)
+  ├── masking.py              # 로그·Sentry용 개인정보 마스킹 — `mask_account_no()`(뒤 4자리), `mask_email()`
   ├── kst.py                  # `today_kst()`/`now_kst()`/`KST` — 사용자 기준 "오늘" 계산 전용 (Absolute Rules "날짜/시각 기준" 참고)
   ├── inproc_lock.py          # 프로세스 내 락 — 동일 계좌 동시 sync 방지, 콜드 캐시 single-flight (단일 프로세스 배포 전제)
   ├── market_hours.py         # KRX/NYSE 개장 여부 판단
   ├── naver_retry.py          # Naver Finance 모바일 API 공용 재시도 정책·User-Agent — `price_sync_sources`·`dividend/sync_sources` 공유. 일시 장애(연결·타임아웃·429·5xx)만 재시도, 404 등 4xx는 즉시 실패시켜 호출부 폴백으로
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등) — `/metrics` 엔드포인트로 노출
   └── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)
-limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수)
+limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수). 키는 `rate_limit_key` — 로그인 요청은 JWT `sub`(서명 미검증, 버킷 구분용), 그 외 `X-Forwarded-For` 첫 hop. 운영은 Vercel→Render 프록시 뒤라 `request.client.host`는 프록시 주소(전원 공용 버킷이 됨)
 enums.py                      # 도메인 StrEnum(AssetType/DataSource/TransactionType/AccountTaxType/InvestmentHorizon/AgeGroup 등) — 매직 스트링 대신 사용
 constants.py                  # 도메인 공통 상수 — `DOMESTIC_MARKETS`, `POSITION_STOCK_ASSET_TYPES`. **새 브로커 추가 시 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 집계 7곳 누락 사고)
 exceptions.py                 # `AppError` 계열(BadRequest/NotFound/ExternalAPI…, 전역 핸들러가 status_code/detail로 변환) + `SyncError` 계열(Provider{Credential,Token,Api,Network}Error)
@@ -336,6 +337,7 @@ jobs/                         # APScheduler 정기 작업
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크
   ├── token_refresh.py        # 매일 06:00 KST KIS 계좌별 토큰 갱신 — 실패는 스택 없는 capture_message로 Sentry 보고(자격증명 지역변수 전송 방지, report_job_failure 미사용)
   ├── cache_sweep.py          # 15분 간격 — in-memory 캐시(`cache_store.py`)의 만료 키를 능동 청소(lazy expiration 보완)
+  ├── app_state_sweep.py      # 매일 04:10 KST — `app_state`(durable_state) 만료 row 일괄 삭제
   └── _job_helpers.py         # job 공통 헬퍼 유틸리티
 ```
 

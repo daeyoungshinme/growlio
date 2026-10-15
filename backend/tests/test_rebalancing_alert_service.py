@@ -1226,6 +1226,18 @@ class TestBuildRebalancingOrders:
 
         assert orders == []
 
+    def test_direction_mismatch_between_qty_and_diff_skipped(self):
+        """수량은 매수(+3)인데 금액 차이는 매도(-) — 기준 시점이 어긋난 항목은 반대 방향 주문을 내지 않는다."""
+        from app.services.rebalancing.order_builder import build_rebalancing_orders
+
+        holder = uuid.uuid4()
+        drifting = [_make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=3.0)]
+        ticker_account_map = {"005930": [_make_ticker_account(holder, quantity=10)]}
+
+        orders = build_rebalancing_orders(drifting, ticker_account_map, "FULL", "MARKET", str(uuid.uuid4()))
+
+        assert orders == []
+
     def test_missing_shares_to_trade_skipped(self):
         from app.services.rebalancing.order_builder import build_rebalancing_orders
 

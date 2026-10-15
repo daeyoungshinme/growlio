@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 
 from sqlalchemy import and_, or_, select
@@ -79,10 +78,10 @@ async def _fetch_current_positions(stock_acc_ids: list, db: AsyncSession) -> dic
 
 async def fetch_position_maps(snap_ids: list, stock_acc_ids: list, db: AsyncSession) -> tuple[dict, dict]:
     """스냅샷별·계좌별 포지션을 각각 dict로 batch 조회한다."""
-    snap_positions, current_positions = await asyncio.gather(
-        _fetch_snapshot_positions(snap_ids, db),
-        _fetch_current_positions(stock_acc_ids, db),
-    )
+    # 같은 AsyncSession은 동시 사용 불가(SQLAlchemy) — asyncpg가 어차피 한 연결에서 직렬화하므로
+    # 순차 실행해도 느려지지 않는다.
+    snap_positions = await _fetch_snapshot_positions(snap_ids, db)
+    current_positions = await _fetch_current_positions(stock_acc_ids, db)
     return snap_positions, current_positions
 
 
@@ -100,11 +99,9 @@ async def build_asset_totals(
     snap_ids = [snap.id for snap, acc in rows if acc.asset_type in _STOCK_TYPES]
     stock_acc_ids_from_rows = [acc.id for _, acc in rows if acc.asset_type in _STOCK_TYPES]
 
-    # Q2(no_snap 계좌 조회)와 Q3(스냅샷 포지션 조회)를 병렬 실행 — 두 쿼리는 서로 독립적
-    no_snap_accounts, snap_positions = await asyncio.gather(
-        get_no_snap_accounts(user_id, db, snapped_ids),
-        _fetch_snapshot_positions(snap_ids, db),
-    )
+    # Q2(no_snap 계좌)·Q3(스냅샷 포지션) — 같은 세션이라 순차 실행(AsyncSession 동시 사용 불가)
+    no_snap_accounts = await get_no_snap_accounts(user_id, db, snapped_ids)
+    snap_positions = await _fetch_snapshot_positions(snap_ids, db)
 
     # Q4: 현재 포지션 (no_snap 계좌 포함 전체 stock 계좌 대상)
     all_stock_acc_ids = stock_acc_ids_from_rows + [acc.id for acc in no_snap_accounts if acc.asset_type in _STOCK_TYPES]

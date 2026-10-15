@@ -190,7 +190,10 @@ class TestSyncProfile:
         app.dependency_overrides[get_db] = override_db
         app.dependency_overrides[get_token_payload] = override_payload
         try:
-            with TestClient(app, raise_server_exceptions=False) as client:
+            with (
+                patch("app.api.v1.auth.supabase_user_exists", new=AsyncMock(return_value=False)),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
                 resp = client.post(
                     "/api/v1/auth/sync-profile",
                     json={"display_name": "재가입유저"},
@@ -198,6 +201,42 @@ class TestSyncProfile:
                 )
             assert resp.status_code == 200
             db.delete.assert_called_once_with(orphan)
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+            app.dependency_overrides.pop(get_token_payload, None)
+
+    def test_sync_profile_does_not_delete_live_user_sharing_email(self):
+        """같은 이메일의 기존 사용자가 Supabase Auth에 아직 살아 있으면 고아가 아니다 — 지우지 않고 409."""
+        from app.api.deps import get_token_payload
+        from app.core.database import get_db
+        from app.main import app
+
+        email = "shared@example.com"
+        existing = _make_user(email=email)
+        db = _make_mock_db()
+        db.scalar = AsyncMock(side_effect=[None, existing])
+        db.delete = AsyncMock()
+
+        async def override_db():
+            yield db
+
+        async def override_payload():
+            return _valid_jwt_payload(str(uuid.uuid4()), email=email)
+
+        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_token_payload] = override_payload
+        try:
+            with (
+                patch("app.api.v1.auth.supabase_user_exists", new=AsyncMock(return_value=True)),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.post(
+                    "/api/v1/auth/sync-profile",
+                    json={"display_name": "x"},
+                    headers={"Authorization": "Bearer faketoken"},
+                )
+            assert resp.status_code == 409
+            db.delete.assert_not_called()
         finally:
             app.dependency_overrides.pop(get_db, None)
             app.dependency_overrides.pop(get_token_payload, None)

@@ -51,22 +51,19 @@ function Harness({
 }: {
   initialStep?: number;
   initialForm?: GoalForm;
-  /** 저장 트리거 감지 로직(5단계→6단계 진입 시 자동 저장, saving true→false 전환 감지)을
-   * 테스트하려면 실제 saving 상태를 흉내내야 하므로, 호출측이 setSaving을 받아 직접 제어한다. */
-  onSaveImpl?: (setSaving: (v: boolean) => void) => void;
+  /** 6단계 진입 시 자동 저장 — 성공 여부(Promise<boolean>)를 돌려준다. 기본은 즉시 성공. */
+  onSaveImpl?: () => Promise<boolean>;
   onClose?: () => void;
 }) {
   const [form, setForm] = useState<GoalForm>(initialForm);
   const [step, setStep] = useState(initialStep);
-  const [saving, setSaving] = useState(false);
   return (
     <GoalSettingWizard
       form={form}
       setForm={setForm}
       step={step}
       setStep={setStep}
-      saving={saving}
-      onSave={() => onSaveImpl?.(setSaving)}
+      onSave={onSaveImpl ?? (() => Promise.resolve(true))}
       onClose={onClose}
     />
   );
@@ -233,7 +230,7 @@ describe("GoalSettingWizard", () => {
 
   it("6단계 진입 시 onSave가 자동으로 1회 호출된다", () => {
     fetchOverallGoalRecommendation.mockResolvedValue(undefined);
-    const onSaveImpl = vi.fn();
+    const onSaveImpl = vi.fn(() => new Promise<boolean>(() => {}));
     renderWizard({ initialStep: 6, onSaveImpl });
     expect(onSaveImpl).toHaveBeenCalledTimes(1);
   });
@@ -263,16 +260,18 @@ describe("GoalSettingWizard", () => {
       market_signal_level: null,
       suggested_candidates: [],
     });
-    let capturedSetSaving: ((v: boolean) => void) | null = null;
-    const onSaveImpl = vi.fn((setSaving: (v: boolean) => void) => {
-      capturedSetSaving = setSaving;
-      setSaving(true);
-    });
+    let resolveSave: ((ok: boolean) => void) | null = null;
+    const onSaveImpl = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
     renderWizard({ initialStep: 6, onSaveImpl });
     expect(screen.getByText(/추천 포트폴리오를 계산하고 있어요/)).toBeInTheDocument();
 
-    act(() => {
-      capturedSetSaving?.(false);
+    await act(async () => {
+      resolveSave?.(true);
     });
 
     await waitFor(() => {
@@ -296,10 +295,32 @@ describe("GoalSettingWizard", () => {
     );
   });
 
+  it("6단계: 저장이 실패하면 이전 설정 기준 추천을 보여주지 않고 재시도를 제공한다", async () => {
+    fetchOverallGoalRecommendation.mockClear();
+    fetchOverallGoalRecommendation.mockResolvedValue(undefined);
+    const onSaveImpl = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    renderWizard({ initialStep: 6, onSaveImpl });
+
+    expect(await screen.findByText(/목표 설정을 저장하지 못해/)).toBeInTheDocument();
+    expect(fetchOverallGoalRecommendation).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "이 추천으로 포트폴리오 만들기" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(onSaveImpl).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(fetchOverallGoalRecommendation).toHaveBeenCalled());
+    expect(screen.queryByText(/목표 설정을 저장하지 못해/)).not.toBeInTheDocument();
+  });
+
   it("6단계: 완료 버튼을 누르면 onClose가 호출된다", () => {
     fetchOverallGoalRecommendation.mockResolvedValue(undefined);
     const onClose = vi.fn();
-    renderWizard({ initialStep: 6, onSaveImpl: vi.fn(), onClose });
+    renderWizard({
+      initialStep: 6,
+      onSaveImpl: vi.fn(() => new Promise<boolean>(() => {})),
+      onClose,
+    });
     fireEvent.click(screen.getByRole("button", { name: "완료" }));
     expect(onClose).toHaveBeenCalled();
   });

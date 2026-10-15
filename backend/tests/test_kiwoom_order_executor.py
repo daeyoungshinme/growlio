@@ -150,6 +150,36 @@ class TestExecuteKiwoomSellsWithClamp:
         assert len(results) == 1
 
     @pytest.mark.asyncio
+    async def test_overseas_sell_matches_unresolved_us_market_from_balance(self, override_settings):
+        """키움 해외잔고(ust21070)는 거래소를 주지 않아 market이 "US" 센티널이다(kiwoom/balance.py).
+        주문은 NASDAQ/NYSE/AMEX라 market까지 키에 넣으면 보유 0으로 오판해 매도가 전부 SKIPPED됐다."""
+        sell_order = _make_order(ticker="AAPL", market="NASDAQ", side="SELL", quantity=10)
+
+        captured_quantity: int | None = None
+        original = _kiwoom_order_executor._execute_kiwoom_single_order
+
+        async def _spy(order, access_token, account_no, is_mock):
+            nonlocal captured_quantity
+            captured_quantity = order.quantity
+            return await original(order, access_token, account_no, is_mock)
+
+        with (
+            patch.object(
+                _kiwoom_order_executor,
+                "kiwoom_get_overseas_balance",
+                AsyncMock(return_value={"positions": [{"ticker": "AAPL", "market": "US", "qty": 4}]}),
+            ),
+            patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})),
+            patch.object(_kiwoom_order_executor, "_execute_kiwoom_single_order", side_effect=_spy),
+        ):
+            results = await _kiwoom_order_executor._execute_kiwoom_sells_with_clamp(
+                [sell_order], "token", "1234567890", True
+            )
+
+        assert captured_quantity == 4
+        assert [r.status for r in results] != ["SKIPPED"]
+
+    @pytest.mark.asyncio
     async def test_mixed_domestic_and_overseas_sells_both_clamped(self, override_settings):
         domestic_sell = _make_order(ticker="005930", market="KOSPI", side="SELL", quantity=10)
         overseas_sell = _make_order(ticker="AAPL", market="NASDAQ", side="SELL", quantity=10)

@@ -272,3 +272,35 @@ class TestBuildAssetTotals:
 
         assert total == pytest.approx(1000000.0)
         assert by_type.get("OTHER", 0) == pytest.approx(1000000.0)
+
+
+class _ConcurrencyDetectingSession:
+    """execute가 겹쳐 호출되면 실패하는 가짜 AsyncSession — SQLAlchemy 세션은 동시 사용 불가."""
+
+    def __init__(self):
+        self.in_flight = 0
+
+    async def execute(self, *_args, **_kwargs):
+        import asyncio
+
+        self.in_flight += 1
+        try:
+            if self.in_flight > 1:
+                raise RuntimeError("AsyncSession used concurrently")
+            await asyncio.sleep(0)
+            result = MagicMock()
+            result.scalars.return_value.all.return_value = []
+            return result
+        finally:
+            self.in_flight -= 1
+
+
+@pytest.mark.asyncio
+async def test_fetch_position_maps_does_not_use_session_concurrently():
+    from app.services.composition_calculator import fetch_position_maps
+
+    db = _ConcurrencyDetectingSession()
+    snap, current = await fetch_position_maps([uuid.uuid4()], [uuid.uuid4()], db)
+
+    assert snap == {}
+    assert current == {}

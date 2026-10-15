@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchStockPrice } from "@/api/assets";
 import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "./useStockSearch";
@@ -27,6 +27,12 @@ export interface Position {
 export function usePositionsEditor(initialRows: Position[], usdRate: number | null) {
   const [rows, setRows] = useState<Position[]>(initialRows);
   const [suggestIdx, setSuggestIdx] = useState<number | null>(null);
+  // blur 지연 콜백은 blur 시점 렌더의 suggestIdx를 캡처한다 — 그 사이 다른 행에 포커스하면 엉뚱한 행의
+  // 드롭다운을 닫거나 못 닫으므로, 콜백은 ref로 최신값을 본다.
+  const suggestIdxRef = useRef(suggestIdx);
+  useEffect(() => {
+    suggestIdxRef.current = suggestIdx;
+  }, [suggestIdx]);
   const [priceLoadingRows, setPriceLoadingRows] = useState<Set<number>>(new Set());
 
   const {
@@ -100,7 +106,7 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
 
   const handleNameBlur = (i: number) => {
     setTimeout(() => {
-      if (suggestIdx === i) {
+      if (suggestIdxRef.current === i) {
         clearSuggestions();
         setSuggestIdx(null);
       }

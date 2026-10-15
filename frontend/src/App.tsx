@@ -139,9 +139,10 @@ export default function App() {
 
   useEffect(() => {
     const handleSessionExpired = () => {
+      // clear()의 제거 이벤트를 persister가 받아 빈 상태를 다시 저장하므로(2s throttle) persist 캐시도
+      // 사실상 비워진다 — 공용 기기에서 다음 사용자에게 이전 데이터가 보이지 않는 쪽이라 의도대로 둔다.
+      // 저장소 키 자체 삭제는 명시적 로그아웃(useLogout.ts)·탈퇴에서 한다.
       queryClient.clear();
-      // persist 캐시는 세션 만료 시 보존 — 재로그인 후 이전 데이터를 즉시 표시하고 백그라운드에서 갱신됨
-      // 명시적 로그아웃 시에만 삭제 (useLogout.ts 참고)
       storageRemove(AUTH_ME_CACHE_KEY);
       void logout();
     };

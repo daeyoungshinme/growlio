@@ -164,9 +164,14 @@ async def fetch_prices_batch(
     if missing:
         account = await _get_any_kis_account(user_id, db)
         if account:
-            fallback_tasks = [_fetch_fallback(account, ticker, market, db, cache) for ticker, market in missing]
-            results = await asyncio.gather(*fallback_tasks, return_exceptions=True)
-            for (ticker, _), result in zip(missing, results, strict=False):
+            # KIS 폴백은 토큰 조회·저장으로 같은 AsyncSession을 쓴다 — 동시 사용 불가라 순차 실행
+            # (KIS 호출 자체도 rate limiter로 직렬화되므로 느려지지 않는다).
+            for ticker, market in missing:
+                try:
+                    result = await _fetch_fallback(account, ticker, market, db, cache)
+                except Exception as e:
+                    logger.warning("kis_price_fallback_failed", ticker=ticker, error=str(e))
+                    continue
                 if isinstance(result, (int, float)) and result > 0:
                     price_map[ticker] = float(result)
 

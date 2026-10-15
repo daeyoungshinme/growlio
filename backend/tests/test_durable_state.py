@@ -80,3 +80,21 @@ class TestCommitFalse:
         await delete_durable(mock_db, "k", commit=False)
         assert mock_db.execute.await_count == 2
         mock_db.commit.assert_not_called()
+
+
+class TestPurgeExpiredDurable:
+    @pytest.mark.asyncio
+    async def test_deletes_only_expired_rows_and_commits(self, mock_db):
+        from app.utils.durable_state import purge_expired_durable
+
+        result = AsyncMock()
+        result.rowcount = 3
+        mock_db.execute = AsyncMock(return_value=result)
+
+        removed = await purge_expired_durable(mock_db)
+
+        assert removed == 3
+        sql = str(mock_db.execute.call_args.args[0])
+        assert "DELETE FROM app_state" in sql
+        assert "expires_at <=" in sql
+        mock_db.commit.assert_awaited_once()

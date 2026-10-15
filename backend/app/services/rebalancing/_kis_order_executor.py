@@ -9,6 +9,7 @@ from app.kis.order import is_overseas_market, place_domestic_order, place_overse
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
 from app.services.rebalancing._order_executor_common import execute_single_order
 from app.services.rebalancing._order_quantity_guard import clamp_buy_orders_to_budget, clamp_sell_orders
+from app.utils.masking import mask_account_no
 
 logger = structlog.get_logger()
 
@@ -175,7 +176,7 @@ async def _execute_two_phase_orders(
     # 해외 주식 포함 시 get_orderable_cash()가 국내 전용이므로 FULL 방식으로 폴백
     has_overseas = any(is_overseas_market(o.market) for o in buys)
     if has_overseas:
-        logger.info("two_phase_fallback_overseas_detected", account_no=account_no)
+        logger.info("two_phase_fallback_overseas_detected", account_no=mask_account_no(account_no))
         sell_results = await _execute_sells_with_clamp(sells, app_key, app_secret, access_token, account_no, is_mock)
         buy_results: list[OrderResult] = []
         for order in buys:
