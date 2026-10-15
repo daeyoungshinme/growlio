@@ -3,6 +3,7 @@ import { useStockSearch } from "@/hooks/useStockSearch";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import { useTimeout } from "@/hooks/useTimeout";
 
 interface Position {
   ticker: string;
@@ -25,6 +26,7 @@ export function TickerSearchField({
   const [directInput, setDirectInput] = useState(!accountPositions.length || !!initialQuery);
   const [query, setQuery] = useState(initialQuery);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const scheduleTimeout = useTimeout();
   const { suggestions, isSearching, search, clearSuggestions } = useStockSearch();
 
   const handleSelect = (name: string, code: string) => {
@@ -83,7 +85,9 @@ export function TickerSearchField({
                 search(v);
               }}
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)}
+              onBlur={() =>
+                scheduleTimeout(() => setShowSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)
+              }
               placeholder="종목명 또는 코드 검색"
               className={`w-full ${INPUT_MD}`}
             />

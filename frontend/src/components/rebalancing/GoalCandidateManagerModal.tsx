@@ -21,6 +21,7 @@ import { invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import Modal from "@/components/common/Modal";
+import { useTimeout } from "@/hooks/useTimeout";
 
 // backend app/services/recommendation_universe.py의 MAX_GOAL_CANDIDATE_TICKERS와 동일하게 유지
 const MAX_CANDIDATE_TICKERS = 20;
@@ -40,6 +41,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
   const queryClient = useQueryClient();
   const [candidateQuery, setCandidateQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const scheduleTimeout = useTimeout();
   const [pendingCandidates, setPendingCandidates] = useState<GoalCandidateTicker[] | null>(null);
   const [isResolvingRegion, setIsResolvingRegion] = useState(false);
   const { suggestions, isSearching, search, clearSuggestions } = useStockSearch();
@@ -211,7 +213,9 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
               search(v);
             }}
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)}
+            onBlur={() =>
+              scheduleTimeout(() => setShowSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)
+            }
             placeholder="추가할 ETF 종목명 또는 코드 검색"
             className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
           />

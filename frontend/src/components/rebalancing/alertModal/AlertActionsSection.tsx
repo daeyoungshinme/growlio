@@ -8,6 +8,7 @@ import ConfirmModal from "@/components/common/ConfirmModal";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
+import { useTimeout } from "@/hooks/useTimeout";
 
 interface Props {
   form: RebalancingAlertFormState;
@@ -19,6 +20,7 @@ interface Props {
 export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccountId }: Props) {
   const queryClient = useQueryClient();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const scheduleTimeout = useTimeout();
   // "지금 계획 생성"은 실제 대기 플랜을 만든다(매수는 대기시간 후 자동 체결) — 한 번 탭으로 실행되지 않게 확인
   const [confirmingQuickExecute, setConfirmingQuickExecute] = useState(false);
 
@@ -68,7 +70,7 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
   function handleDeleteClick() {
     if (!confirmingDelete) {
       setConfirmingDelete(true);
-      setTimeout(() => setConfirmingDelete(false), 3000);
+      scheduleTimeout(() => setConfirmingDelete(false), 3000);
     } else {
       form.deleteMut.mutate();
     }

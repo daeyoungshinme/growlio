@@ -17,6 +17,7 @@ import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import { relativeTime } from "@/utils/format";
 import { buildAlertDescription } from "@/utils/rebalancingAlertDescription";
+import { useTimeout } from "@/hooks/useTimeout";
 
 const ORDER_TYPE_LABEL: Record<RebalancingAlert["order_type"], string> = {
   MARKET: "시장가",
@@ -43,6 +44,7 @@ export default function PerAccountRebalancingAlertList({
   const qc = useQueryClient();
   const [editingAccount, setEditingAccount] = useState<AssetAccount | null>(null);
   const [confirmingSwitchBack, setConfirmingSwitchBack] = useState(false);
+  const scheduleTimeout = useTimeout();
 
   const { data: alertsRaw, isLoading } = useQuery({
     queryKey: QUERY_KEYS.rebalancingAlertsByAccount(portfolioId),
@@ -68,7 +70,7 @@ export default function PerAccountRebalancingAlertList({
   function handleSwitchBackClick() {
     if (!confirmingSwitchBack) {
       setConfirmingSwitchBack(true);
-      setTimeout(() => setConfirmingSwitchBack(false), 3000);
+      scheduleTimeout(() => setConfirmingSwitchBack(false), 3000);
     } else {
       switchToAggregateMut.mutate();
     }

@@ -4,6 +4,7 @@ import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useForm } from "@/hooks/useForm";
+import { useTimeout } from "@/hooks/useTimeout";
 
 interface AccountPosition {
   ticker: string;
@@ -41,6 +42,7 @@ export default function TransactionTickerField({
   clearTickerSuggestions,
   onTickerQueryChange,
 }: Props) {
+  const scheduleTimeout = useTimeout();
   return (
     <>
       <div>
@@ -74,7 +76,7 @@ export default function TransactionTickerField({
                 onChange={(e) => onTickerQueryChange(e.target.value)}
                 onFocus={() => tickerSuggestions.length > 0 && setShowTickerSuggestions(true)}
                 onBlur={() =>
-                  setTimeout(() => setShowTickerSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)
+                  scheduleTimeout(() => setShowTickerSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)
                 }
                 placeholder="종목명 또는 코드 검색"
                 className={`w-full ${INPUT_SM}`}
