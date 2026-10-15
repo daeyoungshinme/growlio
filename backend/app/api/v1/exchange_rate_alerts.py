@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,9 +29,10 @@ router = APIRouter()
 
 
 class AlertCreate(BaseModel):
-    target_rate: float
+    # target_rate 컬럼은 Numeric(10,2) — 상한이 없으면 큰 값이 DB 오버플로 500이 됐다(계획 57 C5)
+    target_rate: float = Field(le=100_000, allow_inf_nan=False)
     direction: Literal["BELOW", "ABOVE"]
-    max_trigger_count: int = 1
+    max_trigger_count: int = Field(default=1, le=1000)
 
     @field_validator("target_rate")
     @classmethod

@@ -5,7 +5,7 @@ from __future__ import annotations
 import structlog
 
 from app.core.database import AsyncSessionLocal
-from app.services.rebalancing.plan_service import expire_due_sell_legs
+from app.services.rebalancing.plan_service import expire_due_sell_legs, fail_stuck_consumed_legs
 
 logger = structlog.get_logger()
 
@@ -18,6 +18,10 @@ async def run_rebalancing_plan_sell_expiry() -> None:
     기존처럼 하루 1회 고정 시각으로는 제때 만료시킬 수 없다.
     """
     async with AsyncSessionLocal() as db:
+        # 결과 기록이 유실된(실행 중 상태로 30분 넘게 남은) leg를 먼저 마감 — 매수/매도 공통(계획 57 C2)
+        stuck = await fail_stuck_consumed_legs(db)
+        if stuck:
+            logger.warning("rebalancing_plan_stuck_legs_failed", count=stuck)
         count = await expire_due_sell_legs(db)
         if count:
             logger.info("rebalancing_plan_sell_expiry_done", count=count)

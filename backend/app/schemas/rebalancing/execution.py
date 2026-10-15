@@ -4,14 +4,15 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ExecutionOrderItem(BaseModel):
     ticker: str
     name: str
     market: str
-    side: str  # "BUY" | "SELL"
+    # str이면 오타("buy")가 통과한 뒤 SELL/BUY 필터에서 조용히 빠졌다(계획 57 C5)
+    side: Literal["BUY", "SELL"]
     quantity: int  # 양수 (방향은 side로)
     account_id: str | None = None  # 실행할 KIS 계좌 ID (None이면 default_account_id 사용)
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
@@ -27,7 +28,7 @@ class ExecutionOrderItem(BaseModel):
 
 class ExecutionRequest(BaseModel):
     account_id: uuid.UUID | None = None  # 기본 KIS 계좌 (order에 account_id 없을 때 폴백)
-    orders: list[ExecutionOrderItem]
+    orders: list[ExecutionOrderItem] = Field(max_length=200)
     strategy: Literal["FULL", "BUY_ONLY", "TWO_PHASE"] = "FULL"
 
     @field_validator("orders")

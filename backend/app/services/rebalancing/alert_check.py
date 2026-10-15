@@ -13,11 +13,13 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
+import sentry_sdk
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.logging import redact_secrets
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
@@ -310,15 +312,8 @@ async def _evaluate_composite_trigger(
     return extra_trigger, composite_reason
 
 
-async def check_rebalancing_alerts(db: AsyncSession) -> None:
-    """활성 리밸런싱 알림을 조회하고 스케줄·조건에 따라 이메일 발송."""
-    from app.core.cache_store import get_cache_store
-
-    _cache = await get_cache_store()
-    # 시장 신호를 루프 전 한 번만 조회 (전체 알림 공용)
-    composite_level, market_data_freshness = await _get_composite_level(_cache, db)
-
-    result = await db.execute(
+async def _load_active_alert_rows(db: AsyncSession, alert_ids: list[uuid.UUID] | None = None) -> list:
+    stmt = (
         select(
             RebalancingAlert,
             Portfolio,
@@ -333,95 +328,136 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
         .where(RebalancingAlert.is_active == True)
     )
-    rows = result.all()
+    if alert_ids is not None:
+        stmt = stmt.where(RebalancingAlert.id.in_(alert_ids))
+    return list((await db.execute(stmt)).all())
+
+
+async def _check_one_rebalancing_alert(row, composite_level, market_data_freshness, db: AsyncSession, _cache) -> bool:
+    """알림 1건을 평가해 발송했으면 True."""
+    alert, portfolio, user_email, notification_email, fcm_token, composite_signal_alerts_enabled = row
+    trigger_condition = getattr(alert, "trigger_condition", "DRIFT_ONLY")
+    is_schedule_day = should_fire_today(alert)
+
+    if _should_skip_by_schedule(alert, trigger_condition, is_schedule_day):
+        return False
+
+    analysis = await _analyze_alert_drift(alert, portfolio, db, _cache)
+    if analysis is None:
+        return False
+
+    threshold = float(alert.threshold_pct)
+    drifting = filter_drifting_items(analysis.items, threshold)
+
+    # UserSettings 행이 없으면(outerjoin NULL) 기본값 True로 폴백 — 신규 유저 기본 동작 유지
+    effective_composite_enabled = (
+        composite_signal_alerts_enabled if composite_signal_alerts_enabled is not None else True
+    )
+    extra_trigger, composite_reason = await _evaluate_composite_trigger(
+        alert, trigger_condition, is_schedule_day, drifting, effective_composite_enabled, db, _cache
+    )
+
+    selected = _select_items_to_show(trigger_condition, is_schedule_day, drifting, analysis.items, extra_trigger)
+    if selected is None:
+        logger.debug(
+            "rebalancing_alert_no_items_selected",
+            alert_id=str(alert.id),
+            trigger_condition=trigger_condition,
+            drifting_count=len(drifting),
+            extra_trigger=extra_trigger,
+        )
+        return False
+    items_to_show, is_scheduled_report, is_composite_triggered = selected
+
+    automation_note = None
+    if getattr(alert, "mode", "NOTIFY") == "AUTO":
+        market_mode = getattr(alert, "market_condition_mode", "DISABLED")
+        if is_market_signal_blocking_auto_mode(market_mode, composite_level, market_data_freshness):
+            automation_note = f"시장 위험 신호({composite_level})로 이번엔 자동 실행 대신 알림만 발송됐습니다."
+
+    email = notification_email or user_email
+    triggered = await _process_rebalancing_alert(
+        alert=alert,
+        portfolio=portfolio,
+        drifting=drifting,
+        items_to_show=items_to_show,
+        is_scheduled_report=is_scheduled_report,
+        threshold=threshold,
+        email=email,
+        composite_level=composite_level,
+        data_freshness=market_data_freshness,
+        db=db,
+        fcm_token=fcm_token,
+        is_composite_triggered=is_composite_triggered,
+        composite_reason=composite_reason,
+        cache=_cache,
+        ticker_account_map=analysis.ticker_account_map,
+        automation_note=automation_note,
+    )
+    if not triggered:
+        return False
+
+    drift_desc = (
+        f"{len(drifting)}개 종목 드리프트"
+        if drifting
+        else ("복합 리스크 신호" if is_composite_triggered else "정기 보고")
+    )
+    history_automation_suffix = f", 자동실행→알림 전환({composite_level})" if automation_note else ""
+    await save_alert_history(
+        db,
+        alert.user_id,
+        "REBALANCING",
+        (
+            f"리밸런싱 알림: {portfolio.name} — {drift_desc} ({alert.schedule_type}) "
+            f"[시장신호: {composite_level}]{history_automation_suffix}"
+        ),
+    )
+    # AUTO 모드는 last_triggered_at을 갱신하지 않는다.
+    # 인트라데이 잡(rebalancing_auto_execution)에서 실제 실행 후 갱신하므로,
+    # 여기서 갱신하면 already_fired_today()가 True → 당일 자동 실행 차단됨.
+    if getattr(alert, "mode", "NOTIFY") != "AUTO":
+        alert.last_triggered_at = datetime.now(tz=UTC)
+    # 발송 직후 항목별 commit — 루프 끝 일괄 commit은 중간 DB 오류 시 이미 보낸 알림의
+    # last_triggered_at까지 롤백해 다음 실행에 중복 발송한다(expire_on_commit=False라 안전).
+    await db.commit()
+    return True
+
+
+async def check_rebalancing_alerts(db: AsyncSession) -> None:
+    """활성 리밸런싱 알림을 조회하고 스케줄·조건에 따라 이메일 발송."""
+    from app.core.cache_store import get_cache_store
+
+    _cache = await get_cache_store()
+    # 시장 신호를 루프 전 한 번만 조회 (전체 알림 공용)
+    composite_level, market_data_freshness = await _get_composite_level(_cache, db)
+
+    rows = await _load_active_alert_rows(db)
+    # rollback 후엔 행의 ORM 객체가 모두 expire돼 접근하면 lazy load(MissingGreenlet)가 난다 — id만 미리 잡아 둔다
+    alert_ids = [row[0].id for row in rows]
 
     triggered_count = 0
-    for alert, portfolio, user_email, notification_email, fcm_token, composite_signal_alerts_enabled in rows:
-        trigger_condition = getattr(alert, "trigger_condition", "DRIFT_ONLY")
-        is_schedule_day = should_fire_today(alert)
-
-        if _should_skip_by_schedule(alert, trigger_condition, is_schedule_day):
-            continue
-
-        analysis = await _analyze_alert_drift(alert, portfolio, db, _cache)
-        if analysis is None:
-            continue
-
-        threshold = float(alert.threshold_pct)
-        drifting = filter_drifting_items(analysis.items, threshold)
-
-        # UserSettings 행이 없으면(outerjoin NULL) 기본값 True로 폴백 — 신규 유저 기본 동작 유지
-        effective_composite_enabled = (
-            composite_signal_alerts_enabled if composite_signal_alerts_enabled is not None else True
-        )
-        extra_trigger, composite_reason = await _evaluate_composite_trigger(
-            alert, trigger_condition, is_schedule_day, drifting, effective_composite_enabled, db, _cache
-        )
-
-        selected = _select_items_to_show(trigger_condition, is_schedule_day, drifting, analysis.items, extra_trigger)
-        if selected is None:
-            logger.debug(
-                "rebalancing_alert_no_items_selected",
-                alert_id=str(alert.id),
-                trigger_condition=trigger_condition,
-                drifting_count=len(drifting),
-                extra_trigger=extra_trigger,
+    index = 0
+    while index < len(rows):
+        alert_id = alert_ids[index]
+        try:
+            if await _check_one_rebalancing_alert(rows[index], composite_level, market_data_freshness, db, _cache):
+                triggered_count += 1
+            index += 1
+        except Exception as e:
+            # 알림 하나의 실패(주문 계산 버그·DB 오류)가 남은 사용자 알림 전체를 막지 않게 격리한다.
+            # 스택 지역변수를 보내는 capture_exception 대신 타입명만(AUTO 경로는 자격증명을 지역변수로 다룬다).
+            logger.error(
+                "rebalancing_alert_check_item_failed",
+                alert_id=str(alert_id),
+                error=redact_secrets(str(e)),
+                error_type=type(e).__name__,
             )
-            continue
-        items_to_show, is_scheduled_report, is_composite_triggered = selected
-
-        automation_note = None
-        if getattr(alert, "mode", "NOTIFY") == "AUTO":
-            market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-            if is_market_signal_blocking_auto_mode(market_mode, composite_level, market_data_freshness):
-                automation_note = f"시장 위험 신호({composite_level})로 이번엔 자동 실행 대신 알림만 발송됐습니다."
-
-        email = notification_email or user_email
-        triggered = await _process_rebalancing_alert(
-            alert=alert,
-            portfolio=portfolio,
-            drifting=drifting,
-            items_to_show=items_to_show,
-            is_scheduled_report=is_scheduled_report,
-            threshold=threshold,
-            email=email,
-            composite_level=composite_level,
-            data_freshness=market_data_freshness,
-            db=db,
-            fcm_token=fcm_token,
-            is_composite_triggered=is_composite_triggered,
-            composite_reason=composite_reason,
-            cache=_cache,
-            ticker_account_map=analysis.ticker_account_map,
-            automation_note=automation_note,
-        )
-        if not triggered:
-            continue
-
-        drift_desc = (
-            f"{len(drifting)}개 종목 드리프트"
-            if drifting
-            else ("복합 리스크 신호" if is_composite_triggered else "정기 보고")
-        )
-        history_automation_suffix = f", 자동실행→알림 전환({composite_level})" if automation_note else ""
-        await save_alert_history(
-            db,
-            alert.user_id,
-            "REBALANCING",
-            (
-                f"리밸런싱 알림: {portfolio.name} — {drift_desc} ({alert.schedule_type}) "
-                f"[시장신호: {composite_level}]{history_automation_suffix}"
-            ),
-        )
-        # AUTO 모드는 last_triggered_at을 갱신하지 않는다.
-        # 인트라데이 잡(rebalancing_auto_execution)에서 실제 실행 후 갱신하므로,
-        # 여기서 갱신하면 already_fired_today()가 True → 당일 자동 실행 차단됨.
-        if getattr(alert, "mode", "NOTIFY") != "AUTO":
-            alert.last_triggered_at = datetime.now(tz=UTC)
-        # 발송 직후 항목별 commit — 루프 끝 일괄 commit은 중간 DB 오류 시 이미 보낸 알림의
-        # last_triggered_at까지 롤백해 다음 실행에 중복 발송한다(expire_on_commit=False라 안전).
-        await db.commit()
-        triggered_count += 1
+            sentry_sdk.capture_message(f"rebalancing_alert_check_item_failed: {type(e).__name__}", level="error")
+            await db.rollback()
+            remaining_ids = alert_ids[index + 1 :]
+            rows = await _load_active_alert_rows(db, remaining_ids) if remaining_ids else []
+            alert_ids = [row[0].id for row in rows]
+            index = 0
 
     if triggered_count:
         alert_trigger_count.labels(alert_type="rebalancing").inc(triggered_count)

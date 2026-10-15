@@ -62,10 +62,8 @@ export interface RebalancingStrategy {
 // API 함수
 // ---------------------------------------------------------------------------
 
-export const fetchPortfolioRisk = (portfolioId?: string) =>
-  portfolioId
-    ? apiGet<PortfolioRiskMetrics>("/portfolio/risk", { params: { portfolio_id: portfolioId } })
-    : apiGet<PortfolioRiskMetrics>("/portfolio/risk");
+// 전체 계좌 통합 기준만 있다 — 백엔드가 portfolio_id를 계산에 반영하지 않아 파라미터를 없앴다
+export const fetchPortfolioRisk = () => apiGet<PortfolioRiskMetrics>("/portfolio/risk");
 
 export const fetchRebalancingStrategy = (portfolioId: string) =>
   apiGet<RebalancingStrategy>(`/portfolio/rebalancing-strategy?portfolio_id=${portfolioId}`);

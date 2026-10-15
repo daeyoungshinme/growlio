@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.enums import TransactionType
 from app.schemas._validators import validate_non_negative_amount, validate_positive_amount
@@ -12,8 +12,8 @@ class TransactionCreate(BaseModel):
     transaction_type: TransactionType
     amount: float
     transaction_date: date
-    ticker: str | None = None
-    notes: str | None = None
+    ticker: str | None = Field(default=None, max_length=50)
+    notes: str | None = Field(default=None, max_length=2000)
     fee: float | None = None
 
     @field_validator("amount")
@@ -31,8 +31,8 @@ class TransactionUpdate(BaseModel):
     transaction_type: TransactionType | None = None
     amount: float | None = None
     transaction_date: date | None = None
-    ticker: str | None = None
-    notes: str | None = None
+    ticker: str | None = Field(default=None, max_length=50)
+    notes: str | None = Field(default=None, max_length=2000)
     fee: float | None = None
 
     @field_validator("amount")

@@ -44,7 +44,7 @@ router = APIRouter(prefix="/stocks", tags=["stocks"])
 async def search_stocks(
     request: Request,
     q: str = Query(..., min_length=1, max_length=100),
-    limit: int = Query(8, le=20),
+    limit: int = Query(8, ge=1, le=20),
 ):
     """종목명·티커 검색.
     한글 입력 → 네이버 금융, 영문/티커 → Yahoo Finance.

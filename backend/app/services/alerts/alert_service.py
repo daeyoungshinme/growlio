@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -15,6 +16,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import redact_secrets
 from app.models.alert import AlertHistory
 from app.utils.metrics import alert_trigger_count
 
@@ -69,6 +71,33 @@ async def notify_and_record_trigger(
     # trigger 갱신까지 롤백돼 다음 실행(5~10분 뒤)에 같은 메일이 다시 간다. expire_on_commit=False라
     # 루프가 이미 읽어 둔 다른 알림 객체는 그대로 쓸 수 있다.
     await db.commit()
+
+
+async def run_isolated_alert_loop(
+    db: AsyncSession,
+    rows: Sequence[Any],
+    handle_row: Callable[[Any], Awaitable[bool]],
+    event: str,
+) -> int:
+    """알림 행마다 `handle_row`를 격리 실행하고 발동 건수를 돌려준다.
+
+    항목별 commit이 DB 오류로 실패하면 세션이 실패 상태라 rollback해야 다음 항목을 처리할 수 있다. rollback은
+    세션의 ORM 객체를 모두 expire시키므로(expire_on_commit과 무관) 이후 행의 알림 객체(row[0])는 쓰기 전에
+    명시적으로 refresh한다 — 그대로 접근하면 비동기 세션에서 lazy load(MissingGreenlet)가 난다.
+    """
+    triggered = 0
+    needs_refresh = False
+    for row in rows:
+        try:
+            if needs_refresh:
+                await db.refresh(row[0])
+            if await handle_row(row):
+                triggered += 1
+        except Exception as e:
+            logger.error(event, error=redact_secrets(str(e)), error_type=type(e).__name__)
+            await db.rollback()
+            needs_refresh = True
+    return triggered
 
 
 async def finalize_alert_batch(

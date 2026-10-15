@@ -65,9 +65,13 @@ class TestRunRebalancingPlanSellExpiry:
             patch(
                 "app.jobs.rebalancing_plan_sell_expiry.expire_due_sell_legs", new=AsyncMock(return_value=3)
             ) as mock_expire,
+            patch(
+                "app.jobs.rebalancing_plan_sell_expiry.fail_stuck_consumed_legs", new=AsyncMock(return_value=0)
+            ) as mock_stuck,
         ):
             from app.jobs.rebalancing_plan_sell_expiry import run_rebalancing_plan_sell_expiry
 
             await run_rebalancing_plan_sell_expiry()
 
         mock_expire.assert_called_once()
+        mock_stuck.assert_called_once()

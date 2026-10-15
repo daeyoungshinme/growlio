@@ -1,11 +1,19 @@
 """공용 Pydantic 검증 함수."""
 
+import math
 from typing import Any
 
 MAX_AMOUNT_KRW = 100_000_000_000  # 1000억 KRW
 
 
+def _require_finite(v: float | None) -> None:
+    # JSON 본문의 NaN/Infinity는 Pydantic float를 통과하고, NaN은 아래 비교(<=, >)가 모두 False라 그대로 저장된다
+    if v is not None and not math.isfinite(v):
+        raise ValueError("금액이 올바른 숫자가 아닙니다")
+
+
 def validate_positive_amount(v: float | None) -> float | None:
+    _require_finite(v)
     if v is not None and v <= 0:
         raise ValueError("금액은 0보다 커야 합니다")
     if v is not None and v > MAX_AMOUNT_KRW:
@@ -14,6 +22,7 @@ def validate_positive_amount(v: float | None) -> float | None:
 
 
 def validate_non_negative_amount(v: float | None) -> float | None:
+    _require_finite(v)
     if v is not None and v < 0:
         raise ValueError("금액은 0 이상이어야 합니다")
     if v is not None and v > MAX_AMOUNT_KRW:

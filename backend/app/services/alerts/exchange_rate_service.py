@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cache_store import CacheStore
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User, UserSettings
-from app.services.alerts.alert_service import finalize_alert_batch, notify_and_record_trigger
+from app.services.alerts.alert_service import (
+    finalize_alert_batch,
+    notify_and_record_trigger,
+    run_isolated_alert_loop,
+)
 from app.services.alerts.calculator import should_trigger_exchange_rate
 from app.utils.currency import fetch_usd_krw
 
@@ -44,10 +48,10 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
     )
     rows = result.all()
 
-    triggered_count = 0
-    for alert, user_email, notification_email, fcm_token in rows:
+    async def _handle(row) -> bool:
+        alert, user_email, notification_email, fcm_token = row
         if not should_trigger_exchange_rate(alert, current_rate):
-            continue
+            return False
 
         email = notification_email or user_email
         target = float(alert.target_rate)
@@ -58,7 +62,7 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
             current_rate=current_rate,
         )
         if not sent:
-            continue
+            return False
 
         direction_label = "이하" if alert.direction == "BELOW" else "이상"
         await notify_and_record_trigger(
@@ -71,6 +75,7 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
             f"USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
             fcm_token,
         )
-        triggered_count += 1
+        return True
 
+    triggered_count = await run_isolated_alert_loop(db, rows, _handle, "exchange_rate_alert_item_failed")
     await finalize_alert_batch(db, "exchange_rate", triggered_count, current_rate=current_rate)

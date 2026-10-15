@@ -35,7 +35,7 @@ async def get_dca_analysis(
 async def get_goal_feasibility(
     request: Request,
     goal_amount: float = Query(..., gt=0),
-    target_year: int = Query(...),
+    target_year: int = Query(..., ge=2000, le=2200),
     monthly_deposit_amount: float = Query(0, ge=0),
     initial_amount: float | None = Query(None, ge=0),
     current_user: User = Depends(get_current_user),

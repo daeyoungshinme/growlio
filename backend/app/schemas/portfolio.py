@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.enums import AccountTaxType, InvestmentHorizon, PortfolioBaseType
 from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
@@ -13,15 +13,17 @@ from app.schemas._validators import validate_portfolio_weights, validate_portfol
 class PortfolioItem(BaseModel):
     model_config = {"from_attributes": True}
 
-    ticker: str
-    name: str = ""  # 자동완성 없이 추가 시 빈 문자열 허용
-    market: str
+    # 길이 상한 = DB 컬럼 길이 — 넘으면 422 대신 DB 오류 500이 났다(계획 57 C5).
+    # 응답에도 쓰이지만 저장값은 이미 컬럼 길이 안이라 영향이 없다
+    ticker: str = Field(max_length=20)
+    name: str = Field(default="", max_length=200)  # 자동완성 없이 추가 시 빈 문자열 허용
+    market: str = Field(max_length=20)
     weight: float  # 0~100, 합계 = 100
 
 
 class PortfolioCreate(BaseModel):
-    name: str
-    items: list[PortfolioItem]
+    name: str = Field(min_length=1, max_length=100)
+    items: list[PortfolioItem] = Field(max_length=100)
     base_type: PortfolioBaseType = PortfolioBaseType.STOCK_ONLY
     account_ids: list[uuid.UUID] | None = None  # null이면 모든 활성 주식 계좌 사용
     # 명시적 기간/세제유형 태그 — 미지정이면 기준 포트폴리오 지정 계좌들의 태그로부터 추론
@@ -35,8 +37,8 @@ class PortfolioCreate(BaseModel):
 
 
 class PortfolioUpdate(BaseModel):
-    name: str | None = None
-    items: list[PortfolioItem] | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    items: list[PortfolioItem] | None = Field(default=None, max_length=100)
     base_type: PortfolioBaseType | None = None
     account_ids: list[uuid.UUID] | None = None  # [] 전송 시 null로 초기화 (전체 계좌 사용)
     # None/미전송 구분은 model_fields_set으로 판별 — 명시적으로 null을 보내면 태그 해제(추론으로 복귀)
@@ -51,7 +53,7 @@ class PortfolioUpdate(BaseModel):
 
 class PortfolioReorderItem(BaseModel):
     id: uuid.UUID
-    sort_order: int
+    sort_order: int = Field(ge=0, le=10_000)
 
 
 class PortfolioReorderRequest(BaseModel):

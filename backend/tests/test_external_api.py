@@ -7,6 +7,7 @@ from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -360,6 +361,37 @@ class TestCreateExternalTransaction:
             )
 
         assert resp.status_code == 400
+
+    @pytest.mark.parametrize("amount", [-5_000_000, 0, 1e17, "NaN"])
+    def test_rejects_non_positive_or_unbounded_amount(self, override_settings, amount):
+        # 음수 DEPOSIT이 MANUAL 계좌 예수금을 깎거나, 1e17이 Numeric 오버플로로 500이 나면 안 된다(계획 57 C1)
+        user = _make_user()
+        account = _make_account(user.id, data_source="MANUAL", deposit_krw=1_000_000.0)
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+
+        patches = self._patches(account)
+        with (
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
+            patches[4],
+            patches[5],
+            patches[6],
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            # JSON 리터럴 NaN을 그대로 보내려고 json= 대신 원문 본문을 쓴다
+            body = (
+                f'{{"account_id": "{account.id}", "transaction_type": "DEPOSIT", '
+                f'"amount": {amount}, "transaction_date": "2026-08-01"}}'
+            )
+            resp = client.post(
+                "/api/v1/external/transactions", content=body, headers={"Content-Type": "application/json"}
+            )
+
+        assert resp.status_code == 422
+        assert account.deposit_krw == 1_000_000.0
 
     def test_returns_404_for_account_not_owned(self, override_settings):
         from fastapi import HTTPException, status

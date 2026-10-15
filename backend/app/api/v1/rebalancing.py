@@ -70,7 +70,7 @@ logger = structlog.get_logger()
 async def analyze_portfolio(
     request: Request,
     portfolio_id: uuid.UUID,
-    account_ids: list[uuid.UUID] | None = Query(default=None),
+    account_ids: list[uuid.UUID] | None = Query(default=None, max_length=50),
     deposit_krw_override: float | None = Query(default=None, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

@@ -3,24 +3,28 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.enums import AccountTaxType, AssetType, DataSource, InvestmentHorizon, IsaType
 from app.models.asset import VALID_MARKETS
-from app.schemas._validators import validate_non_negative_amount, validate_positive_amount
+from app.schemas._validators import MAX_AMOUNT_KRW, validate_non_negative_amount, validate_positive_amount
+
+# 증권사 자격증명 필드(평문, 저장 시 암호화)의 길이 상한.
+# AES-GCM hex 저장값((12 nonce + n + 16 tag) * 2)이 String(512)에 들어가야 한다
+MAX_CREDENTIAL_LENGTH = 220
 
 
 class ManualPosition(BaseModel):
     """수동 종목 입력 스키마."""
 
-    ticker: str
-    name: str
+    ticker: str = Field(max_length=20)
+    name: str = Field(max_length=200)
     market: str = "KOSPI"
-    qty: float
-    avg_price: float
-    avg_price_usd: float | None = None
+    qty: float = Field(allow_inf_nan=False)
+    avg_price: float = Field(allow_inf_nan=False, le=MAX_AMOUNT_KRW)
+    avg_price_usd: float | None = Field(default=None, allow_inf_nan=False)
     usd_rate: float | None = None
-    current_price: float | None = None
+    current_price: float | None = Field(default=None, ge=0, le=MAX_AMOUNT_KRW, allow_inf_nan=False)
 
     @field_validator("name")
     @classmethod
@@ -126,26 +130,38 @@ class RealEstateDetails(BaseModel):
 
 
 class AssetAccountCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=200)
     asset_type: AssetType
     data_source: DataSource = DataSource.MANUAL
-    institution: str | None = None
-    kis_account_no: str | None = None
-    kis_app_key: str | None = None  # 계좌별 KIS App Key (평문, 저장 시 암호화)
-    kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
-    kiwoom_account_no: str | None = None
-    kiwoom_app_key: str | None = None  # 키움 App Key (평문, 저장 시 암호화)
-    kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
-    toss_account_no: str | None = None
-    toss_client_id: str | None = None  # 토스 Client ID (평문, 저장 시 암호화)
-    toss_client_secret: str | None = None  # 토스 Client Secret (평문, 저장 시 암호화)
+    institution: str | None = Field(default=None, max_length=100)
+    kis_account_no: str | None = Field(default=None, max_length=20)
+    kis_app_key: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 계좌별 KIS App Key (평문, 저장 시 암호화)
+    kis_app_secret: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
+    kiwoom_account_no: str | None = Field(default=None, max_length=20)
+    kiwoom_app_key: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 키움 App Key (평문, 저장 시 암호화)
+    kiwoom_app_secret: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 키움 App Secret (평문, 저장 시 암호화)
+    toss_account_no: str | None = Field(default=None, max_length=20)
+    toss_client_id: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 토스 Client ID (평문, 저장 시 암호화)
+    toss_client_secret: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 토스 Client Secret (평문, 저장 시 암호화)
     is_mock_mode: bool = True
     manual_amount: float | None = None
     manual_currency: str = "KRW"
     deposit_krw: float | None = None
     deposit_usd: float | None = None
-    notes: str | None = None
-    sort_order: int = 0
+    notes: str | None = Field(default=None, max_length=2000)
+    sort_order: int = Field(default=0, ge=0, le=10_000)
     real_estate_details: RealEstateDetails | None = None
     include_in_total: bool = True
     tax_type: AccountTaxType = AccountTaxType.GENERAL
@@ -189,20 +205,32 @@ class AssetAccountCreate(BaseModel):
 
 
 class AssetAccountUpdate(BaseModel):
-    name: str | None = None
-    institution: str | None = None
-    kis_app_key: str | None = None  # 계좌별 KIS App Key (평문, 저장 시 암호화)
-    kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
-    kiwoom_app_key: str | None = None  # 키움 App Key (평문, 저장 시 암호화)
-    kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
-    toss_client_id: str | None = None  # 토스 Client ID (평문, 저장 시 암호화)
-    toss_client_secret: str | None = None  # 토스 Client Secret (평문, 저장 시 암호화)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    institution: str | None = Field(default=None, max_length=100)
+    kis_app_key: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 계좌별 KIS App Key (평문, 저장 시 암호화)
+    kis_app_secret: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
+    kiwoom_app_key: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 키움 App Key (평문, 저장 시 암호화)
+    kiwoom_app_secret: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 키움 App Secret (평문, 저장 시 암호화)
+    toss_client_id: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 토스 Client ID (평문, 저장 시 암호화)
+    toss_client_secret: str | None = Field(
+        default=None, max_length=MAX_CREDENTIAL_LENGTH
+    )  # 토스 Client Secret (평문, 저장 시 암호화)
     manual_amount: float | None = None
     deposit_krw: float | None = None
     deposit_usd: float | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=2000)
     is_active: bool | None = None
-    sort_order: int | None = None
+    sort_order: int | None = Field(default=None, ge=0, le=10_000)
     real_estate_details: RealEstateDetails | None = None
     include_in_total: bool | None = None
     tax_type: AccountTaxType | None = None
@@ -227,9 +255,9 @@ class AssetAccountResponse(BaseModel):
     asset_type: AssetType
     data_source: DataSource
     institution: str | None
-    kis_account_no: str | None = None
-    kiwoom_account_no: str | None = None
-    toss_account_no: str | None = None
+    kis_account_no: str | None = Field(default=None, max_length=20)
+    kiwoom_account_no: str | None = Field(default=None, max_length=20)
+    toss_account_no: str | None = Field(default=None, max_length=20)
     is_mock_mode: bool
     manual_amount: float | None
     manual_currency: str

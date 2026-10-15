@@ -82,26 +82,30 @@ async def portfolio_index_exposure(
 @limiter.limit("5/minute")
 async def portfolio_risk(
     request: Request,
-    portfolio_id: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """포트폴리오 위험 지표 — VaR, 베타, 변동성, 분산도. portfolio_id 미지정 시 전체 계좌 통합 기준."""
+    """전체 계좌 통합 위험 지표 — VaR, 베타, 변동성, 분산도.
+
+    예전 `portfolio_id` 파라미터는 캐시 키에만 쓰이고 계산엔 반영되지 않아(임의 문자열로 캐시 키 무한 생성)
+    제거했다(계획 57 C7). 쓰던 호출부도 없었다.
+    """
     cache = await get_cache_store()
-    return await get_portfolio_risk_metrics(current_user.id, db, cache, portfolio_id=portfolio_id)
+    return await get_portfolio_risk_metrics(current_user.id, db, cache)
 
 
 @router.get("/rebalancing-strategy")
 @limiter.limit("3/minute")
 async def portfolio_rebalancing_strategy(
     request: Request,
-    portfolio_id: str = Query(...),
+    portfolio_id: uuid.UUID = Query(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """팩터·프론티어 분석 기반 리밸런싱 전략 제시."""
     cache = await get_cache_store()
-    result = await get_rebalancing_strategy(current_user.id, portfolio_id, db, cache)
+    # str 그대로 UUID 컬럼과 비교하면 형식이 틀린 값이 DB 오류 500이 됐다 — 422로 거부한 뒤 문자열로 넘긴다
+    result = await get_rebalancing_strategy(current_user.id, str(portfolio_id), db, cache)
     if "error" in result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result["error"])
     return result

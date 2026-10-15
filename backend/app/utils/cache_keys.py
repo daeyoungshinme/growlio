@@ -300,8 +300,9 @@ def factor_analysis_portfolio_key(portfolio_id: uuid.UUID | str) -> str:
     return f"{_env_prefix()}factor_analysis:portfolio:{portfolio_id}"
 
 
-def risk_key(user_id: uuid.UUID, portfolio_id: str | None) -> str:
-    return f"{_env_prefix()}risk:{user_id}:{portfolio_id or 'all'}"
+def risk_key(user_id: uuid.UUID) -> str:
+    # 전체 계좌 기준만 있다 — 접미사 'all'은 기존 키·무효화 패턴과의 호환을 위해 유지
+    return f"{_env_prefix()}risk:{user_id}:all"
 
 
 def efficient_frontier_key(user_id: uuid.UUID, compare_portfolio_id: str | None, acct_suffix: str) -> str:

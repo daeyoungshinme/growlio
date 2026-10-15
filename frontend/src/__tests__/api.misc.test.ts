@@ -147,16 +147,10 @@ describe("api/insights", () => {
 describe("api/risk", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("fetchPortfolioRisk calls GET /portfolio/risk without portfolioId", async () => {
+  it("fetchPortfolioRisk calls GET /portfolio/risk", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchPortfolioRisk();
     expect(api.get).toHaveBeenCalledWith("/portfolio/risk");
-  });
-
-  it("fetchPortfolioRisk calls GET /portfolio/risk with portfolio_id param when portfolioId given", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: {} });
-    await fetchPortfolioRisk("port-1");
-    expect(api.get).toHaveBeenCalledWith("/portfolio/risk", { params: { portfolio_id: "port-1" } });
   });
 
   it("fetchRebalancingStrategy calls GET /portfolio/rebalancing-strategy", async () => {
