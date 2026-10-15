@@ -86,3 +86,42 @@ cd backend && uv run --no-sync pip-audit   # A 후 0건(또는 수정 버전 없
 - C1·C2·C3·C4·B3·B4: 수정 전 실패하는 회귀 테스트를 먼저 작성한다. C2는 `execute_rebalancing`이 DB 오류를 던지는 mock으로 leg가 FAILED가 되는지, 다음 leg가 처리되는지 확인한다
 - A: 백엔드 전체 테스트와 `make dev-backend` 기동 스모크(starlette·cryptography 업그레이드)
 - 마지막에 `backend/CLAUDE.md`(레이트리밋 키 규칙, 예외 메시지 헬퍼)와 `docs/plans/README.md` 57행을 갱신한다
+
+## 실행 결과 (2026-10-15, 브랜치 `fix/tech-debt-2026-10-15c`)
+
+A·B·C·D 전부, E는 E1~E5를 구현했다. 실버그는 회귀 테스트를 붙였고 **수정 전 코드에서 실패하는 것을 확인**했다(B1·B3·B5·C1·C2·C4·D1·D2·E2·E3·E5).
+
+| # | 결과 / 계획 대비 조정 |
+|---|---|
+| A1 | `uv lock --upgrade-package`로 12개 패키지 올림(starlette 1.0→1.8, cryptography 48→50, pillow·urllib3 등 + dev 의존 `pip`). `pip-audit` 0건. starlette 1.8의 `HTTP_422_UNPROCESSABLE_ENTITY` deprecation도 `_CONTENT`로 정리 |
+| A2 | `cryptography<51` |
+| A3 | **조정**. CI에 `pip-audit` 단계가 **이미 있었고** `continue-on-error: true`라 69건이 쌓여도 아무도 보지 못했다. 0건이 됐으니 차단 단계로 바꿨다(수정 버전 없는 항목은 `--ignore-vuln`으로 명시 제외) |
+| B1 | **방식 조정**. 운영 헤더 형태를 확인할 수 없어 규칙을 바꾸는 대신, 위조할 수 없는 마지막 hop 키(`peer_rate_limit_key`)를 민감 공개 라우트 4곳에 10배 한도로 겹쳐 걸었다. Vercel 경유는 egress IP를 여러 사용자가 나눠 쓰므로 넉넉하게 |
+| B2 | 종목 검색·지수지역·환율을 기본 `rate_limit_key`로 되돌림 |
+| B3 | `BalancePaginationError(RuntimeError)` 도입, KIS provider가 502로 매핑(키움은 기존 RuntimeError 분기로 이미 502) |
+| B4 | `consumePasswordRecovery()` — 읽으면서 지운다 |
+| B5 | **방식 조정**. 경고 배너+해외 매도 차단 대신, 응답 `overseas_known=false`면 해외 종목 수량을 실시간 잔고 대신 마지막 동기화 값(`ticker_account_map`)으로 쓰고 안내 토스트. 동기화 경로가 해외 미확인 시 기존 포지션을 보존하므로 그 값이 가장 최근 값이다 |
+| C1 | `validate_positive_amount` 재사용, notes 1000자. **추가 발견**: NaN 본문은 검증이 거부해도 FastAPI 기본 422 핸들러가 `input: nan`을 JSON으로 직렬화하다 500이 났다 → `RequestValidationError` 핸들러에서 비유한 float를 None으로 |
+| C2 | rollback→`refresh(locked/plan)` 후 FAILED. buy/sell 루프는 `_run_due_buy_leg` 분리+항목별 try/rollback. `fail_stuck_consumed_legs`(30분)를 매도 만료 잡에 연결, 만료는 실행 중(토큰 소비) leg를 건너뜀 |
+| C3 | 리밸런싱 알림은 `_check_one_rebalancing_alert` 분리, 실패 시 rollback 후 **남은 id로 행을 다시 조회**(selectinload 관계 포함). 주가·환율은 공용 `run_isolated_alert_loop`(rollback 뒤 행 객체 refresh). Sentry는 스택 없는 `capture_message`(AUTO 경로 자격증명 지역변수). **drift_summary·insight는 미적용**: rollback이 루프의 portfolio 객체를 expire시켜 오히려 lazy load 오류가 나고, 읽기 요청이라 실패해도 일부 항목이 빠질 뿐이다 |
+| C4 | 상한 현재+100년, GoalUpdate 금액에 `MAX_AMOUNT_KRW`, goal-feasibility `ge=2000, le=2200` |
+| C5 | 포트폴리오·계좌·수동 포지션·거래·주가/환율 알림·DART 키·FCM 토큰·실행 주문. **추가 발견**: 자격증명은 AES-GCM hex로 저장돼 `(12+n+16)*2 ≤ 512` → 평문 228자 초과 시 500. 상한 `MAX_CREDENTIAL_LENGTH=220`. `quantity gt=0`은 내부 빌더가 0주 주문을 만들 수 있어(하류 SKIPPED 가드 존재) 넣지 않았다. 포트폴리오 `market`도 응답 호환 때문에 Literal 대신 길이만 |
+| C6 | history·search `ge=1`, 백테스트 시작일 ≥1990, `portfolio_ids` ≤30(빈 목록은 SPY·실포트폴리오 비교라 허용), `account_ids` ≤50 |
+| C7 | 프론트가 `portfolio_id` 없이만 호출 → 백엔드·프론트 파라미터 삭제, 캐시 키 `risk:{user}:all` 고정. strategy는 `UUID` 타입 |
+| D1 | `core/logging.public_error_message`. **추가 발견**: KIS·키움 주문 거부가 일반 `RuntimeError(브로커 메시지)`라 그대로 두면 거부 사유("주문가능금액 부족")까지 숨겨진다 → `BrokerOrderRejectedError`로 바꿔 허용 목록에. `broker_request` 실패도 `BrokerRequestError`("실제 접수 여부 불명" 문구 유지) |
+| D2 | HTTP 폴백은 `HTTP {status}`, `RequestError`는 타입명만 |
+| E1 | `snapshot_service.get_latest_snapshots_by_account`(max(date) 조인) — `/external/accounts`, XIRR 집계 |
+| E2~E5 | 계획대로. E4는 `STALE_TIME.NONE/VERY_SHORT/FIVE_MINUTES` 추가 |
+
+검증: 백엔드 2681 passed, 커버리지 91.22%. 프론트 136 files / 1658 tests(coverage 임계값 통과). ruff·format·mypy·eslint `--max-warnings 0`·prettier·tsc 클린. `pip-audit` 0건. 모델 변경 없음(alembic 무관).
+
+배포 후 확인할 것:
+- CI `pip-audit` 차단 단계가 통과하는가(로컬과 같은 lock)
+- Render 로그에서 `rebalancing_plan_stuck_legs_failed`·`rebalancing_alert_check_item_failed`가 나오는지(나오면 원인 예외 조사)
+- 레이트리밋: Render origin 직접 호출에 XFF를 바꿔 보내도 31번째 find-account가 429인지
+
+이관(추가):
+- `challenge_service.py:239,326`의 `_monthly_net_deposits` 챌린지별 조회(N+1) — 챌린지 수가 적어 효과 작음
+- `RebalancingConfirmStep`·`RebalancingOrderTable` 렌더 테스트(E6)
+- drift_summary·insight 루프 DB 오류 격리(위 C3 사유)
+- 운영 헤더 형태 확인 후 `ip_rate_limit_key` 자체를 신뢰 hop 기준으로 바꿀지(B1)

@@ -167,7 +167,7 @@ services/
   ├── sync_all_service.py     # "전체 갱신" 백그라운드 배치 동기화 — jobs/asset_sync.py의 _sync_accounts 재사용, in-memory 캐시(core/cache_store.py)로 락/진행상태 관리 (POST /assets/sync-all, GET /assets/sync-all/status). `_sync_accounts`는 계좌별로 짧게 스코프된 `AsyncSessionLocal()`을 새로 열어 처리 — 브로커 HTTP 응답을 기다리는 동안 요청 커넥션을 붙잡지 않기 위한 패턴(DB 커넥션 풀 슬롯 고갈 방지). 계좌 수만큼 동시에 짧은 sync 요청을 쏘는 유사 엔드포인트를 새로 만들 때 이 패턴을 참고할 것
   ├── auth_service.py         # Supabase JWT 검증(`verify_supabase_token`, JWKS·aud=authenticated) + 탈퇴 재인증용 `verify_password`(Supabase password grant) + `delete_supabase_user`. 자체 JWT 발급 없음
   ├── alerts/                 # 범용 알림 도메인 패키지 (환율/주가/시장신호 체크 + 공통 이력)
-  │   ├── alert_service.py    # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/notify_and_record_trigger/finalize_alert_batch/list_alert_history). 체크 함수 re-export 없음 — 실제 구현 모듈(alerts/exchange_rate_service.py 등)에서 직접 import
+  │   ├── alert_service.py    # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/notify_and_record_trigger/finalize_alert_batch/list_alert_history/run_isolated_alert_loop — 알림 루프 항목별 격리, rollback 뒤 행 객체는 refresh 후 사용). 체크 함수 re-export 없음 — 실제 구현 모듈(alerts/exchange_rate_service.py 등)에서 직접 import
   │   ├── exchange_rate_service.py # 환율 알림 조건 체크
   │   ├── stock_price_service.py   # 주가 알림 조건 체크
   │   ├── market_signal_alert_service.py # 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 즉시 알림 + 매일 08:30 KST 요약(`send_market_signal_daily_digest`, 옵트인). `check_composite_signal`(리스크+시장신호 복합 판정)을 rebalancing/alert_check.py·diagnosis_service.py와 공유. 등급전환 발송 성공 시 alert_check.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신(같은 날 중복 발송 방지)
@@ -185,7 +185,7 @@ services/
   │   ├── alert_test.py       # 리밸런싱 알림 즉시 테스트 발송
   │   ├── plan_service.py     # AUTO 2단계 플랜 API 진입점 — `list_recent_plan_legs()`만 남고 나머지는 아래 3개 서브모듈로 분리, 전체 심볼을 재노출하므로 `from ...plan_service import X`는 무변경. **단, 서브모듈 간 내부 호출을 가로채는 테스트 patch는 `plan_service.X`가 아닌 실제 호출부 서브모듈 경로 사용**
   │   ├── plan_generation.py  # AUTO 대기 플랜 생성: 드리프트 분석→게이트 판정→BUY/SELL leg 생성. `build_pending_plan_for_alert()`가 세금영향·시장신호·하루 거래한도(`UserSettings.auto_rebalancing_daily_value_cap_krw`) 게이트에 걸리면 `TaxGateBlocked`/`MarketSignalGateBlocked`/`DailyValueCapBlocked` sentinel 반환(플랜 미생성)
-  │   ├── plan_execution.py   # AUTO 플랜 leg 잠금/실행/취소/만료 — 매수는 대기시간 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 미응답 시 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지. `execute_due_buy_legs()`는 실행 직전 시장신호 게이트 재확인(차단 시 다음 tick 재시도)
+  │   ├── plan_execution.py   # AUTO 플랜 leg 잠금/실행/취소/만료 — 매수는 대기시간 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 미응답 시 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지. `execute_due_buy_legs()`는 실행 직전 시장신호 게이트 재확인(차단 시 다음 tick 재시도). leg 루프는 항목별 try/rollback 격리, `_execute_leg` 실패 경로는 rollback→refresh 후 FAILED 기록. 결과 기록이 유실돼 `token_consumed_at`만 찍힌 PENDING이 30분 넘게 남으면 `fail_stuck_consumed_legs()`(매도 만료 잡이 15분마다)가 FAILED로 마감하고 확인 알림만 보낸다(재실행 안 함)
   │   ├── plan_notifications.py # AUTO 플랜 이메일/푸시/이력 알림 — 생성 안내, 게이트 차단 보류 안내(`notify_*_blocked()`가 하루 1회 durable_state dedup), leg 실행 완료/실패 결과
   │   ├── quick_execute_service.py # "지금 계획 생성"(`POST /rebalancing/portfolios/{id}/quick-execute`) 유스케이스 — 알림 행 조회→pending/시장신호 게이트→`build_pending_plan_for_alert`→계획 안내 발송. `QuickExecuteStatus` enum+원자료(`QuickExecuteOutcome`)만 반환하고 사용자 문구는 라우터 `_QUICK_EXECUTE_MESSAGES`가 조립. override 계좌 소유권 검증은 라우터가 콜백(`verify_account_owned`)으로 주입(서비스→API 계층 import 금지)
   │   ├── execution_service.py # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis/_kiwoom_order_executor.py로 분리
@@ -284,7 +284,7 @@ schemas/                      # Pydantic 요청/응답 스키마
 core/                         # 설정·DB·in-memory 캐시 store
   ├── config.py                # Settings(pydantic-settings) — env var 로딩
   ├── database.py              # SQLAlchemy async engine/session, Base
-  ├── logging.py               # structlog 시크릿 redact 프로세서(`redact_secrets`, appkey/Bearer/password 등 마스킹 — dict/list 값은 재귀로 돌며 token/secret/password 등 민감 키 값을 통째로 가림) + yfinance 404 소음 필터 — `configure_logging()`. 계좌번호·이메일을 로그에 남길 땐 `utils/masking.py` 사용
+  ├── logging.py               # structlog 시크릿 redact 프로세서(`redact_secrets`, appkey/Bearer/password 등 마스킹 — dict/list 값은 재귀로 돌며 token/secret/password 등 민감 키 값을 통째로 가림) + yfinance 404 소음 필터 — `configure_logging()`. 계좌번호·이메일을 로그에 남길 땐 `utils/masking.py` 사용. **응답·DB·알림에 예외 사유를 남길 땐 `str(e)` 대신 `public_error_message(e)`** — `HTTPException`·`AppError`·`SyncError`·`BrokerOrderRejectedError`(주문 거부)·`BrokerRequestError`·`KisApiError`·`KiwoomApiError`·`ValueError`만 메시지를 내보내고 나머지(SQLAlchemy·httpx 등, SQL 파라미터·URL 쿼리스트링의 계좌번호가 섞임)는 타입명으로 대체한다
   └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 싱글톤, get_cache_store/close_cache_store. `sweep_expired()`를 `jobs/cache_sweep.py`가 15분마다 호출해 만료 키 능동 청소. 항목 수 상한(`_MAX_ENTRIES`=20,000, LRU 축출)으로 메모리 무한 증가 방지. **주의**: 워커/인스턴스 2개 이상으로 늘리면 캐시가 프로세스 로컬이라 적중률 급락 + 무효화 미전파 — 확장 시 공유 캐시(Redis) 재도입 필요(`render.yaml`은 단일 워커/단일 인스턴스 전제)
 kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote, realized — 해외 기간손익 TTTS3039R, 모의투자 미지원)
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants). `client.py`는 KIS와 동일 `AsyncRateLimiter`로 `kiwoom_rate_per_second`(기본 4.0) 제한 — http_client.py의 rate-limit 감지가 키움 `return_code=5`(=EGW00201) 대응
@@ -313,7 +313,7 @@ utils/
   ├── naver_retry.py          # Naver Finance 모바일 API 공용 재시도 정책·User-Agent — `price_sync_sources`·`dividend/sync_sources` 공유. 일시 장애(연결·타임아웃·429·5xx)만 재시도, 404 등 4xx는 즉시 실패시켜 호출부 폴백으로
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등) — `/metrics` 엔드포인트로 노출
   └── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)
-limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수). 키는 `rate_limit_key` — 로그인 요청은 JWT `sub`(서명 미검증, 버킷 구분용), 그 외 `X-Forwarded-For` 첫 hop. 운영은 Vercel→Render 프록시 뒤라 `request.client.host`는 프록시 주소(전원 공용 버킷이 됨). **인증 없는 라우트에 `@limiter.limit`을 달 때는 `key_func=ip_rate_limit_key` 필수** — 서명 미검증 `sub`는 누구나 만들 수 있어 기본 키로는 매 요청 다른 sub로 한도를 우회당한다(`tests/test_rate_limit_key.py`가 공개 라우트 목록을 검사)
+limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수). 키는 `rate_limit_key` — 로그인 요청은 JWT `sub`(서명 미검증, 버킷 구분용), 그 외 `X-Forwarded-For` 첫 hop. 운영은 Vercel→Render 프록시 뒤라 `request.client.host`는 프록시 주소(전원 공용 버킷이 됨). **인증 없이 상태를 바꾸거나 토큰을 받는 라우트**(find-account·플랜 토큰 3개)는 `key_func=ip_rate_limit_key` + `key_func=peer_rate_limit_key` 두 데코레이터를 겹쳐 단다 — 서명 미검증 `sub`는 누구나 만들 수 있고, `X-Forwarded-For` 첫 hop도 Render origin 직접 호출 시 위조 가능하므로 Render가 붙인 마지막 hop(peer, 위조 불가) 상한을 10배로 함께 건다. 종목 검색·지수지역·환율처럼 로그인 사용자가 주로 부르는 저가치 조회는 공용 IP(CGNAT) 버킷을 나눠 쓰지 않도록 기본 `rate_limit_key`(`tests/test_rate_limit_key.py`가 두 목록을 검사)
 enums.py                      # 도메인 StrEnum(AssetType/DataSource/TransactionType/AccountTaxType/InvestmentHorizon/AgeGroup 등) — 매직 스트링 대신 사용
 constants.py                  # 도메인 공통 상수 — `DOMESTIC_MARKETS`, `POSITION_STOCK_ASSET_TYPES`. **새 브로커 추가 시 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 집계 7곳 누락 사고)
 exceptions.py                 # `AppError` 계열(BadRequest/NotFound/ExternalAPI…, 전역 핸들러가 status_code/detail로 변환) + `SyncError` 계열(Provider{Credential,Token,Api,Network}Error)
@@ -360,7 +360,7 @@ jobs/                         # APScheduler 정기 작업
 
 **인증:** 백엔드는 토큰을 발급하지 않는다. 프론트가 Supabase에서 받은 access token을 `Authorization: Bearer`로 보내면 `api/deps.py`의 `get_current_user`가 `auth_service.verify_supabase_token()`(Supabase JWKS 공개키, `aud=authenticated`)으로 검증. 만료/갱신은 Supabase 세션 설정을 따른다. 자매 앱 nestlio도 같은 Supabase JWT로 `/external/*`를 호출.
 
-**미들웨어/핸들러 (`main.py`):** slowapi 레이트 리미팅, CORS(`ALLOWED_ORIGINS`), GZip, Request ID 주입, 보안 헤더(X-Content-Type-Options·X-Frame-Options·X-XSS-Protection·CSP, production에선 HSTS 추가), HTTP 요청 로깅. 예외 핸들러: `AppError`·Provider*Error·`CircuitOpenError`·`KisApiError` → 한국어 detail 응답, 그 외 `Exception`은 `redact_secrets()`로 자격증명 마스킹 후 로깅하고 500. 백엔드 CSP는 API 응답용 — 실제 프론트 CSP는 `frontend/vercel.json`.
+**미들웨어/핸들러 (`main.py`):** slowapi 레이트 리미팅, CORS(`ALLOWED_ORIGINS`), GZip, Request ID 주입, 보안 헤더(X-Content-Type-Options·X-Frame-Options·X-XSS-Protection·CSP, production에선 HSTS 추가), HTTP 요청 로깅. 예외 핸들러: `RequestValidationError`(NaN/Infinity 입력을 None으로 바꿔 422 직렬화 — 기본 핸들러는 500), `AppError`·Provider*Error·`CircuitOpenError`·`KisApiError` → 한국어 detail 응답, 그 외 `Exception`은 `redact_secrets()`로 자격증명 마스킹 후 로깅하고 500. 백엔드 CSP는 API 응답용 — 실제 프론트 CSP는 `frontend/vercel.json`.
 ---
 
 ## Absolute Rules
