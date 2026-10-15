@@ -65,6 +65,10 @@ async def notify_and_record_trigger(
 
     await send_push_to_user(user_id=user_id, title=push_title, body=push_body, fcm_token=fcm_token)
     await apply_alert_trigger(db, alert, history_alert_type, history_message)
+    # 발송 직후 항목별로 commit한다 — 루프 끝에서 한 번만 commit하면 중간 DB 오류 시 이미 보낸 알림의
+    # trigger 갱신까지 롤백돼 다음 실행(5~10분 뒤)에 같은 메일이 다시 간다. expire_on_commit=False라
+    # 루프가 이미 읽어 둔 다른 알림 객체는 그대로 쓸 수 있다.
+    await db.commit()
 
 
 async def finalize_alert_batch(
@@ -73,13 +77,12 @@ async def finalize_alert_batch(
     triggered_count: int,
     **log_kwargs: Any,
 ) -> None:
-    """알림 체크 루프 종료 후 공용 마무리: 발동 건이 있으면 commit + 메트릭 + 로그.
+    """알림 체크 루프 종료 후 공용 마무리: 발동 건이 있으면 메트릭 + 로그 (commit은 항목별로 이미 끝남).
 
     `metric_alert_type`은 Prometheus 라벨/로그 이벤트명에 쓰이는 소문자 slug(예: "exchange_rate").
     """
     if not triggered_count:
         return
-    await db.commit()
     alert_trigger_count.labels(alert_type=metric_alert_type).inc(triggered_count)
     logger.info(f"{metric_alert_type}_alerts_triggered", count=triggered_count, **log_kwargs)
 
