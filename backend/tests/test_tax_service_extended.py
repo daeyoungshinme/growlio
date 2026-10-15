@@ -320,12 +320,11 @@ class TestEstimateOverseasTransferTax:
         assert result["estimated_tax_krw"] == 0.0
 
     def test_year_none_uses_current_year(self):
-        from datetime import UTC, datetime
-
         from app.services.tax_service import estimate_overseas_transfer_tax
+        from app.utils.kst import today_kst
 
         result = estimate_overseas_transfer_tax(12_500_000.0, year=None)
-        current_year_rates_result = estimate_overseas_transfer_tax(12_500_000.0, year=datetime.now(UTC).year)
+        current_year_rates_result = estimate_overseas_transfer_tax(12_500_000.0, year=today_kst().year)
         assert result == current_year_rates_result
 
     def test_future_year_falls_back_to_closest(self):

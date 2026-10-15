@@ -284,7 +284,7 @@ class TestCalcGoalTimeline:
             annual_return_pct=6.0,
         )
         assert result["months_to_goal"] == 120
-        assert result["on_track"] is not None
+        assert isinstance(result["on_track"], bool)
 
     def test_lead_lag_computed_when_near_goal(self, override_settings):
         result = _calc_goal_timeline(

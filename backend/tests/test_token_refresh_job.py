@@ -33,10 +33,13 @@ class TestRefreshAllUserTokens:
         with (
             patch("app.jobs.token_refresh.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs.token_refresh.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.token_refresh.get_access_token", new_callable=AsyncMock) as mock_token,
         ):
             from app.jobs.token_refresh import refresh_all_user_tokens
 
             await refresh_all_user_tokens()
+
+        mock_token.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_kis_token_refresh_called_for_accounts_with_creds(self):

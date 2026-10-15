@@ -3796,9 +3796,10 @@ class TestAgeGroupFromBirthYear:
     실제 나이를 입력받아 기존 연령대 버킷 로직에 매핑하는 헬퍼."""
 
     def _current_year(self) -> int:
-        from datetime import UTC, datetime
+        # 구현이 today_kst() 기준 — UTC로 구하면 12/31 15시(UTC) 이후 연도가 하나 어긋난다
+        from app.utils.kst import today_kst
 
-        return datetime.now(UTC).year
+        return today_kst().year
 
     def test_twenties(self):
         year = self._current_year()

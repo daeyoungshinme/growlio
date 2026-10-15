@@ -58,6 +58,11 @@ class TestXirr:
         ]
         result = xirr(flows)
         assert result is not None
+        # 결과는 % 단위 — 그 연이율로 할인한 NPV가 0이어야 한다(구현 방식과 무관한 독립 검증, 소수 2자리 반올림 허용)
+        t0 = flows[0][0]
+        npv = sum(cf / (1 + result / 100) ** ((d - t0).days / 365.0) for d, cf in flows)
+        assert abs(npv) < 5.0
+        assert 5 < result < 15
 
     def test_unreasonable_return_clamped_to_none(self):
         # 극단적 수익률은 None 반환
