@@ -30,8 +30,8 @@ interface Props {
   setForm: Dispatch<SetStateAction<GoalForm>>;
   step: number;
   setStep: Dispatch<SetStateAction<number>>;
-  saving: boolean;
-  onSave: () => void;
+  /** 저장 성공 여부를 돌려준다 — 실패하면 6단계는 추천 대신 재시도를 보여준다 */
+  onSave: () => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -49,13 +49,12 @@ export default function GoalSettingWizard({
   setForm,
   step,
   setStep,
-  saving,
   onSave,
   onClose,
 }: Props) {
   const { currentAssets, feasibility, feasibilityLoading, band, canProceed } =
     useGoalWizardFeasibility(form, setForm, step);
-  const settingsPersisted = useRecommendationStepAutosave(step, saving, onSave);
+  const autosave = useRecommendationStepAutosave(step, onSave);
   const formProps = { form, setForm };
   const feasibilityProps = { feasibility, feasibilityLoading };
 
@@ -82,7 +81,11 @@ export default function GoalSettingWizard({
         {step === 4 && <RequiredReturnStep {...formProps} {...feasibilityProps} band={band} />}
         {step === 5 && <InvestorProfileStep {...formProps} />}
         {step === RECOMMENDATION_STEP && (
-          <GoalWizardRecommendationStep settingsPersisted={settingsPersisted} onClose={onClose} />
+          <GoalWizardRecommendationStep
+            saveStatus={autosave.status}
+            onRetrySave={autosave.retry}
+            onClose={onClose}
+          />
         )}
 
         <div className="flex gap-3 pt-2">

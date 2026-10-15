@@ -55,8 +55,11 @@ export default function StockPositionsModal({
   const editor = usePositionsEditor([], usdRate);
 
   useEffect(() => {
+    // 계좌 전환 시 늦게 도착한 이전 계좌 응답이 새 행을 덮어쓰지 않도록, 언마운트 후 setState도 막는다
+    let cancelled = false;
     fetchAccountPositions<Position>(accountId)
       .then((data) => {
+        if (cancelled) return;
         const positions = data.positions;
         editor.setRows(
           editor.enrichRows(positions.length ? positions : readonly ? [] : [{ ...EMPTY_ROW }]),
@@ -64,9 +67,14 @@ export default function StockPositionsModal({
         setSummary(data.summary);
       })
       .catch((e) => {
-        setError(extractErrorMessage(e, "포지션 조회에 실패했습니다"));
+        if (!cancelled) setError(extractErrorMessage(e, "포지션 조회에 실패했습니다"));
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // editor.setRows/enrichRows는 렌더마다 새 참조 → dep 포함 시 무한 루프. accountId/readonly 변경 시만 재조회.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, readonly]);

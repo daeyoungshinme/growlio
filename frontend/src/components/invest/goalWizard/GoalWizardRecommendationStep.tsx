@@ -11,17 +11,27 @@ import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData } from "@/utils/queryInvalidation";
 import { normalizeWeights } from "@/utils/recommendationDrift";
 import GoalWizardLoading from "./GoalWizardLoading";
+import type { AutosaveStatus } from "./useRecommendationStepAutosave";
 
-/** 6단계 — 자동 저장이 끝난 뒤 전체 자산 기준 목표 역산 추천을 보여주고, 그 비중으로 새 포트폴리오를 만든다. */
+/** 6단계 — 자동 저장이 끝난 뒤 전체 자산 기준 목표 역산 추천을 보여주고, 그 비중으로 새 포트폴리오를 만든다.
+ * 저장이 실패하면 이전 설정 기준 추천이 되므로 추천 대신 재시도를 보여준다. */
 export default function GoalWizardRecommendationStep({
-  settingsPersisted,
+  saveStatus,
+  onRetrySave,
   onClose,
 }: {
-  settingsPersisted: boolean;
+  saveStatus: AutosaveStatus;
+  onRetrySave: () => void;
   onClose: () => void;
 }) {
+  const settingsPersisted = saveStatus === "saved";
   const queryClient = useQueryClient();
-  const { data: recommendation, isLoading: recommendationLoading } = useQuery({
+  const {
+    data: recommendation,
+    isLoading: recommendationLoading,
+    isError: recommendationError,
+    refetch: refetchRecommendation,
+  } = useQuery({
     queryKey: QUERY_KEYS.goalRecommendationOverall,
     queryFn: fetchOverallGoalRecommendation,
     enabled: settingsPersisted,
@@ -46,6 +56,23 @@ export default function GoalWizardRecommendationStep({
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });
+
+  if (saveStatus === "failed") {
+    return (
+      <StepError
+        message="목표 설정을 저장하지 못해 추천을 계산할 수 없어요."
+        onRetry={onRetrySave}
+      />
+    );
+  }
+  if (settingsPersisted && recommendationError) {
+    return (
+      <StepError
+        message="추천 포트폴리오를 불러오지 못했어요."
+        onRetry={() => void refetchRecommendation()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -105,6 +132,21 @@ export default function GoalWizardRecommendationStep({
             "추천을 계산하지 못했습니다 — 나중에 리밸런싱 탭에서 다시 시도해보세요"}
         </p>
       )}
+    </div>
+  );
+}
+
+function StepError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="space-y-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/40">
+      <p className="text-sm text-red-700 dark:text-red-300">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 py-1.5 text-sm font-medium border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors`}
+      >
+        다시 시도
+      </button>
     </div>
   );
 }
