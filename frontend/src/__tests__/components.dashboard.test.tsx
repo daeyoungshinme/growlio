@@ -90,7 +90,6 @@ const baseDashboard: DashboardData = {
   dividend_monthly_breakdown: [],
   xirr_pct: null,
   xirr_is_estimated: false,
-  benchmark_sp500_pct: null,
   goal_annual_return_pct: null,
   return_goal_gap_pct: null,
   annual_dividend_goal: null,

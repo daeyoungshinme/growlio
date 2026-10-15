@@ -67,6 +67,41 @@
 - D3 `api/dashboard.ts:37` 백엔드에 없는 `benchmark_sp500_pct` 필드를 삭제한다. `fetchPortfolioOverviewLite`의 반환 타입을 `PortfolioOverviewLite`(positions 없음)로 분리해, 나중에 `.positions`를 읽으면 컴파일 에러가 나게 한다.
 - D4 PR #129(vite-plugin-pwa 2.0): **이미 머지됨**(550cf91). 조치 없음.
 
+## 실행 결과 (2026-10-15, 브랜치 `fix/tech-debt-2026-10-15`)
+
+A·B·C 전부와 D 일부를 구현했다. 실버그는 회귀 테스트를 붙였고, 수정 전 코드에서 실패하는 것을 확인했다(B3은 API 형태가 바뀌어 코드 리딩으로 확인).
+
+| # | 결과 / 계획 대비 조정 |
+|---|---|
+| A1 | 해외 보유수량 맵을 ticker 단독 키로 바꿨다. KIS는 잔고 market이 실제 거래소명이라 그대로 둔다(52 B3에 메모) |
+| A2 | **범위 조정**. 확인 페이지(`fmtKrwPrice`)와 이메일이 저장된 `limit_price`를 원화로 표시하는 계약이라 ①②(생성 시 현지통화 저장)는 하지 않았다. 버그가 나는 곳은 실행 시점 한 곳뿐이다. `_rebuild_orders_from_items`가 해외 LIMIT의 현지통화 시세를 못 받으면 ValueError를 내고, 이 호출을 기존 try 안으로 옮겨 leg FAILED와 실패 알림으로 처리한다. 기존 테스트 1건이 시세 mock `{}`로 원화 200,000을 그대로 실행하고 있었다(USD 시세 mock으로 수정). ④ 실행기 상식 검사는 넣지 않았다 |
+| A3 | **방식 조정**. 새 파라미터 대신 `retry_on_request_error=False`(주문 4곳만 사용)의 의미를 "재전송하면 안 되는 뮤테이션"으로 넓혀 5xx도 즉시 실패시킨다. C901 때문에 오류 로깅을 `_log_error_response`로 분리했다 |
+| A4 | 방향을 `shares_to_trade` 부호로 정하고, `diff_krw`와 어긋나면 `direction_mismatch`로 건너뛴다 |
+| B1 | 토스만이 아니다. 공용 `Position.qty: int`, `raw_*_to_position`, `manual_provider`도 int로 잘라 **수동 계좌 소수점도 같은 버그**였다. 전부 float로 바꿨다 |
+| B2 | composition_calculator 2곳, insight_service, `api/v1/rebalancing.py` 분석 2곳(Explore 지목), stocks·price_service KIS 폴백을 순차화했다. 수익률 조회(세션 미사용)만 task로 병렬 유지 |
+| B3 | 훅이 `{status, retry}`를 반환하고, 6단계는 저장 실패·추천 조회 실패 시 재시도 카드를 보여준다. `openEdit`/`openWizard`에 catch를 달았다. 마법사 `saving` prop 제거 |
+| B4 | StockPositionsModal cancelled 플래그, blur 콜백 ref. **오보 1건**: `usePortfolioItemsEditor` NaN은 `value_krw <= 0`을 이미 걸러 도달 불가라 손대지 않았다 |
+| B5 | `notify_and_record_trigger`와 `alert_check` 루프가 발송 직후 commit한다(`expire_on_commit=False` 확인). `finalize_alert_batch`는 메트릭과 로그만 남긴다 |
+| B6 | `broker_request(response_headers=)` 추가. KIS는 `tr_cont` F/M, 키움은 `cont-yn=Y`+`next-key` 헤더 기준이다(본문 연속키만 보면 마지막 페이지를 다시 받아 이중 집계 위험). 상한 20페이지. **실계좌 미검증** |
+| C1 | **방식 조정**. uvicorn `--proxy-headers`는 넣지 않고 `rate_limit_key`가 직접 판단한다. 로그인 요청은 JWT `sub`(서명 미검증, 버킷용), 그 외는 `X-Forwarded-For` 첫 hop. 운영 로그 사전 확인은 하지 못했다 — 배포 후 확인 필요 |
+| C2 | Supabase Admin `GET /admin/users/{id}`로 옛 sub가 살아 있으면 409와 Sentry, 확인 실패면 503. **`iss` 검증은 제외**: 이 프로젝트 JWKS로 서명을 검증하므로 다른 발급자 토큰은 이미 통과 못 하고, URL 표기 차이(슬래시·커스텀 도메인)로 전원 401이 날 위험만 있다 |
+| C3 | redact가 dict/list를 재귀로 돌고 민감 키 이름 값을 가린다. **기존 정규식 버그 추가 발견**: `Authorization: Bearer <토큰>`에서 "Bearer"만 값으로 잡혀 토큰이 남았다 → 수정. `utils/masking.py`(계좌번호 뒤 4자리, 이메일) 신설 |
+| C4·C5 | 그대로. Supabase 3종은 `render.yaml`에 선언돼 있다(값은 대시보드) — **SERVICE_ROLE_KEY가 운영에 비어 있으면 이번 배포부터 기동 실패**하므로 배포 전 확인 |
+| C6 | **범위 축소**. 부분 유니크 `uq_positions_account_ticker_current`는 복구하지 않았다. 수동 포지션 저장에 중복 검사가 없고 브로커가 현금/신용 잔고를 별도 행으로 줄 수 있어, 복구하면 동기화가 IntegrityError로 실패할 수 있다. `env.py` `include_name`(growlio 테이블만 비교)와 `ix_asset_accounts_target_portfolio_id` 복구(`ix1_restore_target_portfolio_index`, `IF NOT EXISTS`)만 했다. DESC 인덱스 반복은 52 G squash에서 함께 정리 |
+| C7 | **방식 조정**. 무관한 잡에 끼우지 않고 `jobs/app_state_sweep.py`(04:10 KST)를 새로 등록했다 |
+| D1 | buster를 빌드에 묶지 않았다. 배포마다 첫 실행의 즉시 표시 이점이 사라지기 때문이다. `App.tsx`의 "세션 만료 시 persist 보존" 주석만 실제 동작(빈 상태로 다시 저장됨)에 맞췄다 |
+| D2 | `__tests__/api.client.refresh.test.ts`(4개): 단일 401 재시도, 동시 401 갱신 1회 공유, 세션 없음 → 만료 이벤트, `/auth/` 제외 |
+| D3 | `benchmark_sp500_pct` 삭제. lite overview 타입 분리는 이관 |
+| D4 | 이미 머지됨 |
+
+검증: 백엔드 2640 passed, 커버리지 91.11%. 프론트 130 files / 1637 tests(coverage 임계값 통과). ruff·mypy·eslint `--max-warnings 0`·prettier·tsc 모두 클린. alembic 단일 head, 오프라인 SQL 렌더 확인.
+
+배포 후 확인할 것:
+- Render 대시보드에 `SUPABASE_SERVICE_ROLE_KEY`가 있는가(C5)
+- 레이트리밋이 사용자별로 분리되는가(C1)
+- 키움 해외 매도가 SKIPPED 없이 나가는가(A1)
+- 보유종목이 많은 계좌에서 잔고 누락이 없는가(B6)
+
 ## 이관 (이번 미구현)
 
 - `asset_snapshots`·`positions`·`alert_history`·리밸런싱 이력 보존 정책: 제품 결정(보관 기간)이 필요하다
@@ -79,6 +114,9 @@
 - `useSyncAllWatcher` 폴링 겹침과 1회 오류 시 종료, `rebalancingExecution` 잔고 1회 로드
 - 국내 지정가 호가단위 반올림, 모델 `Mapped[float]` ↔ Numeric(Decimal) 타입 힌트
 - persist 캐시의 계좌번호: 토큰과 같은 신뢰 경계(계획 28 결론)라 유지한다
+- (신규) `uq_positions_account_ticker_current` 복구 여부: 수동 저장 중복 검사와 브로커 현금/신용 행 병합을 먼저 정한 뒤
+- (신규) `fetchPortfolioOverviewLite` 반환 타입 분리(positions 없음), persist buster 정책
+- (신규) 401 대기열에서 재시도된 요청이 다시 401이면 `_retry`가 없어 갱신을 한 번 더 시도한다(무한은 아님, 저위험)
 
 ## 검증
 
