@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isNativePlatform } from "@/utils/platform";
 import { useHaptic } from "./useHaptic";
+import { storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
 
 const STORAGE_KEY = "growlio_biometric_enabled";
 export const BIOMETRIC_SESSION_KEY = "growlio_biometric_verified";
@@ -14,13 +15,11 @@ export function useBiometric() {
     () => sessionStorage.getItem(BIOMETRIC_SESSION_KEY) === "1",
   );
   // 이전 체크 결과를 localStorage에서 즉시 읽어 초기값으로 사용 (비동기 체크 전 flash 방지)
-  const [isAvailable, setIsAvailable] = useState(
-    () => localStorage.getItem(AVAILABLE_CACHE_KEY) === "1",
-  );
+  const [isAvailable, setIsAvailable] = useState(() => storageGet(AVAILABLE_CACHE_KEY) === "1");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isEnabled = localStorage.getItem(STORAGE_KEY) === "1";
+  const isEnabled = storageGet(STORAGE_KEY) === "1";
 
   const availabilityChecked = useRef(false);
 
@@ -32,7 +31,7 @@ export function useBiometric() {
       try {
         const { NativeBiometric } = await import("capacitor-native-biometric");
         const result = await NativeBiometric.isAvailable();
-        localStorage.setItem(AVAILABLE_CACHE_KEY, result.isAvailable ? "1" : "0");
+        storageSet(AVAILABLE_CACHE_KEY, result.isAvailable ? "1" : "0");
         setIsAvailable(result.isAvailable);
       } catch {
         setIsAvailable(false);
@@ -67,9 +66,9 @@ export function useBiometric() {
 
   const setEnabled = useCallback((enabled: boolean) => {
     if (enabled) {
-      localStorage.setItem(STORAGE_KEY, "1");
+      storageSet(STORAGE_KEY, "1");
     } else {
-      localStorage.removeItem(STORAGE_KEY);
+      storageRemove(STORAGE_KEY);
       sessionStorage.setItem(BIOMETRIC_SESSION_KEY, "1");
       setIsVerified(true);
     }

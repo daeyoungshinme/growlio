@@ -1,10 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { AssetAccount } from "@/api/assets";
 import { KisBalanceResponse, fetchAllBrokerBalances, fetchBrokerBalance } from "@/api/rebalancing";
-import { QUERY_KEYS } from "@/constants/queryKeys";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import type { ExecutionAction } from "./useRebalancingExecution";
+import { invalidateAccountData } from "@/utils/queryInvalidation";
 
 export function useRebalancingBalances(
   dispatch: React.Dispatch<ExecutionAction>,
@@ -27,7 +27,8 @@ export function useRebalancingBalances(
       const is404 = getHttpStatus(err) === 404;
       dispatch({ type: "BALANCE_ERROR", accountId, is404 });
       if (is404) {
-        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts });
+        // 계좌가 사라졌다(삭제·연동 해제) — 계좌 목록과 그 계좌를 합산하던 화면을 함께 갱신
+        void invalidateAccountData(queryClient);
       } else {
         toast(extractErrorMessage(err, "잔고 조회에 실패했습니다"), "error");
       }

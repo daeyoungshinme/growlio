@@ -28,6 +28,7 @@ import {
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { invalidateSettingsData } from "@/utils/queryInvalidation";
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -171,11 +172,9 @@ export default function NotificationSettingsPage() {
     "growlio:settings:market-alerts-open",
   );
   useEffect(() => {
+    // 딥링크 탭이 바뀔 때만 펼친다(setMarketAlertsOpen은 참조 고정)
     if (initialAlertTab === "시장 신호 알림") setMarketAlertsOpen(true);
-    // setMarketAlertsOpen(useCollapsible)은 렌더마다 새 참조 — dep에 넣으면 매 렌더 다시 펼쳐져 사용자가 접을 수 없다.
-    // 딥링크 탭이 바뀔 때만 1회 펼친다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialAlertTab]);
+  }, [initialAlertTab, setMarketAlertsOpen]);
 
   const reportAlertsEnabledCount = countEnabled([
     monthlyReportEnabled,
@@ -191,7 +190,7 @@ export default function NotificationSettingsPage() {
     staleTime: STALE_TIME.LONG,
   });
 
-  const invalidateSettings = () => qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
+  const invalidateSettings = () => invalidateSettingsData(qc);
 
   return (
     <div className="space-y-6 max-w-xl">

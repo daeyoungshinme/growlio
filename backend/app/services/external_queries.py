@@ -52,7 +52,8 @@ async def monthly_net_deposits_by_account(
             AssetAccount.is_active.is_(True),
             Transaction.account_id.in_(account_ids),
             Transaction.transaction_type.in_(_FLOW_TYPES),
-            month >= start_month,
+            # 월 문자열 비교(to_char) 대신 날짜 비교 — transaction_date 인덱스를 탄다
+            Transaction.transaction_date >= date.fromisoformat(f"{start_month}-01"),
         )
         .group_by(Transaction.account_id, month)
         .order_by(month)

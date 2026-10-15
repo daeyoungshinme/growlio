@@ -49,8 +49,14 @@ async def test_run_alert_job_logs_exception_without_propagating():
     mock_db = _make_mock_db()
     mock_func = AsyncMock(side_effect=RuntimeError("service failure"))
 
-    with patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db):
+    with (
+        patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
+        patch("app.jobs._job_helpers.report_job_failure") as mock_report,
+    ):
         from app.jobs._job_helpers import run_alert_job
 
         # 예외가 전파되지 않아야 함
         await run_alert_job(mock_func, "test_job")
+
+    mock_report.assert_called_once()
+    assert isinstance(mock_report.call_args.args[1], RuntimeError)

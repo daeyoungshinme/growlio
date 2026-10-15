@@ -8,7 +8,7 @@ import FormInput from "@/components/common/FormInput";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import { challengeFormSchema } from "@/schemas/challenge";
 import { isStockAccount } from "@/utils/accounts";
-import { fmtKrw, fmtKrwPreview } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview, localMonth } from "@/utils/format";
 import { toast } from "@/utils/toast";
 import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -29,10 +29,6 @@ interface FormState {
   start_month: string;
   deadline_month: string;
   reminder_enabled: boolean;
-}
-
-function currentMonth(): string {
-  return new Date().toISOString().slice(0, 7);
 }
 
 interface Props {
@@ -71,7 +67,7 @@ export default function ChallengeFormModal({
     target_pct: challenge?.target_pct != null ? String(challenge.target_pct) : "",
     target_months: challenge?.target_months != null ? String(challenge.target_months) : "",
     account_id: challenge?.account_id ?? "",
-    start_month: challenge?.start_month ?? currentMonth(),
+    start_month: challenge?.start_month ?? localMonth(),
     deadline_month: challenge?.deadline_month ?? "",
     reminder_enabled: challenge?.reminder_enabled ?? true,
   }));

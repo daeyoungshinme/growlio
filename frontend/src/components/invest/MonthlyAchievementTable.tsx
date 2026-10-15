@@ -1,4 +1,5 @@
 import type { DCAProjectionPoint } from "@/api/invest";
+import { localMonth } from "@/utils/format";
 import AchievementTable from "./AchievementTable";
 
 interface Props {
@@ -7,7 +8,7 @@ interface Props {
 }
 
 export default function MonthlyAchievementTable({ data, flat }: Props) {
-  const today = new Date().toISOString().slice(0, 7);
+  const today = localMonth();
   const rows = data
     .filter((d) => d.month <= today && d.has_data)
     .slice(-24)

@@ -20,6 +20,7 @@ import { PLAN_LEG_STATUS_LABEL } from "@/constants/rebalancingConfig";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
+import { fmtDateTime } from "@/utils/format";
 
 const TRIGGER_LABEL: Record<string, string> = {
   MANUAL: "수동",
@@ -62,7 +63,7 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
             {STRATEGY_LABEL[item.strategy] ?? item.strategy}
           </span>
           <span className="text-sm text-gray-800 dark:text-gray-200">
-            {new Date(item.executed_at).toLocaleString("ko-KR")}
+            {fmtDateTime(item.executed_at)}
           </span>
         </div>
         <div className="flex items-center gap-4 shrink-0">

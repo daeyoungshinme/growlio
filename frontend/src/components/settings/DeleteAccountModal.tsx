@@ -9,6 +9,7 @@ import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import Modal from "@/components/common/Modal";
+import { storageRemove } from "@/utils/safeStorage";
 
 interface Props {
   onClose: () => void;
@@ -22,8 +23,8 @@ export default function DeleteAccountModal({ onClose }: Props) {
     mutationFn: () => deleteAccount(password),
     onSuccess: async () => {
       queryClient.clear();
-      window.localStorage.removeItem(PERSIST_CACHE_KEY);
-      window.localStorage.removeItem(AUTH_ME_CACHE_KEY);
+      storageRemove(PERSIST_CACHE_KEY);
+      storageRemove(AUTH_ME_CACHE_KEY);
       const supabase = await getSupabase();
       await supabase.auth.signOut().catch(() => {});
       useAuthStore.setState({

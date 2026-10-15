@@ -11,6 +11,8 @@ import {
   fmtKrwShort,
   fmtMonth,
   fmtPct,
+  fmtDateTime,
+  localMonth,
   localToday,
   relativeTime,
 } from "@/utils/format";
@@ -214,5 +216,31 @@ describe("localToday", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 5, 12, 0));
     expect(localToday()).toBe("2026-01-05");
+  });
+});
+
+describe("localMonth", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("매월 1일 로컬 자정 직후에도 이번 달 (UTC 기준이면 전월)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 1, 0, 30));
+    expect(localMonth()).toBe("2026-11");
+  });
+
+  it("1월 두 자리 패딩", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 1, 8, 59));
+    expect(localMonth()).toBe("2026-01");
+  });
+});
+
+describe("fmtDateTime", () => {
+  it('ko-KR 로컬 날짜·시각 표기 (인라인 toLocaleString("ko-KR")과 동일)', () => {
+    const iso = "2026-10-14T08:30:00Z";
+    expect(fmtDateTime(iso)).toBe(new Date(iso).toLocaleString("ko-KR"));
+    expect(fmtDateTime(iso)).toMatch(/^2026\. 10\. 14\./);
   });
 });

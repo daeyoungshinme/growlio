@@ -12,7 +12,7 @@ import {
 } from "@/api/rebalancingPlan";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PLAN_LEG_STATUS_LABEL } from "@/constants/rebalancingConfig";
-import { fmtKrwPrice } from "@/utils/format";
+import { fmtDateTime, fmtKrwPrice } from "@/utils/format";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
 
@@ -149,7 +149,7 @@ export default function RebalancingPlanConfirmPage() {
               leg.side === "BUY" ? (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                    {new Date(leg.deadline_at).toLocaleString("ko-KR")}에 자동 실행됩니다.
+                    {fmtDateTime(leg.deadline_at)}에 자동 실행됩니다.
                   </p>
                   <Button
                     variant="outline"
@@ -163,8 +163,7 @@ export default function RebalancingPlanConfirmPage() {
               ) : (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                    {new Date(leg.deadline_at).toLocaleString("ko-KR")}까지 응답이 없으면 자동
-                    취소됩니다.
+                    {fmtDateTime(leg.deadline_at)}까지 응답이 없으면 자동 취소됩니다.
                   </p>
                   <div className="flex gap-2">
                     <Button
