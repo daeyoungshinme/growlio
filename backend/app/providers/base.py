@@ -24,7 +24,7 @@ class Position:
     ticker: str
     name: str
     market: str
-    qty: int
+    qty: float  # 토스·수동 계좌는 소수점 주식(0.5주 등)이 있다 — int로 자르면 평가액이 0이 된다
     avg_price: float  # 항상 KRW
     current_price: float  # 항상 KRW
     currency: str  # KRW | USD (원본 통화)
@@ -60,7 +60,7 @@ def raw_krw_to_position(p: dict[str, Any]) -> Position:
 
     KIS/Kiwoom 모두 원화 종목 변환 로직이 거의 동일했던 것을 공용화한 것.
     """
-    qty = int(p.get("qty", 0))
+    qty = float(p.get("qty", 0))
     current_price = float(p.get("current_price", 0))
     return Position(
         ticker=p["ticker"],
@@ -82,7 +82,7 @@ def raw_usd_to_position(p: dict[str, Any], usd_krw_rate: float) -> Position:
     """
     avg_usd = float(p.get("avg_price", 0))
     cur_usd = float(p.get("current_price", 0))
-    qty = int(p.get("qty", 0))
+    qty = float(p.get("qty", 0))
     return Position(
         ticker=p["ticker"],
         name=p["name"],

@@ -101,7 +101,7 @@ def _db_to_provider_position(p: DBPosition) -> ProviderPosition:
         ticker=p.ticker,
         name=p.name or "",
         market=p.market,
-        qty=int(p.qty or 0),
+        qty=float(p.qty or 0),
         avg_price=float(p.avg_price or 0),
         current_price=float(p.current_price or p.avg_price or 0),
         currency=p.currency or "KRW",
