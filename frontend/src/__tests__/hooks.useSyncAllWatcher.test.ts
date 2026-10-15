@@ -24,6 +24,7 @@ import { getSyncAllStatus } from "@/api/assets";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { useSyncStore } from "@/stores/syncStore";
+import { SYNC_ALL_POLL_INTERVAL } from "@/constants/timers";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -156,5 +157,39 @@ describe("useSyncAllWatcher", () => {
     await waitFor(() => {
       expect(toast).toHaveBeenCalledWith("전체 동기화 실패: boom", "error");
     });
+  });
+
+  it("상태 조회가 한 번 실패해도 진행 표시를 유지하고, 연속 3회 실패해야 끝낸다", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getSyncAllStatus).mockRejectedValue(new Error("network"));
+      useSyncStore.getState().startSyncAll(3);
+
+      renderHook(() => useSyncAllWatcher(), { wrapper: createWrapper() });
+
+      await vi.advanceTimersByTimeAsync(0); // 첫 폴링(즉시)
+      expect(useSyncStore.getState().isSyncingAll).toBe(true);
+      await vi.advanceTimersByTimeAsync(SYNC_ALL_POLL_INTERVAL); // 2회
+      expect(useSyncStore.getState().isSyncingAll).toBe(true);
+      await vi.advanceTimersByTimeAsync(SYNC_ALL_POLL_INTERVAL); // 3회
+      expect(useSyncStore.getState().isSyncingAll).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("이전 상태 조회가 끝나기 전에는 다음 폴링을 보내지 않는다", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getSyncAllStatus).mockReturnValue(new Promise(() => {})); // 응답 없음
+      useSyncStore.getState().startSyncAll(3);
+
+      renderHook(() => useSyncAllWatcher(), { wrapper: createWrapper() });
+      await vi.advanceTimersByTimeAsync(SYNC_ALL_POLL_INTERVAL * 3);
+
+      expect(getSyncAllStatus).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

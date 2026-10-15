@@ -55,7 +55,11 @@ from app.services.external_queries import (
     monthly_net_deposits_by_account,
 )
 from app.services.goal_feasibility import build_feasibility_preview
-from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot, get_latest_snapshot_with_positions
+from app.services.snapshot_service import (
+    _upsert_snapshot,
+    get_latest_snapshot_with_positions,
+    get_latest_snapshots_by_account,
+)
 from app.services.trend_calculator import get_monthly_trend
 from app.utils.cache_keys import (
     challenge_progress_key,
@@ -95,9 +99,11 @@ async def list_account_balances(
     외부 서비스가 자유 빈도로 호출할 수 있어야 하므로 평가 비용이 드는 실시간 재계산을 피한다.
     """
     accounts = await _list_accounts(current_user.id, db, skip=0, limit=200)
+    # 외부 서비스가 자유 빈도로 부르는 엔드포인트라 계좌 수만큼 쿼리하지 않는다(최대 200)
+    latest_by_account = await get_latest_snapshots_by_account(db, [a.id for a in accounts])
     result: list[ExternalAccountBalance] = []
     for account in accounts:
-        latest_snap = await get_latest_snapshot(db, account.id)
+        latest_snap = latest_by_account.get(account.id)
         invested = pnl = None
         if latest_snap is not None:
             value = latest_snap.amount_krw

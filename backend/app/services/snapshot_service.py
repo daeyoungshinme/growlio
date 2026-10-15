@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetSnapshot, Position
+from app.services._snapshot_queries import latest_snapshot_subquery
 
 
 async def _upsert_snapshot(
@@ -51,6 +52,25 @@ async def get_latest_snapshot(db: AsyncSession, account_id: uuid.UUID) -> AssetS
         .order_by(AssetSnapshot.snapshot_date.desc())
         .limit(1)
     )
+
+
+async def get_latest_snapshots_by_account(
+    db: AsyncSession, account_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, AssetSnapshot]:
+    """계좌별 최신 스냅샷을 한 번에 조회한다 — 계좌마다 `get_latest_snapshot`을 부르는 N+1 대신.
+
+    (account_id, snapshot_date)가 유일(uq_snapshot_account_date)이라 max(date) 조인은 계좌당 1행이다.
+    """
+    if not account_ids:
+        return {}
+    subq = latest_snapshot_subquery(account_ids=account_ids)
+    rows = await db.scalars(
+        select(AssetSnapshot).join(
+            subq,
+            (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
+        )
+    )
+    return {snap.account_id: snap for snap in rows if snap.account_id is not None}
 
 
 async def get_latest_snapshot_with_positions(

@@ -111,7 +111,8 @@ export function RebalancingExecutionModal({
           {phase === "result" && <RebalancingResultSection results={results} />}
         </div>
 
-        {phase === "confirm" && missingLimitPriceTickers.length > 0 && (
+        {/* 시세를 불러오는 중엔 모든 종목이 '비어 있음'으로 잡힌다 — 위 로딩 배너로 충분하고 버튼은 계속 막혀 있다 */}
+        {phase === "confirm" && priceState !== "loading" && missingLimitPriceTickers.length > 0 && (
           <p
             role="alert"
             className="shrink-0 px-4 sm:px-6 pt-3 text-xs text-red-600 dark:text-red-400"

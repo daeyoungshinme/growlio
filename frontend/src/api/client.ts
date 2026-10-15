@@ -61,6 +61,8 @@ api.interceptors.response.use(
         return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
+          // 재시도도 _retry를 달아야 새 토큰으로 다시 401이면 갱신을 또 시작하지 않고 실패로 끝난다
+          config._retry = true;
           config.headers["Authorization"] = `Bearer ${token}`;
           return api.request(config);
         });

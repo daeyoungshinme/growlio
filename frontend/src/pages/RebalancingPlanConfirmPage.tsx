@@ -15,6 +15,7 @@ import { PLAN_LEG_STATUS_LABEL } from "@/constants/rebalancingConfig";
 import { fmtDateTime, fmtKrwPrice } from "@/utils/format";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
+import { STALE_TIME } from "@/constants/queryConfig";
 
 const REASON_LABEL: Record<string, string> = {
   NOT_FOUND: "존재하지 않는 링크입니다.",
@@ -79,7 +80,7 @@ export default function RebalancingPlanConfirmPage() {
     queryKey: QUERY_KEYS.rebalancingPlanPreview(token),
     queryFn: () => fetchPlanPreview(token),
     enabled: !!token,
-    staleTime: 0,
+    staleTime: STALE_TIME.NONE,
     retry: false,
   });
 

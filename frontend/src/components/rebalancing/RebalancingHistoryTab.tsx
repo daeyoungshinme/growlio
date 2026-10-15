@@ -21,6 +21,7 @@ import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import { fmtDateTime } from "@/utils/format";
+import { STALE_TIME } from "@/constants/queryConfig";
 
 const TRIGGER_LABEL: Record<string, string> = {
   MANUAL: "수동",
@@ -411,13 +412,13 @@ export default function RebalancingHistoryTab() {
   const { data: history = [], isLoading } = useQuery({
     queryKey: QUERY_KEYS.rebalancingHistory,
     queryFn: () => fetchRebalancingHistory(50),
-    staleTime: 30_000,
+    staleTime: STALE_TIME.SHORT,
   });
 
   const { data: planLegs = [] } = useQuery({
     queryKey: QUERY_KEYS.rebalancingPlans,
     queryFn: () => fetchRecentPlanLegs(30),
-    staleTime: 15_000,
+    staleTime: STALE_TIME.VERY_SHORT,
     // 대기 중(PENDING)인 leg가 있을 때만 30초마다 폴링 — 전부 확정된 상태면 서버 상태가 바뀔 일이
     // 없으므로 탭이 열려 있는 동안 계속 폴링할 필요가 없다.
     refetchInterval: (query) => {

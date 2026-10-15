@@ -33,7 +33,12 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
   useEffect(() => {
     suggestIdxRef.current = suggestIdx;
   }, [suggestIdx]);
-  const [priceLoadingRows, setPriceLoadingRows] = useState<Set<number>>(new Set());
+  // 행 키로 추적한다 — 인덱스로 들고 있으면 조회 중 위 행이 삭제될 때 스피너가 엉뚱한 행에 뜬다
+  const [priceLoadingKeys, setPriceLoadingKeys] = useState<Set<string>>(new Set());
+  const loadingKeyOf = (r: Position | undefined, i: number) => r?._rowKey ?? `idx:${i}`;
+  const priceLoadingRows = new Set(
+    rows.flatMap((r, i) => (priceLoadingKeys.has(loadingKeyOf(r, i)) ? [i] : [])),
+  );
 
   const {
     suggestions,
@@ -75,7 +80,8 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
     // 응답을 기다리는 동안 위 행이 삭제되면 인덱스가 밀리고, 같은 행에서 다른 종목을 다시 고르면 늦게 온
     // 응답이 덮어쓴다 — 행 키로 대상을 찾고, 그 행이 아직 이 종목일 때만 반영한다.
     const rowKey = rows[i]?._rowKey;
-    setPriceLoadingRows((prev) => new Set([...prev, i]));
+    const loadingKey = loadingKeyOf(rows[i], i);
+    setPriceLoadingKeys((prev) => new Set([...prev, loadingKey]));
     try {
       const result = await fetchStockPrice(ticker, market);
       if (result.price_krw) {
@@ -95,9 +101,9 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
     } catch (e: unknown) {
       toast(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
     } finally {
-      setPriceLoadingRows((prev) => {
+      setPriceLoadingKeys((prev) => {
         const s = new Set(prev);
-        s.delete(i);
+        s.delete(loadingKey);
         return s;
       });
     }

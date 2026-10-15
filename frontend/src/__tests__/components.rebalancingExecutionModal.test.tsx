@@ -30,7 +30,12 @@ const LIMIT_ORDER = {
   limit_price: null,
 };
 
-function setExec(over: { confirmed?: boolean; missing?: string[]; orders?: unknown[] }) {
+function setExec(over: {
+  confirmed?: boolean;
+  missing?: string[];
+  orders?: unknown[];
+  priceState?: string;
+}) {
   const dispatch = vi.fn();
   const handleExecute = vi.fn();
   execMock.current = {
@@ -39,7 +44,7 @@ function setExec(over: { confirmed?: boolean; missing?: string[]; orders?: unkno
       results: [],
       confirmed: over.confirmed ?? false,
       orderType: "LIMIT",
-      priceState: "done",
+      priceState: over.priceState ?? "done",
       priceLoadProgress: { loaded: 0, total: 0 },
     },
     orders: over.orders ?? [LIMIT_ORDER],
@@ -72,6 +77,14 @@ describe("RebalancingExecutionModal 실행 게이트", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "지정가가 비어 있는 주문이 있습니다: AAPL —",
     );
+    expect(screen.getByRole("button", { name: /지정가 주문 확인/ })).toBeDisabled();
+  });
+
+  it("시세를 불러오는 중에는 누락 경고 대신 로딩만 보이고 버튼은 막혀 있다", () => {
+    setExec({ missing: ["AAPL"], priceState: "loading" });
+    renderModal();
+
+    expect(screen.queryByText(/지정가가 비어 있는 주문이 있습니다/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /지정가 주문 확인/ })).toBeDisabled();
   });
 
