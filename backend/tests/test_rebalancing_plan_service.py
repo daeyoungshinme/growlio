@@ -1005,7 +1005,8 @@ class TestExecuteDueBuyLegs:
         with (
             patch("app.utils.market_hours.is_korean_market_open", return_value=False),
             patch("app.utils.market_hours.is_us_market_open", return_value=True),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            # 해외 LIMIT은 실행 직전 현지통화(USD) 시세가 있어야 주문한다 — 저장값은 원화
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"AAPL": 150.0})),
             patch(
                 "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(return_value=([], execution_id)),
@@ -1178,3 +1179,54 @@ class TestExecutedPlanIds:
         sql = str(mock_db.execute.call_args.args[0])
         assert "status" in sql
         assert "DISTINCT" in sql
+
+
+# ── _rebuild_orders_from_items: 해외 지정가 통화 ──────────────────────────
+
+
+def _make_plan_item(**kwargs) -> SimpleNamespace:
+    defaults = {
+        "ticker": "AAPL",
+        "name": "Apple",
+        "market": "NASDAQ",
+        "quantity": 3,
+        "account_id": str(uuid.uuid4()),
+        "order_type": "LIMIT",
+        # 계획 생성 시점 값은 원화(확인 페이지·이메일이 fmtKrwPrice로 표시하는 계약)
+        "limit_price": 280000.0,
+        "reference_price": 280000.0,
+    }
+    defaults.update(kwargs)
+    return SimpleNamespace(**defaults)
+
+
+class TestRebuildOrdersOverseasLimitCurrency:
+    @pytest.mark.asyncio
+    async def test_overseas_limit_uses_fresh_native_price(self, mock_db):
+        from app.services.rebalancing.plan_execution import _rebuild_orders_from_items
+
+        with patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"AAPL": 201.5})):
+            orders = await _rebuild_orders_from_items([_make_plan_item()], "BUY", uuid.uuid4(), mock_db, None)
+
+        assert orders[0].limit_price == 201.5
+
+    @pytest.mark.asyncio
+    async def test_overseas_limit_refresh_failure_does_not_send_krw_as_usd(self, mock_db):
+        """현지통화 시세 갱신이 실패하면 저장된 원화 지정가(280,000)가 달러 주문으로 나가던 버그."""
+        from app.services.rebalancing.plan_execution import _rebuild_orders_from_items
+
+        with (
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(side_effect=RuntimeError("yahoo"))),
+            pytest.raises(ValueError, match="현재가"),
+        ):
+            await _rebuild_orders_from_items([_make_plan_item()], "BUY", uuid.uuid4(), mock_db, None)
+
+    @pytest.mark.asyncio
+    async def test_domestic_limit_falls_back_to_stored_krw_price(self, mock_db):
+        from app.services.rebalancing.plan_execution import _rebuild_orders_from_items
+
+        item = _make_plan_item(ticker="005930", market="KOSPI", limit_price=70000.0, reference_price=70000.0)
+        with patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})):
+            orders = await _rebuild_orders_from_items([item], "BUY", uuid.uuid4(), mock_db, None)
+
+        assert orders[0].limit_price == 70000.0

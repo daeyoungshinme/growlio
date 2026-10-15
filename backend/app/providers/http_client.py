@@ -84,6 +84,29 @@ def _is_rate_limit_body(response: httpx.Response) -> bool:
     )
 
 
+def _log_error_response(
+    response: httpx.Response,
+    path: str,
+    log_prefix: str,
+    check_token_expired: Callable[[dict[str, Any], int], bool],
+    token_expired_exc: type[Exception],
+) -> None:
+    """4xx/5xx 응답을 로깅하고, 토큰 만료 응답이면 token_expired_exc를 raise한다."""
+    try:
+        error_body = response.json()
+        if _is_rate_limit_body(response):
+            # EGW00201 — 재시도 가능한 rate limit, WARNING으로 처리
+            logger.warning(f"{log_prefix}_rate_limit_response", status=response.status_code, path=path)
+        else:
+            logger.error(f"{log_prefix}_http_error", status=response.status_code, body=error_body, path=path)
+        if check_token_expired(error_body, response.status_code):
+            raise token_expired_exc()
+    except token_expired_exc:
+        raise
+    except Exception:
+        logger.error(f"{log_prefix}_http_error", status=response.status_code, body=response.text, path=path)
+
+
 async def broker_request(
     method: str,
     path: str,
@@ -111,8 +134,9 @@ async def broker_request(
         retry_on_request_error: httpx.RequestError(타임아웃/커넥션 오류) 발생 시 재시도 여부.
             주문 접수처럼 서버가 요청을 실제로 처리했을 수 있는 뮤테이션 호출은 False로 넘겨
             응답 유실 시 동일 payload를 맹목적으로 재시도해 중복 주문이 나가는 것을 막는다
-            (KIS/키움 API는 클라이언트 지정 idempotency key를 지원하지 않음). 조회성 호출은
-            재시도해도 안전하므로 기본값 True를 유지한다.
+            (KIS/키움 API는 클라이언트 지정 idempotency key를 지원하지 않음). False면 HTTP 5xx도
+            재시도하지 않는다(접수 후 게이트웨이 오류일 수 있음). 429/rate-limit 본문은 미접수가
+            확실하므로 계속 재시도한다. 조회성 호출은 재시도해도 안전하므로 기본값 True를 유지한다.
     """
     client = _get_client(ssl_verify)
     async with semaphore:
@@ -126,33 +150,7 @@ async def broker_request(
                     json=json,
                 )
                 if response.status_code >= 400:
-                    try:
-                        error_body = response.json()
-                        if _is_rate_limit_body(response):
-                            # EGW00201 — 재시도 가능한 rate limit, WARNING으로 처리
-                            logger.warning(
-                                f"{log_prefix}_rate_limit_response",
-                                status=response.status_code,
-                                path=path,
-                            )
-                        else:
-                            logger.error(
-                                f"{log_prefix}_http_error",
-                                status=response.status_code,
-                                body=error_body,
-                                path=path,
-                            )
-                        if check_token_expired(error_body, response.status_code):
-                            raise token_expired_exc()
-                    except token_expired_exc:
-                        raise
-                    except Exception:
-                        logger.error(
-                            f"{log_prefix}_http_error",
-                            status=response.status_code,
-                            body=response.text,
-                            path=path,
-                        )
+                    _log_error_response(response, path, log_prefix, check_token_expired, token_expired_exc)
                     response.raise_for_status()
                 data = response.json()
                 check_api_error(data, path)
@@ -171,6 +169,12 @@ async def broker_request(
                     await asyncio.sleep(wait)
                 elif 400 <= e.response.status_code < 500:
                     raise
+                elif not retry_on_request_error:
+                    # 5xx(502/504 등)는 브로커가 이미 접수한 뒤 게이트웨이에서 날 수도 있다 — 뮤테이션은
+                    # 재전송하면 중복 주문이 되므로 전송 오류와 똑같이 "처리 여부 불명"으로 즉시 실패시킨다.
+                    raise RuntimeError(
+                        f"{log_prefix} API 서버 오류 {e.response.status_code}(재시도 비활성화 — 실제 접수 여부 불명)"
+                    ) from e
                 elif attempt < retries - 1:
                     await asyncio.sleep(1 + random.uniform(0, 0.5))  # nosec B311 — jitter용, 보안 목적 아님
                 else:

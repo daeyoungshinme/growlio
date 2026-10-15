@@ -89,13 +89,13 @@ async def _execute_kiwoom_sells_with_clamp(
     if overseas_sells:
         try:
             balance = await kiwoom_get_overseas_balance(access_token, account_no, is_mock=is_mock)
+            # 키움 해외잔고는 거래소를 주지 않아 market이 "US" 센티널이고(kiwoom/balance.py),
+            # 주문은 NYSE/NASDAQ/AMEX다 — market까지 키에 넣으면 전부 보유 0으로 오판한다.
+            # overseas_sells는 이미 해외만 걸렀으므로 ticker 단독 키로 비교한다.
             held_overseas: dict[str, int] = {}
             for p in balance.get("positions", []):
-                key = f"{p['ticker']}:{str(p.get('market', '')).upper()}"
-                held_overseas[key] = held_overseas.get(key, 0) + int(p.get("qty", 0))
-            adjusted_o, skipped_o = clamp_sell_orders(
-                overseas_sells, held_overseas, key_fn=lambda o: f"{o.ticker}:{o.market.upper()}"
-            )
+                held_overseas[p["ticker"]] = held_overseas.get(p["ticker"], 0) + int(p.get("qty", 0))
+            adjusted_o, skipped_o = clamp_sell_orders(overseas_sells, held_overseas)
         except Exception as exc:
             logger.warning("kiwoom_sell_clamp_overseas_balance_failed", error=str(exc))
             adjusted_o, skipped_o = overseas_sells, []

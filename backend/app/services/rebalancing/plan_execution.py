@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.services.alerts.alert_service import save_alert_history
+from app.services.rebalancing.order_builder import market_group
 from app.services.rebalancing.plan_notifications import _notify_leg_execution_failed, _send_leg_execution_email
 
 logger = structlog.get_logger()
@@ -111,6 +112,10 @@ async def _rebuild_orders_from_items(
             fresh = price_map.get(item.ticker or "")
             if fresh and fresh > 0:
                 limit_price = float(fresh)
+            elif market_group(item.market or "") == "US":
+                # 저장된 limit_price는 원화(확인 페이지·이메일 표시용)라 해외 주문(USD)에 그대로 쓸 수 없다 —
+                # 현지통화 시세를 못 받으면 지정가를 정할 수 없으므로 주문하지 않는다(leg FAILED + 알림).
+                raise ValueError(f"{item.ticker} 해외 현재가 조회에 실패해 지정가를 정할 수 없어 주문하지 않았습니다.")
         orders.append(
             ExecutionOrderItem(
                 ticker=item.ticker or "",
@@ -134,9 +139,9 @@ async def _execute_leg(
     from app.services.rebalancing.execution_service import execute_rebalancing
 
     await db.refresh(locked, attribute_names=["items"])
-    orders = await _rebuild_orders_from_items(locked.items, locked.side, plan.user_id, db, cache)
 
     try:
+        orders = await _rebuild_orders_from_items(locked.items, locked.side, plan.user_id, db, cache)
         _results, execution_id = await execute_rebalancing(
             user_id=plan.user_id,
             account_id=plan.account_id,
