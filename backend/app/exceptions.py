@@ -61,3 +61,7 @@ class ProviderApiError(SyncError):
 
 class ProviderNetworkError(SyncError):
     """연결 실패 또는 타임아웃."""
+
+
+class BalancePaginationError(RuntimeError):
+    """잔고 연속조회가 페이지 상한을 넘거나 같은 연속키를 반복 — 부분 목록으로 동기화하지 않는다."""

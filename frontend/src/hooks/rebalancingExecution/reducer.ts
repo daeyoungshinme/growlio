@@ -15,6 +15,7 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
         liveBalances: action.balances,
         depositKrw: action.deposits,
         orderableKrw: action.orderables,
+        overseasUnknown: action.overseasUnknown,
         balanceState: { ...state.balanceState, ...action.states },
       };
     case "BALANCES_ERROR":
@@ -34,6 +35,7 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
         liveBalances: { ...state.liveBalances, [action.accountId]: action.positions },
         depositKrw: { ...state.depositKrw, [action.accountId]: action.deposit },
         orderableKrw: nextOrderable,
+        overseasUnknown: { ...state.overseasUnknown, [action.accountId]: action.overseasUnknown },
         balanceState: { ...state.balanceState, [action.accountId]: "loaded" },
       };
     }

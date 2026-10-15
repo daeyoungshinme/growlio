@@ -89,7 +89,7 @@ vi.mock("@/stores/authStore", () => ({
 }));
 
 vi.mock("@/lib/supabase", () => ({
-  wasPasswordRecoveryDetected: vi.fn(() => false),
+  consumePasswordRecovery: vi.fn(() => false),
   getSupabase: async () => ({
     auth: {
       onAuthStateChange: vi.fn(() => ({

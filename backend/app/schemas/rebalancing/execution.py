@@ -82,6 +82,8 @@ class KisBalanceResponse(BaseModel):
     positions: list[KisBalancePosition]
     deposit_krw: float
     orderable_krw: float | None = None  # KIS만 지원 (nrcvb_buy_amt), 키움=None
+    # False면 해외 잔고 조회가 실패해 positions에 해외 보유분이 빠져 있다 — 해외 매도 수량을 0으로 오인하지 않게
+    overseas_known: bool = True
     error: str | None = None  # 일괄 조회 시 계좌별 오류 메시지
 
 

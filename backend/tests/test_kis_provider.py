@@ -78,6 +78,26 @@ class TestKISProviderSync:
             await KISProvider().sync(account, db=AsyncMock(), cache=mock_cache)
 
     @pytest.mark.asyncio
+    async def test_sync_pagination_error_maps_to_provider_502(self, override_settings, make_account, mock_cache):
+        """잔고 연속조회 상한/반복 키는 전역 500이 아니라 키움과 같은 502 ProviderApiError로 (계획 57 B3)."""
+        from app.exceptions import BalancePaginationError, ProviderApiError
+
+        account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
+        with (
+            patch("app.providers.kis_provider.decrypt", side_effect=["key", "secret"]),
+            patch("app.providers.kis_provider.get_access_token", new=AsyncMock(return_value="token-1")),
+            patch(
+                "app.providers.kis_provider.get_domestic_balance",
+                new=AsyncMock(side_effect=BalancePaginationError("KIS 잔고 연속조회가 20페이지를 넘었습니다")),
+            ),
+            patch("app.providers.kis_provider.get_overseas_balance", new=AsyncMock(return_value=_empty_overseas())),
+            pytest.raises(ProviderApiError) as exc_info,
+        ):
+            await KISProvider().sync(account, db=AsyncMock(), cache=mock_cache)
+        assert exc_info.value.http_status == 502
+        assert "연속조회" in exc_info.value.detail
+
+    @pytest.mark.asyncio
     async def test_sync_happy_path_no_token_expiry(self, override_settings, make_account, mock_cache):
         account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
         provider = KISProvider()

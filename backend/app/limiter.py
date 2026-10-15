@@ -48,12 +48,28 @@ def rate_limit_key(request: Request) -> str:
 def ip_rate_limit_key(request: Request) -> str:
     """클라이언트 IP 버킷 — 인증 없는 라우트용. 위조 JWT `sub`로 버킷을 바꿔 한도를 우회하지 못하게 한다.
 
+    첫 hop은 origin 직접 호출 시 위조 가능하므로 단독으로 쓰지 말고 `peer_rate_limit_key` 상한을 겹쳐
+    건다. 종목 검색·환율처럼 로그인 사용자가 주로 부르는 저가치 조회 라우트는 공용 IP(통신사 CGNAT·사무실)
+    버킷을 나눠 쓰지 않도록 기본 `rate_limit_key`를 쓴다.
+
     남은 한계: 데코레이터 없는 인증 라우트의 기본 한도(120/min)는 SlowAPIMiddleware가 인증 전에 키를
     계산하므로, 피해자의 사용자 UUID를 아는 사람이 위조 토큰으로 그 버킷을 소진시킬 수 있다. UUID는
     외부에 노출되지 않고 결과가 일시적 429뿐이라 서명 검증(JWKS, 비동기) 비용 대신 감수한다.
     """
     forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
     return f"ip:{forwarded or get_remote_address(request)}"
+
+
+def peer_rate_limit_key(request: Request) -> str:
+    """직전 hop 버킷 — `ip_rate_limit_key`와 겹쳐 거는 위조 불가 상한.
+
+    `X-Forwarded-For` 첫 hop은 Vercel을 거치면 Vercel이 덮어써 믿을 수 있지만, Render origin을 직접
+    호출하면 클라이언트가 마음대로 넣은 값이라 요청마다 바꿔 버킷을 새로 만들 수 있다. 맨 끝 hop은
+    Render 프록시가 붙인 접속 주소라 위조할 수 없다. Vercel 경유 요청은 이 값이 Vercel egress IP라 여러
+    사용자가 한 버킷을 나눠 쓰므로, 라우트 자체 한도보다 넉넉하게(10배) 걸어 직접 호출 남용만 막는다.
+    """
+    hops = [h.strip() for h in request.headers.get("x-forwarded-for", "").split(",") if h.strip()]
+    return f"peer:{hops[-1] if hops else get_remote_address(request)}"
 
 
 # in-memory storage — 단일 인스턴스(Render free plan) 배포라 인스턴스 간 rate limit 공유가 불필요.

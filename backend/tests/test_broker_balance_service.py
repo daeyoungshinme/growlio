@@ -192,3 +192,23 @@ class TestFetchBrokerBalance:
         assert result.orderable_krw is None
         assert result.deposit_krw == 50_000.0
         assert result.positions[0].ticker == "000660"
+
+    @pytest.mark.asyncio
+    async def test_overseas_unknown_is_reported(self, make_account, mock_db, mock_cache):
+        # 해외 잔고 조회 실패 시 positions에 해외분이 빠진다 — 매도 수량 0 오인 방지(계획 57 B5)
+        account = make_account(
+            asset_type="STOCK_KIWOOM",
+            data_source="KIWOOM_API",
+            kiwoom_app_key=b"enc_key",
+            kiwoom_app_secret=b"enc_secret",
+        )
+        balance = BalanceResult(positions=[_position()], deposit_krw=0.0, overseas_known=False)
+
+        with (
+            _patch_session(mock_db),
+            patch("app.services.rebalancing.broker_balance_service.KiwoomProvider") as mock_provider_cls,
+        ):
+            mock_provider_cls.return_value.sync = AsyncMock(return_value=balance)
+            result = await fetch_broker_balance(account, mock_cache)
+
+        assert result.overseas_known is False

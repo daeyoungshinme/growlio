@@ -15,10 +15,13 @@ let clientPromise: Promise<SupabaseClient> | null = null;
 // detectSessionInUrl은 클라이언트 초기화 중에 PASSWORD_RECOVERY를 딱 한 번 발생시킨다. 재설정 페이지는
 // 지연 청크라 구독 시점에 이미 지나갔을 수 있으므로(부팅 시 api/client가 먼저 클라이언트를 만든다),
 // 클라이언트 생성 직후 등록한 리스너로 기록해 둔다. 로그인 세션만으로는 재설정 화면을 열지 않기 위함.
+// 읽으면서 지운다 — 남겨 두면 같은 탭에서 이후 일반 로그인 세션으로도 재설정 폼이 열린다(계획 57 B4).
 let passwordRecoveryDetected = false;
 
-export function wasPasswordRecoveryDetected(): boolean {
-  return passwordRecoveryDetected;
+export function consumePasswordRecovery(): boolean {
+  const detected = passwordRecoveryDetected;
+  passwordRecoveryDetected = false;
+  return detected;
 }
 
 // @supabase/supabase-js(약 200KB)를 top-level import하면 이 파일을 참조하는 모든 부팅 경로

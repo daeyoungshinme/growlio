@@ -27,6 +27,8 @@ export interface GlobalCashSummary {
 
 export interface ExecutionState {
   liveBalances: Record<string, KisBalancePosition[]>;
+  /** 해외 잔고 조회가 실패한 계좌 — 해외 종목 수량은 실시간 잔고 대신 마지막 동기화 값을 쓴다 */
+  overseasUnknown: Record<string, boolean>;
   balanceState: Record<string, BalanceLoadState>;
   depositKrw: Record<string, number>;
   orderableKrw: Record<string, number>;
@@ -55,6 +57,7 @@ export type ExecutionAction =
       balances: Record<string, KisBalancePosition[]>;
       deposits: Record<string, number>;
       orderables: Record<string, number>;
+      overseasUnknown: Record<string, boolean>;
       states: Record<string, BalanceLoadState>;
     }
   | { type: "BALANCES_ERROR"; accountIds: string[] }
@@ -65,6 +68,7 @@ export type ExecutionAction =
       positions: KisBalancePosition[];
       deposit: number;
       orderable: number | null;
+      overseasUnknown: boolean;
     }
   | { type: "BALANCE_ERROR"; accountId: string; is404: boolean }
   | { type: "PRICES_START"; total: number }

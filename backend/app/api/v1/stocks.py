@@ -16,7 +16,7 @@ from app.constants import DOMESTIC_MARKETS
 from app.core.cache_store import CacheStore, get_cache_store
 from app.core.database import get_db
 from app.kis.constants import OVERSEAS_MARKETS
-from app.limiter import ip_rate_limit_key, limiter
+from app.limiter import limiter
 from app.models.user import User
 from app.services.price_service import _price_via_kis, domestic_price_fallback
 from app.services.recommendation_universe import resolve_index_region
@@ -40,7 +40,7 @@ router = APIRouter(prefix="/stocks", tags=["stocks"])
 
 
 @router.get("/search")
-@limiter.limit("30/minute", key_func=ip_rate_limit_key)
+@limiter.limit("30/minute")
 async def search_stocks(
     request: Request,
     q: str = Query(..., min_length=1, max_length=100),
@@ -55,7 +55,7 @@ async def search_stocks(
 
 
 @router.get("/index-region")
-@limiter.limit("30/minute", key_func=ip_rate_limit_key)
+@limiter.limit("30/minute")
 async def get_index_region(
     request: Request,
     ticker: str = Query(..., min_length=1, max_length=20),
@@ -89,7 +89,7 @@ async def get_index_region(
 
 
 @router.get("/exchange-rate")
-@limiter.limit("10/minute", key_func=ip_rate_limit_key)
+@limiter.limit("10/minute")
 async def get_exchange_rate(request: Request, cache: CacheStore = Depends(get_cache_store)):
     """현재 USD/KRW 환율 조회 (캐시 → yfinance, ~15분 지연)."""
     from app.services.yahoo_price import fetch_usdkrw

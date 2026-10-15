@@ -142,6 +142,7 @@ const mockKisAccounts: AssetAccount[] = [
 
 const baseState: ExecutionState = {
   liveBalances: {},
+  overseasUnknown: {},
   balanceState: {},
   depositKrw: {},
   orderableKrw: {},
@@ -191,6 +192,7 @@ describe("executionReducer", () => {
       },
       deposits: { acc1: 1000000 },
       orderables: { acc1: 800000 },
+      overseasUnknown: { acc1: false },
       states: { acc1: "loaded" },
     };
     const result = executionReducer(baseState, action);
@@ -219,9 +221,11 @@ describe("executionReducer", () => {
       positions: [],
       deposit: 2000000,
       orderable: 1500000,
+      overseasUnknown: true,
     };
     const result = executionReducer(baseState, action);
     expect(result.depositKrw["acc1"]).toBe(2000000);
+    expect(result.overseasUnknown["acc1"]).toBe(true);
     expect(result.orderableKrw["acc1"]).toBe(1500000);
     expect(result.balanceState["acc1"]).toBe("loaded");
   });
@@ -926,5 +930,55 @@ describe("useRebalancingExecution", () => {
     });
 
     expect(result.current.getLimitPriceNative("sell_AAPL_acc1", "AAPL", "NASDAQ")).toBe(233.34);
+  });
+});
+
+describe("useRebalancingExecution — 해외 잔고 조회 실패 (계획 57 B5)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function ordersAfterLiveBalance(overseasUnknown: boolean) {
+    const { fetchAllBrokerBalances } = await import("@/api/rebalancing");
+    vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
+    const { result } = renderHook(
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: mockAnalysis,
+          accounts: mockKisAccounts,
+        }),
+      { wrapper: createWrapper() },
+    );
+    // 실시간 잔고에 국내 종목만 있다(해외 잔고 조회 실패 시의 응답 형태)
+    act(() => {
+      result.current.dispatch({
+        type: "BALANCE_LOADED",
+        accountId: "acc1",
+        positions: [
+          {
+            ticker: "005930",
+            name: "삼성전자",
+            market: "KRX",
+            quantity: 10,
+            avg_price: 70000,
+            current_price: 70000,
+            value_krw: 700000,
+          },
+        ],
+        deposit: 5000000,
+        orderable: null,
+        overseasUnknown,
+      });
+    });
+    return result.current.orders;
+  }
+
+  it("해외 잔고를 모르면 해외 매도 행을 마지막 동기화 수량으로 유지한다", async () => {
+    const orders = await ordersAfterLiveBalance(true);
+    expect(orders.some((o) => o.ticker === "AAPL" && o.side === "SELL")).toBe(true);
+  });
+
+  it("해외 잔고를 알고 실제로 없으면 해외 매도 행을 만들지 않는다", async () => {
+    const orders = await ordersAfterLiveBalance(false);
+    expect(orders.some((o) => o.ticker === "AAPL" && o.side === "SELL")).toBe(false);
   });
 });

@@ -122,6 +122,7 @@ export function useRebalancingExecution({
       const { buyAccounts, selected } = computeInitialBuyAndSelected(a, kas);
       return {
         liveBalances: {},
+        overseasUnknown: {},
         balanceState: {},
         depositKrw: {},
         orderableKrw: {},
@@ -147,6 +148,7 @@ export function useRebalancingExecution({
 
   const {
     liveBalances,
+    overseasUnknown,
     qtyOverrides,
     buyAccounts,
     selected,
@@ -164,8 +166,18 @@ export function useRebalancingExecution({
   );
   const { loadAllPrices, retryPrice } = useRebalancingPrices(dispatch, analysis);
 
+  // 해외 잔고 조회가 실패한 계좌의 해외 종목은 실시간 잔고에 없다 — 없음(0주)으로 보면 매도 행이 사라진다
+  function hasLiveBalanceFor(ticker: string, accountId: string): boolean {
+    if (!liveBalances[accountId]) return false;
+    if (!overseasUnknown[accountId]) return true;
+    const market = analysis.items.find((i) => i.ticker === ticker)?.market ?? "";
+    return !isOverseasMarket(market);
+  }
+
   function getAccountQuantity(ticker: string, accountId: string): number {
-    const livePos = liveBalances[accountId]?.find((p) => p.ticker === ticker);
+    const livePos = hasLiveBalanceFor(ticker, accountId)
+      ? liveBalances[accountId]?.find((p) => p.ticker === ticker)
+      : undefined;
     if (livePos !== undefined) return livePos.quantity;
     return (
       (analysis.ticker_account_map[ticker] ?? []).find((a) => a.account_id === accountId)
@@ -174,7 +186,7 @@ export function useRebalancingExecution({
   }
 
   function accountHoldsTicker(ticker: string, accountId: string): boolean {
-    if (liveBalances[accountId]) {
+    if (hasLiveBalanceFor(ticker, accountId)) {
       return liveBalances[accountId].some((p) => p.ticker === ticker && p.quantity > 0);
     }
     return (analysis.ticker_account_map[ticker] ?? []).some(

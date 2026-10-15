@@ -583,6 +583,7 @@ describe("useAssetManagementData", () => {
 
 const baseReducerState: ExecutionState = {
   liveBalances: {},
+  overseasUnknown: {},
   balanceState: {},
   depositKrw: {},
   orderableKrw: {},
