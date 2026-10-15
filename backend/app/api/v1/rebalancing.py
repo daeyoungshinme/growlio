@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
+from app.core.logging import public_error_message
 from app.limiter import limiter
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -341,7 +342,7 @@ async def get_all_broker_balances(
             is_mock=acc.is_mock_mode,
             positions=[],
             deposit_krw=0.0,
-            error=str(r),
+            error=public_error_message(r),
         )
         for acc, r in zip(accounts, results, strict=False)
     ]

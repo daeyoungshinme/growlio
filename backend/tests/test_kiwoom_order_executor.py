@@ -81,15 +81,34 @@ class TestExecuteKiwoomSingleOrder:
         assert result.price == 70000.0
 
     @pytest.mark.asyncio
-    async def test_place_order_exception_returns_failed(self):
+    async def test_place_order_rejection_returns_broker_reason(self):
+        from app.exceptions import BrokerOrderRejectedError
+
         order = _make_order(quantity=1)
         with patch.object(
-            _kiwoom_order_executor, "place_domestic_order", AsyncMock(side_effect=RuntimeError("주문 거부"))
+            _kiwoom_order_executor,
+            "place_domestic_order",
+            AsyncMock(side_effect=BrokerOrderRejectedError("주문가능금액이 부족합니다")),
         ):
             result = await _kiwoom_order_executor._execute_kiwoom_single_order(order, "token", "1234567890", True)
 
         assert result.status == "FAILED"
-        assert result.error_msg == "주문 거부"
+        assert result.error_msg == "주문가능금액이 부족합니다"
+
+    @pytest.mark.asyncio
+    async def test_unexpected_exception_text_is_not_exposed(self):
+        # SQL 바인드 파라미터·URL이 섞일 수 있는 원문은 응답·실행 이력에 남기지 않는다(계획 57 D1)
+        order = _make_order(quantity=1)
+        with patch.object(
+            _kiwoom_order_executor,
+            "place_domestic_order",
+            AsyncMock(side_effect=RuntimeError("(psycopg) INSERT ... access_token='secret-token'")),
+        ):
+            result = await _kiwoom_order_executor._execute_kiwoom_single_order(order, "token", "1234567890", True)
+
+        assert result.status == "FAILED"
+        assert "secret-token" not in (result.error_msg or "")
+        assert "RuntimeError" in (result.error_msg or "")
 
 
 class TestExecuteKiwoomSellsWithClamp:

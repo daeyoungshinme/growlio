@@ -73,3 +73,34 @@ def test_backtest_start_date_and_portfolio_count_bounded():
         BacktestRunRequest(portfolio_ids=[], start_date=date(1900, 1, 1), end_date=date(2020, 1, 1))
     # 빈 목록은 SPY·실포트폴리오만 비교하는 정상 요청
     assert BacktestRunRequest(portfolio_ids=[], start_date=date(2015, 1, 1), end_date=date(2020, 1, 1))
+
+
+def test_public_error_message_hides_unexpected_and_keeps_domain_messages():
+    import httpx
+    from fastapi import HTTPException
+
+    from app.core.logging import public_error_message
+    from app.exceptions import BrokerOrderRejectedError, ProviderApiError
+    from app.providers.http_client import BrokerRequestError
+
+    assert public_error_message(HTTPException(status_code=400, detail="잘못된 요청")) == "잘못된 요청"
+    assert public_error_message(ProviderApiError("KIS API 오류: 잔고 없음")) == "KIS API 오류: 잔고 없음"
+    assert public_error_message(BrokerOrderRejectedError("주문가능금액 부족")) == "주문가능금액 부족"
+    assert "실제 접수 여부 불명" in public_error_message(BrokerRequestError("서버 오류 500(실제 접수 여부 불명)"))
+    request = httpx.Request("GET", "https://broker.example/inquire?CANO=12345678")
+    leaked = httpx.HTTPStatusError("400", request=request, response=httpx.Response(400, request=request))
+    assert "12345678" not in public_error_message(leaked)
+
+
+def test_http_status_fallback_does_not_include_url():
+    import httpx
+
+    from app.providers._error_mapping import map_http_status_error
+
+    request = httpx.Request("GET", "https://broker.example/inquire?CANO=12345678")
+    err = httpx.HTTPStatusError(
+        "400 for url ...CANO=12345678", request=request, response=httpx.Response(400, request=request)
+    )
+    mapped = map_http_status_error(err, broker_name="KIS", message_key="msg1")
+    assert "12345678" not in mapped.detail
+    assert "HTTP 400" in mapped.detail

@@ -63,5 +63,13 @@ class ProviderNetworkError(SyncError):
     """연결 실패 또는 타임아웃."""
 
 
+class BrokerOrderRejectedError(RuntimeError):
+    """증권사가 주문을 거부(rt_cd/return_code != 0) — 메시지는 증권사 사유라 사용자에게 그대로 보여 준다.
+
+    RuntimeError 하위라 기존 호출부와 호환된다. 일반 RuntimeError는 원문을 노출하지 않으므로 거부 사유를
+    잃지 않으려면 이 타입이어야 한다(`public_error_message`).
+    """
+
+
 class BalancePaginationError(RuntimeError):
     """잔고 연속조회가 페이지 상한을 넘거나 같은 연속키를 반복 — 부분 목록으로 동기화하지 않는다."""

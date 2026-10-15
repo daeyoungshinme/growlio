@@ -13,10 +13,12 @@ from app.exceptions import ProviderApiError, ProviderNetworkError
 def map_http_status_error(e: httpx.HTTPStatusError, *, broker_name: str, message_key: str) -> ProviderApiError:
     if e.response.status_code >= 500:
         return ProviderApiError(f"{broker_name} API 오류: 모의투자/실계좌 설정을 확인하세요.", http_status=502)
+    # str(e)는 요청 URL 전체(KIS 잔고 GET은 쿼리스트링에 계좌번호)를 담아 사용자 응답에 내보내면 안 된다
+    fallback = f"HTTP {e.response.status_code}"
     try:
-        msg = e.response.json().get(message_key) or str(e)
+        msg = e.response.json().get(message_key) or fallback
     except Exception:
-        msg = str(e)
+        msg = fallback
     return ProviderApiError(f"{broker_name} API 오류: {msg}")
 
 

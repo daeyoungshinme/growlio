@@ -44,14 +44,25 @@ def public_error_message(error: BaseException) -> str:
     """
     from fastapi import HTTPException
 
-    from app.exceptions import AppError, BalancePaginationError, SyncError
+    from app.exceptions import AppError, BalancePaginationError, BrokerOrderRejectedError, SyncError
     from app.kis.client import KisApiError
+    from app.kiwoom.client import KiwoomApiError, KiwoomTokenIssueError
+    from app.providers.http_client import BrokerRequestError
 
     if isinstance(error, HTTPException):
         return format_sync_error(str(error.detail))
-    if isinstance(error, KisApiError):
-        return format_sync_error(f"KIS API 오류 [{error.rt_cd}]: {error.msg}")
-    if isinstance(error, AppError | SyncError | BalancePaginationError | ValueError):
+    if isinstance(
+        error,
+        AppError
+        | SyncError
+        | BalancePaginationError
+        | BrokerOrderRejectedError
+        | BrokerRequestError
+        | KisApiError
+        | KiwoomApiError
+        | KiwoomTokenIssueError
+        | ValueError,
+    ):
         return format_sync_error(error)
     return f"내부 오류가 발생했습니다({type(error).__name__})"
 

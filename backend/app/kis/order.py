@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from app.exceptions import BrokerOrderRejectedError
 from app.kis.client import auth_headers, kis_request, split_account_no
 from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
@@ -75,7 +76,7 @@ async def place_domestic_order(
     )
 
     if data.get("rt_cd") != "0":
-        raise RuntimeError(data.get("msg1") or "국내주식 주문 실패")
+        raise BrokerOrderRejectedError(data.get("msg1") or "국내주식 주문 실패")
 
     output = data.get("output") or {}
     return {"order_no": output.get("ODNO"), "raw": output}
@@ -140,7 +141,7 @@ async def place_overseas_order(
     )
 
     if data.get("rt_cd") != "0":
-        raise RuntimeError(data.get("msg1") or "해외주식 주문 실패")
+        raise BrokerOrderRejectedError(data.get("msg1") or "해외주식 주문 실패")
 
     output = data.get("output") or {}
     return {"order_no": output.get("ODNO"), "raw": output}
