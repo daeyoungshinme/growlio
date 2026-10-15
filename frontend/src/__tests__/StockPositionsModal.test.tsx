@@ -64,6 +64,22 @@ describe("StockPositionsModal", () => {
     );
   });
 
+  it("수량 0인 행이 있으면 저장하지 않고 해당 종목을 알려준다", async () => {
+    vi.mocked(fetchAccountPositions).mockResolvedValue({
+      ...POSITIONS_RESPONSE,
+      positions: [{ ...POSITIONS_RESPONSE.positions[0], qty: 0 }],
+    });
+    renderWithProviders(
+      <StockPositionsModal accountId="acc-1" accountName="테스트 계좌" onClose={vi.fn()} />,
+    );
+
+    await screen.findAllByDisplayValue("삼성전자");
+    fireEvent.click(screen.getByText("저장"));
+
+    expect(await screen.findByText(/삼성전자: 수량은 0보다 커야 합니다/)).toBeInTheDocument();
+    expect(replaceAccountPositions).not.toHaveBeenCalled();
+  });
+
   it("저장 실패 시 모달을 닫지 않고 에러 메시지를 표시한다", async () => {
     vi.mocked(replaceAccountPositions).mockRejectedValue({
       response: { data: { detail: "저장 중 오류가 발생했습니다" } },

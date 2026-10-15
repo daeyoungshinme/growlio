@@ -94,6 +94,12 @@ export default function StockPositionsModal({
 
   const handleSave = async () => {
     const valid = editor.rows.filter((r) => r.ticker || r.name || r.qty || r.avg_price);
+    // 백엔드는 수량 0 이하를 422로 거부하지만 어느 행인지 알려주지 않는다
+    const badQty = valid.find((r) => !(Number(r.qty) > 0));
+    if (badQty) {
+      setError(`${badQty.name || badQty.ticker || "이름 없는 종목"}: 수량은 0보다 커야 합니다`);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {

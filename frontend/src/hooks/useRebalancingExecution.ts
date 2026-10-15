@@ -2,6 +2,7 @@ export {
   useRebalancingExecution,
   useRebalancingExecutionContext,
   getActionableItems,
+  findMissingLimitPriceTickers,
   RebalancingExecutionContext,
 } from "./rebalancingExecution/index";
 

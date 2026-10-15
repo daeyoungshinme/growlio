@@ -17,6 +17,20 @@ import { toast } from "@/utils/toast";
 
 const EMPTY_ITEM: PortfolioItem = { ticker: "", name: "", market: "KOSPI", weight: 0 };
 
+/** 합계 외의 행 검증 — 백엔드 `validate_portfolio_weights`와 같은 규칙. 합계만 보면 110% + -10%가 통과한다. */
+export function getPortfolioItemsError(items: PortfolioItem[]): string | null {
+  const weights = items.map((i) => Number(i.weight) || 0);
+  if (weights.some((w) => w < 0 || w > 100)) return "각 종목 비중은 0~100% 사이여야 합니다";
+  if (items.some((i, idx) => !i.ticker.trim() && (weights[idx] ?? 0) > 0))
+    return "종목을 선택하지 않은 행에 비중이 입력돼 있습니다";
+  return null;
+}
+
+/** 저장할 행 — 종목을 고르지 않은 빈 행(기본 추가 행)은 보내지 않는다. */
+export function submittablePortfolioItems(items: PortfolioItem[]): PortfolioItem[] {
+  return items.filter((i) => i.ticker.trim());
+}
+
 export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
   const [items, setItems] = useState<PortfolioItem[]>(
     initialItems.length ? initialItems : [{ ...EMPTY_ITEM }],
@@ -28,6 +42,7 @@ export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
 
   const totalWeight = items.reduce((s, i) => s + (Number(i.weight) || 0), 0);
   const weightOk = Math.abs(totalWeight - 100) < PORTFOLIO_WEIGHT_TOLERANCE;
+  const itemsError = getPortfolioItemsError(items);
 
   function addItem() {
     setItems((prev) => [...prev, { ...EMPTY_ITEM }]);
@@ -161,6 +176,7 @@ export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
     setItems,
     totalWeight,
     weightOk,
+    itemsError,
     suggestions,
     activeRow,
     setActiveRow,

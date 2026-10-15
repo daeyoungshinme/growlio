@@ -16,7 +16,7 @@ class TestValidatePortfolioWeightsOptional:
 
         from app.schemas._validators import validate_portfolio_weights_optional
 
-        items = [SimpleNamespace(weight=60.0), SimpleNamespace(weight=40.0)]
+        items = [SimpleNamespace(ticker="T", weight=60.0), SimpleNamespace(ticker="T", weight=40.0)]
         result = validate_portfolio_weights_optional(items)
         assert result is items
 
@@ -27,7 +27,7 @@ class TestValidatePortfolioWeightsOptional:
 
         from app.schemas._validators import validate_portfolio_weights_optional
 
-        items = [SimpleNamespace(weight=50.0)]  # sum != 100
+        items = [SimpleNamespace(ticker="T", weight=50.0)]  # sum != 100
         with pytest.raises(ValueError, match="비중 합계가"):
             validate_portfolio_weights_optional(items)
 

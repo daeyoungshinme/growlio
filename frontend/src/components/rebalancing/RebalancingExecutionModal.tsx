@@ -30,7 +30,8 @@ export function RebalancingExecutionModal({
     accounts,
     onExecuted,
   });
-  const { state, orders, dispatch, loadAllPrices } = exec;
+  const { state, orders, missingLimitPriceTickers, dispatch, loadAllPrices } = exec;
+  const blocked = orders.length === 0 || missingLimitPriceTickers.length > 0;
   const { phase, results, confirmed, orderType, priceState, priceLoadProgress } = state;
 
   return (
@@ -110,6 +111,15 @@ export function RebalancingExecutionModal({
           {phase === "result" && <RebalancingResultSection results={results} />}
         </div>
 
+        {phase === "confirm" && missingLimitPriceTickers.length > 0 && (
+          <p
+            role="alert"
+            className="shrink-0 px-4 sm:px-6 pt-3 text-xs text-red-600 dark:text-red-400"
+          >
+            지정가가 비어 있는 주문이 있습니다: {[...new Set(missingLimitPriceTickers)].join(", ")}{" "}
+            — 가격을 입력하거나 선택을 해제하세요.
+          </p>
+        )}
         <div className="shrink-0 px-4 sm:px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex flex-row gap-2">
           {phase === "confirm" && (
             <>
@@ -123,7 +133,7 @@ export function RebalancingExecutionModal({
                   </button>
                   <button
                     onClick={() => dispatch({ type: "CONFIRM_CLICK" })}
-                    disabled={orders.length === 0}
+                    disabled={blocked}
                     className="flex-1 px-4 py-2.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
                   >
                     {orderType === "LIMIT" ? "지정가" : "시장가"} 주문 확인 ({orders.length}건) →
@@ -139,7 +149,7 @@ export function RebalancingExecutionModal({
                   </button>
                   <button
                     onClick={exec.handleExecute}
-                    disabled={orders.length === 0}
+                    disabled={blocked}
                     className="flex-1 px-4 py-2.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
                   >
                     {orderType === "LIMIT" ? "지정가" : "시장가"} 최종 실행 ({orders.length}건)

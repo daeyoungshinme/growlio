@@ -96,6 +96,16 @@ interface UseRebalancingExecutionParams {
   onExecuted?: (results: ExecutionResult[]) => void;
 }
 
+/**
+ * 지정가인데 가격이 없는 주문의 종목 — 백엔드가 LIMIT+가격 없음을 422로 거부해 배치 전체가 실패하므로
+ * 실행 전에 막는다(입력을 비웠거나 해외 시세 1개만 못 받아도 생긴다).
+ */
+export function findMissingLimitPriceTickers(orders: ExecutionOrderItem[]): string[] {
+  return orders
+    .filter((o) => o.order_type === "LIMIT" && !(o.limit_price != null && o.limit_price > 0))
+    .map((o) => o.ticker);
+}
+
 export function useRebalancingExecution({
   portfolioId,
   analysis,
@@ -460,8 +470,10 @@ export function useRebalancingExecution({
     return acc && !acc.is_mock_mode;
   });
 
+  const missingLimitPriceTickers = findMissingLimitPriceTickers(orders);
+
   async function handleExecute() {
-    if (orders.length === 0) return;
+    if (orders.length === 0 || missingLimitPriceTickers.length > 0) return;
     dispatch({ type: "EXECUTE_START" });
     try {
       const res = await executeRebalancing(portfolioId, {
@@ -498,6 +510,7 @@ export function useRebalancingExecution({
     tradableAccounts,
     actionableItems,
     orders,
+    missingLimitPriceTickers,
     hasRealAccount,
     getAccountQuantity,
     getSellRows: getSellRowsCached,

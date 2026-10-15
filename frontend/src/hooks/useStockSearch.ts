@@ -30,15 +30,16 @@ export function useStockSearch(debounceMs = 300) {
       setIsSearching(true);
       setIsSearchError(false);
       try {
-        setSuggestions(await searchStocks(query.trim(), controller.signal));
+        const result = await searchStocks(query.trim(), controller.signal);
+        if (abortRef.current === controller) setSuggestions(result);
       } catch {
+        // 새 검색에 밀려 중단된 요청은 상태를 건드리지 않는다 — 진행 중인 새 검색의 스피너·결과를 지운다
+        if (controller.signal.aborted) return;
         setSuggestions([]);
-        if (!controller.signal.aborted) {
-          setIsSearchError(true);
-          toast("종목 검색에 실패했습니다", "error");
-        }
+        setIsSearchError(true);
+        toast("종목 검색에 실패했습니다", "error");
       } finally {
-        setIsSearching(false);
+        if (abortRef.current === controller) setIsSearching(false);
       }
     }, debounceMs);
   };

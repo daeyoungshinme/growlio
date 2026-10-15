@@ -1,7 +1,7 @@
 import { ChartLine } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabase, wasPasswordRecoveryDetected } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { INPUT_SM } from "@/constants/inputStyles";
@@ -38,6 +38,8 @@ export default function ResetPasswordPage() {
         }
       });
       unsubscribe = () => subscription.subscription.unsubscribe();
+      // 이 페이지가 구독하기 전에 부팅 시 클라이언트 초기화가 이벤트를 이미 발생시켰을 수 있다
+      if (wasPasswordRecoveryDetected()) setSessionReady(true);
     })();
 
     return () => {

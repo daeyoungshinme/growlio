@@ -234,4 +234,62 @@ describe("usePositionsEditor", () => {
     expect(result.current.suggestIdx).toBe(1);
     vi.useRealTimers();
   });
+
+  describe("현재가 응답 경합", () => {
+    function deferred<T>() {
+      let resolve!: (v: T) => void;
+      const promise = new Promise<T>((r) => (resolve = r));
+      return { promise, resolve };
+    }
+    const price = (krw: number) => ({ price_krw: krw, price_usd: null, usd_rate: null });
+    const suggestion = (ticker: string) => ({
+      ticker,
+      name: ticker,
+      market: "KOSPI",
+      exchange: "KRX",
+    });
+
+    it("응답을 기다리는 동안 위 행이 삭제돼도 원래 행에 가격이 들어간다", async () => {
+      const { fetchStockPrice } = await import("@/api/assets");
+      const d = deferred<ReturnType<typeof price>>();
+      vi.mocked(fetchStockPrice).mockReturnValueOnce(d.promise as never);
+      const { result } = renderHook(() =>
+        usePositionsEditor(
+          [
+            makePos({ ticker: "A", current_price: 1, _rowKey: "a" }),
+            makePos({ ticker: "", current_price: null, _rowKey: "b" }),
+          ],
+          null,
+        ),
+      );
+
+      act(() => result.current.handleSelectSuggestion(1, suggestion("000660")));
+      act(() => result.current.removeRow(0));
+      await act(async () => d.resolve(price(200000)));
+
+      expect(result.current.rows).toHaveLength(1);
+      expect(result.current.rows[0].ticker).toBe("000660");
+      expect(result.current.rows[0].current_price).toBe(200000);
+    });
+
+    it("같은 행에서 종목을 다시 고르면 늦게 온 이전 종목 응답은 무시한다", async () => {
+      const { fetchStockPrice } = await import("@/api/assets");
+      const first = deferred<ReturnType<typeof price>>();
+      const second = deferred<ReturnType<typeof price>>();
+      vi.mocked(fetchStockPrice)
+        .mockReturnValueOnce(first.promise as never)
+        .mockReturnValueOnce(second.promise as never);
+      const { result } = renderHook(() =>
+        usePositionsEditor([makePos({ ticker: "", current_price: null, _rowKey: "a" })], null),
+      );
+
+      act(() => result.current.handleSelectSuggestion(0, suggestion("AAA")));
+      act(() => result.current.handleSelectSuggestion(0, suggestion("BBB")));
+      await act(async () => second.resolve(price(2000)));
+      await act(async () => first.resolve(price(1000)));
+
+      expect(result.current.rows[0].ticker).toBe("BBB");
+      expect(result.current.rows[0].current_price).toBe(2000);
+    });
+  });
 });
