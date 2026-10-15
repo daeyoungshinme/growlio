@@ -40,3 +40,13 @@ def test_mask_account_no_keeps_last_four():
 def test_mask_email():
     assert mask_email("alice@example.com") == "a***@example.com"
     assert mask_email("not-an-email") == "***"
+
+
+def test_namedtuple_value_does_not_raise():
+    from collections import namedtuple
+
+    Pair = namedtuple("Pair", "a b")
+    out = _redact_processor(None, "info", {"event": "x", "pair": Pair("Authorization: Bearer abc123secret", 1)})
+
+    assert "abc123secret" not in str(out["pair"])
+    assert out["pair"][1] == 1

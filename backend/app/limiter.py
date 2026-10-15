@@ -5,19 +5,26 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.requests import Request
 
+# Supabase access token payload는 1KB 안팎 — 그보다 훨씬 큰 값은 디코드하지 않는다
+_MAX_PAYLOAD_LEN = 4096
+
 
 def _jwt_subject(authorization: str) -> str | None:
     """Bearer JWT의 `sub`를 서명 검증 없이 꺼낸다 — 버킷 구분용일 뿐 인증이 아니다.
 
-    위조 토큰은 어차피 인증 단계에서 401이 나므로, 위조로 버킷을 바꿔 얻는 이득은 401 응답뿐이다.
+    서명을 보지 않으므로 아무 `sub`나 만들어 넣을 수 있다. 그래서 인증이 필요한 라우트에서만 의미가
+    있고(위조 토큰은 401), 인증 없는 라우트는 `ip_rate_limit_key`로 고정해야 한도를 우회당하지 않는다.
     """
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or token.count(".") != 2:
         return None
     payload = token.split(".")[1]
+    if len(payload) > _MAX_PAYLOAD_LEN:
+        return None
     try:
         claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
+        # 깊게 중첩된 JSON은 RecursionError — 키 계산에서 500을 내지 않는다
         return None
     sub = claims.get("sub") if isinstance(claims, dict) else None
     return sub if isinstance(sub, str) and sub else None
@@ -35,6 +42,16 @@ def rate_limit_key(request: Request) -> str:
     sub = _jwt_subject(request.headers.get("authorization", ""))
     if sub:
         return f"user:{sub}"
+    return ip_rate_limit_key(request)
+
+
+def ip_rate_limit_key(request: Request) -> str:
+    """클라이언트 IP 버킷 — 인증 없는 라우트용. 위조 JWT `sub`로 버킷을 바꿔 한도를 우회하지 못하게 한다.
+
+    남은 한계: 데코레이터 없는 인증 라우트의 기본 한도(120/min)는 SlowAPIMiddleware가 인증 전에 키를
+    계산하므로, 피해자의 사용자 UUID를 아는 사람이 위조 토큰으로 그 버킷을 소진시킬 수 있다. UUID는
+    외부에 노출되지 않고 결과가 일시적 429뿐이라 서명 검증(JWKS, 비동기) 비용 대신 감수한다.
+    """
     forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
     return f"ip:{forwarded or get_remote_address(request)}"
 

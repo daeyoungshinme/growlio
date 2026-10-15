@@ -52,8 +52,11 @@ def _redact_value(value, depth: int = 0):
             k: "[REDACTED]" if isinstance(k, str) and _SENSITIVE_KEY_PATTERN.search(k) else _redact_value(v, depth + 1)
             for k, v in value.items()
         }
-    if isinstance(value, (list, tuple)):
-        return type(value)(_redact_value(v, depth + 1) for v in value)
+    if isinstance(value, list):
+        return [_redact_value(v, depth + 1) for v in value]
+    if isinstance(value, tuple):
+        # namedtuple 등 서브클래스는 생성자 시그니처가 달라 type(value)(gen)이 TypeError — 일반 tuple로 돌려준다
+        return tuple(_redact_value(v, depth + 1) for v in value)
     return value
 
 

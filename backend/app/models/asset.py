@@ -167,6 +167,8 @@ class AssetSnapshot(Base):
             "snapshot_date",
             postgresql_ops={"snapshot_date": "DESC"},
         ),
+        # aa2_add_snapshots_user_date_index가 raw SQL로 만든 인덱스(idx_snapshots_user_date와 중복 — 52 G에서 정리)
+        Index("idx_snapshots_user_date_desc", "user_id", "snapshot_date", postgresql_ops={"snapshot_date": "DESC"}),
         Index(
             "idx_asset_snapshots_user_account_date",
             "user_id",
@@ -366,6 +368,13 @@ class Position(Base):
             postgresql_where=text("snapshot_id IS NOT NULL"),
         ),
         Index("idx_positions_snapshot_id", "snapshot_id"),
+        # ab1_merge_heads_add_missing_indexes가 만든 인덱스 — 선언하지 않으면 autogenerate가 드롭을 제안한다
+        Index(
+            "idx_positions_snapshot_ticker",
+            "snapshot_id",
+            "ticker",
+            postgresql_where=text("snapshot_id IS NOT NULL"),
+        ),
         Index(
             "idx_positions_account_no_snapshot",
             "account_id",
