@@ -185,3 +185,35 @@ class TestKisBalancePagination:
 
         tickers = sorted(p["ticker"] for p in result["positions"])
         assert tickers == ["AAPL", "AMEX", "MSFT", "NYSE"]
+
+
+class TestKisBalancePaginationGuards:
+    """상한·반복 키에서 부분 목록을 돌려주면 동기화가 나머지 보유종목을 "매도됨"으로 지운다 — 실패로 올려야 한다."""
+
+    @pytest.mark.asyncio
+    async def test_repeated_ctx_key_raises(self):
+        async def _fake(*args, **kwargs):
+            kwargs["response_headers"]["tr_cont"] = "M"
+            return {"output1": [_domestic_row("005930")], "output2": [{}], "ctx_area_nk100": "SAME"}
+
+        with (
+            patch("app.kis.balance.kis_request", side_effect=_fake),
+            pytest.raises(RuntimeError, match="연속조회"),
+        ):
+            await get_domestic_balance("k", "s", "t", "12345678", is_mock=False)
+
+    @pytest.mark.asyncio
+    async def test_page_limit_raises(self):
+        page = 0
+
+        async def _fake(*args, **kwargs):
+            nonlocal page
+            page += 1
+            kwargs["response_headers"]["tr_cont"] = "M"
+            return {"output1": [_domestic_row(f"{page:06d}")], "output2": [{}], "ctx_area_nk100": f"NK{page}"}
+
+        with (
+            patch("app.kis.balance.kis_request", side_effect=_fake),
+            pytest.raises(RuntimeError, match="연속조회"),
+        ):
+            await get_domestic_balance("k", "s", "t", "12345678", is_mock=False)

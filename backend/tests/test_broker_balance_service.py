@@ -150,6 +150,29 @@ class TestFetchBrokerBalance:
         assert result.positions[0].ticker == "AAPL"
 
     @pytest.mark.asyncio
+    async def test_toss_fractional_quantity_is_preserved(self, make_account, mock_db, mock_cache):
+        # 토스 소수점 주식(0.5주) — 응답 스키마가 int면 Pydantic이 거부해 잔고 API 전체가 400이 된다
+        account = make_account(
+            asset_type="STOCK_TOSS",
+            data_source="TOSS_API",
+            toss_client_id=b"enc_id",
+            toss_client_secret=b"enc_secret",
+        )
+        balance = BalanceResult(
+            positions=[_position(ticker="AAPL", name="Apple", market="US", currency="USD", qty=0.5)],
+            deposit_krw=0.0,
+        )
+
+        with (
+            _patch_session(mock_db),
+            patch("app.services.rebalancing.broker_balance_service.TossProvider") as mock_provider_cls,
+        ):
+            mock_provider_cls.return_value.sync = AsyncMock(return_value=balance)
+            result = await fetch_broker_balance(account, mock_cache)
+
+        assert result.positions[0].quantity == 0.5
+
+    @pytest.mark.asyncio
     async def test_kiwoom_account_never_fetches_orderable_cash(self, make_account, mock_db, mock_cache):
         account = make_account(
             asset_type="STOCK_KIWOOM",

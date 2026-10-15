@@ -26,6 +26,7 @@ const { mockSupabaseAuth } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/supabase", () => ({
+  wasPasswordRecoveryDetected: vi.fn(() => false),
   getSupabase: async () => ({ auth: mockSupabaseAuth }),
 }));
 
@@ -36,6 +37,7 @@ vi.mock("@/utils/toast", () => ({
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import FindAccountPage from "@/pages/FindAccountPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import { wasPasswordRecoveryDetected } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { toast } from "@/utils/toast";
 import type { AuthState } from "@/stores/authStore";
@@ -260,6 +262,13 @@ describe("ResetPasswordPage", () => {
     renderWithRouter(<ResetPasswordPage />);
     expect(screen.getByText(/비밀번호 재설정 링크를 확인 중입니다/)).toBeInTheDocument();
     expect(screen.queryByLabelText("새 비밀번호")).not.toBeInTheDocument();
+  });
+
+  it("shows the form when recovery was detected before the page subscribed", async () => {
+    // 부팅 시 클라이언트 초기화가 PASSWORD_RECOVERY를 이미 발생시킨 경우 — 페이지 리스너는 이벤트를 못 받는다
+    vi.mocked(wasPasswordRecoveryDetected).mockReturnValueOnce(true);
+    renderWithRouter(<ResetPasswordPage />);
+    expect(await screen.findByLabelText("새 비밀번호")).toBeInTheDocument();
   });
 
   it("shows link back to forgot-password when not ready", () => {

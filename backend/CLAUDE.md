@@ -291,7 +291,7 @@ kiwoom/                       # 키움증권 API 클라이언트 (auth, balance,
 toss/                         # 토스증권 Open API 클라이언트 (auth, balance, client, constants). OAuth2 Client Credentials(form-encoded), 국내+미국 보유종목 `GET /api/v1/holdings` 통합, 예수금 `/api/v1/buying-power`. 샌드박스 없음, 토큰 ~1h(지연 갱신), **`Open API → IP 관리`에 서버 IP 등록 필수**(미등록 시 403 `edge-blocked`). `toss_rate_per_second`(기본 1.0) 제한 — http_client.py가 토스 `error.code=rate-limit-*` 감지
 providers/                    # 금융 데이터 provider
   ├── base.py                 # Provider 추상 베이스
-  ├── http_client.py          # 공통 HTTP 클라이언트. `broker_request(retry_on_request_error=False)`는 `httpx.RequestError` 시 재시도 없이 즉시 실패 — 주문 접수(`kis/order.py`·`kiwoom/order.py`의 `place_*_order` 4개)만 False로 호출해 응답 유실 시 중복 주문 방지(브로커 API가 idempotency key 미지원). 조회성 호출은 기본값(재시도) 유지. False면 HTTP 5xx도 재시도하지 않는다(접수 후 게이트웨이 오류일 수 있음). `response_headers=`(dict)를 넘기면 응답 헤더(소문자 키)를 채운다 — 잔고 연속조회(KIS `tr_cont`, 키움 `cont-yn`/`next-key`)가 헤더로 오기 때문(`kis/balance.py`·`kiwoom/balance.py`가 상한 20페이지로 끝까지 따라감, 실계좌 미검증)
+  ├── http_client.py          # 공통 HTTP 클라이언트. `broker_request(retry_on_request_error=False)`는 `httpx.RequestError` 시 재시도 없이 즉시 실패 — 주문 접수(`kis/order.py`·`kiwoom/order.py`의 `place_*_order` 4개)만 False로 호출해 응답 유실 시 중복 주문 방지(브로커 API가 idempotency key 미지원). 조회성 호출은 기본값(재시도) 유지. False면 HTTP 5xx도 재시도하지 않는다(접수 후 게이트웨이 오류일 수 있음). `response_headers=`(dict)를 넘기면 응답 헤더(소문자 키)를 채운다 — 잔고 연속조회(KIS `tr_cont`, 키움 `cont-yn`/`next-key`)가 헤더로 오기 때문(`kis/balance.py`·`kiwoom/balance.py`가 상한 20페이지로 끝까지 따라감, 실계좌 미검증. 상한 도달·연속키 반복은 부분 목록 대신 raise — 동기화가 현재 포지션을 지우고 받은 것만 다시 넣으므로 부분 결과는 나머지 보유종목을 "매도됨"으로 만든다)
   ├── kis_provider.py         # KIS API provider
   ├── kiwoom_provider.py      # 키움증권 API provider
   ├── toss_provider.py        # 토스증권 Open API provider (holdings 통합 조회 — 키움보다 단순, `_overseas_cache` 미사용)
@@ -313,7 +313,7 @@ utils/
   ├── naver_retry.py          # Naver Finance 모바일 API 공용 재시도 정책·User-Agent — `price_sync_sources`·`dividend/sync_sources` 공유. 일시 장애(연결·타임아웃·429·5xx)만 재시도, 404 등 4xx는 즉시 실패시켜 호출부 폴백으로
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등) — `/metrics` 엔드포인트로 노출
   └── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)
-limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수). 키는 `rate_limit_key` — 로그인 요청은 JWT `sub`(서명 미검증, 버킷 구분용), 그 외 `X-Forwarded-For` 첫 hop. 운영은 Vercel→Render 프록시 뒤라 `request.client.host`는 프록시 주소(전원 공용 버킷이 됨)
+limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수). 키는 `rate_limit_key` — 로그인 요청은 JWT `sub`(서명 미검증, 버킷 구분용), 그 외 `X-Forwarded-For` 첫 hop. 운영은 Vercel→Render 프록시 뒤라 `request.client.host`는 프록시 주소(전원 공용 버킷이 됨). **인증 없는 라우트에 `@limiter.limit`을 달 때는 `key_func=ip_rate_limit_key` 필수** — 서명 미검증 `sub`는 누구나 만들 수 있어 기본 키로는 매 요청 다른 sub로 한도를 우회당한다(`tests/test_rate_limit_key.py`가 공개 라우트 목록을 검사)
 enums.py                      # 도메인 StrEnum(AssetType/DataSource/TransactionType/AccountTaxType/InvestmentHorizon/AgeGroup 등) — 매직 스트링 대신 사용
 constants.py                  # 도메인 공통 상수 — `DOMESTIC_MARKETS`, `POSITION_STOCK_ASSET_TYPES`. **새 브로커 추가 시 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 집계 7곳 누락 사고)
 exceptions.py                 # `AppError` 계열(BadRequest/NotFound/ExternalAPI…, 전역 핸들러가 status_code/detail로 변환) + `SyncError` 계열(Provider{Credential,Token,Api,Network}Error)

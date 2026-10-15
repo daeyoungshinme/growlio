@@ -316,3 +316,39 @@ class TestKiwoomBalancePagination:
             result = await get_overseas_balance("token", "1234567890", is_mock=True)
 
         assert sorted(p["ticker"] for p in result["positions"]) == ["QQQ", "SPY"]
+
+
+class TestKiwoomBalancePaginationGuards:
+    """상한·반복 키에서 부분 목록을 돌려주면 동기화가 나머지 보유종목을 "매도됨"으로 지운다 — 실패로 올려야 한다."""
+
+    @pytest.mark.asyncio
+    async def test_repeated_next_key_raises(self):
+        async def _dispatch(method, path, *, is_mock, headers, json=None, response_headers=None, **kwargs):
+            if headers["api-id"] == "ust21110":
+                return _ust21110_response()
+            response_headers.update({"cont-yn": "Y", "next-key": "SAME"})
+            return {"result_list": [_ust21070_item("QQQ")]}
+
+        with (
+            patch("app.kiwoom.balance.kiwoom_request", side_effect=_dispatch),
+            pytest.raises(RuntimeError, match="연속조회"),
+        ):
+            await get_overseas_balance("token", "1234567890", is_mock=True)
+
+    @pytest.mark.asyncio
+    async def test_page_limit_raises(self):
+        page = 0
+
+        async def _dispatch(method, path, *, is_mock, headers, json=None, response_headers=None, **kwargs):
+            nonlocal page
+            if headers["api-id"] == "ust21110":
+                return _ust21110_response()
+            page += 1
+            response_headers.update({"cont-yn": "Y", "next-key": f"K{page}"})
+            return {"result_list": [_ust21070_item("QQQ")]}
+
+        with (
+            patch("app.kiwoom.balance.kiwoom_request", side_effect=_dispatch),
+            pytest.raises(RuntimeError, match="연속조회"),
+        ):
+            await get_overseas_balance("token", "1234567890", is_mock=True)

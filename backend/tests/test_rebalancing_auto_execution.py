@@ -1040,11 +1040,14 @@ class TestAutoExecutionPlanGenerationFailure:
     async def test_job_logs_and_continues_when_plan_generation_raises(self):
         """job 루프는 build_pending_plan_for_alert()의 예외를 잡고 다음 alert로 계속 진행한다."""
         mock_db = _make_mock_db()
-        alert = _make_alert()
         portfolio = _make_portfolio()
 
+        # 알림 2개 — 첫 번째가 실패해도 두 번째까지 시도해야 "계속 진행"이 증명된다
         execute_result = MagicMock()
-        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        execute_result.all.return_value = [
+            (_make_alert(), portfolio, "u@test.com", None, None),
+            (_make_alert(), portfolio, "u@test.com", None, None),
+        ]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
@@ -1058,8 +1061,10 @@ class TestAutoExecutionPlanGenerationFailure:
             patch(
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
                 new=AsyncMock(side_effect=RuntimeError("DB error")),
-            ),
+            ) as mock_build,
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
 
-            await _run_auto_execution()  # 예외 없이 종료되면 통과
+            await _run_auto_execution()
+
+        assert mock_build.await_count == 2

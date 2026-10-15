@@ -151,6 +151,7 @@ _공통/입력_
 - `useStockSearch.ts` — 종목 검색
 - `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼(setter 참조 고정 — effect 의존성에 넣어도 됨). `CollapsibleCard`/`CollapsibleSection`과 함께 사용
+- `useTimeout.ts` — 언마운트 시 자동 해제·재예약 시 이전 예약 취소되는 setTimeout(`scheduleTimeout(fn, ms)`). "3초 뒤 확인 해제"·blur 후 드롭다운 닫기처럼 상태를 바꾸는 지연 콜백은 맨 `setTimeout` 대신 이것을 쓴다
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`·`common/ConfirmModal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용. Escape·포커스 트랩은 **맨 위 모달만** 처리(DOM상 다른 열린 모달을 품은 쪽은 아래층, 형제끼리는 나중에 열린 쪽이 위) — Android 뒤로가기가 Escape를 dispatch하므로 확인창 위에서 한 번 눌러 아래 모달까지 닫히지 않게 함
 - `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용
 

@@ -414,6 +414,34 @@ class TestWeightValidation:
                 ],
             )
 
+    def test_negative_weight_raises_even_when_sum_is_100(self):
+        from pydantic import ValidationError
+
+        from app.schemas.portfolio import PortfolioCreate, PortfolioItem
+
+        with pytest.raises(ValidationError, match="0~100"):
+            PortfolioCreate(
+                name="테스트",
+                items=[
+                    PortfolioItem(ticker="AAPL", name="Apple", market="NASDAQ", weight=110),
+                    PortfolioItem(ticker="TSLA", name="Tesla", market="NASDAQ", weight=-10),
+                ],
+            )
+
+    def test_blank_ticker_raises(self):
+        from pydantic import ValidationError
+
+        from app.schemas.portfolio import PortfolioCreate, PortfolioItem
+
+        with pytest.raises(ValidationError, match="종목 코드"):
+            PortfolioCreate(
+                name="테스트",
+                items=[
+                    PortfolioItem(ticker="AAPL", name="Apple", market="NASDAQ", weight=100),
+                    PortfolioItem(ticker=" ", name="", market="KOSPI", weight=0),
+                ],
+            )
+
     def test_weight_sum_100_ok(self):
         from app.schemas.portfolio import PortfolioCreate, PortfolioItem
 

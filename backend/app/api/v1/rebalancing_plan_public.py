@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.limiter import limiter
+from app.limiter import ip_rate_limit_key, limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.schemas.rebalancing import (
@@ -77,7 +77,7 @@ async def _build_preview(leg, db: AsyncSession) -> PlanTokenPreview:
 
 
 @router.get("/{token}", response_model=PlanTokenPreview)
-@limiter.limit("20/minute")
+@limiter.limit("20/minute", key_func=ip_rate_limit_key)
 async def preview_plan_action(
     request: Request,
     token: str,
@@ -91,7 +91,7 @@ async def preview_plan_action(
 
 
 @router.post("/{token}/buy/cancel", response_model=PlanActionResponse)
-@limiter.limit("10/minute")
+@limiter.limit("10/minute", key_func=ip_rate_limit_key)
 async def cancel_buy_by_token(
     request: Request,
     token: str,
@@ -106,7 +106,7 @@ async def cancel_buy_by_token(
 
 
 @router.post("/{token}/sell/decision", response_model=PlanActionResponse)
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=ip_rate_limit_key)
 async def decide_sell_by_token(
     request: Request,
     token: str,

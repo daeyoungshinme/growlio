@@ -64,11 +64,17 @@ async def _fetch_list_pages(
         if first is None:
             first = data
         rows.extend(data.get(list_key) or [])
+        prev_key = next_key
         next_key = resp_headers.get("next-key", "")
         if resp_headers.get("cont-yn") != "Y" or not next_key.strip():
             break
+        if next_key == prev_key:
+            # 같은 키를 반복하면 같은 페이지가 쌓여 수량이 부풀려진다
+            raise RuntimeError(f"키움 잔고 연속조회 키가 반복됩니다({path})")
     else:
+        # 부분 목록을 돌려주면 동기화가 나머지 보유종목을 지우므로 실패로 처리해 기존 포지션을 보존한다
         logger.warning("kiwoom_balance_page_limit", path=path, pages=_MAX_PAGES)
+        raise RuntimeError(f"키움 잔고 연속조회가 {_MAX_PAGES}페이지를 넘었습니다({path})")
     return first or {}, rows
 
 

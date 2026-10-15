@@ -69,7 +69,7 @@ class KisBalancePosition(BaseModel):
     ticker: str
     name: str
     market: str
-    quantity: int
+    quantity: float  # 토스·수동 계좌는 소수점 주식(0.5주)이 있다
     avg_price: float
     current_price: float
     value_krw: float

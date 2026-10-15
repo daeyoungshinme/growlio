@@ -27,13 +27,30 @@ target_metadata = Base.metadata
 def include_name(name, type_, parent_names):
     """autogenerate 비교 대상을 growlio 모델 테이블로 한정한다.
 
-    public 스키마를 nestlio와 공유하므로 필터가 없으면 autogenerate가 nestlio 테이블 드롭을 제안하고,
-    모델에 선언하지 않은 인덱스도 드롭 대상으로 잡힌다(a64e36a53a40이 그렇게 인덱스 2개를 지웠다).
+    public 스키마를 nestlio와 공유하므로 필터가 없으면 autogenerate가 nestlio 테이블 드롭을 제안한다.
+    growlio 테이블의 인덱스는 이 필터로 걸러지지 않는다 — 모델에 선언하지 않은 인덱스는 여전히 드롭 대상으로
+    잡히므로(a64e36a53a40이 그렇게 인덱스 2개를 지웠다) DB 인덱스는 모델에도 선언해야 한다.
     대가: 모델에서 지운 growlio 테이블도 비교에서 빠지므로 테이블 드롭은 마이그레이션을 직접 쓴다.
     """
     if type_ == "table":
         return name in target_metadata.tables
     return True
+
+
+# 정렬(DESC) 인덱스 — alembic이 반영된 정렬을 모델 선언과 같다고 판정하지 못해 autogenerate마다
+# drop/create를 반복 제안한다. 비교에서만 제외한다(52 G squash에서 중복 인덱스와 함께 정리).
+_DESC_INDEXES = frozenset(
+    {"idx_snapshots_account_date_desc", "idx_asset_snapshots_user_account_date", "idx_snapshots_user_date_desc"}
+)
+
+
+def include_object(obj, name, type_, reflected, compare_to):
+    """include_name은 growlio 테이블만 남길 뿐 그 테이블의 인덱스는 전부 비교한다.
+
+    모델에 없는 인덱스는 여전히 드롭 대상으로 잡히므로, DB에 있는 인덱스는 모델 `__table_args__`에도
+    선언해야 한다. 여기서는 정렬 인덱스의 반복 diff만 거른다.
+    """
+    return not (type_ == "index" and name in _DESC_INDEXES)
 
 
 def run_migrations_offline() -> None:
@@ -44,6 +61,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         version_table=VERSION_TABLE,
         include_name=include_name,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -55,6 +73,7 @@ def do_run_migrations(connection):
         target_metadata=target_metadata,
         version_table=VERSION_TABLE,
         include_name=include_name,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

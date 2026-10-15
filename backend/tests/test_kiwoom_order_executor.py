@@ -137,7 +137,9 @@ class TestExecuteKiwoomSellsWithClamp:
             patch.object(
                 _kiwoom_order_executor,
                 "kiwoom_get_overseas_balance",
-                AsyncMock(return_value={"positions": [{"ticker": "AAPL", "market": "NASDAQ", "qty": 4}]}),
+                AsyncMock(
+                    return_value={"positions": [{"ticker": "AAPL", "market": "US", "qty": 4}]}
+                ),  # 실제 잔고 응답은 "US" 센티널
             ),
             patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})),
             patch.object(_kiwoom_order_executor, "_execute_kiwoom_single_order", side_effect=_spy),
@@ -193,7 +195,7 @@ class TestExecuteKiwoomSellsWithClamp:
             patch.object(
                 _kiwoom_order_executor,
                 "kiwoom_get_overseas_balance",
-                AsyncMock(return_value={"positions": [{"ticker": "AAPL", "market": "NASDAQ", "qty": 4}]}),
+                AsyncMock(return_value={"positions": [{"ticker": "AAPL", "market": "US", "qty": 4}]}),
             ),
             patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "1"})),
             patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "2"})),

@@ -72,15 +72,25 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
 
   const loadPrice = async (i: number, ticker: string, market: string) => {
     if (!ticker) return;
+    // 응답을 기다리는 동안 위 행이 삭제되면 인덱스가 밀리고, 같은 행에서 다른 종목을 다시 고르면 늦게 온
+    // 응답이 덮어쓴다 — 행 키로 대상을 찾고, 그 행이 아직 이 종목일 때만 반영한다.
+    const rowKey = rows[i]?._rowKey;
     setPriceLoadingRows((prev) => new Set([...prev, i]));
     try {
       const result = await fetchStockPrice(ticker, market);
       if (result.price_krw) {
-        setRow(i, {
+        const patch: Partial<Position> = {
           current_price: result.price_krw,
           current_price_usd: result.price_usd ?? null,
           ...(result.usd_rate ? { usd_rate: result.usd_rate } : {}),
-        });
+        };
+        setRows((prev) =>
+          prev.map((r, idx) =>
+            (rowKey ? r._rowKey === rowKey : idx === i) && r.ticker === ticker
+              ? { ...r, ...patch }
+              : r,
+          ),
+        );
       }
     } catch (e: unknown) {
       toast(extractErrorMessage(e, "현재가 조회에 실패했습니다"));

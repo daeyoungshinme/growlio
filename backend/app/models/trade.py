@@ -41,7 +41,8 @@ class TradeRecord(Base):
     fee: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     trade_date: Mapped[date] = mapped_column(Date, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # tr1_add_trade_records가 nullable로 만들었다 — 모델도 맞춰 autogenerate drift를 없앤다(server_default가 채움)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         Index("idx_trade_records_user_date", "user_id", "trade_date"),

@@ -50,12 +50,18 @@ async def _fetch_balance_pages(
         pages.append(data)
         if resp_headers.get("tr_cont") not in _TR_CONT_MORE:
             break
+        prev = (fk, nk)
         fk = str(data.get(fk_param.lower()) or "")
         nk = str(data.get(nk_param.lower()) or "")
         if not nk.strip():
             break
+        if (fk, nk) == prev:
+            # 같은 키를 반복하면 같은 페이지가 쌓여 수량이 부풀려진다
+            raise RuntimeError(f"KIS 잔고 연속조회 키가 반복됩니다({path})")
     else:
+        # 부분 목록을 돌려주면 동기화가 나머지 보유종목을 지우므로 실패로 처리해 기존 포지션을 보존한다
         logger.warning("kis_balance_page_limit", path=path, pages=_MAX_PAGES)
+        raise RuntimeError(f"KIS 잔고 연속조회가 {_MAX_PAGES}페이지를 넘었습니다({path})")
     return pages
 
 

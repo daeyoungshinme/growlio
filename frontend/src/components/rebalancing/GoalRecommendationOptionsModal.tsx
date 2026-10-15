@@ -70,7 +70,9 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   const currentShortTermEquityFloorPct =
     shortTermEquityFloorPctInput === null
       ? savedShortTermEquityFloorPct
-      : Number(shortTermEquityFloorPctInput);
+      : shortTermEquityFloorPctInput.trim() === ""
+        ? NaN // Number("")는 0이라 비운 칸이 0% 하한으로 저장됐다 — 무효 입력으로 둔다
+        : Number(shortTermEquityFloorPctInput);
   const currentAgeGroup: AgeGroup | null =
     ageGroupInput === null ? savedAgeGroup : ageGroupInput === "" ? null : ageGroupInput;
 

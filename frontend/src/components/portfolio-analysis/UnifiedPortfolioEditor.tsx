@@ -22,7 +22,10 @@ import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { PortfolioOverview } from "@/types";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
-import { usePortfolioItemsEditor } from "@/hooks/usePortfolioItemsEditor";
+import {
+  submittablePortfolioItems,
+  usePortfolioItemsEditor,
+} from "@/hooks/usePortfolioItemsEditor";
 import { inferHorizonTaxTypeFromAccounts } from "@/utils/portfolio";
 const PortfolioWeightChart = lazy(() => import("./PortfolioWeightChart"));
 import PortfolioAccountSelector from "./PortfolioAccountSelector";
@@ -83,6 +86,7 @@ export default function UnifiedPortfolioEditor({
     items,
     totalWeight,
     weightOk,
+    itemsError,
     suggestions,
     activeRow,
     setActiveRow,
@@ -127,9 +131,16 @@ export default function UnifiedPortfolioEditor({
   }
 
   function handleSubmit() {
-    if (!name.trim() || !weightOk) return;
+    if (!name.trim() || !weightOk || itemsError) return;
     const accountIds = isAllSelected ? null : Array.from(selectedAccountIds);
-    onSave(name.trim(), items, baseType, accountIds, investmentHorizon || null, taxType || null);
+    onSave(
+      name.trim(),
+      submittablePortfolioItems(items),
+      baseType,
+      accountIds,
+      investmentHorizon || null,
+      taxType || null,
+    );
   }
 
   return (
@@ -252,7 +263,7 @@ export default function UnifiedPortfolioEditor({
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   종목 및 비중
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <button
                     type="button"
                     onClick={() =>
@@ -270,6 +281,14 @@ export default function UnifiedPortfolioEditor({
                   >
                     합계 {totalWeight.toFixed(1)}% {weightOk ? "✓" : "(100% 필요)"}
                   </span>
+                  {itemsError && (
+                    <span
+                      role="alert"
+                      className="text-xs font-medium text-red-600 dark:text-red-400"
+                    >
+                      {itemsError}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -350,7 +369,7 @@ export default function UnifiedPortfolioEditor({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!name.trim() || !weightOk || saving}
+              disabled={!name.trim() || !weightOk || !!itemsError || saving}
               className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} flex-1 sm:flex-none bg-blue-600 text-white px-5 py-2.5 sm:py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
             >
               {saving ? "저장 중..." : "저장"}
