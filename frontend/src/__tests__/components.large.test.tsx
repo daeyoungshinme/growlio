@@ -458,6 +458,48 @@ describe("StockHoldingsTable", () => {
     expect(screen.getAllByText("평단가").length).toBeGreaterThan(1);
   });
 
+  it("모바일 카드는 한 번에 하나만 펼쳐진다", () => {
+    const other: PortfolioPosition = {
+      ...mockPosition,
+      ticker: "MSFT",
+      name: "Microsoft",
+    };
+    renderWithProviders(
+      <StockHoldingsTable
+        positions={[mockPosition, other]}
+        dividendMap={{}}
+        divLoading={false}
+        divError={false}
+      />,
+    );
+    const cardFor = (name: string) =>
+      screen
+        .getAllByRole("button")
+        .find((b) => b.hasAttribute("aria-expanded") && b.textContent?.includes(name))!;
+    fireEvent.click(cardFor("Apple Inc."));
+    expect(cardFor("Apple Inc.")).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(cardFor("Microsoft"));
+    expect(cardFor("Microsoft")).toHaveAttribute("aria-expanded", "true");
+    expect(cardFor("Apple Inc.")).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("바깥 정렬 요청(sortRequest)이 오면 정렬을 바꾸고 검색어를 비운다", () => {
+    const props = {
+      positions: [mockPosition],
+      dividendMap: {},
+      divLoading: false,
+      divError: false,
+    };
+    // StockHoldingsTable은 쿼리를 쓰지 않는다 — rerender가 같은 트리를 유지하도록 provider 없이 렌더
+    const { rerender } = render(<StockHoldingsTable {...props} />);
+    fireEvent.change(screen.getByLabelText("종목명 또는 티커 검색"), {
+      target: { value: "zzz" },
+    });
+    rerender(<StockHoldingsTable {...props} sortRequest={{ key: "weight_in_stock", nonce: 1 }} />);
+    expect(screen.getByLabelText("보유 종목 정렬")).toHaveValue("weight_in_stock");
+    expect(screen.getByLabelText("종목명 또는 티커 검색")).toHaveValue("");
+  });
+
   it("데스크톱 계좌별 하위 행은 헤더와 같은 열에 맞춰진다 (계좌명=종목 열, 수량=수량 열)", () => {
     const otherAccount: PortfolioPosition = {
       ...mockPosition,
