@@ -26,6 +26,11 @@ const VIEW_OPTIONS = [
 const OPEN_KEY = "growlio:portfolio:allocationOpen";
 const VIEW_KEY = "growlio:portfolio:allocationView";
 
+// 모바일은 보유 종목 목록이 첫 화면 가까이 오도록 기본 접힘(사용자가 펼치면 그 상태를 기억)
+function isDesktopViewport(): boolean {
+  return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 640px)").matches;
+}
+
 function readStoredView(): View {
   const v = storageGet(VIEW_KEY);
   return VIEW_OPTIONS.some((o) => o.value === v) ? (v as View) : "region";
@@ -34,11 +39,13 @@ function readStoredView(): View {
 interface Props {
   overview: PortfolioOverview;
   accountId?: string | null;
+  /** "종목" 보기의 "전체 비중순 보기" — 아래 보유 종목 목록을 비중순으로 정렬하고 그리로 이동 */
+  onShowAllStocks?: () => void;
 }
 
 /** 자산탭 "비중 분석" — 국내/해외 · 종목 · 지수 비중을 한 카드에서 같은 막대 형식으로 전환해 본다. */
-export default function AllocationCard({ overview, accountId }: Props) {
-  const [isOpen, toggleOpen] = useCollapsible(true, OPEN_KEY);
+export default function AllocationCard({ overview, accountId, onShowAllStocks }: Props) {
+  const [isOpen, toggleOpen] = useCollapsible(isDesktopViewport, OPEN_KEY);
   const [view, setViewState] = useState<View>(readStoredView);
   const [regionBasis, setRegionBasis] = useState<RegionBasis>("exposure");
 
@@ -83,6 +90,16 @@ export default function AllocationCard({ overview, accountId }: Props) {
         : null;
 
   const topStock = overview.stock_allocation.find((a) => a.ticker !== "ETC");
+  const listedTotal = (overview.domestic_stock_krw ?? 0) + (overview.foreign_stock_krw ?? 0);
+  const collapsedHint = [
+    topStock && `최대 종목 ${topStock.name} ${topStock.pct.toFixed(1)}%`,
+    // 해외 보유가 없으면 "해외상장 0%"는 정보가 없어 생략
+    listedTotal > 0 &&
+      (overview.foreign_stock_krw ?? 0) > 0 &&
+      `해외상장 ${(((overview.foreign_stock_krw ?? 0) / listedTotal) * 100).toFixed(0)}%`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <CollapsibleCard
@@ -92,9 +109,7 @@ export default function AllocationCard({ overview, accountId }: Props) {
       title="비중 분석"
       isOpen={isOpen}
       onToggle={toggleOpen}
-      collapsedHint={
-        topStock ? `최대 종목 ${topStock.name} ${topStock.pct.toFixed(1)}%` : undefined
-      }
+      collapsedHint={collapsedHint || undefined}
     >
       <SegmentedControl
         options={VIEW_OPTIONS}
@@ -112,7 +127,9 @@ export default function AllocationCard({ overview, accountId }: Props) {
             fallback={exposureFallback}
           />
         )}
-        {view === "stock" && <StockAllocationView items={overview.stock_allocation} />}
+        {view === "stock" && (
+          <StockAllocationView items={overview.stock_allocation} onShowAll={onShowAllStocks} />
+        )}
         {view === "index" &&
           (exposure.data ? <IndexAllocationView data={exposure.data} /> : exposureFallback)}
       </div>

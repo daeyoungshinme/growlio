@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { Info } from "lucide-react";
+import Tooltip from "@/components/common/Tooltip";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { fmtKrw, fmtKrwShort } from "@/utils/format";
 import SegmentedControl from "./SegmentedControl";
 
@@ -9,10 +12,16 @@ const BASIS_OPTIONS = [
   { value: "listing", label: "상장시장" },
 ] as const;
 
-const BASIS_HINT: Record<RegionBasis, string> = {
-  exposure:
-    "무엇에 투자하는지 기준이에요. 국내상장 미국 ETF(TIGER 미국S&P500 등)는 해외로 계산해요.",
-  listing: "어느 거래소에 상장됐는지 기준이에요. 국내상장 해외 ETF도 국내로 계산해요.",
+const BASIS_HINT: Record<RegionBasis, { short: string; detail: string }> = {
+  exposure: {
+    short: "ETF가 실제로 투자하는 지역 기준",
+    detail:
+      "무엇에 투자하는지 기준이에요. 국내상장 미국 ETF(TIGER 미국S&P500 등)는 해외로 계산해요.",
+  },
+  listing: {
+    short: "상장된 거래소 기준",
+    detail: "어느 거래소에 상장됐는지 기준이에요. 국내상장 해외 ETF도 국내로 계산해요.",
+  },
 };
 
 interface Segment {
@@ -65,7 +74,18 @@ export default function RegionAllocationView({ basis, onBasisChange, amounts, fa
         onChange={onBasisChange}
         ariaLabel="국내/해외 기준"
       />
-      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{BASIS_HINT[basis]}</p>
+      {/* 예시가 붙은 긴 설명은 툴팁으로 — 모바일에서 두 줄을 차지했다 */}
+      <p className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+        {BASIS_HINT[basis].short}
+        <Tooltip content={BASIS_HINT[basis].detail} maxWidth="w-56">
+          <span
+            aria-label="기준 설명"
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} -my-2 text-gray-400 dark:text-gray-500 rounded`}
+          >
+            <Info size={14} aria-hidden="true" />
+          </span>
+        </Tooltip>
+      </p>
 
       <div className="mt-3">
         {!amounts ? (

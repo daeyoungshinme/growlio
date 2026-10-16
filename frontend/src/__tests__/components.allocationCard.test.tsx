@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { IndexExposure, PortfolioOverview } from "@/types";
@@ -171,8 +171,53 @@ describe("AllocationCard", () => {
       expect(screen.getAllByText("국내상장")).toHaveLength(2);
       expect(screen.getAllByText("해외상장")).toHaveLength(1);
       expect(screen.getByText("기타 3종목")).toBeInTheDocument();
-      expect(screen.getByText("아래 보유 종목 표에서 확인")).toBeInTheDocument();
+      expect(screen.getByText("아래 보유 종목 목록에서 확인")).toBeInTheDocument();
       expect(fetchIndexExposure).not.toHaveBeenCalled();
+    });
+
+    it("상위 5종목만 그리고 6위 이하는 백엔드 기타와 합쳐 한 행으로 보여준다", () => {
+      localStorage.setItem("growlio:portfolio:allocationView", "stock");
+      const ranked = Array.from({ length: 7 }, (_, i) => ({
+        ticker: `T${i + 1}`,
+        name: `종목${i + 1}`,
+        market: "KOSPI",
+        value_krw: 1_000_000,
+        pct: 10,
+      }));
+      renderCard({
+        overview: {
+          ...OVERVIEW,
+          stock_allocation: [
+            ...ranked,
+            { ticker: "ETC", name: "기타 4종목", market: null, value_krw: 3_000_000, pct: 30 },
+          ],
+        },
+      });
+      expect(screen.getByText("종목5")).toBeInTheDocument();
+      expect(screen.queryByText("종목6")).not.toBeInTheDocument();
+      expect(screen.getByText("상위 5종목 합계")).toBeInTheDocument();
+      // 6·7위(20%) + 기타 4종목(30%) = 6종목 50%
+      expect(screen.getByText("기타 6종목")).toBeInTheDocument();
+      expect(screen.getAllByText("50.0%").length).toBeGreaterThan(0);
+    });
+
+    it("전체 비중순 보기 버튼은 콜백이 있을 때만 보이고 누르면 호출된다", () => {
+      localStorage.setItem("growlio:portfolio:allocationView", "stock");
+      const onShowAllStocks = vi.fn();
+      vi.mocked(fetchIndexExposure).mockResolvedValue(EXPOSURE);
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const { unmount } = render(
+        <QueryClientProvider client={qc}>
+          <AllocationCard overview={OVERVIEW} onShowAllStocks={onShowAllStocks} />
+        </QueryClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "보유 종목 전체 비중순 보기" }));
+      expect(onShowAllStocks).toHaveBeenCalledTimes(1);
+      unmount();
+      renderCard();
+      expect(
+        screen.queryByRole("button", { name: "보유 종목 전체 비중순 보기" }),
+      ).not.toBeInTheDocument();
     });
 
     it("보유 종목이 없으면 빈 상태 문구", () => {
@@ -245,9 +290,54 @@ describe("AllocationCard", () => {
     expect(localStorage.getItem("growlio:portfolio:allocationView")).toBe("stock");
   });
 
-  it("접으면 최대 종목 요약을 보여준다", () => {
+  it("접으면 최대 종목과 해외상장 비중 요약을 보여준다", () => {
     localStorage.setItem("growlio:portfolio:allocationOpen", "false");
     renderCard();
-    expect(screen.getByText("최대 종목 SPDR S&P 500 ETF Trust 30.0%")).toBeInTheDocument();
+    expect(
+      screen.getByText("최대 종목 SPDR S&P 500 ETF Trust 30.0% · 해외상장 40%"),
+    ).toBeInTheDocument();
+  });
+
+  describe("기본 펼침 상태", () => {
+    // jsdom에는 matchMedia가 없다 — 테스트마다 정의하고 지운다
+    const mockViewport = (desktop: boolean) =>
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        writable: true,
+        value: (query: string) => ({ matches: desktop, media: query }) as MediaQueryList,
+      });
+
+    afterEach(() => {
+      delete (window as { matchMedia?: unknown }).matchMedia;
+    });
+
+    it("모바일 폭에서는 기본 접힘이고 지수 조회도 하지 않는다", () => {
+      mockViewport(false);
+      renderCard();
+      expect(screen.getByRole("button", { name: /비중 분석/ })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      expect(fetchIndexExposure).not.toHaveBeenCalled();
+    });
+
+    it("데스크톱 폭에서는 기본 펼침", () => {
+      mockViewport(true);
+      renderCard();
+      expect(screen.getByRole("button", { name: /비중 분석/ })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+    });
+
+    it("사용자가 펼쳐 둔 상태는 모바일에서도 유지된다", () => {
+      mockViewport(false);
+      localStorage.setItem("growlio:portfolio:allocationOpen", "true");
+      renderCard();
+      expect(screen.getByRole("button", { name: /비중 분석/ })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+    });
   });
 });

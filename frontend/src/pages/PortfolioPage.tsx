@@ -6,7 +6,9 @@ import Tabs from "@/components/common/Tabs";
 import { fetchAccounts, syncAccount, syncAllAccounts } from "@/api/assets";
 import { useSyncStore } from "@/stores/syncStore";
 import { useDividendData } from "@/hooks/useDividendData";
-import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
+import StockHoldingsTable, {
+  type HoldingsSortRequest,
+} from "@/components/assets/StockHoldingsTable";
 import HorizonSummaryCard from "@/components/dashboard/HorizonSummaryCard";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { fmtKrw } from "@/utils/format";
@@ -91,6 +93,14 @@ export default function PortfolioPage() {
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, tab, handleTabChange);
+
+  // 비중 분석 "전체 비중순 보기" → 보유 종목 목록을 비중순으로 정렬하고 그 위치로 스크롤
+  const holdingsRef = useRef<HTMLDivElement>(null);
+  const [holdingsSortRequest, setHoldingsSortRequest] = useState<HoldingsSortRequest | null>(null);
+  const handleShowAllStocks = useCallback(() => {
+    setHoldingsSortRequest((prev) => ({ key: "weight_in_stock", nonce: (prev?.nonce ?? 0) + 1 }));
+    holdingsRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, []);
 
   const { data: accountsList } = useQuery({
     queryKey: QUERY_KEYS.accounts,
@@ -340,22 +350,31 @@ export default function PortfolioPage() {
       <div ref={tabContentRef}>
         {tab === "종목 현황" && (
           <ErrorBoundary variant="section">
-            <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
-              <AllocationCard overview={data} accountId={selectedAccountId} />
-            </Suspense>
-            {(() => {
-              const dividendMap = Object.fromEntries(
-                dividendData.map((d) => [`${d.ticker}-${d.market}`, d]),
-              );
-              return (
-                <StockHoldingsTable
-                  positions={data.all_positions}
-                  dividendMap={dividendMap}
-                  divLoading={divLoading}
-                  divError={divError}
+            <div className="space-y-4">
+              <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
+                <AllocationCard
+                  overview={data}
+                  accountId={selectedAccountId}
+                  onShowAllStocks={handleShowAllStocks}
                 />
-              );
-            })()}
+              </Suspense>
+              <div ref={holdingsRef} className="scroll-mt-2">
+                {(() => {
+                  const dividendMap = Object.fromEntries(
+                    dividendData.map((d) => [`${d.ticker}-${d.market}`, d]),
+                  );
+                  return (
+                    <StockHoldingsTable
+                      positions={data.all_positions}
+                      dividendMap={dividendMap}
+                      divLoading={divLoading}
+                      divError={divError}
+                      sortRequest={holdingsSortRequest}
+                    />
+                  );
+                })()}
+              </div>
+            </div>
           </ErrorBoundary>
         )}
 

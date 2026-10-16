@@ -2,6 +2,7 @@ import {
   Fragment,
   memo,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -21,7 +22,7 @@ import { DOMESTIC_MARKETS } from "@/constants/markets";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 const MOBILE_CARD_VIRTUALIZE_THRESHOLD = 10;
-const MOBILE_CARD_HEIGHT = 96; // 접힌 카드 추정 높이 (px) — 실제 높이는 measureElement로 실측
+const MOBILE_CARD_HEIGHT = 64; // 접힌 카드(2줄) 추정 높이 (px) — 실제 높이는 measureElement로 실측
 
 type AggSortKey = "total_value_krw" | "pnl_pct" | "total_pnl" | "weight_in_stock";
 type SortDir = "asc" | "desc";
@@ -136,6 +137,7 @@ function StockHoldingMobileCard({
   const annualDiv = divReady ? annualDividendLabel(divData, agg.total_qty) : null;
   return (
     <>
+      {/* 접힌 카드는 2줄만 — 비중 막대·배당률은 펼침 영역으로 옮겨 목록 높이를 줄인다 */}
       <button
         type="button"
         onClick={onToggle}
@@ -152,43 +154,49 @@ function StockHoldingMobileCard({
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-3 text-xs">
           <p className="min-w-0 truncate text-gray-400 dark:text-gray-500">
-            {agg.ticker} · {agg.market} · {agg.total_qty.toLocaleString()}주
-          </p>
-          <p className={`shrink-0 font-medium tabular-nums ${pnlColor(agg.total_pnl)}`}>
-            {agg.total_pnl >= 0 ? "+" : ""}
-            {fmtKrwShort(agg.total_pnl)}원 · {fmtPct(agg.pnl_pct)}
-          </p>
-        </div>
-        <div className="mt-2 flex items-center gap-2 text-xs">
-          <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-            <div
-              className={`h-full rounded-full ${weightBarColor(agg.weight_in_stock)}`}
-              style={{ width: `${clampPct(agg.weight_in_stock)}%` }}
-            />
-          </div>
-          {/* 고정 폭 — 라벨 길이에 따라 막대 끝이 들쭉날쭉하지 않게 */}
-          <span className="shrink-0 w-[4.75rem] text-right text-gray-500 dark:text-gray-400 tabular-nums">
-            비중 {agg.weight_in_stock.toFixed(1)}%
-          </span>
-          {divReady && divData.investment_yield > 0 && (
-            <span className="shrink-0 text-green-600 dark:text-green-500 tabular-nums">
-              배당 {divData.investment_yield.toFixed(2)}%
+            {agg.ticker} · {agg.total_qty.toLocaleString()}주 ·{" "}
+            <span className="text-gray-500 dark:text-gray-400 tabular-nums">
+              비중 {agg.weight_in_stock.toFixed(1)}%
             </span>
-          )}
-          <ChevronDown
-            size={14}
-            aria-hidden="true"
-            className={`shrink-0 text-gray-400 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
-          />
+          </p>
+          <span className="shrink-0 flex items-center gap-1">
+            <span className={`font-medium tabular-nums ${pnlColor(agg.total_pnl)}`}>
+              {agg.total_pnl >= 0 ? "+" : ""}
+              {fmtKrwShort(agg.total_pnl)}원 · {fmtPct(agg.pnl_pct)}
+            </span>
+            <ChevronDown
+              size={14}
+              aria-hidden="true"
+              className={`text-gray-400 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+            />
+          </span>
         </div>
       </button>
       {expanded && (
-        <div className="mt-3 rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2.5 text-xs">
+        <div className="mt-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2.5 text-xs">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+              <div
+                className={`h-full rounded-full ${weightBarColor(agg.weight_in_stock)}`}
+                style={{ width: `${clampPct(agg.weight_in_stock)}%` }}
+              />
+            </div>
+            <span className="shrink-0 text-gray-500 dark:text-gray-400 tabular-nums">
+              {agg.market}
+            </span>
+          </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
             <DetailItem label="평단가">
               {Math.round(agg.weighted_avg_price).toLocaleString()}
             </DetailItem>
             <DetailItem label="현재가">{agg.current_price.toLocaleString()}</DetailItem>
+            {divReady && divData.investment_yield > 0 && (
+              <DetailItem label="투자배당율">
+                <span className="text-green-600 dark:text-green-500">
+                  {divData.investment_yield.toFixed(2)}%
+                </span>
+              </DetailItem>
+            )}
             {annualDiv && (
               <DetailItem label="예상 연배당" wide>
                 {annualDiv}
@@ -229,24 +237,38 @@ function StockHoldingMobileCard({
   );
 }
 
+/** 바깥(비중 분석 카드 "전체 비중순 보기")에서 정렬을 바꿔 달라는 요청 — nonce가 바뀔 때마다 적용 */
+export interface HoldingsSortRequest {
+  key: AggSortKey;
+  nonce: number;
+}
+
 interface Props {
   positions: PortfolioPosition[];
   dividendMap: Record<string, DividendYield>;
   divLoading: boolean;
   divError: boolean;
+  sortRequest?: HoldingsSortRequest | null;
 }
 
 const MOBILE_SORT_OPTIONS: { key: AggSortKey; label: string }[] = [
-  { key: "total_value_krw", label: "평가금액순" },
+  // 360px에서 검색 placeholder가 잘리지 않도록 짧게 — 기준은 평가금액
+  { key: "total_value_krw", label: "금액순" },
   { key: "pnl_pct", label: "수익률순" },
   { key: "total_pnl", label: "손익순" },
   { key: "weight_in_stock", label: "비중순" },
 ];
 
-function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Props) {
+function StockHoldingsTable({ positions, dividendMap, divLoading, divError, sortRequest }: Props) {
   const [sort, setSort] = useState<SortState>({ key: "total_value_krw", dir: "desc" });
   const [expandedSet, setExpandedSet] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (!sortRequest) return;
+    setSort({ key: sortRequest.key, dir: "desc" });
+    setQuery("");
+  }, [sortRequest]);
 
   const handleSort = useCallback((k: AggSortKey) => {
     setSort((prev) =>
@@ -315,9 +337,14 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
       return next;
     });
   };
+  // 모바일은 한 번에 한 카드만 펼친다 — 여러 장 펼친 채 내려가면 목록이 끝없이 길어진다
+  const toggleSingle = (key: string) => {
+    setExpandedSet((prev) => (prev.has(key) ? new Set() : new Set([key])));
+  };
 
   return (
-    <div className="card-overflow">
+    // 모바일은 검색·정렬 바를 sticky로 두려고 overflow-hidden을 푼다(sticky는 overflow 조상이 있으면 그 안에 갇힘)
+    <div className="card-overflow max-sm:overflow-visible">
       <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
         <h3 className="font-semibold text-gray-800 dark:text-gray-200">전체 보유 종목</h3>
         {/* 총 평가액은 바로 위 "주식 총평가액" 요약 카드와 같은 값이라 종목 수만 표시(U3) */}
@@ -327,7 +354,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
         <EmptyState title="보유 종목이 없습니다" compact />
       ) : (
         <>
-          <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-2">
+          <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-2 max-sm:sticky max-sm:-top-4 max-sm:z-10 bg-white dark:bg-gray-900">
             <div className="relative flex-1 min-w-0">
               <Search
                 size={14}
@@ -338,7 +365,8 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="종목·티커 검색"
                 aria-label="종목명 또는 티커 검색"
-                className={`${INPUT_SM} w-full pl-8 pr-10`}
+                // 지우기 버튼 자리는 검색어가 있을 때만 비운다
+                className={`${INPUT_SM} w-full pl-8 ${query ? "pr-10" : "pr-3"}`}
               />
               {query && (
                 <button
@@ -395,7 +423,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
                             width: "100%",
                             transform: `translateY(${virtualItem.start - scrollMargin}px)`,
                           }}
-                          className="px-4 py-3 border-b border-gray-100 dark:border-gray-700"
+                          className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700"
                         >
                           <StockHoldingMobileCard
                             agg={agg}
@@ -403,7 +431,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
                             divLoading={divLoading}
                             divError={divError}
                             expanded={expandedSet.has(key)}
-                            onToggle={() => toggle(key)}
+                            onToggle={() => toggleSingle(key)}
                           />
                         </div>
                       );
@@ -413,14 +441,14 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Pr
                   sorted.map((agg) => {
                     const key = `${agg.ticker}-${agg.market}`;
                     return (
-                      <div key={key} className="px-4 py-3">
+                      <div key={key} className="px-4 py-2.5">
                         <StockHoldingMobileCard
                           agg={agg}
                           divData={dividendMap[key]}
                           divLoading={divLoading}
                           divError={divError}
                           expanded={expandedSet.has(key)}
-                          onToggle={() => toggle(key)}
+                          onToggle={() => toggleSingle(key)}
                         />
                       </div>
                     );
