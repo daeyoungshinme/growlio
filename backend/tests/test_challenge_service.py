@@ -351,3 +351,16 @@ class TestCrud:
         await cs.update_challenge(challenge, db, ChallengeUpdate(status="COMPLETED"), mock_cache)
         assert challenge.status == "COMPLETED"
         assert challenge.completed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_update_challenge_clears_completed_at_when_reactivated(self, mock_cache):
+        """완료 → 진행 중 복귀 시 완료 시각이 남지 않는다."""
+        from datetime import UTC, datetime
+
+        from app.schemas.challenge import ChallengeUpdate
+
+        db = AsyncMock()
+        challenge = _ns(status="COMPLETED", completed_at=datetime(2026, 9, 1, tzinfo=UTC))
+        await cs.update_challenge(challenge, db, ChallengeUpdate(status="ACTIVE"), mock_cache)
+        assert challenge.status == "ACTIVE"
+        assert challenge.completed_at is None

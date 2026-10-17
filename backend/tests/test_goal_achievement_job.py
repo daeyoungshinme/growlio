@@ -350,3 +350,22 @@ class TestAlreadyNotifiedThisMonth:
 
         result = await _already_notified_this_month(mock_db, uuid.uuid4(), "GOAL_ASSET")
         assert result is True
+
+    @pytest.mark.asyncio
+    async def test_month_start_is_kst_midnight(self, mock_db):
+        """월초 경계는 KST 1일 00:00(= 전날 15:00 UTC)이어야 한다 — UTC 자정이면 KST 1일 00~09시
+        발송분이 이번 달로 안 잡혀 중복 발송된다."""
+        from datetime import UTC, date, datetime
+
+        from app.jobs.goal_achievement import _already_notified_this_month
+
+        result_mock = MagicMock()
+        result_mock.scalar.return_value = None
+        mock_db.execute = AsyncMock(return_value=result_mock)
+
+        with patch("app.jobs.goal_achievement.today_kst", return_value=date(2026, 10, 1)):
+            await _already_notified_this_month(mock_db, uuid.uuid4(), "GOAL_ASSET")
+
+        stmt = mock_db.execute.call_args.args[0]
+        bound = [v for v in stmt.compile().params.values() if isinstance(v, datetime)]
+        assert bound == [datetime(2026, 9, 30, 15, 0, tzinfo=UTC)]

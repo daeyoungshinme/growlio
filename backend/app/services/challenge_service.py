@@ -301,6 +301,9 @@ async def update_challenge(
         challenge.status = data["status"]
         if data["status"] == "COMPLETED" and challenge.completed_at is None:
             challenge.completed_at = datetime.now(UTC)
+        elif data["status"] != "COMPLETED":
+            # 완료 → 진행 중 복귀 시 완료 시각이 남으면 "완료됨"처럼 보인다
+            challenge.completed_at = None
     await db.commit()
     await db.refresh(challenge)
     await invalidate_challenge_cache(cache, challenge.user_id)

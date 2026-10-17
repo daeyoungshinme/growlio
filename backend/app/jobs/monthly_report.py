@@ -34,6 +34,21 @@ def _prev_month_key(today: date) -> str:
     return (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
 
 
+def _mom_change(monthly_trend: list[dict], month_key: str) -> tuple[float | None, float | None]:
+    """리포트 대상 월(`month_key`, YYYY-MM)과 그 직전 항목의 전월 대비 변화.
+
+    위치(`[-2]`·`[-1]`)로 집으면, 발송 전에 당월 스냅샷(계좌 수정·수동 sync)이 생겼을 때
+    당월 부분합과 비교해 "지난달 급락"으로 보인다 — 반드시 월 키로 찾는다.
+    """
+    idx = next((i for i, row in enumerate(monthly_trend) if str(row["month"]).startswith(month_key)), None)
+    if idx is None or idx == 0:
+        return None, None
+    prev_val = float(monthly_trend[idx - 1]["total_krw"])
+    curr_val = float(monthly_trend[idx]["total_krw"])
+    change = curr_val - prev_val
+    return change, (change / prev_val * 100) if prev_val else None
+
+
 async def _run_monthly_report(db: AsyncSession, cache: CacheStoreType) -> None:
     today = today_kst()
     report_month = _prev_month_label(today)
@@ -78,13 +93,7 @@ async def _send_report_for_user(
                 summary = await get_dashboard_summary(user.id, db, cache)
 
             monthly_trend: list[dict] = summary.get("monthly_trend") or []
-            mom_change_krw: float | None = None
-            mom_change_pct: float | None = None
-            if len(monthly_trend) >= 2:
-                prev_val = float(monthly_trend[-2]["total_krw"])
-                curr_val = float(monthly_trend[-1]["total_krw"])
-                mom_change_krw = curr_val - prev_val
-                mom_change_pct = (mom_change_krw / prev_val * 100) if prev_val else None
+            mom_change_krw, mom_change_pct = _mom_change(monthly_trend, month_key)
 
             sent = await send_monthly_report_email(
                 to_email=to_email,

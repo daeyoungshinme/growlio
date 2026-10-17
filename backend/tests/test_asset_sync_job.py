@@ -83,7 +83,7 @@ class TestRunDailyAssetSync:
 class TestRunIntradayAssetSync:
     @pytest.mark.asyncio
     async def test_intraday_only_syncs_stock_accounts(self, make_account):
-        """intraday sync는 KIS/Kiwoom 주식 계좌만 동기화한다."""
+        """intraday sync는 증권사 API 주식 계좌(KIS/키움/토스)만 동기화한다."""
         accounts = [make_account(data_source="KIS_API"), make_account(data_source="KIWOOM_API")]
         mock_session = AsyncMock()
         execute_result = MagicMock()
@@ -102,3 +102,10 @@ class TestRunIntradayAssetSync:
             await run_intraday_asset_sync()
 
         assert mock_sync.call_count == 2
+
+    def test_intraday_sources_include_all_broker_sync_sources(self):
+        """토스도 잔고 동기화 대상이다(주문 실행 대상만 KIS/키움). 15:30 스냅샷에서 빠지면
+        18:00 전까지 토스 포지션이 오래된 값으로 남는다."""
+        from app.jobs.asset_sync import _STOCK_SOURCES
+
+        assert set(_STOCK_SOURCES) == {"KIS_API", "KIWOOM_API", "TOSS_API"}

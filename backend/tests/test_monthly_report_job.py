@@ -268,3 +268,39 @@ class TestPrevMonthLabel:
 
         result = _prev_month_label(date(2026, 6, 1))
         assert result == "2026년 5월"
+
+
+class TestMomChange:
+    _TREND = [
+        {"month": "2026-08-01", "total_krw": 40_000_000},
+        {"month": "2026-09-01", "total_krw": 50_000_000},
+    ]
+
+    def test_compares_report_month_with_previous_month(self):
+        from app.jobs.monthly_report import _mom_change
+
+        change, pct = _mom_change(self._TREND, "2026-09")
+        assert change == 10_000_000
+        assert pct == pytest.approx(25.0)
+
+    def test_ignores_partial_current_month_entry(self):
+        """발송(1일) 전에 당월 스냅샷이 생겨도 당월 부분합과 비교하지 않는다."""
+        from app.jobs.monthly_report import _mom_change
+
+        trend = [*self._TREND, {"month": "2026-10-01", "total_krw": 3_000_000}]
+        change, pct = _mom_change(trend, "2026-09")
+        assert change == 10_000_000
+        assert pct == pytest.approx(25.0)
+
+    def test_none_when_report_month_or_previous_missing(self):
+        from app.jobs.monthly_report import _mom_change
+
+        assert _mom_change(self._TREND, "2026-07") == (None, None)
+        assert _mom_change(self._TREND, "2026-08") == (None, None)
+        assert _mom_change([], "2026-09") == (None, None)
+
+    def test_pct_none_when_previous_zero(self):
+        from app.jobs.monthly_report import _mom_change
+
+        trend = [{"month": "2026-08-01", "total_krw": 0}, {"month": "2026-09-01", "total_krw": 1_000}]
+        assert _mom_change(trend, "2026-09") == (1_000, None)

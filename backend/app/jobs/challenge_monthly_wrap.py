@@ -100,6 +100,9 @@ async def _wrap_user(user: User, settings_row: UserSettings, cache: CacheStoreTy
                         report_job_failure(
                             "challenge_monthly_wrap_failed", e, user_id=str(user.id), challenge_id=str(challenge.id)
                         )
+                # 결산이 status=COMPLETED로 바꿀 수 있다 — 캐시(TTL 5분)가 이전 상태를 보이지 않게
+                if challenges:
+                    await challenge_service.invalidate_challenge_cache(cache, user.id)
         except Exception as e:
             report_job_failure("challenge_monthly_wrap_failed", e, user_id=str(user.id))
 

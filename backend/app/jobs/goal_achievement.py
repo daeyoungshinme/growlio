@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 
 import structlog
 from sqlalchemy import select
@@ -18,7 +18,7 @@ from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_goal_achievement_email
 from app.services.push_service import send_push_to_user
 from app.utils.cache_keys import CacheStoreType
-from app.utils.kst import today_kst
+from app.utils.kst import KST, today_kst
 
 logger = structlog.get_logger()
 
@@ -28,7 +28,8 @@ _GOAL_CHECK_CONCURRENCY = 3
 async def _already_notified_this_month(db, user_id, alert_type: str) -> bool:
     """이번 달 해당 타입 목표 알림이 이미 발송됐으면 True."""
     today = today_kst()
-    month_start = datetime(today.year, today.month, 1, tzinfo=UTC)
+    # KST 월초 — UTC 자정이면 KST 1일 00~09시 발송분이 지난달로 잡혀 이번 달에 중복 발송된다
+    month_start = datetime(today.year, today.month, 1, tzinfo=KST)
     result = await db.execute(
         select(AlertHistory.id)
         .where(

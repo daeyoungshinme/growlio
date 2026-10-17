@@ -68,7 +68,7 @@ from app.utils.cache_keys import (
     monthly_trend_key,
 )
 from app.utils.currency import fetch_usd_krw
-from app.utils.kst import today_kst
+from app.utils.kst import KST, today_kst
 
 router = APIRouter(prefix="/external", tags=["external"])
 logger = structlog.get_logger()
@@ -213,7 +213,7 @@ async def list_real_estate_items(
                 net_equity_krw=market_value - mortgage,
                 purchase_price_krw=details.get("purchase_price_krw"),
                 purchase_date=details.get("purchase_date"),
-                as_of=account.manual_updated_at.date() if account.manual_updated_at else None,
+                as_of=account.manual_updated_at.astimezone(KST).date() if account.manual_updated_at else None,
             )
         )
     return result

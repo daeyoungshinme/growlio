@@ -257,6 +257,48 @@ class TestUpdateGoal:
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
+    def test_put_goal_null_clears_and_omitted_keeps(self, override_settings):
+        """명시적 null은 값을 비우고, 생략한 필드는 그대로 둔다(입력을 지워도 이전 목표가 남던 버그)."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(
+            goal_amount=300_000_000,
+            goal_annual_return_pct=7.0,
+            annual_deposit_goal=10_000_000,
+            monthly_deposit_amount=800_000,
+            retirement_target_year=2045,
+            goal_start_date=None,
+            goal_initial_amount=None,
+            annual_dividend_goal=12_000_000,
+            birth_year=1990,
+            age_group="THIRTIES",
+        )
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal",
+                    json={"annual_dividend_goal": None, "retirement_target_year": None, "birth_year": None},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.annual_dividend_goal is None
+            assert settings.retirement_target_year is None
+            assert settings.birth_year is None
+            # 생략한 필드는 유지
+            assert settings.goal_amount == 300_000_000
+            assert settings.monthly_deposit_amount == 800_000
+            # 출생연도를 지워도 직접 고를 수 있는 age_group은 유지
+            assert settings.age_group == "THIRTIES"
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
     def test_put_goal_rejects_invalid_birth_year(self, override_settings):
         """미래 출생연도는 422 반환."""
         user = _make_user()
