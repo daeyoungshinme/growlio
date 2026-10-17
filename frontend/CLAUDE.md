@@ -153,7 +153,7 @@ _공통/입력_
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼(setter 참조 고정 — effect 의존성에 넣어도 됨). `CollapsibleCard`/`CollapsibleSection`과 함께 사용
 - `useTimeout.ts` — 언마운트 시 자동 해제·재예약 시 이전 예약 취소되는 setTimeout(`scheduleTimeout(fn, ms)`). "3초 뒤 확인 해제"·blur 후 드롭다운 닫기처럼 상태를 바꾸는 지연 콜백은 맨 `setTimeout` 대신 이것을 쓴다
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`·`common/ConfirmModal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용. Escape·포커스 트랩은 **맨 위 모달만** 처리(DOM상 다른 열린 모달을 품은 쪽은 아래층, 형제끼리는 나중에 열린 쪽이 위) — Android 뒤로가기가 Escape를 dispatch하므로 확인창 위에서 한 번 눌러 아래 모달까지 닫히지 않게 함
-- `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용
+- `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용. `numberFieldPayload(value, initial)` — 부분 갱신 payload 값(값 있음→숫자, 원래 값을 지움→null, 처음부터 빈 칸→undefined로 키 생략). `PUT /settings/goal`은 보낸 키만 바꾸고 null은 비우므로, 초기 폼이 비어 있어도 기존 목표를 지우지 않으려면 이 헬퍼를 쓴다
 
 _세금_
 
@@ -450,7 +450,7 @@ _기타_
 - `dcaAutoBuy.ts` — `isDcaAutoBuyPreset(alert)`: AUTO·매월·SCHEDULE_ONLY·BUY_ONLY 조합이면 "정기 적립식 자동매수"로 표시 판정.
 - `actionPriority.ts` — 행동 항목 우선순위 배지 스타일(`ACTION_PRIORITY_STYLE`: HIGH 우선/MEDIUM 권장/LOW 참고)·마감 라벨(`deadlineLabel`). `TaxActionPlanCard`·`ActionItemsCard` 공용
 - `legacyTabRedirect.ts` — 탭 재편(plans/50)으로 옮겨진 옛 딥링크 변환: `legacyAssetsTaxRedirect()`(자산 세금 → 계획 › 절세), `legacyHistorySegment()`(계좌관리 옛 하위탭 → 내역 세그먼트). 이메일·푸시에 저장된 링크 호환용이라 지우지 말 것
-- `safeStorage.ts` — `storageGet`/`storageSet`/`storageRemove`. 저장소가 막힌 환경(사생활 보호 모드 등)에서 예외를 삼키는 localStorage 래퍼 — `localStorage` 직접 접근 금지.
+- `safeStorage.ts` — `storageGet`/`storageSet`/`storageRemove`(localStorage), `sessionGet`/`sessionSet`(sessionStorage), `getLocalStorageOrUndefined`(객체 자체가 필요한 persister용). 저장소가 막힌 환경(사생활 보호 모드·사이트 데이터 차단)에서 예외를 삼키는 래퍼 — `localStorage`/`sessionStorage` 직접 접근 금지(차단 시 `window.localStorage` 접근만으로 throw해 부팅 실패).
 - `notificationAlertGroups.ts` — 알림 설정 페이지의 필드 그룹(`REPORT_ALERT_FIELDS`/`INSTANT_ALERT_FIELDS`).
 
 **배당 유틸리티 (`src/utils/dividendUtils.ts`)**
@@ -538,7 +538,7 @@ _기타_
 - 계좌 sync 후: `invalidateSyncData(queryClient)` — portfolio-overview + dashboard + dividend 등 무효화.
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 등 무효화.
 - 브로커 API 키 삭제(연동 해제) 후: `invalidateBrokerCredentialData(queryClient)` — 계좌 데이터 + 리밸런싱 알림·대기 플랜 무효화.
-- 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions(전체·계좌별 프리픽스) + dashboard 무효화.
+- 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions(전체·계좌별 프리픽스) + dashboard + 챌린지·연금/ISA·세금·지금 할 일 + 배당 요약·배당 계획(DIVIDEND 거래) 무효화.
 - 수기 매매 기록 CUD 후: `invalidateTradeData(queryClient)` — trades + period-purchases 무효화.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + dividend-plan + challenges + action-items 무효화.
@@ -547,7 +547,7 @@ _기타_
 - 적립 챌린지 알림 설정 변경 후: `invalidateChallengeRemindersData(queryClient)` — settings 무효화.
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
-- 배당 계획 변경 후: `invalidateDividendPlanData(queryClient)`.
+- 배당 목표 변경 후: `invalidateDcaData` + `invalidateGoalRecommendationData` — `PUT /settings/goal`은 대시보드·DCA·챌린지·추천 캐시를 함께 지운다(배당 계획만 무효화하면 홈 목표 카드가 stale).
 - 주가 알림 CUD 후: `invalidateStockPriceAlertData(queryClient)`.
 - 리밸런싱 주문 실행 후: `invalidateRebalancingHistoryData(queryClient)`.
 - 리밸런싱 대기 플랜 취소/승인 후: `invalidateRebalancingPlanData(queryClient, { executed })` — 대기 플랜 목록 + 실행 이력 무효화. 승인은 즉시 체결하므로 응답 `status === "EXECUTED"`면 `executed: true`로 넘겨 `invalidateSyncData`(보유·드리프트·지금 할 일)까지 갱신.

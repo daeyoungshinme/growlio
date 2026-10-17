@@ -11,6 +11,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { STALE_TIME, PERSIST_CACHE_KEY } from "./constants/queryConfig";
+import { getLocalStorageOrUndefined } from "./utils/safeStorage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,7 +28,8 @@ const queryClient = new QueryClient({
 
 // 앱 재시작 시 대시보드·포트폴리오·계좌 캐시를 즉시 표시하기 위한 persistence (24h TTL)
 const persister = createSyncStoragePersister({
-  storage: typeof window !== "undefined" ? window.localStorage : undefined,
+  // 사이트 데이터 차단 시 window.localStorage 접근 자체가 throw해 앱이 부팅조차 못 한다 — 캐시 없이 부팅
+  storage: getLocalStorageOrUndefined(),
   key: PERSIST_CACHE_KEY,
   throttleTime: 2000,
   // localStorage 용량 초과(QuotaExceededError) 시 가장 오래된 쿼리부터 제거하고 재시도

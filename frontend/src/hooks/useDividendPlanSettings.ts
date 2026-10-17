@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchSettings, updateGoalSettings } from "@/api/settings";
 import { toast } from "@/utils/toast";
-import { invalidateDividendPlanData } from "@/utils/queryInvalidation";
-import { useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
+import { invalidateDcaData, invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
+import { numberFieldPayload, useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
 
 export interface DividendPlanForm {
   annual_dividend_goal: string;
@@ -21,6 +21,7 @@ export function useDividendPlanSettings() {
     showCloseConfirm,
     form,
     setForm,
+    initialForm,
     isDirty,
     setShowCloseConfirm,
     setEditing,
@@ -41,11 +42,19 @@ export function useDividendPlanSettings() {
     setSaving(true);
     try {
       await updateGoalSettings({
-        annual_dividend_goal: form.annual_dividend_goal ? Number(form.annual_dividend_goal) : null,
+        annual_dividend_goal: numberFieldPayload(
+          form.annual_dividend_goal,
+          initialForm?.annual_dividend_goal,
+        ),
       });
       toast("설정이 저장되었습니다", "success");
       setEditing(false);
-      await invalidateDividendPlanData(queryClient);
+      // PUT /settings/goal은 대시보드·DCA·챌린지·목표 추천 캐시를 함께 지운다 — 배당 계획만
+      // 무효화하면 홈 목표 카드와 설정의 "목표 N개"가 오래된 배당 목표를 보인다.
+      await Promise.all([
+        invalidateDcaData(queryClient),
+        invalidateGoalRecommendationData(queryClient),
+      ]);
     } catch {
       toast("저장에 실패했습니다", "error");
     } finally {

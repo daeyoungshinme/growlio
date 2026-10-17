@@ -40,7 +40,7 @@ vi.mock("@/utils/queryInvalidation", () => ({
   invalidateSyncData: vi.fn(),
   invalidateAlertData: vi.fn(),
   invalidateDcaData: vi.fn(),
-  invalidateDividendPlanData: vi.fn(),
+  invalidateGoalRecommendationData: vi.fn(),
 }));
 
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));

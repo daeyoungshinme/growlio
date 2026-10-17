@@ -6,6 +6,7 @@ import { fetchAccounts } from "@/api/assets";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import { AnalysisPanel } from "./AnalysisPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import EmptyState from "@/components/common/EmptyState";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { mergeAlertsByPortfolio } from "@/utils/portfolio";
@@ -31,7 +32,12 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
     );
   }, [searchParams, setSearchParams]);
 
-  const { data: portfoliosRaw, isLoading: portfoliosLoading } = useQuery({
+  const {
+    data: portfoliosRaw,
+    isLoading: portfoliosLoading,
+    isError: portfoliosError,
+    refetch: refetchPortfolios,
+  } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
   });
@@ -78,6 +84,15 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
 
   if (portfoliosLoading) {
     return <div className="h-32 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />;
+  }
+
+  if (portfoliosError) {
+    return (
+      <EmptyState
+        title="포트폴리오를 불러오지 못했습니다."
+        action={{ label: "다시 시도", onClick: () => void refetchPortfolios() }}
+      />
+    );
   }
 
   if (portfolios.length === 0) {

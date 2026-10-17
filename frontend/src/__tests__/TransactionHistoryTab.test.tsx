@@ -145,6 +145,18 @@ describe("TransactionHistoryTab", () => {
     });
   });
 
+  it("조회 실패를 '내역 없음'이 아니라 오류+다시 시도로 보여준다", async () => {
+    const { fetchTransactions } = await import("../api/transactions");
+    vi.mocked(fetchTransactions).mockRejectedValueOnce(new Error("network"));
+    renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
+
+    expect(await screen.findByText("거래 내역을 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("등록된 내역이 없습니다.")).not.toBeInTheDocument();
+    vi.mocked(fetchTransactions).mockResolvedValueOnce([]);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByText("등록된 내역이 없습니다.")).toBeInTheDocument();
+  });
+
   it("연도 선택 드롭다운이 현재 연도로 초기화된다", () => {
     const currentYear = new Date().getFullYear();
     renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);

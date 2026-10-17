@@ -9,7 +9,7 @@ import {
 } from "@/hooks/useRebalancingAlertForm";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import { invalidatePortfolioData } from "@/utils/queryInvalidation";
+import { invalidatePortfolioData, invalidateRebalancingAlertData } from "@/utils/queryInvalidation";
 import { DCA_AUTO_BUY_THRESHOLD_PCT } from "@/constants/rebalancingConfig";
 import { isDcaAutoBuyPreset } from "@/utils/dcaAutoBuy";
 import { AlertScheduleSection } from "@/components/rebalancing/alertModal/AlertScheduleSection";
@@ -158,6 +158,8 @@ function AlertFormBody({
     mutationFn: () => updateAlertScope(portfolioId, "PER_ACCOUNT"),
     onSuccess: () => {
       void invalidatePortfolioData(queryClient);
+      // 전환은 AGGREGATE 알림을 지우거나 계좌별 행으로 바꾼다 — 알림 목록·배지·AUTO 배너 갱신
+      void invalidateRebalancingAlertData(queryClient, portfolioId);
       toast("계좌별 독립 설정으로 전환되었습니다", "success");
       onSwitchToPerAccount?.();
     },

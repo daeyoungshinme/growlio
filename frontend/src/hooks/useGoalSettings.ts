@@ -14,7 +14,7 @@ import { invalidateDcaData, invalidateGoalRecommendationData } from "@/utils/que
 import { STALE_TIME } from "@/constants/queryConfig";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { useQuery } from "@tanstack/react-query";
-import { useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
+import { numberFieldPayload, useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
 import { storageGet, storageSet } from "@/utils/safeStorage";
 
 export interface GoalForm {
@@ -68,6 +68,7 @@ export function useGoalSettings() {
     showCloseConfirm,
     form,
     setForm,
+    initialForm,
     isDirty,
     setShowCloseConfirm,
     setEditing,
@@ -159,26 +160,40 @@ export function useGoalSettings() {
   const saveSettings = async (): Promise<boolean> => {
     setSaving(true);
     try {
+      // 비운 필드는 null(백엔드가 지움), 처음부터 비어 있던 필드는 생략(기존 값 유지)
+      const init = initialForm ?? undefined;
       await updateGoalSettings({
-        monthly_deposit_amount: form.monthly_deposit_amount
-          ? Number(form.monthly_deposit_amount)
-          : null,
-        goal_annual_return_pct: form.goal_annual_return_pct
-          ? Number(form.goal_annual_return_pct)
-          : null,
-        goal_amount: form.goal_amount ? Number(form.goal_amount) : null,
+        monthly_deposit_amount: numberFieldPayload(
+          form.monthly_deposit_amount,
+          init?.monthly_deposit_amount,
+        ),
+        goal_annual_return_pct: numberFieldPayload(
+          form.goal_annual_return_pct,
+          init?.goal_annual_return_pct,
+        ),
+        goal_amount: numberFieldPayload(form.goal_amount, init?.goal_amount),
         // 플랫 편집 모달에서도 비워두면 오늘 날짜로 기본값 처리 — wizardMode에서만 기본값을
         // 적용하면 마법사를 거치지 않고 플랫 모달로만 목표를 편집한 사용자는 goal_start_date가
         // null로 저장되어 dca_service의 is_configured가 계속 false로 남고(목표 진행률 카드가
         // "미설정"으로 보임), 목표 설정 가이드 모달이 브라우저를 바꿀 때마다 다시 뜬다.
         goal_start_date: form.goal_start_date || localToday(),
-        goal_initial_amount: form.goal_initial_amount ? Number(form.goal_initial_amount) : null,
-        annual_deposit_goal: form.annual_deposit_goal ? Number(form.annual_deposit_goal) : null,
-        retirement_target_year: form.retirement_target_year
-          ? Number(form.retirement_target_year)
-          : null,
-        annual_dividend_goal: form.annual_dividend_goal ? Number(form.annual_dividend_goal) : null,
-        birth_year: form.birth_year ? Number(form.birth_year) : null,
+        goal_initial_amount: numberFieldPayload(
+          form.goal_initial_amount,
+          init?.goal_initial_amount,
+        ),
+        annual_deposit_goal: numberFieldPayload(
+          form.annual_deposit_goal,
+          init?.annual_deposit_goal,
+        ),
+        retirement_target_year: numberFieldPayload(
+          form.retirement_target_year,
+          init?.retirement_target_year,
+        ),
+        annual_dividend_goal: numberFieldPayload(
+          form.annual_dividend_goal,
+          init?.annual_dividend_goal,
+        ),
+        birth_year: numberFieldPayload(form.birth_year, init?.birth_year),
       });
       if (wizardMode) {
         // 리스크 성향은 전체교체 엔드포인트라 다른 필드(종목당 최대비중 등)를 덮어쓰지 않도록
@@ -193,8 +208,10 @@ export function useGoalSettings() {
           bond_ceiling_pct: current.goal_bond_ceiling_pct,
           cash_ceiling_pct: current.goal_cash_ceiling_pct,
         });
-        await invalidateGoalRecommendationData(queryClient);
       }
+      // 목표 금액·연도·출생연도는 마법사 밖(편집 모달)에서도 바뀌고 추천 결과를 바꾼다 — 백엔드도
+      // 저장 시 추천 캐시를 지우므로 프론트도 모드와 무관하게 무효화한다(persist 대상 키).
+      await invalidateGoalRecommendationData(queryClient);
       toast("설정이 저장되었습니다", "success");
       if (!wizardMode) setEditing(false);
       await invalidateDcaData(queryClient);
