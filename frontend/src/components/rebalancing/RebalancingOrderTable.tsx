@@ -323,6 +323,7 @@ export function RebalancingOrderTable({
                                 type: "SET_QTY",
                                 key,
                                 qty: parseInt(e.target.value) || 0,
+                                max: currentQty,
                               })
                             }
                             className="w-16 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-right text-blue-600 dark:text-blue-400 font-medium focus:outline-none focus:border-indigo-500"

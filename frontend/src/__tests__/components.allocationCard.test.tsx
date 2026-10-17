@@ -94,7 +94,14 @@ const OVERVIEW = {
     },
     { ticker: "360750", name: "TIGER 미국S&P500", market: "KOSPI", value_krw: 3_000_000, pct: 30 },
     { ticker: "005930", name: "삼성전자", market: "KOSPI", value_krw: 2_000_000, pct: 20 },
-    { ticker: "ETC", name: "기타 3종목", market: null, value_krw: 2_000_000, pct: 20 },
+    {
+      ticker: "ETC",
+      name: "기타 3종목",
+      market: null,
+      etc_count: 3,
+      value_krw: 2_000_000,
+      pct: 20,
+    },
   ],
   all_positions: [],
   accounts: [],
@@ -189,7 +196,14 @@ describe("AllocationCard", () => {
           ...OVERVIEW,
           stock_allocation: [
             ...ranked,
-            { ticker: "ETC", name: "기타 4종목", market: null, value_krw: 3_000_000, pct: 30 },
+            {
+              ticker: "ETC",
+              name: "기타 4종목",
+              market: null,
+              etc_count: 4,
+              value_krw: 3_000_000,
+              pct: 30,
+            },
           ],
         },
       });
@@ -199,6 +213,27 @@ describe("AllocationCard", () => {
       // 6·7위(20%) + 기타 4종목(30%) = 6종목 50%
       expect(screen.getByText("기타 6종목")).toBeInTheDocument();
       expect(screen.getAllByText("50.0%").length).toBeGreaterThan(0);
+    });
+
+    it("기타 개수는 표시 이름이 아니라 etc_count로 세고, 0.0%로 반올림돼도 행을 보인다", () => {
+      localStorage.setItem("growlio:portfolio:allocationView", "stock");
+      const ranked = Array.from({ length: 5 }, (_, i) => ({
+        ticker: `T${i + 1}`,
+        name: `종목${i + 1}`,
+        market: "KOSPI",
+        value_krw: 1_000_000,
+        pct: 20,
+      }));
+      renderCard({
+        overview: {
+          ...OVERVIEW,
+          stock_allocation: [
+            ...ranked,
+            { ticker: "ETC", name: "Others", market: null, etc_count: 2, value_krw: 10, pct: 0 },
+          ],
+        },
+      });
+      expect(screen.getByText("기타 2종목")).toBeInTheDocument();
     });
 
     it("전체 비중순 보기 버튼은 콜백이 있을 때만 보이고 누르면 호출된다", () => {

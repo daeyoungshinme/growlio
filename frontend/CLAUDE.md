@@ -358,6 +358,7 @@ _기타_
 - `fmtKrwPrice(n)` — 소수점 없는 원화 가격 표시.
 - `fmtMonth(str)` — "YYYY-MM" → "YYYY년 M월".
 - `fmtPct(n)` — "+5.23%" 형식. null이면 "—".
+- `pctOf(part, total)` — 합계 대비 비중(%), 합계 0 이하면 0. 인라인 `total > 0 ? (v / total) * 100 : 0` 대신 사용.
 - `clampPct(pct)` — 진행률 바 렌더링용 0~100 클램프. 프로그레스 바 `style={{ width }}`에 값 그대로 넣지 말 것.
 - `localToday()` — 사용자 로컬(KST) 기준 오늘 "YYYY-MM-DD". 날짜 입력 기본값에 `new Date().toISOString().slice(0, 10)`를 쓰지 말 것 — UTC라 KST 오전 9시 전엔 전날이 된다. 모듈 최상위 상수로 고정하지 말고 폼을 열 때 호출(자정을 넘긴 세션 대응).
 - `localMonth()` — 같은 기준의 이번 달 "YYYY-MM". `new Date().toISOString().slice(0, 7)` 금지(매월 1일 오전 9시 전엔 전월).

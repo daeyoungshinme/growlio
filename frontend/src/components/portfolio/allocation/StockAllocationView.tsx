@@ -27,15 +27,16 @@ export default function StockAllocationView({ items, onShowAll }: Props) {
   const shown = ranked.slice(0, TOP_N);
   const topNPct = shown.reduce((sum, i) => sum + i.pct, 0);
 
-  // 6위 이하 + 백엔드 "기타"(11위 이하, 이름 형식 "기타 N종목" — portfolio_service._build_stock_allocation)를 한 행으로 합친다
+  // 6위 이하 + 백엔드 "기타"(11위 이하, portfolio_service._build_stock_allocation)를 한 행으로 합친다
   const backendEtc = items.find((i) => i.ticker === ETC_TICKER);
-  const backendEtcCount = Number(backendEtc?.name.match(/\d+/)?.[0] ?? 0);
+  const backendEtcCount = backendEtc?.etc_count ?? 0;
   const restRanked = ranked.slice(TOP_N);
   const restCount = restRanked.length + backendEtcCount;
   const restPct = restRanked.reduce((sum, i) => sum + i.pct, 0) + (backendEtc?.pct ?? 0);
   const restValue =
     restRanked.reduce((sum, i) => sum + (i.value_krw ?? 0), 0) + (backendEtc?.value_krw ?? 0);
-  const hasRest = restPct > 0;
+  // 비중이 0.0%로 반올림돼도 남은 종목이 있으면 행을 보여준다
+  const hasRest = restCount > 0;
 
   return (
     <div>

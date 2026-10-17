@@ -399,6 +399,12 @@ describe("executionReducer", () => {
     expect(result.qtyOverrides["buy_005930_acc1"]).toBe(5);
   });
 
+  it("SET_QTY — max(보유 수량)를 넘는 입력은 max로 자른다", () => {
+    const action: ExecutionAction = { type: "SET_QTY", key: "sell_AAPL_acc1", qty: 100, max: 5 };
+    const result = executionReducer(baseState, action);
+    expect(result.qtyOverrides["sell_AAPL_acc1"]).toBe(5);
+  });
+
   it("SET_QTY_AND_SELECT — qty > 0이면 selected에 추가한다", () => {
     const action: ExecutionAction = { type: "SET_QTY_AND_SELECT", key: "buy_005930_acc1", qty: 3 };
     const result = executionReducer(baseState, action);
@@ -980,5 +986,46 @@ describe("useRebalancingExecution — 해외 잔고 조회 실패 (계획 57 B5)
   it("해외 잔고를 알고 실제로 없으면 해외 매도 행을 만들지 않는다", async () => {
     const orders = await ordersAfterLiveBalance(false);
     expect(orders.some((o) => o.ticker === "AAPL" && o.side === "SELL")).toBe(false);
+  });
+});
+
+// ── 매도 수량 보유량 상한 (계획 59 B3) ─────────────────────────────────────────
+
+describe("useRebalancingExecution — 매도 수량은 실행 계좌 보유량을 넘지 않는다", () => {
+  // 주문 불가(수동) 계좌 보유분까지 합친 매도 권장량(-50)이 KIS 계좌 보유량(5)보다 크다
+  const analysis: RebalancingAnalysis = {
+    ...mockAnalysis,
+    items: [{ ...mockAnalysis.items[1], shares_to_trade: -50 }],
+    ticker_account_map: {
+      AAPL: [
+        { ...mockAnalysis.ticker_account_map.AAPL[0], quantity: 5 },
+        {
+          account_id: "manual1",
+          account_name: "수동 계좌",
+          asset_type: "STOCK_OTHER",
+          quantity: 100,
+          value_krw: 18000000,
+          is_mock_mode: false,
+        },
+      ],
+    },
+  };
+
+  it("권장 매도 수량과 주문 수량을 보유량으로 자른다", () => {
+    const { result } = renderHook(
+      () => useRebalancingExecution({ portfolioId: "p1", analysis, accounts: mockKisAccounts }),
+      { wrapper: createWrapper() },
+    );
+    expect(result.current.getSellRows("acc1")[0]?.suggestedQty).toBe(5);
+
+    act(() => {
+      // max 없이 들어온 과거 입력값도 주문 생성 시 잘린다
+      result.current.dispatch({ type: "SET_QTY", key: "sell_AAPL_acc1", qty: 100 });
+    });
+    if (!result.current.state.selected.has("sell_AAPL_acc1")) {
+      act(() => result.current.dispatch({ type: "TOGGLE_SELECTED", key: "sell_AAPL_acc1" }));
+    }
+    const sell = result.current.orders.find((o) => o.side === "SELL" && o.ticker === "AAPL");
+    expect(sell?.quantity).toBe(5);
   });
 });

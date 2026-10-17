@@ -206,6 +206,7 @@ class TestBuildStockAllocation:
         assert "ETC" in tickers
         assert len(result) == 11  # top 10 + ETC
         assert result[-1]["market"] is None
+        assert result[-1]["etc_count"] == 2
 
     def test_includes_market_for_listing_badge(self, override_settings):
         result = _build_stock_allocation([self._make_pos("AAPL", market="NASDAQ")], 1_000_000)

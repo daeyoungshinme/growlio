@@ -53,6 +53,8 @@ export default function StockPositionsModal({
   const queryClient = useQueryClient();
 
   const editor = usePositionsEditor([], usdRate);
+  // setRows(useState setter)·enrichRows(모듈 함수)는 참조가 안정적이라 effect dep에 넣어도 재조회가 없다
+  const { setRows, enrichRows } = editor;
 
   useEffect(() => {
     // 계좌 전환 시 늦게 도착한 이전 계좌 응답이 새 행을 덮어쓰지 않도록, 언마운트 후 setState도 막는다
@@ -61,9 +63,7 @@ export default function StockPositionsModal({
       .then((data) => {
         if (cancelled) return;
         const positions = data.positions;
-        editor.setRows(
-          editor.enrichRows(positions.length ? positions : readonly ? [] : [{ ...EMPTY_ROW }]),
-        );
+        setRows(enrichRows(positions.length ? positions : readonly ? [] : [{ ...EMPTY_ROW }]));
         setSummary(data.summary);
       })
       .catch((e) => {
@@ -75,9 +75,7 @@ export default function StockPositionsModal({
     return () => {
       cancelled = true;
     };
-    // editor.setRows/enrichRows는 렌더마다 새 참조 → dep 포함 시 무한 루프. accountId/readonly 변경 시만 재조회.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountId, readonly]);
+  }, [accountId, readonly, setRows, enrichRows]);
 
   const liveSummary: Summary = editor.liveRows.reduce(
     (acc, r) => ({

@@ -36,7 +36,7 @@ export default [
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
-      "@typescript-eslint/no-floating-promises": "warn",
+      "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/await-thenable": "warn",
       "no-console": ["warn", { allow: ["warn", "error"] }],
       "no-undef": "off",

@@ -500,6 +500,24 @@ describe("StockHoldingsTable", () => {
     expect(screen.getByLabelText("종목명 또는 티커 검색")).toHaveValue("");
   });
 
+  it("이미 적용된 정렬 요청은 탭 전환으로 재마운트돼도 사용자 정렬을 덮어쓰지 않는다", () => {
+    const props = {
+      positions: [mockPosition],
+      dividendMap: {},
+      divLoading: false,
+      divError: false,
+    };
+    const request = { key: "weight_in_stock" as const, nonce: 1 };
+    const { unmount } = render(<StockHoldingsTable {...props} />);
+    unmount();
+    // 페이지가 요청을 들고 있는 채로 다시 마운트 → 사용자가 고른 기본 정렬이 유지돼야 한다
+    const { rerender } = render(<StockHoldingsTable {...props} sortRequest={request} />);
+    expect(screen.getByLabelText("보유 종목 정렬")).not.toHaveValue("weight_in_stock");
+    // 새 요청(nonce 증가)은 적용
+    rerender(<StockHoldingsTable {...props} sortRequest={{ ...request, nonce: 2 }} />);
+    expect(screen.getByLabelText("보유 종목 정렬")).toHaveValue("weight_in_stock");
+  });
+
   it("데스크톱 계좌별 하위 행은 헤더와 같은 열에 맞춰진다 (계좌명=종목 열, 수량=수량 열)", () => {
     const otherAccount: PortfolioPosition = {
       ...mockPosition,
@@ -515,12 +533,12 @@ describe("StockHoldingsTable", () => {
         divError={false}
       />,
     );
-    const cardButton = screen
-      .getAllByRole("button")
-      .find(
-        (b) => b.getAttribute("aria-expanded") === "false" && b.textContent?.includes("Apple Inc."),
-      );
-    fireEvent.click(cardButton!);
+    // 데스크톱 표 행을 펼친다(모바일 카드 펼침과 상태가 분리됨)
+    const desktopRow = screen
+      .getAllByText("Apple Inc.")
+      .map((el) => el.closest("tr"))
+      .find((tr): tr is HTMLTableRowElement => tr !== null)!;
+    fireEvent.click(desktopRow);
     const subRow = screen
       .getAllByText("다른 계좌")
       .map((el) => el.closest("tr"))
