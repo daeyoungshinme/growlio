@@ -9,6 +9,7 @@ KIS/키움 API가 거부하므로, 주문 직전 실시간 잔고로 수량을 �
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 
 import structlog
@@ -16,6 +17,14 @@ import structlog
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
 
 logger = structlog.get_logger()
+
+# 금액/가격 나눗셈의 부동소수 오차(예: 300000/100000.00000001 → 2.9999999)로 1주가 빠지지 않게 하는 허용치
+_SHARES_EPSILON = 1e-9
+
+
+def floor_shares(value: float) -> int:
+    """목표 금액 ÷ 가격을 정수 주식 수로 내린다(부동소수 경계 오차 보정)."""
+    return math.floor(value + _SHARES_EPSILON)
 
 
 def clamp_sell_orders(

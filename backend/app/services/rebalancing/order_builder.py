@@ -7,7 +7,6 @@ AUTO 자동실행(`rebalancing_auto_execution` job)·원클릭 실행(`create_re
 
 from __future__ import annotations
 
-import math
 import uuid
 from typing import Any, Literal
 
@@ -15,6 +14,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import CASH_EQUIVALENT_TICKER, TAX_DEFERRED_TAX_TYPES
+from app.services.rebalancing._order_quantity_guard import floor_shares
 from app.services.tax_service import _OVERSEAS_MARKETS
 
 logger = structlog.get_logger()
@@ -128,7 +128,7 @@ async def refresh_live_prices(
             item.current_price_krw = float(price)
             if item.ticker not in _NON_TRADABLE_TICKERS:
                 current_qty = item.current_qty or 0
-                target_qty = math.floor(item.target_value_krw / price)
+                target_qty = floor_shares(item.target_value_krw / price)
                 item.shares_to_trade = target_qty - current_qty
                 item.diff_krw = item.target_value_krw - current_qty * price
 

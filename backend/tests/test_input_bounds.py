@@ -92,6 +92,24 @@ def test_public_error_message_hides_unexpected_and_keeps_domain_messages():
     assert "12345678" not in public_error_message(leaked)
 
 
+def test_public_error_message_hides_pydantic_validation_input():
+    from pydantic import BaseModel, ValidationError
+
+    from app.core.logging import public_error_message
+
+    class _M(BaseModel):
+        quantity: int
+
+    try:
+        _M(quantity="SECRET-INPUT-1.5")  # type: ignore[arg-type]
+    except ValidationError as e:
+        msg = public_error_message(e)
+    assert "SECRET-INPUT" not in msg
+    assert "ValidationError" in msg
+    # 우리가 쓴 일반 ValueError 메시지는 그대로 노출
+    assert public_error_message(ValueError("지원하지 않는 계좌 유형: CASH")) == "지원하지 않는 계좌 유형: CASH"
+
+
 def test_http_status_fallback_does_not_include_url():
     import httpx
 

@@ -291,6 +291,22 @@ class TestNonStockNetFlowsInvariant:
         assert "JOIN paf_ns" in net_after_ns_body
 
     @pytest.mark.asyncio
+    async def test_scalar_init_data_ytd_net_deposits_exclude_inactive_accounts(self, mock_db, override_settings):
+        """연간 순입금(nd)이 삭제(soft)·합산 제외 계좌 입출금을 빼고, 계좌 미지정 입출금은 유지하는지 고정."""
+        from app.services.asset_aggregator import _get_scalar_init_data
+
+        result = MagicMock()
+        result.first.return_value = None
+        mock_db.execute = AsyncMock(return_value=result)
+
+        await _get_scalar_init_data(uuid.uuid4(), mock_db)
+
+        sql_text = str(mock_db.execute.call_args[0][0])
+        nd_body = sql_text[sql_text.index("nd AS") : sql_text.index("net_after_ns AS")]
+        assert "LEFT JOIN asset_accounts a ON a.id = t.account_id" in nd_body
+        assert "t.account_id IS NULL OR (a.is_active = TRUE AND a.include_in_total = TRUE)" in nd_body
+
+    @pytest.mark.asyncio
     async def test_dashboard_uses_filtered_non_stock_net_flows_not_raw_totals(self, mock_db, override_settings):
         """get_dashboard_summary가 net_flows 인자로 미필터 net_investment/net_deposits_ytd가 아니라
         반드시 필터링된 non_stock_net_flows_after를 사용하는지 고정.

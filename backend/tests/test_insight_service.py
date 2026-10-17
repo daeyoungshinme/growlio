@@ -203,3 +203,75 @@ class TestGenerateInsights:
 
         # Should not use cached value since force_refresh=True
         cache.get.assert_not_called()
+
+
+# ── 루프 DB 오류 격리 (계획 59 A2) ─────────────────────────────
+
+
+class _AbortedSession:
+    """DB 오류 후 rollback 전까지 모든 조회가 실패하고, rollback은 기존 ORM 객체를 expire시키는 세션 흉내."""
+
+    def __init__(self) -> None:
+        self.aborted = False
+        self.loaded: list[object] = []
+
+    async def rollback(self) -> None:
+        self.aborted = False
+        for obj in self.loaded:
+            object.__setattr__(obj, "_expired", True)
+
+
+class _Pf:
+    def __init__(self, pid: uuid.UUID, name: str) -> None:
+        self._expired = False
+        self._data = {
+            "id": pid,
+            "name": name,
+            "base_type": "STOCK_ONLY",
+            "items": [SimpleNamespace(ticker="AAPL", market="NASDAQ", weight=100.0)],
+            "account_ids": None,
+        }
+
+    def __getattr__(self, key: str):
+        if key.startswith("_"):
+            raise AttributeError(key)
+        if self._expired:
+            raise RuntimeError("MissingGreenlet: expired attribute lazy load")
+        return self._data[key]
+
+
+class TestRebalancingOpportunityIsolation:
+    @pytest.mark.asyncio
+    async def test_db_error_on_first_portfolio_does_not_drop_the_rest(self, override_settings):
+        from app.services.insight_service import _check_rebalancing_opportunity
+
+        ids = [uuid.uuid4(), uuid.uuid4()]
+        session = _AbortedSession()
+
+        async def execute(*_a, **_k):
+            if session.aborted:
+                raise RuntimeError("PendingRollbackError")
+            fresh = [_Pf(ids[0], "첫번째"), _Pf(ids[1], "두번째")]
+            session.loaded.extend(fresh)
+            result = MagicMock()
+            result.scalars.return_value.all.return_value = fresh
+            return result
+
+        session.execute = execute  # type: ignore[attr-defined]
+        calls = {"n": 0}
+
+        async def overview(*_a, **_k):
+            if session.aborted:
+                raise RuntimeError("PendingRollbackError")
+            calls["n"] += 1
+            if calls["n"] == 1:
+                session.aborted = True
+                raise RuntimeError("OperationalError")
+            # AAPL 0% → 목표 100%와 드리프트 100%p
+            return {"total_stock_krw": 1_000_000, "all_positions": []}
+
+        with patch("app.services.portfolio_service.build_portfolio_overview", new=overview):
+            result = await _check_rebalancing_opportunity(uuid.uuid4(), session)  # type: ignore[arg-type]
+
+        assert len(result) == 1
+        assert "두번째" in result[0].detail

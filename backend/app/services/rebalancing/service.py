@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -19,6 +18,7 @@ from app.schemas.rebalancing import (
     TickerAccountInfo,
 )
 from app.schemas.service_dtypes import DividendMapEntry, PositionMapEntry, ReturnsMapEntry
+from app.services.rebalancing._order_quantity_guard import floor_shares
 
 logger = structlog.get_logger()
 
@@ -171,7 +171,7 @@ def _build_target_items(
             current_qty = pos.get("qty", 0.0)
             effective_price = _effective_price(current_price, current_value, current_qty, ticker, market)
             if effective_price is not None:
-                target_qty = float(math.floor(target_value / effective_price))
+                target_qty = float(floor_shares(target_value / effective_price))
                 shares = target_qty - current_qty
             else:
                 shares = None
