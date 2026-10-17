@@ -6,6 +6,8 @@ import uuid
 from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
 
+import pytest
+
 from app.services.alerts.calculator import (
     already_fired_today,
     should_fire_today,
@@ -164,9 +166,19 @@ class TestShouldTriggerStockPrice:
 # ── should_fire_today (edge case) ────────────────────────────────────────────
 
 
+# 발송일 판정은 today_kst()를 쓴다 — 테스트가 따로 '오늘'을 계산하면 KST 자정 경계에서 어긋나 flaky
+_FIXED_NOW = datetime(2026, 10, 15, 12, 0, tzinfo=_KST)
+
+
+@pytest.fixture
+def _freeze_today(monkeypatch):
+    monkeypatch.setattr("app.services.alerts.calculator.today_kst", lambda: _FIXED_NOW.date())
+
+
+@pytest.mark.usefixtures("_freeze_today")
 def test_should_fire_today_semiannual_after_cooldown():
-    today = datetime.now(tz=_KST).date()
-    last_triggered = datetime.now(tz=_KST) - timedelta(days=180)
+    today = _FIXED_NOW.date()
+    last_triggered = _FIXED_NOW - timedelta(days=180)
     alert = _make_rebalancing_alert(
         schedule_type="SEMIANNUAL",
         schedule_day_of_month=today.day,
@@ -175,9 +187,10 @@ def test_should_fire_today_semiannual_after_cooldown():
     assert should_fire_today(alert) is True
 
 
+@pytest.mark.usefixtures("_freeze_today")
 def test_should_fire_today_semiannual_within_cooldown():
-    today = datetime.now(tz=_KST).date()
-    last_triggered = datetime.now(tz=_KST) - timedelta(days=90)
+    today = _FIXED_NOW.date()
+    last_triggered = _FIXED_NOW - timedelta(days=90)
     alert = _make_rebalancing_alert(
         schedule_type="SEMIANNUAL",
         schedule_day_of_month=today.day,
@@ -186,9 +199,10 @@ def test_should_fire_today_semiannual_within_cooldown():
     assert should_fire_today(alert) is False
 
 
+@pytest.mark.usefixtures("_freeze_today")
 def test_should_fire_today_annual_after_cooldown():
-    today = datetime.now(tz=_KST).date()
-    last_triggered = datetime.now(tz=_KST) - timedelta(days=365)
+    today = _FIXED_NOW.date()
+    last_triggered = _FIXED_NOW - timedelta(days=365)
     alert = _make_rebalancing_alert(
         schedule_type="ANNUAL",
         schedule_day_of_month=today.day,

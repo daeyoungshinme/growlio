@@ -10,7 +10,7 @@ updates:
       - "backend"
     groups:
       # minor/patch는 한 PR로 묶는다. major는 개별 PR로 남겨 건별 검토
-      # (structlog 25→26, pytest 등 상한 없는 major 포함).
+      # (structlog·pytest 포함 모든 의존성에 pyproject 상한이 있다 — 상한을 넘는 major는 상한을 먼저 넓혀 검토).
       backend-dependencies:
         patterns:
           - "*"
@@ -30,6 +30,8 @@ updates:
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
+      # tenacity: pyproject 상한(<9)과 일치 — 재시도 데코레이터를 5개 모듈에서 쓰므로 9.x는
+      # 상한을 넓히고 재시도 테스트를 확인하는 별도 PR로 올린다
       - dependency-name: "tenacity"
         update-types:
           - "version-update:semver-major"
@@ -72,7 +74,7 @@ updates:
           - "minor"
           - "patch"
           - "major"
-      # minor/patch는 한 PR로 묶는다. major(recharts 3, tailwind 4, zustand 5,
+      # minor/patch는 한 PR로 묶는다. major(recharts 3, tailwind 4,
       # lucide-react, @sentry/react)는 개별 PR 유지 — docs/plans/20 #5 로드맵이
       # "하나씩 별도 PR로 검증"을 원함. @capacitor/* minor는 이 그룹으로 묶여 함께 올라감.
       # react/react-dom/typescript major는 아래 ignore로 보류(React 18 고정).

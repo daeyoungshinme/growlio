@@ -121,7 +121,7 @@ cd backend && uv run mypy app/
 - `Transaction` — 입출금/배당/이자 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST. INTEREST(예금·CMA 이자)는 금융소득 종합과세 판정 전용 — 수익률·챌린지 등 입출금 흐름 집계는 DEPOSIT/WITHDRAWAL을 명시 필터하므로 새 집계 추가 시에도 이 관례 유지
 - `TradeRecord` — 사용자가 직접 입력한 매수/매도(`side`=BUY/SELL, `qty`, `price_krw`(KRW), `trade_date`). 기간별 매수 수익률 계산 전용 — `Transaction`(현금흐름)과 의도적으로 분리(BUY/SELL을 섞으면 유형 필터 없는 입출금 집계 오염), 보유 Position은 이 기록으로 자동 수정하지 않음. 브로커 sync는 체결내역을 가져오지 않음
 - `InvestmentChallenge` — 적립식 투자 챌린지(매달 입금 습관/수익률/평가금액 목표). `challenge_type`(DEPOSIT/RETURN_PCT/TARGET_VALUE) × `target_amount`/`target_pct`/`target_months` 조합. `account_id`(DEPOSIT만 지정 허용, 나머지는 전체 투자자산). 진행률/스트릭은 저장 안 함
-- `UserSettings` — KIS/키움 자격증명(AES-256), 투자·입금 목표. `challenge_reminders_enabled`(적립 챌린지 독려/결산 알림 옵트인, 기본 OFF — 단 `challenge_service.create_challenge()`가 챌린지별 알림 토글 ON으로 첫 챌린지를 만들면 자동으로 True 전환, 이중 게이트로 알림이 조용히 안 나가는 것 방지). 목표 역산 추천 옵션: `goal_short_term_equity_floor_pct`, `goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`(nullable=상한 없음, `PUT /settings/goal-recommendation-options`), `age_group`(nullable, TWENTIES~SIXTIES_PLUS, `birth_year`로 자동 파생 가능). AUTO 하루 거래대금 상한: `auto_rebalancing_daily_value_cap_krw`(nullable=무제한, `PUT /settings/auto-rebalancing-daily-cap`)
+- `UserSettings` — KIS/키움 자격증명(AES-256), 투자·입금 목표. `challenge_reminders_enabled`(적립 챌린지 독려/결산 알림 옵트인, 기본 OFF — 단 `challenge_service.create_challenge()`가 챌린지별 알림 토글 ON으로 첫 챌린지를 만들면 자동으로 True 전환, 이중 게이트로 알림이 조용히 안 나가는 것 방지). 목표 역산 추천 옵션: `goal_short_term_equity_floor_pct`, `goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`(nullable=상한 없음, `PUT /settings/goal-recommendation-options`), `age_group`(nullable, TWENTIES~SIXTIES_PLUS, `birth_year`로 자동 파생 가능). AUTO 하루 거래대금 상한: `auto_rebalancing_daily_value_cap_krw`(nullable=무제한, `PUT /settings/auto-rebalancing-daily-cap`). 목표 필드(`PUT /settings/goal`)는 **보낸 키만** 바꾼다(`model_fields_set`) — 명시적 null은 비우고 생략은 유지. 출생연도를 비워도 `age_group`은 유지(추천 옵션에서 직접 고를 수 있음)
 
 > 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken`/`TossToken` 등 전체 목록은 `app/models/` 참고.
 
@@ -272,6 +272,7 @@ schemas/                      # Pydantic 요청/응답 스키마
   ├── transaction.py           # 입출금/배당 내역 스키마 (transactions.py 전용)
   ├── trade.py                 # 수기 매매 기록 + 기간별 매수 현황 스키마 (trades.py 전용)
   ├── dashboard.py              # 대시보드 응답 스키마 (dashboard.py 전용)
+  ├── action_items.py          # 홈 "지금 할 일" 카드 행(ActionItem) — action_items_service·dashboard.py
   ├── rebalancing/             # 리밸런싱 스키마 패키지 — `__init__.py`가 전체 재노출하므로 `from app.schemas.rebalancing import X`는 무변경
   │   ├── analysis.py          # 분석 결과: TickerAccountInfo/RebalancingItem/CurrentHolding/TaxImpactItem/DiagnosisContext/RebalancingAnalysis
   │   ├── execution.py         # 실행/실행이력: ExecutionOrderItem/ExecutionRequest/KisBalance*/OrderResult/ExecutionResult/RebalancingExecution*
@@ -319,7 +320,7 @@ constants.py                  # 도메인 공통 상수 — `DOMESTIC_MARKETS`, 
 exceptions.py                 # `AppError` 계열(BadRequest/NotFound/ExternalAPI…, 전역 핸들러가 status_code/detail로 변환) + `SyncError` 계열(Provider{Credential,Token,Api,Network}Error)
 scheduler.py                  # APScheduler 초기화 — `init_scheduler()`의 jobs 스펙 리스트
 jobs/                         # APScheduler 정기 작업
-  ├── asset_sync.py           # 15:30 KST intraday + 18:00 KST daily 전체 계좌 스냅샷
+  ├── asset_sync.py           # 15:30 KST intraday(증권사 API KIS/키움/토스 — 주문 가능 여부와 별개) + 18:00 KST daily 전체 계좌 스냅샷
   ├── exchange_rate_alert.py  # 5분 간격 환율 알림 체크
   ├── goal_achievement.py     # 매일 18:45 KST 투자 목표 달성도 확인
   ├── challenge_deposit_reminder.py  # 매월 25일 09:00 KST — 이번 달 적립 안 한 입금 챌린지 독려(옵트인). 챌린지별 durable_state dedup
