@@ -101,7 +101,7 @@ growlio/
 - `nginx/` + `docker-compose.yml` — 위 Render/Vercel 조합을 쓰지 않고 자체 서버에 통째로 호스팅할 때를 위한 대안 구성(포트 80 리버스 프록시, `/api/*` → backend:8000, 그 외 → frontend 정적파일). 현재 운영에서는 사용하지 않음. 이 경로를 실제로 쓰게 되면 `nginx/nginx.conf`의 `location` 블록도 새 API prefix에 맞춰 수정 필요.
 - `monitoring/` — Prometheus 설정(`prometheus.yml`) + Grafana 대시보드. `docker compose --profile monitoring up -d` 로 실행 (Prometheus `:9090`, Grafana `:3000`).
 - `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build, push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (10분마다 운영 백엔드 `/health` 호출).
-- **Render 무료 플랜 슬립 주의**: 15분 무요청 시 백엔드가 잠들면 같은 프로세스의 스케줄러(AUTO 리밸런싱·알림·일일 동기화)도 멈춘다. `keep-alive.yml`로 완화 중(완전 보장 아님) — 상세는 `backend/CLAUDE.md`의 "스케줄러 실행 제약".
+- **Render 무료 플랜 슬립 주의**: 15분 무요청 시 백엔드가 잠들면 같은 프로세스의 스케줄러(AUTO 리밸런싱·알림·일일 동기화)도 멈춘다. `keep-alive.yml`은 GitHub 스로틀로 실제 2~9시간 간격이라 사실상 효과 없음 — 외부 핑 서비스 필요 — 상세는 `backend/CLAUDE.md`의 "스케줄러 실행 제약".
 
 ---
 

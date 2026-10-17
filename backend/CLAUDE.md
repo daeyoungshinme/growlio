@@ -344,9 +344,9 @@ jobs/                         # APScheduler 정기 작업
 > **새 job 추가:** `jobs/` 에 파일 생성 후 `app/scheduler.py`의 `init_scheduler()` 안 `jobs` 스펙 리스트에 `(함수, 트리거, id)` 한 줄 추가 (cron은 `kst(...)` 헬퍼 사용 — `timezone="Asia/Seoul"` 자동). `tests/test_scheduler.py`의 `EXPECTED_JOB_IDS`도 함께 갱신.
 
 > **스케줄러 실행 제약 (운영):** 잡은 전부 웹 프로세스 안의 APScheduler(메모리 jobstore)에서 돈다.
-> - **Render 무료 플랜(`render.yaml` `plan: free`)은 15분 무요청 시 인스턴스를 재운다** — 잠든 동안 위 잡 전부(AUTO 실행 포함)가 멈춘다. `.github/workflows/keep-alive.yml`이 10분마다 `/health`를 호출해 완화하지만, GitHub cron 지연/누락이 있어 완전 보장은 아님. 확실히 하려면 유료 플랜 전환.
+> - **Render 무료 플랜(`render.yaml` `plan: free`)은 15분 무요청 시 인스턴스를 재운다** — 잠든 동안 위 잡 전부(AUTO 실행 포함)가 멈춘다. `.github/workflows/keep-alive.yml`이 cron 10분 주기로 `/health`를 호출하지만, **실측(2026-10-11~17 `gh run list`) 실제 실행 간격은 2~9시간** — GitHub이 무료 schedule 워크플로를 스로틀해 사실상 완화가 안 된다. 외부 무료 핑(UptimeRobot·cron-job.org 등 5분 주기로 `/health`)을 등록하거나 유료 플랜으로 전환해야 잡이 제때 돈다(계획 59 D1).
 > - 프로세스 재시작(재배포·슬립 복귀) 사이에 놓친 실행은 복구되지 않는다(메모리 jobstore). `misfire_grace_time`(`MISFIRE_GRACE_SECONDS`=900초)은 프로세스가 살아 있는 동안 이벤트 루프 지연으로 잡이 버려지는 것만 막는다. 월/주 1회 잡이 중복 발송되지 않도록 서비스 쪽 "오늘 이미 발송" dedup 패턴을 유지할 것.
-> - 단일 인스턴스 전제 — 인스턴스를 2개 이상으로 늘리면 모든 잡이 중복 실행된다.
+> - 단일 인스턴스 전제 — 인스턴스를 2개 이상으로 늘리면 모든 잡이 중복 실행된다. 무중단 재배포로 구·신 인스턴스가 잠시 겹칠 때도 같다(AUTO 실행의 `already_fired_today`는 읽고-쓰기라 원자적이지 않음 — 원자적 claim은 계획 59 C1).
 
 **자격증명 암호화:** KIS/키움 App Key/Secret·토스 Client ID/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
 

@@ -180,14 +180,14 @@ _리밸런싱/추천_
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
 - `useRebalancingExecution.ts` — 리밸런싱 주문 실행 훅의 공개 진입점(barrel re-export). 실제 구현은 `rebalancingExecution/`(`index.ts`/`reducer.ts`/`types.ts`) 패키지에 있지만, 모든 소비 코드는 이 파일을 통해서만 import — 패키지를 직접 import 금지
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
-- `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
+- `useAlertCrud.ts` / `useRebalancingAlertForm.ts`(`useRebalancingAlertQueries`·`useRebalancingAlertFormState`) — 알림 CRUD
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
 - `useGoalSettings.ts` — 투자 목표 설정 폼 상태
 - `useChallenges.ts` / `useChallengeMutations.ts` / `useChallengeNudge.ts` — 적립 챌린지 목록 조회 / 생성·수정·삭제 뮤테이션 / 하단 네비 배지용 넛지 요약
 - `useAddSuggestedCandidates.ts` — 목표 역산 추천의 `suggested_candidates`(고배당 미등록 후보 제안)를 "후보에 추가" 클릭으로 승인하는 뮤테이션. `RecommendationCard.tsx`/`DividendPlanSection.tsx` 공용
 - `useCandidateOverlap.ts` — 추천 후보 ETF 중복·총보수 분석(`POST /rebalancing/candidates/overlap`) 조회. 후보 편집 연타 시 요청 폭주를 막는 디바운스(`CANDIDATE_OVERLAP_DEBOUNCE_MS`) 포함. 표시 헬퍼는 `utils/etfOverlap.ts`
-- `usePortfolioTabFetching.ts` — 포트폴리오 탭 데이터 프리패치
+- `usePortfolioTabFetching.ts`(`useMainPageFetching`) — 홈·포트폴리오 탭 주요 쿼리 중 하나라도 fetch 중인지(새로고침 인디케이터용)
 
 _알림 토글_ (설정 페이지, `["settings"]` boolean 필드 조회/PUT 패턴)
 
@@ -378,7 +378,7 @@ _기타_
 
 **토스트 (`src/utils/toast.ts`)**
 
-- `toast(message, type?)` — `window.dispatchEvent("growlio:toast")` 이벤트 발행. `useToast()` 훅 외부(비React 코드)에서도 직접 호출 가능.
+- `toast(message, type?)` — `window.dispatchEvent("growlio:toast")` 이벤트 발행. React 훅이 아니라 일반 함수라 컴포넌트·비React 코드 어디서든 직접 호출(`components/Toaster.tsx`가 구독해 표시).
   ```ts
   import { toast } from "@/utils/toast";
   toast("저장되었습니다", "success");

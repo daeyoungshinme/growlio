@@ -105,8 +105,8 @@ updates:
       - dependency-name: "@vitejs/plugin-react"
         update-types:
           - "version-update:semver-major"
-      # vite 8부터 번들러가 Rollup → Rolldown으로 교체됨(vite.config.ts manualChunks →
-      # advancedChunks 등 마이그레이션 수반) → major 자동 PR 보류, 건별로 올린다.
+      # vite major는 번들러·설정 변경이 잦다(7→8에서 Rollup → Rolldown 전환, manualChunks →
+      # advancedChunks 마이그레이션 — 2026-09 수동 완료) → major 자동 PR 보류, 건별로 올린다.
       - dependency-name: "vite"
         update-types:
           - "version-update:semver-major"
@@ -124,8 +124,8 @@ updates:
       - "dependencies"
       - "ci"
     groups:
-      # minor/patch는 한 PR로. major(checkout v7, setup-python v7, setup-uv v9, cache v6)는
-      # 개별 PR로 남겨 SHA 재핀 + 러너 호환(node24)을 건별로 확인.
+      # minor/patch는 한 PR로. major(checkout·setup-python·setup-uv·cache 등 현재 핀 다음 major)는
+      # 개별 PR로 남겨 SHA 재핀 + 러너 호환(node24)을 건별로 확인. 현재 버전은 워크플로의 `# vN` 주석 참고.
       actions:
         patterns:
           - "*"

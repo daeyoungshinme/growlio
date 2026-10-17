@@ -80,7 +80,7 @@ jobs:
         run: .venv/bin/alembic downgrade -1
 
       - name: Test (pytest + coverage)
-        run: .venv/bin/pytest -x -v --tb=short --timeout=60 --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=80
+        run: .venv/bin/pytest -x -v --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=80
 
       - name: Coverage comment (PR only)
         if: github.event_name == 'pull_request'
@@ -105,6 +105,9 @@ jobs:
   secret-scan:
     name: Secret scan (TruffleHog)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -154,6 +157,6 @@ jobs:
       - name: Build + typecheck (tsc + vite)
         run: npm run build
 
+      # 차단 단계 — 런타임 의존성(prod)만 본다. devDependency(빌드·테스트 도구) 취약점은 Dependabot으로 관리(계획 59 D7)
       - name: Dependency vulnerability check (npm audit)
-        continue-on-error: true
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=high
