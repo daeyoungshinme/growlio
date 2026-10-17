@@ -38,6 +38,7 @@ export interface AllocationItem {
   ticker?: string;
   name: string;
   market?: string | null; // stock_allocation 전용 — "기타 N종목"은 null
+  etc_count?: number; // stock_allocation "기타" 행 전용 — 합쳐진 종목 수
   label?: string;
   account_name?: string;
   amount_krw?: number;

@@ -238,6 +238,7 @@ class TestMonthlyWrapJob:
                 ),
             ),
             patch("app.jobs.challenge_monthly_wrap.dispatch_dual_channel_alert", new_callable=AsyncMock) as dispatch,
+            patch("app.services.challenge_service.invalidate_challenge_cache", new_callable=AsyncMock) as invalidate,
         ):
             from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
 
@@ -246,6 +247,9 @@ class TestMonthlyWrapJob:
         assert dispatch.call_args.kwargs["alert_type"] == "CHALLENGE_WRAPUP"
         assert ch.status == "COMPLETED"
         assert ch.completed_at is not None
+        # COMPLETED 전환 후 챌린지 캐시가 이전 상태(ACTIVE)를 보이지 않게
+        invalidate.assert_awaited_once()
+        assert invalidate.await_args.args[1] == user.id
 
     @pytest.mark.asyncio
     async def test_return_pct_wrap_only_sends_when_complete(self):

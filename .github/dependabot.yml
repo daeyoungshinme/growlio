@@ -10,7 +10,7 @@ updates:
       - "backend"
     groups:
       # minor/patch는 한 PR로 묶는다. major는 개별 PR로 남겨 건별 검토
-      # (structlog 25→26, pytest 등 상한 없는 major 포함).
+      # (structlog·pytest 포함 모든 의존성에 pyproject 상한이 있다 — 상한을 넘는 major는 상한을 먼저 넓혀 검토).
       backend-dependencies:
         patterns:
           - "*"
@@ -30,6 +30,8 @@ updates:
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
+      # tenacity: pyproject 상한(<9)과 일치 — 재시도 데코레이터를 5개 모듈에서 쓰므로 9.x는
+      # 상한을 넓히고 재시도 테스트를 확인하는 별도 PR로 올린다
       - dependency-name: "tenacity"
         update-types:
           - "version-update:semver-major"
@@ -72,7 +74,7 @@ updates:
           - "minor"
           - "patch"
           - "major"
-      # minor/patch는 한 PR로 묶는다. major(recharts 3, tailwind 4, zustand 5,
+      # minor/patch는 한 PR로 묶는다. major(recharts 3, tailwind 4,
       # lucide-react, @sentry/react)는 개별 PR 유지 — docs/plans/20 #5 로드맵이
       # "하나씩 별도 PR로 검증"을 원함. @capacitor/* minor는 이 그룹으로 묶여 함께 올라감.
       # react/react-dom/typescript major는 아래 ignore로 보류(React 18 고정).
@@ -105,8 +107,8 @@ updates:
       - dependency-name: "@vitejs/plugin-react"
         update-types:
           - "version-update:semver-major"
-      # vite 8부터 번들러가 Rollup → Rolldown으로 교체됨(vite.config.ts manualChunks →
-      # advancedChunks 등 마이그레이션 수반) → major 자동 PR 보류, 건별로 올린다.
+      # vite major는 번들러·설정 변경이 잦다(7→8에서 Rollup → Rolldown 전환, manualChunks →
+      # advancedChunks 마이그레이션 — 2026-09 수동 완료) → major 자동 PR 보류, 건별로 올린다.
       - dependency-name: "vite"
         update-types:
           - "version-update:semver-major"
@@ -124,8 +126,8 @@ updates:
       - "dependencies"
       - "ci"
     groups:
-      # minor/patch는 한 PR로. major(checkout v7, setup-python v7, setup-uv v9, cache v6)는
-      # 개별 PR로 남겨 SHA 재핀 + 러너 호환(node24)을 건별로 확인.
+      # minor/patch는 한 PR로. major(checkout·setup-python·setup-uv·cache 등 현재 핀 다음 major)는
+      # 개별 PR로 남겨 SHA 재핀 + 러너 호환(node24)을 건별로 확인. 현재 버전은 워크플로의 `# vN` 주석 참고.
       actions:
         patterns:
           - "*"

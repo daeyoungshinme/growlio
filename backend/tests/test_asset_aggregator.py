@@ -150,6 +150,33 @@ class TestCalcXirr:
         assert is_estimated is False
         assert xirr_pct is not None
 
+    @pytest.mark.asyncio
+    async def test_transaction_query_excludes_deleted_and_excluded_accounts(self, mock_db):
+        """종료값(current_total)은 활성·합산 계좌만 더하므로, 입출금도 같은 계좌 집합으로 걸러야 한다.
+        삭제 계좌의 입금만 남으면 XIRR이 크게 음수로 왜곡된다. 계좌 미지정 입출금은 유지."""
+        from sqlalchemy.dialects import postgresql
+
+        from app.services.asset_aggregator import _calc_xirr
+
+        tx_result = MagicMock()
+        tx_result.all.return_value = [
+            SimpleNamespace(
+                transaction_date=today_kst().replace(year=today_kst().year - 1),
+                transaction_type="DEPOSIT",
+                amount=10_000_000.0,
+            )
+        ]
+        mock_db.execute = AsyncMock(return_value=tx_result)
+
+        await _calc_xirr(uuid.uuid4(), 11_000_000.0, mock_db)
+
+        stmt = mock_db.execute.call_args_list[0].args[0]
+        sql = str(stmt.compile(dialect=postgresql.dialect())).lower()
+        assert "left outer join asset_accounts" in sql
+        assert "transactions.account_id is null" in sql
+        assert "asset_accounts.is_active" in sql
+        assert "asset_accounts.include_in_total" in sql
+
 
 # ── get_monthly_trend 캐시 테스트 ─────────────────────────
 

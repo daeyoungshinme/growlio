@@ -43,6 +43,7 @@ def public_error_message(error: BaseException) -> str:
     URL이 들어 있어 `str(e)`를 그대로 내보내면 안 된다. 원문은 로그(redact 적용)에만 남긴다.
     """
     from fastapi import HTTPException
+    from pydantic import ValidationError as PydanticValidationError
 
     from app.exceptions import AppError, BalancePaginationError, BrokerOrderRejectedError, SyncError
     from app.kis.client import KisApiError
@@ -51,6 +52,9 @@ def public_error_message(error: BaseException) -> str:
 
     if isinstance(error, HTTPException):
         return format_sync_error(str(error.detail))
+    if isinstance(error, PydanticValidationError):
+        # ValueError 하위 클래스지만 메시지에 검증 대상 입력값(브로커 응답 등)이 그대로 담긴다
+        return f"내부 오류가 발생했습니다({type(error).__name__})"
     if isinstance(
         error,
         AppError

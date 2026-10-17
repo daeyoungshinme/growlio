@@ -53,7 +53,12 @@ export default function TransactionHistoryTab({ accounts }: Props) {
     currentDeposit: number;
   } | null>(null);
 
-  const { data: txList = [], isLoading } = useQuery<Transaction[]>({
+  const {
+    data: txList = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<Transaction[]>({
     queryKey: QUERY_KEYS.allTransactions(selectedYear),
     queryFn: () => fetchTransactions({ year: selectedYear }),
   });
@@ -247,6 +252,13 @@ export default function TransactionHistoryTab({ accounts }: Props) {
       <div className="card-overflow">
         {isLoading ? (
           <EmptyState title="불러오는 중..." compact />
+        ) : isError ? (
+          // 실패를 "내역 없음"으로 보이면 기록이 사라진 것처럼 오해한다
+          <EmptyState
+            title="거래 내역을 불러오지 못했습니다."
+            action={{ label: "다시 시도", onClick: () => void refetch() }}
+            compact
+          />
         ) : filtered.length === 0 ? (
           <EmptyState title="등록된 내역이 없습니다." compact />
         ) : (

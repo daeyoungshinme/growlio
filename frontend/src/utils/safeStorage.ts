@@ -26,3 +26,31 @@ export function storageRemove(key: string): void {
     // 삭제 실패는 무시
   }
 }
+
+/** sessionStorage 읽기 — 차단 환경에선 null. 렌더 중(useState 초기값)에 불려도 throw하지 않는다. */
+export function sessionGet(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/** sessionStorage 쓰기 — 실패해도 호출부 흐름(로그인·생체 인증 성공 처리)을 막지 않는다. */
+export function sessionSet(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // 저장 실패 시 이번 세션 인증 마킹만 빠진다 — 다음 진입 때 한 번 더 인증
+  }
+}
+
+/** localStorage 객체 자체 — 사이트 데이터 차단 시 `window.localStorage` 접근만으로 SecurityError가
+ * 나므로(Chrome), 객체를 넘겨야 하는 곳(쿼리 캐시 persister)은 이걸로 받고 없으면 기능을 끈다. */
+export function getLocalStorageOrUndefined(): Storage | undefined {
+  try {
+    return typeof window !== "undefined" ? window.localStorage : undefined;
+  } catch {
+    return undefined;
+  }
+}

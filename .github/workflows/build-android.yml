@@ -29,6 +29,9 @@ jobs:
   build-apk:
     name: Build APK
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
     env:
       BUILD_DEBUG: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == 'both') }}
       BUILD_RELEASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both')) }}

@@ -67,7 +67,8 @@ export function invalidateBrokerCredentialData(qc: QueryClient) {
 }
 
 /** 거래내역 CUD 후 — transactions + dashboard + 적립 챌린지(입금이 스트릭에 영향)
- * + 연금/ISA 납입 현황·절세 액션 플랜(입금·배당 내역 기준 집계) */
+ * + 연금/ISA 납입 현황·절세 액션 플랜(입금·배당 내역 기준 집계)
+ * + 배당 요약·배당 계획(수령 배당은 DIVIDEND 거래 기준 — 백엔드도 거래 변경 시 배당 캐시를 지운다) */
 export function invalidateTransactionData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsBase }),
@@ -78,6 +79,8 @@ export function invalidateTransactionData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummaryBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
   ]);
 }
 
@@ -129,11 +132,6 @@ export function invalidateDcaData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
-}
-
-/** 배당 계획 목표 변경 후 */
-export function invalidateDividendPlanData(qc: QueryClient) {
-  return qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan });
 }
 
 /** 환율 알림 CUD 후 */

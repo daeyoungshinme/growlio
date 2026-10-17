@@ -261,13 +261,20 @@ const MOBILE_SORT_OPTIONS: { key: AggSortKey; label: string }[] = [
 
 function StockHoldingsTable({ positions, dividendMap, divLoading, divError, sortRequest }: Props) {
   const [sort, setSort] = useState<SortState>({ key: "total_value_krw", dir: "desc" });
+  // 데스크톱 표는 여러 행을 펼치고, 모바일 카드는 한 장만 펼친다 — 상태를 나눠 뷰포트 전환 시 규칙이 섞이지 않게 한다
   const [expandedSet, setExpandedSet] = useState<Set<string>>(new Set());
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
+  // 요청은 페이지 상태라 탭을 오가며 재마운트되면 같은 요청이 다시 들어온다 — 마운트 시점 nonce는 이미 적용된 것으로 본다
+  const appliedNonceRef = useRef(sortRequest?.nonce);
   useEffect(() => {
-    if (!sortRequest) return;
+    if (!sortRequest || sortRequest.nonce === appliedNonceRef.current) return;
+    appliedNonceRef.current = sortRequest.nonce;
     setSort({ key: sortRequest.key, dir: "desc" });
     setQuery("");
+    setExpandedSet(new Set());
+    setExpandedCard(null);
   }, [sortRequest]);
 
   const handleSort = useCallback((k: AggSortKey) => {
@@ -339,7 +346,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError, sort
   };
   // 모바일은 한 번에 한 카드만 펼친다 — 여러 장 펼친 채 내려가면 목록이 끝없이 길어진다
   const toggleSingle = (key: string) => {
-    setExpandedSet((prev) => (prev.has(key) ? new Set() : new Set([key])));
+    setExpandedCard((prev) => (prev === key ? null : key));
   };
 
   return (
@@ -430,7 +437,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError, sort
                             divData={dividendMap[key]}
                             divLoading={divLoading}
                             divError={divError}
-                            expanded={expandedSet.has(key)}
+                            expanded={expandedCard === key}
                             onToggle={() => toggleSingle(key)}
                           />
                         </div>
@@ -447,7 +454,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError, sort
                           divData={dividendMap[key]}
                           divLoading={divLoading}
                           divError={divError}
-                          expanded={expandedSet.has(key)}
+                          expanded={expandedCard === key}
                           onToggle={() => toggleSingle(key)}
                         />
                       </div>

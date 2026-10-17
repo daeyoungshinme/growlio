@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 _KST = timezone(timedelta(hours=9))
+_FIXED_NOW = datetime(2026, 10, 15, 12, 0, tzinfo=_KST)  # 목요일, 월중순
 
 
 def _make_alert(schedule_type="DAILY", schedule_day_of_week=None, schedule_day_of_month=None, last_triggered_at=None):
@@ -26,6 +27,11 @@ def _make_alert(schedule_type="DAILY", schedule_day_of_week=None, schedule_day_o
 
 
 class TestShouldFireToday:
+    # 발송일 판정은 today_kst()를 쓴다 — 테스트가 따로 '오늘'을 계산하면 KST 자정 경계에서 둘이 어긋나 flaky
+    @pytest.fixture(autouse=True)
+    def _freeze_today(self, monkeypatch):
+        monkeypatch.setattr("app.services.alerts.calculator.today_kst", lambda: _FIXED_NOW.date())
+
     def test_daily_always_true(self, override_settings):
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
@@ -47,14 +53,14 @@ class TestShouldFireToday:
     def test_weekly_matches_today_dow(self, override_settings):
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
-        today_dow = datetime.now(tz=_KST).date().weekday()
+        today_dow = _FIXED_NOW.date().weekday()
         alert = _make_alert(schedule_type="WEEKLY", schedule_day_of_week=today_dow)
         assert _should_fire_today(alert) is True
 
     def test_weekly_mismatches_today_dow(self, override_settings):
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
-        today_dow = datetime.now(tz=_KST).date().weekday()
+        today_dow = _FIXED_NOW.date().weekday()
         mismatch_dow = (today_dow + 3) % 7
         alert = _make_alert(schedule_type="WEEKLY", schedule_day_of_week=mismatch_dow)
         assert _should_fire_today(alert) is False
@@ -62,14 +68,14 @@ class TestShouldFireToday:
     def test_monthly_matches_today_day(self, override_settings):
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
-        today = datetime.now(tz=_KST).date()
+        today = _FIXED_NOW.date()
         alert = _make_alert(schedule_type="MONTHLY", schedule_day_of_month=today.day)
         assert _should_fire_today(alert) is True
 
     def test_monthly_mismatches_today_day(self, override_settings):
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
-        today = datetime.now(tz=_KST).date()
+        today = _FIXED_NOW.date()
         mismatch_day = (today.day % 28) + 1  # never today
         if mismatch_day == today.day:
             mismatch_day = mismatch_day % 28 + 1
@@ -81,7 +87,7 @@ class TestShouldFireToday:
     def test_monthly_defaults_to_day_1(self, override_settings):
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
-        today = datetime.now(tz=_KST).date()
+        today = _FIXED_NOW.date()
         alert = _make_alert(schedule_type="MONTHLY", schedule_day_of_month=None)
         expected = today.day == 1
         assert _should_fire_today(alert) is expected
@@ -90,7 +96,7 @@ class TestShouldFireToday:
         """최초 발송(last_triggered_at=None)이면 True."""
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
-        today = datetime.now(tz=_KST).date()
+        today = _FIXED_NOW.date()
         alert = _make_alert(
             schedule_type="QUARTERLY",
             schedule_day_of_month=today.day,
@@ -104,8 +110,8 @@ class TestShouldFireToday:
         """80일 쿨다운 이전에는 False."""
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
-        today = datetime.now(tz=_KST).date()
-        last_triggered = datetime.now(tz=_KST) - timedelta(days=30)
+        today = _FIXED_NOW.date()
+        last_triggered = _FIXED_NOW - timedelta(days=30)
         alert = _make_alert(
             schedule_type="QUARTERLY",
             schedule_day_of_month=today.day,
@@ -117,8 +123,8 @@ class TestShouldFireToday:
         """80일 이상 경과 후 True."""
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
-        today = datetime.now(tz=_KST).date()
-        last_triggered = datetime.now(tz=_KST) - timedelta(days=90)
+        today = _FIXED_NOW.date()
+        last_triggered = _FIXED_NOW - timedelta(days=90)
         alert = _make_alert(
             schedule_type="QUARTERLY",
             schedule_day_of_month=today.day,
@@ -130,7 +136,7 @@ class TestShouldFireToday:
         """발송일이 오늘과 다르면 False."""
         from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
-        today = datetime.now(tz=_KST).date()
+        today = _FIXED_NOW.date()
         mismatch_day = (today.day % 28) + 1
         if mismatch_day == today.day:
             mismatch_day = mismatch_day % 28 + 1

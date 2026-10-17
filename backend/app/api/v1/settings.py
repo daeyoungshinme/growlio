@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -40,6 +40,17 @@ MAX_GOAL_YEARS_AHEAD = 100
 
 class DartApiKeyUpdate(BaseModel):
     api_key: str = Field(min_length=1, max_length=MAX_CREDENTIAL_LENGTH)  # 암호화 후 String(512)
+
+
+_GOAL_PLAIN_FIELDS = (
+    "goal_amount",
+    "goal_annual_return_pct",
+    "annual_deposit_goal",
+    "monthly_deposit_amount",
+    "retirement_target_year",
+    "goal_initial_amount",
+    "annual_dividend_goal",
+)
 
 
 class GoalUpdate(BaseModel):
@@ -329,27 +340,23 @@ async def update_goal(
 ):
     """투자 목표 설정."""
     row = await get_or_create_settings(db, current_user.id)
-    if req.goal_amount is not None:
-        row.goal_amount = req.goal_amount
-    if req.goal_annual_return_pct is not None:
-        row.goal_annual_return_pct = req.goal_annual_return_pct
-    if req.annual_deposit_goal is not None:
-        row.annual_deposit_goal = req.annual_deposit_goal
-    if req.monthly_deposit_amount is not None:
-        row.monthly_deposit_amount = req.monthly_deposit_amount
-    if req.retirement_target_year is not None:
-        row.retirement_target_year = req.retirement_target_year
-    if req.goal_start_date is not None:
-        from datetime import datetime
-
-        row.goal_start_date = datetime.combine(req.goal_start_date, datetime.min.time()).replace(tzinfo=UTC)
-    if req.goal_initial_amount is not None:
-        row.goal_initial_amount = req.goal_initial_amount
-    if req.annual_dividend_goal is not None:
-        row.annual_dividend_goal = req.annual_dividend_goal
-    if req.birth_year is not None:
+    # 보낸 필드만 바꾼다 — 생략한 필드는 유지하고, 명시적으로 null을 보낸 필드는 비운다
+    # (`is not None`으로만 거르면 사용자가 입력을 지워도 이전 목표가 남는다).
+    sent = req.model_fields_set
+    for field in _GOAL_PLAIN_FIELDS:
+        if field in sent:
+            setattr(row, field, getattr(req, field))
+    if "goal_start_date" in sent:
+        row.goal_start_date = (
+            datetime.combine(req.goal_start_date, datetime.min.time()).replace(tzinfo=UTC)
+            if req.goal_start_date is not None
+            else None
+        )
+    if "birth_year" in sent:
         row.birth_year = req.birth_year
-        row.age_group = age_group_from_birth_year(req.birth_year).value
+        # age_group은 추천 옵션에서 직접 고를 수도 있으므로, 출생연도를 지울 때는 건드리지 않는다
+        if req.birth_year is not None:
+            row.age_group = age_group_from_birth_year(req.birth_year).value
     await db.commit()
     cache = await get_cache_store()
     await invalidate_user_caches(

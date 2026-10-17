@@ -169,6 +169,12 @@ export default function PortfolioPage() {
     }
   };
 
+  // StockHoldingsTable이 memo라 매 렌더 새 객체를 넘기면 표 전체가 다시 그려진다
+  const dividendMap = useMemo(
+    () => Object.fromEntries(dividendData.map((d) => [`${d.ticker}-${d.market}`, d])),
+    [dividendData],
+  );
+
   const stockAccounts = useMemo(
     () => data?.accounts.filter((a) => isPortfolioAccount(a.asset_type)) ?? [],
     [data],
@@ -359,20 +365,13 @@ export default function PortfolioPage() {
                 />
               </Suspense>
               <div ref={holdingsRef} className="scroll-mt-2">
-                {(() => {
-                  const dividendMap = Object.fromEntries(
-                    dividendData.map((d) => [`${d.ticker}-${d.market}`, d]),
-                  );
-                  return (
-                    <StockHoldingsTable
-                      positions={data.all_positions}
-                      dividendMap={dividendMap}
-                      divLoading={divLoading}
-                      divError={divError}
-                      sortRequest={holdingsSortRequest}
-                    />
-                  );
-                })()}
+                <StockHoldingsTable
+                  positions={data.all_positions}
+                  dividendMap={dividendMap}
+                  divLoading={divLoading}
+                  divError={divError}
+                  sortRequest={holdingsSortRequest}
+                />
               </div>
             </div>
           </ErrorBoundary>

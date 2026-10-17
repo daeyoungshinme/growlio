@@ -7,7 +7,6 @@ import {
   invalidateTransactionData,
   invalidatePortfolioData,
   invalidateDcaData,
-  invalidateDividendPlanData,
   invalidateAlertData,
   invalidateStockPriceAlertData,
   invalidateRebalancingAlertData,
@@ -63,6 +62,9 @@ describe("invalidateTransactionData", () => {
     // 백엔드 isa_service가 입금·배당 거래를 합산 — 절세 액션 플랜만 갱신되고 ISA 카드는 stale하던 버그
     expect(keys).toContain("isa-status");
     expect(keys).toContain("pension-contribution");
+    // DIVIDEND 거래가 수령 배당 합계를 바꾼다 — 배당 탭·배당 계획이 1시간 stale하던 버그
+    expect(keys).toContain("dividend-summary");
+    expect(keys).toContain("dividend-plan");
   });
 });
 
@@ -103,15 +105,6 @@ describe("invalidateDcaData", () => {
     expect(keys).toContain("dca-analysis");
     expect(keys).toContain("settings");
     expect(keys).toContain("dashboard");
-  });
-});
-
-describe("invalidateDividendPlanData", () => {
-  it("dividend-plan 무효화", async () => {
-    const qc = makeQueryClient();
-    await invalidateDividendPlanData(qc as any);
-    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
-    expect(keys).toContain("dividend-plan");
   });
 });
 

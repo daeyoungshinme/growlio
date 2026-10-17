@@ -53,7 +53,7 @@ vi.mock("@/api/alerts", async (importOriginal) => {
 
 vi.mock("@/utils/queryInvalidation", () => ({
   invalidateDcaData: vi.fn().mockResolvedValue(undefined),
-  invalidateDividendPlanData: vi.fn().mockResolvedValue(undefined),
+  invalidateGoalRecommendationData: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/utils/toast", () => ({

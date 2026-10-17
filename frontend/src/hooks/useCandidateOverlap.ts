@@ -5,7 +5,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 
 /** 후보 관리 모달에서 연달아 추가·삭제·자산군 변경할 때 매 편집마다 요청이 나가지 않도록 묶는 간격. */
-export const CANDIDATE_OVERLAP_DEBOUNCE_MS = 400;
+const CANDIDATE_OVERLAP_DEBOUNCE_MS = 400;
 
 function overlapSignature(candidates?: OverlapCandidateInput[]): string {
   return candidates

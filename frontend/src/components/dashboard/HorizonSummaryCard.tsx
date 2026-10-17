@@ -1,6 +1,6 @@
 import type { PortfolioOverview } from "@/types";
 import { INVESTMENT_HORIZON_LABELS, InvestmentHorizon } from "@/api/assets";
-import { clampPct, fmtKrw, fmtKrwShort } from "@/utils/format";
+import { clampPct, fmtKrw, fmtKrwShort, pctOf } from "@/utils/format";
 
 interface Props {
   overview: PortfolioOverview | undefined;
@@ -38,7 +38,7 @@ export default function HorizonSummaryCard({ overview }: Props) {
 
   const withPct = groups.map((g) => ({
     ...g,
-    pct: totalTagged > 0 ? (g.amount / totalTagged) * 100 : 0,
+    pct: pctOf(g.amount, totalTagged),
   }));
 
   return (
@@ -82,8 +82,7 @@ export default function HorizonSummaryCard({ overview }: Props) {
         </ul>
       </div>
       <div className={`hidden sm:grid ${GRID_COLS[groups.length] ?? "sm:grid-cols-3"} sm:gap-4`}>
-        {groups.map((g) => {
-          const pct = totalTagged > 0 ? (g.amount / totalTagged) * 100 : 0;
+        {withPct.map(({ pct, ...g }) => {
           return (
             <div key={g.horizon} className="min-w-0">
               <p className="text-xs font-medium text-gray-600 dark:text-gray-300">

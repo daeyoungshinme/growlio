@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.utils.cache_keys import TTL_MONTHLY_TREND, CacheStoreType, get_cached_json, monthly_trend_key, set_cached_json
+from app.utils.kst import today_kst
+
+
+def _trend_window_start(today: date) -> date:
+    """12개월 창의 시작(11개월 전 월 1일). DB CURRENT_DATE는 UTC라 KST 1일 새벽에 한 달 밀린다."""
+    months = today.year * 12 + today.month - 1 - 11
+    return date(months // 12, months % 12 + 1, 1)
 
 
 async def get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> list[dict]:
@@ -32,7 +40,7 @@ async def get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, cache: CacheSt
                 WHERE s.user_id = :uid
                     AND a.is_active = TRUE
                     AND a.include_in_total = TRUE
-                    AND s.snapshot_date >= (date_trunc('month', CURRENT_DATE) - INTERVAL '11 months')
+                    AND s.snapshot_date >= :start_date
             )
             SELECT month, SUM(amount_krw) AS total_krw
             FROM ranked
@@ -40,7 +48,7 @@ async def get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, cache: CacheSt
             GROUP BY month
             ORDER BY month
         """),
-        {"uid": str(user_id)},
+        {"uid": str(user_id), "start_date": _trend_window_start(today_kst())},
     )
     data = [{"month": str(row.month), "total_krw": float(row.total_krw)} for row in result]
 

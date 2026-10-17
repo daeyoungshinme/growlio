@@ -85,6 +85,11 @@ async def generate_insights(
             insights.extend(await run_checker())
         except Exception as res:
             logger.warning("insight_checker_failed", error=str(res))
+            # 뒤 체커가 aborted 트랜잭션에서 실패하지 않게 되돌린다(체커는 ORM 객체를 새로 읽는다)
+            try:
+                await db.rollback()
+            except Exception:
+                logger.warning("insight_checker_rollback_failed")
 
     # 심각도 순 정렬: ALERT → WARNING → INFO
     _severity_order = {InsightSeverity.ALERT: 0, InsightSeverity.WARNING: 1, InsightSeverity.INFO: 2}
@@ -153,20 +158,26 @@ async def _check_rebalancing_opportunity(
     from app.models.portfolio import Portfolio
     from app.services.portfolio_service import build_portfolio_overview
 
-    result = await db.execute(
-        select(Portfolio)
-        .where(Portfolio.user_id == user_id)
-        .options(
-            selectinload(Portfolio.items),
-            selectinload(Portfolio.linked_accounts),
+    async def _load_portfolios() -> dict[uuid.UUID, Portfolio]:
+        result = await db.execute(
+            select(Portfolio)
+            .where(Portfolio.user_id == user_id)
+            .options(
+                selectinload(Portfolio.items),
+                selectinload(Portfolio.linked_accounts),
+            )
         )
-    )
-    portfolios = result.scalars().all()
-    if not portfolios:
+        return {p.id: p for p in result.scalars().all()}
+
+    by_id = await _load_portfolios()
+    if not by_id:
         return []
 
     insights: list[Insight] = []
-    for pf in portfolios:
+    for pf_id in list(by_id):
+        pf = by_id.get(pf_id)
+        if pf is None:
+            continue
         items = pf.items
         if not items:
             continue
@@ -178,7 +189,14 @@ async def _check_rebalancing_opportunity(
         try:
             overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, cache=cache)
         except Exception as e:  # 포트폴리오 단위 실패 무시, 나머지 계속
-            logger.warning("portfolio_overview_failed", portfolio_id=str(pf.id), error=str(e))
+            logger.warning("portfolio_overview_failed", portfolio_id=str(pf_id), error=str(e))
+            # aborted 트랜잭션을 되돌리고, rollback이 expire시킨 Portfolio 객체를 다시 읽는다
+            try:
+                await db.rollback()
+                by_id = await _load_portfolios()
+            except Exception:
+                logger.warning("insight_portfolio_recover_failed", user_id=str(user_id))
+                break
             continue
 
         # base_type에 따라 드리프트 분모 결정

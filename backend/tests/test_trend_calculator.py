@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.trend_calculator import get_monthly_trend
+from app.services.trend_calculator import _trend_window_start, get_monthly_trend
 
 
 class TestGetMonthlyTrend:
@@ -90,3 +91,35 @@ class TestGetMonthlyTrend:
         await get_monthly_trend(user_id, db, cache)
 
         cache.setex.assert_called_once()
+
+
+class TestTrendWindowStart:
+    """12개월 창 시작일은 KST 오늘 기준(DB UTC CURRENT_DATE 아님, 계획 59 A4)."""
+
+    @pytest.mark.parametrize(
+        ("today", "expected"),
+        [
+            (date(2026, 10, 1), date(2025, 11, 1)),
+            (date(2026, 12, 31), date(2026, 1, 1)),
+            (date(2026, 11, 15), date(2025, 12, 1)),
+            (date(2026, 1, 1), date(2025, 2, 1)),
+        ],
+    )
+    def test_window_start(self, today, expected):
+        assert _trend_window_start(today) == expected
+
+    @pytest.mark.asyncio
+    async def test_query_binds_kst_start_date(self, monkeypatch):
+        from app.services import trend_calculator as tc
+
+        monkeypatch.setattr(tc, "today_kst", lambda: date(2026, 11, 1))
+        execute_result = MagicMock()
+        execute_result.__iter__ = MagicMock(return_value=iter([]))
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=execute_result)
+
+        await tc.get_monthly_trend(uuid.uuid4(), db, None)
+
+        sql, params = db.execute.call_args.args
+        assert "CURRENT_DATE" not in str(sql)
+        assert params["start_date"] == date(2025, 12, 1)

@@ -6,7 +6,7 @@ import { clampPct } from "@/utils/format";
 import { weightBarColor } from "@/utils/dividendUtils";
 
 /** 국내/해외 배지 — 상장시장 또는 실제 투자지역 표시에 공용. */
-export function RegionBadge({ domestic, children }: { domestic: boolean; children?: ReactNode }) {
+function RegionBadge({ domestic, children }: { domestic: boolean; children?: ReactNode }) {
   return (
     <span
       className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${

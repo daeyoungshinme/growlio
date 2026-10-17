@@ -513,6 +513,11 @@ async def invalidate_asset_account_caches(
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
         goal_recommendation_age_key(user_id),
+        # 계좌 삭제·잔액 수정(입출금 거래 생성)·sync가 챌린지 진행률(순입금·평가액·수익률)과
+        # 보유 포지션 기반 인사이트·리스크 지표를 바꾼다 — 빠지면 TTL 동안 삭제 계좌가 남는다
+        challenge_progress_key(user_id),
+        insights_key(user_id),
+        risk_key(user_id),
     ]
     await invalidate_user_caches(cache, *keys)
     await _invalidate_alloc_history(cache, user_id)

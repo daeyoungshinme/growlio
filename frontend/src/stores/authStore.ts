@@ -4,7 +4,7 @@ import { getSupabase } from "@/lib/supabase";
 import { api } from "@/api/client";
 import { getHttpStatus } from "@/utils/error";
 import { BIOMETRIC_SESSION_KEY } from "@/hooks/useBiometric";
-import { storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
+import { sessionSet, storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
 
 export const AUTH_ME_CACHE_KEY = "growlio:auth-me";
 const AUTH_ME_TTL = 30 * 60 * 1000;
@@ -96,7 +96,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       api.post("/auth/sync-profile", { display_name: null }).catch(() => {});
 
       // 이메일/비밀번호 인증 = 생체인증과 동급 → 이번 세션 마킹으로 BiometricGuard 통과
-      sessionStorage.setItem(BIOMETRIC_SESSION_KEY, "1");
+      sessionSet(BIOMETRIC_SESSION_KEY, "1");
 
       setLoggedIn(data.user);
 

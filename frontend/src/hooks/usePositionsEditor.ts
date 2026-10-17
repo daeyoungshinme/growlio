@@ -24,6 +24,18 @@ export interface Position {
   _rowKey?: string; // 리스트 렌더링용 안정적 키 (백엔드 응답에는 없음)
 }
 
+/** 서버 포지션을 편집 행으로 변환(해외 USD 현재가 역산·행 키) — 순수 함수라 참조가 안정적이다(effect dep로 써도 됨) */
+function enrichRows(positions: Position[]): Position[] {
+  return positions.map((p) => ({
+    ...p,
+    current_price_usd:
+      isOverseasMarket(p.market) && p.current_price && p.usd_rate
+        ? +(p.current_price / p.usd_rate).toFixed(4)
+        : (p.current_price_usd ?? null),
+    _rowKey: p._rowKey ?? `${p.ticker}-${p.market}`,
+  }));
+}
+
 export function usePositionsEditor(initialRows: Position[], usdRate: number | null) {
   const [rows, setRows] = useState<Position[]>(initialRows);
   const [suggestIdx, setSuggestIdx] = useState<number | null>(null);
@@ -167,16 +179,6 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
       pnl_pct,
     };
   });
-
-  const enrichRows = (positions: Position[]): Position[] =>
-    positions.map((p) => ({
-      ...p,
-      current_price_usd:
-        isOverseasMarket(p.market) && p.current_price && p.usd_rate
-          ? +(p.current_price / p.usd_rate).toFixed(4)
-          : (p.current_price_usd ?? null),
-      _rowKey: p._rowKey ?? `${p.ticker}-${p.market}`,
-    }));
 
   return {
     rows,

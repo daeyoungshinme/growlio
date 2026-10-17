@@ -91,7 +91,8 @@ export type ExecutionAction =
   | { type: "SET_ORDER_TYPE"; orderType: OrderType }
   | { type: "SET_STRATEGY"; strategy: Strategy }
   | { type: "SET_LIMIT_PRICE"; key: string; price: number }
-  | { type: "SET_QTY"; key: string; qty: number }
+  /** max: 매도 행의 보유 수량 — 입력값을 그 이하로 자른다(input max는 브라우저가 강제하지 않음) */
+  | { type: "SET_QTY"; key: string; qty: number; max?: number }
   | { type: "SET_QTY_AND_SELECT"; key: string; qty: number }
   | { type: "TOGGLE_SELECTED"; key: string }
   | { type: "ADD_BUY_ACCOUNT"; ticker: string; accountId: string }

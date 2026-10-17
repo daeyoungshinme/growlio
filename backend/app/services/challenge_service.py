@@ -78,18 +78,22 @@ async def _monthly_net_deposits(
 ) -> dict[str, float]:
     """start_month 이후 각 월의 순입금(DEPOSIT - WITHDRAWAL) 합계. {"2026-01": 500000.0, ...}"""
     base_sql = """
-        SELECT to_char(transaction_date, 'YYYY-MM') AS month,
-               SUM(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE -amount END) AS net
-        FROM transactions
-        WHERE user_id = :user_id
-          AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
-          AND transaction_date >= :start_date
+        SELECT to_char(t.transaction_date, 'YYYY-MM') AS month,
+               SUM(CASE WHEN t.transaction_type = 'DEPOSIT' THEN t.amount ELSE -t.amount END) AS net
+        FROM transactions t
+        LEFT JOIN asset_accounts a ON a.id = t.account_id
+        WHERE t.user_id = :user_id
+          AND t.transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
+          AND t.transaction_date >= :start_date
     """
     # 월 문자열 비교(to_char) 대신 날짜 비교 — transaction_date 인덱스를 탄다
     params: dict[str, Any] = {"user_id": str(user_id), "start_date": date.fromisoformat(f"{start_month}-01")}
     if account_id is not None:
-        base_sql += " AND account_id = :account_id"
+        base_sql += " AND t.account_id = :account_id"
         params["account_id"] = str(account_id)
+    else:
+        # 전체 계좌 챌린지: 계좌 미지정 입출금은 유지, 삭제(soft)된 계좌 입출금은 제외
+        base_sql += " AND (t.account_id IS NULL OR a.is_active = TRUE)"
     sql = text(base_sql + " GROUP BY 1")
     result = await db.execute(sql, params)
     return {row.month: float(row.net) for row in result.all()}
@@ -297,6 +301,9 @@ async def update_challenge(
         challenge.status = data["status"]
         if data["status"] == "COMPLETED" and challenge.completed_at is None:
             challenge.completed_at = datetime.now(UTC)
+        elif data["status"] != "COMPLETED":
+            # 완료 → 진행 중 복귀 시 완료 시각이 남으면 "완료됨"처럼 보인다
+            challenge.completed_at = None
     await db.commit()
     await db.refresh(challenge)
     await invalidate_challenge_cache(cache, challenge.user_id)

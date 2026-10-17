@@ -6,7 +6,7 @@ import asyncio
 import uuid
 from datetime import date
 
-from sqlalchemy import asc, func, select
+from sqlalchemy import and_, asc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
@@ -91,9 +91,16 @@ async def calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) 
 
     result = await db.execute(
         select(Transaction.transaction_date, Transaction.transaction_type, Transaction.amount)
+        # 종료값(current_total)은 활성·합산 계좌만 더하므로 입출금도 같은 계좌 집합으로 거른다 —
+        # 삭제(soft)·합산 제외 계좌의 입금만 남으면 XIRR이 크게 음수로 왜곡된다. 계좌 미지정 입출금은 유지.
+        .outerjoin(AssetAccount, AssetAccount.id == Transaction.account_id)
         .where(
             Transaction.user_id == user_id,
             Transaction.transaction_type.in_(["DEPOSIT", "WITHDRAWAL"]),
+            or_(
+                Transaction.account_id.is_(None),
+                and_(AssetAccount.is_active == True, AssetAccount.include_in_total == True),
+            ),
         )
         .order_by(asc(Transaction.transaction_date))
     )

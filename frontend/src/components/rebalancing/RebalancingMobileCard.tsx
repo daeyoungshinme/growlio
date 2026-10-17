@@ -79,11 +79,18 @@ export function RebalancingMobileCard({
               value={qty || ""}
               onFocus={(e) => e.target.select()}
               onChange={(e) =>
-                dispatch({
-                  type: isBuy ? "SET_QTY_AND_SELECT" : "SET_QTY",
-                  key: orderKey,
-                  qty: parseInt(e.target.value) || 0,
-                })
+                isBuy
+                  ? dispatch({
+                      type: "SET_QTY_AND_SELECT",
+                      key: orderKey,
+                      qty: parseInt(e.target.value) || 0,
+                    })
+                  : dispatch({
+                      type: "SET_QTY",
+                      key: orderKey,
+                      qty: parseInt(e.target.value) || 0,
+                      max: maxQty,
+                    })
               }
               className={`w-24 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-2.5 text-right font-medium text-sm focus:outline-none focus:border-indigo-500 ${
                 isBuy ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"

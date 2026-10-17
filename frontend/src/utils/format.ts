@@ -125,6 +125,14 @@ export function clampPct(pct: number): number {
 }
 
 /**
+ * 합계 대비 비중(%) — 합계가 0 이하면 0 (0 나누기 방지)
+ * 예: pctOf(25, 200) → 12.5, pctOf(10, 0) → 0
+ */
+export function pctOf(part: number, total: number): number {
+  return total > 0 ? (part / total) * 100 : 0;
+}
+
+/**
  * ISO 날짜 문자열을 현재 시각 기준 상대 시간으로 변환
  * 예: "3일 전", "오늘", "1시간 전"
  */

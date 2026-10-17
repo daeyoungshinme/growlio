@@ -123,3 +123,21 @@ class TestClampBuyOrdersToBudget:
 
         assert {o.ticker: o.quantity for o in adjusted} == {"A": 5}
         assert [s.ticker for s in skipped] == ["B"]
+
+
+class TestFloorShares:
+    """목표금액 ÷ 가격의 부동소수 경계 오차 보정 (계획 59 A5)."""
+
+    def test_float_noise_below_integer_rounds_up_to_integer(self):
+        from app.services.rebalancing._order_quantity_guard import floor_shares
+
+        noisy = 0.3 / 0.1 * 1  # 2.9999999999999996
+        assert noisy < 3
+        assert floor_shares(noisy) == 3
+
+    def test_real_fraction_still_floors(self):
+        from app.services.rebalancing._order_quantity_guard import floor_shares
+
+        assert floor_shares(2.5) == 2
+        assert floor_shares(2.999) == 2
+        assert floor_shares(0.0) == 0

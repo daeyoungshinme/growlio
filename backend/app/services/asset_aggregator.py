@@ -76,13 +76,16 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
                       AND s.snapshot_date = paf_ns.first_date
                   ),
                   nd AS (
+                    -- 계좌 미지정 입출금(account_id NULL)은 유지하고, 삭제(soft)·합산 제외 계좌는 뺀다
                     SELECT COALESCE(
-                      SUM(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE -amount END), 0
+                      SUM(CASE WHEN t.transaction_type = 'DEPOSIT' THEN t.amount ELSE -t.amount END), 0
                     ) AS net
-                    FROM transactions
-                    WHERE user_id = :uid
-                      AND EXTRACT(YEAR FROM transaction_date) = :year
-                      AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
+                    FROM transactions t
+                    LEFT JOIN asset_accounts a ON a.id = t.account_id
+                    WHERE t.user_id = :uid
+                      AND EXTRACT(YEAR FROM t.transaction_date) = :year
+                      AND t.transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
+                      AND (t.account_id IS NULL OR (a.is_active = TRUE AND a.include_in_total = TRUE))
                   ),
                   net_after_ns AS (
                     SELECT COALESCE(

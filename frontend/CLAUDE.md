@@ -153,7 +153,7 @@ _공통/입력_
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼(setter 참조 고정 — effect 의존성에 넣어도 됨). `CollapsibleCard`/`CollapsibleSection`과 함께 사용
 - `useTimeout.ts` — 언마운트 시 자동 해제·재예약 시 이전 예약 취소되는 setTimeout(`scheduleTimeout(fn, ms)`). "3초 뒤 확인 해제"·blur 후 드롭다운 닫기처럼 상태를 바꾸는 지연 콜백은 맨 `setTimeout` 대신 이것을 쓴다
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`·`common/ConfirmModal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용. Escape·포커스 트랩은 **맨 위 모달만** 처리(DOM상 다른 열린 모달을 품은 쪽은 아래층, 형제끼리는 나중에 열린 쪽이 위) — Android 뒤로가기가 Escape를 dispatch하므로 확인창 위에서 한 번 눌러 아래 모달까지 닫히지 않게 함
-- `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용
+- `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용. `numberFieldPayload(value, initial)` — 부분 갱신 payload 값(값 있음→숫자, 원래 값을 지움→null, 처음부터 빈 칸→undefined로 키 생략). `PUT /settings/goal`은 보낸 키만 바꾸고 null은 비우므로, 초기 폼이 비어 있어도 기존 목표를 지우지 않으려면 이 헬퍼를 쓴다
 
 _세금_
 
@@ -180,14 +180,14 @@ _리밸런싱/추천_
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
 - `useRebalancingExecution.ts` — 리밸런싱 주문 실행 훅의 공개 진입점(barrel re-export). 실제 구현은 `rebalancingExecution/`(`index.ts`/`reducer.ts`/`types.ts`) 패키지에 있지만, 모든 소비 코드는 이 파일을 통해서만 import — 패키지를 직접 import 금지
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
-- `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
+- `useAlertCrud.ts` / `useRebalancingAlertForm.ts`(`useRebalancingAlertQueries`·`useRebalancingAlertFormState`) — 알림 CRUD
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
 - `useGoalSettings.ts` — 투자 목표 설정 폼 상태
 - `useChallenges.ts` / `useChallengeMutations.ts` / `useChallengeNudge.ts` — 적립 챌린지 목록 조회 / 생성·수정·삭제 뮤테이션 / 하단 네비 배지용 넛지 요약
 - `useAddSuggestedCandidates.ts` — 목표 역산 추천의 `suggested_candidates`(고배당 미등록 후보 제안)를 "후보에 추가" 클릭으로 승인하는 뮤테이션. `RecommendationCard.tsx`/`DividendPlanSection.tsx` 공용
 - `useCandidateOverlap.ts` — 추천 후보 ETF 중복·총보수 분석(`POST /rebalancing/candidates/overlap`) 조회. 후보 편집 연타 시 요청 폭주를 막는 디바운스(`CANDIDATE_OVERLAP_DEBOUNCE_MS`) 포함. 표시 헬퍼는 `utils/etfOverlap.ts`
-- `usePortfolioTabFetching.ts` — 포트폴리오 탭 데이터 프리패치
+- `usePortfolioTabFetching.ts`(`useMainPageFetching`) — 홈·포트폴리오 탭 주요 쿼리 중 하나라도 fetch 중인지(새로고침 인디케이터용)
 
 _알림 토글_ (설정 페이지, `["settings"]` boolean 필드 조회/PUT 패턴)
 
@@ -358,6 +358,7 @@ _기타_
 - `fmtKrwPrice(n)` — 소수점 없는 원화 가격 표시.
 - `fmtMonth(str)` — "YYYY-MM" → "YYYY년 M월".
 - `fmtPct(n)` — "+5.23%" 형식. null이면 "—".
+- `pctOf(part, total)` — 합계 대비 비중(%), 합계 0 이하면 0. 인라인 `total > 0 ? (v / total) * 100 : 0` 대신 사용.
 - `clampPct(pct)` — 진행률 바 렌더링용 0~100 클램프. 프로그레스 바 `style={{ width }}`에 값 그대로 넣지 말 것.
 - `localToday()` — 사용자 로컬(KST) 기준 오늘 "YYYY-MM-DD". 날짜 입력 기본값에 `new Date().toISOString().slice(0, 10)`를 쓰지 말 것 — UTC라 KST 오전 9시 전엔 전날이 된다. 모듈 최상위 상수로 고정하지 말고 폼을 열 때 호출(자정을 넘긴 세션 대응).
 - `localMonth()` — 같은 기준의 이번 달 "YYYY-MM". `new Date().toISOString().slice(0, 7)` 금지(매월 1일 오전 9시 전엔 전월).
@@ -377,7 +378,7 @@ _기타_
 
 **토스트 (`src/utils/toast.ts`)**
 
-- `toast(message, type?)` — `window.dispatchEvent("growlio:toast")` 이벤트 발행. `useToast()` 훅 외부(비React 코드)에서도 직접 호출 가능.
+- `toast(message, type?)` — `window.dispatchEvent("growlio:toast")` 이벤트 발행. React 훅이 아니라 일반 함수라 컴포넌트·비React 코드 어디서든 직접 호출(`components/Toaster.tsx`가 구독해 표시).
   ```ts
   import { toast } from "@/utils/toast";
   toast("저장되었습니다", "success");
@@ -449,7 +450,7 @@ _기타_
 - `dcaAutoBuy.ts` — `isDcaAutoBuyPreset(alert)`: AUTO·매월·SCHEDULE_ONLY·BUY_ONLY 조합이면 "정기 적립식 자동매수"로 표시 판정.
 - `actionPriority.ts` — 행동 항목 우선순위 배지 스타일(`ACTION_PRIORITY_STYLE`: HIGH 우선/MEDIUM 권장/LOW 참고)·마감 라벨(`deadlineLabel`). `TaxActionPlanCard`·`ActionItemsCard` 공용
 - `legacyTabRedirect.ts` — 탭 재편(plans/50)으로 옮겨진 옛 딥링크 변환: `legacyAssetsTaxRedirect()`(자산 세금 → 계획 › 절세), `legacyHistorySegment()`(계좌관리 옛 하위탭 → 내역 세그먼트). 이메일·푸시에 저장된 링크 호환용이라 지우지 말 것
-- `safeStorage.ts` — `storageGet`/`storageSet`/`storageRemove`. 저장소가 막힌 환경(사생활 보호 모드 등)에서 예외를 삼키는 localStorage 래퍼 — `localStorage` 직접 접근 금지.
+- `safeStorage.ts` — `storageGet`/`storageSet`/`storageRemove`(localStorage), `sessionGet`/`sessionSet`(sessionStorage), `getLocalStorageOrUndefined`(객체 자체가 필요한 persister용). 저장소가 막힌 환경(사생활 보호 모드·사이트 데이터 차단)에서 예외를 삼키는 래퍼 — `localStorage`/`sessionStorage` 직접 접근 금지(차단 시 `window.localStorage` 접근만으로 throw해 부팅 실패).
 - `notificationAlertGroups.ts` — 알림 설정 페이지의 필드 그룹(`REPORT_ALERT_FIELDS`/`INSTANT_ALERT_FIELDS`).
 
 **배당 유틸리티 (`src/utils/dividendUtils.ts`)**
@@ -537,7 +538,7 @@ _기타_
 - 계좌 sync 후: `invalidateSyncData(queryClient)` — portfolio-overview + dashboard + dividend 등 무효화.
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 등 무효화.
 - 브로커 API 키 삭제(연동 해제) 후: `invalidateBrokerCredentialData(queryClient)` — 계좌 데이터 + 리밸런싱 알림·대기 플랜 무효화.
-- 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions(전체·계좌별 프리픽스) + dashboard 무효화.
+- 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions(전체·계좌별 프리픽스) + dashboard + 챌린지·연금/ISA·세금·지금 할 일 + 배당 요약·배당 계획(DIVIDEND 거래) 무효화.
 - 수기 매매 기록 CUD 후: `invalidateTradeData(queryClient)` — trades + period-purchases 무효화.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + dividend-plan + challenges + action-items 무효화.
@@ -546,7 +547,7 @@ _기타_
 - 적립 챌린지 알림 설정 변경 후: `invalidateChallengeRemindersData(queryClient)` — settings 무효화.
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
-- 배당 계획 변경 후: `invalidateDividendPlanData(queryClient)`.
+- 배당 목표 변경 후: `invalidateDcaData` + `invalidateGoalRecommendationData` — `PUT /settings/goal`은 대시보드·DCA·챌린지·추천 캐시를 함께 지운다(배당 계획만 무효화하면 홈 목표 카드가 stale).
 - 주가 알림 CUD 후: `invalidateStockPriceAlertData(queryClient)`.
 - 리밸런싱 주문 실행 후: `invalidateRebalancingHistoryData(queryClient)`.
 - 리밸런싱 대기 플랜 취소/승인 후: `invalidateRebalancingPlanData(queryClient, { executed })` — 대기 플랜 목록 + 실행 이력 무효화. 승인은 즉시 체결하므로 응답 `status === "EXECUTED"`면 `executed: true`로 넘겨 `invalidateSyncData`(보유·드리프트·지금 할 일)까지 갱신.

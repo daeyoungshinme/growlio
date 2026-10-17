@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Info } from "lucide-react";
 import Tooltip from "@/components/common/Tooltip";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
-import { fmtKrw, fmtKrwShort } from "@/utils/format";
+import { fmtKrw, fmtKrwShort, pctOf } from "@/utils/format";
 import SegmentedControl from "./SegmentedControl";
 
 export type RegionBasis = "exposure" | "listing";
@@ -64,7 +64,6 @@ export default function RegionAllocationView({ basis, onBasisChange, amounts, fa
       ].filter((s) => s.value > 0)
     : [];
   const total = segments.reduce((sum, s) => sum + s.value, 0);
-  const pctOf = (v: number) => (total > 0 ? (v / total) * 100 : 0);
 
   return (
     <div>
@@ -96,7 +95,7 @@ export default function RegionAllocationView({ basis, onBasisChange, amounts, fa
           <>
             <div className="flex h-8 rounded-lg overflow-hidden" aria-hidden="true">
               {segments.map((s) => {
-                const pct = pctOf(s.value);
+                const pct = pctOf(s.value, total);
                 return (
                   <div
                     key={s.key}
@@ -117,7 +116,7 @@ export default function RegionAllocationView({ basis, onBasisChange, amounts, fa
                   <div className="min-w-0">
                     <div className="text-xs text-gray-500 dark:text-gray-400">{s.label}</div>
                     <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 tabular-nums">
-                      {pctOf(s.value).toFixed(1)}%
+                      {pctOf(s.value, total).toFixed(1)}%
                     </div>
                     {/* 3칸 범례(판별 불가 포함)는 모바일에서 "1.23억원"이 잘려 축약 금액을 쓴다 */}
                     <div className="text-xs text-gray-500 dark:text-gray-400 tabular-nums truncate">

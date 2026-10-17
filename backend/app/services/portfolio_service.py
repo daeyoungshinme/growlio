@@ -144,6 +144,8 @@ def _build_stock_allocation(all_positions: list[dict], stock_total_krw: float) -
                 "ticker": "ETC",
                 "name": f"기타 {len(rest)}종목",
                 "market": None,
+                # 표시 이름을 파싱하지 않게 개수를 별도 필드로 준다(프론트 상위 5 + 기타 합산)
+                "etc_count": len(rest),
                 "value_krw": rest_value,
                 "pct": round(rest_value / stock_total_krw * 100, 2) if stock_total_krw else 0,
             }

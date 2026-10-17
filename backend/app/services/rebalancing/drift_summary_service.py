@@ -53,7 +53,12 @@ async def get_drift_summaries(
     # (실제 DB 연결 시도) 채택하지 않았다 — 순차 실행 유지, 콜드 캐시 시나리오는
     # 1.2(캐시 스레딩)/1.5(single-flight 락)로 완화한다.
     summaries: list[PortfolioDriftSummary] = []
-    for portfolio in portfolios:
+    pending_ids = [p.id for p in portfolios]
+    by_id = {p.id: p for p in portfolios}
+    for portfolio_id in pending_ids:
+        portfolio = by_id.get(portfolio_id)
+        if portfolio is None:
+            continue
         try:
             portfolio_account_ids = getattr(portfolio, "account_ids", None)
             effective_ids = [uuid.UUID(aid) for aid in portfolio_account_ids] if portfolio_account_ids else None
@@ -67,9 +72,17 @@ async def get_drift_summaries(
         except Exception as e:
             logger.error(
                 "drift_summary_failed",
-                portfolio_id=str(portfolio.id),
+                portfolio_id=str(portfolio_id),
                 error=str(e),
                 exc_type=type(e).__name__,
             )
+            # DB 오류로 트랜잭션이 aborted면 뒤 포트폴리오가 전부 PendingRollbackError로 빠진다.
+            # rollback은 루프의 Portfolio 객체를 expire시키므로(async lazy load 불가) 다시 읽는다.
+            try:
+                await db.rollback()
+                by_id = {p.id: p for p in await get_linked_portfolios(db, user_id)}
+            except Exception:
+                logger.warning("drift_summary_recover_failed", user_id=str(user_id))
+                break
 
     return summaries

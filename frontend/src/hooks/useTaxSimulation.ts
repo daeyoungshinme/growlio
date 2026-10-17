@@ -12,7 +12,7 @@ export interface OverseasTaxRule {
   rate: number;
 }
 
-export const DEFAULT_OVERSEAS_TAX_RULE: OverseasTaxRule = {
+const DEFAULT_OVERSEAS_TAX_RULE: OverseasTaxRule = {
   deduction: TAX_DEDUCTION,
   rate: TAX_RATE,
 };

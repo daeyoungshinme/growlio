@@ -105,6 +105,34 @@ class TestMonthlyNetDepositsQuery:
         assert params["start_date"] == date(2026, 3, 1)
         assert out == {"2026-03": 100.0}
 
+    @pytest.mark.asyncio
+    async def test_all_accounts_excludes_inactive_accounts(self):
+        """전체 계좌 챌린지는 삭제(soft)된 계좌 입출금을 제외하고 계좌 미지정 입출금은 유지한다."""
+        db = AsyncMock()
+        result = MagicMock()
+        result.all.return_value = []
+        db.execute = AsyncMock(return_value=result)
+
+        await cs._monthly_net_deposits(uuid.uuid4(), db, "2026-03", None)
+
+        where = str(db.execute.call_args.args[0]).split("WHERE", 1)[1]
+        assert "t.account_id IS NULL OR a.is_active = TRUE" in where
+
+    @pytest.mark.asyncio
+    async def test_specific_account_filters_by_account_only(self):
+        db = AsyncMock()
+        result = MagicMock()
+        result.all.return_value = []
+        db.execute = AsyncMock(return_value=result)
+        acc = uuid.uuid4()
+
+        await cs._monthly_net_deposits(uuid.uuid4(), db, "2026-03", acc)
+
+        sql, params = db.execute.call_args.args
+        assert "t.account_id = :account_id" in str(sql)
+        assert "a.is_active" not in str(sql).split("WHERE", 1)[1]
+        assert params["account_id"] == str(acc)
+
 
 class TestBuildMonths:
     def test_target_met_requires_target_amount(self):
@@ -323,3 +351,16 @@ class TestCrud:
         await cs.update_challenge(challenge, db, ChallengeUpdate(status="COMPLETED"), mock_cache)
         assert challenge.status == "COMPLETED"
         assert challenge.completed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_update_challenge_clears_completed_at_when_reactivated(self, mock_cache):
+        """완료 → 진행 중 복귀 시 완료 시각이 남지 않는다."""
+        from datetime import UTC, datetime
+
+        from app.schemas.challenge import ChallengeUpdate
+
+        db = AsyncMock()
+        challenge = _ns(status="COMPLETED", completed_at=datetime(2026, 9, 1, tzinfo=UTC))
+        await cs.update_challenge(challenge, db, ChallengeUpdate(status="ACTIVE"), mock_cache)
+        assert challenge.status == "ACTIVE"
+        assert challenge.completed_at is None

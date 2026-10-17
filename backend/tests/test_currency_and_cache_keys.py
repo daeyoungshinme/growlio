@@ -242,6 +242,24 @@ class TestInvalidateDcaAnalysisCache:
         patterns = [c.kwargs["match"] for c in cache.scan.call_args_list]
         assert any(p.startswith("test:alloc_history_") and str(user_id) in p for p in patterns)
 
+    @pytest.mark.asyncio
+    async def test_invalidate_asset_account_caches_clears_challenge_insights_risk(self, override_settings):
+        """계좌 삭제·잔액 수정·sync 후 챌린지 진행률·인사이트·리스크가 TTL(5분~1시간) 동안
+        삭제 계좌를 반영한 채 남던 버그."""
+        from app.utils.cache_keys import challenge_progress_key, insights_key, risk_key
+
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, []))
+        cache.unlink = AsyncMock()
+        user_id = uuid.uuid4()
+
+        await invalidate_asset_account_caches(cache, user_id)
+
+        deleted = {k for c in cache.delete.call_args_list for k in c.args}
+        assert challenge_progress_key(user_id) in deleted
+        assert insights_key(user_id) in deleted
+        assert risk_key(user_id) in deleted
+
 
 # ── currency ─────────────────────────────────────────────────────────────────
 

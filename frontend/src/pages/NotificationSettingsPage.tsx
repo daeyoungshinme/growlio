@@ -13,6 +13,7 @@ import { useRecommendationDriftAlertToggle } from "@/hooks/useRecommendationDrif
 import { useChallengeRemindersToggle } from "@/hooks/useChallengeRemindersToggle";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
+import EmptyState from "@/components/common/EmptyState";
 import Tabs from "@/components/common/Tabs";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
@@ -55,6 +56,8 @@ function AlertHistorySection() {
     data: history,
     isLoading,
     isFetching,
+    isError,
+    refetch,
   } = useQuery({
     queryKey: [...QUERY_KEYS.alertHistory, limit],
     queryFn: () => fetchAlertHistory({ limit }),
@@ -65,6 +68,12 @@ function AlertHistorySection() {
     <SectionCard title="알림 발송 이력">
       {isLoading ? (
         <div className="h-20 bg-gray-50 dark:bg-gray-800 rounded animate-pulse" />
+      ) : isError ? (
+        <EmptyState
+          title="알림 이력을 불러오지 못했습니다."
+          action={{ label: "다시 시도", onClick: () => void refetch() }}
+          compact
+        />
       ) : !history || history.length === 0 ? (
         <p className="text-xs text-gray-400 dark:text-gray-500 py-2">
           발송된 알림 이력이 없습니다.

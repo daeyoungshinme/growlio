@@ -107,7 +107,10 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
     case "SET_QTY":
       return {
         ...state,
-        qtyOverrides: { ...state.qtyOverrides, [action.key]: Math.max(0, action.qty) },
+        qtyOverrides: {
+          ...state.qtyOverrides,
+          [action.key]: Math.min(action.max ?? Infinity, Math.max(0, action.qty)),
+        },
       };
     case "SET_QTY_AND_SELECT": {
       const next = new Set(state.selected);

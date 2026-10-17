@@ -14,6 +14,7 @@ import RegionAllocationView, { type RegionBasis } from "./allocation/RegionAlloc
 import StockAllocationView from "./allocation/StockAllocationView";
 import IndexAllocationView from "./allocation/IndexAllocationView";
 import { storageGet, storageSet } from "@/utils/safeStorage";
+import { pctOf } from "@/utils/format";
 
 type View = "region" | "stock" | "index";
 
@@ -96,7 +97,7 @@ export default function AllocationCard({ overview, accountId, onShowAllStocks }:
     // 해외 보유가 없으면 "해외상장 0%"는 정보가 없어 생략
     listedTotal > 0 &&
       (overview.foreign_stock_krw ?? 0) > 0 &&
-      `해외상장 ${(((overview.foreign_stock_krw ?? 0) / listedTotal) * 100).toFixed(0)}%`,
+      `해외상장 ${pctOf(overview.foreign_stock_krw ?? 0, listedTotal).toFixed(0)}%`,
   ]
     .filter(Boolean)
     .join(" · ");

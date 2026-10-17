@@ -159,7 +159,7 @@ export function useRebalancingExecution({
     globalUsdRate,
   } = state;
 
-  const actionableItems = getActionableItems(analysis);
+  const actionableItems = useMemo(() => getActionableItems(analysis), [analysis]);
   const { loadLiveBalance, loadAllLiveBalances } = useRebalancingBalances(
     dispatch,
     tradableAccounts,
@@ -233,7 +233,9 @@ export function useRebalancingExecution({
       const totalSuggested = Math.abs(Math.round(item.shares_to_trade!));
       const suggested =
         allKisQty > 0 ? Math.round((totalSuggested * currentQty) / allKisQty) : totalSuggested;
-      if (suggested > 0) rows.push({ item, currentQty, suggestedQty: suggested });
+      // 수동 계좌 등 주문 불가 계좌 보유분까지 합친 매도 권장량이 이 계좌 보유량을 넘을 수 있다
+      const capped = Math.min(suggested, currentQty);
+      if (capped > 0) rows.push({ item, currentQty, suggestedQty: capped });
     }
     return rows;
   }
@@ -255,15 +257,16 @@ export function useRebalancingExecution({
     const map: Record<string, ReturnType<typeof getSellRows>> = {};
     for (const acc of tradableAccounts) map[acc.id] = getSellRows(acc.id);
     return map;
-    // getSellRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
-  }, [actionableItems, liveBalances, tradableAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+    // getSellRows는 훅 스코프 함수라 dep에 넣으면 매 렌더 재계산 — 대신 그 함수가 읽는 값을 전부 나열한다
+    // (getAccountQuantity·accountHoldsTicker → liveBalances·overseasUnknown·analysis)
+  }, [actionableItems, liveBalances, overseasUnknown, analysis, tradableAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const buyRowsByAccount = useMemo(() => {
     const map: Record<string, ReturnType<typeof getBuyRows>> = {};
     for (const acc of tradableAccounts) map[acc.id] = getBuyRows(acc.id);
     return map;
-    // getBuyRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
-  }, [actionableItems, liveBalances, buyAccounts, tradableAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+    // getBuyRows는 훅 스코프 함수 — 그 함수가 읽는 값(getAccountQuantity 경유 포함)을 전부 나열한다
+  }, [actionableItems, liveBalances, overseasUnknown, analysis, buyAccounts, tradableAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function getBuyTotalInfo(ticker: string): { allocated: number; needed: number } {
     const item = actionableItems.find((i) => i.ticker === ticker);
@@ -279,10 +282,11 @@ export function useRebalancingExecution({
   function buildOrders(): ExecutionOrderItem[] {
     const orders: ExecutionOrderItem[] = [];
     tradableAccounts.forEach((acc) => {
-      (sellRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty }) => {
+      (sellRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty, currentQty }) => {
         const key = `sell_${item.ticker}_${acc.id}`;
         if (!selected.has(key)) return;
-        const qty = qtyOverrides[key] ?? suggestedQty;
+        // 보유량 초과 매도는 백엔드가 잘라 내므로, 확인 화면 수량과 실제 주문 수량이 어긋나지 않게 여기서도 자른다
+        const qty = Math.min(qtyOverrides[key] ?? suggestedQty, currentQty);
         if (qty > 0)
           orders.push({
             ticker: item.ticker,
