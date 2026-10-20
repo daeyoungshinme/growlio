@@ -45,6 +45,32 @@ async def set_durable(db: AsyncSession, key: str, value: str, ttl: int | None = 
         await db.commit()
 
 
+async def claim_durable(db: AsyncSession, key: str, ttl: int, *, commit: bool = True) -> bool:
+    """key를 원자적으로 선점한다 — 이 호출이 처음 차지했으면 True, 이미 살아 있는 claim이 있으면 False.
+
+    `get_durable` 후 `set_durable`은 읽고 쓰는 사이에 다른 프로세스가 끼어들 수 있다(Render 무중단 배포로
+    두 인스턴스가 겹치면 in-proc 락도 소용없다). 여기서는 PK 충돌을 DB가 판정한다:
+    `INSERT … ON CONFLICT DO NOTHING RETURNING key`가 행을 돌려주면 선점 성공(plans/61 C1).
+    만료된 claim은 먼저 지워서 TTL이 지난 키는 다시 차지할 수 있게 한다. Transaction Pooler(6543)에서는
+    session advisory lock을 쓸 수 없어서 이 방식을 쓴다.
+    """
+    now = datetime.now(UTC)
+    await db.execute(
+        delete(AppState).where(AppState.key == key, AppState.expires_at.is_not(None), AppState.expires_at <= now)
+    )
+    stmt = (
+        insert(AppState)
+        .values(key=key, value="1", expires_at=now + timedelta(seconds=ttl))
+        .on_conflict_do_nothing(index_elements=[AppState.key])
+        .returning(AppState.key)
+    )
+    result = await db.execute(stmt)
+    claimed = result.scalar_one_or_none() is not None
+    if commit:
+        await db.commit()
+    return claimed
+
+
 async def delete_durable(db: AsyncSession, key: str, *, commit: bool = True) -> None:
     await db.execute(delete(AppState).where(AppState.key == key))
     if commit:

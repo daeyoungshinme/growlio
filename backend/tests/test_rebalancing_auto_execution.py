@@ -29,6 +29,7 @@ def _make_mock_db():
     mock_db.get = AsyncMock(return_value=None)
     mock_db.commit = AsyncMock()
     mock_db.refresh = AsyncMock()
+    mock_db.rollback = AsyncMock()
     return mock_db
 
 
@@ -88,6 +89,17 @@ def _make_plan(*, buy_count: int = 1, sell_count: int = 0, account_id=None, mark
             )
         )
     return SimpleNamespace(id=uuid4(), account_id=account_id, legs=legs, created_at="2026-01-01T00:00:00+00:00")
+
+
+def _rows_loader(all_rows):
+    """`_load_auto_alert_rows` 대역 — 실패 후 재조회는 남은 id만 돌려준다(실제 쿼리의 IN 필터와 같게)."""
+
+    async def _load(_db, alert_ids=None):
+        if alert_ids is None:
+            return list(all_rows)
+        return [row for row in all_rows if row[0].id in alert_ids]
+
+    return _load
 
 
 # ── run_rebalancing_auto_execution ───────────────────────────
@@ -808,7 +820,7 @@ class TestBuildPendingPlanForAlert:
             result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
 
         assert result == (plan, "buy-token", None)
-        assert alert.last_triggered_at == plan.created_at
+        # last_triggered_at은 generate_pending_plan_for_alert가 플랜 commit 전에 기록한다(plans/61 C1)
         mock_gen.assert_called_once()
 
     @pytest.mark.asyncio
@@ -1043,15 +1055,17 @@ class TestAutoExecutionPlanGenerationFailure:
         portfolio = _make_portfolio()
 
         # 알림 2개 — 첫 번째가 실패해도 두 번째까지 시도해야 "계속 진행"이 증명된다
-        execute_result = MagicMock()
-        execute_result.all.return_value = [
+        all_rows = [
             (_make_alert(), portfolio, "u@test.com", None, None),
             (_make_alert(), portfolio, "u@test.com", None, None),
         ]
-        mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
             _patch_common(mock_db),
+            patch(
+                "app.jobs.rebalancing_auto_execution._load_auto_alert_rows",
+                new=AsyncMock(side_effect=_rows_loader(all_rows)),
+            ),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
             patch(
@@ -1062,9 +1076,95 @@ class TestAutoExecutionPlanGenerationFailure:
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
                 new=AsyncMock(side_effect=RuntimeError("DB error")),
             ) as mock_build,
+            patch("app.jobs.rebalancing_auto_execution.delete_durable", new=AsyncMock()) as release,
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
 
             await _run_auto_execution()
 
         assert mock_build.await_count == 2
+        # 생성 실패는 claim을 풀어 다음 tick 재시도를 막지 않는다
+        assert release.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_notify_failure_rolls_back_and_continues_with_reloaded_rows(self):
+        """notify_* 실패(내부 commit 오류 등)가 남은 알림 전체를 PendingRollbackError로 막지 않는다(plans/61 C1)."""
+        mock_db = _make_mock_db()
+        portfolio = _make_portfolio()
+        all_rows = [(_make_alert(), portfolio, "u@test.com", None, None) for _ in range(3)]
+        notify = AsyncMock(side_effect=[RuntimeError("commit failed"), None, None])
+
+        with (
+            _patch_common(mock_db),
+            patch(
+                "app.jobs.rebalancing_auto_execution._load_auto_alert_rows",
+                new=AsyncMock(side_effect=_rows_loader(all_rows)),
+            ),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
+            patch(
+                "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
+                new=AsyncMock(return_value=(_make_plan(), [("KR", "t")], [])),
+            ),
+            patch("app.jobs.rebalancing_auto_execution.notify_plan_generated", new=notify),
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        assert notify.await_count == 3
+        mock_db.rollback.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_claim_held_by_other_instance_skips_generation(self):
+        """다른 인스턴스가 같은 알림+날짜를 이미 선점했으면 플랜을 만들지 않는다(plans/61 C1)."""
+        mock_db = _make_mock_db()
+        rows = [(_make_alert(), _make_portfolio(), "u@test.com", None, None)]
+
+        with (
+            _patch_common(mock_db),
+            patch("app.jobs.rebalancing_auto_execution._load_auto_alert_rows", new=AsyncMock(return_value=rows)),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
+            patch("app.jobs.rebalancing_auto_execution.claim_durable", new=AsyncMock(return_value=False)),
+            patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_build,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        mock_build.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_claim_released_when_no_plan_generated(self):
+        """게이트 차단·주문 없음이면 claim을 풀어 기존처럼 다음 tick에 다시 평가한다."""
+        mock_db = _make_mock_db()
+        rows = [(_make_alert(), _make_portfolio(), "u@test.com", None, None)]
+        release = AsyncMock()
+
+        with (
+            _patch_common(mock_db),
+            patch("app.jobs.rebalancing_auto_execution._load_auto_alert_rows", new=AsyncMock(return_value=rows)),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
+            patch("app.jobs.rebalancing_auto_execution.claim_durable", new=AsyncMock(return_value=True)),
+            patch("app.jobs.rebalancing_auto_execution.delete_durable", new=release),
+            patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock(return_value=None)),
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        release.assert_awaited_once()
