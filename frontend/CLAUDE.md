@@ -151,6 +151,7 @@ _공통/입력_
 - `useStockSearch.ts` — 종목 검색
 - `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼(setter 참조 고정 — effect 의존성에 넣어도 됨). `CollapsibleCard`/`CollapsibleSection`과 함께 사용
+- `useLatestRef.ts` — 항상 최신 값을 가리키는 ref(`useLayoutEffect`로 갱신). 네이티브 리스너(푸시·Android 뒤로가기)처럼 한 번만 등록하고 콜백에서 최신 값을 읽을 때 쓴다 — 특히 `useNavigate()`는 non-data `BrowserRouter`에서 경로마다 새 함수라 effect deps에 넣으면 이동마다 재등록된다(plans/61 B1)
 - `useTimeout.ts` — 언마운트 시 자동 해제·재예약 시 이전 예약 취소되는 setTimeout(`scheduleTimeout(fn, ms)`). "3초 뒤 확인 해제"·blur 후 드롭다운 닫기처럼 상태를 바꾸는 지연 콜백은 맨 `setTimeout` 대신 이것을 쓴다
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`·`common/ConfirmModal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용. Escape·포커스 트랩은 **맨 위 모달만** 처리(DOM상 다른 열린 모달을 품은 쪽은 아래층, 형제끼리는 나중에 열린 쪽이 위) — Android 뒤로가기가 Escape를 dispatch하므로 확인창 위에서 한 번 눌러 아래 모달까지 닫히지 않게 함
 - `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용. `numberFieldPayload(value, initial)` — 부분 갱신 payload 값(값 있음→숫자, 원래 값을 지움→null, 처음부터 빈 칸→undefined로 키 생략). `PUT /settings/goal`은 보낸 키만 바꾸고 null은 비우므로, 초기 폼이 비어 있어도 기존 목표를 지우지 않으려면 이 헬퍼를 쓴다
@@ -218,7 +219,7 @@ _기타_
 **기타 상수 (`src/constants/`):**
 
 - `queryKeys.ts` — React Query queryKey 상수 (`QUERY_KEYS` 객체). 모든 queryKey는 여기서 import
-- `queryConfig.ts` — `STALE_TIME`, `REFETCH_INTERVAL` 상수. 매직 넘버 대신 이 상수 사용
+- `queryConfig.ts` — `STALE_TIME`, `REFETCH_INTERVAL` 상수. 매직 넘버 대신 이 상수 사용. persist(24h localStorage) 설정도 여기: `PERSIST_QUERY_KEYS`·`shouldPersistQuery`(기본 필터와 합쳐 성공한 쿼리만 저장)·`PERSIST_CACHE_BUSTER` — **persist 대상 응답 형태를 호환되지 않게 바꾸면 buster를 날짜로 올린다**(배포마다 자동 변경은 첫 부팅 콜드화로 채택 안 함, plans/61 B4)
 - `defaults.ts` — 백테스트 기본 날짜 상수 (`BACKTEST_DEFAULT_START_DATE` 등)
 - `tabs.ts` — 탭 배열 + 타입: `ASSETS_TOP_TABS`("투자현황"/"계좌관리", AssetsPage 상위 탭), `ASSET_MANAGEMENT_TABS`("은행계좌"/"증권계좌"/"부동산"/"내역", 계좌관리 내부 탭 — "내역"은 `AccountHistoryTab`), `PORTFOLIO_TABS`("종목 현황"/"배당", 세금은 계획탭 › 절세로 이동)
 - `transaction.ts` — 거래 유형 상수 (`TX_TYPES`, `TX_LABELS`/`TX_COLORS`: DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST) + `txDeleteConfirmMessage()`(입출금 기록 삭제 확인 문구)
@@ -257,7 +258,7 @@ _기타_
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시 — 포트폴리오 페이지는 주식 계좌 전용 뷰이므로 의도된 동작.
 
-**`src/lib/supabase.ts`** — `getSupabase()`(async 함수)를 통해 Supabase 클라이언트를 지연 초기화한다(env vars 필요). `@supabase/supabase-js`(약 200KB)를 top-level import하면 이 파일을 참조하는 모든 부팅 경로(authStore/api client)가 실제 렌더 전에 파싱·실행을 먼저 기다려야 해 모바일 저사양 기기에서 체감 로딩 지연을 유발했다 — 그래서 `await import("@supabase/supabase-js")`로 동적 로드하고 클라이언트를 메모이즈한다. 모든 소비 코드(`authStore.ts`, `api/client.ts`, `AuthCallbackPage.tsx` 등)는 `const supabase = await getSupabase();` 형태로 사용 — 동기 `supabase` export는 없음. 직접 확장 금지 — 토큰 첨부·갱신은 `api/client.ts` 인터셉터 소관. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장됨 — httpOnly 쿠키 전환은 Capacitor WebView SameSite 제약으로 보류, CSP + 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제로 경계강화만 적용(결정기록: `docs/plans/28-localstorage-token-decision.md`).
+**`src/lib/supabase.ts`** — `getSupabase()`(async 함수)를 통해 Supabase 클라이언트를 지연 초기화한다(env vars 필요). `@supabase/supabase-js`(약 200KB)를 top-level import하면 이 파일을 참조하는 모든 부팅 경로(authStore/api client)가 실제 렌더 전에 파싱·실행을 먼저 기다려야 해 모바일 저사양 기기에서 체감 로딩 지연을 유발했다 — 그래서 `await import("@supabase/supabase-js")`로 동적 로드하고 클라이언트를 메모이즈한다. 모든 소비 코드(`authStore.ts`, `api/client.ts`, `AuthCallbackPage.tsx` 등)는 `const supabase = await getSupabase();` 형태로 사용 — 동기 `supabase` export는 없음. 직접 확장 금지 — 토큰 첨부·갱신은 `api/client.ts` 인터셉터 소관. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장됨 — httpOnly 쿠키 전환은 Capacitor WebView SameSite 제약으로 보류, CSP + 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제 + 사용자 전환 감지(`utils/cacheOwner.ts`) + 로그아웃 시 푸시 토큰 삭제로 경계강화만 적용(결정기록: `docs/plans/28-localstorage-token-decision.md`).
 
 > **인증 구조:** 로그인·회원가입·토큰 갱신은 전부 Supabase Auth가 담당하고, 백엔드는 토큰을 발급하지 않는다. `api/client.ts`의 Axios 인터셉터가 Supabase 세션의 `access_token`을 `Authorization: Bearer`로 첨부하고(모듈 레벨 캐시), 401이면 `supabase.auth.refreshSession()` 후 대기 큐의 요청을 재시도, 갱신 실패 시 로그아웃. 백엔드는 이 토큰을 Supabase JWKS로 검증만 한다(`backend/app/services/auth_service.py`). 별도의 "백엔드 JWT"는 없다.
 
@@ -450,6 +451,7 @@ _기타_
 - `dcaAutoBuy.ts` — `isDcaAutoBuyPreset(alert)`: AUTO·매월·SCHEDULE_ONLY·BUY_ONLY 조합이면 "정기 적립식 자동매수"로 표시 판정.
 - `actionPriority.ts` — 행동 항목 우선순위 배지 스타일(`ACTION_PRIORITY_STYLE`: HIGH 우선/MEDIUM 권장/LOW 참고)·마감 라벨(`deadlineLabel`). `TaxActionPlanCard`·`ActionItemsCard` 공용
 - `legacyTabRedirect.ts` — 탭 재편(plans/50)으로 옮겨진 옛 딥링크 변환: `legacyAssetsTaxRedirect()`(자산 세금 → 계획 › 절세), `legacyHistorySegment()`(계좌관리 옛 하위탭 → 내역 세그먼트). 이메일·푸시에 저장된 링크 호환용이라 지우지 말 것
+- `cacheOwner.ts` — `claimCacheOwner(userId)`: 쿼리 캐시를 채운 사용자 id를 기록하고, 다른 사용자가 로그인하면 persist 캐시를 지운 뒤 true(`authStore.setLoggedIn`이 `CACHE_OWNER_CHANGED_EVENT`를 보내 App이 `queryClient.clear()`). 쿼리키에 user id가 없어 공유 기기 사용자 전환 시 이전 사용자 캐시가 복원되던 문제 대응(plans/61 B3)
 - `safeStorage.ts` — `storageGet`/`storageSet`/`storageRemove`(localStorage), `sessionGet`/`sessionSet`(sessionStorage), `getLocalStorageOrUndefined`(객체 자체가 필요한 persister용). 저장소가 막힌 환경(사생활 보호 모드·사이트 데이터 차단)에서 예외를 삼키는 래퍼 — `localStorage`/`sessionStorage` 직접 접근 금지(차단 시 `window.localStorage` 접근만으로 throw해 부팅 실패).
 - `notificationAlertGroups.ts` — 알림 설정 페이지의 필드 그룹(`REPORT_ALERT_FIELDS`/`INSTANT_ALERT_FIELDS`).
 

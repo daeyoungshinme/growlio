@@ -5,16 +5,19 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { fmtKrwShort, fmtPct } from "@/utils/format";
 import { isNativePlatform } from "@/utils/platform";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { useAuthStore } from "@/stores/authStore";
 
 // 앱 데이터가 갱신될 때마다 Android 홈 화면 위젯 데이터를 SharedPreferences로 동기화한다.
 // 위젯은 GrowlioWidget.java (AppWidgetProvider)가 직접 읽어 렌더링한다.
 export function useWidget() {
   const native = isNativePlatform();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const { data } = useQuery({
     queryKey: QUERY_KEYS.dashboard,
     queryFn: fetchDashboard,
-    enabled: native,
+    // 로그아웃 상태(로그인·가입 화면)에서 조회하면 401 → "세션 만료" 토스트가 뜬다
+    enabled: native && isAuthenticated,
     staleTime: STALE_TIME.FIVE_MINUTES,
   });
 

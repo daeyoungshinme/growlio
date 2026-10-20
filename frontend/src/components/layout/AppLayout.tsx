@@ -8,6 +8,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { toast } from "@/utils/toast";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
 import { isNativePlatform } from "@/utils/platform";
 import { RefreshContext } from "./RefreshContext";
@@ -17,6 +18,7 @@ export default function AppLayout() {
   const email = useAuthStore((s) => s.email);
   const forgotPassword = useAuthStore((s) => s.forgotPassword);
   const navigate = useNavigate();
+  const navigateRef = useLatestRef(navigate);
 
   const mainRef = useRef<HTMLElement>(null);
   const refreshFnRef = useRef<(() => Promise<void>) | null>(null);
@@ -35,7 +37,8 @@ export default function AppLayout() {
   // 모바일에서만 스와이프 탭 전환 (lg 이상은 Sidebar 사용)
   useSwipeNavigation(mainRef);
 
-  // Android 물리 뒤로가기 버튼 처리
+  // Android 물리 뒤로가기 버튼 처리 — navigate는 경로마다 바뀌므로 ref로 읽어 리스너를 한 번만 등록한다
+  // (deps에 넣으면 이동마다 재등록되고, 비동기 해제 사이에 리스너가 겹쳐 뒤로가기가 두 번 될 수 있다)
   useEffect(() => {
     if (!isNativePlatform()) return;
     const handle = App.addListener("backButton", ({ canGoBack }) => {
@@ -45,7 +48,7 @@ export default function AppLayout() {
         return;
       }
       if (canGoBack) {
-        void navigate(-1);
+        void navigateRef.current(-1);
       } else {
         void App.exitApp();
       }
@@ -53,7 +56,7 @@ export default function AppLayout() {
     return () => {
       void handle.then((h) => h.remove());
     };
-  }, [navigate]);
+  }, [navigateRef]);
 
   const handleSendResetEmail = async () => {
     if (!email) return;

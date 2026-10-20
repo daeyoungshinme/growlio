@@ -21,6 +21,7 @@ import { fetchDCAAnalysis } from "./api/invest";
 import { fetchSettings } from "./api/settings";
 import { QUERY_KEYS } from "./constants/queryKeys";
 import { storageRemove } from "./utils/safeStorage";
+import { CACHE_OWNER_CHANGED_EVENT } from "./utils/cacheOwner";
 /** Sentry 라우터 v7 통합용 — 트랜잭션을 라우트 패턴 단위로 묶는다(DSN 미설정 시 그대로 `Routes`). */
 const SentryRoutes = Sentry.withSentryReactRouterV7Routing(Routes);
 
@@ -149,6 +150,13 @@ export default function App() {
     window.addEventListener("growlio:session-expired", handleSessionExpired);
     return () => window.removeEventListener("growlio:session-expired", handleSessionExpired);
   }, [logout, queryClient]);
+
+  useEffect(() => {
+    // 다른 사용자가 로그인함 — 이전 사용자의 메모리 캐시를 비운다(persist 키는 claimCacheOwner가 지움)
+    const handleOwnerChanged = () => queryClient.clear();
+    window.addEventListener(CACHE_OWNER_CHANGED_EVENT, handleOwnerChanged);
+    return () => window.removeEventListener(CACHE_OWNER_CHANGED_EVENT, handleOwnerChanged);
+  }, [queryClient]);
 
   return (
     <>

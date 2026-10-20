@@ -12,6 +12,7 @@ import { toast } from "@/utils/toast";
 import { isNativePlatform } from "@/utils/platform";
 import { registerPushToken } from "@/api/settings";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
+import { useLatestRef } from "@/hooks/useLatestRef";
 
 /** 설정탭 "다시 시도" 버튼 등에서 등록을 재시도할 때 사용 — 실제 토큰 수신은 usePushNotifications()가
  * 마운트해둔 "registration" 리스너가 처리하므로, 여기서는 권한 재요청 + register() 호출만 한다. */
@@ -77,6 +78,8 @@ export function resolvePushDeepLink(
 export function usePushNotifications() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const navigate = useNavigate();
+  // navigate는 경로마다 새로 만들어진다 — deps에 넣으면 화면 이동마다 권한 요청·register·토큰 PUT이 반복된다
+  const navigateRef = useLatestRef(navigate);
   const setStatus = usePushNotificationStore((s) => s.setStatus);
 
   useEffect(() => {
@@ -126,7 +129,7 @@ export function usePushNotifications() {
         (action) => {
           if (cancelled) return;
           const path = resolvePushDeepLink(action.notification.data);
-          if (path) void navigate(path);
+          if (path) void navigateRef.current(path);
         },
       );
 
@@ -145,5 +148,5 @@ export function usePushNotifications() {
       cancelled = true;
       handles.forEach((h) => h.remove());
     };
-  }, [isAuthenticated, navigate, setStatus]);
+  }, [isAuthenticated, navigateRef, setStatus]);
 }

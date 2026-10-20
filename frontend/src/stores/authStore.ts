@@ -5,6 +5,12 @@ import { api } from "@/api/client";
 import { getHttpStatus } from "@/utils/error";
 import { BIOMETRIC_SESSION_KEY } from "@/hooks/useBiometric";
 import { sessionSet, storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
+import { CACHE_OWNER_CHANGED_EVENT, claimCacheOwner } from "@/utils/cacheOwner";
+import { usePushNotificationStore } from "@/stores/pushNotificationStore";
+import { registerPushToken } from "@/api/settings";
+
+/** 로그아웃이 푸시 토큰 삭제 응답을 기다리는 최대 시간 — api 기본 타임아웃(60s)만큼 막히지 않게 한다. */
+const LOGOUT_PUSH_CLEAR_TIMEOUT_MS = 3000;
 
 export const AUTH_ME_CACHE_KEY = "growlio:auth-me";
 const AUTH_ME_TTL = 30 * 60 * 1000;
@@ -67,7 +73,9 @@ function getOptimisticAuthState(): OptimisticAuth {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
-  const setLoggedIn = (user: { email?: string | null; id: string }, needsReset = false) =>
+  const setLoggedIn = (user: { email?: string | null; id: string }, needsReset = false) => {
+    // 이벤트는 동기로 처리되므로 새 사용자 상태로 렌더하기 전에 이전 사용자 캐시가 비워진다
+    if (claimCacheOwner(user.id)) window.dispatchEvent(new Event(CACHE_OWNER_CHANGED_EVENT));
     set({
       isAuthenticated: true,
       email: user.email ?? null,
@@ -75,6 +83,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       needsPasswordReset: needsReset,
       isAuthChecking: false,
     });
+  };
   const setLoggedOut = () =>
     set({ isAuthenticated: false, userId: null, email: null, isAuthChecking: false });
 
@@ -141,6 +150,15 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     logout: async () => {
+      // FCM 토큰은 기기 단위다 — 지우지 않으면 이 기기가 로그아웃한 계정의 알림을 계속 받는다(plans/61 B2).
+      // 인증이 살아 있는 지금 best-effort로 지운다(실패·지연은 로그아웃을 막지 않는다).
+      if (usePushNotificationStore.getState().status === "registered") {
+        await Promise.race([
+          registerPushToken(null).catch(() => undefined),
+          new Promise((resolve) => setTimeout(resolve, LOGOUT_PUSH_CLEAR_TIMEOUT_MS)),
+        ]);
+        usePushNotificationStore.getState().setStatus("idle");
+      }
       set({ isAuthenticated: false, userId: null, email: null, needsPasswordReset: false });
       storageRemove(AUTH_ME_CACHE_KEY);
       const supabase = await getSupabase();
