@@ -89,6 +89,20 @@ class TestVerifyPassword:
         ):
             await verify_password("user@example.com", "pw")
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status_code", [429, 500, 503])
+    async def test_raises_on_rate_limit_or_outage(self, monkeypatch, status_code):
+        """레이트리밋·장애는 "비밀번호 불일치"(False)가 아니라 예외로 넘긴다 (plans/61 D)."""
+        from app.services.auth_service import verify_password
+
+        monkeypatch.setattr("app.core.config.settings.supabase_project_url", "https://proj.supabase.co")
+
+        async def fake_post(self, url, **kwargs):
+            return httpx.Response(status_code, request=httpx.Request("POST", url))
+
+        with patch("httpx.AsyncClient.post", new=fake_post), pytest.raises(httpx.HTTPStatusError):
+            await verify_password("user@example.com", "pw")
+
 
 class TestDeleteSupabaseUser:
     @pytest.mark.asyncio

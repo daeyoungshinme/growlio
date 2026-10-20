@@ -1,3 +1,4 @@
+import math
 import re
 from datetime import date, datetime
 from typing import Any
@@ -291,6 +292,14 @@ class IsaPnlOverrideUpdate(BaseModel):
     """ISA 계좌 누적 손익 수동 입력/해제. cumulative_pnl_krw=None 전송 시 자동 추정치로 되돌림."""
 
     cumulative_pnl_krw: float | None = None
+
+    @field_validator("cumulative_pnl_krw")
+    @classmethod
+    def _validate_pnl(cls, v: float | None) -> float | None:
+        # 손실이라 음수도 받는다. NaN/Infinity는 JSON float를 통과하고, 범위가 없으면 Numeric(18,2) 오버플로로 500
+        if v is not None and (not math.isfinite(v) or abs(v) > MAX_AMOUNT_KRW):
+            raise ValueError(f"누적 손익은 ±{MAX_AMOUNT_KRW:,}원 범위의 숫자여야 합니다")
+        return v
 
 
 class KisCredentialVerifyRequest(BaseModel):

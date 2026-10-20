@@ -1,4 +1,4 @@
-# 계획61 — 기술부채 감사 (2026-10-20)
+# 61. 기술부채 감사 (2026-10-20)
 
 ## Context
 
@@ -6,7 +6,7 @@
 
 그래서 이번 감사는 55~60에서 다루지 않은 축을 봤다: **인증·세션·사용자 전환, 푸시 토큰, 알림 중복판정, 스키마 검증, 영속 캐시**. Explore 3개의 보고 중 아래 A·B 항목은 전부 코드를 직접 읽어 재확인했다. 정정 1건: Explore는 "AUTO 경로의 실시간 가격도 호가 격자를 벗어난다"고 했지만, 실시간 현재가는 체결가라 원래 격자 위에 있다. 따라서 C2(호가단위)의 위험은 **수동 지정가 입력**에만 해당한다.
 
-산출물: `docs/plans/61-technical-debt-2026-10-20.md`(이 계획 그대로) + `docs/plans/README.md` 인덱스 행 추가. 브랜치 `fix/tech-debt-2026-10-20`. 배치별로 커밋한다.
+상태: **A·B·C·D 완료**(아래 "실행 결과"). 브랜치 `fix/tech-debt-2026-10-20`, 배치별 커밋.
 
 ## 배치 A — 백엔드 실버그 (최우선)
 
@@ -76,3 +76,29 @@ cd backend && uv run alembic check   # A1 마이그레이션 후 드리프트 �
 - C1 SQL: 텍스트 고정 + `uvx --with pglast`로 문법을 확인한다
 - 배포 후 확인: 11월 첫 월요일 연말 리마인더가 알림 이력에 남는지, 08:30 다이제스트가 1회만 가는지, 공유 기기 로그아웃 → 다른 계정 로그인 시 이전 계정 푸시가 안 오는지(실기기)
 - 완료 후 메모리 `project_tech_debt_2026-10-20.md` + MEMORY.md 한 줄
+
+---
+
+## 실행 결과 (2026-10-20, 브랜치 `fix/tech-debt-2026-10-20`)
+
+**A·B·C·D 완료.** 백엔드 2769 tests 91.37%, 프론트 1689 tests. ruff·ruff format·mypy·tsc·eslint(`--max-warnings 0`)·prettier 클린. 커밋: A `91cf4f70`, B `42074b69`, C1 `7c17b476`, C2 `97da6d94`, D(이 문서와 함께).
+
+회귀 테스트가 수정 전 코드에서 실패하는 것을 확인한 항목: A1(길이 20으로 되돌리면 실패), A2(3건), A3(8건), B1(register 3회), C2(3건). A4·A5·B2~B4는 새 헬퍼나 분기를 추가한 것이라 동작 테스트로 고정했다. C1은 구조를 바꿔(`_process_one_alert`·`_load_auto_alert_rows` 신설) 수정 전 코드에 같은 테스트를 걸 수 없다.
+
+계획 대비 정정·추가:
+- **A4**: `send_push`(bool)는 그대로 두고 `deliver_push`가 결과 상태(`PushResult`)를 돌려주게 했다. 호출부 12곳은 바꾸지 않았다. 폐기된 토큰은 `send_push_to_user`가 **별도 세션**에서 지운다. 호출부들이 각자 트랜잭션 중간에 푸시를 보내기 때문이다. 그 사이 사용자가 새 토큰을 등록했을 수 있어서 토큰 값까지 같을 때만 지운다.
+- **A5**: 기존 orphan 분기의 503 처리를 `_supabase_user_exists_or_503`으로 묶어 두 곳에서 같이 쓴다. 새 sub 확인을 orphan 정리보다 **먼저** 한다. 존재하지 않는 sub 때문에 고아 row가 지워지는 일을 막기 위해서다.
+- **B2**: 탈퇴는 서버 CASCADE로 토큰이 지워지므로 로그아웃만 고쳤다. api 기본 타임아웃이 60초라서 토큰 삭제는 최대 3초까지만 기다린다.
+- **B3**: `authStore`에서는 queryClient에 접근할 수 없다. 그래서 `claimCacheOwner`가 persist 키를 지우고, `CACHE_OWNER_CHANGED_EVENT`(동기 window 이벤트)를 받은 App이 `queryClient.clear()`를 호출한다. 소유자 기록 없이 캐시만 남은 기기(배포 전 캐시)는 한 번 비운다.
+- **B4**: buster는 배포마다 자동으로 바꾸지 않고 명시 상수 `PERSIST_CACHE_BUSTER`로 했다. 자동으로 바꾸면 매 배포 첫 부팅이 콜드가 된다. 응답 형태를 바꿀 때 날짜로 올린다(`frontend/CLAUDE.md`). 필터는 `shouldPersistQuery`로 옮겨 테스트했다.
+- **B5**: `openEdit`는 `fetchQuery` 캐시 재사용을 넣지 않았다. staleTime 동안 저장 직후의 이전 값이 보일 수 있어서 기존처럼 항상 새로 조회한다.
+- **C1**: claim은 **플랜을 실제로 만든 경우에만 유지**한다. 게이트 차단·주문 없음·락 경합·생성 예외면 해제한다. 이전에는 이 경우들에 `last_triggered_at`을 기록하지 않아 다음 tick에 재평가했는데, 그 의미를 바꾸지 않기 위해서다. claim과 해제 사이에 크래시가 나면 그날은 실행하지 않는다. 실주문 경로에서는 중복보다 이쪽이 안전하다. `generate_pending_plan_for_alert` docstring의 "alert를 절대 mutate하지 않는다"는 원래도 사실이 아니었다(이전에도 build에서 `last_triggered_at` 대입). 문구를 사실에 맞게 고쳤다. 실패 시 rollback이 내부·외부에서 두 번 일어나는 것은 무해하다.
+- **C2**: 모듈 위치는 `utils/`가 아니라 `services/rebalancing/krx_tick.py`로 했다. 서비스(ETF 이름 판별)를 import하기 때문이다. ETF 판별에는 이름 기반 `has_korean_etf_name`만 쓴다(`looks_like_korean_etf`에서 추출). 코드 prefix 폴백은 일반주 오판 위험이 있어 쓰지 않는다. executor가 보정한 **사본**을 쓰므로 `OrderResult.price`에도 실제 주문가가 남는다. 프론트에는 보정값 미리보기 대신 안내 문구만 넣었다. 미리보기를 하려면 ETF 브랜드 목록을 TS로 복제해야 하기 때문이다. 현행 호가표는 웹 검색으로 2023 개편 표와 일치하는 것을 확인했다. ETF 5원은 별도 출처로 재확인하지 못했다(이 위험은 위 설계로 다룬다).
+- **D**: `_calc_months_to_goal`의 0 반환은 **보류**했다. 호출부 4곳이 `if months_to_goal`로 판정하므로, 0을 반환하면 "이미 달성"이 "계산 불가" 분기로 빠진다. `verify_password`는 `httpx.TransportError` 전체와 429/5xx를 예외로 넘기고, 탈퇴 라우트는 `httpx.HTTPError`를 503으로 바꾼다.
+- **검증 메모**: 개발 DB(공유 Supabase)에는 마이그레이션을 적용하지 않았다. 읽기 전용 `compare_metadata`로 확인한 결과는 다음과 같다. 이번 차이는 `alert_type` 1건이다. 계획55의 `ix1` 인덱스도 개발 DB에 미적용 상태다. 나머지는 DESC 인덱스 오탐이다. 전체 pytest를 다른 명령과 병렬로 실행했을 때 한 번 97건이 실패했지만(루트 경로 기준으로 수집됨) 재현되지 않았다. 단독 재실행에서는 전부 통과했다.
+
+배포 후 확인:
+- Render `preDeployCommand`로 `at1_widen_alert_history_alert_type`이 적용되는지(varchar 확장이라 잠금이 짧다)
+- 11월 첫 월요일 연말 리마인더가 알림 이력에 남는지, 08:30 다이제스트가 하루 1회인지
+- 공유 기기에서 로그아웃 → 다른 계정 로그인 시 이전 계정의 푸시가 오지 않는지, 이전 계정 캐시가 보이지 않는지(실기기)
+- 수동 실행 국내 지정가(호가 밖 값)가 거부되지 않고 체결 화면에 보정가로 표시되는지

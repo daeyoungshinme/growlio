@@ -35,3 +35,17 @@ def test_kst_day_start_includes_early_morning_kst():
     start = kst_day_start(date(2026, 10, 1))
     assert start == datetime(2026, 9, 30, 15, 0, tzinfo=UTC)
     assert sent_at >= start
+
+
+def test_fred_today_uses_us_central_date():
+    # UTC 2026-10-20 02:00(= KST 11:00)은 미국 중부에선 아직 10-19 — 서버 UTC 날짜를 쓰면 FRED가 400(plans/61 D)
+    from app.services import economic_indicator_service as svc
+
+    class _Fixed(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            base = datetime(2026, 10, 20, 2, 0, tzinfo=UTC)
+            return base.astimezone(tz) if tz else base
+
+    with patch.object(svc, "datetime", _Fixed):
+        assert svc._fred_today() == date(2026, 10, 19)

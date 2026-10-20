@@ -134,7 +134,7 @@ async def delete_account(
     """
     try:
         password_ok = await verify_password(current_user.email, req.password)
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
+    except httpx.HTTPError as e:
         logger.error("account_delete_password_verify_unreachable", error=str(e))
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="인증 서버에 연결할 수 없습니다"

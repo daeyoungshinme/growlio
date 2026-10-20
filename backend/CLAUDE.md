@@ -189,6 +189,7 @@ services/
   │   ├── plan_notifications.py # AUTO 플랜 이메일/푸시/이력 알림 — 생성 안내, 게이트 차단 보류 안내(`notify_*_blocked()`가 하루 1회 durable_state dedup), leg 실행 완료/실패 결과
   │   ├── quick_execute_service.py # "지금 계획 생성"(`POST /rebalancing/portfolios/{id}/quick-execute`) 유스케이스 — 알림 행 조회→pending/시장신호 게이트→`build_pending_plan_for_alert`→계획 안내 발송. `QuickExecuteStatus` enum+원자료(`QuickExecuteOutcome`)만 반환하고 사용자 문구는 라우터 `_QUICK_EXECUTE_MESSAGES`가 조립. override 계좌 소유권 검증은 라우터가 콜백(`verify_account_owned`)으로 주입(서비스→API 계층 import 금지)
   │   ├── execution_service.py # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis/_kiwoom_order_executor.py로 분리
+  │   ├── krx_tick.py         # 국내 지정가 호가단위 보정(`domestic_limit_price`: KRX 2023 호가표, ETF·ETN 5원, 매수 내림·매도 올림, ETF는 종목명 기반) — KIS·키움 executor가 국내 LIMIT 주문 직전 적용(plans/61 C2)
   │   ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE/FULL 주문 실행. FULL 매수도 실행 직전 `get_orderable_cash()`로 예산 clamp(매도 부족·실패 시 매수가 가용 현금 초과 방지, AUTO leg도 공유)
   │   ├── _kiwoom_order_executor.py # Kiwoom 국내/해외 단일 주문 실행 + FULL 매수 예산 clamp(`get_domestic_balance()`가 kt00001에서 함께 반환하는 `orderable_krw`=100stk_ord_alow_amt 사용, 없으면 `deposit_krw`=D+2 예수금 폴백 — KIS `get_orderable_cash()`와 대칭)
   │   ├── _order_executor_common.py # KIS/Kiwoom 주문 실행 결과 처리 공용 헬퍼
@@ -260,7 +261,7 @@ services/
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가(VIX·미국 금리 커브·하이일드 스프레드·달러인덱스·환율·유가·인플레이션(CPI+PCE)·고용(실업률) 8종, 상한 27점). `get_confirmed_composite_level()`은 AUTO 게이트·등급전환 알림 전용 hysteresis(연속 2회 관측), raw(`get_market_signal`)는 배너 표시용으로 별개. 캐시·single-flight 진입점+hysteresis만 담당하고 개별 지표 조회는 `market_signal_indicators.py`, 복합 점수 계산(순수 함수)은 `market_signal_scoring.py`로 분리 — 외부는 계속 `market_signal_service`에서 import(재노출). 지표 fetcher끼리 내부 호출(인플레이션→CPI/PCE, 금리커브→장단기/인하기대)하므로 그 patch는 `market_signal_indicators.*` 경로로
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어) — `estimation.py` 축소추정을 프론티어 곡선·포트폴리오 위치·종목 좌표에 일관 적용
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
-  ├── push_service.py               # FCM 푸시 알림 발송
+  ├── push_service.py               # FCM 푸시 알림 발송. `deliver_push`가 결과(SENT/SKIPPED/INVALID_TOKEN/FAILED)를 구분하고 `send_push_to_user`는 폐기된 토큰을 별도 세션에서 지운다. 토큰은 기기 단위라 `PUT /settings/push-token`이 같은 토큰을 다른 사용자 row에서 먼저 뗀다(plans/61 A4)
   └── risk_service.py               # 포트폴리오 리스크 지표 계산 (VaR, 변동성 등)
 
 > 새 서비스 파일 추가/삭제 시 이 목록도 함께 갱신.
@@ -306,9 +307,9 @@ utils/
   ├── cache_keys.py           # 캐시 키 빌더 + TTL 상수 (`dividend_ticker_summary_key` 등) — Tier1(휘발성) 캐시 전용, get_cached_json/set_cached_json/invalidate_* 포함
   ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom/Toss 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
   ├── currency.py             # USD/KRW 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
-  ├── durable_state.py        # Postgres(`AppState` 테이블) 기반 key-value durable state — get_durable/set_durable/delete_durable. 재시작에도 유지돼야 하는 상태(시장신호 등급 마지막 값, 알림 dedup 플래그) 전용, cache_keys.py의 휘발성 캐시와는 별개. 만료 row는 `purge_expired_durable()`을 `jobs/app_state_sweep.py`가 매일 청소(날짜 포함 dedup 키는 다시 읽히지 않아 opportunistic 삭제가 안 일어남)
+  ├── durable_state.py        # Postgres(`AppState` 테이블) 기반 key-value durable state — get_durable/set_durable/delete_durable, `claim_durable(key, ttl)->bool`(INSERT … ON CONFLICT DO NOTHING RETURNING — 여러 프로세스 중 하나만 통과해야 하는 선점. get→set은 경합에 안전하지 않음). 재시작에도 유지돼야 하는 상태(시장신호 등급 마지막 값, 알림 dedup 플래그) 전용, cache_keys.py의 휘발성 캐시와는 별개. 만료 row는 `purge_expired_durable()`을 `jobs/app_state_sweep.py`가 매일 청소(날짜 포함 dedup 키는 다시 읽히지 않아 opportunistic 삭제가 안 일어남)
   ├── masking.py              # 로그·Sentry용 개인정보 마스킹 — `mask_account_no()`(뒤 4자리), `mask_email()`
-  ├── kst.py                  # `today_kst()`/`now_kst()`/`KST` — 사용자 기준 "오늘" 계산 전용 (Absolute Rules "날짜/시각 기준" 참고)
+  ├── kst.py                  # `today_kst()`/`now_kst()`/`KST`/`kst_day_start(d)` — 사용자 기준 "오늘" 계산 전용. "오늘 이미 보냈나" 비교는 `kst_day_start`(UTC 자정으로 만들면 경계가 KST 09:00이 됨) (Absolute Rules "날짜/시각 기준" 참고)
   ├── inproc_lock.py          # 프로세스 내 락 — 동일 계좌 동시 sync 방지, 콜드 캐시 single-flight (단일 프로세스 배포 전제)
   ├── market_hours.py         # KRX/NYSE 개장 여부 판단
   ├── naver_retry.py          # Naver Finance 모바일 API 공용 재시도 정책·User-Agent — `price_sync_sources`·`dividend/sync_sources` 공유. 일시 장애(연결·타임아웃·429·5xx)만 재시도, 404 등 4xx는 즉시 실패시켜 호출부 폴백으로
@@ -331,7 +332,7 @@ jobs/                         # APScheduler 정기 작업
   ├── market_signal_daily_digest.py  # 매일 08:30 KST — 등급 전환 여부와 무관하게 현재 시장 신호를 요약 발송(옵트인, 기본 OFF)
   ├── year_end_tax_reminder.py       # 11~12월 매주 월요일 09:00 KST — 손실수확 후보·연금공제 잔여한도·ISA 만기 현황 요약 발송(옵트인, 기본 OFF). 알릴 내용이 없으면 스킵
   ├── recommendation_drift_alert.py  # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오와 유의미하게 달라지면 이메일/푸시 발송(옵트인, 기본 OFF)
-  ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고). **스케줄 준수**: BOTH는 매일, DRIFT_ONLY/SCHEDULE_ONLY는 `alerts/calculator.is_auto_schedule_day`(주말 지정일은 다음 평일로 이월)일 때만 — 이 체크가 빠지면 월간 AUTO(정기 적립식 자동매수 포함)가 매 거래일 실행됨. SCHEDULE_ONLY는 스케줄일에 임계값 0으로 계획 생성(`plan_generation.build_pending_plan_for_alert`)
+  ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고). **스케줄 준수**: BOTH는 매일, DRIFT_ONLY/SCHEDULE_ONLY는 `alerts/calculator.is_auto_schedule_day`(주말 지정일은 다음 평일로 이월)일 때만 — 이 체크가 빠지면 월간 AUTO(정기 적립식 자동매수 포함)가 매 거래일 실행됨. SCHEDULE_ONLY는 스케줄일에 임계값 0으로 계획 생성(`plan_generation.build_pending_plan_for_alert`). **중복 방지**: 알림마다 `claim_durable(rebalancing_auto_claim_key(alert, KST일자))`로 원자적 선점(배포 겹침 대비, 플랜을 만든 경우만 유지·나머지 결과는 해제), `last_triggered_at`은 플랜과 같은 commit. 루프는 항목별 격리(rollback+남은 row 재조회)·항목별 commit(plans/61 C1)
   ├── dca_cash_shortfall.py   # 매일 18:30 KST — 정기 적립식 자동매수(AUTO·매월·SCHEDULE_ONLY·BUY_ONLY) 다음 실행일 1~3일 전, 실행 계좌 `deposit_krw`(해외 종목 있으면 `deposit_usd` 환산 합산)가 `monthly_deposit_amount`(미설정 시 1만원) 미만이면 이메일·푸시(`DCA_CASH_SHORTFALL`). 실행일 단위 durable dedup. 판정부는 `find_dca_cash_shortfalls(user_id=, notice_window=)`로 분리돼 홈 "지금 할 일"이 날짜 창 없이 재사용
   ├── rebalancing_plan_buy_execution.py  # 1분 간격 — 대기시간 지난 매수 leg 자동 실행. 실행 직전 시장신호 게이트를 재확인(대기 중 상황 악화 대응) — 차단되면 조용히 다음 tick 재시도
   ├── rebalancing_plan_sell_expiry.py  # 15분 간격(app/scheduler.py) — 당일 미응답 매도 승인 요청 만료 처리
@@ -399,7 +400,8 @@ db.add(obj); await db.commit(); await db.refresh(obj)
 **날짜/시각 기준 (KST)**
 - 운영 서버(Render Docker)는 TZ 미설정 = UTC. 사용자 기준 "오늘"(스냅샷 날짜·연도·알림 dedup 등)은 `date.today()`/
   `datetime.now()` 대신 반드시 `app.utils.kst`의 `today_kst()`/`now_kst()`/`KST` 사용 — UTC면 KST 00~09시에 전날이 된다.
-- 예외: 미국 데이터 소스가 자기 날짜 기준을 요구하는 곳(FRED `realtime_start` 등, `economic_indicator_service`).
+- 예외: 미국 데이터 소스가 자기 날짜 기준을 요구하는 곳(FRED `realtime_start` 등) — `economic_indicator_service._fred_today()`(US Central). 서버 `date.today()`(UTC)도 KST 09~15시엔 미국보다 하루 앞서 400이 난다.
+- `alert_history.alert_type`은 `String(ALERT_TYPE_MAX_LEN=40)` — 새 타입 문자열은 이 길이 이하(`tests/test_alert_type_length.py`가 AST로 검사). 20자였을 때 21자 타입 이력이 조용히 저장 실패했다.
 - DB 타임스탬프(`created_at` 등)는 기존대로 `datetime.now(UTC)`.
 
 **HTTP 에러 메시지**
