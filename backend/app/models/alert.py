@@ -19,6 +19,8 @@ from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
 from app.core.database import Base
 
+ALERT_TYPE_MAX_LEN = 40
+
 
 class _AlertMixin:
     """공통 알림 컬럼 — ExchangeRateAlert, RebalancingAlert, StockPriceAlert에서 사용."""
@@ -149,8 +151,9 @@ class AlertHistory(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    # EXCHANGE_RATE | REBALANCING | STOCK_PRICE
-    alert_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    # EXCHANGE_RATE | REBALANCING | STOCK_PRICE | MARKET_SIGNAL[_DIGEST] | YEAR_END_TAX_REMINDER 등
+    # (프론트 NotificationSettingsPage 라벨 맵 참고). 20자였을 때 21자 타입이 저장 실패했다(plans/61 A1).
+    alert_type: Mapped[str] = mapped_column(String(ALERT_TYPE_MAX_LEN), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

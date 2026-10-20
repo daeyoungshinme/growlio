@@ -102,7 +102,10 @@ class TestSyncProfile:
         app.dependency_overrides[get_db] = override_db
         app.dependency_overrides[get_token_payload] = override_payload
         try:
-            with TestClient(app, raise_server_exceptions=False) as client:
+            with (
+                patch("app.api.v1.auth.supabase_user_exists", new=AsyncMock(return_value=True)),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
                 resp = client.post(
                     "/api/v1/auth/sync-profile",
                     json={"display_name": "새유저"},
@@ -191,7 +194,8 @@ class TestSyncProfile:
         app.dependency_overrides[get_token_payload] = override_payload
         try:
             with (
-                patch("app.api.v1.auth.supabase_user_exists", new=AsyncMock(return_value=False)),
+                # 새 sub는 Supabase에 있고(True), 옛 sub(고아)는 없다(False)
+                patch("app.api.v1.auth.supabase_user_exists", new=AsyncMock(side_effect=[True, False])),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.post(
@@ -240,6 +244,49 @@ class TestSyncProfile:
         finally:
             app.dependency_overrides.pop(get_db, None)
             app.dependency_overrides.pop(get_token_payload, None)
+
+    def _post_new_sub(self, exists_mock):
+        from app.api.deps import get_token_payload
+        from app.core.database import get_db
+        from app.main import app
+
+        db = _make_mock_db(existing_user=None)
+
+        async def override_db():
+            yield db
+
+        async def override_payload():
+            return _valid_jwt_payload(str(uuid.uuid4()))
+
+        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_token_payload] = override_payload
+        try:
+            with (
+                patch("app.api.v1.auth.supabase_user_exists", new=exists_mock),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.post(
+                    "/api/v1/auth/sync-profile",
+                    json={"display_name": None},
+                    headers={"Authorization": "Bearer faketoken"},
+                )
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+            app.dependency_overrides.pop(get_token_payload, None)
+        return resp, db
+
+    def test_sync_profile_rejects_deleted_supabase_user(self):
+        """탈퇴 후 다른 기기에 남은 access token으로 호출하면 계정을 되살리지 않는다 (plans/61 A5)."""
+        resp, db = self._post_new_sub(AsyncMock(return_value=False))
+        assert resp.status_code == 401
+        db.add.assert_not_called()
+
+    def test_sync_profile_503_when_supabase_unreachable(self):
+        import httpx
+
+        resp, db = self._post_new_sub(AsyncMock(side_effect=httpx.ConnectError("down")))
+        assert resp.status_code == 503
+        db.add.assert_not_called()
 
 
 # ── POST /auth/find-account ───────────────────────────────────

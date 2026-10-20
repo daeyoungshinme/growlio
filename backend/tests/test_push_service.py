@@ -82,18 +82,18 @@ class TestSendPushToUser:
 
     @pytest.mark.asyncio
     async def test_delegates_to_send_push(self, override_settings):
-        from app.services.push_service import send_push_to_user
+        from app.services.push_service import PushResult, send_push_to_user
 
-        with patch("app.services.push_service.send_push", new=AsyncMock(return_value=False)):
+        with patch("app.services.push_service.deliver_push", new=AsyncMock(return_value=PushResult.FAILED)):
             result = await send_push_to_user(uuid.uuid4(), "제목", "내용", "token")
 
         assert result is False
 
     @pytest.mark.asyncio
     async def test_success_logs_delivered(self, override_settings):
-        from app.services.push_service import send_push_to_user
+        from app.services.push_service import PushResult, send_push_to_user
 
-        with patch("app.services.push_service.send_push", new=AsyncMock(return_value=True)):
+        with patch("app.services.push_service.deliver_push", new=AsyncMock(return_value=PushResult.SENT)):
             result = await send_push_to_user(uuid.uuid4(), "제목", "내용", "token")
 
         assert result is True
@@ -191,3 +191,60 @@ class TestSendPushException:
         finally:
             ps._firebase_initialized = original_initialized
             ps._firebase_app = original_app
+
+    @pytest.mark.asyncio
+    async def test_invalid_token_is_cleared(self, override_settings):
+        # FCM이 폐기한 토큰은 지운다 — 남기면 5~10분 주기 잡마다 같은 토큰으로 계속 호출한다(plans/61 A4)
+        from app.services.push_service import PushResult, send_push_to_user
+
+        user_id = uuid.uuid4()
+        clear = AsyncMock()
+        with (
+            patch("app.services.push_service.deliver_push", new=AsyncMock(return_value=PushResult.INVALID_TOKEN)),
+            patch("app.services.push_service._clear_invalid_token", new=clear),
+        ):
+            result = await send_push_to_user(user_id, "제목", "내용", "dead-token")
+
+        assert result is False
+        clear.assert_awaited_once_with(user_id, "dead-token")
+
+    @pytest.mark.asyncio
+    async def test_other_failures_keep_token(self, override_settings):
+        from app.services.push_service import PushResult, send_push_to_user
+
+        clear = AsyncMock()
+        with (
+            patch("app.services.push_service.deliver_push", new=AsyncMock(return_value=PushResult.FAILED)),
+            patch("app.services.push_service._clear_invalid_token", new=clear),
+        ):
+            await send_push_to_user(uuid.uuid4(), "제목", "내용", "token")
+
+        clear.assert_not_awaited()
+
+
+class TestDeliverPushClassifiesErrors:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("error", "expected"),
+        [
+            ("Requested entity was not found. (registration-token-not-registered)", "invalid_token"),
+            ("invalid-registration-token", "invalid_token"),
+            ("503 unavailable", "failed"),
+        ],
+    )
+    async def test_classifies(self, override_settings, error, expected):
+        import app.services.push_service as ps
+
+        original_initialized, original_app = ps._firebase_initialized, ps._firebase_app
+        try:
+            ps._firebase_initialized = True
+            ps._firebase_app = MagicMock()
+            with (
+                patch("app.services.push_service.asyncio.get_running_loop") as mock_loop,
+                patch.dict("sys.modules", {"firebase_admin": MagicMock(), "firebase_admin.messaging": MagicMock()}),
+            ):
+                mock_loop.return_value.run_in_executor = AsyncMock(side_effect=Exception(error))
+                result = await ps.deliver_push("token", "제목", "내용")
+            assert result == expected
+        finally:
+            ps._firebase_initialized, ps._firebase_app = original_initialized, original_app
