@@ -9,6 +9,7 @@ from app.kis.order import is_overseas_market, place_domestic_order, place_overse
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
 from app.services.rebalancing._order_executor_common import execute_single_order
 from app.services.rebalancing._order_quantity_guard import clamp_buy_orders_to_budget, clamp_sell_orders
+from app.services.rebalancing.krx_tick import domestic_limit_price
 from app.utils.masking import mask_account_no
 
 logger = structlog.get_logger()
@@ -22,6 +23,13 @@ async def _execute_single_order(
     account_no: str,
     is_mock: bool,
 ) -> OrderResult:
+    # 수동 입력 지정가가 호가 격자에서 벗어나면 broker가 거부한다 — 주문 전에 맞추고, 결과(OrderResult.price)에도
+    # 실제 주문가가 남도록 사본을 쓴다(plans/61 C2). 실시간 현재가는 이미 격자 위라 값이 바뀌지 않는다.
+    if order.order_type == "LIMIT" and not is_overseas_market(order.market):
+        order = order.model_copy(
+            update={"limit_price": domestic_limit_price(order.limit_price, order.side, order.name)}
+        )
+
     async def _place() -> dict:
         if is_overseas_market(order.market):
             return await place_overseas_order(

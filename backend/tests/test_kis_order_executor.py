@@ -26,6 +26,44 @@ def _make_order(
     )
 
 
+class TestDomesticLimitTickRounding:
+    """수동 입력 지정가를 호가 격자에 맞춰 주문하고, 결과에도 실제 주문가를 남긴다 (plans/61 C2)."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("side", "expected"), [("BUY", 51_200.0), ("SELL", 51_300.0)])
+    async def test_off_grid_domestic_limit_is_rounded(self, side, expected):
+        order = ExecutionOrderItem(
+            ticker="005930",
+            name="삼성전자",
+            market="KOSPI",
+            side=side,
+            quantity=1,
+            order_type="LIMIT",
+            limit_price=51_230.0,
+        )
+        place = AsyncMock(return_value={"order_no": "1"})
+        with patch.object(_kis_order_executor, "place_domestic_order", place):
+            result = await _kis_order_executor._execute_single_order(order, "k", "s", "t", "12345678-01", True)
+        assert place.call_args.kwargs["limit_price"] == expected
+        assert result.price == expected
+
+    @pytest.mark.asyncio
+    async def test_overseas_limit_is_untouched(self):
+        order = ExecutionOrderItem(
+            ticker="AAPL",
+            name="Apple",
+            market="NASDAQ",
+            side="BUY",
+            quantity=1,
+            order_type="LIMIT",
+            limit_price=190.37,
+        )
+        place = AsyncMock(return_value={"order_no": "1"})
+        with patch.object(_kis_order_executor, "place_overseas_order", place):
+            await _kis_order_executor._execute_single_order(order, "k", "s", "t", "12345678-01", True)
+        assert place.call_args.kwargs["limit_price"] == 190.37
+
+
 class TestExecuteSingleOrderPrice:
     """OrderResult.price는 limit_price를 우선하고, 없으면 reference_price로 채워져야 한다."""
 

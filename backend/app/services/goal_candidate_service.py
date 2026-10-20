@@ -88,10 +88,15 @@ LEVERAGED_INVERSE_RE = re.compile(r"레버리지|인버스|곱버스|[23]X")
 """레버리지·인버스 ETF 종목명 패턴(대문자 비교). 예: KODEX 레버리지, TIGER 인버스, KODEX 200선물인버스2X."""
 
 
-def looks_like_korean_etf(c: dict[str, str]) -> bool:
-    name = (c.get("name") or "").strip().upper()
+def has_korean_etf_name(name: str | None) -> bool:
+    """종목명만으로 국내 ETF인지 — 운용사 브랜드 접두어 또는 "ETF" 단어."""
+    upper = (name or "").strip().upper()
     # 브랜드 뒤 공백까지 확인 — 접두어만 보면 "BNK금융지주"(일반주)가 브랜드 "BNK"에 걸려 ETF로 오판된다.
-    if any(name == p or name.startswith(p + " ") for p in _KR_ETF_BRAND_PREFIXES) or " ETF" in f" {name}":
+    return any(upper == p or upper.startswith(p + " ") for p in _KR_ETF_BRAND_PREFIXES) or " ETF" in f" {upper}"
+
+
+def looks_like_korean_etf(c: dict[str, str]) -> bool:
+    if has_korean_etf_name(c.get("name")):
         return True
     return is_korean_etf(c["ticker"], c["market"])
 
