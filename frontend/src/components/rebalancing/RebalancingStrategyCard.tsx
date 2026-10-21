@@ -73,7 +73,7 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
       {/* 헤더 */}
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">전략 분석</h3>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">효율 분석</h3>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
             현재 포트폴리오 →{" "}
             <span className="text-amber-600 dark:text-amber-400 font-medium">{portfolioName}</span>

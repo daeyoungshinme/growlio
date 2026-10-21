@@ -109,7 +109,9 @@ function DiagnosticGauge({ value }: { value: number }) {
   return (
     <div>
       <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-        <span>자산 집중도</span>
+        {/* 같은 진단 탭의 위험 지표 "최대 종목 비중"(단일 종목)과 다른 값 — 주식·예금 등 가장 큰 자산 유형의
+            비중임을 라벨로 구분한다(plans/63 P2-1) */}
+        <span>자산 유형 집중도 (가장 큰 유형 비중)</span>
         <span className="font-medium">{value.toFixed(1)}%</span>
       </div>
       <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">

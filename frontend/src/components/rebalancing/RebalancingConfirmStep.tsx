@@ -52,9 +52,9 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
         주문이 즉시 체결됩니다. 내용을 신중히 확인하세요.
       </div>
 
-      {/* 실행 전략 선택 */}
+      {/* 주문 방식 선택 — "전략"은 효율 분석·전술과 겹쳐 주문 쪽은 "주문 방식"으로 부른다(plans/63 P2-5) */}
       <div className="rounded-lg bg-gray-100 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/50 px-4 py-3 space-y-2">
-        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">실행 전략</p>
+        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">주문 방식</p>
         <div className="space-y-1.5">
           {STRATEGY_OPTIONS.map((opt) => (
             <button

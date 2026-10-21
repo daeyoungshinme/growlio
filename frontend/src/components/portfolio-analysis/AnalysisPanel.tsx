@@ -11,30 +11,6 @@ import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { useAnalysisState } from "@/hooks/useAnalysisState";
 
-function StrategyAnalysisSection({
-  id,
-  portfolio,
-  alertByPortfolioId,
-  onOpenAlertModal,
-}: {
-  id: string;
-  portfolio: Portfolio;
-  alertByPortfolioId: Record<string, RebalancingAlert>;
-  onOpenAlertModal: (portfolioId: string) => void;
-}) {
-  const existingAlert = alertByPortfolioId[id];
-
-  return (
-    <div className="space-y-4">
-      <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />
-      <AutomationStatusBar
-        existingAlert={existingAlert}
-        onOpenAlertModal={() => onOpenAlertModal(id)}
-      />
-    </div>
-  );
-}
-
 interface Props {
   selectedIds: Set<string>;
   selectedNames: string;
@@ -152,7 +128,7 @@ export function AnalysisPanel({
               : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           }`}
         >
-          전략 분석
+          효율 분석
         </button>
 
         {selectedIds.size > 0 && (
@@ -162,6 +138,14 @@ export function AnalysisPanel({
           </span>
         )}
       </div>
+
+      {/* 자동화 상태 — 분석 모드(리밸런싱·효율)와 무관하게 선택 포트폴리오당 한 번만(plans/63 P2-2) */}
+      {canRebalance && mode && (
+        <AutomationStatusBar
+          existingAlert={alertByPortfolioId[Array.from(selectedIds)[0]]}
+          onOpenAlertModal={() => onOpenAlertModal(Array.from(selectedIds)[0])}
+        />
+      )}
 
       {/* 최초 분석 중 — 아직 표시할 이전 결과가 없을 때만 스켈레톤 */}
       {mode === "rebalancing" && analyzing && !analysis && <SkeletonCard rows={4} />}
@@ -212,18 +196,6 @@ export function AnalysisPanel({
               </>
             );
           })()}
-          {(() => {
-            const portfolioIdStr = analysis.portfolio_id.toString();
-            const existingAlert = alertByPortfolioId[portfolioIdStr];
-            return (
-              <div className="mt-4">
-                <AutomationStatusBar
-                  existingAlert={existingAlert}
-                  onOpenAlertModal={() => onOpenAlertModal(portfolioIdStr)}
-                />
-              </div>
-            );
-          })()}
         </div>
       )}
       {mode === "rebalancing" && error && !analysis && (
@@ -238,20 +210,13 @@ export function AnalysisPanel({
         </div>
       )}
 
-      {/* 전략 분석 결과 */}
+      {/* 효율 분석(팩터·프런티어) 결과 */}
       {mode === "strategy" &&
         (() => {
           const [id] = Array.from(selectedIds);
           const portfolio = portfolios.find((p) => p.id === id);
           if (!id || !portfolio) return null;
-          return (
-            <StrategyAnalysisSection
-              id={id}
-              portfolio={portfolio}
-              alertByPortfolioId={alertByPortfolioId}
-              onOpenAlertModal={onOpenAlertModal}
-            />
-          );
+          return <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />;
         })()}
 
       {/* Empty state */}
