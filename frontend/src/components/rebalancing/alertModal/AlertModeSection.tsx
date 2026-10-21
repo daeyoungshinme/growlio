@@ -69,28 +69,29 @@ export function AlertModeSection({
         </div>
       </div>
 
-      {/* ── NOTIFY 모드 알림 시각 ── */}
-      {form.mode === "NOTIFY" && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            알림 시각 (KST)
-          </label>
-          <select
-            value={form.notifyTime}
-            onChange={(e) => form.setNotifyTime(e.target.value)}
-            className={inputClass}
-          >
-            {NOTIFY_TIME_OPTIONS.map(({ value, label }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-            매일 지정 시각에 알림을 확인합니다. 기본값: 08:30
-          </p>
-        </div>
-      )}
+      {/* ── 알림(리포트) 시각 — AUTO도 이 시각에 이탈 리포트를 받는다. 예전엔 AUTO에서 숨겨져 기본 08:30으로
+          저장된 채 리포트가 발송돼, 사용자가 모르는 시각에 메일·푸시를 받았다(plans/63 P4-1) ── */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          {form.mode === "AUTO" ? "이탈 리포트 시각 (KST)" : "알림 시각 (KST)"}
+        </label>
+        <select
+          value={form.notifyTime}
+          onChange={(e) => form.setNotifyTime(e.target.value)}
+          className={inputClass}
+        >
+          {NOTIFY_TIME_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+          {form.mode === "AUTO"
+            ? "자동 실행과 별도로 이 시각에 이탈 현황 리포트를 보내요. 주문 시각은 “자동 실행 시각”에서 정해요."
+            : "매일 지정 시각에 알림을 확인합니다. 기본값: 08:30"}
+        </p>
+      </div>
     </>
   );
 }

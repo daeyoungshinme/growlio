@@ -15,6 +15,7 @@ import { useTacticalMutations, useTacticalStatus } from "@/hooks/useTacticalAllo
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
+import { useAutoExecutionNotice } from "@/hooks/useAutoExecutionNotice";
 import TacticalWeightsEditor from "./TacticalWeightsEditor";
 import {
   ASSET_LABEL,
@@ -190,6 +191,7 @@ function TacticalStatusView({
   const { upsert, disable, apply } = useTacticalMutations(status.portfolio_id);
   const [confirmApply, setConfirmApply] = useState(false);
   const [justApplied, setJustApplied] = useState(false);
+  const autoExecutionNotice = useAutoExecutionNotice(status.portfolio_id);
   const regime = status.confirmed_regime ?? status.observed_regime;
   const alreadyApplied =
     status.applied_regime != null &&
@@ -314,8 +316,10 @@ function TacticalStatusView({
           </>
         )}
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          과거 데이터 기반 참고 신호이며 수익을 보장하지 않아요. 주문은 리밸런싱 화면에서 직접 확인
-          후 실행돼요.
+          과거 데이터 기반 참고 신호이며 수익을 보장하지 않아요.{" "}
+          {autoExecutionNotice
+            ? "이 포트폴리오는 자동 실행이 켜져 있어 적용한 비중이 다음 자동 실행에 반영돼요."
+            : "주문은 리밸런싱 화면에서 직접 확인 후 실행돼요."}
         </p>
       </section>
 
@@ -337,7 +341,7 @@ function TacticalStatusView({
 
       {confirmApply && status.proposed_weights && (
         <ConfirmModal
-          message={`"${status.portfolio_name}" 목표 비중을 ${REGIME_LABEL[status.confirmed_regime ?? "NEUTRAL"]} 국면 비중(${formatWeights(status.proposed_weights)})으로 바꿀까요? 주문은 나가지 않으며, 다음 화면에서 매매 내역을 확인한 뒤 직접 실행해요.${status.portfolio_compatible ? "" : " QQQ·SPY·DIA·현금 외 종목은 목표에서 빠집니다."}`}
+          message={`"${status.portfolio_name}" 목표 비중을 ${REGIME_LABEL[status.confirmed_regime ?? "NEUTRAL"]} 국면 비중(${formatWeights(status.proposed_weights)})으로 바꿀까요? ${autoExecutionNotice ?? "주문은 나가지 않으며, 다음 화면에서 매매 내역을 확인한 뒤 직접 실행해요."}${status.portfolio_compatible ? "" : " QQQ·SPY·DIA·현금 외 종목은 목표에서 빠집니다."}`}
           confirmLabel="적용"
           danger={false}
           onCancel={() => setConfirmApply(false)}

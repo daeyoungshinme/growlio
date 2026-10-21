@@ -154,6 +154,22 @@ export function useRebalancingAlertFormState({
     alert?.max_tax_impact_krw ?? null,
   );
 
+  // 저장된 알림과 화면 값이 다른지 — "지금 계획 생성"은 임계치·트리거 등을 저장된 행에서 읽으므로,
+  // 미저장 변경이 있으면 저장 값과 화면 값이 섞인 계획이 만들어진다(plans/63 P4-2)
+  const isDirty =
+    !!alert &&
+    (threshold !== alert.threshold_pct ||
+      scheduleType !== alert.schedule_type ||
+      triggerCondition !== (alert.trigger_condition ?? "DRIFT_ONLY") ||
+      mode !== alert.mode ||
+      strategy !== alert.strategy ||
+      accountId !== (alert.account_id ?? targetAccountId ?? "") ||
+      orderType !== alert.order_type ||
+      marketConditionMode !== (alert.market_condition_mode ?? "DISABLED") ||
+      buyWaitMinutes !== (alert.buy_wait_minutes ?? 10) ||
+      taxImpactGateMode !== (alert.tax_impact_gate_mode ?? "DISABLED") ||
+      maxTaxImpactKrw !== (alert.max_tax_impact_krw ?? null));
+
   const upsertMut = useMutation({
     mutationFn: () => {
       if (mode === "AUTO" && !accountId) {
@@ -224,6 +240,7 @@ export function useRebalancingAlertFormState({
     setThreshold,
     recommendedThreshold,
     isNewAlert: !alert,
+    isDirty,
     mode,
     setMode,
     strategy,

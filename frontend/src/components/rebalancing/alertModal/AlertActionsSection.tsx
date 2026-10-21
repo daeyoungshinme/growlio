@@ -95,7 +95,8 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
       {hasAlert && form.mode === "AUTO" && form.accountId && (
         <button
           onClick={() => setConfirmingQuickExecute(true)}
-          disabled={quickExecuteMut.isPending}
+          disabled={quickExecuteMut.isPending || form.isDirty}
+          title={form.isDirty ? "변경한 설정을 먼저 저장해 주세요" : undefined}
           className="w-full flex items-center justify-center gap-2 py-2 text-sm border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-950 disabled:opacity-50 transition-colors"
         >
           {quickExecuteMut.isPending ? (
@@ -105,6 +106,11 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
           )}
           지금 계획 생성
         </button>
+      )}
+      {hasAlert && form.mode === "AUTO" && form.accountId && form.isDirty && (
+        <p className="-mt-1 text-xs text-gray-500 dark:text-gray-400 text-center">
+          변경한 설정을 저장한 뒤 계획을 만들 수 있어요
+        </p>
       )}
       {confirmingQuickExecute && (
         <ConfirmModal

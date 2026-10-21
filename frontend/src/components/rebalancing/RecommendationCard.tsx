@@ -27,6 +27,8 @@ import { normalizeWeights } from "@/utils/recommendationDrift";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import { useAutoExecutionNotice } from "@/hooks/useAutoExecutionNotice";
+
 import SkeletonCard from "@/components/common/SkeletonCard";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
@@ -40,6 +42,17 @@ import {
   type OverallTargetSelection,
   type RecommendationTabActions,
 } from "@/components/rebalancing/recommendationCardModel";
+
+/** 적용 확인창 안내 — 자동 실행이 켜진 포트폴리오면 다음 자동 실행이 새 목표로 주문함을 알린다(plans/63 P4-4) */
+function AutoExecutionNotice({ portfolioId }: { portfolioId: string }) {
+  const notice = useAutoExecutionNotice(portfolioId);
+  if (!notice) return null;
+  return (
+    <p className="mb-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300">
+      {notice}
+    </p>
+  );
+}
 
 const HORIZON_ORDER: InvestmentHorizon[] = ["SHORT_TERM", "MID_TERM", "LONG_TERM"];
 const TAX_TYPE_ORDER: AccountTaxType[] = [
@@ -413,6 +426,7 @@ export default function RecommendationCard({
           }
           onCancel={() => setConfirmOpen(false)}
         >
+          <AutoExecutionNotice portfolioId={applyConfirm.target.id} />
           <RecommendationComparisonPreview
             recommendedItems={applyConfirm.items}
             currentItems={applyConfirm.target.items}
