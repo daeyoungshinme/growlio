@@ -52,7 +52,7 @@ export const STRATEGY_OPTIONS: {
   label: string;
   desc: string;
 }[] = [
-  { value: "BUY_ONLY", label: "매수만 (권장)", desc: "세금 절감" },
+  { value: "BUY_ONLY", label: "매수만", desc: "매도 없이 예수금으로만 매수 — 매매차익 과세 회피" },
   { value: "FULL", label: "매도+매수", desc: "매도 후 매수 순서로 완전 리밸런싱" },
   {
     value: "TWO_PHASE",

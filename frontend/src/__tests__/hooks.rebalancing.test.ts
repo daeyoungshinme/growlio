@@ -849,6 +849,30 @@ describe("useRebalancingExecution", () => {
     expect(invalidateRebalancingHistoryData).toHaveBeenCalledTimes(1);
   });
 
+  it("매수만(BUY_ONLY)을 고르면 매도 주문이 빠지고 매수만 남는다 (plans/63 P0-1)", async () => {
+    const { fetchAllBrokerBalances } = await import("@/api/rebalancing");
+    vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
+
+    const { result } = renderHook(
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: mockAnalysis,
+          accounts: mockKisAccounts,
+        }),
+      { wrapper: createWrapper() },
+    );
+    expect(result.current.orders.some((o) => o.side === "SELL")).toBe(true);
+
+    act(() => {
+      result.current.dispatch({ type: "SET_STRATEGY", strategy: "BUY_ONLY" });
+    });
+
+    expect(result.current.orders.length).toBeGreaterThan(0);
+    expect(result.current.orders.every((o) => o.side === "BUY")).toBe(true);
+    expect(result.current.getSellRows("acc1")).toEqual([]);
+  });
+
   it("actionableItems에서 거래 가능한 아이템만 반환한다", async () => {
     const { fetchAllBrokerBalances } = await import("@/api/rebalancing");
     vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);

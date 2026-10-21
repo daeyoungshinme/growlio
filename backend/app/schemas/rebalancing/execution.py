@@ -38,6 +38,13 @@ class ExecutionRequest(BaseModel):
             raise ValueError("주문 항목이 최소 1개 이상이어야 합니다.")
         return v
 
+    @model_validator(mode="after")
+    def validate_buy_only(self) -> "ExecutionRequest":
+        # 실행기는 strategy를 TWO_PHASE 분기에만 쓰므로, 매수만인데 SELL이 섞이면 그대로 매도된다(plans/63 P0-1)
+        if self.strategy == "BUY_ONLY" and any(o.side == "SELL" for o in self.orders):
+            raise ValueError("매수만(BUY_ONLY) 전략에는 매도 주문을 포함할 수 없습니다.")
+        return self
+
 
 class ExecutionPlanOverride(BaseModel):
     """대기 계획 생성(`/quick-execute`) 시 저장된 알림 설정 대신 사용할 화면 값 override."""

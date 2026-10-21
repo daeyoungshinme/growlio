@@ -44,6 +44,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
     errorMsg,
     confirmed,
   } = state;
+  const skippedSellCount = actionableItems.filter((i) => (i.shares_to_trade ?? 0) < 0).length;
 
   return (
     <>
@@ -70,6 +71,11 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
             </button>
           ))}
         </div>
+        {state.strategy === "BUY_ONLY" && skippedSellCount > 0 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            과비중 {skippedSellCount}개 종목은 매도하지 않고, 예수금 범위에서 매수만 진행해요.
+          </p>
+        )}
       </div>
 
       {hasRealAccount && (

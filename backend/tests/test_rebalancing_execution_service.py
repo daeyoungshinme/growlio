@@ -573,6 +573,17 @@ class TestRebalancingSchemaValidators:
         req = ExecutionRequest(orders=[order])
         assert len(req.orders) == 1
 
+    def test_execution_request_buy_only_rejects_sell(self):
+        """매수만 전략에 SELL이 섞이면 거부 — 실행기는 BUY_ONLY를 필터하지 않아 그대로 매도된다(plans/63 P0-1)."""
+        from pydantic import ValidationError
+
+        from app.schemas.rebalancing import ExecutionRequest
+
+        with pytest.raises(ValidationError, match="BUY_ONLY"):
+            ExecutionRequest(orders=[_make_order(side="SELL"), _make_order()], strategy="BUY_ONLY")
+        assert ExecutionRequest(orders=[_make_order()], strategy="BUY_ONLY").strategy == "BUY_ONLY"
+        assert len(ExecutionRequest(orders=[_make_order(side="SELL")], strategy="FULL").orders) == 1
+
 
 class TestBuildFailedGroupResult:
     """계좌 그룹 실패 로그 — 예상 밖 예외는 error 레벨+예외 타입, 자격증명 노출 우려로 exc_info는 남기지 않는다."""

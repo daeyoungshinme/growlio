@@ -257,13 +257,16 @@ export function useRebalancingExecution({
       });
   }
 
+  // 매수만(BUY_ONLY)이면 매도 행 자체를 만들지 않는다 — 표·현금 계산·주문 목록이 모두 이 맵을 거치므로
+  // 여기서 비워야 "매수만"을 골라도 매도 주문이 나가던 문제가 한 곳에서 막힌다(plans/63 P0-1)
   const sellRowsByAccount = useMemo(() => {
     const map: Record<string, ReturnType<typeof getSellRows>> = {};
-    for (const acc of tradableAccounts) map[acc.id] = getSellRows(acc.id);
+    for (const acc of tradableAccounts)
+      map[acc.id] = state.strategy === "BUY_ONLY" ? [] : getSellRows(acc.id);
     return map;
     // getSellRows는 훅 스코프 함수라 dep에 넣으면 매 렌더 재계산 — 대신 그 함수가 읽는 값을 전부 나열한다
     // (getAccountQuantity·accountHoldsTicker → liveBalances·overseasUnknown·analysis)
-  }, [actionableItems, liveBalances, overseasUnknown, analysis, tradableAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [actionableItems, liveBalances, overseasUnknown, analysis, tradableAccounts, state.strategy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const buyRowsByAccount = useMemo(() => {
     const map: Record<string, ReturnType<typeof getBuyRows>> = {};
