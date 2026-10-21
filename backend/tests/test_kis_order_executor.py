@@ -142,6 +142,34 @@ class TestExecuteTwoPhaseOrdersSellClamp:
         assert len(results) == 2
 
 
+class TestExecuteTwoPhaseUnaffordableBuys:
+    @pytest.mark.asyncio
+    async def test_phase3_unaffordable_buy_recorded_as_skipped(self, override_settings):
+        """plans/62 A6 — 매도 후에도 예산이 모자란 매수는 버리지 않고 SKIPPED로 결과에 남긴다."""
+        buy_order = _make_order(ticker="005930", side="BUY", quantity=10, limit_price=1000.0)
+
+        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+            return OrderResult(
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="SUCCESS",
+            )
+
+        with (
+            # Phase 1 예산 0 → 전량 이월, Phase 3 예산 3000 → 3주만 매수, 7주 부족
+            patch.object(_kis_order_executor, "get_orderable_cash", AsyncMock(side_effect=[0.0, 3000.0])),
+            patch.object(_kis_order_executor, "_execute_single_order", side_effect=mock_execute_single),
+        ):
+            results = await _kis_order_executor._execute_two_phase_orders(
+                [buy_order], "key", "secret", "token", "12345678-01", True
+            )
+
+        assert [(r.status, r.quantity) for r in results] == [("SUCCESS", 3), ("SKIPPED", 7)]
+
+
 class TestExecuteBuysWithCashCheck:
     """FULL 전략 매수 실행 — 실행 직전 주문가능금액으로 clamp(_execute_buys_with_cash_check)."""
 

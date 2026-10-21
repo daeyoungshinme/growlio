@@ -64,7 +64,9 @@ def init_scheduler() -> None:
         (run_intraday_asset_sync, kst(hour=15, minute=30), "asset_sync_intraday"),
         (run_daily_asset_sync, kst(hour=18, minute=0), "asset_sync_daily"),
         (run_exchange_rate_alert_check, IntervalTrigger(minutes=5), "exchange_rate_alert_check"),
-        (run_rebalancing_alert_check, IntervalTrigger(minutes=10), "rebalancing_alert_check_interval"),
+        # 정각 정렬 필수 — notify_time(:00/:30)을 ±4분 창으로 매칭하므로, 기동 시각 기준 IntervalTrigger면
+        # tick이 :x5에 놓일 때 모든 리밸런싱 알림이 매일 누락된다(plans/62 A3)
+        (run_rebalancing_alert_check, kst(minute="*/10"), "rebalancing_alert_check_interval"),
         (run_market_signal_alert_check, IntervalTrigger(hours=1), "market_signal_alert_check_interval"),
         (run_rebalancing_auto_execution, kst(minute="*/5"), "rebalancing_auto_execution_intraday"),
         (run_rebalancing_plan_buy_execution, IntervalTrigger(minutes=1), "rebalancing_plan_buy_execution"),

@@ -372,3 +372,21 @@ class TestTriggerAccountRebalancingAlertTest:
             account_id=account_id,
             cache=ANY,
         )
+
+
+class TestValidateAutoExecutionAccount:
+    """plans/62 A9 — 비활성(삭제·숨김) 계좌는 AUTO 실행 계좌로 받지 않는다(실행 경로는 활성 계좌만 주문)."""
+
+    async def test_query_requires_active_account(self, mock_db):
+        import pytest
+        from fastapi import HTTPException
+
+        from app.api.v1.rebalancing_alerts import _validate_auto_execution_account
+
+        mock_db.scalar = AsyncMock(return_value=None)
+        with pytest.raises(HTTPException) as exc_info:
+            await _validate_auto_execution_account(mock_db, uuid.uuid4(), uuid.uuid4())
+
+        assert exc_info.value.status_code == 422
+        compiled = str(mock_db.scalar.call_args.args[0].compile())
+        assert "asset_accounts.is_active" in compiled

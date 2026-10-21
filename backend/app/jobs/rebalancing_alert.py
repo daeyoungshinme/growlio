@@ -1,4 +1,4 @@
-"""리밸런싱 알림 체크 — 10분 간격 실행, 각 알림의 notify_time(HH:MM) 기준."""
+"""리밸런싱 알림 체크 — 정각 기준 10분 간격(KST :00·:10…) 실행, 각 알림의 notify_time(HH:MM) 기준."""
 
 from app.jobs._job_helpers import run_alert_job
 from app.services.rebalancing.alert_check import check_rebalancing_alerts

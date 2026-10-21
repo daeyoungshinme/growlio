@@ -26,6 +26,15 @@ from app.services.rebalancing.plan_notifications import _notify_leg_execution_fa
 
 logger = structlog.get_logger()
 
+HISTORY_MISSING_MESSAGE = "주문은 실행됐지만 실행 기록 저장에 실패했습니다. 증권사 앱에서 체결 내역을 확인하세요."
+
+
+def leg_executed_message(label: str, execution_id: uuid.UUID | None) -> str:
+    """승인 즉시 실행 응답 문구 — 기록 저장 실패(execution_id 없음)면 체결 확인을 안내한다."""
+    if execution_id is None:
+        return f"{label} 주문이 실행되었지만 실행 기록 저장에 실패했습니다. 증권사 앱에서 체결 내역을 확인하세요."
+    return f"{label} 주문이 실행되었습니다"
+
 
 async def get_plan_leg_by_token(
     raw_token: str, expected_side: Literal["BUY", "SELL"] | None, db: AsyncSession
@@ -42,6 +51,10 @@ async def get_plan_leg_by_token(
     if expected_side is not None and leg.side != expected_side:
         return None
     return leg
+
+
+def _as_aware(dt: datetime) -> datetime:
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 async def _lock_and_claim(leg_id: uuid.UUID, db: AsyncSession) -> RebalancingPlanLeg:
@@ -178,6 +191,11 @@ async def _execute_leg(
         await _notify_leg_execution_failed(plan, locked.side, reason, db)
         return None
 
+    if execution_id is None:
+        # 주문은 나갔지만 실행 기록 저장이 실패해 세션이 rollback됐다(만료된 객체 재조회) — FAILED로 두면
+        # 실제 체결과 어긋나므로 EXECUTED로 기록하되 확인 안내를 남긴다(plans/62 A7)
+        await db.refresh(locked)
+        locked.error_message = HISTORY_MISSING_MESSAGE
     locked.status = "EXECUTED"
     locked.execution_id = execution_id
     locked.decided_at = datetime.now(tz=UTC)
@@ -197,6 +215,16 @@ async def _approve_leg_now(
     plan = await db.get(RebalancingPlan, locked.plan_id)
     if plan is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계획을 찾을 수 없습니다")
+
+    # 매도 deadline_at은 당일 장마감 승인 기한이다 — 만료 job(15분 주기)이 돌기 전에 들어온 승인도
+    # 기한이 지났으면 실행하지 않고 만료로 마감한다(plans/62 A4). 매수 deadline_at은 실행 예정 시각이라 해당 없음.
+    if locked.side == "SELL" and _as_aware(locked.deadline_at) <= datetime.now(tz=UTC):
+        locked.status = "EXPIRED"
+        locked.decided_at = datetime.now(tz=UTC)
+        locked.decided_by = "SYSTEM_EXPIRY"
+        await save_alert_history(db, plan.user_id, "REBALANCING", "리밸런싱 자동화 매도 승인 만료 (장마감 미응답)")
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="승인 기한(장마감)이 지나 만료된 계획입니다")
 
     execution_id = await _execute_leg(locked, plan, db, cache, decided_by)
     if execution_id:

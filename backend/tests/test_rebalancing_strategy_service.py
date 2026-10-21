@@ -364,3 +364,23 @@ class TestBuildSummary:
             overall_direction="균형 조정형",
         )
         assert "팩터 노출도가 강화됩니다" not in result
+
+
+class TestGetRebalancingStrategyOwnership:
+    """plans/62 A1 — 남의 portfolio_id로 전략(포트폴리오 이름·종목·비중)이 조회되지 않아야 한다."""
+
+    async def test_portfolio_query_filters_by_owner(self, mock_db, make_user_id):
+        import uuid
+
+        from app.services.rebalancing.strategy_service import get_rebalancing_strategy
+
+        mock_db.scalar.return_value = None
+        portfolio_id = str(uuid.uuid4())
+
+        result = await get_rebalancing_strategy(make_user_id, portfolio_id, mock_db)
+
+        assert result == {"error": "포트폴리오를 찾을 수 없습니다"}
+        stmt = mock_db.scalar.call_args.args[0]
+        compiled = stmt.compile()
+        assert "portfolios.user_id" in str(compiled)
+        assert make_user_id in compiled.params.values()
