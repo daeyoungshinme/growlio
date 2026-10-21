@@ -26,7 +26,7 @@ import { Portfolio } from "@/api/portfolios";
 import { RebalancingAlert } from "@/api/alerts";
 import { AssetAccount } from "@/api/assets";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
-import { getPortfolioTargetState } from "@/utils/portfolio";
+import { DRIFT_STATUS_LABEL, getDriftStatus, getPortfolioTargetState } from "@/utils/portfolio";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -93,8 +93,13 @@ const PortfolioCard = memo(function PortfolioCard({
   onConfirmDelete,
   onToggleTarget,
 }: PortfolioCardProps) {
-  const isNeeded = drift?.needs_rebalancing ?? false;
-  const isCaution = !!drift && !isNeeded && drift.max_drift_pct >= drift.threshold_pct / 2;
+  const driftStatus = drift
+    ? drift.needs_rebalancing
+      ? "critical"
+      : getDriftStatus(drift.max_drift_pct, drift.threshold_pct)
+    : null;
+  const isNeeded = driftStatus === "critical";
+  const isCaution = driftStatus === "caution";
 
   const sorted = p.items.length > 0 ? [...p.items].sort((a, b) => b.weight - a.weight) : [];
   const top = sorted.slice(0, 5);
@@ -181,17 +186,17 @@ const PortfolioCard = memo(function PortfolioCard({
           (isNeeded ? (
             <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400">
               <TriangleAlert size={10} />
-              {drift.max_drift_pct.toFixed(1)}% 이탈
+              {DRIFT_STATUS_LABEL.critical} {drift.max_drift_pct.toFixed(1)}%
             </span>
           ) : isCaution ? (
             <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
               <TriangleAlert size={10} />
-              {drift.max_drift_pct.toFixed(1)}% 주의
+              {DRIFT_STATUS_LABEL.caution} {drift.max_drift_pct.toFixed(1)}%
             </span>
           ) : (
             <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-400">
               <CircleCheck size={10} />
-              안정
+              {DRIFT_STATUS_LABEL.stable}
             </span>
           ))}
         <div className="flex-1" />

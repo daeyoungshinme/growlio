@@ -196,9 +196,11 @@ export function AnalysisPanel({
                   analysis={analysis}
                   portfolioId={analysis.portfolio_id}
                   accounts={analysisAccounts}
-                  alertThreshold={
-                    alertByPortfolioId[analysis.portfolio_id.toString()]?.threshold_pct
-                  }
+                  alertThreshold={(() => {
+                    // 서버 drift-summary와 같은 기준 — 켜진 알림의 최소 임계치, 없으면 기본값
+                    const a = alertByPortfolioId[analysis.portfolio_id.toString()];
+                    return a?.is_active ? a.threshold_pct : undefined;
+                  })()}
                   autoOpenExecution={autoOpenExecution}
                   cashIsLive={cashIsLive}
                 />

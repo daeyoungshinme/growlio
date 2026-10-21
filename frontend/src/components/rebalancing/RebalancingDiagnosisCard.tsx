@@ -5,16 +5,9 @@ import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 import DiagnosisInsightList from "./DiagnosisInsightList";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
+import { DRIFT_STATUS_LABEL, getDriftStatus, type DriftStatus } from "@/utils/portfolio";
 
 const DEFAULT_THRESHOLD = 5.0;
-
-type DriftStatus = "critical" | "caution" | "stable";
-
-function getDriftStatus(maxDrift: number, threshold: number): DriftStatus {
-  if (maxDrift >= threshold) return "critical";
-  if (maxDrift >= threshold / 2) return "caution";
-  return "stable";
-}
 
 // 카드 전체를 상태색으로 채우는 대신, 대시보드 RebalancingStatusCard와 동일하게
 // 중립 `.card` 배경 위에 상태별 테두리/링만 얹어 앱 전역의 "진단 카드 강조" 시각 언어를 통일한다.
@@ -24,21 +17,21 @@ const STATUS_CONFIG = {
     icon: TriangleAlert,
     iconColor: "text-red-600 dark:text-red-400",
     badge: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-    label: "리밸런싱 필요",
+    label: DRIFT_STATUS_LABEL.critical,
   },
   caution: {
     cardAccent: "border-amber-300 dark:border-amber-700/60",
     icon: Info,
     iconColor: "text-amber-600 dark:text-amber-400",
     badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-    label: "점검 권고",
+    label: DRIFT_STATUS_LABEL.caution,
   },
   stable: {
     cardAccent: "",
     icon: CircleCheck,
     iconColor: "text-green-600 dark:text-green-400",
     badge: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-    label: "포트폴리오 안정",
+    label: DRIFT_STATUS_LABEL.stable,
   },
 } satisfies Record<
   DriftStatus,

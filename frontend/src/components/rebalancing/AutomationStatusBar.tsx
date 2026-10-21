@@ -12,6 +12,7 @@ type ExistingAlertLike = Partial<
     | "trigger_condition"
     | "strategy"
     | "schedule_day_of_month"
+    | "is_active"
   >
 >;
 
@@ -23,9 +24,12 @@ interface Props {
 }
 
 export default function AutomationStatusBar({ existingAlert, onOpenAlertModal, compact }: Props) {
-  const hasAlert = !!existingAlert;
-  const isAuto = existingAlert?.mode === "AUTO";
-  const isDcaAutoBuy = isDcaAutoBuyPreset(existingAlert as RebalancingAlert | undefined);
+  // 꺼진 알림은 "설정됨"으로 세지 않는다 — 진단 탭·설정 화면과 같은 기준(plans/63 P1-4)
+  const isOff = existingAlert?.is_active === false;
+  const hasAlert = !!existingAlert && !isOff;
+  const isAuto = hasAlert && existingAlert?.mode === "AUTO";
+  const isDcaAutoBuy =
+    hasAlert && isDcaAutoBuyPreset(existingAlert as RebalancingAlert | undefined);
 
   if (compact) {
     return (
@@ -48,7 +52,15 @@ export default function AutomationStatusBar({ existingAlert, onOpenAlertModal, c
       >
         {isDcaAutoBuy ? <RefreshCw size={11} /> : isAuto ? <Zap size={11} /> : <Bell size={11} />}
         <span>
-          {isDcaAutoBuy ? "적립매수" : isAuto ? "자동" : hasAlert ? "알림" : "자동화 설정"}
+          {isDcaAutoBuy
+            ? "적립매수"
+            : isAuto
+              ? "자동"
+              : hasAlert
+                ? "알림"
+                : isOff
+                  ? "꺼짐"
+                  : "자동화 설정"}
         </span>
       </button>
     );
@@ -56,7 +68,12 @@ export default function AutomationStatusBar({ existingAlert, onOpenAlertModal, c
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
-      {existingAlert ? (
+      {isOff ? (
+        <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <Bell size={12} />
+          자동화가 꺼져 있어요 — 설정에서 다시 켤 수 있어요
+        </span>
+      ) : existingAlert ? (
         <span
           className={`flex items-center gap-1.5 text-xs ${
             isDcaAutoBuy

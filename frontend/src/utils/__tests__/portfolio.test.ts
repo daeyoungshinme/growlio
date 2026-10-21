@@ -4,6 +4,9 @@ import {
   groupPositionsByTicker,
   inferHorizonTaxTypeFromAccounts,
   mergeAlertsByPortfolio,
+  activeAlertsOnly,
+  getDriftStatus,
+  DRIFT_STATUS_LABEL,
 } from "../portfolio";
 import type { PortfolioPosition } from "@/types";
 import type { RebalancingAlert } from "@/api/alerts";
@@ -329,5 +332,43 @@ describe("inferHorizonTaxTypeFromAccounts", () => {
       makeAccount({ id: "acc-2", investment_horizon: undefined, tax_type: "IRP" }),
     ];
     expect(inferHorizonTaxTypeFromAccounts(accounts)).toBeNull();
+  });
+});
+
+describe("mergeAlertsByPortfolio — 활성 알림 기준 (plans/63 P1-4)", () => {
+  const row = (over: Partial<RebalancingAlert>): RebalancingAlert =>
+    ({
+      id: "a",
+      portfolio_id: "p1",
+      is_active: true,
+      mode: "NOTIFY",
+      threshold_pct: 5,
+      ...over,
+    }) as RebalancingAlert;
+
+  it("임계치는 켜진 알림의 최솟값, 꺼진 알림은 무시한다", () => {
+    const merged = mergeAlertsByPortfolio([
+      row({ id: "1", threshold_pct: 3, is_active: false, mode: "AUTO" }),
+      row({ id: "2", threshold_pct: 7 }),
+      row({ id: "3", threshold_pct: 6 }),
+    ]);
+    expect(merged.p1.threshold_pct).toBe(6);
+    expect(merged.p1.mode).toBe("NOTIFY");
+    expect(merged.p1.is_active).toBe(true);
+  });
+
+  it("전부 꺼져 있으면 is_active=false로 남고 activeAlertsOnly에서 빠진다", () => {
+    const merged = mergeAlertsByPortfolio([row({ is_active: false })]);
+    expect(merged.p1.is_active).toBe(false);
+    expect(activeAlertsOnly(merged)).toEqual({});
+  });
+});
+
+describe("getDriftStatus (plans/63 P1-2)", () => {
+  it("임계치 이상=리밸런싱 필요, 절반 이상=주의, 그 외=안정", () => {
+    expect(getDriftStatus(5, 5)).toBe("critical");
+    expect(getDriftStatus(2.5, 5)).toBe("caution");
+    expect(getDriftStatus(2.4, 5)).toBe("stable");
+    expect(DRIFT_STATUS_LABEL.caution).toBe("주의");
   });
 });

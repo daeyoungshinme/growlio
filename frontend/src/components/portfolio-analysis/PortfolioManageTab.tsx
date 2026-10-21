@@ -28,7 +28,7 @@ import RebalancingAlertModalRouter from "@/components/rebalancing/RebalancingAle
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData, invalidateAccountData } from "@/utils/queryInvalidation";
-import { mergeAlertsByPortfolio } from "@/utils/portfolio";
+import { activeAlertsOnly, mergeAlertsByPortfolio } from "@/utils/portfolio";
 import { isStockAccount } from "@/utils/accounts";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -103,13 +103,18 @@ export default function PortfolioManageTab({
     () => mergeAlertsByPortfolio(rebalancingAlerts),
     [rebalancingAlerts],
   );
-  const alertPortfolioIds = useMemo(
-    () => new Set(Object.keys(alertByPortfolioId)),
+  // 배너의 "자동 실행 N·알림 M" 집계는 켜진 알림만 — 꺼진 알림은 카드에 "꺼짐"으로 따로 보인다
+  const activeAlertByPortfolioId = useMemo(
+    () => activeAlertsOnly(alertByPortfolioId),
     [alertByPortfolioId],
   );
+  const alertPortfolioIds = useMemo(
+    () => new Set(Object.keys(activeAlertByPortfolioId)),
+    [activeAlertByPortfolioId],
+  );
   const autoAlertCount = useMemo(
-    () => Object.values(alertByPortfolioId).filter((a) => a.mode === "AUTO").length,
-    [alertByPortfolioId],
+    () => Object.values(activeAlertByPortfolioId).filter((a) => a.mode === "AUTO").length,
+    [activeAlertByPortfolioId],
   );
 
   const { data: driftSummaryRaw } = useQuery({
