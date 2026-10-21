@@ -216,7 +216,9 @@ describe("GoalTimelineCard", () => {
     expect(screen.getByText("이 방법으로는 달성이 어려워요")).toBeDefined();
     const ctas = screen.getAllByText(/수익률을 높이는 포트폴리오 추천 보기/);
     expect(ctas).toHaveLength(1);
-    expect(ctas[0].closest("a")).toHaveAttribute("href", "/rebalancing?rtab=추천");
+    expect(decodeURIComponent(ctas[0].closest("a")?.getAttribute("href") ?? "")).toBe(
+      "/rebalancing?rtab=목표 조정&gmode=추천",
+    );
   });
 
   it("shows the goal-recommendation summary once the recommendation query resolves", async () => {

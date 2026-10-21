@@ -7,6 +7,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { mergeAlertsByPortfolio } from "@/utils/portfolio";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import SkeletonCard from "@/components/common/SkeletonCard";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 /** 설정 페이지 알림 섹션에 노출되는 리밸런싱 알림 현황 요약 — 실제 편집은 리밸런싱 탭에서 이뤄지므로
  * 여기서는 상태 요약 + 딥링크만 제공한다 (frontend/CLAUDE.md "다른 설정" 패턴과 동일). */
@@ -36,7 +37,7 @@ export default function RebalancingAlertSummaryCard() {
   if (alertsError || portfoliosError) {
     return (
       <Link
-        to="/rebalancing?rtab=포트폴리오"
+        to={rebalancingUrl({ tab: "포트폴리오" })}
         className={`w-full gap-3 -mx-3 px-3 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
       >
         <span className="flex-1 leading-relaxed">
@@ -56,8 +57,8 @@ export default function RebalancingAlertSummaryCard() {
   const targetId =
     totalCount === 1 ? portfolios![0].id : alertedCount === 1 ? Object.keys(merged)[0] : null;
   const linkTo = targetId
-    ? `/rebalancing?rtab=포트폴리오&portfolioId=${targetId}&openAlert=1`
-    : "/rebalancing?rtab=포트폴리오";
+    ? rebalancingUrl({ tab: "포트폴리오", portfolioId: targetId, openAlert: "1" })
+    : rebalancingUrl({ tab: "포트폴리오" });
 
   return (
     <Link

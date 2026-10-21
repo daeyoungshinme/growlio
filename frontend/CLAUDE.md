@@ -90,7 +90,7 @@ make build-android-release         # APK Release 빌드
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 + 절세 + 적립 챌린지 (InvestPlanPage, 상단 탭: 적립 계획/배당 계획/절세/챌린지)
 - `/settings` — DART API 키, 계정 정보(비밀번호 변경), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). 계좌 연동·목표·DCA·추천 옵션·알림 설정은 각 페이지에 실제 편집 UI가 있고 설정 탭엔 상태 요약 + 딥링크만
 - `/settings/notifications` — 알림 설정 상세(`NotificationSettingsPage`, `/settings`에서 딥링크). 공통 수신 이메일(`NotificationEmailSection`) + `CollapsibleCard` 3개("정기 리포트·요약"/"즉시 알림"/"시장 모니터링") + 환율/주가/발송이력 탭. `MarketSignalBanner.tsx`/`RebalancingHistoryTab.tsx`의 `?atab=` 딥링크가 이 경로를 가리킴
-- `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage, `?rtab=` 진단/추천/전술/포트폴리오/이력)
+- `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage, `?rtab=` 진단/포트폴리오/목표 조정/이력 + 목표 조정 안 `?gmode=` 추천/전술 — 예전 `rtab=추천`/`rtab=전술` 링크는 해당 모드로 매핑. 링크는 반드시 `utils/rebalancingUrl.ts`의 `rebalancingUrl()`로 만들고, 페이지 내부 URL 상태는 `hooks/useRebalancingUrlState.ts`)
 - 미매칭 경로(`*`)는 `/dashboard`로 리다이렉트
 
 > `/market`, `/portfolio`, `/asset-management`, `/trend` 라우트는 존재하지 않음(과거 구조, 제거됨). `BottomNav`(`src/constants/nav.ts`)도 홈/자산/리밸런싱/계획/설정 5탭만 존재.
@@ -121,9 +121,10 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/portfolio-analysis/TaxTabContainer.tsx`** — 계획탭 "절세" 서브탭 진입점(lazy, `InvestPlanPage`). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`·`TaxOptimizationCard`를 묶음. 탭 상태 `?taxTab=`, 세금 추정 계좌 `?taxAccount=` 영속화. `taxTab` 미지정 딥링크는 "한도 현황" 랜딩. 옛 `/assets?portfolioTab=세금` 링크는 `utils/legacyTabRedirect.ts`가 이쪽으로 옮김.
 - **`components/portfolio/AllocationCard.tsx`** — 자산탭 투자현황의 비중 분석 카드(lazy). 국내/해외(상장시장 ↔ 실제 투자지역 토글)·종목·지수별 비중을 탭 1개 카드로 통합. 하위 뷰는 `components/portfolio/allocation/`(`RegionAllocationView`/`StockAllocationView`/`IndexAllocationView` + 공용 `WeightBarRow`·`ListingBadge`·`SegmentedControl`). "종목" 보기는 아래 보유 종목 목록(`StockHoldingsTable`)과 겹치지 않게 상위 5 + "기타 N종목"만 그리고, "보유 종목 전체 비중순 보기"가 `PortfolioPage`를 거쳐 목록의 `sortRequest` prop으로 비중순 정렬 + 스크롤한다. 모바일 기본 접힘(아래 콜랩스 규칙 예외).
 - **`components/assets/AccountHistoryTab.tsx`** — 계좌관리 "내역" 탭. 세그먼트 "현금 흐름"(입출금·배당 `TransactionHistoryTab`) / "매수 내역"(`PeriodPurchasesTab` — 월/연 매수 종목·수익률, 스냅샷 추정 `추정`/수기 `기록` 배지 + `TradeFormModal`로 매수/매도 기록, 해외 USD→KRW 환산). 세그먼트는 `?history=` 영속. 옛 `atab=입출금·배당`/`기간별 매수`는 `legacyHistorySegment()`로 변환.
-- **`components/rebalancing/TacticalAllocationTab.tsx`** — 리밸런싱 "전술" 탭(lazy). 포트폴리오 선택 → `useTacticalStatus`로 QQQ/SPY 전술 배분 국면(매크로 확정등급 × 차트 추세, 2일 확정)·지표·현재/제안 비중 표시, 켜기/알림 토글/끄기, "제안 비중 적용"(`ConfirmModal` 경유 → `POST /tactical/{id}/apply`, **주문 없음**) 후 "리밸런싱 분석·실행으로 이동"으로 포트폴리오 탭의 기존 실행 흐름에 넘긴다. 나스닥/S&P 틸트 상태(`TiltSummary`)도 표시. DIA(다우) 지표는 "참고 · 국면 판단 미반영"으로 표시하고, 비중 비교 표의 DIA 행은 현재·제안 모두 0%면 숨긴다. 하위 `TacticalBacktestSection.tsx`(규칙 백테스트, 기본 접힘 `growlio:rebalancing:tactical-backtest-open`), `TacticalWeightsEditor.tsx`(전략 켠 경우 국면별 비중표 3국면×4자산(QQQ/SPY/DIA/현금 — DIA는 선택 자산, 응답에 없으면 0) + 틸트 이동폭 0~20%p 편집, 기본 접힘 `growlio:rebalancing:tactical-weights-open`, 서버 값 변경 시 `key`로 재마운트해 초안 초기화), 문구·색상 `tacticalLabels.ts`. 진단 탭과의 역할 구분(진단=목표 대비 이탈 점검, 전술=목표 자체 변경 제안)은 `RebalancingPage`의 탭 소개 줄(`TabIntro`)이 담당하고, "매크로(확정)" 배지 옆에 진단 탭 즉시 등급보다 늦게 바뀔 수 있다는 안내를 툴팁이 아닌 화면 문구로 둔다(모바일은 툴팁 미동작). 진단 탭 `MarketSignalBanner`는 `onOpenTactical` prop을 받으면 상세 영역 하단에 전술 탭 이동 버튼을 그린다. 설정 upsert는 항상 현재 `tilt_shift_pct`를 함께 보낸다(생략 시 서버 기본값 10으로 덮임).
+- **`components/rebalancing/GoalAdjustTab.tsx`** — 리밸런싱 "목표 조정" 탭(lazy, plans/64). 추천·전술(둘 다 목표 비중 자체를 바꾸는 제안)을 underline 서브탭(`gmode`)으로 묶고 `RecommendationCard`/`TacticalAllocationTab`을 lazy 렌더.
+- **`components/rebalancing/TacticalAllocationTab.tsx`** — 리밸런싱 "목표 조정 › 전술" 모드(lazy). 포트폴리오 선택 → `useTacticalStatus`로 QQQ/SPY 전술 배분 국면(매크로 확정등급 × 차트 추세, 2일 확정)·지표·현재/제안 비중 표시, 켜기/알림 토글/끄기, "제안 비중 적용"(`ConfirmModal` 경유 → `POST /tactical/{id}/apply`, **주문 없음**) 후 "리밸런싱 분석·실행으로 이동"으로 포트폴리오 탭의 기존 실행 흐름에 넘긴다. 나스닥/S&P 틸트 상태(`TiltSummary`)도 표시. DIA(다우) 지표는 "참고 · 국면 판단 미반영"으로 표시하고, 비중 비교 표의 DIA 행은 현재·제안 모두 0%면 숨긴다. 하위 `TacticalBacktestSection.tsx`(규칙 백테스트, 기본 접힘 `growlio:rebalancing:tactical-backtest-open`), `TacticalWeightsEditor.tsx`(전략 켠 경우 국면별 비중표 3국면×4자산(QQQ/SPY/DIA/현금 — DIA는 선택 자산, 응답에 없으면 0) + 틸트 이동폭 0~20%p 편집, 기본 접힘 `growlio:rebalancing:tactical-weights-open`, 서버 값 변경 시 `key`로 재마운트해 초안 초기화), 문구·색상 `tacticalLabels.ts`. 진단 탭과의 역할 구분(진단=목표 대비 이탈 점검, 전술=목표 자체 변경 제안)은 `RebalancingPage`의 진단 `TabIntro`와 `GoalAdjustTab`의 모드 소개 줄이 담당하고, "매크로(확정)" 배지 옆에 진단 탭 즉시 등급보다 늦게 바뀔 수 있다는 안내를 툴팁이 아닌 화면 문구로 둔다(모바일은 툴팁 미동작). 진단 탭 `MarketSignalBanner`는 `onOpenTactical` prop을 받으면 상세 영역 하단에 "목표 조정 › 전술" 이동 버튼을 그린다. 설정 upsert는 항상 현재 `tilt_shift_pct`를 함께 보낸다(생략 시 서버 기본값 10으로 덮임).
 - **`components/portfolio-analysis/TaxLimitsSection.tsx`** — "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`(계좌 조건부) + `HealthInsuranceRiskCard`(항상)를 감싸는 순수 프레젠테이션. 항상 전체 계좌 기준(`accountId` prop 없음). 항상 렌더 카드가 있어 empty-state 없음.
-- **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드(lazy). 리밸런싱 페이지 **"추천" 서브탭**(진단/추천/전술/포트폴리오/이력, `rtab=추천`) 전용 — 추천 관련 딥링크는 `rtab=추천`, 포트폴리오 생성·관리·실행은 `rtab=포트폴리오`. `openRecOptions=1`이면 옵션 모달을 연 채 마운트. 전체/연령대/기간별 3탭. 적용 대상은 모든 포트폴리오(기준 포트폴리오 우선 선택). 결과 렌더는 `RecommendationResultPanel.tsx`로 통합, 탭별 문구·`useMutation`·전환 상태머신은 이 파일.
+- **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드(lazy). 리밸런싱 페이지 **"목표 조정 › 추천" 모드**(`rtab=목표 조정&gmode=추천`) 전용 — 링크는 `rebalancingUrl({ tab: "목표 조정", mode: "추천" })`, 포트폴리오 생성·관리·실행은 `rtab=포트폴리오`. `openRecOptions=1`이면 옵션 모달을 연 채 마운트. 전체/연령대/기간별 3탭. 적용 대상은 모든 포트폴리오(기준 포트폴리오 우선 선택). 결과 렌더는 `RecommendationResultPanel.tsx`로 통합, 탭별 문구·`useMutation`·전환 상태머신은 이 파일.
 - **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 곳(분석/실행 패널, 진단탭 CTA, 계획탭 배너)은 `portfolioId=<id>&openAlert=1` URL 파라미터로 요청한다(`openAlert=dca`는 신규 알림일 때 정기 적립식 자동매수 프리셋 화면으로 바로 연다 — 계획탭 `AutoInvestStatusBanner`의 "자동매수 설정"). 새 진입점도 모달을 직접 마운트하지 말고 이 파라미터를 쓸 것.
 - **`components/rebalancing/RecommendationResultPanel.tsx`** — 3탭 공유 추천 결과 프레젠테이션(드리프트 배지·`RecommendationWeightList`·`MarketSignalLevelBadge`·`SuggestedCandidatesBlock`·`RecommendationApplySection`). `applySection===null`이면 적용 섹션 생략(현금성 자동 연결 계좌 없을 때).
 - **`components/invest/ChallengeSection.tsx`** — 계획 탭 "챌린지" 서브탭(lazy). `useChallenges`+`useChallengeMutations`, `ChallengeCard` 리스트, `ChallengeFormModal`(생성/편집), `ChallengeMonthGrid`(적립 습관 캘린더). 스트릭 기준은 백엔드가 "월 순입금>0"으로 계산 — 목표액 수정해도 과거 스트릭 불변. `components/dashboard/ChallengeProgressCard.tsx`가 홈에서 진행 중 챌린지 요약(입금 스트릭 우선), `BottomNav`가 `useChallengeNudge`로 계획 탭 아이콘에 빨간 점.
@@ -178,6 +179,7 @@ _배당_
 
 _리밸런싱/추천_
 
+- `useRebalancingUrlState.ts` — 리밸런싱 페이지 URL 상태(rtab·gmode·portfolioId 읽기, `navigateTo`/`clearParam` 쓰기). 탭은 state로 복사하지 않고 URL에서 파생
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
 - `useAutoExecutionNotice.ts` — 포트폴리오에 켜진 AUTO 알림이 있으면 "다음 자동 실행부터 새 목표로 주문" 안내 문구(없으면 null). 목표 비중을 바꾸는 확인창(추천 적용·전술 적용)에서 사용
 - `useSyncAccounts.ts` — 여러 계좌 동기화 + 동기화 쿼리 무효화(`run`이 전부 성공 여부 반환). 리밸런싱 실행 결과·분석 하단 "계좌 데이터 갱신"·실행 후 "실행 전 기준" 배너가 공유하며, 성공 시 호출부가 바로 재분석
@@ -397,6 +399,11 @@ _기타_
 - `getPortfolioHorizon(portfolio, stockAccounts)` / `getPortfolioHorizonTaxType(portfolio, stockAccounts)` — 포트폴리오의 `investment_horizon`(+`tax_type`) 명시값이 없으면 "기준 포트폴리오"로 지정된 계좌들의 태그가 전부 동일할 때만 역으로 추론. 목표 역산 추천(`RecommendationCard`) 적용 시 어느 포트폴리오가 어느 (기간, 세제유형) 카드를 담당하는지 판별.
 - `inferHorizonTaxTypeFromAccounts(accounts)` — 계좌 목록의 `investment_horizon`/`tax_type`이 전부 동일하면 반환. 추천 비중 카드에서 계좌가 미리 선택된 채로 새 포트폴리오를 만들 때 두 태그 초기값을 채우는 데 사용.
 - `mergeAlertsByPortfolio(alerts)` — PER_ACCOUNT 스코프 포트폴리오의 계좌별 알림을 portfolio_id 기준으로 병합 (하나라도 AUTO면 병합 결과도 AUTO 표시).
+
+**리밸런싱 URL 유틸리티 (`src/utils/rebalancingUrl.ts`)**
+- `REBALANCING_TABS`(진단/포트폴리오/목표 조정/이력)·`GOAL_MODES`(추천/전술) — 탭 이름의 단일 정의. 백엔드 `email_service._rebalancing_link`·`insight_service`·`action_items_service`의 탭 문자열과 같아야 함
+- `parseRebalancingTab(params)` — 예전 `rtab=추천`/`rtab=전술`(이미 발송된 이메일·푸시)을 목표 조정 탭의 해당 모드로 매핑, 알 수 없는 값은 진단
+- `rebalancingUrl(options)` — `/rebalancing` 링크 빌더(공백은 `%20`). 링크 문자열을 직접 조립하지 말 것
 
 **리밸런싱 알림 설명 유틸리티 (`src/utils/rebalancingAlertDescription.ts`)**
 

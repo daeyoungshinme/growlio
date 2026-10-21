@@ -289,9 +289,11 @@ describe("GoalSettingWizard", () => {
       );
     });
     await waitFor(() =>
-      expect(mockNavigate).toHaveBeenCalledWith(
-        "/rebalancing?rtab=포트폴리오&portfolioId=new-portfolio",
-      ),
+      expect(
+        decodeURIComponent(
+          mockNavigate.mock.calls[mockNavigate.mock.calls.length - 1]?.[0] as string,
+        ),
+      ).toBe("/rebalancing?rtab=포트폴리오&portfolioId=new-portfolio"),
     );
   });
 

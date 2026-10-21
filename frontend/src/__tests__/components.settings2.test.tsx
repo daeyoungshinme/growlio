@@ -348,7 +348,9 @@ describe("RebalancingAlertSummaryCard", () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([]);
     renderCard();
     const link = await screen.findByText(/아직 설정된 리밸런싱 자동화가 없어요/);
-    expect(link.closest("a")?.getAttribute("href")).toBe("/rebalancing?rtab=포트폴리오");
+    expect(decodeURIComponent(link.closest("a")?.getAttribute("href") ?? "")).toBe(
+      "/rebalancing?rtab=포트폴리오",
+    );
   });
 });
 

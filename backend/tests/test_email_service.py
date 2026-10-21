@@ -476,6 +476,23 @@ async def test_send_rebalancing_alert_includes_app_cta_link(monkeypatch):
     assert "https://app.growlio.example/rebalancing?rtab=" in captured["html"]
 
 
+def test_rebalancing_link_targets_match_frontend_tabs(monkeypatch):
+    """이메일 딥링크 목적지 — 포트폴리오 알림은 포트폴리오 탭의 해당 포트폴리오, 추천·전술은 목표 조정 탭의
+    해당 모드(plans/64 S1). 탭 이름은 frontend utils/rebalancingUrl.ts와 같아야 한다."""
+    from urllib.parse import parse_qs, urlparse
+
+    from app.services.email_service import _rebalancing_link
+
+    monkeypatch.setattr("app.core.config.settings.frontend_url", "https://growlio.app")
+
+    def query(url: str) -> dict[str, list[str]]:
+        return parse_qs(urlparse(url).query)
+
+    assert query(_rebalancing_link("포트폴리오", portfolioId="p1")) == {"rtab": ["포트폴리오"], "portfolioId": ["p1"]}
+    assert query(_rebalancing_link("목표 조정", gmode="전술")) == {"rtab": ["목표 조정"], "gmode": ["전술"]}
+    assert query(_rebalancing_link("진단")) == {"rtab": ["진단"]}
+
+
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_drift_branch(monkeypatch):
     """is_scheduled_report=False이면 제목에 '알림'이 포함된다."""

@@ -5,6 +5,7 @@ import { fetchPortfolios } from "@/api/portfolios";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useCollapsible } from "@/hooks/useCollapsible";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 export default function SetupTargetPortfolioBanner() {
   const [dismissed, , setDismissed] = useCollapsible(
@@ -30,7 +31,7 @@ export default function SetupTargetPortfolioBanner() {
         전체 투자 자산에 대한 기준 포트폴리오를 만들어보세요
       </p>
       <Link
-        to="/rebalancing?rtab=포트폴리오"
+        to={rebalancingUrl({ tab: "포트폴리오" })}
         className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
       >
         만들기 →

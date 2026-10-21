@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChartLine } from "lucide-react";
 import { fetchMarketSignal } from "@/api/marketSignals";
@@ -16,6 +15,8 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useCollapsible } from "@/hooks/useCollapsible";
+import { useRebalancingUrlState } from "@/hooks/useRebalancingUrlState";
+import { REBALANCING_TABS, type GoalMode, type RebalancingTab } from "@/utils/rebalancingUrl";
 
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
@@ -23,7 +24,7 @@ const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSi
 const InflationIndicatorList = lazy(
   () => import("../components/rebalancing/InflationIndicatorList"),
 );
-const RecommendationCard = lazy(() => import("../components/rebalancing/RecommendationCard"));
+const GoalAdjustTab = lazy(() => import("../components/rebalancing/GoalAdjustTab"));
 const PortfolioManageTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioManageTab"),
 );
@@ -32,85 +33,45 @@ const PortfolioExecutionTab = lazy(
 );
 const RebalancingHistoryTab = lazy(() => import("../components/rebalancing/RebalancingHistoryTab"));
 const BacktestTab = lazy(() => import("../components/rebalancing/BacktestTab"));
-const TacticalAllocationTab = lazy(() => import("../components/rebalancing/TacticalAllocationTab"));
 
-// 추천은 목록·분석·실행과 역할이 달라 포트폴리오 탭에서 분리(계획 37 U6) — 포트폴리오 탭은 내 포트폴리오 전용
-// "전술": 매크로+차트 국면 기반 QQQ/SPY 목표 비중 제안 — 적용 후 실행은 포트폴리오 탭의 기존 분석·실행 흐름으로
-const REBALANCING_PAGE_TABS = ["진단", "추천", "전술", "포트폴리오", "이력"] as const;
-type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];
+// 탭 순서는 핵심 루프(진단 → 포트폴리오에서 분석·실행)를 앞에, 목표 자체를 바꾸는 추천·전술(목표 조정)을
+// 뒤에 둔다(plans/64 S1). 탭·URL 정의는 utils/rebalancingUrl.ts.
 
-/** 탭 맨 위 역할 한 줄 — 진단(목표 대비 이탈 점검)과 전술(목표 자체를 바꿀지 제안)을 구분한다 */
+/** 탭 맨 위 역할 한 줄 */
 function TabIntro({ children }: { children: string }) {
   return <p className="text-xs text-gray-500 dark:text-gray-400 px-1">{children}</p>;
 }
 
 export default function RebalancingPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const portfolioId = searchParams.get("portfolioId") ?? undefined;
-  // 탭은 URL(rtab)에서 파생한다 — state로 복사하면 페이지가 열린 채 들어온 딥링크(푸시 알림 등)가
-  // URL만 바꾸고 화면 탭은 그대로 남는다(plans/62 B4)
-  const rawTab = searchParams.get("rtab");
-  const localTab: RebalancingPageTab = REBALANCING_PAGE_TABS.includes(rawTab as RebalancingPageTab)
-    ? (rawTab as RebalancingPageTab)
-    : "진단";
+  const {
+    searchParams,
+    tab: localTab,
+    mode: goalMode,
+    portfolioId,
+    navigateTo,
+    clearParam,
+  } = useRebalancingUrlState();
 
-  const handleTabChange = useCallback(
-    (tab: RebalancingPageTab) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set("rtab", tab);
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
+  const handleTabChange = useCallback((tab: RebalancingTab) => navigateTo({ tab }), [navigateTo]);
+
+  const handleGoalModeChange = useCallback(
+    (mode: GoalMode) => navigateTo({ tab: "목표 조정", mode }),
+    [navigateTo],
   );
 
   const handlePortfolioChange = useCallback(
-    (id: string) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set("portfolioId", id);
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
+    (id: string) => navigateTo({ portfolioId: id }),
+    [navigateTo],
   );
 
   const handlePortfolioSelectFromDiagnosis = useCallback(
-    (id: string, openAlert?: boolean) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set("portfolioId", id);
-          next.set("rtab", "포트폴리오");
-          if (openAlert) {
-            next.set("openAlert", "1");
-          }
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
+    (id: string, openAlert?: boolean) =>
+      navigateTo({ tab: "포트폴리오", portfolioId: id, openAlert: openAlert ? "1" : undefined }),
+    [navigateTo],
   );
 
   // 설정탭 "목표 역산 추천 옵션" 딥링크(openRecOptions=1)로 열린 옵션 모달을 닫으면 파라미터 제거
-  const clearOpenRecOptions = useCallback(() => {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("openRecOptions");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [setSearchParams]);
+  const clearOpenRecOptions = useCallback(() => clearParam("openRecOptions"), [clearParam]);
 
   // 추천 → 새 포트폴리오 생성 prefill. 한 덩어리로 두어 소비 시 이름까지 함께 비운다 — 따로 두면
   // 이름만 남아 다음 "새 포트폴리오"가 이전 추천 이름으로 열렸다(plans/62 B3)
@@ -119,7 +80,7 @@ export default function RebalancingPage() {
     name: string;
     accountIds: string[] | null;
   } | null>(null);
-  // 빈 상태 CTA(진단·전술 탭) — 탭만 바꾸면 다시 "만들기"를 찾아 눌러야 해서 편집기까지 바로 연다.
+  // 빈 상태 CTA(진단 탭·목표 조정 › 전술) — 탭만 바꾸면 다시 "만들기"를 찾아 눌러야 해서 편집기까지 바로 연다.
   // 빈 prefill이면 PortfolioManageTab이 신규 생성 모드로 편집기를 연다(plans/63 P3-5)
   const openNewPortfolioEditor = useCallback(() => {
     setPrefill({ items: [], name: "", accountIds: null });
@@ -131,7 +92,7 @@ export default function RebalancingPage() {
   );
 
   const tabContentRef = useRef<HTMLDivElement>(null);
-  useSwipeTabs(tabContentRef, REBALANCING_PAGE_TABS, localTab, handleTabChange);
+  useSwipeTabs(tabContentRef, REBALANCING_TABS, localTab, handleTabChange);
 
   const executionRef = useRef<HTMLDivElement>(null);
   const scrolledForPortfolioIdRef = useRef<string | undefined>(undefined);
@@ -199,7 +160,7 @@ export default function RebalancingPage() {
       <h1 className="sr-only">리밸런싱</h1>
       <div className="px-1">
         <Tabs
-          tabs={REBALANCING_PAGE_TABS}
+          tabs={REBALANCING_TABS}
           activeTab={localTab}
           onChange={handleTabChange}
           variant="pill"
@@ -231,7 +192,7 @@ export default function RebalancingPage() {
                   <MarketSignalBanner
                     signal={signal}
                     inflation={inflationSummary}
-                    onOpenTactical={() => handleTabChange("전술")}
+                    onOpenTactical={() => handleGoalModeChange("전술")}
                   />
                 </Suspense>
               </ErrorBoundary>
@@ -253,45 +214,6 @@ export default function RebalancingPage() {
                 </Suspense>
               </ErrorBoundary>
             )}
-          </>
-        )}
-
-        {/* ── 추천 탭: 목표 역산 추천 비중(전체/연령대/기간별) → 포트폴리오 적용·생성 ── */}
-        {localTab === "추천" && (
-          <ErrorBoundary variant="section">
-            <Suspense fallback={<SkeletonCard />}>
-              <RecommendationCard
-                onApplied={(id) => handlePortfolioSelectFromDiagnosis(id)}
-                onCreatePortfolio={(items, name, accountIds) => {
-                  setPrefill({ items, name, accountIds: accountIds ?? null });
-                  // 포트폴리오 편집기는 포트폴리오 탭(PortfolioManageTab)이 prefill을 소비해 연다
-                  handleTabChange("포트폴리오");
-                }}
-                initialOptionsOpen={searchParams.get("openRecOptions") === "1"}
-                onOptionsClosed={clearOpenRecOptions}
-                selectedPortfolioId={portfolioId}
-                onSelectPortfolio={handlePortfolioChange}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-
-        {/* ── 전술 탭: QQQ/SPY 전술 배분 국면·제안 비중 → 목표 비중 적용 후 포트폴리오 탭에서 실행 ── */}
-        {localTab === "전술" && (
-          <>
-            <TabIntro>
-              시장 국면(매크로+차트 추세)에 따라 QQQ·SPY 목표 비중 자체를 바꿀지 제안해요.
-            </TabIntro>
-            <ErrorBoundary variant="section">
-              <Suspense fallback={<SkeletonCard />}>
-                <TacticalAllocationTab
-                  onCreatePortfolio={openNewPortfolioEditor}
-                  selectedPortfolioId={portfolioId}
-                  onSelectPortfolio={handlePortfolioChange}
-                  onGoToExecution={(id) => handlePortfolioSelectFromDiagnosis(id)}
-                />
-              </Suspense>
-            </ErrorBoundary>
           </>
         )}
 
@@ -337,6 +259,27 @@ export default function RebalancingPage() {
               </CollapsibleCard>
             </ErrorBoundary>
           </>
+        )}
+
+        {/* ── 목표 조정 탭: 추천·전술 — 목표 비중 자체를 바꾸고, 실행은 포트폴리오 탭으로 ── */}
+        {localTab === "목표 조정" && (
+          <Suspense fallback={<SkeletonCard />}>
+            <GoalAdjustTab
+              mode={goalMode}
+              onModeChange={handleGoalModeChange}
+              selectedPortfolioId={portfolioId}
+              onSelectPortfolio={handlePortfolioChange}
+              onGoToExecution={(id) => handlePortfolioSelectFromDiagnosis(id)}
+              onCreatePortfolio={(items, name, accountIds) => {
+                setPrefill({ items, name, accountIds: accountIds ?? null });
+                // 포트폴리오 편집기는 포트폴리오 탭(PortfolioManageTab)이 prefill을 소비해 연다
+                handleTabChange("포트폴리오");
+              }}
+              onCreateEmptyPortfolio={openNewPortfolioEditor}
+              initialRecOptionsOpen={searchParams.get("openRecOptions") === "1"}
+              onRecOptionsClosed={clearOpenRecOptions}
+            />
+          </Suspense>
         )}
 
         {/* ── 이력 탭 ── */}

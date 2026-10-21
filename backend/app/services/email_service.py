@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import urlencode
 
 import httpx
 import structlog
@@ -97,6 +97,11 @@ async def _send_templated(
         return False
 
 
+def _rebalancing_link(tab: str, **params: str) -> str:
+    """앱 리밸런싱 페이지 링크. 탭 이름은 frontend `utils/rebalancingUrl.ts`의 REBALANCING_TABS와 같아야 한다."""
+    return f"{settings.frontend_url}/rebalancing?{urlencode({'rtab': tab, **params})}"
+
+
 async def send_exchange_rate_alert(
     to_email: str,
     target_rate: float,
@@ -127,9 +132,14 @@ async def send_rebalancing_alert(
     composite_reason: str | None = None,
     order_preview_items: list | None = None,
     automation_note: str | None = None,
+    portfolio_id: str | None = None,
 ) -> bool:
-    """리밸런싱 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
-    app_link = f"{settings.frontend_url}/rebalancing?rtab={quote('진단')}"
+    """리밸런싱 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환.
+
+    portfolio_id가 있으면 푸시와 같은 목적지(포트폴리오 탭의 해당 포트폴리오)로, 없으면(복합신호 단독 등)
+    진단 탭으로 연다(plans/63 P3-4, plans/64 S1).
+    """
+    app_link = _rebalancing_link("포트폴리오", portfolioId=portfolio_id) if portfolio_id else _rebalancing_link("진단")
     return await _send_templated(
         to_email,
         lambda: rebalancing_alert_template(
@@ -418,7 +428,7 @@ async def send_market_signal_daily_digest_alert(to_email: str, level: str, reaso
 
 async def send_recommendation_drift_alert_email(to_email: str, portfolio_names: list[str]) -> bool:
     """추천 비중 변화 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    app_link = f"{settings.frontend_url}/rebalancing?rtab={quote('추천')}"
+    app_link = _rebalancing_link("목표 조정", gmode="추천")
     return await _send_templated(
         to_email,
         lambda: recommendation_drift_alert_template(portfolio_names, app_link),
@@ -435,9 +445,11 @@ async def send_tactical_regime_change_email(
     new_label: str,
     weights_text: str,
     reasons: list[str],
+    portfolio_id: str | None = None,
 ) -> bool:
     """전술 배분 국면 변경 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    app_link = f"{settings.frontend_url}/rebalancing?rtab={quote('전술')}"
+    params = {"gmode": "전술", **({"portfolioId": portfolio_id} if portfolio_id else {})}
+    app_link = _rebalancing_link("목표 조정", **params)
     return await _send_templated(
         to_email,
         lambda: tactical_regime_change_template(portfolio_name, old_label, new_label, weights_text, reasons, app_link),

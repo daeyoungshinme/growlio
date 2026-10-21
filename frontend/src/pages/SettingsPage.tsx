@@ -42,6 +42,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 const RISK_TOLERANCE_LABELS: Record<string, string> = {
   CONSERVATIVE: "보수적",
@@ -227,7 +228,7 @@ export default function SettingsPage() {
           status={goalSummary}
         />
         <SettingsLinkRow
-          to="/rebalancing?rtab=추천&openRecOptions=1"
+          to={rebalancingUrl({ tab: "목표 조정", mode: "추천", openRecOptions: true })}
           icon={<Sparkles size={18} className="text-gray-400 dark:text-gray-500" />}
           label="목표 역산 추천 옵션"
           status={recommendationSummary}

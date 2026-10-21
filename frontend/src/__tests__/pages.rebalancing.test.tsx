@@ -55,6 +55,10 @@ vi.mock("@/components/rebalancing/RecommendationCard", () => ({
     ),
 }));
 
+vi.mock("@/components/rebalancing/TacticalAllocationTab", () => ({
+  default: () => React.createElement("div", { "data-testid": "tactical-tab" }),
+}));
+
 vi.mock("@/components/rebalancing/RebalancingHistoryTab", () => ({
   default: () => React.createElement("div", { "data-testid": "history-tab" }),
 }));
@@ -99,11 +103,36 @@ describe("RebalancingPage", () => {
     renderPage("?portfolioId=123");
   });
 
-  it("추천은 독립 서브탭 — 포트폴리오 탭에는 추천 카드가 없다", async () => {
+  it("탭은 진단·포트폴리오·목표 조정·이력 4개 — 추천·전술은 목표 조정 안의 모드 (plans/64)", async () => {
     renderPage("?rtab=포트폴리오");
     expect(await screen.findByTestId("portfolio-manage-tab")).toBeInTheDocument();
     expect(screen.queryByTestId("recommendation-card")).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "추천" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "진단",
+      "포트폴리오",
+      "목표 조정",
+      "이력",
+    ]);
+  });
+
+  it("예전 링크 rtab=추천은 목표 조정 탭의 추천 모드로 연다", async () => {
+    renderPage("?rtab=추천");
+    expect(await screen.findByTestId("recommendation-card")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "목표 조정" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "추천" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("예전 링크 rtab=전술은 목표 조정 탭의 전술 모드로 연다", async () => {
+    renderPage("?rtab=전술");
+    expect(await screen.findByTestId("tactical-tab")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "전술" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("목표 조정 탭에서 전술 모드로 바꾸면 전술 화면이 보인다", async () => {
+    renderPage("?rtab=목표 조정");
+    expect(await screen.findByTestId("recommendation-card")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "전술" }));
+    expect(await screen.findByTestId("tactical-tab")).toBeInTheDocument();
   });
 
   it("rtab=추천&openRecOptions=1 이면 추천 카드가 옵션 모달을 연 상태로 마운트된다", async () => {

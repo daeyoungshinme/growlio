@@ -88,7 +88,13 @@ async def _check_one(db, strategy_id, market: dict) -> None:
         alert_type="TACTICAL_REGIME",
         history_message=f"[{portfolio.name}] 전술 배분 국면 {old_label} → {new_label} ({weights_text})",
         send_email=lambda: send_tactical_regime_change_email(
-            to_email, portfolio.name, old_label, new_label, weights_text, tactical.observed_for(market, regime)[1]
+            to_email,
+            portfolio.name,
+            old_label,
+            new_label,
+            weights_text,
+            tactical.observed_for(market, regime)[1],
+            portfolio_id=str(portfolio.id),
         ),
         push_title=f"전술 배분: {new_label} 국면",
         push_body=f"{portfolio.name} 제안 비중 {weights_text} — 앱에서 확인 후 적용하세요.",

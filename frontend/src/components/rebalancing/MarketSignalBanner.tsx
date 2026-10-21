@@ -14,7 +14,7 @@ interface Props {
   signal: MarketSignalResponse;
   /** 미국 물가 지표 — 지정 시 상세 영역 하단에 함께 표시(별도 카드 대신, U9) */
   inflation?: InflationIndicatorSummary[];
-  /** 지정 시 상세 영역 하단에 "전술 탭" 이동 안내 — 이 신호로 목표 비중 자체를 바꾸는 곳은 전술 탭 */
+  /** 지정 시 상세 영역 하단에 "목표 조정 › 전술" 이동 안내 — 이 신호로 목표 비중 자체를 바꾸는 곳 */
   onOpenTactical?: () => void;
 }
 
@@ -134,7 +134,7 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
               onClick={onOpenTactical}
               className={`${TOUCH_TARGET_ROW} gap-0.5 text-xs text-blue-600 dark:text-blue-400 hover:underline`}
             >
-              이 신호로 QQQ·SPY 비중을 조절하려면 → 전술 탭
+              이 신호로 QQQ·SPY 비중을 조절하려면 → 목표 조정 › 전술
             </button>
           )}
         </div>

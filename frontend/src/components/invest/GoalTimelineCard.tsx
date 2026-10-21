@@ -6,6 +6,7 @@ import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { fmtKrw, fmtMonth, fmtPct } from "@/utils/format";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 interface Props {
   timeline: GoalTimeline;
@@ -237,7 +238,7 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
           )}
 
           <Link
-            to="/rebalancing?rtab=추천"
+            to={rebalancingUrl({ tab: "목표 조정", mode: "추천" })}
             className="flex items-center gap-1.5 text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline mt-3"
           >
             수익률을 높이는 포트폴리오 추천 보기 <ArrowRight size={12} />
