@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
@@ -19,15 +19,44 @@ vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
 }));
 
 vi.mock("@/components/portfolio-analysis/PortfolioManageTab", () => ({
-  default: () => React.createElement("div", { "data-testid": "portfolio-manage-tab" }),
+  default: ({
+    prefillName,
+    onPrefillConsumed,
+  }: {
+    prefillName?: string;
+    onPrefillConsumed?: () => void;
+  }) =>
+    React.createElement(
+      "div",
+      { "data-testid": "portfolio-manage-tab", "data-prefill-name": prefillName ?? "" },
+      React.createElement("button", { onClick: onPrefillConsumed }, "consume-prefill"),
+    ),
 }));
 
 vi.mock("@/components/rebalancing/RecommendationCard", () => ({
-  default: ({ initialOptionsOpen }: { initialOptionsOpen?: boolean }) =>
-    React.createElement("div", {
-      "data-testid": "recommendation-card",
-      "data-options-open": String(Boolean(initialOptionsOpen)),
-    }),
+  default: ({
+    initialOptionsOpen,
+    onCreatePortfolio,
+  }: {
+    initialOptionsOpen?: boolean;
+    onCreatePortfolio?: (items: unknown[], name: string, accountIds?: string[]) => void;
+  }) =>
+    React.createElement(
+      "div",
+      {
+        "data-testid": "recommendation-card",
+        "data-options-open": String(Boolean(initialOptionsOpen)),
+      },
+      React.createElement(
+        "button",
+        { onClick: () => onCreatePortfolio?.([], "추천 포트폴리오") },
+        "create-from-recommendation",
+      ),
+    ),
+}));
+
+vi.mock("@/components/rebalancing/RebalancingHistoryTab", () => ({
+  default: () => React.createElement("div", { "data-testid": "history-tab" }),
 }));
 
 vi.mock("@/components/portfolio-analysis/PortfolioExecutionTab", () => ({
@@ -42,11 +71,17 @@ import { fetchInflationSummary } from "@/api/economicIndicators";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function renderPage(search = "") {
+function NavigateButton({ to }: { to: string }) {
+  const navigate = useNavigate();
+  return <button onClick={() => void navigate(to)}>navigate</button>;
+}
+
+function renderPage(search = "", navigateTo?: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return render(
     <MemoryRouter initialEntries={[`/rebalancing${search}`]}>
       <QueryClientProvider client={qc}>
+        {navigateTo && <NavigateButton to={navigateTo} />}
         <RebalancingPage />
       </QueryClientProvider>
     </MemoryRouter>,
@@ -75,6 +110,23 @@ describe("RebalancingPage", () => {
     renderPage("?rtab=추천&openRecOptions=1");
     const card = await screen.findByTestId("recommendation-card");
     expect(card).toHaveAttribute("data-options-open", "true");
+  });
+
+  it("페이지가 열린 채 rtab만 바뀌어도(푸시 딥링크) 탭이 따라간다 (plans/62 B4)", async () => {
+    renderPage("?rtab=진단", "/rebalancing?rtab=이력");
+    fireEvent.click(screen.getByRole("button", { name: "navigate" }));
+    expect(await screen.findByTestId("history-tab")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "이력" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("추천 prefill을 소비하면 이름까지 비운다 (plans/62 B3)", async () => {
+    renderPage("?rtab=추천");
+    fireEvent.click(await screen.findByRole("button", { name: "create-from-recommendation" }));
+    const manage = await screen.findByTestId("portfolio-manage-tab");
+    expect(manage).toHaveAttribute("data-prefill-name", "추천 포트폴리오");
+
+    fireEvent.click(screen.getByRole("button", { name: "consume-prefill" }));
+    expect(screen.getByTestId("portfolio-manage-tab")).toHaveAttribute("data-prefill-name", "");
   });
 
   it("시장신호 조회가 실패해도 물가 지표는 단독으로 보여준다 (plans/39 N7)", async () => {

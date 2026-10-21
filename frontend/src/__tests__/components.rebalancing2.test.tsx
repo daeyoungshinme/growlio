@@ -90,7 +90,7 @@ describe("StatusBadge", () => {
 describe("MarketSignalLevelBadge", () => {
   it("renders GREEN level", () => {
     render(<MarketSignalLevelBadge level="GREEN" />);
-    expect(screen.getByText("안전")).toBeDefined();
+    expect(screen.getByText("안정")).toBeDefined();
   });
 
   it("renders YELLOW level", () => {

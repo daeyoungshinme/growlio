@@ -26,7 +26,8 @@ export function RebalancingPriceInput({
   globalUsdRate,
   dispatch,
 }: RebalancingPriceInputProps) {
-  if (orderType !== "LIMIT") return <td />;
+  // 지정가 열(헤더·colgroup)은 LIMIT일 때만 있다 — 빈 칸을 내면 시장가 행이 헤더보다 한 칸 많아진다
+  if (orderType !== "LIMIT") return null;
   const overseas = isOverseasMarket(market);
   const estKrw =
     overseas && globalUsdRate != null ? nativeVal * globalUsdRate * qty : nativeVal * qty;

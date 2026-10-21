@@ -42,16 +42,15 @@ type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];
 export default function RebalancingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const portfolioId = searchParams.get("portfolioId") ?? undefined;
+  // 탭은 URL(rtab)에서 파생한다 — state로 복사하면 페이지가 열린 채 들어온 딥링크(푸시 알림 등)가
+  // URL만 바꾸고 화면 탭은 그대로 남는다(plans/62 B4)
   const rawTab = searchParams.get("rtab");
-  const [localTab, setLocalTab] = useState<RebalancingPageTab>(
-    REBALANCING_PAGE_TABS.includes(rawTab as RebalancingPageTab)
-      ? (rawTab as RebalancingPageTab)
-      : "진단",
-  );
+  const localTab: RebalancingPageTab = REBALANCING_PAGE_TABS.includes(rawTab as RebalancingPageTab)
+    ? (rawTab as RebalancingPageTab)
+    : "진단";
 
   const handleTabChange = useCallback(
     (tab: RebalancingPageTab) => {
-      setLocalTab(tab);
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
@@ -80,7 +79,6 @@ export default function RebalancingPage() {
 
   const handlePortfolioSelectFromDiagnosis = useCallback(
     (id: string, openAlert?: boolean) => {
-      setLocalTab("포트폴리오");
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
@@ -109,9 +107,13 @@ export default function RebalancingPage() {
     );
   }, [setSearchParams]);
 
-  const [prefillItems, setPrefillItems] = useState<PortfolioItem[] | null>(null);
-  const [prefillName, setPrefillName] = useState("");
-  const [prefillAccountIds, setPrefillAccountIds] = useState<string[] | null>(null);
+  // 추천 → 새 포트폴리오 생성 prefill. 한 덩어리로 두어 소비 시 이름까지 함께 비운다 — 따로 두면
+  // 이름만 남아 다음 "새 포트폴리오"가 이전 추천 이름으로 열렸다(plans/62 B3)
+  const [prefill, setPrefill] = useState<{
+    items: PortfolioItem[];
+    name: string;
+    accountIds: string[] | null;
+  } | null>(null);
   const [isBacktestOpen, toggleBacktestOpen] = useCollapsible(
     false,
     "growlio:rebalancing:backtest-section-open",
@@ -242,9 +244,7 @@ export default function RebalancingPage() {
               <RecommendationCard
                 onApplied={(id) => handlePortfolioSelectFromDiagnosis(id)}
                 onCreatePortfolio={(items, name, accountIds) => {
-                  setPrefillItems(items);
-                  setPrefillName(name);
-                  setPrefillAccountIds(accountIds ?? null);
+                  setPrefill({ items, name, accountIds: accountIds ?? null });
                   // 포트폴리오 편집기는 포트폴리오 탭(PortfolioManageTab)이 prefill을 소비해 연다
                   handleTabChange("포트폴리오");
                 }}
@@ -274,13 +274,10 @@ export default function RebalancingPage() {
               <PortfolioManageTab
                 selectedPortfolioId={portfolioId}
                 onAnalyze={handlePortfolioChange}
-                prefillItems={prefillItems}
-                prefillName={prefillName}
-                prefillAccountIds={prefillAccountIds}
-                onPrefillConsumed={() => {
-                  setPrefillItems(null);
-                  setPrefillAccountIds(null);
-                }}
+                prefillItems={prefill?.items ?? null}
+                prefillName={prefill?.name ?? ""}
+                prefillAccountIds={prefill?.accountIds ?? null}
+                onPrefillConsumed={() => setPrefill(null)}
               />
             </Suspense>
             {portfolioId && (

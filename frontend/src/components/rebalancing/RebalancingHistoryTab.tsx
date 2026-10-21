@@ -52,7 +52,7 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
     <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
       >
         <div className="flex items-center gap-3 flex-wrap">
           <span

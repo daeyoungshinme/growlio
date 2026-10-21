@@ -30,9 +30,13 @@ export function useAnalysisState({
   const signatureRef = useRef(portfolioItemsSignature);
   signatureRef.current = portfolioItemsSignature;
   const analyzedSignatureRef = useRef<string | undefined>(undefined);
+  // 마지막 요청만 반영한다 — 포트폴리오를 빠르게 바꾸면 늦게 도착한 이전 응답이 새 포트폴리오 화면을
+  // 덮어써 다른 포트폴리오의 분석이 보였다(plans/62 B5)
+  const requestSeqRef = useRef(0);
 
   const triggerRebalancingAnalysis = useCallback(
     async (id: string, depositKrwOverride?: number) => {
+      const seq = ++requestSeqRef.current;
       analyzedSignatureRef.current = signatureRef.current;
       // 재분석 시 이전 결과(analysis)를 유지한 채 analyzing만 세워 화면이 비는 깜빡임을 방지
       setState((s) => ({
@@ -43,8 +47,10 @@ export function useAnalysisState({
       }));
       try {
         const result = await analyzePortfolio(id, undefined, depositKrwOverride);
+        if (seq !== requestSeqRef.current) return;
         setState((s) => ({ ...s, analysis: result, analyzing: false }));
       } catch (err) {
+        if (seq !== requestSeqRef.current) return;
         setState((s) => ({
           ...s,
           error: extractErrorMessage(err, "분석 중 오류가 발생했습니다."),

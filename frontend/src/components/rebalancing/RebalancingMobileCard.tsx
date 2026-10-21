@@ -14,6 +14,8 @@ export interface RebalancingMobileCardProps {
   isBuy: boolean;
   maxQty?: number;
   extra?: React.ReactNode;
+  /** 여러 계좌에 나눠 매수할 때 이 계좌 몫을 빼는 동작(데스크톱 표의 × 버튼과 동일) */
+  onRemove?: () => void;
   selected: Set<string>;
   orderType: OrderType;
   priceState: PriceLoadState;
@@ -36,6 +38,7 @@ export function RebalancingMobileCard({
   isBuy,
   maxQty,
   extra,
+  onRemove,
   selected,
   orderType,
   priceState,
@@ -104,6 +107,14 @@ export function RebalancingMobileCard({
             </p>
           )}
           {extra}
+          {onRemove && (
+            <button
+              onClick={onRemove}
+              className={`text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-1 transition-colors ${TOUCH_TARGET_MIN}`}
+            >
+              이 계좌에서 제거
+            </button>
+          )}
         </div>
       </div>
 

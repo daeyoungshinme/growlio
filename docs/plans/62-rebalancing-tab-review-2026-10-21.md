@@ -9,6 +9,16 @@
 
 **산출물**: 실행 첫 단계로 이 계획을 `docs/plans/62-rebalancing-tab-review-2026-10-21.md`(61은 미병합 브랜치 `fix/tech-debt-2026-10-20`에 있음)로 저장하고 `docs/plans/README.md` 인덱스에 추가.
 
+## 진행 상황 (2026-10-21, 브랜치 `fix/rebalancing-review-2026-10-21`)
+- **A 완료**(A8 제외): A1~A7·A9 구현 + 회귀 테스트. A8(AUTO job 알림별 격리)은 미병합 계획 61 브랜치(`fix/tech-debt-2026-10-20`)가 같은 방식(rollback 후 남은 row 재조회 + 항목별 commit)으로 이미 처리해 중복 작업하지 않음 — 61 병합 시 해결.
+  - 정정 A3: "5분 간격으로"가 아니라 **정각 정렬 cron(`kst(minute="*/10")`)** 으로 해결. notify_time은 :00/:30만 선택 가능하고, AUTO 모드는 alert_check에서 `last_triggered_at`을 갱신하지 않아 5분 간격이면 같은 창에 두 번 발송될 수 있었다. 원인은 IntervalTrigger의 위상이 기동 시각에 묶여 :x5 tick이면 모든 알림이 매일 누락되는 것.
+  - 정정 A4: 매수 leg의 `deadline_at`은 만료가 아니라 실행 예정 시각이라 **매도 승인만** 기한 검사. 장 운영시간 검사는 장전 승인 흐름을 막을 수 있어 넣지 않음.
+  - A7 추가 발견: 이력 저장이 flush 이후 실패하면 세션 rollback이 없어 호출부 commit이 PendingRollbackError로 깨졌다 → `_save_execution_history`가 rollback + Sentry, leg는 EXECUTED + 확인 안내, API는 leg 상태로 판정.
+  - A9 키움 TWO_PHASE: 거부 대신 문서화·로그(키움은 주문가능금액 API가 없어 매도→매수(예산 clamp)로 실행, 결과 방향 동일).
+- **B 완료**: B1~B8. B2는 ConfirmStep 테스트에 실행 컨텍스트 목이 커서 회귀 테스트 생략(D3에서 CashSummaryBar와 통합 예정). B4는 탭만 URL 파생으로 바꿨고 `openExecution`/`openRecOptions` 일회성 소비는 E4로 남김. B8 시장신호 GREEN 라벨은 이메일·홈·전술과 같은 "안정"으로 통일.
+- 검증: 백엔드 2796 passed / 커버리지 91.30%, ruff·mypy 클린. 프론트 1701 passed, tsc·eslint(0 warnings)·prettier 클린.
+- **남은 작업**: C·D·E(사용자 확인 후), F(전술 — 2026-10-21 PR #144로 main 병합됨, 착수 가능).
+
 ---
 
 ## 배치 A — 보안·실버그 (백엔드, 최우선)

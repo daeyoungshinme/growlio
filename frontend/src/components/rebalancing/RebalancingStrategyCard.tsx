@@ -134,14 +134,16 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
                 <p className="font-semibold text-gray-700 dark:text-gray-300">
                   {frontier.current_risk.toFixed(2)}% → {frontier.target_risk.toFixed(2)}%
                 </p>
-                <p
-                  className={`text-xs font-medium mt-0.5 ${
-                    (frontier_changes.risk_change ?? 0) < 0 ? "text-red-500" : "text-blue-500"
-                  }`}
-                >
-                  {(frontier_changes.risk_change ?? 0) < 0 ? "" : "+"}
-                  {frontier_changes.risk_change?.toFixed(2)}%p
-                </p>
+                {frontier_changes.risk_change != null && (
+                  <p
+                    className={`text-xs font-medium mt-0.5 ${
+                      frontier_changes.risk_change < 0 ? "text-red-500" : "text-blue-500"
+                    }`}
+                  >
+                    {frontier_changes.risk_change < 0 ? "" : "+"}
+                    {frontier_changes.risk_change.toFixed(2)}%p
+                  </p>
+                )}
               </div>
               <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-2.5 text-xs">
                 <p className="text-gray-400 dark:text-gray-500 mb-0.5">기대수익</p>
@@ -150,14 +152,16 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
                   {frontier.current_return.toFixed(2)}% → {frontier.target_return >= 0 ? "+" : ""}
                   {frontier.target_return.toFixed(2)}%
                 </p>
-                <p
-                  className={`text-xs font-medium mt-0.5 ${
-                    (frontier_changes.return_change ?? 0) > 0 ? "text-red-500" : "text-blue-500"
-                  }`}
-                >
-                  {(frontier_changes.return_change ?? 0) > 0 ? "+" : ""}
-                  {frontier_changes.return_change?.toFixed(2)}%p
-                </p>
+                {frontier_changes.return_change != null && (
+                  <p
+                    className={`text-xs font-medium mt-0.5 ${
+                      frontier_changes.return_change > 0 ? "text-red-500" : "text-blue-500"
+                    }`}
+                  >
+                    {frontier_changes.return_change > 0 ? "+" : ""}
+                    {frontier_changes.return_change.toFixed(2)}%p
+                  </p>
+                )}
               </div>
               {frontier_changes.sharpe_improvement != null && (
                 <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-2.5 text-xs">

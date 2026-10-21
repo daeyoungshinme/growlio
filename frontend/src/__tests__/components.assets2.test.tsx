@@ -165,7 +165,7 @@ describe("RebalancingPriceInput", () => {
     dispatch: vi.fn(),
   };
 
-  it("MARKET 주문 타입이면 빈 td를 반환한다", () => {
+  it("MARKET 주문 타입이면 셀을 렌더하지 않는다(지정가 열 없음)", () => {
     const { container } = render(
       <table>
         <tbody>
@@ -175,9 +175,7 @@ describe("RebalancingPriceInput", () => {
         </tbody>
       </table>,
     );
-    const td = container.querySelector("td");
-    expect(td).toBeDefined();
-    expect(td?.children.length).toBe(0);
+    expect(container.querySelector("td")).toBeNull();
   });
 
   it("국내 종목 LIMIT 주문은 원 단위를 표시한다", () => {
