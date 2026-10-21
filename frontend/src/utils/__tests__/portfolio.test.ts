@@ -364,9 +364,10 @@ describe("mergeAlertsByPortfolio — 활성 알림 기준 (plans/63 P1-4)", () =
   });
 });
 
-describe("getDriftStatus (plans/63 P1-2)", () => {
-  it("임계치 이상=리밸런싱 필요, 절반 이상=주의, 그 외=안정", () => {
-    expect(getDriftStatus(5, 5)).toBe("critical");
+describe("getDriftStatus (plans/63 P1-2·P1-3)", () => {
+  it("임계치 초과=리밸런싱 필요(서버 알림과 같은 기준), 절반 이상=주의, 그 외=안정", () => {
+    expect(getDriftStatus(5.01, 5)).toBe("critical");
+    expect(getDriftStatus(5, 5)).toBe("caution");
     expect(getDriftStatus(2.5, 5)).toBe("caution");
     expect(getDriftStatus(2.4, 5)).toBe("stable");
     expect(DRIFT_STATUS_LABEL.caution).toBe("주의");

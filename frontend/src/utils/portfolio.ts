@@ -150,10 +150,11 @@ export type DriftStatus = "critical" | "caution" | "stable";
 
 /**
  * 이탈 상태 3단계 — 진단 탭 행·포트폴리오 카드·분석 진단 카드가 같은 기준·라벨을 쓴다(plans/63 P1-2).
- * 임계치 이상이면 리밸런싱 필요, 임계치 절반 이상이면 주의.
+ * 임계치를 **초과**하면 리밸런싱 필요(서버 알림·drift-summary의 `filter_drifting_items`와 같은 기준,
+ * plans/63 P1-3), 임계치 절반 이상이면 주의.
  */
 export function getDriftStatus(maxDriftPct: number, thresholdPct: number): DriftStatus {
-  if (maxDriftPct >= thresholdPct) return "critical";
+  if (maxDriftPct > thresholdPct) return "critical";
   if (maxDriftPct >= thresholdPct / 2) return "caution";
   return "stable";
 }

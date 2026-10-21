@@ -482,6 +482,16 @@ _DEFAULT_DRIFT_THRESHOLD = 5.0
 _TOP_DRIFTED_LIMIT = 3
 
 
+def filter_drifting_items(items: list[Any], threshold_pct: float) -> list[Any]:
+    """threshold_pct(%)를 **초과**하는 드리프트 항목만 반환한다 — 이탈 판정의 단일 기준.
+
+    알림 발송(alert_check)·대기 계획 생성(plan_generation)·진단 요약(drift-summary)·수동 분석 화면이
+    모두 이 규칙을 따른다. 예전엔 진단 요약만 자체 기준(별도 base·`>=`·예수금/미포함 종목 제외)이라
+    "N개 종목 이탈" 푸시를 열면 다른 종목 목록이 보였다(plans/63 P1-3).
+    """
+    return [item for item in items if abs(item.weight_diff_pct) > threshold_pct]
+
+
 def compute_portfolio_drift_summary(
     portfolio: Portfolio,
     overview: dict,
@@ -489,21 +499,13 @@ def compute_portfolio_drift_summary(
 ) -> PortfolioDriftSummary:
     """DB 포지션 데이터만으로 포트폴리오 비중 이탈 현황을 계산한다.
 
-    배당·수익률 외부 API를 호출하지 않으므로 빠르게 실행된다.
-    대시보드 RebalancingStatusCard 용도로 설계됨.
+    배당·수익률 외부 API를 호출하지 않으므로 빠르게 실행된다(대시보드·진단 탭용).
+    알림과 같은 분석(`analyze_rebalancing(include_implicit_cash=True)` — 기준 자산 `compute_base_value_krw`,
+    TOTAL_ASSETS면 암묵 예수금 항목 포함, 목표에 없는 보유 종목 포함)과 같은 판정(`filter_drifting_items`)을 쓴다.
     """
-    _real_estate_krw = 0.0 if _has_real_estate_item(portfolio) else _real_estate_value_krw(overview)
-    if portfolio.base_type == "TOTAL_ASSETS":
-        base_krw = float(overview.get("total_assets_krw", 0)) - _real_estate_krw
-    else:
-        total_stock = float(overview.get("total_stock_krw", 0))
-        _dep = float(overview.get("total_deposit_krw") or 0)
-        available_cash = (
-            _dep if _dep > 0 else max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock - _real_estate_krw)
-        )
-        base_krw = total_stock + available_cash
-
-    if base_krw <= 0:
+    analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+    items = analysis.items
+    if analysis.base_value_krw <= 0 or not items:
         return PortfolioDriftSummary(
             portfolio_id=uuid.UUID(str(portfolio.id)),
             portfolio_name=portfolio.name,
@@ -514,28 +516,9 @@ def compute_portfolio_drift_summary(
             top_drifted_items=[],
         )
 
-    current_map = _build_current_map(overview)
-    # dividend/returns는 None으로 생략 — 빠른 계산용
-    result_items, _ = _build_target_items(portfolio, base_krw, overview, current_map, None, None)
-
-    # CASH·KR_PROPERTY·CASH_EQUIVALENT 제외한 주식 종목만 드리프트 계산
-    tradeable = [
-        i for i in result_items if i.ticker not in ("CASH", CASH_EQUIVALENT_TICKER) and i.market != "KR_PROPERTY"
-    ]
-    if not tradeable:
-        return PortfolioDriftSummary(
-            portfolio_id=uuid.UUID(str(portfolio.id)),
-            portfolio_name=portfolio.name,
-            needs_rebalancing=False,
-            threshold_pct=threshold_pct,
-            max_drift_pct=0.0,
-            drifted_items_count=0,
-            top_drifted_items=[],
-        )
-
-    sorted_by_drift = sorted(tradeable, key=lambda i: abs(i.weight_diff_pct), reverse=True)
+    drifting = filter_drifting_items(items, threshold_pct)
+    sorted_by_drift = sorted(items, key=lambda i: abs(i.weight_diff_pct), reverse=True)
     max_drift = abs(sorted_by_drift[0].weight_diff_pct)
-    drifted_count = sum(1 for i in tradeable if abs(i.weight_diff_pct) >= threshold_pct)
     top_items = [
         DriftedItem(ticker=i.ticker, name=i.name, weight_diff_pct=round(i.weight_diff_pct, 2))
         for i in sorted_by_drift[:_TOP_DRIFTED_LIMIT]
@@ -544,9 +527,9 @@ def compute_portfolio_drift_summary(
     return PortfolioDriftSummary(
         portfolio_id=uuid.UUID(str(portfolio.id)),
         portfolio_name=portfolio.name,
-        needs_rebalancing=max_drift >= threshold_pct,
+        needs_rebalancing=bool(drifting),
         threshold_pct=threshold_pct,
         max_drift_pct=round(max_drift, 2),
-        drifted_items_count=drifted_count,
+        drifted_items_count=len(drifting),
         top_drifted_items=top_items,
     )

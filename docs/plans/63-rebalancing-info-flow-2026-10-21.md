@@ -11,7 +11,8 @@
 
 ## 진행 상황 (2026-10-21, 브랜치 `fix/rebalancing-review-2026-10-21`)
 - **완료**: P0(4b239a29), P1-1(f59dddda), P1-2·P1-4(d5a7301b), P1-5(76dec312), P3 + P2-3(2b16a85c), P2-1·P2-2·P2-5(ba93d9d8), P4(7755d338).
-- **남음: P1-3**(이탈 계산 기준 통일 = 62 E1) — 사용자에게 보이는 숫자가 바뀌므로 기준 확정 대기.
+- **P1-3 완료**(= 62 E1, 사용자 승인: 알림 기준으로 통일) — `filter_drifting_items`(임계치 **초과**)를 `service.py` 단일 정의로(order_builder는 재노출), 진단 요약 `compute_portfolio_drift_summary`가 `analyze_rebalancing(include_implicit_cash=True)` 결과로 판정, 수동 analyze API도 `include_implicit_cash=True`, 프론트 `getDriftStatus`·분석 진단카드도 `>` + 모든 항목. 계좌 범위는 AGGREGATE 기준 이미 동일(PER_ACCOUNT 알림은 계좌 1개 범위라 포트폴리오 단위 진단과 의도적으로 다름).
+  - 바뀌는 숫자: TOTAL_ASSETS 포트폴리오의 목표 밖 예수금·목표에 없는 보유 종목이 이탈로 잡힘, 임계치와 정확히 같은 이탈은 더 이상 "필요"가 아님.
 - 계획 대비 변경:
   - P0: 백엔드는 실행기가 아닌 `ExecutionRequest` 스키마 검증(422)으로 막음 — plan 경로는 스키마를 거치지 않아 영향 없음. 수동 모달 기본값은 FULL 유지, "(권장)" 라벨만 제거.
   - P1-1: `/broker-balance-all` 포트폴리오 계좌 필터는 생략 — 합계가 이미 `tradableAccounts`(포트폴리오 계좌)만 돌아 표시 불일치는 없음(과조회만).

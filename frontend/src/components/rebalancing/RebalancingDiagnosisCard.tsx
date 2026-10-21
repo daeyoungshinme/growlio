@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { TriangleAlert, CircleCheck, Info, Zap } from "lucide-react";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
-import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 import DiagnosisInsightList from "./DiagnosisInsightList";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -60,17 +59,14 @@ export default function RebalancingDiagnosisCard({
   const threshold = alertThreshold ?? DEFAULT_THRESHOLD;
   const [isOpen, toggleOpen] = useCollapsible(true);
 
-  const { tradeable, maxDrift, driftedCount } = useMemo(() => {
-    const tradeable = analysis.items.filter(
-      (i) =>
-        i.ticker !== CASH_TICKER &&
-        i.ticker !== CASH_EQUIVALENT_TICKER &&
-        i.market !== "KR_PROPERTY",
-    );
+  // 서버 알림·진단 요약과 같은 기준 — 예수금·목표 밖 보유 종목까지 모든 항목, 임계치 "초과"(plans/63 P1-3).
+  // 예전엔 예수금 등을 빼고 ">="로 세어 "N개 종목 이탈" 알림과 다른 개수가 보였다.
+  const { maxDrift, driftedCount } = useMemo(() => {
+    const items = analysis.items;
     const maxDrift =
-      tradeable.length > 0 ? Math.max(...tradeable.map((i) => Math.abs(i.weight_diff_pct))) : 0;
-    const driftedCount = tradeable.filter((i) => Math.abs(i.weight_diff_pct) >= threshold).length;
-    return { tradeable, maxDrift, driftedCount };
+      items.length > 0 ? Math.max(...items.map((i) => Math.abs(i.weight_diff_pct))) : 0;
+    const driftedCount = items.filter((i) => Math.abs(i.weight_diff_pct) > threshold).length;
+    return { maxDrift, driftedCount };
   }, [analysis.items, threshold]);
 
   const status = getDriftStatus(maxDrift, threshold);
@@ -81,7 +77,7 @@ export default function RebalancingDiagnosisCard({
       ? `모든 종목이 ±${threshold}% 이내 비중을 유지하고 있습니다`
       : status === "caution"
         ? `최대 ${maxDrift.toFixed(1)}% 이탈 — 모니터링이 필요합니다`
-        : `${driftedCount}개 종목이 ±${threshold}% 이상 목표 비중을 이탈했습니다`;
+        : `${driftedCount}개 항목이 목표 비중에서 ±${threshold}%를 넘게 벗어났습니다`;
 
   return (
     <CollapsibleCard
@@ -108,7 +104,7 @@ export default function RebalancingDiagnosisCard({
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{subText}</p>
 
       {/* 안정 상태 - 이탈 없음 메시지 */}
-      {status === "stable" && tradeable.length > 0 && (
+      {status === "stable" && analysis.items.length > 0 && (
         <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-3">
           <CircleCheck size={12} className="text-green-500" />
           최대 이탈 {maxDrift.toFixed(1)}% (기준 ±{threshold}%)
