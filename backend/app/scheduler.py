@@ -51,6 +51,7 @@ def init_scheduler() -> None:
     from app.jobs.rebalancing_plan_sell_expiry import run_rebalancing_plan_sell_expiry
     from app.jobs.recommendation_drift_alert import run_recommendation_drift_alert
     from app.jobs.stock_price_alert import run_stock_price_alert_check
+    from app.jobs.tactical_regime_check import run_tactical_regime_check
     from app.jobs.token_refresh import refresh_all_user_tokens
     from app.jobs.year_end_tax_reminder import run_year_end_tax_reminder
     from app.services.yahoo_price import refresh_kosdaq_tickers
@@ -72,6 +73,8 @@ def init_scheduler() -> None:
         (run_monthly_report, kst(day=1, hour=9, minute=0), "monthly_report_job"),
         (run_goal_achievement_check, kst(hour=18, minute=45), "goal_achievement_check_daily"),
         (run_market_signal_daily_digest, kst(hour=8, minute=30), "market_signal_daily_digest"),
+        # 미국 장 마감(서머타임 05:00/표준 06:00 KST) 후 일봉 확정 — 전술 배분 국면 점검·전환 알림
+        (run_tactical_regime_check, kst(hour=7, minute=40), "tactical_regime_check_daily"),
         (
             run_year_end_tax_reminder,
             kst(month="11-12", day_of_week="mon", hour=9, minute=0),

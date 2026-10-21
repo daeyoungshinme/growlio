@@ -72,8 +72,14 @@ FRED_BASE = "https://api.stlouisfed.org/fred"
 # ---------------------------------------------------------------------------
 
 
-async def _fred_get_observations(series_id: str, limit: int = 36) -> list[dict[str, Any]]:
-    """FRED에서 최근 limit개 관측치를 가져온다."""
+async def _fred_get_observations(
+    series_id: str, limit: int = 36, observation_start: date | None = None
+) -> list[dict[str, Any]]:
+    """FRED에서 최근 limit개 관측치를 가져온다.
+
+    `observation_start` 미지정 시 limit×35일 전을 하한으로 쓴다(월간 시리즈 기준 여유). 일별 시리즈를 수천 개
+    받을 때는 그 하한이 FRED 허용 범위(1776년~)를 벗어나 요청이 거부되므로 시작일을 직접 넘긴다.
+    """
     if not settings.fred_api_key:
         logger.warning("fred_api_key_not_configured", series=series_id)
         return []
@@ -86,7 +92,7 @@ async def _fred_get_observations(series_id: str, limit: int = 36) -> list[dict[s
         "sort_order": "desc",
         "limit": limit,
         # 조회 하한(limit×35일)이라 KST/UTC 하루 차이는 무관 — 서버 date.today() 그대로 둔다
-        "observation_start": (date.today() - timedelta(days=limit * 35)).isoformat(),
+        "observation_start": (observation_start or date.today() - timedelta(days=limit * 35)).isoformat(),
     }
     try:
         async with httpx.AsyncClient(timeout=10) as client:

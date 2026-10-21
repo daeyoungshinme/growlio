@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import public_error_message, redact_secrets
 from app.exceptions import AppError, SyncError
 from app.kis.auth import get_access_token
+from app.kis.exchange_master import resolve_kis_overseas_market
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
@@ -283,6 +284,21 @@ async def _execute_kiwoom_account_orders(
     return account_results
 
 
+async def _normalize_kis_overseas_markets(orders: list[ExecutionOrderItem], cache) -> list[ExecutionOrderItem]:
+    """NYSE Arca ETF처럼 "NYSE"로 저장됐지만 KIS가 아멕스로 분류하는 종목의 market을 "AMEX"로 보정한다.
+
+    보정하지 않으면 매수는 거래소 불일치로 거부되고, 매도는 KIS 잔고(AMEX)와 ticker+market 키가
+    어긋나 clamp에서 SKIPPED가 된다. 키움은 같은 종목을 NYSE로 분류하므로 KIS 경로에만 적용한다.
+    """
+    if not any(o.market.upper() == "NYSE" for o in orders):
+        return orders
+    normalized: list[ExecutionOrderItem] = []
+    for order in orders:
+        market = await resolve_kis_overseas_market(order.ticker, order.market, cache)
+        normalized.append(order if market == order.market else order.model_copy(update={"market": market}))
+    return normalized
+
+
 async def _execute_kis_account_orders(
     account: AssetAccount,
     group_orders: list[ExecutionOrderItem],
@@ -309,6 +325,8 @@ async def _execute_kis_account_orders(
         user_id=str(user_id),
         account_id=str(acc_uuid),
     )
+
+    group_orders = await _normalize_kis_overseas_markets(group_orders, cache)
 
     if strategy == "TWO_PHASE":
         return await _execute_two_phase_orders(

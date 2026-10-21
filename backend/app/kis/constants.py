@@ -34,6 +34,18 @@ OVERSEAS_MARKET_CODES = {
 
 OVERSEAS_MARKETS = frozenset(OVERSEAS_MARKET_CODES.keys())  # {"NYSE", "NASDAQ", "AMEX"}
 
+# 해외 시세 조회(HHDFS00000300 등)의 EXCD는 주문/잔고(OVRS_EXCG_CD)와 코드 체계가 다르다 — 3자리.
+OVERSEAS_QUOTE_EXCD = {
+    "NYSE": "NYS",
+    "NASDAQ": "NAS",
+    "AMEX": "AMS",
+}
+
+# KIS 공식 해외 종목마스터(아멕스). KIS는 NYSE Arca 상장 ETF(SPY·VOO·SCHD 등)를 아멕스(AMS)로
+# 분류하는 반면 Yahoo는 PCX(NYSE Arca)로 주고 우리는 이를 "NYSE"로 정규화해 저장한다 — 이 파일로
+# KIS 주문 직전에 "AMEX"로 보정한다(exchange_master.py). 키움은 같은 종목을 NYSE로 분류하므로 무관.
+KIS_AMEX_MASTER_URL = "https://new.real.download.dws.co.kr/common/master/amsmst.cod.zip"
+
 # 국내 시장 구분
 DOMESTIC_MARKET_DIV = "J"  # 주식
 DOMESTIC_MARKET_DIV_ETF = "E"  # ETF/ETN

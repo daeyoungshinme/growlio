@@ -1,0 +1,72 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  applyTacticalWeights,
+  deleteTacticalStrategy,
+  fetchTacticalBacktest,
+  fetchTacticalStatus,
+  type TacticalStrategyPayload,
+  upsertTacticalStrategy,
+} from "@/api/tactical";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { extractErrorMessage } from "@/utils/error";
+import { invalidateTacticalData } from "@/utils/queryInvalidation";
+import { toast } from "@/utils/toast";
+
+/** 포트폴리오의 전술 배분 국면·차트 지표·제안 비중. 일봉 기준이라 자주 바뀌지 않는다. */
+export function useTacticalStatus(portfolioId: string | undefined) {
+  return useQuery({
+    queryKey: QUERY_KEYS.tacticalStatus(portfolioId ?? ""),
+    queryFn: () => fetchTacticalStatus(portfolioId as string),
+    enabled: !!portfolioId,
+    staleTime: STALE_TIME.MEDIUM,
+  });
+}
+
+/** 전술 배분 규칙 백테스트 — 카드를 펼쳤을 때만 조회(`enabled`). */
+export function useTacticalBacktest(
+  portfolioId: string | undefined,
+  years: number,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: QUERY_KEYS.tacticalBacktest(portfolioId ?? "", years),
+    queryFn: () => fetchTacticalBacktest(portfolioId as string, years),
+    enabled: !!portfolioId && enabled,
+    staleTime: STALE_TIME.LONG,
+    retry: false,
+  });
+}
+
+/** 전략 켜기/설정 변경·끄기·제안 비중 적용 뮤테이션 묶음. */
+export function useTacticalMutations(portfolioId: string) {
+  const queryClient = useQueryClient();
+
+  const upsert = useMutation({
+    mutationFn: (payload: TacticalStrategyPayload) => upsertTacticalStrategy(portfolioId, payload),
+    onSuccess: async () => {
+      await invalidateTacticalData(queryClient);
+    },
+    onError: (e) => toast(extractErrorMessage(e), "error"),
+  });
+
+  const disable = useMutation({
+    mutationFn: () => deleteTacticalStrategy(portfolioId),
+    onSuccess: async () => {
+      toast("전술 배분을 껐습니다. 포트폴리오 목표 비중은 그대로 유지됩니다.", "info");
+      await invalidateTacticalData(queryClient);
+    },
+    onError: (e) => toast(extractErrorMessage(e), "error"),
+  });
+
+  const apply = useMutation({
+    mutationFn: () => applyTacticalWeights(portfolioId),
+    onSuccess: async () => {
+      toast("제안 비중을 목표 비중으로 저장했습니다", "success");
+      await invalidateTacticalData(queryClient, { portfolioChanged: true });
+    },
+    onError: (e) => toast(extractErrorMessage(e), "error"),
+  });
+
+  return { upsert, disable, apply };
+}

@@ -48,3 +48,36 @@ def market_signal_daily_digest_template(level: str, reason: str | None) -> tuple
         "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 신호 알림에서 변경하세요.",
     )
     return subject, html
+
+
+def tactical_regime_change_template(
+    portfolio_name: str,
+    old_label: str,
+    new_label: str,
+    weights_text: str,
+    reasons: list[str],
+    app_link: str,
+) -> tuple[str, str]:
+    """QQQ/SPY 전술 배분 국면이 바뀌었을 때 발송 — 자동 주문 없이 제안 비중만 안내한다."""
+    subject = f"[Growlio] 전술 배분 국면 변경 — {old_label} → {new_label}"
+    body = _kv_table(
+        [
+            ("포트폴리오", portfolio_name),
+            ("이전 국면", old_label),
+            ("현재 국면", f"<span style='font-weight:bold;'>{new_label}</span>"),
+            ("제안 비중", weights_text),
+        ]
+    )
+    if reasons:
+        items = "".join(f"<li>{r}</li>" for r in reasons)
+        body += f"<ul style='color:#64748b;font-size:13px;margin-top:12px;'>{items}</ul>"
+    link = f"<a href='{app_link}' style='color:#2563eb;'>앱에서 제안 비중 확인·적용하기</a>"
+    body += f"<p style='margin-top:16px;'>{link}</p>"
+    html = _email_div(
+        "전술 배분 국면 변경",
+        "#2563eb",
+        body,
+        "자동 주문은 실행되지 않았습니다. 제안 비중을 적용한 뒤 리밸런싱 화면에서 직접 확인·실행하세요.<br>"
+        "이 신호는 과거 데이터 기반 참고용이며 수익을 보장하지 않습니다.",
+    )
+    return subject, html

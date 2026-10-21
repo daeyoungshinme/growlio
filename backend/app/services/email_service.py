@@ -39,6 +39,7 @@ from app.services.email_templates import (
     rebalancing_plan_pending_template,
     recommendation_drift_alert_template,
     stock_price_alert_template,
+    tactical_regime_change_template,
     tax_impact_gate_blocked_template,
     test_email_template,
     year_end_tax_reminder_template,
@@ -424,6 +425,25 @@ async def send_recommendation_drift_alert_email(to_email: str, portfolio_names: 
         ok_event="recommendation_drift_alert_email_sent",
         fail_event="recommendation_drift_alert_email_failed",
         portfolio_count=len(portfolio_names),
+    )
+
+
+async def send_tactical_regime_change_email(
+    to_email: str,
+    portfolio_name: str,
+    old_label: str,
+    new_label: str,
+    weights_text: str,
+    reasons: list[str],
+) -> bool:
+    """전술 배분 국면 변경 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
+    app_link = f"{settings.frontend_url}/rebalancing?rtab={quote('전술')}"
+    return await _send_templated(
+        to_email,
+        lambda: tactical_regime_change_template(portfolio_name, old_label, new_label, weights_text, reasons, app_link),
+        ok_event="tactical_regime_change_email_sent",
+        fail_event="tactical_regime_change_email_failed",
+        new_regime=new_label,
     )
 
 

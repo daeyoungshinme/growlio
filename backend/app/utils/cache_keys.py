@@ -75,6 +75,10 @@ TTL_OVERSEAS_STOCK_META = 7 * 24 * 3600  # 해외 종목 영문 캐노니컬 이
 # 이름만 찾고 상장 시장은 못 찾은 부분 결과 1시간 — 7일 캐싱하면 NASDAQ 폴백(키움 주문 거래소 라우팅)이 1주일 고정된다
 TTL_OVERSEAS_STOCK_META_PARTIAL = 3600
 TTL_CHALLENGE_PROGRESS = 300  # 적립 챌린지 진행률(진행률/스트릭) 5분 — 목표/거래내역 변경 시 수동 무효화가 primary
+TTL_KIS_AMEX_MASTER = 86400  # KIS 공식 아멕스(AMS) 종목마스터 티커 집합 1일 — KIS가 매일 갱신
+TTL_TECHNICAL_SIGNAL = 6 * 3600  # QQQ/SPY 일봉 기술적 지표 6시간 — 장중 변화 없음, 미국 장 마감 후 반나절 내 갱신
+TTL_TACTICAL_BACKTEST = 86400  # 전술 배분 백테스트 1일 — 과거 일봉 기반, 비중표 해시+기간이 키
+TTL_TECHNICAL_SIGNAL_DEGRADED = 600  # 일부 종목 종가 조회 실패 결과는 10분만 — Yahoo 일시 장애 후 빠른 복구
 
 # ---------------------------------------------------------------------------
 # 캐시 스키마 버전 상수
@@ -178,6 +182,26 @@ def has_overseas_key(account_id: uuid.UUID) -> str:
 def overseas_stock_meta_key(ticker: str) -> str:
     """해외 종목 티커 → {name, market} JSON 캐시 키 (동기화 시점 Yahoo 조회 결과 재사용)."""
     return f"{_env_prefix()}overseas_stock_meta:{ticker}"
+
+
+def technical_signal_key(tickers: tuple[str, ...]) -> str:
+    """차트 기술적 지표 스냅샷(일봉) 캐시 키 — 유저 무관 전역 공유. v2: 추세 히스테리시스 밴드 도입."""
+    return f"{_env_prefix()}technical_signal:v2:{','.join(sorted(tickers))}"
+
+
+def tactical_tilt_key() -> str:
+    """QQQ/SPY 틸트 입력(실질금리·상대강도) 캐시 키 — 유저 무관 전역 공유."""
+    return f"{_env_prefix()}tactical_tilt:v1"
+
+
+def tactical_backtest_key(settings_hash: str, years: int) -> str:
+    """전술 배분 백테스트 결과 캐시 키 — 비중표+틸트 이동폭 해시가 같으면 유저 간 공유. v2: 공격 국면 유지·틸트."""
+    return f"{_env_prefix()}tactical_backtest:v2:{settings_hash}:{years}"
+
+
+def kis_amex_master_key() -> str:
+    """KIS 아멕스(AMS) 종목마스터 티커 목록 JSON 캐시 키 — 유저 무관 전역 공유."""
+    return f"{_env_prefix()}kis_amex_master"
 
 
 def dividend_summary_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
