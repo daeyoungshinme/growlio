@@ -183,6 +183,14 @@ describe("MarketSignalBanner", () => {
     expect(screen.getByText("시장 위험 신호")).toBeDefined();
   });
 
+  it("자동 실행 판단 등급이 표시 등급과 다를 때만 안내한다 (plans/63 P1-5)", () => {
+    const { unmount } = renderBanner({ ...mockSignal, confirmed_level: "GREEN" });
+    expect(screen.getByText(/자동 실행 판단 기준은 아직/)).toBeDefined();
+    unmount();
+    renderBanner({ ...mockSignal, confirmed_level: mockSignal.composite_level });
+    expect(screen.queryByText(/자동 실행 판단 기준은 아직/)).toBeNull();
+  });
+
   it("shows short implication text for YELLOW", () => {
     renderBanner();
     expect(screen.getByText(/분할 집행 권장/)).toBeDefined();

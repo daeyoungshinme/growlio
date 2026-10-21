@@ -215,7 +215,9 @@ function TacticalStatusView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-          <span>매크로</span>
+          <span title="연속 확인된 시장 위험 등급 — 자동 실행 판단과 같은 기준이라 진단 탭 표시 등급보다 늦게 바뀔 수 있어요">
+            매크로(확정)
+          </span>
           <MarketSignalLevelBadge level={status.macro_level} />
           {status.macro_freshness === "STALE" && (
             <span className="text-amber-600 dark:text-amber-400">지표 데이터 지연</span>

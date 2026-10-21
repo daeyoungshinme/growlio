@@ -104,6 +104,8 @@ export interface MarketSignalResponse {
   };
   computed_at: string;
   data_freshness: "LIVE" | "CACHED" | "PARTIAL" | "STALE";
+  /** 자동 실행 게이트·전술 탭이 쓰는 연속 확인된 등급(없으면 null) — 표시 등급과 잠시 다를 수 있다 */
+  confirmed_level?: MarketRiskLevel | null;
 }
 
 export const fetchMarketSignal = () => apiGet<MarketSignalResponse>("/market-signals");

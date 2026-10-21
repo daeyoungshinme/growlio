@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import structlog
 from fastapi import APIRouter, Depends, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
-from app.services.market_signal_service import get_market_signal
+from app.services.market_signal_service import get_last_composite_level, get_market_signal
 
 router = APIRouter(prefix="/market-signals", tags=["market_signals"])
 logger = structlog.get_logger()
@@ -20,6 +21,7 @@ logger = structlog.get_logger()
 async def get_market_signal_endpoint(
     request: Request,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """복합 시장 위험 신호(GREEN/YELLOW/RED)와 개별 지표 값을 반환한다.
 
@@ -32,6 +34,11 @@ async def get_market_signal_endpoint(
     - signals.exchange_rate: 원/달러 환율(DEXKOUS) 20일선 이격도 + 레벨 (예측치 아님, 참고 지표)
     - signals.oil_price: WTI 현물유가(DCOILWTICO) 20일선 이격도 + 레벨 (급등/급락 모두 위험 신호)
     - data_freshness: LIVE | CACHED | PARTIAL | STALE
+    - confirmed_level: AUTO 실행 게이트가 쓰는 연속 확인된 등급(아직 없으면 null). 표시용 composite_level은
+      즉시 반영되고 confirmed는 연속 확인 후 반영돼 둘이 잠시 다를 수 있다 — 배너가 이를 함께 보여 준다.
+      확인 단계를 전진시키지 않도록 저장된 값만 읽는다(전진은 스케줄러 job 담당).
     """
     cache = await get_cache_store()
-    return await get_market_signal(cache)
+    signal = await get_market_signal(cache)
+    # 캐시된 dict는 사용자 간 공유되므로 복사본에 덧붙인다
+    return {**signal, "confirmed_level": await get_last_composite_level(db)}
