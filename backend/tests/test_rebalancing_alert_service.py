@@ -1808,3 +1808,40 @@ async def test_check_rebalancing_alerts_isolates_failing_alert(mock_db, override
     mock_db.rollback.assert_awaited_once()
     # 재조회는 실패한 알림 뒤의 id만으로 — 실패한 알림을 같은 tick에 다시 돌리지 않는다
     assert load.await_args_list[1].args[1] == [rows[1][0].id, rows[2][0].id]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("drifting", "composite", "expected_type"),
+    [([], True, "MARKET_SIGNAL"), ([], False, "REBALANCING")],
+)
+async def test_process_rebalancing_alert_push_type_by_trigger(mock_db, drifting, composite, expected_type):
+    """복합신호만으로 보낸 알림은 MARKET_SIGNAL(진단 탭) — 포트폴리오 실행 모달을 열지 않는다(plans/63 P3-4)."""
+    portfolio_id = uuid.uuid4()
+    alert, portfolio, _, items = _make_process_alert_args(uuid.uuid4(), portfolio_id)
+
+    from app.services.rebalancing.alert_check import _process_rebalancing_alert
+
+    push = AsyncMock(return_value=True)
+    with (
+        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=False)),
+        patch("app.services.push_service.send_push_to_user", new=push),
+    ):
+        await _process_rebalancing_alert(
+            alert=alert,
+            portfolio=portfolio,
+            drifting=drifting,
+            items_to_show=items,
+            is_scheduled_report=False,
+            threshold=5.0,
+            email="user@example.com",
+            composite_level="RED",
+            db=mock_db,
+            fcm_token="fcm-token-xyz",
+            is_composite_triggered=composite,
+            composite_reason="VIX 급등",
+        )
+
+    data = push.call_args.kwargs["data"]
+    assert data["type"] == expected_type
+    assert ("portfolio_id" in data) is (expected_type == "REBALANCING")

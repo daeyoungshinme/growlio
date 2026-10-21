@@ -114,6 +114,12 @@ export default function RebalancingPage() {
     name: string;
     accountIds: string[] | null;
   } | null>(null);
+  // 빈 상태 CTA(진단·전술 탭) — 탭만 바꾸면 다시 "만들기"를 찾아 눌러야 해서 편집기까지 바로 연다.
+  // 빈 prefill이면 PortfolioManageTab이 신규 생성 모드로 편집기를 연다(plans/63 P3-5)
+  const openNewPortfolioEditor = useCallback(() => {
+    setPrefill({ items: [], name: "", accountIds: null });
+    handleTabChange("포트폴리오");
+  }, [handleTabChange]);
   const [isBacktestOpen, toggleBacktestOpen] = useCollapsible(
     false,
     "growlio:rebalancing:backtest-section-open",
@@ -206,7 +212,7 @@ export default function RebalancingPage() {
                   onPortfolioSelect={handlePortfolioSelectFromDiagnosis}
                   signalDisplay="none"
                   showAllInsights={true}
-                  emptyStateCta={() => handleTabChange("포트폴리오")}
+                  emptyStateCta={openNewPortfolioEditor}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -250,6 +256,8 @@ export default function RebalancingPage() {
                 }}
                 initialOptionsOpen={searchParams.get("openRecOptions") === "1"}
                 onOptionsClosed={clearOpenRecOptions}
+                selectedPortfolioId={portfolioId}
+                onSelectPortfolio={handlePortfolioChange}
               />
             </Suspense>
           </ErrorBoundary>
@@ -260,7 +268,9 @@ export default function RebalancingPage() {
           <ErrorBoundary variant="section">
             <Suspense fallback={<SkeletonCard />}>
               <TacticalAllocationTab
-                initialPortfolioId={portfolioId}
+                onCreatePortfolio={openNewPortfolioEditor}
+                selectedPortfolioId={portfolioId}
+                onSelectPortfolio={handlePortfolioChange}
                 onGoToExecution={(id) => handlePortfolioSelectFromDiagnosis(id)}
               />
             </Suspense>

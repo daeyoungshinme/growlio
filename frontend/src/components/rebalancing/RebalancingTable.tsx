@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Zap } from "lucide-react";
+import { Loader2, RefreshCw, Zap } from "lucide-react";
 import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
+import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { AssetAccount } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
 import { isOrderExecutableAccount } from "@/utils/accounts";
@@ -18,7 +19,8 @@ interface Props {
   portfolioId: string;
   accounts: AssetAccount[];
   alertThreshold?: number;
-  onExecuted?: (results: ExecutionResult[]) => void;
+  /** 같은 포트폴리오를 다시 분석 — 실행 후 계좌 동기화가 끝나면 호출한다 */
+  onReanalyze?: () => void;
   /** 푸시 알림 딥링크(openExecution=1)로 진입한 경우, 분석 결과가 준비되면 실행 모달을 자동으로 연다. */
   autoOpenExecution?: boolean;
   /** 예수금이 증권사 실시간 잔고 기준인지(false면 마지막 동기화 시점 값) */
@@ -30,7 +32,7 @@ export default function RebalancingTable({
   portfolioId,
   accounts,
   alertThreshold,
-  onExecuted,
+  onReanalyze,
   autoOpenExecution,
   cashIsLive = false,
 }: Props) {
@@ -57,6 +59,20 @@ export default function RebalancingTable({
     return () => observer.disconnect();
   }, []);
 
+  // 주문을 실행하면 지금 보이는 분석은 실행 전 잔고 기준이 된다 — 재분석으로 analysis가 바뀔 때까지
+  // "실행 전 기준" 배너로 알리고, 동기화+재분석을 한 번에 할 수 있게 한다(plans/63 P3-1)
+  const [executed, setExecuted] = useState<{
+    analysis: RebalancingAnalysis;
+    accountIds: string[];
+  } | null>(null);
+  const showPreExecutionNotice = executed?.analysis === analysis;
+  const { state: syncState, run: syncAccounts } = useSyncAccounts();
+  const handleExecuted = (results: ExecutionResult[]) =>
+    setExecuted({ analysis, accountIds: [...new Set(results.map((r) => r.account_id))] });
+  const syncAndReanalyze = async () => {
+    if (executed && (await syncAccounts(executed.accountIds))) onReanalyze?.();
+  };
+
   const [now] = useState(() => Date.now());
   const minutesOld = (now - new Date(analysis.analyzed_at).getTime()) / 60000;
   const isStale = minutesOld > 10;
@@ -81,8 +97,31 @@ export default function RebalancingTable({
         portfolioName={analysis.portfolio_name}
       />
 
+      {showPreExecutionNotice && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-700/40 dark:bg-amber-900/30 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-300">
+          <span className="flex-1">
+            주문을 실행했어요 — 아래 분석은 실행 전 잔고 기준이에요.
+            {syncState === "error" && " 일부 계좌 동기화에 실패했어요."}
+          </span>
+          {onReanalyze && (
+            <button
+              onClick={() => void syncAndReanalyze()}
+              disabled={syncState === "syncing"}
+              className="inline-flex items-center justify-center gap-1.5 self-end sm:self-auto px-3 py-1.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors"
+            >
+              {syncState === "syncing" ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <RefreshCw size={12} />
+              )}
+              동기화하고 다시 분석
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 재분석 권장 배너 — 데스크탑/모바일 공통 노출 */}
-      {isStale && (
+      {!showPreExecutionNotice && isStale && (
         <span className="inline-flex text-xs text-amber-600 dark:text-amber-400 bg-amber-50 border border-amber-200 dark:bg-amber-900/30 dark:border-amber-700/40 rounded-lg px-2.5 py-1">
           분석 {Math.floor(minutesOld)}분 경과 — 재분석 권장
         </span>
@@ -198,7 +237,8 @@ export default function RebalancingTable({
             portfolioId={portfolioId}
             analysis={analysis}
             accounts={accounts}
-            onExecuted={onExecuted}
+            onExecuted={handleExecuted}
+            onSynced={onReanalyze}
             onClose={() => setExecutionOpen(false)}
           />
         </ErrorBoundary>

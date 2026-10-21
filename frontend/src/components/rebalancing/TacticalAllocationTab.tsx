@@ -28,9 +28,14 @@ import {
 const TacticalBacktestSection = lazy(() => import("./TacticalBacktestSection"));
 
 interface Props {
-  initialPortfolioId?: string;
+  /** 페이지에서 고른 포트폴리오(URL portfolioId) — 탭 간 선택을 공유한다(plans/63 P3-3) */
+  selectedPortfolioId?: string;
+  /** 포트폴리오 변경 시 호출 — 부모가 URL에 반영한다. 없으면 이 탭 안에서만 바뀐다 */
+  onSelectPortfolio?: (portfolioId: string) => void;
   /** 제안 비중 적용 후 기존 리밸런싱 분석·실행 화면으로 이동 */
   onGoToExecution: (portfolioId: string) => void;
+  /** 포트폴리오가 없을 때 빈 상태 CTA — 새 포트폴리오 편집기를 연다 */
+  onCreatePortfolio?: () => void;
 }
 
 /** 백엔드 tactical_allocation_service.format_weights와 같은 규칙 — DIA는 0%면 생략 */
@@ -353,13 +358,22 @@ function TacticalStatusView({
 }
 
 /** 리밸런싱 페이지 "전술" 탭 — 포트폴리오를 골라 QQQ/SPY(+DIA) 전술 배분 국면·제안 비중을 보고 적용한다. */
-export default function TacticalAllocationTab({ initialPortfolioId, onGoToExecution }: Props) {
+export default function TacticalAllocationTab({
+  selectedPortfolioId,
+  onSelectPortfolio,
+  onGoToExecution,
+  onCreatePortfolio,
+}: Props) {
   const { data: portfolios, isLoading: portfoliosLoading } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
     staleTime: STALE_TIME.MEDIUM,
   });
-  const [pickedId, setSelectedId] = useState<string | undefined>(initialPortfolioId);
+  // 부모가 URL로 관리하면(onSelectPortfolio) URL이 단일 진실, 아니면 탭 내부 상태
+  const [localPickedId, setLocalPickedId] = useState<string | undefined>(selectedPortfolioId);
+  const pickedId = onSelectPortfolio ? selectedPortfolioId : localPickedId;
+  const setSelectedId = (id: string) =>
+    onSelectPortfolio ? onSelectPortfolio(id) : setLocalPickedId(id);
   // 선택값이 목록에 없으면(미지정·삭제됨) 첫 포트폴리오 — effect로 setState하지 않고 렌더 중 파생
   const selectedId = portfolios?.some((p) => p.id === pickedId) ? pickedId : portfolios?.[0]?.id;
 
@@ -371,7 +385,12 @@ export default function TacticalAllocationTab({ initialPortfolioId, onGoToExecut
       <div className="card">
         <EmptyState
           title="포트폴리오가 없어요"
-          description="포트폴리오 탭에서 리밸런싱 대상 포트폴리오를 먼저 만들어주세요."
+          description="QQQ·SPY 비중을 관리할 포트폴리오를 먼저 만들어주세요."
+          action={
+            onCreatePortfolio
+              ? { label: "포트폴리오 만들기", onClick: onCreatePortfolio }
+              : undefined
+          }
         />
       </div>
     );

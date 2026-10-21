@@ -62,6 +62,10 @@ interface Props {
   initialOptionsOpen?: boolean;
   /** 옵션 모달이 닫힐 때 호출 — 부모가 딥링크 파라미터를 정리한다 */
   onOptionsClosed?: () => void;
+  /** 페이지에서 이미 고른 포트폴리오(URL portfolioId) — 있으면 적용 대상으로 먼저 선택한다 */
+  selectedPortfolioId?: string;
+  /** 적용 대상 변경 시 호출 — 부모가 URL에 반영해 다른 탭과 선택을 공유한다(plans/63 P3-3) */
+  onSelectPortfolio?: (portfolioId: string) => void;
 }
 
 /** 목표 역산 추천("전체")과 투자기간별 추천("단기"/"중기"/"장기")을 하나의 탭 카드로 합쳐 보여준다.
@@ -74,6 +78,8 @@ export default function RecommendationCard({
   onCreatePortfolio,
   initialOptionsOpen = false,
   onOptionsClosed,
+  selectedPortfolioId,
+  onSelectPortfolio,
 }: Props) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ActiveTab>("전체");
@@ -190,8 +196,15 @@ export default function RecommendationCard({
     (a, b) =>
       Number(anchoredPortfolioIds.includes(b.id)) - Number(anchoredPortfolioIds.includes(a.id)),
   );
-  const [selectedOverallTargetId, setSelectedOverallTargetId] = useState("");
-  const effectiveOverallTargetId = selectedOverallTargetId || anchoredPortfolioIds[0] || "";
+  // 부모가 URL로 관리하면(onSelectPortfolio) URL이 단일 진실, 아니면 카드 내부 상태
+  const [localTargetId, setLocalTargetId] = useState("");
+  const requestedTargetId = onSelectPortfolio ? (selectedPortfolioId ?? "") : localTargetId;
+  const effectiveOverallTargetId =
+    (portfolios.some((p) => p.id === requestedTargetId) ? requestedTargetId : "") ||
+    anchoredPortfolioIds[0] ||
+    "";
+  const selectOverallTarget = (id: string) =>
+    onSelectPortfolio ? onSelectPortfolio(id) : setLocalTargetId(id);
   const overallConfirmTarget =
     targetPortfolios.find((p) => p.id === effectiveOverallTargetId) ?? targetPortfolios[0];
 
@@ -280,7 +293,7 @@ export default function RecommendationCard({
   const overallSelection: OverallTargetSelection = {
     targetPortfolios,
     selectedTargetId: effectiveOverallTargetId,
-    onSelectTarget: setSelectedOverallTargetId,
+    onSelectTarget: selectOverallTarget,
     anchoredTargetIds: anchoredPortfolioIds,
     confirmTarget: overallConfirmTarget,
   };

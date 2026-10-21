@@ -203,6 +203,7 @@ export function AnalysisPanel({
                   })()}
                   autoOpenExecution={autoOpenExecution}
                   cashIsLive={cashIsLive}
+                  onReanalyze={() => triggerRebalancingAnalysis(analysis.portfolio_id)}
                 />
                 <RebalancingAccountSyncSection
                   accounts={analysisAccounts}

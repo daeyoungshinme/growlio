@@ -167,6 +167,14 @@ async def _process_rebalancing_alert(
         push_title = f"리밸런싱 알림 — {portfolio.name}"
         push_body = f"{portfolio.name} 정기 리밸런싱 리포트"
 
+    # 복합신호만으로 보낸 알림은 특정 포트폴리오 주문 화면이 아니라 진단 탭으로 연다 —
+    # REBALANCING+portfolio_id면 앱이 그 포트폴리오의 실행 모달을 띄웠다(plans/63 P3-4)
+    push_data = (
+        {"type": "REBALANCING", "portfolio_id": str(portfolio.id)}
+        if drift_count or not is_composite_triggered
+        else {"type": "MARKET_SIGNAL"}
+    )
+
     # 이메일 독립 처리
     email_sent = False
     try:
@@ -194,7 +202,7 @@ async def _process_rebalancing_alert(
             title=push_title,
             body=push_body,
             fcm_token=fcm_token,
-            data={"type": "REBALANCING", "portfolio_id": str(portfolio.id)},
+            data=push_data,
         )
     except Exception as exc:
         logger.warning("rebalancing_alert_push_failed", alert_id=str(alert.id), error=str(exc))

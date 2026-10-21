@@ -1,16 +1,13 @@
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import type { ExecutionResult } from "@/api/rebalancing";
-import { syncAccount } from "@/api/assets";
-import { invalidateSyncData } from "@/utils/queryInvalidation";
+import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { isOverseasMarket } from "@/constants/markets";
 import { fmtKrw } from "@/utils/format";
 import { SideBadge, StatusBadge } from "./RebalancingBadges";
 
-type SyncState = "idle" | "syncing" | "done" | "error";
-
 interface Props {
   results: ExecutionResult[];
+  /** 동기화가 모두 성공하면 호출 — 분석 화면이 실행 후 잔고로 다시 분석한다 */
+  onSynced?: () => void;
 }
 
 function fmtOrderPrice(price: number | null | undefined, market: string): string {
@@ -18,17 +15,12 @@ function fmtOrderPrice(price: number | null | undefined, market: string): string
   return isOverseasMarket(market) ? `$${price.toFixed(2)}` : fmtKrw(price);
 }
 
-export function RebalancingResultSection({ results }: Props) {
-  const queryClient = useQueryClient();
-  const [syncState, setSyncState] = useState<SyncState>("idle");
+export function RebalancingResultSection({ results, onSynced }: Props) {
+  const { state: syncState, run: syncAccounts } = useSyncAccounts();
 
   async function handleSync() {
-    setSyncState("syncing");
-    const accountIds = [...new Set(results.map((r) => r.account_id))];
-    const settled = await Promise.allSettled(accountIds.map((id) => syncAccount(id)));
-    const allOk = settled.every((s) => s.status === "fulfilled");
-    setSyncState(allOk ? "done" : "error");
-    await invalidateSyncData(queryClient);
+    const ok = await syncAccounts([...new Set(results.map((r) => r.account_id))]);
+    if (ok) onSynced?.();
   }
 
   if (results.length === 0) return null;
@@ -156,7 +148,7 @@ export function RebalancingResultSection({ results }: Props) {
             onClick={() => void handleSync()}
             className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
           >
-            계좌 동기화
+            {onSynced ? "계좌 동기화 후 다시 분석" : "계좌 동기화"}
           </button>
         )}
         {syncState === "syncing" && (
@@ -166,7 +158,9 @@ export function RebalancingResultSection({ results }: Props) {
           </div>
         )}
         {syncState === "done" && (
-          <span className="text-sm text-green-600 dark:text-green-400">동기화 완료</span>
+          <span className="text-sm text-green-600 dark:text-green-400">
+            {onSynced ? "동기화 완료 — 분석을 갱신했어요" : "동기화 완료"}
+          </span>
         )}
         {syncState === "error" && (
           <div className="flex items-center gap-2">

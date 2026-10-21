@@ -214,9 +214,12 @@ export default function PortfolioManageTab({
       investment_horizon: InvestmentHorizon | null;
       tax_type: AccountTaxType | null;
     }) => createPortfolio(args),
-    onSuccess: () => {
+    onSuccess: (created) => {
       void invalidatePortfolioData(qc);
       closeEditor();
+      // 만든 포트폴리오를 바로 선택·분석 — 추천에서 "새 포트폴리오 만들기"로 온 경우 목록에서 다시 찾아
+      // 눌러야 하던 단계를 없앤다(기존 포트폴리오에 추천 적용 시와 같은 동작, plans/63 P3-2)
+      if (created?.id) onAnalyze(created.id);
     },
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 저장에 실패했습니다"), "error"),
   });

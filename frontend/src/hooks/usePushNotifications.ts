@@ -57,7 +57,18 @@ export function resolvePushDeepLink(
     }
     case "REBALANCING_PLAN_PENDING":
     case "REBALANCING_EXECUTED":
+    case "REBALANCING_PLAN_EXECUTION_FAILED":
       return "/rebalancing?rtab=이력";
+    // 세금·시장·하루 한도 게이트로 자동 실행이 보류된 알림 — 해결은 자동화 설정 조정이라 설정 모달로 연다
+    // (예전엔 매핑이 없어 알림을 눌러도 앱 첫 화면에 머물렀다, plans/63 P3-4)
+    case "REBALANCING_TAX_GATE_BLOCKED":
+    case "REBALANCING_MARKET_GATE_BLOCKED":
+    case "REBALANCING_DAILY_CAP_BLOCKED": {
+      const portfolioId = data.portfolio_id;
+      return portfolioId
+        ? `/rebalancing?rtab=포트폴리오&portfolioId=${portfolioId}&openAlert=1`
+        : "/rebalancing?rtab=포트폴리오";
+    }
     case "MARKET_SIGNAL":
       return "/rebalancing?rtab=진단";
     case "GOAL_ASSET":
