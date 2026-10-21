@@ -32,9 +32,11 @@ const PortfolioExecutionTab = lazy(
 );
 const RebalancingHistoryTab = lazy(() => import("../components/rebalancing/RebalancingHistoryTab"));
 const BacktestTab = lazy(() => import("../components/rebalancing/BacktestTab"));
+const TacticalAllocationTab = lazy(() => import("../components/rebalancing/TacticalAllocationTab"));
 
 // 추천은 목록·분석·실행과 역할이 달라 포트폴리오 탭에서 분리(계획 37 U6) — 포트폴리오 탭은 내 포트폴리오 전용
-const REBALANCING_PAGE_TABS = ["진단", "추천", "포트폴리오", "이력"] as const;
+// "전술": 매크로+차트 국면 기반 QQQ/SPY 목표 비중 제안 — 적용 후 실행은 포트폴리오 탭의 기존 분석·실행 흐름으로
+const REBALANCING_PAGE_TABS = ["진단", "추천", "전술", "포트폴리오", "이력"] as const;
 type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];
 
 export default function RebalancingPage() {
@@ -248,6 +250,18 @@ export default function RebalancingPage() {
                 }}
                 initialOptionsOpen={searchParams.get("openRecOptions") === "1"}
                 onOptionsClosed={clearOpenRecOptions}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+
+        {/* ── 전술 탭: QQQ/SPY 전술 배분 국면·제안 비중 → 목표 비중 적용 후 포트폴리오 탭에서 실행 ── */}
+        {localTab === "전술" && (
+          <ErrorBoundary variant="section">
+            <Suspense fallback={<SkeletonCard />}>
+              <TacticalAllocationTab
+                initialPortfolioId={portfolioId}
+                onGoToExecution={(id) => handlePortfolioSelectFromDiagnosis(id)}
               />
             </Suspense>
           </ErrorBoundary>

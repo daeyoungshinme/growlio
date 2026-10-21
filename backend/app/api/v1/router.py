@@ -21,6 +21,7 @@ from app.api.v1 import (
     rebalancing_plan_public,
     settings,
     stocks,
+    tactical,
     tax,
     trades,
     transactions,
@@ -50,4 +51,5 @@ router.include_router(alerts.router)
 router.include_router(tax.router)
 router.include_router(economic_indicators.router)
 router.include_router(market_signals.router)
+router.include_router(tactical.router)
 router.include_router(external.router)

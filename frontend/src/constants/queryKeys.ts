@@ -98,4 +98,13 @@ export const QUERY_KEYS = {
     initialAmount: number,
   ) => ["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount] as const,
   inflationSummary: ["inflation-summary"] as const,
+  /** QQQ/SPY 전술 배분 국면·제안 비중(포트폴리오별) */
+  tacticalStatus: (portfolioId: string) => ["tactical-status", portfolioId] as const,
+  /** 무효화 프리픽스 전용 */
+  tacticalStatusBase: ["tactical-status"] as const,
+  /** 전술 배분 규칙 백테스트(포트폴리오별 비중표 × 기간) */
+  tacticalBacktest: (portfolioId: string, years: number) =>
+    ["tactical-backtest", portfolioId, years] as const,
+  /** 무효화 프리픽스 전용 */
+  tacticalBacktestBase: ["tactical-backtest"] as const,
 } as const;

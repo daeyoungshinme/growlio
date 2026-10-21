@@ -150,6 +150,7 @@ API Request
         ├── economic_indicators.py  # 미국 CPI/Core CPI 요약(GET /economic-indicators/inflation-summary) — 프론트 진단탭 MarketSignalBanner(InflationIndicatorList) 전용. 이 엔드포인트만 존재
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
         ├── market_signals.py       # VIX·미국 금리 커브·하이일드 스프레드 등 복합 신호 (/market-signals)
+        ├── tactical.py             # QQQ/SPY 전술 배분(/tactical/{portfolio_id}) — GET 국면·차트지표·제안비중(조회 시에도 국면 확정 진행), PUT 켜기/설정, DELETE 끄기, POST /apply(제안 비중을 포트폴리오 목표로 저장 — **주문 없음**, 실행은 기존 리밸런싱 화면), GET /backtest(규칙 백테스트)
         ├── positions.py            # 포지션 CRUD + 현재가 sync (assets.py 하위, /assets/{id}/positions)
         ├── exchange_rate_alerts.py # 환율 알림 CRUD (alerts.py 하위, /alerts/exchange-rate)
         ├── rebalancing_alerts.py   # 리밸런싱 드리프트 알림 (alerts.py 하위, /alerts/rebalancing)
@@ -258,6 +259,11 @@ services/
   ├── action_items_service.py       # 홈 "지금 할 일"(`get_action_items`) — 리밸런싱 필요(drift_summary_service)·자동매수 예수금 부족(jobs/dca_cash_shortfall.`find_dca_cash_shortfalls`)·세금 경고+절세 1순위(`tax_action_service.get_tax_action_plan_with_summary` — 요약 재계산 없음)·챌린지 미입금(`get_challenge_summary`)을 `ActionItem` 한 모양으로 모아 우선순위→마감 순 최대 5건. 소스는 순차 호출·개별 실패 격리(실패 시 rollback), 결과 캐시 없음(각 소스 캐시 사용). 추천 비중 변화는 MVO 비용 때문에 제외. E12(일일 요약 알림)가 재사용할 집계 함수
   ├── market_data_fetcher.py        # [팩터·리스크용 배치 수익률 그룹] 시장 데이터 수집 유틸 (VIX, 금리차 등) — 개별 현재가 조회(price_service.py 등)와는 별개 책임
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가(VIX·미국 금리 커브·하이일드 스프레드·달러인덱스·환율·유가·인플레이션(CPI+PCE)·고용(실업률) 8종, 상한 27점). `get_confirmed_composite_level()`은 AUTO 게이트·등급전환 알림 전용 hysteresis(연속 2회 관측), raw(`get_market_signal`)는 배너 표시용으로 별개. 캐시·single-flight 진입점+hysteresis만 담당하고 개별 지표 조회는 `market_signal_indicators.py`, 복합 점수 계산(순수 함수)은 `market_signal_scoring.py`로 분리 — 외부는 계속 `market_signal_service`에서 import(재노출). 지표 fetcher끼리 내부 호출(인플레이션→CPI/PCE, 금리커브→장단기/인하기대)하므로 그 patch는 `market_signal_indicators.*` 경로로
+  ├── technical_indicators.py       # 차트 기술적 지표 순수 함수(SMA50/200·RSI14·MACD 히스토그램·52주 고점 대비·추세 UP/NEUTRAL/DOWN/UNKNOWN, 백테스트용 `trend_series`). 추세는 200일선 ±1% 히스테리시스(`TREND_BAND_PCT`, 직전 상태 이어받음 — 스냅샷도 `trend_series` 마지막 값). pandas는 TYPE_CHECKING/함수 내부 import — 앱 기동 시 pandas 로드 방지
+  ├── technical_signal_service.py   # QQQ/SPY/DIA 일봉(`fetch_yf_close_series`) → 지표 스냅샷, 전역 6h 캐시(QQQ·SPY 일부 실패 시 10분 — DIA는 표시 전용이라 실패해도 정상 TTL)
+  ├── tactical_allocation_service.py # 전술 배분 국면 판정(`classify_regime`: 매크로 확정등급 × SPY/QQQ 추세 → RISK_ON/NEUTRAL/RISK_OFF, STALE 매크로는 공격·방어 판정에 안 씀, **이미 RISK_ON이면 매크로 YELLOW까지 유지** — `evaluate_market`이 prev 유무 두 경우를 계산하고 `observed_for`가 선택)·확정(`step_confirmation`/`advance_regime`: 같은 새 국면이 서로 다른 KST 날짜 2회 — 백테스트도 같은 함수)·틸트 월 1회 갱신(`advance_tilt`)·국면별 비중표(기본값/검증)·제안 비중(`proposed_weights_for` = 비중표 + 틸트)·포트폴리오 목표 교체(`apply_regime_to_portfolio`, QQQ/SPY/DIA/CASH 외 종목 삭제). **DIA(다우)는 비중표 전용 선택 자산**(기본 0%, 판정·틸트 미사용, `format_weights`는 0%면 생략). 알림 판정은 `last_regime != notified_regime`(조회가 확정을 진행해도 알림 유실 없음)
+  ├── tactical_tilt.py              # 나스닥/S&P 틸트 — 국면과 별개로 주식 몫 안에서 QQQ↔SPY만 `tilt_shift_pct`%p 이동(0~20, 0=끔). 입력: 10년 실질금리 DFII10 20거래일 변화 + QQQ/SPY 비율의 50일 평균 대비 이격(`get_tilt_inputs`, 전역 6h 캐시 — 부분 실패는 미캐시). 판정은 월 1회(매일 갱신 시 10년 130회+ 매매로 국면 완충 상쇄)
+  ├── tactical_backtest.py          # 전술 배분 규칙 백테스트 — 실시간과 같은 `classify_regime`을 과거 일봉에 적용(룩어헤드 없음, 2거래일 확정, 전환 시에만 리밸런싱, 현금 0%, 틸트는 매월 첫 거래일 판정 — DFII10 이력 사용). **매크로는 VIX만으로 근사**(ICE 하이일드 등은 FRED 이력 ~3년) — 응답 `macro_note`로 고지. 비중표+틸트 이동폭 해시+기간 1일 캐시. DIA 시세는 선택 — 결측이면 DIA 비교를 빼고 진행, 비중표에 DIA>0이면 오류
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어) — `estimation.py` 축소추정을 프론티어 곡선·포트폴리오 위치·종목 좌표에 일관 적용
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송
@@ -287,7 +293,7 @@ core/                         # 설정·DB·in-memory 캐시 store
   ├── database.py              # SQLAlchemy async engine/session, Base
   ├── logging.py               # structlog 시크릿 redact 프로세서(`redact_secrets`, appkey/Bearer/password 등 마스킹 — dict/list 값은 재귀로 돌며 token/secret/password 등 민감 키 값을 통째로 가림) + yfinance 404 소음 필터 — `configure_logging()`. 계좌번호·이메일을 로그에 남길 땐 `utils/masking.py` 사용. **응답·DB·알림에 예외 사유를 남길 땐 `str(e)` 대신 `public_error_message(e)`** — `HTTPException`·`AppError`·`SyncError`·`BrokerOrderRejectedError`(주문 거부)·`BrokerRequestError`·`KisApiError`·`KiwoomApiError`·`ValueError`만 메시지를 내보내고 나머지(SQLAlchemy·httpx 등, SQL 파라미터·URL 쿼리스트링의 계좌번호가 섞임)는 타입명으로 대체한다
   └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 싱글톤, get_cache_store/close_cache_store. `sweep_expired()`를 `jobs/cache_sweep.py`가 15분마다 호출해 만료 키 능동 청소. 항목 수 상한(`_MAX_ENTRIES`=20,000, LRU 축출)으로 메모리 무한 증가 방지. **주의**: 워커/인스턴스 2개 이상으로 늘리면 캐시가 프로세스 로컬이라 적중률 급락 + 무효화 미전파 — 확장 시 공유 캐시(Redis) 재도입 필요(`render.yaml`은 단일 워커/단일 인스턴스 전제)
-kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote, realized — 해외 기간손익 TTTS3039R, 모의투자 미지원)
+kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote, realized — 해외 기간손익 TTTS3039R, 모의투자 미지원, exchange_master). **해외 거래소 코드 주의**: 주문/잔고 OVRS_EXCG_CD는 NASD/NYSE/AMEX, 시세 EXCD는 NAS/NYS/AMS(`OVERSEAS_QUOTE_EXCD`)로 체계가 다르다. KIS는 NYSE Arca ETF(SPY·VOO·SCHD 등)를 **AMEX**로 분류하지만 Yahoo PCX→"NYSE"로 저장되므로 `exchange_master.resolve_kis_overseas_market()`(KIS 공식 AMS 종목마스터 1일 캐시)로 KIS 주문(`execution_service._normalize_kis_overseas_markets`)·시세 직전에 보정 — 키움은 같은 종목을 NYSE로 분류해 무보정
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants). `client.py`는 KIS와 동일 `AsyncRateLimiter`로 `kiwoom_rate_per_second`(기본 4.0) 제한 — http_client.py의 rate-limit 감지가 키움 `return_code=5`(=EGW00201) 대응
 toss/                         # 토스증권 Open API 클라이언트 (auth, balance, client, constants). OAuth2 Client Credentials(form-encoded), 국내+미국 보유종목 `GET /api/v1/holdings` 통합, 예수금 `/api/v1/buying-power`. 샌드박스 없음, 토큰 ~1h(지연 갱신), **`Open API → IP 관리`에 서버 IP 등록 필수**(미등록 시 403 `edge-blocked`). `toss_rate_per_second`(기본 1.0) 제한 — http_client.py가 토스 `error.code=rate-limit-*` 감지
 providers/                    # 금융 데이터 provider
@@ -329,6 +335,7 @@ jobs/                         # APScheduler 정기 작업
   ├── rebalancing_alert.py    # 10분 간격 — 리밸런싱 드리프트 초과 시 이메일 알림(SCHEDULE/DRIFT/BOTH 조건 체크)
   ├── market_signal_alert.py  # 1시간 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
   ├── market_signal_daily_digest.py  # 매일 08:30 KST — 등급 전환 여부와 무관하게 현재 시장 신호를 요약 발송(옵트인, 기본 OFF)
+  ├── tactical_regime_check.py       # 매일 07:40 KST(미국 장 마감 후) — 전술 배분 국면 확정·틸트(월 1회) 갱신 + 확정 국면이 `notified_regime`과 다르면 이메일/푸시(`TACTICAL_REGIME`, 이미 적용한 국면·알림 OFF면 무발송, 틸트 단독 변경은 무알림). 주문 없음
   ├── year_end_tax_reminder.py       # 11~12월 매주 월요일 09:00 KST — 손실수확 후보·연금공제 잔여한도·ISA 만기 현황 요약 발송(옵트인, 기본 OFF). 알릴 내용이 없으면 스킵
   ├── recommendation_drift_alert.py  # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오와 유의미하게 달라지면 이메일/푸시 발송(옵트인, 기본 OFF)
   ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고). **스케줄 준수**: BOTH는 매일, DRIFT_ONLY/SCHEDULE_ONLY는 `alerts/calculator.is_auto_schedule_day`(주말 지정일은 다음 평일로 이월)일 때만 — 이 체크가 빠지면 월간 AUTO(정기 적립식 자동매수 포함)가 매 거래일 실행됨. SCHEDULE_ONLY는 스케줄일에 임계값 0으로 계획 생성(`plan_generation.build_pending_plan_for_alert`)

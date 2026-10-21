@@ -315,10 +315,13 @@ async def _price_via_kis(
 
             price = await get_domestic_price(app_key, app_secret, token, ticker, is_mock=is_mock)
         else:
+            from app.kis.exchange_master import resolve_kis_overseas_market
             from app.kis.overseas_quote import get_overseas_price
 
-            result = await get_overseas_price(app_key, app_secret, token, ticker, market, is_mock=is_mock)
-            price = float(result.get("price", 0)) or None
+            kis_market = await resolve_kis_overseas_market(ticker, market, cache)
+            result = await get_overseas_price(app_key, app_secret, token, ticker, kis_market, is_mock=is_mock)
+            # 현지통화(USD) 시세 — Yahoo 경로와 같은 단위. 과거 "price" 키를 읽어 항상 None이던 버그 수정.
+            price = float(result.get("price_usd", 0)) or None
     except Exception as e:
         logger.warning("kis_price_fetch_failed", ticker=ticker, market=market, error=str(e))
         kis_circuit.record_failure()

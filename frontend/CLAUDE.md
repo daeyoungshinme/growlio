@@ -90,7 +90,7 @@ make build-android-release         # APK Release 빌드
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 + 절세 + 적립 챌린지 (InvestPlanPage, 상단 탭: 적립 계획/배당 계획/절세/챌린지)
 - `/settings` — DART API 키, 계정 정보(비밀번호 변경), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). 계좌 연동·목표·DCA·추천 옵션·알림 설정은 각 페이지에 실제 편집 UI가 있고 설정 탭엔 상태 요약 + 딥링크만
 - `/settings/notifications` — 알림 설정 상세(`NotificationSettingsPage`, `/settings`에서 딥링크). 공통 수신 이메일(`NotificationEmailSection`) + `CollapsibleCard` 3개("정기 리포트·요약"/"즉시 알림"/"시장 모니터링") + 환율/주가/발송이력 탭. `MarketSignalBanner.tsx`/`RebalancingHistoryTab.tsx`의 `?atab=` 딥링크가 이 경로를 가리킴
-- `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
+- `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage, `?rtab=` 진단/추천/전술/포트폴리오/이력)
 - 미매칭 경로(`*`)는 `/dashboard`로 리다이렉트
 
 > `/market`, `/portfolio`, `/asset-management`, `/trend` 라우트는 존재하지 않음(과거 구조, 제거됨). `BottomNav`(`src/constants/nav.ts`)도 홈/자산/리밸런싱/계획/설정 5탭만 존재.
@@ -121,6 +121,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/portfolio-analysis/TaxTabContainer.tsx`** — 계획탭 "절세" 서브탭 진입점(lazy, `InvestPlanPage`). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`·`TaxOptimizationCard`를 묶음. 탭 상태 `?taxTab=`, 세금 추정 계좌 `?taxAccount=` 영속화. `taxTab` 미지정 딥링크는 "한도 현황" 랜딩. 옛 `/assets?portfolioTab=세금` 링크는 `utils/legacyTabRedirect.ts`가 이쪽으로 옮김.
 - **`components/portfolio/AllocationCard.tsx`** — 자산탭 투자현황의 비중 분석 카드(lazy). 국내/해외(상장시장 ↔ 실제 투자지역 토글)·종목·지수별 비중을 탭 1개 카드로 통합. 하위 뷰는 `components/portfolio/allocation/`(`RegionAllocationView`/`StockAllocationView`/`IndexAllocationView` + 공용 `WeightBarRow`·`ListingBadge`·`SegmentedControl`). "종목" 보기는 아래 보유 종목 목록(`StockHoldingsTable`)과 겹치지 않게 상위 5 + "기타 N종목"만 그리고, "보유 종목 전체 비중순 보기"가 `PortfolioPage`를 거쳐 목록의 `sortRequest` prop으로 비중순 정렬 + 스크롤한다. 모바일 기본 접힘(아래 콜랩스 규칙 예외).
 - **`components/assets/AccountHistoryTab.tsx`** — 계좌관리 "내역" 탭. 세그먼트 "현금 흐름"(입출금·배당 `TransactionHistoryTab`) / "매수 내역"(`PeriodPurchasesTab` — 월/연 매수 종목·수익률, 스냅샷 추정 `추정`/수기 `기록` 배지 + `TradeFormModal`로 매수/매도 기록, 해외 USD→KRW 환산). 세그먼트는 `?history=` 영속. 옛 `atab=입출금·배당`/`기간별 매수`는 `legacyHistorySegment()`로 변환.
+- **`components/rebalancing/TacticalAllocationTab.tsx`** — 리밸런싱 "전술" 탭(lazy). 포트폴리오 선택 → `useTacticalStatus`로 QQQ/SPY 전술 배분 국면(매크로 확정등급 × 차트 추세, 2일 확정)·지표·현재/제안 비중 표시, 켜기/알림 토글/끄기, "제안 비중 적용"(`ConfirmModal` 경유 → `POST /tactical/{id}/apply`, **주문 없음**) 후 "리밸런싱 분석·실행으로 이동"으로 포트폴리오 탭의 기존 실행 흐름에 넘긴다. 나스닥/S&P 틸트 상태(`TiltSummary`)도 표시. DIA(다우) 지표는 "참고 · 국면 판단 미반영"으로 표시하고, 비중 비교 표의 DIA 행은 현재·제안 모두 0%면 숨긴다. 하위 `TacticalBacktestSection.tsx`(규칙 백테스트, 기본 접힘 `growlio:rebalancing:tactical-backtest-open`), `TacticalWeightsEditor.tsx`(전략 켠 경우 국면별 비중표 3국면×4자산(QQQ/SPY/DIA/현금 — DIA는 선택 자산, 응답에 없으면 0) + 틸트 이동폭 0~20%p 편집, 기본 접힘 `growlio:rebalancing:tactical-weights-open`, 서버 값 변경 시 `key`로 재마운트해 초안 초기화), 문구·색상 `tacticalLabels.ts`. 설정 upsert는 항상 현재 `tilt_shift_pct`를 함께 보낸다(생략 시 서버 기본값 10으로 덮임).
 - **`components/portfolio-analysis/TaxLimitsSection.tsx`** — "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`(계좌 조건부) + `HealthInsuranceRiskCard`(항상)를 감싸는 순수 프레젠테이션. 항상 전체 계좌 기준(`accountId` prop 없음). 항상 렌더 카드가 있어 empty-state 없음.
 - **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드(lazy). 리밸런싱 페이지 **"추천" 서브탭**(진단/추천/포트폴리오/이력, `rtab=추천`) 전용 — 추천 관련 딥링크는 `rtab=추천`, 포트폴리오 생성·관리·실행은 `rtab=포트폴리오`. `openRecOptions=1`이면 옵션 모달을 연 채 마운트. 전체/연령대/기간별 3탭. 적용 대상은 모든 포트폴리오(기준 포트폴리오 우선 선택). 결과 렌더는 `RecommendationResultPanel.tsx`로 통합, 탭별 문구·`useMutation`·전환 상태머신은 이 파일.
 - **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 곳(분석/실행 패널, 진단탭 CTA, 계획탭 배너)은 `portfolioId=<id>&openAlert=1` URL 파라미터로 요청한다(`openAlert=dca`는 신규 알림일 때 정기 적립식 자동매수 프리셋 화면으로 바로 연다 — 계획탭 `AutoInvestStatusBanner`의 "자동매수 설정"). 새 진입점도 모달을 직접 마운트하지 말고 이 파라미터를 쓸 것.
@@ -188,6 +189,7 @@ _리밸런싱/추천_
 - `useAddSuggestedCandidates.ts` — 목표 역산 추천의 `suggested_candidates`(고배당 미등록 후보 제안)를 "후보에 추가" 클릭으로 승인하는 뮤테이션. `RecommendationCard.tsx`/`DividendPlanSection.tsx` 공용
 - `useCandidateOverlap.ts` — 추천 후보 ETF 중복·총보수 분석(`POST /rebalancing/candidates/overlap`) 조회. 후보 편집 연타 시 요청 폭주를 막는 디바운스(`CANDIDATE_OVERLAP_DEBOUNCE_MS`) 포함. 표시 헬퍼는 `utils/etfOverlap.ts`
 - `usePortfolioTabFetching.ts`(`useMainPageFetching`) — 홈·포트폴리오 탭 주요 쿼리 중 하나라도 fetch 중인지(새로고침 인디케이터용)
+- `useTacticalAllocation.ts` — QQQ/SPY 전술 배분: `useTacticalStatus`(국면·지표·제안 비중) / `useTacticalBacktest`(카드 펼칠 때만) / `useTacticalMutations`(켜기·설정 `upsert`, 끄기 `disable`, 제안 비중 적용 `apply` — 적용은 포트폴리오 목표가 바뀌므로 `invalidateTacticalData(qc, { portfolioChanged: true })`)
 
 _알림 토글_ (설정 페이지, `["settings"]` boolean 필드 조회/PUT 패턴)
 
@@ -334,6 +336,8 @@ _기타_
 | 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표)          | `["portfolio-expected-metrics", portfolioId]`                                                                               |
 | 목표 설정 마법사 필요수익률·적립액 가이드 프리뷰                   | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]`                                         |
 | CPI/Core CPI 인플레이션 요약                                       | `["inflation-summary"]`                                                                                                     |
+| QQQ/SPY 전술 배분 국면·제안 비중 (포트폴리오별)                    | `["tactical-status", portfolioId]` — `tacticalStatusBase` 무효화 전용                                                       |
+| 전술 배분 규칙 백테스트                                            | `["tactical-backtest", portfolioId, years]` — `tacticalBacktestBase` 무효화 전용(비중표 변경 시)                            |
 
 > 모든 키는 `src/constants/queryKeys.ts`의 `QUERY_KEYS` 상수에서 import. 문자열 하드코딩 금지. 새 키 추가 시 이 표도 함께 갱신.
 
@@ -501,7 +505,7 @@ _기타_
 - 보조/상세 카드(`InvestmentSnapshotCard`, `RebalancingStatusCard`, `TaxLimitsSection` 등)는 `useCollapsible`로 접기 가능하게 하되, 최초 방문 시 기본값은 **열림**(`true`)으로 시작 — 사용자가 직접 접으면 그 상태가 `localStorage`로 유지된다.
 - 단, 이미 펼쳐진 부모 카드 내부의 2차 상세 토글(`MarketSignalBanner` 매크로·물가 지표 확장, `RebalancingDetailMetrics`, `RebalancingDiagnosisCard` 등 영속화 키 없는 세션 한정 토글)은 이 규칙 대상이 아님 — "최상위 카드"에만 적용되는 규칙이므로 중첩된 하위 토글까지 강제로 펼칠 필요는 없다.
 - 새 카드 추가 시 이 규칙을 따를 것.
-- 예외: `RebalancingPage.tsx` "포트폴리오" 탭의 백테스트 카드와 계획탭 "절약 복리 시뮬레이터" 카드는
+- 예외: `RebalancingPage.tsx` "포트폴리오" 탭의 백테스트 카드·"전술" 탭의 규칙 백테스트 카드와 계획탭 "절약 복리 시뮬레이터" 카드는
   보조 도구라 **기본 접힘**(`growlio:rebalancing:backtest-section-open`, `growlio:invest:savingsSimulatorOpen`).
 - 예외: 자산탭 투자현황의 `AllocationCard`(비중 분석)는 **모바일(<640px)만 기본 접힘**(`growlio:portfolio:allocationOpen`, 사용자가 펼치면 유지) —
   바로 아래 보유 종목 목록이 첫 화면 가까이 오도록(plans/58). 접힘 힌트로 최대 종목·해외상장 비중을 보여준다.
@@ -540,6 +544,7 @@ _기타_
 - 브로커 API 키 삭제(연동 해제) 후: `invalidateBrokerCredentialData(queryClient)` — 계좌 데이터 + 리밸런싱 알림·대기 플랜 무효화.
 - 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions(전체·계좌별 프리픽스) + dashboard + 챌린지·연금/ISA·세금·지금 할 일 + 배당 요약·배당 계획(DIVIDEND 거래) 무효화.
 - 수기 매매 기록 CUD 후: `invalidateTradeData(queryClient)` — trades + period-purchases 무효화.
+- 전술 배분 설정 변경 후: `invalidateTacticalData(queryClient)` — tactical-status + tactical-backtest. 제안 비중 적용(포트폴리오 목표 교체) 후엔 `{ portfolioChanged: true }`로 `invalidatePortfolioData`까지.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + dividend-plan + challenges + action-items 무효화.
 - 소득 구간 변경 후: `invalidateIncomeBracketData(queryClient)` — tax-action-plan + settings + action-items 무효화.

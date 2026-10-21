@@ -21,6 +21,7 @@ EXPECTED_JOB_IDS = {
     "monthly_report_job",
     "goal_achievement_check_daily",
     "market_signal_daily_digest",
+    "tactical_regime_check_daily",
     "year_end_tax_reminder",
     "recommendation_drift_alert",
     "challenge_deposit_reminder",
