@@ -46,7 +46,7 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
     [portfoliosRaw],
   );
 
-  const { data: accountsRaw } = useQuery({
+  const { data: accountsRaw, isLoading: accountsLoading } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
   });
@@ -116,6 +116,7 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
           autoAnalyzeId={portfolioId}
           alertByPortfolioId={alertByPortfolioId}
           autoOpenExecution={autoOpenExecution}
+          accountsReady={!accountsLoading}
         />
       </ErrorBoundary>
     </div>

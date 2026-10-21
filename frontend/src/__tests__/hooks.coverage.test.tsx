@@ -38,6 +38,7 @@ vi.mock("@/context/ExchangeRateContext", () => ({
 
 vi.mock("@/api/rebalancing", () => ({
   analyzePortfolio: vi.fn(),
+  fetchBrokerBalance: vi.fn(),
   fetchRebalancingAlerts: vi.fn(),
 }));
 
@@ -450,8 +451,10 @@ describe("useAnalysisState", () => {
     const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "2" }));
 
     let first: Promise<void> = Promise.resolve();
-    act(() => {
+    // 첫 요청이 실시간 예수금 조회를 마치고 분석 API까지 나간 뒤에 두 번째 요청을 보낸다
+    await act(async () => {
       first = result.current.triggerRebalancingAnalysis("1");
+      await vi.waitFor(() => expect(analyzePortfolio).toHaveBeenCalledTimes(1));
     });
     await act(async () => {
       await result.current.triggerRebalancingAnalysis("2");
@@ -463,6 +466,45 @@ describe("useAnalysisState", () => {
 
     expect(result.current.analysis).toEqual({ portfolio_id: 2, items: [] });
     expect(result.current.analyzing).toBe(false);
+  });
+
+  it("모든 분석 경로가 증권사 실시간 예수금 합계를 override로 보낸다 (plans/63 P1-1)", async () => {
+    const { analyzePortfolio, fetchBrokerBalance } = await import("@/api/rebalancing");
+    vi.mocked(analyzePortfolio).mockResolvedValue({ portfolio_id: 1, items: [] } as never);
+    vi.mocked(fetchBrokerBalance)
+      .mockResolvedValueOnce({ deposit_krw: 300_000, error: null } as never)
+      .mockResolvedValueOnce({ deposit_krw: 0, error: "조회 실패" } as never);
+    const accounts = [
+      { id: "a1", asset_type: "STOCK_KIS" },
+      { id: "a2", asset_type: "STOCK_KIWOOM" },
+      { id: "m1", asset_type: "BANK" },
+    ] as never[];
+
+    const { result } = renderHook(() =>
+      useAnalysisState({
+        selectedIdStr: "1",
+        autoAnalyzeId: "1",
+        getDepositAccounts: () => accounts,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.analysis).not.toBeNull());
+    expect(fetchBrokerBalance).toHaveBeenCalledTimes(2);
+    expect(analyzePortfolio).toHaveBeenCalledWith("1", undefined, 300_000);
+    expect(result.current.cashIsLive).toBe(true);
+  });
+
+  it("계좌 목록 로딩 전에는 자동 분석을 미룬다", async () => {
+    const { analyzePortfolio } = await import("@/api/rebalancing");
+    vi.mocked(analyzePortfolio).mockResolvedValue({ portfolio_id: 1, items: [] } as never);
+    const { rerender } = renderHook(
+      ({ ready }) =>
+        useAnalysisState({ selectedIdStr: "1", autoAnalyzeId: "1", accountsReady: ready }),
+      { initialProps: { ready: false } },
+    );
+    expect(analyzePortfolio).not.toHaveBeenCalled();
+    rerender({ ready: true });
+    await waitFor(() => expect(analyzePortfolio).toHaveBeenCalledTimes(1));
   });
 
   it("triggerRebalancingAnalysis 실패 시 error가 설정된다", async () => {

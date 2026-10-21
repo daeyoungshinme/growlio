@@ -3,8 +3,6 @@ import { ChartColumn, Loader2, RefreshCw } from "lucide-react";
 import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
-import { fetchBrokerBalance } from "@/api/rebalancing";
-import { isBrokerBalanceAccount } from "@/utils/accounts";
 
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
@@ -46,6 +44,15 @@ interface Props {
   autoAnalyzeId?: string;
   alertByPortfolioId: Record<string, RebalancingAlert>;
   autoOpenExecution?: boolean;
+  /** 계좌 목록 로딩 완료 여부 — 자동 분석이 실시간 예수금 조회 대상 계좌를 알고 시작하도록 */
+  accountsReady?: boolean;
+}
+
+/** 분석·예수금 기준 계좌 — 포트폴리오에 연결 계좌가 있으면 그 계좌들, 없으면 활성 계좌 전체 */
+function portfolioAccounts(portfolio: Portfolio | undefined, activeAccounts: AssetAccount[]) {
+  return portfolio?.account_ids?.length
+    ? activeAccounts.filter((a) => portfolio.account_ids!.includes(a.id))
+    : activeAccounts;
 }
 
 export function AnalysisPanel({
@@ -57,13 +64,28 @@ export function AnalysisPanel({
   autoAnalyzeId,
   alertByPortfolioId,
   autoOpenExecution,
+  accountsReady,
 }: Props) {
   const selectedIdStr = Array.from(selectedIds).sort().join(",");
   const portfolioItemsSignature = autoAnalyzeId
     ? JSON.stringify(portfolios.find((p) => p.id === autoAnalyzeId)?.items ?? [])
     : undefined;
-  const { mode, analysis, analyzing, error, triggerRebalancingAnalysis, setMode } =
-    useAnalysisState({ autoAnalyzeId, selectedIdStr, portfolioItemsSignature });
+  const getDepositAccounts = useCallback(
+    (id: string) =>
+      portfolioAccounts(
+        portfolios.find((p) => p.id === id),
+        activeAccounts,
+      ),
+    [portfolios, activeAccounts],
+  );
+  const { mode, analysis, analyzing, error, cashIsLive, triggerRebalancingAnalysis, setMode } =
+    useAnalysisState({
+      autoAnalyzeId,
+      selectedIdStr,
+      portfolioItemsSignature,
+      getDepositAccounts,
+      accountsReady,
+    });
 
   const analysisResultRef = useRef<HTMLDivElement>(null);
   const autoScrolledForRef = useRef<string | undefined>(undefined);
@@ -90,33 +112,10 @@ export function AnalysisPanel({
 
   const canRebalance = selectedIds.size === 1;
 
-  const handleRebalancingAnalysis = useCallback(async () => {
+  const handleRebalancingAnalysis = useCallback(() => {
     const [id] = Array.from(selectedIds);
-    if (!id) return;
-
-    const currentPortfolio = portfolios.find((p) => p.id === id);
-    const brokerAccounts = (
-      currentPortfolio?.account_ids?.length
-        ? activeAccounts.filter((a) => currentPortfolio.account_ids!.includes(a.id))
-        : activeAccounts
-    ).filter((a) => isBrokerBalanceAccount(a.asset_type));
-
-    let depositKrwOverride: number | undefined;
-    if (brokerAccounts.length > 0) {
-      const results = await Promise.allSettled(brokerAccounts.map((a) => fetchBrokerBalance(a.id)));
-      let total = 0;
-      let hasSuccess = false;
-      for (const r of results) {
-        if (r.status === "fulfilled" && !r.value.error) {
-          total += r.value.deposit_krw ?? 0;
-          hasSuccess = true;
-        }
-      }
-      if (hasSuccess) depositKrwOverride = total;
-    }
-
-    void triggerRebalancingAnalysis(id, depositKrwOverride);
-  }, [selectedIds, portfolios, activeAccounts, triggerRebalancingAnalysis]);
+    if (id) void triggerRebalancingAnalysis(id);
+  }, [selectedIds, triggerRebalancingAnalysis]);
 
   return (
     <div className="flex-1 min-w-0 space-y-4">
@@ -190,9 +189,7 @@ export function AnalysisPanel({
             const currentPortfolio = portfolios.find(
               (p) => p.id === analysis.portfolio_id.toString(),
             );
-            const analysisAccounts = currentPortfolio?.account_ids?.length
-              ? activeAccounts.filter((a) => currentPortfolio.account_ids!.includes(a.id))
-              : activeAccounts;
+            const analysisAccounts = portfolioAccounts(currentPortfolio, activeAccounts);
             return (
               <>
                 <RebalancingTable
@@ -203,6 +200,7 @@ export function AnalysisPanel({
                     alertByPortfolioId[analysis.portfolio_id.toString()]?.threshold_pct
                   }
                   autoOpenExecution={autoOpenExecution}
+                  cashIsLive={cashIsLive}
                 />
                 <RebalancingAccountSyncSection
                   accounts={analysisAccounts}

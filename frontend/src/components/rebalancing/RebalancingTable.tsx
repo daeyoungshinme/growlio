@@ -21,6 +21,8 @@ interface Props {
   onExecuted?: (results: ExecutionResult[]) => void;
   /** 푸시 알림 딥링크(openExecution=1)로 진입한 경우, 분석 결과가 준비되면 실행 모달을 자동으로 연다. */
   autoOpenExecution?: boolean;
+  /** 예수금이 증권사 실시간 잔고 기준인지(false면 마지막 동기화 시점 값) */
+  cashIsLive?: boolean;
 }
 
 export default function RebalancingTable({
@@ -30,6 +32,7 @@ export default function RebalancingTable({
   alertThreshold,
   onExecuted,
   autoOpenExecution,
+  cashIsLive = false,
 }: Props) {
   const tradableAccounts = accounts.filter((a) => isOrderExecutableAccount(a.asset_type));
   const [executionOpen, setExecutionOpen] = useState(false);
@@ -112,6 +115,7 @@ export default function RebalancingTable({
       <RebalancingSummaryCards
         analysis={analysis}
         cashAvailable={cashAvailable}
+        cashIsLive={cashIsLive}
         totalBuySummary={totalBuySummary}
         totalSellSummary={totalSellSummary}
         cashAfter={cashAfter}
