@@ -222,6 +222,20 @@ describe("MarketSignalBanner", () => {
     expect(screen.getByText("미국 CPI")).toBeDefined();
   });
 
+  it("onOpenTactical이 있을 때만 상세 영역에 전술 탭 이동 안내를 보여준다", () => {
+    const onOpenTactical = vi.fn();
+    const { unmount } = renderBanner();
+    expect(screen.queryByText(/전술 탭/)).toBeNull();
+    unmount();
+    renderWithProviders(
+      <MemoryRouter>
+        <MarketSignalBanner signal={mockSignal} onOpenTactical={onOpenTactical} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText(/전술 탭/));
+    expect(onOpenTactical).toHaveBeenCalledTimes(1);
+  });
+
   it("shows the on/off state text for the composite signal alert", async () => {
     renderBanner();
     expect(await screen.findByText("받는 중")).toBeDefined();

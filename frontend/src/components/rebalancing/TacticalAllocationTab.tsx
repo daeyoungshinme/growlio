@@ -207,7 +207,7 @@ function TacticalStatusView({
           <div>
             <h2 className="text-base font-semibold">QQQ·SPY 전술 배분</h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              매크로 신호와 차트 추세로 국면을 판단해 목표 비중을 제안해요. 자동 주문은 하지 않아요.
+              국면에 맞는 새 목표 비중을 제안해요. 적용해도 주문은 나가지 않아요.
             </p>
           </div>
           {regime ? (
@@ -222,10 +222,12 @@ function TacticalStatusView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-          <span title="연속 확인된 시장 위험 등급 — 자동 실행 판단과 같은 기준이라 진단 탭 표시 등급보다 늦게 바뀔 수 있어요">
-            매크로(확정)
-          </span>
+          <span>매크로(확정)</span>
           <MarketSignalLevelBadge level={status.macro_level} />
+          {/* 모바일은 title 툴팁이 안 뜬다 — 진단 탭 배지와 등급이 다를 수 있는 이유를 화면에 적는다 */}
+          <span className="basis-full text-gray-500 dark:text-gray-400">
+            진단 탭 시장 신호를 연속 확인한 등급이라 진단 탭보다 늦게 바뀔 수 있어요
+          </span>
           {status.macro_freshness === "STALE" && (
             <span className="text-amber-600 dark:text-amber-400">지표 데이터 지연</span>
           )}

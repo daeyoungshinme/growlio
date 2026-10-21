@@ -14,6 +14,8 @@ interface Props {
   signal: MarketSignalResponse;
   /** 미국 물가 지표 — 지정 시 상세 영역 하단에 함께 표시(별도 카드 대신, U9) */
   inflation?: InflationIndicatorSummary[];
+  /** 지정 시 상세 영역 하단에 "전술 탭" 이동 안내 — 이 신호로 목표 비중 자체를 바꾸는 곳은 전술 탭 */
+  onOpenTactical?: () => void;
 }
 
 const BANNER_BG: Record<MarketRiskLevel, string> = {
@@ -34,7 +36,7 @@ function scoreColor(level: MarketRiskLevel): string {
   return "text-red-600 dark:text-red-400";
 }
 
-export default function MarketSignalBanner({ signal, inflation }: Props) {
+export default function MarketSignalBanner({ signal, inflation, onOpenTactical }: Props) {
   const {
     composite_level,
     composite_score,
@@ -124,6 +126,16 @@ export default function MarketSignalBanner({ signal, inflation }: Props) {
             <div className="pt-2.5 border-t border-inherit">
               <InflationIndicatorList data={inflation} />
             </div>
+          )}
+
+          {onOpenTactical && (
+            <button
+              type="button"
+              onClick={onOpenTactical}
+              className={`${TOUCH_TARGET_ROW} gap-0.5 text-xs text-blue-600 dark:text-blue-400 hover:underline`}
+            >
+              이 신호로 QQQ·SPY 비중을 조절하려면 → 전술 탭
+            </button>
           )}
         </div>
       )}

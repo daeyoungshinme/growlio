@@ -39,6 +39,11 @@ const TacticalAllocationTab = lazy(() => import("../components/rebalancing/Tacti
 const REBALANCING_PAGE_TABS = ["진단", "추천", "전술", "포트폴리오", "이력"] as const;
 type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];
 
+/** 탭 맨 위 역할 한 줄 — 진단(목표 대비 이탈 점검)과 전술(목표 자체를 바꿀지 제안)을 구분한다 */
+function TabIntro({ children }: { children: string }) {
+  return <p className="text-xs text-gray-500 dark:text-gray-400 px-1">{children}</p>;
+}
+
 export default function RebalancingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const portfolioId = searchParams.get("portfolioId") ?? undefined;
@@ -205,6 +210,10 @@ export default function RebalancingPage() {
         {/* ── 진단 탭: 전체 포트폴리오 드리프트 현황 + 시장신호 ── */}
         {localTab === "진단" && (
           <>
+            <TabIntro>
+              정해 둔 목표 비중에서 얼마나 벗어났는지와 지금 시장 위험도를 점검해요. 목표 비중은
+              바꾸지 않아요.
+            </TabIntro>
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RebalancingStatusCard
@@ -219,7 +228,11 @@ export default function RebalancingPage() {
             {signal && (
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard rows={1} />}>
-                  <MarketSignalBanner signal={signal} inflation={inflationSummary} />
+                  <MarketSignalBanner
+                    signal={signal}
+                    inflation={inflationSummary}
+                    onOpenTactical={() => handleTabChange("전술")}
+                  />
                 </Suspense>
               </ErrorBoundary>
             )}
@@ -265,16 +278,21 @@ export default function RebalancingPage() {
 
         {/* ── 전술 탭: QQQ/SPY 전술 배분 국면·제안 비중 → 목표 비중 적용 후 포트폴리오 탭에서 실행 ── */}
         {localTab === "전술" && (
-          <ErrorBoundary variant="section">
-            <Suspense fallback={<SkeletonCard />}>
-              <TacticalAllocationTab
-                onCreatePortfolio={openNewPortfolioEditor}
-                selectedPortfolioId={portfolioId}
-                onSelectPortfolio={handlePortfolioChange}
-                onGoToExecution={(id) => handlePortfolioSelectFromDiagnosis(id)}
-              />
-            </Suspense>
-          </ErrorBoundary>
+          <>
+            <TabIntro>
+              시장 국면(매크로+차트 추세)에 따라 QQQ·SPY 목표 비중 자체를 바꿀지 제안해요.
+            </TabIntro>
+            <ErrorBoundary variant="section">
+              <Suspense fallback={<SkeletonCard />}>
+                <TacticalAllocationTab
+                  onCreatePortfolio={openNewPortfolioEditor}
+                  selectedPortfolioId={portfolioId}
+                  onSelectPortfolio={handlePortfolioChange}
+                  onGoToExecution={(id) => handlePortfolioSelectFromDiagnosis(id)}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          </>
         )}
 
         {/* ── 포트폴리오 탭: 목록 관리 + 분석/실행 ── */}
