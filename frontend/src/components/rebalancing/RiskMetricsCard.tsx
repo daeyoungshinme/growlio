@@ -56,7 +56,8 @@ function RiskMetricRow({
 }
 
 export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMetrics }) {
-  const [isOpen, toggleOpen] = useCollapsible(true);
+  // 진단 탭 보조 카드라 기본 접힘, 사용자가 펼치면 유지(plans/53 Phase C · plans/64 S4)
+  const [isOpen, toggleOpen] = useCollapsible(false, "growlio:rebalancing:risk-metrics-open");
 
   const metricList = buildMetrics(metrics);
 

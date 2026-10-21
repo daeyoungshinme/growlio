@@ -48,7 +48,8 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
   // 표시 등급은 즉시, 자동 실행 판단 등급은 연속 확인 후 바뀐다 — 다를 때만 알려 "배너는 위험인데 자동 실행이
   // 돌았다"는 혼란을 막는다(plans/63 P1-5)
   const gateLagging = !!confirmed_level && confirmed_level !== composite_level;
-  const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
+  // 등급 배지 + 한 줄 요약이 기본 — 비GREEN이면 자동으로 8행 상세가 펼쳐져 진단 탭이 길어졌다(plans/64 S4)
+  const [isOpen, setIsOpen] = useState(false);
 
   const rows = buildSignalRows(signals);
   const tierA = rows.filter((r) => r.tier === "A");

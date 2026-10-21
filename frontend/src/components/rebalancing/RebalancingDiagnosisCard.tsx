@@ -83,8 +83,14 @@ export default function RebalancingDiagnosisCard({
       iconWrapClassName="bg-transparent"
       iconColorClassName={cfg.iconColor}
       title={
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.badge}`}>
-          {cfg.label}
+        // 선택 포트폴리오 기준(analysis.diagnosis_context) — 진단 탭의 "전체 자산 진단"과 구분(plans/64 S4)
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            이 포트폴리오 진단
+          </span>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.badge}`}>
+            {cfg.label}
+          </span>
         </span>
       }
       headerRight={
