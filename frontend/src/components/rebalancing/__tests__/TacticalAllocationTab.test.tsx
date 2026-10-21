@@ -128,6 +128,27 @@ describe("TacticalAllocationTab", () => {
     expect(screen.queryByText("DIA (다우존스)")).toBeNull();
   });
 
+  it("페이지에서 고른 포트폴리오(URL)를 쓰고, 바꾸면 부모에 알린다 (plans/63 P3-3)", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({ portfolio_id: "p2" }),
+    );
+    const onSelectPortfolio = vi.fn();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <TacticalAllocationTab
+          onGoToExecution={vi.fn()}
+          selectedPortfolioId="p2"
+          onSelectPortfolio={onSelectPortfolio}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(tacticalApi.fetchTacticalStatus).toHaveBeenCalledWith("p2"));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "p1" } });
+    expect(onSelectPortfolio).toHaveBeenCalledWith("p1");
+  });
+
   it("DIA 제안 비중이 있으면 비교 행을 보여준다", async () => {
     const proposed = { QQQ: 40, SPY: 30, DIA: 20, CASH: 10 };
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(

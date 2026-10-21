@@ -13,6 +13,7 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import type { Insight, InsightType, InsightSeverity } from "@/api/insights";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 import { buildCombinedStatusNote } from "@/utils/diagnosisInsights";
+import { DRIFT_STATUS_LABEL, getDriftStatus } from "@/utils/portfolio";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
@@ -43,6 +44,9 @@ function PortfolioDriftRow({
   onClick?: (id: string, openAlert?: boolean) => void;
 }) {
   const isAlert = summary.needs_rebalancing;
+  // 포트폴리오 카드·분석 진단 카드와 같은 3단계 — 절반 이상 이탈이면 "주의"(plans/63 P1-2)
+  const isCaution =
+    !isAlert && getDriftStatus(summary.max_drift_pct, summary.threshold_pct) === "caution";
   const showCompositeBadge = !isAlert && summary.has_composite_signal;
   // 구버전 API 응답(필드 없음) 호환을 위해 명시적으로 false일 때만 미설정으로 간주
   const alertNotConfigured = summary.has_alert_configured === false;
@@ -58,7 +62,7 @@ function PortfolioDriftRow({
     >
       <div className="flex items-center gap-2 w-full">
         <span
-          className={`w-2 h-2 rounded-full shrink-0 ${isAlert ? "bg-red-500" : "bg-green-500"}`}
+          className={`w-2 h-2 rounded-full shrink-0 ${isAlert ? "bg-red-500" : isCaution ? "bg-amber-500" : "bg-green-500"}`}
         />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1 truncate min-w-0">
           {summary.portfolio_name}
@@ -70,7 +74,7 @@ function PortfolioDriftRow({
         </span>
         {isAlert && (
           <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-1.5 py-0.5 shrink-0">
-            필요
+            {DRIFT_STATUS_LABEL.critical}
           </span>
         )}
         {showCompositeBadge && (
@@ -105,7 +109,9 @@ function DiagnosticGauge({ value }: { value: number }) {
   return (
     <div>
       <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-        <span>자산 집중도</span>
+        {/* 같은 진단 탭의 위험 지표 "최대 종목 비중"(단일 종목)과 다른 값 — 주식·예금 등 가장 큰 자산 유형의
+            비중임을 라벨로 구분한다(plans/63 P2-1) */}
+        <span>자산 유형 집중도 (가장 큰 유형 비중)</span>
         <span className="font-medium">{value.toFixed(1)}%</span>
       </div>
       <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">

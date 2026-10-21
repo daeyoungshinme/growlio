@@ -54,4 +54,12 @@ describe("AlertActionsSection — 지금 계획 생성", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(mockCreatePlan).not.toHaveBeenCalled();
   });
+
+  it("저장하지 않은 변경이 있으면 계획 생성을 막고 저장을 안내한다 (plans/63 P4-2)", () => {
+    const dirtyForm = { ...autoForm, isDirty: true } as RebalancingAlertFormState;
+    renderWithProviders(<AlertActionsSection form={dirtyForm} hasAlert portfolioId="pf-1" />);
+
+    expect(screen.getByRole("button", { name: "지금 계획 생성" })).toBeDisabled();
+    expect(screen.getByText("변경한 설정을 저장한 뒤 계획을 만들 수 있어요")).toBeInTheDocument();
+  });
 });

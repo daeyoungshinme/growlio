@@ -1,13 +1,9 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw, Check, CircleAlert } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
-import { syncAccount } from "@/api/assets";
-import { invalidateSyncData } from "@/utils/queryInvalidation";
+import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { isSyncableAccount } from "@/utils/accounts";
 import { STOCK_TYPE_LABELS } from "@/constants";
-
-type SyncResult = "idle" | "syncing" | "done" | "error";
 
 interface Props {
   accounts: AssetAccount[];
@@ -15,13 +11,12 @@ interface Props {
 }
 
 export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) {
-  const queryClient = useQueryClient();
   const syncableAccounts = accounts.filter((a) => isSyncableAccount(a.data_source));
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(syncableAccounts.map((a) => a.id)),
   );
-  const [syncResult, setSyncResult] = useState<SyncResult>("idle");
+  const { state: syncResult, run: syncAccounts } = useSyncAccounts();
 
   if (syncableAccounts.length === 0) return null;
 
@@ -40,19 +35,10 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
     });
   }
 
+  // 동기화가 성공하면 바로 재분석 — "동기화 → 재분석" 두 번 누르던 단계를 하나로(plans/63 P2-3)
   async function handleSync() {
     if (selectedIds.size === 0) return;
-    setSyncResult("syncing");
-    const ids = Array.from(selectedIds);
-    const settled = await Promise.allSettled(ids.map((id) => syncAccount(id)));
-    const allOk = settled.every((s) => s.status === "fulfilled");
-    await invalidateSyncData(queryClient);
-    setSyncResult(allOk ? "done" : "error");
-  }
-
-  function handleReanalyze() {
-    setSyncResult("idle");
-    onReanalyze();
+    if (await syncAccounts(Array.from(selectedIds))) onReanalyze();
   }
 
   const isSyncing = syncResult === "syncing";
@@ -105,14 +91,14 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
           <>
             <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
               <Check size={12} />
-              동기화 완료
+              동기화 완료 — 다시 분석했어요
             </span>
             <button
-              onClick={handleReanalyze}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={() => void handleSync()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <RefreshCw size={12} />
-              재분석
+              다시 동기화
             </button>
           </>
         )}
@@ -144,7 +130,7 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
             ) : (
               <>
                 <RefreshCw size={12} />
-                선택 계좌 동기화
+                선택 계좌 동기화 후 재분석
               </>
             )}
           </button>

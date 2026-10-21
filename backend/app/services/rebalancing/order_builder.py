@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import CASH_EQUIVALENT_TICKER, TAX_DEFERRED_TAX_TYPES
 from app.services.rebalancing._order_quantity_guard import floor_shares
+from app.services.rebalancing.service import filter_drifting_items  # noqa: F401 — 이탈 판정 단일 기준 재노출
 from app.services.tax_service import _OVERSEAS_MARKETS
 
 logger = structlog.get_logger()
@@ -24,11 +25,6 @@ ORDER_EXECUTABLE_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
 읽기·진단 경로의 `_account_queries._BROKER_ASSET_TYPES`(토스 포함)와 의도적으로 다르다."""
 _NON_TRADABLE_TICKERS = ("CASH", "REAL_ESTATE", CASH_EQUIVALENT_TICKER)
 """실제 주문을 낼 수 없는 합성 포트폴리오 항목 티커 — 가격 조회·주문 생성 양쪽에서 제외."""
-
-
-def filter_drifting_items(items: list[Any], threshold_pct: float) -> list[Any]:
-    """threshold_pct(%)를 초과하는 드리프트 항목만 반환한다."""
-    return [item for item in items if abs(item.weight_diff_pct) > threshold_pct]
 
 
 def _build_sell_orders(

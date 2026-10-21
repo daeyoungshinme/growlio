@@ -397,7 +397,7 @@ describe("RebalancingTable", () => {
           analysis={mockAnalysis}
           portfolioId="p1"
           accounts={[mockAccount]}
-          onExecuted={vi.fn()}
+          onReanalyze={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -411,7 +411,7 @@ describe("RebalancingTable", () => {
           analysis={mockAnalysis}
           portfolioId="p1"
           accounts={[mockAccount]}
-          onExecuted={vi.fn()}
+          onReanalyze={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -425,7 +425,7 @@ describe("RebalancingTable", () => {
           analysis={mockAnalysis}
           portfolioId="p1"
           accounts={[mockAccount]}
-          onExecuted={vi.fn()}
+          onReanalyze={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -439,7 +439,7 @@ describe("RebalancingTable", () => {
           analysis={mockAnalysis}
           portfolioId="p1"
           accounts={[mockAccount]}
-          onExecuted={vi.fn()}
+          onReanalyze={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -454,7 +454,7 @@ describe("RebalancingTable", () => {
           analysis={emptyAnalysis}
           portfolioId="p1"
           accounts={[]}
-          onExecuted={vi.fn()}
+          onReanalyze={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -468,7 +468,7 @@ describe("RebalancingTable", () => {
           analysis={mockAnalysis}
           portfolioId="p1"
           accounts={[]}
-          onExecuted={vi.fn()}
+          onReanalyze={vi.fn()}
         />
       </MemoryRouter>,
     );

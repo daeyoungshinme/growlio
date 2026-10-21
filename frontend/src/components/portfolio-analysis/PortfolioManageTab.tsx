@@ -28,7 +28,7 @@ import RebalancingAlertModalRouter from "@/components/rebalancing/RebalancingAle
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData, invalidateAccountData } from "@/utils/queryInvalidation";
-import { mergeAlertsByPortfolio } from "@/utils/portfolio";
+import { activeAlertsOnly, mergeAlertsByPortfolio } from "@/utils/portfolio";
 import { isStockAccount } from "@/utils/accounts";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -103,13 +103,18 @@ export default function PortfolioManageTab({
     () => mergeAlertsByPortfolio(rebalancingAlerts),
     [rebalancingAlerts],
   );
-  const alertPortfolioIds = useMemo(
-    () => new Set(Object.keys(alertByPortfolioId)),
+  // 배너의 "자동 실행 N·알림 M" 집계는 켜진 알림만 — 꺼진 알림은 카드에 "꺼짐"으로 따로 보인다
+  const activeAlertByPortfolioId = useMemo(
+    () => activeAlertsOnly(alertByPortfolioId),
     [alertByPortfolioId],
   );
+  const alertPortfolioIds = useMemo(
+    () => new Set(Object.keys(activeAlertByPortfolioId)),
+    [activeAlertByPortfolioId],
+  );
   const autoAlertCount = useMemo(
-    () => Object.values(alertByPortfolioId).filter((a) => a.mode === "AUTO").length,
-    [alertByPortfolioId],
+    () => Object.values(activeAlertByPortfolioId).filter((a) => a.mode === "AUTO").length,
+    [activeAlertByPortfolioId],
   );
 
   const { data: driftSummaryRaw } = useQuery({
@@ -209,9 +214,12 @@ export default function PortfolioManageTab({
       investment_horizon: InvestmentHorizon | null;
       tax_type: AccountTaxType | null;
     }) => createPortfolio(args),
-    onSuccess: () => {
+    onSuccess: (created) => {
       void invalidatePortfolioData(qc);
       closeEditor();
+      // 만든 포트폴리오를 바로 선택·분석 — 추천에서 "새 포트폴리오 만들기"로 온 경우 목록에서 다시 찾아
+      // 눌러야 하던 단계를 없앤다(기존 포트폴리오에 추천 적용 시와 같은 동작, plans/63 P3-2)
+      if (created?.id) onAnalyze(created.id);
     },
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 저장에 실패했습니다"), "error"),
   });

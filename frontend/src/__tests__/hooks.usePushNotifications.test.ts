@@ -44,4 +44,19 @@ describe("resolvePushDeepLink", () => {
   it("routes MARKET_SIGNAL to the diagnosis tab", () => {
     expect(resolvePushDeepLink({ type: "MARKET_SIGNAL" })).toBe("/rebalancing?rtab=진단");
   });
+
+  it("자동 실행 보류 알림은 해당 포트폴리오 자동화 설정으로, 실행 실패는 이력으로 연다 (plans/63 P3-4)", () => {
+    for (const type of [
+      "REBALANCING_TAX_GATE_BLOCKED",
+      "REBALANCING_MARKET_GATE_BLOCKED",
+      "REBALANCING_DAILY_CAP_BLOCKED",
+    ]) {
+      expect(resolvePushDeepLink({ type, portfolio_id: "p1" })).toBe(
+        "/rebalancing?rtab=포트폴리오&portfolioId=p1&openAlert=1",
+      );
+    }
+    expect(resolvePushDeepLink({ type: "REBALANCING_PLAN_EXECUTION_FAILED" })).toBe(
+      "/rebalancing?rtab=이력",
+    );
+  });
 });

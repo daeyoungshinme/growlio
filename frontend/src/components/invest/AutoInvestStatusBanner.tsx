@@ -9,7 +9,7 @@ import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { fmtKrw } from "@/utils/format";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { mergeAlertsByPortfolio } from "@/utils/portfolio";
+import { activeAlertsOnly, mergeAlertsByPortfolio } from "@/utils/portfolio";
 import {
   dcaAccountCashKrw,
   dcaCashShortfallKrw,
@@ -47,7 +47,8 @@ export default function AutoInvestStatusBanner() {
 
   if (!portfolios || portfolios.length === 0) return null;
 
-  const alertByPortfolioId = mergeAlertsByPortfolio(alerts ?? []);
+  // 꺼진 정기 적립식은 "자동매수 중"으로 보이면 안 된다(plans/63 P1-4)
+  const alertByPortfolioId = activeAlertsOnly(mergeAlertsByPortfolio(alerts ?? []));
   const activeEntry = portfolios
     .map((p) => ({ portfolio: p, alert: alertByPortfolioId[p.id] }))
     .find(({ alert }) => isDcaAutoBuyPreset(alert));

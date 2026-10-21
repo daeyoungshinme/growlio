@@ -36,11 +36,12 @@ MAX_ACTION_ITEMS = 5
 _PRIORITY_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 _LINK_TAX_ESTIMATE = "/invest-plan?tab=절세&taxTab=세금 추정"
 _LINK_CHALLENGE = "/invest-plan?tab=챌린지"
+# 예수금 부족 푸시(DCA_CASH_SHORTFALL)와 같은 목적지 — 적립 계획의 자동매수 배너가 부족액과 설정 링크를 함께 보여 준다
+_LINK_DCA_PLAN = "/invest-plan?tab=적립 계획"
 
 
-def _portfolio_link(portfolio_id: uuid.UUID | str, *, open_alert: bool = False) -> str:
-    link = f"/rebalancing?rtab=포트폴리오&portfolioId={portfolio_id}"
-    return f"{link}&openAlert=1" if open_alert else link
+def _portfolio_link(portfolio_id: uuid.UUID | str) -> str:
+    return f"/rebalancing?rtab=포트폴리오&portfolioId={portfolio_id}"
 
 
 async def _rebalance_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
@@ -79,8 +80,8 @@ async def _dca_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
                 priority="HIGH" if sf.days_until <= NOTICE_WINDOW_DAYS[1] else "MEDIUM",
                 title=f"{sf.run_date.month}월 {sf.run_date.day}일 자동매수 전 예수금 채우기",
                 detail=f"{sf.portfolio.name} · {sf.account.name} {detail}",
-                cta_label="설정 보기",
-                link=_portfolio_link(sf.portfolio.id, open_alert=True),
+                cta_label="확인하기",
+                link=_LINK_DCA_PLAN,
                 deadline=sf.run_date.isoformat(),
             )
         )

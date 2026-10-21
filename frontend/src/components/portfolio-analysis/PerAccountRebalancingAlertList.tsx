@@ -159,7 +159,7 @@ export default function PerAccountRebalancingAlertList({
           >
             {switchToAggregateMut.isPending && <Loader2 size={14} className="animate-spin" />}
             {confirmingSwitchBack
-              ? "정말 전환? (계좌별 설정 모두 삭제됨)"
+              ? `정말 전환? (계좌별 설정 ${alerts.length}개 모두 삭제됨)`
               : "전체 통합 설정으로 전환"}
           </button>
         </div>

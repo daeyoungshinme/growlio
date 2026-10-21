@@ -1113,3 +1113,63 @@ class TestBaseValueKrwNegativeCash:
         overview = _make_overview(total_assets_krw=-500_000, total_stock_krw=1_000_000)
         result = analyze_rebalancing(portfolio, overview)
         assert result.base_value_krw == pytest.approx(0)
+
+
+# ── 이탈 판정 단일 기준 (plans/63 P1-3) ───────────────────────
+
+
+class TestDriftSummaryMatchesAlertStandard:
+    """진단 요약(drift-summary)이 알림·대기 계획과 같은 분석·판정을 써서 같은 종목을 이탈로 본다."""
+
+    _OVERVIEW = {
+        "total_assets_krw": 10_000_000,
+        "total_stock_krw": 8_000_000,
+        "total_deposit_krw": 2_000_000,
+        "all_positions": [
+            {"ticker": "AAPL", "market": "NASDAQ", "value_krw": 5_000_000, "current_price": 100_000, "qty": 50},
+            {"ticker": "MSFT", "market": "NASDAQ", "value_krw": 2_500_000, "current_price": 100_000, "qty": 25},
+            # 목표에 없는 보유 종목 — 알림은 target 0% 매도 대상으로 이탈에 포함한다
+            {"ticker": "TSLA", "market": "NASDAQ", "value_krw": 500_000, "current_price": 100_000, "qty": 5},
+        ],
+        "accounts": [],
+    }
+
+    def _assert_same_as_alert(self, portfolio, threshold):
+        from app.services.rebalancing.service import compute_portfolio_drift_summary, filter_drifting_items
+
+        summary = compute_portfolio_drift_summary(portfolio, self._OVERVIEW, threshold)
+        alert_drifting = filter_drifting_items(
+            analyze_rebalancing(portfolio, self._OVERVIEW, include_implicit_cash=True).items, threshold
+        )
+        assert summary.drifted_items_count == len(alert_drifting)
+        assert summary.needs_rebalancing is bool(alert_drifting)
+        return summary, {i.ticker for i in alert_drifting}
+
+    def test_total_assets_counts_implicit_cash_and_untracked_like_alert(self):
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 50},
+                {"ticker": "MSFT", "name": "Microsoft", "market": "NASDAQ", "weight": 50},
+            ],
+            base_type="TOTAL_ASSETS",
+        )
+        summary, tickers = self._assert_same_as_alert(portfolio, 5.0)
+        # MSFT 25%→50%(25%p)·목표 밖 예수금 20%→0%(20%p)는 초과, 미포함 TSLA는 정확히 5%p라 제외
+        # (예전 진단 요약은 예수금을 빼고 계산해 MSFT만 이탈로 봤다)
+        assert tickers == {"MSFT", "CASH"}
+        assert summary.max_drift_pct == pytest.approx(25.0)
+
+    def test_exactly_at_threshold_is_not_drifting(self):
+        """임계치와 같은 이탈은 알림처럼 '초과'가 아니므로 리밸런싱 필요가 아니다(예전 진단 요약은 >=)."""
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 45},
+                {"ticker": "MSFT", "name": "Microsoft", "market": "NASDAQ", "weight": 30},
+                {"ticker": "CASH", "name": "현금", "market": "KRW", "weight": 25},
+            ],
+        )
+        # base 10M: AAPL 50% vs 45%(5.0), MSFT 25% vs 30%(5.0), TSLA 5% vs 0%(5.0), CASH 20% vs 25%(5.0)
+        summary, tickers = self._assert_same_as_alert(portfolio, 5.0)
+        assert tickers == set()
+        assert summary.needs_rebalancing is False
+        assert summary.max_drift_pct == pytest.approx(5.0)

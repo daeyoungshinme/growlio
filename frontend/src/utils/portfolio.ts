@@ -106,6 +106,13 @@ export function inferHorizonTaxTypeFromAccounts(
   return matches ? { horizon, taxType } : null;
 }
 
+/**
+ * 포트폴리오별 알림을 1건으로 합친다(PER_ACCOUNT는 계좌별 여러 행).
+ * 활성 알림을 기준으로 삼아 서버 drift-summary(`get_active_alert_thresholds` — 활성 알림 최소 임계치)와
+ * 같은 값을 낸다: 임계치는 활성 행 최솟값, 활성 행 중 AUTO가 있으면 AUTO. 전부 꺼져 있으면
+ * `is_active: false`로 남겨 화면이 "꺼짐"으로 보여 준다 — 꺼진 알림이 어떤 화면에선 "알림", 다른 화면에선
+ * "미설정"으로 보이던 불일치를 막는다(plans/63 P1-4).
+ */
 export function mergeAlertsByPortfolio(
   alerts: RebalancingAlert[],
 ): Record<string, RebalancingAlert> {
@@ -116,9 +123,44 @@ export function mergeAlertsByPortfolio(
     map.set(a.portfolio_id, list);
   }
   return Object.fromEntries(
-    Array.from(map.entries()).map(([portfolioId, rows]) => [
-      portfolioId,
-      { ...rows[0], mode: rows.some((r) => r.mode === "AUTO") ? ("AUTO" as const) : rows[0].mode },
-    ]),
+    Array.from(map.entries()).map(([portfolioId, rows]) => {
+      const active = rows.filter((r) => r.is_active);
+      const basis = active.length > 0 ? active : rows;
+      return [
+        portfolioId,
+        {
+          ...basis[0],
+          is_active: active.length > 0,
+          mode: basis.some((r) => r.mode === "AUTO") ? ("AUTO" as const) : basis[0].mode,
+          threshold_pct: Math.min(...basis.map((r) => r.threshold_pct)),
+        },
+      ];
+    }),
   );
 }
+
+/** 켜져 있는 알림만 — 합친 결과(mergeAlertsByPortfolio)에서 "설정됨" 개수·판정에 쓴다. */
+export function activeAlertsOnly(
+  byPortfolio: Record<string, RebalancingAlert>,
+): Record<string, RebalancingAlert> {
+  return Object.fromEntries(Object.entries(byPortfolio).filter(([, a]) => a.is_active));
+}
+
+export type DriftStatus = "critical" | "caution" | "stable";
+
+/**
+ * 이탈 상태 3단계 — 진단 탭 행·포트폴리오 카드·분석 진단 카드가 같은 기준·라벨을 쓴다(plans/63 P1-2).
+ * 임계치를 **초과**하면 리밸런싱 필요(서버 알림·drift-summary의 `filter_drifting_items`와 같은 기준,
+ * plans/63 P1-3), 임계치 절반 이상이면 주의.
+ */
+export function getDriftStatus(maxDriftPct: number, thresholdPct: number): DriftStatus {
+  if (maxDriftPct > thresholdPct) return "critical";
+  if (maxDriftPct >= thresholdPct / 2) return "caution";
+  return "stable";
+}
+
+export const DRIFT_STATUS_LABEL: Record<DriftStatus, string> = {
+  critical: "리밸런싱 필요",
+  caution: "주의",
+  stable: "안정",
+};

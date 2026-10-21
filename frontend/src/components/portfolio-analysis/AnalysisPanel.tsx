@@ -3,8 +3,6 @@ import { ChartColumn, Loader2, RefreshCw } from "lucide-react";
 import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
-import { fetchBrokerBalance } from "@/api/rebalancing";
-import { isBrokerBalanceAccount } from "@/utils/accounts";
 
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
@@ -12,30 +10,6 @@ import RebalancingStrategyCard from "@/components/rebalancing/RebalancingStrateg
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { useAnalysisState } from "@/hooks/useAnalysisState";
-
-function StrategyAnalysisSection({
-  id,
-  portfolio,
-  alertByPortfolioId,
-  onOpenAlertModal,
-}: {
-  id: string;
-  portfolio: Portfolio;
-  alertByPortfolioId: Record<string, RebalancingAlert>;
-  onOpenAlertModal: (portfolioId: string) => void;
-}) {
-  const existingAlert = alertByPortfolioId[id];
-
-  return (
-    <div className="space-y-4">
-      <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />
-      <AutomationStatusBar
-        existingAlert={existingAlert}
-        onOpenAlertModal={() => onOpenAlertModal(id)}
-      />
-    </div>
-  );
-}
 
 interface Props {
   selectedIds: Set<string>;
@@ -46,6 +20,15 @@ interface Props {
   autoAnalyzeId?: string;
   alertByPortfolioId: Record<string, RebalancingAlert>;
   autoOpenExecution?: boolean;
+  /** 계좌 목록 로딩 완료 여부 — 자동 분석이 실시간 예수금 조회 대상 계좌를 알고 시작하도록 */
+  accountsReady?: boolean;
+}
+
+/** 분석·예수금 기준 계좌 — 포트폴리오에 연결 계좌가 있으면 그 계좌들, 없으면 활성 계좌 전체 */
+function portfolioAccounts(portfolio: Portfolio | undefined, activeAccounts: AssetAccount[]) {
+  return portfolio?.account_ids?.length
+    ? activeAccounts.filter((a) => portfolio.account_ids!.includes(a.id))
+    : activeAccounts;
 }
 
 export function AnalysisPanel({
@@ -57,13 +40,28 @@ export function AnalysisPanel({
   autoAnalyzeId,
   alertByPortfolioId,
   autoOpenExecution,
+  accountsReady,
 }: Props) {
   const selectedIdStr = Array.from(selectedIds).sort().join(",");
   const portfolioItemsSignature = autoAnalyzeId
     ? JSON.stringify(portfolios.find((p) => p.id === autoAnalyzeId)?.items ?? [])
     : undefined;
-  const { mode, analysis, analyzing, error, triggerRebalancingAnalysis, setMode } =
-    useAnalysisState({ autoAnalyzeId, selectedIdStr, portfolioItemsSignature });
+  const getDepositAccounts = useCallback(
+    (id: string) =>
+      portfolioAccounts(
+        portfolios.find((p) => p.id === id),
+        activeAccounts,
+      ),
+    [portfolios, activeAccounts],
+  );
+  const { mode, analysis, analyzing, error, cashIsLive, triggerRebalancingAnalysis, setMode } =
+    useAnalysisState({
+      autoAnalyzeId,
+      selectedIdStr,
+      portfolioItemsSignature,
+      getDepositAccounts,
+      accountsReady,
+    });
 
   const analysisResultRef = useRef<HTMLDivElement>(null);
   const autoScrolledForRef = useRef<string | undefined>(undefined);
@@ -90,33 +88,10 @@ export function AnalysisPanel({
 
   const canRebalance = selectedIds.size === 1;
 
-  const handleRebalancingAnalysis = useCallback(async () => {
+  const handleRebalancingAnalysis = useCallback(() => {
     const [id] = Array.from(selectedIds);
-    if (!id) return;
-
-    const currentPortfolio = portfolios.find((p) => p.id === id);
-    const brokerAccounts = (
-      currentPortfolio?.account_ids?.length
-        ? activeAccounts.filter((a) => currentPortfolio.account_ids!.includes(a.id))
-        : activeAccounts
-    ).filter((a) => isBrokerBalanceAccount(a.asset_type));
-
-    let depositKrwOverride: number | undefined;
-    if (brokerAccounts.length > 0) {
-      const results = await Promise.allSettled(brokerAccounts.map((a) => fetchBrokerBalance(a.id)));
-      let total = 0;
-      let hasSuccess = false;
-      for (const r of results) {
-        if (r.status === "fulfilled" && !r.value.error) {
-          total += r.value.deposit_krw ?? 0;
-          hasSuccess = true;
-        }
-      }
-      if (hasSuccess) depositKrwOverride = total;
-    }
-
-    void triggerRebalancingAnalysis(id, depositKrwOverride);
-  }, [selectedIds, portfolios, activeAccounts, triggerRebalancingAnalysis]);
+    if (id) void triggerRebalancingAnalysis(id);
+  }, [selectedIds, triggerRebalancingAnalysis]);
 
   return (
     <div className="flex-1 min-w-0 space-y-4">
@@ -153,7 +128,7 @@ export function AnalysisPanel({
               : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           }`}
         >
-          전략 분석
+          효율 분석
         </button>
 
         {selectedIds.size > 0 && (
@@ -163,6 +138,14 @@ export function AnalysisPanel({
           </span>
         )}
       </div>
+
+      {/* 자동화 상태 — 분석 모드(리밸런싱·효율)와 무관하게 선택 포트폴리오당 한 번만(plans/63 P2-2) */}
+      {canRebalance && mode && (
+        <AutomationStatusBar
+          existingAlert={alertByPortfolioId[Array.from(selectedIds)[0]]}
+          onOpenAlertModal={() => onOpenAlertModal(Array.from(selectedIds)[0])}
+        />
+      )}
 
       {/* 최초 분석 중 — 아직 표시할 이전 결과가 없을 때만 스켈레톤 */}
       {mode === "rebalancing" && analyzing && !analysis && <SkeletonCard rows={4} />}
@@ -190,37 +173,27 @@ export function AnalysisPanel({
             const currentPortfolio = portfolios.find(
               (p) => p.id === analysis.portfolio_id.toString(),
             );
-            const analysisAccounts = currentPortfolio?.account_ids?.length
-              ? activeAccounts.filter((a) => currentPortfolio.account_ids!.includes(a.id))
-              : activeAccounts;
+            const analysisAccounts = portfolioAccounts(currentPortfolio, activeAccounts);
             return (
               <>
                 <RebalancingTable
                   analysis={analysis}
                   portfolioId={analysis.portfolio_id}
                   accounts={analysisAccounts}
-                  alertThreshold={
-                    alertByPortfolioId[analysis.portfolio_id.toString()]?.threshold_pct
-                  }
+                  alertThreshold={(() => {
+                    // 서버 drift-summary와 같은 기준 — 켜진 알림의 최소 임계치, 없으면 기본값
+                    const a = alertByPortfolioId[analysis.portfolio_id.toString()];
+                    return a?.is_active ? a.threshold_pct : undefined;
+                  })()}
                   autoOpenExecution={autoOpenExecution}
+                  cashIsLive={cashIsLive}
+                  onReanalyze={() => triggerRebalancingAnalysis(analysis.portfolio_id)}
                 />
                 <RebalancingAccountSyncSection
                   accounts={analysisAccounts}
                   onReanalyze={() => triggerRebalancingAnalysis(analysis.portfolio_id)}
                 />
               </>
-            );
-          })()}
-          {(() => {
-            const portfolioIdStr = analysis.portfolio_id.toString();
-            const existingAlert = alertByPortfolioId[portfolioIdStr];
-            return (
-              <div className="mt-4">
-                <AutomationStatusBar
-                  existingAlert={existingAlert}
-                  onOpenAlertModal={() => onOpenAlertModal(portfolioIdStr)}
-                />
-              </div>
             );
           })()}
         </div>
@@ -237,20 +210,13 @@ export function AnalysisPanel({
         </div>
       )}
 
-      {/* 전략 분석 결과 */}
+      {/* 효율 분석(팩터·프런티어) 결과 */}
       {mode === "strategy" &&
         (() => {
           const [id] = Array.from(selectedIds);
           const portfolio = portfolios.find((p) => p.id === id);
           if (!id || !portfolio) return null;
-          return (
-            <StrategyAnalysisSection
-              id={id}
-              portfolio={portfolio}
-              alertByPortfolioId={alertByPortfolioId}
-              onOpenAlertModal={onOpenAlertModal}
-            />
-          );
+          return <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />;
         })()}
 
       {/* Empty state */}

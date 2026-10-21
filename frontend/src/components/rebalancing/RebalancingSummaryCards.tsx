@@ -5,6 +5,8 @@ import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 interface Props {
   analysis: RebalancingAnalysis;
   cashAvailable: number;
+  /** 예수금이 증권사 실시간 잔고 기준인지(false면 마지막 동기화 시점 값) */
+  cashIsLive?: boolean;
   totalBuySummary: number;
   totalSellSummary: number;
   cashAfter: number;
@@ -15,6 +17,7 @@ interface Props {
 export default function RebalancingSummaryCards({
   analysis,
   cashAvailable,
+  cashIsLive = false,
   totalBuySummary,
   totalSellSummary,
   cashAfter,
@@ -40,7 +43,12 @@ export default function RebalancingSummaryCards({
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-white dark:bg-gray-800/60 rounded-lg p-2">
-          <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">예수금</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+            예수금
+            <span className="ml-1 text-gray-400 dark:text-gray-500">
+              {cashIsLive ? "실시간" : "동기화 기준"}
+            </span>
+          </div>
           <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
             {fmtKrw(cashAvailable)}
           </div>

@@ -62,6 +62,8 @@ vi.mock("@/api/rebalancing", () => ({
   fetchRebalancingHistory: vi.fn().mockResolvedValue([]),
   fetchRebalancingExecutionDetail: vi.fn().mockResolvedValue(null),
   fetchDriftSummary: vi.fn().mockResolvedValue([]),
+  // 실시간 예수금 조회 실패 → 동기화 기준 예수금으로 분석(override 없음)
+  fetchBrokerBalance: vi.fn().mockResolvedValue({ deposit_krw: null, error: "조회 실패" }),
 }));
 
 vi.mock("@/api/transactions", () => ({

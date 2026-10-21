@@ -27,6 +27,8 @@ import { normalizeWeights } from "@/utils/recommendationDrift";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import { useAutoExecutionNotice } from "@/hooks/useAutoExecutionNotice";
+
 import SkeletonCard from "@/components/common/SkeletonCard";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
@@ -40,6 +42,17 @@ import {
   type OverallTargetSelection,
   type RecommendationTabActions,
 } from "@/components/rebalancing/recommendationCardModel";
+
+/** 적용 확인창 안내 — 자동 실행이 켜진 포트폴리오면 다음 자동 실행이 새 목표로 주문함을 알린다(plans/63 P4-4) */
+function AutoExecutionNotice({ portfolioId }: { portfolioId: string }) {
+  const notice = useAutoExecutionNotice(portfolioId);
+  if (!notice) return null;
+  return (
+    <p className="mb-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300">
+      {notice}
+    </p>
+  );
+}
 
 const HORIZON_ORDER: InvestmentHorizon[] = ["SHORT_TERM", "MID_TERM", "LONG_TERM"];
 const TAX_TYPE_ORDER: AccountTaxType[] = [
@@ -62,6 +75,10 @@ interface Props {
   initialOptionsOpen?: boolean;
   /** 옵션 모달이 닫힐 때 호출 — 부모가 딥링크 파라미터를 정리한다 */
   onOptionsClosed?: () => void;
+  /** 페이지에서 이미 고른 포트폴리오(URL portfolioId) — 있으면 적용 대상으로 먼저 선택한다 */
+  selectedPortfolioId?: string;
+  /** 적용 대상 변경 시 호출 — 부모가 URL에 반영해 다른 탭과 선택을 공유한다(plans/63 P3-3) */
+  onSelectPortfolio?: (portfolioId: string) => void;
 }
 
 /** 목표 역산 추천("전체")과 투자기간별 추천("단기"/"중기"/"장기")을 하나의 탭 카드로 합쳐 보여준다.
@@ -74,6 +91,8 @@ export default function RecommendationCard({
   onCreatePortfolio,
   initialOptionsOpen = false,
   onOptionsClosed,
+  selectedPortfolioId,
+  onSelectPortfolio,
 }: Props) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ActiveTab>("전체");
@@ -190,8 +209,15 @@ export default function RecommendationCard({
     (a, b) =>
       Number(anchoredPortfolioIds.includes(b.id)) - Number(anchoredPortfolioIds.includes(a.id)),
   );
-  const [selectedOverallTargetId, setSelectedOverallTargetId] = useState("");
-  const effectiveOverallTargetId = selectedOverallTargetId || anchoredPortfolioIds[0] || "";
+  // 부모가 URL로 관리하면(onSelectPortfolio) URL이 단일 진실, 아니면 카드 내부 상태
+  const [localTargetId, setLocalTargetId] = useState("");
+  const requestedTargetId = onSelectPortfolio ? (selectedPortfolioId ?? "") : localTargetId;
+  const effectiveOverallTargetId =
+    (portfolios.some((p) => p.id === requestedTargetId) ? requestedTargetId : "") ||
+    anchoredPortfolioIds[0] ||
+    "";
+  const selectOverallTarget = (id: string) =>
+    onSelectPortfolio ? onSelectPortfolio(id) : setLocalTargetId(id);
   const overallConfirmTarget =
     targetPortfolios.find((p) => p.id === effectiveOverallTargetId) ?? targetPortfolios[0];
 
@@ -280,7 +306,7 @@ export default function RecommendationCard({
   const overallSelection: OverallTargetSelection = {
     targetPortfolios,
     selectedTargetId: effectiveOverallTargetId,
-    onSelectTarget: setSelectedOverallTargetId,
+    onSelectTarget: selectOverallTarget,
     anchoredTargetIds: anchoredPortfolioIds,
     confirmTarget: overallConfirmTarget,
   };
@@ -400,6 +426,7 @@ export default function RecommendationCard({
           }
           onCancel={() => setConfirmOpen(false)}
         >
+          <AutoExecutionNotice portfolioId={applyConfirm.target.id} />
           <RecommendationComparisonPreview
             recommendedItems={applyConfirm.items}
             currentItems={applyConfirm.target.items}

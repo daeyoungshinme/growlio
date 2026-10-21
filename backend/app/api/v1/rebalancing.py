@@ -139,11 +139,13 @@ async def analyze_portfolio(
             "total_assets_krw": float(overview.get("total_assets_krw", 0)) + delta,
         }
 
+    # 알림·대기 계획·진단 요약과 같은 분석 기준 — TOTAL_ASSETS면 목표 밖 예수금도 이탈 항목으로 본다(plans/63 P1-3)
     analysis = analyze_rebalancing(
         portfolio,
         overview,
         cast(dict[tuple[str, str], DividendMapEntry], dividend_map),
         cast(dict[tuple[str, str], ReturnsMapEntry], returns_map),
+        include_implicit_cash=True,
     )
 
     try:

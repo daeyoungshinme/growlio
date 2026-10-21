@@ -69,7 +69,7 @@
 - D11 ORM 컬럼에 대한 방어적 `getattr(..., default)` 38건 → 직접 속성(기본값 불일치 `trigger_condition` 포함).
 
 ## 배치 E — 구조 리팩터링 (선택, 회귀 위험 중)
-- E1 드리프트 계산 기준 통일: 대시보드 drift_summary(`service.py:495-504` 자체 base, `>=`) vs 분석/알림(`compute_base_value_krw`, `>`), CASH 포함 여부, 계좌 스코프(`account_ids` vs `resolve_effective_account_ids`). **사용자에게 보이는 숫자가 바뀌므로 기준 하나로 확정 후 진행.**
+- E1 ✅ (계획 63 P1-3에서 처리 — 알림 기준으로 통일) 드리프트 계산 기준 통일: 대시보드 drift_summary(`service.py:495-504` 자체 base, `>=`) vs 분석/알림(`compute_base_value_krw`, `>`), CASH 포함 여부, 계좌 스코프(`account_ids` vs `resolve_effective_account_ids`). **사용자에게 보이는 숫자가 바뀌므로 기준 하나로 확정 후 진행.**
 - E2 KIS/키움 주문 실행기 ~70% 중복 → 브로커 어댑터(주문·보유수량·예산조회) + 공통 루프; `_execute_buys_within_budget`를 `clamp_buy_orders_to_budget`로 대체.
 - E3 `AnalysisPanel`/`useAnalysisState` 다중선택 잔재 제거 + `useQuery` 전환, 수동/자동 분석의 예수금 기준 통일(`fetchAllBrokerBalances` 1회). B5 해소.
 - E4 `useRebalancingUrlState()` 훅 + `rebalancingUrl()` 빌더(현재 setSearchParams 복붙 6곳, `/rebalancing?rtab=` 수동 문자열 ~15곳). B4와 함께.

@@ -35,7 +35,17 @@ function scoreColor(level: MarketRiskLevel): string {
 }
 
 export default function MarketSignalBanner({ signal, inflation }: Props) {
-  const { composite_level, composite_score, composite_score_max, data_freshness, signals } = signal;
+  const {
+    composite_level,
+    composite_score,
+    composite_score_max,
+    data_freshness,
+    signals,
+    confirmed_level,
+  } = signal;
+  // 표시 등급은 즉시, 자동 실행 판단 등급은 연속 확인 후 바뀐다 — 다를 때만 알려 "배너는 위험인데 자동 실행이
+  // 돌았다"는 혼란을 막는다(plans/63 P1-5)
+  const gateLagging = !!confirmed_level && confirmed_level !== composite_level;
   const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
 
   const rows = buildSignalRows(signals);
@@ -74,6 +84,14 @@ export default function MarketSignalBanner({ signal, inflation }: Props) {
           />
         </button>
       </div>
+
+      {gateLagging && confirmed_level && (
+        <div className="px-4 pb-2.5 -mt-1 flex items-center gap-1.5 flex-wrap text-xs text-gray-500 dark:text-gray-400">
+          <span>자동 실행 판단 기준은 아직</span>
+          <MarketSignalLevelBadge level={confirmed_level} />
+          <span>— 같은 등급이 연속 확인되면 반영돼요</span>
+        </div>
+      )}
 
       {/* 상세 내용 */}
       {isOpen && (

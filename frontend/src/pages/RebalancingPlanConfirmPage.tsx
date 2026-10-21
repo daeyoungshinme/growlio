@@ -152,6 +152,11 @@ export default function RebalancingPlanConfirmPage() {
                   <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
                     {fmtDateTime(leg.deadline_at)}에 자동 실행됩니다.
                   </p>
+                  {/* 앱 이력 탭은 같은 매수 계획을 바로 실행할 수 있지만 이 페이지는 취소만 된다 — 차이를
+                      알려 "기다리는 수밖에 없다"고 오해하지 않게 한다(plans/63 P4-5) */}
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    기다리지 않고 바로 실행하려면 앱의 리밸런싱 › 이력 탭에서 승인하세요.
+                  </p>
                   <Button
                     variant="outline"
                     className="w-full justify-center"

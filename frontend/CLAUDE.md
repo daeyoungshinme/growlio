@@ -179,10 +179,12 @@ _배당_
 _리밸런싱/추천_
 
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
+- `useAutoExecutionNotice.ts` — 포트폴리오에 켜진 AUTO 알림이 있으면 "다음 자동 실행부터 새 목표로 주문" 안내 문구(없으면 null). 목표 비중을 바꾸는 확인창(추천 적용·전술 적용)에서 사용
+- `useSyncAccounts.ts` — 여러 계좌 동기화 + 동기화 쿼리 무효화(`run`이 전부 성공 여부 반환). 리밸런싱 실행 결과·분석 하단 "계좌 데이터 갱신"·실행 후 "실행 전 기준" 배너가 공유하며, 성공 시 호출부가 바로 재분석
 - `useRebalancingExecution.ts` — 리밸런싱 주문 실행 훅의 공개 진입점(barrel re-export). 실제 구현은 `rebalancingExecution/`(`index.ts`/`reducer.ts`/`types.ts`) 패키지에 있지만, 모든 소비 코드는 이 파일을 통해서만 import — 패키지를 직접 import 금지
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts`(`useRebalancingAlertQueries`·`useRebalancingAlertFormState`) — 알림 CRUD
-- `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
+- `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석 (`useAnalysisState`는 모든 분석 진입 경로에서 `fetchLiveDepositKrw`로 증권사 실시간 예수금을 override로 보냄 — 경로별 예수금 기준 불일치 방지, 계좌 로딩 전 자동 분석 보류)
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
 - `useGoalSettings.ts` — 투자 목표 설정 폼 상태
 - `useChallenges.ts` / `useChallengeMutations.ts` / `useChallengeNudge.ts` — 적립 챌린지 목록 조회 / 생성·수정·삭제 뮤테이션 / 하단 네비 배지용 넛지 요약

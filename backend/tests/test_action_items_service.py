@@ -108,7 +108,8 @@ async def test_dca_shortfall_priority_by_days_until(days_until, priority):
     assert items[0].priority == priority
     assert "700,000원 부족" in items[0].detail
     assert items[0].deadline == "2026-11-25"
-    assert items[0].link.endswith(f"portfolioId={sf.portfolio.id}&openAlert=1")
+    # 예수금 부족 푸시와 같은 목적지(적립 계획 탭) — plans/63 P3-4
+    assert items[0].link == "/invest-plan?tab=적립 계획"
 
 
 @pytest.mark.asyncio

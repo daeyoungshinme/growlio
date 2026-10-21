@@ -14,6 +14,8 @@ interface Props {
   analysis: RebalancingAnalysis;
   accounts: AssetAccount[];
   onExecuted?: (results: ExecutionResult[]) => void;
+  /** 결과 화면에서 계좌 동기화가 성공하면 호출 — 분석 재실행용 */
+  onSynced?: () => void;
   onClose: () => void;
 }
 
@@ -22,6 +24,7 @@ export function RebalancingExecutionModal({
   analysis,
   accounts,
   onExecuted,
+  onSynced,
   onClose,
 }: Props) {
   const exec = useRebalancingExecution({
@@ -108,7 +111,7 @@ export function RebalancingExecutionModal({
             </div>
           )}
 
-          {phase === "result" && <RebalancingResultSection results={results} />}
+          {phase === "result" && <RebalancingResultSection results={results} onSynced={onSynced} />}
         </div>
 
         {/* 시세를 불러오는 중엔 모든 종목이 '비어 있음'으로 잡힌다 — 위 로딩 배너로 충분하고 버튼은 계속 막혀 있다 */}

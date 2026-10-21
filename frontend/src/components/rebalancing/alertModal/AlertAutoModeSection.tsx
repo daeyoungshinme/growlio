@@ -5,6 +5,7 @@ import type { AssetAccount } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 import { fetchSettings } from "@/api/settings";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
+import { useTimeout } from "@/hooks/useTimeout";
 import { INPUT_SM } from "@/constants/inputStyles";
 import NoTradableAccountNotice from "./NoTradableAccountNotice";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -41,6 +42,18 @@ export function AlertAutoModeSection({
   marketSignal,
 }: Props) {
   const [capEditOpen, setCapEditOpen] = useState(false);
+  // 계좌별 전환은 지금 통합 설정을 실행 계좌 전용 설정으로 옮기거나(연결 계좌일 때) 지운다 — 한 번 더 눌러
+  // 확인하게 하고 무엇이 바뀌는지 알린다(plans/63 P4-3, 반대 방향 전환과 같은 2단계 확인)
+  const [confirmingSwitch, setConfirmingSwitch] = useState(false);
+  const scheduleTimeout = useTimeout();
+  const handleSwitchClick = () => {
+    if (!confirmingSwitch) {
+      setConfirmingSwitch(true);
+      scheduleTimeout(() => setConfirmingSwitch(false), 3000);
+    } else {
+      switchToPerAccountMut.mutate();
+    }
+  };
   const { data: settingsData } = useQuery({
     queryKey: QUERY_KEYS.settings,
     queryFn: fetchSettings,
@@ -121,13 +134,21 @@ export function AlertAutoModeSection({
 
       {!targetAccountId && canSwitchToPerAccount && (
         <button
-          onClick={() => switchToPerAccountMut.mutate()}
+          onClick={handleSwitchClick}
           disabled={switchToPerAccountMut.isPending}
           className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
         >
           {switchToPerAccountMut.isPending && <Loader2 size={12} className="animate-spin" />}
-          여러 계좌에 각각 자동 실행 설정하기 →
+          {confirmingSwitch
+            ? "한 번 더 눌러 전환 (지금 설정은 실행 계좌 설정으로 옮겨져요)"
+            : "여러 계좌에 각각 자동 실행 설정하기 →"}
         </button>
+      )}
+      {!targetAccountId && canSwitchToPerAccount && confirmingSwitch && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          실행 계좌가 이 포트폴리오에 연결돼 있지 않으면 지금 설정은 삭제되고, 나머지 계좌는 새로
+          설정해야 해요.
+        </p>
       )}
 
       <div className="space-y-2">
