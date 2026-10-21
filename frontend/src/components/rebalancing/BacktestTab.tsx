@@ -11,7 +11,12 @@ import { BACKTEST_DEFAULT_END_DATE } from "@/constants/defaults";
 import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
-export default function BacktestTab() {
+interface Props {
+  /** 처음 체크해 둘 포트폴리오 — 분석 패널에서 열면 지금 보는 포트폴리오(plans/64 S3) */
+  defaultPortfolioIds?: string[];
+}
+
+export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
   const { data: portfoliosRaw, isLoading } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
@@ -24,7 +29,9 @@ export default function BacktestTab() {
   const { startDate, endDate, activePreset, setStartDate, setEndDate, setPreset } =
     useBacktestDateRange();
 
-  const [backtestSelectedIds, setBacktestSelectedIds] = useState<Set<string>>(() => new Set());
+  const [backtestSelectedIds, setBacktestSelectedIds] = useState<Set<string>>(
+    () => new Set(defaultPortfolioIds),
+  );
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);

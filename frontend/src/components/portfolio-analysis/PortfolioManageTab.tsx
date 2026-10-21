@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { arrayMove } from "@dnd-kit/sortable";
 import { DragEndEvent } from "@dnd-kit/core";
@@ -183,13 +183,6 @@ export default function PortfolioManageTab({
     () => (selectedPortfolioId ? new Set([selectedPortfolioId]) : new Set<string>()),
     [selectedPortfolioId],
   );
-
-  // 포트폴리오가 1개면 자동 선택 (분석 탭으로 넘어가지 않고 강조만)
-  const initialSelectionDone = useRef(false);
-  useEffect(() => {
-    if (initialSelectionDone.current || portfolios.length !== 1) return;
-    initialSelectionDone.current = true;
-  }, [portfolios]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;

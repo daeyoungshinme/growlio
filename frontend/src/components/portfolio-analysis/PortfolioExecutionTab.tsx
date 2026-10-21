@@ -12,10 +12,13 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { mergeAlertsByPortfolio } from "@/utils/portfolio";
 
 interface Props {
-  portfolioId?: string;
+  /** 분석 대상 — 페이지가 URL 선택값 또는 기본 포트폴리오(useSelectedPortfolio)로 정해 넘긴다 */
+  portfolioId: string;
+  /** false면 분석 결과로 자동 스크롤하지 않는다 — 기본 선택(URL 미지정)으로 열린 경우 */
+  scrollToResult?: boolean;
 }
 
-export default function PortfolioExecutionTab({ portfolioId }: Props) {
+export default function PortfolioExecutionTab({ portfolioId, scrollToResult }: Props) {
   // 푸시 알림 딥링크에서 넘어온 경우 실행 모달을 자동으로 연다.
   const [searchParams, setSearchParams] = useSearchParams();
   const [autoOpenExecution] = useState(() => searchParams.get("openExecution") === "1");
@@ -75,13 +78,6 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
       { replace: true },
     );
 
-  const selectedIds = useMemo(
-    () => (portfolioId ? new Set([portfolioId]) : new Set<string>()),
-    [portfolioId],
-  );
-  const selectedPortfolio = portfolios.find((p) => p.id === portfolioId);
-  const selectedNames = selectedPortfolio?.name ?? "";
-
   if (portfoliosLoading) {
     return <div className="h-32 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />;
   }
@@ -95,28 +91,21 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
     );
   }
 
-  if (portfolios.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3">
-        <p className="text-sm text-gray-500 dark:text-gray-400">포트폴리오가 없습니다.</p>
-        <p className="text-xs text-gray-400 dark:text-gray-500">위에서 포트폴리오를 만드세요.</p>
-      </div>
-    );
-  }
+  // 방금 삭제된 포트폴리오 등 — 목록에 없으면 그리지 않는다(빈 상태는 위 목록이 담당)
+  if (!portfolios.some((p) => p.id === portfolioId)) return null;
 
   return (
     <div className="space-y-4">
       <ErrorBoundary variant="section">
         <AnalysisPanel
-          selectedIds={selectedIds}
-          selectedNames={selectedNames}
+          portfolioId={portfolioId}
           portfolios={portfolios}
           activeAccounts={activeAccounts}
           onOpenAlertModal={openAlertModal}
-          autoAnalyzeId={portfolioId}
           alertByPortfolioId={alertByPortfolioId}
           autoOpenExecution={autoOpenExecution}
           accountsReady={!accountsLoading}
+          scrollToResult={scrollToResult}
         />
       </ErrorBoundary>
     </div>

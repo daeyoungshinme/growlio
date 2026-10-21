@@ -180,6 +180,7 @@ _배당_
 _리밸런싱/추천_
 
 - `useSelectedPortfolio.ts` — 리밸런싱 페이지의 "지금 보는 포트폴리오"(URL `portfolioId` → 첫 기준 포트폴리오 → 첫 포트폴리오, `resolveSelectedPortfolioId`). 목표 조정(추천·전술)과 포트폴리오 탭이 같은 기본값을 쓴다. 기본값은 URL에 쓰지 않고 파생만
+- `useAnalysisState.ts`는 `AnalysisPanel`(포트폴리오 1개 전용 — 다중선택 잔재 제거, plans/64 S3)이 사용. 포트폴리오 탭 분석 영역은 기본 선택으로 열려도 결과로 자동 스크롤하지 않고(`scrollToResult`), URL로 직접 고른 경우만 스크롤
 - `useRebalancingUrlState.ts` — 리밸런싱 페이지 URL 상태(rtab·gmode·portfolioId 읽기, `navigateTo`/`clearParam` 쓰기). 탭은 state로 복사하지 않고 URL에서 파생
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
 - `useAutoExecutionNotice.ts` — 포트폴리오에 켜진 AUTO 알림이 있으면 "다음 자동 실행부터 새 목표로 주문" 안내 문구(없으면 null). 목표 비중을 바꾸는 확인창(추천 적용·전술 적용)에서 사용
@@ -515,8 +516,8 @@ _기타_
 - 보조/상세 카드(`InvestmentSnapshotCard`, `RebalancingStatusCard`, `TaxLimitsSection` 등)는 `useCollapsible`로 접기 가능하게 하되, 최초 방문 시 기본값은 **열림**(`true`)으로 시작 — 사용자가 직접 접으면 그 상태가 `localStorage`로 유지된다.
 - 단, 이미 펼쳐진 부모 카드 내부의 2차 상세 토글(`MarketSignalBanner` 매크로·물가 지표 확장, `RebalancingDetailMetrics`, `RebalancingDiagnosisCard` 등 영속화 키 없는 세션 한정 토글)은 이 규칙 대상이 아님 — "최상위 카드"에만 적용되는 규칙이므로 중첩된 하위 토글까지 강제로 펼칠 필요는 없다.
 - 새 카드 추가 시 이 규칙을 따를 것.
-- 예외: `RebalancingPage.tsx` "포트폴리오" 탭의 백테스트 카드·"전술" 탭의 규칙 백테스트 카드와 계획탭 "절약 복리 시뮬레이터" 카드는
-  보조 도구라 **기본 접힘**(`growlio:rebalancing:backtest-section-open`, `growlio:invest:savingsSimulatorOpen`).
+- 예외: 리밸런싱 "목표 조정 › 전술"의 규칙 백테스트 카드와 계획탭 "절약 복리 시뮬레이터" 카드는
+  보조 도구라 **기본 접힘**(`growlio:rebalancing:tactical-backtest-open`, `growlio:invest:savingsSimulatorOpen`). 포트폴리오 백테스트는 카드가 아니라 분석 패널(`AnalysisPanel`)의 세 번째 보기(리밸런싱 분석 / 효율 분석 / 백테스트 segmented)로 옮겼다(plans/64 S3).
 - 예외: 자산탭 투자현황의 `AllocationCard`(비중 분석)는 **모바일(<640px)만 기본 접힘**(`growlio:portfolio:allocationOpen`, 사용자가 펼치면 유지) —
   바로 아래 보유 종목 목록이 첫 화면 가까이 오도록(plans/58). 접힘 힌트로 최대 종목·해외상장 비중을 보여준다.
 - 예외: 홈의 `RebalancingStatusCard`는 `statusOnly` — 상태 확인용으로 **기본 접힘**(`growlio:dashboard:rebalancingStatusOpen`)

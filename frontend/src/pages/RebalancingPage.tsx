@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChartLine } from "lucide-react";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
@@ -9,13 +8,12 @@ import { fetchPortfolios } from "@/api/portfolios";
 import type { PortfolioItem } from "@/api/portfolios";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
-import CollapsibleCard from "@/components/common/CollapsibleCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
-import { useCollapsible } from "@/hooks/useCollapsible";
 import { useRebalancingUrlState } from "@/hooks/useRebalancingUrlState";
+import { useSelectedPortfolio } from "@/hooks/useSelectedPortfolio";
 import { REBALANCING_TABS, type GoalMode, type RebalancingTab } from "@/utils/rebalancingUrl";
 
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
@@ -32,7 +30,6 @@ const PortfolioExecutionTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioExecutionTab"),
 );
 const RebalancingHistoryTab = lazy(() => import("../components/rebalancing/RebalancingHistoryTab"));
-const BacktestTab = lazy(() => import("../components/rebalancing/BacktestTab"));
 
 // 탭 순서는 핵심 루프(진단 → 포트폴리오에서 분석·실행)를 앞에, 목표 자체를 바꾸는 추천·전술(목표 조정)을
 // 뒤에 둔다(plans/64 S1). 탭·URL 정의는 utils/rebalancingUrl.ts.
@@ -86,10 +83,9 @@ export default function RebalancingPage() {
     setPrefill({ items: [], name: "", accountIds: null });
     handleTabChange("포트폴리오");
   }, [handleTabChange]);
-  const [isBacktestOpen, toggleBacktestOpen] = useCollapsible(
-    false,
-    "growlio:rebalancing:backtest-section-open",
-  );
+  // URL이 비어 있으면 기준 포트폴리오를 기본으로 — 예전엔 아무것도 선택되지 않아 분석·실행 영역이 숨겨졌다.
+  // 기본값은 URL에 쓰지 않고 파생만 한다(plans/64 S3)
+  const { selectedId: effectivePortfolioId } = useSelectedPortfolio(portfolioId);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, REBALANCING_TABS, localTab, handleTabChange);
@@ -222,7 +218,7 @@ export default function RebalancingPage() {
           <>
             <Suspense fallback={<SkeletonCard />}>
               <PortfolioManageTab
-                selectedPortfolioId={portfolioId}
+                selectedPortfolioId={effectivePortfolioId}
                 onAnalyze={handlePortfolioChange}
                 prefillItems={prefill?.items ?? null}
                 prefillName={prefill?.name ?? ""}
@@ -230,7 +226,7 @@ export default function RebalancingPage() {
                 onPrefillConsumed={() => setPrefill(null)}
               />
             </Suspense>
-            {portfolioId && (
+            {effectivePortfolioId && (
               <div ref={executionRef}>
                 <div className="flex items-center gap-3 px-1">
                   <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
@@ -240,24 +236,13 @@ export default function RebalancingPage() {
                   <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
                 </div>
                 <Suspense fallback={<SkeletonCard />}>
-                  <PortfolioExecutionTab portfolioId={portfolioId} />
+                  <PortfolioExecutionTab
+                    portfolioId={effectivePortfolioId}
+                    scrollToResult={portfolioId !== undefined}
+                  />
                 </Suspense>
               </div>
             )}
-            {/* 설정탭 "백테스트 기능 표시" 플래그 뒤에 숨겨져 있던 것을 접힌 카드로 상시 노출(U15) */}
-            <ErrorBoundary variant="section">
-              <CollapsibleCard
-                icon={ChartLine}
-                title="백테스트"
-                isOpen={isBacktestOpen}
-                onToggle={toggleBacktestOpen}
-                collapsedHint="과거 데이터로 포트폴리오 성과를 시뮬레이션해볼 수 있어요"
-              >
-                <Suspense fallback={<SkeletonCard />}>
-                  <BacktestTab />
-                </Suspense>
-              </CollapsibleCard>
-            </ErrorBoundary>
           </>
         )}
 
