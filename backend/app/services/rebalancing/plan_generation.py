@@ -193,6 +193,27 @@ async def get_alert_ids_with_pending_plan(alert_ids: list[uuid.UUID], db: AsyncS
     return {alert_id for alert_id in result.scalars().all() if alert_id is not None}
 
 
+def _build_plan_orders(
+    alert: RebalancingAlert,
+    drifting: list,
+    ticker_account_map: dict[str, list] | None,
+    strategy: str,
+    order_type: Literal["MARKET", "LIMIT"],
+    account_id: uuid.UUID | None,
+) -> list:
+    """드리프트 항목 → 실제로 플랜에 담길 주문(전략·건당 한도·해외 지정가 강제 반영)."""
+    orders = build_rebalancing_orders(
+        drifting, ticker_account_map or {}, strategy, order_type, str(account_id), alert_id=str(alert.id)
+    )
+    orders = clamp_orders_to_max_value(orders, settings.auto_rebalancing_max_order_value_krw)
+    return _coerce_overseas_market_orders_to_limit(orders, alert_id=str(alert.id))
+
+
+def _orders_value_krw(orders: list) -> float:
+    """주문 거래대금 합(수량 × 원화 참조가) — `sum_today_auto_plan_value_krw`와 같은 기준."""
+    return sum(o.quantity * o.reference_price for o in orders if o.reference_price)
+
+
 async def generate_pending_plan_for_alert(
     alert: RebalancingAlert,
     portfolio: Portfolio,
@@ -203,6 +224,7 @@ async def generate_pending_plan_for_alert(
     strategy_override: str | None = None,
     order_type_override: Literal["MARKET", "LIMIT"] | None = None,
     account_id_override: uuid.UUID | None = None,
+    orders: list | None = None,
 ) -> tuple[RebalancingPlan | None, list[tuple[str, str]], list[tuple[str, str]]]:
     """드리프트 항목으로부터 BUY/SELL leg를 가진 대기 플랜을 생성한다 (실행하지 않음).
 
@@ -221,11 +243,8 @@ async def generate_pending_plan_for_alert(
     order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
     account_id = account_id_override or alert.account_id
 
-    orders = build_rebalancing_orders(
-        drifting, ticker_account_map or {}, strategy, order_type, str(account_id), alert_id=str(alert.id)
-    )
-    orders = clamp_orders_to_max_value(orders, settings.auto_rebalancing_max_order_value_krw)
-    orders = _coerce_overseas_market_orders_to_limit(orders, alert_id=str(alert.id))
+    if orders is None:
+        orders = _build_plan_orders(alert, drifting, ticker_account_map, strategy, order_type, account_id)
     if not orders:
         return None, [], []
 
@@ -364,11 +383,24 @@ async def build_pending_plan_for_alert(
             logger.info("rebalancing_plan_generation_lock_busy", alert_id=str(alert.id))
             return PlanGenerationInProgress()
 
+        strategy = cast(str, strategy_override or getattr(alert, "strategy", "BUY_ONLY"))
+        order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
+        orders = _build_plan_orders(
+            alert,
+            drifting,
+            analysis.ticker_account_map,
+            strategy,
+            order_type,
+            account_id_override or alert.account_id,
+        )
+
         daily_cap_krw = await db.scalar(
             select(UserSettings.auto_rebalancing_daily_value_cap_krw).where(UserSettings.user_id == alert.user_id)
         )
         if daily_cap_krw is not None:
-            attempted_value_krw = sum(abs(item.diff_krw) for item in drifting)
+            # 실제로 나갈 주문 기준 — 드리프트 diff 합은 현금·부동산 항목과 BUY_ONLY가 건너뛸 매도까지 더해
+            # 오늘 누적액(주문 수량 × 참조가)과 기준이 달랐고 약 2배로 과대 집계됐다(plans/62 A5)
+            attempted_value_krw = _orders_value_krw(orders)
             today_total_krw = await sum_today_auto_plan_value_krw(alert.user_id, db)
             if is_daily_value_cap_blocking_auto_mode(today_total_krw, attempted_value_krw, float(daily_cap_krw)):
                 logger.info(
@@ -394,6 +426,7 @@ async def build_pending_plan_for_alert(
             strategy_override=strategy_override,
             order_type_override=order_type_override,
             account_id_override=account_id_override,
+            orders=orders,
         )
 
     if plan is None:

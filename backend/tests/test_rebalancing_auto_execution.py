@@ -740,6 +740,52 @@ class TestRunAutoExecution:
 
 
 class TestBuildPendingPlanForAlert:
+    @pytest.fixture(autouse=True)
+    def fake_plan_orders(self):
+        """가짜 분석 항목엔 ticker 등이 없어 실제 주문 빌드 대신, 항목마다 |diff_krw|어치 주문 1건으로 대체한다."""
+
+        def _fake(_alert, drifting, *_args):
+            return [SimpleNamespace(quantity=1, reference_price=abs(getattr(i, "diff_krw", 0.0))) for i in drifting]
+
+        with patch("app.services.rebalancing.plan_generation._build_plan_orders", side_effect=_fake) as mock_build:
+            yield mock_build
+
+    @pytest.mark.asyncio
+    async def test_daily_value_cap_counts_built_orders_not_drift_diffs(self, fake_plan_orders):
+        """plans/62 A5 — 한도 합산은 실제 나갈 주문 기준. 현금 항목·BUY_ONLY가 건너뛸 매도의 diff는 빼야 한다."""
+        from app.services.rebalancing.plan_service import build_pending_plan_for_alert
+
+        alert = _make_alert(threshold_pct=5.0)
+        portfolio = _make_portfolio()
+        # 현금 -3M(매수 재원)과 종목 +3M(매수) — diff 합이면 6M로 두 배 집계된다
+        analysis = SimpleNamespace(
+            items=[
+                SimpleNamespace(weight_diff_pct=10.0, diff_krw=-3_000_000.0),
+                SimpleNamespace(weight_diff_pct=10.0, diff_krw=3_000_000.0),
+            ],
+            ticker_account_map={},
+        )
+        fake_plan_orders.side_effect = lambda *_a: [SimpleNamespace(quantity=30, reference_price=100_000.0)]
+        mock_db = _make_mock_db()
+        mock_db.scalar = AsyncMock(side_effect=[5_000_000.0, 1_000_000.0])
+        plan = _make_plan()
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_generation.refresh_live_prices", new=AsyncMock()),
+            patch(
+                "app.services.rebalancing.plan_generation.generate_pending_plan_for_alert",
+                new=AsyncMock(return_value=(plan, [], [])),
+            ) as mock_gen,
+        ):
+            result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        # 1M + 3M(주문) <= 5M → 통과. diff 합(6M)이었다면 차단됐다
+        assert result == (plan, [], [])
+        # 한도 판정에 쓴 주문을 그대로 플랜에 넘긴다(두 번 빌드해 어긋나지 않게)
+        assert mock_gen.call_args.kwargs["orders"] == [SimpleNamespace(quantity=30, reference_price=100_000.0)]
+
     @pytest.mark.asyncio
     async def test_returns_none_when_no_items_exceed_threshold(self):
         alert = _make_alert(threshold_pct=5.0)

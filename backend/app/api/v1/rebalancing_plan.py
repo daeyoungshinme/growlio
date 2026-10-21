@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +14,7 @@ from app.limiter import limiter
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanLeg
 from app.models.user import User
 from app.schemas.rebalancing import PlanActionResponse, RebalancingPlanItemOut, RebalancingPlanLegSummary
+from app.services.rebalancing.plan_execution import leg_executed_message
 from app.services.rebalancing.plan_service import (
     approve_buy_leg,
     approve_sell_leg,
@@ -79,7 +80,7 @@ async def _get_owned_leg(
 @limiter.limit("20/minute")
 async def list_plans(
     request: Request,
-    limit: int = 30,
+    limit: int = Query(30, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -127,6 +128,7 @@ async def approve_plan_leg(
     label = "매수" if leg.side == "BUY" else "매도"
     approve_fn = approve_buy_leg if leg.side == "BUY" else approve_sell_leg
     execution_id = await approve_fn(leg, db, cache, decided_by="USER_APP")
-    if execution_id is None:
+    # 실행 기록 저장만 실패한 경우 execution_id는 없지만 주문은 나갔다 — leg 상태로 판정(plans/62 A7)
+    if execution_id is None and leg.status != "EXECUTED":
         return PlanActionResponse(status="FAILED", message=f"{label} 주문 실행에 실패했습니다")
-    return PlanActionResponse(status="EXECUTED", message=f"{label} 주문이 실행되었습니다")
+    return PlanActionResponse(status="EXECUTED", message=leg_executed_message(label, execution_id))

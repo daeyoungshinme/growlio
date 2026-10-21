@@ -332,7 +332,7 @@ jobs/                         # APScheduler 정기 작업
   ├── challenge_deposit_reminder.py  # 매월 25일 09:00 KST — 이번 달 적립 안 한 입금 챌린지 독려(옵트인). 챌린지별 durable_state dedup
   ├── challenge_monthly_wrap.py      # 매월 1일 09:30 KST — 지난달 적립 챌린지 결산(달성/미달·스트릭·마일스톤) + 수익률/평가금액 챌린지 목표 도달 시 status=COMPLETED 전환
   ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송
-  ├── rebalancing_alert.py    # 10분 간격 — 리밸런싱 드리프트 초과 시 이메일 알림(SCHEDULE/DRIFT/BOTH 조건 체크)
+  ├── rebalancing_alert.py    # 정각 기준 10분 간격(KST :00·:10…, notify_time 창 매칭) — 리밸런싱 드리프트 초과 시 이메일 알림(SCHEDULE/DRIFT/BOTH 조건 체크)
   ├── market_signal_alert.py  # 1시간 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
   ├── market_signal_daily_digest.py  # 매일 08:30 KST — 등급 전환 여부와 무관하게 현재 시장 신호를 요약 발송(옵트인, 기본 OFF)
   ├── tactical_regime_check.py       # 매일 07:40 KST(미국 장 마감 후) — 전술 배분 국면 확정·틸트(월 1회) 갱신 + 확정 국면이 `notified_regime`과 다르면 이메일/푸시(`TACTICAL_REGIME`, 이미 적용한 국면·알림 OFF면 무발송, 틸트 단독 변경은 무알림). 주문 없음

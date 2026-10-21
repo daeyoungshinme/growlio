@@ -140,14 +140,14 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                   ? "text-gray-500 dark:text-gray-400"
                   : globalCashSummary.surplus >= 0
                     ? "text-green-600 dark:text-green-400"
-                    : "text-red-600 dark:text-red-400"
+                    : "text-amber-600 dark:text-amber-400"
               }`}
             >
               {globalCashSummary.surplus === null
                 ? "여유/부족 계산 불가"
                 : globalCashSummary.surplus >= 0
                   ? `여유 +${fmtKrw(globalCashSummary.surplus)}`
-                  : `부족 ${fmtKrw(globalCashSummary.surplus)}`}
+                  : `부족 ${fmtKrw(Math.abs(globalCashSummary.surplus))}`}
             </span>
           </div>
           {globalCashSummary.isInsufficient && (

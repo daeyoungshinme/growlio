@@ -100,3 +100,33 @@ def test_report_job_failure_logs_and_captures_to_sentry():
 
     mock_logger.error.assert_called_once_with("x_failed", error="boom", user_id="u1")
     mock_capture.assert_called_once_with(exc)
+
+
+def test_rebalancing_alert_check_ticks_on_every_notify_time(registered_jobs):
+    """plans/62 A3 — notify_time(:00/:30, ±4분 창)마다 tick이 정확히 한 번 떨어져야 한다.
+
+    기동 시각 기준 IntervalTrigger(10분)면 tick이 :x5에 놓일 때 모든 알림이 매일 누락됐다.
+    """
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.utils.market_hours import is_alert_execution_time
+
+    job = next(j for j in registered_jobs if j.id == "rebalancing_alert_check_interval")
+    assert isinstance(job.trigger, CronTrigger)
+
+    kst = ZoneInfo("Asia/Seoul")
+    # 기동 시각을 :05로 가정해도 하루치 tick이 각 notify_time 창에 정확히 1번 들어와야 한다
+    start = datetime(2026, 10, 21, 0, 5, 30, tzinfo=kst)
+    ticks = []
+    prev = None
+    now = start
+    while now < start + timedelta(days=1):
+        nxt = job.trigger.get_next_fire_time(prev, now)
+        ticks.append(nxt)
+        prev = nxt
+        now = nxt + timedelta(seconds=1)
+
+    for notify_time in ("06:00", "08:30", "13:30", "22:00"):
+        hits = [t for t in ticks if is_alert_execution_time(notify_time, now=t)]
+        assert len(hits) == 1, (notify_time, hits)

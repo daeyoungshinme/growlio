@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 
 import structlog
@@ -227,7 +226,8 @@ async def get_rebalancing_strategy(
             selectinload(Portfolio.items),
             selectinload(Portfolio.linked_accounts),
         )
-        .where(Portfolio.id == portfolio_id)
+        # 소유자 조건 필수 — 없으면 남의 portfolio_id로 이름·종목·목표 비중이 그대로 노출된다
+        .where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
     )
     if not portfolio:
         return {"error": "포트폴리오를 찾을 수 없습니다"}
@@ -242,12 +242,12 @@ async def get_rebalancing_strategy(
     if cached is not None:
         return cached
 
-    # 1+2. 팩터·프론티어 병렬 조회 — 세 호출이 서로 독립적이므로 asyncio.gather로 동시 실행.
-    # 캐시 히트(TTL=1h) 시 DB 접근 없이 캐시에서 즉시 반환되어 AsyncSession 경합 없음.
-    current_factors_data, target_factors_data, frontier_data = await asyncio.gather(
-        get_factor_analysis(user_id, db, cache, account_ids=portfolio_acct_ids),
-        get_factor_analysis_for_portfolio(portfolio_id, db, cache),
-        get_efficient_frontier(user_id, db, cache, compare_portfolio_id=portfolio_id, account_ids=portfolio_acct_ids),
+    # 1+2. 팩터·프론티어 조회 — 셋 다 같은 AsyncSession으로 DB를 읽으므로 순차 실행한다.
+    # (캐시 미스 시 asyncio.gather로 같은 세션을 동시에 쓰면 SQLAlchemy가 거부한다)
+    current_factors_data = await get_factor_analysis(user_id, db, cache, account_ids=portfolio_acct_ids)
+    target_factors_data = await get_factor_analysis_for_portfolio(portfolio_id, db, cache)
+    frontier_data = await get_efficient_frontier(
+        user_id, db, cache, compare_portfolio_id=portfolio_id, account_ids=portfolio_acct_ids
     )
 
     current_pf = current_factors_data.get("portfolio_factors", {})

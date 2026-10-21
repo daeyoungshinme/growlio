@@ -24,6 +24,7 @@ from app.schemas.rebalancing import (
     RebalancingPlanLegSummary,
     SellDecisionRequest,
 )
+from app.services.rebalancing.plan_execution import leg_executed_message
 from app.services.rebalancing.plan_service import (
     approve_sell_leg,
     cancel_buy_leg,
@@ -129,6 +130,7 @@ async def decide_sell_by_token(
 
     cache = await get_cache_store()
     execution_id = await approve_sell_leg(leg, db, cache, decided_by="USER_EMAIL")
-    if execution_id is None:
+    # 실행 기록 저장만 실패한 경우 execution_id는 없지만 주문은 나갔다 — leg 상태로 판정(plans/62 A7)
+    if execution_id is None and leg.status != "EXECUTED":
         return PlanActionResponse(status="FAILED", message="주문 실행에 실패했습니다")
-    return PlanActionResponse(status="EXECUTED", message="매도 주문이 실행되었습니다")
+    return PlanActionResponse(status="EXECUTED", message=leg_executed_message("매도", execution_id))

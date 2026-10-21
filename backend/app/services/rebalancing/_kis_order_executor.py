@@ -218,9 +218,23 @@ async def _execute_two_phase_orders(
             new_orderable_cash=new_orderable_cash,
             remaining_buy_count=len(remaining_buys),
         )
-        phase3_results, _, _ = await _execute_buys_within_budget(
+        phase3_results, unaffordable, _ = await _execute_buys_within_budget(
             remaining_buys, new_orderable_cash, app_key, app_secret, access_token, account_no, is_mock
         )
+        # 매도 후에도 살 수 없는 분량은 결과·이력에 SKIPPED로 남긴다 — 버리면 계획의 매수가
+        # 어디에도 기록되지 않아 사용자가 미체결 사실을 알 수 없다(plans/62 A6)
+        phase3_results += [
+            OrderResult(
+                ticker=o.ticker,
+                name=o.name,
+                market=o.market,
+                side=o.side,
+                quantity=o.quantity,
+                status="SKIPPED",
+                error_msg="주문가능금액이 부족해 매수를 건너뜁니다.",
+            )
+            for o in unaffordable
+        ]
 
     return phase1_results + sell_results + phase3_results
 

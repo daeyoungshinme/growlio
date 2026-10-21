@@ -113,7 +113,11 @@ export function useRebalancingExecution({
   onExecuted,
 }: UseRebalancingExecutionParams) {
   const queryClient = useQueryClient();
-  const tradableAccounts = accounts.filter((a) => isOrderExecutableAccount(a.asset_type));
+  // 아래 useMemo 여러 곳의 의존성이라 매 렌더 새 배열이면 메모가 전부 무력화된다(plans/62 B7)
+  const tradableAccounts = useMemo(
+    () => accounts.filter((a) => isOrderExecutableAccount(a.asset_type)),
+    [accounts],
+  );
 
   const [state, dispatch] = useReducer(
     executionReducer,

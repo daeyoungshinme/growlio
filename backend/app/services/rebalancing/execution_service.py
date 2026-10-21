@@ -4,6 +4,7 @@ import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
 
+import sentry_sdk
 import structlog
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -140,7 +141,8 @@ async def _save_execution_history(
 ) -> uuid.UUID | None:
     """실행 결과를 RebalancingExecution/RebalancingExecutionResult로 저장한다.
 
-    저장 실패는 경고 로그만 남기고 삼킨다 — 이미 완료된 주문 실행 결과 자체는 영향받지 않아야 한다.
+    저장 실패는 오류 로그·Sentry만 남기고 삼킨다(세션은 rollback) — 이미 완료된 주문 실행 결과
+    자체는 영향받지 않아야 한다.
     반환값(생성된 execution.id, 저장 실패 시 None)은 AUTO 실행 후 "방금 이 실행이 만든" 기록을
     정확히 재조회하는 데 쓰인다 — "가장 최근 것"으로 재조회하면 같은 포트폴리오의 다른 실행(다른
     계좌 등) 결과를 잘못 집어올 수 있다.
@@ -181,7 +183,16 @@ async def _save_execution_history(
         await db.commit()
         return execution.id
     except Exception as e:
-        logger.warning("rebalancing_history_save_failed", user_id=str(user_id), error=str(e))
+        # 실주문은 이미 나갔는데 기록이 없는 상태 — 경고가 아니라 오류로 알린다. flush 이후 실패면 세션이
+        # 실패 상태라 호출부의 후속 commit(leg 상태 기록 등)이 PendingRollbackError로 깨지므로 되돌린다.
+        logger.error(
+            "rebalancing_history_save_failed",
+            user_id=str(user_id),
+            error=redact_secrets(str(e)),
+            error_type=type(e).__name__,
+        )
+        sentry_sdk.capture_message(f"rebalancing_history_save_failed: {type(e).__name__}", level="error")
+        await db.rollback()
         return None
 
 
@@ -376,6 +387,10 @@ async def _execute_account_group(
     is_mock = account.is_mock_mode
 
     if account.asset_type == "STOCK_KIWOOM":
+        # 키움은 주문가능금액 조회 API가 없어 TWO_PHASE(예수금 매수→매도→잔여 매수)를 지원하지 않는다 —
+        # 매도→매수(예수금 근사 예산 clamp)로 실행한다. 결과(매도 후 가능한 만큼 매수)는 같은 방향이다.
+        if strategy == "TWO_PHASE":
+            logger.info("kiwoom_two_phase_runs_as_sell_then_buy", account_id=acc_id_str)
         account_results = await _execute_kiwoom_account_orders(
             account, group_orders, user_id, acc_uuid, db, cache, is_mock
         )

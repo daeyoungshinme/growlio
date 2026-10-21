@@ -11,6 +11,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.core.config import settings
+from app.services.rebalancing import plan_execution as svc_exec
 from app.services.rebalancing import plan_service as svc
 
 
@@ -589,7 +590,7 @@ class TestRejectSellLeg:
 # ── approve_sell_leg ──────────────────────────────────────────
 
 
-def _make_pending_sell_leg(plan_id, quantity=5):
+def _make_pending_sell_leg(plan_id, quantity=5, deadline_at=None):
     item = SimpleNamespace(
         ticker="005930",
         name="삼성전자",
@@ -606,6 +607,7 @@ def _make_pending_sell_leg(plan_id, quantity=5):
         side="SELL",
         status="PENDING",
         token_consumed_at=None,
+        deadline_at=deadline_at or datetime.now(tz=UTC) + timedelta(hours=1),
         items=[item],
         decided_at=None,
         decided_by=None,
@@ -693,6 +695,56 @@ class TestApproveSellLeg:
         with pytest.raises(HTTPException) as exc_info:
             await svc.approve_sell_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_EMAIL")
         assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_history_save_failure_still_marks_executed(self, mock_db):
+        """plans/62 A7 — 주문은 나갔고 실행 기록 저장만 실패하면 FAILED가 아니라 EXECUTED + 확인 안내."""
+        plan_id = uuid.uuid4()
+        locked_leg = _make_pending_sell_leg(plan_id)
+        plan = SimpleNamespace(
+            id=plan_id, user_id=uuid.uuid4(), account_id=uuid.uuid4(), portfolio_id=uuid.uuid4(), strategy="FULL"
+        )
+        mock_db.scalar = AsyncMock(return_value=locked_leg)
+        mock_db.get = AsyncMock(return_value=plan)
+        mock_db.refresh = AsyncMock()
+
+        mock_email = AsyncMock()
+        with (
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch(
+                "app.services.rebalancing.execution_service.execute_rebalancing",
+                new=AsyncMock(return_value=([], None)),
+            ),
+            patch("app.services.rebalancing.plan_execution._send_leg_execution_email", new=mock_email),
+        ):
+            result = await svc.approve_sell_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_EMAIL")
+
+        assert result is None
+        assert locked_leg.status == "EXECUTED"
+        assert locked_leg.error_message == svc_exec.HISTORY_MISSING_MESSAGE
+        mock_email.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_approve_after_deadline_expires_without_executing(self, mock_db):
+        """plans/62 A4 — 만료 job(15분 주기)이 돌기 전이라도 장마감 기한이 지난 매도 승인은 주문하지 않는다."""
+        plan_id = uuid.uuid4()
+        locked_leg = _make_pending_sell_leg(plan_id, deadline_at=datetime.now(tz=UTC) - timedelta(minutes=5))
+        plan = SimpleNamespace(id=plan_id, user_id=uuid.uuid4())
+        mock_db.scalar = AsyncMock(return_value=locked_leg)
+        mock_db.get = AsyncMock(return_value=plan)
+        mock_db.refresh = AsyncMock()
+
+        mock_execute = AsyncMock()
+        with (
+            patch("app.services.rebalancing.execution_service.execute_rebalancing", new=mock_execute),
+            patch("app.services.rebalancing.plan_execution.save_alert_history", new=AsyncMock()),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            await svc.approve_sell_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_EMAIL")
+
+        assert exc_info.value.status_code == 409
+        assert locked_leg.status == "EXPIRED"
+        mock_execute.assert_not_awaited()
 
 
 # ── approve_buy_leg ───────────────────────────────────────────

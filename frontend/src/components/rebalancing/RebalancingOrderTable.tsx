@@ -203,7 +203,18 @@ export function RebalancingOrderTable({
                   nativeLimitPrice={nativeLimitPrice}
                   currentNativePrice={currentNativePrice}
                   estKrw={estKrw}
-                  marketOrderEst={est}
+                  // 분할 매수는 배분 현황만 표시(데스크톱과 동일) — ≈ 추정액과 겹쳐 보이지 않게
+                  marketOrderEst={isMultiAccount ? null : est}
+                  onRemove={
+                    isMultiAccount
+                      ? () =>
+                          dispatch({
+                            type: "REMOVE_BUY_ACCOUNT",
+                            ticker: item.ticker,
+                            accountId: accId,
+                          })
+                      : undefined
+                  }
                   dispatch={dispatch}
                 />
               );

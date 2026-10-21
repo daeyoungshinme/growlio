@@ -257,6 +257,28 @@ class TestApprovePlanLeg:
         assert resp.status_code == 200
         assert resp.json()["status"] == "FAILED"
 
+    def test_reports_executed_when_only_history_save_failed(self):
+        """plans/62 A7 — 실행 기록만 저장 실패(execution_id 없음)해도 leg가 EXECUTED면 실행됨으로 응답."""
+        user = _make_user()
+        db = _make_mock_db()
+        leg = _make_leg(side="SELL")
+        db.scalar = AsyncMock(return_value=leg)
+
+        async def _approve(leg_arg, *_a, **_kw):
+            leg_arg.status = "EXECUTED"
+            return None
+
+        with patch("app.api.v1.rebalancing_plan.approve_sell_leg", new=AsyncMock(side_effect=_approve)):
+            app = _setup_authenticated_app(user, db)
+            client = TestClient(app)
+            try:
+                resp = client.post(f"/api/v1/rebalancing/plans/{leg.plan_id}/legs/{leg.id}/approve")
+            finally:
+                _teardown_app()
+
+        assert resp.json()["status"] == "EXECUTED"
+        assert "체결 내역을 확인" in resp.json()["message"]
+
 
 # ── 인증 없음 (rebalancing_plan_public.py) ─────────────────────
 

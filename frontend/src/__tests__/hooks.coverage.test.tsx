@@ -440,6 +440,31 @@ describe("useAnalysisState", () => {
     expect(result.current.mode).toBe("rebalancing");
   });
 
+  it("늦게 도착한 이전 요청 응답은 마지막 요청 결과를 덮어쓰지 않는다 (plans/62 B5)", async () => {
+    const { analyzePortfolio } = await import("@/api/rebalancing");
+    let resolveFirst: (v: unknown) => void = () => {};
+    vi.mocked(analyzePortfolio)
+      .mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)) as never)
+      .mockResolvedValueOnce({ portfolio_id: 2, items: [] } as never);
+
+    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "2" }));
+
+    let first: Promise<void> = Promise.resolve();
+    act(() => {
+      first = result.current.triggerRebalancingAnalysis("1");
+    });
+    await act(async () => {
+      await result.current.triggerRebalancingAnalysis("2");
+    });
+    await act(async () => {
+      resolveFirst({ portfolio_id: 1, items: [] });
+      await first;
+    });
+
+    expect(result.current.analysis).toEqual({ portfolio_id: 2, items: [] });
+    expect(result.current.analyzing).toBe(false);
+  });
+
   it("triggerRebalancingAnalysis 실패 시 error가 설정된다", async () => {
     const { analyzePortfolio } = await import("@/api/rebalancing");
     vi.mocked(analyzePortfolio).mockRejectedValue(new Error("분석 실패"));
