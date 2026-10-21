@@ -1527,7 +1527,7 @@ describe("RecommendationCard", () => {
       expect(onApplied).not.toHaveBeenCalled();
     });
 
-    it("splits recommendations by tax type within the same horizon and switches on chip click", async () => {
+    it("splits recommendations by tax type within the same horizon and switches via the tax select", async () => {
       fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
       fetchHorizonGoalRecommendations.mockResolvedValue(
         makeHorizonResponse([
@@ -1578,10 +1578,12 @@ describe("RecommendationCard", () => {
       fireEvent.click(await screen.findByText("장기"));
 
       expect(await screen.findByText(/KODEX 200/)).toBeDefined();
-      expect(screen.getByText("ISA")).toBeDefined();
-      expect(screen.getByText("해외전용")).toBeDefined();
+      // 세제유형은 4단 탭이 되지 않게 select(plans/64 S2)
+      const taxSelect = screen.getByRole("combobox", { name: "계좌 유형" });
+      expect(screen.getByRole("option", { name: "ISA" })).toBeDefined();
+      expect(screen.getByRole("option", { name: "해외전용" })).toBeDefined();
 
-      fireEvent.click(screen.getByText("해외전용"));
+      fireEvent.change(taxSelect, { target: { value: "OVERSEAS_DEDICATED" } });
 
       expect(await screen.findByText(/SPDR S&P 500 ETF/)).toBeDefined();
       expect(screen.queryByText(/KODEX 200/)).toBeNull();
@@ -1645,7 +1647,9 @@ describe("RecommendationCard", () => {
 
       expect(await screen.findByText("일반 포트폴리오에 적용")).toBeDefined();
 
-      fireEvent.click(screen.getByText("ISA"));
+      fireEvent.change(screen.getByRole("combobox", { name: "계좌 유형" }), {
+        target: { value: "ISA" },
+      });
 
       expect(await screen.findByText("ISA 포트폴리오에 적용")).toBeDefined();
       expect(screen.queryByText("일반 포트폴리오에 적용")).toBeNull();

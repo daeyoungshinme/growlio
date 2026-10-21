@@ -3,6 +3,8 @@ import type { PortfolioItem } from "@/api/portfolios";
 import Tabs from "@/components/common/Tabs";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
+import { useSelectedPortfolio } from "@/hooks/useSelectedPortfolio";
 import { GOAL_MODES, type GoalMode } from "@/utils/rebalancingUrl";
 
 const RecommendationCard = lazy(() => import("./RecommendationCard"));
@@ -41,6 +43,9 @@ export default function GoalAdjustTab({
   initialRecOptionsOpen,
   onRecOptionsClosed,
 }: Props) {
+  // 추천·전술이 같은 대상 포트폴리오를 보도록 선택기는 여기 하나만 둔다(plans/64 S2)
+  const { portfolios, anchoredIds, selectedId } = useSelectedPortfolio(selectedPortfolioId);
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
@@ -48,6 +53,28 @@ export default function GoalAdjustTab({
       </p>
       <Tabs tabs={GOAL_MODES} activeTab={mode} onChange={onModeChange} variant="underline" />
       <p className="text-xs text-gray-500 dark:text-gray-400 px-1">{MODE_INTRO[mode]}</p>
+
+      {portfolios.length > 0 && (
+        <label className="flex flex-col gap-1 px-1">
+          <span className={LABEL_SM}>대상 포트폴리오</span>
+          <select
+            className={SELECT_SM}
+            value={selectedId ?? ""}
+            onChange={(e) => onSelectPortfolio(e.target.value)}
+          >
+            {portfolios.map((p) => (
+              <option key={p.id} value={p.id}>
+                {anchoredIds.includes(p.id) ? `${p.name} (기준)` : p.name}
+              </option>
+            ))}
+          </select>
+          {mode === "추천" && (
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              단기·중기·장기 추천은 계좌 투자기간이 맞는 포트폴리오에 적용돼요.
+            </span>
+          )}
+        </label>
+      )}
 
       <ErrorBoundary variant="section">
         <Suspense fallback={<SkeletonCard />}>
@@ -57,15 +84,17 @@ export default function GoalAdjustTab({
               onCreatePortfolio={onCreatePortfolio}
               initialOptionsOpen={initialRecOptionsOpen}
               onOptionsClosed={onRecOptionsClosed}
-              selectedPortfolioId={selectedPortfolioId}
+              selectedPortfolioId={selectedId}
               onSelectPortfolio={onSelectPortfolio}
+              showTargetPicker={false}
             />
           ) : (
             <TacticalAllocationTab
               onCreatePortfolio={onCreateEmptyPortfolio}
-              selectedPortfolioId={selectedPortfolioId}
+              selectedPortfolioId={selectedId}
               onSelectPortfolio={onSelectPortfolio}
               onGoToExecution={onGoToExecution}
+              showPortfolioPicker={false}
             />
           )}
         </Suspense>

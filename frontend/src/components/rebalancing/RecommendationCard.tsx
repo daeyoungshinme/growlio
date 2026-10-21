@@ -25,6 +25,8 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { normalizeWeights } from "@/utils/recommendationDrift";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
+import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
 import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { useAutoExecutionNotice } from "@/hooks/useAutoExecutionNotice";
@@ -79,6 +81,8 @@ interface Props {
   selectedPortfolioId?: string;
   /** 적용 대상 변경 시 호출 — 부모가 URL에 반영해 다른 탭과 선택을 공유한다(plans/63 P3-3) */
   onSelectPortfolio?: (portfolioId: string) => void;
+  /** false면 적용 섹션의 포트폴리오 select를 숨긴다 — 목표 조정 탭이 상단 공용 선택기를 그릴 때(plans/64 S2) */
+  showTargetPicker?: boolean;
 }
 
 /** 목표 역산 추천("전체")과 투자기간별 추천("단기"/"중기"/"장기")을 하나의 탭 카드로 합쳐 보여준다.
@@ -93,6 +97,7 @@ export default function RecommendationCard({
   onOptionsClosed,
   selectedPortfolioId,
   onSelectPortfolio,
+  showTargetPicker = true,
 }: Props) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ActiveTab>("전체");
@@ -304,7 +309,12 @@ export default function RecommendationCard({
     onCreatePortfolio,
   };
   const overallSelection: OverallTargetSelection = {
-    targetPortfolios,
+    // 상단 공용 선택기가 있으면 고른 포트폴리오 하나만 대상으로 — 적용 버튼이 "○○에 적용"으로 바로 보인다
+    targetPortfolios: showTargetPicker
+      ? targetPortfolios
+      : overallConfirmTarget
+        ? [overallConfirmTarget]
+        : [],
     selectedTargetId: effectiveOverallTargetId,
     onSelectTarget: selectOverallTarget,
     anchoredTargetIds: anchoredPortfolioIds,
@@ -319,40 +329,34 @@ export default function RecommendationCard({
           <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">추천 비중</span>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {(["전체", "연령대", ...availableHorizons] as ActiveTab[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2.5 py-1 text-xs rounded-full transition-colors ${
-                tab === effectiveTab
-                  ? "bg-teal-600 text-white"
-                  : "bg-white dark:bg-gray-800 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800/50"
-              }`}
-            >
-              {tab === "전체" || tab === "연령대" ? tab : INVESTMENT_HORIZON_LABELS[tab]}
-            </button>
-          ))}
-        </div>
+        {/* 탭 위계: 페이지 pill → 목표 조정 underline(추천/전술) → 여기 segmented가 3단. 세제유형은
+            4단 탭이 되지 않도록 select로 둔다(plans/50 위계 규칙, plans/64 S2) */}
+        <SegmentedControl
+          ariaLabel="추천 기준"
+          stretch
+          options={(["전체", "연령대", ...availableHorizons] as ActiveTab[]).map((tab) => ({
+            value: tab,
+            label: tab === "전체" || tab === "연령대" ? tab : INVESTMENT_HORIZON_LABELS[tab],
+          }))}
+          value={effectiveTab}
+          onChange={setActiveTab}
+        />
 
-        {effectiveTab !== "전체" && taxTypesForHorizon.length > 1 && (
-          <div className="flex flex-wrap gap-1.5">
-            {taxTypesForHorizon.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setSelectedTaxType(t)}
-                className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 py-1 text-xs rounded-full border transition-colors ${
-                  t === activeTaxType
-                    ? "bg-teal-100 dark:bg-teal-800/40 border-teal-400 dark:border-teal-600 text-teal-700 dark:text-teal-300"
-                    : "bg-transparent border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
-                }`}
-              >
-                {ACCOUNT_TAX_TYPE_LABELS[t]}
-              </button>
-            ))}
-          </div>
+        {effectiveTab !== "전체" && effectiveTab !== "연령대" && taxTypesForHorizon.length > 1 && (
+          <label className="flex items-center gap-2">
+            <span className={LABEL_SM}>계좌 유형</span>
+            <select
+              className={SELECT_SM}
+              value={activeTaxType}
+              onChange={(e) => setSelectedTaxType(e.target.value as AccountTaxType)}
+            >
+              {taxTypesForHorizon.map((t) => (
+                <option key={t} value={t}>
+                  {ACCOUNT_TAX_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
 
         {effectiveTab === "전체" ? (

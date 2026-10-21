@@ -37,6 +37,8 @@ interface Props {
   onGoToExecution: (portfolioId: string) => void;
   /** 포트폴리오가 없을 때 빈 상태 CTA — 새 포트폴리오 편집기를 연다 */
   onCreatePortfolio?: () => void;
+  /** false면 이 탭의 포트폴리오 select를 숨긴다 — 목표 조정 탭이 상단 공용 선택기를 그릴 때(plans/64 S2) */
+  showPortfolioPicker?: boolean;
 }
 
 /** 백엔드 tactical_allocation_service.format_weights와 같은 규칙 — DIA는 0%면 생략 */
@@ -363,12 +365,13 @@ function TacticalStatusView({
   );
 }
 
-/** 리밸런싱 페이지 "전술" 탭 — 포트폴리오를 골라 QQQ/SPY(+DIA) 전술 배분 국면·제안 비중을 보고 적용한다. */
+/** 리밸런싱 페이지 "목표 조정 › 전술" 모드 — 포트폴리오를 골라 QQQ/SPY(+DIA) 전술 배분 국면·제안 비중을 보고 적용한다. */
 export default function TacticalAllocationTab({
   selectedPortfolioId,
   onSelectPortfolio,
   onGoToExecution,
   onCreatePortfolio,
+  showPortfolioPicker = true,
 }: Props) {
   const { data: portfolios, isLoading: portfoliosLoading } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
@@ -404,20 +407,22 @@ export default function TacticalAllocationTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1 px-1">
-        <span className={LABEL_SM}>전술 배분을 적용할 포트폴리오</span>
-        <select
-          className={SELECT_SM}
-          value={selectedId ?? ""}
-          onChange={(e) => setSelectedId(e.target.value)}
-        >
-          {portfolios.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {showPortfolioPicker && (
+        <label className="flex flex-col gap-1 px-1">
+          <span className={LABEL_SM}>전술 배분을 적용할 포트폴리오</span>
+          <select
+            className={SELECT_SM}
+            value={selectedId ?? ""}
+            onChange={(e) => setSelectedId(e.target.value)}
+          >
+            {portfolios.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {isLoading && <SkeletonCard rows={4} />}
       {isError && (
