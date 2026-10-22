@@ -12,7 +12,6 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   TriangleAlert,
   Anchor,
-  Bell,
   CircleAlert,
   CircleCheck,
   Pen,
@@ -320,9 +319,25 @@ export default function PortfolioListSection({
   }
 
   return (
-    <div className="w-full md:w-72 lg:w-80 md:flex-shrink-0 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">포트폴리오</h3>
+    <div className="w-full space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">포트폴리오</h3>
+          {/* 자동화 합계 — 카드마다 칩이 있어 박스 배너 대신 헤더 부제 한 줄(plans/64 S3) */}
+          {!isLoading && portfolios.length > 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {alertPortfolioIds.size > 0
+                ? [
+                    autoAlertCount > 0 && `자동 실행 ${autoAlertCount}개`,
+                    alertPortfolioIds.size - autoAlertCount > 0 &&
+                      `알림 ${alertPortfolioIds.size - autoAlertCount}개`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") + ` / ${portfolios.length}개`
+                : "자동화 설정 없음 — 카드의 '자동화 설정'에서 켤 수 있어요"}
+            </p>
+          )}
+        </div>
         <button
           onClick={() => onOpenEditor(null)}
           className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors`}
@@ -352,35 +367,6 @@ export default function PortfolioListSection({
           <p className="text-xs text-amber-600/70 dark:text-amber-500/70 mt-1.5">
             포트폴리오 카드에서 기준 포트폴리오 지정 버튼을 클릭해 지정하세요.
           </p>
-        </div>
-      )}
-
-      {/* 자동화 현황 배너 */}
-      {!isLoading && portfolios.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/60 text-xs text-gray-500 dark:text-gray-400">
-          <Bell size={12} className="shrink-0" />
-          {alertPortfolioIds.size > 0 ? (
-            <span>
-              {portfolios.length}개 중{" "}
-              {autoAlertCount > 0 && (
-                <span className="font-medium text-gray-700 dark:text-gray-300">
-                  자동 실행 {autoAlertCount}개
-                </span>
-              )}
-              {autoAlertCount > 0 && alertPortfolioIds.size - autoAlertCount > 0 && ", "}
-              {alertPortfolioIds.size - autoAlertCount > 0 && (
-                <span className="font-medium text-gray-700 dark:text-gray-300">
-                  알림 {alertPortfolioIds.size - autoAlertCount}개
-                </span>
-              )}{" "}
-              설정됨
-            </span>
-          ) : (
-            <span>
-              자동화 설정된 포트폴리오가 없습니다. 각 포트폴리오의 '자동화 설정' 버튼으로
-              설정하세요.
-            </span>
-          )}
         </div>
       )}
 

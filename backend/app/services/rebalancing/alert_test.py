@@ -101,6 +101,7 @@ async def send_test_rebalancing_alert(
             schedule_type=getattr(alert, "schedule_type", "DAILY"),
             is_test=True,
             order_preview_items=order_preview_items,
+            portfolio_id=str(portfolio.id),
         )
     except Exception as exc:
         logger.error("test_rebalancing_alert_email_failed", portfolio_id=str(portfolio_id), error=str(exc))

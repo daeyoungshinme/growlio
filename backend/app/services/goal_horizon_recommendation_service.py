@@ -272,7 +272,7 @@ async def _build_horizon_result(
     if len(filtered) == 1:
         return _single_candidate_horizon_result(filtered[0], common, _combine_note)
 
-    returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent)
+    returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent, cache)
     equity_floor, equity_ceiling = _horizon_equity_bounds(
         is_irp, include_cash_equivalent, filtered, short_term_equity_floor
     )

@@ -38,6 +38,7 @@ import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import GoalSettingWizard from "@/components/invest/GoalSettingWizard";
 import Tabs from "@/components/common/Tabs";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 // 절세는 자산 › 투자현황 › 세금에서 이동(plans/50 M1) — 목표·배당·절세 "계획"을 한 탭에 모은다
 const TABS = ["적립 계획", "배당 계획", "절세", "챌린지"] as const;
@@ -169,7 +170,7 @@ export default function InvestPlanPage() {
             {/* 리밸런싱 추천 탭 "목표 설정하러 가기"에서 온 경우, 목표 저장 후 추천으로 돌아가는 길(U16) */}
             {fromRecommendation && isConfigured && (
               <Link
-                to="/rebalancing?rtab=추천"
+                to={rebalancingUrl({ tab: "목표 조정", mode: "추천" })}
                 className="flex items-center justify-between gap-2 rounded-xl border border-teal-200 dark:border-teal-800/50 bg-teal-50 dark:bg-teal-950/30 px-4 py-3 text-sm font-medium text-teal-700 dark:text-teal-300"
               >
                 목표가 설정됐어요 — 목표에 맞춘 추천 비중 보러 가기

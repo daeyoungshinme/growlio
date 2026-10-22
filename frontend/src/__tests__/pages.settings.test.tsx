@@ -177,7 +177,9 @@ describe("SettingsPage", () => {
     expect(goalLink).toHaveAttribute("href", "/invest-plan?tab=적립 계획");
 
     const recommendationLink = screen.getByText("목표 역산 추천 옵션").closest("a");
-    expect(recommendationLink).toHaveAttribute("href", "/rebalancing?rtab=추천&openRecOptions=1");
+    expect(decodeURIComponent(recommendationLink?.getAttribute("href") ?? "")).toBe(
+      "/rebalancing?rtab=목표 조정&gmode=추천&openRecOptions=1",
+    );
   });
 
   it("계좌 연동이 있고 목표가 설정된 경우 다른 설정 카드에 반영한다", async () => {

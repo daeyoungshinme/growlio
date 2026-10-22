@@ -354,7 +354,7 @@ function PendingPlanRow({
         {leg.partially_executed && (
           <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
             같은 계획의 {leg.side === "BUY" ? "매도" : "매수"} 주문은 이미 체결됐어요. 비중이 한쪽만
-            조정된 상태일 수 있으니 진단 탭에서 다시 분석해 보세요.
+            조정된 상태일 수 있으니 포트폴리오 탭에서 다시 분석해 보세요.
           </p>
         )}
 

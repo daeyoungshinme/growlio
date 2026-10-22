@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { TriangleAlert, CircleCheck, Info, Zap } from "lucide-react";
+import { TriangleAlert, CircleCheck, Info } from "lucide-react";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 import DiagnosisInsightList from "./DiagnosisInsightList";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
@@ -46,14 +46,12 @@ const STATUS_CONFIG = {
 interface Props {
   analysis: RebalancingAnalysis;
   alertThreshold?: number;
-  onExecute?: () => void;
   portfolioName?: string;
 }
 
 export default function RebalancingDiagnosisCard({
   analysis,
   alertThreshold,
-  onExecute,
   portfolioName,
 }: Props) {
   const threshold = alertThreshold ?? DEFAULT_THRESHOLD;
@@ -85,8 +83,14 @@ export default function RebalancingDiagnosisCard({
       iconWrapClassName="bg-transparent"
       iconColorClassName={cfg.iconColor}
       title={
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.badge}`}>
-          {cfg.label}
+        // 선택 포트폴리오 기준(analysis.diagnosis_context) — 진단 탭의 "전체 자산 진단"과 구분(plans/64 S4)
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            이 포트폴리오 진단
+          </span>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.badge}`}>
+            {cfg.label}
+          </span>
         </span>
       }
       headerRight={
@@ -112,18 +116,6 @@ export default function RebalancingDiagnosisCard({
       )}
 
       <DiagnosisInsightList context={analysis.diagnosis_context} />
-
-      {/* CRITICAL: 실행 CTA 버튼 */}
-      {status === "critical" && onExecute && (
-        <div className="mt-3 flex justify-end">
-          <button
-            onClick={onExecute}
-            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            <Zap size={14} /> 지금 실행하기
-          </button>
-        </div>
-      )}
     </CollapsibleCard>
   );
 }

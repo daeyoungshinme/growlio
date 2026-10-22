@@ -15,6 +15,7 @@ import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 const ActionItemsCard = lazy(() => import("../components/dashboard/ActionItemsCard"));
 
@@ -67,7 +68,7 @@ function OnboardingChecklist() {
               </p>
             </div>
             <Link
-              to="/rebalancing?rtab=포트폴리오"
+              to={rebalancingUrl({ tab: "포트폴리오" })}
               className="shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
             >
               둘러보기 →
@@ -204,7 +205,9 @@ export default function DashboardPage() {
               maxDriftRows={3}
               signalDisplay="badge"
               marketSignal={marketSignal}
-              onPortfolioSelect={(id) => navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${id}`)}
+              onPortfolioSelect={(id) =>
+                navigate(rebalancingUrl({ tab: "포트폴리오", portfolioId: id }))
+              }
               statusOnly
               storageKey="growlio:dashboard:rebalancingStatusOpen"
             />

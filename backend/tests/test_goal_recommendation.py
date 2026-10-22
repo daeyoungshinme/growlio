@@ -11,7 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.constants import MAX_GOAL_CANDIDATE_TICKERS
-from app.services._goal_recommendation_common import _fetch_dividend_yields, _suggest_for_dividend_goal
+from app.services._goal_recommendation_common import (
+    _fetch_candidate_returns,
+    _fetch_dividend_yields,
+    _suggest_for_dividend_goal,
+)
 from app.services.goal_age_recommendation_service import (
     _AGE_GROUP_PROFILE,
     age_group_from_birth_year,
@@ -45,6 +49,7 @@ from app.services.recommendation_universe import (
     resolve_index_region,
     resolve_tracking_index,
 )
+from app.utils.cache_keys import daily_returns_key, goal_recommendation_key
 from app.utils.kst import today_kst
 
 
@@ -2129,7 +2134,52 @@ class TestGetGoalRecommendation:
             result = await get_goal_recommendation(mock_cache, 10_000_000.0, [], settings_row, AsyncMock())
 
         assert result.recommended_items
-        mock_cache.setex.assert_awaited_once()
+        # 결과 1건 + 심볼별 일별수익률(SPY·QQQ) 캐시
+        keys = [c.args[0] for c in mock_cache.setex.await_args_list]
+        assert keys.count(goal_recommendation_key(settings_row.user_id)) == 1
+        assert sorted(k for k in keys if "daily_returns" in k) == sorted(
+            [daily_returns_key("QQQ"), daily_returns_key("SPY")]
+        )
+
+
+class TestFetchCandidateReturnsCache:
+    """`_fetch_candidate_returns` 심볼별 일별수익률 캐시."""
+
+    @staticmethod
+    def _candidates(*symbols: str) -> list:
+        return [SimpleNamespace(symbol=s) for s in symbols]
+
+    async def test_cache_hit_skips_fetch_for_cached_symbols(self):
+        cache = AsyncMock()
+        cache.get = AsyncMock(
+            side_effect=lambda key: json.dumps([0.01, 0.02]) if key == daily_returns_key("SPY") else None
+        )
+        fetch = MagicMock(return_value={"QQQ": [0.03]})
+
+        result = await _fetch_candidate_returns(fetch, self._candidates("SPY", "QQQ"), False, cache)
+
+        assert result == {"SPY": [0.01, 0.02], "QQQ": [0.03]}
+        fetch.assert_called_once_with(["QQQ"])
+        cache.setex.assert_awaited_once()
+        assert cache.setex.await_args.args[0] == daily_returns_key("QQQ")
+
+    async def test_failed_symbols_are_not_cached(self):
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        fetch = MagicMock(return_value={"SPY": [0.01]})  # QQQ 조회 실패
+
+        result = await _fetch_candidate_returns(fetch, self._candidates("SPY", "QQQ"), False, cache)
+
+        assert result == {"SPY": [0.01]}
+        assert [c.args[0] for c in cache.setex.await_args_list] == [daily_returns_key("SPY")]
+
+    async def test_without_cache_fetches_all(self):
+        fetch = MagicMock(return_value={"SPY": [0.01]})
+
+        result = await _fetch_candidate_returns(fetch, self._candidates("SPY"), False)
+
+        assert result == {"SPY": [0.01]}
+        fetch.assert_called_once_with(["SPY"])
 
 
 def _execute_result(rows: list[tuple]) -> MagicMock:
@@ -3736,7 +3786,8 @@ class TestGetHorizonRecommendations:
 
         assert len(result.recommendations) == 1
         assert result.recommendations[0].recommended_items
-        mock_cache.setex.assert_awaited_once()
+        # 일별수익률 심볼 캐시를 뺀 결과 캐시는 1건
+        assert len([c for c in mock_cache.setex.await_args_list if "daily_returns" not in c.args[0]]) == 1
 
 
 class TestAgeGroupProfile:
@@ -3998,7 +4049,8 @@ class TestGetAgeBasedRecommendation:
             result = await get_age_based_recommendation(mock_cache, AsyncMock(), uuid.uuid4(), settings_row)
 
         assert result.recommended_items
-        mock_cache.setex.assert_awaited_once()
+        # 일별수익률 심볼 캐시를 뺀 결과 캐시는 1건
+        assert len([c for c in mock_cache.setex.await_args_list if "daily_returns" not in c.args[0]]) == 1
 
     async def test_age_default_dividend_floor_shifts_weight_to_high_yield_candidate(self):
         """annual_dividend_goal 미설정 + 40대 → 연령대 기본 배당수익률 하한(1.5%)이

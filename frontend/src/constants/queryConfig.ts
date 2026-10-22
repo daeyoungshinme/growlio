@@ -7,6 +7,8 @@ export const STALE_TIME = {
   SHORT: 30_000,
   MEDIUM: 60_000,
   LONG: 1000 * 60 * 60,
+  /** 영속 캐시 maxAge(main.tsx)와 같은 하루 — 무거운 계산 결과를 gcTime으로 오래 남길 때 */
+  DAY: 1000 * 60 * 60 * 24,
   EXCHANGE_RATE: 5 * 60 * 1000,
   FIVE_MINUTES: 5 * 60 * 1000,
 } as const;

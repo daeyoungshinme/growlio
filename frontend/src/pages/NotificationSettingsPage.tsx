@@ -30,6 +30,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -311,9 +312,23 @@ export default function NotificationSettingsPage() {
         title="시장 모니터링"
         isOpen={isMarketAlertsOpen}
         onToggle={toggleMarketAlertsOpen}
-        collapsedHint="시장 위험 신호 등급 전환 알림 + 매일 아침 요약"
+        collapsedHint="시장 위험 신호 등급 전환 알림 + 매일 아침 요약 · 전술 국면 알림"
       >
         <MarketSignalAlertSection embedded />
+        {/* 전술 국면 알림은 포트폴리오별 설정이라 여기선 위치만 알린다 — 시장 관련 알림을 한 목록에서 찾게(plans/64 S4) */}
+        <div className="mt-4 border-t border-gray-100 dark:border-gray-700 pt-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">전술 배분 국면 전환 알림</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            QQQ·SPY 전술 배분을 켠 포트폴리오의 국면이 바뀌면 알려드려요. 포트폴리오마다 켜고 끌 수
+            있어요.
+          </p>
+          <Link
+            to={rebalancingUrl({ tab: "목표 조정", mode: "전술" })}
+            className={`${TOUCH_TARGET_ROW} text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline`}
+          >
+            리밸런싱 › 목표 조정 › 전술에서 설정 →
+          </Link>
+        </div>
       </CollapsibleCard>
 
       {/* 알림 탭 */}

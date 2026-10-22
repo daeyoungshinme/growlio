@@ -190,6 +190,8 @@ async def _process_rebalancing_alert(
             composite_reason=composite_reason,
             order_preview_items=order_preview_items,
             automation_note=automation_note,
+            # 푸시와 같은 목적지 — 복합신호 단독 알림은 포트폴리오 없이 진단 탭
+            portfolio_id=push_data.get("portfolio_id"),
         )
     except Exception as exc:
         logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))

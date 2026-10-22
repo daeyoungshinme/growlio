@@ -17,6 +17,7 @@ import { MONTH_LABELS } from "@/utils/dividendUtils";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 interface Props {
   onOpenSettings: () => void;
@@ -335,7 +336,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
           />
 
           <Link
-            to="/rebalancing?rtab=추천"
+            to={rebalancingUrl({ tab: "목표 조정", mode: "추천" })}
             className="flex items-center gap-1.5 text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline mt-3"
           >
             추천 포트폴리오 자세히 보기 <ArrowRight size={12} />

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import { ChartColumn, Loader2, RefreshCw } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, RefreshCw } from "lucide-react";
 import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
@@ -8,20 +8,34 @@ import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
 import RebalancingStrategyCard from "@/components/rebalancing/RebalancingStrategyCard";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
+import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { useAnalysisState } from "@/hooks/useAnalysisState";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+
+const BacktestTab = lazy(() => import("@/components/rebalancing/BacktestTab"));
+
+type AnalysisView = "rebalancing" | "strategy" | "backtest";
+
+const VIEW_OPTIONS: { value: AnalysisView; label: string }[] = [
+  { value: "rebalancing", label: "리밸런싱 분석" },
+  { value: "strategy", label: "효율 분석" },
+  { value: "backtest", label: "백테스트" },
+];
 
 interface Props {
-  selectedIds: Set<string>;
-  selectedNames: string;
+  /** 분석 대상 포트폴리오 — 선택되면 자동으로 리밸런싱 분석을 시작한다 */
+  portfolioId: string;
   portfolios: Portfolio[];
   activeAccounts: AssetAccount[];
   onOpenAlertModal: (portfolioId: string) => void;
-  autoAnalyzeId?: string;
   alertByPortfolioId: Record<string, RebalancingAlert>;
   autoOpenExecution?: boolean;
   /** 계좌 목록 로딩 완료 여부 — 자동 분석이 실시간 예수금 조회 대상 계좌를 알고 시작하도록 */
   accountsReady?: boolean;
+  /** 분석이 끝나면 결과로 스크롤 — 사용자가 직접 고른 경우만. 기본 선택으로 열렸을 때 탭을 열자마자
+   * 화면이 아래로 튀지 않도록(plans/64 S3) */
+  scrollToResult?: boolean;
 }
 
 /** 분석·예수금 기준 계좌 — 포트폴리오에 연결 계좌가 있으면 그 계좌들, 없으면 활성 계좌 전체 */
@@ -32,20 +46,17 @@ function portfolioAccounts(portfolio: Portfolio | undefined, activeAccounts: Ass
 }
 
 export function AnalysisPanel({
-  selectedIds,
-  selectedNames,
+  portfolioId,
   portfolios,
   activeAccounts,
   onOpenAlertModal,
-  autoAnalyzeId,
   alertByPortfolioId,
   autoOpenExecution,
   accountsReady,
+  scrollToResult = true,
 }: Props) {
-  const selectedIdStr = Array.from(selectedIds).sort().join(",");
-  const portfolioItemsSignature = autoAnalyzeId
-    ? JSON.stringify(portfolios.find((p) => p.id === autoAnalyzeId)?.items ?? [])
-    : undefined;
+  const portfolio = portfolios.find((p) => p.id === portfolioId);
+  const portfolioItemsSignature = JSON.stringify(portfolio?.items ?? []);
   const getDepositAccounts = useCallback(
     (id: string) =>
       portfolioAccounts(
@@ -56,102 +67,99 @@ export function AnalysisPanel({
   );
   const { mode, analysis, analyzing, error, cashIsLive, triggerRebalancingAnalysis, setMode } =
     useAnalysisState({
-      autoAnalyzeId,
-      selectedIdStr,
+      autoAnalyzeId: portfolioId,
+      selectedIdStr: portfolioId,
       portfolioItemsSignature,
       getDepositAccounts,
       accountsReady,
     });
+  // 백테스트는 분석 상태(useAnalysisState)와 별개로 보여준다 — 다녀와도 리밸런싱 분석 결과가 남도록
+  // 어느 포트폴리오에서 백테스트를 열었는지로 파생 — 포트폴리오를 바꾸면 자연히 리밸런싱 분석으로 돌아간다
+  const [backtestFor, setBacktestFor] = useState<string | null>(null);
+  const showBacktest = backtestFor === portfolioId;
+  const view: AnalysisView = showBacktest ? "backtest" : (mode ?? "rebalancing");
 
   const analysisResultRef = useRef<HTMLDivElement>(null);
   const autoScrolledForRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     autoScrolledForRef.current = undefined;
-  }, [autoAnalyzeId]);
+  }, [portfolioId]);
 
   useEffect(() => {
     if (
-      !autoAnalyzeId ||
+      !scrollToResult ||
       !analysis ||
-      analysis.portfolio_id.toString() !== autoAnalyzeId ||
-      autoScrolledForRef.current === autoAnalyzeId
+      analysis.portfolio_id.toString() !== portfolioId ||
+      autoScrolledForRef.current === portfolioId
     ) {
       return;
     }
-    autoScrolledForRef.current = autoAnalyzeId;
+    autoScrolledForRef.current = portfolioId;
     const timer = setTimeout(() => {
       analysisResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
     return () => clearTimeout(timer);
-  }, [autoAnalyzeId, analysis]);
-
-  const canRebalance = selectedIds.size === 1;
+  }, [portfolioId, analysis, scrollToResult]);
 
   const handleRebalancingAnalysis = useCallback(() => {
-    const [id] = Array.from(selectedIds);
-    if (id) void triggerRebalancingAnalysis(id);
-  }, [selectedIds, triggerRebalancingAnalysis]);
+    void triggerRebalancingAnalysis(portfolioId);
+  }, [portfolioId, triggerRebalancingAnalysis]);
+
+  const handleViewChange = (next: AnalysisView) => {
+    if (next === "backtest") {
+      setBacktestFor(portfolioId);
+      return;
+    }
+    setBacktestFor(null);
+    if (next === "strategy") {
+      if (mode !== "strategy") setMode("strategy");
+      return;
+    }
+    // 효율 분석에서 돌아오면 결과가 비워져 있으므로 다시 분석, 백테스트에서 돌아오면 기존 결과 유지
+    if (mode !== "rebalancing" || !analysis) handleRebalancingAnalysis();
+  };
 
   return (
     <div className="flex-1 min-w-0 space-y-4">
-      {/* 분석 버튼 행 */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden">
-        <button
-          onClick={handleRebalancingAnalysis}
-          disabled={!canRebalance || analyzing}
-          title={!canRebalance ? "포트폴리오를 1개만 선택하세요" : undefined}
-          className={`flex-none whitespace-nowrap flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
-            mode === "rebalancing"
-              ? "bg-blue-600 text-white hover:bg-blue-700"
-              : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-          }`}
-        >
-          {analyzing && mode === "rebalancing" ? (
-            <>
-              <Loader2 size={14} className="animate-spin" /> 분석 중...
-            </>
-          ) : (
-            <>
-              <RefreshCw size={14} /> 리밸런싱 분석
-            </>
-          )}
-        </button>
-
-        <button
-          onClick={() => setMode("strategy")}
-          disabled={!canRebalance}
-          title={!canRebalance ? "포트폴리오를 1개만 선택하세요" : undefined}
-          className={`flex-none whitespace-nowrap flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
-            mode === "strategy"
-              ? "bg-amber-500 text-white hover:bg-amber-600"
-              : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-          }`}
-        >
-          효율 분석
-        </button>
-
-        {selectedIds.size > 0 && (
-          <span className="flex-none whitespace-nowrap text-xs text-gray-400 dark:text-gray-500">
-            {selectedNames}
-            {selectedIds.size > 1 && ` 외 ${selectedIds.size - 1}개`} 선택됨
-          </span>
+      {/* 분석 보기 — 탭 위계 3단(페이지 pill → 포트폴리오 탭 → segmented, plans/64 S3) */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <SegmentedControl
+            ariaLabel="분석 보기"
+            stretch
+            options={VIEW_OPTIONS}
+            value={view}
+            onChange={handleViewChange}
+          />
+        </div>
+        {view === "rebalancing" && (
+          <button
+            type="button"
+            onClick={handleRebalancingAnalysis}
+            disabled={analyzing}
+            aria-label="다시 분석"
+            title="다시 분석"
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} flex-none justify-center px-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-40`}
+          >
+            {analyzing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          </button>
         )}
       </div>
 
-      {/* 자동화 상태 — 분석 모드(리밸런싱·효율)와 무관하게 선택 포트폴리오당 한 번만(plans/63 P2-2) */}
-      {canRebalance && mode && (
+      {/* 자동화 상태 — 분석 보기와 무관하게 선택 포트폴리오당 한 번만(plans/63 P2-2) */}
+      {view !== "backtest" && (
         <AutomationStatusBar
-          existingAlert={alertByPortfolioId[Array.from(selectedIds)[0]]}
-          onOpenAlertModal={() => onOpenAlertModal(Array.from(selectedIds)[0])}
+          existingAlert={alertByPortfolioId[portfolioId]}
+          onOpenAlertModal={() => onOpenAlertModal(portfolioId)}
         />
       )}
 
-      {/* 최초 분석 중 — 아직 표시할 이전 결과가 없을 때만 스켈레톤 */}
-      {mode === "rebalancing" && analyzing && !analysis && <SkeletonCard rows={4} />}
+      {/* 최초 분석 중(또는 계좌 로딩을 기다리는 중) — 아직 표시할 이전 결과가 없을 때만 스켈레톤 */}
+      {view === "rebalancing" && !analysis && !error && <SkeletonCard rows={4} />}
 
       {/* 리밸런싱 결과 */}
-      {mode === "rebalancing" && analysis && (
+      {view === "rebalancing" && analysis && (
         <div ref={analysisResultRef} className="card pb-20 sm:pb-0 relative">
           {analyzing && (
             <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 mb-3">
@@ -198,7 +206,7 @@ export function AnalysisPanel({
           })()}
         </div>
       )}
-      {mode === "rebalancing" && error && !analysis && (
+      {view === "rebalancing" && error && !analysis && (
         <div className="card flex flex-col items-center justify-center gap-3 py-10 text-center">
           <p className="text-sm text-red-500">{error}</p>
           <button
@@ -211,40 +219,15 @@ export function AnalysisPanel({
       )}
 
       {/* 효율 분석(팩터·프런티어) 결과 */}
-      {mode === "strategy" &&
-        (() => {
-          const [id] = Array.from(selectedIds);
-          const portfolio = portfolios.find((p) => p.id === id);
-          if (!id || !portfolio) return null;
-          return <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />;
-        })()}
-
-      {/* Empty state */}
-      {!mode && selectedIds.size === 0 && (
-        <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 dark:text-gray-500">
-          <ChartColumn size={32} className="mb-3" />
-          <div className="text-sm font-medium mb-1">포트폴리오를 선택하세요</div>
-          <div className="text-xs">포트폴리오 목록에서 선택하면 분석을 시작할 수 있습니다</div>
-        </div>
+      {view === "strategy" && portfolio && (
+        <RebalancingStrategyCard portfolioId={portfolioId} portfolioName={portfolio.name} />
       )}
-      {!mode && selectedIds.size > 0 && (
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={handleRebalancingAnalysis}
-            disabled={!canRebalance || analyzing}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-40"
-          >
-            <div className="text-left">
-              <div className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                리밸런싱 분석
-              </div>
-              <div className="text-xs text-blue-500 dark:text-blue-400 mt-0.5">
-                비중 이탈 확인 및 매수/매도 수량 계산
-              </div>
-            </div>
-            <span className="text-blue-400 text-lg">→</span>
-          </button>
-        </div>
+
+      {/* 백테스트 — 선택 포트폴리오를 기본으로 체크, 다른 포트폴리오와 비교 가능 */}
+      {view === "backtest" && (
+        <Suspense fallback={<SkeletonCard />}>
+          <BacktestTab key={portfolioId} defaultPortfolioIds={[portfolioId]} />
+        </Suspense>
       )}
     </div>
   );

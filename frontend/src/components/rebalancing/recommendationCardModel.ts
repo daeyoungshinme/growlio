@@ -135,7 +135,7 @@ const applyMessage = (name: string) =>
  * 대상 포트폴리오/추천 데이터/안내 문구를 골라준다(null이면 확인창을 띄우지 않음). */
 export function buildApplyConfirm(params: {
   tab: "전체" | "연령대" | "기간별";
-  overallData: GoalRecommendation;
+  overallData: GoalRecommendation | undefined;
   ageData: GoalRecommendation | undefined;
   overallTarget: Portfolio | undefined;
   horizonRec: HorizonGoalRecommendation | undefined;
@@ -145,7 +145,7 @@ export function buildApplyConfirm(params: {
   const { tab, overallData, ageData, overallTarget, horizonRec, horizonTarget } = params;
   const { cashEquivalentMatches } = params;
 
-  if (tab === "전체" && overallTarget) {
+  if (tab === "전체" && overallData && overallTarget) {
     return {
       target: overallTarget,
       items: overallData.recommended_items,

@@ -386,7 +386,8 @@ export default function RebalancingStatusCard({
       {/* 진단 결과 섹션 */}
       {hasDiagnosis && (
         <div className="space-y-2 border-t border-gray-100 dark:border-gray-700 pt-3">
-          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">진단 결과</p>
+          {/* 전체 자산 기준(insights API) — 포트폴리오 탭의 "이 포트폴리오 진단"과 구분(plans/64 S4) */}
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">전체 자산 진단</p>
           {concentrationInsight?.metric_value != null && (
             <DiagnosticGauge value={concentrationInsight.metric_value} />
           )}

@@ -17,6 +17,7 @@ import {
   isDcaAutoBuyPreset,
 } from "@/utils/dcaAutoBuy";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 /** "정기 적립식 자동매수"(리밸런싱 AUTO의 SCHEDULE_ONLY+BUY_ONLY 프리셋) 설정 여부를 한 줄로
  * 보여주고, /rebalancing 실행 화면으로 딥링크한다. 적립 계획 탭에서 이 기능의 존재를 알리는
@@ -74,8 +75,12 @@ export default function AutoInvestStatusBanner() {
   // 여러 개 중 고르는 경우만 목록으로 보낸다.
   const targetId = activeEntry?.portfolio.id ?? (portfolios.length === 1 ? portfolios[0].id : null);
   const linkTo = targetId
-    ? `/rebalancing?rtab=포트폴리오&portfolioId=${targetId}&openAlert=${activeEntry ? "1" : "dca"}`
-    : `/rebalancing?rtab=포트폴리오`;
+    ? rebalancingUrl({
+        tab: "포트폴리오",
+        portfolioId: targetId,
+        openAlert: activeEntry ? "1" : "dca",
+      })
+    : rebalancingUrl({ tab: "포트폴리오" });
 
   return (
     <div className="card flex items-center gap-3">

@@ -636,8 +636,7 @@ describe("AnalysisPanel", () => {
     renderWithProviders(
       <MemoryRouter>
         <AnalysisPanel
-          selectedIds={new Set(["p1"])}
-          selectedNames="테스트 포트폴리오"
+          portfolioId="p1"
           portfolios={[mockPortfolio]}
           activeAccounts={[mockStockAccount]}
           onOpenAlertModal={vi.fn()}
@@ -650,22 +649,36 @@ describe("AnalysisPanel", () => {
     });
   });
 
-  it("renders with empty portfolios", async () => {
+  it("분석 보기는 리밸런싱·효율·백테스트 segmented — 백테스트는 선택 포트폴리오를 기본 체크한다 (plans/64 S3)", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([mockPortfolio] as never);
     renderWithProviders(
       <MemoryRouter>
         <AnalysisPanel
-          selectedIds={new Set()}
-          selectedNames=""
-          portfolios={[]}
-          activeAccounts={[]}
+          portfolioId="p1"
+          portfolios={[mockPortfolio]}
+          activeAccounts={[mockStockAccount]}
           onOpenAlertModal={vi.fn()}
           alertByPortfolioId={{}}
         />
       </MemoryRouter>,
     );
-    await waitFor(() => {
-      expect(document.body).toBeDefined();
-    });
+    const group = screen.getByRole("group", { name: "분석 보기" });
+    expect(Array.from(group.querySelectorAll("button")).map((b) => b.textContent)).toEqual([
+      "리밸런싱 분석",
+      "효율 분석",
+      "백테스트",
+    ]);
+    expect(screen.getByRole("button", { name: "리밸런싱 분석" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "백테스트" }));
+    expect(screen.getByRole("button", { name: "백테스트" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(await screen.findByRole("checkbox", { name: /테스트 포트폴리오/ })).toBeChecked();
   });
 
   it("다른 포트폴리오로 전환해 분석이 완료되면 결과로 다시 스크롤한다", async () => {
@@ -693,13 +706,11 @@ describe("AnalysisPanel", () => {
       <QueryClientProvider client={qc}>
         <MemoryRouter>
           <AnalysisPanel
-            selectedIds={new Set([autoAnalyzeId])}
-            selectedNames={autoAnalyzeId === "p1" ? "테스트 포트폴리오" : "두번째 포트폴리오"}
+            portfolioId={autoAnalyzeId}
             portfolios={[mockPortfolio, mockPortfolio2]}
             activeAccounts={[mockStockAccount]}
             onOpenAlertModal={vi.fn()}
             alertByPortfolioId={{}}
-            autoAnalyzeId={autoAnalyzeId}
           />
         </MemoryRouter>
       </QueryClientProvider>

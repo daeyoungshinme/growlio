@@ -49,8 +49,10 @@ from app.services.market_signal_service import get_market_signal
 from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
 from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
+    TTL_DAILY_RETURNS,
     TTL_GOAL_CANDIDATE_DIVIDEND_YIELD,
     CacheStoreType,
+    daily_returns_key,
     get_cached_json,
     goal_candidate_dividend_yield_key,
     set_cached_json,
@@ -414,18 +416,37 @@ async def _fetch_candidate_returns(
     fetch_daily_returns: Callable[[list[str]], dict[str, list[float]]],
     candidates: list[_GoalCandidate],
     include_cash_equivalent: bool,
+    cache: CacheStoreType = None,
 ) -> dict[str, list[float]]:
     """후보의 일별수익률을 조회하고, 합성 현금성 자산이 포함되면 그 합성 시계열을 더한다.
 
     `fetch_daily_returns`는 호출 모듈의 `fetch_yf_daily_returns`를 넘긴다(모듈 docstring 참고).
+    심볼별 결과는 `TTL_DAILY_RETURNS`(1일) 전역 캐시를 공유한다 — 순차 `yf.download`(threads=False)가
+    추천 콜드 계산의 가장 느린 구간이었고, 기간별 추천은 조합마다 같은 심볼을 반복 조회했다.
+    조회에 실패해 결과에 없는 심볼은 캐싱하지 않는다(다음 요청에서 재시도).
     """
     real_symbols = [c.symbol for c in candidates if c.symbol != _CASH_EQUIVALENT_TICKER]
     returns_map: dict[str, list[float]] = {}
     if real_symbols:
-        returns_map = await run_yf_bounded(fetch_daily_returns, real_symbols)
+        cached = await asyncio.gather(*(get_cached_json(cache, daily_returns_key(s)) for s in real_symbols))
+        returns_map = {s: v for s, v in zip(real_symbols, cached, strict=True) if isinstance(v, list)}
+        missing = [s for s in real_symbols if s not in returns_map]
+        if missing:
+            fetched = await run_yf_bounded(fetch_daily_returns, missing)
+            returns_map.update(fetched)
+            for sym in missing:
+                if sym in fetched:
+                    await _cache_daily_returns(cache, sym, fetched[sym])
     if include_cash_equivalent:
         returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
     return returns_map
+
+
+async def _cache_daily_returns(cache: CacheStoreType, symbol: str, returns: list[float]) -> None:
+    try:
+        await set_cached_json(cache, daily_returns_key(symbol), returns, TTL_DAILY_RETURNS)
+    except ValueError:  # NaN/Infinity 포함 — 캐싱만 건너뛰고 계산은 그대로
+        logger.warning("goal_daily_returns_cache_skipped", symbol=symbol)
 
 
 async def _run_goal_optimizer(

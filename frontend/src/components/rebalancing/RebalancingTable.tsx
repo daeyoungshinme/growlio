@@ -93,7 +93,6 @@ export default function RebalancingTable({
       <RebalancingDiagnosisCard
         analysis={analysis}
         alertThreshold={alertThreshold}
-        onExecute={tradableAccounts.length > 0 ? () => setExecutionOpen(true) : undefined}
         portfolioName={analysis.portfolio_name}
       />
 

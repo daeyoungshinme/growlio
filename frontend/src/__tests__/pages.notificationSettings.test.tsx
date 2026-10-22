@@ -183,6 +183,18 @@ describe("NotificationSettingsPage", () => {
     });
   });
 
+  it("시장 모니터링에서 전술 국면 알림 설정 위치(목표 조정 › 전술)로 안내한다 (plans/64 S4)", async () => {
+    renderNotificationSettings();
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "알림 설정", level: 1 })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /시장 모니터링/ }));
+    const link = await screen.findByRole("link", { name: /목표 조정 › 전술에서 설정/ });
+    expect(decodeURIComponent(link.getAttribute("href") ?? "")).toBe(
+      "/rebalancing?rtab=목표 조정&gmode=전술",
+    );
+  });
+
   it("?atab=시장 신호 알림 쿼리로 진입하면 시장 모니터링 카드가 자동으로 펼쳐진다", async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     render(

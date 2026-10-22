@@ -118,6 +118,13 @@ def compute_recommendation_drift(
     return round(max_delta_pct, 1), new_candidate_count
 
 
+async def get_cached_goal_recommendation(cache: CacheStoreType, user_id: uuid.UUID) -> GoalRecommendation | None:
+    """캐시된 전체 자산 기준 추천만 조회한다(없으면 None) — 엔드포인트가 `base_krw`/`existing_items`
+    계산(overview·포지션 조회) 전에 먼저 확인해, 캐시 히트 시 그 앞단 조회를 건너뛰기 위함."""
+    cached = await get_cached_json(cache, goal_recommendation_key(user_id))
+    return GoalRecommendation(**cached) if cached is not None else None
+
+
 async def get_goal_recommendation(
     cache: CacheStoreType,
     base_krw: float,
@@ -376,7 +383,9 @@ async def _compute_goal_recommendation(
         result.note = _grc._join_notes(preference_fallback_note, result.note)
         return _grc._apply_dividend_suggestions(result, await _suggest_dividend_candidates(None))
 
-    returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent=False)
+    returns_map = await _grc._fetch_candidate_returns(
+        fetch_yf_daily_returns, filtered, include_cash_equivalent=False, cache=cache
+    )
     items, expected_return_pct, expected_volatility_pct, opt_note = await _grc._run_goal_optimizer(
         filtered,
         returns_map,

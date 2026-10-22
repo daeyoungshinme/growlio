@@ -12,6 +12,7 @@ import { toast } from "@/utils/toast";
 import { isNativePlatform } from "@/utils/platform";
 import { registerPushToken } from "@/api/settings";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 /** 설정탭 "다시 시도" 버튼 등에서 등록을 재시도할 때 사용 — 실제 토큰 수신은 usePushNotifications()가
  * 마운트해둔 "registration" 리스너가 처리하므로, 여기서는 권한 재요청 + register() 호출만 한다. */
@@ -52,13 +53,13 @@ export function resolvePushDeepLink(
     case "REBALANCING": {
       const portfolioId = data.portfolio_id;
       return portfolioId
-        ? `/rebalancing?rtab=포트폴리오&portfolioId=${portfolioId}&openExecution=1`
-        : "/rebalancing?rtab=진단";
+        ? rebalancingUrl({ tab: "포트폴리오", portfolioId, openExecution: true })
+        : rebalancingUrl({ tab: "진단" });
     }
     case "REBALANCING_PLAN_PENDING":
     case "REBALANCING_EXECUTED":
     case "REBALANCING_PLAN_EXECUTION_FAILED":
-      return "/rebalancing?rtab=이력";
+      return rebalancingUrl({ tab: "이력" });
     // 세금·시장·하루 한도 게이트로 자동 실행이 보류된 알림 — 해결은 자동화 설정 조정이라 설정 모달로 연다
     // (예전엔 매핑이 없어 알림을 눌러도 앱 첫 화면에 머물렀다, plans/63 P3-4)
     case "REBALANCING_TAX_GATE_BLOCKED":
@@ -66,11 +67,11 @@ export function resolvePushDeepLink(
     case "REBALANCING_DAILY_CAP_BLOCKED": {
       const portfolioId = data.portfolio_id;
       return portfolioId
-        ? `/rebalancing?rtab=포트폴리오&portfolioId=${portfolioId}&openAlert=1`
-        : "/rebalancing?rtab=포트폴리오";
+        ? rebalancingUrl({ tab: "포트폴리오", portfolioId, openAlert: "1" })
+        : rebalancingUrl({ tab: "포트폴리오" });
     }
     case "MARKET_SIGNAL":
-      return "/rebalancing?rtab=진단";
+      return rebalancingUrl({ tab: "진단" });
     case "GOAL_ASSET":
     case "GOAL_DEPOSIT":
       return `/invest-plan?tab=${encodeURIComponent("적립 계획")}`;
@@ -79,7 +80,10 @@ export function resolvePushDeepLink(
     case "DCA_CASH_SHORTFALL":
       return `/invest-plan?tab=${encodeURIComponent("적립 계획")}`;
     case "RECOMMENDATION_DRIFT":
-      return "/rebalancing?rtab=추천";
+      return rebalancingUrl({ tab: "목표 조정", mode: "추천" });
+    // 전술 국면 변경 — 백엔드 push_type이 소문자(tactical_regime_check.py)라 그대로 매핑
+    case "tactical_regime":
+      return rebalancingUrl({ tab: "목표 조정", mode: "전술" });
     default:
       return null;
   }

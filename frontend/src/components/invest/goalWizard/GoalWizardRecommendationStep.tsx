@@ -13,6 +13,7 @@ import { normalizeWeights } from "@/utils/recommendationDrift";
 import GoalWizardLoading from "./GoalWizardLoading";
 import type { AutosaveStatus } from "./useRecommendationStepAutosave";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 /** 6단계 — 자동 저장이 끝난 뒤 전체 자산 기준 목표 역산 추천을 보여주고, 그 비중으로 새 포트폴리오를 만든다.
  * 저장이 실패하면 이전 설정 기준 추천이 되므로 추천 대신 재시도를 보여준다. */
@@ -53,7 +54,7 @@ export default function GoalWizardRecommendationStep({
       toast("추천 포트폴리오가 생성되었습니다 — 계좌를 연결하면 비중 진단이 시작됩니다", "success");
       await invalidatePortfolioData(queryClient);
       onClose();
-      void navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${created.id}`);
+      void navigate(rebalancingUrl({ tab: "포트폴리오", portfolioId: created.id }));
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });

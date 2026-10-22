@@ -14,7 +14,7 @@ interface Props {
   signal: MarketSignalResponse;
   /** 미국 물가 지표 — 지정 시 상세 영역 하단에 함께 표시(별도 카드 대신, U9) */
   inflation?: InflationIndicatorSummary[];
-  /** 지정 시 상세 영역 하단에 "전술 탭" 이동 안내 — 이 신호로 목표 비중 자체를 바꾸는 곳은 전술 탭 */
+  /** 지정 시 상세 영역 하단에 "목표 조정 › 전술" 이동 안내 — 이 신호로 목표 비중 자체를 바꾸는 곳 */
   onOpenTactical?: () => void;
 }
 
@@ -48,7 +48,8 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
   // 표시 등급은 즉시, 자동 실행 판단 등급은 연속 확인 후 바뀐다 — 다를 때만 알려 "배너는 위험인데 자동 실행이
   // 돌았다"는 혼란을 막는다(plans/63 P1-5)
   const gateLagging = !!confirmed_level && confirmed_level !== composite_level;
-  const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
+  // 등급 배지 + 한 줄 요약이 기본 — 비GREEN이면 자동으로 8행 상세가 펼쳐져 진단 탭이 길어졌다(plans/64 S4)
+  const [isOpen, setIsOpen] = useState(false);
 
   const rows = buildSignalRows(signals);
   const tierA = rows.filter((r) => r.tier === "A");
@@ -134,7 +135,7 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
               onClick={onOpenTactical}
               className={`${TOUCH_TARGET_ROW} gap-0.5 text-xs text-blue-600 dark:text-blue-400 hover:underline`}
             >
-              이 신호로 QQQ·SPY 비중을 조절하려면 → 전술 탭
+              이 신호로 QQQ·SPY 비중을 조절하려면 → 목표 조정 › 전술
             </button>
           )}
         </div>

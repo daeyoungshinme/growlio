@@ -156,6 +156,26 @@ describe("TacticalAllocationTab", () => {
     expect(onSelectPortfolio).toHaveBeenCalledWith("p1");
   });
 
+  it("목표 조정 탭이 공용 선택기를 그리면 자체 select를 숨긴다 (plans/64 S2)", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({ portfolio_id: "p2" }),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <TacticalAllocationTab
+          onGoToExecution={vi.fn()}
+          selectedPortfolioId="p2"
+          onSelectPortfolio={vi.fn()}
+          showPortfolioPicker={false}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(tacticalApi.fetchTacticalStatus).toHaveBeenCalledWith("p2"));
+    expect(screen.queryByRole("combobox")).toBeNull();
+  });
+
   it("DIA 제안 비중이 있으면 비교 행을 보여준다", async () => {
     const proposed = { QQQ: 40, SPY: 30, DIA: 20, CASH: 10 };
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(

@@ -177,6 +177,15 @@ describe("MarketSignalBanner", () => {
         <MarketSignalBanner signal={signal} />
       </MemoryRouter>,
     );
+  /** 상세는 기본 접힘(plans/64 S4) — 상세 내용을 보는 테스트는 먼저 펼친다 */
+  const openDetail = () => fireEvent.click(screen.getByLabelText("시장 신호 상세 보기"));
+
+  it("비GREEN이어도 상세는 기본 접힘 — 배지와 한 줄 요약만 (plans/64 S4)", () => {
+    renderBanner();
+    expect(screen.getByText(/분할 집행 권장/)).toBeDefined();
+    expect(screen.getByLabelText("시장 신호 상세 보기")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("VIX")).toBeNull();
+  });
 
   it("renders signal banner with label", () => {
     renderBanner();
@@ -218,6 +227,7 @@ describe("MarketSignalBanner", () => {
         <MarketSignalBanner signal={mockSignal} inflation={mockInflationSummary} />
       </MemoryRouter>,
     );
+    openDetail();
     expect(screen.getByText("물가 지표 (미국)")).toBeDefined();
     expect(screen.getByText("미국 CPI")).toBeDefined();
   });
@@ -225,14 +235,16 @@ describe("MarketSignalBanner", () => {
   it("onOpenTactical이 있을 때만 상세 영역에 전술 탭 이동 안내를 보여준다", () => {
     const onOpenTactical = vi.fn();
     const { unmount } = renderBanner();
-    expect(screen.queryByText(/전술 탭/)).toBeNull();
+    openDetail();
+    expect(screen.queryByText(/목표 조정 › 전술/)).toBeNull();
     unmount();
     renderWithProviders(
       <MemoryRouter>
         <MarketSignalBanner signal={mockSignal} onOpenTactical={onOpenTactical} />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByText(/전술 탭/));
+    openDetail();
+    fireEvent.click(screen.getByText(/목표 조정 › 전술/));
     expect(onOpenTactical).toHaveBeenCalledTimes(1);
   });
 
@@ -255,12 +267,14 @@ describe("MarketSignalBanner", () => {
   it("auto-expands the macro tier and shows the exchange rate signal row when a macro signal is elevated", () => {
     // mockSignal.signals.us_rate_curve.sub_score is 1, so the macro group defaults open
     renderBanner();
+    openDetail();
     expect(screen.getByText("원/달러 환율")).toBeDefined();
     expect(screen.getByText(/₩1380/)).toBeDefined();
   });
 
-  it("keeps the core tier (VIX/high-yield/employment) always visible", () => {
+  it("keeps the core tier (VIX/high-yield/employment) visible once the detail is open", () => {
     renderBanner();
+    openDetail();
     expect(screen.getByText("VIX")).toBeDefined();
     expect(screen.getByText("하이일드 스프레드")).toBeDefined();
     expect(screen.getByText("고용")).toBeDefined();
@@ -275,6 +289,7 @@ describe("MarketSignalBanner", () => {
       },
     };
     renderBanner(allCalm);
+    openDetail();
     expect(screen.queryByText("원/달러 환율")).toBeNull();
     expect(screen.getByText(/매크로 지표 5개 더보기/)).toBeDefined();
   });
@@ -288,6 +303,7 @@ describe("MarketSignalBanner", () => {
       },
     };
     renderBanner(allCalm);
+    openDetail();
     fireEvent.click(screen.getByText(/매크로 지표 5개 더보기/));
     expect(screen.getByText("원/달러 환율")).toBeDefined();
   });
