@@ -37,6 +37,7 @@ from app.services.goal_candidate_service import existing_items_from_positions
 from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal_recommendation_service import (
     compute_portfolio_expected_metrics,
+    get_cached_goal_recommendation,
     get_goal_recommendation,
 )
 from app.services.portfolio_service import build_portfolio_overview
@@ -177,6 +178,10 @@ async def get_overall_goal_recommendation_endpoint(
     cache=Depends(get_cache_store),
 ):
     """전체 계좌(전체 투자현황) 기준으로 목표 역산 추천을 반환한다 (자동 적용 아님)."""
+    # 캐시 히트면 아래 overview·포지션 조회(캐시 미스 시 계산 입력)를 건너뛴다
+    cached = await get_cached_goal_recommendation(cache, current_user.id)
+    if cached is not None:
+        return cached
     overview = await build_portfolio_overview(current_user.id, db, cache=cache)
     settings_row = await get_settings_row(db, current_user.id)
 

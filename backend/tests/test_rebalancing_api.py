@@ -290,6 +290,43 @@ class TestGoalRecommendationEndpoint:
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
+    def test_cache_hit_skips_overview_and_positions(self, override_settings):
+        """캐시된 추천이 있으면 계산 입력(overview·포지션) 조회 없이 바로 반환한다."""
+        from app.schemas.rebalancing import GoalRecommendation
+
+        user = _make_user()
+        db = _make_mock_db()
+        cached = {"generated_at": "2024-01-01T00:00:00Z", "is_configured": True, "required_return_pct": 5.0}
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.get_cached_goal_recommendation",
+                    new_callable=AsyncMock,
+                    return_value=GoalRecommendation(**cached),
+                ),
+                patch("app.api.v1.rebalancing.build_portfolio_overview", new_callable=AsyncMock) as mock_overview,
+                patch("app.api.v1.rebalancing.query_latest_position_map", new_callable=AsyncMock) as mock_positions,
+                patch("app.api.v1.rebalancing.get_goal_recommendation", new_callable=AsyncMock) as mock_get_rec,
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    "/api/v1/rebalancing/goal-recommendation",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert resp.json()["required_return_pct"] == 5.0
+            mock_overview.assert_not_called()
+            mock_positions.assert_not_called()
+            mock_get_rec.assert_not_called()
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
 
 class TestDriftSummary:
     def test_composite_signal_alerts_disabled_forces_has_composite_signal_false(self, override_settings):

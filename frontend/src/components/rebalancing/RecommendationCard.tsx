@@ -106,11 +106,15 @@ export default function RecommendationCard({
     data: overallData,
     isPending: overallPending,
     isError: overallIsError,
+    isFetching: overallFetching,
     refetch: refetchOverall,
   } = useQuery({
     queryKey: QUERY_KEYS.goalRecommendationOverall,
     queryFn: fetchOverallGoalRecommendation,
     staleTime: STALE_TIME.LONG,
+    // 영속 캐시(main.tsx PERSIST_QUERY_KEYS)에 남도록 — 기본 30분 gcTime이면 탭을 한동안 안 열 때
+    // 저장본에서 빠져 재방문이 다시 콜드 계산(수십 초)을 기다렸다
+    gcTime: STALE_TIME.DAY,
   });
 
   // "기간별"/"연령대" 탭을 실제로 클릭하기 전까지는 지연 로딩 — 둘 다 MVO 최적화 + 외부
@@ -273,23 +277,6 @@ export default function RecommendationCard({
     }
   }, [overallData, horizonData, ageData, queryClient]);
 
-  if (overallPending) return <SkeletonCard rows={4} />;
-
-  if (overallIsError || !overallData) {
-    return (
-      <div className="rounded-xl border border-teal-200 dark:border-teal-800/50 bg-teal-50 dark:bg-teal-900/20 p-4 flex items-center justify-between gap-2 text-sm">
-        <span className="text-red-600 dark:text-red-400">추천 비중을 불러오지 못했습니다.</span>
-        <button
-          type="button"
-          onClick={() => refetchOverall()}
-          className="underline font-medium text-teal-700 dark:text-teal-400 shrink-0"
-        >
-          다시 시도
-        </button>
-      </div>
-    );
-  }
-
   const isHorizonTab = effectiveTab !== "전체" && effectiveTab !== "연령대";
   const applyConfirm = buildApplyConfirm({
     tab: isHorizonTab ? "기간별" : effectiveTab,
@@ -360,11 +347,41 @@ export default function RecommendationCard({
         )}
 
         {effectiveTab === "전체" ? (
-          <RecommendationOverallTab
-            data={overallData}
-            selection={overallSelection}
-            actions={tabActions}
-          />
+          // 전체 추천(콜드 계산 수십 초)을 기다리는 동안에도 기준 전환·설정 버튼은 먼저 보여준다
+          overallPending ? (
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                추천 비중을 계산하고 있어요. 처음엔 시세를 모으느라 시간이 걸릴 수 있어요.
+              </p>
+              <SkeletonCard rows={4} />
+            </div>
+          ) : overallIsError || !overallData ? (
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span className="text-red-600 dark:text-red-400">
+                추천 비중을 불러오지 못했습니다.
+              </span>
+              <button
+                type="button"
+                onClick={() => refetchOverall()}
+                className="underline font-medium text-teal-700 dark:text-teal-400 shrink-0"
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : (
+            <>
+              {overallFetching && (
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  최신 추천으로 업데이트 중…
+                </p>
+              )}
+              <RecommendationOverallTab
+                data={overallData}
+                selection={overallSelection}
+                actions={tabActions}
+              />
+            </>
+          )
         ) : effectiveTab === "연령대" ? (
           <RecommendationAgeTab
             data={ageData}

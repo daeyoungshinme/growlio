@@ -3,8 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
-import { fetchCompositeSignalStatus, fetchDriftSummary } from "@/api/rebalancing";
+import {
+  fetchCompositeSignalStatus,
+  fetchDriftSummary,
+  fetchOverallGoalRecommendation,
+} from "@/api/rebalancing";
 import { fetchPortfolios } from "@/api/portfolios";
+import { fetchSettings } from "@/api/settings";
 import type { PortfolioItem } from "@/api/portfolios";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
@@ -149,6 +154,24 @@ export default function RebalancingPage() {
     queryFn: fetchDriftSummary,
     staleTime: STALE_TIME.MEDIUM,
     enabled: localTab === "진단",
+  });
+
+  // 목표 조정 › 추천의 전체 추천은 콜드 계산이 무겁다 — RecommendationCard는 lazy 청크 2단계
+  // (GoalAdjustTab → RecommendationCard)를 받은 뒤에야 마운트되므로, 여기서 같은 queryKey로 먼저
+  // 발화해 청크 로딩과 병렬로 돌린다(옵션은 RecommendationCard와 동일하게 유지).
+  const goalRecommendationTab = localTab === "목표 조정" && goalMode === "추천";
+  useQuery({
+    queryKey: QUERY_KEYS.goalRecommendationOverall,
+    queryFn: fetchOverallGoalRecommendation,
+    staleTime: STALE_TIME.LONG,
+    gcTime: STALE_TIME.DAY,
+    enabled: goalRecommendationTab,
+  });
+  useQuery({
+    queryKey: QUERY_KEYS.settings,
+    queryFn: fetchSettings,
+    staleTime: STALE_TIME.LONG,
+    enabled: goalRecommendationTab,
   });
 
   return (

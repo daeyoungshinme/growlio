@@ -28,6 +28,7 @@ TTL_MONTHLY_TREND = 300  # 월별 추이 5분
 TTL_DASHBOARD_SUMMARY = 900  # 대시보드 전체 응답 15분 (sync 후 수동 무효화가 primary)
 TTL_DCA_ANALYSIS = 900  # DCA 분석 응답 15분 (대시보드와 동일 무효화 트리거 공유)
 TTL_PRICE_RETURN = 86400  # 기간 수익률 1일
+TTL_DAILY_RETURNS = 86400  # 일별수익률(MVO 입력) 1일
 TTL_BACKTEST = 86400  # 백테스트 결과 1일
 TTL_ALLOC_HISTORY = 86400  # 포트폴리오 배분 이력 1일
 TTL_DIVIDEND_INFO = 86400  # 배당 정보 1일
@@ -122,6 +123,11 @@ def current_price_display_key(ticker: str, market: str) -> str:
 
 def price_return_key(years: int, ticker: str, market: str) -> str:
     return f"{_env_prefix()}return:{years}y:{ticker}:{market}"
+
+
+def daily_returns_key(symbol: str, period_days: int = 365) -> str:
+    """목표 역산 추천 MVO 입력용 심볼별 일별수익률(`fetch_yf_daily_returns`) — 유저 무관 전역 캐시."""
+    return f"{_env_prefix()}daily_returns:{period_days}d:{symbol}"
 
 
 def etf_index_region_key(ticker: str) -> str:
@@ -527,6 +533,8 @@ async def invalidate_asset_account_caches(
 
     `positions_changed`: 보유 종목 구성이 실제로 바뀌었는지 — `invalidate_dividend_caches`
     참고. 계좌 CRUD 등 변경 여부를 모르는 호출부는 기본값(True, 항상 전체 무효화)을 쓴다.
+    목표 역산 추천 캐시도 이 값이 True일 때만 지운다 — 평가액만 바뀐 정기 sync마다 지우면 무거운
+    MVO 재계산이 거의 매번 콜드로 돌았다(평가액 변동은 TTL 1시간까지 미반영 — 허용된 트레이드오프).
     """
 
     _year = year if year is not None else today_kst().year
@@ -534,15 +542,18 @@ async def invalidate_asset_account_caches(
         monthly_trend_key(user_id),
         dashboard_summary_key(user_id),
         dca_analysis_key(user_id),
-        goal_recommendation_key(user_id),
-        goal_recommendation_horizon_key(user_id),
-        goal_recommendation_age_key(user_id),
         # 계좌 삭제·잔액 수정(입출금 거래 생성)·sync가 챌린지 진행률(순입금·평가액·수익률)과
         # 보유 포지션 기반 인사이트·리스크 지표를 바꾼다 — 빠지면 TTL 동안 삭제 계좌가 남는다
         challenge_progress_key(user_id),
         insights_key(user_id),
         risk_key(user_id),
     ]
+    if positions_changed:
+        keys += [
+            goal_recommendation_key(user_id),
+            goal_recommendation_horizon_key(user_id),
+            goal_recommendation_age_key(user_id),
+        ]
     await invalidate_user_caches(cache, *keys)
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)

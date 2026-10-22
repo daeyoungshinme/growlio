@@ -207,7 +207,7 @@ async def _compute_age_based_recommendation(
         no_data_result.note = _grc._join_notes(duplicate_index_note, no_data_result.note)
         return await _with_bracket(no_data_result, None)
 
-    returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent)
+    returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent, cache)
     items, expected_return_pct, expected_volatility_pct, opt_note = await _grc._run_goal_optimizer(
         filtered,
         returns_map,

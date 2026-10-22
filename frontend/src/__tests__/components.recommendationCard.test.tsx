@@ -308,6 +308,30 @@ describe("RecommendationCard", () => {
   });
 
   describe("전체 탭 (목표 역산)", () => {
+    it("keeps the basis selector and settings usable while the overall recommendation is still computing", async () => {
+      fetchOverallGoalRecommendation.mockReturnValue(new Promise(() => {}));
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText(/추천 비중을 계산하고 있어요/)).toBeDefined();
+      expect(screen.getByText("연령대")).toBeDefined();
+      expect(screen.getByText(/후보 ETF 관리/)).toBeDefined();
+
+      // 기다리지 않고 연령대 기준으로 넘어갈 수 있다
+      fireEvent.click(screen.getByText("연령대"));
+      await waitFor(() => expect(fetchAgeGoalRecommendation).toHaveBeenCalled());
+    });
+
+    it("shows a retry action inside the card when the overall recommendation fails", async () => {
+      fetchOverallGoalRecommendation.mockRejectedValue(new Error("boom"));
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText("추천 비중을 불러오지 못했습니다.")).toBeDefined();
+      expect(screen.getByText("연령대")).toBeDefined();
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fireEvent.click(screen.getByText("다시 시도"));
+      await waitFor(() => expect(fetchOverallGoalRecommendation).toHaveBeenCalledTimes(2));
+    });
+
     it("shows the not-configured guidance instead of hiding the card", async () => {
       fetchOverallGoalRecommendation.mockResolvedValue(
         makeOverallRecommendation({ is_configured: false, recommended_items: [] }),

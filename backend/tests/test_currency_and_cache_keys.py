@@ -187,6 +187,45 @@ class TestInvalidateDividendCaches:
         assert "dividend_summary:" in kwargs["match"]
 
 
+class TestInvalidateAssetAccountCachesGoalRecommendation:
+    """목표 역산 추천 캐시는 보유 종목 구성이 바뀐 경우에만 지운다 — 평가액만 바뀐 정기 sync마다
+    지우면 무거운 MVO 재계산이 거의 매번 콜드로 돌았다."""
+
+    @staticmethod
+    def _deleted_keys(cache: AsyncMock) -> set[str]:
+        return {k for call in cache.delete.call_args_list for k in call.args}
+
+    @pytest.mark.asyncio
+    async def test_positions_changed_invalidates_goal_recommendation(self, override_settings):
+        from app.utils.cache_keys import goal_recommendation_key, invalidate_asset_account_caches
+
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, []))
+        uid = uuid.uuid4()
+
+        await invalidate_asset_account_caches(cache, uid)
+
+        assert goal_recommendation_key(uid) in self._deleted_keys(cache)
+
+    @pytest.mark.asyncio
+    async def test_positions_unchanged_keeps_goal_recommendation(self, override_settings):
+        from app.utils.cache_keys import (
+            dashboard_summary_key,
+            goal_recommendation_key,
+            invalidate_asset_account_caches,
+        )
+
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, []))
+        uid = uuid.uuid4()
+
+        await invalidate_asset_account_caches(cache, uid, positions_changed=False)
+
+        deleted = self._deleted_keys(cache)
+        assert goal_recommendation_key(uid) not in deleted
+        assert dashboard_summary_key(uid) in deleted
+
+
 class TestInvalidateUserCaches:
     @pytest.mark.asyncio
     async def test_calls_cache_delete(self, override_settings):
