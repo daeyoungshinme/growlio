@@ -128,6 +128,13 @@ describe("TacticalAllocationTab", () => {
     expect(screen.queryByText("DIA (다우존스)")).toBeNull();
   });
 
+  it("매크로 확정 등급이 진단 탭 신호와 다를 수 있는 이유를 툴팁 없이 화면에 적는다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
+    renderTab();
+
+    expect(await screen.findByText(/진단 탭보다 늦게 바뀔 수 있어요/)).toBeDefined();
+  });
+
   it("페이지에서 고른 포트폴리오(URL)를 쓰고, 바꾸면 부모에 알린다 (plans/63 P3-3)", async () => {
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
       makeStatus({ portfolio_id: "p2" }),
