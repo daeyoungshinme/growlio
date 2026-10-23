@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Bell, Mail, TrendingUp, Activity } from "lucide-react";
+import { ArrowLeft, Bell, Mail, Activity } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchSettings } from "@/api/settings";
@@ -11,7 +11,7 @@ import { useMonthlyReportAlertsToggle } from "@/hooks/useMonthlyReportAlertsTogg
 import { useYearEndTaxReminderToggle } from "@/hooks/useYearEndTaxReminderToggle";
 import { useRecommendationDriftAlertToggle } from "@/hooks/useRecommendationDriftAlertToggle";
 import { useChallengeRemindersToggle } from "@/hooks/useChallengeRemindersToggle";
-import { ToggleSwitch } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleSwitch";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import EmptyState from "@/components/common/EmptyState";
 import Tabs from "@/components/common/Tabs";
@@ -21,11 +21,7 @@ import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSec
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
 import { NotificationEmailSection } from "@/components/settings/NotificationEmailSection";
 import { SectionCard } from "@/components/settings/shared";
-import {
-  REPORT_ALERT_FIELDS,
-  INSTANT_ALERT_FIELDS,
-  countEnabled,
-} from "@/utils/notificationAlertGroups";
+import { REPORT_ALERT_FIELDS, countEnabled } from "@/utils/notificationAlertGroups";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
@@ -81,7 +77,8 @@ function AlertHistorySection() {
         </p>
       ) : (
         <>
-          <div className="max-h-64 overflow-y-auto space-y-2">
+          {/* 페이지 스크롤 안의 중첩 스크롤(max-h-64) 제거 — 개수는 아래 "더 보기"가 제한 (docs/plans/67 P1-17) */}
+          <div className="space-y-2">
             {history.map((item: AlertHistoryItem) => (
               <div
                 key={item.id}
@@ -173,10 +170,6 @@ export default function NotificationSettingsPage() {
     false,
     "growlio:settings:report-alerts-open",
   );
-  const [isGoalAlertsOpen, toggleGoalAlertsOpen] = useCollapsible(
-    false,
-    "growlio:settings:goal-alerts-open",
-  );
   const [isMarketAlertsOpen, toggleMarketAlertsOpen, setMarketAlertsOpen] = useCollapsible(
     false,
     "growlio:settings:market-alerts-open",
@@ -192,7 +185,6 @@ export default function NotificationSettingsPage() {
     recommendationDriftAlertEnabled,
     challengeRemindersEnabled,
   ]);
-  const instantAlertsEnabledCount = countEnabled([goalAlertsEnabled]);
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -231,81 +223,55 @@ export default function NotificationSettingsPage() {
         onToggle={toggleReportAlertsOpen}
         collapsedHint={`${REPORT_ALERT_FIELDS.length}개 중 ${reportAlertsEnabledCount}개 켜짐`}
       >
-        <div>
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">월간 리포트</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            매월 1일 전월 포트폴리오 요약을 이메일로 보내드립니다.
-          </p>
-          <ToggleSwitch
-            checked={monthlyReportEnabled}
-            disabled={monthlyReportPending}
-            onChange={toggleMonthlyReport}
-            ariaLabel="월간 리포트"
-          />
-        </div>
+        <ToggleRow
+          title="월간 리포트"
+          description="매월 1일 전월 포트폴리오 요약을 이메일로 보내드립니다."
+          checked={monthlyReportEnabled}
+          disabled={monthlyReportPending}
+          onChange={toggleMonthlyReport}
+        />
 
-        <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">연말 절세 리마인더</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            11~12월 매주 월요일, 활용 가능한 절세 방법(손실수확·공제한도)을 요약해 보내드립니다.
-          </p>
-          <ToggleSwitch
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-2 mt-2">
+          <ToggleRow
+            title="연말 절세 리마인더"
+            description="11~12월 매주 월요일, 활용 가능한 절세 방법(손실수확·공제한도)을 요약해 보내드립니다."
             checked={yearEndTaxReminderEnabled}
             disabled={yearEndTaxReminderPending}
             onChange={toggleYearEndTaxReminder}
-            ariaLabel="연말 절세 리마인더"
           />
         </div>
 
-        <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">추천 비중 변화 알림</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            매주 월요일, 목표 역산 추천 비중이 기준 포트폴리오의 현재 목표 비중과 유의미하게
-            달라지면 이메일/푸시로 알려드립니다.
-          </p>
-          <ToggleSwitch
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-2 mt-2">
+          <ToggleRow
+            title="추천 비중 변화 알림"
+            description="매주 월요일, 목표 역산 추천 비중이 기준 포트폴리오의 현재 목표 비중과 유의미하게 달라지면 이메일/푸시로 알려드립니다."
             checked={recommendationDriftAlertEnabled}
             disabled={recommendationDriftAlertPending}
             onChange={toggleRecommendationDriftAlert}
-            ariaLabel="추천 비중 변화 알림"
           />
         </div>
 
-        <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">적립 챌린지 알림</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            매월 25일 이번 달 적립 독려, 매월 1일 지난달 결산·연속 적립 현황을 이메일/푸시로
-            알려드립니다.
-          </p>
-          <ToggleSwitch
+        <div className="border-t border-gray-100 dark:border-gray-800 pt-2 mt-2">
+          <ToggleRow
+            title="적립 챌린지 알림"
+            description="매월 25일 이번 달 적립 독려, 매월 1일 지난달 결산·연속 적립 현황을 이메일/푸시로 알려드립니다."
             checked={challengeRemindersEnabled}
             disabled={challengeRemindersPending}
             onChange={toggleChallengeReminders}
-            ariaLabel="적립 챌린지 알림"
           />
         </div>
       </CollapsibleCard>
 
-      <CollapsibleCard
-        icon={TrendingUp}
-        title="즉시 알림"
-        isOpen={isGoalAlertsOpen}
-        onToggle={toggleGoalAlertsOpen}
-        collapsedHint={`${INSTANT_ALERT_FIELDS.length}개 중 ${instantAlertsEnabledCount}개 켜짐`}
-      >
-        <div>
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">목표 달성 알림</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            투자·입금·배당 목표를 달성하면 이메일·푸시로 알려드립니다.
-          </p>
-          <ToggleSwitch
-            checked={goalAlertsEnabled}
-            disabled={goalAlertsPending}
-            onChange={toggleGoalAlerts}
-            ariaLabel="목표 달성 알림"
-          />
-        </div>
-      </CollapsibleCard>
+      {/* 토글 1개짜리 접힘 카드는 여는 수고만 늘려 바로 보이게 (docs/plans/67 P1-17) */}
+      <div className="card">
+        <ToggleRow
+          title="목표 달성 알림"
+          description="투자·입금·배당 목표를 달성하면 이메일·푸시로 알려드립니다."
+          checked={goalAlertsEnabled}
+          disabled={goalAlertsPending}
+          onChange={toggleGoalAlerts}
+        />
+      </div>
 
       <CollapsibleCard
         icon={Activity}

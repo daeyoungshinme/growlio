@@ -85,11 +85,22 @@ describe("ActionItemsCard — 홈 지금 할 일 (docs/plans/50 M5)", () => {
     expect(await screen.findByText(/지금 할 일이 없어요/)).toBeInTheDocument();
   });
 
-  it("조회 실패 시 아무것도 렌더하지 않는다 (홈 전체를 막지 않음)", async () => {
+  it("조회 실패 시 한 줄 안내와 다시 시도를 보여준다 (홈 전체를 막지 않음)", async () => {
     fetchActionItems.mockRejectedValue(new Error("boom"));
-    const { container } = renderCard();
-    await vi.waitFor(() => expect(fetchActionItems).toHaveBeenCalled());
-    await vi.waitFor(() => expect(container.querySelector(".card")).toBeNull());
-    expect(screen.queryByText(/지금 할 일/)).not.toBeInTheDocument();
+    renderCard();
+    expect(await screen.findByText("지금 할 일을 불러오지 못했어요")).toBeInTheDocument();
+    fetchActionItems.mockResolvedValue([]);
+    fireEvent.click(screen.getByRole("button", { name: /다시 시도/ }));
+    expect(await screen.findByText(/지금 할 일이 없어요/)).toBeInTheDocument();
+  });
+
+  it("4건 이상이면 3건만 보이고 나머지는 더 보기로 펼친다", async () => {
+    const items = [1, 2, 3, 4].map((n) => ({ ...challenge, id: `c${n}`, title: `할 일 ${n}` }));
+    fetchActionItems.mockResolvedValue(items);
+    renderCard();
+    expect(await screen.findByText("할 일 3")).toBeInTheDocument();
+    expect(screen.queryByText("할 일 4")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /1개 더 보기/ }));
+    expect(screen.getByText("할 일 4")).toBeInTheDocument();
   });
 });

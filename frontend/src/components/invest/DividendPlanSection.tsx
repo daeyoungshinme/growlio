@@ -53,6 +53,9 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
     "growlio:dividendPlan:monthlyOptimizationOpen",
   );
 
+  // "더 빨리 달성하려면?"은 보조 제안이라 기본 접힘 — 적립 계획 탭의 같은 블록과 함께 화면 길이를 줄인다(docs/plans/67 P1-14)
+  const [fasterOpen, toggleFaster] = useCollapsible(false, "growlio:dividendPlan:fasterOpen");
+
   if (isLoading) return <SkeletonCard rows={5} height="h-5" />;
 
   if (isError || !data) {
@@ -128,12 +131,16 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">배당 달성률</p>
                   <p
-                    className={`text-3xl font-bold ${(goal_achievement_pct ?? 0) >= 100 ? "text-red-500" : "text-blue-500"}`}
+                    className={`text-3xl font-bold ${
+                      (goal_achievement_pct ?? 0) >= 100
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-blue-500"
+                    }`}
                   >
                     {goal_achievement_pct !== null ? `${goal_achievement_pct.toFixed(1)}%` : "—"}
                   </p>
                   {(goal_achievement_pct ?? 0) >= 100 && (
-                    <span className="inline-flex items-center gap-1 text-xs text-red-500 mt-0.5">
+                    <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
                       <TrendingUp size={12} /> 목표 달성
                     </span>
                   )}
@@ -201,12 +208,16 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">달성률</p>
                 <p
-                  className={`text-xl font-bold ${(goal_achievement_pct ?? 0) >= 100 ? "text-red-500" : "text-blue-500"}`}
+                  className={`text-xl font-bold ${
+                    (goal_achievement_pct ?? 0) >= 100
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-blue-500"
+                  }`}
                 >
                   {goal_achievement_pct !== null ? `${goal_achievement_pct.toFixed(1)}%` : "—"}
                 </p>
                 {(goal_achievement_pct ?? 0) >= 100 && (
-                  <span className="inline-flex items-center gap-1 text-xs text-red-500 mt-0.5">
+                  <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
                     <TrendingUp size={12} /> 목표 달성
                   </span>
                 )}
@@ -234,17 +245,11 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
 
             {progressPct !== null && (
               <div>
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  <span>0%</span>
-                  <span>
-                    {goal_achievement_pct !== null ? `${goal_achievement_pct.toFixed(1)}%` : ""}
-                  </span>
-                  <span>100%</span>
-                </div>
+                {/* 달성률 %는 바로 위 수치와 중복이라 막대만 (docs/plans/67 P1-13) */}
                 <div className="h-2.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      progressPct >= 100 ? "bg-red-500" : "bg-blue-500"
+                      progressPct >= 100 ? "bg-emerald-500" : "bg-blue-500"
                     }`}
                     style={{ width: `${progressPct}%` }}
                   />
@@ -292,28 +297,26 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
 
       {/* 배당 목표 달성 추천 ETF — 적립 계획 탭의 "더 빨리 달성하려면?"과 동일한 사상 */}
       {annual_dividend_goal && recommendation?.is_configured && (
-        <div className="card">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">
-            배당 목표를 더 빨리 달성하려면?
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 mb-3">
-            배당수익률이 높은 ETF를 후보에 추가하면 목표 배당금에 더 가까워질 수 있어요.
+        <CollapsibleCard
+          icon={TrendingUp}
+          iconWrapClassName="bg-violet-50 dark:bg-violet-950"
+          iconColorClassName="text-violet-600 dark:text-violet-400"
+          title="배당 목표를 더 빨리 달성하려면?"
+          isOpen={fasterOpen}
+          onToggle={toggleFaster}
+          collapsedHint={recommendation.note ?? "배당수익률이 높은 ETF 후보를 추천해요"}
+        >
+          {/* 위 달성 현황의 "필요 배당수익률"과 같은 축 — 칸 2개 대신 한 줄 비교 (docs/plans/67 P1-13) */}
+          <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+            추천 비중의 기대 배당수익률{" "}
+            <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+              {fmtPct(recommendation.expected_dividend_yield_pct)}
+            </span>{" "}
+            · 목표{" "}
+            <span className="font-semibold text-gray-900 dark:text-gray-50">
+              {fmtPct(recommendation.required_dividend_yield_pct)}
+            </span>
           </p>
-
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-3 p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950">
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500">목표 배당수익률</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">
-                {fmtPct(recommendation.required_dividend_yield_pct)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500">기대 배당수익률</p>
-              <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-                {fmtPct(recommendation.expected_dividend_yield_pct)}
-              </p>
-            </div>
-          </div>
 
           {recommendation.note && (
             <p
@@ -337,11 +340,11 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
 
           <Link
             to={rebalancingUrl({ tab: "목표 조정", mode: "추천" })}
-            className="flex items-center gap-1.5 text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline mt-3"
+            className="flex items-center gap-1.5 min-h-[44px] text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline"
           >
             추천 포트폴리오 자세히 보기 <ArrowRight size={12} />
           </Link>
-        </div>
+        </CollapsibleCard>
       )}
 
       {/* 월별 배당 분포 */}

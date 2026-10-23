@@ -92,11 +92,11 @@ export default function BacktestMetricsTable({ metrics }: Props) {
               {showAdvanced && (
                 <>
                   <span title="변동성 1단위당 초과 수익률 (높을수록 효율적)">
-                    Sharpe {m.sharpe_ratio.toFixed(3)}
+                    Sharpe {m.sharpe_ratio.toFixed(2)}
                   </span>
                   <span>변동성 {m.volatility_pct.toFixed(2)}%</span>
                   <span title="하락 변동성 대비 수익률 (높을수록 손실 관리 우수)">
-                    Sortino {m.sortino_ratio.toFixed(3)}
+                    Sortino {m.sortino_ratio.toFixed(2)}
                   </span>
                 </>
               )}
@@ -179,7 +179,7 @@ export default function BacktestMetricsTable({ metrics }: Props) {
                     <td
                       className={`py-2 px-2 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap ${i === bSharpe ? HIGHLIGHT : ""}`}
                     >
-                      {m.sharpe_ratio.toFixed(3)}
+                      {m.sharpe_ratio.toFixed(2)}
                     </td>
                     <td
                       className={`py-2 px-2 text-right text-gray-500 dark:text-gray-400 whitespace-nowrap ${i === bVol ? HIGHLIGHT : ""}`}
@@ -189,7 +189,7 @@ export default function BacktestMetricsTable({ metrics }: Props) {
                     <td
                       className={`py-2 px-2 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap ${i === bSortino ? HIGHLIGHT : ""}`}
                     >
-                      {m.sortino_ratio.toFixed(3)}
+                      {m.sortino_ratio.toFixed(2)}
                     </td>
                   </>
                 )}

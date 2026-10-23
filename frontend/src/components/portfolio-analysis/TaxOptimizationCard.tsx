@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { TriangleAlert, ChevronDown, ChevronUp, Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchOverseasPositionsTax, fetchOverseasRealized, fetchTaxSummary } from "@/api/tax";
+import {
+  fetchOverseasPositionsTax,
+  fetchOverseasRealized,
+  fetchTaxSummary,
+  type TaxSummary,
+} from "@/api/tax";
 import TaxPlannerSection from "@/components/tax/TaxPlannerSection";
 import { GeumtSimulationSection } from "@/components/tax/GeumtSimulationSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -61,9 +66,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap">
             세금 추정
           </h3>
-          <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500">
-            배당세·해외 양도세
-          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">배당세·해외 양도세</span>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">기준 연도</label>
@@ -85,70 +88,18 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
 
       {taxData && !taxLoading && (
         <div className="space-y-3">
-          {(taxData.domestic_large_holder_warning || taxData.comprehensive_tax_warning) && (
-            <div className="space-y-2">
-              {taxData.domestic_large_holder_warning && (
-                <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                  <TriangleAlert size={14} className="text-orange-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-orange-700 dark:text-orange-400">
-                    국내 주식 보유액이 10억원을 {fmtKrw(taxData.domestic_large_holder_excess_krw)}{" "}
-                    초과했습니다. 대주주 요건 해당 시 양도소득세(22%)가 부과될 수 있습니다 — 초과분
-                    이상을 매도하면 기준 아래로 내려갑니다.
-                  </p>
-                </div>
-              )}
-              {taxData.comprehensive_tax_warning ? (
-                <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <TriangleAlert size={14} className="text-red-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-red-700 dark:text-red-400">
-                    금융소득(이자·배당)이 2,000만원 이상입니다. 금융소득 종합과세 대상이 될 수
-                    있습니다.
-                  </p>
-                </div>
-              ) : (
-                taxData.comprehensive_tax_remaining_krw > 0 &&
-                taxData.comprehensive_tax_remaining_krw <= COMPREHENSIVE_TAX_NEAR_THRESHOLD_KRW && (
-                  <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                    <TriangleAlert size={14} className="text-amber-500 mt-0.5 shrink-0" />
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      금융소득(이자·배당)이 종합과세 기준(2,000만원)까지{" "}
-                      {fmtKrw(taxData.comprehensive_tax_remaining_krw)} 남았습니다.
-                    </p>
-                  </div>
-                )
-              )}
-            </div>
-          )}
-
-          {(taxData.health_insurance_estimate.dependent_risk_warning ||
-            taxData.health_insurance_estimate.income_remaining_until_risk_krw <=
-              HEALTH_INSURANCE_NEAR_THRESHOLD_KRW) && (
-            <div className="space-y-1">
-              {taxData.health_insurance_estimate.dependent_risk_warning ? (
-                <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <TriangleAlert size={14} className="text-red-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-red-700 dark:text-red-400">
-                    금융소득(배당·이자, 2,000만원 기준)이 건강보험 피부양자 자격상실 기준을
-                    초과했습니다. 지역가입자 전환 시 예상 월 보험료는 약{" "}
-                    {fmtKrw(taxData.health_insurance_estimate.estimated_monthly_premium_krw ?? 0)}
-                    입니다.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                  <TriangleAlert size={14} className="text-amber-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-amber-700 dark:text-amber-400">
-                    금융소득(배당·이자)이 건강보험 피부양자 자격상실 기준(2,000만원)까지{" "}
-                    {fmtKrw(taxData.health_insurance_estimate.income_remaining_until_risk_krw)}{" "}
-                    남았습니다.
-                  </p>
-                </div>
-              )}
-              <p className="text-xs text-gray-400 dark:text-gray-500 pl-1">
-                {taxData.health_insurance_estimate.note}
+          {taxData.domestic_large_holder_warning && (
+            <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+              <TriangleAlert size={14} className="text-orange-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-orange-700 dark:text-orange-400">
+                국내 주식 보유액이 10억원을 {fmtKrw(taxData.domestic_large_holder_excess_krw)}{" "}
+                초과했습니다. 대주주 요건 해당 시 양도소득세(22%)가 부과될 수 있습니다 — 초과분
+                이상을 매도하면 기준 아래로 내려갑니다.
               </p>
             </div>
           )}
+
+          <FinancialIncomeThresholdNotice taxData={taxData} />
 
           <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden">
             <div className="min-w-0 px-3 py-2.5">
@@ -240,6 +191,65 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
             </ErrorBoundary>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** 금융소득 2,000만원 경고 — 종합과세와 건보 피부양자 자격상실은 같은 기준선이라 박스 하나로 묶는다.
+ * 예전엔 최대 3개의 색 박스가 쌓였다 (docs/plans/67 P1-16). */
+function FinancialIncomeThresholdNotice({ taxData }: { taxData: TaxSummary }) {
+  const hi = taxData.health_insurance_estimate;
+  const comprehensiveNear =
+    !taxData.comprehensive_tax_warning &&
+    taxData.comprehensive_tax_remaining_krw > 0 &&
+    taxData.comprehensive_tax_remaining_krw <= COMPREHENSIVE_TAX_NEAR_THRESHOLD_KRW;
+  const healthNear =
+    !hi.dependent_risk_warning &&
+    hi.income_remaining_until_risk_krw <= HEALTH_INSURANCE_NEAR_THRESHOLD_KRW;
+  const exceeded = taxData.comprehensive_tax_warning || hi.dependent_risk_warning;
+  if (!exceeded && !comprehensiveNear && !healthNear) return null;
+
+  const lines: string[] = [];
+  if (taxData.comprehensive_tax_warning) lines.push("금융소득 종합과세 대상이 될 수 있어요.");
+  else if (comprehensiveNear)
+    lines.push(`종합과세 기준까지 ${fmtKrw(taxData.comprehensive_tax_remaining_krw)} 남았어요.`);
+  if (hi.dependent_risk_warning)
+    lines.push(
+      `건강보험 피부양자 자격을 잃을 수 있어요 — 지역가입자 전환 시 월 약 ${fmtKrw(hi.estimated_monthly_premium_krw ?? 0)}.`,
+    );
+  else if (healthNear)
+    lines.push(
+      `건강보험 피부양자 기준까지 ${fmtKrw(hi.income_remaining_until_risk_krw)} 남았어요.`,
+    );
+
+  const tone = exceeded
+    ? {
+        box: "bg-red-50 dark:bg-red-900/20",
+        icon: "text-red-500",
+        text: "text-red-700 dark:text-red-400",
+      }
+    : {
+        box: "bg-amber-50 dark:bg-amber-900/20",
+        icon: "text-amber-500",
+        text: "text-amber-700 dark:text-amber-400",
+      };
+
+  return (
+    <div className="space-y-1">
+      <div className={`flex items-start gap-2 p-3 rounded-lg ${tone.box}`}>
+        <TriangleAlert size={14} className={`${tone.icon} mt-0.5 shrink-0`} />
+        <div className={`text-xs ${tone.text} space-y-0.5`}>
+          <p className="font-semibold">
+            금융소득(이자·배당) 2,000만원 {exceeded ? "이상" : "근접"}
+          </p>
+          {lines.map((l) => (
+            <p key={l}>{l}</p>
+          ))}
+        </div>
+      </div>
+      {(hi.dependent_risk_warning || healthNear) && hi.note && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 pl-1">{hi.note}</p>
       )}
     </div>
   );

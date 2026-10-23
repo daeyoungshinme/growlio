@@ -255,7 +255,7 @@ describe("MarketSignalBanner", () => {
 
   it("shows a labeled link to the settings page to change the alert (read-only here)", async () => {
     renderBanner();
-    const link = await screen.findByText("설정에서 켜기/끄기 →");
+    const link = await screen.findByRole("link", { name: "시장 위험 신호 알림 설정" });
     expect(link.getAttribute("href")).toBe("/settings/notifications?atab=시장 신호 알림");
   });
 

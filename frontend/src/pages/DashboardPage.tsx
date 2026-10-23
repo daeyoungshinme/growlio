@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Circle, RefreshCw, Wallet } from "lucide-react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { fetchPortfolios } from "@/api/portfolios";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
@@ -100,7 +100,6 @@ function OnboardingChecklist() {
 
 export default function DashboardPage() {
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const [syncing, setSyncing] = useState(false);
 
   const handleRefresh = useCallback(async () => {
@@ -196,21 +195,10 @@ export default function DashboardPage() {
           </Suspense>
         </ErrorBoundary>
 
-        {/* 리밸런싱 점검: 상태 확인용(기본 접힘) — "필요" 신호·행동 유도는 위 지금 할 일이 담당 (M5) */}
+        {/* 리밸런싱 점검: 한 줄 상태 행 — "필요" 신호·행동 유도는 위 지금 할 일이 담당 (M5, plans/67 P1-3) */}
         <ErrorBoundary variant="section">
-          <Suspense fallback={<SkeletonCard rows={2} />}>
-            <RebalancingStatusCard
-              showAllInsights={false}
-              showDriftRows={true}
-              maxDriftRows={3}
-              signalDisplay="badge"
-              marketSignal={marketSignal}
-              onPortfolioSelect={(id) =>
-                navigate(rebalancingUrl({ tab: "포트폴리오", portfolioId: id }))
-              }
-              statusOnly
-              storageKey="growlio:dashboard:rebalancingStatusOpen"
-            />
+          <Suspense fallback={<SkeletonCard rows={1} />}>
+            <RebalancingStatusCard marketSignal={marketSignal} statusOnly />
           </Suspense>
         </ErrorBoundary>
 

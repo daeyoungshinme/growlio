@@ -71,8 +71,7 @@ function SettingsLinkRow({
       {icon}
       <span className="flex-1 min-w-0 leading-snug break-keep">{label}</span>
       <span
-        title={status}
-        className={`text-xs min-w-0 max-w-[50%] truncate text-right ${statusClassName ?? "text-gray-400 dark:text-gray-500"}`}
+        className={`text-xs shrink-0 text-right ${statusClassName ?? "text-gray-500 dark:text-gray-400"}`}
       >
         {status}
       </span>
@@ -188,7 +187,10 @@ export default function SettingsPage() {
     : 0;
   const notificationSummary = !current
     ? "불러오는 중..."
-    : `정기 ${reportAlertsEnabledCount}/${REPORT_ALERT_FIELDS.length} · 즉시 ${instantAlertsEnabledCount}/${INSTANT_ALERT_FIELDS.length} · 시장 ${marketAlertsEnabledCount}/${MARKET_ALERT_COUNT} 켜짐`;
+    : // 그룹별 3분할 요약은 390px에서 말줄임으로 잘렸다 — 합계 한 줄로 (docs/plans/67)
+      `${reportAlertsEnabledCount + instantAlertsEnabledCount + marketAlertsEnabledCount}/${
+        REPORT_ALERT_FIELDS.length + INSTANT_ALERT_FIELDS.length + MARKET_ALERT_COUNT
+      }개 켜짐`;
 
   return (
     <div className="space-y-6 max-w-xl">

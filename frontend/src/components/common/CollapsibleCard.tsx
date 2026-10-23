@@ -52,7 +52,7 @@ export default function CollapsibleCard({
         {headerRight && <div className="flex items-center gap-1.5 shrink-0">{headerRight}</div>}
       </div>
       {!isOpen && collapsedHint && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 ml-0.5">{collapsedHint}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 ml-0.5">{collapsedHint}</p>
       )}
       {isOpen && <div className="mt-3">{children}</div>}
     </div>

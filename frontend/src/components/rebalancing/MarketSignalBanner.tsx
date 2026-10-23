@@ -141,34 +141,33 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
         </div>
       )}
 
-      {/* 시장 위험 신호 알림 현황 — isOpen 상태와 무관하게 항상 표시. 읽기 전용(켜기/끄기는 설정 페이지가 단일 소스),
-          배너 상태색과 분리된 중립 배경으로 "알림 영역"임을 구분 */}
+      {/* 시장 위험 신호 알림 현황 — 읽기 전용 한 줄(켜기/끄기는 설정 페이지가 단일 소스). 상시 3줄+링크였던 것을
+          상태 한 줄로 줄이고, 설명은 알림이 실제로 발동했을 때의 사유만 남긴다 (docs/plans/67 P1-9) */}
       {compositeStatus && (
-        <div className="flex flex-col gap-1 px-4 py-2.5 border-t border-inherit bg-gray-50/80 dark:bg-gray-900/40 rounded-b-xl">
+        <div className="px-4 py-1 border-t border-inherit bg-gray-50/80 dark:bg-gray-900/40 rounded-b-xl">
           <div className="flex items-center gap-2">
             <Bell size={13} className="text-gray-400 shrink-0" />
             <span className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
               시장 위험 신호 알림
             </span>
             <span
-              className={`text-xs font-semibold shrink-0 ml-auto ${compositeStatus.enabled ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`}
+              className={`text-xs font-semibold shrink-0 ${compositeStatus.enabled ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"}`}
             >
               {compositeStatus.enabled ? "받는 중" : "꺼짐"}
             </span>
+            <Link
+              to="/settings/notifications?atab=시장 신호 알림"
+              aria-label="시장 위험 신호 알림 설정"
+              className={`${TOUCH_TARGET_ROW} !justify-end ml-auto text-xs text-blue-600 dark:text-blue-400`}
+            >
+              설정 →
+            </Link>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 ml-5">
-            {compositeStatus.triggered && compositeStatus.reason
-              ? compositeStatus.reason
-              : compositeStatus.enabled
-                ? "이탈이 없어도 시장/리스크가 위험 수준이면 알림을 보내드려요"
-                : "알림이 꺼져 있어 신호를 평가하지 않습니다"}
-          </p>
-          <Link
-            to="/settings/notifications?atab=시장 신호 알림"
-            className="text-xs text-blue-600 dark:text-blue-400 underline self-start ml-5"
-          >
-            설정에서 켜기/끄기 →
-          </Link>
+          {compositeStatus.triggered && compositeStatus.reason && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 ml-5 pb-1.5">
+              {compositeStatus.reason}
+            </p>
+          )}
         </div>
       )}
     </div>

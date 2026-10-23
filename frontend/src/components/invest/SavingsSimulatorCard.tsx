@@ -80,11 +80,14 @@ export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
           절약 복리 시뮬레이터
         </h3>
       )}
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
-        {isLumpSum
-          ? "받은 보너스나 목돈을 한 번에 투자하면 복리로 얼마나 커지는지 미리 확인해보세요."
-          : "매달 아낀 돈을 투자하면 복리로 얼마나 커지는지 미리 확인해보세요."}
-      </p>
+      {/* 접힘 카드(flat) 안에선 카드 힌트가 같은 설명을 이미 보여준다 — 반복 제거 (docs/plans/67 P1-12) */}
+      {!flat && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          {isLumpSum
+            ? "받은 보너스나 목돈을 한 번에 투자하면 복리로 얼마나 커지는지 미리 확인해보세요."
+            : "매달 아낀 돈을 투자하면 복리로 얼마나 커지는지 미리 확인해보세요."}
+        </p>
+      )}
 
       <div className="mb-3">
         <Tabs tabs={SAVINGS_MODES} activeTab={mode} onChange={setMode} variant="pill" fullWidth />
@@ -278,12 +281,6 @@ export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
           투자 후 금액 (복리)
         </span>
       </div>
-
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-        {isLumpSum
-          ? "묵혀둔 목돈을 그대로 두는 대신 투자하면, 시간이 지날수록 그 차이가 커집니다."
-          : "커피 한 잔, 배달비 한 번을 아껴서 꾸준히 투자하면 그 차이는 시간이 지날수록 커집니다. 지출을 조금만 줄여도 목표 달성이 눈에 띄게 빨라져요."}
-      </p>
     </div>
   );
 }

@@ -124,23 +124,22 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-2 mt-1 text-gray-500 dark:text-gray-400">
+                        {/* 주문번호는 증권사 문의용 정보라 모바일에선 뺀다(데스크탑 표에 유지) — docs/plans/67 P1-10 */}
                         <span>{order.quantity.toLocaleString()}주</span>
-                        <span className="font-mono text-gray-500 dark:text-gray-500">
-                          {order.order_no ?? "—"}
-                        </span>
                         {order.status === "SUCCESS" ? (
                           <span className="text-emerald-600 dark:text-emerald-400">성공</span>
                         ) : order.status === "FAILED" ? (
-                          <span
-                            className="text-red-600 dark:text-red-400"
-                            title={order.error_msg ?? ""}
-                          >
-                            실패
-                          </span>
+                          <span className="text-red-600 dark:text-red-400">실패</span>
                         ) : (
                           <span className="text-gray-500 dark:text-gray-500">건너뜀</span>
                         )}
                       </div>
+                      {/* 실패 사유는 title(hover 전용)이 아니라 화면에 — docs/plans/67 P2-1 */}
+                      {order.status === "FAILED" && order.error_msg && (
+                        <p className="mt-1 text-red-600 dark:text-red-400 break-keep">
+                          {order.error_msg}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -181,11 +180,13 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
                             {order.status === "SUCCESS" ? (
                               <span className="text-emerald-600 dark:text-emerald-400">성공</span>
                             ) : order.status === "FAILED" ? (
-                              <span
-                                className="text-red-600 dark:text-red-400"
-                                title={order.error_msg ?? ""}
-                              >
+                              <span className="text-red-600 dark:text-red-400">
                                 실패
+                                {order.error_msg && (
+                                  <span className="block max-w-[16rem] ml-auto text-left break-keep">
+                                    {order.error_msg}
+                                  </span>
+                                )}
                               </span>
                             ) : (
                               <span className="text-gray-500 dark:text-gray-500">건너뜀</span>

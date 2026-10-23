@@ -127,10 +127,7 @@ describe("NotificationSettingsPage", () => {
   it("목표 달성 알림 토글을 클릭하면 설정을 저장한다", async () => {
     vi.mocked(api.put).mockResolvedValue({ data: {} });
     renderNotificationSettings();
-    await waitFor(() => {
-      expect(screen.getByText("즉시 알림")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("button", { name: /즉시 알림/ }));
+    // 토글 1개짜리라 접힘 없이 바로 보인다 (docs/plans/67 P1-17)
     await waitFor(() => {
       expect(screen.getByText("목표 달성 알림")).toBeInTheDocument();
     });

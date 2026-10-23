@@ -75,11 +75,10 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 space-y-3">
         <div className="flex items-start gap-2 p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
           <Info size={13} className="text-blue-500 mt-0.5 shrink-0" />
+          {/* 4문장 상시 안내를 핵심 한 줄로 (docs/plans/67 P1-12) */}
           <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-            <span className="font-medium">배당금은 250만원 공제 대상이 아닙니다.</span> 배당금은
-            배당소득세(15.4%)로 별도 원천징수됩니다. 이 플래너는 해외 주식
-            <span className="font-medium"> 매매 차익(양도소득)</span>만 계산합니다. 양도차익은
-            분류과세라 금융소득 종합과세(이자·배당 연 2,000만원 초과)와 합산되지 않습니다.
+            해외 주식 <span className="font-medium">매매 차익</span>만 계산해요. 배당금은 공제
+            대상이 아니에요(15.4% 별도 원천징수).
           </p>
         </div>
 

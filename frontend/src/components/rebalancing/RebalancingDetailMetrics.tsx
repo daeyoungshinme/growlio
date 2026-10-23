@@ -39,27 +39,25 @@ export default function RebalancingDetailMetrics({ analysis }: Props) {
     >
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
-          <div
-            className="bg-gray-100 dark:bg-gray-700 rounded-xl p-3 text-center"
-            title="집중도 지수(HHI): 낮을수록 종목이 고르게 분산된 포트폴리오입니다"
-          >
+          <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-3 text-center">
             <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">현재 종목 집중도</div>
             <div className={`text-sm font-semibold ${curLabel.cls}`}>{curLabel.text}</div>
             <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
-              HHI {currentHHI.toFixed(0)}
+              지수 {currentHHI.toFixed(0)}
             </div>
           </div>
-          <div
-            className="bg-gray-100 dark:bg-gray-700 rounded-xl p-3 text-center"
-            title="리밸런싱 후 목표 집중도"
-          >
+          <div className="bg-gray-100 dark:bg-gray-700 rounded-xl p-3 text-center">
             <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">목표 종목 집중도</div>
             <div className={`text-sm font-semibold ${tgtLabel.cls}`}>{tgtLabel.text}</div>
             <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
-              HHI {targetHHI.toFixed(0)}
+              지수 {targetHHI.toFixed(0)}
             </div>
           </div>
         </div>
+        {/* title 툴팁은 터치에서 안 보여 설명을 화면에 적는다 (docs/plans/67 P1-10) */}
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          집중도 지수(HHI)는 낮을수록 종목이 고르게 나뉜 상태예요.
+        </p>
         {hasCagrData && (
           <div className="grid grid-cols-2 gap-3">
             <CagrCard label="현재 포트폴리오 CAGR" cagr={analysis.current_weighted_cagr_10y_pct} />

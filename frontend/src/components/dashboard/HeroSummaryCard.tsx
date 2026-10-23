@@ -4,7 +4,6 @@ import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { pnlColor, PIE_COLORS } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
-import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 import type { DashboardData } from "@/api/dashboard";
 
 const AssetAllocationChart = lazy(() => import("./AssetAllocationChart"));
@@ -65,29 +64,34 @@ export default memo(function HeroSummaryCard({
   }, [data]);
 
   if (isLoading || !data) {
+    // 실제 카드 모양(좌: 제목·총액·지표 / 우: 도넛)에 맞춘 스켈레톤
     return (
       <div className="card">
         <div
           role="status"
           aria-label="로딩 중"
           aria-busy="true"
-          className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0"
+          className="flex items-center gap-4 animate-pulse"
         >
-          {[0, 1, 2, 3].map((i) => (
-            <SkeletonStatBox key={i} />
-          ))}
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-16 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-7 w-32 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-4 w-40 rounded bg-gray-200 dark:bg-gray-700" />
+          </div>
+          <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-700 shrink-0" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="card !pt-0 !pr-2 !pb-3 !pl-3 sm:!pt-0 sm:!pr-3 sm:!pb-5 sm:!pl-5 flex flex-col gap-3 lg:gap-4">
-      <div className="flex flex-row items-center gap-2 sm:gap-4">
+    <div className="card">
+      {/* 모바일: [지표 | 도넛] 아래 범례 전폭 행 / sm+: 범례가 도넛 아래 (docs/plans/67 P1-2) */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 sm:gap-x-4 items-center">
         {/* 좌: 제목/금액 + 지표 */}
-        <div className="flex-1 min-w-0 flex flex-col gap-1 sm:gap-2">
+        <div className="min-w-0 flex flex-col gap-1 sm:gap-2 sm:row-span-2">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</h2>
+            <h2 className="text-xs text-gray-500 dark:text-gray-400 font-medium">전체 자산</h2>
             <div className="flex items-center gap-1">
               {onSync && (
                 <button
@@ -110,11 +114,9 @@ export default memo(function HeroSummaryCard({
           </p>
           <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-1.5 sm:pt-2">
             <div>
-              <p
-                className="text-xs text-gray-400 dark:text-gray-500 font-medium"
-                title="현금·부동산을 포함한 전체 자산 기준 누적 수익률(추적 시작 이후). 주식 평가손익률·목표 연수익률(XIRR)과는 기준이 다릅니다."
-              >
-                전체 누적 수익률
+              {/* 기준을 화면에 표시 — 주식 평가손익률(매입원가)·목표 연수익률(XIRR)과 구분 (67 P1-1) */}
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                누적 수익률 <span className="font-normal">(전체 자산)</span>
               </p>
               <p
                 className={`text-sm sm:text-lg font-bold ${
@@ -127,54 +129,54 @@ export default memo(function HeroSummaryCard({
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">환율(USD/KRW)</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">환율(USD/KRW)</p>
               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                 {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
               </p>
             </div>
           </div>
           {updatedLabel && (
-            <p className="text-xs text-gray-300 dark:text-gray-600">{updatedLabel}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">{updatedLabel}</p>
           )}
         </div>
 
-        {/* 우: 도넛 + 범례 */}
-        <div className="shrink-0 self-start w-[136px] sm:w-[180px] lg:w-[196px] xl:w-[208px] flex flex-col items-center gap-0 -mr-2 sm:mr-0">
+        {/* 우: 도넛 */}
+        <div className="w-32 h-32 sm:w-[180px] sm:h-44 lg:w-[196px] lg:h-48 xl:w-[208px]">
           {allocationChartData.length > 0 ? (
-            <Suspense fallback={<div className="w-full h-40 sm:h-44 lg:h-48" />}>
-              <>
-                <div className="w-full h-40 sm:h-44 lg:h-48">
-                  <AssetAllocationChart
-                    data={allocationChartData}
-                    size="compact"
-                    fillHeight={true}
-                    showLegend={false}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-x-1.5 gap-y-0.5 w-full">
-                  {allocationChartData.map((item, i) => (
-                    <div key={i} className="flex items-center gap-1 min-w-0 w-full">
-                      <span
-                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                        style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
-                      />
-                      <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight truncate min-w-0">
-                        {item.name} {item.pct.toFixed(0)}%
-                        <span className="text-gray-400 dark:text-gray-500 ml-0.5">
-                          · {fmtKrwShort(item.value)}
-                        </span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
+            <Suspense fallback={<div className="w-full h-full" />}>
+              <AssetAllocationChart
+                data={allocationChartData}
+                size="compact"
+                fillHeight={true}
+                showLegend={false}
+              />
             </Suspense>
           ) : (
-            <div className="flex items-center justify-center w-full h-40 sm:h-44 lg:h-48 text-gray-300 dark:text-gray-600 text-xs text-center">
+            <div className="flex items-center justify-center w-full h-full text-gray-400 dark:text-gray-500 text-xs text-center">
               자산 데이터 없음
             </div>
           )}
         </div>
+
+        {/* 범례: 비중만 표시 — 금액은 아래 카드(주식 투자 현황)·자산 탭과 중복이라 sm+에서만 (67 P1-2) */}
+        {allocationChartData.length > 0 && (
+          <ul className="col-span-2 sm:col-span-1 sm:col-start-2 flex flex-wrap gap-x-3 gap-y-1 sm:grid sm:grid-cols-2 sm:gap-x-1.5 sm:gap-y-0.5">
+            {allocationChartData.map((item, i) => (
+              <li key={i} className="flex items-center gap-1 min-w-0">
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                  style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400 leading-tight truncate min-w-0">
+                  {item.name} {item.pct.toFixed(0)}%
+                  <span className="hidden sm:inline text-gray-500 ml-0.5">
+                    · {fmtKrwShort(item.value)}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

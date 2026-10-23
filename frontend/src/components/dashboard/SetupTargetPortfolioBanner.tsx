@@ -27,8 +27,9 @@ export default function SetupTargetPortfolioBanner() {
       <div className="p-1.5 rounded-lg shrink-0 bg-blue-100/60 dark:bg-blue-900/40">
         <Anchor size={16} className="text-blue-500 dark:text-blue-400" aria-hidden="true" />
       </div>
-      <p className="flex-1 min-w-0 text-sm font-medium text-blue-900 dark:text-blue-200 truncate">
-        전체 투자 자산에 대한 기준 포트폴리오를 만들어보세요
+      {/* 390px에서 아이콘·만들기·닫기 사이 약 200px — 짧은 문구 + 2줄 허용 (docs/plans/67 P1-6) */}
+      <p className="flex-1 min-w-0 text-sm font-medium text-blue-900 dark:text-blue-200 line-clamp-2 break-keep">
+        기준 포트폴리오를 만들어보세요
       </p>
       <Link
         to={rebalancingUrl({ tab: "포트폴리오" })}
