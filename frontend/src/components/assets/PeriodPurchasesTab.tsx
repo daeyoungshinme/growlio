@@ -18,6 +18,7 @@ import { INPUT_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { fmtKrw, fmtKrwPrice, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
+import { marketLabel } from "@/constants/markets";
 
 const TradeFormModal = lazy(() => import("./TradeFormModal"));
 
@@ -299,7 +300,7 @@ function PurchaseRow({
             )}
           </div>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            {item.ticker} · {item.market}
+            {item.ticker} · {marketLabel(item.market)}
             {showAccount && ` · ${item.account_name}`}
             {item.first_buy_date && ` · 첫 매수 ${item.first_buy_date}`}
           </p>

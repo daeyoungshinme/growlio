@@ -27,8 +27,8 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>
@@ -79,10 +79,13 @@ export default function ForgotPasswordPage() {
         )}
 
         <div className="mt-6 flex justify-between text-xs text-gray-500 dark:text-gray-400">
-          <Link to="/find-account" className="text-blue-600 dark:text-blue-400 hover:underline">
+          <Link
+            to="/find-account"
+            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+          >
             아이디 찾기
           </Link>
-          <Link to="/login" className="hover:underline">
+          <Link to="/login" className="inline-flex items-center min-h-[44px] hover:underline">
             로그인으로 돌아가기
           </Link>
         </div>

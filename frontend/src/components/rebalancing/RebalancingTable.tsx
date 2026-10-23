@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, RefreshCw, Zap } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { useSyncAccounts } from "@/hooks/useSyncAccounts";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import { AssetAccount } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
 import { isOrderExecutableAccount } from "@/utils/accounts";
@@ -39,6 +40,10 @@ export default function RebalancingTable({
 }: Props) {
   const tradableAccounts = accounts.filter((a) => isOrderExecutableAccount(a.asset_type));
   const [executionOpen, setExecutionOpen] = useState(false);
+  const [detailsOpen, toggleDetailsOpen] = useCollapsible(
+    false,
+    "growlio:rebalancing:analysisDetailsOpen",
+  );
 
   const autoOpenRef = useRef(autoOpenExecution);
   useEffect(() => {
@@ -164,48 +169,80 @@ export default function RebalancingTable({
       {/* 리밸런싱 비중 테이블 */}
       <RebalancingWeightTable items={analysis.items} />
 
-      {/* 상세 지표 (집중도 · CAGR) — 접기/펼치기 */}
-      <RebalancingDetailMetrics analysis={analysis} />
-
-      {/* 배당 분석 섹션 */}
-      {hasDividendData && <RebalancingDividendSection analysis={analysis} />}
-
-      {/* 미추적 보유 종목 */}
-      {(analysis.untracked_holdings ?? []).length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/30 rounded-xl p-4">
-          <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
-            포트폴리오 미포함 보유 종목 ({(analysis.untracked_holdings ?? []).length}개)
-          </div>
-          <div className="space-y-1.5">
-            {(analysis.untracked_holdings ?? []).map((h, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs">
-                <div className="min-w-0">
-                  <span className="font-medium text-gray-800 dark:text-gray-200 truncate">
-                    {h.name}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400 ml-1.5">{h.ticker}</span>
-                </div>
-                <div className="text-right shrink-0 ml-3">
-                  <span className="text-gray-700 dark:text-gray-300">
-                    {fmtKrw(h.current_value_krw)}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400 ml-1">
-                    ({h.current_weight_pct.toFixed(1)}%)
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
-        분석 시점:{" "}
-        {new Date(analysis.analyzed_at).toLocaleTimeString("ko-KR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
+      {/* 상세: 지표·배당·미포함 종목·분석 시점 — 주문에 필요한 표 아래 보조 정보를 하나로 접어
+          포트폴리오 탭 세로 길이를 줄인다(기본 접힘·상태 기억, docs/plans/67 Phase 3) */}
+      <div className="border-t border-gray-100 dark:border-gray-800 pt-1">
+        <button
+          type="button"
+          onClick={toggleDetailsOpen}
+          aria-expanded={detailsOpen}
+          className="w-full flex items-center justify-between min-h-[44px] text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          <span>
+            상세 정보
+            <span className="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">
+              {[
+                "집중도·CAGR",
+                hasDividendData && "배당",
+                (analysis.untracked_holdings ?? []).length > 0 &&
+                  `미포함 보유 ${(analysis.untracked_holdings ?? []).length}개`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </span>
+          <ChevronDown
+            size={16}
+            className={`text-gray-400 transition-transform ${detailsOpen ? "rotate-180" : ""}`}
+          />
+        </button>
       </div>
+      {detailsOpen && (
+        <>
+          {/* 상세 지표 (집중도 · CAGR) — 접기/펼치기 */}
+          <RebalancingDetailMetrics analysis={analysis} defaultOpen />
+
+          {/* 배당 분석 섹션 */}
+          {hasDividendData && <RebalancingDividendSection analysis={analysis} />}
+
+          {/* 미추적 보유 종목 */}
+          {(analysis.untracked_holdings ?? []).length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/30 rounded-xl p-4">
+              <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
+                포트폴리오 미포함 보유 종목 ({(analysis.untracked_holdings ?? []).length}개)
+              </div>
+              <div className="space-y-1.5">
+                {(analysis.untracked_holdings ?? []).map((h, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <div className="min-w-0">
+                      <span className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                        {h.name}
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400 ml-1.5">{h.ticker}</span>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {fmtKrw(h.current_value_krw)}
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400 ml-1">
+                        ({h.current_weight_pct.toFixed(1)}%)
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
+            분석 시점:{" "}
+            {new Date(analysis.analyzed_at).toLocaleTimeString("ko-KR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+        </>
+      )}
 
       {/* 모바일: 하단 고정 실행 버튼 (분석 결과가 보일 때만). 주문 가능한 계좌가 없으면 비활성 버튼 대신
           연동 화면으로 가는 링크 — 누를 수 없는 큰 버튼만 떠 있던 문제 (docs/plans/67 P2-5) */}

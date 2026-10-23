@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 @layer components {
+  /* 모바일 p-4 — 카드가 쌓이는 화면에서 좌우 폭·세로 길이를 조금씩 아낀다 (docs/plans/67 Phase 3) */
   .card {
-    @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5;
+    @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5;
   }
   .card-overflow {
     @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden;

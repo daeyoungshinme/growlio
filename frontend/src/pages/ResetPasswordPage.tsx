@@ -57,12 +57,12 @@ export default function ResetPasswordPage() {
 
   if (!sessionReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-        <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+        <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             비밀번호 재설정 링크를 확인 중입니다...
           </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             이메일의 재설정 링크를 클릭해 이 페이지에 접근해야 합니다.
           </p>
           <Link
@@ -114,8 +114,8 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>
@@ -205,7 +205,7 @@ export default function ResetPasswordPage() {
 
         {!success && (
           <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-6">
-            <Link to="/login" className="hover:underline">
+            <Link to="/login" className="inline-flex items-center min-h-[44px] hover:underline">
               로그인으로 돌아가기
             </Link>
           </p>

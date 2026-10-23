@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react";
 import type { StockSuggestion } from "@/api/assets";
 import { fmtKrwPrice, fmtKrwShort } from "@/utils/format";
-import { isOverseasMarket } from "@/constants/markets";
+import { isOverseasMarket, marketLabel } from "@/constants/markets";
 import PriceCell from "@/components/common/PriceCell";
 import type { Position } from "@/hooks/usePositionsEditor";
 import { PnlCell } from "./PositionHelpers";
@@ -41,7 +41,7 @@ function ReadonlyMobileCard({ row }: { row: Position }) {
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
               {row.ticker}
               {row.ticker && " · "}
-              {row.market}
+              {marketLabel(row.market)}
             </p>
           )}
         </div>
@@ -83,7 +83,7 @@ function ReadonlyDesktopRow({ row }: { row: Position }) {
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
             {row.ticker}
             {row.ticker && " · "}
-            {row.market}
+            {marketLabel(row.market)}
           </p>
         )}
       </td>

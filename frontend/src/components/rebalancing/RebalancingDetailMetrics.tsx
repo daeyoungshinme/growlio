@@ -12,11 +12,13 @@ function hhiLabel(hhi: number) {
 
 interface Props {
   analysis: RebalancingAnalysis;
+  /** 이미 접힌 "상세 정보" 안에 놓일 때는 펼친 채 시작 — 두 번 탭하지 않게 */
+  defaultOpen?: boolean;
 }
 
 // 상세 지표 (집중도 · CAGR) — 접기/펼치기
-export default function RebalancingDetailMetrics({ analysis }: Props) {
-  const [isOpen, toggleOpen] = useCollapsible(false);
+export default function RebalancingDetailMetrics({ analysis, defaultOpen = false }: Props) {
+  const [isOpen, toggleOpen] = useCollapsible(defaultOpen);
 
   const hasCagrData =
     analysis.target_weighted_cagr_10y_pct != null || analysis.current_weighted_cagr_10y_pct != null;

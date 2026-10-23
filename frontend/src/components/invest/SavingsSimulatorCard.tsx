@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrw, fmtKrwPreview, fmtKrwShort } from "@/utils/format";
-import { chartTooltipStyle } from "@/utils/chart";
+import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import {
   buildLumpSumProjectionSeries,
   buildSavingsProjectionSeries,
@@ -173,7 +173,8 @@ export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
 
       <div className="mb-4">
         <p className="mb-1 text-xs text-gray-500 dark:text-gray-400 font-medium">가정 수익률</p>
-        <div className="flex gap-1.5">
+        {/* 4버튼 한 줄이면 "공격적 연10%"가 2줄로 감겨 모바일은 2열 (docs/plans/67) */}
+        <div className="grid grid-cols-2 sm:flex gap-1.5">
           {SAVINGS_RETURN_PRESETS.map((preset) => (
             <button
               key={preset.pct}
@@ -246,12 +247,12 @@ export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f0f0f0"} />
           <XAxis
             dataKey="year"
-            tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6b7280" }}
+            tick={chartTickStyle(isDark)}
             tickFormatter={(v: number) => `${v}년`}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6b7280" }}
+            tick={chartTickStyle(isDark)}
             tickFormatter={(v: number) => fmtKrwShort(v)}
             width={48}
           />

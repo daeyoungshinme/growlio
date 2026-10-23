@@ -214,7 +214,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="sm:ml-auto flex items-center justify-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          className="sm:ml-auto flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
         >
           {showForm ? <ChevronUp size={16} /> : <Plus size={16} />}
           내역 추가

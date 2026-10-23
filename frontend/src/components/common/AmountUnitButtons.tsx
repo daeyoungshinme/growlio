@@ -1,3 +1,5 @@
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+
 interface Props {
   onAdd: (delta: number) => void;
   className?: string;
@@ -18,7 +20,7 @@ export default function AmountUnitButtons({ onAdd, className = "" }: Props) {
           key={label}
           type="button"
           onClick={() => onAdd(value)}
-          className="text-xs py-1.5 px-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-950 hover:text-blue-600 dark:hover:text-blue-400 rounded-full transition-colors"
+          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-xs px-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-950 hover:text-blue-600 dark:hover:text-blue-400 rounded-full transition-colors`}
         >
           {label}
         </button>

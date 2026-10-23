@@ -147,7 +147,7 @@ export default function InvestPlanPage() {
         <span>데이터를 불러오지 못했습니다.</span>
         <button
           onClick={() => invalidateDcaData(queryClient)}
-          className="underline font-medium ml-2"
+          className="underline font-medium ml-2 min-h-[44px]"
         >
           다시 시도
         </button>
@@ -286,7 +286,7 @@ export default function InvestPlanPage() {
                   <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
                     월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
                     있습니다.{" "}
-                    <button onClick={openWizard} className="underline font-medium">
+                    <button onClick={openWizard} className="underline font-medium min-h-[44px]">
                       지금 설정하기
                     </button>
                   </div>

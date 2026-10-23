@@ -9,7 +9,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { useThemeStore } from "@/stores/themeStore";
-import { chartTooltipStyle } from "@/utils/chart";
+import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
@@ -108,7 +108,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
           </h3>
           <button
             onClick={onOpenSettings}
-            className="shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="shrink-0 flex items-center gap-2 px-4 py-2 min-h-[44px] sm:min-h-0 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             <Settings2 size={15} />
             설정 편집
@@ -117,7 +117,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
         <div className="text-right mb-4">
           <Link
             to="/assets?tab=투자현황&portfolioTab=배당"
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            className="inline-flex items-center min-h-[44px] text-xs text-blue-600 dark:text-blue-400 hover:underline"
           >
             종목별 배당 내역 보기
           </Link>
@@ -360,13 +360,13 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
             <BarChart data={monthlyChartData} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11, fill: isDark ? "#9ca3af" : "#6b7280" }}
+                tick={chartTickStyle(isDark)}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 tickFormatter={(v: number) => fmtKrwShort(v)}
-                tick={{ fontSize: 11, fill: isDark ? "#9ca3af" : "#6b7280" }}
+                tick={chartTickStyle(isDark)}
                 axisLine={false}
                 tickLine={false}
                 width={50}
@@ -426,13 +426,13 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               >
                 <XAxis
                   dataKey="name"
-                  tick={{ fontSize: 11, fill: isDark ? "#9ca3af" : "#6b7280" }}
+                  tick={chartTickStyle(isDark)}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   tickFormatter={(v: number) => fmtKrwShort(v)}
-                  tick={{ fontSize: 11, fill: isDark ? "#9ca3af" : "#6b7280" }}
+                  tick={chartTickStyle(isDark)}
                   axisLine={false}
                   tickLine={false}
                   width={50}

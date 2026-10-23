@@ -11,7 +11,7 @@ import {
 import type { DCAProjectionPoint } from "@/api/invest";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrw, fmtKrwShort, localMonth } from "@/utils/format";
-import { chartTooltipStyle } from "@/utils/chart";
+import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { buildScenarioCurve } from "@/utils/dcaScenarioProjection";
 import { SAVINGS_RETURN_PRESETS } from "@/constants/savingsPresets";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -26,6 +26,11 @@ interface Props {
 
 function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
+  // 첫 렌더 시점의 뷰포트만 본다 — 회전 등으로 바뀌어도 높이만 다를 뿐이라 리스너는 두지 않음
+  const [isMobile] = useState(
+    () =>
+      typeof window.matchMedia === "function" && window.matchMedia("(max-width: 639px)").matches,
+  );
   const [showScenarios, setShowScenarios] = useState(false);
   const canShowScenarios = !!monthlyDepositAmount && monthlyDepositAmount > 0;
   const today = localMonth();
@@ -95,8 +100,8 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
 
   return (
     <div className="card pl-2 sm:pl-5">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 break-keep">
           이론 복리 곡선 vs 실제 자산
         </h3>
         {canShowScenarios && (
@@ -142,17 +147,18 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
           </>
         )}
       </div>
-      <ResponsiveContainer width="100%" height={320}>
+      {/* 모바일은 240px — 적립 계획 탭 세로 길이 축소 (docs/plans/67 Phase 3) */}
+      <ResponsiveContainer width="100%" height={isMobile ? 240 : 320}>
         <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f0f0f0"} />
           <XAxis
             dataKey="month"
-            tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6b7280" }}
+            tick={chartTickStyle(isDark)}
             tickFormatter={(v: string) => v.slice(2)}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6b7280" }}
+            tick={chartTickStyle(isDark)}
             tickFormatter={(v: number) => fmtKrwShort(v)}
             width={56}
             domain={yDomain}

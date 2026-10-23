@@ -116,6 +116,17 @@ const PortfolioCard = memo(function PortfolioCard({
               : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
       }`}
       onClick={() => onToggleSelect(p.id)}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-label={`${p.name} 선택`}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggleSelect(p.id);
+        }
+      }}
     >
       {/* 행1: 드래그 핸들 + 이름/부제/미니바 + 수정/삭제 */}
       <div className="flex items-start gap-2">

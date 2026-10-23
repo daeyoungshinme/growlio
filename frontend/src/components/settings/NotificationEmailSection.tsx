@@ -3,6 +3,7 @@ import { sendTestEmail as requestTestEmail, updateNotificationEmail } from "@/ap
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { SectionCard, inputClass, labelClass } from "./shared";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   userEmail?: string;
@@ -58,14 +59,14 @@ export function NotificationEmailSection({ userEmail, onSettingsChange }: Props)
         <button
           onClick={saveNotificationEmail}
           disabled={saving === "notification-email"}
-          className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
         >
           {saving === "notification-email" ? "저장 중..." : "저장"}
         </button>
         <button
           onClick={sendTestEmail}
           disabled={saving === "test-email"}
-          className="px-5 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-5 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors`}
         >
           {saving === "test-email" ? "발송 중..." : "테스트 발송"}
         </button>

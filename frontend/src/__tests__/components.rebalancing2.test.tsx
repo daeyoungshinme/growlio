@@ -583,6 +583,25 @@ describe("RebalancingHistoryTab", () => {
     expect(screen.queryByText("EXECUTED")).toBeNull();
   });
 
+  it("대기 플랜은 전부, 종료된 플랜은 5개만 보이고 나머지는 더 보기로 (docs/plans/67)", async () => {
+    const closed = Array.from({ length: 7 }, (_, i) => ({
+      ...buyLeg,
+      leg_id: `closed-${i}`,
+      status: "EXECUTED" as const,
+      actionable: false,
+    }));
+    mockFetchRecentPlanLegs.mockResolvedValue([{ ...buyLeg, leg_id: "pending-1" }, ...closed]);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findAllByText("실행됨")).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "종료된 플랜 2개 더 보기" }));
+    expect(screen.getAllByText("실행됨")).toHaveLength(7);
+  });
+
   it("marks a failed leg as partially executed when its sibling leg was filled", async () => {
     mockFetchRecentPlanLegs.mockResolvedValue([
       { ...buyLeg, status: "FAILED" as const, actionable: false, partially_executed: true },

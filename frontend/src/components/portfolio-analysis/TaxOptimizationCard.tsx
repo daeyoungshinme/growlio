@@ -28,8 +28,8 @@ const HEALTH_INSURANCE_NEAR_THRESHOLD_KRW = 5_000_000;
 export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardProps = {}) {
   const currentYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(currentYear);
-  // 사용자가 명시적으로 토글하기 전까지는 null — 그동안은 손실수확 후보(해외 미실현 손실) 존재 여부로
-  // 기본 펼침 여부를 정한다(자산탭→세금탭→펼치기 3클릭에 숨어있던 절세 정보 발견성 개선).
+  // 플래너는 기본 접힘 — 손실수확 후보가 있으면 토글 옆 "손실수확 가능" 배지로 알린다. 예전처럼 자동으로
+  // 펼치면 절세 탭이 표·입력폼까지 한 번에 길어졌다 (docs/plans/67 Phase 3)
   const [plannerOpenOverride, setPlannerOpenOverride] = useState<boolean | null>(null);
   const [geumtOpen, setGeumtOpen] = useState(false);
 
@@ -40,7 +40,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
   });
 
   const hasLossHarvestCandidates = (taxData?.overseas_unrealized_gain_krw ?? 0) < 0;
-  const plannerOpen = plannerOpenOverride ?? hasLossHarvestCandidates;
+  const plannerOpen = plannerOpenOverride ?? false;
 
   const { data: positionsData, isLoading: posLoading } = useQuery({
     queryKey: QUERY_KEYS.overseasPositionsTax(accountId),
@@ -109,7 +109,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
               <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5 truncate">
                 {fmtKrw(taxData.dividend_tax_krw + (taxData.interest_tax_krw ?? 0))}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 break-keep">
                 {interestIncome > 0
                   ? `배당 ${fmtKrw(taxData.dividend_income_krw)} + 이자 ${fmtKrw(interestIncome)}`
                   : `과세계좌 배당 ${fmtKrw(taxData.dividend_income_krw)}`}{" "}
@@ -123,7 +123,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
               <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5 truncate">
                 {fmtKrw(taxData.overseas_tax_estimated_krw)}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 break-keep">
                 {taxData.overseas_realized_gain_krw != null &&
                   `실현 ${fmtKrw(taxData.overseas_realized_gain_krw)} + `}
                 미실현 {fmtKrw(taxData.overseas_unrealized_gain_krw)} (
@@ -141,16 +141,17 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
             </div>
           </div>
 
-          <p className="text-xs text-gray-400 dark:text-gray-500">{taxData.note}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{taxData.note}</p>
 
           <button
             onClick={() => setPlannerOpenOverride(!plannerOpen)}
-            className="w-full flex items-center justify-between py-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-t border-gray-100 dark:border-gray-700 pt-3 transition-colors"
+            aria-expanded={plannerOpen}
+            className="w-full flex items-center justify-between min-h-[44px] text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-t border-gray-100 dark:border-gray-700 pt-3 transition-colors"
           >
             <span className="flex items-center gap-1.5">
-              절세 플래너 — 해외 종목 매도 시뮬레이션
+              <span className="text-left break-keep">절세 플래너 — 해외 종목 매도 시뮬레이션</span>
               {hasLossHarvestCandidates && (
-                <span className="px-1.5 py-0.5 text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
+                <span className="shrink-0 px-1.5 py-0.5 text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
                   손실수확 가능
                 </span>
               )}

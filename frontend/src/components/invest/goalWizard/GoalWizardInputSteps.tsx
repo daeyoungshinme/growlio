@@ -4,6 +4,7 @@ import type { GoalRiskTolerance } from "@/api/settings";
 import { RISK_TOLERANCE_OPTIONS } from "@/constants/goalRiskTolerance";
 import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import type { GoalForm } from "@/hooks/useGoalSettings";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 export interface StepFormProps {
   form: GoalForm;
@@ -43,7 +44,7 @@ export function InitialAssetsStep({
           onClick={() =>
             setForm((f) => ({ ...f, goal_initial_amount: String(Math.round(currentAssets)) }))
           }
-          className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline`}
         >
           현재 자산 값으로 채우기
         </button>

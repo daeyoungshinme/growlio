@@ -51,7 +51,7 @@ export default function ChallengeCard({ challenge, onEdit, onArchive, onDelete }
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 truncate">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 break-keep">
               {challenge.title}
             </h3>
             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">

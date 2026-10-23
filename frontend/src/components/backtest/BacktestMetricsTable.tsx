@@ -91,13 +91,9 @@ export default function BacktestMetricsTable({ metrics }: Props) {
               </span>
               {showAdvanced && (
                 <>
-                  <span title="변동성 1단위당 초과 수익률 (높을수록 효율적)">
-                    Sharpe {m.sharpe_ratio.toFixed(2)}
-                  </span>
+                  <span>Sharpe {m.sharpe_ratio.toFixed(2)}</span>
                   <span>변동성 {m.volatility_pct.toFixed(2)}%</span>
-                  <span title="하락 변동성 대비 수익률 (높을수록 손실 관리 우수)">
-                    Sortino {m.sortino_ratio.toFixed(2)}
-                  </span>
+                  <span>Sortino {m.sortino_ratio.toFixed(2)}</span>
                 </>
               )}
             </div>
@@ -199,10 +195,18 @@ export default function BacktestMetricsTable({ metrics }: Props) {
         </table>
       </div>
 
+      {/* 용어 설명 — title 툴팁은 터치에서 안 보여 펼쳤을 때 화면에 적는다 (docs/plans/67) */}
+      {showAdvanced && (
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          Sharpe: 변동성 대비 초과 수익 · Sortino: 하락 변동성 대비 수익 (둘 다 높을수록 좋아요)
+        </p>
+      )}
+
       {/* 상세 지표 토글 */}
       <button
         onClick={() => setShowAdvanced((v) => !v)}
-        className="mt-2 flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        aria-expanded={showAdvanced}
+        className="mt-1 flex items-center gap-1 min-h-[44px] text-xs text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
       >
         {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         {showAdvanced ? "기본 지표만 보기" : "상세 지표 보기 (Sharpe · 변동성 · Sortino)"}

@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { chartTooltipStyle } from "@/utils/chart";
+import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { fmtKrwShort } from "@/utils/format";
 
 interface BarEntry {
@@ -42,12 +42,7 @@ function MonthlyDividendChart({
             }
           }}
         >
-          <XAxis
-            dataKey="name"
-            tick={{ fontSize: 11, fill: "#9CA3AF" }}
-            axisLine={false}
-            tickLine={false}
-          />
+          <XAxis dataKey="name" tick={chartTickStyle(isDark)} axisLine={false} tickLine={false} />
           <YAxis
             tickFormatter={(v: number) =>
               v >= 1e8
@@ -56,7 +51,7 @@ function MonthlyDividendChart({
                   ? `${Math.round(v / 1e4)}만`
                   : `${v}`
             }
-            tick={{ fontSize: 11, fill: "#9CA3AF" }}
+            tick={chartTickStyle(isDark)}
             axisLine={false}
             tickLine={false}
             width={48}

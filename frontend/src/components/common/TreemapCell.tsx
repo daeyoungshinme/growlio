@@ -52,7 +52,7 @@ export default function TreemapCell({
             y={y + height / 2 + 9}
             fill="rgba(255,255,255,0.85)"
             textAnchor="middle"
-            fontSize={11}
+            fontSize={12}
           >
             {pct.toFixed(1)}%
           </text>
@@ -62,7 +62,7 @@ export default function TreemapCell({
               y={y + height / 2 + 22}
               fill="rgba(255,255,255,0.6)"
               textAnchor="middle"
-              fontSize={10}
+              fontSize={12}
             >
               {ticker}
             </text>

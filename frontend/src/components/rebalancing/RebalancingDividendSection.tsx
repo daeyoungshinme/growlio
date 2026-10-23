@@ -29,14 +29,15 @@ export default function RebalancingDividendSection({ analysis }: Props) {
         <div className="flex items-center gap-3 shrink-0">
           <Link
             to="/invest-plan?tab=배당 계획"
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            className="inline-flex items-center min-h-[44px] sm:min-h-0 text-xs text-blue-600 dark:text-blue-400 hover:underline"
           >
             배당 목표 확인
           </Link>
           {dividendItems.length > 0 && (
             <button
               onClick={() => setShowDividendDetail((v) => !v)}
-              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              aria-expanded={showDividendDetail}
+              className="min-h-[44px] sm:min-h-0 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
             >
               {showDividendDetail ? "▲ 접기" : "▼ 종목별 상세"}
             </button>

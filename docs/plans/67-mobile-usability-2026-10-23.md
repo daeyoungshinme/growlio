@@ -166,7 +166,71 @@
 
 ---
 
-## Phase 3 — 스크롤 길이·밀도·가독성 스윕
+## Phase 3 — 스크롤 길이·밀도·가독성 스윕 — **대부분 완료(2026-10-23)**
+
+**진행 기록**
+- 완료:
+  - 리밸런싱 › 포트폴리오:
+    - "상세 정보" 묶음을 만들었다(집중도·CAGR·배당·미포함 종목·분석 시점, 기본 접힘·상태 기억). 안의 상세 지표 카드는 펼친 채 시작한다(`defaultOpen`).
+    - `RebalancingWeightTable` 모바일 카드: 1줄 "매수 N주 · 금액", 2줄 "현재→목표 %" + 차이 배지. 보유 주수·가격×수량·수수료는 탭해서 펼친다. 모바일에서는 비중 막대를 없앴다.
+  - 이력 탭: 대기 플랜은 전부, 종료 플랜은 5개 + 더 보기. 실행 이력은 10개씩 더 보기. 섹션 라벨은 "예약 주문 (대기 · 최근 종료)"로 바꿨다.
+  - 계획:
+    - DCA 차트 높이: 모바일 240px.
+    - 절세 플래너 자동 펼침을 없앴다(배지만 남김). 공식 줄은 truncate 대신 줄바꿈한다.
+  - 중첩 스크롤 제거:
+    - `AllocationHistoryChart`(최대 12개월)
+    - `RecommendationComparisonPreview`: 표 스크롤을 제거하고 도넛 2개는 sm+에서만 보인다.
+  - 홈:
+    - 카드 간격 `space-y-3 sm:space-y-6`, `.card` 모바일 `p-4`
+    - 온보딩 `max-w-md p-5` + CTA 44px
+    - 오류 "다시 시도" 44px
+  - 탭 위계: `AccountHistoryTab`, `DividendTab`의 pill → `SegmentedControl`.
+  - 가독성:
+    - `CHART_TICK_FONT_SIZE`/`chartTickStyle`을 추가해 8개 파일에 적용했다. `TreemapCell`은 12px.
+    - `marketLabel()`(`constants/markets.ts`)을 추가해 5개 화면에 적용했다.
+  - 잘림·숨김 해제:
+    - TaxPlanner 안내 2곳·헤더
+    - DCA 헤더
+    - DividendTab 라벨
+    - AutoInvestStatusBanner
+    - ChallengeCard 제목
+    - Pension 라벨
+  - 고정폭 정리:
+    - 시뮬레이터 프리셋 → 모바일 2열
+    - `w-36` 입력 2곳 → 모바일 `flex-1`
+    - 설정 카드 펼침 → 2열 유지(Phase 1)
+  - `ChallengeMonthGrid`: 최근 12개월 + 이전 보기, 연도 표시, 색 범례, 칸을 탭하면 입금액 토스트.
+  - `StockAccountCard`: 연필을 값 칸에서 "예수금" 라벨 옆으로 옮겼다. ⚙과 같은 동작이지만 예수금 수정 진입점이라 유지했다.
+  - 터치 타겟:
+    - AmountUnitButtons
+    - 마법사 "채우기"
+    - TaxPositionTable 수량 입력
+    - 알림 재활성화·추가·검색 결과
+    - NotificationEmailSection
+    - 내역 추가
+    - RiskMetricsCard 헤더
+    - AccountSyncSection
+    - RebalancingDividendSection
+    - DividendPlanSection
+    - InvestPlanPage 재시도·지금 설정하기
+    - 인증 페이지 링크(인증 페이지 wrapper `px-4`, 카드 `p-6 sm:p-8`)
+  - 기타:
+    - `AlertAutoModeSection` inputMode
+    - 포트폴리오 카드 div에 role/키보드 지원 추가
+    - 백테스트 Sharpe·Sortino 설명을 title 대신 화면에 표시
+- **보류/미착수**:
+  - 포트폴리오 카드 목록 → "선택 1장 + 변경(바텀시트)": 목록 화면 재설계라 별도 설계가 필요하다.
+  - `TransactionHistoryTab` 70vh 중첩 스크롤: window virtualizer로 전환해야 한다.
+  - 공용 `InfoTip` 컴포넌트: 대상 대부분을 화면 표시 문구로 해결해 보류했다. HHI·Sharpe·점검 권장·수익률 기준이 여기에 해당한다.
+  - PortfolioListSection 미니바 세그먼트 title.
+  - 환율·주가 알림 폼 `grid-cols-2`.
+  - 설정 토글 3패턴 통일: 알림 페이지만 `ToggleRow`로 바꿨고, MarketSignalAlertSection·SettingsPage 앱 설정·ChallengeFormModal은 남아 있다.
+  - `RebalancingStatusCard` 진단탭 드리프트 행의 중첩 버튼.
+  - 각주 병합(P1-16 잔여), `GoalAdjustTab` 반복 안내(P1-8 잔여, 계획 66 커밋 후).
+- 검증:
+  - 프론트 1750 tests 통과(+7), 커버리지 임계 통과.
+  - tsc·eslint(src, max-warnings 0)·prettier --check·vite build 클린.
+  - **390px 실브라우저 확인은 하지 않았다** — 로그인 가능한 테스트 계정 seed가 운영 Supabase를 건드리기 때문(계획 53과 같은 제약).
 
 ### 섹션 통합 / 기본 접힘
 - **리밸런싱 › 포트폴리오** (`RebalancingTable.tsx:153-207`)

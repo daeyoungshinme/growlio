@@ -86,8 +86,8 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>
@@ -201,7 +201,10 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
           이미 계정이 있으신가요?{" "}
-          <Link to="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
+          <Link
+            to="/login"
+            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+          >
             로그인
           </Link>
         </p>

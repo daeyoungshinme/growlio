@@ -108,7 +108,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 
 - `ExchangeRateContext.tsx` — `ExchangeRateProvider`로 앱 전체에 환율 공유. `useExchangeRateContext()`로 소비. `useExchangeRate.ts` 훅과 별개 — 컨텍스트 방식으로 동일 쿼리 중복 방지.
 
-`components/common/` 주요 파일: `AccountActionsMenu.tsx` (카드 헤더 등에 밀집된 부가 액션을 `⋯` 오버플로우 메뉴로 접는 공용 컴포넌트 — `items: {icon, label, onClick, disabled?, variant?}[]`, 아이콘+라벨 텍스트를 함께 렌더해 모바일 `title` 툴팁 미동작 문제 우회), `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `CollapsibleCard.tsx` (카드 전체를 감싸는 헤더+접기 토글, `isOpen`/`onToggle` controlled), `CollapsibleSection.tsx` (카드 내부에 삽입하는 경량 접기 토글), `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SuggestionDropdown.tsx`, `Tabs.tsx`, `ToggleSwitch.tsx` (`checked`/`onChange`/`disabled?`/`ariaLabel?` props의 스위치 토글), `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
+`components/common/` 주요 파일: `AccountActionsMenu.tsx` (카드 헤더 등에 밀집된 부가 액션을 `⋯` 오버플로우 메뉴로 접는 공용 컴포넌트 — `items: {icon, label, onClick, disabled?, variant?}[]`, 아이콘+라벨 텍스트를 함께 렌더해 모바일 `title` 툴팁 미동작 문제 우회), `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `CollapsibleCard.tsx` (카드 전체를 감싸는 헤더+접기 토글, `isOpen`/`onToggle` controlled), `CollapsibleSection.tsx` (카드 내부에 삽입하는 경량 접기 토글), `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx` (+ `ModalFooter` — 스크롤 본문 다음 형제로 두는 하단 고정 버튼 영역. 입력 폼 모달의 저장/다음 버튼은 여기에 둔다 — 본문 끝에 두면 모바일 키보드에 가려짐), `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SuggestionDropdown.tsx`, `Tabs.tsx`, `ToggleSwitch.tsx` (`checked`/`onChange`/`disabled?`/`ariaLabel?` props의 스위치 토글 + `ToggleRow` — 제목·설명·스위치 한 행 전체가 label이라 어디를 눌러도 토글, 설정 목록은 이걸 쓴다), `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
 
 > 새 공통 컴포넌트 추가/삭제 시 이 목록도 함께 갱신.
 
@@ -498,6 +498,10 @@ _기타_
 - 단, 배지/탭/필터 칩/보조 링크/카드 내부 아이콘 버튼처럼 여러 개가 조밀하게 나열되는 요소는 44px 강제 시 시각적으로 뭉툭해져 오히려 가독성이 떨어질 수 있다 — 이 경우 `TOUCH_TARGET_COMPACT_MOBILE_ONLY`(36px, WCAG AA 24px 이상 충족)를 사용해도 된다.
 - 단, `StockAccountCard.tsx`/`BankAccountCard.tsx`/`PortfolioItemRow.tsx`의 삭제 버튼처럼 이미 앱 전역에 44px로 정착된 아이콘 버튼 패턴은 개별 화면에서 임의로 축소하지 말 것 — 화면 간 일관성이 깨짐.
 - 금융 기록 삭제·실주문/실계획 생성처럼 되돌릴 수 없는 동작은 한 번 탭으로 실행하지 말고 `ConfirmModal`(무엇이 지워지는지/실행되는지 문구 포함)을 거친다 — 휴지통이 수정 아이콘 바로 옆이라 모바일 오탭이 잦다.
+- 차트 축·범례 글자도 12px 이상 — Recharts tick은 `chartTickStyle(isDark)`(`utils/chart.ts`, `CHART_TICK_FONT_SIZE`)를 쓴다.
+- 모바일 하단 네비 높이는 `index.css`의 `--bottom-nav-h` 하나가 기준 — 하단에 붙는 고정 요소(모달 `avoidBottomNav`·Toaster·고정 실행 바·본문 하단 여백)는 `bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))]`처럼 이 변수를 쓰고 rem 값을 하드코딩하지 말 것.
+- `title` 속성은 터치에서 보이지 않는다 — 실패 사유·용어 설명·비활성 사유처럼 사용자가 알아야 하는 정보는 화면에 표시하거나 탭→토스트로 보여준다.
+- 페이지 스크롤 안에 `max-h-* overflow-y-auto` 중첩 스크롤을 두지 말고 "N개 더 보기"로 개수를 제한한다.
 - 음수가 가능한 숫자 입력(실현 손익·누적손익 등)은 `inputMode="numeric"/"decimal"` 키패드에 마이너스 키가 없으므로 이익/손실 `SegmentedControl` 토글 + 절댓값 입력으로 받는다(`TaxPlannerSection`·`IsaMaturityCard` 참고).
 
 **탭/서브패널 지연 로딩 규칙**
@@ -514,21 +518,26 @@ _기타_
 
 - 정보 밀도가 낮은 헤드라인 카드(`HeroSummaryCard`, `InvestmentGoalCard` 최상위 등)는 콜랩스 불가로 항상 펼침 유지 — 접었다 폈다 할 만큼 내용이 많지 않음.
 - 보조/상세 카드(`InvestmentSnapshotCard`, `RebalancingStatusCard`, `TaxLimitsSection` 등)는 `useCollapsible`로 접기 가능하게 하되, 최초 방문 시 기본값은 **열림**(`true`)으로 시작 — 사용자가 직접 접으면 그 상태가 `localStorage`로 유지된다.
-- 단, 이미 펼쳐진 부모 카드 내부의 2차 상세 토글(`MarketSignalBanner` 매크로·물가 지표 확장, `RebalancingDetailMetrics`, `RebalancingDiagnosisCard` 등 영속화 키 없는 세션 한정 토글)은 이 규칙 대상이 아님 — "최상위 카드"에만 적용되는 규칙이므로 중첩된 하위 토글까지 강제로 펼칠 필요는 없다.
+- 단, 이미 펼쳐진 부모 카드 내부의 2차 상세 토글(`MarketSignalBanner` 매크로·물가 지표 확장, `RebalancingDetailMetrics` 등 영속화 키 없는 세션 한정 토글)은 이 규칙 대상이 아님 — "최상위 카드"에만 적용되는 규칙이므로 중첩된 하위 토글까지 강제로 펼칠 필요는 없다.
 - 새 카드 추가 시 이 규칙을 따를 것.
 - 예외: 리밸런싱 진단 탭의 `RiskMetricsCard`는 **기본 접힘**(`growlio:rebalancing:risk-metrics-open`), `MarketSignalBanner`는 등급과 무관하게 배지+한 줄 요약이 기본이고 상세는 "자세히"로 연다(plans/64 S4 — 예전엔 비GREEN이면 자동 펼침).
 - 예외: 리밸런싱 "목표 조정 › 전술"의 규칙 백테스트 카드와 계획탭 "절약 복리 시뮬레이터" 카드는
   보조 도구라 **기본 접힘**(`growlio:rebalancing:tactical-backtest-open`, `growlio:invest:savingsSimulatorOpen`). 포트폴리오 백테스트는 카드가 아니라 분석 패널(`AnalysisPanel`)의 세 번째 보기(리밸런싱 분석 / 효율 분석 / 백테스트 segmented)로 옮겼다(plans/64 S3).
 - 예외: 자산탭 투자현황의 `AllocationCard`(비중 분석)는 **모바일(<640px)만 기본 접힘**(`growlio:portfolio:allocationOpen`, 사용자가 펼치면 유지) —
   바로 아래 보유 종목 목록이 첫 화면 가까이 오도록(plans/58). 접힘 힌트로 최대 종목·해외상장 비중을 보여준다.
-- 예외: 홈의 `RebalancingStatusCard`는 `statusOnly` — 상태 확인용으로 **기본 접힘**(`growlio:dashboard:rebalancingStatusOpen`)
-  + 한 줄 힌트("N개 모두 목표 비중 이내" / "N개 중 M개 이탈 · 지금 할 일 참고"). "리밸런싱 필요" 신호(헤더 배지·빨간 테두리·
-  결합 안내)는 홈 `ActionItemsCard`가 단독 담당 — 두 카드가 같은 drift-summary를 중복 표시하지 않게. 진단탭 인스턴스는 항상 펼침.
+- 예외: 홈의 `RebalancingStatusCard`는 `statusOnly` — 접는 카드가 아니라 `/rebalancing`으로 가는 **한 줄 상태 행**
+  ("N개 모두 목표 비중 이내" / "N개 중 M개 이탈" + 시장 신호 배지). "리밸런싱 필요" 신호와 이탈 상세는 홈 `ActionItemsCard`와
+  리밸런싱 탭이 담당 — 같은 drift-summary가 홈에 여러 번 노출되지 않게(plans/67 P1-3). 진단탭 인스턴스는 항상 펼침.
+  홈의 `ChallengeProgressCard`도 같은 이유로 한 줄 행.
+- 예외(plans/67): 리밸런싱 포트폴리오 탭의 `RebalancingDiagnosisCard`(`growlio:rebalancing:diagnosisCardOpen`)와 분석 결과 아래
+  "상세 정보"(지표·배당·미포함 종목·분석 시점, `growlio:rebalancing:analysisDetailsOpen`), 계획탭의 "더 빨리 달성하려면?"
+  (`growlio:goalTimeline:fasterOpen`, `growlio:dividendPlan:fasterOpen`), 절세 플래너는 **기본 접힘** — 보조 제안·상세라 화면 길이만 늘림.
 
 **마켓 유틸리티 (`src/constants/markets.ts`)**
 
 - `DOMESTIC_MARKETS` — 국내 시장 코드(KOSPI·KOSDAQ·KRX). 비교 전 `.toUpperCase()`. 토스 해외 포지션은 `"US"`라 `isOverseasMarket`이 해외로 못 잡으므로, 국내/해외 이분은 `DOMESTIC_MARKETS.includes`로 한다.
 - `POSITION_MARKETS` — 포지션 편집 드롭다운용 시장 목록.
+- `marketLabel(market)` — 화면 표시용 라벨(`NASDAQ_US`→NASDAQ, `US`→미국, `KRX`→국내, `CASH`→현금). 시장 코드를 화면에 그릴 땐 원시값 대신 이것을 쓴다.
 - `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.
   ```ts
   import { isOverseasMarket } from "@/constants/markets";
@@ -544,6 +553,7 @@ _기타_
 **차트 유틸리티 (`src/utils/chart.ts`)**
 
 - `chartTooltipStyle(isDark)` — Recharts `<Tooltip>` 다크모드 스타일 반환. 인라인 스타일 객체 중복 작성 금지.
+- `chartTickStyle(isDark)` / `CHART_TICK_FONT_SIZE`(12) — 축 tick 스타일. `fontSize: 11` 같은 인라인 값 금지.
   ```ts
   import { chartTooltipStyle } from "@/utils/chart";
   const { contentStyle, labelStyle, itemStyle } = chartTooltipStyle(isDark);

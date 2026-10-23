@@ -15,6 +15,7 @@ import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 const ActionItemsCard = lazy(() => import("../components/dashboard/ActionItemsCard"));
@@ -28,12 +29,12 @@ const AllocationHistoryChart = lazy(() => import("../components/dashboard/Alloca
 function OnboardingChecklist() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 sm:p-12 max-w-xs sm:max-w-md w-full">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 sm:p-12 max-w-md w-full">
         <Wallet size={40} className="mx-auto mb-4 text-blue-400" />
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-1 text-center">
           Growlio 시작하기
         </h2>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mb-6 text-center">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">
           아래 단계를 완료하면 대시보드가 활성화됩니다.
         </p>
 
@@ -45,13 +46,13 @@ function OnboardingChecklist() {
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 1단계: 계좌 등록
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 은행·증권 계좌를 연결하세요.
               </p>
             </div>
             <Link
               to="/assets?tab=계좌관리&atab=증권계좌"
-              className="shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
             >
               등록하기 →
             </Link>
@@ -63,13 +64,13 @@ function OnboardingChecklist() {
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 2단계: 포트폴리오 구성
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 목표 비중을 설정해 리밸런싱을 관리하세요.
               </p>
             </div>
             <Link
               to={rebalancingUrl({ tab: "포트폴리오" })}
-              className="shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
             >
               둘러보기 →
             </Link>
@@ -81,13 +82,13 @@ function OnboardingChecklist() {
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 3단계: 투자 목표 설정
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 자산·배당·입금 목표를 입력하세요.
               </p>
             </div>
             <Link
               to="/invest-plan"
-              className="shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
             >
               설정하기 →
             </Link>
@@ -148,7 +149,7 @@ export default function DashboardPage() {
         <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
         <button
           onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard })}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 min-h-[44px] text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           다시 시도
         </button>
@@ -171,7 +172,8 @@ export default function DashboardPage() {
           {syncing ? "갱신 중..." : "데이터 갱신"}
         </button>
       </div>
-      <div className="space-y-6">
+      {/* 모바일 카드 간격 24→12px — 카드 7~8장 기준 약 100px 절약 (docs/plans/67 Phase 3) */}
+      <div className="space-y-3 sm:space-y-6">
         <ErrorBoundary variant="section">
           <SetupTargetPortfolioBanner />
         </ErrorBoundary>

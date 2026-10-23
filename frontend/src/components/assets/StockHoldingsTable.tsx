@@ -20,6 +20,7 @@ import EmptyState from "@/components/common/EmptyState";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { DOMESTIC_MARKETS } from "@/constants/markets";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { marketLabel } from "@/constants/markets";
 
 const MOBILE_CARD_VIRTUALIZE_THRESHOLD = 10;
 const MOBILE_CARD_HEIGHT = 64; // 접힌 카드(2줄) 추정 높이 (px) — 실제 높이는 measureElement로 실측
@@ -182,7 +183,7 @@ function StockHoldingMobileCard({
               />
             </div>
             <span className="shrink-0 text-gray-500 dark:text-gray-400 tabular-nums">
-              {agg.market}
+              {marketLabel(agg.market)}
             </span>
           </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
@@ -550,7 +551,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError, sort
                                     {agg.name}
                                   </p>
                                   <p className="text-xs text-gray-400 dark:text-gray-500">
-                                    {agg.ticker} · {agg.market}
+                                    {agg.ticker} · {marketLabel(agg.market)}
                                   </p>
                                 </div>
                               </div>

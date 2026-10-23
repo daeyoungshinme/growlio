@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import Tabs from "@/components/common/Tabs";
+import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
 import type { AssetAccount } from "@/api/assets";
@@ -33,12 +33,13 @@ export default function AccountHistoryTab({ accounts }: { accounts: AssetAccount
 
   return (
     <div className="space-y-4">
-      <Tabs
-        tabs={HISTORY_SEGMENTS}
-        activeTab={segment}
+      {/* 탭 위계 3단(페이지 pill → 계좌관리 underline → 이 화면) — segmented (docs/plans/67) */}
+      <SegmentedControl
+        ariaLabel="내역 종류"
+        stretch
+        options={HISTORY_SEGMENTS.map((v) => ({ value: v, label: v }))}
+        value={segment}
         onChange={setSegment}
-        variant="pill"
-        fullWidth
       />
       {segment === "현금 흐름" ? (
         <TransactionHistoryTab accounts={accounts} />

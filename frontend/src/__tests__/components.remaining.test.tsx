@@ -143,6 +143,8 @@ vi.mock("@/utils/queryInvalidation", () => ({
 
 vi.mock("@/utils/chart", () => ({
   chartTooltipStyle: vi.fn(() => ({})),
+  chartTickStyle: vi.fn(() => ({})),
+  CHART_TICK_FONT_SIZE: 12,
 }));
 
 // ---- Imports ----
