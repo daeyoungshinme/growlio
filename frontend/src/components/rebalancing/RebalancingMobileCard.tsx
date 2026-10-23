@@ -56,15 +56,21 @@ export function RebalancingMobileCard({
   const overseas = isOverseasMarket(item.market);
 
   return (
-    <div className={`px-3 py-1.5 ${selected.has(orderKey) ? "bg-indigo-950/20" : ""}`}>
+    <div
+      className={`px-3 py-1.5 ${selected.has(orderKey) ? "bg-indigo-50 dark:bg-indigo-950/20" : ""}`}
+    >
       {/* Row 1: checkbox | 종목명+티커 | qty input */}
       <div className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          checked={selected.has(orderKey)}
-          onChange={() => dispatch({ type: "TOGGLE_SELECTED", key: orderKey })}
-          className="mt-0.5 w-5 h-5 accent-indigo-500 shrink-0"
-        />
+        {/* 20px 체크박스를 44px 탭 영역의 label로 감싸고 이름을 붙인다 — 실주문 선택 (docs/plans/67 P2-3) */}
+        <label className="-m-3 p-3 shrink-0 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={selected.has(orderKey)}
+            onChange={() => dispatch({ type: "TOGGLE_SELECTED", key: orderKey })}
+            aria-label={`${item.name} 주문 선택`}
+            className="block mt-0.5 w-5 h-5 accent-indigo-500"
+          />
+        </label>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-gray-900 dark:text-white text-sm">{item.name}</span>
@@ -80,6 +86,7 @@ export function RebalancingMobileCard({
               min={0}
               max={maxQty}
               value={qty || ""}
+              aria-label={`${item.name} 주문 수량`}
               onFocus={(e) => e.target.select()}
               onChange={(e) =>
                 isBuy
@@ -156,6 +163,7 @@ export function RebalancingMobileCard({
               step={overseas ? 0.01 : 1}
               value={nativeLimitPrice || ""}
               placeholder={overseas ? "USD 입력" : "원 입력"}
+              aria-label={`${item.name} 지정가`}
               onChange={(e) =>
                 dispatch({
                   type: "SET_LIMIT_PRICE",

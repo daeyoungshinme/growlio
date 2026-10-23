@@ -32,7 +32,7 @@ import { fmtKrw, fmtKrwPreview, localMonth } from "@/utils/format";
 import { invalidateDcaData } from "@/utils/queryInvalidation";
 import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalFooter } from "@/components/common/Modal";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -466,23 +466,22 @@ export default function InvestPlanPage() {
                 />
               );
             })}
-
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={handleCloseModal}
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
-              >
-                취소
-              </button>
-              <button
-                onClick={saveSettings}
-                disabled={saving}
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
-              >
-                {saving ? "저장 중..." : "저장"}
-              </button>
-            </div>
           </div>
+          <ModalFooter>
+            <button
+              onClick={handleCloseModal}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+            >
+              취소
+            </button>
+            <button
+              onClick={saveSettings}
+              disabled={saving}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+            >
+              {saving ? "저장 중..." : "저장"}
+            </button>
+          </ModalFooter>
         </Modal>
       )}
 
@@ -520,23 +519,22 @@ export default function InvestPlanPage() {
               }
               hint="예상 연배당이 이 금액을 넘으면 목표 달성"
             />
-
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={handleDividendCloseModal}
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
-              >
-                취소
-              </button>
-              <button
-                onClick={saveDividendSettings}
-                disabled={dividendSaving}
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
-              >
-                {dividendSaving ? "저장 중..." : "저장"}
-              </button>
-            </div>
           </div>
+          <ModalFooter>
+            <button
+              onClick={handleDividendCloseModal}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+            >
+              취소
+            </button>
+            <button
+              onClick={saveDividendSettings}
+              disabled={dividendSaving}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+            >
+              {dividendSaving ? "저장 중..." : "저장"}
+            </button>
+          </ModalFooter>
         </Modal>
       )}
 

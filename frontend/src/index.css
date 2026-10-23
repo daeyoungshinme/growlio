@@ -20,6 +20,9 @@
 
 :root {
   color-scheme: light;
+  /* 모바일 하단 네비 높이(safe-area 제외) — BottomNav가 이 높이로 고정되고, 모달·토스트·고정 실행 바가
+     같은 값을 써서 겹치지 않는다(예전엔 실제 약 66px vs 가정 60px·64px로 어긋남, docs/plans/67 P2-5) */
+  --bottom-nav-h: 4rem;
 }
 
 .dark {

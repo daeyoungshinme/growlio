@@ -32,7 +32,7 @@ export default function Modal({
   const titleId = useId();
 
   const overlayPositionClass = avoidBottomNav
-    ? "fixed inset-x-0 top-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] sm:inset-0"
+    ? "fixed inset-x-0 top-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] sm:inset-0"
     : "fixed inset-0 pb-[env(safe-area-inset-bottom)]";
   const overlayZClass = avoidBottomNav ? "z-40 sm:z-[60]" : "z-[60]";
 
@@ -69,6 +69,16 @@ export default function Modal({
         )}
         {children}
       </div>
+    </div>
+  );
+}
+
+/** 모달 하단 고정 버튼 영역 — 스크롤 본문(`flex-1 overflow-y-auto`) 다음 형제로 둔다. 버튼이 본문 끝에 있으면
+ * 모바일 키보드가 올라올 때 화면 밖으로 밀려 "저장"을 찾으려 스크롤해야 했다 (docs/plans/67 P2-4). */
+export function ModalFooter({ children }: { children: ReactNode }) {
+  return (
+    <div className="shrink-0 flex gap-3 px-6 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 dark:border-gray-800">
+      {children}
     </div>
   );
 }

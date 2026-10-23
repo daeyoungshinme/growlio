@@ -110,6 +110,19 @@ describe("ErrorBoundary", () => {
 
 // ------- Toaster -------
 describe("Toaster", () => {
+  it("탭하면 토스트가 닫힌다 — 가려진 버튼을 누를 수 있게 (docs/plans/67 P2-5)", async () => {
+    renderWithProviders(<Toaster />);
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent("growlio:toast", {
+          detail: { id: "t-tap", type: "info", message: "탭해서 닫기" },
+        }),
+      );
+    });
+    fireEvent.click(screen.getByText("탭해서 닫기"));
+    expect(screen.queryByText("탭해서 닫기")).toBeNull();
+  });
+
   it("renders nothing initially", () => {
     const { container } = renderWithProviders(<Toaster />);
     expect(container.firstChild).toBeNull();

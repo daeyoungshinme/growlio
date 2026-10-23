@@ -125,7 +125,21 @@
 
 ---
 
-## Phase 2 — 실자금·오판 위험 있는 사용성 (High)
+## Phase 2 — 실자금·오판 위험 있는 사용성 (High) — **완료(2026-10-23)**
+
+**진행 기록**
+- P2-1: Phase 1 커밋에서 처리했다.
+- P2-2: `RebalancingConfirmStep`(잔고 조회·자동 조정), `RebalancingExecutionModal`(재조회), `RebalancingPriceCell`(재조회 아이콘)을 모바일 44px로 키웠다.
+- P2-3: 체크박스를 44px label로 감쌌다. `{종목명} 주문 선택`·`주문 수량`·`지정가` aria-label을 달고, 라이트모드 선택 배경은 `bg-indigo-50`으로 바꿨다.
+- P2-4: `ModalFooter`(`common/Modal.tsx`)를 추가해 적립 설정·배당 설정·챌린지·목표 마법사 모달 4곳의 버튼을 스크롤 본문 밖으로 옮겼다. 마법사도 함께 손봤다.
+  - 2단계 "다음" 비활성 사유를 표시한다.
+  - 6단계 "완료"를 보조 버튼으로 바꿨다(Phase 3 항목을 앞당김).
+- P2-5: `--bottom-nav-h: 4rem`(`index.css`)을 단일 기준으로 삼았다.
+  - BottomNav 항목 높이를 이 값으로 고정했다. 그 결과 Modal(avoidBottomNav), Toaster, AppLayout 하단 여백, 리밸런싱 고정 실행 바가 같은 값을 쓴다.
+  - 고정 실행 바는 `bottom-16`으로 safe-area를 빼먹던 문제도 함께 해결했다.
+  - Toaster: `z-[80]`, 좌우 여백, 탭하면 닫힘.
+  - 주문 가능한 계좌가 없으면 고정 바에 비활성 버튼 대신 "증권계좌 연동" 링크를 보여준다.
+- 검증: 프론트 테스트 전부 통과, tsc 클린.
 
 - **P2-1. 실행 결과·이력의 실패 사유가 잘리거나 hover에만 있음**
   - 대상: `RebalancingResultSection.tsx:88`(truncate 160px), `RebalancingHistoryTab.tsx:136,186`(title)

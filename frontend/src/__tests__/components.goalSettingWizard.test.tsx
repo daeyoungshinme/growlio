@@ -116,6 +116,8 @@ describe("GoalSettingWizard", () => {
   it("2단계: 목표 금액/시점을 입력하지 않으면 다음 버튼이 비활성화된다", () => {
     renderWizard({ initialStep: 2 });
     expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+    // 비활성 이유를 화면에 표시 (docs/plans/67)
+    expect(screen.getByText(/목표 금액과 목표 시점을 입력하면/)).toBeInTheDocument();
   });
 
   it("2단계: 목표 금액/시점을 입력하면 다음으로 진행할 수 있다", () => {
@@ -123,6 +125,7 @@ describe("GoalSettingWizard", () => {
     fireEvent.change(screen.getByLabelText(/목표 금액 \(원\)/), { target: { value: "500000000" } });
     fireEvent.change(screen.getByLabelText(/목표 시점 \(연도\)/), { target: { value: "2045" } });
     expect(screen.getByRole("button", { name: "다음" })).not.toBeDisabled();
+    expect(screen.queryByText(/목표 금액과 목표 시점을 입력하면/)).toBeNull();
     expect(screen.getByText("500,000,000원 (5.00억원)")).toBeInTheDocument();
   });
 

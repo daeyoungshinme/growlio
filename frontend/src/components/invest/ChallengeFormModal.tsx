@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { Challenge, ChallengeCreatePayload, ChallengeType } from "@/api/challenges";
 import type { AssetAccount } from "@/api/assets";
 import type { SettingsData } from "@/api/settings";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalFooter } from "@/components/common/Modal";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import FormInput from "@/components/common/FormInput";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
@@ -306,25 +306,24 @@ export default function ChallengeFormModal({
               ariaLabel="이 챌린지 알림"
             />
           </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={requestClose}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={submitting}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
-            >
-              {submitting ? "저장 중..." : isEdit ? "저장" : "만들기"}
-            </button>
-          </div>
         </div>
+        <ModalFooter>
+          <button
+            type="button"
+            onClick={requestClose}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+          >
+            {submitting ? "저장 중..." : isEdit ? "저장" : "만들기"}
+          </button>
+        </ModalFooter>
       </Modal>
 
       {confirmClose && (

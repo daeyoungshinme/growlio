@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalFooter } from "@/components/common/Modal";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { GoalForm } from "@/hooks/useGoalSettings";
 import {
@@ -87,38 +87,44 @@ export default function GoalSettingWizard({
             onClose={onClose}
           />
         )}
-
-        <div className="flex gap-3 pt-2">
-          {step > 1 && (
-            <button
-              type="button"
-              onClick={() => setStep((s) => s - 1)}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
-            >
-              이전
-            </button>
-          )}
-          {step < TOTAL_STEPS ? (
-            <button
-              type="button"
-              disabled={!canProceed}
-              onClick={() => setStep((s) => s + 1)}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
-            >
-              {/* 5단계(마지막 입력 단계)의 "다음"이 실제 저장 트리거 — 6단계 진입 시 자동 저장된다 */}
-              다음
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onClose}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
-            >
-              완료
-            </button>
-          )}
-        </div>
+        {/* "다음"이 비활성인 이유를 화면에 — 버튼만 흐려져 무엇을 채워야 하는지 몰랐다 (docs/plans/67) */}
+        {!canProceed && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            목표 금액과 목표 시점을 입력하면 다음으로 넘어갈 수 있어요.
+          </p>
+        )}
       </div>
+      <ModalFooter>
+        {step > 1 && (
+          <button
+            type="button"
+            onClick={() => setStep((s) => s - 1)}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+          >
+            이전
+          </button>
+        )}
+        {step < TOTAL_STEPS ? (
+          <button
+            type="button"
+            disabled={!canProceed}
+            onClick={() => setStep((s) => s + 1)}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+          >
+            {/* 5단계(마지막 입력 단계)의 "다음"이 실제 저장 트리거 — 6단계 진입 시 자동 저장된다 */}
+            다음
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            // 6단계의 주 행동은 본문의 "이 추천으로 포트폴리오 만들기" — 완료는 보조 버튼 (docs/plans/67)
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+          >
+            완료
+          </button>
+        )}
+      </ModalFooter>
     </Modal>
   );
 }
