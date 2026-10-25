@@ -61,7 +61,6 @@ _MAX_SERIES_POINTS = 260  # 차트용 다운샘플 상한
 _LEVERAGE_BASE: dict[str, tuple[str, float]] = {"QLD": ("QQQ", 0.0095 + 0.02), "SSO": ("SPY", 0.0089 + 0.02)}
 _LEVERAGE = 2.0
 _COST_RATE = 0.001  # 편도 거래비용(해외 ETF 수수료+스프레드 근사) — 매수·매도 금액 각각에 부과
-_BACKTEST_VERSION = 2  # 계산 방식이 바뀌면 올린다(캐시 키에 포함) — v2: 현금 이자·거래비용·평균 비중 고정
 
 
 def vix_to_macro_level(vix: float | None) -> str:
@@ -139,6 +138,7 @@ def simulate(
     dip_shift_pct: float = 0.0,
     dip_exit_stages: frozenset[str] = DIP_EXIT_STAGES,
     cash_yield: pd.Series | None = None,
+    use_macro: bool = True,
 ) -> dict[str, Any]:
     """closes: QQQ/SPY(+선택 DIA·QLD·SSO) 종가(워밍업 포함), vix·real_yield·cash_yield(연율 %): 일별 시계열.
 
@@ -202,6 +202,7 @@ def simulate(
             "LIVE",
             {t: trends[t].iloc[i] for t in ("QQQ", "SPY")},
             prev=prev_regime,
+            use_macro=use_macro,
         )
         state, changed = step_confirmation(state, observed, day)
         if changed and state.current is not None:
@@ -315,9 +316,12 @@ async def _fetch_cash_yield_history(days: int) -> pd.Series:
     return await _fetch_fred_history("DTB3", days)  # 미국 3개월 국채(연율 %)
 
 
-def _settings_hash(weights_table: dict[str, dict[str, float]], tilt_shift_pct: float, dip_shift_pct: float) -> str:
+def _settings_hash(
+    weights_table: dict[str, dict[str, float]], tilt_shift_pct: float, dip_shift_pct: float, use_macro: bool = True
+) -> str:
+    # 계산 방식이 바뀌면 cache_keys.tactical_backtest_key의 버전을 올린다
     payload = json.dumps(
-        {"v": _BACKTEST_VERSION, "w": weights_table, "tilt": tilt_shift_pct, "dip": dip_shift_pct}, sort_keys=True
+        {"w": weights_table, "tilt": tilt_shift_pct, "dip": dip_shift_pct, "macro": use_macro}, sort_keys=True
     )
     return hashlib.sha256(payload.encode()).hexdigest()[:12]
 
@@ -328,8 +332,9 @@ async def run_tactical_backtest(
     cache: CacheStore | None,
     tilt_shift_pct: float = 0.0,
     dip_shift_pct: float = 0.0,
+    use_macro: bool = True,
 ) -> dict[str, Any]:
-    key = tactical_backtest_key(_settings_hash(weights_table, tilt_shift_pct, dip_shift_pct), years)
+    key = tactical_backtest_key(_settings_hash(weights_table, tilt_shift_pct, dip_shift_pct, use_macro), years)
     if (hit := await get_cached_json(cache, key)) is not None:
         return hit
 
@@ -349,11 +354,12 @@ async def run_tactical_backtest(
     except Exception as exc:
         logger.warning("tactical_backtest_vix_failed", error=str(exc))
         vix = pd.Series(dtype=float)
-    macro_note = (
-        "매크로 입력은 VIX만으로 근사했습니다(실시간 신호는 8개 지표 복합)."
-        if not vix.empty
-        else "VIX 이력을 받지 못해 매크로 입력 없이(항상 '주의') 차트 추세만으로 계산했습니다."
-    )
+    if not use_macro:
+        macro_note = "매크로 미반영(차트 추세만) 설정으로 계산했습니다."
+    elif not vix.empty:
+        macro_note = "매크로 입력은 VIX만으로 근사했습니다(실시간 신호는 8개 지표 복합)."
+    else:
+        macro_note = "VIX 이력을 받지 못해 매크로 입력 없이(항상 '주의') 차트 추세만으로 계산했습니다."
 
     try:
         cash_yield = await _fetch_cash_yield_history(days)
@@ -382,8 +388,10 @@ async def run_tactical_backtest(
         tilt_shift_pct=tilt_shift_pct,
         dip_shift_pct=dip_shift_pct,
         cash_yield=cash_yield,
+        use_macro=use_macro,
     )
     result["years"] = years
+    result["use_macro"] = use_macro
     result["tilt_shift_pct"] = tilt_shift_pct
     result["dip_shift_pct"] = dip_shift_pct
     result["macro_note"] = macro_note

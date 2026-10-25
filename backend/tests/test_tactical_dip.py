@@ -504,9 +504,86 @@ class TestBacktestCosts:
         assert "static" in result["series"][0]
         assert result["turnover_pct_per_year"] == 0.0  # 국면 전환 없음 — 최초 진입 매수는 회전율에서 제외
 
-    def test_settings_hash_includes_version(self):
+    def test_settings_hash_includes_macro_option(self):
         from app.services import tactical_backtest as bt
 
-        base = bt._settings_hash(tactical.DEFAULT_REGIME_WEIGHTS, 10, 0)
-        with patch.object(bt, "_BACKTEST_VERSION", 99):
-            assert bt._settings_hash(tactical.DEFAULT_REGIME_WEIGHTS, 10, 0) != base
+        on = bt._settings_hash(tactical.DEFAULT_REGIME_WEIGHTS, 10, 0)
+        assert bt._settings_hash(tactical.DEFAULT_REGIME_WEIGHTS, 10, 0, use_macro=False) != on
+
+    def test_simulate_without_macro_matches_calm_vix(self):
+        # 매크로를 끄면 VIX가 아무리 높아도 VIX 15(항상 안정)와 같은 결과
+        idx, closes = self._closes()
+        panic = simulate(closes, pd.Series(40.0, index=idx), tactical.DEFAULT_REGIME_WEIGHTS, idx[300], use_macro=False)
+        calm = simulate(closes, pd.Series(15.0, index=idx), tactical.DEFAULT_REGIME_WEIGHTS, idx[300])
+        assert panic["metrics"][0] == calm["metrics"][0]
+        assert panic["regime_time_pct"]["RISK_OFF"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# plans/70 — 매크로 반영 끄기 옵션
+# ---------------------------------------------------------------------------
+
+
+class TestMacroOption:
+    _client = TestApi._client
+
+    def test_classify_ignores_macro_when_off(self):
+        up = {"SPY": "UP", "QQQ": "UP"}
+        assert tactical.classify_regime("RED", "LIVE", up)[0] == "RISK_OFF"
+        regime, reasons = tactical.classify_regime("RED", "LIVE", up, use_macro=False)
+        assert regime == "RISK_ON"
+        assert "반영 안 함" in reasons[0]
+        assert tactical.classify_regime("GREEN", "LIVE", {"SPY": "DOWN", "QQQ": "UP"}, use_macro=False)[0] == "RISK_OFF"
+
+    def test_observed_for_uses_no_macro_branch(self):
+        market = {
+            "observed_regime": "RISK_OFF",
+            "reasons": ["a"],
+            "observed_if_risk_on": "RISK_OFF",
+            "reasons_if_risk_on": ["b"],
+            "observed_no_macro": "RISK_ON",
+            "reasons_no_macro": ["c"],
+        }
+        assert tactical.observed_for(market, "RISK_ON", use_macro=False) == ("RISK_ON", ["c"])
+        assert tactical.observed_for(market, "RISK_ON") == ("RISK_OFF", ["b"])
+        # 매크로 끔 관측이 없는 구버전 market(테스트·캐시)은 기본 경로로
+        legacy = {"observed_regime": "NEUTRAL", "reasons": []}
+        assert tactical.observed_for(legacy, None, use_macro=False) == ("NEUTRAL", [])
+
+    def test_uses_macro_defaults_true(self):
+        assert tactical.uses_macro(None) is True
+        assert tactical.uses_macro(_strategy(use_macro=None)) is True
+        assert tactical.uses_macro(_strategy(use_macro=False)) is False
+
+    def test_advance_regime_follows_no_macro_observation(self):
+        from datetime import date
+
+        s = _strategy(last_regime="RISK_OFF", use_macro=False)
+        market = {"observed_regime": "RISK_OFF", "reasons": [], "observed_no_macro": "RISK_ON", "reasons_no_macro": []}
+        assert tactical.advance_regime(s, market, date(2026, 10, 1)) is False
+        assert s.pending_regime == "RISK_ON"
+        assert tactical.advance_regime(s, market, date(2026, 10, 2)) is True
+        assert s.last_regime == "RISK_ON"
+
+    def test_upsert_saves_use_macro(self, api_db):
+        portfolio = SimpleNamespace(id=uuid.uuid4(), name="P", items=[])
+        p1, p2, p3, tc = self._client(api_db, portfolio, None)
+        with p1, p2, p3, tc as client:
+            off = client.put(f"/api/v1/tactical/{portfolio.id}", json={"use_macro": False})
+            default = client.put(f"/api/v1/tactical/{portfolio.id}", json={})
+        assert off.status_code == 200
+        assert off.json()["use_macro"] is False
+        assert default.json()["use_macro"] is True
+        assert default.json()["tilt_shift_pct"] == 0.0  # 틸트 기본 끔(plans/70)
+
+    @pytest.mark.asyncio
+    async def test_job_regime_alert_uses_no_macro_reasons(self):
+        strategy = _strategy(last_regime="RISK_ON", notified_regime="NEUTRAL", use_macro=False, tilt_shift_pct=0)
+        market = {
+            **_MARKET,
+            "observed_no_macro": "RISK_ON",
+            "reasons_no_macro": ["매크로 신호: 반영 안 함(차트 추세만)"],
+        }
+        dispatch = await TestDipAlertJob()._run(strategy, market)
+        dispatch.assert_awaited_once()
+        assert dispatch.await_args.kwargs["alert_type"] == "TACTICAL_REGIME"

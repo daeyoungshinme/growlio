@@ -203,15 +203,21 @@ function TacticalDetails({ status }: { status: TacticalStatus }) {
     >
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-          <span>매크로(확정)</span>
-          <MarketSignalLevelBadge level={status.macro_level} />
-          {status.macro_freshness === "STALE" && (
-            <span className="text-amber-600 dark:text-amber-400">지표 데이터 지연</span>
+          {status.use_macro ? (
+            <>
+              <span>매크로(확정)</span>
+              <MarketSignalLevelBadge level={status.macro_level} />
+              {status.macro_freshness === "STALE" && (
+                <span className="text-amber-600 dark:text-amber-400">지표 데이터 지연</span>
+              )}
+              {/* 모바일은 title 툴팁이 안 뜬다 — 진단 탭 배지와 등급이 다를 수 있는 이유를 화면에 적는다 */}
+              <span className="basis-full text-gray-500 dark:text-gray-400">
+                연속 확인한 등급이라 진단 탭보다 늦게 바뀔 수 있어요
+              </span>
+            </>
+          ) : (
+            <span>매크로 반영 안 함 — SPY·QQQ 200일선 추세만으로 판단해요</span>
           )}
-          {/* 모바일은 title 툴팁이 안 뜬다 — 진단 탭 배지와 등급이 다를 수 있는 이유를 화면에 적는다 */}
-          <span className="basis-full text-gray-500 dark:text-gray-400">
-            연속 확인한 등급이라 진단 탭보다 늦게 바뀔 수 있어요
-          </span>
         </div>
         <ReasonList items={status.reasons} />
         <div>
@@ -413,6 +419,7 @@ function TacticalStatusView({
                     regime_weights: status.is_default_weights ? null : status.regime_weights,
                     tilt_shift_pct: status.tilt_shift_pct,
                     dip_shift_pct: status.dip_shift_pct,
+                    use_macro: status.use_macro,
                   })
                 }
                 ariaLabel="국면 전환 알림"
@@ -468,11 +475,12 @@ function TacticalStatusView({
 
       {status.enabled && (
         <TacticalWeightsEditor
-          key={`${JSON.stringify(status.regime_weights)}:${status.tilt_shift_pct}:${status.dip_shift_pct}`}
+          key={`${JSON.stringify(status.regime_weights)}:${status.tilt_shift_pct}:${status.dip_shift_pct}:${status.use_macro}`}
           regimeWeights={status.regime_weights}
           isDefaultWeights={status.is_default_weights}
           tiltShiftPct={status.tilt_shift_pct}
           dipShiftPct={status.dip_shift_pct}
+          useMacro={status.use_macro}
           notifyEnabled={status.notify_enabled}
           saving={upsert.isPending}
           onSave={(payload) =>

@@ -18,6 +18,10 @@
 절반 이상을 차지해 도입했다(10년 88→39회, CAGR·샤프 동반 개선 — 비대칭 확정일수·최소 유지기간은 회복 구간
 재진입을 늦춰 오히려 성과가 나빠 채택하지 않음).
 
+매크로 반영 끄기(`use_macro=False`, 전략별 옵션 — plans/70): 매크로를 항상 GREEN으로 보고 차트 추세만으로 판정한다
+(SPY 하락 → 방어, SPY·QQQ 상승 → 공격). 백테스트(VIX 근사)에선 20년 CAGR +1~1.7%p였지만 최근 10년 MDD는 나빠졌고
+실시간 매크로는 8개 지표 복합이라 단정할 수 없어 기본은 켬이다.
+
 국면 확정(`step_confirmation`): 같은 새 국면이 서로 다른 KST 날짜에 2번 관측돼야 바뀐다. 매크로 등급 자체에도
 2연속 확인 히스테리시스가 있으므로 이중 완충이다. 자동 주문은 하지 않는다 — 제안 비중을 포트폴리오 목표에
 적용(`apply_regime_to_portfolio`)한 뒤 기존 리밸런싱 실행 화면에서 사용자가 직접 확인·실행한다.
@@ -85,16 +89,28 @@ _MACRO_LABELS = {"GREEN": "안정", "YELLOW": "주의", "RED": "위험"}
 
 
 def classify_regime(
-    macro_level: str, macro_freshness: str, trends: dict[str, TrendState], prev: str | None = None
+    macro_level: str,
+    macro_freshness: str,
+    trends: dict[str, TrendState],
+    prev: str | None = None,
+    *,
+    use_macro: bool = True,
 ) -> tuple[Regime | None, list[str]]:
-    """(국면 또는 판정불가 None, 판정 근거 문장 목록). `prev`는 직전 확정 국면(공격 국면 유지 판정용)."""
+    """(국면 또는 판정불가 None, 판정 근거 문장 목록). `prev`는 직전 확정 국면(공격 국면 유지 판정용).
+
+    `use_macro=False`면 매크로를 GREEN·LIVE로 취급한다(차트 추세만으로 판정).
+    """
     spy = trends.get("SPY", "UNKNOWN")
     qqq = trends.get("QQQ", "UNKNOWN")
-    macro_stale = macro_freshness == "STALE"
-    reasons = [
-        f"매크로 신호: {_MACRO_LABELS.get(macro_level, macro_level)}" + (" (데이터 지연)" if macro_stale else ""),
-        f"SPY 추세: {_TREND_LABELS[spy]} · QQQ 추세: {_TREND_LABELS[qqq]}",
-    ]
+    if use_macro:
+        macro_stale = macro_freshness == "STALE"
+        macro_line = f"매크로 신호: {_MACRO_LABELS.get(macro_level, macro_level)}" + (
+            " (데이터 지연)" if macro_stale else ""
+        )
+    else:
+        macro_level, macro_stale = "GREEN", False
+        macro_line = "매크로 신호: 반영 안 함(차트 추세만)"
+    reasons = [macro_line, f"SPY 추세: {_TREND_LABELS[spy]} · QQQ 추세: {_TREND_LABELS[qqq]}"]
     if spy == "UNKNOWN" and qqq == "UNKNOWN":
         reasons.append("시세를 받지 못해 국면을 판정하지 않았습니다.")
         return None, reasons
@@ -137,7 +153,7 @@ def step_confirmation(state: ConfirmState, observed: str | None, today: date) ->
 
 def advance_regime(strategy: TacticalStrategy, market: dict[str, Any], today: date) -> bool:
     """시장 관측(`evaluate_market`)으로 확정 상태를 갱신한다. 확정 국면이 바뀌었으면 True(최초 확정 포함)."""
-    observed, _ = observed_for(market, strategy.last_regime)
+    observed, _ = observed_for(market, strategy.last_regime, uses_macro(strategy))
     state = ConfirmState(strategy.last_regime, strategy.pending_regime, strategy.pending_first_seen)
     new, changed = step_confirmation(state, observed, today)
     strategy.pending_regime = new.pending
@@ -174,6 +190,11 @@ def advance_dip(strategy: TacticalStrategy, market: dict[str, Any]) -> bool:
         return False
     strategy.dip_level = new
     return True
+
+
+def uses_macro(strategy: TacticalStrategy | None) -> bool:
+    # 새로 만든 객체는 flush 전까지 server_default가 채워지지 않아 None일 수 있다
+    return strategy is None or strategy.use_macro is None or bool(strategy.use_macro)
 
 
 def dip_shift_of(strategy: TacticalStrategy | None) -> float:
@@ -272,6 +293,8 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
     observed, reasons = classify_regime(macro_level, freshness, trends)
     # 공격 국면 유지(히스테리시스)는 전략별 직전 확정 국면에 달려 있어 두 경우를 모두 계산해 둔다
     observed_on, reasons_on = classify_regime(macro_level, freshness, trends, prev="RISK_ON")
+    # 매크로를 끈 전략용 — 매크로가 GREEN 고정이라 공격 유지 히스테리시스와 무관(prev 불필요)
+    observed_nm, reasons_nm = classify_regime(macro_level, freshness, trends, use_macro=False)
     tilt_inputs = await get_tilt_inputs(cache)
     observed_tilt = classify_tilt(tilt_inputs["real_yield_change_pp"], tilt_inputs["relative_strength_pct"])
     return {
@@ -282,6 +305,8 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
         "reasons": reasons,
         "observed_if_risk_on": observed_on,
         "reasons_if_risk_on": reasons_on,
+        "observed_no_macro": observed_nm,
+        "reasons_no_macro": reasons_nm,
         "tilt_inputs": tilt_inputs,
         "tilt_inputs_complete": all(v is not None for v in tilt_inputs.values()),
         "observed_tilt": observed_tilt,
@@ -290,8 +315,10 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
     }
 
 
-def observed_for(market: dict[str, Any], prev: str | None) -> tuple[Regime | None, list[str]]:
-    """직전 확정 국면을 반영한 관측 국면과 근거."""
+def observed_for(market: dict[str, Any], prev: str | None, use_macro: bool = True) -> tuple[Regime | None, list[str]]:
+    """직전 확정 국면·매크로 반영 여부를 반영한 관측 국면과 근거."""
+    if not use_macro and "observed_no_macro" in market:
+        return market["observed_no_macro"], market["reasons_no_macro"]
     if prev == "RISK_ON" and "observed_if_risk_on" in market:
         return market["observed_if_risk_on"], market["reasons_if_risk_on"]
     return market["observed_regime"], market["reasons"]
@@ -333,7 +360,8 @@ async def build_status(
 ) -> dict[str, Any]:
     weights_table = resolve_weights(strategy)
     confirmed = strategy.last_regime if strategy else None
-    observed, reasons = observed_for(market, confirmed)
+    use_macro = uses_macro(strategy)
+    observed, reasons = observed_for(market, confirmed, use_macro)
     effective = confirmed or observed
     dip_level = effective_dip_level(strategy, effective)
     deployed = dip_deployed_for(strategy, effective, market)
@@ -344,6 +372,7 @@ async def build_status(
         "portfolio_name": portfolio.name,
         "enabled": strategy is not None,
         "notify_enabled": strategy.notify_enabled if strategy else False,
+        "use_macro": use_macro,
         "macro_level": market["macro_level"],
         "macro_freshness": market["macro_freshness"],
         "technicals": market["technicals"],
@@ -376,7 +405,7 @@ async def build_status(
         if partial_active and strategy and strategy.partial_applied_on
         else None,
         "transition_hints": transition_hints(
-            effective, market["macro_level"], market["macro_freshness"], market["technicals"]
+            effective, market["macro_level"], market["macro_freshness"], market["technicals"], use_macro=use_macro
         ),
         "current_weights": _current_weights(portfolio),
         "portfolio_compatible": is_tactical_managed(portfolio),

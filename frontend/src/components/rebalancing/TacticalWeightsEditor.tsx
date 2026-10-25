@@ -7,6 +7,7 @@ import type {
   TacticalStrategyPayload,
 } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
+import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
 import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
@@ -17,6 +18,8 @@ import {
   LEVERAGED_ASSETS,
   REGIME_LABEL,
   TACTICAL_ASSETS,
+  TACTICAL_PRESETS,
+  type TacticalPreset,
 } from "./tacticalLabels";
 
 const REGIME_ORDER: TacticalRegime[] = ["RISK_ON", "NEUTRAL", "RISK_OFF"];
@@ -77,6 +80,23 @@ function rowSum(row: Record<TacticalAsset, string>): number | null {
   return sum;
 }
 
+function presetMatches(
+  preset: TacticalPreset,
+  draft: Draft,
+  shift: ShiftOption,
+  dip: DipOption,
+  useMacro: boolean,
+): boolean {
+  return (
+    REGIME_ORDER.every((r) =>
+      TACTICAL_ASSETS.every((a) => parseCell(draft[r][a]) === preset.weights[r][a]),
+    ) &&
+    Number(shift) === preset.tiltShiftPct &&
+    Number(dip) === preset.dipShiftPct &&
+    useMacro === preset.useMacro
+  );
+}
+
 function toShiftOption(v: number): ShiftOption {
   return (SHIFT_OPTIONS.find((o) => Number(o.value) === v)?.value ??
     String(DEFAULT_TILT_SHIFT_PCT)) as ShiftOption;
@@ -92,13 +112,14 @@ interface Props {
   isDefaultWeights: boolean;
   tiltShiftPct: number;
   dipShiftPct: number;
+  useMacro: boolean;
   notifyEnabled: boolean;
   saving: boolean;
   onSave: (payload: TacticalStrategyPayload) => void;
 }
 
 /**
- * 국면별 비중표 + 나스닥/S&P 틸트 이동폭 + 웅덩이 투입폭 편집. 서버 값이 바뀌면 호출부가 `key`로 다시 마운트해 초안을 초기화한다
+ * 프리셋(안정·균형·성장·레버리지) + 국면별 비중표 + 나스닥/S&P 틸트 이동폭 + 웅덩이 투입폭 + 매크로 반영 편집. 서버 값이 바뀌면 호출부가 `key`로 다시 마운트해 초안을 초기화한다
  * (effect로 props→state 동기화하지 않음).
  */
 export default function TacticalWeightsEditor({
@@ -106,6 +127,7 @@ export default function TacticalWeightsEditor({
   isDefaultWeights,
   tiltShiftPct,
   dipShiftPct,
+  useMacro,
   notifyEnabled,
   saving,
   onSave,
@@ -114,6 +136,7 @@ export default function TacticalWeightsEditor({
   const [draft, setDraft] = useState<Draft>(() => toDraft(regimeWeights));
   const [shift, setShift] = useState<ShiftOption>(() => toShiftOption(tiltShiftPct));
   const [dip, setDip] = useState<DipOption>(() => toDipOption(dipShiftPct));
+  const [macro, setMacro] = useState(useMacro);
 
   const sums = REGIME_ORDER.map((r) => rowSum(draft[r]));
   const valid = sums.every((s) => s != null && Math.abs(s - 100) < 0.01);
@@ -122,11 +145,21 @@ export default function TacticalWeightsEditor({
       TACTICAL_ASSETS.some((a) => parseCell(draft[r][a]) !== (regimeWeights[r][a] ?? 0)),
     ) ||
     Number(shift) !== tiltShiftPct ||
-    Number(dip) !== dipShiftPct;
+    Number(dip) !== dipShiftPct ||
+    macro !== useMacro;
   const atDefaults =
     isDefaultWeights &&
     tiltShiftPct === DEFAULT_TILT_SHIFT_PCT &&
-    dipShiftPct === DEFAULT_DIP_SHIFT_PCT;
+    dipShiftPct === DEFAULT_DIP_SHIFT_PCT &&
+    useMacro;
+  const activePreset = TACTICAL_PRESETS.find((p) => presetMatches(p, draft, shift, dip, macro));
+
+  const applyPreset = (p: TacticalPreset) => {
+    setDraft(toDraft(p.weights));
+    setShift(toShiftOption(p.tiltShiftPct));
+    setDip(toDipOption(p.dipShiftPct));
+    setMacro(p.useMacro);
+  };
   // 레버리지 비중이 있는 국면 — 방어 국면 보유는 특히 경고
   const leveragedIn = REGIME_ORDER.filter((r) =>
     [...LEVERAGED_ASSETS].some((a) => (parseCell(draft[r][a]) ?? 0) > 0),
@@ -148,6 +181,7 @@ export default function TacticalWeightsEditor({
       regime_weights: table,
       tilt_shift_pct: Number(shift),
       dip_shift_pct: Number(dip),
+      use_macro: macro,
     });
   };
 
@@ -162,6 +196,38 @@ export default function TacticalWeightsEditor({
       }
     >
       <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-semibold">프리셋</span>
+          <div className="grid grid-cols-2 gap-2">
+            {TACTICAL_PRESETS.map((p) => {
+              const active = activePreset?.key === p.key;
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  aria-pressed={active}
+                  className={`${TOUCH_TARGET_MIN} flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors ${
+                    active
+                      ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
+                      : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
+                  }`}
+                  onClick={() => applyPreset(p)}
+                >
+                  <span className="text-sm font-semibold">{p.label}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{p.description}</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-300">
+                    연 {p.backtest.cagrPct}% · 최대낙폭 {p.backtest.mddPct}%
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            2006~2026년 20년 백테스트(현금 국채 이자·거래비용 반영). 나스닥 강세기 기준이라 미래를
+            보장하지 않아요. 누르면 아래 값이 채워지고, 저장해야 반영돼요.
+          </p>
+        </div>
+
         {REGIME_ORDER.map((r, idx) => {
           const sum = sums[idx];
           const ok = sum != null && Math.abs(sum - 100) < 0.01;
@@ -222,6 +288,17 @@ export default function TacticalWeightsEditor({
         </div>
 
         <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold">매크로 신호 반영</span>
+            <ToggleSwitch checked={macro} onChange={setMacro} ariaLabel="매크로 신호 반영" />
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            끄면 SPY·QQQ 200일선 추세만으로 국면을 판단해요. 과거 백테스트에선 수익률이 더 높았지만
+            최근 10년 최대낙폭은 커졌어요.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">웅덩이 매수 투입폭</span>
           <SegmentedControl
             options={DIP_OPTIONS}
@@ -256,6 +333,7 @@ export default function TacticalWeightsEditor({
                 regime_weights: null,
                 tilt_shift_pct: DEFAULT_TILT_SHIFT_PCT,
                 dip_shift_pct: DEFAULT_DIP_SHIFT_PCT,
+                use_macro: true,
               })
             }
           >

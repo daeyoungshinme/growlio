@@ -43,6 +43,7 @@ function makeStatus(overrides: Partial<TacticalStatus> = {}): TacticalStatus {
     portfolio_name: "미국 전술",
     enabled: true,
     notify_enabled: true,
+    use_macro: true,
     macro_level: "GREEN",
     macro_freshness: "LIVE",
     technicals: {
@@ -300,8 +301,17 @@ describe("TacticalAllocationTab", () => {
         regime_weights: null,
         tilt_shift_pct: 15,
         dip_shift_pct: 0,
+        use_macro: true,
       }),
     );
+  });
+
+  it("매크로 반영을 끈 전략은 매크로 배지 대신 추세만 쓴다고 알린다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus({ use_macro: false }));
+    renderTab();
+    await openDetails();
+    expect(screen.getByText(/매크로 반영 안 함/)).toBeDefined();
+    expect(screen.queryByText("매크로(확정)")).toBeNull();
   });
 
   it("웅덩이 단계 배지와 이평선 이격을 보여준다", async () => {

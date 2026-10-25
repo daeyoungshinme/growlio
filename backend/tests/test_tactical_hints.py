@@ -18,14 +18,16 @@ class TestTransitionHints:
 
     def test_risk_on_shows_nearest_exit_and_macro(self):
         tech = {
-            "SPY": _snap(110.0, 105.0, 100.0, "UP"),  # 이탈선 99 → -10.0%
-            "QQQ": _snap(103.0, 101.0, 100.0, "UP"),  # 이탈선 99 → -3.9%
+            "SPY": _snap(110.0, 105.0, 100.0, "UP"),  # 이탈선 98 → -10.9%
+            "QQQ": _snap(103.0, 101.0, 100.0, "UP"),  # 이탈선 98 → -4.9%
         }
         hints = transition_hints("RISK_ON", "YELLOW", "LIVE", tech)
         assert [h["kind"] for h in hints] == ["TO_NEUTRAL", "TO_RISK_OFF"]
         assert hints[0]["text"].startswith("QQQ")
-        assert hints[0]["distance_pct"] == pytest.approx(-3.9)
+        assert hints[0]["distance_pct"] == pytest.approx(-4.9)
         assert hints[1]["distance_pct"] is None
+        # 매크로 반영을 끄면 매크로 안내가 빠진다
+        assert [h["kind"] for h in transition_hints("RISK_ON", "RED", "LIVE", tech, use_macro=False)] == ["TO_NEUTRAL"]
 
     def test_neutral_lists_missing_conditions(self):
         tech = {
@@ -47,6 +49,12 @@ class TestTransitionHints:
         on = next(h for h in hints if h["kind"] == "TO_RISK_ON")
         assert "SPY 50일선" in on["text"]
 
+    def test_neutral_without_macro_drops_macro_conditions(self):
+        tech = {"SPY": _snap(110.0, 105.0, 100.0, "UP"), "QQQ": _snap(98.0, 95.0, 100.0, "DOWN")}
+        hints = transition_hints("NEUTRAL", "YELLOW", "LIVE", tech, use_macro=False)
+        assert all("매크로" not in h["text"] for h in hints)
+        assert any("QQQ 50일선" in h["text"] for h in hints)
+
     def test_stale_macro_noted(self):
         tech = {"SPY": _snap(110.0, 105.0, 100.0, "UP"), "QQQ": _snap(110.0, 105.0, 100.0, "UP")}
         hints = transition_hints("NEUTRAL", "GREEN", "STALE", tech)
@@ -56,5 +64,8 @@ class TestTransitionHints:
         tech = {"SPY": _snap(95.0, 97.0, 100.0, "DOWN"), "QQQ": _snap(95.0, 97.0, 100.0, "DOWN")}
         hints = transition_hints("RISK_OFF", "RED", "LIVE", tech)
         assert hints[0]["text"].startswith("매크로")
-        assert hints[1]["distance_pct"] == pytest.approx(6.3)  # 101 / 95 - 1
+        assert hints[1]["distance_pct"] == pytest.approx(7.4)  # 102 / 95 - 1
+        # 매크로를 끄면 RED여도 매크로 해제 조건은 없다
+        no_macro = transition_hints("RISK_OFF", "RED", "LIVE", tech, use_macro=False)
+        assert [h["distance_pct"] for h in no_macro] == [pytest.approx(7.4)]
         assert transition_hints("RISK_OFF", "YELLOW", "LIVE", tech)[0]["kind"] == "TO_NEUTRAL"

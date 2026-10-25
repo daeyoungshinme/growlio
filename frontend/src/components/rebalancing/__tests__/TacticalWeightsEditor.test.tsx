@@ -14,8 +14,9 @@ function renderEditor(props: Partial<Parameters<typeof TacticalWeightsEditor>[0]
     <TacticalWeightsEditor
       regimeWeights={TABLE}
       isDefaultWeights
-      tiltShiftPct={10}
+      tiltShiftPct={0}
       dipShiftPct={0}
+      useMacro
       notifyEnabled
       saving={false}
       onSave={onSave}
@@ -64,6 +65,7 @@ describe("TacticalWeightsEditor", () => {
       regime_weights: { ...TABLE, RISK_ON: { QQQ: 60, SPY: 30, DIA: 0, QLD: 0, SSO: 0, CASH: 10 } },
       tilt_shift_pct: 20,
       dip_shift_pct: 0,
+      use_macro: true,
     });
   });
 
@@ -91,9 +93,9 @@ describe("TacticalWeightsEditor", () => {
 
   it("이동폭만 바꿔도 저장할 수 있다", () => {
     const { onSave } = renderEditor();
-    fireEvent.click(tiltOption("끔"));
+    fireEvent.click(tiltOption("10%p"));
     fireEvent.click(saveBtn());
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ tilt_shift_pct: 0 }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ tilt_shift_pct: 10 }));
   });
 
   it("웅덩이 투입폭을 저장한다", () => {
@@ -122,13 +124,64 @@ describe("TacticalWeightsEditor", () => {
   });
 
   it("직접 정한 비중표면 기본값으로 되돌릴 수 있다", () => {
-    const { onSave } = renderEditor({ isDefaultWeights: false, tiltShiftPct: 15, dipShiftPct: 20 });
+    const { onSave } = renderEditor({
+      isDefaultWeights: false,
+      tiltShiftPct: 15,
+      dipShiftPct: 20,
+      useMacro: false,
+    });
     fireEvent.click(screen.getByText("기본값으로"));
     expect(onSave).toHaveBeenCalledWith({
       notify_enabled: true,
       regime_weights: null,
-      tilt_shift_pct: 10,
+      tilt_shift_pct: 0,
       dip_shift_pct: 0,
+      use_macro: true,
     });
+  });
+
+  it("매크로 반영만 꺼도 저장할 수 있고, 매크로를 끈 상태면 기본값이 아니다", () => {
+    const { onSave } = renderEditor();
+    fireEvent.click(screen.getByLabelText("매크로 신호 반영"));
+    fireEvent.click(saveBtn());
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ use_macro: false }));
+  });
+
+  it("기본 비중표면 안정형 프리셋이 선택돼 있고, 다른 프리셋을 누르면 초안을 채운다", () => {
+    const { onSave } = renderEditor();
+    expect(screen.getByRole("button", { name: /안정형/ }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByText("연 12.6% · 최대낙폭 24.9%")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: /성장형/ }));
+    expect(screen.getByRole("button", { name: /성장형/ }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /안정형/ }).getAttribute("aria-pressed")).toBe(
+      "false",
+    );
+    expect(cell("공격 국면 QQQ 비중").value).toBe("80");
+    expect(cell("방어 국면 현금 비중").value).toBe("80");
+    expect(onSave).not.toHaveBeenCalled(); // 누르기만 해선 저장하지 않는다
+
+    fireEvent.click(saveBtn());
+    const payload = onSave.mock.calls[0][0];
+    expect(payload.use_macro).toBe(false);
+    expect(payload.regime_weights.NEUTRAL).toEqual({
+      QQQ: 50,
+      SPY: 20,
+      DIA: 0,
+      QLD: 0,
+      SSO: 0,
+      CASH: 30,
+    });
+  });
+
+  it("레버리지형 프리셋은 복리 감쇠 경고를 띄운다", () => {
+    renderEditor();
+    fireEvent.click(screen.getByRole("button", { name: /레버리지형/ }));
+    expect(cell("공격 국면 QLD 비중").value).toBe("60");
+    expect(screen.getByText(/레버리지 ETF라/)).toBeDefined();
   });
 });

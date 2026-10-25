@@ -1,6 +1,7 @@
 import type { SeriesData } from "@/api/backtest";
 import type {
   PullbackStage,
+  RegimeWeightsTable,
   TacticalBacktestResult,
   TacticalAsset,
   TacticalRegime,
@@ -88,11 +89,94 @@ export const TILT_LABEL: Record<TacticalTilt, string> = {
 
 export const TILT_ORDER: TacticalTilt[] = ["FAVOR_QQQ", "BALANCED", "FAVOR_SPY"];
 
-/** 백엔드 tactical_tilt.DEFAULT_TILT_SHIFT_PCT */
-export const DEFAULT_TILT_SHIFT_PCT = 10;
+/** 백엔드 tactical_tilt.DEFAULT_TILT_SHIFT_PCT — 기본은 끔(plans/70: 20년 MDD 악화·회전율의 1/3) */
+export const DEFAULT_TILT_SHIFT_PCT = 0;
 
 /** 백엔드 tactical_dip.DEFAULT_DIP_SHIFT_PCT — 기본은 끔 */
 export const DEFAULT_DIP_SHIFT_PCT = 0;
+
+export interface TacticalPreset {
+  key: "stable" | "balanced" | "growth" | "leveraged";
+  label: string;
+  description: string;
+  weights: RegimeWeightsTable;
+  tiltShiftPct: number;
+  dipShiftPct: number;
+  useMacro: boolean;
+  /** 2006~2026 20년 백테스트(현금 국채 이자·거래비용 0.1%·추세 밴드 2%) — plans/70 */
+  backtest: { cagrPct: number; mddPct: number; sharpe: number };
+}
+
+function presetTable(
+  on: Partial<Record<TacticalAsset, number>>,
+  neutral: Partial<Record<TacticalAsset, number>>,
+  off: Partial<Record<TacticalAsset, number>>,
+): RegimeWeightsTable {
+  const full = (w: Partial<Record<TacticalAsset, number>>) =>
+    Object.fromEntries(TACTICAL_ASSETS.map((a) => [a, w[a] ?? 0])) as Record<TacticalAsset, number>;
+  return { RISK_ON: full(on), NEUTRAL: full(neutral), RISK_OFF: full(off) };
+}
+
+const BALANCED_TABLE = presetTable(
+  { QQQ: 80, SPY: 20 },
+  { QQQ: 50, SPY: 20, CASH: 30 },
+  { SPY: 20, CASH: 80 },
+);
+
+/**
+ * 비중표 프리셋 — 신호의 질(샤프 0.74~0.85)은 거의 같고 수익↔낙폭 위치만 다르다(plans/70 스윕).
+ * 수치는 나스닥 강세기(2006~2026) 기준이라 사후 편향이 섞여 있다.
+ */
+export const TACTICAL_PRESETS: TacticalPreset[] = [
+  {
+    key: "stable",
+    label: "안정형",
+    description: "기본 비중표 · 매크로 반영",
+    weights: presetTable(
+      { QQQ: 50, SPY: 40, CASH: 10 },
+      { QQQ: 30, SPY: 40, CASH: 30 },
+      { QQQ: 10, SPY: 30, CASH: 60 },
+    ),
+    tiltShiftPct: 0,
+    dipShiftPct: 0,
+    useMacro: true,
+    backtest: { cagrPct: 10.4, mddPct: 24.9, sharpe: 0.84 },
+  },
+  {
+    key: "balanced",
+    label: "균형형",
+    description: "QQQ 중심 · 매크로 반영",
+    weights: BALANCED_TABLE,
+    tiltShiftPct: 0,
+    dipShiftPct: 0,
+    useMacro: true,
+    backtest: { cagrPct: 11.1, mddPct: 24.8, sharpe: 0.84 },
+  },
+  {
+    key: "growth",
+    label: "성장형",
+    description: "QQQ 중심 · 차트 추세만",
+    weights: BALANCED_TABLE,
+    tiltShiftPct: 0,
+    dipShiftPct: 0,
+    useMacro: false,
+    backtest: { cagrPct: 12.6, mddPct: 24.9, sharpe: 0.85 },
+  },
+  {
+    key: "leveraged",
+    label: "레버리지형",
+    description: "공격 국면 QLD 60% · 매크로 반영",
+    weights: presetTable(
+      { QQQ: 40, QLD: 60 },
+      { QQQ: 50, SPY: 30, CASH: 20 },
+      { SPY: 30, CASH: 70 },
+    ),
+    tiltShiftPct: 0,
+    dipShiftPct: 0,
+    useMacro: true,
+    backtest: { cagrPct: 15.2, mddPct: 36.9, sharpe: 0.74 },
+  },
+];
 
 /** 전환 조건 안내 꼬리말 — 백엔드 step_confirmation(서로 다른 날 2번 관측) */
 export const TRANSITION_CONFIRM_NOTE = "조건을 충족해도 다음 거래일에 한 번 더 확인돼야 전환돼요";

@@ -47,7 +47,7 @@ class TacticalStrategy(Base):
 
     # 나스닥/S&P 틸트(tactical_tilt) — 주식 몫 안에서 QQQ↔SPY로 옮길 %p(0이면 끔). 월 1회 갱신이라 확정 대기 없이
     # 그 달 첫 점검일의 판정을 그대로 쓴다.
-    tilt_shift_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="10")
+    tilt_shift_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="0")
     last_tilt: Mapped[str | None] = mapped_column(String(12), nullable=True)
     tilt_evaluated_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
@@ -56,6 +56,9 @@ class TacticalStrategy(Base):
     dip_shift_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="0")
     dip_level: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
     notified_dip_level: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
+
+    # False면 매크로 신호를 무시하고 차트 추세(SPY·QQQ 200일선)만으로 국면을 판정한다(plans/70)
+    use_macro: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
     # 분할 적용(fraction<1) 진행 중인 국면·적용일 — 같은 국면에서 "절반 먼저"가 두 번 눌려 75%가 되는 것을 막고
     # 화면에 "나머지 적용"을 띄운다. 전체 적용·확정 국면 변경 시 비운다.

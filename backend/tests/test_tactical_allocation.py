@@ -59,11 +59,12 @@ class TestIndicators:
         assert ti.classify_trend(close, s50, s200) == expected
 
     def test_trend_band_keeps_state_near_sma200(self):
-        # 200일선을 0.5% 밑돈 종가: 직전이 UP이면 밴드(1%) 안이라 UP 유지, 직전 상태가 없으면 NEUTRAL
-        assert ti.classify_trend(99.5, 105, 100, prev="UP") == "UP"
-        assert ti.classify_trend(99.5, 105, 100) == "NEUTRAL"
-        assert ti.classify_trend(98.9, 105, 100, prev="UP") == "NEUTRAL"  # 밴드 밖으로 이탈
-        assert ti.classify_trend(100.5, 95, 100, prev="DOWN") == "DOWN"
+        # 200일선을 1.5% 밑돈 종가: 직전이 UP이면 밴드(2%) 안이라 UP 유지, 직전 상태가 없으면 NEUTRAL
+        assert ti.TREND_BAND_PCT == 2.0
+        assert ti.classify_trend(98.5, 105, 100, prev="UP") == "UP"
+        assert ti.classify_trend(98.5, 105, 100) == "NEUTRAL"
+        assert ti.classify_trend(97.9, 105, 100, prev="UP") == "NEUTRAL"  # 밴드 밖으로 이탈
+        assert ti.classify_trend(101.5, 95, 100, prev="DOWN") == "DOWN"
         assert ti.classify_trend(99.5, 95, 100, prev="UP") == "DOWN"  # 데드크로스면 밴드와 무관
 
     def test_snapshot_uptrend(self):
@@ -224,9 +225,10 @@ class TestTilt:
         s = _strategy(last_tilt="FAVOR_QQQ", tilt_shift_pct=10)
         expected = {"QQQ": 40.0, "SPY": 30.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 30.0}
         assert tactical.proposed_weights_for(s, "NEUTRAL", {}) == expected
-        # 전략이 없으면 오늘 판정으로 미리보기, 이동폭은 기본값
+        # 전략이 없으면 오늘 판정으로 미리보기, 이동폭은 기본값(0 = 끔 — plans/70)
         preview = tactical.proposed_weights_for(None, "NEUTRAL", {"observed_tilt": "FAVOR_SPY"})
-        assert preview == {"QQQ": 20.0, "SPY": 50.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 30.0}
+        assert preview == tactical.DEFAULT_REGIME_WEIGHTS["NEUTRAL"]
+        assert tilt.DEFAULT_TILT_SHIFT_PCT == 0.0
         assert tactical.tilt_shift_of(_strategy(tilt_shift_pct=None)) == tilt.DEFAULT_TILT_SHIFT_PCT
 
     def test_reasons_mention_missing_data(self):

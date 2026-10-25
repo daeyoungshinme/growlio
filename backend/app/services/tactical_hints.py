@@ -98,8 +98,15 @@ def transition_hints(
     macro_level: str,
     macro_freshness: str,
     technicals: Mapping[str, Mapping[str, Any]],
+    *,
+    use_macro: bool = True,
 ) -> list[TransitionHint]:
-    """현재(확정, 없으면 관측) 국면에서 다음 전환 후보까지 남은 조건 — 가까운(중요한) 순. 판정 불가면 빈 목록."""
+    """현재(확정, 없으면 관측) 국면에서 다음 전환 후보까지 남은 조건 — 가까운(중요한) 순. 판정 불가면 빈 목록.
+
+    `use_macro=False`(매크로 반영 끔)면 매크로 조건은 늘 충족된 것으로 보고 매크로 관련 안내를 뺀다.
+    """
+    if not use_macro:
+        macro_level, macro_freshness = "GREEN", "LIVE"
     spy, qqq = technicals.get("SPY"), technicals.get("QQQ")
     spy_trend = spy.get("trend", "UNKNOWN") if spy else "UNKNOWN"
     qqq_trend = qqq.get("trend", "UNKNOWN") if qqq else "UNKNOWN"
@@ -128,7 +135,7 @@ def transition_hints(
             if tr == "UP" and (h := _exit_up(t, snap)) is not None
         ]
         exits.sort(key=lambda h: abs(h["distance_pct"] or 0))
-        return [*exits[:1], macro_red]
+        return [*exits[:1], macro_red] if use_macro else exits[:1]
 
     # NEUTRAL — 공격 진입에 빠진 조건 + 방어 후보까지
     missing = [
@@ -143,5 +150,6 @@ def transition_hints(
         hints.append({"kind": "TO_RISK_ON", "text": "공격 전환 조건: " + " · ".join(missing), "distance_pct": None})
     if spy_trend != "DOWN" and (h := _spy_down_hint(spy)):
         hints.append(h)
-    hints.append(macro_red)
+    if use_macro:
+        hints.append(macro_red)
     return hints

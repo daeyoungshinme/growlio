@@ -23,8 +23,9 @@ RSI_PERIOD = 14
 MACD_FAST, MACD_SLOW, MACD_SIGNAL = 12, 26, 9
 HIGH_LOOKBACK = 252  # 52주 거래일
 # 추세 히스테리시스 — 이미 UP(DOWN)인 상태는 종가가 200일선 아래(위)로 이 비율 이상 벗어나야 이탈한다.
-# 200일선 근처에서 종가가 위아래로 오가며 국면이 하루 단위로 뒤집히던 왕복을 줄인다.
-TREND_BAND_PCT = 1.0
+# 200일선 근처에서 종가가 위아래로 오가며 국면이 하루 단위로 뒤집히던 왕복을 줄인다. 1%→2%(plans/70): 20년 성과는
+# 같고(CAGR·MDD·샤프 ±0.1) 국면 전환이 94→75회로 줄어 매매·세금 부담이 준다.
+TREND_BAND_PCT = 2.0
 
 
 class TechnicalSnapshot(TypedDict):

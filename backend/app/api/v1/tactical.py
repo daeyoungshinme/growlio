@@ -37,6 +37,8 @@ class TacticalStrategyUpsert(BaseModel):
     tilt_shift_pct: float = Field(DEFAULT_TILT_SHIFT_PCT, ge=0, le=MAX_TILT_SHIFT_PCT)
     # 눌림목(웅덩이) 현금 투입 최대폭(%p) — 0이면 끔
     dip_shift_pct: float = Field(DEFAULT_DIP_SHIFT_PCT, ge=0, le=MAX_DIP_SHIFT_PCT)
+    # False면 매크로 신호를 무시하고 차트 추세만으로 국면 판정
+    use_macro: bool = True
 
     @field_validator("regime_weights")
     @classmethod
@@ -105,6 +107,7 @@ async def upsert_tactical_strategy(
     strategy.regime_weights = body.regime_weights
     strategy.tilt_shift_pct = Decimal(str(body.tilt_shift_pct))
     strategy.dip_shift_pct = Decimal(str(body.dip_shift_pct))
+    strategy.use_macro = body.use_macro
 
     cache = await get_cache_store()
     market = await tactical.evaluate_market(cache, db)
@@ -205,6 +208,7 @@ async def backtest_tactical_rules(
             await get_cache_store(),
             tilt_shift_pct=tactical.tilt_shift_of(strategy),
             dip_shift_pct=tactical.dip_shift_of(strategy),
+            use_macro=tactical.uses_macro(strategy),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc

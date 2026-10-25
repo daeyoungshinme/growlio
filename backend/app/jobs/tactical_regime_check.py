@@ -113,7 +113,7 @@ async def _notify_regime(db, strategy: TacticalStrategy, market: dict) -> bool:
             old_label,
             new_label,
             weights_text,
-            tactical.observed_for(market, regime)[1],
+            tactical.observed_for(market, regime, tactical.uses_macro(strategy))[1],
             portfolio_id=str(portfolio.id),
         ),
         push_title=f"전술 배분: {new_label} 국면",

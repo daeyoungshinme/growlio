@@ -45,6 +45,8 @@ export interface TacticalStatus {
   portfolio_name: string;
   enabled: boolean;
   notify_enabled: boolean;
+  /** false면 매크로를 무시하고 차트 추세만으로 국면 판정(전략별 옵션, plans/70) */
+  use_macro: boolean;
   macro_level: MarketRiskLevel;
   macro_freshness: "LIVE" | "CACHED" | "PARTIAL" | "STALE";
   technicals: Partial<Record<"QQQ" | "SPY" | "DIA", TechnicalSnapshot>>;
@@ -85,10 +87,12 @@ export interface TacticalStatus {
 export interface TacticalStrategyPayload {
   notify_enabled: boolean;
   regime_weights?: RegimeWeightsTable | null;
-  /** 생략하면 서버 기본값(10)으로 저장되므로 설정 변경 시에는 현재 값을 함께 보낸다 */
+  /** 생략하면 서버 기본값(0 = 끔)으로 저장되므로 설정 변경 시에는 현재 값을 함께 보낸다 */
   tilt_shift_pct?: number;
   /** 생략하면 0(끔)으로 저장되므로 설정 변경 시에는 현재 값을 함께 보낸다 */
   dip_shift_pct?: number;
+  /** 생략하면 true(매크로 반영)로 저장되므로 설정 변경 시에는 현재 값을 함께 보낸다 */
+  use_macro?: boolean;
 }
 
 export interface TacticalBacktestMetric {

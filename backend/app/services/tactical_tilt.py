@@ -9,7 +9,8 @@
 상대강도 +1% 초과 → QQQ 우위, 그 외·데이터 결측 → 균형. 판정은 **월 1회**(그 달 첫 점검일)만 갱신한다 —
 매일 갱신하면 백테스트 10년 틸트 변경이 130회를 넘어(매번 매매 발생) 국면 완충 효과를 상쇄했다.
 백테스트 실측(10년): CAGR +0.3%p·샤프 +0.02, 20년은 MDD가 약 2.7%p 악화 — 약한 신호라 이동폭은 사용자가
-0(끔)~20%p로 조절한다.
+0(끔)~20%p로 조절한다. 현금 이자·거래비용 반영 후(plans/70)에도 20년 MDD 24.7→27.7 악화·회전율의 약 1/3을 차지해
+**기본값은 끔(0)**이다(기존 전략에 저장된 값은 유지).
 
 순수 함수 + 입력 조회(캐시). 국면 상태 갱신은 tactical_allocation_service.
 """
@@ -34,7 +35,7 @@ Tilt = Literal["FAVOR_QQQ", "BALANCED", "FAVOR_SPY"]
 TILTS: tuple[Tilt, ...] = ("FAVOR_QQQ", "BALANCED", "FAVOR_SPY")
 TILT_LABELS: dict[str, str] = {"FAVOR_QQQ": "나스닥 우위", "BALANCED": "균형", "FAVOR_SPY": "S&P500 우위"}
 
-DEFAULT_TILT_SHIFT_PCT = 10.0
+DEFAULT_TILT_SHIFT_PCT = 0.0
 MAX_TILT_SHIFT_PCT = 20.0
 
 REAL_YIELD_LOOKBACK = 20  # 거래일
