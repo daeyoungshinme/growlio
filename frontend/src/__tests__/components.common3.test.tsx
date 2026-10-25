@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import * as Sentry from "@sentry/react";
+import { captureException } from "@/lib/sentry";
 
 // Mock Sentry
-vi.mock("@sentry/react", () => ({
+vi.mock("@/lib/sentry", () => ({
   captureException: vi.fn(),
 }));
 
@@ -77,7 +77,7 @@ describe("ErrorBoundary", () => {
         <BrokenComponent shouldThrow />
       </ErrorBoundary>,
     );
-    expect(Sentry.captureException).toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalled();
   });
 
   it("retry button resets error state (section variant)", () => {

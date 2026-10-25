@@ -1,4 +1,3 @@
-import "./lib/sentry";
 import { QueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import {
@@ -14,6 +13,7 @@ import { STALE_TIME, PERSIST_CACHE_KEY, FOCUS_REFETCH_MIN_AGE } from "./constant
 import { getLocalStorageOrUndefined } from "./utils/safeStorage";
 import { QUERY_KEYS } from "./constants/queryKeys";
 import { setupServiceWorker } from "./lib/serviceWorker";
+import { initSentryDeferred } from "./lib/sentry";
 
 setupServiceWorker();
 
@@ -72,3 +72,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </PersistQueryClientProvider>
   </React.StrictMode>,
 );
+
+// 첫 렌더를 먼저 — Sentry는 유휴 시간에 로드(lib/sentry.ts)
+initSentryDeferred();
