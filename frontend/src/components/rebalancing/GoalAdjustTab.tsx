@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import type { PortfolioItem } from "@/api/portfolios";
 import Tabs from "@/components/common/Tabs";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -7,8 +7,10 @@ import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
 import { useSelectedPortfolio } from "@/hooks/useSelectedPortfolio";
 import { GOAL_MODES, type GoalMode } from "@/utils/rebalancingUrl";
 
-const RecommendationCard = lazy(() => import("./RecommendationCard"));
-const TacticalAllocationTab = lazy(() => import("./TacticalAllocationTab"));
+const loadRecommendationCard = () => import("./RecommendationCard");
+const loadTacticalAllocationTab = () => import("./TacticalAllocationTab");
+const RecommendationCard = lazy(loadRecommendationCard);
+const TacticalAllocationTab = lazy(loadTacticalAllocationTab);
 
 const MODE_INTRO: Record<GoalMode, string> = {
   추천: "목표 수익률·연령대·투자 기간에 맞춘 추천 비중을 포트폴리오 목표로 적용해요.",
@@ -46,6 +48,11 @@ export default function GoalAdjustTab({
   // 추천·전술이 같은 대상 포트폴리오를 보도록 선택기는 여기 하나만 둔다(plans/64 S2)
   const { portfolios, anchoredIds, selectedId } = useSelectedPortfolio(selectedPortfolioId);
 
+  // 반대쪽 모드 청크를 미리 받아 서브탭 전환 시 청크 대기가 없게 한다
+  useEffect(() => {
+    void (mode === "추천" ? loadTacticalAllocationTab() : loadRecommendationCard());
+  }, [mode]);
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
@@ -76,7 +83,9 @@ export default function GoalAdjustTab({
         </label>
       )}
 
-      <ErrorBoundary variant="section">
+      {/* 라우터가 URL 변경을 startTransition으로 감싸서, 이미 그려진 경계는 새 청크 로딩 동안
+          이전 화면을 붙잡는다(탭 하이라이트까지 늦게 바뀜). 모드별 key로 새 경계를 만들어 즉시 fallback */}
+      <ErrorBoundary variant="section" key={mode}>
         <Suspense fallback={<SkeletonCard />}>
           {mode === "추천" ? (
             <RecommendationCard

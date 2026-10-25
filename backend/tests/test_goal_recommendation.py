@@ -49,7 +49,7 @@ from app.services.recommendation_universe import (
     resolve_index_region,
     resolve_tracking_index,
 )
-from app.utils.cache_keys import daily_returns_key, goal_recommendation_key
+from app.utils.cache_keys import daily_returns_key, goal_recommendation_key, goal_recommendation_stale_key
 from app.utils.kst import today_kst
 
 
@@ -2137,6 +2137,7 @@ class TestGetGoalRecommendation:
         # 결과 1건 + 심볼별 일별수익률(SPY·QQQ) 캐시
         keys = [c.args[0] for c in mock_cache.setex.await_args_list]
         assert keys.count(goal_recommendation_key(settings_row.user_id)) == 1
+        assert keys.count(goal_recommendation_stale_key(settings_row.user_id)) == 1
         assert sorted(k for k in keys if "daily_returns" in k) == sorted(
             [daily_returns_key("QQQ"), daily_returns_key("SPY")]
         )
@@ -4467,3 +4468,65 @@ class TestComputeRecommendationDrift:
         current = [("069500", "KOSDAQ", 100.0)]
         max_delta_pct, new_candidate_count = compute_recommendation_drift(recommended, current)
         assert new_candidate_count == 1
+
+
+class TestRefreshGoalRecommendationInBackground:
+    """stale 응답 뒤 백그라운드 재계산(plans/66)."""
+
+    async def test_recomputes_with_own_session(self):
+        from app.core.cache_store import CacheStore
+        from app.services.goal_recommendation_service import refresh_goal_recommendation_in_background
+
+        uid = uuid.uuid4()
+        session = AsyncMock()
+        session_cm = MagicMock()
+        session_cm.__aenter__ = AsyncMock(return_value=session)
+        session_cm.__aexit__ = AsyncMock(return_value=False)
+        with (
+            patch("app.services.goal_recommendation_service.AsyncSessionLocal", return_value=session_cm),
+            patch(
+                "app.services.goal_recommendation_service.get_overall_goal_recommendation_for_user",
+                new_callable=AsyncMock,
+            ) as mock_compute,
+        ):
+            await refresh_goal_recommendation_in_background(uid, CacheStore())
+
+        mock_compute.assert_awaited_once()
+        assert mock_compute.call_args.args[:2] == (uid, session)
+
+    async def test_skips_when_refresh_already_running(self):
+        from app.core.cache_store import CacheStore
+        from app.services.goal_recommendation_service import refresh_goal_recommendation_in_background
+
+        uid = uuid.uuid4()
+        cache = CacheStore()
+        await cache.set(f"refresh:{goal_recommendation_key(uid)}", "other", nx=True, ex=60)
+        with patch(
+            "app.services.goal_recommendation_service.get_overall_goal_recommendation_for_user",
+            new_callable=AsyncMock,
+        ) as mock_compute:
+            await refresh_goal_recommendation_in_background(uid, cache)
+
+        mock_compute.assert_not_called()
+
+    async def test_failure_is_swallowed_and_lock_released(self):
+        from app.core.cache_store import CacheStore
+        from app.services.goal_recommendation_service import refresh_goal_recommendation_in_background
+
+        uid = uuid.uuid4()
+        cache = CacheStore()
+        session_cm = MagicMock()
+        session_cm.__aenter__ = AsyncMock(return_value=AsyncMock())
+        session_cm.__aexit__ = AsyncMock(return_value=False)
+        with (
+            patch("app.services.goal_recommendation_service.AsyncSessionLocal", return_value=session_cm),
+            patch(
+                "app.services.goal_recommendation_service.get_overall_goal_recommendation_for_user",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("yahoo down"),
+            ),
+        ):
+            await refresh_goal_recommendation_in_background(uid, cache)
+
+        # 다음 stale 응답이 다시 갱신을 시도할 수 있어야 한다
+        assert await cache.get(f"refresh:{goal_recommendation_key(uid)}") is None

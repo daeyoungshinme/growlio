@@ -34,15 +34,13 @@ from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services._account_queries import active_accounts_stmt
 from app.services._portfolio_queries import get_linked_portfolios
-from app.services.goal_candidate_service import existing_items_from_positions
 from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal_recommendation_service import (
     _RECOMMENDATION_DRIFT_THRESHOLD_PCT,
+    build_overall_recommendation_inputs,
     compute_recommendation_drift,
     get_goal_recommendation,
 )
-from app.services.portfolio_service import build_portfolio_overview
-from app.services.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import CacheStoreType
 from app.utils.kst import today_kst
 
@@ -109,14 +107,7 @@ async def _find_drifted_portfolios(
         return max_delta_pct >= _RECOMMENDATION_DRIFT_THRESHOLD_PCT or new_candidate_count > 0
 
     # 전체(overall) 경로 — /rebalancing?rtab=포트폴리오의 "전체" 탭과 동일한 입력 구성
-    overview = await build_portfolio_overview(user_id, db, cache=cache)
-    real_estate_krw = next(
-        (item["amount_krw"] for item in overview.get("asset_type_allocation", []) if item.get("type") == "REAL_ESTATE"),
-        0.0,
-    )
-    base_krw = float(overview.get("total_assets_krw", 0)) - real_estate_krw
-    pos_map = await query_latest_position_map(user_id, db, include_name=True)
-    existing_items = existing_items_from_positions(pos_map)
+    base_krw, existing_items = await build_overall_recommendation_inputs(user_id, db, cache)
     overall_rec = await get_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
     if overall_rec.recommended_items:
         overall_target = next((p for p in portfolios if _is_full_target(p, stock_accounts)), None)

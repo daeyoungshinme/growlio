@@ -197,7 +197,11 @@ class TestInvalidateAssetAccountCachesGoalRecommendation:
 
     @pytest.mark.asyncio
     async def test_positions_changed_invalidates_goal_recommendation(self, override_settings):
-        from app.utils.cache_keys import goal_recommendation_key, invalidate_asset_account_caches
+        from app.utils.cache_keys import (
+            goal_recommendation_key,
+            goal_recommendation_stale_key,
+            invalidate_asset_account_caches,
+        )
 
         cache = AsyncMock()
         cache.scan = AsyncMock(return_value=(0, []))
@@ -205,13 +209,17 @@ class TestInvalidateAssetAccountCachesGoalRecommendation:
 
         await invalidate_asset_account_caches(cache, uid)
 
-        assert goal_recommendation_key(uid) in self._deleted_keys(cache)
+        deleted = self._deleted_keys(cache)
+        assert goal_recommendation_key(uid) in deleted
+        # 보유 종목이 바뀌면 stale 결과도 틀린 답이라 함께 지운다(plans/66)
+        assert goal_recommendation_stale_key(uid) in deleted
 
     @pytest.mark.asyncio
     async def test_positions_unchanged_keeps_goal_recommendation(self, override_settings):
         from app.utils.cache_keys import (
             dashboard_summary_key,
             goal_recommendation_key,
+            goal_recommendation_stale_key,
             invalidate_asset_account_caches,
         )
 
@@ -223,7 +231,27 @@ class TestInvalidateAssetAccountCachesGoalRecommendation:
 
         deleted = self._deleted_keys(cache)
         assert goal_recommendation_key(uid) not in deleted
+        assert goal_recommendation_stale_key(uid) not in deleted
         assert dashboard_summary_key(uid) in deleted
+
+
+class TestInvalidateGoalRecommendationCaches:
+    @pytest.mark.asyncio
+    async def test_settings_change_invalidates_stale_result_too(self, override_settings):
+        """목표·후보·옵션 변경 후 stale 결과를 돌려주면 바뀌기 전 설정의 답이 보인다 — 함께 지운다."""
+        from app.utils.cache_keys import (
+            goal_recommendation_key,
+            goal_recommendation_stale_key,
+            invalidate_goal_recommendation_caches,
+        )
+
+        cache = AsyncMock()
+        uid = uuid.uuid4()
+
+        await invalidate_goal_recommendation_caches(cache, uid)
+
+        deleted = {k for call in cache.delete.call_args_list for k in call.args}
+        assert {goal_recommendation_key(uid), goal_recommendation_stale_key(uid)} <= deleted
 
 
 class TestInvalidateUserCaches:
