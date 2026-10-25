@@ -58,6 +58,9 @@ export default defineConfig({
       : []),
     VitePWA({
       registerType: "autoUpdate",
+      // 등록은 main.tsx가 직접 한다(src/lib/serviceWorker.ts) — 기본 registerSW.js 주입은 Capacitor WebView에서도
+      // SW를 등록해 API 응답이 SW 캐시를 거치고, 앱 업데이트 후 낡은 index.html이 남을 위험이 있었다.
+      injectRegister: null,
       manifest: {
         name: "Growlio",
         short_name: "Growlio",

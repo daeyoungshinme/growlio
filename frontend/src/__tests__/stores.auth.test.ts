@@ -241,6 +241,35 @@ describe("authStore — checkAuth", () => {
     expect(state.isAuthenticated).toBe(true);
   });
 
+  it("낙관적 로그인 상태에서 /auth/me가 네트워크 오류면 로그아웃하지 않는다", async () => {
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
+      data: { session: { user: { id: "user-net", email: "n@example.com" }, access_token: "t" } },
+      error: null,
+    } as never);
+    vi.mocked(api.get).mockRejectedValue(new Error("Network Error"));
+    useAuthStore.setState({ isAuthenticated: true, userId: "user-net", isAuthChecking: false });
+
+    await useAuthStore.getState().checkAuth();
+
+    const state = useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.email).toBe("n@example.com");
+  });
+
+  it("로그인 전 상태에서 /auth/me가 네트워크 오류면 로그아웃 처리한다", async () => {
+    vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
+      data: { session: { user: { id: "user-net2", email: "n@example.com" }, access_token: "t" } },
+      error: null,
+    } as never);
+    vi.mocked(api.get).mockRejectedValue(new Error("Network Error"));
+    useAuthStore.setState({ isAuthenticated: false, userId: null, isAuthChecking: true });
+
+    await useAuthStore.getState().checkAuth();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().isAuthChecking).toBe(false);
+  });
+
   it("세션 있고 /auth/me가 401이면 sync-profile 후 재시도한다", async () => {
     vi.mocked(mockSupabaseAuth.getSession).mockResolvedValue({
       data: {

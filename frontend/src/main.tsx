@@ -12,6 +12,9 @@ import App from "./App";
 import "./index.css";
 import { STALE_TIME, PERSIST_CACHE_KEY } from "./constants/queryConfig";
 import { getLocalStorageOrUndefined } from "./utils/safeStorage";
+import { setupServiceWorker } from "./lib/serviceWorker";
+
+setupServiceWorker();
 
 const queryClient = new QueryClient({
   defaultOptions: {
