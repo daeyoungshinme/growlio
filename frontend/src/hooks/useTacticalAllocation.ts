@@ -50,11 +50,20 @@ export function useTacticalMutations(portfolioId: string) {
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });
 
+  /** 인자 dcaLinked — 자동매수가 전술 연동이었으면 서버가 일반 모드로 되돌리므로 안내·알림 목록 갱신 */
   const disable = useMutation({
-    mutationFn: () => deleteTacticalStrategy(portfolioId),
-    onSuccess: async () => {
-      toast("전술 배분을 껐습니다. 포트폴리오 목표 비중은 그대로 유지됩니다.", "info");
+    mutationFn: (_opts?: { dcaLinked?: boolean }) => deleteTacticalStrategy(portfolioId),
+    onSuccess: async (_data, opts) => {
+      toast(
+        opts?.dcaLinked
+          ? "전술 배분을 껐습니다. 전술 연동 자동매수는 일반 모드로 바뀌었어요."
+          : "전술 배분을 껐습니다. 포트폴리오 목표 비중은 그대로 유지됩니다.",
+        "info",
+      );
       await invalidateTacticalData(queryClient);
+      if (opts?.dcaLinked) {
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts });
+      }
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });

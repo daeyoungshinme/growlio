@@ -35,6 +35,7 @@ from app.services.rebalancing.order_builder import (
     filter_drifting_items,
     is_market_signal_blocking_auto_mode,
     refresh_live_prices,
+    tactical_regime_for_gate,
 )
 from app.utils.cache_keys import TTL_COMPOSITE_ALERT_SENT, composite_alert_sent_key
 from app.utils.durable_state import get_durable, set_durable
@@ -142,7 +143,8 @@ async def _process_rebalancing_alert(
     # 시장 신호 기반 자동 실행 게이트
     if mode == "AUTO":
         market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-        if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness):
+        tactical_regime = await tactical_regime_for_gate(alert, db)
+        if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness, tactical_regime):
             logger.info(
                 "rebalancing_auto_skipped_market_signal",
                 alert_id=str(alert.id),
@@ -382,8 +384,13 @@ async def _check_one_rebalancing_alert(row, composite_level, market_data_freshne
     automation_note = None
     if getattr(alert, "mode", "NOTIFY") == "AUTO":
         market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-        if is_market_signal_blocking_auto_mode(market_mode, composite_level, market_data_freshness):
-            automation_note = f"시장 위험 신호({composite_level})로 이번엔 자동 실행 대신 알림만 발송됐습니다."
+        tactical_regime = await tactical_regime_for_gate(alert, db)
+        if is_market_signal_blocking_auto_mode(market_mode, composite_level, market_data_freshness, tactical_regime):
+            automation_note = (
+                "전술 배분이 방어 국면이라 이번엔 자동 매수 대신 알림만 발송됐습니다."
+                if market_mode == "TACTICAL"
+                else f"시장 위험 신호({composite_level})로 이번엔 자동 실행 대신 알림만 발송됐습니다."
+            )
 
     email = notification_email or user_email
     triggered = await _process_rebalancing_alert(

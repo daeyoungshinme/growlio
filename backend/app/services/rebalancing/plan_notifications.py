@@ -187,7 +187,12 @@ async def notify_market_signal_gate_blocked(
         except Exception as exc:
             logger.error("market_signal_gate_blocked_email_error", alert_id=str(alert.id), error=str(exc))
 
-    push_body = f"시장신호 게이트({blocked.composite_level})로 이번 계획을 만들지 않았습니다."
+    tactical = blocked.market_condition_mode == "TACTICAL"
+    push_body = (
+        "전술 배분이 방어 국면이라 이번 적립 매수를 보류했어요. 다음 매수일에 함께 매수해요."
+        if tactical
+        else f"시장신호 게이트({blocked.composite_level})로 이번 계획을 만들지 않았습니다."
+    )
     try:
         await send_push_to_user(
             user_id=alert.user_id,
@@ -199,7 +204,11 @@ async def notify_market_signal_gate_blocked(
     except Exception as exc:
         logger.warning("market_signal_gate_blocked_push_failed", alert_id=str(alert.id), error=str(exc))
 
-    history_message = f"리밸런싱 자동화 보류(시장신호 게이트): {portfolio.name} — 현재 신호 {blocked.composite_level}"
+    history_message = (
+        f"적립 매수 보류(전술 방어 국면): {portfolio.name}"
+        if tactical
+        else f"리밸런싱 자동화 보류(시장신호 게이트): {portfolio.name} — 현재 신호 {blocked.composite_level}"
+    )
     await save_alert_history(db, alert.user_id, "REBALANCING", history_message)
     await db.commit()
 

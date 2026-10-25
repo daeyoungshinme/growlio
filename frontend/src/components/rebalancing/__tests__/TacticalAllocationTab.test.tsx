@@ -22,13 +22,20 @@ vi.mock("@/api/tactical", () => ({
   fetchTacticalBacktest: vi.fn(),
 }));
 
+vi.mock("@/api/alerts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/api/alerts")>();
+  return { ...actual, fetchRebalancingAlerts: vi.fn().mockResolvedValue([]) };
+});
+
 vi.mock("@/utils/queryInvalidation", () => ({
   invalidateTacticalData: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
 
+import * as alertsApi from "@/api/alerts";
 import * as tacticalApi from "@/api/tactical";
+import { MemoryRouter } from "react-router-dom";
 import TacticalAllocationTab from "@/components/rebalancing/TacticalAllocationTab";
 
 const DEFAULT_TABLE = {
@@ -114,9 +121,11 @@ function makeStatus(overrides: Partial<TacticalStatus> = {}): TacticalStatus {
 function renderTab(onGoToExecution = vi.fn()) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <QueryClientProvider client={qc}>
-      <TacticalAllocationTab onGoToExecution={onGoToExecution} />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <TacticalAllocationTab onGoToExecution={onGoToExecution} />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
   return { onGoToExecution };
 }
@@ -129,6 +138,7 @@ async function openDetails() {
 describe("TacticalAllocationTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(alertsApi.fetchRebalancingAlerts).mockResolvedValue([]);
     localStorage.clear(); // 접힘 상태 기억(useCollapsible)이 테스트 사이에 새지 않게
   });
 
@@ -435,5 +445,55 @@ describe("TacticalAllocationTab", () => {
 
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "p2" } });
     await waitFor(() => expect(tacticalApi.fetchTacticalStatus).toHaveBeenCalledWith("p2"));
+  });
+  function dcaAlert(market_condition_mode: alertsApi.MarketConditionMode) {
+    return {
+      portfolio_id: "p1",
+      is_active: true,
+      mode: "AUTO",
+      strategy: "BUY_ONLY",
+      market_condition_mode,
+      threshold_pct: 0.5,
+    } as unknown as alertsApi.RebalancingAlert;
+  }
+
+  it("적립 자동매수 포트폴리오면 비중 적용 대신 전술 연동을 권하는 안내를 보여준다", async () => {
+    vi.mocked(alertsApi.fetchRebalancingAlerts).mockResolvedValue([dcaAlert("DISABLED")]);
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
+    renderTab();
+    expect(await screen.findByText("적립 자동매수 중인 포트폴리오예요")).toBeDefined();
+    const link = screen.getByText("자동매수 설정 열기").closest("a");
+    expect(link?.getAttribute("href")).toContain("openAlert=1");
+  });
+
+  it("전술 연동 중이면 적립 보조 모드 문구를 보여주고 방어 국면엔 매수 보류를 알린다", async () => {
+    vi.mocked(alertsApi.fetchRebalancingAlerts).mockResolvedValue([dcaAlert("TACTICAL")]);
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({ confirmed_regime: "RISK_OFF", observed_regime: "RISK_OFF" }),
+    );
+    renderTab();
+    expect(await screen.findByText(/이번 적립 매수는 보류돼요/)).toBeDefined();
+    expect(screen.getByText(/적립 보조 모드/)).toBeDefined();
+    expect(screen.queryByText("적립 자동매수 중인 포트폴리오예요")).toBeNull();
+  });
+
+  it("전술 연동 중 공격 국면이면 적립 정상 진행으로 안내한다", async () => {
+    vi.mocked(alertsApi.fetchRebalancingAlerts).mockResolvedValue([dcaAlert("TACTICAL")]);
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
+    renderTab();
+    expect(await screen.findByText(/적립 매수 정상 진행 · 공격 국면/)).toBeDefined();
+  });
+
+  it("전술 연동 중에 전술 배분을 끄면 연동 해제 안내와 함께 끈다", async () => {
+    vi.mocked(alertsApi.fetchRebalancingAlerts).mockResolvedValue([dcaAlert("TACTICAL")]);
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
+    vi.mocked(tacticalApi.deleteTacticalStrategy).mockResolvedValue(undefined as never);
+    renderTab();
+    await screen.findByText(/적립 보조 모드/);
+    fireEvent.click(screen.getByText("전술 배분 끄기"));
+    const { toast } = await import("@/utils/toast");
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(expect.stringContaining("일반 모드로 바뀌었어요"), "info"),
+    );
   });
 });

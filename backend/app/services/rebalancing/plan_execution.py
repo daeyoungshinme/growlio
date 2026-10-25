@@ -288,7 +288,7 @@ async def _run_due_buy_leg(
 ) -> bool:
     """대기시간이 지난 BUY leg 1건을 만료·보류·실행한다. 처리(만료 또는 실행)했으면 True."""
     from app.models.alert import RebalancingAlert
-    from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
+    from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode, tactical_regime_for_gate
     from app.utils.market_hours import is_korean_market_open, is_us_market_open
 
     locked = await db.scalar(select(RebalancingPlanLeg).where(RebalancingPlanLeg.id == leg_id).with_for_update())
@@ -311,7 +311,8 @@ async def _run_due_buy_leg(
     plan_alert_id = getattr(plan, "alert_id", None)
     alert = await db.get(RebalancingAlert, plan_alert_id) if plan_alert_id else None
     market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-    if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness):
+    tactical_regime = await tactical_regime_for_gate(alert, db)
+    if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness, tactical_regime):
         logger.info(
             "rebalancing_plan_buy_execution_skipped_market_signal",
             leg_id=str(locked.id),

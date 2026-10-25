@@ -53,6 +53,7 @@ class MarketSignalGateBlocked:
     composite_level: str
     market_condition_mode: str
     data_freshness: str
+    tactical_regime: str | None = None
 
 
 @dataclass(frozen=True)

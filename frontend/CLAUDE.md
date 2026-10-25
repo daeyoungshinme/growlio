@@ -183,6 +183,7 @@ _리밸런싱/추천_
 - `useAnalysisState.ts`는 `AnalysisPanel`(포트폴리오 1개 전용 — 다중선택 잔재 제거, plans/64 S3)이 사용. 포트폴리오 탭 분석 영역은 기본 선택으로 열려도 결과로 자동 스크롤하지 않고(`scrollToResult`), URL로 직접 고른 경우만 스크롤
 - `useRebalancingUrlState.ts` — 리밸런싱 페이지 URL 상태(rtab·gmode·portfolioId 읽기, `navigateTo`/`clearParam` 쓰기). 탭은 state로 복사하지 않고 URL에서 파생
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
+- `useDcaTacticalLink.ts` — 포트폴리오 자동매수가 적립식(활성 AUTO + BUY_ONLY)인지·전술 연동(`market_condition_mode="TACTICAL"`)인지 `{dcaAuto, linked}`. 전술 탭이 "비중 적용 대신 전술 연동 권장" 안내·적립 보조 모드 "지금 할 일"(`tacticalNextAction(..., {dcaLinked})`)·끄기 토스트에 사용(plans/71)
 - `useAutoExecutionNotice.ts` — 포트폴리오에 켜진 AUTO 알림이 있으면 "다음 자동 실행부터 새 목표로 주문" 안내 문구(없으면 null). 목표 비중을 바꾸는 확인창(추천 적용·전술 적용)에서 사용
 - `useSyncAccounts.ts` — 여러 계좌 동기화 + 동기화 쿼리 무효화(`run`이 전부 성공 여부 반환). 리밸런싱 실행 결과·분석 하단 "계좌 데이터 갱신"·실행 후 "실행 전 기준" 배너가 공유하며, 성공 시 호출부가 바로 재분석
 - `useRebalancingExecution.ts` — 리밸런싱 주문 실행 훅의 공개 진입점(barrel re-export). 실제 구현은 `rebalancingExecution/`(`index.ts`/`reducer.ts`/`types.ts`) 패키지에 있지만, 모든 소비 코드는 이 파일을 통해서만 import — 패키지를 직접 import 금지

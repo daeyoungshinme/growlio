@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { ListChecks } from "lucide-react";
 import { fetchPortfolios } from "@/api/portfolios";
 import type { TacticalStatus, TechnicalSnapshot } from "@/api/tactical";
@@ -14,9 +15,11 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { useCollapsible } from "@/hooks/useCollapsible";
+import { useDcaTacticalLink } from "@/hooks/useDcaTacticalLink";
 import { useTacticalMutations, useTacticalStatus } from "@/hooks/useTacticalAllocation";
 import { extractErrorMessage } from "@/utils/error";
 import { localToday, parseYmd } from "@/utils/format";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { toast } from "@/utils/toast";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 import { useAutoExecutionNotice } from "@/hooks/useAutoExecutionNotice";
@@ -335,7 +338,8 @@ function TacticalStatusView({
     status.partial_regime != null && status.partial_regime === status.confirmed_regime;
   const fullyApplied = alreadyApplied || justApplied === 1;
   const showGoToExecution = fullyApplied || justApplied != null || partialActive;
-  const nextAction = tacticalNextAction(status, fullyApplied);
+  const { dcaAuto, linked } = useDcaTacticalLink(status.portfolio_id);
+  const nextAction = tacticalNextAction(status, fullyApplied, undefined, { dcaLinked: linked });
   const days = status.enabled ? regimeDayCount(status.regime_changed_at) : null;
   const hints = status.transition_hints.slice(0, 2);
 
@@ -397,6 +401,34 @@ function TacticalStatusView({
           </p>
         )}
 
+        {/* 적립식 코어 + 전술 보조(plans/71) — 적립 자동매수 포트폴리오엔 비중 적용(매도)보다 매수 보류 연동을 권한다 */}
+        {dcaAuto && !linked && (
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-xs text-blue-900 dark:text-blue-100 flex flex-col gap-1">
+            <p className="font-semibold">적립 자동매수 중인 포트폴리오예요</p>
+            <p>
+              제안 비중 적용은 매도·양도세가 생기고, 과거 20년 적립식에선 수익률을 연 2~4%p
+              낮췄어요. 자동매수 설정의 &lsquo;전술 연동&rsquo;을 켜면 방어 국면에만 매수를 보류해요
+              (수익은 비슷, 금융위기 때 낙폭 절반).
+            </p>
+            <Link
+              to={rebalancingUrl({
+                tab: "포트폴리오",
+                portfolioId: status.portfolio_id,
+                openAlert: "1",
+              })}
+              className="self-start font-medium text-blue-700 dark:text-blue-300 underline"
+            >
+              자동매수 설정 열기
+            </Link>
+          </div>
+        )}
+        {linked && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            적립 보조 모드 — 이 포트폴리오 자동매수는 전술 연동 중이라 방어 국면엔 매수만 보류해요.
+            제안 비중 적용은 필요하지 않아요.
+          </p>
+        )}
+
         {!status.enabled ? (
           <button
             type="button"
@@ -428,7 +460,11 @@ function TacticalStatusView({
             {!fullyApplied && (
               <button
                 type="button"
-                className={`${TOUCH_TARGET_MIN} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+                className={
+                  linked
+                    ? `${TOUCH_TARGET_MIN} px-5 rounded-lg text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-50`
+                    : `${TOUCH_TARGET_MIN} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`
+                }
                 disabled={!status.confirmed_regime || apply.isPending}
                 onClick={() => setConfirmApply(true)}
               >
@@ -460,7 +496,7 @@ function TacticalStatusView({
               type="button"
               className={`${TOUCH_TARGET_MIN} text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200`}
               disabled={disable.isPending}
-              onClick={() => disable.mutate()}
+              onClick={() => disable.mutate({ dcaLinked: linked })}
             >
               전술 배분 끄기
             </button>

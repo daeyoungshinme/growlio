@@ -12,11 +12,13 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
+from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.models.user import User
@@ -130,9 +132,22 @@ async def delete_tactical_strategy(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """전략 사용 중지(포트폴리오 목표 비중은 그대로 둔다)."""
+    """전략 사용 중지(포트폴리오 목표 비중은 그대로 둔다).
+
+    이 포트폴리오의 자동매수가 전술 연동(`market_condition_mode="TACTICAL"`)이면 일반 모드(DISABLED)로 되돌린다 —
+    국면이 없으면 게이트가 늘 통과라 연동 표시만 남아 오해를 부른다.
+    """
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
     if strategy is not None:
+        await db.execute(
+            update(RebalancingAlert)
+            .where(
+                RebalancingAlert.portfolio_id == portfolio_id,
+                RebalancingAlert.user_id == current_user.id,
+                RebalancingAlert.market_condition_mode == "TACTICAL",
+            )
+            .values(market_condition_mode="DISABLED")
+        )
         await db.delete(strategy)
         await db.commit()
 

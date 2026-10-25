@@ -175,7 +175,10 @@ def clamp_orders_to_max_value(orders: list[Any], max_order_value_krw: float) -> 
 
 
 def is_market_signal_blocking_auto_mode(
-    market_condition_mode: str, composite_level: str, data_freshness: str = "LIVE"
+    market_condition_mode: str,
+    composite_level: str,
+    data_freshness: str = "LIVE",
+    tactical_regime: str | None = None,
 ) -> bool:
     """AUTO 모드에서 시장 신호 등급이 `market_condition_mode` 게이트를 위반하는지 판정한다.
 
@@ -187,13 +190,33 @@ def is_market_signal_blocking_auto_mode(
     FRED_API_KEY 미설정, 전면 장애 등)이면 CAUTIOUS/STRICT에서 composite_level과 무관하게
     차단한다. "판단 불가"를 "GREEN(안전)"으로 오인해 실행을 통과시키는 것을 막기 위함 —
     DISABLED는 애초에 시장 신호를 보지 않으므로 영향받지 않는다.
+
+    `TACTICAL`(plans/71 — 적립식 코어 + 전술 보조): 같은 포트폴리오의 전술 배분 확정 국면이 방어(RISK_OFF)일
+    때만 차단한다(매수 보류 → 돈은 예수금으로 남고 다음 정기 매수일에 BUY_ONLY가 함께 매수). 복합 신호 등급·
+    STALE은 보지 않는다 — 전술 국면이 매크로 지연을 자체 처리한다. 전략이 없어 `tactical_regime`이 None이면
+    차단하지 않는다(설정 API가 전략 없는 TACTICAL을 거부하고, 전략을 끄면 DISABLED로 되돌린다).
     """
     if market_condition_mode == "DISABLED":
         return False
+    if market_condition_mode == "TACTICAL":
+        return tactical_regime == "RISK_OFF"
     if data_freshness == "STALE":
         return True
     return (market_condition_mode == "CAUTIOUS" and composite_level == "RED") or (
         market_condition_mode == "STRICT" and composite_level in ("YELLOW", "RED")
+    )
+
+
+async def tactical_regime_for_gate(alert: Any, db: AsyncSession) -> str | None:
+    """`market_condition_mode == "TACTICAL"`인 알림이면 그 포트폴리오 전술 배분의 확정 국면, 아니면 None(DB 미조회)."""
+    if alert is None or getattr(alert, "market_condition_mode", "DISABLED") != "TACTICAL":
+        return None
+    from sqlalchemy import select
+
+    from app.models.tactical import TacticalStrategy
+
+    return await db.scalar(
+        select(TacticalStrategy.last_regime).where(TacticalStrategy.portfolio_id == alert.portfolio_id)
     )
 
 

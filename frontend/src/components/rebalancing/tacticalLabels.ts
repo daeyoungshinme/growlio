@@ -200,6 +200,7 @@ export function tacticalNextAction(
   status: TacticalStatus,
   alreadyApplied: boolean,
   now: Date = new Date(),
+  opts: { dcaLinked?: boolean } = {},
 ): { tone: NextActionTone; text: string } {
   const regime = status.confirmed_regime;
   if (!status.enabled) {
@@ -218,6 +219,19 @@ export function tacticalNextAction(
       tone: "wait",
       text: `${REGIME_LABEL[status.pending_regime]} 전환 확인 중 — 다음 거래일 재확인 후 적용하세요`,
     };
+  }
+  // 적립 보조 모드(자동매수 전술 연동, plans/71) — 비중 적용 대신 방어 국면에만 매수를 보류한다
+  if (opts.dcaLinked) {
+    const days = regimeDayCount(status.regime_changed_at, now);
+    return regime === "RISK_OFF"
+      ? {
+          tone: "wait",
+          text: "방어 국면 — 이번 적립 매수는 보류돼요(현금 보관 후 다음 매수일에 함께 매수)",
+        }
+      : {
+          tone: "idle",
+          text: `적립 매수 정상 진행 · ${REGIME_LABEL[regime]} 국면${days ? ` ${days}일째` : ""}`,
+        };
   }
   if (status.partial_regime === regime) {
     return { tone: "action", text: "절반 적용함 — 나머지를 적용하세요" };
