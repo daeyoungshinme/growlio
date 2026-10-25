@@ -69,7 +69,8 @@ TTL_ETF_PROFILE_MISSING = 86400  # ETF 아님/데이터 없음 확정 1일 — �
 # 프로필과 같은 7일(TTL_ETF_PROFILE)을 쓴다
 TTL_CANDIDATE_OVERLAP = 86400  # 후보·보유 ETF 중복 분석 1일 — 입력 목록 해시가 키라 목록이 바뀌면 자동으로 새 키
 TTL_GOAL_RECOMMENDATION = 3600  # 목표 역산 추천(전체/기간별) 1시간 — 프론트 staleTime과 정합, 설정 변경 시 무효화됨
-TTL_GOAL_CANDIDATE_DIVIDEND_YIELD = 3600  # 목표 역산 추천 후보 배당수익률 1시간 — ticker+market 전역 공유(유저 무관)
+TTL_GOAL_RECOMMENDATION_STALE = 86400  # 전체 추천 마지막 정상 결과 1일 — 1시간 키 만료 시 즉시 응답+백그라운드 재계산
+TTL_GOAL_CANDIDATE_DIVIDEND_YIELD = 86400  # 목표 역산 추천 후보 배당수익률 1일 — ticker+market 전역 공유(유저 무관)
 TTL_REBALANCING_ANALYSIS = 90  # 리밸런싱 진단(analyze) 응답 90초 — 포트폴리오 선택 시 자동 실행되어 재방문마다
 # 전체 파이프라인(배당·수익률·현재가 다중 조회)이 재실행되는 것을 막기 위한 단기 캐시
 TTL_OVERSEAS_STOCK_META = 7 * 24 * 3600  # 해외 종목 영문 캐노니컬 이름 + 상장 시장 7일 — 사실상 불변
@@ -284,6 +285,10 @@ def goal_recommendation_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}goal_recommendation:{user_id}"
 
 
+def goal_recommendation_stale_key(user_id: uuid.UUID) -> str:
+    return f"{_env_prefix()}goal_recommendation_stale:{user_id}"
+
+
 def goal_recommendation_horizon_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}goal_recommendation_horizon:{user_id}"
 
@@ -471,6 +476,7 @@ async def invalidate_goal_recommendation_caches(cache: CacheStoreType, user_id: 
     await invalidate_user_caches(
         cache,
         goal_recommendation_key(user_id),
+        goal_recommendation_stale_key(user_id),
         goal_recommendation_horizon_key(user_id),
         goal_recommendation_age_key(user_id),
     )
@@ -551,6 +557,7 @@ async def invalidate_asset_account_caches(
     if positions_changed:
         keys += [
             goal_recommendation_key(user_id),
+            goal_recommendation_stale_key(user_id),
             goal_recommendation_horizon_key(user_id),
             goal_recommendation_age_key(user_id),
         ]

@@ -250,22 +250,22 @@ class TestGoalRecommendationEndpoint:
                     return_value=AsyncMock(),
                 ),
                 patch(
-                    "app.api.v1.rebalancing.build_portfolio_overview",
+                    "app.services.goal_recommendation_service.build_portfolio_overview",
                     new_callable=AsyncMock,
                     return_value=overview,
                 ),
                 patch(
-                    "app.api.v1.rebalancing.get_settings_row",
+                    "app.services.goal_recommendation_service.get_settings_row",
                     new_callable=AsyncMock,
                     return_value=settings_row,
                 ),
                 patch(
-                    "app.api.v1.rebalancing.query_latest_position_map",
+                    "app.services.goal_recommendation_service.query_latest_position_map",
                     new_callable=AsyncMock,
                     return_value={},
                 ),
                 patch(
-                    "app.api.v1.rebalancing.get_goal_recommendation",
+                    "app.services.goal_recommendation_service.get_goal_recommendation",
                     new_callable=AsyncMock,
                     return_value={
                         "generated_at": "2024-01-01T00:00:00Z",
@@ -306,9 +306,15 @@ class TestGoalRecommendationEndpoint:
                     new_callable=AsyncMock,
                     return_value=GoalRecommendation(**cached),
                 ),
-                patch("app.api.v1.rebalancing.build_portfolio_overview", new_callable=AsyncMock) as mock_overview,
-                patch("app.api.v1.rebalancing.query_latest_position_map", new_callable=AsyncMock) as mock_positions,
-                patch("app.api.v1.rebalancing.get_goal_recommendation", new_callable=AsyncMock) as mock_get_rec,
+                patch(
+                    "app.services.goal_recommendation_service.build_portfolio_overview", new_callable=AsyncMock
+                ) as mock_overview,
+                patch(
+                    "app.services.goal_recommendation_service.query_latest_position_map", new_callable=AsyncMock
+                ) as mock_positions,
+                patch(
+                    "app.services.goal_recommendation_service.get_goal_recommendation", new_callable=AsyncMock
+                ) as mock_get_rec,
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.get(
@@ -320,6 +326,53 @@ class TestGoalRecommendationEndpoint:
             mock_overview.assert_not_called()
             mock_positions.assert_not_called()
             mock_get_rec.assert_not_called()
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_stale_hit_returns_immediately_and_schedules_refresh(self, override_settings):
+        """1시간 키가 만료됐어도 마지막 정상 결과가 있으면 계산 없이 반환하고 백그라운드 갱신을 예약한다."""
+        from app.schemas.rebalancing import GoalRecommendation
+
+        user = _make_user()
+        db = _make_mock_db()
+        stale = {"generated_at": "2024-01-01T00:00:00Z", "is_configured": True, "required_return_pct": 7.0}
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.get_cached_goal_recommendation",
+                    new_callable=AsyncMock,
+                    return_value=None,
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_stale_goal_recommendation",
+                    new_callable=AsyncMock,
+                    return_value=GoalRecommendation(**stale),
+                ),
+                patch(
+                    "app.api.v1.rebalancing.refresh_goal_recommendation_in_background",
+                    new_callable=AsyncMock,
+                ) as mock_refresh,
+                patch(
+                    "app.api.v1.rebalancing.get_overall_goal_recommendation_for_user",
+                    new_callable=AsyncMock,
+                ) as mock_compute,
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    "/api/v1/rebalancing/goal-recommendation",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert resp.json()["required_return_pct"] == 7.0
+            mock_compute.assert_not_called()
+            mock_refresh.assert_awaited_once()
+            assert mock_refresh.call_args.args[0] == user.id
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db

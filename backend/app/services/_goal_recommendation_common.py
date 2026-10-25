@@ -151,7 +151,7 @@ async def _fetch_dividend_yields(
     `api/v1/rebalancing.py`의 `_collect_dividend_map`과 동일한 소스(Naver/Yahoo)를 쓰되,
     임의의 후보 티커 목록(포트폴리오 미보유 큐레이션 ETF 포함)을 대상으로 한다는 점이 다르다.
 
-    ticker+market 단위로 `TTL_GOAL_CANDIDATE_DIVIDEND_YIELD`(1시간) 전역 캐시를 공유한다 —
+    ticker+market 단위로 `TTL_GOAL_CANDIDATE_DIVIDEND_YIELD`(1일) 전역 캐시를 공유한다 —
     유저별 요청마다 반복 조회할 필요가 없어, 첫 콜드 계산 이후에는 모든 유저·추천 경로
     (전체/기간별/연령대별)가 캐시를 재사용해 Naver/Yahoo 실시간 스크래핑 호출을 건너뛴다.
     배당수익률이 0인 종목도 그대로 캐싱한다 — 재조회 자체를 막는 게 목적이라, 매 콜드미스마다
@@ -431,6 +431,7 @@ async def _fetch_candidate_returns(
         cached = await asyncio.gather(*(get_cached_json(cache, daily_returns_key(s)) for s in real_symbols))
         returns_map = {s: v for s, v in zip(real_symbols, cached, strict=True) if isinstance(v, list)}
         missing = [s for s in real_symbols if s not in returns_map]
+        logger.info("goal_daily_returns_cache", hit=len(returns_map), miss=len(missing))
         if missing:
             fetched = await run_yf_bounded(fetch_daily_returns, missing)
             returns_map.update(fetched)

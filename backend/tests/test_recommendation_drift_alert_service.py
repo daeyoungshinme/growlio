@@ -141,9 +141,7 @@ class TestFindDriftedPortfolios:
 
         with (
             patch(f"{_MODULE}.get_linked_portfolios", AsyncMock(return_value=[portfolio])),
-            patch(f"{_MODULE}.build_portfolio_overview", AsyncMock(return_value={"total_assets_krw": 1_000_000.0})),
-            patch(f"{_MODULE}.query_latest_position_map", AsyncMock(return_value={})),
-            patch(f"{_MODULE}.existing_items_from_positions", return_value=[]),
+            patch(f"{_MODULE}.build_overall_recommendation_inputs", AsyncMock(return_value=(1_000_000.0, []))),
             patch(f"{_MODULE}.get_goal_recommendation", AsyncMock(return_value=overall_rec)),
             patch(f"{_MODULE}.get_horizon_recommendations", AsyncMock(return_value=empty_horizon)),
         ):
@@ -170,9 +168,7 @@ class TestFindDriftedPortfolios:
 
         with (
             patch(f"{_MODULE}.get_linked_portfolios", AsyncMock(return_value=[portfolio])),
-            patch(f"{_MODULE}.build_portfolio_overview", AsyncMock(return_value={"total_assets_krw": 1_000_000.0})),
-            patch(f"{_MODULE}.query_latest_position_map", AsyncMock(return_value={})),
-            patch(f"{_MODULE}.existing_items_from_positions", return_value=[]),
+            patch(f"{_MODULE}.build_overall_recommendation_inputs", AsyncMock(return_value=(1_000_000.0, []))),
             patch(f"{_MODULE}.get_goal_recommendation", AsyncMock(return_value=overall_rec)),
             patch(f"{_MODULE}.get_horizon_recommendations", AsyncMock(return_value=empty_horizon)),
         ):
@@ -216,9 +212,7 @@ class TestFindDriftedPortfolios:
 
         with (
             patch(f"{_MODULE}.get_linked_portfolios", AsyncMock(return_value=[portfolio])),
-            patch(f"{_MODULE}.build_portfolio_overview", AsyncMock(return_value={"total_assets_krw": 1_000_000.0})),
-            patch(f"{_MODULE}.query_latest_position_map", AsyncMock(return_value={})),
-            patch(f"{_MODULE}.existing_items_from_positions", return_value=[]),
+            patch(f"{_MODULE}.build_overall_recommendation_inputs", AsyncMock(return_value=(1_000_000.0, []))),
             patch(f"{_MODULE}.get_goal_recommendation", AsyncMock(return_value=overall_rec)),
             patch(f"{_MODULE}.get_horizon_recommendations", AsyncMock(return_value=horizon_rec)),
         ):
@@ -265,9 +259,7 @@ class TestFindDriftedPortfolios:
 
         with (
             patch(f"{_MODULE}.get_linked_portfolios", AsyncMock(return_value=[portfolio])),
-            patch(f"{_MODULE}.build_portfolio_overview", AsyncMock(return_value={"total_assets_krw": 1_000_000.0})),
-            patch(f"{_MODULE}.query_latest_position_map", AsyncMock(return_value={})),
-            patch(f"{_MODULE}.existing_items_from_positions", return_value=[]),
+            patch(f"{_MODULE}.build_overall_recommendation_inputs", AsyncMock(return_value=(1_000_000.0, []))),
             patch(f"{_MODULE}.get_goal_recommendation", AsyncMock(return_value=overall_rec)),
             patch(f"{_MODULE}.get_horizon_recommendations", AsyncMock(return_value=horizon_rec)),
         ):

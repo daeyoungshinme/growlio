@@ -1,11 +1,12 @@
 """리밸런싱 분석 및 브로커 잔고 API."""
 
 import asyncio
+import time
 import uuid
 from typing import cast
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -33,15 +34,15 @@ from app.services._settings_queries import get_or_create_settings, get_settings_
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.etf_overlap_service import analyze_candidate_overlap_for_user
 from app.services.goal_age_recommendation_service import get_age_based_recommendation
-from app.services.goal_candidate_service import existing_items_from_positions
 from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal_recommendation_service import (
     compute_portfolio_expected_metrics,
     get_cached_goal_recommendation,
-    get_goal_recommendation,
+    get_overall_goal_recommendation_for_user,
+    get_stale_goal_recommendation,
+    refresh_goal_recommendation_in_background,
 )
 from app.services.portfolio_service import build_portfolio_overview
-from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
 from app.services.rebalancing.broker_balance_service import fetch_broker_balance
 from app.services.rebalancing.diagnosis_service import (
@@ -173,29 +174,25 @@ async def analyze_portfolio(
 @limiter.limit("5/minute")
 async def get_overall_goal_recommendation_endpoint(
     request: Request,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     cache=Depends(get_cache_store),
 ):
     """전체 계좌(전체 투자현황) 기준으로 목표 역산 추천을 반환한다 (자동 적용 아님)."""
-    # 캐시 히트면 아래 overview·포지션 조회(캐시 미스 시 계산 입력)를 건너뛴다
+    started = time.perf_counter()
+    # 캐시 히트면 overview·포지션 조회(캐시 미스 시 계산 입력)를 건너뛴다
     cached = await get_cached_goal_recommendation(cache, current_user.id)
     if cached is not None:
         return cached
-    overview = await build_portfolio_overview(current_user.id, db, cache=cache)
-    settings_row = await get_settings_row(db, current_user.id)
-
-    # 부동산은 목표 역산 추천 MVO 엔진의 후보에 포함되지 않으므로(성장 미모델링) 필요
-    # 수익률 역산의 원금(base_krw)에서 제외 — 그렇지 않으면 부동산 추가만으로 필요
-    # 수익률이 부당하게 낮아지거나 "이미 달성"으로 잘못 판정된다.
-    real_estate_krw = next(
-        (item["amount_krw"] for item in overview.get("asset_type_allocation", []) if item.get("type") == "REAL_ESTATE"),
-        0.0,
-    )
-    base_krw = float(overview.get("total_assets_krw", 0)) - real_estate_krw
-    pos_map = await query_latest_position_map(current_user.id, db, include_name=True)
-    existing_items = existing_items_from_positions(pos_map)
-    return await get_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
+    # 1시간 키가 만료됐어도 마지막 정상 결과가 있으면 바로 돌려주고 응답 뒤에 재계산한다(plans/66)
+    stale = await get_stale_goal_recommendation(cache, current_user.id)
+    if stale is not None:
+        background_tasks.add_task(refresh_goal_recommendation_in_background, current_user.id, cache)
+        return stale
+    result = await get_overall_goal_recommendation_for_user(current_user.id, db, cache)
+    logger.info("goal_recommendation_cold_request", total_ms=round((time.perf_counter() - started) * 1000))
+    return result
 
 
 @router.get("/goal-recommendation/by-horizon", response_model=HorizonRecommendationResponse)

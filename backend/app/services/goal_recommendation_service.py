@@ -53,6 +53,7 @@ MVO 최적화 엔진은 `goal_portfolio_optimizer.py`, 후보 종목 관리/영�
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -61,10 +62,12 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import MAX_GOAL_CANDIDATE_TICKERS
+from app.core.database import AsyncSessionLocal
 from app.enums import AccountTaxType
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation, PortfolioExpectedMetrics
 from app.services import _goal_recommendation_common as _grc
+from app.services._settings_queries import get_settings_row
 from app.services.goal_candidate_service import (
     _active_account_tax_types,
     _apply_index_region_preference,
@@ -72,22 +75,27 @@ from app.services.goal_candidate_service import (
     _matches_index_region_preference,
     _persist_added_candidates,
     detect_duplicate_tracking_index_note,
+    existing_items_from_positions,
     pension_exclusion_note,
     pension_ineligibility_reason,
 )
 from app.services.goal_portfolio_optimizer import _MIN_CANDIDATES, compute_weighted_expected_metrics
 from app.services.goal_return_solver import months_until_year_end, solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
+from app.services.portfolio_service import build_portfolio_overview
+from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
 from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
+    TTL_GOAL_RECOMMENDATION_STALE,
     CacheStoreType,
     get_cached_json,
     goal_recommendation_key,
+    goal_recommendation_stale_key,
     set_cached_json,
 )
-from app.utils.inproc_lock import single_flight_fetch
+from app.utils.inproc_lock import inproc_lock, single_flight_fetch
 
 logger = structlog.get_logger()
 
@@ -125,6 +133,66 @@ async def get_cached_goal_recommendation(cache: CacheStoreType, user_id: uuid.UU
     return GoalRecommendation(**cached) if cached is not None else None
 
 
+async def get_stale_goal_recommendation(cache: CacheStoreType, user_id: uuid.UUID) -> GoalRecommendation | None:
+    """1시간 키가 만료된 뒤에도 남아 있는 마지막 정상 결과(1일)를 조회한다(plans/66).
+
+    엔드포인트는 이 값을 바로 반환하고 `refresh_goal_recommendation_in_background`로 재계산한다.
+    목표·후보 변경, 포지션 변경 sync처럼 입력이 바뀌면 무효화 함수가 이 키도 함께 지우므로
+    여기 남은 값은 "평가액만 조금 다른" 결과다(1시간 키와 같은 트레이드오프)."""
+    cached = await get_cached_json(cache, goal_recommendation_stale_key(user_id))
+    return GoalRecommendation(**cached) if cached is not None else None
+
+
+async def build_overall_recommendation_inputs(
+    user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
+) -> tuple[float, list[tuple[str, str, str]]]:
+    """전체 자산 기준 추천의 입력 `(base_krw, existing_items)` — 엔드포인트·백그라운드 갱신·
+    추천 변화 알림 job이 같은 입력을 쓰도록 한 곳에 둔다.
+
+    부동산은 MVO 후보에 포함되지 않으므로(성장 미모델링) 필요 수익률 역산의 원금(base_krw)에서
+    제외한다 — 그렇지 않으면 부동산 추가만으로 필요 수익률이 부당하게 낮아지거나 "이미 달성"으로
+    잘못 판정된다."""
+    overview = await build_portfolio_overview(user_id, db, cache=cache)
+    real_estate_krw = next(
+        (item["amount_krw"] for item in overview.get("asset_type_allocation", []) if item.get("type") == "REAL_ESTATE"),
+        0.0,
+    )
+    base_krw = float(overview.get("total_assets_krw", 0)) - real_estate_krw
+    pos_map = await query_latest_position_map(user_id, db, include_name=True)
+    return base_krw, existing_items_from_positions(pos_map)
+
+
+async def get_overall_goal_recommendation_for_user(
+    user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
+) -> GoalRecommendation:
+    """입력 구성부터 계산·캐싱까지 — 캐시 미스 시 엔드포인트와 백그라운드 갱신이 공유한다."""
+    settings_row = await get_settings_row(db, user_id)
+    base_krw, existing_items = await build_overall_recommendation_inputs(user_id, db, cache)
+    return await get_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
+
+
+_REFRESH_LOCK_TTL = 300
+"""백그라운드 재계산 중복 방지 락 TTL(초) — 콜드 계산이 수십 초 걸릴 수 있어 single-flight 기본(15초)보다 길게."""
+
+
+async def refresh_goal_recommendation_in_background(user_id: uuid.UUID, cache: CacheStoreType) -> None:
+    """stale 결과를 반환한 뒤 1시간 키를 다시 채운다(FastAPI BackgroundTasks — 응답 전송 후 실행).
+
+    요청의 DB 세션은 응답과 함께 닫히므로 자기 세션을 연다. 같은 유저의 갱신이 이미 돌고 있으면
+    (여러 탭·기기에서 동시에 stale을 받은 경우) 건너뛴다. 실패해도 stale 결과가 남으니 로그만 남긴다.
+    """
+    if cache is None:
+        return
+    async with inproc_lock(cache, f"refresh:{goal_recommendation_key(user_id)}", ttl=_REFRESH_LOCK_TTL) as acquired:
+        if not acquired:
+            return
+        try:
+            async with AsyncSessionLocal() as db:
+                await get_overall_goal_recommendation_for_user(user_id, db, cache)
+        except Exception as e:
+            logger.warning("goal_recommendation_background_refresh_failed", user_id=str(user_id), error=str(e))
+
+
 async def get_goal_recommendation(
     cache: CacheStoreType,
     base_krw: float,
@@ -152,9 +220,9 @@ async def get_goal_recommendation(
     async def _fetch_and_cache() -> GoalRecommendation:
         result = await _compute_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
         if user_id is not None and result.recommended_items:
-            await set_cached_json(
-                cache, goal_recommendation_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
-            )
+            payload = result.model_dump(mode="json")
+            await set_cached_json(cache, goal_recommendation_key(user_id), payload, TTL_GOAL_RECOMMENDATION)
+            await set_cached_json(cache, goal_recommendation_stale_key(user_id), payload, TTL_GOAL_RECOMMENDATION_STALE)
         return result
 
     if user_id is None:
@@ -333,6 +401,16 @@ async def _compute_goal_recommendation(
     if early_result is not None:
         return early_result
 
+    # 단계별 소요 시간 — 어느 구간이 콜드 지연을 지배하는지 운영 로그로 확인하기 위함(plans/66)
+    started = time.perf_counter()
+    timings_ms: dict[str, int] = {}
+
+    def _mark(stage: str) -> None:
+        nonlocal started
+        now = time.perf_counter()
+        timings_ms[f"{stage}_ms"] = round((now - started) * 1000)
+        started = now
+
     candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
     if not candidate_dicts:
         return _grc._no_recommendation(
@@ -370,9 +448,11 @@ async def _compute_goal_recommendation(
         )
 
     tickers_only = [(c["ticker"], c["market"]) for c in computed_candidates]
+    _mark("candidates")
     cagr_map, dividend_map, market_signal_level = await _fetch_overall_candidate_data(
         cache, tickers_only, cagr_lookback_years
     )
+    _mark("cagr_dividend_signal")
     filtered = _grc._candidates_with_cagr(computed_candidates, cagr_map, dividend_map, equity_vs_other=False)
     if len(filtered) < _MIN_CANDIDATES:
         result = _grc._no_recommendation(
@@ -386,6 +466,7 @@ async def _compute_goal_recommendation(
     returns_map = await _grc._fetch_candidate_returns(
         fetch_yf_daily_returns, filtered, include_cash_equivalent=False, cache=cache
     )
+    _mark("daily_returns")
     items, expected_return_pct, expected_volatility_pct, opt_note = await _grc._run_goal_optimizer(
         filtered,
         returns_map,
@@ -396,6 +477,7 @@ async def _compute_goal_recommendation(
         market_signal_level=market_signal_level,
         required_dividend_yield_pct=required_dividend_yield_pct,
     )
+    _mark("optimizer")
     expected_dividend_yield_pct = _grc._weighted_dividend_yield(items, dividend_map)
 
     result = GoalRecommendation(
@@ -413,7 +495,12 @@ async def _compute_goal_recommendation(
         max_weight_pct=round(max_weight * 100, 2),
         market_signal_level=market_signal_level,
     )
-    return _grc._apply_dividend_suggestions(result, await _suggest_dividend_candidates(expected_dividend_yield_pct))
+    suggestion = await _suggest_dividend_candidates(expected_dividend_yield_pct)
+    _mark("dividend_suggest")
+    logger.info(
+        "goal_recommendation_timing", candidates=len(tickers_only), total_ms=sum(timings_ms.values()), **timings_ms
+    )
+    return _grc._apply_dividend_suggestions(result, suggestion)
 
 
 async def compute_portfolio_expected_metrics(
