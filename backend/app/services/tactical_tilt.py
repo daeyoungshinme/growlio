@@ -22,7 +22,13 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 
 import structlog
 
-from app.utils.cache_keys import TTL_TECHNICAL_SIGNAL, get_cached_json, set_cached_json, tactical_tilt_key
+from app.utils.cache_keys import (
+    TTL_MARKET_SIGNAL_DEGRADED,
+    TTL_TECHNICAL_SIGNAL,
+    get_cached_json,
+    set_cached_json,
+    tactical_tilt_key,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -138,6 +144,8 @@ async def get_tilt_inputs(cache: CacheStore | None) -> TiltInputs:
         real_yield_change_pp=real_yield_change(yields),
         relative_strength_pct=rs,
     )
-    if all(v is not None for v in result.values()):  # 부분 실패는 캐시하지 않아 다음 조회에서 재시도
-        await set_cached_json(cache, key, result, TTL_TECHNICAL_SIGNAL)
+    # 부분 실패는 짧게만 캐시해 곧 재시도한다 — 아예 캐시하지 않으면 FRED 장애·키 미설정 동안 전술 탭 조회마다
+    # FRED·Yahoo를 다시 호출해 응답이 매번 외부 타임아웃만큼 늘어졌다
+    complete = all(v is not None for v in result.values())
+    await set_cached_json(cache, key, result, TTL_TECHNICAL_SIGNAL if complete else TTL_MARKET_SIGNAL_DEGRADED)
     return result

@@ -28,6 +28,7 @@ QLD·SSO(2배 레버리지)는 실제 시세가 있는 날은 실제 수익률, 
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from datetime import timedelta
@@ -342,18 +343,31 @@ async def run_tactical_backtest(
     # 레버리지 ETF는 비중표에 쓰일 때만 받는다(결측이면 합성 수익률로 대체)
     uses_leverage = [a for a in sorted(LEVERAGED_ASSETS) if any(w.get(a, 0.0) > 0 for w in weights_table.values())]
     tickers = ["QQQ", "SPY", "DIA", *uses_leverage]
-    closes_map = await fetch_close_history(tickers, days)
+
+    async def _no_real_yield() -> pd.Series | None:
+        return None
+
+    # 시세·VIX·국채·실질금리는 서로 독립이라 동시에 받는다(순차면 FRED 왕복이 콜드 캐시에서 그대로 누적됐다)
+    closes_map, vix_res, cash_res, real_res = await asyncio.gather(
+        fetch_close_history(tickers, days),
+        _fetch_vix_history(days),
+        _fetch_cash_yield_history(days),
+        _fetch_real_yield_history(days) if tilt_shift_pct > 0 else _no_real_yield(),
+        return_exceptions=True,
+    )
+    if isinstance(closes_map, BaseException):
+        raise closes_map
     if "QQQ" not in closes_map or "SPY" not in closes_map:
         raise ValueError("QQQ/SPY 과거 시세를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")
     # DIA는 비교·선택 자산 — 결측이면 빼고 진행(비중표에 DIA가 있으면 simulate가 오류)
     closes = pd.DataFrame({t: closes_map[t] for t in tickers if t in closes_map})
     closes.index = pd.to_datetime(closes.index).tz_localize(None)
 
-    try:
-        vix = await _fetch_vix_history(days)
-    except Exception as exc:
-        logger.warning("tactical_backtest_vix_failed", error=str(exc))
+    if isinstance(vix_res, BaseException):
+        logger.warning("tactical_backtest_vix_failed", error=str(vix_res))
         vix = pd.Series(dtype=float)
+    else:
+        vix = vix_res
     if not use_macro:
         macro_note = "매크로 미반영(차트 추세만) 설정으로 계산했습니다."
     elif not vix.empty:
@@ -361,25 +375,28 @@ async def run_tactical_backtest(
     else:
         macro_note = "VIX 이력을 받지 못해 매크로 입력 없이(항상 '주의') 차트 추세만으로 계산했습니다."
 
-    try:
-        cash_yield = await _fetch_cash_yield_history(days)
-    except Exception as exc:
-        logger.warning("tactical_backtest_cash_yield_failed", error=str(exc))
+    if isinstance(cash_res, BaseException):
+        logger.warning("tactical_backtest_cash_yield_failed", error=str(cash_res))
         cash_yield = pd.Series(dtype=float)
+    else:
+        cash_yield = cash_res
     if cash_yield.empty:
         macro_note += " 국채 금리 이력을 받지 못해 현금 수익률은 0으로 계산했습니다."
 
     real_yield: pd.Series | None = None
     if tilt_shift_pct > 0:
-        try:
-            real_yield = await _fetch_real_yield_history(days)
-        except Exception as exc:
-            logger.warning("tactical_backtest_real_yield_failed", error=str(exc))
+        if isinstance(real_res, BaseException):
+            logger.warning("tactical_backtest_real_yield_failed", error=str(real_res))
+        else:
+            real_yield = real_res
         if real_yield is None or real_yield.empty:
             macro_note += " 실질금리 이력을 받지 못해 나스닥/S&P 틸트는 반영하지 않았습니다."
 
     start = closes.index[-1] - timedelta(days=years * 365)
-    result = simulate(
+    # 일 단위 파이썬 루프(20년이면 약 5,000회 × pandas 접근)라 Render 저사양 CPU에서 수 초 걸린다 —
+    # 이벤트 루프에서 돌리면 그동안 모든 사용자의 요청이 멈추므로 스레드로 넘긴다
+    result = await asyncio.to_thread(
+        simulate,
         closes,
         vix,
         weights_table,

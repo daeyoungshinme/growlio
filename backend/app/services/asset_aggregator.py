@@ -27,6 +27,7 @@ from app.utils.cache_keys import (
     get_cached_json,
     set_cached_json,
 )
+from app.utils.inproc_lock import single_flight_fetch
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -117,11 +118,30 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
 
 
 async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> dict[str, Any]:
-    """전체 자산 집계 + 목표 달성률 + 수익률 계산."""
-    cached = await get_cached_json(cache, dashboard_summary_key(user_id))
+    """전체 자산 집계 + 목표 달성률 + 수익률 계산.
+
+    `/dashboard`·`/insights`·`/challenges`가 앱 시작 시 동시에 이 함수를 부른다 — 콜드 캐시에서 셋이
+    각자 계산하면 종목별 배당 외부 API 체인이 최대 3중으로 돌았으므로 single-flight로 한 건만 계산한다.
+    """
+    cache_key = dashboard_summary_key(user_id)
+
+    async def _read_cache() -> dict[str, Any] | None:
+        return await get_cached_json(cache, cache_key)
+
+    cached = await _read_cache()
     if cached is not None:
         return cached
+    if cache is None:
+        return await _compute_dashboard_summary(user_id, db, cache)
 
+    async def _fetch_and_cache() -> dict[str, Any]:
+        return await _compute_dashboard_summary(user_id, db, cache)
+
+    result: dict[str, Any] = await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
+    return result
+
+
+async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> dict[str, Any]:
     # 1단계: 서로 논리적으로는 독립적이지만 같은 AsyncSession을 쓰므로 순차 실행
     # (asyncpg/SQLAlchemy AsyncSession은 하나의 커넥션에서 동시 쿼리 실행을 지원하지
     # 않음 — asyncio.gather로 묶으면 병렬화 이득 없이 간헐적 InterfaceError 위험만 생김)

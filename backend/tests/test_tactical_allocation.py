@@ -238,29 +238,43 @@ class TestTilt:
         assert "+1.2%" in reasons[1]
 
     @pytest.mark.asyncio
-    async def test_get_inputs_caches_only_complete(self):
+    async def test_get_inputs_caches_partial_briefly(self):
         from app.core.cache_store import CacheStore
+        from app.utils.cache_keys import TTL_MARKET_SIGNAL_DEGRADED, TTL_TECHNICAL_SIGNAL
 
         closes = _trend_closes(120)
         closes["QQQ"] = closes["QQQ"] * np.linspace(1.0, 1.2, 120)  # 나스닥 우위
         cache = CacheStore()
         fetch = AsyncMock(return_value=closes)
+        ttls: list[int] = []
+        real_set = tilt.set_cached_json
+
+        async def spy_set(c, key, value, ttl):
+            ttls.append(ttl)
+            await real_set(c, key, value, ttl)
+
         with (
+            patch.object(tilt, "set_cached_json", spy_set),
             patch("app.services.technical_signal_service.fetch_close_history", fetch),
             patch.object(tilt, "_fetch_real_yields", AsyncMock(side_effect=RuntimeError("fred"))),
         ):
             partial = await tilt.get_tilt_inputs(cache)
+            again_partial = await tilt.get_tilt_inputs(cache)
         assert partial["real_yield"] is None
         assert partial["relative_strength_pct"] > 0
+        assert again_partial == partial
+        assert fetch.await_count == 1  # 부분 실패도 짧게 캐시 — 장애 중 매 요청 재조회 방지
+        assert ttls == [TTL_MARKET_SIGNAL_DEGRADED]
+
+        await cache.delete(tilt.tactical_tilt_key())  # 짧은 TTL 경과
         with (
+            patch.object(tilt, "set_cached_json", spy_set),
             patch("app.services.technical_signal_service.fetch_close_history", fetch),
             patch.object(tilt, "_fetch_real_yields", AsyncMock(return_value=[2.0] * 20 + [1.8])),
         ):
             full = await tilt.get_tilt_inputs(cache)
-            again = await tilt.get_tilt_inputs(cache)
         assert full["real_yield_change_pp"] == pytest.approx(-0.2)
-        assert again == full
-        assert fetch.await_count == 2  # 부분 실패 결과는 캐시하지 않아 재조회, 완전한 결과는 캐시
+        assert ttls[-1] == TTL_TECHNICAL_SIGNAL
 
     @pytest.mark.asyncio
     async def test_get_inputs_survive_price_failure(self):
@@ -684,6 +698,27 @@ class TestFetchWrappers:
         assert "현금 수익률 0" in result["assumptions"]
         assert result["years"] == 1
         assert cached == result
+
+    @pytest.mark.asyncio
+    async def test_backtest_simulate_runs_off_event_loop(self):
+        """simulate는 CPU 루프라 이벤트 루프를 막지 않도록 asyncio.to_thread로 실행돼야 한다."""
+        from app.services import tactical_backtest as bt
+
+        calls: list[object] = []
+        real_to_thread = bt.asyncio.to_thread
+
+        async def spy(func, *args, **kwargs):
+            calls.append(func)
+            return await real_to_thread(func, *args, **kwargs)
+
+        with (
+            patch.object(bt, "fetch_close_history", AsyncMock(return_value=_trend_closes())),
+            patch.object(bt, "_fetch_vix_history", AsyncMock(return_value=pd.Series(dtype=float))),
+            patch.object(bt, "_fetch_cash_yield_history", AsyncMock(return_value=pd.Series(dtype=float))),
+            patch.object(bt.asyncio, "to_thread", spy),
+        ):
+            await bt.run_tactical_backtest(tactical.DEFAULT_REGIME_WEIGHTS, 1, None)
+        assert bt.simulate in calls
 
     @pytest.mark.asyncio
     async def test_backtest_missing_prices_raises(self):
