@@ -32,9 +32,9 @@ import * as tacticalApi from "@/api/tactical";
 import TacticalAllocationTab from "@/components/rebalancing/TacticalAllocationTab";
 
 const DEFAULT_TABLE = {
-  RISK_ON: { QQQ: 50, SPY: 40, DIA: 0, CASH: 10 },
-  NEUTRAL: { QQQ: 30, SPY: 40, DIA: 0, CASH: 30 },
-  RISK_OFF: { QQQ: 10, SPY: 30, DIA: 0, CASH: 60 },
+  RISK_ON: { QQQ: 50, SPY: 40, DIA: 0, QLD: 0, SSO: 0, CASH: 10 },
+  NEUTRAL: { QQQ: 30, SPY: 40, DIA: 0, QLD: 0, SSO: 0, CASH: 30 },
+  RISK_OFF: { QQQ: 10, SPY: 30, DIA: 0, QLD: 0, SSO: 0, CASH: 60 },
 };
 
 function makeStatus(overrides: Partial<TacticalStatus> = {}): TacticalStatus {
@@ -48,12 +48,16 @@ function makeStatus(overrides: Partial<TacticalStatus> = {}): TacticalStatus {
     technicals: {
       QQQ: {
         close: 716.19,
+        sma20: 730.0,
+        sma60: 720.0,
+        sma120: 700.0,
         sma50: 726.17,
         sma200: 674.72,
         rsi14: 40.2,
         macd_hist: -5.08,
         drawdown_pct: -5.7,
         trend: "UP",
+        pullback_stage: "SMA60",
       },
       SPY: {
         close: 767.87,
@@ -94,6 +98,10 @@ function makeStatus(overrides: Partial<TacticalStatus> = {}): TacticalStatus {
       "미국 10년 실질금리: 1.80% (20거래일 -0.05%p)",
       "QQQ/SPY 상대강도: 50일 평균 대비 +0.4%",
     ],
+    dip_shift_pct: 0,
+    dip_level: 0,
+    pullback_stage: "SMA60",
+    dip_reasons: ["QQQ 웅덩이 단계: 60일선 웅덩이"],
     ...overrides,
   };
 }
@@ -121,7 +129,7 @@ describe("TacticalAllocationTab", () => {
     expect(tacticalApi.fetchTacticalStatus).toHaveBeenCalledWith("p1");
     expect(screen.getAllByText("추세 상승")).toHaveLength(2);
     expect(screen.getByText("기타 종목")).toBeDefined();
-    expect(screen.getByText(/QQQ·SPY·DIA·현금 외 종목이 있어요/)).toBeDefined();
+    expect(screen.getByText(/QQQ·SPY·DIA·QLD·SSO·현금 외 종목이 있어요/)).toBeDefined();
     // DIA 지표는 참고용으로 표시하고, 현재·제안 모두 0%면 비중 비교 행은 숨긴다
     expect(screen.getByText("참고 · 국면 판단 미반영")).toBeDefined();
     expect(screen.getByText("추세 혼조")).toBeDefined();
@@ -177,7 +185,7 @@ describe("TacticalAllocationTab", () => {
   });
 
   it("DIA 제안 비중이 있으면 비교 행을 보여준다", async () => {
-    const proposed = { QQQ: 40, SPY: 30, DIA: 20, CASH: 10 };
+    const proposed = { QQQ: 40, SPY: 30, DIA: 20, QLD: 0, SSO: 0, CASH: 10 };
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
       makeStatus({ proposed_weights: proposed }),
     );
@@ -209,8 +217,10 @@ describe("TacticalAllocationTab", () => {
     expect(tacticalApi.applyTacticalWeights).not.toHaveBeenCalled();
     expect(screen.getByText(/주문은 나가지 않으며/)).toBeDefined();
 
-    fireEvent.click(screen.getByText("적용"));
-    await waitFor(() => expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1"));
+    // 다른 종목이 섞인 포트폴리오는 분할 적용 버튼이 없다
+    expect(screen.queryByText("절반 먼저 적용")).toBeNull();
+    fireEvent.click(screen.getByText("한 번에 적용"));
+    await waitFor(() => expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 1));
 
     fireEvent.click(await screen.findByText("리밸런싱 분석·실행으로 이동"));
     expect(onGoToExecution).toHaveBeenCalledWith("p1");
@@ -259,8 +269,40 @@ describe("TacticalAllocationTab", () => {
         notify_enabled: false,
         regime_weights: null,
         tilt_shift_pct: 15,
+        dip_shift_pct: 0,
       }),
     );
+  });
+
+  it("웅덩이 단계 배지와 이평선 이격을 보여준다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
+    renderTab();
+
+    expect(await screen.findByText("60일선 웅덩이")).toBeDefined();
+    // QQQ 종가 716.19 / 20일선 730 → -1.9%
+    expect(screen.getByText("-1.9%")).toBeDefined();
+    expect(screen.getByText("사용 안 함")).toBeDefined();
+  });
+
+  it("웅덩이 투입 중이면 투입량을 보여준다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({ dip_shift_pct: 15, dip_level: 2 }),
+    );
+    renderTab();
+    expect(await screen.findByText("현금 10%p 투입 중")).toBeDefined();
+  });
+
+  it("전술 자산만 있는 포트폴리오는 절반만 먼저 적용할 수 있다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({ portfolio_compatible: true, current_weights: { QQQ: 30, SPY: 40, CASH: 30 } }),
+    );
+    vi.mocked(tacticalApi.applyTacticalWeights).mockResolvedValue(makeStatus());
+    renderTab();
+
+    fireEvent.click(await screen.findByText("제안 비중을 목표 비중으로 적용"));
+    fireEvent.click(screen.getByText("절반 먼저 적용"));
+    await waitFor(() => expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 0.5));
+    expect(await screen.findByText("리밸런싱 분석·실행으로 이동")).toBeDefined();
   });
 
   it("전략이 꺼져 있으면 비중표 편집을 보여주지 않는다", async () => {

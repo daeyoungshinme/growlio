@@ -59,10 +59,16 @@ export function useTacticalMutations(portfolioId: string) {
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });
 
+  /** 인자 fraction(기본 1) — 0.5면 절반만 적용(분할 적용) */
   const apply = useMutation({
-    mutationFn: () => applyTacticalWeights(portfolioId),
-    onSuccess: async () => {
-      toast("제안 비중을 목표 비중으로 저장했습니다", "success");
+    mutationFn: (fraction?: number) => applyTacticalWeights(portfolioId, fraction ?? 1),
+    onSuccess: async (_data, fraction) => {
+      toast(
+        (fraction ?? 1) < 1
+          ? "제안 비중의 절반을 목표 비중에 반영했습니다. 나머지는 다음 거래일에 다시 적용하세요"
+          : "제안 비중을 목표 비중으로 저장했습니다",
+        "success",
+      );
       await invalidateTacticalData(queryClient, { portfolioChanged: true });
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),

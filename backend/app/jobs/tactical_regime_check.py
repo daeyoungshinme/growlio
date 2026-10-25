@@ -3,9 +3,15 @@
 전략을 켠 포트폴리오마다 국면 확정 상태를 갱신하고, 확정 국면이 마지막 알림 국면과 다르면 이메일/푸시로
 제안 비중을 안내한다. 주문은 내지 않는다. 서버가 잠들어 이 job을 놓친 날은 앱 조회(GET /tactical)가
 확정을 대신 진행하고, 다음 job 실행 때 `notified_regime`과 비교해 놓친 알림을 보낸다.
+
+웅덩이(눌림목) 투입 단계가 `notified_dip_level`보다 깊어지면 별도로 알린다(투입을 켠 전략만). 같은 실행에서
+국면 알림을 보냈다면 그 제안 비중에 투입분이 이미 들어 있으므로 웅덩이 알림은 생략한다. 단계가 낮아지는
+변화(회복·국면 이탈)는 알리지 않고 기록만 맞춘다.
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 import structlog
 from sqlalchemy import select
@@ -18,7 +24,8 @@ from app.models.tactical import TacticalStrategy
 from app.models.user import User, UserSettings
 from app.services import tactical_allocation_service as tactical
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
-from app.services.email_service import send_tactical_regime_change_email
+from app.services.email_service import send_tactical_dip_email, send_tactical_regime_change_email
+from app.services.tactical_dip import DIP_LEVEL_LABELS, dip_amount, dip_reasons
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -50,15 +57,13 @@ async def _check_one(db, strategy_id, market: dict) -> None:
     today = today_kst()
     tactical.advance_regime(strategy, market, today)
     tactical.advance_tilt(strategy, market, today)  # 틸트 단독 변경은 알림 없음(월 1회·소폭 조정이라 소음만 늘린다)
-    regime = strategy.last_regime
-    if regime is None or regime == strategy.notified_regime:
-        await db.commit()
-        return
-    if not strategy.notify_enabled or regime == strategy.applied_regime:
-        strategy.notified_regime = regime  # 알림 꺼짐 / 이미 그 국면 비중을 적용함 — 알릴 필요 없음
-        await db.commit()
-        return
+    tactical.advance_dip(strategy, market)
+    regime_sent = await _notify_regime(db, strategy, market)
+    await _notify_dip(db, strategy, market, regime_sent=regime_sent)
+    await db.commit()
 
+
+async def _recipient(db, strategy: TacticalStrategy) -> tuple[Any, str, str | None, Portfolio] | None:
     row = (
         await db.execute(
             select(User, UserSettings, Portfolio)
@@ -68,11 +73,25 @@ async def _check_one(db, strategy_id, market: dict) -> None:
         )
     ).first()
     if row is None:
-        await db.commit()
-        return
+        return None
     user, settings_row, portfolio = row
     to_email = (settings_row.notification_email if settings_row else None) or user.email
     fcm_token = settings_row.fcm_token if settings_row else None
+    return user, to_email, fcm_token, portfolio
+
+
+async def _notify_regime(db, strategy: TacticalStrategy, market: dict) -> bool:
+    """확정 국면이 마지막 알림과 다르면 알린다. 발송했으면 True."""
+    regime = strategy.last_regime
+    if regime is None or regime == strategy.notified_regime:
+        return False
+    if not strategy.notify_enabled or regime == strategy.applied_regime:
+        strategy.notified_regime = regime  # 알림 꺼짐 / 이미 그 국면 비중을 적용함 — 알릴 필요 없음
+        return False
+    recipient = await _recipient(db, strategy)
+    if recipient is None:
+        return False
+    user, to_email, fcm_token, portfolio = recipient
 
     old_label = tactical.REGIME_LABELS.get(strategy.notified_regime or "", "없음")
     new_label = tactical.REGIME_LABELS[regime]
@@ -81,7 +100,8 @@ async def _check_one(db, strategy_id, market: dict) -> None:
     async def _mark_notified() -> None:
         strategy.notified_regime = regime
 
-    sent = await dispatch_dual_channel_alert(
+    # 실패하면 국면 확정 상태만 저장되고 알림은 다음 실행 때 재시도
+    return await dispatch_dual_channel_alert(
         db,
         user.id,
         event_prefix="tactical_regime_change",
@@ -102,5 +122,42 @@ async def _check_one(db, strategy_id, market: dict) -> None:
         fcm_token=fcm_token,
         after_sent=_mark_notified,
     )
-    if not sent:
-        await db.commit()  # 국면 확정 상태는 저장하고, 알림은 다음 실행 때 재시도
+
+
+async def _notify_dip(db, strategy: TacticalStrategy, market: dict, *, regime_sent: bool) -> None:
+    level = strategy.dip_level or 0
+    shift = tactical.dip_shift_of(strategy)
+    if level <= (strategy.notified_dip_level or 0) or regime_sent or shift <= 0 or not strategy.notify_enabled:
+        strategy.notified_dip_level = level  # 단계 하락·국면 알림에 포함됨·투입 꺼짐·알림 꺼짐 — 따로 알리지 않음
+        return
+    regime = strategy.last_regime
+    if regime is None:
+        return
+    recipient = await _recipient(db, strategy)
+    if recipient is None:
+        return
+    user, to_email, fcm_token, portfolio = recipient
+
+    stage_label = DIP_LEVEL_LABELS[level]
+    deploy = dip_amount(level, shift)
+    weights_text = tactical.format_weights(tactical.proposed_weights_for(strategy, regime, market))
+    reasons = dip_reasons(market.get("qqq_pullback_stage", "UNKNOWN"), level, shift, regime)
+
+    async def _mark_notified() -> None:
+        strategy.notified_dip_level = level
+
+    await dispatch_dual_channel_alert(
+        db,
+        user.id,
+        event_prefix="tactical_dip",
+        alert_type="TACTICAL_DIP",
+        history_message=f"[{portfolio.name}] 웅덩이 매수 제안 — {stage_label}, 현금 {deploy:g}%p 투입 ({weights_text})",
+        send_email=lambda: send_tactical_dip_email(
+            to_email, portfolio.name, stage_label, deploy, weights_text, reasons, portfolio_id=str(portfolio.id)
+        ),
+        push_title=f"웅덩이 매수 제안: {stage_label}",
+        push_body=f"{portfolio.name} 현금 {deploy:g}%p를 주식으로 — 제안 비중 {weights_text}",
+        push_type="tactical_dip",
+        fcm_token=fcm_token,
+        after_sent=_mark_notified,
+    )

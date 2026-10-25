@@ -10,7 +10,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, SmallInteger, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -50,6 +50,12 @@ class TacticalStrategy(Base):
     tilt_shift_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="10")
     last_tilt: Mapped[str | None] = mapped_column(String(12), nullable=True)
     tilt_evaluated_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    # 눌림목(웅덩이) 현금 투입(tactical_dip) — 현금에서 주식으로 옮길 최대 %p(0이면 끔). 투입 단계(0~3)는 한 웅덩이
+    # 안에서 올라가기만 하고, 회복·방어 국면이면 0. notified_dip_level은 단계 상승 알림 중복 방지용.
+    dip_shift_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="0")
+    dip_level: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
+    notified_dip_level: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

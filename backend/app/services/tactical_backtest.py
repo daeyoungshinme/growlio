@@ -11,6 +11,12 @@
 
 나스닥/S&P 틸트(`tactical_tilt`)는 매월 첫 거래일(입력이 모두 있는 첫날)에 그날 종가까지의 실질금리 변화·
 QQQ/SPY 상대강도로 판정하고, 바뀌면 그 시점에 리밸런싱한다(실시간의 "그 달 첫 점검일" 갱신과 같은 취지).
+
+눌림목(웅덩이) 투입(`tactical_dip`)은 매 거래일 그날 종가까지의 QQQ 웅덩이 단계로 실시간과 같은
+`advance_dip_level`을 돌리고, 투입 단계가 바뀌면 리밸런싱한다.
+
+QLD·SSO(2배 레버리지)는 실제 시세가 있는 날은 실제 수익률, 상장 전(2006년 이전)·결측일은 기초지수 일수익률
+×2 − (보수+차입비용)/252로 합성한다.
 """
 
 from __future__ import annotations
@@ -24,9 +30,16 @@ import pandas as pd
 import structlog
 
 from app.services.backtest_metrics import compute_metrics
-from app.services.tactical_allocation_service import TACTICAL_ASSETS, ConfirmState, classify_regime, step_confirmation
+from app.services.tactical_allocation_service import (
+    LEVERAGED_ASSETS,
+    TACTICAL_ASSETS,
+    ConfirmState,
+    classify_regime,
+    step_confirmation,
+)
+from app.services.tactical_dip import DIP_EXIT_STAGES, advance_dip_level, apply_dip
 from app.services.tactical_tilt import REAL_YIELD_LOOKBACK, RS_SMA, apply_tilt, classify_tilt
-from app.services.technical_indicators import trend_series
+from app.services.technical_indicators import pullback_series, trend_series
 from app.services.technical_signal_service import fetch_close_history
 from app.utils.cache_keys import TTL_TACTICAL_BACKTEST, get_cached_json, set_cached_json, tactical_backtest_key
 
@@ -37,6 +50,9 @@ logger = structlog.get_logger()
 
 _WARMUP_DAYS = 420  # 200일선 워밍업(달력일)
 _MAX_SERIES_POINTS = 260  # 차트용 다운샘플 상한
+# 레버리지 ETF → (기초 종목, 연 보수+차입비용 근사). 차입비용은 장기 단기금리 평균 근사 2%(1배분 차입).
+_LEVERAGE_BASE: dict[str, tuple[str, float]] = {"QLD": ("QQQ", 0.0095 + 0.02), "SSO": ("SPY", 0.0089 + 0.02)}
+_LEVERAGE = 2.0
 
 
 def vix_to_macro_level(vix: float | None) -> str:
@@ -49,6 +65,19 @@ def vix_to_macro_level(vix: float | None) -> str:
     return "YELLOW"
 
 
+def leveraged_returns(base_rets: pd.DataFrame, actual: pd.DataFrame | None) -> pd.DataFrame:
+    """QLD·SSO 일수익률 — 실제 시세 수익률이 있으면 그것, 없으면 기초 수익률로 합성."""
+    out = pd.DataFrame(index=base_rets.index)
+    for lev, (base, annual_cost) in _LEVERAGE_BASE.items():
+        synthetic = base_rets[base] * _LEVERAGE - annual_cost / 252
+        if actual is not None and lev in actual.columns:
+            real = actual[lev].reindex(base_rets.index).pct_change(fill_method=None)
+            out[lev] = real.where(real.notna(), synthetic)
+        else:
+            out[lev] = synthetic
+    return out
+
+
 def simulate(
     closes: pd.DataFrame,
     vix: pd.Series,
@@ -56,12 +85,15 @@ def simulate(
     start: pd.Timestamp,
     real_yield: pd.Series | None = None,
     tilt_shift_pct: float = 0.0,
+    dip_shift_pct: float = 0.0,
+    dip_exit_stages: frozenset[str] = DIP_EXIT_STAGES,
 ) -> dict[str, Any]:
-    """closes: QQQ/SPY(+선택 DIA) 종가(워밍업 포함), vix·real_yield: 일별 시계열. start 이후 구간을 평가한다."""
+    """closes: QQQ/SPY(+선택 DIA·QLD·SSO) 종가(워밍업 포함), vix·real_yield: 일별 시계열. start 이후 구간을 평가한다."""
     has_dia = "DIA" in closes.columns
     if not has_dia and any(w.get("DIA", 0.0) > 0 for w in weights_table.values()):
         raise ValueError("DIA 과거 시세를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")
     bench_tickers = ["SPY", "QQQ"] + (["DIA"] if has_dia else [])
+    lev_actual = closes[[c for c in closes.columns if c in LEVERAGED_ASSETS]]
     closes = closes[["QQQ", "SPY"] + (["DIA"] if has_dia else [])].dropna()
     trends = {t: trend_series(closes[t]) for t in ("QQQ", "SPY")}
     vix_aligned = vix.reindex(closes.index).ffill()
@@ -70,12 +102,14 @@ def simulate(
     ry = (real_yield if real_yield is not None else pd.Series(dtype=float)).reindex(closes.index).ffill()
     ry_change = ry - ry.shift(REAL_YIELD_LOOKBACK)
     tilt_on = tilt_shift_pct > 0
+    qqq_stages = pullback_series(closes["QQQ"]) if dip_shift_pct > 0 else None
 
     eval_idx = [i for i, ts in enumerate(closes.index) if ts >= start]
     if len(eval_idx) < 2:
         raise ValueError("백테스트 기간의 시세 데이터가 부족합니다.")
 
     rets = closes.pct_change().fillna(0.0)
+    rets = rets.join(leveraged_returns(rets, lev_actual if not lev_actual.empty else None))
     state = ConfirmState(None, None, None)
     holdings: dict[str, float] = {}
     equity = 100.0
@@ -86,6 +120,9 @@ def simulate(
     tilt_month: tuple[int, int] | None = None
     tilt_switches = 0
     tilt_days: dict[str, int] = {"FAVOR_QQQ": 0, "BALANCED": 0, "FAVOR_SPY": 0}
+    dip_level = 0
+    dip_entries = 0
+    dip_days = 0
     timeline: list[dict[str, str]] = []
 
     first = eval_idx[0]
@@ -122,8 +159,17 @@ def simulate(
                 tilt, tilt_changed = new_tilt, True
                 tilt_switches += 1
 
-        if (changed or tilt_changed) and state.current is not None:
-            weights = apply_tilt(weights_table[state.current], tilt, tilt_shift_pct)
+        dip_changed = False
+        if qqq_stages is not None:
+            new_level = advance_dip_level(dip_level, qqq_stages.iloc[i], state.current, dip_exit_stages)
+            dip_changed = new_level != dip_level
+            dip_entries += int(dip_level == 0 < new_level)
+            dip_level = new_level
+        dip_days += int(dip_level > 0)
+
+        if (changed or tilt_changed or dip_changed) and state.current is not None:
+            tilted = apply_tilt(weights_table[state.current], tilt, tilt_shift_pct)
+            weights = apply_dip(tilted, dip_level, dip_shift_pct)
             holdings = {a: equity * weights.get(a, 0.0) / 100.0 for a in TACTICAL_ASSETS}
         if state.current is not None:
             days_in[state.current] += 1
@@ -157,6 +203,8 @@ def simulate(
             for i in picks
         ],
         "regime_switches": switches,
+        "dip_entries": dip_entries,
+        "dip_time_pct": round(dip_days / (len(closes) - first or 1) * 100, 1),
         "tilt_switches": tilt_switches,
         "tilt_time_pct": {k: round(v / (sum(tilt_days.values()) or 1) * 100, 1) for k, v in tilt_days.items()},
         "regime_time_pct": {k: round(v / total_days * 100, 1) for k, v in days_in.items()},
@@ -189,8 +237,8 @@ async def _fetch_real_yield_history(days: int) -> pd.Series:
     return await _fetch_fred_history("DFII10", days)
 
 
-def _settings_hash(weights_table: dict[str, dict[str, float]], tilt_shift_pct: float) -> str:
-    payload = json.dumps({"w": weights_table, "tilt": tilt_shift_pct}, sort_keys=True)
+def _settings_hash(weights_table: dict[str, dict[str, float]], tilt_shift_pct: float, dip_shift_pct: float) -> str:
+    payload = json.dumps({"w": weights_table, "tilt": tilt_shift_pct, "dip": dip_shift_pct}, sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()[:12]
 
 
@@ -199,17 +247,21 @@ async def run_tactical_backtest(
     years: int,
     cache: CacheStore | None,
     tilt_shift_pct: float = 0.0,
+    dip_shift_pct: float = 0.0,
 ) -> dict[str, Any]:
-    key = tactical_backtest_key(_settings_hash(weights_table, tilt_shift_pct), years)
+    key = tactical_backtest_key(_settings_hash(weights_table, tilt_shift_pct, dip_shift_pct), years)
     if (hit := await get_cached_json(cache, key)) is not None:
         return hit
 
     days = years * 366 + _WARMUP_DAYS
-    closes_map = await fetch_close_history(["QQQ", "SPY", "DIA"], days)
+    # 레버리지 ETF는 비중표에 쓰일 때만 받는다(결측이면 합성 수익률로 대체)
+    uses_leverage = [a for a in sorted(LEVERAGED_ASSETS) if any(w.get(a, 0.0) > 0 for w in weights_table.values())]
+    tickers = ["QQQ", "SPY", "DIA", *uses_leverage]
+    closes_map = await fetch_close_history(tickers, days)
     if "QQQ" not in closes_map or "SPY" not in closes_map:
         raise ValueError("QQQ/SPY 과거 시세를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")
     # DIA는 비교·선택 자산 — 결측이면 빼고 진행(비중표에 DIA가 있으면 simulate가 오류)
-    closes = pd.DataFrame({t: closes_map[t] for t in ("QQQ", "SPY", "DIA") if t in closes_map})
+    closes = pd.DataFrame({t: closes_map[t] for t in tickers if t in closes_map})
     closes.index = pd.to_datetime(closes.index).tz_localize(None)
 
     try:
@@ -233,14 +285,25 @@ async def run_tactical_backtest(
             macro_note += " 실질금리 이력을 받지 못해 나스닥/S&P 틸트는 반영하지 않았습니다."
 
     start = closes.index[-1] - timedelta(days=years * 365)
-    result = simulate(closes, vix, weights_table, start, real_yield=real_yield, tilt_shift_pct=tilt_shift_pct)
+    result = simulate(
+        closes,
+        vix,
+        weights_table,
+        start,
+        real_yield=real_yield,
+        tilt_shift_pct=tilt_shift_pct,
+        dip_shift_pct=dip_shift_pct,
+    )
     result["years"] = years
     result["tilt_shift_pct"] = tilt_shift_pct
+    result["dip_shift_pct"] = dip_shift_pct
     result["macro_note"] = macro_note
     result["assumptions"] = (
         "국면 확정 2거래일 연속 · 공격 국면은 매크로 '주의'까지 유지 · 나스닥/S&P 틸트 월 1회 · "
-        "전환 시에만 리밸런싱 · "
-        "현금 수익률 0 · 거래비용·세금·환율 미반영"
+        + ("웅덩이 투입은 공격 국면만·회복 시 회수 · " if dip_shift_pct > 0 else "")
+        + "전환 시에만 리밸런싱 · "
+        + ("QLD·SSO 상장 전 구간은 2배 합성(보수·차입비용 차감) · " if uses_leverage else "")
+        + "현금 수익률 0 · 거래비용·세금·환율 미반영"
     )
     await set_cached_json(cache, key, result, TTL_TACTICAL_BACKTEST)
     return result

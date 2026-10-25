@@ -81,3 +81,36 @@ def tactical_regime_change_template(
         "이 신호는 과거 데이터 기반 참고용이며 수익을 보장하지 않습니다.",
     )
     return subject, html
+
+
+def tactical_dip_template(
+    portfolio_name: str,
+    stage_label: str,
+    deploy_pct: float,
+    weights_text: str,
+    reasons: list[str],
+    app_link: str,
+) -> tuple[str, str]:
+    """전술 배분 공격 국면에서 QQQ 웅덩이(눌림목) 단계가 깊어졌을 때 발송 — 현금 일부를 주식으로 옮기는 제안."""
+    subject = f"[Growlio] 웅덩이 매수 제안 — {stage_label}"
+    body = _kv_table(
+        [
+            ("포트폴리오", portfolio_name),
+            ("웅덩이 단계", f"<span style='font-weight:bold;'>{stage_label}</span>"),
+            ("현금 → 주식", f"{deploy_pct:g}%p"),
+            ("제안 비중", weights_text),
+        ]
+    )
+    if reasons:
+        items = "".join(f"<li>{r}</li>" for r in reasons)
+        body += f"<ul style='color:#64748b;font-size:13px;margin-top:12px;'>{items}</ul>"
+    link = f"<a href='{app_link}' style='color:#2563eb;'>앱에서 제안 비중 확인·적용하기</a>"
+    body += f"<p style='margin-top:16px;'>{link}</p>"
+    html = _email_div(
+        "웅덩이 매수 제안",
+        "#2563eb",
+        body,
+        "자동 주문은 실행되지 않았습니다. 가격이 회복되면 투입분을 다시 현금으로 돌리는 제안이 이어집니다.<br>"
+        "이 신호는 과거 데이터 기반 참고용이며 수익을 보장하지 않습니다.",
+    )
+    return subject, html

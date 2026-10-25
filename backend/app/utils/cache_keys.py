@@ -192,8 +192,9 @@ def overseas_stock_meta_key(ticker: str) -> str:
 
 
 def technical_signal_key(tickers: tuple[str, ...]) -> str:
-    """차트 기술적 지표 스냅샷(일봉) 캐시 키 — 유저 무관 전역 공유. v2: 추세 히스테리시스 밴드 도입."""
-    return f"{_env_prefix()}technical_signal:v2:{','.join(sorted(tickers))}"
+    """차트 기술적 지표 스냅샷(일봉) 캐시 키 — 유저 무관 전역 공유. v2: 추세 히스테리시스 밴드 도입.
+    v3: 20/60/120일선·웅덩이 단계 추가(스냅샷 모양 변경)."""
+    return f"{_env_prefix()}technical_signal:v3:{','.join(sorted(tickers))}"
 
 
 def tactical_tilt_key() -> str:
@@ -202,8 +203,9 @@ def tactical_tilt_key() -> str:
 
 
 def tactical_backtest_key(settings_hash: str, years: int) -> str:
-    """전술 배분 백테스트 결과 캐시 키 — 비중표+틸트 이동폭 해시가 같으면 유저 간 공유. v2: 공격 국면 유지·틸트."""
-    return f"{_env_prefix()}tactical_backtest:v2:{settings_hash}:{years}"
+    """전술 배분 백테스트 결과 캐시 키 — 비중표+틸트·웅덩이 이동폭 해시가 같으면 유저 간 공유.
+    v2: 공격 국면 유지·틸트. v3: 웅덩이 투입·레버리지 자산."""
+    return f"{_env_prefix()}tactical_backtest:v3:{settings_hash}:{years}"
 
 
 def kis_amex_master_key() -> str:

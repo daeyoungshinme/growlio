@@ -1,8 +1,8 @@
 import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPortfolios } from "@/api/portfolios";
-import type { TacticalStatus, TacticalWeights, TechnicalSnapshot } from "@/api/tactical";
-import ConfirmModal from "@/components/common/ConfirmModal";
+import type { TacticalStatus, TechnicalSnapshot } from "@/api/tactical";
+import Modal, { ModalFooter } from "@/components/common/Modal";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
@@ -19,8 +19,13 @@ import { useAutoExecutionNotice } from "@/hooks/useAutoExecutionNotice";
 import TacticalWeightsEditor from "./TacticalWeightsEditor";
 import {
   ASSET_LABEL,
+  formatTacticalWeights,
+  OPTIONAL_ASSETS,
+  PULLBACK_BADGE_CLASS,
+  PULLBACK_LABEL,
   REGIME_BADGE_CLASS,
   REGIME_LABEL,
+  TACTICAL_ASSET_LIST_TEXT,
   TACTICAL_ASSETS,
   TILT_LABEL,
   TREND_LABEL,
@@ -41,15 +46,15 @@ interface Props {
   showPortfolioPicker?: boolean;
 }
 
-/** 백엔드 tactical_allocation_service.format_weights와 같은 규칙 — DIA는 0%면 생략 */
-function formatWeights(weights: TacticalWeights): string {
-  return TACTICAL_ASSETS.filter((a) => a !== "DIA" || (weights[a] ?? 0) > 0)
-    .map((a) => `${a === "CASH" ? "현금" : a} ${weights[a] ?? 0}%`)
-    .join(" · ");
-}
-
 function fmtNum(n: number | null | undefined, digits = 2): string {
   return n == null ? "—" : n.toFixed(digits);
+}
+
+/** 종가의 이평선 대비 이격(%) — 음수면 이평선 아래(웅덩이) */
+function fmtGap(close: number | null | undefined, ma: number | null | undefined): string {
+  if (close == null || ma == null || ma <= 0) return "—";
+  const pct = (close / ma - 1) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
 }
 
 function IndicatorRow({
@@ -62,6 +67,7 @@ function IndicatorRow({
   note?: string;
 }) {
   const trend = snap?.trend ?? "UNKNOWN";
+  const stage = snap?.pullback_stage;
   const trendCls =
     trend === "UP"
       ? "text-red-500"
@@ -79,7 +85,14 @@ function IndicatorRow({
             </span>
           )}
         </span>
-        <span className={`text-sm font-medium ${trendCls}`}>추세 {TREND_LABEL[trend]}</span>
+        <span className="flex items-center gap-2">
+          {stage && stage !== "UNKNOWN" && (
+            <span className={`px-2 py-0.5 rounded-full text-xs ${PULLBACK_BADGE_CLASS[stage]}`}>
+              {PULLBACK_LABEL[stage]}
+            </span>
+          )}
+          <span className={`text-sm font-medium ${trendCls}`}>추세 {TREND_LABEL[trend]}</span>
+        </span>
       </div>
       <dl className="mt-1 grid grid-cols-3 gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-300">
         <div>
@@ -87,24 +100,30 @@ function IndicatorRow({
           <dd>${fmtNum(snap?.close)}</dd>
         </div>
         <div>
-          <dt className="text-gray-400 dark:text-gray-500">50일선</dt>
-          <dd>${fmtNum(snap?.sma50)}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-400 dark:text-gray-500">200일선</dt>
-          <dd>${fmtNum(snap?.sma200)}</dd>
-        </div>
-        <div>
           <dt className="text-gray-400 dark:text-gray-500">RSI(14)</dt>
           <dd>{fmtNum(snap?.rsi14, 1)}</dd>
         </div>
         <div>
-          <dt className="text-gray-400 dark:text-gray-500">MACD 히스토그램</dt>
-          <dd>{fmtNum(snap?.macd_hist)}</dd>
-        </div>
-        <div>
           <dt className="text-gray-400 dark:text-gray-500">52주 고점 대비</dt>
           <dd>{snap?.drawdown_pct == null ? "—" : `${snap.drawdown_pct.toFixed(1)}%`}</dd>
+        </div>
+        {/* 이평선은 절대 가격 대신 종가 이격으로 — 어느 선까지 눌렸는지(웅덩이 깊이)가 한눈에 보이게 */}
+        {(
+          [
+            ["20일선", snap?.sma20],
+            ["60일선", snap?.sma60],
+            ["120일선", snap?.sma120],
+            ["200일선", snap?.sma200],
+          ] as const
+        ).map(([label, ma]) => (
+          <div key={label}>
+            <dt className="text-gray-400 dark:text-gray-500">{label} 대비</dt>
+            <dd>{fmtGap(snap?.close, ma)}</dd>
+          </div>
+        ))}
+        <div>
+          <dt className="text-gray-400 dark:text-gray-500">MACD 히스토그램</dt>
+          <dd>{fmtNum(snap?.macd_hist)}</dd>
         </div>
       </dl>
     </div>
@@ -139,6 +158,31 @@ function TiltSummary({ status }: { status: TacticalStatus }) {
   );
 }
 
+function DipSummary({ status }: { status: TacticalStatus }) {
+  const off = status.dip_shift_pct <= 0;
+  const deploying = !off && status.dip_level > 0;
+  return (
+    <div className="border-t border-gray-100 dark:border-gray-700 pt-2 flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold">웅덩이 매수(눌림목)</span>
+        <span className="text-sm font-medium">
+          {off
+            ? "사용 안 함"
+            : deploying
+              ? `현금 ${+((status.dip_shift_pct * status.dip_level) / 3).toFixed(1)}%p 투입 중`
+              : "대기"}
+        </span>
+      </div>
+      <ul className="text-xs text-gray-500 dark:text-gray-400 list-disc pl-4 space-y-0.5">
+        {status.dip_reasons.map((r) => (
+          <li key={r}>{r}</li>
+        ))}
+        {off && <li>비중표 편집에서 켜면 공격 국면의 눌림목에 현금 일부를 주식으로 옮겨요.</li>}
+      </ul>
+    </div>
+  );
+}
+
 function WeightsCompare({ status }: { status: TacticalStatus }) {
   const proposed = status.proposed_weights;
   const otherCurrent = Object.entries(status.current_weights)
@@ -157,8 +201,8 @@ function WeightsCompare({ status }: { status: TacticalStatus }) {
         {TACTICAL_ASSETS.map((a) => {
           const cur = status.current_weights[a] ?? 0;
           const next = proposed?.[a] ?? 0;
-          // DIA는 선택 자산 — 현재·제안 모두 0이면 행을 숨긴다
-          if (a === "DIA" && cur === 0 && next === 0) return null;
+          // DIA·QLD·SSO는 선택 자산 — 현재·제안 모두 0이면 행을 숨긴다
+          if (OPTIONAL_ASSETS.has(a) && cur === 0 && next === 0) return null;
           return (
             <tr key={a} className="border-t border-gray-100 dark:border-gray-700">
               <td className="py-1.5">{ASSET_LABEL[a]}</td>
@@ -192,6 +236,10 @@ function TacticalStatusView({
 }) {
   const { upsert, disable, apply } = useTacticalMutations(status.portfolio_id);
   const [confirmApply, setConfirmApply] = useState(false);
+  const runApply = (fraction: number) => {
+    setConfirmApply(false);
+    apply.mutate(fraction, { onSuccess: () => setJustApplied(true) });
+  };
   const [justApplied, setJustApplied] = useState(false);
   const autoExecutionNotice = useAutoExecutionNotice(status.portfolio_id);
   const regime = status.confirmed_regime ?? status.observed_regime;
@@ -247,6 +295,7 @@ function TacticalStatusView({
           <IndicatorRow ticker="DIA" snap={status.technicals.DIA} note="참고 · 국면 판단 미반영" />
         </div>
         <TiltSummary status={status} />
+        <DipSummary status={status} />
       </section>
 
       <section className="card flex flex-col gap-3">
@@ -256,8 +305,8 @@ function TacticalStatusView({
         <WeightsCompare status={status} />
         {!status.portfolio_compatible && (
           <p className="text-xs text-amber-700 dark:text-amber-400">
-            이 포트폴리오에는 QQQ·SPY·DIA·현금 외 종목이 있어요. 적용하면 그 종목들은 목표 비중에서
-            빠져요.
+            이 포트폴리오에는 {TACTICAL_ASSET_LIST_TEXT} 외 종목이 있어요. 적용하면 그 종목들은 목표
+            비중에서 빠져요.
           </p>
         )}
 
@@ -282,6 +331,7 @@ function TacticalStatusView({
                     notify_enabled: checked,
                     regime_weights: status.is_default_weights ? null : status.regime_weights,
                     tilt_shift_pct: status.tilt_shift_pct,
+                    dip_shift_pct: status.dip_shift_pct,
                   })
                 }
                 ariaLabel="국면 전환 알림"
@@ -324,10 +374,11 @@ function TacticalStatusView({
 
       {status.enabled && (
         <TacticalWeightsEditor
-          key={`${JSON.stringify(status.regime_weights)}:${status.tilt_shift_pct}`}
+          key={`${JSON.stringify(status.regime_weights)}:${status.tilt_shift_pct}:${status.dip_shift_pct}`}
           regimeWeights={status.regime_weights}
           isDefaultWeights={status.is_default_weights}
           tiltShiftPct={status.tilt_shift_pct}
+          dipShiftPct={status.dip_shift_pct}
           notifyEnabled={status.notify_enabled}
           saving={upsert.isPending}
           onSave={(payload) =>
@@ -339,16 +390,47 @@ function TacticalStatusView({
       )}
 
       {confirmApply && status.proposed_weights && (
-        <ConfirmModal
-          message={`"${status.portfolio_name}" 목표 비중을 ${REGIME_LABEL[status.confirmed_regime ?? "NEUTRAL"]} 국면 비중(${formatWeights(status.proposed_weights)})으로 바꿀까요? ${autoExecutionNotice ?? "주문은 나가지 않으며, 다음 화면에서 매매 내역을 확인한 뒤 직접 실행해요."}${status.portfolio_compatible ? "" : " QQQ·SPY·DIA·현금 외 종목은 목표에서 빠집니다."}`}
-          confirmLabel="적용"
-          danger={false}
-          onCancel={() => setConfirmApply(false)}
-          onConfirm={() => {
-            setConfirmApply(false);
-            apply.mutate(undefined, { onSuccess: () => setJustApplied(true) });
-          }}
-        />
+        <Modal title="제안 비중 적용" size="sm" onClose={() => setConfirmApply(false)}>
+          <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <p>
+              &ldquo;{status.portfolio_name}&rdquo; 목표 비중을{" "}
+              {REGIME_LABEL[status.confirmed_regime ?? "NEUTRAL"]} 국면 비중(
+              {formatTacticalWeights(status.proposed_weights)})으로 바꿀까요?
+            </p>
+            <p className="text-gray-500 dark:text-gray-400">
+              {autoExecutionNotice ??
+                "주문은 나가지 않으며, 다음 화면에서 매매 내역을 확인한 뒤 직접 실행해요."}
+              {!status.portfolio_compatible &&
+                ` ${TACTICAL_ASSET_LIST_TEXT} 외 종목은 목표에서 빠집니다.`}
+            </p>
+            {status.portfolio_compatible && (
+              <p className="text-gray-500 dark:text-gray-400">
+                국면이 막 바뀐 직후라면 절반만 먼저 적용하고 다음 거래일에 나머지를 적용해 매수·매도
+                타이밍을 나눌 수 있어요.
+              </p>
+            )}
+          </div>
+          <ModalFooter>
+            {status.portfolio_compatible && (
+              <button
+                type="button"
+                className={`${TOUCH_TARGET_MIN} flex-1 px-4 rounded-lg text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-50`}
+                disabled={apply.isPending}
+                onClick={() => runApply(0.5)}
+              >
+                절반 먼저 적용
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${TOUCH_TARGET_MIN} flex-1 bg-blue-600 text-white px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+              disabled={apply.isPending}
+              onClick={() => runApply(1)}
+            >
+              한 번에 적용
+            </button>
+          </ModalFooter>
+        </Modal>
       )}
 
       <ErrorBoundary variant="section">
@@ -360,7 +442,7 @@ function TacticalStatusView({
   );
 }
 
-/** 리밸런싱 페이지 "목표 조정 › 전술" 모드 — 포트폴리오를 골라 QQQ/SPY(+DIA) 전술 배분 국면·제안 비중을 보고 적용한다. */
+/** 리밸런싱 페이지 "목표 조정 › 전술" 모드 — 포트폴리오를 골라 QQQ/SPY(+DIA·QLD·SSO) 전술 배분 국면·제안 비중을 보고 적용한다. */
 export default function TacticalAllocationTab({
   selectedPortfolioId,
   onSelectPortfolio,

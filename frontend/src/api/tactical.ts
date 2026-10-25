@@ -4,8 +4,10 @@ import type { MarketRiskLevel } from "./marketSignals";
 /** QQQ/SPY 전술 배분 국면 — 백엔드 tactical_allocation_service.Regime */
 export type TacticalRegime = "RISK_ON" | "NEUTRAL" | "RISK_OFF";
 export type TrendState = "UP" | "NEUTRAL" | "DOWN" | "UNKNOWN";
-/** DIA(다우)는 비중표에만 쓰이고 국면 판정에는 쓰이지 않는다 */
-export type TacticalAsset = "QQQ" | "SPY" | "DIA" | "CASH";
+/** DIA(다우)·QLD·SSO(2배 레버리지)는 비중표에만 쓰이고 국면 판정에는 쓰이지 않는다 */
+export type TacticalAsset = "QQQ" | "SPY" | "DIA" | "QLD" | "SSO" | "CASH";
+/** 백엔드 technical_indicators.PullbackStage — 종가가 가장 깊이 내려간 이평선(웅덩이매매법 분할매수 구간) */
+export type PullbackStage = "NONE" | "SMA20" | "SMA60" | "SMA120" | "SMA120_RSI" | "UNKNOWN";
 export type TacticalWeights = Record<TacticalAsset, number>;
 export type RegimeWeightsTable = Record<TacticalRegime, TacticalWeights>;
 /** 나스닥/S&P 틸트 — 백엔드 tactical_tilt.Tilt (주식 몫 안에서 QQQ↔SPY 이동) */
@@ -19,12 +21,16 @@ export interface TiltInputs {
 
 export interface TechnicalSnapshot {
   close: number | null;
+  sma20?: number | null;
+  sma60?: number | null;
+  sma120?: number | null;
   sma50: number | null;
   sma200: number | null;
   rsi14: number | null;
   macd_hist: number | null;
   drawdown_pct: number | null; // 52주 고점 대비(%, 0 이하)
   trend: TrendState;
+  pullback_stage?: PullbackStage;
 }
 
 export interface TacticalStatus {
@@ -45,7 +51,7 @@ export interface TacticalStatus {
   is_default_weights: boolean;
   proposed_weights: TacticalWeights | null;
   current_weights: Record<string, number>;
-  /** 포트폴리오가 QQQ/SPY/DIA/CASH로만 구성됐는지 — false면 적용 시 다른 종목이 목표에서 빠진다 */
+  /** 포트폴리오가 전술 자산(QQQ/SPY/DIA/QLD/SSO/CASH)으로만 구성됐는지 — false면 적용 시 다른 종목이 목표에서 빠진다 */
   portfolio_compatible: boolean;
   /** 틸트 이동폭(%p, 0이면 끔). proposed_weights에는 이미 반영돼 있다 */
   tilt_shift_pct: number;
@@ -54,6 +60,13 @@ export interface TacticalStatus {
   tilt_evaluated_on: string | null;
   tilt_inputs: TiltInputs | null;
   tilt_reasons: string[];
+  /** 웅덩이(눌림목) 현금 투입 최대폭(%p, 0이면 끔). 공격 국면에서만 proposed_weights에 반영된다 */
+  dip_shift_pct: number;
+  /** 현재 투입 단계 0~3(60일선/120일선/120일선+RSI 과매도) — 공격 국면이 아니면 0 */
+  dip_level: number;
+  /** QQQ 웅덩이 단계(오늘) */
+  pullback_stage: PullbackStage;
+  dip_reasons: string[];
 }
 
 export interface TacticalStrategyPayload {
@@ -61,6 +74,8 @@ export interface TacticalStrategyPayload {
   regime_weights?: RegimeWeightsTable | null;
   /** 생략하면 서버 기본값(10)으로 저장되므로 설정 변경 시에는 현재 값을 함께 보낸다 */
   tilt_shift_pct?: number;
+  /** 생략하면 0(끔)으로 저장되므로 설정 변경 시에는 현재 값을 함께 보낸다 */
+  dip_shift_pct?: number;
 }
 
 export interface TacticalBacktestMetric {
@@ -84,6 +99,9 @@ export interface TacticalBacktestResult {
   tilt_shift_pct: number;
   tilt_switches: number;
   tilt_time_pct: Record<TacticalTilt, number>;
+  dip_shift_pct?: number;
+  dip_entries?: number; // 웅덩이 진입 횟수
+  dip_time_pct?: number; // 투입 상태였던 기간 비율(%)
   regime_timeline: { date: string; regime: TacticalRegime }[];
   macro_note: string;
   assumptions: string;
@@ -98,8 +116,9 @@ export const upsertTacticalStrategy = (portfolioId: string, payload: TacticalStr
 export const deleteTacticalStrategy = (portfolioId: string) =>
   apiDelete(`/tactical/${portfolioId}`);
 
-export const applyTacticalWeights = (portfolioId: string) =>
-  apiPost<TacticalStatus>(`/tactical/${portfolioId}/apply`);
+/** fraction<1이면 현재 목표에서 제안 쪽으로 그만큼만 옮긴다(분할 적용 — 전술 자산만 있는 포트폴리오만) */
+export const applyTacticalWeights = (portfolioId: string, fraction = 1) =>
+  apiPost<TacticalStatus>(`/tactical/${portfolioId}/apply`, { fraction });
 
 export const fetchTacticalBacktest = (portfolioId: string, years: number) =>
   apiGet<TacticalBacktestResult>(`/tactical/${portfolioId}/backtest`, { params: { years } });

@@ -222,10 +222,11 @@ class TestTilt:
 
     def test_proposed_weights_apply_confirmed_tilt(self):
         s = _strategy(last_tilt="FAVOR_QQQ", tilt_shift_pct=10)
-        assert tactical.proposed_weights_for(s, "NEUTRAL", {}) == {"QQQ": 40.0, "SPY": 30.0, "DIA": 0.0, "CASH": 30.0}
+        expected = {"QQQ": 40.0, "SPY": 30.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 30.0}
+        assert tactical.proposed_weights_for(s, "NEUTRAL", {}) == expected
         # 전략이 없으면 오늘 판정으로 미리보기, 이동폭은 기본값
         preview = tactical.proposed_weights_for(None, "NEUTRAL", {"observed_tilt": "FAVOR_SPY"})
-        assert preview == {"QQQ": 20.0, "SPY": 50.0, "DIA": 0.0, "CASH": 30.0}
+        assert preview == {"QQQ": 20.0, "SPY": 50.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 30.0}
         assert tactical.tilt_shift_of(_strategy(tilt_shift_pct=None)) == tilt.DEFAULT_TILT_SHIFT_PCT
 
     def test_reasons_mention_missing_data(self):
@@ -276,7 +277,7 @@ class TestWeights:
     def test_valid_table_fills_missing_assets(self):
         raw = {"RISK_ON": {"QQQ": 100}, "NEUTRAL": {"SPY": 50, "CASH": 50}, "RISK_OFF": {"CASH": 100}}
         out = tactical.validate_regime_weights(raw)
-        assert out["RISK_ON"] == {"QQQ": 100.0, "SPY": 0.0, "DIA": 0.0, "CASH": 0.0}
+        assert out["RISK_ON"] == {"QQQ": 100.0, "SPY": 0.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 0.0}
 
     @pytest.mark.parametrize(
         "raw",

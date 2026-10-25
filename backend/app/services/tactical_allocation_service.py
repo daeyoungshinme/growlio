@@ -1,7 +1,10 @@
 """QQQ/SPY 전술 배분 — 매크로 복합신호 + 차트 추세로 국면을 판정해 목표 비중을 제안한다.
 
-비중 자산은 QQQ·SPY·DIA(다우)·현금. DIA는 비중표에만 쓰이고(기본 0%) 국면 판정에는 넣지 않는다 — SPY와 상관이
-0.95를 넘어 판정 입력으로는 새 정보가 거의 없고, 판정 규칙은 백테스트로 검증된 QQQ/SPY 기준을 유지한다.
+비중 자산은 QQQ·SPY·DIA(다우)·QLD·SSO(나스닥·S&P 2배)·현금. DIA·QLD·SSO는 비중표에만 쓰이는 선택 자산이고(기본 0%)
+국면 판정에는 넣지 않는다 — DIA는 SPY와 상관이 0.95를 넘어 새 정보가 거의 없고, 레버리지 ETF는 기초지수(QQQ·SPY)
+신호와 같으며, 판정 규칙은 백테스트로 검증된 QQQ/SPY 기준을 유지한다.
+
+제안 비중 = 국면 비중표 → 나스닥/S&P 틸트(`tactical_tilt`, 월 1회) → 눌림목 현금 투입(`tactical_dip`, 공격 국면만).
 
 판정 규칙(순서대로):
 1. SPY·QQQ 추세가 모두 UNKNOWN(시세 조회 실패)이면 판정 불가 → 기존 확정 국면 유지
@@ -32,6 +35,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.portfolio import Portfolio, PortfolioItem
 from app.models.tactical import TacticalStrategy
+from app.services.tactical_dip import ACTIVE_REGIMES as DIP_ACTIVE_REGIMES
+from app.services.tactical_dip import DEFAULT_DIP_SHIFT_PCT, advance_dip_level, apply_dip, dip_reasons
 from app.services.tactical_tilt import (
     DEFAULT_TILT_SHIFT_PCT,
     apply_tilt,
@@ -52,21 +57,25 @@ Regime = Literal["RISK_ON", "NEUTRAL", "RISK_OFF"]
 REGIMES: tuple[Regime, ...] = ("RISK_ON", "NEUTRAL", "RISK_OFF")
 REGIME_LABELS: dict[str, str] = {"RISK_ON": "공격", "NEUTRAL": "중립", "RISK_OFF": "방어"}
 
-TACTICAL_ASSETS: tuple[str, ...] = ("QQQ", "SPY", "DIA", "CASH")
+TACTICAL_ASSETS: tuple[str, ...] = ("QQQ", "SPY", "DIA", "QLD", "SSO", "CASH")
 # 0%면 비중 문구에서 생략하는 선택 자산(기본 비중표에 없음)
-_OPTIONAL_ASSETS = frozenset({"DIA"})
-# 포트폴리오 항목 저장 형식 — 프론트 종목검색 저장값과 동일(SPY·DIA는 Yahoo PCX→"NYSE"; KIS 주문 시 AMEX로 보정됨)
+OPTIONAL_ASSETS = frozenset({"DIA", "QLD", "SSO"})
+LEVERAGED_ASSETS = frozenset({"QLD", "SSO"})
+# 포트폴리오 항목 저장 형식 — 프론트 종목검색 저장값과 동일(NYSE Arca 상장 ETF는 Yahoo PCX→"NYSE";
+# KIS 주문 시 kis/exchange_master가 AMS 종목마스터로 AMEX 보정)
 _ASSET_META: dict[str, tuple[str, str]] = {
     "QQQ": ("Invesco QQQ Trust", "NASDAQ"),
     "SPY": ("SPDR S&P 500 ETF Trust", "NYSE"),
     "DIA": ("SPDR Dow Jones Industrial Average ETF Trust", "NYSE"),
+    "QLD": ("ProShares Ultra QQQ", "NYSE"),
+    "SSO": ("ProShares Ultra S&P500", "NYSE"),
     "CASH": ("현금", "KRW"),
 }
 
 DEFAULT_REGIME_WEIGHTS: dict[str, dict[str, float]] = {
-    "RISK_ON": {"QQQ": 50.0, "SPY": 40.0, "DIA": 0.0, "CASH": 10.0},
-    "NEUTRAL": {"QQQ": 30.0, "SPY": 40.0, "DIA": 0.0, "CASH": 30.0},
-    "RISK_OFF": {"QQQ": 10.0, "SPY": 30.0, "DIA": 0.0, "CASH": 60.0},
+    "RISK_ON": {"QQQ": 50.0, "SPY": 40.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 10.0},
+    "NEUTRAL": {"QQQ": 30.0, "SPY": 40.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 30.0},
+    "RISK_OFF": {"QQQ": 10.0, "SPY": 30.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 60.0},
 }
 
 _TREND_LABELS: dict[TrendState, str] = {"UP": "상승", "NEUTRAL": "혼조", "DOWN": "하락", "UNKNOWN": "확인 불가"}
@@ -149,6 +158,32 @@ def advance_tilt(strategy: TacticalStrategy, market: dict[str, Any], today: date
     return True
 
 
+def advance_dip(strategy: TacticalStrategy, market: dict[str, Any]) -> bool:
+    """확정 국면 갱신 뒤 호출 — 눌림목 투입 단계를 갱신한다. 바뀌었으면 True(호출부 커밋 판단용).
+
+    투입을 끈 전략(이동폭 0)도 단계는 추적한다 — 나중에 켰을 때 진행 중인 웅덩이를 바로 반영하도록.
+    """
+    prev = strategy.dip_level or 0
+    new = advance_dip_level(prev, market.get("qqq_pullback_stage"), strategy.last_regime)
+    if new == prev:
+        return False
+    strategy.dip_level = new
+    return True
+
+
+def dip_shift_of(strategy: TacticalStrategy | None) -> float:
+    if strategy is None or strategy.dip_shift_pct is None:
+        return DEFAULT_DIP_SHIFT_PCT
+    return float(strategy.dip_shift_pct)
+
+
+def effective_dip_level(strategy: TacticalStrategy | None, regime: str | None) -> int:
+    """제안 비중에 쓸 투입 단계 — 전략이 없으면(미리보기)·공격 국면이 아니면 투입하지 않는다."""
+    if strategy is None or regime not in DIP_ACTIVE_REGIMES:
+        return 0
+    return strategy.dip_level or 0
+
+
 def tilt_shift_of(strategy: TacticalStrategy | None) -> float:
     # 새로 만든 객체는 flush 전까지 server_default가 채워지지 않아 None일 수 있다
     if strategy is None or strategy.tilt_shift_pct is None:
@@ -164,18 +199,19 @@ def effective_tilt(strategy: TacticalStrategy | None, market: dict[str, Any]) ->
 
 
 def proposed_weights_for(strategy: TacticalStrategy | None, regime: str, market: dict[str, Any]) -> dict[str, float]:
-    return apply_tilt(resolve_weights(strategy)[regime], effective_tilt(strategy, market), tilt_shift_of(strategy))
+    tilted = apply_tilt(resolve_weights(strategy)[regime], effective_tilt(strategy, market), tilt_shift_of(strategy))
+    return apply_dip(tilted, effective_dip_level(strategy, regime), dip_shift_of(strategy))
 
 
 def validate_regime_weights(raw: dict[str, Any]) -> dict[str, dict[str, float]]:
-    """국면별 비중표 검증 — 3개 국면 모두, 자산은 QQQ/SPY/DIA/CASH(누락은 0), 각 0~100, 합계 100."""
+    """국면별 비중표 검증 — 3개 국면 모두, 자산은 TACTICAL_ASSETS(누락은 0), 각 0~100, 합계 100."""
     if set(raw) != set(REGIMES):
         raise ValueError("공격·중립·방어 3개 국면의 비중을 모두 입력해야 합니다.")
     result: dict[str, dict[str, float]] = {}
     for regime in REGIMES:
         weights = raw[regime]
         if not isinstance(weights, dict) or not weights or not set(weights) <= set(TACTICAL_ASSETS):
-            raise ValueError("비중 자산은 QQQ·SPY·DIA·CASH만 사용할 수 있습니다.")
+            raise ValueError("비중 자산은 QQQ·SPY·DIA·QLD·SSO·CASH만 사용할 수 있습니다.")
         cleaned = {k: float(v) for k, v in weights.items()}
         if any(v < 0 or v > 100 for v in cleaned.values()):
             raise ValueError("각 비중은 0~100 사이여야 합니다.")
@@ -198,7 +234,7 @@ def format_weights(weights: dict[str, float]) -> str:
     return " · ".join(
         f"{'현금' if a == 'CASH' else a} {weights.get(a, 0):g}%"
         for a in TACTICAL_ASSETS
-        if a not in _OPTIONAL_ASSETS or weights.get(a, 0) > 0
+        if a not in OPTIONAL_ASSETS or weights.get(a, 0) > 0
     )
 
 
@@ -213,6 +249,8 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
         macro_level, freshness = "GREEN", "STALE"
     technicals: dict[str, TechnicalSnapshot] = await get_technical_signals(cache)
     trends = {t: s["trend"] for t, s in technicals.items()}
+    qqq_snap = technicals.get("QQQ")
+    qqq_stage = qqq_snap.get("pullback_stage", "UNKNOWN") if qqq_snap else "UNKNOWN"
     observed, reasons = classify_regime(macro_level, freshness, trends)
     # 공격 국면 유지(히스테리시스)는 전략별 직전 확정 국면에 달려 있어 두 경우를 모두 계산해 둔다
     observed_on, reasons_on = classify_regime(macro_level, freshness, trends, prev="RISK_ON")
@@ -230,6 +268,7 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
         "tilt_inputs_complete": all(v is not None for v in tilt_inputs.values()),
         "observed_tilt": observed_tilt,
         "tilt_reasons": tilt_reasons(tilt_inputs, observed_tilt),
+        "qqq_pullback_stage": qqq_stage,
     }
 
 
@@ -265,7 +304,7 @@ def _current_weights(portfolio: Portfolio) -> dict[str, float]:
 
 
 def is_tactical_managed(portfolio: Portfolio) -> bool:
-    """포트폴리오 구성이 QQQ/SPY/DIA/CASH만으로 이뤄졌는지 — 아니면 적용 시 다른 종목이 지워진다는 경고 대상."""
+    """포트폴리오가 전술 자산(TACTICAL_ASSETS)만으로 구성됐는지 — 아니면 적용 시 다른 종목이 지워진다는 경고 대상."""
     return all(item.ticker in TACTICAL_ASSETS for item in portfolio.items)
 
 
@@ -278,6 +317,8 @@ async def build_status(
     confirmed = strategy.last_regime if strategy else None
     observed, reasons = observed_for(market, confirmed)
     effective = confirmed or observed
+    dip_level = effective_dip_level(strategy, effective)
+    stage = market.get("qqq_pullback_stage", "UNKNOWN")
     return {
         "portfolio_id": str(portfolio.id),
         "portfolio_name": portfolio.name,
@@ -305,16 +346,33 @@ async def build_status(
         else None,
         "tilt_inputs": market.get("tilt_inputs"),
         "tilt_reasons": market.get("tilt_reasons", []),
+        "dip_shift_pct": dip_shift_of(strategy),
+        "dip_level": dip_level,
+        "pullback_stage": stage,
+        "dip_reasons": dip_reasons(stage, dip_level, dip_shift_of(strategy), effective),
         "current_weights": _current_weights(portfolio),
         "portfolio_compatible": is_tactical_managed(portfolio),
     }
 
 
+def interpolate_weights(current: dict[str, float], target: dict[str, float], fraction: float) -> dict[str, float]:
+    """현재 목표에서 제안 비중 쪽으로 `fraction`만큼 이동(0.1%p 단위). 반올림 오차는 현금이 흡수한다."""
+    out = {a: round(current.get(a, 0.0) + (target.get(a, 0.0) - current.get(a, 0.0)) * fraction, 1) for a in target}
+    out["CASH"] = round(100.0 - sum(v for a, v in out.items() if a != "CASH"), 1)
+    return out
+
+
 async def apply_regime_to_portfolio(
-    portfolio: Portfolio, strategy: TacticalStrategy, regime: Regime, db: AsyncSession
+    portfolio: Portfolio, strategy: TacticalStrategy, regime: Regime, db: AsyncSession, fraction: float = 1.0
 ) -> dict[str, float]:
-    """포트폴리오 목표 비중을 국면(+틸트) 비중으로 교체한다(QQQ/SPY/DIA/CASH 외 기존 종목은 삭제). 커밋은 호출부."""
+    """포트폴리오 목표 비중을 제안 비중(국면+틸트+웅덩이)으로 교체한다(전술 자산 외 기존 종목은 삭제). 커밋은 호출부.
+
+    `fraction<1`이면 현재 목표에서 제안 쪽으로 그만큼만 옮긴다(분할 적용 — 전술 자산만으로 구성된 포트폴리오인지는
+    호출부가 확인). 이때는 "적용 완료"로 기록하지 않아 화면의 적용 버튼이 남는다.
+    """
     weights = proposed_weights_for(strategy, regime, {})
+    if fraction < 1:
+        weights = interpolate_weights(_current_weights(portfolio), weights, fraction)
     await db.execute(delete(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio.id))
     for idx, asset in enumerate(a for a in TACTICAL_ASSETS if weights.get(a, 0) > 0):
         name, market = _ASSET_META[asset]
@@ -328,5 +386,7 @@ async def apply_regime_to_portfolio(
                 sort_order=idx,
             )
         )
-    strategy.applied_regime = regime
+    if fraction >= 1:
+        strategy.applied_regime = regime
+        strategy.notified_dip_level = strategy.dip_level or 0
     return weights

@@ -39,6 +39,7 @@ from app.services.email_templates import (
     rebalancing_plan_pending_template,
     recommendation_drift_alert_template,
     stock_price_alert_template,
+    tactical_dip_template,
     tactical_regime_change_template,
     tax_impact_gate_blocked_template,
     test_email_template,
@@ -456,6 +457,27 @@ async def send_tactical_regime_change_email(
         ok_event="tactical_regime_change_email_sent",
         fail_event="tactical_regime_change_email_failed",
         new_regime=new_label,
+    )
+
+
+async def send_tactical_dip_email(
+    to_email: str,
+    portfolio_name: str,
+    stage_label: str,
+    deploy_pct: float,
+    weights_text: str,
+    reasons: list[str],
+    portfolio_id: str | None = None,
+) -> bool:
+    """웅덩이(눌림목) 투입 단계 상승 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
+    params = {"gmode": "전술", **({"portfolioId": portfolio_id} if portfolio_id else {})}
+    app_link = _rebalancing_link("목표 조정", **params)
+    return await _send_templated(
+        to_email,
+        lambda: tactical_dip_template(portfolio_name, stage_label, deploy_pct, weights_text, reasons, app_link),
+        ok_event="tactical_dip_email_sent",
+        fail_event="tactical_dip_email_failed",
+        stage=stage_label,
     )
 
 

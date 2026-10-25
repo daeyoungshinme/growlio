@@ -59,6 +59,8 @@ export default function TacticalBacktestSection({ portfolioId }: Props) {
               {data.start_date} ~ {data.end_date} · 국면 전환 {data.regime_switches}회
               {data.tilt_shift_pct > 0 &&
                 ` · 나스닥·S&P 조절 ${data.tilt_switches}회(${data.tilt_shift_pct}%p)`}
+              {(data.dip_shift_pct ?? 0) > 0 &&
+                ` · 웅덩이 매수 ${data.dip_entries ?? 0}회(투입 상태 ${data.dip_time_pct ?? 0}%)`}
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
