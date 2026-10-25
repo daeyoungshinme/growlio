@@ -2,19 +2,24 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchAccounts } from "@/api/assets";
 import { fetchDashboard } from "@/api/dashboard";
 import { fetchDCAAnalysis } from "@/api/invest";
-import { fetchAllocationHistory, fetchPortfolioOverviewLite } from "@/api/portfolios";
+import { fetchPortfolioOverviewLite } from "@/api/portfolios";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchChallenges } from "@/api/challenges";
 import { useExchangeRate } from "./useExchangeRate";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
+import { isNativePlatform } from "@/utils/platform";
+
+// 네이티브 앱은 포그라운드에 있는 동안만 쓰이고 복귀 시 갱신되므로 주기 폴링을 끈다(PortfolioPage와 동일) —
+// 화면을 켜 둔 채 두면 5분마다 대시보드·overview 재계산 요청이 이어졌다
+const DASHBOARD_POLL = isNativePlatform() ? false : REFETCH_INTERVAL.DASHBOARD;
 
 export function useDashboardData() {
   const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: QUERY_KEYS.dashboard,
     queryFn: fetchDashboard,
     staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 백엔드 캐시 TTL(5분)과 동기화
-    refetchInterval: REFETCH_INTERVAL.DASHBOARD,
+    refetchInterval: DASHBOARD_POLL,
     refetchOnWindowFocus: false,
   });
 
@@ -22,7 +27,7 @@ export function useDashboardData() {
     queryKey: QUERY_KEYS.portfolioOverviewLite,
     queryFn: fetchPortfolioOverviewLite,
     staleTime: STALE_TIME.EXCHANGE_RATE,
-    refetchInterval: REFETCH_INTERVAL.DASHBOARD,
+    refetchInterval: DASHBOARD_POLL,
     refetchOnWindowFocus: false,
   });
 
@@ -51,14 +56,6 @@ export function useDashboardData() {
     queryFn: fetchMarketSignal,
     staleTime: STALE_TIME.MEDIUM,
     refetchOnWindowFocus: false,
-  });
-
-  // AllocationHistoryChart가 마운트되기 전에 미리 fetch해 waterfall을 제거한다.
-  useQuery({
-    queryKey: QUERY_KEYS.allocationHistory(12),
-    queryFn: () => fetchAllocationHistory(12),
-    staleTime: STALE_TIME.LONG,
-    gcTime: STALE_TIME.LONG,
   });
 
   return {

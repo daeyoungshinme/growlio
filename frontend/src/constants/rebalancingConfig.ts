@@ -84,6 +84,11 @@ export const MARKET_CONDITION_OPTIONS: {
   { value: "DISABLED", label: "신호 무시", desc: "시장 상황과 무관하게 자동 실행" },
   { value: "CAUTIOUS", label: "신중", desc: "고위험(RED) 신호 시 자동 실행 중단" },
   { value: "STRICT", label: "엄격", desc: "중위험(YELLOW) 이상에서 자동 실행 중단" },
+  {
+    value: "TACTICAL",
+    label: "전술 연동",
+    desc: "전술 배분이 방어 국면이면 이번 매수 보류(현금 보관 → 다음 매수일에 함께 매수) · 전술 배분을 켠 포트폴리오만",
+  },
 ];
 
 export const TAX_IMPACT_GATE_OPTIONS: { value: TaxImpactGateMode; label: string; desc: string }[] =

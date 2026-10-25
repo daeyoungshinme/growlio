@@ -18,7 +18,8 @@ class RebalancingAlertCreate(BaseModel):
     strategy: Literal["FULL", "BUY_ONLY", "TWO_PHASE"] = "BUY_ONLY"
     account_id: uuid.UUID | None = None
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
-    market_condition_mode: Literal["DISABLED", "CAUTIOUS", "STRICT"] = "DISABLED"
+    # TACTICAL: 같은 포트폴리오 전술 배분이 방어 국면이면 AUTO 매수 보류(plans/71)
+    market_condition_mode: Literal["DISABLED", "CAUTIOUS", "STRICT", "TACTICAL"] = "DISABLED"
     # AUTO 모드 실행 시각 (HH:MM KST, 예: "09:30" 또는 해외 종목용 "22:30"). None이면 장 개시 후
     # 첫 tick에 실행. 시장 개장 여부는 종목별 소속 시장(국내 KRX/해외 NYSE)에 맞춰 leg 단위로
     # 자동 판단되므로 이 필드는 시각 형식만 검증한다.

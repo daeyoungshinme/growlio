@@ -13,6 +13,9 @@ export const STALE_TIME = {
   FIVE_MINUTES: 5 * 60 * 1000,
 } as const;
 
+/** 앱 복귀(window focus) 시 이보다 오래된 쿼리만 재조회 (main.tsx QueryClient 기본값) */
+export const FOCUS_REFETCH_MIN_AGE = 5 * 60 * 1000;
+
 export const REFETCH_INTERVAL = {
   DASHBOARD: 300_000,
   PORTFOLIO: 300_000,

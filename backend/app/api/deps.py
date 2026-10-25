@@ -50,6 +50,11 @@ async def get_current_user(
     user = await db.scalar(select(User).where(User.id == user_id, User.is_active == True))
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    # 이 조회가 autobegin한 트랜잭션을 바로 끝내 커넥션을 풀에 돌려준다 — 안 그러면 요청이 끝날 때까지
+    # (외부 API 대기 포함) 커넥션을 쥐고 있어, 콜드 스타트에 홈 요청 10여 개가 몰리면 풀(5+2)이 고갈돼
+    # 나머지가 pool_timeout까지 줄을 섰다. 아직 쓰기 전이라 커밋할 내용이 없고, expire_on_commit=False라
+    # user 속성도 그대로 쓸 수 있다. 이후 쿼리는 새 트랜잭션을 autobegin한다.
+    await db.commit()
     return user
 
 

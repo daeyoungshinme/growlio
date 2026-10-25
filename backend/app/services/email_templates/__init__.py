@@ -17,6 +17,7 @@ from app.services.email_templates.alerts import (
 from app.services.email_templates.market_signal import (
     market_signal_change_template,
     market_signal_daily_digest_template,
+    tactical_dip_template,
     tactical_regime_change_template,
 )
 from app.services.email_templates.rebalancing import (
@@ -57,6 +58,7 @@ __all__ = [
     "rebalancing_plan_pending_template",
     "recommendation_drift_alert_template",
     "stock_price_alert_template",
+    "tactical_dip_template",
     "tactical_regime_change_template",
     "tax_impact_gate_blocked_template",
     "test_email_template",

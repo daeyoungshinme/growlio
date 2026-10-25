@@ -126,10 +126,15 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-def _path_prefix(path: str) -> str:
-    """'/api/v1/dashboard/summary' → '/api/v1/dashboard'"""
-    parts = path.rstrip("/").split("/")
-    return "/".join(parts[:4]) if len(parts) >= 4 else path
+def _route_label(request: Request) -> str:
+    """매칭된 라우트 템플릿('/api/v1/dashboard/action-items', '/api/v1/tactical/{portfolio_id}')을 레이블로.
+
+    경로 앞 4세그먼트로 자르면 같은 라우터의 엔드포인트(dashboard vs action-items)가 한 레이블로
+    합쳐져 느린 엔드포인트를 특정할 수 없었다. 매칭 실패(404 등)는 카디널리티 폭증을 막기 위해 한 값으로 묶는다.
+    """
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    return path if isinstance(path, str) else "unmatched"
 
 
 @app.middleware("http")
@@ -150,7 +155,7 @@ async def log_requests(request: Request, call_next):
     )
     http_request_duration.labels(
         method=request.method,
-        path_prefix=_path_prefix(request.url.path),
+        path_prefix=_route_label(request),
         status_class=status_class,
     ).observe(elapsed)
     return response

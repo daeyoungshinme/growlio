@@ -32,6 +32,7 @@ TTL_DAILY_RETURNS = 86400  # 일별수익률(MVO 입력) 1일
 TTL_BACKTEST = 86400  # 백테스트 결과 1일
 TTL_ALLOC_HISTORY = 86400  # 포트폴리오 배분 이력 1일
 TTL_DIVIDEND_INFO = 86400  # 배당 정보 1일
+TTL_DIVIDEND_FALLBACK_FX = 300  # 환율 fallback으로 계산된 배당 요약 5분 — 1300원 고정값이 24h 굳는 것 방지
 TTL_DART = 3600  # DART 공시 1시간
 TTL_DIVIDEND_MONTHS = 604800  # 배당 월별 데이터 7일
 TTL_HAS_OVERSEAS_TRUE = 21600  # 해외 보유 중 6시간
@@ -192,8 +193,9 @@ def overseas_stock_meta_key(ticker: str) -> str:
 
 
 def technical_signal_key(tickers: tuple[str, ...]) -> str:
-    """차트 기술적 지표 스냅샷(일봉) 캐시 키 — 유저 무관 전역 공유. v2: 추세 히스테리시스 밴드 도입."""
-    return f"{_env_prefix()}technical_signal:v2:{','.join(sorted(tickers))}"
+    """차트 기술적 지표 스냅샷(일봉) 캐시 키 — 유저 무관 전역 공유. v2: 추세 히스테리시스 밴드 도입.
+    v3: 20/60/120일선·웅덩이 단계 추가(스냅샷 모양 변경). v4: 추세 밴드 1%→2%(같은 모양, 추세 값이 달라짐)."""
+    return f"{_env_prefix()}technical_signal:v4:{','.join(sorted(tickers))}"
 
 
 def tactical_tilt_key() -> str:
@@ -202,8 +204,10 @@ def tactical_tilt_key() -> str:
 
 
 def tactical_backtest_key(settings_hash: str, years: int) -> str:
-    """전술 배분 백테스트 결과 캐시 키 — 비중표+틸트 이동폭 해시가 같으면 유저 간 공유. v2: 공격 국면 유지·틸트."""
-    return f"{_env_prefix()}tactical_backtest:v2:{settings_hash}:{years}"
+    """전술 배분 백테스트 결과 캐시 키 — 비중표+틸트·웅덩이 이동폭 해시가 같으면 유저 간 공유.
+    v2: 공격 국면 유지·틸트. v3: 웅덩이 투입·레버리지 자산. v4: 현금 이자·거래비용·평균 비중 고정(plans/69),
+    추세 밴드 2%·매크로 반영 옵션(plans/70)."""
+    return f"{_env_prefix()}tactical_backtest:v4:{settings_hash}:{years}"
 
 
 def kis_amex_master_key() -> str:

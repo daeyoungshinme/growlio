@@ -56,6 +56,7 @@ vi.mock("@/utils/queryInvalidation", () => ({
 // ── imports ───────────────────────────────────────────────────────────────────
 
 import { api } from "@/api/client";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 import { executionReducer } from "@/hooks/rebalancingExecution/reducer";
 import { useAccountMutations } from "@/hooks/useAccountMutations";
 import type { ExecutionState } from "@/hooks/rebalancingExecution/types";
@@ -64,7 +65,7 @@ import { useOptimizationSuggestions } from "@/hooks/useOptimizationSuggestions";
 import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
 import { useAllocationHistory } from "@/hooks/useAllocationHistory";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
-import { useAnalysisState } from "@/hooks/useAnalysisState";
+import { clearAnalysisCache, useAnalysisState } from "@/hooks/useAnalysisState";
 import { useAssetManagementData } from "@/hooks/useAssetManagementData";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -397,10 +398,15 @@ describe("useAlertCrud", () => {
 // ─── useAnalysisState ────────────────────────────────────────────────────────
 
 describe("useAnalysisState", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAnalysisCache();
+  });
 
   it("초기 상태는 모두 null/false다", () => {
-    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "" }));
+    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "" }), {
+      wrapper: createWrapper(),
+    });
     expect(result.current.mode).toBeNull();
     expect(result.current.analysis).toBeNull();
     expect(result.current.analyzing).toBe(false);
@@ -408,7 +414,9 @@ describe("useAnalysisState", () => {
   });
 
   it("setMode('strategy')가 mode를 설정한다", () => {
-    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "1" }));
+    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "1" }), {
+      wrapper: createWrapper(),
+    });
     act(() => {
       result.current.setMode("strategy");
     });
@@ -416,7 +424,9 @@ describe("useAnalysisState", () => {
   });
 
   it("setMode('rebalancing')가 mode를 설정한다", () => {
-    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "1" }));
+    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "1" }), {
+      wrapper: createWrapper(),
+    });
     act(() => {
       result.current.setMode("rebalancing");
     });
@@ -430,7 +440,9 @@ describe("useAnalysisState", () => {
     const mockAnalysis = { portfolio_id: 1, items: [], drift_pct: 5 };
     vi.mocked(analyzePortfolio).mockResolvedValue(mockAnalysis as never);
 
-    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "1" }));
+    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "1" }), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.triggerRebalancingAnalysis("1");
@@ -448,7 +460,9 @@ describe("useAnalysisState", () => {
       .mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)) as never)
       .mockResolvedValueOnce({ portfolio_id: 2, items: [] } as never);
 
-    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "2" }));
+    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "2" }), {
+      wrapper: createWrapper(),
+    });
 
     let first: Promise<void> = Promise.resolve();
     // 첫 요청이 실시간 예수금 조회를 마치고 분석 API까지 나간 뒤에 두 번째 요청을 보낸다
@@ -468,7 +482,28 @@ describe("useAnalysisState", () => {
     expect(result.current.analyzing).toBe(false);
   });
 
-  it("모든 분석 경로가 증권사 실시간 예수금 합계를 override로 보낸다 (plans/63 P1-1)", async () => {
+  it("자동 분석은 증권사를 호출하지 않고 동기화 기준 예수금으로 분석한다 (plans/72 2-5)", async () => {
+    const { analyzePortfolio, fetchBrokerBalance } = await import("@/api/rebalancing");
+    vi.mocked(analyzePortfolio).mockResolvedValue({ portfolio_id: 1, items: [] } as never);
+    const accounts = [{ id: "a1", asset_type: "STOCK_KIS" }] as never[];
+
+    const { result } = renderHook(
+      () =>
+        useAnalysisState({
+          selectedIdStr: "1",
+          autoAnalyzeId: "1",
+          getDepositAccounts: () => accounts,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.analysis).not.toBeNull());
+    expect(fetchBrokerBalance).not.toHaveBeenCalled();
+    expect(analyzePortfolio).toHaveBeenCalledWith("1", undefined, undefined);
+    expect(result.current.cashIsLive).toBe(false);
+  });
+
+  it("live 옵션이면 증권사 실시간 예수금 합계를 override로 보낸다", async () => {
     const { analyzePortfolio, fetchBrokerBalance } = await import("@/api/rebalancing");
     vi.mocked(analyzePortfolio).mockResolvedValue({ portfolio_id: 1, items: [] } as never);
     vi.mocked(fetchBrokerBalance)
@@ -480,18 +515,44 @@ describe("useAnalysisState", () => {
       { id: "m1", asset_type: "BANK" },
     ] as never[];
 
-    const { result } = renderHook(() =>
-      useAnalysisState({
-        selectedIdStr: "1",
-        autoAnalyzeId: "1",
-        getDepositAccounts: () => accounts,
-      }),
+    const { result } = renderHook(
+      () => useAnalysisState({ selectedIdStr: "1", getDepositAccounts: () => accounts }),
+      { wrapper: createWrapper() },
     );
 
-    await waitFor(() => expect(result.current.analysis).not.toBeNull());
+    await act(async () => {
+      await result.current.triggerRebalancingAnalysis("1", { live: true });
+    });
     expect(fetchBrokerBalance).toHaveBeenCalledTimes(2);
     expect(analyzePortfolio).toHaveBeenCalledWith("1", undefined, 300_000);
     expect(result.current.cashIsLive).toBe(true);
+  });
+
+  it("다시 마운트되면 최근 자동 분석 결과를 재사용하고, 계좌 데이터가 무효화되면 다시 분석한다", async () => {
+    const { analyzePortfolio } = await import("@/api/rebalancing");
+    vi.mocked(analyzePortfolio).mockResolvedValue({ portfolio_id: 7, items: [] } as never);
+    const qc = new QueryClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    const props = { selectedIdStr: "7", autoAnalyzeId: "7", portfolioItemsSignature: "[]" };
+
+    const first = renderHook(() => useAnalysisState(props), { wrapper });
+    await waitFor(() => expect(first.result.current.analysis).not.toBeNull());
+    first.unmount();
+
+    const second = renderHook(() => useAnalysisState(props), { wrapper });
+    expect(second.result.current.analysis).toEqual({ portfolio_id: 7, items: [] });
+    expect(analyzePortfolio).toHaveBeenCalledTimes(1);
+    second.unmount();
+
+    await act(async () => {
+      qc.setQueryData(QUERY_KEYS.accounts, []); // 앱에선 계좌 쿼리가 항상 캐시에 있다
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts });
+    });
+    const third = renderHook(() => useAnalysisState(props), { wrapper });
+    await waitFor(() => expect(analyzePortfolio).toHaveBeenCalledTimes(2));
+    third.unmount();
   });
 
   it("계좌 목록 로딩 전에는 자동 분석을 미룬다", async () => {
@@ -500,7 +561,7 @@ describe("useAnalysisState", () => {
     const { rerender } = renderHook(
       ({ ready }) =>
         useAnalysisState({ selectedIdStr: "1", autoAnalyzeId: "1", accountsReady: ready }),
-      { initialProps: { ready: false } },
+      { wrapper: createWrapper(), initialProps: { ready: false } },
     );
     expect(analyzePortfolio).not.toHaveBeenCalled();
     rerender({ ready: true });
@@ -511,7 +572,9 @@ describe("useAnalysisState", () => {
     const { analyzePortfolio } = await import("@/api/rebalancing");
     vi.mocked(analyzePortfolio).mockRejectedValue(new Error("분석 실패"));
 
-    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "1" }));
+    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "1" }), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.triggerRebalancingAnalysis("1");
@@ -524,7 +587,7 @@ describe("useAnalysisState", () => {
   it("selectedIdStr 변경으로 다중 선택이 되면 mode가 null로 리셋된다", () => {
     const { result, rerender } = renderHook(
       ({ selectedIdStr }: { selectedIdStr: string }) => useAnalysisState({ selectedIdStr }),
-      { initialProps: { selectedIdStr: "1" } },
+      { wrapper: createWrapper(), initialProps: { selectedIdStr: "1" } },
     );
 
     act(() => {
@@ -546,8 +609,9 @@ describe("useAnalysisState — additional coverage", () => {
     const { analyzePortfolio } = await import("@/api/rebalancing");
     vi.mocked(analyzePortfolio).mockResolvedValue({ portfolio_id: 5 } as never);
 
-    const { result } = renderHook(() =>
-      useAnalysisState({ autoAnalyzeId: "5", selectedIdStr: "5" }),
+    const { result } = renderHook(
+      () => useAnalysisState({ autoAnalyzeId: "5", selectedIdStr: "5" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(result.current.analyzing).toBe(false));
@@ -556,7 +620,9 @@ describe("useAnalysisState — additional coverage", () => {
   });
 
   it("autoAnalyzeId가 없으면 자동 분석이 트리거되지 않는다", () => {
-    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "5" }));
+    const { result } = renderHook(() => useAnalysisState({ selectedIdStr: "5" }), {
+      wrapper: createWrapper(),
+    });
     expect(result.current.analyzing).toBe(false);
     expect(result.current.mode).toBeNull();
   });
@@ -568,7 +634,7 @@ describe("useAnalysisState — additional coverage", () => {
 
     const { result, rerender } = renderHook(
       ({ selectedIdStr }: { selectedIdStr: string }) => useAnalysisState({ selectedIdStr }),
-      { initialProps: { selectedIdStr: "1" } },
+      { wrapper: createWrapper(), initialProps: { selectedIdStr: "1" } },
     );
 
     await act(async () => {
@@ -588,7 +654,7 @@ describe("useAnalysisState — additional coverage", () => {
     const { result, rerender } = renderHook(
       ({ portfolioItemsSignature }: { portfolioItemsSignature: string }) =>
         useAnalysisState({ autoAnalyzeId: "5", selectedIdStr: "5", portfolioItemsSignature }),
-      { initialProps: { portfolioItemsSignature: "sig-1" } },
+      { wrapper: createWrapper(), initialProps: { portfolioItemsSignature: "sig-1" } },
     );
 
     await waitFor(() => expect(result.current.analyzing).toBe(false));

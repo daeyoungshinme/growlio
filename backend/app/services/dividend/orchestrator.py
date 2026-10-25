@@ -26,11 +26,12 @@ from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DI
 from app.services.dividend.fetcher import fetch_ticker_dividend_info
 from app.utils.cache_keys import (
     TTL_DART,
+    TTL_DIVIDEND_FALLBACK_FX,
     TTL_DIVIDEND_INFO,
     dividend_ticker_summary_key,
     portfolio_overview_acct_suffix,
 )
-from app.utils.currency import get_usd_krw_rate
+from app.utils.currency import get_live_or_cached_usd_krw
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -308,7 +309,7 @@ async def get_ticker_dividend_summary(
 
     dart_key = await fetch_dart_api_key(user_id, db)
     kis_creds = await get_kis_user_credentials(user_id, db)
-    usd_krw_rate: float = await get_usd_krw_rate(cache)
+    usd_krw_rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
 
     estimated_map = await _fetch_estimated_dividend_map(positions, cache, kis_creds, dart_key, usd_krw_rate)
 
@@ -316,6 +317,9 @@ async def get_ticker_dividend_summary(
 
     has_yield = any(item.get("investment_yield", 0) > 0 for item in output)
     ttl = TTL_DIVIDEND_INFO if has_yield else TTL_DART
+    if not rate_is_live:
+        # 환율 fallback(설정값)으로 계산한 해외 배당 원화 환산이 24h 캐시에 굳지 않게 짧게
+        ttl = min(ttl, TTL_DIVIDEND_FALLBACK_FX)
     await cache.setex(cache_key, ttl, json.dumps(output))
     logger.info("dividend_by_ticker_computed", user_id=str(user_id), count=len(output))
     return output

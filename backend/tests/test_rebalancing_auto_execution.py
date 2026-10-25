@@ -1114,3 +1114,50 @@ class TestAutoExecutionPlanGenerationFailure:
             await _run_auto_execution()
 
         assert mock_build.await_count == 2
+
+
+class TestTacticalGate:
+    """plans/71 — 적립 자동매수 `TACTICAL` 게이트: 같은 포트폴리오 전술 배분이 방어 국면이면 계획을 만들지 않는다."""
+
+    async def _run(self, regime):
+        mock_db = _make_mock_db()
+        mock_db.scalar = AsyncMock(return_value=regime)  # TacticalStrategy.last_regime 조회
+        alert = _make_alert(market_condition_mode="TACTICAL", portfolio_id=uuid4())
+        portfolio = _make_portfolio()
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            _patch_common(mock_db, composite_level="RED"),  # 복합 신호는 무시돼야 한다
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
+            patch(
+                "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock(return_value=None)
+            ) as mock_gen,
+            patch(
+                "app.jobs.rebalancing_auto_execution.notify_market_signal_gate_blocked", new=AsyncMock()
+            ) as mock_notify,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+        return mock_gen, mock_notify
+
+    @pytest.mark.asyncio
+    async def test_risk_off_defers_buy_with_tactical_context(self):
+        mock_gen, mock_notify = await self._run("RISK_OFF")
+        mock_gen.assert_not_called()
+        blocked = mock_notify.call_args.args[2]
+        assert blocked.market_condition_mode == "TACTICAL"
+        assert blocked.tactical_regime == "RISK_OFF"
+
+    @pytest.mark.asyncio
+    async def test_neutral_buys_even_when_macro_red(self):
+        mock_gen, mock_notify = await self._run("NEUTRAL")
+        mock_gen.assert_called_once()
+        mock_notify.assert_not_called()

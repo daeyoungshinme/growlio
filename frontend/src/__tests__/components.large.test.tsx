@@ -2,7 +2,7 @@
  * Smoke tests for large uncovered components.
  * These tests primarily verify components render without crashing.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, fireEvent, waitFor, render } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
@@ -211,6 +211,7 @@ import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { AnalysisPanel } from "@/components/portfolio-analysis/AnalysisPanel";
+import { clearAnalysisCache } from "@/hooks/useAnalysisState";
 import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
 import { fetchPortfolios } from "@/api/portfolios";
 import { analyzePortfolio, fetchDriftSummary } from "@/api/rebalancing";
@@ -622,6 +623,7 @@ describe("DividendTab", () => {
 // AnalysisPanel
 // =========================================
 describe("AnalysisPanel", () => {
+  beforeEach(() => clearAnalysisCache());
   const mockPortfolio = {
     id: "p1",
     name: "테스트 포트폴리오",

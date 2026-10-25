@@ -102,7 +102,15 @@ export interface OverseasRealizedSummary {
   realized_gain_krw: number | null;
   /** BROKER=해외 보유 계좌 전부 자동 집계, PARTIAL=일부 계좌 미지원/실패, NONE=자동 집계 계좌 없음 */
   source: "BROKER" | "PARTIAL" | "NONE";
-  covered_accounts: { account_id: string; account_name: string; realized_krw: number }[];
+  covered_accounts: {
+    account_id: string;
+    account_name: string;
+    realized_krw: number;
+    /** BROKER=증권사 체결 조회(KIS 실전), TRADE_RECORD=직접 기록한 해외 SELL 기준 — 캐시된 예전 응답엔 없음 */
+    method?: "BROKER" | "TRADE_RECORD";
+    /** TRADE_RECORD 취득가 일부를 평균단가로 추정했거나 취득가를 몰라 뺀 기록이 있음 */
+    estimated?: boolean;
+  }[];
   uncovered_accounts: { account_id: string; account_name: string; reason: string }[];
   as_of: string;
 }

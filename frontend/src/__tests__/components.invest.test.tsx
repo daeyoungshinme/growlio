@@ -675,6 +675,38 @@ describe("TaxPlannerSection", () => {
     );
     expect(screen.queryByTestId("auto-realized")).toBeNull();
     expect(screen.getByLabelText("올해 실현 손익 (원)")).toBeDefined();
+    expect(screen.getByRole("link", { name: "매도 내역을 기록" }).getAttribute("href")).toContain(
+      "history=",
+    );
+  });
+
+  it("직접 기록한 매도로 집계된 계좌는 기록 기준·추정 여부를 표시한다", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxPlannerSection
+          positions={[realizedPos]}
+          realized={{
+            year: 2026,
+            realized_gain_krw: 800_000,
+            source: "BROKER",
+            covered_accounts: [
+              {
+                account_id: "w1",
+                account_name: "키움 계좌",
+                realized_krw: 800_000,
+                method: "TRADE_RECORD",
+                estimated: true,
+              },
+            ],
+            uncovered_accounts: [],
+            as_of: "2026-10-25",
+          }}
+        />
+      </MemoryRouter>,
+    );
+    const box = screen.getByTestId("auto-realized");
+    expect(box.textContent).toContain("직접 기록한 매도 기준");
+    expect(box.textContent).toContain("평균단가로 추정");
   });
 
   it("손실 토글로 음수 실현 손익을 입력한다 (숫자 키패드엔 마이너스 키가 없음)", () => {

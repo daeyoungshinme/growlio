@@ -38,7 +38,17 @@ _HISTORY_DAYS = 420  # 200일선 + 52주 고점 계산에 필요한 거래일(�
 
 def _empty_snapshot() -> TechnicalSnapshot:
     return TechnicalSnapshot(
-        close=None, sma50=None, sma200=None, rsi14=None, macd_hist=None, drawdown_pct=None, trend="UNKNOWN"
+        close=None,
+        sma20=None,
+        sma60=None,
+        sma120=None,
+        sma50=None,
+        sma200=None,
+        rsi14=None,
+        macd_hist=None,
+        drawdown_pct=None,
+        trend="UNKNOWN",
+        pullback_stage="UNKNOWN",
     )
 
 

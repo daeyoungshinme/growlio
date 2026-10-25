@@ -160,11 +160,19 @@ describe("invalidateGoalRecommendationData", () => {
 });
 
 describe("invalidateTradeData", () => {
-  it("trades + period-purchases 무효화", async () => {
+  it("trades + period-purchases + 해외 실현손익·세금·지금 할 일 무효화", async () => {
     const qc = makeQueryClient();
     await invalidateTradeData(qc as any);
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
-    expect(keys).toEqual(["trades", "period-purchases"]);
+    // 해외 SELL 기록은 미지원 계좌의 양도세 실현손익이 된다 — 기록 직후 "지금 할 일" 절세 항목이 갱신돼야 함
+    expect(keys).toEqual([
+      "trades",
+      "period-purchases",
+      "overseas-realized",
+      "tax-summary",
+      "tax-action-plan",
+      "action-items",
+    ]);
   });
 
   it("계좌 sync·CUD도 기간별 매수(스냅샷 추정)를 갱신", async () => {

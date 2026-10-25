@@ -1,8 +1,11 @@
 import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { ListChecks } from "lucide-react";
 import { fetchPortfolios } from "@/api/portfolios";
-import type { TacticalStatus, TacticalWeights, TechnicalSnapshot } from "@/api/tactical";
-import ConfirmModal from "@/components/common/ConfirmModal";
+import type { TacticalStatus, TechnicalSnapshot } from "@/api/tactical";
+import CollapsibleCard from "@/components/common/CollapsibleCard";
+import Modal, { ModalFooter } from "@/components/common/Modal";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
@@ -11,18 +14,31 @@ import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import { useCollapsible } from "@/hooks/useCollapsible";
+import { useDcaTacticalLink } from "@/hooks/useDcaTacticalLink";
 import { useTacticalMutations, useTacticalStatus } from "@/hooks/useTacticalAllocation";
 import { extractErrorMessage } from "@/utils/error";
+import { localToday, parseYmd } from "@/utils/format";
+import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { toast } from "@/utils/toast";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 import { useAutoExecutionNotice } from "@/hooks/useAutoExecutionNotice";
 import TacticalWeightsEditor from "./TacticalWeightsEditor";
 import {
   ASSET_LABEL,
+  formatTacticalWeights,
+  type NextActionTone,
+  OPTIONAL_ASSETS,
+  PULLBACK_BADGE_CLASS,
+  PULLBACK_LABEL,
   REGIME_BADGE_CLASS,
   REGIME_LABEL,
+  regimeDayCount,
+  TACTICAL_ASSET_LIST_TEXT,
   TACTICAL_ASSETS,
+  tacticalNextAction,
   TILT_LABEL,
+  TRANSITION_CONFIRM_NOTE,
   TREND_LABEL,
 } from "./tacticalLabels";
 
@@ -41,27 +57,43 @@ interface Props {
   showPortfolioPicker?: boolean;
 }
 
-/** 백엔드 tactical_allocation_service.format_weights와 같은 규칙 — DIA는 0%면 생략 */
-function formatWeights(weights: TacticalWeights): string {
-  return TACTICAL_ASSETS.filter((a) => a !== "DIA" || (weights[a] ?? 0) > 0)
-    .map((a) => `${a === "CASH" ? "현금" : a} ${weights[a] ?? 0}%`)
-    .join(" · ");
-}
+const NEXT_ACTION_CLASS: Record<NextActionTone, string> = {
+  action: "bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200",
+  wait: "bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-200",
+  idle: "bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
+};
 
 function fmtNum(n: number | null | undefined, digits = 2): string {
   return n == null ? "—" : n.toFixed(digits);
+}
+
+/** 종가의 이평선 대비 이격(%) — 음수면 이평선 아래(웅덩이) */
+function fmtGap(close: number | null | undefined, ma: number | null | undefined): string {
+  if (close == null || ma == null || ma <= 0) return "—";
+  const pct = (close / ma - 1) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+/** "YYYY-MM-DD" → "M/D" */
+function fmtMd(ymd: string): string {
+  const { month, day } = parseYmd(ymd);
+  return `${month}/${day}`;
 }
 
 function IndicatorRow({
   ticker,
   snap,
   note,
+  showPullback = false,
 }: {
   ticker: string;
   snap?: TechnicalSnapshot;
   note?: string;
+  /** 웅덩이 배지 — 투입 판정 기준인 QQQ에만 단다(SPY·DIA는 이격 수치만) */
+  showPullback?: boolean;
 }) {
   const trend = snap?.trend ?? "UNKNOWN";
+  const stage = snap?.pullback_stage;
   const trendCls =
     trend === "UP"
       ? "text-red-500"
@@ -79,7 +111,14 @@ function IndicatorRow({
             </span>
           )}
         </span>
-        <span className={`text-sm font-medium ${trendCls}`}>추세 {TREND_LABEL[trend]}</span>
+        <span className="flex items-center gap-2">
+          {showPullback && stage && stage !== "UNKNOWN" && (
+            <span className={`px-2 py-0.5 rounded-full text-xs ${PULLBACK_BADGE_CLASS[stage]}`}>
+              {PULLBACK_LABEL[stage]}
+            </span>
+          )}
+          <span className={`text-sm font-medium ${trendCls}`}>추세 {TREND_LABEL[trend]}</span>
+        </span>
       </div>
       <dl className="mt-1 grid grid-cols-3 gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-300">
         <div>
@@ -87,55 +126,144 @@ function IndicatorRow({
           <dd>${fmtNum(snap?.close)}</dd>
         </div>
         <div>
-          <dt className="text-gray-400 dark:text-gray-500">50일선</dt>
-          <dd>${fmtNum(snap?.sma50)}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-400 dark:text-gray-500">200일선</dt>
-          <dd>${fmtNum(snap?.sma200)}</dd>
-        </div>
-        <div>
           <dt className="text-gray-400 dark:text-gray-500">RSI(14)</dt>
           <dd>{fmtNum(snap?.rsi14, 1)}</dd>
         </div>
         <div>
-          <dt className="text-gray-400 dark:text-gray-500">MACD 히스토그램</dt>
-          <dd>{fmtNum(snap?.macd_hist)}</dd>
-        </div>
-        <div>
           <dt className="text-gray-400 dark:text-gray-500">52주 고점 대비</dt>
           <dd>{snap?.drawdown_pct == null ? "—" : `${snap.drawdown_pct.toFixed(1)}%`}</dd>
+        </div>
+        {/* 이평선은 절대 가격 대신 종가 이격으로 — 어느 선까지 눌렸는지(웅덩이 깊이)가 한눈에 보이게 */}
+        {(
+          [
+            ["20일선", snap?.sma20],
+            ["60일선", snap?.sma60],
+            ["120일선", snap?.sma120],
+            ["200일선", snap?.sma200],
+          ] as const
+        ).map(([label, ma]) => (
+          <div key={label}>
+            <dt className="text-gray-400 dark:text-gray-500">{label} 대비</dt>
+            <dd>{fmtGap(snap?.close, ma)}</dd>
+          </div>
+        ))}
+        <div>
+          <dt className="text-gray-400 dark:text-gray-500">MACD 히스토그램</dt>
+          <dd>{fmtNum(snap?.macd_hist)}</dd>
         </div>
       </dl>
     </div>
   );
 }
 
-function TiltSummary({ status }: { status: TacticalStatus }) {
-  const off = status.tilt_shift_pct <= 0;
+/** 요약 한 줄(제목 + 값) — 근거 목록은 "판정 근거·차트 지표" 접힘 안에 둔다 */
+function SummaryLine({ title, value }: { title: string; value: string }) {
   return (
-    <div className="border-t border-gray-100 dark:border-gray-700 pt-2 flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold">나스닥·S&P 비중</span>
-        <span className="text-sm font-medium">
-          {off
-            ? "조절 안 함"
-            : `${TILT_LABEL[status.confirmed_tilt]}${status.confirmed_tilt === "BALANCED" ? "" : ` (${status.tilt_shift_pct}%p 이동)`}`}
-        </span>
-      </div>
-      {!off && (
-        <ul className="text-xs text-gray-500 dark:text-gray-400 list-disc pl-4 space-y-0.5">
-          {status.tilt_reasons.map((r) => (
-            <li key={r}>{r}</li>
-          ))}
-          {status.enabled && status.observed_tilt !== status.confirmed_tilt && (
-            <li className="text-amber-600 dark:text-amber-400">
-              오늘 판단은 {TILT_LABEL[status.observed_tilt]} — 다음 달 첫 점검일에 반영돼요
-            </li>
-          )}
-        </ul>
-      )}
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-sm font-semibold">{title}</span>
+      <span className="text-sm font-medium text-right">{value}</span>
     </div>
+  );
+}
+
+function tiltValue(status: TacticalStatus): string {
+  if (status.tilt_shift_pct <= 0) return "조절 안 함";
+  return `${TILT_LABEL[status.confirmed_tilt]}${status.confirmed_tilt === "BALANCED" ? "" : ` (${status.tilt_shift_pct}%p 이동)`}`;
+}
+
+function dipValue(status: TacticalStatus): string {
+  if (status.dip_shift_pct <= 0) return "사용 안 함";
+  if (status.dip_deployed_pct > 0) return `현금 ${status.dip_deployed_pct}%p 투입 중`;
+  // 단계는 진행 중인데 옮길 현금이 없는 비중표(현금 0%)
+  return status.dip_level > 0 ? "투입할 현금 없음" : "대기";
+}
+
+function ReasonList({ items }: { items: string[] }) {
+  return (
+    <ul className="text-xs text-gray-500 dark:text-gray-400 list-disc pl-4 space-y-0.5">
+      {items.map((r) => (
+        <li key={r}>{r}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** 판정 근거(매크로·추세)·차트 지표·틸트/웅덩이 근거 — 모바일 길이를 줄이려 기본 접힘(plans/69 P4) */
+function TacticalDetails({ status }: { status: TacticalStatus }) {
+  const [isOpen, toggle] = useCollapsible(false, "growlio:rebalancing:tactical-details-open");
+  // DIA는 비중표 어느 국면에든 쓰일 때만 참고 지표로 보여준다
+  const usesDia =
+    Object.values(status.regime_weights).some((w) => (w.DIA ?? 0) > 0) ||
+    (status.current_weights.DIA ?? 0) > 0;
+  const tiltOn = status.tilt_shift_pct > 0;
+  return (
+    <CollapsibleCard
+      icon={ListChecks}
+      title="판정 근거·차트 지표"
+      isOpen={isOpen}
+      onToggle={toggle}
+      cardClassName="border-t border-gray-100 dark:border-gray-700 pt-1"
+    >
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+          {status.use_macro ? (
+            <>
+              <span>매크로(확정)</span>
+              <MarketSignalLevelBadge level={status.macro_level} />
+              {status.macro_freshness === "STALE" && (
+                <span className="text-amber-600 dark:text-amber-400">지표 데이터 지연</span>
+              )}
+              {/* 모바일은 title 툴팁이 안 뜬다 — 진단 탭 배지와 등급이 다를 수 있는 이유를 화면에 적는다 */}
+              <span className="basis-full text-gray-500 dark:text-gray-400">
+                연속 확인한 등급이라 진단 탭보다 늦게 바뀔 수 있어요
+              </span>
+            </>
+          ) : (
+            <span>매크로 반영 안 함 — SPY·QQQ 200일선 추세만으로 판단해요</span>
+          )}
+        </div>
+        <ReasonList items={status.reasons} />
+        <div>
+          <IndicatorRow ticker="QQQ" snap={status.technicals.QQQ} showPullback />
+          <IndicatorRow ticker="SPY" snap={status.technicals.SPY} />
+          {usesDia && (
+            <IndicatorRow
+              ticker="DIA"
+              snap={status.technicals.DIA}
+              note="참고 · 국면 판단 미반영"
+            />
+          )}
+        </div>
+        {tiltOn && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+              나스닥·S&P 비중 근거
+            </span>
+            <ReasonList items={status.tilt_reasons} />
+            {status.enabled && status.observed_tilt !== status.confirmed_tilt && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                오늘 판단은 {TILT_LABEL[status.observed_tilt]} — 다음 달 첫 점검일에 반영돼요
+              </p>
+            )}
+          </div>
+        )}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+            웅덩이 매수 근거
+          </span>
+          <ReasonList
+            items={
+              status.dip_shift_pct > 0
+                ? status.dip_reasons
+                : [
+                    ...status.dip_reasons,
+                    "비중표 편집에서 켜면 공격 국면의 눌림목에 현금 일부를 주식으로 옮겨요.",
+                  ]
+            }
+          />
+        </div>
+      </div>
+    </CollapsibleCard>
   );
 }
 
@@ -157,8 +285,8 @@ function WeightsCompare({ status }: { status: TacticalStatus }) {
         {TACTICAL_ASSETS.map((a) => {
           const cur = status.current_weights[a] ?? 0;
           const next = proposed?.[a] ?? 0;
-          // DIA는 선택 자산 — 현재·제안 모두 0이면 행을 숨긴다
-          if (a === "DIA" && cur === 0 && next === 0) return null;
+          // DIA·QLD·SSO는 선택 자산 — 현재·제안 모두 0이면 행을 숨긴다
+          if (OPTIONAL_ASSETS.has(a) && cur === 0 && next === 0) return null;
           return (
             <tr key={a} className="border-t border-gray-100 dark:border-gray-700">
               <td className="py-1.5">{ASSET_LABEL[a]}</td>
@@ -192,7 +320,12 @@ function TacticalStatusView({
 }) {
   const { upsert, disable, apply } = useTacticalMutations(status.portfolio_id);
   const [confirmApply, setConfirmApply] = useState(false);
-  const [justApplied, setJustApplied] = useState(false);
+  // 이번 화면에서 방금 적용한 비율(1=전체, 0.5=절반) — 서버 재조회 전에도 다음 단계 버튼을 보여주려고
+  const [justApplied, setJustApplied] = useState<number | null>(null);
+  const runApply = (fraction: number) => {
+    setConfirmApply(false);
+    apply.mutate(fraction, { onSuccess: () => setJustApplied(fraction) });
+  };
   const autoExecutionNotice = useAutoExecutionNotice(status.portfolio_id);
   const regime = status.confirmed_regime ?? status.observed_regime;
   const alreadyApplied =
@@ -201,6 +334,14 @@ function TacticalStatusView({
     TACTICAL_ASSETS.every(
       (a) => (status.current_weights[a] ?? 0) === (status.proposed_weights?.[a] ?? 0),
     );
+  const partialActive =
+    status.partial_regime != null && status.partial_regime === status.confirmed_regime;
+  const fullyApplied = alreadyApplied || justApplied === 1;
+  const showGoToExecution = fullyApplied || justApplied != null || partialActive;
+  const { dcaAuto, linked } = useDcaTacticalLink(status.portfolio_id);
+  const nextAction = tacticalNextAction(status, fullyApplied, undefined, { dcaLinked: linked });
+  const days = status.enabled ? regimeDayCount(status.regime_changed_at) : null;
+  const hints = status.transition_hints.slice(0, 2);
 
   return (
     <>
@@ -209,44 +350,43 @@ function TacticalStatusView({
           {/* "주문은 나가지 않아요"는 목표 조정 탭 상단 안내가 이미 말한다 — 반복 제거 (docs/plans/67 P1-8) */}
           <h2 className="text-base font-semibold">QQQ·SPY 전술 배분</h2>
           {regime ? (
-            <span
-              className={`shrink-0 px-3 py-1 rounded-full border text-sm font-semibold ${REGIME_BADGE_CLASS[regime]}`}
-            >
-              {REGIME_LABEL[regime]}
+            <span className="shrink-0 flex flex-col items-end gap-0.5">
+              <span
+                className={`px-3 py-1 rounded-full border text-sm font-semibold ${REGIME_BADGE_CLASS[regime]}`}
+              >
+                {status.enabled ? REGIME_LABEL[regime] : `${REGIME_LABEL[regime]} (오늘 관측)`}
+              </span>
+              {days != null && status.confirmed_regime && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">{days}일째</span>
+              )}
             </span>
           ) : (
             <span className="shrink-0 text-sm text-gray-500 dark:text-gray-400">판정 불가</span>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-          <span>매크로(확정)</span>
-          <MarketSignalLevelBadge level={status.macro_level} />
-          {/* 모바일은 title 툴팁이 안 뜬다 — 진단 탭 배지와 등급이 다를 수 있는 이유를 화면에 적는다 */}
-          <span className="basis-full text-gray-500 dark:text-gray-400">
-            연속 확인한 등급이라 진단 탭보다 늦게 바뀔 수 있어요
-          </span>
-          {status.macro_freshness === "STALE" && (
-            <span className="text-amber-600 dark:text-amber-400">지표 데이터 지연</span>
-          )}
-          {status.enabled && status.pending_regime && (
-            <span className="text-amber-600 dark:text-amber-400">
-              {REGIME_LABEL[status.pending_regime]} 전환 확인 중(다음 거래일 재확인)
-            </span>
-          )}
-        </div>
-        <ul className="text-xs text-gray-500 dark:text-gray-400 list-disc pl-4 space-y-0.5">
-          {status.reasons.map((r) => (
-            <li key={r}>{r}</li>
-          ))}
-        </ul>
+        <p
+          className={`rounded-lg px-3 py-2 text-sm font-medium ${NEXT_ACTION_CLASS[nextAction.tone]}`}
+        >
+          {nextAction.text}
+        </p>
 
-        <div>
-          <IndicatorRow ticker="QQQ" snap={status.technicals.QQQ} />
-          <IndicatorRow ticker="SPY" snap={status.technicals.SPY} />
-          <IndicatorRow ticker="DIA" snap={status.technicals.DIA} note="참고 · 국면 판단 미반영" />
+        {hints.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+              다음 전환 조건
+            </span>
+            <ReasonList items={hints.map((h) => h.text)} />
+            <p className="text-xs text-gray-400 dark:text-gray-500">{TRANSITION_CONFIRM_NOTE}</p>
+          </div>
+        )}
+
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-2 flex flex-col gap-1">
+          <SummaryLine title="나스닥·S&P 비중" value={tiltValue(status)} />
+          <SummaryLine title="웅덩이 매수(눌림목)" value={dipValue(status)} />
         </div>
-        <TiltSummary status={status} />
+
+        <TacticalDetails status={status} />
       </section>
 
       <section className="card flex flex-col gap-3">
@@ -256,8 +396,36 @@ function TacticalStatusView({
         <WeightsCompare status={status} />
         {!status.portfolio_compatible && (
           <p className="text-xs text-amber-700 dark:text-amber-400">
-            이 포트폴리오에는 QQQ·SPY·DIA·현금 외 종목이 있어요. 적용하면 그 종목들은 목표 비중에서
-            빠져요.
+            이 포트폴리오에는 {TACTICAL_ASSET_LIST_TEXT} 외 종목이 있어요. 적용하면 그 종목들은 목표
+            비중에서 빠져요.
+          </p>
+        )}
+
+        {/* 적립식 코어 + 전술 보조(plans/71) — 적립 자동매수 포트폴리오엔 비중 적용(매도)보다 매수 보류 연동을 권한다 */}
+        {dcaAuto && !linked && (
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-xs text-blue-900 dark:text-blue-100 flex flex-col gap-1">
+            <p className="font-semibold">적립 자동매수 중인 포트폴리오예요</p>
+            <p>
+              제안 비중 적용은 매도·양도세가 생기고, 과거 20년 적립식에선 수익률을 연 2~4%p
+              낮췄어요. 자동매수 설정의 &lsquo;전술 연동&rsquo;을 켜면 방어 국면에만 매수를 보류해요
+              (수익은 비슷, 금융위기 때 낙폭 절반).
+            </p>
+            <Link
+              to={rebalancingUrl({
+                tab: "포트폴리오",
+                portfolioId: status.portfolio_id,
+                openAlert: "1",
+              })}
+              className="self-start font-medium text-blue-700 dark:text-blue-300 underline"
+            >
+              자동매수 설정 열기
+            </Link>
+          </div>
+        )}
+        {linked && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            적립 보조 모드 — 이 포트폴리오 자동매수는 전술 연동 중이라 방어 국면엔 매수만 보류해요.
+            제안 비중 적용은 필요하지 않아요.
           </p>
         )}
 
@@ -282,34 +450,53 @@ function TacticalStatusView({
                     notify_enabled: checked,
                     regime_weights: status.is_default_weights ? null : status.regime_weights,
                     tilt_shift_pct: status.tilt_shift_pct,
+                    dip_shift_pct: status.dip_shift_pct,
+                    use_macro: status.use_macro,
                   })
                 }
                 ariaLabel="국면 전환 알림"
               />
             </div>
-            {justApplied || alreadyApplied ? (
+            {!fullyApplied && (
               <button
                 type="button"
-                className={`${TOUCH_TARGET_MIN} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors`}
-                onClick={() => onGoToExecution(status.portfolio_id)}
-              >
-                리밸런싱 분석·실행으로 이동
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={`${TOUCH_TARGET_MIN} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+                className={
+                  linked
+                    ? `${TOUCH_TARGET_MIN} px-5 rounded-lg text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-50`
+                    : `${TOUCH_TARGET_MIN} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`
+                }
                 disabled={!status.confirmed_regime || apply.isPending}
                 onClick={() => setConfirmApply(true)}
               >
-                제안 비중을 목표 비중으로 적용
+                {partialActive ? "나머지 적용" : "제안 비중을 목표 비중으로 적용"}
+              </button>
+            )}
+            {partialActive && status.partial_applied_on && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {status.partial_applied_on === localToday()
+                  ? "오늘"
+                  : fmtMd(status.partial_applied_on)}{" "}
+                절반 적용 · 다음 거래일 이후 나머지 적용을 권장해요
+              </p>
+            )}
+            {showGoToExecution && (
+              <button
+                type="button"
+                className={
+                  fullyApplied
+                    ? `${TOUCH_TARGET_MIN} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors`
+                    : `${TOUCH_TARGET_MIN} px-5 rounded-lg text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200`
+                }
+                onClick={() => onGoToExecution(status.portfolio_id)}
+              >
+                리밸런싱 분석·실행으로 이동
               </button>
             )}
             <button
               type="button"
               className={`${TOUCH_TARGET_MIN} text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200`}
               disabled={disable.isPending}
-              onClick={() => disable.mutate()}
+              onClick={() => disable.mutate({ dcaLinked: linked })}
             >
               전술 배분 끄기
             </button>
@@ -324,10 +511,12 @@ function TacticalStatusView({
 
       {status.enabled && (
         <TacticalWeightsEditor
-          key={`${JSON.stringify(status.regime_weights)}:${status.tilt_shift_pct}`}
+          key={`${JSON.stringify(status.regime_weights)}:${status.tilt_shift_pct}:${status.dip_shift_pct}:${status.use_macro}`}
           regimeWeights={status.regime_weights}
           isDefaultWeights={status.is_default_weights}
           tiltShiftPct={status.tilt_shift_pct}
+          dipShiftPct={status.dip_shift_pct}
+          useMacro={status.use_macro}
           notifyEnabled={status.notify_enabled}
           saving={upsert.isPending}
           onSave={(payload) =>
@@ -339,16 +528,52 @@ function TacticalStatusView({
       )}
 
       {confirmApply && status.proposed_weights && (
-        <ConfirmModal
-          message={`"${status.portfolio_name}" 목표 비중을 ${REGIME_LABEL[status.confirmed_regime ?? "NEUTRAL"]} 국면 비중(${formatWeights(status.proposed_weights)})으로 바꿀까요? ${autoExecutionNotice ?? "주문은 나가지 않으며, 다음 화면에서 매매 내역을 확인한 뒤 직접 실행해요."}${status.portfolio_compatible ? "" : " QQQ·SPY·DIA·현금 외 종목은 목표에서 빠집니다."}`}
-          confirmLabel="적용"
-          danger={false}
-          onCancel={() => setConfirmApply(false)}
-          onConfirm={() => {
-            setConfirmApply(false);
-            apply.mutate(undefined, { onSuccess: () => setJustApplied(true) });
-          }}
-        />
+        <Modal
+          title={partialActive ? "나머지 적용" : "제안 비중 적용"}
+          size="sm"
+          onClose={() => setConfirmApply(false)}
+        >
+          <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <p>
+              &ldquo;{status.portfolio_name}&rdquo; 목표 비중을{" "}
+              {REGIME_LABEL[status.confirmed_regime ?? "NEUTRAL"]} 국면 비중(
+              {formatTacticalWeights(status.proposed_weights)})으로 {partialActive ? "마저 " : ""}
+              바꿀까요?
+            </p>
+            <p className="text-gray-500 dark:text-gray-400">
+              {autoExecutionNotice ??
+                "주문은 나가지 않으며, 다음 화면에서 매매 내역을 확인한 뒤 직접 실행해요."}
+              {!status.portfolio_compatible &&
+                ` ${TACTICAL_ASSET_LIST_TEXT} 외 종목은 목표에서 빠집니다.`}
+            </p>
+            {status.portfolio_compatible && !partialActive && (
+              <p className="text-gray-500 dark:text-gray-400">
+                국면이 막 바뀐 직후라면 절반만 먼저 적용하고 다음 거래일에 나머지를 적용해 매수·매도
+                타이밍을 나눌 수 있어요.
+              </p>
+            )}
+          </div>
+          <ModalFooter>
+            {status.portfolio_compatible && !partialActive && (
+              <button
+                type="button"
+                className={`${TOUCH_TARGET_MIN} flex-1 px-4 rounded-lg text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-50`}
+                disabled={apply.isPending}
+                onClick={() => runApply(0.5)}
+              >
+                절반 먼저 적용
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${TOUCH_TARGET_MIN} flex-1 bg-blue-600 text-white px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+              disabled={apply.isPending}
+              onClick={() => runApply(1)}
+            >
+              {partialActive ? "나머지 적용" : "한 번에 적용"}
+            </button>
+          </ModalFooter>
+        </Modal>
       )}
 
       <ErrorBoundary variant="section">
@@ -360,7 +585,7 @@ function TacticalStatusView({
   );
 }
 
-/** 리밸런싱 페이지 "목표 조정 › 전술" 모드 — 포트폴리오를 골라 QQQ/SPY(+DIA) 전술 배분 국면·제안 비중을 보고 적용한다. */
+/** 리밸런싱 페이지 "목표 조정 › 전술" 모드 — 포트폴리오를 골라 QQQ/SPY(+DIA·QLD·SSO) 전술 배분 국면·제안 비중을 보고 적용한다. */
 export default function TacticalAllocationTab({
   selectedPortfolioId,
   onSelectPortfolio,

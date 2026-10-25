@@ -74,7 +74,9 @@ _QUICK_EXECUTE_MESSAGES: dict[QuickExecuteStatus, Callable[[QuickExecuteOutcome]
         "이미 대기중인 계획이 있습니다. 리밸런싱 계획 목록에서 확인해주세요."
     ),
     QuickExecuteStatus.MARKET_BLOCKED: lambda o: (
-        f"현재 시장 위험 신호({o.composite_level})로 인해 실행이 보류됩니다. "
+        "전술 배분이 방어 국면이라 실행이 보류됩니다. 자동화 설정의 '전술 연동'을 확인해주세요."
+        if o.tactical_blocked
+        else f"현재 시장 위험 신호({o.composite_level})로 인해 실행이 보류됩니다. "
         "자동화 설정의 시장 상황 조건을 확인해주세요."
     ),
     QuickExecuteStatus.TAX_BLOCKED: _tax_blocked_message,

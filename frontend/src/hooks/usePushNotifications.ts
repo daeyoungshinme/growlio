@@ -83,6 +83,7 @@ export function resolvePushDeepLink(
       return rebalancingUrl({ tab: "목표 조정", mode: "추천" });
     // 전술 국면 변경 — 백엔드 push_type이 소문자(tactical_regime_check.py)라 그대로 매핑
     case "tactical_regime":
+    case "tactical_dip":
       return rebalancingUrl({ tab: "목표 조정", mode: "전술" });
     default:
       return null;

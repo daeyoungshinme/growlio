@@ -50,6 +50,7 @@ def init_scheduler() -> None:
     from app.jobs.rebalancing_plan_buy_execution import run_rebalancing_plan_buy_execution
     from app.jobs.rebalancing_plan_sell_expiry import run_rebalancing_plan_sell_expiry
     from app.jobs.recommendation_drift_alert import run_recommendation_drift_alert
+    from app.jobs.startup_warmup import run_startup_warmup
     from app.jobs.stock_price_alert import run_stock_price_alert_check
     from app.jobs.tactical_regime_check import run_tactical_regime_check
     from app.jobs.token_refresh import refresh_all_user_tokens
@@ -94,6 +95,8 @@ def init_scheduler() -> None:
         scheduler.add_job(func, trigger, id=job_id, replace_existing=True)
     # 기동 직후 1회도 실행 — 07:00까지 비어 있으면 그동안 KOSDAQ 보유종목이 `.KS`로 조회돼 Yahoo 404가 난다
     scheduler.modify_job("kosdaq_tickers_refresh", next_run_time=now_kst())
+    # 기동 직후 1회 — 환율·시장 신호·기술적 신호·JWKS 예열(콜드 스타트 첫 요청의 외부 API 대기 제거)
+    scheduler.add_job(run_startup_warmup, id="startup_warmup", next_run_time=now_kst(), replace_existing=True)
 
     scheduler.add_listener(_on_job_event, EVENT_JOB_ERROR | EVENT_JOB_MISSED)
     scheduler.start()

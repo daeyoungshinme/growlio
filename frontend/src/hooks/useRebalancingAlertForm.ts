@@ -55,7 +55,6 @@ export function useRebalancingAlertQueries({
   const { data: accounts = [], isLoading: accountsLoading } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
-    staleTime: STALE_TIME.MEDIUM,
   });
 
   const { data: marketSignal } = useQuery({

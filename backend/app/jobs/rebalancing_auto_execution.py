@@ -16,7 +16,7 @@ from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services.alerts.calculator import already_fired_today, is_auto_schedule_day
-from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
+from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode, tactical_regime_for_gate
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
     MarketSignalGateBlocked,
@@ -97,7 +97,8 @@ async def _run_auto_execution() -> None:
             # 시장 신호 게이트 — 계획 생성 시점에 확인한다. 매수 실행 직전(1분 간격 job)에도
             # 재확인한다(rebalancing_plan_buy_execution.py) — 대기시간 동안 상황이 바뀔 수 있어서다.
             market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-            if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness):
+            tactical_regime = await tactical_regime_for_gate(alert, db)
+            if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness, tactical_regime):
                 logger.info(
                     "rebalancing_auto_skipped_market_signal",
                     alert_id=str(alert.id),
@@ -108,6 +109,7 @@ async def _run_auto_execution() -> None:
                     composite_level=composite_level,
                     market_condition_mode=market_mode,
                     data_freshness=data_freshness,
+                    tactical_regime=tactical_regime,
                 )
                 await notify_market_signal_gate_blocked(alert, portfolio, blocked_by_signal, email, fcm_token, db)
                 continue

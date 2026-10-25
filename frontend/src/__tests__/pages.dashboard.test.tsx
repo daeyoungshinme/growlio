@@ -18,7 +18,7 @@ vi.mock("@/utils/queryInvalidation", () => ({
 }));
 
 // Lazy-loaded components
-vi.mock("../components/dashboard/AllocationHistoryChart", () => ({
+vi.mock("../components/dashboard/AllocationHistoryCard", () => ({
   default: () => <div data-testid="allocation-chart">AllocationHistoryChart</div>,
 }));
 vi.mock("@/components/dashboard/HeroSummaryCard", () => ({

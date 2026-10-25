@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
 import { getSupabase } from "@/lib/supabase";
+import { hasStoredSession, readValidStoredToken } from "@/lib/storedSession";
 import { toast } from "@/utils/toast";
 import { getApiBaseUrl } from "@/utils/platform";
 
@@ -12,20 +13,33 @@ type QueueEntry = { resolve: (token: string) => void; reject: (err: unknown) => 
 
 let isRefreshing = false;
 let failedQueue: QueueEntry[] = [];
-// 세션 토큰 캐시 — 매 요청마다 getSession() 호출을 피하기 위해 모듈 레벨에서 관리
-let cachedToken: string | null = null;
+// 세션 토큰 캐시 — 매 요청마다 getSession() 호출을 피하기 위해 모듈 레벨에서 관리.
+// 저장된 세션이 아직 유효하면 SDK 로드 전에 동기로 채운다 — 비워 두면 부팅 직후 요청이 헤더 없이
+// 나가 401 → refreshSession → 재시도 왕복이 생겼다.
+let cachedToken: string | null = readValidStoredToken();
 
 // 앱 시작 시 현재 세션 토큰 초기화 + 로그인·로그아웃·토큰 갱신 시 캐시 자동 갱신.
-// getSupabase()가 @supabase/supabase-js를 동적 import하므로 이 초기화도 자연히 지연되지만,
-// 이미 비동기·eventually-consistent 구조(interceptor는 cachedToken이 채워지기 전엔 헤더 없이
-// 요청)라 기능 영향은 없다.
-void getSupabase().then((supabase) => {
-  void supabase.auth.getSession().then(({ data: { session } }) => {
-    cachedToken = session?.access_token ?? null;
+// getSupabase()가 @supabase/supabase-js를 동적 import하므로 이 초기화는 지연된다.
+const initialTokenReady: Promise<void> = getSupabase()
+  .then(async (supabase) => {
+    supabase.auth.onAuthStateChange((_event, session) => {
+      cachedToken = session?.access_token ?? null;
+    });
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      cachedToken = session?.access_token ?? null;
+    } catch {
+      /* 세션 조회 실패 — 요청은 헤더 없이 나가고 401 경로가 처리 */
+    }
+  })
+  .catch(() => {
+    /* SDK 청크 로드 실패 — 위와 동일하게 401 경로로 폴백 */
   });
-  supabase.auth.onAuthStateChange((_event, session) => {
-    cachedToken = session?.access_token ?? null;
-  });
+let initialTokenSettled = false;
+void initialTokenReady.finally(() => {
+  initialTokenSettled = true;
 });
 
 function processQueue(error: unknown, token: string | null = null) {
@@ -41,7 +55,12 @@ export const api = axios.create({
 });
 
 // Supabase 액세스 토큰을 Authorization 헤더에 첨부 (캐시된 토큰 사용)
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
+  // 저장 세션이 있는데 토큰이 만료돼 시드되지 않았다면 SDK의 세션 복원(갱신)을 한 번 기다린다.
+  // 로그인 전(저장 세션 없음) 요청은 기다리지 않는다.
+  if (!cachedToken && !initialTokenSettled && hasStoredSession()) {
+    await initialTokenReady;
+  }
   if (cachedToken) {
     config.headers["Authorization"] = `Bearer ${cachedToken}`;
   }

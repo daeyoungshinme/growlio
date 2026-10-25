@@ -30,10 +30,14 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
   // "더 빨리 달성하려면?"은 보조 제안이라 기본 접힘(docs/plans/67 P1-14)
   const [fasterOpen, toggleFaster] = useCollapsible(false, "growlio:goalTimeline:fasterOpen");
 
+  // 전체 추천은 무거운 계산이고 기본 접힌 "더 빨리 달성하려면?" 안에서만 쓰인다 — 펼칠 때만 조회한다
+  // (이미 캐시돼 있으면 접혀 있어도 그 값을 쓴다). 예전엔 적립 계획 탭을 열 때마다 불렀다.
+  // 단축 시나리오가 없으면 섹션 노출 여부 자체가 추천 결과에 달려 있어 그때는 바로 조회한다.
   const { data: recommendation } = useQuery({
     queryKey: QUERY_KEYS.goalRecommendationOverall,
     queryFn: fetchOverallGoalRecommendation,
     staleTime: STALE_TIME.LONG,
+    enabled: fasterOpen || acceleration_scenarios.length === 0,
   });
   const recommendationExpectedReturnPct =
     recommendation?.is_configured && recommendation.expected_return_pct !== null

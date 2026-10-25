@@ -78,6 +78,20 @@ def _validate_tax_gate_fields(body: RebalancingAlertCreate) -> None:
         )
 
 
+async def _validate_tactical_gate(db: AsyncSession, body: RebalancingAlertCreate, portfolio_id: uuid.UUID) -> None:
+    """`TACTICAL` 게이트는 같은 포트폴리오에 전술 배분이 켜져 있어야 동작한다 — 없으면 422(조용히 무효인 설정 방지)."""
+    if body.market_condition_mode != "TACTICAL":
+        return
+    from app.models.tactical import TacticalStrategy
+
+    exists = await db.scalar(select(TacticalStrategy.id).where(TacticalStrategy.portfolio_id == portfolio_id))
+    if exists is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="전술 연동은 목표 조정 › 전술에서 전술 배분을 먼저 켜야 사용할 수 있습니다",
+        )
+
+
 def _apply_alert_fields(alert: RebalancingAlert, body: RebalancingAlertCreate) -> None:
     """AGGREGATE/PER_ACCOUNT 양쪽 upsert가 공유하는 필드 할당 — account_id/alert_scope는 호출부 책임."""
     alert.threshold_pct = body.threshold_pct
@@ -190,6 +204,7 @@ async def upsert_rebalancing_alert(
             )
         await _validate_auto_execution_account(db, body.account_id, current_user.id)
     _validate_tax_gate_fields(body)
+    await _validate_tactical_gate(db, body, portfolio_id)
 
     alert = await get_alert_by_portfolio(db, portfolio_id, current_user.id)
     if not alert:
@@ -318,6 +333,7 @@ async def upsert_account_rebalancing_alert(
     if body.mode == "AUTO":
         await _validate_auto_execution_account(db, account_id, current_user.id)
     _validate_tax_gate_fields(body)
+    await _validate_tactical_gate(db, body, portfolio_id)
 
     alert = await get_alert_by_portfolio_and_account(db, portfolio_id, account_id, current_user.id)
     if not alert:

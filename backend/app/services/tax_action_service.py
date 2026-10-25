@@ -297,12 +297,20 @@ def build_isa_contribution_actions(isa_contrib: list[IsaContributionStatus], tod
     return actions
 
 
-def _realized_note(realized_krw: float | None, realized_partial: bool) -> str:
+def _realized_note(
+    realized_krw: float | None, realized_partial: bool, from_records: bool = False, estimated: bool = False
+) -> str:
     if realized_krw is None:
-        return "올해 이미 실현한 해외 손익이 있다면 그만큼 공제 여유가 줄어요(실현손익 0 가정). "
-    note = f"증권사 체결 기준 올해 실현손익 {_fmt_won(realized_krw)}을 반영했어요. "
+        return (
+            "올해 이미 실현한 해외 손익이 있다면 그만큼 공제 여유가 줄어요(실현손익 0 가정) — "
+            "매도 내역을 기록하면 반영돼요. "
+        )
+    basis = "증권사 체결·직접 기록한 매도 기준" if from_records else "증권사 체결 기준"
+    note = f"{basis} 올해 실현손익 {_fmt_won(realized_krw)}을 반영했어요. "
+    if estimated:
+        note += "기록한 매도 일부는 취득가를 평균단가로 추정했어요. "
     if realized_partial:
-        note += "자동 집계가 안 되는 계좌(키움·토스·수기)의 실현손익은 빠져 있어요. "
+        note += "자동 집계가 안 되는 계좌(키움·토스·수기)는 매도 내역을 기록해야 반영돼요. "
     return note
 
 
@@ -313,11 +321,13 @@ def build_overseas_gain_harvest_action(
     today: date,
     realized_krw: float | None = None,
     realized_partial: bool = False,
+    realized_from_records: bool = False,
+    realized_estimated: bool = False,
 ) -> TaxAction | None:
     """A4 — 해외주식 250만원 기본공제 범위 내 이익실현(취득가 상향).
 
-    `realized_krw`(증권사 체결 기준 올해 실현손익, E6)가 있으면 공제 여유 = 공제 − 실현손익(손실이면 여유 증가),
-    없으면 올해 실현손익 0으로 가정한다.
+    `realized_krw`(증권사 체결 + 미지원 계좌는 수기 SELL 기록 기준 올해 실현손익, E6)가 있으면
+    공제 여유 = 공제 − 실현손익(손실이면 여유 증가), 없으면 올해 실현손익 0으로 가정한다.
     """
     gains = sum(p["unrealized_pnl_krw"] for p in positions if p["unrealized_pnl_krw"] > 0)
     room = max(0.0, deduction_krw - (realized_krw or 0.0))
@@ -331,7 +341,8 @@ def build_overseas_gain_harvest_action(
         detail=(
             f"해외주식 양도차익은 연 {_fmt_won(deduction_krw)}까지 공제돼요. 공제 범위만큼 이익을 실현하고 "
             "다시 사면 취득가가 올라가 나중에 낼 양도세가 줄어요(아래 절감액은 향후 매도 시 기준). "
-            f"{_realized_note(realized_krw, realized_partial)}결제일 기준이라 12월 마지막 주 "
+            f"{_realized_note(realized_krw, realized_partial, realized_from_records, realized_estimated)}"
+            "결제일 기준이라 12월 마지막 주 "
             "초까지 매도해야 올해 귀속돼요. 정보 제공 목적이며 매매 권유가 아닙니다."
         ),
         amount=amount,
@@ -482,6 +493,9 @@ async def get_tax_action_plan_with_summary(
         today,
         realized_krw=realized["realized_gain_krw"],
         realized_partial=realized["source"] == "PARTIAL",
+        # 캐시된 예전 응답에는 method/estimated가 없다
+        realized_from_records=any(a.get("method") == "TRADE_RECORD" for a in realized["covered_accounts"]),
+        realized_estimated=any(a.get("estimated", False) for a in realized["covered_accounts"]),
     )
     if gain_action:
         actions.append(gain_action)

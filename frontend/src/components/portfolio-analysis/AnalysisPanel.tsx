@@ -105,6 +105,9 @@ export function AnalysisPanel({
   const handleRebalancingAnalysis = useCallback(() => {
     void triggerRebalancingAnalysis(portfolioId);
   }, [portfolioId, triggerRebalancingAnalysis]);
+  const handleLiveAnalysis = useCallback(() => {
+    void triggerRebalancingAnalysis(portfolioId, { live: true });
+  }, [portfolioId, triggerRebalancingAnalysis]);
 
   const handleViewChange = (next: AnalysisView) => {
     if (next === "backtest") {
@@ -136,10 +139,10 @@ export function AnalysisPanel({
         {view === "rebalancing" && (
           <button
             type="button"
-            onClick={handleRebalancingAnalysis}
+            onClick={handleLiveAnalysis}
             disabled={analyzing}
-            aria-label="다시 분석"
-            title="다시 분석"
+            aria-label="실시간 잔고로 다시 분석"
+            title="실시간 잔고로 다시 분석"
             className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} flex-none justify-center px-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-40`}
           >
             {analyzing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}

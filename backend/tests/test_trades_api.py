@@ -227,3 +227,15 @@ class TestTradeCrud:
         resp = client.delete(f"/api/v1/trades/{trade.id}", headers=AUTH)
         assert resp.status_code == 204
         db.delete.assert_awaited_with(trade)
+
+    def test_cud_invalidates_overseas_tax_caches(self, client_ctx):
+        """해외 SELL 기록이 미지원 계좌 실현손익이 되므로 기록 변경 즉시 양도세 캐시를 지운다."""
+        client, user, db = client_ctx
+        trade = _trade(user.id)
+        db.scalar = AsyncMock(return_value=trade)
+        inv = AsyncMock()
+        with patch("app.api.v1.trades.invalidate_tax_overseas_caches", new=inv):
+            assert client.put(f"/api/v1/trades/{trade.id}", json={"qty": 5}, headers=AUTH).status_code == 200
+            assert client.delete(f"/api/v1/trades/{trade.id}", headers=AUTH).status_code == 204
+        assert inv.await_count == 2
+        assert inv.call_args.args[1] == user.id

@@ -12,15 +12,18 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
+from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.models.user import User
 from app.services import tactical_allocation_service as tactical
+from app.services.tactical_dip import DEFAULT_DIP_SHIFT_PCT, MAX_DIP_SHIFT_PCT
 from app.services.tactical_tilt import DEFAULT_TILT_SHIFT_PCT, MAX_TILT_SHIFT_PCT
 from app.utils.cache_keys import invalidate_rebalancing_analysis_cache, invalidate_user_caches, portfolio_list_key
 from app.utils.kst import today_kst
@@ -34,11 +37,20 @@ class TacticalStrategyUpsert(BaseModel):
     regime_weights: dict[str, dict[str, float]] | None = None  # None이면 기본 비중표
     # 나스닥/S&P 틸트 이동폭(%p) — 0이면 틸트 끔
     tilt_shift_pct: float = Field(DEFAULT_TILT_SHIFT_PCT, ge=0, le=MAX_TILT_SHIFT_PCT)
+    # 눌림목(웅덩이) 현금 투입 최대폭(%p) — 0이면 끔
+    dip_shift_pct: float = Field(DEFAULT_DIP_SHIFT_PCT, ge=0, le=MAX_DIP_SHIFT_PCT)
+    # False면 매크로 신호를 무시하고 차트 추세만으로 국면 판정
+    use_macro: bool = True
 
     @field_validator("regime_weights")
     @classmethod
     def _validate_weights(cls, v: dict[str, dict[str, float]] | None) -> dict[str, dict[str, float]] | None:
         return None if v is None else tactical.validate_regime_weights(v)
+
+
+class TacticalApplyRequest(BaseModel):
+    # 1이면 제안 비중 그대로, 0.5면 현재 목표에서 제안 쪽으로 절반만(분할 적용)
+    fraction: float = Field(1.0, gt=0, le=1)
 
 
 async def _portfolio_or_404(portfolio_id: uuid.UUID, user: User, db: AsyncSession) -> Portfolio:
@@ -57,7 +69,8 @@ async def _status(
         today = today_kst()
         regime_changed = tactical.advance_regime(strategy, market, today)
         tilt_changed = tactical.advance_tilt(strategy, market, today)
-        if regime_changed or tilt_changed:
+        dip_changed = tactical.advance_dip(strategy, market)
+        if regime_changed or tilt_changed or dip_changed:
             await db.commit()
     return await tactical.build_status(portfolio, strategy, market)
 
@@ -70,7 +83,7 @@ async def get_tactical_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """현재 국면(관측·확정), 매크로 등급, QQQ/SPY/DIA 차트 지표, 제안 비중과 현재 목표 비중을 반환한다."""
+    """현재 국면(관측·확정), 매크로 등급, QQQ/SPY/DIA 차트 지표(웅덩이 단계 포함), 제안 비중·현재 목표 비중."""
     portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
     # 서버가 잠들어 일일 점검 job이 못 돈 날도 앱을 열면 국면 확정이 진행되도록 조회 시에도 갱신한다
@@ -95,14 +108,18 @@ async def upsert_tactical_strategy(
     strategy.notify_enabled = body.notify_enabled
     strategy.regime_weights = body.regime_weights
     strategy.tilt_shift_pct = Decimal(str(body.tilt_shift_pct))
+    strategy.dip_shift_pct = Decimal(str(body.dip_shift_pct))
+    strategy.use_macro = body.use_macro
 
     cache = await get_cache_store()
     market = await tactical.evaluate_market(cache, db)
     today = today_kst()
     tactical.advance_regime(strategy, market, today)
     tactical.advance_tilt(strategy, market, today)
+    tactical.advance_dip(strategy, market)
     if strategy.notified_regime is None:
         strategy.notified_regime = strategy.last_regime  # 사용 시작 시점 국면은 알릴 필요 없음
+        strategy.notified_dip_level = strategy.dip_level or 0  # 진행 중인 웅덩이도 마찬가지
     await db.commit()
     return await tactical.build_status(portfolio, strategy, market)
 
@@ -115,9 +132,22 @@ async def delete_tactical_strategy(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """전략 사용 중지(포트폴리오 목표 비중은 그대로 둔다)."""
+    """전략 사용 중지(포트폴리오 목표 비중은 그대로 둔다).
+
+    이 포트폴리오의 자동매수가 전술 연동(`market_condition_mode="TACTICAL"`)이면 일반 모드(DISABLED)로 되돌린다 —
+    국면이 없으면 게이트가 늘 통과라 연동 표시만 남아 오해를 부른다.
+    """
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
     if strategy is not None:
+        await db.execute(
+            update(RebalancingAlert)
+            .where(
+                RebalancingAlert.portfolio_id == portfolio_id,
+                RebalancingAlert.user_id == current_user.id,
+                RebalancingAlert.market_condition_mode == "TACTICAL",
+            )
+            .values(market_condition_mode="DISABLED")
+        )
         await db.delete(strategy)
         await db.commit()
 
@@ -127,10 +157,15 @@ async def delete_tactical_strategy(
 async def apply_tactical_weights(
     request: Request,
     portfolio_id: uuid.UUID,
+    body: TacticalApplyRequest | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """확정 국면의 제안 비중을 포트폴리오 목표 비중으로 저장한다 — 주문은 내지 않는다."""
+    """확정 국면의 제안 비중을 포트폴리오 목표 비중으로 저장한다 — 주문은 내지 않는다.
+
+    `fraction<1`(분할 적용)은 전술 자산만으로 구성된 포트폴리오에서만, 같은 국면에서 한 번만 허용한다 — 다른 종목을
+    절반만 줄이는 건 전술 배분이 관리하는 범위가 아니고, 두 번째부터는 나머지 적용(fraction=1)이다.
+    """
     portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
     if strategy is None:
@@ -141,7 +176,20 @@ async def apply_tactical_weights(
             status_code=status.HTTP_409_CONFLICT, detail="아직 국면이 확정되지 않았습니다. 잠시 후 다시 시도해주세요."
         )
 
-    await tactical.apply_regime_to_portfolio(portfolio, strategy, regime, db)
+    fraction = body.fraction if body else 1.0
+    if fraction < 1 and not tactical.is_tactical_managed(portfolio):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="전술 자산 외 종목이 있는 포트폴리오는 나눠서 적용할 수 없습니다. 한 번에 적용해주세요.",
+        )
+    if fraction < 1 and strategy.partial_regime == regime:
+        # 현재 목표에서 다시 절반을 보간하면 75%가 된다 — 두 번째는 나머지(전체) 적용만 허용
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="이미 절반을 적용했어요. 나머지를 적용해주세요.",
+        )
+
+    await tactical.apply_regime_to_portfolio(portfolio, strategy, regime, db, fraction=fraction)
     strategy.notified_regime = strategy.last_regime  # 이미 반영했으니 같은 국면으로 다시 알릴 필요 없음
     await db.commit()
 
@@ -163,7 +211,7 @@ async def backtest_tactical_rules(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """이 포트폴리오의 국면별 비중표·틸트 이동폭으로 과거 규칙을 재현한 백테스트(SPY·QQQ·DIA 단순보유와 비교)."""
+    """이 포트폴리오의 국면별 비중표·틸트·웅덩이 투입폭으로 과거 규칙을 재현한 백테스트(SPY·QQQ·DIA 단순보유와 비교)."""
     from app.services.tactical_backtest import run_tactical_backtest
 
     await _portfolio_or_404(portfolio_id, current_user, db)
@@ -174,6 +222,8 @@ async def backtest_tactical_rules(
             years,
             await get_cache_store(),
             tilt_shift_pct=tactical.tilt_shift_of(strategy),
+            dip_shift_pct=tactical.dip_shift_of(strategy),
+            use_macro=tactical.uses_macro(strategy),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc

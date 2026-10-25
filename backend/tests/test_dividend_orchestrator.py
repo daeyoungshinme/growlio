@@ -321,10 +321,60 @@ class TestGetTickerDividendSummary:
             patch("app.services.dividend.orchestrator._collect_positions", new=AsyncMock(return_value={})),
             patch("app.services.dividend.orchestrator.fetch_dart_api_key", new=AsyncMock(return_value="key")),
             patch("app.services.dividend.orchestrator.get_kis_user_credentials", new=AsyncMock(return_value=None)),
-            patch("app.services.dividend.orchestrator.get_usd_krw_rate", new=AsyncMock(return_value=1350.0)),
+            patch(
+                "app.services.dividend.orchestrator.get_live_or_cached_usd_krw",
+                new=AsyncMock(return_value=(1350.0, True)),
+            ),
         ):
             result = await get_ticker_dividend_summary(uuid.uuid4(), mock_db)
 
         # Should have __unclassified__ entry
         unclassified = next((r for r in result if r["ticker"] is None), None)
         assert unclassified is not None
+
+
+@pytest.mark.asyncio
+async def test_ticker_summary_with_fallback_fx_uses_short_ttl():
+    """환율 실값을 못 구해 fallback으로 계산한 요약은 1h/24h가 아니라 짧게 캐시한다."""
+    from app.services.dividend.orchestrator import get_ticker_dividend_summary
+    from app.utils.cache_keys import TTL_DIVIDEND_FALLBACK_FX
+
+    mock_db = AsyncMock()
+    empty = MagicMock()
+    empty.all.return_value = []
+    empty.__iter__ = MagicMock(return_value=iter([]))
+    mock_db.execute = AsyncMock(return_value=empty)
+    mock_cache = AsyncMock()
+    mock_cache.get = AsyncMock(return_value=None)
+    mock_cache.setex = AsyncMock()
+
+    with (
+        patch("app.services.dividend.orchestrator.get_cache_store", new=AsyncMock(return_value=mock_cache)),
+        patch("app.services.dividend.orchestrator._collect_positions", new=AsyncMock(return_value={})),
+        patch("app.services.dividend.orchestrator.fetch_dart_api_key", new=AsyncMock(return_value=None)),
+        patch("app.services.dividend.orchestrator.get_kis_user_credentials", new=AsyncMock(return_value=None)),
+        patch(
+            "app.services.dividend.orchestrator.get_live_or_cached_usd_krw",
+            new=AsyncMock(return_value=(1300.0, False)),
+        ),
+    ):
+        await get_ticker_dividend_summary(uuid.uuid4(), mock_db)
+
+    assert mock_cache.setex.await_args.args[1] == TTL_DIVIDEND_FALLBACK_FX
+
+
+@pytest.mark.asyncio
+async def test_live_or_cached_usd_krw():
+    from app.core.cache_store import CacheStore
+    from app.utils import currency
+
+    store = CacheStore()
+    with patch("app.services.yahoo_price.fetch_usdkrw", new=AsyncMock(return_value=1400.0)) as live:
+        assert await currency.get_live_or_cached_usd_krw(store) == (1400.0, True)
+        assert await currency.get_live_or_cached_usd_krw(store) == (1400.0, True)  # 두 번째는 캐시
+    live.assert_awaited_once()
+
+    with patch("app.services.yahoo_price.fetch_usdkrw", new=AsyncMock(return_value=0.0)):
+        rate, is_live = await currency.get_live_or_cached_usd_krw(CacheStore())
+    assert is_live is False
+    assert rate == currency.settings.usd_krw_fallback_rate

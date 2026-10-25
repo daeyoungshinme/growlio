@@ -33,7 +33,8 @@ export const deleteExchangeRateAlert = (id: string) => apiDelete(`/alerts/exchan
 // ── 리밸런싱 알림 ──────────────────────────────────────────────────────────
 
 export type ScheduleType = "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY" | "SEMIANNUAL" | "ANNUAL";
-export type MarketConditionMode = "DISABLED" | "CAUTIOUS" | "STRICT";
+/** TACTICAL: 같은 포트폴리오 전술 배분이 방어 국면이면 자동매수 보류(plans/71) */
+export type MarketConditionMode = "DISABLED" | "CAUTIOUS" | "STRICT" | "TACTICAL";
 export type TriggerCondition = "DRIFT_ONLY" | "SCHEDULE_ONLY" | "BOTH";
 export type TaxImpactGateMode = "DISABLED" | "ENABLED";
 

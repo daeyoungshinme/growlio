@@ -9,7 +9,8 @@
 상대강도 +1% 초과 → QQQ 우위, 그 외·데이터 결측 → 균형. 판정은 **월 1회**(그 달 첫 점검일)만 갱신한다 —
 매일 갱신하면 백테스트 10년 틸트 변경이 130회를 넘어(매번 매매 발생) 국면 완충 효과를 상쇄했다.
 백테스트 실측(10년): CAGR +0.3%p·샤프 +0.02, 20년은 MDD가 약 2.7%p 악화 — 약한 신호라 이동폭은 사용자가
-0(끔)~20%p로 조절한다.
+0(끔)~20%p로 조절한다. 현금 이자·거래비용 반영 후(plans/70)에도 20년 MDD 24.7→27.7 악화·회전율의 약 1/3을 차지해
+**기본값은 끔(0)**이다(기존 전략에 저장된 값은 유지).
 
 순수 함수 + 입력 조회(캐시). 국면 상태 갱신은 tactical_allocation_service.
 """
@@ -21,7 +22,13 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 
 import structlog
 
-from app.utils.cache_keys import TTL_TECHNICAL_SIGNAL, get_cached_json, set_cached_json, tactical_tilt_key
+from app.utils.cache_keys import (
+    TTL_MARKET_SIGNAL_DEGRADED,
+    TTL_TECHNICAL_SIGNAL,
+    get_cached_json,
+    set_cached_json,
+    tactical_tilt_key,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -34,7 +41,7 @@ Tilt = Literal["FAVOR_QQQ", "BALANCED", "FAVOR_SPY"]
 TILTS: tuple[Tilt, ...] = ("FAVOR_QQQ", "BALANCED", "FAVOR_SPY")
 TILT_LABELS: dict[str, str] = {"FAVOR_QQQ": "나스닥 우위", "BALANCED": "균형", "FAVOR_SPY": "S&P500 우위"}
 
-DEFAULT_TILT_SHIFT_PCT = 10.0
+DEFAULT_TILT_SHIFT_PCT = 0.0
 MAX_TILT_SHIFT_PCT = 20.0
 
 REAL_YIELD_LOOKBACK = 20  # 거래일
@@ -137,6 +144,8 @@ async def get_tilt_inputs(cache: CacheStore | None) -> TiltInputs:
         real_yield_change_pp=real_yield_change(yields),
         relative_strength_pct=rs,
     )
-    if all(v is not None for v in result.values()):  # 부분 실패는 캐시하지 않아 다음 조회에서 재시도
-        await set_cached_json(cache, key, result, TTL_TECHNICAL_SIGNAL)
+    # 부분 실패는 짧게만 캐시해 곧 재시도한다 — 아예 캐시하지 않으면 FRED 장애·키 미설정 동안 전술 탭 조회마다
+    # FRED·Yahoo를 다시 호출해 응답이 매번 외부 타임아웃만큼 늘어졌다
+    complete = all(v is not None for v in result.values())
+    await set_cached_json(cache, key, result, TTL_TECHNICAL_SIGNAL if complete else TTL_MARKET_SIGNAL_DEGRADED)
     return result

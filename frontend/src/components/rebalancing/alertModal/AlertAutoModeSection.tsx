@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import type { MarketConditionMode } from "@/api/alerts";
 import type { AssetAccount } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 import { fetchSettings } from "@/api/settings";
@@ -249,9 +250,7 @@ export function AlertAutoModeSection({
         <select
           className={inputClass}
           value={form.marketConditionMode}
-          onChange={(e) =>
-            form.setMarketConditionMode(e.target.value as "DISABLED" | "CAUTIOUS" | "STRICT")
-          }
+          onChange={(e) => form.setMarketConditionMode(e.target.value as MarketConditionMode)}
         >
           {MARKET_CONDITION_OPTIONS.map(({ value, label, desc }) => (
             <option key={value} value={value}>

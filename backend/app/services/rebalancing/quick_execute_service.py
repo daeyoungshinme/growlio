@@ -22,7 +22,7 @@ from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.schemas.rebalancing import ExecutionPlanOverride
-from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
+from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode, tactical_regime_for_gate
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
     PlanGenerationInProgress,
@@ -49,6 +49,7 @@ class QuickExecuteStatus(StrEnum):
 class QuickExecuteOutcome:
     status: QuickExecuteStatus
     composite_level: str | None = None
+    tactical_blocked: bool = False  # MARKET_BLOCKED가 전술 방어 국면(TACTICAL 게이트) 때문인지
     tax_gate: TaxGateBlocked | None = None
     daily_cap: DailyValueCapBlocked | None = None
     email_sent: bool = False
@@ -155,8 +156,13 @@ async def quick_execute_plan(
         data_freshness = "STALE"
 
     market_mode = getattr(alert_row, "market_condition_mode", "DISABLED")
-    if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness):
-        return QuickExecuteOutcome(QuickExecuteStatus.MARKET_BLOCKED, composite_level=composite_level)
+    tactical_regime = await tactical_regime_for_gate(alert_row, db)
+    if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness, tactical_regime):
+        return QuickExecuteOutcome(
+            QuickExecuteStatus.MARKET_BLOCKED,
+            composite_level=composite_level,
+            tactical_blocked=market_mode == "TACTICAL",
+        )
 
     generated = await build_pending_plan_for_alert(
         alert_row,

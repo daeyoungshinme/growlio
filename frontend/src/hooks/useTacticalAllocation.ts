@@ -50,19 +50,34 @@ export function useTacticalMutations(portfolioId: string) {
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });
 
+  /** 인자 dcaLinked — 자동매수가 전술 연동이었으면 서버가 일반 모드로 되돌리므로 안내·알림 목록 갱신 */
   const disable = useMutation({
-    mutationFn: () => deleteTacticalStrategy(portfolioId),
-    onSuccess: async () => {
-      toast("전술 배분을 껐습니다. 포트폴리오 목표 비중은 그대로 유지됩니다.", "info");
+    mutationFn: (_opts?: { dcaLinked?: boolean }) => deleteTacticalStrategy(portfolioId),
+    onSuccess: async (_data, opts) => {
+      toast(
+        opts?.dcaLinked
+          ? "전술 배분을 껐습니다. 전술 연동 자동매수는 일반 모드로 바뀌었어요."
+          : "전술 배분을 껐습니다. 포트폴리오 목표 비중은 그대로 유지됩니다.",
+        "info",
+      );
       await invalidateTacticalData(queryClient);
+      if (opts?.dcaLinked) {
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts });
+      }
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });
 
+  /** 인자 fraction(기본 1) — 0.5면 절반만 적용(분할 적용) */
   const apply = useMutation({
-    mutationFn: () => applyTacticalWeights(portfolioId),
-    onSuccess: async () => {
-      toast("제안 비중을 목표 비중으로 저장했습니다", "success");
+    mutationFn: (fraction?: number) => applyTacticalWeights(portfolioId, fraction ?? 1),
+    onSuccess: async (_data, fraction) => {
+      toast(
+        (fraction ?? 1) < 1
+          ? "제안 비중의 절반을 목표 비중에 반영했습니다. 나머지는 다음 거래일에 다시 적용하세요"
+          : "제안 비중을 목표 비중으로 저장했습니다",
+        "success",
+      );
       await invalidateTacticalData(queryClient, { portfolioChanged: true });
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),

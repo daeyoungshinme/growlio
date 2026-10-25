@@ -1,6 +1,5 @@
 import { lazy, LazyExoticComponent, Suspense, useCallback, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import * as Sentry from "@sentry/react";
 import { useQueryClient } from "@tanstack/react-query";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -21,8 +20,6 @@ import { fetchDCAAnalysis } from "./api/invest";
 import { fetchSettings } from "./api/settings";
 import { QUERY_KEYS } from "./constants/queryKeys";
 import { storageRemove } from "./utils/safeStorage";
-/** Sentry 라우터 v7 통합용 — 트랜잭션을 라우트 패턴 단위로 묶는다(DSN 미설정 시 그대로 `Routes`). */
-const SentryRoutes = Sentry.withSentryReactRouterV7Routing(Routes);
 
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
@@ -55,16 +52,22 @@ function LazyRoute({ Component }: { Component: LazyExoticComponent<() => React.J
   );
 }
 
-function AppRoutes() {
+/** 로딩 바 전용 leaf — useIsFetching 카운트가 바뀔 때마다 리렌더되므로 라우트 트리와 분리한다
+ * (AppRoutes에 두면 로드 버스트·폴링 때마다 현재 페이지 전체가 다시 렌더됐다) */
+function AppTopLoadingBar() {
   const isAuthChecking = useAuthStore((s) => s.isAuthChecking);
   const isPageLoading = useMainPageFetching();
+  return <TopLoadingBar isVisible={isAuthChecking || isPageLoading} />;
+}
+
+function AppRoutes() {
   usePushNotifications();
   useSyncAllWatcher();
 
   return (
     <>
-      <TopLoadingBar isVisible={isAuthChecking || isPageLoading} />
-      <SentryRoutes>
+      <AppTopLoadingBar />
+      <Routes>
         <Route path="/login" element={<LazyRoute Component={LoginPage} />} />
         <Route path="/register" element={<LazyRoute Component={RegisterPage} />} />
         <Route path="/find-account" element={<LazyRoute Component={FindAccountPage} />} />
@@ -100,7 +103,7 @@ function AppRoutes() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
-      </SentryRoutes>
+      </Routes>
     </>
   );
 }

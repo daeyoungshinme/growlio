@@ -172,6 +172,22 @@ class TestBuildOverseasGainHarvestAction:
         )
         assert action is not None
         assert "자동 집계가 안 되는 계좌" in action["detail"]
+        assert "매도 내역을 기록" in action["detail"]
+
+    def test_trade_record_realized_note_and_room(self):
+        action = build_overseas_gain_harvest_action(
+            [{"unrealized_pnl_krw": 5_000_000}],
+            2_500_000,
+            0.22,
+            TODAY,
+            realized_krw=2_000_000,
+            realized_from_records=True,
+            realized_estimated=True,
+        )
+        assert action is not None
+        assert action["amount_krw"] == 500_000  # 기록한 매도 이익만큼 공제 여유가 줄어든다
+        assert "직접 기록한 매도" in action["detail"]
+        assert "평균단가로 추정" in action["detail"]
 
     def test_unknown_realized_assumes_zero(self):
         action = build_overseas_gain_harvest_action([{"unrealized_pnl_krw": 1_000_000}], 2_500_000, 0.22, TODAY)

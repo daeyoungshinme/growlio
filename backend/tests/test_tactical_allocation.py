@@ -59,11 +59,12 @@ class TestIndicators:
         assert ti.classify_trend(close, s50, s200) == expected
 
     def test_trend_band_keeps_state_near_sma200(self):
-        # 200일선을 0.5% 밑돈 종가: 직전이 UP이면 밴드(1%) 안이라 UP 유지, 직전 상태가 없으면 NEUTRAL
-        assert ti.classify_trend(99.5, 105, 100, prev="UP") == "UP"
-        assert ti.classify_trend(99.5, 105, 100) == "NEUTRAL"
-        assert ti.classify_trend(98.9, 105, 100, prev="UP") == "NEUTRAL"  # 밴드 밖으로 이탈
-        assert ti.classify_trend(100.5, 95, 100, prev="DOWN") == "DOWN"
+        # 200일선을 1.5% 밑돈 종가: 직전이 UP이면 밴드(2%) 안이라 UP 유지, 직전 상태가 없으면 NEUTRAL
+        assert ti.TREND_BAND_PCT == 2.0
+        assert ti.classify_trend(98.5, 105, 100, prev="UP") == "UP"
+        assert ti.classify_trend(98.5, 105, 100) == "NEUTRAL"
+        assert ti.classify_trend(97.9, 105, 100, prev="UP") == "NEUTRAL"  # 밴드 밖으로 이탈
+        assert ti.classify_trend(101.5, 95, 100, prev="DOWN") == "DOWN"
         assert ti.classify_trend(99.5, 95, 100, prev="UP") == "DOWN"  # 데드크로스면 밴드와 무관
 
     def test_snapshot_uptrend(self):
@@ -222,10 +223,12 @@ class TestTilt:
 
     def test_proposed_weights_apply_confirmed_tilt(self):
         s = _strategy(last_tilt="FAVOR_QQQ", tilt_shift_pct=10)
-        assert tactical.proposed_weights_for(s, "NEUTRAL", {}) == {"QQQ": 40.0, "SPY": 30.0, "DIA": 0.0, "CASH": 30.0}
-        # 전략이 없으면 오늘 판정으로 미리보기, 이동폭은 기본값
+        expected = {"QQQ": 40.0, "SPY": 30.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 30.0}
+        assert tactical.proposed_weights_for(s, "NEUTRAL", {}) == expected
+        # 전략이 없으면 오늘 판정으로 미리보기, 이동폭은 기본값(0 = 끔 — plans/70)
         preview = tactical.proposed_weights_for(None, "NEUTRAL", {"observed_tilt": "FAVOR_SPY"})
-        assert preview == {"QQQ": 20.0, "SPY": 50.0, "DIA": 0.0, "CASH": 30.0}
+        assert preview == tactical.DEFAULT_REGIME_WEIGHTS["NEUTRAL"]
+        assert tilt.DEFAULT_TILT_SHIFT_PCT == 0.0
         assert tactical.tilt_shift_of(_strategy(tilt_shift_pct=None)) == tilt.DEFAULT_TILT_SHIFT_PCT
 
     def test_reasons_mention_missing_data(self):
@@ -235,29 +238,43 @@ class TestTilt:
         assert "+1.2%" in reasons[1]
 
     @pytest.mark.asyncio
-    async def test_get_inputs_caches_only_complete(self):
+    async def test_get_inputs_caches_partial_briefly(self):
         from app.core.cache_store import CacheStore
+        from app.utils.cache_keys import TTL_MARKET_SIGNAL_DEGRADED, TTL_TECHNICAL_SIGNAL
 
         closes = _trend_closes(120)
         closes["QQQ"] = closes["QQQ"] * np.linspace(1.0, 1.2, 120)  # 나스닥 우위
         cache = CacheStore()
         fetch = AsyncMock(return_value=closes)
+        ttls: list[int] = []
+        real_set = tilt.set_cached_json
+
+        async def spy_set(c, key, value, ttl):
+            ttls.append(ttl)
+            await real_set(c, key, value, ttl)
+
         with (
+            patch.object(tilt, "set_cached_json", spy_set),
             patch("app.services.technical_signal_service.fetch_close_history", fetch),
             patch.object(tilt, "_fetch_real_yields", AsyncMock(side_effect=RuntimeError("fred"))),
         ):
             partial = await tilt.get_tilt_inputs(cache)
+            again_partial = await tilt.get_tilt_inputs(cache)
         assert partial["real_yield"] is None
         assert partial["relative_strength_pct"] > 0
+        assert again_partial == partial
+        assert fetch.await_count == 1  # 부분 실패도 짧게 캐시 — 장애 중 매 요청 재조회 방지
+        assert ttls == [TTL_MARKET_SIGNAL_DEGRADED]
+
+        await cache.delete(tilt.tactical_tilt_key())  # 짧은 TTL 경과
         with (
+            patch.object(tilt, "set_cached_json", spy_set),
             patch("app.services.technical_signal_service.fetch_close_history", fetch),
             patch.object(tilt, "_fetch_real_yields", AsyncMock(return_value=[2.0] * 20 + [1.8])),
         ):
             full = await tilt.get_tilt_inputs(cache)
-            again = await tilt.get_tilt_inputs(cache)
         assert full["real_yield_change_pp"] == pytest.approx(-0.2)
-        assert again == full
-        assert fetch.await_count == 2  # 부분 실패 결과는 캐시하지 않아 재조회, 완전한 결과는 캐시
+        assert ttls[-1] == TTL_TECHNICAL_SIGNAL
 
     @pytest.mark.asyncio
     async def test_get_inputs_survive_price_failure(self):
@@ -276,7 +293,7 @@ class TestWeights:
     def test_valid_table_fills_missing_assets(self):
         raw = {"RISK_ON": {"QQQ": 100}, "NEUTRAL": {"SPY": 50, "CASH": 50}, "RISK_OFF": {"CASH": 100}}
         out = tactical.validate_regime_weights(raw)
-        assert out["RISK_ON"] == {"QQQ": 100.0, "SPY": 0.0, "DIA": 0.0, "CASH": 0.0}
+        assert out["RISK_ON"] == {"QQQ": 100.0, "SPY": 0.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 0.0}
 
     @pytest.mark.parametrize(
         "raw",
@@ -341,7 +358,8 @@ class TestSimulate:
 
         result = simulate(closes, vix, tactical.DEFAULT_REGIME_WEIGHTS, idx[250])
 
-        strat, spy = result["metrics"][0], result["metrics"][1]
+        by_name = {m["name"]: m for m in result["metrics"]}
+        strat, spy = by_name["전술 배분"], by_name["SPY 보유"]
         assert result["regime_time_pct"]["RISK_OFF"] > 0
         assert strat["mdd_pct"] < spy["mdd_pct"]
         assert result["regime_switches"] >= 1
@@ -372,7 +390,7 @@ class TestSimulate:
 
         result = simulate(closes, vix, table, idx[300])
 
-        assert [m["name"] for m in result["metrics"]][1:] == ["SPY 보유", "QQQ 보유", "DIA 보유"]
+        assert [m["name"] for m in result["metrics"]][1:] == ["평균 비중 고정", "SPY 보유", "QQQ 보유", "DIA 보유"]
         assert "dia" in result["series"][0]
         # DIA 100% 보유 — 첫 국면 확정(2거래일) 이후 DIA 수익률을 따라간다
         assert result["metrics"][0]["total_return_pct"] > 0
@@ -385,7 +403,7 @@ class TestSimulate:
             simulate(closes, pd.Series(15.0, index=idx), table, idx[300])
         # DIA 0%면 DIA 시세 없이도 계산되고 DIA 비교는 빠진다
         default = simulate(closes, pd.Series(15.0, index=idx), tactical.DEFAULT_REGIME_WEIGHTS, idx[300])
-        assert len(default["metrics"]) == 3
+        assert len(default["metrics"]) == 4  # 전술·평균 비중 고정·SPY·QQQ
         assert "dia" not in default["series"][0]
 
     def test_too_short_period_raises(self):
@@ -671,12 +689,36 @@ class TestFetchWrappers:
         with (
             patch.object(bt, "fetch_close_history", AsyncMock(return_value=_trend_closes())),
             patch.object(bt, "_fetch_vix_history", AsyncMock(side_effect=RuntimeError("fred"))),
+            patch.object(bt, "_fetch_cash_yield_history", AsyncMock(side_effect=RuntimeError("fred"))),
         ):
             result = await bt.run_tactical_backtest(tactical.DEFAULT_REGIME_WEIGHTS, 1, cache)
             cached = await bt.run_tactical_backtest(tactical.DEFAULT_REGIME_WEIGHTS, 1, cache)
         assert "VIX 이력을 받지 못해" in result["macro_note"]
+        assert "현금 수익률은 0" in result["macro_note"]
+        assert "현금 수익률 0" in result["assumptions"]
         assert result["years"] == 1
         assert cached == result
+
+    @pytest.mark.asyncio
+    async def test_backtest_simulate_runs_off_event_loop(self):
+        """simulate는 CPU 루프라 이벤트 루프를 막지 않도록 asyncio.to_thread로 실행돼야 한다."""
+        from app.services import tactical_backtest as bt
+
+        calls: list[object] = []
+        real_to_thread = bt.asyncio.to_thread
+
+        async def spy(func, *args, **kwargs):
+            calls.append(func)
+            return await real_to_thread(func, *args, **kwargs)
+
+        with (
+            patch.object(bt, "fetch_close_history", AsyncMock(return_value=_trend_closes())),
+            patch.object(bt, "_fetch_vix_history", AsyncMock(return_value=pd.Series(dtype=float))),
+            patch.object(bt, "_fetch_cash_yield_history", AsyncMock(return_value=pd.Series(dtype=float))),
+            patch.object(bt.asyncio, "to_thread", spy),
+        ):
+            await bt.run_tactical_backtest(tactical.DEFAULT_REGIME_WEIGHTS, 1, None)
+        assert bt.simulate in calls
 
     @pytest.mark.asyncio
     async def test_backtest_missing_prices_raises(self):

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getSupabase } from "@/lib/supabase";
+import { hasStoredSession, readStoredSession } from "@/lib/storedSession";
 // 인증 부트스트랩(세션 복원·프로필 동기화·401 재시도) 전용이라 도메인 api 모듈을 거치지 않고 client를 직접 쓴다.
 import { api } from "@/api/client";
 import { getHttpStatus } from "@/utils/error";
@@ -7,7 +8,12 @@ import { BIOMETRIC_SESSION_KEY } from "@/hooks/useBiometric";
 import { sessionSet, storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
 
 export const AUTH_ME_CACHE_KEY = "growlio:auth-me";
+// /auth/me 재검증을 생략하는 기간 — 지나면 checkAuth가 다시 조회한다
 const AUTH_ME_TTL = 30 * 60 * 1000;
+// 저장 세션 + /auth/me 캐시가 있으면 이 기간 동안은 검증을 기다리지 않고 바로 로그인 상태로 렌더한다
+// (검증은 checkAuth가 백그라운드로 수행, 실패 시 로그아웃). 30분 TTL에 묶여 있으면 30분 넘게 지나 앱을 열 때마다
+// SDK 로드 + getSession + /auth/me를 전체 화면 스피너로 기다려 영속 쿼리 캐시가 무의미해졌다.
+const OPTIMISTIC_AUTH_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
 interface AuthMeCache {
   userId: string;
@@ -50,11 +56,11 @@ function getOptimisticAuthState(): OptimisticAuth {
     const raw = storageGet(AUTH_ME_CACHE_KEY);
     if (!raw) return fallback;
     const cached: AuthMeCache = JSON.parse(raw);
-    if (Date.now() - cached.cachedAt >= AUTH_ME_TTL) return fallback;
-    const hasSbSession = Object.keys(localStorage).some(
-      (k) => k.startsWith("sb-") && k.endsWith("-auth-token"),
-    );
-    if (!hasSbSession) return fallback;
+    if (Date.now() - cached.cachedAt >= OPTIMISTIC_AUTH_MAX_AGE) return fallback;
+    if (!hasStoredSession()) return fallback;
+    // 저장 형식을 해석할 수 있으면 다른 계정의 세션인지도 확인한다
+    const stored = readStoredSession();
+    if (stored?.userId && stored.userId !== cached.userId) return fallback;
     return {
       isAuthChecking: false,
       isAuthenticated: true,
@@ -193,6 +199,16 @@ export const useAuthStore = create<AuthState>((set, get) => {
         } catch (err) {
           // 세션은 있지만 앱 DB에 user 없음 (이메일 인증 후 첫 접속)
           const httpStatus = getHttpStatus(err);
+          // 네트워크 오류(오프라인·서버 기상 중)는 인증 실패가 아니다 — 낙관적 로그인 상태로 캐시 화면을
+          // 이미 보여주고 있다면 쫓아내지 않는다(다음 checkAuth/요청에서 다시 검증).
+          if (
+            httpStatus === undefined &&
+            get().isAuthenticated &&
+            get().userId === session.user.id
+          ) {
+            set({ email: session.user.email ?? null, isAuthChecking: false });
+            return;
+          }
           if (httpStatus === 401) {
             try {
               await api.post("/auth/sync-profile", { display_name: null });

@@ -424,10 +424,13 @@ def tax_impact_gate_blocked_template(
 def market_signal_gate_blocked_template(
     portfolio_name: str, composite_level: str, market_condition_mode: str
 ) -> tuple[str, str]:
-    """시장신호 게이트로 이번 자동 실행 계획 생성이 보류됐을 때 발송."""
+    """시장신호 게이트로 이번 자동 실행 계획 생성이 보류됐을 때 발송. TACTICAL은 전술 방어 국면 매수 보류 문구."""
+    if market_condition_mode == "TACTICAL":
+        return _tactical_gate_blocked_template(portfolio_name)
     level_label = _SIGNAL_LEVEL_LABEL.get(composite_level, composite_level)
     level_color = _SIGNAL_LEVEL_COLOR.get(composite_level, "#374151")
-    mode_label = {"CAUTIOUS": "신중(YELLOW/RED 차단)", "STRICT": "엄격(RED만 차단)"}.get(
+    # 판정은 order_builder.is_market_signal_blocking_auto_mode — CAUTIOUS=RED만, STRICT=YELLOW·RED
+    mode_label = {"CAUTIOUS": "신중(RED만 차단)", "STRICT": "엄격(YELLOW·RED 차단)"}.get(
         market_condition_mode, market_condition_mode
     )
     subject = f"[Growlio] 리밸런싱 자동화 보류 — 시장신호 게이트 ({portfolio_name})"
@@ -445,6 +448,26 @@ def market_signal_gate_blocked_template(
         "현재 시장 위험 신호가 설정하신 자동화 게이트 조건에 해당해 이번 자동 실행 계획을 만들지 않았습니다. "
         "신호가 완화되면 다음 실행 시각에 다시 확인합니다. 게이트 조건은 리밸런싱 자동화 설정에서 조정할 수 있습니다. "
         "이 알림은 같은 알림에 대해 하루 1회만 발송됩니다.",
+    )
+    return subject, html
+
+
+def _tactical_gate_blocked_template(portfolio_name: str) -> tuple[str, str]:
+    color = "#2563eb"
+    subject = f"[Growlio] 적립 매수 보류 — 전술 방어 국면 ({portfolio_name})"
+    table = _kv_table(
+        [
+            ("포트폴리오", portfolio_name),
+            ("전술 배분 국면", f"<span style='color:{color};font-weight:bold;'>방어</span>"),
+            ("설정된 게이트", "전술 연동(방어 국면이면 보류)"),
+        ]
+    )
+    html = _email_div(
+        "적립 매수 보류 — 전술 방어 국면",
+        color,
+        table,
+        "전술 배분이 방어 국면이라 이번 적립 매수를 보류했습니다. 입금액은 예수금으로 남아 있고, 방어 국면이 끝난 뒤 "
+        "정기 매수일에 함께 매수됩니다. 매도는 하지 않습니다. 이 알림은 같은 알림에 대해 하루 1회만 발송됩니다.",
     )
     return subject, html
 

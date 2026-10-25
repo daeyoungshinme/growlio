@@ -24,7 +24,7 @@ const RebalancingStatusCard = lazy(() => import("../components/dashboard/Rebalan
 
 const InvestmentSnapshotCard = lazy(() => import("../components/dashboard/InvestmentSnapshotCard"));
 
-const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
+const AllocationHistoryCard = lazy(() => import("../components/dashboard/AllocationHistoryCard"));
 
 function OnboardingChecklist() {
   return (
@@ -230,7 +230,7 @@ export default function DashboardPage() {
         {!isBrandNewUser && (
           <ErrorBoundary variant="section">
             <Suspense fallback={<SkeletonCard rows={3} height="h-4" />}>
-              <AllocationHistoryChart />
+              <AllocationHistoryCard />
             </Suspense>
           </ErrorBoundary>
         )}
