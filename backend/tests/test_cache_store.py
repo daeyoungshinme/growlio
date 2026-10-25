@@ -97,3 +97,47 @@ class TestRunCacheSweep:
             await run_cache_sweep()  # 카운터가 리셋돼 두 번째 실행은 경고하지 않는다
 
         logger.warning.assert_called_once_with("cache_lru_evictions", evicted=5, entries=0)
+
+
+class TestHitMissMetrics:
+    def test_cache_name_strips_env_prefix(self):
+        from app.core.cache_store import _cache_name
+        from app.core.config import settings
+
+        assert _cache_name(f"{settings.app_env}:dashboard:abc") == "dashboard"
+        assert _cache_name("lock:job") == "lock"
+
+    @pytest.mark.asyncio
+    async def test_get_counts_hit_and_miss(self):
+        from app.core.config import settings
+        from app.utils.metrics import cache_hit_count, cache_miss_count
+
+        key = f"{settings.app_env}:metric_probe:1"
+        hit = cache_hit_count.labels(cache_name="metric_probe")
+        miss = cache_miss_count.labels(cache_name="metric_probe")
+        hit_before, miss_before = hit._value.get(), miss._value.get()
+
+        store = CacheStore()
+        await store.get(key)
+        await store.set(key, "v", ex=60)
+        await store.get(key)
+
+        assert miss._value.get() == miss_before + 1
+        assert hit._value.get() == hit_before + 1
+
+
+class TestRouteLabel:
+    def test_matched_route_uses_template(self):
+        from types import SimpleNamespace
+
+        from app.main import _route_label
+
+        req = SimpleNamespace(scope={"route": SimpleNamespace(path="/api/v1/dashboard/action-items")})
+        assert _route_label(req) == "/api/v1/dashboard/action-items"  # type: ignore[arg-type]
+
+    def test_unmatched_route_collapses(self):
+        from types import SimpleNamespace
+
+        from app.main import _route_label
+
+        assert _route_label(SimpleNamespace(scope={})) == "unmatched"  # type: ignore[arg-type]

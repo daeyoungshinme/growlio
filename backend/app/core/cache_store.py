@@ -12,7 +12,7 @@ import fnmatch
 import re
 import time
 
-from app.utils.metrics import cache_lru_eviction_count
+from app.utils.metrics import cache_hit_count, cache_lru_eviction_count, cache_miss_count
 
 _MAX_ENTRIES = 20_000
 """Render free 인스턴스(512MB)에서 무제한 축적을 막기 위한 상한 — 7일짜리 TTL 캐시(배당/ETF 메타
@@ -23,6 +23,16 @@ _MAX_ENTRIES = 20_000
 상한 도달 시 만료된 항목부터 치우고, 그래도 넘칠 때만 살아 있는 항목을 LRU로 축출한다. 살아 있는
 항목 축출은 분산락(`set(nx=True)`)·토큰 캐시 키도 가리지 않으므로 `cache_lru_eviction_total` 메트릭과
 `cache_sweep` 잡의 경고 로그로 발생 여부를 감시한다 — 경고가 보이면 상한 상향을 검토할 것."""
+
+
+def _cache_name(key: str) -> str:
+    """'production:dashboard:<uid>' → 'dashboard' — 히트율 메트릭 레이블(키 종류 단위, 사용자별 아님)."""
+    parts = key.split(":", 2)
+    from app.core.config import settings  # lazy — 순환 임포트 방지
+
+    if len(parts) > 1 and parts[0] == settings.app_env:
+        return parts[1]
+    return parts[0]
 
 
 class CacheStore:
@@ -45,13 +55,16 @@ class CacheStore:
         async with self._lock:
             entry = self._data.get(key)
             if entry is None:
+                cache_miss_count.labels(cache_name=_cache_name(key)).inc()
                 return None
             value, expires_at = entry
             if self._is_expired(expires_at):
                 del self._data[key]
+                cache_miss_count.labels(cache_name=_cache_name(key)).inc()
                 return None
             del self._data[key]
             self._data[key] = entry
+            cache_hit_count.labels(cache_name=_cache_name(key)).inc()
             return value
 
     async def set(self, key: str, value: str, nx: bool = False, ex: int | None = None) -> bool:
