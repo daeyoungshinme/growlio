@@ -1,7 +1,10 @@
+import type { SeriesData } from "@/api/backtest";
 import type {
   PullbackStage,
+  TacticalBacktestResult,
   TacticalAsset,
   TacticalRegime,
+  TacticalStatus,
   TacticalTilt,
   TrendState,
 } from "@/api/tactical";
@@ -90,3 +93,76 @@ export const DEFAULT_TILT_SHIFT_PCT = 10;
 
 /** 백엔드 tactical_dip.DEFAULT_DIP_SHIFT_PCT — 기본은 끔 */
 export const DEFAULT_DIP_SHIFT_PCT = 0;
+
+/** 전환 조건 안내 꼬리말 — 백엔드 step_confirmation(서로 다른 날 2번 관측) */
+export const TRANSITION_CONFIRM_NOTE = "조건을 충족해도 다음 거래일에 한 번 더 확인돼야 전환돼요";
+
+/** 확정 국면이 며칠째인지(바뀐 날 = 1일째, 로컬 날짜 기준). 바뀐 시각이 없으면 null */
+export function regimeDayCount(changedAt: string | null, now: Date = new Date()): number | null {
+  if (!changedAt) return null;
+  const since = new Date(changedAt);
+  if (Number.isNaN(since.getTime())) return null;
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return Math.max(1, Math.round((startOf(now) - startOf(since)) / 86_400_000) + 1);
+}
+
+export type NextActionTone = "action" | "wait" | "idle";
+
+/**
+ * 탭 맨 위 "지금 할 일" 한 줄 — 우선순위: 미사용 → 판정 불가 → 전환 확인 중 → 절반 적용 후 나머지 →
+ * 미적용 → 할 일 없음.
+ */
+export function tacticalNextAction(
+  status: TacticalStatus,
+  alreadyApplied: boolean,
+  now: Date = new Date(),
+): { tone: NextActionTone; text: string } {
+  const regime = status.confirmed_regime;
+  if (!status.enabled) {
+    return { tone: "idle", text: "켜면 국면이 바뀔 때 알려드려요" };
+  }
+  if (!regime) {
+    return status.pending_regime
+      ? {
+          tone: "wait",
+          text: `${REGIME_LABEL[status.pending_regime]} 전환 확인 중 — 다음 거래일 확정`,
+        }
+      : { tone: "wait", text: "시세를 받지 못해 국면을 판정하지 못했어요" };
+  }
+  if (status.pending_regime) {
+    return {
+      tone: "wait",
+      text: `${REGIME_LABEL[status.pending_regime]} 전환 확인 중 — 다음 거래일 재확인 후 적용하세요`,
+    };
+  }
+  if (status.partial_regime === regime) {
+    return { tone: "action", text: "절반 적용함 — 나머지를 적용하세요" };
+  }
+  if (!alreadyApplied) {
+    return { tone: "action", text: `${REGIME_LABEL[regime]} 국면 제안 비중을 적용하세요` };
+  }
+  const days = regimeDayCount(status.regime_changed_at, now);
+  return {
+    tone: "idle",
+    text: `할 일 없음 · ${REGIME_LABEL[regime]} 국면 유지${days ? ` ${days}일째` : ""}`,
+  };
+}
+
+/** 백테스트 응답 series(행 단위) → BacktestResultChart 입력(열 단위). 이름은 metrics와 같게 맞춘다 */
+export function toChartSeries(data: TacticalBacktestResult): {
+  dates: string[];
+  series: SeriesData[];
+} {
+  const rows = data.series;
+  const cols: [string, (r: TacticalBacktestResult["series"][number]) => number | undefined][] = [
+    ["전술 배분", (r) => r.strategy],
+    ["평균 비중 고정", (r) => r.static],
+    ["SPY 보유", (r) => r.spy],
+    ["QQQ 보유", (r) => r.qqq],
+  ];
+  if (rows.some((r) => r.dia != null)) cols.push(["DIA 보유", (r) => r.dia]);
+  return {
+    dates: rows.map((r) => r.date),
+    series: cols.map(([name, pick]) => ({ name, values: rows.map((r) => pick(r) ?? null) })),
+  };
+}

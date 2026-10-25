@@ -19,6 +19,13 @@ export interface TiltInputs {
   relative_strength_pct: number | null; // QQQ/SPY 비율의 50일 평균 대비(%)
 }
 
+/** 다음 국면 전환 후보까지 남은 조건 — 백엔드 tactical_hints.TransitionHint */
+export interface TransitionHint {
+  kind: "TO_RISK_OFF" | "TO_NEUTRAL" | "TO_RISK_ON";
+  text: string;
+  distance_pct: number | null; // 종가 기준 필요한 가격 변동(%), 가격 조건이 아니면 null
+}
+
 export interface TechnicalSnapshot {
   close: number | null;
   sma20?: number | null;
@@ -64,9 +71,15 @@ export interface TacticalStatus {
   dip_shift_pct: number;
   /** 현재 투입 단계 0~3(60일선/120일선/120일선+RSI 과매도) — 공격 국면이 아니면 0 */
   dip_level: number;
+  /** 제안 비중에 실제로 들어간 투입량(%p) — 명목 투입량이 현금 비중을 넘으면 현금까지만 */
+  dip_deployed_pct: number;
   /** QQQ 웅덩이 단계(오늘) */
   pullback_stage: PullbackStage;
   dip_reasons: string[];
+  /** 확정 국면에서 절반만 먼저 적용했으면 그 국면(남은 절반 대기) — 아니면 null */
+  partial_regime: TacticalRegime | null;
+  partial_applied_on: string | null; // "YYYY-MM-DD"
+  transition_hints: TransitionHint[];
 }
 
 export interface TacticalStrategyPayload {
@@ -92,8 +105,19 @@ export interface TacticalBacktestResult {
   years: number;
   start_date: string;
   end_date: string;
-  metrics: TacticalBacktestMetric[]; // [전술 배분, SPY 보유, QQQ 보유, (DIA 시세가 있으면) DIA 보유]
-  series: { date: string; strategy: number; spy: number; qqq: number; dia?: number }[];
+  /** [전술 배분, 평균 비중 고정, SPY 보유, QQQ 보유, (DIA 시세가 있으면) DIA 보유] */
+  metrics: TacticalBacktestMetric[];
+  series: {
+    date: string;
+    strategy: number;
+    static: number;
+    spy: number;
+    qqq: number;
+    dia?: number;
+  }[];
+  /** 전술 배분이 기간 중 평균적으로 든 목표 비중(시간가중) — "평균 비중 고정" 비교선의 비중 */
+  avg_weights: TacticalWeights;
+  turnover_pct_per_year: number; // 연평균 회전율(%)
   regime_switches: number;
   regime_time_pct: Record<TacticalRegime, number>;
   tilt_shift_pct: number;

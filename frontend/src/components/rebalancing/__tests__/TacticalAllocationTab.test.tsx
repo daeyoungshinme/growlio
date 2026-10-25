@@ -101,7 +101,11 @@ function makeStatus(overrides: Partial<TacticalStatus> = {}): TacticalStatus {
     dip_shift_pct: 0,
     dip_level: 0,
     pullback_stage: "SMA60",
+    dip_deployed_pct: 0,
     dip_reasons: ["QQQ 웅덩이 단계: 60일선 웅덩이"],
+    partial_regime: null,
+    partial_applied_on: null,
+    transition_hints: [],
     ...overrides,
   };
 }
@@ -116,9 +120,15 @@ function renderTab(onGoToExecution = vi.fn()) {
   return { onGoToExecution };
 }
 
+/** 판정 근거·차트 지표는 기본 접힘(plans/69 P4) — 지표·근거를 보는 테스트는 먼저 펼친다 */
+async function openDetails() {
+  fireEvent.click(await screen.findByText("판정 근거·차트 지표"));
+}
+
 describe("TacticalAllocationTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear(); // 접힘 상태 기억(useCollapsible)이 테스트 사이에 새지 않게
   });
 
   it("국면 배지·지표·제안 비중과 비호환 경고를 보여준다", async () => {
@@ -127,18 +137,36 @@ describe("TacticalAllocationTab", () => {
 
     expect(await screen.findByText("공격")).toBeDefined();
     expect(tacticalApi.fetchTacticalStatus).toHaveBeenCalledWith("p1");
-    expect(screen.getAllByText("추세 상승")).toHaveLength(2);
     expect(screen.getByText("기타 종목")).toBeDefined();
     expect(screen.getByText(/QQQ·SPY·DIA·QLD·SSO·현금 외 종목이 있어요/)).toBeDefined();
-    // DIA 지표는 참고용으로 표시하고, 현재·제안 모두 0%면 비중 비교 행은 숨긴다
+    // 지표는 접힘 안 — 펼치기 전엔 보이지 않는다
+    expect(screen.queryByText("추세 상승")).toBeNull();
+    await openDetails();
+    expect(screen.getAllByText("추세 상승")).toHaveLength(2);
+    // 비중표에 DIA가 없으면 DIA 참고 지표·비중 비교 행 모두 숨긴다
+    expect(screen.queryByText("참고 · 국면 판단 미반영")).toBeNull();
+    expect(screen.queryByText("DIA (다우존스)")).toBeNull();
+  });
+
+  it("비중표에 DIA가 있으면 DIA 참고 지표를 보여준다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({
+        regime_weights: {
+          ...DEFAULT_TABLE,
+          NEUTRAL: { ...DEFAULT_TABLE.NEUTRAL, SPY: 20, DIA: 20 },
+        },
+      }),
+    );
+    renderTab();
+    await openDetails();
     expect(screen.getByText("참고 · 국면 판단 미반영")).toBeDefined();
     expect(screen.getByText("추세 혼조")).toBeDefined();
-    expect(screen.queryByText("DIA (다우존스)")).toBeNull();
   });
 
   it("매크로 확정 등급이 진단 탭 신호와 다를 수 있는 이유를 툴팁 없이 화면에 적는다", async () => {
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
     renderTab();
+    await openDetails();
 
     expect(await screen.findByText(/진단 탭보다 늦게 바뀔 수 있어요/)).toBeDefined();
   });
@@ -244,6 +272,7 @@ describe("TacticalAllocationTab", () => {
     renderTab();
 
     expect(await screen.findByText("S&P500 우위 (10%p 이동)")).toBeDefined();
+    await openDetails();
     expect(screen.getByText(/오늘 판단은 나스닥 우위/)).toBeDefined();
     expect(screen.getByText(/미국 10년 실질금리/)).toBeDefined();
   });
@@ -253,6 +282,7 @@ describe("TacticalAllocationTab", () => {
     renderTab();
 
     expect(await screen.findByText("조절 안 함")).toBeDefined();
+    await openDetails();
     expect(screen.queryByText(/미국 10년 실질금리/)).toBeNull();
   });
 
@@ -277,19 +307,93 @@ describe("TacticalAllocationTab", () => {
   it("웅덩이 단계 배지와 이평선 이격을 보여준다", async () => {
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
     renderTab();
+    expect(await screen.findByText("사용 안 함")).toBeDefined();
+    await openDetails();
 
     expect(await screen.findByText("60일선 웅덩이")).toBeDefined();
     // QQQ 종가 716.19 / 20일선 730 → -1.9%
     expect(screen.getByText("-1.9%")).toBeDefined();
-    expect(screen.getByText("사용 안 함")).toBeDefined();
+    // 웅덩이 배지는 투입 기준인 QQQ에만
+    expect(screen.getAllByText("60일선 웅덩이")).toHaveLength(1);
   });
 
-  it("웅덩이 투입 중이면 투입량을 보여준다", async () => {
+  it("웅덩이 투입 중이면 서버가 계산한 실제 투입량을 보여준다", async () => {
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
-      makeStatus({ dip_shift_pct: 15, dip_level: 2 }),
+      makeStatus({ dip_shift_pct: 30, dip_level: 3, dip_deployed_pct: 10 }),
     );
     renderTab();
     expect(await screen.findByText("현금 10%p 투입 중")).toBeDefined();
+  });
+
+  it("단계는 진행 중인데 현금이 없으면 투입할 현금 없음으로 표시한다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({ dip_shift_pct: 15, dip_level: 2, dip_deployed_pct: 0 }),
+    );
+    renderTab();
+    expect(await screen.findByText("투입할 현금 없음")).toBeDefined();
+  });
+
+  it("절반 적용 상태면 나머지 적용만 제안하고 실행 화면으로도 갈 수 있다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({
+        portfolio_compatible: true,
+        current_weights: { QQQ: 40, SPY: 40, CASH: 20 },
+        partial_regime: "RISK_ON",
+        partial_applied_on: "2026-10-20",
+      }),
+    );
+    vi.mocked(tacticalApi.applyTacticalWeights).mockResolvedValue(makeStatus());
+    renderTab();
+
+    expect(await screen.findByText("절반 적용함 — 나머지를 적용하세요")).toBeDefined();
+    expect(screen.getByText(/10\/20 절반 적용/)).toBeDefined();
+    expect(screen.getByText("리밸런싱 분석·실행으로 이동")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "나머지 적용" }));
+    expect(screen.queryByText("절반 먼저 적용")).toBeNull();
+    const buttons = screen.getAllByRole("button", { name: "나머지 적용" });
+    fireEvent.click(buttons[buttons.length - 1]);
+    await waitFor(() => expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 1));
+  });
+
+  it("다음 전환 조건과 확정 안내를 최대 2줄 보여준다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({
+        transition_hints: [
+          { kind: "TO_NEUTRAL", text: "QQQ가 3.9% 더 내려 200일선 아래", distance_pct: -3.9 },
+          { kind: "TO_RISK_OFF", text: "매크로 위험이면 방어 후보", distance_pct: null },
+          { kind: "TO_RISK_OFF", text: "세 번째 줄", distance_pct: null },
+        ],
+      }),
+    );
+    renderTab();
+    expect(await screen.findByText("QQQ가 3.9% 더 내려 200일선 아래")).toBeDefined();
+    expect(screen.getByText("매크로 위험이면 방어 후보")).toBeDefined();
+    expect(screen.queryByText("세 번째 줄")).toBeNull();
+    expect(screen.getByText(/다음 거래일에 한 번 더 확인돼야/)).toBeDefined();
+  });
+
+  it("이미 적용한 국면이면 할 일 없음과 유지 일수를 보여준다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({
+        applied_regime: "RISK_ON",
+        current_weights: DEFAULT_TABLE.RISK_ON,
+        portfolio_compatible: true,
+        regime_changed_at: new Date().toISOString(),
+      }),
+    );
+    renderTab();
+    expect(await screen.findByText("할 일 없음 · 공격 국면 유지 1일째")).toBeDefined();
+    expect(screen.getByText("1일째")).toBeDefined();
+    expect(screen.queryByText("제안 비중을 목표 비중으로 적용")).toBeNull();
+  });
+
+  it("전략을 켜지 않았으면 배지에 오늘 관측임을 밝힌다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({ enabled: false, confirmed_regime: null }),
+    );
+    renderTab();
+    expect(await screen.findByText("공격 (오늘 관측)")).toBeDefined();
+    expect(screen.getByText("켜면 국면이 바뀔 때 알려드려요")).toBeDefined();
   });
 
   it("전술 자산만 있는 포트폴리오는 절반만 먼저 적용할 수 있다", async () => {

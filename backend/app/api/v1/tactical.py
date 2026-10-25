@@ -145,8 +145,8 @@ async def apply_tactical_weights(
 ) -> dict[str, Any]:
     """확정 국면의 제안 비중을 포트폴리오 목표 비중으로 저장한다 — 주문은 내지 않는다.
 
-    `fraction<1`(분할 적용)은 전술 자산만으로 구성된 포트폴리오에서만 허용한다 — 다른 종목을 절반만 줄이는 건
-    전술 배분이 관리하는 범위가 아니다.
+    `fraction<1`(분할 적용)은 전술 자산만으로 구성된 포트폴리오에서만, 같은 국면에서 한 번만 허용한다 — 다른 종목을
+    절반만 줄이는 건 전술 배분이 관리하는 범위가 아니고, 두 번째부터는 나머지 적용(fraction=1)이다.
     """
     portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
@@ -163,6 +163,12 @@ async def apply_tactical_weights(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="전술 자산 외 종목이 있는 포트폴리오는 나눠서 적용할 수 없습니다. 한 번에 적용해주세요.",
+        )
+    if fraction < 1 and strategy.partial_regime == regime:
+        # 현재 목표에서 다시 절반을 보간하면 75%가 된다 — 두 번째는 나머지(전체) 적용만 허용
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="이미 절반을 적용했어요. 나머지를 적용해주세요.",
         )
 
     await tactical.apply_regime_to_portfolio(portfolio, strategy, regime, db, fraction=fraction)

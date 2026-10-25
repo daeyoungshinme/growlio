@@ -57,6 +57,11 @@ class TacticalStrategy(Base):
     dip_level: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
     notified_dip_level: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
 
+    # 분할 적용(fraction<1) 진행 중인 국면·적용일 — 같은 국면에서 "절반 먼저"가 두 번 눌려 75%가 되는 것을 막고
+    # 화면에 "나머지 적용"을 띄운다. 전체 적용·확정 국면 변경 시 비운다.
+    partial_regime: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    partial_applied_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

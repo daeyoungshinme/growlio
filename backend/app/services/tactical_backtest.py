@@ -7,7 +7,14 @@
 
 룩어헤드 방지: t일 종가까지의 데이터로 판정한 국면은 t+1일 수익률부터 적용. 국면 판정·확정은 실시간과 같은
 `classify_regime`(직전 확정 국면 전달)과 `step_confirmation`을 거래일 날짜로 돌린다. 국면이 바뀔 때만 목표
-비중으로 리밸런싱하고 그 사이에는 비중이 시세대로 흘러가게 둔다. 현금 수익률 0, 거래비용·세금·환율 미반영.
+비중으로 리밸런싱하고 그 사이에는 비중이 시세대로 흘러가게 둔다. 현금은 미국 3개월 국채 금리(FRED DTB3)로 이자를
+받고(이력이 없으면 0), 리밸런싱마다 거래한 주식 금액의 `_COST_RATE`를 비용으로 뺀다. 세금·환율은 미반영.
+
+공정 비교용 "평균 비중 고정": 전술 배분이 기간 동안 평균적으로 들고 있던 목표 비중(시간가중)을 처음부터 그대로 두고
+매월 리밸런싱한 결과. 전술 배분이 이보다 나아야 국면 판단(타이밍)이 가치를 더한 것이다 — 단순 보유보다 MDD가
+작은 이유가 "평소 주식이 적어서"인지 "위험할 때 줄여서"인지 구분한다.
+
+(2026-10-21·25 docstring의 실측 수치는 현금 0·비용 0 기준이다. 현금 이자·비용 반영 기준은 docs/plans/69.)
 
 나스닥/S&P 틸트(`tactical_tilt`)는 매월 첫 거래일(입력이 모두 있는 첫날)에 그날 종가까지의 실질금리 변화·
 QQQ/SPY 상대강도로 판정하고, 바뀌면 그 시점에 리밸런싱한다(실시간의 "그 달 첫 점검일" 갱신과 같은 취지).
@@ -53,6 +60,8 @@ _MAX_SERIES_POINTS = 260  # 차트용 다운샘플 상한
 # 레버리지 ETF → (기초 종목, 연 보수+차입비용 근사). 차입비용은 장기 단기금리 평균 근사 2%(1배분 차입).
 _LEVERAGE_BASE: dict[str, tuple[str, float]] = {"QLD": ("QQQ", 0.0095 + 0.02), "SSO": ("SPY", 0.0089 + 0.02)}
 _LEVERAGE = 2.0
+_COST_RATE = 0.001  # 편도 거래비용(해외 ETF 수수료+스프레드 근사) — 매수·매도 금액 각각에 부과
+_BACKTEST_VERSION = 2  # 계산 방식이 바뀌면 올린다(캐시 키에 포함) — v2: 현금 이자·거래비용·평균 비중 고정
 
 
 def vix_to_macro_level(vix: float | None) -> str:
@@ -78,6 +87,48 @@ def leveraged_returns(base_rets: pd.DataFrame, actual: pd.DataFrame | None) -> p
     return out
 
 
+def _rebalance(holdings: dict[str, float], equity: float, weights: dict[str, float]) -> tuple[dict[str, float], float]:
+    """목표 비중으로 재배분하고 거래비용을 뺀다. (새 보유, 회전율 = Σ|Δ비중|/2 — 현금 포함, 0~1).
+
+    보유가 비어 있으면(최초 진입) 전액 현금에서 사는 것으로 보고 비용은 물리되, 회전율은 0으로 돌려준다 —
+    회전율은 "진입 이후 얼마나 자주 갈아탔나"를 보여주는 값이다.
+    """
+    entering = not (equity > 0 and holdings)
+    if entering:
+        old = {a: (100.0 if a == "CASH" else 0.0) for a in TACTICAL_ASSETS}
+    else:
+        old = {a: holdings.get(a, 0.0) / equity * 100.0 for a in TACTICAL_ASSETS}
+    deltas = {a: abs(weights.get(a, 0.0) - old[a]) for a in TACTICAL_ASSETS}
+    traded = sum(v for a, v in deltas.items() if a != "CASH") / 100.0
+    net = equity * (1 - traded * _COST_RATE)
+    turnover = 0.0 if entering else sum(deltas.values()) / 200.0
+    return {a: net * weights.get(a, 0.0) / 100.0 for a in TACTICAL_ASSETS}, turnover
+
+
+def _grow(holdings: dict[str, float], row: pd.Series, cash_rate: float) -> None:
+    """하루치 수익률 적용 — 현금은 국채 이자, 시세 없는 0% 자산은 그대로."""
+    for asset in holdings:
+        if asset == "CASH":
+            holdings[asset] *= 1 + cash_rate
+        elif asset in row.index:
+            holdings[asset] *= 1 + float(row[asset])
+
+
+def simulate_static(rets: pd.DataFrame, cash_daily: pd.Series, weights: dict[str, float], first: int) -> list[float]:
+    """고정 비중을 매월 첫 거래일에 리밸런싱하며 보유한 가치(100 시작) — "평균 비중 고정" 비교선."""
+    holdings, _ = _rebalance({}, 100.0, weights)
+    values = [sum(holdings.values())]
+    month = (rets.index[first].year, rets.index[first].month)
+    for i in range(first + 1, len(rets)):
+        _grow(holdings, rets.iloc[i], float(cash_daily.iloc[i]))
+        ts = rets.index[i]
+        if (ts.year, ts.month) != month:
+            month = (ts.year, ts.month)
+            holdings, _ = _rebalance(holdings, sum(holdings.values()), weights)
+        values.append(sum(holdings.values()))
+    return values
+
+
 def simulate(
     closes: pd.DataFrame,
     vix: pd.Series,
@@ -87,8 +138,12 @@ def simulate(
     tilt_shift_pct: float = 0.0,
     dip_shift_pct: float = 0.0,
     dip_exit_stages: frozenset[str] = DIP_EXIT_STAGES,
+    cash_yield: pd.Series | None = None,
 ) -> dict[str, Any]:
-    """closes: QQQ/SPY(+선택 DIA·QLD·SSO) 종가(워밍업 포함), vix·real_yield: 일별 시계열. start 이후 구간을 평가한다."""
+    """closes: QQQ/SPY(+선택 DIA·QLD·SSO) 종가(워밍업 포함), vix·real_yield·cash_yield(연율 %): 일별 시계열.
+
+    start 이후 구간을 평가한다.
+    """
     has_dia = "DIA" in closes.columns
     if not has_dia and any(w.get("DIA", 0.0) > 0 for w in weights_table.values()):
         raise ValueError("DIA 과거 시세를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")
@@ -110,6 +165,8 @@ def simulate(
 
     rets = closes.pct_change().fillna(0.0)
     rets = rets.join(leveraged_returns(rets, lev_actual if not lev_actual.empty else None))
+    cy = (cash_yield if cash_yield is not None else pd.Series(dtype=float)).reindex(closes.index).ffill()
+    cash_daily = (cy.fillna(0.0) / 100.0 / 252).clip(lower=0.0)
     state = ConfirmState(None, None, None)
     holdings: dict[str, float] = {}
     equity = 100.0
@@ -124,14 +181,16 @@ def simulate(
     dip_entries = 0
     dip_days = 0
     timeline: list[dict[str, str]] = []
+    target: dict[str, float] = {}
+    target_sum: dict[str, float] = dict.fromkeys(TACTICAL_ASSETS, 0.0)
+    target_days = 0
+    turnover = 0.0
 
     first = eval_idx[0]
     for i in range(first, len(closes)):
         if i > first:
-            # t-1 종가 기준 보유분에 t일 수익률 적용
-            for asset in holdings:
-                if asset in rets.columns:  # 현금(·시세 없는 0% 자산)은 그대로
-                    holdings[asset] *= 1 + float(rets.iloc[i][asset])
+            # t-1 종가 기준 보유분에 t일 수익률(현금은 국채 이자) 적용
+            _grow(holdings, rets.iloc[i], float(cash_daily.iloc[i]))
             equity = sum(holdings.values())
         strat_values.append(equity)
 
@@ -169,14 +228,25 @@ def simulate(
 
         if (changed or tilt_changed or dip_changed) and state.current is not None:
             tilted = apply_tilt(weights_table[state.current], tilt, tilt_shift_pct)
-            weights = apply_dip(tilted, dip_level, dip_shift_pct)
-            holdings = {a: equity * weights.get(a, 0.0) / 100.0 for a in TACTICAL_ASSETS}
+            target = apply_dip(tilted, dip_level, dip_shift_pct)
+            holdings, traded = _rebalance(holdings, equity, target)
+            turnover += traded
+            equity = sum(holdings.values())
+            strat_values[-1] = equity  # 거래비용은 그날 가치에 반영
         if state.current is not None:
             days_in[state.current] += 1
+        if target:
+            for a in TACTICAL_ASSETS:
+                target_sum[a] += target.get(a, 0.0)
+            target_days += 1
         tilt_days[tilt] += 1
 
     eval_closes = closes.iloc[first:]
     bench = {t: (eval_closes[t] / eval_closes[t].iloc[0] * 100.0).tolist() for t in bench_tickers}
+    avg_weights = {a: round(v / (target_days or 1), 1) for a, v in target_sum.items()}
+    avg_weights["CASH"] = round(100.0 - sum(v for a, v in avg_weights.items() if a != "CASH"), 1)
+    static_values = simulate_static(rets, cash_daily, avg_weights, first)
+    eval_years = max(len(strat_values) - 1, 1) / 252
     dates = [ts.date().isoformat() for ts in eval_closes.index]
 
     step = max(1, len(dates) // _MAX_SERIES_POINTS)
@@ -190,12 +260,14 @@ def simulate(
         "end_date": dates[-1],
         "metrics": [
             compute_metrics("전술 배분", strat_values).model_dump(),
+            compute_metrics("평균 비중 고정", static_values).model_dump(),
             *(compute_metrics(f"{t} 보유", bench[t]).model_dump() for t in bench_tickers),
         ],
         "series": [
             {
                 "date": dates[i],
                 "strategy": round(strat_values[i], 2),
+                "static": round(static_values[i], 2),
                 "spy": round(bench["SPY"][i], 2),
                 "qqq": round(bench["QQQ"][i], 2),
                 **({"dia": round(bench["DIA"][i], 2)} if has_dia else {}),
@@ -203,6 +275,8 @@ def simulate(
             for i in picks
         ],
         "regime_switches": switches,
+        "avg_weights": avg_weights,
+        "turnover_pct_per_year": round(turnover / eval_years * 100, 1),
         "dip_entries": dip_entries,
         "dip_time_pct": round(dip_days / (len(closes) - first or 1) * 100, 1),
         "tilt_switches": tilt_switches,
@@ -237,8 +311,14 @@ async def _fetch_real_yield_history(days: int) -> pd.Series:
     return await _fetch_fred_history("DFII10", days)
 
 
+async def _fetch_cash_yield_history(days: int) -> pd.Series:
+    return await _fetch_fred_history("DTB3", days)  # 미국 3개월 국채(연율 %)
+
+
 def _settings_hash(weights_table: dict[str, dict[str, float]], tilt_shift_pct: float, dip_shift_pct: float) -> str:
-    payload = json.dumps({"w": weights_table, "tilt": tilt_shift_pct, "dip": dip_shift_pct}, sort_keys=True)
+    payload = json.dumps(
+        {"v": _BACKTEST_VERSION, "w": weights_table, "tilt": tilt_shift_pct, "dip": dip_shift_pct}, sort_keys=True
+    )
     return hashlib.sha256(payload.encode()).hexdigest()[:12]
 
 
@@ -275,6 +355,14 @@ async def run_tactical_backtest(
         else "VIX 이력을 받지 못해 매크로 입력 없이(항상 '주의') 차트 추세만으로 계산했습니다."
     )
 
+    try:
+        cash_yield = await _fetch_cash_yield_history(days)
+    except Exception as exc:
+        logger.warning("tactical_backtest_cash_yield_failed", error=str(exc))
+        cash_yield = pd.Series(dtype=float)
+    if cash_yield.empty:
+        macro_note += " 국채 금리 이력을 받지 못해 현금 수익률은 0으로 계산했습니다."
+
     real_yield: pd.Series | None = None
     if tilt_shift_pct > 0:
         try:
@@ -293,6 +381,7 @@ async def run_tactical_backtest(
         real_yield=real_yield,
         tilt_shift_pct=tilt_shift_pct,
         dip_shift_pct=dip_shift_pct,
+        cash_yield=cash_yield,
     )
     result["years"] = years
     result["tilt_shift_pct"] = tilt_shift_pct
@@ -303,7 +392,8 @@ async def run_tactical_backtest(
         + ("웅덩이 투입은 공격 국면만·회복 시 회수 · " if dip_shift_pct > 0 else "")
         + "전환 시에만 리밸런싱 · "
         + ("QLD·SSO 상장 전 구간은 2배 합성(보수·차입비용 차감) · " if uses_leverage else "")
-        + "현금 수익률 0 · 거래비용·세금·환율 미반영"
+        + ("현금은 미국 3개월 국채 금리 · " if not cash_yield.empty else "현금 수익률 0 · ")
+        + f"거래비용 매매금액의 {_COST_RATE * 100:g}% · 세금·환율 미반영"
     )
     await set_cached_json(cache, key, result, TTL_TACTICAL_BACKTEST)
     return result

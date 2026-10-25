@@ -37,6 +37,7 @@ from app.models.portfolio import Portfolio, PortfolioItem
 from app.models.tactical import TacticalStrategy
 from app.services.tactical_dip import ACTIVE_REGIMES as DIP_ACTIVE_REGIMES
 from app.services.tactical_dip import DEFAULT_DIP_SHIFT_PCT, advance_dip_level, apply_dip, dip_reasons
+from app.services.tactical_hints import transition_hints
 from app.services.tactical_tilt import (
     DEFAULT_TILT_SHIFT_PCT,
     apply_tilt,
@@ -47,6 +48,7 @@ from app.services.tactical_tilt import (
 )
 from app.services.technical_indicators import TechnicalSnapshot, TrendState
 from app.services.technical_signal_service import get_technical_signals
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
@@ -143,6 +145,9 @@ def advance_regime(strategy: TacticalStrategy, market: dict[str, Any], today: da
     if changed:
         strategy.last_regime = new.current
         strategy.last_regime_changed_at = datetime.now(UTC)
+        # 이전 국면의 분할 적용은 새 국면 제안과 무관 — 새 국면은 처음부터 다시 적용한다
+        strategy.partial_regime = None
+        strategy.partial_applied_on = None
     return changed
 
 
@@ -198,9 +203,22 @@ def effective_tilt(strategy: TacticalStrategy | None, market: dict[str, Any]) ->
     return strategy.last_tilt or "BALANCED"
 
 
+def _tilted_weights(strategy: TacticalStrategy | None, regime: str, market: dict[str, Any]) -> dict[str, float]:
+    return apply_tilt(resolve_weights(strategy)[regime], effective_tilt(strategy, market), tilt_shift_of(strategy))
+
+
 def proposed_weights_for(strategy: TacticalStrategy | None, regime: str, market: dict[str, Any]) -> dict[str, float]:
-    tilted = apply_tilt(resolve_weights(strategy)[regime], effective_tilt(strategy, market), tilt_shift_of(strategy))
+    tilted = _tilted_weights(strategy, regime, market)
     return apply_dip(tilted, effective_dip_level(strategy, regime), dip_shift_of(strategy))
+
+
+def dip_deployed_for(strategy: TacticalStrategy | None, regime: str | None, market: dict[str, Any]) -> float:
+    """제안 비중에 실제로 들어간 웅덩이 투입량(%p) — 명목 투입량(`dip_amount`)이 현금 비중을 넘으면 현금까지만."""
+    if regime is None:
+        return 0.0
+    tilted = _tilted_weights(strategy, regime, market)
+    proposed = apply_dip(tilted, effective_dip_level(strategy, regime), dip_shift_of(strategy))
+    return round(tilted.get("CASH", 0.0) - proposed.get("CASH", 0.0), 1)
 
 
 def validate_regime_weights(raw: dict[str, Any]) -> dict[str, dict[str, float]]:
@@ -318,7 +336,9 @@ async def build_status(
     observed, reasons = observed_for(market, confirmed)
     effective = confirmed or observed
     dip_level = effective_dip_level(strategy, effective)
+    deployed = dip_deployed_for(strategy, effective, market)
     stage = market.get("qqq_pullback_stage", "UNKNOWN")
+    partial_active = strategy is not None and confirmed is not None and strategy.partial_regime == confirmed
     return {
         "portfolio_id": str(portfolio.id),
         "portfolio_name": portfolio.name,
@@ -349,7 +369,15 @@ async def build_status(
         "dip_shift_pct": dip_shift_of(strategy),
         "dip_level": dip_level,
         "pullback_stage": stage,
-        "dip_reasons": dip_reasons(stage, dip_level, dip_shift_of(strategy), effective),
+        "dip_deployed_pct": deployed,
+        "dip_reasons": dip_reasons(stage, dip_level, dip_shift_of(strategy), effective, deployed=deployed),
+        "partial_regime": strategy.partial_regime if partial_active and strategy else None,
+        "partial_applied_on": strategy.partial_applied_on.isoformat()
+        if partial_active and strategy and strategy.partial_applied_on
+        else None,
+        "transition_hints": transition_hints(
+            effective, market["macro_level"], market["macro_freshness"], market["technicals"]
+        ),
         "current_weights": _current_weights(portfolio),
         "portfolio_compatible": is_tactical_managed(portfolio),
     }
@@ -368,7 +396,8 @@ async def apply_regime_to_portfolio(
     """포트폴리오 목표 비중을 제안 비중(국면+틸트+웅덩이)으로 교체한다(전술 자산 외 기존 종목은 삭제). 커밋은 호출부.
 
     `fraction<1`이면 현재 목표에서 제안 쪽으로 그만큼만 옮긴다(분할 적용 — 전술 자산만으로 구성된 포트폴리오인지는
-    호출부가 확인). 이때는 "적용 완료"로 기록하지 않아 화면의 적용 버튼이 남는다.
+    호출부가 확인). 이때는 "적용 완료" 대신 분할 적용 진행 상태(`partial_regime`)를 기록해 화면에
+    "나머지 적용"이 남는다.
     """
     weights = proposed_weights_for(strategy, regime, {})
     if fraction < 1:
@@ -389,4 +418,9 @@ async def apply_regime_to_portfolio(
     if fraction >= 1:
         strategy.applied_regime = regime
         strategy.notified_dip_level = strategy.dip_level or 0
+        strategy.partial_regime = None
+        strategy.partial_applied_on = None
+    else:
+        strategy.partial_regime = regime
+        strategy.partial_applied_on = today_kst()
     return weights

@@ -342,7 +342,8 @@ class TestSimulate:
 
         result = simulate(closes, vix, tactical.DEFAULT_REGIME_WEIGHTS, idx[250])
 
-        strat, spy = result["metrics"][0], result["metrics"][1]
+        by_name = {m["name"]: m for m in result["metrics"]}
+        strat, spy = by_name["전술 배분"], by_name["SPY 보유"]
         assert result["regime_time_pct"]["RISK_OFF"] > 0
         assert strat["mdd_pct"] < spy["mdd_pct"]
         assert result["regime_switches"] >= 1
@@ -373,7 +374,7 @@ class TestSimulate:
 
         result = simulate(closes, vix, table, idx[300])
 
-        assert [m["name"] for m in result["metrics"]][1:] == ["SPY 보유", "QQQ 보유", "DIA 보유"]
+        assert [m["name"] for m in result["metrics"]][1:] == ["평균 비중 고정", "SPY 보유", "QQQ 보유", "DIA 보유"]
         assert "dia" in result["series"][0]
         # DIA 100% 보유 — 첫 국면 확정(2거래일) 이후 DIA 수익률을 따라간다
         assert result["metrics"][0]["total_return_pct"] > 0
@@ -386,7 +387,7 @@ class TestSimulate:
             simulate(closes, pd.Series(15.0, index=idx), table, idx[300])
         # DIA 0%면 DIA 시세 없이도 계산되고 DIA 비교는 빠진다
         default = simulate(closes, pd.Series(15.0, index=idx), tactical.DEFAULT_REGIME_WEIGHTS, idx[300])
-        assert len(default["metrics"]) == 3
+        assert len(default["metrics"]) == 4  # 전술·평균 비중 고정·SPY·QQQ
         assert "dia" not in default["series"][0]
 
     def test_too_short_period_raises(self):
@@ -672,10 +673,13 @@ class TestFetchWrappers:
         with (
             patch.object(bt, "fetch_close_history", AsyncMock(return_value=_trend_closes())),
             patch.object(bt, "_fetch_vix_history", AsyncMock(side_effect=RuntimeError("fred"))),
+            patch.object(bt, "_fetch_cash_yield_history", AsyncMock(side_effect=RuntimeError("fred"))),
         ):
             result = await bt.run_tactical_backtest(tactical.DEFAULT_REGIME_WEIGHTS, 1, cache)
             cached = await bt.run_tactical_backtest(tactical.DEFAULT_REGIME_WEIGHTS, 1, cache)
         assert "VIX 이력을 받지 못해" in result["macro_note"]
+        assert "현금 수익률은 0" in result["macro_note"]
+        assert "현금 수익률 0" in result["assumptions"]
         assert result["years"] == 1
         assert cached == result
 

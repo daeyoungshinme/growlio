@@ -83,14 +83,23 @@ def apply_dip(weights: dict[str, float], level: int, shift_pct: float) -> dict[s
     return out
 
 
-def dip_reasons(stage: str, level: int, shift_pct: float, regime: str | None) -> list[str]:
+def dip_reasons(
+    stage: str, level: int, shift_pct: float, regime: str | None, *, deployed: float | None = None
+) -> list[str]:
+    """`deployed`는 제안 비중에 실제로 들어간 투입량(현금 한도 반영) — 없으면 명목 투입량."""
     reasons = [f"QQQ 웅덩이 단계: {PULLBACK_LABELS.get(stage, stage)}"]
     if shift_pct <= 0:
         return reasons
     if regime not in ACTIVE_REGIMES:
         reasons.append("웅덩이 투입은 공격 국면에서만 해요(중립·방어 국면의 눌림은 더 깊어지는 경우가 많아요).")
     elif level > 0:
-        reasons.append(f"현금 {dip_amount(level, shift_pct):g}%p를 주식으로 옮겨요({DIP_LEVEL_LABELS[level]}).")
+        amount = dip_amount(level, shift_pct) if deployed is None else deployed
+        capped = deployed is not None and deployed < dip_amount(level, shift_pct)
+        reasons.append(
+            f"현금 {amount:g}%p를 주식으로 옮겨요({DIP_LEVEL_LABELS[level]}"
+            + (", 현금 비중 한도까지" if capped else "")
+            + ")."
+        )
     else:
         reasons.append("60일선까지 눌리면 현금 일부를 주식으로 옮겨요.")
     return reasons

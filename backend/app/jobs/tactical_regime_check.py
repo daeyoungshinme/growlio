@@ -25,7 +25,7 @@ from app.models.user import User, UserSettings
 from app.services import tactical_allocation_service as tactical
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.email_service import send_tactical_dip_email, send_tactical_regime_change_email
-from app.services.tactical_dip import DIP_LEVEL_LABELS, dip_amount, dip_reasons
+from app.services.tactical_dip import DIP_LEVEL_LABELS, dip_reasons
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -139,9 +139,12 @@ async def _notify_dip(db, strategy: TacticalStrategy, market: dict, *, regime_se
     user, to_email, fcm_token, portfolio = recipient
 
     stage_label = DIP_LEVEL_LABELS[level]
-    deploy = dip_amount(level, shift)
+    deploy = tactical.dip_deployed_for(strategy, regime, market)  # 현금 한도 반영한 실제 투입량
+    if deploy <= 0:  # 현금이 없어 옮길 몫이 없으면 알릴 내용도 없다
+        strategy.notified_dip_level = level
+        return
     weights_text = tactical.format_weights(tactical.proposed_weights_for(strategy, regime, market))
-    reasons = dip_reasons(market.get("qqq_pullback_stage", "UNKNOWN"), level, shift, regime)
+    reasons = dip_reasons(market.get("qqq_pullback_stage", "UNKNOWN"), level, shift, regime, deployed=deploy)
 
     async def _mark_notified() -> None:
         strategy.notified_dip_level = level

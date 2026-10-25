@@ -210,7 +210,7 @@ class TestBacktest:
         lev = simulate(closes, pd.Series(15.0, index=idx), table, idx[300])
         plain = simulate(closes, pd.Series(15.0, index=idx), tactical.DEFAULT_REGIME_WEIGHTS, idx[300])
         assert lev["metrics"][0]["total_return_pct"] > plain["metrics"][0]["total_return_pct"]
-        assert len(lev["metrics"]) == 3  # 레버리지는 벤치마크에 추가하지 않음
+        assert len(lev["metrics"]) == 4  # 전술·평균 비중 고정·SPY·QQQ — 레버리지는 벤치마크에 추가하지 않음
 
     def test_simulate_dip_enters_and_exits(self):
         # 긴 상승 → 120일선까지 눌림 → 재상승. 공격 국면 유지 중 웅덩이 투입이 생겨야 한다(수익 우열은 경로 의존).
@@ -382,3 +382,131 @@ class TestDipAlertJob:
         dispatch.assert_awaited_once()
         assert dispatch.await_args.kwargs["alert_type"] == "TACTICAL_REGIME"
         assert strategy.notified_dip_level == 1
+
+
+# ---------------------------------------------------------------------------
+# plans/69 — 분할 적용 상태 · 실제 투입량 · 백테스트 현금 이자/거래비용/평균 비중 고정
+# ---------------------------------------------------------------------------
+
+
+class TestPartialApply:
+    _client = TestApi._client  # 클라이언트 구성만 재사용(상속하면 TestApi 테스트가 중복 실행됨)
+
+    def test_second_half_rejected_then_full_clears(self, api_db):
+        portfolio = SimpleNamespace(id=uuid.uuid4(), name="P", items=_items(QQQ=50, SPY=40, CASH=10))
+        strategy = _strategy(last_regime="RISK_OFF", notified_regime="RISK_ON", tilt_shift_pct=0)
+        p1, p2, p3, tc = self._client(api_db, portfolio, strategy)
+        with p1, p2, p3, tc as client:
+            first = client.post(f"/api/v1/tactical/{portfolio.id}/apply", json={"fraction": 0.5})
+            assert first.status_code == 200
+            assert strategy.partial_regime == "RISK_OFF"
+            assert strategy.partial_applied_on is not None
+            assert first.json()["partial_regime"] == "RISK_OFF"
+            again = client.post(f"/api/v1/tactical/{portfolio.id}/apply", json={"fraction": 0.5})
+            assert again.status_code == 400
+            assert "나머지" in again.json()["detail"]
+            full = client.post(f"/api/v1/tactical/{portfolio.id}/apply", json={"fraction": 1})
+        assert full.status_code == 200
+        assert strategy.partial_regime is None
+        assert strategy.partial_applied_on is None
+        assert strategy.applied_regime == "RISK_OFF"
+
+    def test_regime_change_clears_partial(self):
+        from datetime import date
+
+        s = _strategy(last_regime="RISK_OFF", partial_regime="RISK_OFF", partial_applied_on=date(2026, 10, 1))
+        s.pending_regime, s.pending_first_seen = "NEUTRAL", date(2026, 10, 1)
+        market = {"observed_regime": "NEUTRAL", "reasons": []}
+        assert tactical.advance_regime(s, market, date(2026, 10, 2)) is True
+        assert s.partial_regime is None
+        assert s.partial_applied_on is None
+
+    @pytest.mark.asyncio
+    async def test_status_hides_stale_partial(self):
+        s = _strategy(last_regime="RISK_ON", partial_regime="RISK_OFF", tilt_shift_pct=0)
+        portfolio = SimpleNamespace(id=uuid.uuid4(), name="P", items=[])
+        status = await tactical.build_status(portfolio, s, _MARKET)
+        assert status["partial_regime"] is None
+        assert status["partial_applied_on"] is None
+
+
+class TestDipDeployed:
+    @pytest.mark.asyncio
+    async def test_deployed_capped_by_cash(self):
+        # 공격 국면 기본 현금 10% — 명목 30%p×3/3=30%p 요청이어도 실제 투입은 10%p
+        s = _strategy(last_regime="RISK_ON", dip_shift_pct=30, dip_level=3, tilt_shift_pct=0)
+        portfolio = SimpleNamespace(id=uuid.uuid4(), name="P", items=[])
+        status = await tactical.build_status(portfolio, s, {**_MARKET, "qqq_pullback_stage": "SMA120_RSI"})
+        assert status["dip_deployed_pct"] == 10.0
+        assert "현금 10%p" in status["dip_reasons"][1]
+        assert "한도" in status["dip_reasons"][1]
+
+    def test_deployed_zero_outside_risk_on(self):
+        s = _strategy(last_regime="NEUTRAL", dip_shift_pct=30, dip_level=3, tilt_shift_pct=0)
+        assert tactical.dip_deployed_for(s, "NEUTRAL", {}) == 0.0
+        assert tactical.dip_deployed_for(s, None, {}) == 0.0
+
+    def test_reasons_uncapped_amount(self):
+        assert "현금 5%p" in dip.dip_reasons("SMA120", 2, 7.5, "RISK_ON", deployed=5.0)[1]
+        assert "한도" not in dip.dip_reasons("SMA60", 1, 15, "RISK_ON", deployed=5.0)[1]
+
+    @pytest.mark.asyncio
+    async def test_job_skips_dip_alert_without_cash(self):
+        # 현금 0% 비중표 — 단계가 깊어져도 옮길 현금이 없으면 알리지 않고 기록만 맞춘다
+        table = {r: {"QQQ": 50.0, "SPY": 50.0, "CASH": 0.0} for r in tactical.REGIMES}
+        strategy = _strategy(
+            last_regime="RISK_ON", notified_regime="RISK_ON", dip_shift_pct=15, tilt_shift_pct=0, regime_weights=table
+        )
+        dispatch = await TestDipAlertJob()._run(strategy, {**_MARKET, "qqq_pullback_stage": "SMA120"})
+        assert dispatch.await_count == 0
+        assert strategy.notified_dip_level == 2
+
+
+class TestBacktestCosts:
+    def _closes(self, n=600):
+        idx = pd.bdate_range("2015-01-01", periods=n)
+        up = np.linspace(100, 300, n)
+        return idx, pd.DataFrame({"QQQ": up, "SPY": up}, index=idx)
+
+    def test_rebalance_charges_cost_on_traded_equity(self):
+        from app.services.tactical_backtest import _COST_RATE, _rebalance
+
+        holdings, turnover = _rebalance({}, 100.0, {"QQQ": 60.0, "SPY": 0.0, "CASH": 40.0})
+        assert sum(holdings.values()) == pytest.approx(100 * (1 - 0.6 * _COST_RATE))
+        assert turnover == 0.0  # 최초 진입은 비용만 — 회전율 제외
+        # 비중 변화가 없으면 비용·회전율 0
+        same, t2 = _rebalance(holdings, sum(holdings.values()), {"QQQ": 60.0, "CASH": 40.0})
+        assert sum(same.values()) == pytest.approx(sum(holdings.values()))
+        assert t2 == pytest.approx(0.0, abs=1e-9)
+        # QQQ 60→30: 주식 30%p 매도 → 비용 30%p×0.1%, 회전율 (30+30)/200
+        equity = sum(same.values())
+        half, t3 = _rebalance(same, equity, {"QQQ": 30.0, "CASH": 70.0})
+        assert sum(half.values()) == pytest.approx(equity * (1 - 0.3 * _COST_RATE))
+        assert t3 == pytest.approx(0.3)
+
+    def test_cash_earns_treasury_yield(self):
+        idx, closes = self._closes()
+        cash_only = {r: {"CASH": 100.0} for r in tactical.REGIMES}
+        vix = pd.Series(15.0, index=idx)
+        no_yield = simulate(closes, vix, cash_only, idx[300])
+        with_yield = simulate(closes, vix, cash_only, idx[300], cash_yield=pd.Series(5.0, index=idx))
+        assert no_yield["metrics"][0]["total_return_pct"] == pytest.approx(0.0)
+        assert with_yield["metrics"][0]["total_return_pct"] > 5  # 약 1.2년 × 5%
+        assert with_yield["turnover_pct_per_year"] == 0.0
+
+    def test_static_benchmark_uses_average_weights(self):
+        idx, closes = self._closes()
+        result = simulate(closes, pd.Series(15.0, index=idx), tactical.DEFAULT_REGIME_WEIGHTS, idx[300])
+        assert result["metrics"][1]["name"] == "평균 비중 고정"
+        # 상승장 + VIX 15 → 계속 공격 국면이라 평균 비중 = 공격 국면 비중
+        assert result["avg_weights"]["QQQ"] == 50.0
+        assert result["avg_weights"]["CASH"] == 10.0
+        assert "static" in result["series"][0]
+        assert result["turnover_pct_per_year"] == 0.0  # 국면 전환 없음 — 최초 진입 매수는 회전율에서 제외
+
+    def test_settings_hash_includes_version(self):
+        from app.services import tactical_backtest as bt
+
+        base = bt._settings_hash(tactical.DEFAULT_REGIME_WEIGHTS, 10, 0)
+        with patch.object(bt, "_BACKTEST_VERSION", 99):
+            assert bt._settings_hash(tactical.DEFAULT_REGIME_WEIGHTS, 10, 0) != base
