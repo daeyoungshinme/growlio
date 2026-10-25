@@ -61,7 +61,7 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
         <Lightbulb size={15} className="text-amber-500 shrink-0" />
         <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
           해외 양도세 절세 플래너
@@ -75,11 +75,10 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 space-y-3">
         <div className="flex items-start gap-2 p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
           <Info size={13} className="text-blue-500 mt-0.5 shrink-0" />
+          {/* 4문장 상시 안내를 핵심 한 줄로 (docs/plans/67 P1-12) */}
           <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-            <span className="font-medium">배당금은 250만원 공제 대상이 아닙니다.</span> 배당금은
-            배당소득세(15.4%)로 별도 원천징수됩니다. 이 플래너는 해외 주식
-            <span className="font-medium"> 매매 차익(양도소득)</span>만 계산합니다. 양도차익은
-            분류과세라 금융소득 종합과세(이자·배당 연 2,000만원 초과)와 합산되지 않습니다.
+            해외 주식 <span className="font-medium">매매 차익</span>만 계산해요. 배당금은 공제
+            대상이 아니에요(15.4% 별도 원천징수).
           </p>
         </div>
 
@@ -149,7 +148,7 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
             value={realizedAbsInput}
             onChange={(e) => applyRealized(e.target.value.replace(/-/g, ""), realizedSign)}
             placeholder={autoRealized !== null ? String(Math.round(autoRealized)) : "0"}
-            className="w-36 min-w-0 min-h-[44px] border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 sm:flex-none sm:w-36 min-w-0 min-h-[44px] border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {isManualRealized && alreadyRealized !== 0 && (
             <span className={`text-xs font-medium ${pnlColor(alreadyRealized)}`}>
@@ -200,13 +199,14 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
 
       {profitPositions.length > 0 && (
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          {/* 사용 안내가 모바일에서 hidden이었다 — 줄바꿈 허용으로 항상 표시 (docs/plans/67) */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
             <TrendingUp size={14} className="text-red-400" />
             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
               수익 종목
             </span>
-            <span className="hidden sm:inline ml-1 text-xs text-gray-400 dark:text-gray-500">
-              — 매도 수량을 입력해 세금을 계산하세요
+            <span className="order-last basis-full sm:order-none sm:basis-auto text-xs text-gray-500 dark:text-gray-400 break-keep">
+              매도 수량을 입력해 세금을 계산하세요
             </span>
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
               {profitPositions.length}종목
@@ -227,13 +227,13 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
 
       {lossPositions.length > 0 && (
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
             <TrendingDown size={14} className="text-blue-400" />
             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
               손실 종목
             </span>
-            <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500 ml-1">
-              — 매도 시 손익 통산으로 수익 종목 절세 효과
+            <span className="order-last basis-full sm:order-none sm:basis-auto text-xs text-gray-500 dark:text-gray-400 break-keep">
+              매도하면 손익 통산으로 수익 종목 세금이 줄어요
             </span>
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
               {lossPositions.length}종목

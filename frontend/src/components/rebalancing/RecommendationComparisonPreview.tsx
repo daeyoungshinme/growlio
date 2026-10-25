@@ -58,9 +58,10 @@ export default function RecommendationComparisonPreview({
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
-      <div className="grid grid-cols-2 gap-2">
+      {/* 범례 없는 150px 도넛 2개는 모바일에서 식별이 어렵고 아래 표와 같은 정보 — sm+에서만 (docs/plans/67) */}
+      <div className="hidden sm:grid grid-cols-2 gap-2">
         <div>
-          <p className="text-center text-xs text-gray-400 dark:text-gray-500">현재</p>
+          <p className="text-center text-xs text-gray-500 dark:text-gray-400">현재</p>
           <PortfolioWeightChart items={currentItems} />
         </div>
         <div>
@@ -68,7 +69,8 @@ export default function RecommendationComparisonPreview({
           <PortfolioWeightChart items={recommendedItems} />
         </div>
       </div>
-      <div className="max-h-40 overflow-y-auto">
+      {/* 확인창 자체가 스크롤되므로 표 안의 중첩 스크롤(max-h-40)은 두지 않는다 */}
+      <div>
         <table className="w-full text-xs">
           <thead>
             <tr className="text-gray-400 dark:text-gray-500">

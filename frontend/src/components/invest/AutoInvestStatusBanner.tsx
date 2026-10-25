@@ -94,12 +94,12 @@ export default function AutoInvestStatusBanner() {
         <RefreshCw size={16} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 break-keep">
           {activeEntry
             ? `정기 적립식 ${describeDcaAutoBuy(activeEntry.alert)}`
             : "정기 적립식 자동매수를 설정해보세요"}
         </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+        <p className="text-xs text-gray-500 dark:text-gray-400 break-keep">
           {activeEntry
             ? activeEntry.portfolio.name
             : "매달 지정한 날짜에 목표 비중대로 자동 매수됩니다"}

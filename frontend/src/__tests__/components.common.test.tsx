@@ -9,7 +9,7 @@ import BankAccountCard from "@/components/assets/BankAccountCard";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
-import { ToggleSwitch } from "@/components/common/ToggleSwitch";
+import { ToggleRow, ToggleSwitch } from "@/components/common/ToggleSwitch";
 
 vi.mock("@/context/ExchangeRateContext", () => ({
   useExchangeRateContext: vi.fn(() => ({ rate: 1350, isLoading: false, error: null })),
@@ -285,5 +285,19 @@ describe("ToggleSwitch", () => {
   it("disabled이면 체크박스가 비활성화된다", () => {
     render(<ToggleSwitch checked={false} onChange={vi.fn()} disabled ariaLabel="테스트 토글" />);
     expect(screen.getByRole("checkbox", { name: "테스트 토글" })).toBeDisabled();
+  });
+});
+
+// ------- ToggleRow -------
+describe("ToggleRow", () => {
+  it("설명 텍스트를 눌러도 토글된다 — 행 전체가 label (docs/plans/67)", () => {
+    const onChange = vi.fn();
+    render(
+      <ToggleRow title="월간 리포트" description="매월 요약" checked={false} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByText("매월 요약"));
+    expect(onChange).toHaveBeenCalledWith(true);
+    // 접근성 이름은 제목만
+    expect(screen.getByRole("checkbox", { name: "월간 리포트" })).not.toBeChecked();
   });
 });

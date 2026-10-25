@@ -116,6 +116,17 @@ const PortfolioCard = memo(function PortfolioCard({
               : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
       }`}
       onClick={() => onToggleSelect(p.id)}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-label={`${p.name} 선택`}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggleSelect(p.id);
+        }
+      }}
     >
       {/* 행1: 드래그 핸들 + 이름/부제/미니바 + 수정/삭제 */}
       <div className="flex items-start gap-2">
@@ -163,7 +174,7 @@ const PortfolioCard = memo(function PortfolioCard({
               onOpenEditor(p);
             }}
             aria-label="포트폴리오 수정"
-            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
           >
             <Pen size={14} />
           </button>
@@ -173,7 +184,7 @@ const PortfolioCard = memo(function PortfolioCard({
               onConfirmDelete(p.id);
             }}
             aria-label="포트폴리오 삭제"
-            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
           >
             <Trash2 size={14} />
           </button>

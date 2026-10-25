@@ -854,7 +854,7 @@ describe("RebalancingStatusCard", () => {
     });
   });
 
-  it("statusOnly: 모든 포트폴리오가 정상이면 접힌 채 정상 힌트만 보인다", async () => {
+  it("statusOnly: 모든 포트폴리오가 정상이면 한 줄 정상 힌트만 보인다", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
       { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 1, needs_rebalancing: false },
@@ -868,7 +868,7 @@ describe("RebalancingStatusCard", () => {
     expect(screen.queryByText("포트폴리오 이탈 현황")).not.toBeInTheDocument();
   });
 
-  it("statusOnly: 리밸런싱 필요 포트폴리오가 있어도 접힌 채 힌트만 — 필요 배지·결합 안내는 지금 할 일 몫", async () => {
+  it("statusOnly: 리밸런싱 필요 포트폴리오가 있어도 한 줄 상태 행만 — 필요 배지·결합 안내·이탈 행은 지금 할 일·리밸런싱 탭 몫", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
       { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
@@ -882,15 +882,15 @@ describe("RebalancingStatusCard", () => {
         />
       </MemoryRouter>,
     );
-    expect(
-      await screen.findByText("포트폴리오 1개 중 1개 이탈 · 지금 할 일 참고"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("포트폴리오 1개 중 1개 이탈")).toBeInTheDocument();
     expect(screen.queryByText("포트폴리오 이탈 현황")).not.toBeInTheDocument();
     expect(screen.queryByText("1개 필요")).not.toBeInTheDocument();
     expect(screen.queryByText(/이탈 종목이 발견되었습니다/)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByText("리밸런싱 점검"));
-    expect(await screen.findByText("포트폴리오 이탈 현황")).toBeInTheDocument();
+    expect(screen.getByText("시장 위험")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /리밸런싱 점검/ })).toHaveAttribute(
+      "href",
+      "/rebalancing",
+    );
   });
 });
 

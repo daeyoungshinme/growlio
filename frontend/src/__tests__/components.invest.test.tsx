@@ -140,6 +140,7 @@ describe("GoalTimelineCard", () => {
   }
 
   beforeEach(() => {
+    localStorage.clear();
     vi.mocked(fetchOverallGoalRecommendation).mockResolvedValue(notConfiguredRecommendation);
   });
 
@@ -172,8 +173,9 @@ describe("GoalTimelineCard", () => {
     expect(await screen.findByText("목표 달성 전망")).toBeDefined();
   });
 
-  it("shows on_track badge when on_track = false", async () => {
-    const offTrack = { ...mockTimeline, on_track: false };
+  it("shows on_track badge when on_track = false and lead/lag is unknown", async () => {
+    // 계획 대비·상태 두 칸을 합쳐(docs/plans/67 P1-15) 개월 차이가 없을 때만 달성/미달 판정을 보여준다
+    const offTrack = { ...mockTimeline, on_track: false, lead_lag_months: null };
     renderCard(offTrack, null);
     expect(await screen.findByText(/계획 미달/)).toBeDefined();
   });
@@ -209,7 +211,8 @@ describe("GoalTimelineCard", () => {
       ],
     };
     renderCard(withScenarios, 100000000);
-    expect(await screen.findByText("더 빨리 달성하려면?")).toBeDefined();
+    // 기본 접힘(docs/plans/67 P1-14)
+    fireEvent.click(await screen.findByText("더 빨리 달성하려면?"));
     expect(screen.getByText("1년 앞당기기")).toBeDefined();
     expect(screen.getByText("2년 앞당기기")).toBeDefined();
     expect(screen.getByText("연 9.5%")).toBeDefined();
@@ -238,6 +241,7 @@ describe("GoalTimelineCard", () => {
       ],
     });
     renderCard(mockTimeline, 100000000);
+    fireEvent.click(await screen.findByText("더 빨리 달성하려면?"));
     expect(await screen.findByText("목표 달성 필요 수익률")).toBeDefined();
     expect(screen.getByText("+7.20%")).toBeDefined();
     expect(screen.getByText("+8.50%")).toBeDefined();
@@ -266,6 +270,7 @@ describe("GoalTimelineCard", () => {
       ],
     };
     renderCard(withScenarios, 100000000);
+    fireEvent.click(await screen.findByText("더 빨리 달성하려면?"));
     expect(await screen.findByText("추천 포트폴리오로 달성 가능")).toBeDefined();
   });
 
@@ -291,6 +296,7 @@ describe("GoalTimelineCard", () => {
       ],
     };
     renderCard(withScenarios, 100000000);
+    fireEvent.click(await screen.findByText("더 빨리 달성하려면?"));
     expect(await screen.findByText("추천 포트폴리오로는 1.5%p 부족")).toBeDefined();
   });
 });
@@ -405,7 +411,8 @@ describe("MonthlyAchievementTable", () => {
     ];
     renderWithProviders(<MonthlyAchievementTable data={pastData} />);
     expect(screen.getByText(/월별 계획 대비 달성률/)).toBeDefined();
-    expect(screen.getByText(/목표를 변경하면 과거 수치도 새 기준으로 다시/)).toBeDefined();
+    // 재계산 안내는 같은 카드의 연도별 표에만 (docs/plans/67 P1-15)
+    expect(screen.queryByText(/목표를 변경하면 과거 수치도 새 기준으로 다시/)).toBeNull();
   });
 });
 

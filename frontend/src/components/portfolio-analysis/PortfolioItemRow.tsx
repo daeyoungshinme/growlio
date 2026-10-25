@@ -6,6 +6,7 @@ import {
   TOUCH_TARGET_COMPACT_MOBILE_ONLY,
   TOUCH_TARGET_MIN_MOBILE_ONLY,
 } from "@/constants/uiSizes";
+import { marketLabel } from "@/constants/markets";
 
 interface Props {
   item: PortfolioItem;
@@ -72,7 +73,7 @@ export default function PortfolioItemRow({
               {item.name}
             </span>
             <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
-              {item.ticker} · {item.market}
+              {item.ticker} · {marketLabel(item.market)}
             </span>
           </div>
           <button
@@ -109,7 +110,9 @@ export default function PortfolioItemRow({
                     {s.name}
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500">{s.ticker}</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">{s.market}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">
+                    {marketLabel(s.market)}
+                  </span>
                 </button>
               ))}
             </div>

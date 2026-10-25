@@ -143,9 +143,7 @@ describe("SettingsPage", () => {
   it("알림 설정 카드에 요약과 딥링크를 표시한다", async () => {
     renderSettings();
     await waitFor(() => {
-      expect(
-        screen.getByText(/정기 \d+\/\d+ · 즉시 \d+\/\d+ · 시장 \d+\/2 켜짐/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/^\d+\/7개 켜짐$/)).toBeInTheDocument();
     });
     const notificationLink = screen.getByText("알림 설정").closest("a");
     expect(notificationLink).toHaveAttribute("href", "/settings/notifications");

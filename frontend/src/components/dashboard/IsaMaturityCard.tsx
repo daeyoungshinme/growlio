@@ -127,7 +127,7 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
                 id={`isa-pnl-${status.account_id}`}
                 type="text"
                 inputMode="numeric"
-                className={`${INPUT_SM} w-36 min-w-0`}
+                className={`${INPUT_SM} flex-1 sm:flex-none sm:w-36 min-w-0`}
                 value={value}
                 onChange={(e) => setValue(e.target.value.replace(/[^0-9]/g, ""))}
                 placeholder="0"

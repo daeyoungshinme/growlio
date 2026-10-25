@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, ChevronRight, ListChecks } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, ListChecks, RotateCw } from "lucide-react";
 import { fetchActionItems, type ActionItem } from "@/api/dashboard";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -8,6 +8,9 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { ACTION_PRIORITY_STYLE, deadlineLabel } from "@/utils/actionPriority";
+import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+
+const VISIBLE_LIMIT = 3;
 
 function ActionRow({ item }: { item: ActionItem }) {
   const priority = ACTION_PRIORITY_STYLE[item.priority];
@@ -23,18 +26,19 @@ function ActionRow({ item }: { item: ActionItem }) {
           {priority.label}
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{item.title}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
-            {item.detail}
-          </p>
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
-            {item.cta_label}
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            <span>{item.title}</span>
             {item.deadline && (
-              <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">
+              <span className="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400 whitespace-nowrap">
                 {deadlineLabel(item.deadline)}
               </span>
             )}
           </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+            {item.detail}
+          </p>
+          {/* 행 전체가 링크이고 chevron이 이동을 알리므로 CTA 문구는 보조기기에만 (docs/plans/67 P1-5) */}
+          <span className="sr-only">{item.cta_label}</span>
         </div>
         <ChevronRight size={16} className="mt-0.5 shrink-0 text-gray-300 dark:text-gray-600" />
       </Link>
@@ -46,15 +50,33 @@ function ActionRow({ item }: { item: ActionItem }) {
  * 우선순위 리스트 1장으로 모은다(docs/plans/50 M5). 집계·정렬은 백엔드 `/dashboard/action-items`. */
 export default function ActionItemsCard() {
   const [isOpen, toggleOpen] = useCollapsible(true, "growlio:dashboard:actionItemsOpen");
-  const { data, isLoading, isError } = useQuery({
+  const [showAll, toggleShowAll] = useCollapsible(false);
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: QUERY_KEYS.actionItems,
     queryFn: fetchActionItems,
     staleTime: STALE_TIME.MEDIUM,
   });
 
   if (isLoading) return <SkeletonCard rows={2} />;
-  // 집계 실패는 홈 전체를 막지 않는다 — 각 신호의 상세 화면은 그대로 동작
-  if (isError || !data) return null;
+  // 집계 실패는 홈 전체를 막지 않는다 — 다만 조용히 사라지면 "할 일 없음"으로 오해하므로 한 줄로 알린다
+  if (isError) {
+    return (
+      <div className="card flex items-center gap-2">
+        <p className="flex-1 text-sm text-gray-600 dark:text-gray-400">
+          지금 할 일을 불러오지 못했어요
+        </p>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className={`${TOUCH_TARGET_ROW} gap-1 px-2 -mr-2 text-xs font-medium text-blue-600 dark:text-blue-400 disabled:opacity-50`}
+        >
+          <RotateCw size={12} className={isFetching ? "animate-spin" : ""} />
+          다시 시도
+        </button>
+      </div>
+    );
+  }
+  if (!data) return null;
 
   if (data.length === 0) {
     return (
@@ -90,11 +112,24 @@ export default function ActionItemsCard() {
       onToggle={toggleOpen}
       collapsedHint={data[0].title}
     >
-      <ul className="-mb-3">
-        {data.map((item) => (
+      <ul className={data.length > VISIBLE_LIMIT ? undefined : "-mb-3"}>
+        {(showAll ? data : data.slice(0, VISIBLE_LIMIT)).map((item) => (
           <ActionRow key={item.id} item={item} />
         ))}
       </ul>
+      {data.length > VISIBLE_LIMIT && (
+        <button
+          onClick={toggleShowAll}
+          aria-expanded={showAll}
+          className={`${TOUCH_TARGET_ROW} w-full gap-1 -mb-2 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200`}
+        >
+          {showAll ? "접기" : `${data.length - VISIBLE_LIMIT}개 더 보기`}
+          <ChevronDown
+            size={12}
+            className={`transition-transform ${showAll ? "rotate-180" : ""}`}
+          />
+        </button>
+      )}
     </CollapsibleCard>
   );
 }

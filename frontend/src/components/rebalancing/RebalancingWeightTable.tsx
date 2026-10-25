@@ -1,4 +1,7 @@
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { RebalancingItem } from "@/api/rebalancing";
+import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 import { fmtKrw } from "@/utils/format";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 import {
@@ -27,50 +30,80 @@ function TradeExecutionDetail({ item }: { item: RebalancingItem }) {
   );
 }
 
+/** 모바일 항목 카드 — 1줄: 무엇을 할지(매수/매도 N주 · 금액), 2줄: 현재→목표 비중.
+ * 가격×수량·수수료·보유 주수는 탭해서 펼친다. 예전엔 약 8개 숫자가 모두 text-xs로 한꺼번에 보였고
+ * 비중 막대·차이 배지가 같은 비교를 반복했다 (docs/plans/67 Phase 3). */
 function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
+  const [open, setOpen] = useState(false);
   const isUntracked = item.target_weight_pct === 0 && item.diff_krw < 0;
-  const weightDiff = item.weight_diff_pct;
-  const directionIcon = weightDiff > 0 ? "↑" : weightDiff < 0 ? "↓" : "";
+  const signedKrw = calcSignedTradeKrw(item);
+  const shares = item.shares_to_trade;
+  const hasTrade = signedKrw !== 0;
+  const isBuy = signedKrw > 0;
+  const action = !hasTrade
+    ? "유지"
+    : `${isBuy ? "매수" : "매도"}${shares ? ` ${Math.abs(Math.round(shares))}주` : ""}`;
+  const hasDetail = isTradableItem(item) && (shares ?? 0) !== 0;
+
   return (
-    <div className="py-3 px-1">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
+    <div className="py-2.5 px-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={!hasDetail}
+        aria-expanded={hasDetail ? open : undefined}
+        className="w-full text-left min-h-[44px] disabled:cursor-default"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
             <p className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm">
               {item.name}
             </p>
             {isUntracked && (
               <span className="text-xs text-amber-600 dark:text-amber-500 shrink-0">목표 외</span>
             )}
-            {directionIcon && (
-              <span
-                className={`text-xs shrink-0 ${weightDiff > 0 ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}
-              >
-                {directionIcon}
+          </div>
+          <p
+            className={`shrink-0 text-sm font-semibold tabular-nums ${
+              !hasTrade ? "text-gray-500 dark:text-gray-400" : isBuy ? PROFIT_COLOR : LOSS_COLOR
+            }`}
+          >
+            {action}
+            {hasTrade && (
+              <span className="font-normal">
+                {" · "}
+                {isBuy ? "+" : ""}
+                {fmtKrw(signedKrw)}
               </span>
             )}
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {item.ticker} · 현재 {item.current_weight_pct.toFixed(1)}%
           </p>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-xs text-gray-500 dark:text-gray-500">
-            목표 {item.target_weight_pct.toFixed(1)}%
-          </div>
-          <DiffCell diff={calcSignedTradeKrw(item)} />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            <QuantityCell item={item} />
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+            {item.current_weight_pct.toFixed(1)}% → 목표 {item.target_weight_pct.toFixed(1)}%
           </p>
+          <span className="flex items-center gap-1 shrink-0">
+            <WeightDiffBadge diff={item.weight_diff_pct} />
+            {hasDetail && (
+              <ChevronDown
+                size={14}
+                className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+              />
+            )}
+          </span>
+        </div>
+      </button>
+      {open && hasDetail && (
+        <div className="mt-1 pl-0.5 space-y-0.5">
+          <p className="text-xs text-gray-500 dark:text-gray-400">{item.ticker}</p>
+          {item.current_qty != null && item.target_qty != null && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              보유 {item.current_qty.toFixed(0)}주 → {item.target_qty.toFixed(0)}주
+            </p>
+          )}
           <TradeExecutionDetail item={item} />
         </div>
-      </div>
-      <div className="mt-2">
-        <WeightBar current={item.current_weight_pct} target={item.target_weight_pct} />
-      </div>
-      <div className="mt-1.5">
-        <WeightDiffBadge diff={item.weight_diff_pct} />
-      </div>
+      )}
     </div>
   );
 }

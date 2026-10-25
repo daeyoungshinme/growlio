@@ -84,10 +84,13 @@ export function RebalancingResultSection({ results, onSynced }: Props) {
                     {o.order_type === "LIMIT" ? "지정가" : "시장가"}
                   </span>
                   <span>{fmtOrderPrice(o.price, o.market)}</span>
-                  {(o.order_no ?? o.error_msg) && (
-                    <span className="truncate max-w-[160px]">{o.order_no ?? o.error_msg}</span>
-                  )}
                 </div>
+                {/* 실패 사유는 잘리지 않게 전폭 줄로, 주문번호는 증권사 문의용이라 생략 (docs/plans/67 P2-1) */}
+                {o.error_msg && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400 break-keep">
+                    {o.error_msg}
+                  </p>
+                )}
               </div>
             ))}
           </div>

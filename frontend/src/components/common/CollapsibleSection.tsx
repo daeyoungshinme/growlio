@@ -17,7 +17,7 @@ export default function CollapsibleSection({
   label,
   collapsedHint,
   children,
-  buttonClassName = "w-full flex items-center justify-between py-2 px-3 text-xs text-gray-400 dark:text-gray-500 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors",
+  buttonClassName = "w-full flex items-center justify-between min-h-[44px] px-3 text-xs text-gray-500 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors",
 }: Props) {
   return (
     <div>
@@ -29,7 +29,7 @@ export default function CollapsibleSection({
         />
       </button>
       {!isOpen && collapsedHint && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 px-3">{collapsedHint}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-3">{collapsedHint}</p>
       )}
       {isOpen && <div className="mt-2">{children}</div>}
     </div>

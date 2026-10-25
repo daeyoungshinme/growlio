@@ -4,6 +4,7 @@ import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 import { STRATEGY_OPTIONS } from "@/constants/rebalancingConfig";
 import { CashSummaryBar } from "./CashSummaryBar";
 import { RebalancingOrderTable } from "./RebalancingOrderTable";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   ordersCount: number;
@@ -163,7 +164,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
               </span>
               <button
                 onClick={autoAdjustForCash}
-                className="shrink-0 text-xs bg-amber-200 dark:bg-amber-700/60 hover:bg-amber-300 dark:hover:bg-amber-700 text-amber-800 dark:text-amber-200 px-3 py-1.5 rounded-lg transition-colors font-medium border border-amber-300 dark:border-amber-600/40"
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 text-xs bg-amber-200 dark:bg-amber-700/60 hover:bg-amber-300 dark:hover:bg-amber-700 text-amber-800 dark:text-amber-200 px-3 py-1.5 rounded-lg transition-colors font-medium border border-amber-300 dark:border-amber-600/40`}
               >
                 예수금에 맞춰 자동 조정
               </button>
@@ -245,7 +246,8 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                     <button
                       onClick={() => loadLiveBalance(acc.id)}
                       disabled={bState === "loading"}
-                      className="text-xs px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors border border-gray-300 dark:border-gray-600"
+                      // 실주문 직전 화면 — 약 20px이던 버튼을 모바일 44px로 (docs/plans/67 P2-2)
+                      className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs px-3 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors border border-gray-300 dark:border-gray-600`}
                     >
                       {bState === "loading"
                         ? "조회 중..."

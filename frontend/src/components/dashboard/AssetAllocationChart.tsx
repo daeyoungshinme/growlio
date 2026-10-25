@@ -3,6 +3,7 @@ import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recha
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
 import { PIE_COLORS } from "@/utils/colors";
+import { fmtKrwShort } from "@/utils/format";
 
 const CONFIG = {
   "compact-sm": { height: 140, innerRadius: 30, outerRadius: 56 },
@@ -47,8 +48,9 @@ const AssetAllocationChart = memo(function AssetAllocationChart({
             </Pie>
             <Tooltip
               {...chartTooltipStyle(isDark)}
-              formatter={(value: number) =>
-                `${(value / 1e4).toFixed(0)}만원 (${data.find((d) => d.value === value)?.pct.toFixed(1)}%)`
+              // 값으로 역조회하면 같은 금액의 조각끼리 비중이 뒤바뀐다 — 조각 자신의 payload 사용
+              formatter={(value: number, _name, entry) =>
+                `${fmtKrwShort(value)}원 (${(entry.payload as { pct: number }).pct.toFixed(1)}%)`
               }
             />
             {size === "full" && <Legend />}

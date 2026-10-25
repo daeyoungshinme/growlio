@@ -55,7 +55,7 @@ function PortfolioWeightChart({ items }: Props) {
               formatter={(value: unknown, name: string) =>
                 typeof value === "number" ? [`${value.toFixed(1)}%`, name] : ["-", name]
               }
-              contentStyle={{ fontSize: 11, padding: "4px 8px", borderRadius: 6 }}
+              contentStyle={{ fontSize: 12, padding: "4px 8px", borderRadius: 6 }}
             />
           </PieChart>
         </ResponsiveContainer>

@@ -4,6 +4,7 @@ import { fmtKrw, fmtKrwPreview, fmtPct } from "@/utils/format";
 import type { GoalFeasibilityBand } from "@/utils/goalFeasibility";
 import GoalWizardLoading from "./GoalWizardLoading";
 import type { StepFormProps } from "./GoalWizardInputSteps";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 // 백엔드 DEPOSIT_GUIDE_PRESET_RETURNS_PCT(4/7/10%)와 배열 순서로 매칭되는 표시용 레이블
 const DEPOSIT_GUIDE_PRESET_LABELS = ["보수적", "중립", "공격적"];
@@ -86,7 +87,7 @@ export function MonthlyDepositStep({
                   annual_deposit_goal: String(Math.round(item.required_annual_deposit)),
                 }))
               }
-              className="shrink-0 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 shrink-0 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline`}
             >
               이 값으로 채우기
             </button>

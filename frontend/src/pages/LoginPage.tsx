@@ -53,8 +53,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>
@@ -115,17 +115,26 @@ export default function LoginPage() {
         </form>
 
         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-3">
-          <Link to="/find-account" className="text-blue-600 dark:text-blue-400 hover:underline">
+          <Link
+            to="/find-account"
+            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+          >
             아이디 찾기
           </Link>
-          <Link to="/forgot-password" className="text-blue-600 dark:text-blue-400 hover:underline">
+          <Link
+            to="/forgot-password"
+            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+          >
             비밀번호 찾기
           </Link>
         </div>
 
         <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
           계정이 없으신가요?{" "}
-          <Link to="/register" className="text-blue-600 dark:text-blue-400 hover:underline">
+          <Link
+            to="/register"
+            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+          >
             회원가입
           </Link>
         </p>

@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { ChevronDown, ChevronRight, ChartNoAxesColumn } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
-import { chartTooltipStyle } from "@/utils/chart";
+import { CHART_TICK_FONT_SIZE, chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
@@ -109,14 +109,14 @@ function AllocationHistoryChart({
               />
               <XAxis
                 dataKey="month"
-                tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6B7280" }}
+                tick={chartTickStyle(isDark)}
                 tickLine={false}
                 axisLine={false}
                 interval="preserveStartEnd"
               />
               <YAxis
                 tickFormatter={(v: number) => fmtKrwShort(v)}
-                tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6B7280" }}
+                tick={chartTickStyle(isDark)}
                 tickLine={false}
                 axisLine={false}
                 width={52}
@@ -133,7 +133,7 @@ function AllocationHistoryChart({
               />
               <Legend
                 formatter={(value: string) => labelMap[value] ?? value}
-                wrapperStyle={{ fontSize: 11 }}
+                wrapperStyle={{ fontSize: CHART_TICK_FONT_SIZE }}
               />
               {allTypes.map((type, idx) => (
                 <Bar
@@ -150,7 +150,8 @@ function AllocationHistoryChart({
 
         <button
           onClick={() => setShowDetail((v) => !v)}
-          className="mt-4 w-full flex items-center justify-between py-2 px-3 text-xs text-gray-400 dark:text-gray-500 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          aria-expanded={showDetail}
+          className="mt-4 w-full flex items-center justify-between min-h-[44px] px-3 text-xs text-gray-500 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
         >
           <span>월별 상세</span>
           <ChevronDown
@@ -159,9 +160,10 @@ function AllocationHistoryChart({
         </button>
 
         {showDetail && (
-          <div className="mt-2 max-h-96 overflow-y-auto overflow-x-auto">
+          // 최대 12개월이라 페이지 안 중첩 스크롤(max-h-96) 없이 펼친다 (docs/plans/67 Phase 3)
+          <div className="mt-2 overflow-x-auto">
             <table className="w-full">
-              <thead className="sticky top-0 bg-white dark:bg-gray-900">
+              <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
                   <th className="py-1.5 px-1 sm:px-2 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">
                     월

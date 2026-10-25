@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, RefreshCw, Zap } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw, Zap } from "lucide-react";
+import { Link } from "react-router-dom";
 import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { useSyncAccounts } from "@/hooks/useSyncAccounts";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import { AssetAccount } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
 import { isOrderExecutableAccount } from "@/utils/accounts";
@@ -38,6 +40,10 @@ export default function RebalancingTable({
 }: Props) {
   const tradableAccounts = accounts.filter((a) => isOrderExecutableAccount(a.asset_type));
   const [executionOpen, setExecutionOpen] = useState(false);
+  const [detailsOpen, toggleDetailsOpen] = useCollapsible(
+    false,
+    "growlio:rebalancing:analysisDetailsOpen",
+  );
 
   const autoOpenRef = useRef(autoOpenExecution);
   useEffect(() => {
@@ -163,71 +169,101 @@ export default function RebalancingTable({
       {/* 리밸런싱 비중 테이블 */}
       <RebalancingWeightTable items={analysis.items} />
 
-      {/* 상세 지표 (집중도 · CAGR) — 접기/펼치기 */}
-      <RebalancingDetailMetrics analysis={analysis} />
+      {/* 상세: 지표·배당·미포함 종목·분석 시점 — 주문에 필요한 표 아래 보조 정보를 하나로 접어
+          포트폴리오 탭 세로 길이를 줄인다(기본 접힘·상태 기억, docs/plans/67 Phase 3) */}
+      <div className="border-t border-gray-100 dark:border-gray-800 pt-1">
+        <button
+          type="button"
+          onClick={toggleDetailsOpen}
+          aria-expanded={detailsOpen}
+          className="w-full flex items-center justify-between min-h-[44px] text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          <span>
+            상세 정보
+            <span className="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">
+              {[
+                "집중도·CAGR",
+                hasDividendData && "배당",
+                (analysis.untracked_holdings ?? []).length > 0 &&
+                  `미포함 보유 ${(analysis.untracked_holdings ?? []).length}개`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </span>
+          <ChevronDown
+            size={16}
+            className={`text-gray-400 transition-transform ${detailsOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+      </div>
+      {detailsOpen && (
+        <>
+          {/* 상세 지표 (집중도 · CAGR) — 접기/펼치기 */}
+          <RebalancingDetailMetrics analysis={analysis} defaultOpen />
 
-      {/* 배당 분석 섹션 */}
-      {hasDividendData && <RebalancingDividendSection analysis={analysis} />}
+          {/* 배당 분석 섹션 */}
+          {hasDividendData && <RebalancingDividendSection analysis={analysis} />}
 
-      {/* 미추적 보유 종목 */}
-      {(analysis.untracked_holdings ?? []).length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/30 rounded-xl p-4">
-          <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
-            포트폴리오 미포함 보유 종목 ({(analysis.untracked_holdings ?? []).length}개)
-          </div>
-          <div className="space-y-1.5">
-            {(analysis.untracked_holdings ?? []).map((h, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs">
-                <div className="min-w-0">
-                  <span className="font-medium text-gray-800 dark:text-gray-200 truncate">
-                    {h.name}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400 ml-1.5">{h.ticker}</span>
-                </div>
-                <div className="text-right shrink-0 ml-3">
-                  <span className="text-gray-700 dark:text-gray-300">
-                    {fmtKrw(h.current_value_krw)}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400 ml-1">
-                    ({h.current_weight_pct.toFixed(1)}%)
-                  </span>
-                </div>
+          {/* 미추적 보유 종목 */}
+          {(analysis.untracked_holdings ?? []).length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/30 rounded-xl p-4">
+              <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
+                포트폴리오 미포함 보유 종목 ({(analysis.untracked_holdings ?? []).length}개)
               </div>
-            ))}
+              <div className="space-y-1.5">
+                {(analysis.untracked_holdings ?? []).map((h, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <div className="min-w-0">
+                      <span className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                        {h.name}
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400 ml-1.5">{h.ticker}</span>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {fmtKrw(h.current_value_krw)}
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400 ml-1">
+                        ({h.current_weight_pct.toFixed(1)}%)
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
+            분석 시점:{" "}
+            {new Date(analysis.analyzed_at).toLocaleTimeString("ko-KR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </div>
-        </div>
+        </>
       )}
 
-      <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
-        분석 시점:{" "}
-        {new Date(analysis.analyzed_at).toLocaleTimeString("ko-KR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-      </div>
-
-      {/* 모바일: 하단 고정 실행 버튼 (분석 결과가 보일 때만) */}
+      {/* 모바일: 하단 고정 실행 버튼 (분석 결과가 보일 때만). 주문 가능한 계좌가 없으면 비활성 버튼 대신
+          연동 화면으로 가는 링크 — 누를 수 없는 큰 버튼만 떠 있던 문제 (docs/plans/67 P2-5) */}
       <div
-        className={`sm:hidden fixed bottom-16 left-0 right-0 px-4 z-20 ${resultsInView ? "" : "hidden"}`}
-        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }}
+        className={`sm:hidden fixed bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] left-0 right-0 px-4 pb-2 z-20 ${resultsInView ? "" : "hidden"}`}
       >
-        {tradableAccounts.length === 0 && (
-          <div className="text-center text-xs text-gray-500 dark:text-gray-400 bg-white/90 dark:bg-gray-900/90 rounded-t-lg px-2 py-1">
-            KIS·키움 증권계좌 연동 시 자동 주문 가능
-          </div>
+        {tradableAccounts.length === 0 ? (
+          <Link
+            to="/assets?tab=계좌관리&atab=증권계좌"
+            className="w-full flex items-center justify-center gap-1.5 bg-white dark:bg-gray-900 border border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 py-3 rounded-xl text-sm font-semibold shadow-lg"
+          >
+            증권계좌 연동하면 바로 주문할 수 있어요 →
+          </Link>
+        ) : (
+          <button
+            onClick={() => setExecutionOpen(true)}
+            className="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-sm font-semibold shadow-lg transition-colors"
+          >
+            <Zap size={16} /> 리밸런싱 실행
+          </button>
         )}
-        <button
-          onClick={() => setExecutionOpen(true)}
-          disabled={tradableAccounts.length === 0}
-          className="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-sm font-semibold shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          title={
-            tradableAccounts.length === 0
-              ? "자산 › 계좌관리에서 KIS·키움 증권계좌를 연동하세요"
-              : ""
-          }
-        >
-          <Zap size={16} /> 리밸런싱 실행
-        </button>
       </div>
 
       {executionOpen && (

@@ -282,6 +282,7 @@ export function AlertAutoModeSection({
             </label>
             <input
               type="number"
+              inputMode="numeric"
               min={1}
               step={10000}
               placeholder="예: 500000"

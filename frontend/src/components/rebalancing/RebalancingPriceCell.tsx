@@ -2,6 +2,7 @@ import { RefreshCw } from "lucide-react";
 import { fmtKrwPrice } from "@/utils/format";
 import { isOverseasMarket } from "@/constants/markets";
 import type { PriceLoadState } from "@/hooks/useRebalancingExecution";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 export interface PriceCellProps {
   ticker: string;
@@ -51,8 +52,7 @@ export function PriceCell({
           onClick={() => onRetryPrice(ticker, market)}
           disabled={retrying}
           aria-label="현재가 재조회"
-          title="현재가 재조회"
-          className="text-gray-500 hover:text-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 text-gray-500 hover:text-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
         >
           <RefreshCw size={large ? 14 : 12} className={retrying ? "animate-spin" : ""} />
         </button>

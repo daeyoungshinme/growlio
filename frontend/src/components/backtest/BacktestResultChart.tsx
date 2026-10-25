@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { SeriesData } from "@/api/backtest";
 import { useThemeStore } from "@/stores/themeStore";
-import { chartTooltipStyle } from "@/utils/chart";
+import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { PIE_COLORS } from "@/utils/colors";
 
 type ChartView = "cumulative" | "annual" | "drawdown";
@@ -107,7 +107,7 @@ function BacktestResultChart({ dates, series }: Props) {
 
   const tooltipStyle = chartTooltipStyle(isDark);
   const axisProps = {
-    tick: { fontSize: 10, fill: "#9CA3AF" },
+    tick: chartTickStyle(isDark),
     axisLine: false as const,
     tickLine: false as const,
   };

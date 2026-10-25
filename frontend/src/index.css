@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 @layer components {
+  /* 모바일 p-4 — 카드가 쌓이는 화면에서 좌우 폭·세로 길이를 조금씩 아낀다 (docs/plans/67 Phase 3) */
   .card {
-    @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5;
+    @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5;
   }
   .card-overflow {
     @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden;
@@ -20,6 +21,9 @@
 
 :root {
   color-scheme: light;
+  /* 모바일 하단 네비 높이(safe-area 제외) — BottomNav가 이 높이로 고정되고, 모달·토스트·고정 실행 바가
+     같은 값을 써서 겹치지 않는다(예전엔 실제 약 66px vs 가정 60px·64px로 어긋남, docs/plans/67 P2-5) */
+  --bottom-nav-h: 4rem;
 }
 
 .dark {

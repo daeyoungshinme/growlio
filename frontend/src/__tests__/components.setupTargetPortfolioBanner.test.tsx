@@ -30,9 +30,7 @@ describe("SetupTargetPortfolioBanner", () => {
     fetchPortfolios.mockResolvedValue([]);
     renderBanner();
     await waitFor(() => {
-      expect(
-        screen.getByText("전체 투자 자산에 대한 기준 포트폴리오를 만들어보세요"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("기준 포트폴리오를 만들어보세요")).toBeInTheDocument();
     });
   });
 
@@ -40,9 +38,7 @@ describe("SetupTargetPortfolioBanner", () => {
     fetchPortfolios.mockResolvedValue([{ id: "p-1" }]);
     renderBanner();
     await waitFor(() => expect(fetchPortfolios).toHaveBeenCalled());
-    expect(
-      screen.queryByText("전체 투자 자산에 대한 기준 포트폴리오를 만들어보세요"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("기준 포트폴리오를 만들어보세요")).not.toBeInTheDocument();
   });
 
   it("닫기 버튼을 누르면 localStorage에 저장되어 재마운트해도 다시 표시되지 않는다", async () => {
@@ -52,16 +48,12 @@ describe("SetupTargetPortfolioBanner", () => {
       expect(screen.getByLabelText("배너 닫기")).toBeInTheDocument();
     });
     fireEvent.click(screen.getByLabelText("배너 닫기"));
-    expect(
-      screen.queryByText("전체 투자 자산에 대한 기준 포트폴리오를 만들어보세요"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("기준 포트폴리오를 만들어보세요")).not.toBeInTheDocument();
     expect(localStorage.getItem(STORAGE_KEY)).toBe("true");
 
     unmount();
     renderBanner();
     await waitFor(() => expect(fetchPortfolios).toHaveBeenCalledTimes(2));
-    expect(
-      screen.queryByText("전체 투자 자산에 대한 기준 포트폴리오를 만들어보세요"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("기준 포트폴리오를 만들어보세요")).not.toBeInTheDocument();
   });
 });

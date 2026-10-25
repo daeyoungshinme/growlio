@@ -14,7 +14,7 @@ import {
   type RebalancingPlanLegSummary,
 } from "@/api/rebalancingPlan";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PLAN_LEG_STATUS_LABEL } from "@/constants/rebalancingConfig";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
@@ -124,23 +124,22 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-2 mt-1 text-gray-500 dark:text-gray-400">
+                        {/* 주문번호는 증권사 문의용 정보라 모바일에선 뺀다(데스크탑 표에 유지) — docs/plans/67 P1-10 */}
                         <span>{order.quantity.toLocaleString()}주</span>
-                        <span className="font-mono text-gray-500 dark:text-gray-500">
-                          {order.order_no ?? "—"}
-                        </span>
                         {order.status === "SUCCESS" ? (
                           <span className="text-emerald-600 dark:text-emerald-400">성공</span>
                         ) : order.status === "FAILED" ? (
-                          <span
-                            className="text-red-600 dark:text-red-400"
-                            title={order.error_msg ?? ""}
-                          >
-                            실패
-                          </span>
+                          <span className="text-red-600 dark:text-red-400">실패</span>
                         ) : (
                           <span className="text-gray-500 dark:text-gray-500">건너뜀</span>
                         )}
                       </div>
+                      {/* 실패 사유는 title(hover 전용)이 아니라 화면에 — docs/plans/67 P2-1 */}
+                      {order.status === "FAILED" && order.error_msg && (
+                        <p className="mt-1 text-red-600 dark:text-red-400 break-keep">
+                          {order.error_msg}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -181,11 +180,13 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
                             {order.status === "SUCCESS" ? (
                               <span className="text-emerald-600 dark:text-emerald-400">성공</span>
                             ) : order.status === "FAILED" ? (
-                              <span
-                                className="text-red-600 dark:text-red-400"
-                                title={order.error_msg ?? ""}
-                              >
+                              <span className="text-red-600 dark:text-red-400">
                                 실패
+                                {order.error_msg && (
+                                  <span className="block max-w-[16rem] ml-auto text-left break-keep">
+                                    {order.error_msg}
+                                  </span>
+                                )}
                               </span>
                             ) : (
                               <span className="text-gray-500 dark:text-gray-500">건너뜀</span>
@@ -407,8 +408,15 @@ function PendingPlanRow({
   );
 }
 
+/** 종료된 플랜·실행 이력의 첫 노출 개수 — 최대 30+50개를 한 번에 그려 화면이 끝없이 길었다(docs/plans/67).
+ * 대기(PENDING) 플랜은 행동이 필요하므로 개수와 무관하게 항상 전부 보인다. */
+const CLOSED_LEGS_VISIBLE = 5;
+const HISTORY_PAGE = 10;
+
 export default function RebalancingHistoryTab() {
   const qc = useQueryClient();
+  const [showAllLegs, setShowAllLegs] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(HISTORY_PAGE);
   const { data: history = [], isLoading } = useQuery({
     queryKey: QUERY_KEYS.rebalancingHistory,
     queryFn: () => fetchRebalancingHistory(50),
@@ -445,6 +453,13 @@ export default function RebalancingHistoryTab() {
     onError: (e) => toast(extractErrorMessage(e, "처리 중 오류가 발생했습니다"), "error"),
   });
 
+  const pendingLegs = planLegs.filter((leg) => leg.status === "PENDING");
+  const closedLegs = planLegs.filter((leg) => leg.status !== "PENDING");
+  const visibleLegs = showAllLegs
+    ? planLegs
+    : [...pendingLegs, ...closedLegs.slice(0, CLOSED_LEGS_VISIBLE)];
+  const hiddenLegCount = planLegs.length - visibleLegs.length;
+
   const alertHistoryLink = (
     <Link
       to="/settings/notifications?atab=발송 이력"
@@ -480,10 +495,10 @@ export default function RebalancingHistoryTab() {
       {alertHistoryLink}
       {planLegs.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-500">
-            대기중 / 최근 종료된 플랜
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            예약 주문 (대기 · 최근 종료)
           </p>
-          {planLegs.map((leg) => (
+          {visibleLegs.map((leg) => (
             <PendingPlanRow
               key={leg.leg_id}
               leg={leg}
@@ -492,13 +507,31 @@ export default function RebalancingHistoryTab() {
               isPending={cancelMut.isPending || approveMut.isPending}
             />
           ))}
+          {hiddenLegCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAllLegs(true)}
+              className={`${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400`}
+            >
+              종료된 플랜 {hiddenLegCount}개 더 보기
+            </button>
+          )}
         </div>
       )}
       {history.length > 0 && (
         <div className="space-y-2">
-          {history.map((item) => (
+          {history.slice(0, historyVisible).map((item) => (
             <ExecutionRow key={item.id} item={item} />
           ))}
+          {history.length > historyVisible && (
+            <button
+              type="button"
+              onClick={() => setHistoryVisible((n) => n + HISTORY_PAGE)}
+              className={`${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400`}
+            >
+              실행 이력 더 보기 ({history.length - historyVisible}개 남음)
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -30,6 +30,7 @@ export default function MonthlyAchievementTable({ data, flat }: Props) {
       rows={rows}
       flat={flat}
       scrollable
+      showRecalcNote={false}
     />
   );
 }

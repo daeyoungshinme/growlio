@@ -55,7 +55,9 @@ export default function RebalancingDiagnosisCard({
   portfolioName,
 }: Props) {
   const threshold = alertThreshold ?? DEFAULT_THRESHOLD;
-  const [isOpen, toggleOpen] = useCollapsible(true);
+  // 기본 접힘 — 상태 배지 + 한 줄 힌트로 충분하고, 항목별 이탈은 바로 아래 비중 표가 이미 보여준다
+  // (포트폴리오 탭에서 같은 이탈이 4번 노출되던 문제, docs/plans/67 P1-7). 펼침 상태는 기억한다.
+  const [isOpen, toggleOpen] = useCollapsible(false, "growlio:rebalancing:diagnosisCardOpen");
 
   // 서버 알림·진단 요약과 같은 기준 — 예수금·목표 밖 보유 종목까지 모든 항목, 임계치 "초과"(plans/63 P1-3).
   // 예전엔 예수금 등을 빼고 ">="로 세어 "N개 종목 이탈" 알림과 다른 개수가 보였다.

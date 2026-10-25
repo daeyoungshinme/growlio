@@ -10,7 +10,11 @@ import {
 import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
-import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import {
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+  TOUCH_TARGET_MIN,
+  TOUCH_TARGET_MIN_MOBILE_ONLY,
+} from "@/constants/uiSizes";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
@@ -98,7 +102,7 @@ export function StockPriceAlertSection() {
               {suggestions.map((s) => (
                 <button
                   key={`${s.ticker}-${s.market}`}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="w-full text-left px-3 min-h-[44px] text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onClick={() => {
                     setSelectedStock(s);
                     setForm((f) => ({ ...f, query: `${s.name} (${s.ticker})` }));
@@ -156,7 +160,7 @@ export function StockPriceAlertSection() {
         <button
           onClick={() => createMutation.mutate()}
           disabled={!selectedStock || !form.target_price || createMutation.isPending}
-          className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
         >
           {createMutation.isPending ? "등록 중..." : "알림 추가"}
         </button>
@@ -190,7 +194,7 @@ export function StockPriceAlertSection() {
                   <button
                     onClick={() => reactivateMutation.mutate(alert.id)}
                     disabled={reactivateMutation.isPending}
-                    className="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-600 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
+                    className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-600 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors`}
                   >
                     재활성화
                   </button>

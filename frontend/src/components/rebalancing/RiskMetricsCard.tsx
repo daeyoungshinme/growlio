@@ -84,7 +84,11 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">
-        <button onClick={toggleOpen} className="flex items-center gap-2" aria-expanded={isOpen}>
+        <button
+          onClick={toggleOpen}
+          className="flex items-center gap-2 min-h-[44px] -my-2"
+          aria-expanded={isOpen}
+        >
           <div className="p-1.5 bg-orange-50 dark:bg-orange-950 rounded-lg">
             <ShieldAlert size={16} className="text-orange-600 dark:text-orange-400" />
           </div>

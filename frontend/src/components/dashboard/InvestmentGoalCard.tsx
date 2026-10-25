@@ -46,9 +46,9 @@ function ProgressHeadline({
   return (
     <div>
       <p
-        className={`text-xs text-gray-400 dark:text-gray-500 mb-0.5 ${size === "lg" ? "font-medium" : ""}`}
+        className={`text-xs text-gray-500 dark:text-gray-400 mb-0.5 ${size === "lg" ? "font-medium" : ""}`}
       >
-        전체 진행률
+        자산 목표 진행률
       </p>
       <p
         className={`font-bold text-gray-900 dark:text-gray-50 ${size === "lg" ? "text-lg" : "text-base"}`}
@@ -56,9 +56,7 @@ function ProgressHeadline({
         {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
       </p>
       {goalAmountDisplay != null && hasData && (
-        <p
-          className={`text-xs mt-0.5 ${size === "lg" ? "text-gray-400 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"}`}
-        >
+        <p className={`text-xs mt-0.5 text-gray-500 dark:text-gray-400`}>
           {goalGapAmount != null && goalGapAmount > 0
             ? `목표까지 ${fmtKrw(goalGapAmount)} 남음`
             : `목표 ${fmtKrw(goalAmountDisplay)} 달성`}
@@ -75,7 +73,11 @@ function gapBadge(gap: number, { unit, decimals = 1, aheadLabel, behindLabel }: 
     <>
       <span
         className={`inline-flex items-center gap-0.5 text-sm font-bold ${
-          isEven ? "text-gray-500 dark:text-gray-400" : isAhead ? "text-red-500" : "text-blue-500"
+          isEven
+            ? "text-gray-500 dark:text-gray-400"
+            : isAhead
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-amber-600 dark:text-amber-400"
         }`}
       >
         {!isEven && (isAhead ? <TrendingUp size={12} /> : <TrendingDown size={12} />)}
@@ -244,7 +246,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
             </>
           ) : retirementGapYears > 0 ? (
             <>
-              <span className="inline-flex items-center gap-0.5 text-sm font-bold text-red-500">
+              <span className="inline-flex items-center gap-0.5 text-sm font-bold text-emerald-600 dark:text-emerald-400">
                 <TrendingUp size={12} />
                 {retirementGapYears}년 앞서 달성
               </span>
@@ -254,7 +256,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
             </>
           ) : (
             <>
-              <span className="inline-flex items-center gap-0.5 text-sm font-bold text-blue-500">
+              <span className="inline-flex items-center gap-0.5 text-sm font-bold text-amber-600 dark:text-amber-400">
                 <TrendingDown size={12} />
                 {Math.abs(retirementGapYears)}년 지연 예상
               </span>
@@ -287,6 +289,8 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
       .filter((e): e is [string, number] => e[1] != null && e[1] < 100)
       .sort((a, b) => a[1] - b[1])[0]?.[0] ?? null;
   const hiddenOnMobileCount = goalChips.filter((c) => c.key !== laggingKey).length;
+  // "모두 순항 중"은 설정한 목표가 있을 때만 — 미설정 칩까지 세면 목표가 없는데도 순항이라고 말하게 된다
+  const hasAnySetChip = goalChips.some((c) => c.isSet);
 
   if (
     !isLoading &&
@@ -396,7 +400,9 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
               ? "접기"
               : laggingKey
                 ? `목표 ${hiddenOnMobileCount}개 더 보기`
-                : `모든 목표 순항 중 · 목표 ${hiddenOnMobileCount}개 보기`}
+                : hasAnySetChip
+                  ? `설정한 목표 모두 순항 중 · 목표 ${hiddenOnMobileCount}개 보기`
+                  : `목표 ${hiddenOnMobileCount}개 보기`}
           </button>
         )}
 
@@ -415,7 +421,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                 isOpen={dcaDetailOpen}
                 onToggle={toggleDcaDetail}
                 label="달성 예상일 · 진행 상세"
-                buttonClassName="mt-2 w-full flex items-center justify-between py-1.5 text-xs text-gray-400 dark:text-gray-500 font-medium"
+                buttonClassName="mt-1 w-full flex items-center justify-between min-h-[44px] text-xs text-gray-500 dark:text-gray-400 font-medium"
               >
                 <div className="flex items-end justify-between">
                   <p className="text-xs text-gray-400 dark:text-gray-500">실제 달성 예상</p>
@@ -432,8 +438,8 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
                         timeline.lead_lag_months > 0
-                          ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
-                          : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+                          : "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
                       }`}
                     >
                       {timeline.lead_lag_months > 0 ? (
@@ -514,7 +520,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                 <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">—</p>
               ) : timeline.lead_lag_months > 0 ? (
                 <div className="mt-0.5 flex flex-col gap-1">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 w-fit">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 w-fit">
                     <TrendingUp size={11} />
                     {timeline.lead_lag_months}개월 앞서
                   </span>
@@ -526,7 +532,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                 </div>
               ) : timeline.lead_lag_months < 0 ? (
                 <div className="mt-0.5 flex flex-col gap-1">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 w-fit">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 w-fit">
                     <TrendingDown size={11} />
                     {Math.abs(timeline.lead_lag_months)}개월 지연
                   </span>

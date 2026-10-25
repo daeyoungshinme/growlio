@@ -370,6 +370,6 @@ describe("InvestmentSnapshotCard", () => {
     expect(fetchTaxSummary).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: /주식 투자 현황/ }));
-    expect(screen.getByText(/^평가액 .*원$/)).toBeInTheDocument();
+    expect(screen.getByText(/^평가손익 [+-].*원 \([+-][0-9.]+%\)$/)).toBeInTheDocument();
   });
 });

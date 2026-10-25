@@ -88,7 +88,10 @@ export default function RecommendationResultPanel({
         </p>
       )}
 
-      <PortfolioWeightChart items={items} />
+      {/* 바로 위 비중 리스트와 같은 정보 — 모바일에선 세로 길이만 늘려 데스크탑에서만 (docs/plans/67 P1-8) */}
+      <div className="hidden sm:block">
+        <PortfolioWeightChart items={items} />
+      </div>
 
       {extraNoticeAfterWeightList}
 

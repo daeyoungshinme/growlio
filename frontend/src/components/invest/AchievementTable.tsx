@@ -1,4 +1,9 @@
+import { useState } from "react";
 import { fmtKrw } from "@/utils/format";
+import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+
+/** 모바일에서 scrollable 표가 처음 보여줄 행 수 — 페이지 안 중첩 스크롤 대신 "더 보기" (docs/plans/67) */
+const MOBILE_INITIAL_ROWS = 6;
 import EmptyState from "@/components/common/EmptyState";
 
 function pctColor(pct: number) {
@@ -23,8 +28,10 @@ interface Props {
   actualLabel: string;
   rows: AchievementRow[];
   flat?: boolean;
-  /** true면 모바일 카드 목록도 데스크탑처럼 내부 스크롤(최대 360px)로 제한 */
+  /** true면 행이 많은 표 — 데스크탑은 내부 스크롤(최대 440px), 모바일은 최근 6행 + "더 보기" */
   scrollable?: boolean;
+  /** "목표를 바꾸면 과거 수치도 다시 계산" 안내 — 같은 카드에 표가 둘이면 한쪽만 (docs/plans/67 P1-15) */
+  showRecalcNote?: boolean;
 }
 
 export default function AchievementTable({
@@ -36,7 +43,9 @@ export default function AchievementTable({
   rows,
   flat,
   scrollable,
+  showRecalcNote = true,
 }: Props) {
+  const [showAllMobile, setShowAllMobile] = useState(false);
   if (rows.length === 0) {
     return (
       <div className={flat ? undefined : "card"}>
@@ -47,21 +56,24 @@ export default function AchievementTable({
   }
 
   const reversed = [...rows].reverse();
+  const mobileRows =
+    scrollable && !showAllMobile ? reversed.slice(0, MOBILE_INITIAL_ROWS) : reversed;
 
   return (
     <div className={flat ? undefined : "card"}>
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">{title}</h3>
-      <p className="text-xs text-gray-400 dark:text-gray-500">{subtitle}</p>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
-        현재 설정된 목표 기준으로 계산되며, 목표를 변경하면 과거 수치도 새 기준으로 다시 계산됩니다.
+      <p className={`text-xs text-gray-500 dark:text-gray-400 ${showRecalcNote ? "" : "mb-3"}`}>
+        {subtitle}
       </p>
+      {showRecalcNote && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          현재 설정된 목표 기준으로 계산되며, 목표를 변경하면 과거 수치도 새 기준으로 다시
+          계산됩니다.
+        </p>
+      )}
       {/* 모바일 카드 뷰 */}
-      <div
-        className={`sm:hidden divide-y divide-gray-100 dark:divide-gray-700 ${
-          scrollable ? "max-h-[360px] overflow-y-auto overscroll-contain" : ""
-        }`}
-      >
-        {reversed.map((row) => {
+      <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
+        {mobileRows.map((row) => {
           const diff = row.actual !== null ? row.actual - row.projected : null;
           return (
             <div key={row.key} className="py-2.5">
@@ -93,6 +105,17 @@ export default function AchievementTable({
           );
         })}
       </div>
+
+      {scrollable && reversed.length > MOBILE_INITIAL_ROWS && (
+        <button
+          type="button"
+          onClick={() => setShowAllMobile((v) => !v)}
+          aria-expanded={showAllMobile}
+          className={`sm:hidden ${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400`}
+        >
+          {showAllMobile ? "접기" : `${reversed.length - MOBILE_INITIAL_ROWS}개월 더 보기`}
+        </button>
+      )}
 
       {/* 데스크탑 테이블 */}
       <div

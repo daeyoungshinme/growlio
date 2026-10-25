@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrwShort } from "@/utils/format";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import Tabs from "@/components/common/Tabs";
+import SegmentedControl from "./allocation/SegmentedControl";
 
 const TreemapChart = lazy(() => import("./TreemapChart"));
 const MonthlyDividendChart = lazy(() => import("./MonthlyDividendChart"));
@@ -17,6 +17,7 @@ import {
 } from "@/utils/dividendUtils";
 import EmptyState from "@/components/common/EmptyState";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { marketLabel } from "@/constants/markets";
 
 interface DividendSummary {
   annual_received: number;
@@ -176,7 +177,7 @@ export default function DividendTab({
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
         <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
           <div className="px-2 py-3 sm:px-4 sm:py-4">
-            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-tight break-keep">
               예상 연간 배당금
             </p>
             <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600 truncate">
@@ -193,7 +194,7 @@ export default function DividendTab({
             )}
           </div>
           <div className="px-2 py-3 sm:px-4 sm:py-4">
-            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-tight break-keep">
               올해 수령 배당금
             </p>
             <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50 truncate">
@@ -204,7 +205,7 @@ export default function DividendTab({
             </p>
           </div>
           <div className="px-2 py-3 sm:px-4 sm:py-4">
-            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-tight break-keep">
               월평균 예상 배당금
             </p>
             <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600 truncate">
@@ -216,7 +217,13 @@ export default function DividendTab({
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Tabs tabs={DIV_SUBTABS} activeTab={divSubTab} onChange={setDivSubTab} variant="pill" />
+        {/* 자산 › 투자현황 › 배당 아래 3단 — pill 대신 segmented (docs/plans/67) */}
+        <SegmentedControl
+          ariaLabel="배당 보기"
+          options={DIV_SUBTABS.map((v) => ({ value: v, label: v }))}
+          value={divSubTab}
+          onChange={setDivSubTab}
+        />
         <Link
           to="/invest-plan?tab=배당 계획"
           className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
@@ -262,7 +269,7 @@ export default function DividendTab({
                     <div className="flex items-center justify-between mt-0.5 gap-2">
                       <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                         <span className="text-xs text-gray-400 dark:text-gray-500 truncate">
-                          {d.ticker} · {d.market}
+                          {d.ticker} · {marketLabel(d.market)}
                         </span>
                         {investmentYield > 0 && (
                           <span
@@ -348,7 +355,7 @@ export default function DividendTab({
                         <td className="py-2 px-5">
                           <p className="font-medium text-gray-900 dark:text-gray-50">{d.name}</p>
                           <p className="text-xs text-gray-400 dark:text-gray-500">
-                            {d.ticker} · {d.market}
+                            {d.ticker} · {marketLabel(d.market)}
                           </p>
                         </td>
                         <td className="py-2 px-3 text-right font-medium text-green-600 dark:text-green-400">

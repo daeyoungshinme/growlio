@@ -1,7 +1,15 @@
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, TriangleAlert, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
+import {
+  Activity,
+  TriangleAlert,
+  ArrowRight,
+  BellOff,
+  ChevronDown,
+  ChevronRight,
+  Shuffle,
+} from "lucide-react";
 
 import { fetchDriftSummary } from "@/api/rebalancing";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
@@ -78,10 +86,7 @@ function PortfolioDriftRow({
           </span>
         )}
         {showCompositeBadge && (
-          <span
-            className="text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full px-1.5 py-0.5 shrink-0"
-            title={summary.composite_reason ?? undefined}
-          >
+          <span className="text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full px-1.5 py-0.5 shrink-0">
             점검 권장
           </span>
         )}
@@ -99,6 +104,12 @@ function PortfolioDriftRow({
           </button>
         )}
       </div>
+      {/* 점검 권장 사유 — title은 터치에서 안 보이므로 화면에 표시 (docs/plans/67) */}
+      {showCompositeBadge && summary.composite_reason && (
+        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 pl-4">
+          {summary.composite_reason}
+        </p>
+      )}
     </div>
   );
 }
@@ -245,7 +256,7 @@ export default function RebalancingStatusCard({
     statusHint =
       needsCount === 0
         ? `포트폴리오 ${driftSummaries.length}개 모두 목표 비중 이내`
-        : `포트폴리오 ${driftSummaries.length}개 중 ${needsCount}개 이탈 · 지금 할 일 참고`;
+        : `포트폴리오 ${driftSummaries.length}개 중 ${needsCount}개 이탈`;
   }
 
   const combinedStatusNote = useMemo(
@@ -265,7 +276,7 @@ export default function RebalancingStatusCard({
           <span>포트폴리오 현황을 불러오지 못했습니다.</span>
           <button
             onClick={() => refetchPortfolios()}
-            className="flex-none flex items-center gap-1 font-medium hover:text-red-600 dark:hover:text-red-300 transition-colors"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-none gap-1 font-medium hover:text-red-600 dark:hover:text-red-300 transition-colors`}
           >
             다시 시도
           </button>
@@ -290,11 +301,45 @@ export default function RebalancingStatusCard({
         </p>
         <button
           onClick={emptyStateCta}
-          className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} !justify-start gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
         >
           포트폴리오 만들기 <ArrowRight size={12} />
         </button>
       </div>
+    );
+  }
+
+  // 홈: 한 줄 상태 행 — 이탈 상세는 "지금 할 일"·리밸런싱 탭이 담당하므로 펼침 카드를 두지 않는다
+  // (같은 drift-summary가 홈에 4번 노출되던 문제, docs/plans/67 P1-3)
+  if (statusOnly) {
+    return (
+      <Link
+        to="/rebalancing"
+        className="card flex items-center gap-3 min-h-[44px] active:opacity-70 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+      >
+        <div className="p-1.5 bg-blue-50 dark:bg-blue-950 rounded-lg shrink-0">
+          <Shuffle size={16} className="text-blue-600 dark:text-blue-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">리밸런싱 점검</p>
+          {statusHint && (
+            <p
+              className={`text-xs mt-0.5 ${needsCount > 0 ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}
+            >
+              {statusHint}
+            </p>
+          )}
+        </div>
+        {marketSignal && (
+          <span
+            className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 shrink-0 ${SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+            시장 {SIGNAL_LABEL[marketSignal.composite_level]}
+          </span>
+        )}
+        <ChevronRight size={16} className="shrink-0 text-gray-400 dark:text-gray-500" />
+      </Link>
     );
   }
 
@@ -329,7 +374,7 @@ export default function RebalancingStatusCard({
           {!showAllInsights && (
             <Link
               to="/rebalancing"
-              className="flex items-center gap-1 -my-1 py-1.5 px-2 -mr-2 rounded-md text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 active:opacity-70 transition-colors"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1 -my-1 px-2 -mr-2 rounded-md text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 active:opacity-70 transition-colors`}
             >
               분석하기 <ArrowRight size={12} />
             </Link>

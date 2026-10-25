@@ -32,7 +32,7 @@ import { fmtKrw, fmtKrwPreview, localMonth } from "@/utils/format";
 import { invalidateDcaData } from "@/utils/queryInvalidation";
 import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalFooter } from "@/components/common/Modal";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -147,7 +147,7 @@ export default function InvestPlanPage() {
         <span>데이터를 불러오지 못했습니다.</span>
         <button
           onClick={() => invalidateDcaData(queryClient)}
-          className="underline font-medium ml-2"
+          className="underline font-medium ml-2 min-h-[44px]"
         >
           다시 시도
         </button>
@@ -206,15 +206,8 @@ export default function InvestPlanPage() {
                     </button>
                   </div>
                 </div>
-                {isConfigured && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1 mb-3">
-                    가이드로 설정은 투자성향·배당목표까지 처음부터 다시 입력받습니다. 금액·날짜만
-                    고치려면 설정 편집을 사용하세요.
-                  </p>
-                )}
-                <div
-                  className={`grid gap-4 ${showAllStats ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-7" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"}`}
-                >
+                {/* 상시 안내 2문단(가이드 vs 편집 차이·홈 탭 안내)은 버튼 이름으로 충분해 제거 (docs/plans/67 P1-12) */}
+                <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
                   {(
                     [
                       {
@@ -263,10 +256,10 @@ export default function InvestPlanPage() {
                       key={stat.label}
                       className={stat.priority || showAllStats ? "" : "hidden sm:block"}
                     >
-                      <p className="text-xs text-gray-400 dark:text-gray-500">{stat.label}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{stat.label}</p>
                       <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
                         {stat.value ?? (
-                          <span className="text-gray-300 dark:text-gray-600">
+                          <span className="text-gray-400 dark:text-gray-500">
                             {"emptyLabel" in stat ? stat.emptyLabel : "미설정"}
                           </span>
                         )}
@@ -289,14 +282,11 @@ export default function InvestPlanPage() {
                     </>
                   )}
                 </button>
-                <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                  연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 홈 탭에서 확인할 수 있습니다.
-                </p>
                 {data && !isConfigured && (
                   <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
                     월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
                     있습니다.{" "}
-                    <button onClick={openWizard} className="underline font-medium">
+                    <button onClick={openWizard} className="underline font-medium min-h-[44px]">
                       지금 설정하기
                     </button>
                   </div>
@@ -476,23 +466,22 @@ export default function InvestPlanPage() {
                 />
               );
             })}
-
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={handleCloseModal}
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
-              >
-                취소
-              </button>
-              <button
-                onClick={saveSettings}
-                disabled={saving}
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
-              >
-                {saving ? "저장 중..." : "저장"}
-              </button>
-            </div>
           </div>
+          <ModalFooter>
+            <button
+              onClick={handleCloseModal}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+            >
+              취소
+            </button>
+            <button
+              onClick={saveSettings}
+              disabled={saving}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+            >
+              {saving ? "저장 중..." : "저장"}
+            </button>
+          </ModalFooter>
         </Modal>
       )}
 
@@ -530,23 +519,22 @@ export default function InvestPlanPage() {
               }
               hint="예상 연배당이 이 금액을 넘으면 목표 달성"
             />
-
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={handleDividendCloseModal}
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
-              >
-                취소
-              </button>
-              <button
-                onClick={saveDividendSettings}
-                disabled={dividendSaving}
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
-              >
-                {dividendSaving ? "저장 중..." : "저장"}
-              </button>
-            </div>
           </div>
+          <ModalFooter>
+            <button
+              onClick={handleDividendCloseModal}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+            >
+              취소
+            </button>
+            <button
+              onClick={saveDividendSettings}
+              disabled={dividendSaving}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+            >
+              {dividendSaving ? "저장 중..." : "저장"}
+            </button>
+          </ModalFooter>
         </Modal>
       )}
 

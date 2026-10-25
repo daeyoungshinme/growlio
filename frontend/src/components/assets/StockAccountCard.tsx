@@ -203,7 +203,7 @@ export default function StockAccountCard({
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">평가손익</p>
             <p
               className={`text-sm font-semibold mt-0.5 truncate ${pnlColor(pnl)}`}
               title={fmtKrw(pnl)}
@@ -214,9 +214,19 @@ export default function StockAccountCard({
             <p className={`text-xs font-medium ${pnlColor(pnl)}`}>({fmtPct(ret)})</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
-            <div className="flex items-start gap-1 mt-0.5">
-              <div className="flex-1 min-w-0">
+            {/* 연필을 값 칸이 아니라 라벨 옆에 둔다 — 44px 버튼이 약 100px 칸에서 금액을 잘라먹었다 (docs/plans/67) */}
+            <div className="flex items-center gap-0.5">
+              <p className="text-xs text-gray-500 dark:text-gray-400">예수금</p>
+              <button
+                onClick={() => onEdit(account)}
+                aria-label="예수금 수정"
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-3 -mr-2 p-1 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0`}
+              >
+                <Pencil size={12} />
+              </button>
+            </div>
+            <div className="mt-0.5">
+              <div className="min-w-0">
                 {(() => {
                   const krw = account.deposit_krw ?? 0;
                   const usd = account.deposit_usd ?? 0;
@@ -242,13 +252,6 @@ export default function StockAccountCard({
                   );
                 })()}
               </div>
-              <button
-                onClick={() => onEdit(account)}
-                aria-label="예수금 수정"
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 dark:hover:text-blue-400 transition-colors shrink-0`}
-              >
-                <Pencil size={12} />
-              </button>
             </div>
           </div>
           {/* 누적 입금·배당은 상단 증권계좌 요약 카드와 같은 지표라 기본은 접어 카드 높이를 줄인다(U4) */}

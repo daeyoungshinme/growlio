@@ -123,6 +123,7 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
 describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     fetchSettings.mockResolvedValue(makeSettingsData());
   });
 
@@ -132,7 +133,8 @@ describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
 
     renderWithProviders(<DividendPlanSection onOpenSettings={vi.fn()} />);
 
-    expect(await screen.findByText("배당 목표를 더 빨리 달성하려면?")).toBeDefined();
+    // 기본 접힘(docs/plans/67 P1-14) — 펼쳐서 확인
+    fireEvent.click(await screen.findByText("배당 목표를 더 빨리 달성하려면?"));
     expect(screen.getByText("+3.00%")).toBeDefined(); // 목표 배당수익률
     expect(screen.getByText("+1.80%")).toBeDefined(); // 기대 배당수익률
     expect(screen.getByText(/Nasdaq Equity Premium/)).toBeDefined();
@@ -168,6 +170,7 @@ describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
 
     renderWithProviders(<DividendPlanSection onOpenSettings={vi.fn()} />);
 
+    fireEvent.click(await screen.findByText("배당 목표를 더 빨리 달성하려면?"));
     fireEvent.click(await screen.findByText("후보에 추가"));
 
     await waitFor(() => expect(updateGoalCandidateTickers).toHaveBeenCalled());

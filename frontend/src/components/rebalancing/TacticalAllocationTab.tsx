@@ -206,12 +206,8 @@ function TacticalStatusView({
     <>
       <section className="card flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold">QQQ·SPY 전술 배분</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              국면에 맞는 새 목표 비중을 제안해요. 적용해도 주문은 나가지 않아요.
-            </p>
-          </div>
+          {/* "주문은 나가지 않아요"는 목표 조정 탭 상단 안내가 이미 말한다 — 반복 제거 (docs/plans/67 P1-8) */}
+          <h2 className="text-base font-semibold">QQQ·SPY 전술 배분</h2>
           {regime ? (
             <span
               className={`shrink-0 px-3 py-1 rounded-full border text-sm font-semibold ${REGIME_BADGE_CLASS[regime]}`}
@@ -228,7 +224,7 @@ function TacticalStatusView({
           <MarketSignalLevelBadge level={status.macro_level} />
           {/* 모바일은 title 툴팁이 안 뜬다 — 진단 탭 배지와 등급이 다를 수 있는 이유를 화면에 적는다 */}
           <span className="basis-full text-gray-500 dark:text-gray-400">
-            진단 탭 시장 신호를 연속 확인한 등급이라 진단 탭보다 늦게 바뀔 수 있어요
+            연속 확인한 등급이라 진단 탭보다 늦게 바뀔 수 있어요
           </span>
           {status.macro_freshness === "STALE" && (
             <span className="text-amber-600 dark:text-amber-400">지표 데이터 지연</span>
@@ -320,10 +316,9 @@ function TacticalStatusView({
           </>
         )}
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          과거 데이터 기반 참고 신호이며 수익을 보장하지 않아요.{" "}
-          {autoExecutionNotice
-            ? "이 포트폴리오는 자동 실행이 켜져 있어 적용한 비중이 다음 자동 실행에 반영돼요."
-            : "주문은 리밸런싱 화면에서 직접 확인 후 실행돼요."}
+          과거 데이터 기반 참고 신호이며 수익을 보장하지 않아요.
+          {autoExecutionNotice &&
+            " 이 포트폴리오는 자동 실행이 켜져 있어 적용한 비중이 다음 자동 실행에 반영돼요."}
         </p>
       </section>
 
