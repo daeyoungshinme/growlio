@@ -346,6 +346,7 @@ jobs/                         # APScheduler 정기 작업
   ├── rebalancing_plan_sell_expiry.py  # 15분 간격(app/scheduler.py) — 당일 미응답 매도 승인 요청 만료 처리
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크
   ├── token_refresh.py        # 매일 06:00 KST KIS 계좌별 토큰 갱신 — 실패는 스택 없는 capture_message로 Sentry 보고(자격증명 지역변수 전송 방지, report_job_failure 미사용)
+  ├── startup_warmup.py       # 기동 직후 1회(`next_run_time=now`) — USD/KRW·시장신호·기술적 신호·Supabase JWKS 예열. Render 슬립 후 첫 요청들이 외부 API를 동기 대기하던 것과 환율 fallback(1300) 고착 방지, 항목별 실패 격리(plans/72)
   ├── cache_sweep.py          # 15분 간격 — in-memory 캐시(`cache_store.py`)의 만료 키를 능동 청소(lazy expiration 보완)
   ├── app_state_sweep.py      # 매일 04:10 KST — `app_state`(durable_state) 만료 row 일괄 삭제
   └── _job_helpers.py         # job 공통 헬퍼 유틸리티

@@ -108,7 +108,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 
 - `ExchangeRateContext.tsx` — `ExchangeRateProvider`로 앱 전체에 환율 공유. `useExchangeRateContext()`로 소비. `useExchangeRate.ts` 훅과 별개 — 컨텍스트 방식으로 동일 쿼리 중복 방지.
 
-`components/common/` 주요 파일: `AccountActionsMenu.tsx` (카드 헤더 등에 밀집된 부가 액션을 `⋯` 오버플로우 메뉴로 접는 공용 컴포넌트 — `items: {icon, label, onClick, disabled?, variant?}[]`, 아이콘+라벨 텍스트를 함께 렌더해 모바일 `title` 툴팁 미동작 문제 우회), `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `CollapsibleCard.tsx` (카드 전체를 감싸는 헤더+접기 토글, `isOpen`/`onToggle` controlled), `CollapsibleSection.tsx` (카드 내부에 삽입하는 경량 접기 토글), `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx` (+ `ModalFooter` — 스크롤 본문 다음 형제로 두는 하단 고정 버튼 영역. 입력 폼 모달의 저장/다음 버튼은 여기에 둔다 — 본문 끝에 두면 모바일 키보드에 가려짐), `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SuggestionDropdown.tsx`, `Tabs.tsx`, `ToggleSwitch.tsx` (`checked`/`onChange`/`disabled?`/`ariaLabel?` props의 스위치 토글 + `ToggleRow` — 제목·설명·스위치 한 행 전체가 label이라 어디를 눌러도 토글, 설정 목록은 이걸 쓴다), `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
+`components/common/` 주요 파일: `AccountActionsMenu.tsx` (카드 헤더 등에 밀집된 부가 액션을 `⋯` 오버플로우 메뉴로 접는 공용 컴포넌트 — `items: {icon, label, onClick, disabled?, variant?}[]`, 아이콘+라벨 텍스트를 함께 렌더해 모바일 `title` 툴팁 미동작 문제 우회), `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `CollapsibleCard.tsx` (카드 전체를 감싸는 헤더+접기 토글, `isOpen`/`onToggle` controlled), `CollapsibleSection.tsx` (카드 내부에 삽입하는 경량 접기 토글), `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx` (+ `ModalFooter` — 스크롤 본문 다음 형제로 두는 하단 고정 버튼 영역. 입력 폼 모달의 저장/다음 버튼은 여기에 둔다 — 본문 끝에 두면 모바일 키보드에 가려짐), `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SuggestionDropdown.tsx`, `MiniDonut.tsx` (의존성 없는 SVG 도넛 — 홈 히어로가 recharts 청크 없이 자산 구성을 그림, 조각 탭 시 가운데 라벨), `Tabs.tsx`, `ToggleSwitch.tsx` (`checked`/`onChange`/`disabled?`/`ariaLabel?` props의 스위치 토글 + `ToggleRow` — 제목·설명·스위치 한 행 전체가 label이라 어디를 눌러도 토글, 설정 목록은 이걸 쓴다), `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
 
 > 새 공통 컴포넌트 추가/삭제 시 이 목록도 함께 갱신.
 
@@ -188,7 +188,8 @@ _리밸런싱/추천_
 - `useRebalancingExecution.ts` — 리밸런싱 주문 실행 훅의 공개 진입점(barrel re-export). 실제 구현은 `rebalancingExecution/`(`index.ts`/`reducer.ts`/`types.ts`) 패키지에 있지만, 모든 소비 코드는 이 파일을 통해서만 import — 패키지를 직접 import 금지
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts`(`useRebalancingAlertQueries`·`useRebalancingAlertFormState`) — 알림 CRUD
-- `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석 (`useAnalysisState`는 모든 분석 진입 경로에서 `fetchLiveDepositKrw`로 증권사 실시간 예수금을 override로 보냄 — 경로별 예수금 기준 불일치 방지, 계좌 로딩 전 자동 분석 보류)
+- `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석 (`useAnalysisState`는 기본적으로 동기화 기준 예수금으로 분석하고 결과를 5분 재사용 — 계좌·overview·portfolios 쿼리가 무효화되면 폐기. 증권사 실시간 예수금(`fetchLiveDepositKrw`)은 `triggerRebalancingAnalysis(id, { live: true })`, 즉 "실시간 잔고로 다시 분석" 버튼에서만. 계좌 로딩 전 자동 분석 보류, plans/72)
+- `useMediaQuery.ts` — `useMediaQuery(query)`/`useIsSmUp()`. 모바일 카드 뷰·데스크톱 표 중 보이는 쪽만 렌더할 때 사용(matchMedia 없는 환경은 null → 둘 다 렌더하고 CSS에 맡김)
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
 - `useGoalSettings.ts` — 투자 목표 설정 폼 상태
 - `useChallenges.ts` / `useChallengeMutations.ts` / `useChallengeNudge.ts` — 적립 챌린지 목록 조회 / 생성·수정·삭제 뮤테이션 / 하단 네비 배지용 넛지 요약
@@ -264,6 +265,8 @@ _기타_
 > 순수 유틸뿐 아니라 컴포넌트·훅·페이지·API 레이어 모두 테스트 대상. 새 유틸은 동일 디렉토리에 `*.test.ts`, 새 컴포넌트/훅/페이지는 `src/__tests__/`에 대응 파일 작성. `vite.config.ts`에 커버리지 임계값(lines/functions/branches/statements) 설정됨.
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시 — 포트폴리오 페이지는 주식 계좌 전용 뷰이므로 의도된 동작.
+
+**`src/lib/storedSession.ts`** — supabase-js가 저장한 `sb-*-auth-token`을 SDK 없이 동기로 읽음(`readValidStoredToken`/`hasStoredSession`/`readStoredSession`). `api/client.ts`가 부팅 시 토큰을 시드해 401→refresh 왕복을 없애고, `authStore`의 낙관적 로그인(7일, `/auth/me` 검증은 백그라운드)이 사용자 일치 확인에 씀. 형식 해석 실패 시 null(기존 경로로 폴백). **`src/lib/serviceWorker.ts`** — 웹에서만 SW 등록(`vite.config.ts`의 `injectRegister: null`), Capacitor에서는 기존 등록·캐시 해제. **`src/lib/sentry.ts`** — Sentry 지연 초기화(`initSentryDeferred`, 유휴 시간 동적 import) + `captureException` 래퍼. 앱 코드는 `@sentry/react`를 직접 import하지 말 것(엔트리 청크로 다시 끌려옴). 라우트 패턴 트랜잭션은 쓰지 않음(plans/72).
 
 **`src/lib/supabase.ts`** — `getSupabase()`(async 함수)를 통해 Supabase 클라이언트를 지연 초기화한다(env vars 필요). `@supabase/supabase-js`(약 200KB)를 top-level import하면 이 파일을 참조하는 모든 부팅 경로(authStore/api client)가 실제 렌더 전에 파싱·실행을 먼저 기다려야 해 모바일 저사양 기기에서 체감 로딩 지연을 유발했다 — 그래서 `await import("@supabase/supabase-js")`로 동적 로드하고 클라이언트를 메모이즈한다. 모든 소비 코드(`authStore.ts`, `api/client.ts`, `AuthCallbackPage.tsx` 등)는 `const supabase = await getSupabase();` 형태로 사용 — 동기 `supabase` export는 없음. 직접 확장 금지 — 토큰 첨부·갱신은 `api/client.ts` 인터셉터 소관. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장됨 — httpOnly 쿠키 전환은 Capacitor WebView SameSite 제약으로 보류, CSP + 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제로 경계강화만 적용(결정기록: `docs/plans/28-localstorage-token-decision.md`).
 
