@@ -119,3 +119,25 @@ class TestGetOwnedResource:
             await get_owned_or_404(mock_db, Transaction, uuid.uuid4(), uuid.uuid4())
 
         assert exc_info.value.status_code == 404
+
+
+class TestGetCurrentUserReleasesConnection:
+    @pytest.mark.asyncio
+    async def test_commits_after_lookup_to_release_connection(self, override_settings, mock_db):
+        """인증 조회 트랜잭션을 바로 끝내 외부 API 대기 동안 커넥션을 쥐지 않는다."""
+        from app.api.deps import get_current_user
+
+        user = object()
+        mock_db.scalar = AsyncMock(return_value=user)
+        mock_db.commit = AsyncMock()
+        with patch("app.api.deps.verify_supabase_token", return_value={"sub": str(uuid.uuid4())}):
+            result = await get_current_user(authorization="Bearer token", db=mock_db)
+
+        assert result is user
+        mock_db.commit.assert_awaited_once()
+
+    def test_session_factory_keeps_attributes_after_commit(self):
+        """commit 후 user 속성 접근이 재조회(async lazy load 오류)를 일으키지 않으려면 필수."""
+        from app.core.database import AsyncSessionLocal
+
+        assert AsyncSessionLocal.kw.get("expire_on_commit") is False
