@@ -156,6 +156,12 @@ class TestHighCorrelation:
         weekly = _weekly(AAA=_series(short), BBB=_series(short))
         assert find_overlap_groups(items, weekly) == []
 
+    def test_same_symbol_different_market_code_does_not_crash(self, base_returns):
+        """시장 코드만 다른 같은 종목(NYSE/NASDAQ) → 같은 심볼이라 중복 열 DataFrame으로 TypeError 나던 회귀."""
+        items = [_Item("AAA", "Alpha", "NYSE", held=True), _Item("AAA", "Alpha", "NASDAQ", candidate=True)]
+        weekly = _weekly(AAA=_series(base_returns))
+        assert find_overlap_groups(items, weekly) == []
+
     def test_cross_listing_skips_correlation(self, base_returns):
         items = [_Item("AAA", "Alpha", "NYSE", held=True), _Item("000001", "베타", "KOSPI", candidate=True)]
         weekly = _weekly(**{"AAA": _series(base_returns), "000001.KS": _series(base_returns)})

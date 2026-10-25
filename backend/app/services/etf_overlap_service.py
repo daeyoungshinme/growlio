@@ -138,8 +138,12 @@ def weekly_returns_frame(close_series: dict[str, pd.Series]) -> pd.DataFrame:
 
 
 def _pair_correlation(weekly: pd.DataFrame, sym_a: str, sym_b: str) -> float | None:
-    """상관계수(변동성 비율 조건 불충족·표본 부족이면 None)."""
-    if sym_a not in weekly.columns or sym_b not in weekly.columns:
+    """상관계수(변동성 비율 조건 불충족·표본 부족이면 None).
+
+    시장 코드만 다른 같은 종목은 같은 심볼로 변환된다 — `weekly[[s, s]]`가 중복 열이 돼 `pair[s]`가
+    DataFrame이 되므로 계산하지 않는다.
+    """
+    if sym_a == sym_b or sym_a not in weekly.columns or sym_b not in weekly.columns:
         return None
     pair = weekly[[sym_a, sym_b]].dropna()
     if len(pair) < _MIN_OVERLAP_WEEKS:
