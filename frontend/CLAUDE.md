@@ -568,7 +568,7 @@ _기타_
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 등 무효화.
 - 브로커 API 키 삭제(연동 해제) 후: `invalidateBrokerCredentialData(queryClient)` — 계좌 데이터 + 리밸런싱 알림·대기 플랜 무효화.
 - 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions(전체·계좌별 프리픽스) + dashboard + 챌린지·연금/ISA·세금·지금 할 일 + 배당 요약·배당 계획(DIVIDEND 거래) 무효화.
-- 수기 매매 기록 CUD 후: `invalidateTradeData(queryClient)` — trades + period-purchases 무효화.
+- 수기 매매 기록 CUD 후: `invalidateTradeData(queryClient)` — trades + period-purchases + overseas-realized·tax-summary·tax-action-plan·action-items 무효화(해외 SELL 기록이 미지원 계좌 양도세 실현손익이 됨).
 - 전술 배분 설정 변경 후: `invalidateTacticalData(queryClient)` — tactical-status + tactical-backtest. 제안 비중 적용(포트폴리오 목표 교체) 후엔 `{ portfolioChanged: true }`로 `invalidatePortfolioData`까지.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + dividend-plan + challenges + action-items 무효화.

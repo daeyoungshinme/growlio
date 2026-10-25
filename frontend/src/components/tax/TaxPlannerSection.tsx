@@ -1,6 +1,7 @@
 import { BadgeCheck, Info, TrendingUp, TrendingDown, Lightbulb, TriangleAlert } from "lucide-react";
 import type { OverseasPositionDetail, OverseasRealizedSummary } from "@/api/tax";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { fmtKrw } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { useTaxSimulation, type OverseasTaxRule } from "@/hooks/useTaxSimulation";
@@ -11,14 +12,19 @@ import { TaxRecommendationList } from "./TaxRecommendationList";
 
 interface Props {
   positions: OverseasPositionDetail[];
-  /** 증권사 체결 기준 올해 실현손익 자동 집계(E6) — 없거나 자동 집계 계좌가 없으면 수기 입력만 */
+  /** 올해 실현손익 자동 집계(E6, 증권사 체결 + 직접 기록한 매도) — 없거나 집계 계좌가 없으면 수기 입력만 */
   realized?: OverseasRealizedSummary | null;
   /** 세금 요약 응답의 해외 양도세 공제·세율 — 없으면 훅의 폴백 상수 */
   taxRule?: OverseasTaxRule;
 }
 
+/** 키움·토스·수기 계좌는 계좌관리 › 내역 › 매수 내역에서 해외 매도를 기록하면 실현손익에 반영된다 */
+const TRADE_RECORD_LINK = "/assets?tab=계좌관리&atab=내역&history=매수 내역";
+
 export default function TaxPlannerSection({ positions, realized, taxRule }: Props) {
   const autoRealized = realized?.realized_gain_krw ?? null;
+  const fromRecords = realized?.covered_accounts.some((a) => a.method === "TRADE_RECORD") ?? false;
+  const estimated = realized?.covered_accounts.some((a) => a.estimated) ?? false;
   const {
     taxDeduction,
     taxRate,
@@ -87,20 +93,28 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
             <div className="flex items-start gap-2">
               <BadgeCheck size={13} className="text-emerald-500 mt-0.5 shrink-0" />
               <p className="text-xs text-gray-600 dark:text-gray-300">
-                증권사 체결 기준 올해 실현 손익{" "}
+                {fromRecords ? "증권사 체결·직접 기록한 매도 기준" : "증권사 체결 기준"} 올해 실현
+                손익{" "}
                 <span className={`font-semibold ${pnlColor(autoRealized)}`}>
                   {fmtKrw(autoRealized)}
                 </span>
                 을 자동으로 불러왔어요 (
                 {realized.covered_accounts.map((a) => a.account_name).join(", ")}, {realized.as_of}{" "}
                 기준).
+                {estimated && " 기록한 매도 일부는 취득가를 평균단가로 추정했어요."}
               </p>
             </div>
             {realized.uncovered_accounts.length > 0 && (
               <div className="flex items-start gap-2">
                 <TriangleAlert size={13} className="text-amber-500 mt-0.5 shrink-0" />
                 <div className="text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
-                  <p>아래 계좌의 실현 손익은 빠져 있어요 — 있다면 합계를 직접 입력하세요.</p>
+                  <p>
+                    아래 계좌의 실현 손익은 빠져 있어요 —{" "}
+                    <Link to={TRADE_RECORD_LINK} className="underline font-medium">
+                      매도 내역을 기록
+                    </Link>
+                    하면 자동 반영되고, 바로 확인하려면 합계를 직접 입력하세요.
+                  </p>
                   <ul className="list-disc pl-4">
                     {realized.uncovered_accounts.map((a) => (
                       <li key={a.account_id}>
@@ -117,7 +131,11 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
             <Info size={13} className="text-gray-400 mt-0.5 shrink-0" />
             <p className="text-xs text-gray-500 dark:text-gray-400">
               올해 이미 해외 주식을 매도해 실현한 손익이 있다면 입력하세요 (양도차익만, 배당금
-              제외). 없으면 0. 한국투자증권(KIS) 실전 계좌는 자동으로 불러와요.
+              제외). 없으면 0. 한국투자증권(KIS) 실전 계좌는 자동으로 불러오고, 다른 계좌는{" "}
+              <Link to={TRADE_RECORD_LINK} className="underline font-medium">
+                매도 내역을 기록
+              </Link>
+              하면 자동 반영돼요.
             </p>
           </div>
         )}

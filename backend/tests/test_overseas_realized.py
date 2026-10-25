@@ -93,7 +93,14 @@ def _db_with_accounts(accounts: list) -> MagicMock:
 class TestGetOverseasRealizedSummary:
     @pytest.fixture(autouse=True)
     def _today(self):
-        with patch("app.services.overseas_realized_service.today_kst", return_value=TODAY):
+        # 수기 매매 기록 집계는 TestTradeRecordRealized가 따로 검증 — 여기선 기록 없음으로 고정
+        with (
+            patch("app.services.overseas_realized_service.today_kst", return_value=TODAY),
+            patch(
+                "app.services.overseas_realized_service.load_trade_record_realized",
+                new=AsyncMock(return_value={}),
+            ) as self.load_records,
+        ):
             yield
 
     @pytest.mark.asyncio
@@ -229,3 +236,182 @@ def test_resolve_source():
     assert resolve_source([], uncovered) == "NONE"
     assert resolve_source(covered, []) == "BROKER"
     assert resolve_source(covered, uncovered) == "PARTIAL"
+
+
+def _trade(
+    side: str, qty: float, price: float, day: date, *, ticker="AAPL", market="NASDAQ", fee=None, account_id=None
+):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        account_id=account_id,
+        side=side,
+        ticker=ticker,
+        market=market,
+        qty=qty,
+        price_krw=price,
+        fee=fee,
+        trade_date=day,
+    )
+
+
+def _pos(snapshot_id, account_id, avg_price, qty=1, ticker="AAPL", market="NASDAQ"):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        snapshot_id=snapshot_id, account_id=account_id, ticker=ticker, market=market, qty=qty, avg_price=avg_price
+    )
+
+
+START, END = date(2026, 1, 1), TODAY
+
+
+class TestComputeTradeRealized:
+    def test_uses_buy_record_cost_and_fee(self):
+        from app.services.overseas_realized_service import compute_trade_realized
+
+        trades = [
+            _trade("SELL", 4, 150_000, date(2026, 3, 1), fee=1_000),
+            _trade("BUY", 10, 100_000, date(2025, 12, 1)),
+        ]
+        r = compute_trade_realized(trades, START, END, lambda t: None)
+        assert r.realized_krw == pytest.approx(4 * 150_000 - 1_000 - 4 * 100_000)
+        assert (r.sell_count, r.missing_basis_count, r.estimated) == (1, 0, False)
+
+    def test_falls_back_to_snapshot_avg_when_buys_do_not_cover(self):
+        from app.services.overseas_realized_service import compute_trade_realized
+
+        trades = [_trade("BUY", 1, 90_000, date(2026, 2, 1)), _trade("SELL", 3, 150_000, date(2026, 3, 1))]
+        r = compute_trade_realized(trades, START, END, lambda t: 120_000.0)
+        assert r.realized_krw == pytest.approx(3 * 150_000 - 3 * 120_000)
+        assert r.estimated is True
+
+    def test_missing_basis_is_excluded(self):
+        from app.services.overseas_realized_service import compute_trade_realized
+
+        r = compute_trade_realized([_trade("SELL", 3, 150_000, date(2026, 3, 1))], START, END, lambda t: None)
+        assert (r.realized_krw, r.sell_count, r.missing_basis_count) == (0.0, 0, 1)
+
+    def test_prior_year_sell_consumes_lot_and_future_sell_ignored(self):
+        from app.services.overseas_realized_service import compute_trade_realized
+
+        trades = [
+            _trade("BUY", 10, 100_000, date(2025, 6, 1)),
+            _trade("SELL", 5, 200_000, date(2025, 11, 1)),  # 작년 매도 — lot만 줄인다
+            _trade("SELL", 5, 110_000, date(2026, 2, 1)),
+            _trade("SELL", 5, 300_000, date(2026, 12, 1)),  # 오늘 이후 — 무시
+        ]
+        r = compute_trade_realized(trades, START, END, lambda t: None)
+        assert r.realized_krw == pytest.approx(5 * 110_000 - 5 * 100_000)
+        assert r.sell_count == 1
+
+    def test_tickers_have_separate_lots(self):
+        from app.services.overseas_realized_service import compute_trade_realized
+
+        trades = [
+            _trade("BUY", 1, 100_000, date(2026, 1, 5), ticker="AAPL"),
+            _trade("BUY", 1, 500_000, date(2026, 1, 5), ticker="MSFT"),
+            _trade("SELL", 1, 50_000, date(2026, 2, 5), ticker="MSFT"),
+        ]
+        r = compute_trade_realized(trades, START, END, lambda t: None)
+        assert r.realized_krw == pytest.approx(-450_000)
+
+
+def _result(*, scalars=None, rows=None) -> MagicMock:
+    res = MagicMock()
+    res.scalars.return_value.all.return_value = scalars or []
+    res.all.return_value = rows or []
+    return res
+
+
+class TestLoadTradeRecordRealized:
+    @pytest.mark.asyncio
+    async def test_filters_domestic_and_uses_snapshot_before_sell_date(self, make_account):
+        from app.services.overseas_realized_service import load_trade_record_realized
+
+        acc = make_account(account_id=uuid.uuid4(), asset_type="STOCK_KIWOOM")
+        sell_day = date(2026, 3, 10)
+        trades = [
+            _trade("SELL", 2, 150_000, sell_day, account_id=acc.id),
+            _trade("SELL", 1, 70_000, sell_day, ticker="005930", market="KOSPI", account_id=acc.id),
+        ]
+        before_id, same_day_id = uuid.uuid4(), uuid.uuid4()
+        snaps = [(before_id, acc.id, date(2026, 3, 9)), (same_day_id, acc.id, sell_day)]
+        positions = [
+            _pos(before_id, acc.id, 100_000, qty=4),
+            _pos(same_day_id, acc.id, 999_999, qty=2),  # 매도 당일 스냅샷은 쓰지 않는다
+            _pos(None, acc.id, 888_888, qty=2),
+        ]
+        db = MagicMock()
+        db.execute = AsyncMock(side_effect=[_result(scalars=trades), _result(rows=snaps), _result(scalars=positions)])
+
+        out = await load_trade_record_realized(uuid.uuid4(), [acc], START, END, db)
+
+        r = out[str(acc.id)]
+        assert r.realized_krw == pytest.approx(2 * 150_000 - 2 * 100_000)  # 국내 매도 제외, 직전 스냅샷 평단
+        assert (r.sell_count, r.estimated) == (1, True)
+
+    @pytest.mark.asyncio
+    async def test_current_position_fallback_and_no_sells(self, make_account):
+        from app.services.overseas_realized_service import load_trade_record_realized
+
+        acc = make_account(account_id=uuid.uuid4(), asset_type="STOCK_TOSS")
+        trades = [_trade("SELL", 1, 150_000, date(2026, 3, 10), account_id=acc.id)]
+        current = [_pos(None, acc.id, 130_000, market="US")]
+        db = MagicMock()
+        db.execute = AsyncMock(side_effect=[_result(scalars=trades), _result(rows=[]), _result(scalars=current)])
+        out = await load_trade_record_realized(uuid.uuid4(), [acc], START, END, db)
+        assert out[str(acc.id)].realized_krw == pytest.approx(20_000)
+
+        buy_only = [_trade("BUY", 1, 1, date(2026, 3, 1), account_id=acc.id)]
+        db.execute = AsyncMock(return_value=_result(scalars=buy_only))
+        assert await load_trade_record_realized(uuid.uuid4(), [acc], START, END, db) == {}
+        assert db.execute.await_count == 1  # SELL이 없으면 스냅샷·포지션을 읽지 않는다
+
+        assert await load_trade_record_realized(uuid.uuid4(), [], START, END, db) == {}
+
+
+class TestSummaryWithTradeRecords:
+    @pytest.mark.asyncio
+    async def test_records_cover_unsupported_accounts_without_double_counting_kis(self, make_account, mock_cache):
+        from app.services.overseas_realized_service import TradeRealized
+
+        kis = _acc(make_account, "KIS 일반")
+        kiwoom = _acc(make_account, "키움", asset_type="STOCK_KIWOOM")
+        toss_sold_out = _acc(make_account, "토스", asset_type="STOCK_TOSS")
+        manual_no_basis = _acc(make_account, "수기", asset_type="STOCK_OTHER")
+        db = _db_with_accounts([kis, kiwoom, toss_sold_out, manual_no_basis])
+        records = {
+            str(kiwoom.id): TradeRealized(realized_krw=1_000_000, sell_count=2),
+            str(toss_sold_out.id): TradeRealized(realized_krw=-200_000, sell_count=1, estimated=True),
+            str(manual_no_basis.id): TradeRealized(sell_count=0, missing_basis_count=1),
+        }
+        load = AsyncMock(return_value=records)
+        with (
+            patch("app.services.overseas_realized_service.today_kst", return_value=TODAY),
+            patch("app.services.overseas_realized_service.load_trade_record_realized", new=load),
+            patch("app.services.overseas_realized_service._fetch_kis_realized", new=AsyncMock(return_value=500_000.0)),
+            patch(
+                "app.services.overseas_realized_service.get_overseas_positions_detail",
+                new=AsyncMock(return_value=[{"account_id": str(kiwoom.id)}]),
+            ),
+        ):
+            summary = await get_overseas_realized_summary(uuid.uuid4(), 2026, db, cache=mock_cache)
+
+        assert kis not in load.call_args.args[1]  # KIS 자동 집계 계좌는 기록을 쓰지 않는다(이중 집계 방지)
+        assert summary["realized_gain_krw"] == 1_300_000
+        methods = {a["account_name"]: (a["method"], a["estimated"]) for a in summary["covered_accounts"]}
+        assert methods == {
+            "KIS 일반": ("BROKER", False),
+            "키움": ("TRADE_RECORD", False),
+            "토스": ("TRADE_RECORD", True),  # 전량 매도로 현재 보유가 없어도 집계
+        }
+        assert summary["uncovered_accounts"] == [
+            {
+                "account_id": str(manual_no_basis.id),
+                "account_name": "수기",
+                "reason": "매도 기록의 취득가를 알 수 없어요",
+            }
+        ]
+        assert summary["source"] == "PARTIAL"

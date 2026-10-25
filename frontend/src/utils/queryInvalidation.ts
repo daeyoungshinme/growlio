@@ -84,11 +84,16 @@ export function invalidateTransactionData(qc: QueryClient) {
   ]);
 }
 
-/** 수기 매매 기록 CUD 후 — 기록 목록 + 기간별 매수 현황(수기 기록이 추정을 대체) */
+/** 수기 매매 기록 CUD 후 — 기록 목록 + 기간별 매수 현황(수기 기록이 추정을 대체)
+ * + 해외 SELL 기록이 미지원 계좌 실현손익이 되므로 양도세 요약·절세 액션·지금 할 일 */
 export function invalidateTradeData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.trades }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.periodPurchasesBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasRealizedBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
 

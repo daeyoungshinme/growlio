@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import PaginationDep, get_current_user, get_db, get_owned_or_404
 from app.api.v1._account_deps import get_owned_account
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.trade import TradeRecord
 from app.models.user import User
@@ -22,6 +23,7 @@ from app.schemas.trade import (
     TradeUpdate,
 )
 from app.services.period_purchase_service import get_period_purchases, resolve_period
+from app.utils.cache_keys import invalidate_tax_overseas_caches
 from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/trades", tags=["trades"])
@@ -101,6 +103,7 @@ async def create_trade(
     )
     db.add(trade)
     await db.commit()
+    await _invalidate_trade_caches(current_user.id)
     await db.refresh(trade)
     return trade
 
@@ -119,6 +122,7 @@ async def update_trade(
         if value is not None or field_name in TRADE_CLEARABLE_FIELDS:
             setattr(trade, field_name, value)
     await db.commit()
+    await _invalidate_trade_caches(current_user.id)
     await db.refresh(trade)
     return trade
 
@@ -134,3 +138,10 @@ async def delete_trade(
     trade = await get_owned_or_404(db, TradeRecord, trade_id, current_user.id, "매매 기록을 찾을 수 없습니다")
     await db.delete(trade)
     await db.commit()
+    await _invalidate_trade_caches(current_user.id)
+
+
+async def _invalidate_trade_caches(user_id: UUID) -> None:
+    # 해외 SELL 기록은 미지원 계좌(키움·토스·수기)의 올해 실현손익이 된다
+    # — 양도세 요약·절세 액션이 1시간 캐시에 묶이지 않게 지운다
+    await invalidate_tax_overseas_caches(await get_cache_store(), user_id)

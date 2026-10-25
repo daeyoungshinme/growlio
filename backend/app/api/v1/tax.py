@@ -50,7 +50,8 @@ async def tax_summary(
 ) -> dict:
     """연도별 세금 추정 요약. account_id 미지정 시 전체 계좌 통합 기준.
 
-    해외 양도세 추정에는 증권사 체결 기준 올해 실현손익(KIS 실전 계좌)을 합산한다 — 미지원 계좌는 0으로 본다.
+    해외 양도세 추정에는 올해 실현손익(KIS 실전 계좌는 증권사 체결, 나머지는 수기 SELL 기록)을 합산한다 —
+    기록도 없는 미지원 계좌는 0으로 본다.
     """
     current_year = today_kst().year
     target_year = year if year is not None else current_year
@@ -77,9 +78,10 @@ async def overseas_realized(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """해외주식 올해 실현손익(증권사 체결 기준 자동 집계) — 250만원 공제 잔여 계산용.
+    """해외주식 올해 실현손익(증권사 체결 + 수기 SELL 기록 기준 집계) — 250만원 공제 잔여 계산용.
 
-    KIS 실전 계좌만 자동 집계되고, 해외 종목을 보유한 키움·토스·수기·모의 계좌는 `uncovered_accounts`로 반환한다.
+    KIS 실전 계좌는 브로커 조회(method=BROKER), 키움·토스·수기·모의 계좌는 해외 SELL 기록이 있으면 그 기록으로
+    계산(method=TRADE_RECORD)하고, 기록 없이 해외 종목을 보유 중이면 `uncovered_accounts`로 반환한다.
     """
     current_year = today_kst().year
     target_year = year if year is not None else current_year
