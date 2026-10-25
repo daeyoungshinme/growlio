@@ -148,7 +148,7 @@ vi.mock("@/context/ExchangeRateContext", () => ({
 }));
 
 // Lazy component mock
-vi.mock("../components/dashboard/AllocationHistoryChart", () => ({
+vi.mock("../components/dashboard/AllocationHistoryCard", () => ({
   default: () => <div data-testid="allocation-chart">Allocation Chart</div>,
 }));
 vi.mock("../components/dashboard/DisclosureFeedCard", () => ({

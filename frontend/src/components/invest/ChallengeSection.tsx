@@ -5,7 +5,6 @@ import type { Challenge, ChallengeCreatePayload } from "@/api/challenges";
 import { fetchAccounts } from "@/api/assets";
 import type { SettingsData } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeMutations } from "@/hooks/useChallengeMutations";
 import ChallengeCard from "@/components/invest/ChallengeCard";
@@ -26,7 +25,6 @@ export default function ChallengeSection({ settings }: Props) {
   const { data: accounts } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
-    staleTime: STALE_TIME.MEDIUM,
   });
   const { create, update, remove } = useChallengeMutations();
 

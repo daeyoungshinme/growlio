@@ -37,7 +37,6 @@ export default function AutoInvestStatusBanner() {
   const { data: accounts } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
-    staleTime: STALE_TIME.MEDIUM,
   });
   const { data: settings } = useQuery({
     queryKey: QUERY_KEYS.settings,

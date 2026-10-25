@@ -10,8 +10,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import { STALE_TIME, PERSIST_CACHE_KEY } from "./constants/queryConfig";
+import { STALE_TIME, PERSIST_CACHE_KEY, FOCUS_REFETCH_MIN_AGE } from "./constants/queryConfig";
 import { getLocalStorageOrUndefined } from "./utils/safeStorage";
+import { QUERY_KEYS } from "./constants/queryKeys";
 import { setupServiceWorker } from "./lib/serviceWorker";
 
 setupServiceWorker();
@@ -23,11 +24,17 @@ const queryClient = new QueryClient({
       retry: 1,
       gcTime: 30 * 60 * 1000,
       refetchIntervalInBackground: false,
-      // window focus 시 60초 이내 갱신된 쿼리는 재조회 생략 (thundering herd 방지)
-      refetchOnWindowFocus: (query) => Date.now() - (query.state.dataUpdatedAt ?? 0) > 60_000,
+      // window focus(앱 복귀) 시 5분 이내 갱신된 쿼리는 재조회 생략 — 60초였을 땐 잠깐 다른 앱을 보고 돌아올 때마다
+      // 현재 화면의 쿼리 8~10개가 한꺼번에 재요청됐다. 즉시 최신값이 필요하면 당겨서 새로고침을 쓴다.
+      refetchOnWindowFocus: (query) =>
+        Date.now() - (query.state.dataUpdatedAt ?? 0) > FOCUS_REFETCH_MIN_AGE,
     },
   },
 });
+
+// 계좌 목록은 계좌 CRUD·sync 시 명시적으로 무효화되므로 오래 신선하게 둔다 — observer마다 30초~1시간이
+// 섞여 있어(staleTime 미지정 → 기본 30초) 리밸런싱·자산 화면에 들어갈 때마다 거의 매번 재조회됐다.
+queryClient.setQueryDefaults(QUERY_KEYS.accounts, { staleTime: STALE_TIME.FIVE_MINUTES });
 
 // 앱 재시작 시 대시보드·포트폴리오·계좌 캐시를 즉시 표시하기 위한 persistence (24h TTL)
 const persister = createSyncStoragePersister({

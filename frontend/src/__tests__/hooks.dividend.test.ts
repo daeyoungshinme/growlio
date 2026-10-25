@@ -96,4 +96,17 @@ describe("useDividendData", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
   });
+
+  it("detailsEnabled=false면 종목별 배당수익률만 조회한다(배당 탭 밖)", async () => {
+    mockGet.mockResolvedValue({ data: MOCK_POSITIONS });
+
+    const { result } = renderHook(() => useDividendData(true, null, false), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    expect(mockGet).toHaveBeenCalledWith("/dividends/positions", expect.anything());
+    expect(result.current.dividendPositions).toEqual(MOCK_POSITIONS);
+  });
 });

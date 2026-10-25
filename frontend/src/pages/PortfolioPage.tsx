@@ -130,7 +130,7 @@ export default function PortfolioPage() {
     dividendByTicker,
     isLoading: divLoading,
     isError: divError,
-  } = useDividendData(!isLoading && !!data, selectedAccountId);
+  } = useDividendData(true, selectedAccountId, tab === "배당");
 
   const handleSyncAll = async () => {
     try {
