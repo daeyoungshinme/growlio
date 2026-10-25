@@ -6,6 +6,11 @@ import { fmtKrw } from "@/utils/format";
 import { TX_LABELS, TX_COLORS, txDeleteConfirmMessage } from "@/constants/transaction";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import { useIsSmUp } from "@/hooks/useMediaQuery";
+
+// 모바일 카드 뷰는 페이지 스크롤 안에 있어 가상화 대신 나눠 그린다 — 전체를 한 번에 그리면
+// 수백 건일 때 탭 전환마다 카드 수백 개를 만들었다
+const MOBILE_PAGE_SIZE = 50;
 
 interface TransactionListProps {
   txList: Transaction[] | undefined;
@@ -27,6 +32,10 @@ export function TransactionList({
   const filtered = (txList ?? []).filter((t) => t.transaction_type === activeType);
   // 휴지통 아이콘이 수정 아이콘 바로 옆이라 오탭이 잦다 — 금융 기록은 확인 후 삭제
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
+  const [mobileLimit, setMobileLimit] = useState({ type: activeType, count: MOBILE_PAGE_SIZE });
+  // 거래 유형 탭을 바꾸면 처음 50건부터
+  const mobileCount = mobileLimit.type === activeType ? mobileLimit.count : MOBILE_PAGE_SIZE;
+  const isSmUp = useIsSmUp();
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -60,137 +69,152 @@ export function TransactionList({
   return (
     <>
       {/* 모바일 카드 뷰 */}
-      <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-800">
-        {filtered.map((tx) => (
-          <div key={tx.id} className="px-3 py-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-medium ${TX_COLORS[tx.transaction_type]}`}>
-                    {TX_LABELS[tx.transaction_type]}
-                  </span>
-                  {tx.ticker && (
-                    <span className="text-xs text-gray-400 dark:text-gray-500">{tx.ticker}</span>
-                  )}
+      {isSmUp !== true && (
+        <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-800">
+          {filtered.slice(0, mobileCount).map((tx) => (
+            <div key={tx.id} className="px-3 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${TX_COLORS[tx.transaction_type]}`}>
+                      {TX_LABELS[tx.transaction_type]}
+                    </span>
+                    {tx.ticker && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{tx.ticker}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                    {tx.transaction_date}
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                  {tx.transaction_date}
-                </p>
+                <div className="flex items-center gap-1 shrink-0">
+                  <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">
+                    {fmtKrw(tx.amount)}
+                  </p>
+                  <button
+                    onClick={() => onEdit(tx)}
+                    aria-label="수정"
+                    className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors`}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    onClick={() => setPendingDelete(tx)}
+                    disabled={isDeleting}
+                    aria-label="삭제"
+                    className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors`}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">
-                  {fmtKrw(tx.amount)}
-                </p>
-                <button
-                  onClick={() => onEdit(tx)}
-                  aria-label="수정"
-                  className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors`}
-                >
-                  <Pencil size={13} />
-                </button>
-                <button
-                  onClick={() => setPendingDelete(tx)}
-                  disabled={isDeleting}
-                  aria-label="삭제"
-                  className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors`}
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
+              {tx.notes && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{tx.notes}</p>
+              )}
             </div>
-            {tx.notes && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{tx.notes}</p>
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+          {filtered.length > mobileCount && (
+            <button
+              type="button"
+              onClick={() =>
+                setMobileLimit({ type: activeType, count: mobileCount + MOBILE_PAGE_SIZE })
+              }
+              className="w-full min-h-[44px] text-xs font-medium text-blue-600 dark:text-blue-400"
+            >
+              더 보기 ({filtered.length - mobileCount}건 남음)
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 데스크탑 테이블 — 가상화 (패딩-행 방식으로 native 레이아웃 유지, TransactionHistoryTab.tsx와 동일 패턴) */}
-      <div
-        ref={tableContainerRef}
-        className="hidden sm:block overflow-auto"
-        style={{ maxHeight: "480px" }}
-      >
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
-            <tr className="border-b border-gray-100 dark:border-gray-700">
-              <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
-                날짜
-              </th>
-              <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
-                구분
-              </th>
-              <th className="text-right px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
-                금액
-              </th>
-              <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
-                메모
-              </th>
-              <th className="px-3 py-2.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {paddingTop > 0 && (
-              <tr>
-                <td colSpan={5} style={{ height: paddingTop }} />
+      {isSmUp !== false && (
+        <div
+          ref={tableContainerRef}
+          className="hidden sm:block overflow-auto"
+          style={{ maxHeight: "480px" }}
+        >
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
+              <tr className="border-b border-gray-100 dark:border-gray-700">
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                  날짜
+                </th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                  구분
+                </th>
+                <th className="text-right px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                  금액
+                </th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                  메모
+                </th>
+                <th className="px-3 py-2.5" />
               </tr>
-            )}
-            {virtualItems.map((virtualRow) => {
-              const tx = filtered[virtualRow.index];
-              return (
-                <tr
-                  key={tx.id}
-                  className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">
-                    {tx.transaction_date}
-                  </td>
-                  <td
-                    className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}
-                  >
-                    <span>{TX_LABELS[tx.transaction_type]}</span>
-                    {tx.ticker && (
-                      <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal mt-0.5">
-                        {tx.ticker}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">
-                    {fmtKrw(tx.amount)}
-                  </td>
-                  <td className="px-3 py-3 text-gray-500 dark:text-gray-400 text-xs">
-                    <div className="max-w-[100px] truncate">{tx.notes || "—"}</div>
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() => onEdit(tx)}
-                        aria-label="수정"
-                        className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors`}
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        onClick={() => setPendingDelete(tx)}
-                        disabled={isDeleting}
-                        aria-label="삭제"
-                        className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors`}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
+            </thead>
+            <tbody>
+              {paddingTop > 0 && (
+                <tr>
+                  <td colSpan={5} style={{ height: paddingTop }} />
                 </tr>
-              );
-            })}
-            {paddingBottom > 0 && (
-              <tr>
-                <td colSpan={5} style={{ height: paddingBottom }} />
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              )}
+              {virtualItems.map((virtualRow) => {
+                const tx = filtered[virtualRow.index];
+                return (
+                  <tr
+                    key={tx.id}
+                    className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">
+                      {tx.transaction_date}
+                    </td>
+                    <td
+                      className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}
+                    >
+                      <span>{TX_LABELS[tx.transaction_type]}</span>
+                      {tx.ticker && (
+                        <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal mt-0.5">
+                          {tx.ticker}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">
+                      {fmtKrw(tx.amount)}
+                    </td>
+                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400 text-xs">
+                      <div className="max-w-[100px] truncate">{tx.notes || "—"}</div>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <button
+                          onClick={() => onEdit(tx)}
+                          aria-label="수정"
+                          className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors`}
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          onClick={() => setPendingDelete(tx)}
+                          disabled={isDeleting}
+                          aria-label="삭제"
+                          className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors`}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {paddingBottom > 0 && (
+                <tr>
+                  <td colSpan={5} style={{ height: paddingBottom }} />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
       {pendingDelete && (
         <ConfirmModal
           message={txDeleteConfirmMessage(pendingDelete)}

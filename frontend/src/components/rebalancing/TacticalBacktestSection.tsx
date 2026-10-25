@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { History } from "lucide-react";
 import type { TacticalBacktestResult, TacticalRegime } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
@@ -74,7 +74,8 @@ export default function TacticalBacktestSection({ portfolioId }: Props) {
     Number(years),
     isOpen,
   );
-  const chart = data ? toChartSeries(data) : null;
+  // 매 렌더 새 배열을 넘기면 memo(BacktestResultChart)가 무력화돼 차트 데이터를 다시 계산한다
+  const chart = useMemo(() => (data ? toChartSeries(data) : null), [data]);
 
   return (
     <CollapsibleCard

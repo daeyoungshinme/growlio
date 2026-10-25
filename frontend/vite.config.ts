@@ -34,7 +34,10 @@ export default defineConfig({
             { name: "vendor-query", test: /[\\/]node_modules[\\/]@tanstack[\\/]react-query[\\/]/ },
             { name: "vendor-dnd", test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/ },
             { name: "vendor-router", test: /[\\/]node_modules[\\/]react-router(-dom)?[\\/]/ },
-            { name: "vendor-utils", test: /[\\/]node_modules[\\/](axios|zod)[\\/]/ },
+            // zod는 lazy 모달의 폼 스키마(src/schemas)에서만 쓰여 axios(부팅 필수)와 묶으면 부팅 시 약 90KB를
+            // 끌고 왔다 — 별도 그룹으로 분리해 모달과 함께 로드되게 한다
+            { name: "vendor-utils", test: /[\\/]node_modules[\\/]axios[\\/]/ },
+            { name: "vendor-zod", test: /[\\/]node_modules[\\/]zod[\\/]/ },
             { name: "vendor-supabase", test: /[\\/]node_modules[\\/]@supabase[\\/]/ },
           ],
         },

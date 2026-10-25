@@ -55,15 +55,21 @@ function LazyRoute({ Component }: { Component: LazyExoticComponent<() => React.J
   );
 }
 
-function AppRoutes() {
+/** 로딩 바 전용 leaf — useIsFetching 카운트가 바뀔 때마다 리렌더되므로 라우트 트리와 분리한다
+ * (AppRoutes에 두면 로드 버스트·폴링 때마다 현재 페이지 전체가 다시 렌더됐다) */
+function AppTopLoadingBar() {
   const isAuthChecking = useAuthStore((s) => s.isAuthChecking);
   const isPageLoading = useMainPageFetching();
+  return <TopLoadingBar isVisible={isAuthChecking || isPageLoading} />;
+}
+
+function AppRoutes() {
   usePushNotifications();
   useSyncAllWatcher();
 
   return (
     <>
-      <TopLoadingBar isVisible={isAuthChecking || isPageLoading} />
+      <AppTopLoadingBar />
       <SentryRoutes>
         <Route path="/login" element={<LazyRoute Component={LoginPage} />} />
         <Route path="/register" element={<LazyRoute Component={RegisterPage} />} />

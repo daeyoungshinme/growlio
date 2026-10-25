@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -103,6 +103,26 @@ function BacktestResultChart({ dates, series }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const [view, setView] = useState<ChartView>("cumulative");
 
+  // 차트 데이터는 입력이 바뀔 때만 다시 만든다. 낙폭은 시리즈마다 한 번만 계산 — 예전엔 날짜마다 시리즈
+  // 전체 낙폭을 다시 계산해(O(날짜²)) 일별 수천 포인트 백테스트에서 렌더마다 수백만 번 연산했다
+  const { cumulativeData, drawdownData, annualData } = useMemo(() => {
+    const drawdowns = series.map((s) => computeDrawdown(s.values));
+    const toRows = (pick: (seriesIdx: number, i: number) => number | null | undefined) =>
+      dates.map((d, i) => {
+        const row: Record<string, string | number | undefined> = { date: d.slice(0, 7) };
+        series.forEach((s, si) => {
+          const v = pick(si, i);
+          row[s.name] = v == null ? undefined : v;
+        });
+        return row;
+      });
+    return {
+      cumulativeData: toRows((si, i) => series[si].values[i]),
+      drawdownData: toRows((si, i) => drawdowns[si][i]),
+      annualData: computeAnnualReturns(dates, series),
+    };
+  }, [dates, series]);
+
   if (!dates.length || !series.length) return null;
 
   const tooltipStyle = chartTooltipStyle(isDark);
@@ -116,30 +136,6 @@ function BacktestResultChart({ dates, series }: Props) {
   const legendStyle = {
     wrapperStyle: { fontSize: 12, paddingTop: 12, color: isDark ? "#d1d5db" : undefined },
   };
-
-  // cumulative line chart data
-  const cumulativeData = dates.map((d, i) => {
-    const row: Record<string, string | number | undefined> = { date: d.slice(0, 7) };
-    series.forEach((s) => {
-      const v = s.values[i];
-      row[s.name] = v == null ? undefined : v;
-    });
-    return row;
-  });
-
-  // drawdown chart data
-  const drawdownData = dates.map((d, i) => {
-    const row: Record<string, string | number | undefined> = { date: d.slice(0, 7) };
-    series.forEach((s) => {
-      const dd = computeDrawdown(s.values);
-      const v = dd[i];
-      row[s.name] = v == null ? undefined : v;
-    });
-    return row;
-  });
-
-  // annual returns data
-  const annualData = computeAnnualReturns(dates, series);
 
   const btnBase = "px-2.5 py-1 text-xs rounded-lg font-medium transition-colors";
   const btnActive = `${btnBase} bg-blue-600 text-white`;

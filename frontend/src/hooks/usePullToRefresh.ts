@@ -26,6 +26,26 @@ export function usePullToRefresh({
 
   const startYRef = useRef(0);
   const hapticFiredRef = useRef(false);
+  // touchend 핸들러가 최신 값을 ref로 읽어 리스너를 다시 붙이지 않게 한다 — 예전엔 pullDistance가 바뀌는
+  // 매 touchmove마다 handleTouchEnd가 새로 만들어져 리스너 3개를 떼고 다시 붙였다
+  const pullDistanceRef = useRef(0);
+  const isPullingRef = useRef(false);
+  const isRefreshingRef = useRef(false);
+  const onRefreshRef = useRef(onRefresh);
+  useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
+  const frameRef = useRef<number | null>(null);
+
+  const setDistance = useCallback((value: number) => {
+    pullDistanceRef.current = value;
+    // 화면 갱신은 프레임당 한 번 — touchmove는 프레임보다 자주 온다
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      setPullDistance(pullDistanceRef.current);
+    });
+  }, []);
 
   const handleTouchStart = useCallback(
     (e: TouchEvent) => {
@@ -49,34 +69,43 @@ export function usePullToRefresh({
       e.preventDefault();
 
       const clamped = Math.min(delta * 0.5, threshold * 1.5);
-      setIsPulling(true);
-      setPullDistance(clamped);
+      if (!isPullingRef.current) {
+        isPullingRef.current = true;
+        setIsPulling(true);
+      }
+      setDistance(clamped);
 
       if (clamped >= threshold && !hapticFiredRef.current) {
         hapticFiredRef.current = true;
         void triggerHaptic("medium");
       }
     },
-    [disabled, containerRef, threshold],
+    [disabled, containerRef, threshold, setDistance],
   );
 
   const handleTouchEnd = useCallback(async () => {
-    if (!isPulling) return;
+    if (!isPullingRef.current) return;
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    const reached = pullDistanceRef.current >= threshold;
+    isPullingRef.current = false;
+    pullDistanceRef.current = 0;
+    setIsPulling(false);
+    setPullDistance(0);
 
-    if (pullDistance >= threshold && !isRefreshing) {
+    if (reached && !isRefreshingRef.current) {
+      isRefreshingRef.current = true;
       setIsRefreshing(true);
-      setPullDistance(0);
-      setIsPulling(false);
       try {
-        await onRefresh();
+        await onRefreshRef.current();
       } finally {
+        isRefreshingRef.current = false;
         setIsRefreshing(false);
       }
-    } else {
-      setIsPulling(false);
-      setPullDistance(0);
     }
-  }, [isPulling, pullDistance, threshold, isRefreshing, onRefresh]);
+  }, [threshold]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -92,6 +121,13 @@ export function usePullToRefresh({
       el.removeEventListener("touchend", handleTouchEnd);
     };
   }, [handleTouchStart, handleTouchMove, handleTouchEnd, containerRef]);
+
+  useEffect(
+    () => () => {
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    },
+    [],
+  );
 
   return { isPulling, pullDistance, isRefreshing };
 }

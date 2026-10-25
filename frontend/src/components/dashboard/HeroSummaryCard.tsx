@@ -1,12 +1,11 @@
-import { lazy, memo, Suspense, useMemo } from "react";
+import { memo, useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { pnlColor, PIE_COLORS } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { DashboardData } from "@/api/dashboard";
-
-const AssetAllocationChart = lazy(() => import("./AssetAllocationChart"));
+import MiniDonut from "@/components/common/MiniDonut";
 
 const CASH_TYPES = new Set(["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"]);
 interface Props {
@@ -143,14 +142,7 @@ export default memo(function HeroSummaryCard({
         {/* 우: 도넛 */}
         <div className="w-32 h-32 sm:w-[180px] sm:h-44 lg:w-[196px] lg:h-48 xl:w-[208px]">
           {allocationChartData.length > 0 ? (
-            <Suspense fallback={<div className="w-full h-full" />}>
-              <AssetAllocationChart
-                data={allocationChartData}
-                size="compact"
-                fillHeight={true}
-                showLegend={false}
-              />
-            </Suspense>
+            <MiniDonut data={allocationChartData} />
           ) : (
             <div className="flex items-center justify-center w-full h-full text-gray-400 dark:text-gray-500 text-xs text-center">
               자산 데이터 없음
