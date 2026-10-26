@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import CASH_EQUIVALENT_TICKER, TAX_DEFERRED_TAX_TYPES
 from app.services.rebalancing._order_quantity_guard import floor_shares
+from app.services.rebalancing.group_expansion import expand_group_items, is_group_item
 from app.services.rebalancing.service import filter_drifting_items  # noqa: F401 — 이탈 판정 단일 기준 재노출
 from app.services.tax_service import _OVERSEAS_MARKETS
 
@@ -108,6 +109,8 @@ async def refresh_live_prices(
     """
     from app.services.price_service import fetch_prices_batch_krw
 
+    # 지수 그룹 행은 수량이 없다(멤버 행이 매매 단위) — 호출부가 expand_group_items로 먼저 펼친다
+    items = [item for item in items if not is_group_item(item)]
     tickers = [(item.ticker, item.market) for item in items if item.ticker not in _NON_TRADABLE_TICKERS]
     if not tickers:
         return
@@ -295,6 +298,7 @@ def build_rebalancing_orders(
 
     ticker_account_map = ticker_account_map or {}
     account_tax_type_map = _flatten_account_tax_types(ticker_account_map)
+    drifting = expand_group_items(drifting, account_tax_type_map.get(buy_account_id, "GENERAL"))
     orders: list[ExecutionOrderItem] = []
     for item in drifting:
         if item.ticker in _NON_TRADABLE_TICKERS or item.shares_to_trade is None:

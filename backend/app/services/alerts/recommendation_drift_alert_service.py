@@ -39,6 +39,7 @@ from app.services.goal_recommendation_service import (
     _RECOMMENDATION_DRIFT_THRESHOLD_PCT,
     build_overall_recommendation_inputs,
     compute_recommendation_drift,
+    fold_into_portfolio_groups,
     get_goal_recommendation,
 )
 from app.utils.cache_keys import CacheStoreType
@@ -113,7 +114,9 @@ async def _find_drifted_portfolios(
         overall_target = next((p for p in portfolios if _is_full_target(p, stock_accounts)), None)
         if overall_target is not None:
             current_items = [(i.ticker, i.market, float(i.weight)) for i in overall_target.items]
-            recommended_items = [(i.ticker, i.market, i.weight) for i in overall_rec.recommended_items]
+            recommended_items = fold_into_portfolio_groups(
+                [(i.ticker, i.market, i.weight) for i in overall_rec.recommended_items], overall_target.items
+            )
             max_delta_pct, new_candidate_count = compute_recommendation_drift(recommended_items, current_items)
             if _is_significant(max_delta_pct, new_candidate_count):
                 drifted_names.append(overall_target.name)
@@ -132,7 +135,9 @@ async def _find_drifted_portfolios(
         if target is None:
             continue
         current_items = [(i.ticker, i.market, float(i.weight)) for i in target.items]
-        recommended_items = [(i.ticker, i.market, i.weight) for i in rec.recommended_items]
+        recommended_items = fold_into_portfolio_groups(
+            [(i.ticker, i.market, i.weight) for i in rec.recommended_items], target.items
+        )
         max_delta_pct, new_candidate_count = compute_recommendation_drift(recommended_items, current_items)
         if _is_significant(max_delta_pct, new_candidate_count) and target.name not in drifted_names:
             drifted_names.append(target.name)

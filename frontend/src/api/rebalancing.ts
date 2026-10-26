@@ -24,6 +24,14 @@ export interface RebalancingItem {
   return_10y_pct?: number | null;
   cagr_10y_pct?: number | null;
   actual_years_10y?: number | null;
+  // 지수 그룹 항목(plans/74) — 그룹 행은 shares_to_trade가 null이고 종목별 매매는 members에 있다.
+  // ticker/market은 대표 매수 종목. 멤버 행의 group_role은 PRIMARY | MEMBER | DOMESTIC_ALT
+  group_key?: string | null;
+  group_label?: string | null;
+  group_role?: string | null;
+  /** 그룹 멤버 행의 레버리지 배수(노출 = 평가액 × 배수) */
+  leverage?: number | null;
+  members?: RebalancingItem[];
 }
 
 export interface CurrentHolding {

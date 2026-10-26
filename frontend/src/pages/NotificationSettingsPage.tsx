@@ -285,8 +285,8 @@ export default function NotificationSettingsPage() {
         <div className="mt-4 border-t border-gray-100 dark:border-gray-700 pt-3">
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">전술 배분 국면 전환 알림</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            QQQ·SPY 전술 배분을 켠 포트폴리오의 국면이 바뀌면 알려드려요. 포트폴리오마다 켜고 끌 수
-            있어요.
+            나스닥·S&P500 전술 배분을 켠 포트폴리오의 국면이 바뀌면 알려드려요. 포트폴리오마다 켜고
+            끌 수 있어요.
           </p>
           <Link
             to={rebalancingUrl({ tab: "목표 조정", mode: "전술" })}

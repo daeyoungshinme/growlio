@@ -10,6 +10,24 @@ from app.enums import AccountTaxType, InvestmentHorizon, PortfolioBaseType
 from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
 
 
+class PortfolioGroupMember(BaseModel):
+    ticker: str = Field(min_length=1, max_length=20)
+    market: str = Field(max_length=20)
+    name: str = Field(default="", max_length=200)
+    # 정방향 레버리지 배수 — 그룹 비중은 노출 기준(평가액 × 배수)으로 합산한다(QLD=2). 국내 대체 매수 종목은 1만 허용
+    leverage: float = Field(default=1.0, ge=1, le=3)
+
+
+class PortfolioItemGroup(BaseModel):
+    """지수 그룹 항목(plans/74) — 항목의 ticker/market이 대표 매수 종목, members는 그 외 합산 종목."""
+
+    key: str = Field(min_length=1, max_length=64)
+    label: str = Field(default="", max_length=50)
+    members: list[PortfolioGroupMember] = Field(default=[], max_length=30)
+    # ISA·연금저축·IRP 계좌에서 대표 종목(해외 상장) 대신 매수할 국내 상장 종목 — 그룹 합산에도 포함
+    domestic_alt: PortfolioGroupMember | None = None
+
+
 class PortfolioItem(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -19,6 +37,7 @@ class PortfolioItem(BaseModel):
     name: str = Field(default="", max_length=200)  # 자동완성 없이 추가 시 빈 문자열 허용
     market: str = Field(max_length=20)
     weight: float  # 0~100, 합계 = 100
+    group: PortfolioItemGroup | None = None
 
 
 class PortfolioCreate(BaseModel):
@@ -91,6 +110,9 @@ class IndexExposureMember(BaseModel):
     hedged: bool = False
     pct_of_stock: float
     region: Literal["DOMESTIC", "OVERSEAS"] | None = None  # 실제 투자지역(판별 불가면 None)
+    # 정방향 레버리지(LEVERAGED 그룹)의 기초 지수·배수 — 리밸런싱 지수 그룹 제안이 원 지수 그룹에 합친다
+    underlying_index_key: str | None = None
+    leverage: float = 1.0
 
 
 class IndexExposureGroup(BaseModel):
@@ -122,3 +144,30 @@ class IndexExposureResponse(BaseModel):
     groups: list[IndexExposureGroup] = []
     region_exposure: RegionExposure = RegionExposure()
     profiles_complete: bool = True  # False면 일부 종목의 ETF 정보 조회 실패 — 분류가 부정확할 수 있음
+
+
+class IndexGroupSuggestionMember(PortfolioGroupMember):
+    value_krw: float = 0.0  # 현재 보유 평가액(전체 계좌, 미보유 후보는 0)
+    # 분석 대상 계좌에 보유 중인지 — False면 다른 계좌에만 있어 그 계좌를 분석 대상에 추가해야 합산된다
+    in_scope: bool = True
+    account_names: list[str] = []  # 보유 계좌 이름
+
+
+class IndexGroupSuggestion(BaseModel):
+    """지수 그룹 제안(`GET /portfolios/index-group-suggestions`, plans/74) — 저장 안 함, 편집기가 골라 쓴다."""
+
+    key: str
+    label: str
+    value_krw: float  # 멤버 평가액 합계
+    exposure_krw: float  # 노출 합계(평가액 × 레버리지 배수) — 리밸런싱이 이탈을 판단하는 기준
+    pct_of_stock: float
+    primary: IndexGroupSuggestionMember  # 기본 대표 매수 종목
+    domestic_alt: IndexGroupSuggestionMember | None = None  # 기본 국내 대체 매수 종목(대표가 해외 상장일 때만)
+    members: list[IndexGroupSuggestionMember]  # 이 지수를 추종하는 보유 종목(대표 포함)
+    primary_candidates: list[IndexGroupSuggestionMember]  # 대표로 고를 수 있는 종목(보유 → 큐레이션 순)
+    domestic_alt_candidates: list[IndexGroupSuggestionMember]
+
+
+class IndexGroupSuggestionResponse(BaseModel):
+    groups: list[IndexGroupSuggestion] = []
+    profiles_complete: bool = True

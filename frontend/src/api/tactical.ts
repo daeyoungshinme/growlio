@@ -1,7 +1,7 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "./client";
 import type { MarketRiskLevel } from "./marketSignals";
 
-/** QQQ/SPY 전술 배분 국면 — 백엔드 tactical_allocation_service.Regime */
+/** 나스닥100/S&P500 전술 배분 국면 — 백엔드 tactical_allocation_service.Regime */
 export type TacticalRegime = "RISK_ON" | "NEUTRAL" | "RISK_OFF";
 export type TrendState = "UP" | "NEUTRAL" | "DOWN" | "UNKNOWN";
 /** DIA(다우)·QLD·SSO(2배 레버리지)는 비중표에만 쓰이고 국면 판정에는 쓰이지 않는다 */
@@ -40,6 +40,14 @@ export interface TechnicalSnapshot {
   pullback_stage?: PullbackStage;
 }
 
+/** 백엔드 tactical_allocation_service.current_groups 값 */
+export interface TacticalGroupSummary {
+  label: string;
+  primary: string; // 대표 매수 종목
+  member_count: number; // 대표 외 합산 종목 수(국내 대체 제외)
+  domestic_alt: string | null;
+}
+
 export interface TacticalStatus {
   portfolio_id: string;
   portfolio_name: string;
@@ -59,8 +67,11 @@ export interface TacticalStatus {
   regime_weights: RegimeWeightsTable;
   is_default_weights: boolean;
   proposed_weights: TacticalWeights | null;
+  /** 현재 목표 비중 — 나스닥100·S&P500·다우 지수 그룹은 대표 종목과 무관하게 QQQ·SPY·DIA 키, 그 외 종목은 ticker 키 */
   current_weights: Record<string, number>;
-  /** 포트폴리오가 전술 자산(QQQ/SPY/DIA/QLD/SSO/CASH)으로만 구성됐는지 — false면 적용 시 다른 종목이 목표에서 빠진다 */
+  /** 전술 자산별 지수 그룹 구성(plans/76) — 그룹이 아닌 자산은 없음. 적용해도 대표·멤버·국내 대체는 유지된다 */
+  current_groups: Partial<Record<TacticalAsset, TacticalGroupSummary>>;
+  /** 포트폴리오가 전술 자산(나스닥100·S&P500·다우 그룹, QLD/SSO, 현금)으로만 구성됐는지 — false면 적용 시 다른 종목이 목표에서 빠진다 */
   portfolio_compatible: boolean;
   /** 틸트 이동폭(%p, 0이면 끔). proposed_weights에는 이미 반영돼 있다 */
   tilt_shift_pct: number;

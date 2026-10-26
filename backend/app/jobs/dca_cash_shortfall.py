@@ -18,18 +18,19 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS
+from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, TAX_DEFERRED_TAX_TYPES
 from app.core.database import AsyncSessionLocal
 from app.jobs._job_helpers import report_job_failure, run_alert_job
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
-from app.models.portfolio import Portfolio
+from app.models.portfolio import GROUP_ROLE_DOMESTIC_ALT, Portfolio
 from app.models.user import User, UserSettings
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.alerts.calculator import next_auto_schedule_date
@@ -68,13 +69,23 @@ def is_cash_short(cash_krw: float, expected_krw: float | None) -> bool:
     return cash_krw < _MIN_CASH_KRW
 
 
+def _buy_market(item: Any, tax_type: str | None) -> str:
+    """실제로 매수될 종목의 시장 — 지수 그룹이 ISA·연금 계좌에서 국내 대체 종목으로 사는 경우 반영(plans/74)."""
+    if tax_type in TAX_DEFERRED_TAX_TYPES and getattr(item, "group_key", None):
+        alt = next((m for m in getattr(item, "members", None) or [] if m.role == GROUP_ROLE_DOMESTIC_ALT), None)
+        if alt is not None and (item.market or "").upper() not in DOMESTIC_MARKETS:
+            return alt.market
+    return item.market
+
+
 def account_cash_krw(account: AssetAccount, portfolio: Portfolio, usd_krw: float | None) -> float:
     """실행 계좌 예수금(원). 포트폴리오에 해외 종목이 있을 때만 달러 예수금을 환산해 더한다 —
     국내 종목만 사는 적립식이면 달러는 매수에 쓰이지 않아 부족 판정을 가리기만 한다."""
     cash = float(account.deposit_krw or 0)
+    tax_type = getattr(account, "tax_type", None)
     has_overseas = any(
-        (item.market or "").upper() not in DOMESTIC_MARKETS and item.market != CASH_EQUIVALENT_MARKET
-        for item in portfolio.items
+        (market or "").upper() not in DOMESTIC_MARKETS and market != CASH_EQUIVALENT_MARKET
+        for market in (_buy_market(item, tax_type) for item in portfolio.items)
     )
     if has_overseas and account.deposit_usd and usd_krw:
         cash += float(account.deposit_usd) * usd_krw

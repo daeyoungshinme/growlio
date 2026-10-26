@@ -5,7 +5,9 @@ SPY(미국상장)와 TIGER 미국S&P500(국내상장)처럼 상장시장·운용
 (해외 ticker 맵·큐레이션 유니버스 > Naver 기초지수명 > 종목명 > 해외 정식명칭)를 따르되, 비중 집계에 맞게
 다음 규칙을 더한다.
 
-- 레버리지·인버스: 기초지수와 무관하게 `LEVERAGED` 묶음(배수 노출은 반영하지 않는다).
+- 레버리지·인버스: 기초지수와 무관하게 `LEVERAGED` 묶음(지수별 비중 카드는 배수 노출을 반영하지 않는다).
+  단 정방향 레버리지는 `index_key`(기초 지수)와 `leverage`(배수)를 함께 채운다 — 리밸런싱 지수 그룹이
+  QLD를 나스닥100 그룹에 노출 기준(평가액 × 배수)으로 합산하는 데 쓴다(plans/74 후속). 인버스는 키 없음.
 - 커버드콜: 원 지수와 별도 그룹. 나스닥100/S&P500 외 기초지수는 `COVERED_CALL:<기초지수 키>`,
   기초지수를 모르면 `COVERED_CALL_OTHER`.
 - 환헤지(H)·합성·선물형: 원 지수에 합산하고 `hedged` 플래그만 남긴다.
@@ -65,6 +67,28 @@ _US_LEVERAGED_TICKERS: frozenset[str] = frozenset(
 )  # fmt: skip
 """해외 레버리지·인버스 ETF ticker — 정식명칭("ProShares UltraPro QQQ")에 한글 패턴이 없어 따로 둔다."""
 
+_US_LEVERAGED_LONG: dict[str, tuple[float, str]] = {
+    "QLD": (2.0, "US_NASDAQ100"),
+    "TQQQ": (3.0, "US_NASDAQ100"),
+    "SSO": (2.0, "US_SP500"),
+    "UPRO": (3.0, "US_SP500"),
+    "SPXL": (3.0, "US_SP500"),
+    "DDM": (2.0, "US_DJIA"),
+    "UDOW": (3.0, "US_DJIA"),
+    "SOXL": (3.0, "US_PHLX_SEMI"),
+}
+"""해외 정방향 레버리지 ETF → (배수, 기초 지수 키). 여기 없는 해외 레버리지(개별주·섹터 등)는 기초 지수 없음."""
+
+_KR_LEVERAGED_LONG: dict[str, tuple[float, str]] = {
+    "122630": (2.0, "KR_KOSPI200"),  # KODEX 레버리지 — 이름에 기초 지수가 없다
+    "123320": (2.0, "KR_KOSPI200"),  # TIGER 레버리지
+}
+
+_KR_INVERSE_RE = re.compile(r"인버스|곱버스|INVERSE|BEAR|SHORT", re.IGNORECASE)
+_KR_LEVERAGE_3X_RE = re.compile(r"3X", re.IGNORECASE)
+_KR_LEVERAGE_2X_RE = re.compile(r"레버리지|2X", re.IGNORECASE)
+_LEVERAGE_NOISE_RE = re.compile(r"레버리지|[23]X|\(\s*합성\s*(H)?\s*\)|\(\s*H\s*\)|합성", re.IGNORECASE)
+
 _US_LEVERAGED_NAME_RE = re.compile(
     r"\bUltra(Pro|Short)?\b|\bInverse\b|\bBear\b|\bBull\s*[23]X\b|\b[23]X\b|\bProShares\s+Short\b|Daily\s+.*\b[23]X\b",
     re.IGNORECASE,
@@ -93,6 +117,7 @@ class IndexClass:
     index_key: str | None = None
     label: str | None = None
     hedged: bool = False
+    leverage: float = 1.0  # 정방향 레버리지 배수(LEVERAGED + index_key일 때만 1 초과)
     region: Region | None = None  # 실제 투자지역(상장시장과 다름 — TIGER 미국S&P500은 OVERSEAS). 판별 불가면 None
 
 
@@ -119,6 +144,24 @@ def _is_leveraged(ticker: str, market: str, name: str, long_name: str | None) ->
     if ticker.upper() in _US_LEVERAGED_TICKERS:
         return True
     return any(_US_LEVERAGED_NAME_RE.search(n) for n in (name, long_name) if n)
+
+
+def _leverage_info(ticker: str, market: str, name: str) -> tuple[float, str] | None:
+    """정방향 레버리지 ETF의 (배수, 기초 지수 키). 인버스이거나 기초 지수를 모르면 None."""
+    if not is_domestic_listed(market):
+        return _US_LEVERAGED_LONG.get(ticker.upper())
+    if ticker in _KR_LEVERAGED_LONG:
+        return _KR_LEVERAGED_LONG[ticker]
+    if _KR_INVERSE_RE.search(name):
+        return None
+    if _KR_LEVERAGE_3X_RE.search(name):
+        multiplier = 3.0
+    elif _KR_LEVERAGE_2X_RE.search(name):
+        multiplier = 2.0
+    else:
+        return None
+    key = guess_tracking_index(_LEVERAGE_NOISE_RE.sub(" ", name))
+    return (multiplier, key) if key else None
 
 
 def _covered_call_key(names: list[str]) -> str:
@@ -197,7 +240,12 @@ def classify_holding(ticker: str, market: str, name: str, profile: EtfProfile | 
     hedged = bool(_HEDGED_RE.search(name))
 
     if _is_leveraged(ticker, market, name, long_name):
-        cls = IndexClass(kind="LEVERAGED", hedged=hedged)
+        info = _leverage_info(ticker, market, name)
+        cls = (
+            IndexClass(kind="LEVERAGED", index_key=info[1], label=index_label(info[1]), hedged=hedged, leverage=info[0])
+            if info
+            else IndexClass(kind="LEVERAGED", hedged=hedged)
+        )
     elif key := _resolve_index_key(ticker, market, name, profile):
         base_index = profile.get("base_index") if profile else None
         cls = IndexClass(kind="INDEX", index_key=key, label=index_label(key, base_index), hedged=hedged)

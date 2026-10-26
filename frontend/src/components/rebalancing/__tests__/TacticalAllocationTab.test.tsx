@@ -96,6 +96,7 @@ function makeStatus(overrides: Partial<TacticalStatus> = {}): TacticalStatus {
     is_default_weights: true,
     proposed_weights: DEFAULT_TABLE.RISK_ON,
     current_weights: { AAPL: 100 },
+    current_groups: {},
     portfolio_compatible: false,
     tilt_shift_pct: 10,
     observed_tilt: "BALANCED",
@@ -149,14 +150,16 @@ describe("TacticalAllocationTab", () => {
     expect(await screen.findByText("공격")).toBeDefined();
     expect(tacticalApi.fetchTacticalStatus).toHaveBeenCalledWith("p1");
     expect(screen.getByText("기타 종목")).toBeDefined();
-    expect(screen.getByText(/QQQ·SPY·DIA·QLD·SSO·현금 외 종목이 있어요/)).toBeDefined();
+    expect(
+      screen.getByText(/나스닥100·S&P500·다우존스·나스닥100 2배·S&P500 2배·현금 외 종목이 있어요/),
+    ).toBeDefined();
     // 지표는 접힘 안 — 펼치기 전엔 보이지 않는다
     expect(screen.queryByText("추세 상승")).toBeNull();
     await openDetails();
     expect(screen.getAllByText("추세 상승")).toHaveLength(2);
     // 비중표에 DIA가 없으면 DIA 참고 지표·비중 비교 행 모두 숨긴다
     expect(screen.queryByText("참고 · 국면 판단 미반영")).toBeNull();
-    expect(screen.queryByText("DIA (다우존스)")).toBeNull();
+    expect(screen.queryByText("다우존스")).toBeNull();
   });
 
   it("비중표에 DIA가 있으면 DIA 참고 지표를 보여준다", async () => {
@@ -229,7 +232,7 @@ describe("TacticalAllocationTab", () => {
       makeStatus({ proposed_weights: proposed }),
     );
     renderTab();
-    expect(await screen.findByText("DIA (다우존스)")).toBeDefined();
+    expect(await screen.findByText("다우존스")).toBeDefined();
   });
 
   it("전략이 꺼져 있으면 켜기 버튼으로 알림과 함께 활성화한다", async () => {
@@ -427,6 +430,24 @@ describe("TacticalAllocationTab", () => {
     fireEvent.click(screen.getByText("절반 먼저 적용"));
     await waitFor(() => expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 0.5));
     expect(await screen.findByText("리밸런싱 분석·실행으로 이동")).toBeDefined();
+  });
+
+  it("지수 그룹 포트폴리오는 그룹 구성을 보조 문구로 보여준다 (plans/76)", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({
+        portfolio_compatible: true,
+        current_weights: { SPY: 40, CASH: 60 },
+        current_groups: {
+          SPY: { label: "S&P 500", primary: "VOO", member_count: 2, domestic_alt: "360750" },
+        },
+      }),
+    );
+    renderTab();
+
+    expect(await screen.findByText("대표 VOO · 2종목 합산")).toBeDefined();
+    // 나스닥 그룹은 아직 없음 — 적용 시 묶인다는 안내
+    expect(screen.getByText("적용하면 같은 지수 보유 종목을 묶어요")).toBeDefined();
+    expect(screen.queryByText("기타 종목")).toBeNull();
   });
 
   it("전략이 꺼져 있으면 비중표 편집을 보여주지 않는다", async () => {

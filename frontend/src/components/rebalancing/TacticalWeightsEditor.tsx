@@ -25,11 +25,11 @@ import {
 const REGIME_ORDER: TacticalRegime[] = ["RISK_ON", "NEUTRAL", "RISK_OFF"];
 
 const INPUT_LABEL: Record<TacticalAsset, string> = {
-  QQQ: "QQQ",
-  SPY: "SPY",
-  DIA: "DIA",
-  QLD: "QLD",
-  SSO: "SSO",
+  QQQ: "나스닥100",
+  SPY: "S&P500",
+  DIA: "다우",
+  QLD: "나스닥 2배",
+  SSO: "S&P 2배",
   CASH: "현금",
 };
 

@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import case, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -11,14 +11,24 @@ from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.asset import AssetAccount
-from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
+from app.models.portfolio import (
+    GROUP_ROLE_DOMESTIC_ALT,
+    GROUP_ROLE_MEMBER,
+    Portfolio,
+    PortfolioAccount,
+    PortfolioItem,
+    PortfolioItemMember,
+)
 from app.models.user import User
 from app.schemas.portfolio import (
+    IndexGroupSuggestionResponse,
     PortfolioCreate,
     PortfolioReorderRequest,
     PortfolioResponse,
     PortfolioUpdate,
 )
+from app.schemas.portfolio import PortfolioItem as PortfolioItemSchema
+from app.services.index_exposure_service import get_index_group_suggestions
 from app.utils.cache_keys import (
     TTL_PORTFOLIO_LIST,
     get_cached_json,
@@ -52,6 +62,31 @@ async def _validate_account_ids(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"유효하지 않은 계좌 ID: {', '.join(invalid)}",
         )
+
+
+def _build_portfolio_item(portfolio_id: uuid.UUID, idx: int, item: PortfolioItemSchema) -> PortfolioItem:
+    """요청 항목 → ORM 행. 지수 그룹이면 멤버·국내 대체 종목 행도 함께 만든다(plans/74)."""
+    row = PortfolioItem(
+        portfolio_id=portfolio_id,
+        ticker=item.ticker,
+        name=item.name,
+        market=item.market,
+        weight=item.weight,
+        sort_order=idx,
+    )
+    group = item.group
+    if group is None:
+        return row
+    row.group_key = group.key
+    row.group_label = group.label or None
+    members = [(m, GROUP_ROLE_MEMBER) for m in group.members]
+    if group.domestic_alt is not None:
+        members.append((group.domestic_alt, GROUP_ROLE_DOMESTIC_ALT))
+    row.members = [
+        PortfolioItemMember(ticker=m.ticker, market=m.market, name=m.name, role=role, leverage=m.leverage, sort_order=i)
+        for i, (m, role) in enumerate(members)
+    ]
+    return row
 
 
 def _with_relations(q):
@@ -89,6 +124,21 @@ async def list_portfolios(
     return result
 
 
+@router.get("/index-group-suggestions", response_model=IndexGroupSuggestionResponse)
+@limiter.limit("10/minute")
+async def index_group_suggestions(
+    request: Request,
+    account_ids: list[uuid.UUID] | None = Query(default=None, max_length=50),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """보유 종목 기준 지수 그룹 제안(plans/74) — 같은 지수 추종 ETF 묶음 + 대표·국내 대체 매수 종목. 저장 안 함."""
+    if account_ids:
+        await _validate_account_ids(account_ids, current_user.id, db)
+    cache = await get_cache_store()
+    return await get_index_group_suggestions(cache, db, current_user.id, account_ids or None)
+
+
 @router.post("", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("30/minute")
 async def create_portfolio(
@@ -110,16 +160,7 @@ async def create_portfolio(
     await db.flush()  # id 생성
 
     for idx, item in enumerate(body.items):
-        db.add(
-            PortfolioItem(
-                portfolio_id=portfolio.id,
-                ticker=item.ticker,
-                name=item.name,
-                market=item.market,
-                weight=item.weight,
-                sort_order=idx,
-            )
-        )
+        db.add(_build_portfolio_item(portfolio.id, idx, item))
 
     if body.account_ids:
         for aid in body.account_ids:
@@ -180,16 +221,7 @@ async def update_portfolio(
     if body.items is not None:
         await db.execute(delete(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio_id))
         for idx, item in enumerate(body.items):
-            db.add(
-                PortfolioItem(
-                    portfolio_id=portfolio.id,
-                    ticker=item.ticker,
-                    name=item.name,
-                    market=item.market,
-                    weight=item.weight,
-                    sort_order=idx,
-                )
-            )
+            db.add(_build_portfolio_item(portfolio.id, idx, item))
 
     if body.account_ids is not None:
         old_ids = {str(la.account_id) for la in portfolio.linked_accounts}

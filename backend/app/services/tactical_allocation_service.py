@@ -1,8 +1,11 @@
-"""QQQ/SPY 전술 배분 — 매크로 복합신호 + 차트 추세로 국면을 판정해 목표 비중을 제안한다.
+"""나스닥100/S&P500 전술 배분 — 매크로 복합신호 + 차트 추세로 국면을 판정해 목표 비중을 제안한다.
 
-비중 자산은 QQQ·SPY·DIA(다우)·QLD·SSO(나스닥·S&P 2배)·현금. DIA·QLD·SSO는 비중표에만 쓰이는 선택 자산이고(기본 0%)
-국면 판정에는 넣지 않는다 — DIA는 SPY와 상관이 0.95를 넘어 새 정보가 거의 없고, 레버리지 ETF는 기초지수(QQQ·SPY)
-신호와 같으며, 판정 규칙은 백테스트로 검증된 QQQ/SPY 기준을 유지한다.
+비중 자산은 QQQ·SPY·DIA(다우)·QLD·SSO(나스닥·S&P 2배)·현금. QQQ·SPY·DIA는 각각 나스닥100·S&P500·다우 **지수 그룹**의
+비중이다(plans/76) — 판정 지표·백테스트는 QQQ·SPY·DIA 가격으로 지수를 재현하고, 포트폴리오에는 지수 그룹 항목
+(plans/74, 대표 종목+멤버)으로 적용해 같은 지수를 여러 종목으로 들고 있어도 전량 매도가 나지 않는다.
+DIA·QLD·SSO는 비중표에만 쓰이는 선택 자산이고(기본 0%) 국면 판정에는 넣지 않는다 — DIA는 SPY와 상관이 0.95를 넘어
+새 정보가 거의 없고, 레버리지 ETF는 기초지수(QQQ·SPY) 신호와 같으며,
+판정 규칙은 백테스트로 검증된 QQQ/SPY 기준을 유지한다.
 
 제안 비중 = 국면 비중표 → 나스닥/S&P 틸트(`tactical_tilt`, 월 1회) → 눌림목 현금 투입(`tactical_dip`, 공격 국면만).
 
@@ -37,7 +40,13 @@ import structlog
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.portfolio import Portfolio, PortfolioItem
+from app.models.portfolio import (
+    GROUP_ROLE_DOMESTIC_ALT,
+    GROUP_ROLE_MEMBER,
+    Portfolio,
+    PortfolioItem,
+    PortfolioItemMember,
+)
 from app.models.tactical import TacticalStrategy
 from app.services.tactical_dip import ACTIVE_REGIMES as DIP_ACTIVE_REGIMES
 from app.services.tactical_dip import DEFAULT_DIP_SHIFT_PCT, advance_dip_level, apply_dip, dip_reasons
@@ -56,6 +65,7 @@ from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
+    from app.schemas.portfolio import IndexGroupSuggestion
 
 logger = structlog.get_logger()
 
@@ -77,6 +87,21 @@ _ASSET_META: dict[str, tuple[str, str]] = {
     "SSO": ("ProShares Ultra S&P500", "NYSE"),
     "CASH": ("현금", "KRW"),
 }
+
+# 화면·알림 문구용 이름 — 프론트 tacticalLabels.ASSET_LABEL과 같은 뜻
+ASSET_LABELS: dict[str, str] = {
+    "QQQ": "나스닥100",
+    "SPY": "S&P500",
+    "DIA": "다우존스",
+    "QLD": "나스닥100 2배",
+    "SSO": "S&P500 2배",
+    "CASH": "현금",
+}
+# 지수 그룹으로 적용하는 자산 → 그룹 키(etf_index_classifier.INDEX_LABELS 키, plans/76)
+ASSET_GROUP_KEYS: dict[str, str] = {"QQQ": "US_NASDAQ100", "SPY": "US_SP500", "DIA": "US_DJIA"}
+_GROUP_KEY_ASSET: dict[str, str] = {v: k for k, v in ASSET_GROUP_KEYS.items()}
+# 레버리지 자산 → (같은 지수 그룹 자산, 배수). 비중표에서 0%면 짝 그룹의 레버리지 멤버(노출 합산)로 둔다
+_LEVERAGED_PAIR: dict[str, tuple[str, float]] = {"QLD": ("QQQ", 2.0), "SSO": ("SPY", 2.0)}
 
 DEFAULT_REGIME_WEIGHTS: dict[str, dict[str, float]] = {
     "RISK_ON": {"QQQ": 50.0, "SPY": 40.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 10.0},
@@ -271,7 +296,7 @@ def resolve_weights(strategy: TacticalStrategy | None) -> dict[str, dict[str, fl
 
 def format_weights(weights: dict[str, float]) -> str:
     return " · ".join(
-        f"{'현금' if a == 'CASH' else a} {weights.get(a, 0):g}%"
+        f"{ASSET_LABELS[a]} {weights.get(a, 0):g}%"
         for a in TACTICAL_ASSETS
         if a not in OPTIONAL_ASSETS or weights.get(a, 0) > 0
     )
@@ -344,13 +369,44 @@ async def get_strategy(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSes
     return result.scalar_one_or_none()
 
 
+def tactical_asset_of(item: Any) -> str | None:
+    """포트폴리오 항목이 어느 전술 자산인지 — 나스닥100·S&P500·다우 지수 그룹은 대표 종목과 무관하게 QQQ·SPY·DIA,
+    그룹이 아닌 단독 항목은 ticker가 전술 자산일 때만. 그 외(다른 지수 그룹·개별 종목)는 None."""
+    group_key = getattr(item, "group_key", None)
+    if group_key:
+        return _GROUP_KEY_ASSET.get(group_key)
+    return item.ticker if item.ticker in TACTICAL_ASSETS else None
+
+
 def _current_weights(portfolio: Portfolio) -> dict[str, float]:
-    return {item.ticker: float(item.weight) for item in portfolio.items}
+    """현재 목표 비중 — 전술 자산은 자산 키(그룹은 QQQ·SPY·DIA)로, 나머지는 ticker 키로."""
+    out: dict[str, float] = {}
+    for item in portfolio.items:
+        key = tactical_asset_of(item) or item.ticker
+        out[key] = round(out.get(key, 0.0) + float(item.weight), 2)
+    return out
+
+
+def current_groups(portfolio: Portfolio) -> dict[str, dict[str, Any]]:
+    """전술 자산별 지수 그룹 구성 요약(화면 보조 문구용) — 그룹이 아닌 자산은 넣지 않는다."""
+    out: dict[str, dict[str, Any]] = {}
+    for item in portfolio.items:
+        asset = tactical_asset_of(item)
+        if asset and getattr(item, "group_key", None):
+            members = getattr(item, "members", None) or []
+            out[asset] = {
+                "label": item.group_label or "",
+                "primary": item.ticker,
+                "member_count": sum(1 for m in members if m.role == GROUP_ROLE_MEMBER),
+                "domestic_alt": next((m.ticker for m in members if m.role == GROUP_ROLE_DOMESTIC_ALT), None),
+            }
+    return out
 
 
 def is_tactical_managed(portfolio: Portfolio) -> bool:
-    """포트폴리오가 전술 자산(TACTICAL_ASSETS)만으로 구성됐는지 — 아니면 적용 시 다른 종목이 지워진다는 경고 대상."""
-    return all(item.ticker in TACTICAL_ASSETS for item in portfolio.items)
+    """포트폴리오가 전술 자산(나스닥100·S&P500·다우 지수 그룹 포함)만으로 구성됐는지 — 아니면 적용 시 다른 종목이
+    지워진다는 경고 대상."""
+    return all(tactical_asset_of(item) is not None for item in portfolio.items)
 
 
 def pending_action(strategy: TacticalStrategy, portfolio: Portfolio) -> Literal["APPLY", "PARTIAL"] | None:
@@ -429,6 +485,7 @@ async def build_status(
             effective, market["macro_level"], market["macro_freshness"], market["technicals"], use_macro=use_macro
         ),
         "current_weights": _current_weights(portfolio),
+        "current_groups": current_groups(portfolio),
         "portfolio_compatible": is_tactical_managed(portfolio),
     }
 
@@ -440,31 +497,165 @@ def interpolate_weights(current: dict[str, float], target: dict[str, float], fra
     return out
 
 
+class _MemberSpec(NamedTuple):
+    ticker: str
+    market: str
+    name: str
+    role: str
+    leverage: float = 1.0
+
+
+class _GroupSpec(NamedTuple):
+    """다시 만들 지수 그룹 항목 — 대표 종목(ticker/market/name) + 라벨 + 멤버."""
+
+    ticker: str
+    market: str
+    name: str
+    label: str
+    members: list[_MemberSpec]
+
+
+def _weights_to_apply(
+    portfolio: Portfolio, strategy: TacticalStrategy, regime: str, fraction: float
+) -> dict[str, float]:
+    weights = proposed_weights_for(strategy, regime, {})
+    if fraction < 1:
+        weights = interpolate_weights(_current_weights(portfolio), weights, fraction)
+    return weights
+
+
+def _existing_groups(portfolio: Portfolio) -> dict[str, Any]:
+    return {
+        asset: item
+        for item in portfolio.items
+        if getattr(item, "group_key", None) and (asset := tactical_asset_of(item)) is not None
+    }
+
+
+def needs_group_suggestions(
+    portfolio: Portfolio, strategy: TacticalStrategy, regime: str, fraction: float = 1.0
+) -> bool:
+    """적용 시 새로 만들 지수 그룹이 있는지 — 있을 때만 호출부가 보유 종목 기반 그룹 제안을 조회한다."""
+    weights = _weights_to_apply(portfolio, strategy, regime, fraction)
+    existing = _existing_groups(portfolio)
+    return any(weights.get(a, 0) > 0 and a not in existing for a in ASSET_GROUP_KEYS)
+
+
+def _group_from_item(item: Any) -> _GroupSpec:
+    return _GroupSpec(
+        ticker=item.ticker,
+        market=item.market,
+        name=item.name,
+        label=item.group_label or "",
+        members=[_MemberSpec(m.ticker, m.market, m.name, m.role, float(m.leverage or 1)) for m in (item.members or [])],
+    )
+
+
+def _group_from_suggestion(asset: str, suggestion: IndexGroupSuggestion | None) -> _GroupSpec:
+    """새 그룹 — 대표 종목은 전술 자산(판정·백테스트 기준 ETF), 멤버·국내 대체는 보유 종목 기반 제안에서."""
+    from app.services.etf_index_classifier import index_label
+
+    name, market = _ASSET_META[asset]
+    label = suggestion.label if suggestion else index_label(ASSET_GROUP_KEYS[asset])
+    members: list[_MemberSpec] = []
+    if suggestion is not None:
+        alt = suggestion.domestic_alt
+        skip = {asset} | ({alt.ticker} if alt else set())
+        members = [
+            _MemberSpec(m.ticker, m.market, m.name, GROUP_ROLE_MEMBER, m.leverage)
+            for m in suggestion.members
+            if m.ticker not in skip
+        ]
+        if alt is not None:
+            members.append(_MemberSpec(alt.ticker, alt.market, alt.name, GROUP_ROLE_DOMESTIC_ALT))
+    return _GroupSpec(ticker=asset, market=market, name=name, label=label, members=members)
+
+
+def _plan_groups(
+    portfolio: Portfolio,
+    weights: dict[str, float],
+    suggestions: dict[str, IndexGroupSuggestion] | None,
+) -> dict[str, _GroupSpec]:
+    """비중>0인 QQQ·SPY·DIA의 그룹 구성 — 기존 그룹은 그대로, 없으면 제안으로 새로. 레버리지 규칙 반영.
+
+    QLD·SSO 비중>0이면 단독 항목으로 관리하므로 짝 그룹 멤버에서 뺀다(한 종목은 한 항목에만). 0%면 예전 단독
+    항목이었던 경우 짝 그룹의 레버리지 멤버로 옮긴다 — 목표에 없는 종목으로 전량 매도되지 않고 그룹이 비중을
+    넘을 때 먼저 팔린다(group_expansion).
+    """
+    existing = _existing_groups(portfolio)
+    groups: dict[str, _GroupSpec] = {}
+    for asset, group_key in ASSET_GROUP_KEYS.items():
+        if weights.get(asset, 0) <= 0:
+            continue
+        if asset in existing:
+            groups[asset] = _group_from_item(existing[asset])
+        else:
+            groups[asset] = _group_from_suggestion(asset, (suggestions or {}).get(group_key))
+
+    standalone = {item.ticker for item in portfolio.items if not getattr(item, "group_key", None)}
+    for lev, (pair, multiple) in _LEVERAGED_PAIR.items():
+        spec = groups.get(pair)
+        if spec is None:
+            continue
+        members = [m for m in spec.members if m.ticker != lev]
+        if weights.get(lev, 0) <= 0:
+            held = next((m for m in spec.members if m.ticker == lev), None)
+            if held is not None:
+                members.append(held)
+            elif lev in standalone:
+                name, market = _ASSET_META[lev]
+                members.append(_MemberSpec(lev, market, name, GROUP_ROLE_MEMBER, multiple))
+        groups[pair] = spec._replace(members=members)
+    return groups
+
+
+def _new_item(portfolio: Portfolio, asset: str, weight: float, idx: int, spec: _GroupSpec | None) -> PortfolioItem:
+    if spec is None:
+        name, market = _ASSET_META[asset]
+        return PortfolioItem(
+            portfolio_id=portfolio.id, ticker=asset, name=name, market=market, weight=weight, sort_order=idx
+        )
+    return PortfolioItem(
+        portfolio_id=portfolio.id,
+        ticker=spec.ticker,
+        name=spec.name,
+        market=spec.market,
+        weight=weight,
+        sort_order=idx,
+        group_key=ASSET_GROUP_KEYS[asset],
+        group_label=spec.label or None,
+        members=[
+            PortfolioItemMember(
+                ticker=m.ticker, market=m.market, name=m.name, role=m.role, leverage=m.leverage, sort_order=i
+            )
+            for i, m in enumerate(spec.members)
+        ],
+    )
+
+
 async def apply_regime_to_portfolio(
-    portfolio: Portfolio, strategy: TacticalStrategy, regime: Regime, db: AsyncSession, fraction: float = 1.0
+    portfolio: Portfolio,
+    strategy: TacticalStrategy,
+    regime: Regime,
+    db: AsyncSession,
+    fraction: float = 1.0,
+    group_suggestions: dict[str, IndexGroupSuggestion] | None = None,
 ) -> dict[str, float]:
     """포트폴리오 목표 비중을 제안 비중(국면+틸트+웅덩이)으로 교체한다(전술 자산 외 기존 종목은 삭제). 커밋은 호출부.
+
+    QQQ·SPY·DIA는 지수 그룹 항목으로 저장한다(plans/76) — 기존 그룹은 대표 종목·멤버·국내 대체를 그대로 두고
+    비중만 바꾸고, 없으면 `group_suggestions`(그룹 키 → 보유 종목 기반 제안)로 만든다(제안이 없으면 대표 종목만).
 
     `fraction<1`이면 현재 목표에서 제안 쪽으로 그만큼만 옮긴다(분할 적용 — 전술 자산만으로 구성된 포트폴리오인지는
     호출부가 확인). 이때는 "적용 완료" 대신 분할 적용 진행 상태(`partial_regime`)를 기록해 화면에
     "나머지 적용"이 남는다.
     """
-    weights = proposed_weights_for(strategy, regime, {})
-    if fraction < 1:
-        weights = interpolate_weights(_current_weights(portfolio), weights, fraction)
+    weights = _weights_to_apply(portfolio, strategy, regime, fraction)
+    groups = _plan_groups(portfolio, weights, group_suggestions)
+    # 그룹 구성은 위에서 값으로 복사해 뒀다 — 항목을 다시 만들어도(기존 멤버는 FK CASCADE로 삭제) 보존된다
     await db.execute(delete(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio.id))
     for idx, asset in enumerate(a for a in TACTICAL_ASSETS if weights.get(a, 0) > 0):
-        name, market = _ASSET_META[asset]
-        db.add(
-            PortfolioItem(
-                portfolio_id=portfolio.id,
-                ticker=asset,
-                name=name,
-                market=market,
-                weight=weights[asset],
-                sort_order=idx,
-            )
-        )
+        db.add(_new_item(portfolio, asset, weights[asset], idx, groups.get(asset)))
     if fraction >= 1:
         strategy.applied_regime = regime
         strategy.notified_dip_level = strategy.dip_level or 0

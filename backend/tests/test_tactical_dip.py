@@ -158,8 +158,11 @@ class TestServiceIntegration:
         )
         assert table["RISK_ON"]["QLD"] == 20.0
         assert table["NEUTRAL"]["QLD"] == 0.0
-        assert tactical.format_weights(table["RISK_ON"]) == "QQQ 30% · SPY 30% · QLD 20% · SSO 10% · 현금 10%"
-        assert tactical.format_weights(table["NEUTRAL"]) == "QQQ 0% · SPY 70% · 현금 30%"
+        assert (
+            tactical.format_weights(table["RISK_ON"])
+            == "나스닥100 30% · S&P500 30% · 나스닥100 2배 20% · S&P500 2배 10% · 현금 10%"
+        )
+        assert tactical.format_weights(table["NEUTRAL"]) == "나스닥100 0% · S&P500 70% · 현금 30%"
 
     def test_interpolate_weights_half(self):
         out = tactical.interpolate_weights(
@@ -273,6 +276,13 @@ def api_db():
 
 def _items(**weights):
     return [SimpleNamespace(ticker=t, weight=w) for t, w in weights.items()]
+
+
+@pytest.fixture(autouse=True)
+def _no_group_suggestions():
+    # 적용 시 새 지수 그룹의 보유 종목 제안 조회(plans/76) — 여기선 대표 종목만으로 생성
+    with patch("app.api.v1.tactical._group_suggestions", AsyncMock(return_value=None)):
+        yield
 
 
 class TestApi:

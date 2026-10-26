@@ -8,6 +8,9 @@ export const QUERY_KEYS = {
   // indexExposureBase: 무효화 프리픽스 전용 — 계좌 필터(전체/개별) 전 변형 포함
   indexExposureBase: ["index-exposure"] as const,
   indexExposure: (accountId?: string | null) => ["index-exposure", accountId ?? "all"] as const,
+  // 포트폴리오 편집기 "지수로 묶기" 제안 — indexExposureBase 하위라 sync·계좌 CUD 무효화를 공유
+  indexGroupSuggestions: (accountIds: string[] | null) =>
+    ["index-exposure", "group-suggestions", accountIds?.slice().sort().join(",") ?? "all"] as const,
   portfolios: ["portfolios"] as const,
   accounts: ["accounts"] as const,
   accountPositions: (accountId: string) => ["account-positions", accountId] as const,

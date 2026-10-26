@@ -41,14 +41,14 @@ describe("TacticalWeightsEditor", () => {
 
   it("변경이 없으면 저장 버튼이 꺼져 있고, 기본값이면 되돌리기도 꺼져 있다", () => {
     renderEditor();
-    expect(cell("공격 국면 QQQ 비중").value).toBe("50");
+    expect(cell("공격 국면 나스닥100 비중").value).toBe("50");
     expect(saveBtn().disabled).toBe(true);
     expect((screen.getByText("기본값으로") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("합계가 100이 아니면 경고하고 저장을 막는다", () => {
     renderEditor();
-    fireEvent.change(cell("공격 국면 QQQ 비중"), { target: { value: "60" } });
+    fireEvent.change(cell("공격 국면 나스닥100 비중"), { target: { value: "60" } });
     expect(screen.getByText(/합계 110%/)).toBeDefined();
     expect(screen.getByText(/100%가 되어야 해요/)).toBeDefined();
     expect(saveBtn().disabled).toBe(true);
@@ -56,8 +56,8 @@ describe("TacticalWeightsEditor", () => {
 
   it("유효한 변경은 비중표와 이동폭을 함께 저장한다", () => {
     const { onSave } = renderEditor();
-    fireEvent.change(cell("공격 국면 QQQ 비중"), { target: { value: "60" } });
-    fireEvent.change(cell("공격 국면 SPY 비중"), { target: { value: "30" } });
+    fireEvent.change(cell("공격 국면 나스닥100 비중"), { target: { value: "60" } });
+    fireEvent.change(cell("공격 국면 S&P500 비중"), { target: { value: "30" } });
     fireEvent.click(tiltOption("20%p"));
     fireEvent.click(saveBtn());
     expect(onSave).toHaveBeenCalledWith({
@@ -76,10 +76,10 @@ describe("TacticalWeightsEditor", () => {
       RISK_OFF: { QQQ: 10, SPY: 30, CASH: 60 },
     } as unknown as typeof TABLE;
     const { onSave } = renderEditor({ regimeWeights: legacy });
-    expect(cell("공격 국면 DIA 비중").value).toBe("0");
+    expect(cell("공격 국면 다우 비중").value).toBe("0");
     expect(saveBtn().disabled).toBe(true);
-    fireEvent.change(cell("공격 국면 SPY 비중"), { target: { value: "20" } });
-    fireEvent.change(cell("공격 국면 DIA 비중"), { target: { value: "20" } });
+    fireEvent.change(cell("공격 국면 S&P500 비중"), { target: { value: "20" } });
+    fireEvent.change(cell("공격 국면 다우 비중"), { target: { value: "20" } });
     fireEvent.click(saveBtn());
     expect(onSave.mock.calls[0][0].regime_weights.RISK_ON).toEqual({
       QQQ: 50,
@@ -108,10 +108,10 @@ describe("TacticalWeightsEditor", () => {
   it("레버리지 비중을 넣으면 경고하고, 방어 국면이면 추가로 경고한다", () => {
     renderEditor();
     expect(screen.queryByText(/레버리지 ETF라/)).toBeNull();
-    fireEvent.change(cell("공격 국면 QLD 비중"), { target: { value: "20" } });
+    fireEvent.change(cell("공격 국면 나스닥 2배 비중"), { target: { value: "20" } });
     expect(screen.getByText(/레버리지 ETF라/)).toBeDefined();
     expect(screen.queryByText(/방어 국면에 레버리지/)).toBeNull();
-    fireEvent.change(cell("방어 국면 SSO 비중"), { target: { value: "10" } });
+    fireEvent.change(cell("방어 국면 S&P 2배 비중"), { target: { value: "10" } });
     expect(screen.getByText(/방어 국면에 레버리지/)).toBeDefined();
   });
 
@@ -161,7 +161,7 @@ describe("TacticalWeightsEditor", () => {
     expect(screen.getByRole("button", { name: /안정형/ }).getAttribute("aria-pressed")).toBe(
       "false",
     );
-    expect(cell("공격 국면 QQQ 비중").value).toBe("80");
+    expect(cell("공격 국면 나스닥100 비중").value).toBe("80");
     expect(cell("방어 국면 현금 비중").value).toBe("80");
     expect(onSave).not.toHaveBeenCalled(); // 누르기만 해선 저장하지 않는다
 
@@ -181,7 +181,7 @@ describe("TacticalWeightsEditor", () => {
   it("레버리지형 프리셋은 복리 감쇠 경고를 띄운다", () => {
     renderEditor();
     fireEvent.click(screen.getByRole("button", { name: /레버리지형/ }));
-    expect(cell("공격 국면 QLD 비중").value).toBe("60");
+    expect(cell("공격 국면 나스닥 2배 비중").value).toBe("60");
     expect(screen.getByText(/레버리지 ETF라/)).toBeDefined();
   });
 });

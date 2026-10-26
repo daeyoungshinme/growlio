@@ -14,6 +14,7 @@ import {
   type RebalancingItem,
   executeRebalancing,
 } from "@/api/rebalancing";
+import { flattenTradeItems } from "@/components/rebalancing/rebalancingTradeMath";
 import { useRebalancingBalances } from "../useRebalancingBalances";
 import { useRebalancingPrices } from "../useRebalancingPrices";
 import type {
@@ -39,7 +40,7 @@ export type {
 } from "./types";
 
 export function getActionableItems(analysis: RebalancingAnalysis): RebalancingItem[] {
-  return analysis.items.filter(
+  return flattenTradeItems(analysis.items).filter(
     (i) =>
       i.ticker !== CASH_TICKER &&
       i.ticker !== CASH_EQUIVALENT_TICKER &&
@@ -174,7 +175,7 @@ export function useRebalancingExecution({
   function hasLiveBalanceFor(ticker: string, accountId: string): boolean {
     if (!liveBalances[accountId]) return false;
     if (!overseasUnknown[accountId]) return true;
-    const market = analysis.items.find((i) => i.ticker === ticker)?.market ?? "";
+    const market = flattenTradeItems(analysis.items).find((i) => i.ticker === ticker)?.market ?? "";
     return !isOverseasMarket(market);
   }
 

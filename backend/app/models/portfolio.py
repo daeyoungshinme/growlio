@@ -9,6 +9,7 @@ from sqlalchemy import (
     Numeric,
     PrimaryKeyConstraint,
     String,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -31,10 +32,68 @@ class PortfolioItem(Base):
     market: Mapped[str] = mapped_column(String(20), nullable=False)
     weight: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # 지수 그룹 항목(plans/74) — 값이 있으면 이 행은 그룹 하나이고 ticker/market은 대표 매수 종목.
+    # 이탈은 대표 종목+멤버 합계로 판정하고 주문은 group_expansion이 종목 단위로 전개한다
+    group_key: Mapped[str | None] = mapped_column(String(64))
+    group_label: Mapped[str | None] = mapped_column(String(50))
 
     portfolio: Mapped["Portfolio"] = relationship(back_populates="items")
+    # items를 읽는 곳(selectinload(Portfolio.items))이 많아 멤버는 항상 함께 읽는다
+    members: Mapped[list["PortfolioItemMember"]] = relationship(
+        back_populates="item",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="PortfolioItemMember.sort_order",
+    )
 
     __table_args__ = (Index("idx_portfolio_items_portfolio", "portfolio_id"),)
+
+    @property
+    def group(self) -> dict | None:
+        """응답 스키마(`PortfolioItem.group`)용 — 대표 종목은 members에 포함하지 않는다."""
+        if not self.group_key:
+            return None
+        alt = next((m for m in self.members if m.role == GROUP_ROLE_DOMESTIC_ALT), None)
+        return {
+            "key": self.group_key,
+            "label": self.group_label or "",
+            "members": [
+                {"ticker": m.ticker, "market": m.market, "name": m.name, "leverage": float(m.leverage or 1)}
+                for m in self.members
+                if m.role == GROUP_ROLE_MEMBER
+            ],
+            "domestic_alt": {"ticker": alt.ticker, "market": alt.market, "name": alt.name} if alt else None,
+        }
+
+
+GROUP_ROLE_MEMBER = "MEMBER"
+GROUP_ROLE_DOMESTIC_ALT = "DOMESTIC_ALT"
+
+
+class PortfolioItemMember(Base):
+    """지수 그룹 항목의 멤버 종목 — 대표 종목 외에 같은 그룹으로 합산할 보유 종목과 국내 대체 매수 종목."""
+
+    __tablename__ = "portfolio_item_members"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    portfolio_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("portfolio_items.id", ondelete="CASCADE"), nullable=False
+    )
+    ticker: Mapped[str] = mapped_column(String(20), nullable=False)
+    market: Mapped[str] = mapped_column(String(20), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    # MEMBER(합산 대상) | DOMESTIC_ALT(ISA·연금 계좌 매수용 국내 상장 대체 종목 — 합산 대상이기도 함)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default=GROUP_ROLE_MEMBER)
+    # 정방향 레버리지 배수 — 그룹 현재 비중은 평가액 × 배수(노출 기준)로 합산한다(QLD=2)
+    leverage: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False, default=1.0, server_default="1")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    item: Mapped[PortfolioItem] = relationship(back_populates="members")
+
+    __table_args__ = (
+        UniqueConstraint("portfolio_item_id", "ticker", "market", name="uq_portfolio_item_members_key"),
+        Index("idx_portfolio_item_members_item", "portfolio_item_id"),
+    )
 
 
 class PortfolioAccount(Base):

@@ -67,6 +67,19 @@ async def collect_dividend_map(
     return dividend_map
 
 
+def _target_names(portfolio: Portfolio) -> dict[tuple[str, str], str]:
+    """목표 항목 + 지수 그룹 멤버(국내 대체 매수 종목 포함, plans/74)의 (ticker, market) → 이름."""
+    names: dict[tuple[str, str], str] = {}
+    for raw_item in portfolio.items:
+        names[(str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))] = str(
+            _item_attr(raw_item, "name")
+        )
+        members = raw_item.get("members") if isinstance(raw_item, dict) else getattr(raw_item, "members", None)
+        for m in members or []:
+            names.setdefault((str(_item_attr(m, "ticker")), str(_item_attr(m, "market"))), str(_item_attr(m, "name")))
+    return names
+
+
 async def enrich_overview_with_prices(
     portfolio: Portfolio,
     overview: dict,
@@ -78,12 +91,9 @@ async def enrich_overview_with_prices(
     existing_price_keys: set[tuple[str, str]] = {
         (pos["ticker"], pos["market"]) for pos in overview.get("all_positions", []) if pos.get("current_price")
     }
+    names = _target_names(portfolio)
     unpriced: list[tuple[str, str]] = [
-        (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
-        for raw_item in portfolio.items
-        if str(_item_attr(raw_item, "ticker")) != "CASH"
-        and str(_item_attr(raw_item, "market")) != "KR_PROPERTY"
-        and (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market"))) not in existing_price_keys
+        key for key in names if key[0] != "CASH" and key[1] != "KR_PROPERTY" and key not in existing_price_keys
     ]
     if not unpriced:
         return overview
@@ -93,14 +103,7 @@ async def enrich_overview_with_prices(
         {
             "ticker": ticker,
             "market": market,
-            "name": next(
-                (
-                    str(_item_attr(raw_item, "name"))
-                    for raw_item in portfolio.items
-                    if str(_item_attr(raw_item, "ticker")) == ticker
-                ),
-                ticker,
-            ),
+            "name": names.get((ticker, market)) or ticker,
             "value_krw": 0.0,
             "current_price": fetched_prices[ticker],
             "qty": 0.0,

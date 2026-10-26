@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Plus, WandSparkles, X } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { Layers, Plus, WandSparkles, X } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ACCOUNT_TAX_TYPE_LABELS,
   AccountTaxType,
@@ -9,7 +9,7 @@ import {
   INVESTMENT_HORIZON_LABELS,
   InvestmentHorizon,
 } from "@/api/assets";
-import { Portfolio, PortfolioItem } from "@/api/portfolios";
+import { fetchIndexGroupSuggestions, Portfolio, PortfolioItem } from "@/api/portfolios";
 import {
   BASE_TYPE_STOCK_ONLY,
   BASE_TYPE_TOTAL_ASSETS,
@@ -27,8 +27,11 @@ import {
   usePortfolioItemsEditor,
 } from "@/hooks/usePortfolioItemsEditor";
 import { inferHorizonTaxTypeFromAccounts } from "@/utils/portfolio";
+import { applyIndexGroup } from "@/utils/portfolioGroups";
 const PortfolioWeightChart = lazy(() => import("./PortfolioWeightChart"));
+import IndexGroupPicker from "./IndexGroupPicker";
 import PortfolioAccountSelector from "./PortfolioAccountSelector";
+import PortfolioGroupItemRow from "./PortfolioGroupItemRow";
 import PortfolioItemRow from "./PortfolioItemRow";
 
 interface Props {
@@ -84,6 +87,7 @@ export default function UnifiedPortfolioEditor({
   const { dialogRef, overlayRef } = useModalBehavior(onClose);
   const {
     items,
+    setItems,
     totalWeight,
     weightOk,
     itemsError,
@@ -119,6 +123,19 @@ export default function UnifiedPortfolioEditor({
 
   const isAllSelected =
     userOverrideIds === null || accounts.every((a) => selectedAccountIds.has(a.id));
+
+  // "지수로 묶기"(plans/74) — 분석 대상 계좌의 보유 종목 기준 제안. 펼칠 때만 조회한다
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false);
+  const suggestionAccountIds = isAllSelected ? null : Array.from(selectedAccountIds);
+  const hasGroupItems = items.some((i) => i.group);
+  const groupSuggestions = useQuery({
+    queryKey: QUERY_KEYS.indexGroupSuggestions(suggestionAccountIds),
+    queryFn: () => fetchIndexGroupSuggestions(suggestionAccountIds),
+    // 보유 종목이 바뀌었거나 이전 응답이 남아 있을 수 있어 항상 새로 받는다(서버는 overview·ETF 프로필 캐시 재사용)
+    staleTime: 0,
+    enabled: groupPickerOpen || hasGroupItems,
+  });
+  const suggestionByKey = new Map((groupSuggestions.data?.groups ?? []).map((g) => [g.key, g]));
 
   function toggleAccount(id: string) {
     setUserOverrideIds((prev) => {
@@ -276,6 +293,19 @@ export default function UnifiedPortfolioEditor({
                   >
                     <WandSparkles size={12} /> 현재 보유 종목으로 채우기
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // 그룹 항목이 있으면 쿼리가 이미 켜져 있어 펼침만으로는 재조회되지 않는다
+                      if (!groupPickerOpen) void groupSuggestions.refetch();
+                      setGroupPickerOpen((v) => !v);
+                    }}
+                    aria-expanded={groupPickerOpen}
+                    className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-2 py-1 rounded-lg transition-colors`}
+                    title="같은 지수를 추종하는 종목을 한 항목으로 묶습니다"
+                  >
+                    <Layers size={12} /> 지수로 묶기
+                  </button>
                   <span
                     className={`text-xs font-medium ${weightOk ? "text-green-600" : "text-orange-500"}`}
                   >
@@ -292,24 +322,47 @@ export default function UnifiedPortfolioEditor({
                 </div>
               </div>
 
-              <div className="space-y-2">
-                {items.map((item, idx) => (
-                  <PortfolioItemRow
-                    key={idx}
-                    item={item}
-                    idx={idx}
-                    isEditing={editingRows.has(idx)}
-                    isActive={activeRow === idx}
-                    suggestions={suggestions}
-                    onRegisterInputRef={registerInputRef}
-                    onTickerInput={handleTickerInput}
-                    onFocus={setActiveRow}
-                    onSelectSuggestion={selectSuggestion}
-                    onStartEditing={startEditing}
-                    onUpdateWeight={(i, weight) => updateItem(i, { weight })}
-                    onRemove={removeItem}
+              {groupPickerOpen && (
+                <div className="mb-3">
+                  <IndexGroupPicker
+                    data={groupSuggestions.data}
+                    isLoading={groupSuggestions.isLoading}
+                    isError={groupSuggestions.isError}
+                    appliedKeys={new Set(items.flatMap((i) => (i.group ? [i.group.key] : [])))}
+                    onApply={(g) => setItems((prev) => applyIndexGroup(prev, g))}
                   />
-                ))}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {items.map((item, idx) =>
+                  item.group ? (
+                    <PortfolioGroupItemRow
+                      key={idx}
+                      item={item}
+                      idx={idx}
+                      suggestion={suggestionByKey.get(item.group.key)}
+                      onChange={(i, next) => updateItem(i, { ...next, group: next.group ?? null })}
+                      onRemove={removeItem}
+                    />
+                  ) : (
+                    <PortfolioItemRow
+                      key={idx}
+                      item={item}
+                      idx={idx}
+                      isEditing={editingRows.has(idx)}
+                      isActive={activeRow === idx}
+                      suggestions={suggestions}
+                      onRegisterInputRef={registerInputRef}
+                      onTickerInput={handleTickerInput}
+                      onFocus={setActiveRow}
+                      onSelectSuggestion={selectSuggestion}
+                      onStartEditing={startEditing}
+                      onUpdateWeight={(i, weight) => updateItem(i, { weight })}
+                      onRemove={removeItem}
+                    />
+                  ),
+                )}
               </div>
 
               {/* 비중 도넛차트 */}

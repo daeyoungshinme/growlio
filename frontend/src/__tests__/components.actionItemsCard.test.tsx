@@ -158,7 +158,7 @@ describe("ActionItemsCard — 홈 지금 할 일 (docs/plans/50 M5)", () => {
         kind: "TACTICAL",
         priority: "HIGH",
         title: "미국 전술 전술: 공격 국면 비중 적용 전",
-        detail: "제안 QQQ 50% · SPY 40% · 현금 10%",
+        detail: "제안 나스닥100 50% · S&P500 40% · 현금 10%",
         cta_label: "적용하기",
         link: "/rebalancing?rtab=목표 조정&gmode=전술&portfolioId=p2",
         deadline: null,
