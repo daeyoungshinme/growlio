@@ -117,7 +117,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드. 계획탭 › 절세(`TaxTabContainer`)의 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드. 마찬가지로 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/HealthInsuranceRiskCard.tsx`** — 배당소득 기준 건보 피부양자 자격상실 위험 상시 카드(진행률 바 + 초과 시 예상 월 보험료). `TaxLimitsSection`이 계좌 유무와 무관하게 항상 렌더(배당소득은 전체 수령액 기준). `TaxOptimizationCard`의 조건부 경고 배너와 상호 보완.
-- **`components/dashboard/ActionItemsCard.tsx`** — 홈 "지금 할 일"(Hero 바로 아래, lazy). `GET /dashboard/action-items`(백엔드 `action_items_service`가 리밸런싱 필요·자동매수 예수금 부족·세금 경고·절세 1순위·챌린지 미입금을 우선순위·마감 순 최대 5건으로 집계)를 행 단위 링크로 렌더. 0건이면 한 줄 안내, 조회 실패 시 렌더 안 함. 홈에서 "리밸런싱 필요" 신호의 단일 표면 — 바로 아래 `RebalancingStatusCard`(`statusOnly`)는 상태 확인용으로만 남김. 세금 한도 요약/경고는 예전엔 `InvestmentSnapshotCard`의 `TaxLimitsBanner`였음(2026-10-08 삭제 — 스냅샷 카드는 주식 3수치만). 우선순위 배지·마감 라벨은 `utils/actionPriority.ts`(`TaxActionPlanCard`와 공용).
+- **`components/dashboard/ActionItemsCard.tsx`** — 홈 "지금 할 일"(Hero 바로 아래, lazy). `GET /dashboard/action-items`(백엔드 `action_items_service`가 전술 제안 비중 적용(TACTICAL, 목표 조정 › 전술 링크 — plans/75)·리밸런싱 필요·자동매수 예수금 부족·세금 경고·절세 1순위·챌린지 미입금을 우선순위·마감 순 최대 5건으로 집계)를 행 단위 링크로 렌더. 0건이면 한 줄 안내, 조회 실패 시 "다시 시도" 한 줄. 홈에서 리밸런싱을 다루는 유일한 카드 — REBALANCE 행 제목 옆에 시장 신호 배지(`marketSignal` prop, "시장 안정/주의/위험")를 붙인다. 리밸런싱 행이 없으면 홈에 시장 신호가 없다(등급 전환은 즉시 알림·진단 탭이 담당). 예전 별도 "리밸런싱 점검" 카드와 카드 하단 상태 줄은 삭제(plans/73). 배지 상수는 `utils/marketSignalBadge.ts`(진단탭 `RebalancingStatusCard`와 공용). 세금 한도 요약/경고는 예전엔 `InvestmentSnapshotCard`의 `TaxLimitsBanner`였음(2026-10-08 삭제 — 스냅샷 카드는 주식 3수치만). 우선순위 배지·마감 라벨은 `utils/actionPriority.ts`(`TaxActionPlanCard`와 공용).
 - **`components/portfolio-analysis/TaxTabContainer.tsx`** — 계획탭 "절세" 서브탭 진입점(lazy, `InvestPlanPage`). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`·`TaxOptimizationCard`를 묶음. 탭 상태 `?taxTab=`, 세금 추정 계좌 `?taxAccount=` 영속화. `taxTab` 미지정 딥링크는 "한도 현황" 랜딩. 옛 `/assets?portfolioTab=세금` 링크는 `utils/legacyTabRedirect.ts`가 이쪽으로 옮김.
 - **`components/portfolio/AllocationCard.tsx`** — 자산탭 투자현황의 비중 분석 카드(lazy). 국내/해외(상장시장 ↔ 실제 투자지역 토글)·종목·지수별 비중을 탭 1개 카드로 통합. 하위 뷰는 `components/portfolio/allocation/`(`RegionAllocationView`/`StockAllocationView`/`IndexAllocationView` + 공용 `WeightBarRow`·`ListingBadge`·`SegmentedControl`). "종목" 보기는 아래 보유 종목 목록(`StockHoldingsTable`)과 겹치지 않게 상위 5 + "기타 N종목"만 그리고, "보유 종목 전체 비중순 보기"가 `PortfolioPage`를 거쳐 목록의 `sortRequest` prop으로 비중순 정렬 + 스크롤한다. 모바일 기본 접힘(아래 콜랩스 규칙 예외).
 - **`components/assets/AccountHistoryTab.tsx`** — 계좌관리 "내역" 탭. 세그먼트 "현금 흐름"(입출금·배당 `TransactionHistoryTab`) / "매수 내역"(`PeriodPurchasesTab` — 월/연 매수 종목·수익률, 스냅샷 추정 `추정`/수기 `기록` 배지 + `TradeFormModal`로 매수/매도 기록, 해외 USD→KRW 환산). 세그먼트는 `?history=` 영속. 옛 `atab=입출금·배당`/`기간별 매수`는 `legacyHistorySegment()`로 변환.
@@ -529,10 +529,9 @@ _기타_
   보조 도구라 **기본 접힘**(`growlio:rebalancing:tactical-backtest-open`, `growlio:invest:savingsSimulatorOpen`). 포트폴리오 백테스트는 카드가 아니라 분석 패널(`AnalysisPanel`)의 세 번째 보기(리밸런싱 분석 / 효율 분석 / 백테스트 segmented)로 옮겼다(plans/64 S3).
 - 예외: 자산탭 투자현황의 `AllocationCard`(비중 분석)는 **모바일(<640px)만 기본 접힘**(`growlio:portfolio:allocationOpen`, 사용자가 펼치면 유지) —
   바로 아래 보유 종목 목록이 첫 화면 가까이 오도록(plans/58). 접힘 힌트로 최대 종목·해외상장 비중을 보여준다.
-- 예외: 홈의 `RebalancingStatusCard`는 `statusOnly` — 접는 카드가 아니라 `/rebalancing`으로 가는 **한 줄 상태 행**
-  ("N개 모두 목표 비중 이내" / "N개 중 M개 이탈" + 시장 신호 배지). "리밸런싱 필요" 신호와 이탈 상세는 홈 `ActionItemsCard`와
-  리밸런싱 탭이 담당 — 같은 drift-summary가 홈에 여러 번 노출되지 않게(plans/67 P1-3). 진단탭 인스턴스는 항상 펼침.
-  홈의 `ChallengeProgressCard`도 같은 이유로 한 줄 행.
+- 홈에는 `RebalancingStatusCard`가 없다 — 리밸런싱은 `ActionItemsCard`의 REBALANCE 행(+시장 신호 배지)만 다룬다(같은 drift-summary가 홈에 여러 번
+  노출되지 않게, plans/67 P1-3 → plans/73). `RebalancingStatusCard`는 진단탭 전용이며 항상 펼침.
+  예외: 홈의 `ChallengeProgressCard`는 접는 카드가 아니라 한 줄 행.
 - 예외(plans/67): 리밸런싱 포트폴리오 탭의 `RebalancingDiagnosisCard`(`growlio:rebalancing:diagnosisCardOpen`)와 분석 결과 아래
   "상세 정보"(지표·배당·미포함 종목·분석 시점, `growlio:rebalancing:analysisDetailsOpen`), 계획탭의 "더 빨리 달성하려면?"
   (`growlio:goalTimeline:fasterOpen`, `growlio:dividendPlan:fasterOpen`), 절세 플래너는 **기본 접힘** — 보조 제안·상세라 화면 길이만 늘림.

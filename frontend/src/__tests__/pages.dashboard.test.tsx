@@ -41,8 +41,8 @@ vi.mock("@/components/common/SkeletonStatBox", () => ({
 vi.mock("@/api/marketSignals", () => ({
   fetchMarketSignal: vi.fn().mockResolvedValue(null),
 }));
-vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
-  default: () => <div data-testid="rebalancing-status-card" />,
+vi.mock("@/components/dashboard/ActionItemsCard", () => ({
+  default: () => <div data-testid="action-items-card" />,
 }));
 
 import DashboardPage from "@/pages/DashboardPage";
@@ -219,7 +219,9 @@ describe("DashboardPage", () => {
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
-    expect(screen.getByTestId("rebalancing-status-card")).toBeInTheDocument();
+    expect(screen.getByTestId("action-items-card")).toBeInTheDocument();
+    // 리밸런싱 상태는 지금 할 일 카드 하단으로 흡수 — 별도 카드 없음 (docs/plans/73)
+    expect(screen.queryByText("리밸런싱 점검")).not.toBeInTheDocument();
     expect(screen.getByTestId("allocation-chart")).toBeInTheDocument();
   });
 

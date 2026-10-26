@@ -2,7 +2,11 @@
 
 소스(이 결과는 캐시하지 않는다 — 사용자가 행동한 직후 바로 사라져야 한다. 리밸런싱·챌린지는 자체 캐시를 쓰지만
 세금 요약은 캐시가 없어 홈 로드마다 다시 계산한다):
-- REBALANCE: 비중 이탈이 임계값을 넘은 포트폴리오 (`get_drift_summaries` — `/rebalancing/drift-summary`와 같은 판정)
+- TACTICAL: 전술 배분 확정 국면의 제안 비중을 아직(또는 절반만) 적용하지 않은 포트폴리오
+  (`tactical_allocation_service.pending_action` — 전술 탭 "적용하세요" 안내와 같은 판정, 적립 연동 모드는 제외).
+  이 포트폴리오는 REBALANCE에서 뺀다 — 예전 목표 비중으로 리밸런싱하게 만들지 않도록(docs/plans/75).
+- REBALANCE: 비중 이탈이 임계값을 넘은 포트폴리오 (`get_drift_summaries` — `/rebalancing/drift-summary`와 같은 판정).
+  2개 이상이면 1행으로 묶는다 — 포트폴리오별 행이 상한 5건을 차지해 다른 할 일을 밀어내지 않게(docs/plans/73).
 - DCA_SHORTFALL: 정기 적립식 자동매수 다음 실행일 기준 예수금 부족 (`find_dca_cash_shortfalls` — 18:30 잡과 같은 판정)
 - TAX_WARNING: 건보 피부양자·금융소득 종합과세·국내 대주주 경고 (세금 추정 요약)
 - TAX_ACTION: 절세 액션 플랜 1순위 (손실수확도 이 플랜의 한 카테고리라 별도 항목을 만들지 않는다)
@@ -16,14 +20,21 @@ from __future__ import annotations
 
 import calendar
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
+from functools import partial
 from typing import Any
 
 import structlog
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.jobs.dca_cash_shortfall import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls
+from app.models.alert import RebalancingAlert
+from app.models.portfolio import Portfolio
+from app.models.tactical import TacticalStrategy
 from app.schemas.action_items import ActionItem
+from app.services import tactical_allocation_service as tactical
 from app.services.challenge_service import get_challenge_summary
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
 from app.services.tax_action_service import get_tax_action_plan_with_summary
@@ -40,16 +51,107 @@ _LINK_CHALLENGE = "/invest-plan?tab=챌린지"
 _LINK_DCA_PLAN = "/invest-plan?tab=적립 계획"
 
 
+# 프론트 `REBALANCE_GROUP_ID`(api/dashboard.ts)와 같은 값 — 이 id면 홈 카드가 drift-summary로 펼침 목록을 그린다
+REBALANCE_GROUP_ID = "rebalance:all"
+_LINK_REBALANCING = "/rebalancing"
+
+
 def _portfolio_link(portfolio_id: uuid.UUID | str) -> str:
     return f"/rebalancing?rtab=포트폴리오&portfolioId={portfolio_id}"
 
 
-async def _rebalance_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
+def _tactical_link(portfolio_id: uuid.UUID | str) -> str:
+    # 국면 변경 이메일·푸시(`_rebalancing_link("목표 조정", gmode="전술")`)와 같은 목적지
+    return f"/rebalancing?rtab=목표 조정&gmode=전술&portfolioId={portfolio_id}"
+
+
+async def _dca_tactical_linked_portfolio_ids(user_id: uuid.UUID, db: AsyncSession) -> set[uuid.UUID]:
+    """자동매수가 전술 연동(TACTICAL 게이트)인 포트폴리오 — 비중을 바꾸지 않고 방어 국면에 매수만 보류하는 모드라
+    적용할 제안 비중이 없다(프론트 `useDcaTacticalLink`와 같은 조건)."""
+    rows = await db.execute(
+        select(RebalancingAlert.portfolio_id).where(
+            RebalancingAlert.user_id == user_id,
+            RebalancingAlert.is_active.is_(True),
+            RebalancingAlert.mode == "AUTO",
+            RebalancingAlert.strategy == "BUY_ONLY",
+            RebalancingAlert.market_condition_mode == "TACTICAL",
+        )
+    )
+    return set(rows.scalars().all())
+
+
+async def _tactical_strategies(user_id: uuid.UUID, db: AsyncSession) -> list[tuple[TacticalStrategy, Portfolio]]:
+    result = await db.execute(
+        select(TacticalStrategy, Portfolio)
+        .join(Portfolio, Portfolio.id == TacticalStrategy.portfolio_id)
+        .options(selectinload(Portfolio.items))
+        .where(TacticalStrategy.user_id == user_id)
+        .order_by(Portfolio.sort_order)
+    )
+    return [(strategy, portfolio) for strategy, portfolio in result.all()]
+
+
+async def _tactical_items(
+    user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType, *, found_portfolio_ids: set[uuid.UUID]
+) -> list[ActionItem]:
+    rows = await _tactical_strategies(user_id, db)
+    if not rows:
+        return []
+    linked = await _dca_tactical_linked_portfolio_ids(user_id, db)
     items: list[ActionItem] = []
-    for s in await get_drift_summaries(user_id, db, cache):
-        if not s.needs_rebalancing:
+    portfolio_ids: list[uuid.UUID] = []
+    for strategy, portfolio in rows:
+        if portfolio.id in linked:
             continue
-        items.append(
+        action = tactical.pending_action(strategy, portfolio)
+        regime = strategy.last_regime
+        if action is None or regime is None:
+            continue
+        weights = tactical.format_weights(tactical.proposed_weights_for(strategy, regime, {}))
+        if action == "PARTIAL":
+            item = ActionItem(
+                id=f"tactical:{portfolio.id}",
+                kind="TACTICAL",
+                priority="MEDIUM",
+                title=f"{portfolio.name} 전술 비중 절반 적용함",
+                detail=f"나머지를 적용하세요 · 제안 {weights}",
+                cta_label="나머지 적용",
+                link=_tactical_link(portfolio.id),
+            )
+        else:
+            item = ActionItem(
+                id=f"tactical:{portfolio.id}",
+                kind="TACTICAL",
+                priority="HIGH",
+                title=f"{portfolio.name} 전술: {tactical.REGIME_LABELS[regime]} 국면 비중 적용 전",
+                detail=f"제안 {weights}",
+                cta_label="적용하기",
+                link=_tactical_link(portfolio.id),
+            )
+        items.append(item)
+        portfolio_ids.append(portfolio.id)
+    # 끝까지 성공했을 때만 기록 — 중간에 실패해 전술 행이 버려지면 리밸런싱 행은 그대로 보여야 한다
+    found_portfolio_ids.update(portfolio_ids)
+    return items
+
+
+async def _rebalance_items(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    cache: CacheStoreType,
+    *,
+    skip_portfolio_ids: Collection[uuid.UUID] = (),
+) -> list[ActionItem]:
+    drifted = [
+        s
+        for s in await get_drift_summaries(user_id, db, cache)
+        if s.needs_rebalancing and s.portfolio_id not in skip_portfolio_ids
+    ]
+    if not drifted:
+        return []
+    if len(drifted) == 1:
+        s = drifted[0]
+        return [
             ActionItem(
                 id=f"rebalance:{s.portfolio_id}",
                 kind="REBALANCE",
@@ -61,8 +163,20 @@ async def _rebalance_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
                 cta_label="점검하기",
                 link=_portfolio_link(s.portfolio_id),
             )
+        ]
+    worst = max(drifted, key=lambda s: s.max_drift_pct)
+    return [
+        ActionItem(
+            id=REBALANCE_GROUP_ID,
+            kind="REBALANCE",
+            priority="HIGH",
+            title=f"리밸런싱 필요 · 포트폴리오 {len(drifted)}개",
+            detail=f"{worst.portfolio_name} 최대 {worst.max_drift_pct:.1f}%p 이탈 외 {len(drifted) - 1}개",
+            cta_label="자세히 보기",
+            # 펼침 목록을 못 그릴 때의 대체 경로 — 진단 탭(기본 탭)이 포트폴리오별 이탈 현황을 보여 준다
+            link=_LINK_REBALANCING,
         )
-    return items
+    ]
 
 
 async def _dca_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
@@ -153,8 +267,10 @@ async def _challenge_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
     ]
 
 
-_SOURCES: list[tuple[str, Callable[[uuid.UUID, AsyncSession, CacheStoreType], Awaitable[list[ActionItem]]]]] = [
-    ("rebalance", _rebalance_items),
+_Source = Callable[[uuid.UUID, AsyncSession, CacheStoreType], Awaitable[list[ActionItem]]]
+
+# 전술·리밸런싱은 get_action_items가 앞에 붙인다(전술 항목이 난 포트폴리오를 리밸런싱에서 빼야 해서)
+_SOURCES: list[tuple[str, _Source]] = [
     ("dca", _dca_items),
     ("tax", _tax_items),
     ("challenge", _challenge_items),
@@ -163,7 +279,13 @@ _SOURCES: list[tuple[str, Callable[[uuid.UUID, AsyncSession, CacheStoreType], Aw
 
 async def get_action_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> list[ActionItem]:
     collected: list[ActionItem] = []
-    for name, source in _SOURCES:
+    tactical_portfolio_ids: set[uuid.UUID] = set()
+    sources: list[tuple[str, _Source]] = [
+        ("tactical", partial(_tactical_items, found_portfolio_ids=tactical_portfolio_ids)),
+        ("rebalance", partial(_rebalance_items, skip_portfolio_ids=tactical_portfolio_ids)),
+        *_SOURCES,
+    ]
+    for name, source in sources:
         try:
             collected.extend(await source(user_id, db, cache))
         except Exception as e:
@@ -174,6 +296,6 @@ async def get_action_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
                 await db.rollback()
             except Exception:
                 logger.warning("action_items_rollback_failed", source=name)
-    # 안정 정렬 — 같은 우선순위·마감이면 소스 순서(리밸런싱 → 적립 → 세금 → 챌린지)를 유지한다
+    # 안정 정렬 — 같은 우선순위·마감이면 소스 순서(전술 → 리밸런싱 → 적립 → 세금 → 챌린지)를 유지한다
     collected.sort(key=lambda it: (_PRIORITY_ORDER[it.priority], it.deadline or "9999-12-31"))
     return collected[:MAX_ACTION_ITEMS]

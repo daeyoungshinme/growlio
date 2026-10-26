@@ -44,7 +44,7 @@ export interface DashboardData {
 export const fetchDashboard = () => apiGet<DashboardData>("/dashboard");
 
 export type ActionItemKind =
-  "REBALANCE" | "DCA_SHORTFALL" | "TAX_WARNING" | "TAX_ACTION" | "CHALLENGE";
+  "TACTICAL" | "REBALANCE" | "DCA_SHORTFALL" | "TAX_WARNING" | "TAX_ACTION" | "CHALLENGE";
 
 /** 홈 "지금 할 일" 1행 — 백엔드 `action_items_service`가 우선순위·마감 순으로 최대 5건 반환 */
 export interface ActionItem {
@@ -57,5 +57,9 @@ export interface ActionItem {
   link: string;
   deadline: string | null;
 }
+
+/** 이탈 포트폴리오 2개 이상을 묶은 REBALANCE 행의 id — 백엔드 `action_items_service.REBALANCE_GROUP_ID`와 같은 값.
+ * 이 행은 링크 대신 drift-summary로 포트폴리오 목록을 펼친다(docs/plans/73). */
+export const REBALANCE_GROUP_ID = "rebalance:all";
 
 export const fetchActionItems = () => apiGet<ActionItem[]>("/dashboard/action-items");

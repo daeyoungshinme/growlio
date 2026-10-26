@@ -127,12 +127,13 @@ export function invalidatePortfolioData(qc: QueryClient) {
   ]);
 }
 
-/** 전술 배분 설정 변경 후 — 국면 상태 + 백테스트(비중표가 바뀌면 결과도 바뀜). 제안 비중 적용 시엔 포트폴리오 목표가
- * 바뀌므로 `invalidatePortfolioData`도 함께(포트폴리오 목록·드리프트·리밸런싱 전략). */
+/** 전술 배분 설정 변경 후 — 국면 상태 + 백테스트(비중표가 바뀌면 결과도 바뀜) + 홈 "지금 할 일"(전술 적용 항목).
+ * 제안 비중 적용 시엔 포트폴리오 목표가 바뀌므로 `invalidatePortfolioData`도 함께(포트폴리오 목록·드리프트·리밸런싱 전략). */
 export function invalidateTacticalData(qc: QueryClient, opts: { portfolioChanged?: boolean } = {}) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.tacticalStatusBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.tacticalBacktestBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
     ...(opts.portfolioChanged ? [invalidatePortfolioData(qc)] : []),
   ]);
 }

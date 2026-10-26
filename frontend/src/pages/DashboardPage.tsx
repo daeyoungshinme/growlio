@@ -20,8 +20,6 @@ import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
 const ActionItemsCard = lazy(() => import("../components/dashboard/ActionItemsCard"));
 
-const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
-
 const InvestmentSnapshotCard = lazy(() => import("../components/dashboard/InvestmentSnapshotCard"));
 
 const AllocationHistoryCard = lazy(() => import("../components/dashboard/AllocationHistoryCard"));
@@ -190,17 +188,11 @@ export default function DashboardPage() {
           />
         </ErrorBoundary>
 
-        {/* 지금 할 일: 리밸런싱·자동매수 예수금·세금·챌린지 행동 신호를 우선순위 1장으로 (docs/plans/50 M5) */}
+        {/* 지금 할 일: 리밸런싱·자동매수 예수금·세금·챌린지 행동 신호를 우선순위 1장으로 (docs/plans/50 M5)
+            + 하단 리밸런싱 상태·시장 신호 한 줄 — 예전 별도 "리밸런싱 점검" 카드를 흡수 (docs/plans/73) */}
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard rows={2} />}>
-            <ActionItemsCard />
-          </Suspense>
-        </ErrorBoundary>
-
-        {/* 리밸런싱 점검: 한 줄 상태 행 — "필요" 신호·행동 유도는 위 지금 할 일이 담당 (M5, plans/67 P1-3) */}
-        <ErrorBoundary variant="section">
-          <Suspense fallback={<SkeletonCard rows={1} />}>
-            <RebalancingStatusCard marketSignal={marketSignal} statusOnly />
+            <ActionItemsCard marketSignal={marketSignal} />
           </Suspense>
         </ErrorBoundary>
 
