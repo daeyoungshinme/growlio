@@ -1,15 +1,7 @@
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Activity,
-  TriangleAlert,
-  ArrowRight,
-  BellOff,
-  ChevronDown,
-  ChevronRight,
-  Shuffle,
-} from "lucide-react";
+import { Activity, TriangleAlert, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
 
 import { fetchDriftSummary } from "@/api/rebalancing";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
@@ -25,6 +17,7 @@ import { DRIFT_STATUS_LABEL, getDriftStatus } from "@/utils/portfolio";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { MARKET_SIGNAL_BADGE_CLASS, MARKET_SIGNAL_LABEL } from "@/utils/marketSignalBadge";
 
 const OTHER_INSIGHTS_VISIBLE_LIMIT = 3;
 
@@ -34,14 +27,6 @@ const SIGNAL_BG = {
   YELLOW:
     "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950/30 dark:border-yellow-800/40 dark:text-yellow-300",
   RED: "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-300",
-};
-
-const SIGNAL_LABEL = { GREEN: "안정", YELLOW: "주의", RED: "위험" };
-
-const SIGNAL_BADGE_CLASS = {
-  GREEN: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  YELLOW: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  RED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
 function PortfolioDriftRow({
@@ -180,10 +165,6 @@ interface Props {
   /** 지정 시, 포트폴리오가 하나도 없을 때 `null` 대신 "포트폴리오 만들기" CTA 카드를 렌더한다.
    * 리밸런싱 진단 탭 전용(대시보드 인스턴스는 미지정 → 종전대로 아무것도 렌더하지 않음). */
   emptyStateCta?: () => void;
-  /** 홈 전용 상태 확인 모드 — "리밸런싱 필요" 신호와 행동 유도는 홈 "지금 할 일"(`ActionItemsCard`)이
-   * 맡으므로, 이 카드는 기본 접힘 + 한 줄 상태 힌트만 보이고 헤더 "N개 필요" 배지·빨간 테두리·결합 안내
-   * 문구를 끈다(같은 drift-summary를 두 카드가 중복 표시하던 문제). 펼치면 전체 이탈 행·집중도는 그대로. */
-  statusOnly?: boolean;
 }
 
 // 손실수확(TAX_LOSS_HARVEST)은 홈 "지금 할 일"(절세 액션 플랜 1순위)이 담당해 홈 인스턴스에선 뺀다 (docs/plans/50 M5)
@@ -206,9 +187,8 @@ export default function RebalancingStatusCard({
   maxDriftRows,
   storageKey,
   emptyStateCta,
-  statusOnly = false,
 }: Props) {
-  const [isOpen, toggleOpen] = useCollapsible(!statusOnly, storageKey);
+  const [isOpen, toggleOpen] = useCollapsible(true, storageKey);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
   const {
     data: portfoliosRaw,
@@ -250,14 +230,6 @@ export default function RebalancingStatusCard({
     if (!driftSummaries) return 0;
     return driftSummaries.filter((s) => s.needs_rebalancing).length;
   }, [driftSummaries]);
-
-  let statusHint: string | undefined;
-  if (statusOnly && driftSummaries && driftSummaries.length > 0) {
-    statusHint =
-      needsCount === 0
-        ? `포트폴리오 ${driftSummaries.length}개 모두 목표 비중 이내`
-        : `포트폴리오 ${driftSummaries.length}개 중 ${needsCount}개 이탈`;
-  }
 
   const combinedStatusNote = useMemo(
     () => buildCombinedStatusNote(needsCount, marketSignal?.composite_level),
@@ -309,42 +281,8 @@ export default function RebalancingStatusCard({
     );
   }
 
-  // 홈: 한 줄 상태 행 — 이탈 상세는 "지금 할 일"·리밸런싱 탭이 담당하므로 펼침 카드를 두지 않는다
-  // (같은 drift-summary가 홈에 4번 노출되던 문제, docs/plans/67 P1-3)
-  if (statusOnly) {
-    return (
-      <Link
-        to="/rebalancing"
-        className="card flex items-center gap-3 min-h-[44px] active:opacity-70 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
-      >
-        <div className="p-1.5 bg-blue-50 dark:bg-blue-950 rounded-lg shrink-0">
-          <Shuffle size={16} className="text-blue-600 dark:text-blue-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">리밸런싱 점검</p>
-          {statusHint && (
-            <p
-              className={`text-xs mt-0.5 ${needsCount > 0 ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}
-            >
-              {statusHint}
-            </p>
-          )}
-        </div>
-        {marketSignal && (
-          <span
-            className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 shrink-0 ${SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
-            시장 {SIGNAL_LABEL[marketSignal.composite_level]}
-          </span>
-        )}
-        <ChevronRight size={16} className="shrink-0 text-gray-400 dark:text-gray-500" />
-      </Link>
-    );
-  }
-
   const cardClass =
-    needsCount > 0 && !statusOnly
+    needsCount > 0
       ? "card border-red-300 dark:border-red-700/60 ring-1 ring-red-200 dark:ring-red-800/40"
       : "card";
 
@@ -355,7 +293,7 @@ export default function RebalancingStatusCard({
       iconColorClassName="text-blue-600 dark:text-blue-400"
       title="리밸런싱 점검"
       titleBadge={
-        !statusOnly && needsCount > 0 ? (
+        needsCount > 0 ? (
           <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
             {needsCount}개 필요
           </span>
@@ -365,10 +303,10 @@ export default function RebalancingStatusCard({
         <>
           {marketSignal && signalDisplay === "badge" && (
             <span
-              className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 ${SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}
+              className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 ${MARKET_SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
-              {SIGNAL_LABEL[marketSignal.composite_level]}
+              {MARKET_SIGNAL_LABEL[marketSignal.composite_level]}
             </span>
           )}
           {!showAllInsights && (
@@ -383,7 +321,6 @@ export default function RebalancingStatusCard({
       }
       isOpen={isOpen}
       onToggle={toggleOpen}
-      collapsedHint={statusHint}
       cardClassName={cardClass}
     >
       {/* 시장 신호 배너 */}
@@ -399,7 +336,7 @@ export default function RebalancingStatusCard({
           )}
           <span>
             시장 신호:{" "}
-            <span className="font-bold">{SIGNAL_LABEL[marketSignal.composite_level]}</span>
+            <span className="font-bold">{MARKET_SIGNAL_LABEL[marketSignal.composite_level]}</span>
             {marketSignal.composite_level !== "GREEN" && " — 리밸런싱 전략을 확인하세요"}
           </span>
           <ArrowRight size={12} className="ml-auto flex-shrink-0" />
@@ -407,7 +344,7 @@ export default function RebalancingStatusCard({
       )}
 
       {/* 이탈 종목 + 시장상황 결합 안내 */}
-      {!statusOnly && combinedStatusNote && (
+      {combinedStatusNote && (
         <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
           {combinedStatusNote}
         </p>

@@ -337,6 +337,44 @@ class TestWeights:
         assert out == {"QQQ": 50, "SPY": 20, "DIA": 20, "CASH": 10}
 
 
+class TestPendingAction:
+    """홈 "지금 할 일" 전술 판정 — 프론트 tacticalNextAction의 action 톤과 같다 (docs/plans/75)."""
+
+    @staticmethod
+    def _portfolio(weights):
+        return SimpleNamespace(items=[SimpleNamespace(ticker=t, weight=w) for t, w in weights.items()])
+
+    _ON = {"QQQ": 50.0, "SPY": 40.0, "CASH": 10.0}
+
+    def test_applied_and_weights_match(self):
+        assert (
+            tactical.pending_action(
+                _strategy(last_regime="RISK_ON", applied_regime="RISK_ON"), self._portfolio(self._ON)
+            )
+            is None
+        )
+
+    def test_regime_not_applied(self):
+        s = _strategy(last_regime="RISK_ON", applied_regime="NEUTRAL")
+        assert tactical.pending_action(s, self._portfolio(self._ON)) == "APPLY"
+
+    def test_weights_drifted_from_proposal(self):
+        # 웅덩이 투입으로 제안 비중이 바뀜
+        s = _strategy(last_regime="RISK_ON", applied_regime="RISK_ON", dip_level=1, dip_shift_pct=10.0)
+        assert tactical.pending_action(s, self._portfolio(self._ON)) == "APPLY"
+
+    def test_partial(self):
+        s = _strategy(last_regime="RISK_ON", applied_regime="NEUTRAL", partial_regime="RISK_ON")
+        assert tactical.pending_action(s, self._portfolio({})) == "PARTIAL"
+
+    def test_pending_or_unconfirmed_is_not_action(self):
+        assert (
+            tactical.pending_action(_strategy(last_regime="RISK_ON", pending_regime="NEUTRAL"), self._portfolio({}))
+            is None
+        )
+        assert tactical.pending_action(_strategy(last_regime=None), self._portfolio({})) is None
+
+
 # ---------------------------------------------------------------------------
 # 백테스트 시뮬레이션
 # ---------------------------------------------------------------------------

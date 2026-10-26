@@ -821,24 +821,6 @@ describe("RebalancingStatusCard", () => {
     expect(onCreate).toHaveBeenCalled();
   });
 
-  it("statusOnly면 결합 안내 문구를 숨긴다", async () => {
-    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
-    vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
-      { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
-    ] as never);
-    renderWithProviders(
-      <MemoryRouter>
-        <RebalancingStatusCard marketSignal={{ composite_level: "RED" } as never} statusOnly />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(screen.getByText("리밸런싱 점검")).toBeInTheDocument();
-    });
-    expect(
-      screen.queryByText(/시장 위험 신호가 높은 국면에서 이탈 종목이 발견되었습니다/),
-    ).not.toBeInTheDocument();
-  });
-
   it("기본(진단탭)이면 결합 안내 문구를 표시한다", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
@@ -854,45 +836,6 @@ describe("RebalancingStatusCard", () => {
         screen.getByText(/시장 위험 신호가 높은 국면에서 이탈 종목이 발견되었습니다/),
       ).toBeInTheDocument();
     });
-  });
-
-  it("statusOnly: 모든 포트폴리오가 정상이면 한 줄 정상 힌트만 보인다", async () => {
-    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
-    vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
-      { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 1, needs_rebalancing: false },
-    ] as never);
-    renderWithProviders(
-      <MemoryRouter>
-        <RebalancingStatusCard showDriftRows statusOnly />
-      </MemoryRouter>,
-    );
-    expect(await screen.findByText("포트폴리오 1개 모두 목표 비중 이내")).toBeInTheDocument();
-    expect(screen.queryByText("포트폴리오 이탈 현황")).not.toBeInTheDocument();
-  });
-
-  it("statusOnly: 리밸런싱 필요 포트폴리오가 있어도 한 줄 상태 행만 — 필요 배지·결합 안내·이탈 행은 지금 할 일·리밸런싱 탭 몫", async () => {
-    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
-    vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
-      { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
-    ] as never);
-    renderWithProviders(
-      <MemoryRouter>
-        <RebalancingStatusCard
-          showDriftRows
-          statusOnly
-          marketSignal={{ composite_level: "RED" } as never}
-        />
-      </MemoryRouter>,
-    );
-    expect(await screen.findByText("포트폴리오 1개 중 1개 이탈")).toBeInTheDocument();
-    expect(screen.queryByText("포트폴리오 이탈 현황")).not.toBeInTheDocument();
-    expect(screen.queryByText("1개 필요")).not.toBeInTheDocument();
-    expect(screen.queryByText(/이탈 종목이 발견되었습니다/)).not.toBeInTheDocument();
-    expect(screen.getByText("시장 위험")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /리밸런싱 점검/ })).toHaveAttribute(
-      "href",
-      "/rebalancing",
-    );
   });
 });
 

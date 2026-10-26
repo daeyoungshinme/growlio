@@ -353,6 +353,27 @@ def is_tactical_managed(portfolio: Portfolio) -> bool:
     return all(item.ticker in TACTICAL_ASSETS for item in portfolio.items)
 
 
+def pending_action(strategy: TacticalStrategy, portfolio: Portfolio) -> Literal["APPLY", "PARTIAL"] | None:
+    """확정 국면의 제안 비중을 아직 적용하지 않았으면 "APPLY", 절반만 적용했으면 "PARTIAL" — 홈 "지금 할 일"용.
+
+    프론트 `tacticalNextAction`의 action 톤과 같은 판정(적립 연동 모드는 호출부가 거른다). 전환 확인 중이면
+    다음 거래일 재확인 후 적용하라는 안내뿐이라 할 일로 보지 않는다. 제안 비중은 저장된 틸트·웅덩이 단계로
+    계산하므로(`apply_regime_to_portfolio`와 같은 `market={}`) 시세를 조회하지 않는다.
+    """
+    regime = strategy.last_regime
+    if regime is None or strategy.pending_regime:
+        return None
+    if strategy.partial_regime == regime:
+        return "PARTIAL"
+    if strategy.applied_regime != regime:
+        return "APPLY"
+    proposed = proposed_weights_for(strategy, regime, {})
+    current = _current_weights(portfolio)
+    if any(round(current.get(a, 0.0), 1) != round(proposed.get(a, 0.0), 1) for a in TACTICAL_ASSETS):
+        return "APPLY"
+    return None
+
+
 async def build_status(
     portfolio: Portfolio,
     strategy: TacticalStrategy | None,

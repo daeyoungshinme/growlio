@@ -85,10 +85,10 @@ export default memo(function HeroSummaryCard({
 
   return (
     <div className="card">
-      {/* 모바일: [지표 | 도넛] 아래 범례 전폭 행 / sm+: 범례가 도넛 아래 (docs/plans/67 P1-2) */}
+      {/* 1행 [지표 | 도넛], 2행 [업데이트 시각 | 범례] — 범례는 항상 도넛 바로 아래 (docs/plans/67 P1-2) */}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 sm:gap-x-4 items-center">
         {/* 좌: 제목/금액 + 지표 */}
-        <div className="min-w-0 flex flex-col gap-1 sm:gap-2 sm:row-span-2">
+        <div className="min-w-0 flex flex-col gap-1 sm:gap-2">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-xs text-gray-500 dark:text-gray-400 font-medium">전체 자산</h2>
             <div className="flex items-center gap-1">
@@ -134,9 +134,6 @@ export default memo(function HeroSummaryCard({
               </p>
             </div>
           </div>
-          {updatedLabel && (
-            <p className="text-xs text-gray-400 dark:text-gray-500">{updatedLabel}</p>
-          )}
         </div>
 
         {/* 우: 도넛 */}
@@ -150,9 +147,14 @@ export default memo(function HeroSummaryCard({
           )}
         </div>
 
-        {/* 범례: 비중만 표시 — 금액은 아래 카드(주식 투자 현황)·자산 탭과 중복이라 sm+에서만 (67 P1-2) */}
+        {updatedLabel && (
+          <p className="text-xs text-gray-400 dark:text-gray-500 sm:self-end">{updatedLabel}</p>
+        )}
+
+        {/* 범례: 비중만 표시 — 금액은 아래 카드(주식 투자 현황)·자산 탭과 중복이라 sm+에서만 (67 P1-2).
+            모바일 max-w-40: 2항목은 한 줄, 그 이상은 도넛 폭 근처에서 줄바꿈(지표 열을 밀어내지 않게) */}
         {allocationChartData.length > 0 && (
-          <ul className="col-span-2 sm:col-span-1 sm:col-start-2 flex flex-wrap gap-x-3 gap-y-1 sm:grid sm:grid-cols-2 sm:gap-x-1.5 sm:gap-y-0.5">
+          <ul className="col-start-2 justify-self-center max-w-40 flex flex-wrap justify-center gap-x-2 gap-y-1 sm:max-w-none sm:justify-self-stretch sm:grid sm:grid-cols-2 sm:gap-x-1.5 sm:gap-y-0.5">
             {allocationChartData.map((item, i) => (
               <li key={i} className="flex items-center gap-1 min-w-0">
                 <span
