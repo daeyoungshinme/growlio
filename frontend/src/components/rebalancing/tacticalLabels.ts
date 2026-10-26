@@ -38,20 +38,24 @@ export const TACTICAL_ASSETS: TacticalAsset[] = ["QQQ", "SPY", "DIA", "QLD", "SS
 /** 0%면 비중 문구·표에서 생략하는 선택 자산 — 백엔드 tactical_allocation_service.OPTIONAL_ASSETS */
 export const OPTIONAL_ASSETS: ReadonlySet<TacticalAsset> = new Set(["DIA", "QLD", "SSO"]);
 export const LEVERAGED_ASSETS: ReadonlySet<TacticalAsset> = new Set(["QLD", "SSO"]);
+/** 포트폴리오에 지수 그룹으로 적용되는 자산 — 백엔드 tactical_allocation_service.ASSET_GROUP_KEYS */
+export const INDEX_GROUP_ASSETS: ReadonlySet<TacticalAsset> = new Set(["QQQ", "SPY", "DIA"]);
 
+/**
+ * 전술 자산 이름 — 백엔드 tactical_allocation_service.ASSET_LABELS. QQQ·SPY·DIA는 지수 그룹(대표 종목+같은 지수
+ * 보유 종목, plans/76) 비중이고, QQQ·SPY 가격은 국면 판정·백테스트에만 쓴다.
+ */
 export const ASSET_LABEL: Record<TacticalAsset, string> = {
-  QQQ: "QQQ (나스닥100)",
-  SPY: "SPY (S&P500)",
-  DIA: "DIA (다우존스)",
-  QLD: "QLD (나스닥100 2배)",
-  SSO: "SSO (S&P500 2배)",
+  QQQ: "나스닥100",
+  SPY: "S&P500",
+  DIA: "다우존스",
+  QLD: "나스닥100 2배",
+  SSO: "S&P500 2배",
   CASH: "현금",
 };
 
-/** 화면 문구용 전술 자산 나열("QQQ·SPY·…·현금") */
-export const TACTICAL_ASSET_LIST_TEXT = TACTICAL_ASSETS.map((a) =>
-  a === "CASH" ? "현금" : a,
-).join("·");
+/** 화면 문구용 전술 자산 나열("나스닥100·S&P500·…·현금") */
+export const TACTICAL_ASSET_LIST_TEXT = TACTICAL_ASSETS.map((a) => ASSET_LABEL[a]).join("·");
 
 /** 백엔드 tactical_dip.PULLBACK_LABELS와 같은 문구 유지 */
 export const PULLBACK_LABEL: Record<PullbackStage, string> = {
@@ -76,7 +80,7 @@ export const PULLBACK_BADGE_CLASS: Record<PullbackStage, string> = {
 /** 비중 문구 — 백엔드 tactical_allocation_service.format_weights와 같은 규칙(선택 자산은 0%면 생략) */
 export function formatTacticalWeights(weights: Partial<Record<TacticalAsset, number>>): string {
   return TACTICAL_ASSETS.filter((a) => !OPTIONAL_ASSETS.has(a) || (weights[a] ?? 0) > 0)
-    .map((a) => `${a === "CASH" ? "현금" : a} ${weights[a] ?? 0}%`)
+    .map((a) => `${ASSET_LABEL[a]} ${weights[a] ?? 0}%`)
     .join(" · ");
 }
 

@@ -21,7 +21,9 @@ from app.core.config import settings
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
+from app.services.rebalancing.group_expansion import expand_group_items
 from app.services.rebalancing.order_builder import (
+    _flatten_account_tax_types,
     build_rebalancing_orders,
     clamp_orders_to_max_value,
     filter_drifting_items,
@@ -351,6 +353,12 @@ async def build_pending_plan_for_alert(
     if not drifting:
         logger.info("rebalancing_plan_no_drift", alert_id=str(alert.id))
         return None
+
+    # 지수 그룹 행(plans/74)은 매수 계좌의 세제유형에 맞춰 종목 단위 멤버 행으로 펼친다(ISA·연금이면 국내 대체 종목).
+    # 펼친 멤버 행은 analysis.items 그룹 행의 members와 같은 객체라 아래 시세 갱신이 세금영향 미리보기에도 반영된다
+    buy_account_id = account_id_override or alert.account_id
+    buy_tax_type = _flatten_account_tax_types(analysis.ticker_account_map).get(str(buy_account_id), "GENERAL")
+    drifting = expand_group_items(drifting, buy_tax_type)
 
     # 게이트 판정(세금영향·하루합산한도) 이전에 라이브 시세로 갱신 — analysis.items와 drifting은
     # 같은 객체를 참조하므로 여기서 갱신하면 아래 _build_tax_preview(analysis, ...)에도 반영된다.

@@ -37,6 +37,13 @@ class RebalancingItem(BaseModel):
     return_10y_pct: float | None = None  # 10년 누적 수익률 (%)
     cagr_10y_pct: float | None = None  # 10년 연환산 수익률 (%)
     actual_years_10y: float | None = None  # 실제 데이터 기간 (년)
+    # 지수 그룹 항목(plans/74) — 그룹 행은 shares_to_trade/target_qty가 None이고 종목별 수량은 members에 있다.
+    # ticker/market은 대표 매수 종목. 멤버 행의 group_role은 PRIMARY | MEMBER | DOMESTIC_ALT
+    group_key: str | None = None
+    group_label: str | None = None
+    group_role: str | None = None
+    leverage: float | None = None  # 그룹 멤버 행의 레버리지 배수(노출 = 평가액 × 배수)
+    members: list["RebalancingItem"] = []
 
 
 class CurrentHolding(BaseModel):

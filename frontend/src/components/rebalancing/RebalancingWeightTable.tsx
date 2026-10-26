@@ -14,9 +14,51 @@ import {
 import {
   calcSignedTradeKrw,
   calcTradeKrw,
+  flattenTradeItems,
+  isGroupItem,
   isTradableItem,
   TRADING_FEE_RATE,
 } from "./rebalancingTradeMath";
+
+function GroupBadge() {
+  return (
+    <span className="text-[11px] font-medium text-indigo-700 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-900/40 px-1.5 py-0.5 rounded shrink-0">
+      지수
+    </span>
+  );
+}
+
+// 지수 그룹(plans/74) 멤버별 매매 — 그룹 차이를 대표 종목 매수/비대표 멤버 우선 매도로 나눈 결과
+function GroupMemberLines({ item }: { item: RebalancingItem }) {
+  return (
+    <ul className="space-y-0.5">
+      {(item.members ?? []).map((m) => {
+        const signed = calcSignedTradeKrw(m);
+        const shares = m.shares_to_trade;
+        const label =
+          m.target_value_krw === m.current_value_krw
+            ? "유지"
+            : `${signed > 0 ? "매수" : "매도"}${shares ? ` ${Math.abs(Math.round(shares))}주` : ""} · ${signed > 0 ? "+" : ""}${fmtKrw(signed)}`;
+        return (
+          <li
+            key={`${m.ticker}-${m.market}`}
+            className="flex justify-between gap-2 text-xs text-gray-500 dark:text-gray-400"
+          >
+            <span className="truncate">
+              {m.name} <span className="text-gray-400 dark:text-gray-500">{m.ticker}</span>
+              {(m.leverage ?? 1) > 1 && ` · ${m.leverage}배`}
+              {m.group_role === "PRIMARY" && " · 대표"}
+              {m.group_role === "DOMESTIC_ALT" && " · 국내 대체"}
+            </span>
+            <span className="shrink-0 tabular-nums">
+              {fmtKrw(m.current_value_krw)} · {label}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 // 매매 가능 종목의 실제 거래 내역(가격×수량 + 수수료) — 모바일/데스크탑 공용
 function TradeExecutionDetail({ item }: { item: RebalancingItem }) {
@@ -43,7 +85,8 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
   const action = !hasTrade
     ? "유지"
     : `${isBuy ? "매수" : "매도"}${shares ? ` ${Math.abs(Math.round(shares))}주` : ""}`;
-  const hasDetail = isTradableItem(item) && (shares ?? 0) !== 0;
+  const isGroup = isGroupItem(item);
+  const hasDetail = isGroup || (isTradableItem(item) && (shares ?? 0) !== 0);
 
   return (
     <div className="py-2.5 px-1">
@@ -59,6 +102,7 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
             <p className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm">
               {item.name}
             </p>
+            {isGroup && <GroupBadge />}
             {isUntracked && (
               <span className="text-xs text-amber-600 dark:text-amber-500 shrink-0">목표 외</span>
             )}
@@ -93,7 +137,12 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
           </span>
         </div>
       </button>
-      {open && hasDetail && (
+      {open && isGroup && (
+        <div className="mt-1 pl-0.5">
+          <GroupMemberLines item={item} />
+        </div>
+      )}
+      {open && hasDetail && !isGroup && (
         <div className="mt-1 pl-0.5 space-y-0.5">
           <p className="text-xs text-gray-500 dark:text-gray-400">{item.ticker}</p>
           {item.current_qty != null && item.target_qty != null && (
@@ -108,15 +157,25 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
   );
 }
 
-function RebalancingItemRow({ item }: { item: RebalancingItem }) {
-  const isUntracked = item.target_weight_pct === 0 && item.diff_krw < 0;
+function RebalancingItemRow({ item, nested = false }: { item: RebalancingItem; nested?: boolean }) {
+  const isUntracked = !nested && item.target_weight_pct === 0 && item.diff_krw < 0;
+  const isGroup = isGroupItem(item);
   return (
-    <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 group">
-      <td className="py-3.5 px-3 sticky left-0 bg-white dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 transition-colors">
-        <div className="font-medium text-gray-900 dark:text-gray-100 truncate max-w-[160px]">
-          {item.name}
+    <tr
+      className={`border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 group ${nested ? "text-xs" : ""}`}
+    >
+      <td
+        className={`${nested ? "py-2 pl-7 pr-3" : "py-3.5 px-3"} sticky left-0 bg-white dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 transition-colors`}
+      >
+        <div className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-gray-100 max-w-[180px]">
+          <span className="truncate">{item.name}</span>
+          {isGroup && <GroupBadge />}
         </div>
-        <div className="text-xs text-gray-500 dark:text-gray-400">{item.ticker}</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          {isGroup
+            ? `${item.members?.length ?? 0}개 종목 합산${item.members?.some((m) => (m.leverage ?? 1) > 1) ? " · 노출 기준" : ""}`
+            : `${item.ticker}${(item.leverage ?? 1) > 1 ? ` · ${item.leverage}배` : ""}${item.group_role === "PRIMARY" ? " · 대표" : item.group_role === "DOMESTIC_ALT" ? " · 국내 대체" : ""}`}
+        </div>
         {isUntracked && (
           <div className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">목표 외</div>
         )}
@@ -154,7 +213,7 @@ function RebalancingItemRow({ item }: { item: RebalancingItem }) {
 
 // 리밸런싱 비중 테이블 — 모바일 카드 뷰 + 데스크탑 테이블 뷰 (종목별 거래 실행 정보 포함)
 export default function RebalancingWeightTable({ items }: { items: RebalancingItem[] }) {
-  const unpricedItems = items.filter(
+  const unpricedItems = flattenTradeItems(items).filter(
     (i) =>
       i.diff_krw !== 0 &&
       (i.shares_to_trade === null || !i.current_price_krw) &&
@@ -187,9 +246,12 @@ export default function RebalancingWeightTable({ items }: { items: RebalancingIt
             </tr>
           </thead>
           <tbody>
-            {items.map((item, idx) => (
-              <RebalancingItemRow key={idx} item={item} />
-            ))}
+            {items.flatMap((item, idx) => [
+              <RebalancingItemRow key={idx} item={item} />,
+              ...(isGroupItem(item) ? (item.members ?? []) : []).map((m) => (
+                <RebalancingItemRow key={`${idx}-${m.ticker}-${m.market}`} item={m} nested />
+              )),
+            ])}
           </tbody>
         </table>
       </div>

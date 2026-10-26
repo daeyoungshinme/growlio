@@ -1,4 +1,4 @@
-"""QQQ/SPY 전술 배분 API — 매크로+차트 국면 조회·전략 설정·제안 비중 적용·규칙 백테스트.
+"""나스닥100/S&P500 전술 배분 API — 매크로+차트 국면 조회·전략 설정·제안 비중 적용·규칙 백테스트.
 
 자동 주문은 없다. `/apply`는 포트폴리오 목표 비중만 바꾸고, 실제 주문은 기존 리밸런싱 실행 화면에서 한다.
 """
@@ -12,16 +12,17 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
-from app.core.cache_store import get_cache_store
+from app.core.cache_store import CacheStore, get_cache_store
 from app.limiter import limiter
 from app.models.alert import RebalancingAlert
-from app.models.portfolio import Portfolio
+from app.models.portfolio import Portfolio, PortfolioAccount
 from app.models.tactical import TacticalStrategy
 from app.models.user import User
+from app.schemas.portfolio import IndexGroupSuggestion
 from app.services import tactical_allocation_service as tactical
 from app.services.tactical_dip import DEFAULT_DIP_SHIFT_PCT, MAX_DIP_SHIFT_PCT
 from app.services.tactical_tilt import DEFAULT_TILT_SHIFT_PCT, MAX_TILT_SHIFT_PCT
@@ -152,6 +153,27 @@ async def delete_tactical_strategy(
         await db.commit()
 
 
+async def _group_suggestions(
+    portfolio: Portfolio, user: User, db: AsyncSession, cache: CacheStore
+) -> dict[str, IndexGroupSuggestion] | None:
+    """새로 만들 지수 그룹의 멤버·국내 대체 종목 — 포트폴리오 연결 계좌의 보유 종목 기준 제안(plans/76).
+
+    실패해도 적용은 막지 않는다(대표 종목만으로 그룹 생성).
+    """
+    from app.services.index_exposure_service import get_index_group_suggestions
+
+    try:
+        rows = await db.execute(
+            select(PortfolioAccount.account_id).where(PortfolioAccount.portfolio_id == portfolio.id)
+        )
+        account_ids = list(rows.scalars().all()) or None
+        result = await get_index_group_suggestions(cache, db, user.id, account_ids)
+    except Exception as exc:
+        logger.warning("tactical_group_suggestions_failed", portfolio_id=str(portfolio.id), error=str(exc))
+        return None
+    return {g.key: g for g in result.groups}
+
+
 @router.post("/{portfolio_id}/apply")
 @limiter.limit("10/minute")
 async def apply_tactical_weights(
@@ -189,11 +211,18 @@ async def apply_tactical_weights(
             detail="이미 절반을 적용했어요. 나머지를 적용해주세요.",
         )
 
-    await tactical.apply_regime_to_portfolio(portfolio, strategy, regime, db, fraction=fraction)
+    cache = await get_cache_store()
+    suggestions = (
+        await _group_suggestions(portfolio, current_user, db, cache)
+        if tactical.needs_group_suggestions(portfolio, strategy, regime, fraction)
+        else None
+    )
+    await tactical.apply_regime_to_portfolio(
+        portfolio, strategy, regime, db, fraction=fraction, group_suggestions=suggestions
+    )
     strategy.notified_regime = strategy.last_regime  # 이미 반영했으니 같은 국면으로 다시 알릴 필요 없음
     await db.commit()
 
-    cache = await get_cache_store()
     await invalidate_user_caches(cache, portfolio_list_key(current_user.id))
     await invalidate_rebalancing_analysis_cache(cache, current_user.id, portfolio_id)
 

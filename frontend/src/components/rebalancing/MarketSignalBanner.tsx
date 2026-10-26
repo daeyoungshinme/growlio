@@ -135,7 +135,7 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
               onClick={onOpenTactical}
               className={`${TOUCH_TARGET_ROW} gap-0.5 text-xs text-blue-600 dark:text-blue-400 hover:underline`}
             >
-              이 신호로 QQQ·SPY 비중을 조절하려면 → 목표 조정 › 전술
+              이 신호로 나스닥·S&P500 비중을 조절하려면 → 목표 조정 › 전술
             </button>
           )}
         </div>

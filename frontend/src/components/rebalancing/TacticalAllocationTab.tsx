@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ListChecks } from "lucide-react";
 import { fetchPortfolios } from "@/api/portfolios";
-import type { TacticalStatus, TechnicalSnapshot } from "@/api/tactical";
+import type { TacticalAsset, TacticalStatus, TechnicalSnapshot } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import Modal, { ModalFooter } from "@/components/common/Modal";
 import EmptyState from "@/components/common/EmptyState";
@@ -27,6 +27,7 @@ import TacticalWeightsEditor from "./TacticalWeightsEditor";
 import {
   ASSET_LABEL,
   formatTacticalWeights,
+  INDEX_GROUP_ASSETS,
   type NextActionTone,
   OPTIONAL_ASSETS,
   PULLBACK_BADGE_CLASS,
@@ -267,6 +268,19 @@ function TacticalDetails({ status }: { status: TacticalStatus }) {
   );
 }
 
+/** 지수 그룹 자산 행 보조 문구 — 대표 종목·합산 종목 수, 그룹이 아직 없으면 적용 시 묶인다는 안내 (plans/76) */
+function GroupNote({ asset, status }: { asset: TacticalAsset; status: TacticalStatus }) {
+  if (!INDEX_GROUP_ASSETS.has(asset)) return null;
+  const group = status.current_groups?.[asset];
+  const text = group
+    ? `대표 ${group.primary}${group.member_count > 0 ? ` · ${group.member_count}종목 합산` : ""}`
+    : (status.proposed_weights?.[asset] ?? 0) > 0
+      ? "적용하면 같은 지수 보유 종목을 묶어요"
+      : null;
+  if (!text) return null;
+  return <span className="block text-xs text-gray-500 dark:text-gray-400">{text}</span>;
+}
+
 function WeightsCompare({ status }: { status: TacticalStatus }) {
   const proposed = status.proposed_weights;
   const otherCurrent = Object.entries(status.current_weights)
@@ -289,7 +303,10 @@ function WeightsCompare({ status }: { status: TacticalStatus }) {
           if (OPTIONAL_ASSETS.has(a) && cur === 0 && next === 0) return null;
           return (
             <tr key={a} className="border-t border-gray-100 dark:border-gray-700">
-              <td className="py-1.5">{ASSET_LABEL[a]}</td>
+              <td className="py-1.5">
+                {ASSET_LABEL[a]}
+                <GroupNote asset={a} status={status} />
+              </td>
               <td className="py-1.5 text-right">{cur}%</td>
               <td
                 className={`py-1.5 text-right font-semibold ${cur !== next ? "text-blue-600 dark:text-blue-400" : ""}`}
@@ -348,7 +365,7 @@ function TacticalStatusView({
       <section className="card flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           {/* "주문은 나가지 않아요"는 목표 조정 탭 상단 안내가 이미 말한다 — 반복 제거 (docs/plans/67 P1-8) */}
-          <h2 className="text-base font-semibold">QQQ·SPY 전술 배분</h2>
+          <h2 className="text-base font-semibold">나스닥·S&P500 전술 배분</h2>
           {regime ? (
             <span className="shrink-0 flex flex-col items-end gap-0.5">
               <span
@@ -543,6 +560,7 @@ function TacticalStatusView({
             <p className="text-gray-500 dark:text-gray-400">
               {autoExecutionNotice ??
                 "주문은 나가지 않으며, 다음 화면에서 매매 내역을 확인한 뒤 직접 실행해요."}
+              {" 지수 그룹의 대표·합산 종목 구성은 그대로 두고 비중만 바꿔요."}
               {!status.portfolio_compatible &&
                 ` ${TACTICAL_ASSET_LIST_TEXT} 외 종목은 목표에서 빠집니다.`}
             </p>
@@ -614,7 +632,7 @@ export default function TacticalAllocationTab({
       <div className="card">
         <EmptyState
           title="포트폴리오가 없어요"
-          description="QQQ·SPY 비중을 관리할 포트폴리오를 먼저 만들어주세요."
+          description="나스닥·S&P500 비중을 관리할 포트폴리오를 먼저 만들어주세요."
           action={
             onCreatePortfolio
               ? { label: "포트폴리오 만들기", onClick: onCreatePortfolio }

@@ -18,6 +18,7 @@ from app.constants import CASH_EQUIVALENT_TICKER, TAX_DEFERRED_TAX_TYPES
 from app.models.user import UserSettings
 from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxImpactItem
 from app.services.market_signal_service import get_market_signal
+from app.services.rebalancing.group_expansion import iter_trade_items
 from app.services.risk_service import get_portfolio_risk_metrics
 from app.services.tax_service import _OVERSEAS_MARKETS, estimate_overseas_transfer_tax
 from app.utils.cache_keys import CacheStoreType
@@ -110,7 +111,8 @@ def _build_tax_preview(
     total_fee = 0.0
     tax_items: list[TaxImpactItem] = []
 
-    for item in analysis.items:
+    # 지수 그룹 행은 수량이 없어 아래 "보유수량 전체 매도" 폴백에 걸린다 — 종목 단위 멤버 행으로 평탄화
+    for item in iter_trade_items(analysis.items):
         if item.diff_krw >= 0:
             continue
         if item.ticker in _EXCLUDED_TICKERS or item.market in _EXCLUDED_MARKETS:

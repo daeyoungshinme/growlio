@@ -227,7 +227,7 @@ async def test_tactical_regime_not_applied_is_high():
     item = items[0]
     assert item.priority == "HIGH"
     assert item.title == "미국 전술 전술: 공격 국면 비중 적용 전"
-    assert item.detail == "제안 QQQ 50% · SPY 40% · 현금 10%"
+    assert item.detail == "제안 나스닥100 50% · S&P500 40% · 현금 10%"
     assert item.cta_label == "적용하기"
     assert item.link == f"/rebalancing?rtab=목표 조정&gmode=전술&portfolioId={row[1].id}"
 

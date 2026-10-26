@@ -23,7 +23,7 @@ import { getPortfolioHorizonTaxType, getPortfolioTargetState } from "@/utils/por
 import { isBankAccount, isStockAccount } from "@/utils/accounts";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import { normalizeWeights } from "@/utils/recommendationDrift";
+import { toPortfolioItemsPreservingGroups } from "@/utils/recommendationDrift";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
 import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
@@ -244,8 +244,10 @@ export default function RecommendationCard({
       items: GoalRecommendationItem[];
       accountIds?: string[];
     }) => {
+      // 대상 포트폴리오의 지수 그룹(plans/74)은 유지 — 추천이 그룹 멤버를 내면 그룹 비중으로 합산한다
+      const current = portfolios.find((p) => p.id === portfolioId)?.items ?? [];
       const body: { items: PortfolioItem[]; account_ids?: string[] } = {
-        items: normalizeWeights(items),
+        items: toPortfolioItemsPreservingGroups(items, current),
       };
       if (accountIds?.length) body.account_ids = accountIds;
       await updatePortfolio(portfolioId, body);

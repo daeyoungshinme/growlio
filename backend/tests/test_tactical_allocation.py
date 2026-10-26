@@ -312,13 +312,16 @@ class TestWeights:
         assert tactical.resolve_weights(_strategy(regime_weights={"bad": {}})) is tactical.DEFAULT_REGIME_WEIGHTS
 
     def test_format(self):
-        assert tactical.format_weights({"QQQ": 50, "SPY": 40, "CASH": 10}) == "QQQ 50% · SPY 40% · 현금 10%"
+        assert tactical.format_weights({"QQQ": 50, "SPY": 40, "CASH": 10}) == "나스닥100 50% · S&P500 40% · 현금 10%"
 
     def test_format_shows_dia_only_when_held(self):
-        assert tactical.format_weights({"QQQ": 0, "SPY": 40, "DIA": 0, "CASH": 60}) == "QQQ 0% · SPY 40% · 현금 60%"
+        assert (
+            tactical.format_weights({"QQQ": 0, "SPY": 40, "DIA": 0, "CASH": 60})
+            == "나스닥100 0% · S&P500 40% · 현금 60%"
+        )
         assert (
             tactical.format_weights({"QQQ": 40, "SPY": 30, "DIA": 20, "CASH": 10})
-            == "QQQ 40% · SPY 30% · DIA 20% · 현금 10%"
+            == "나스닥100 40% · S&P500 30% · 다우존스 20% · 현금 10%"
         )
 
     def test_dia_table_accepted_and_legacy_table_fills_zero(self):
@@ -335,6 +338,11 @@ class TestWeights:
     def test_tilt_keeps_dia_share(self):
         out = tilt.apply_tilt({"QQQ": 40, "SPY": 30, "DIA": 20, "CASH": 10}, "FAVOR_QQQ", 10)
         assert out == {"QQQ": 50, "SPY": 20, "DIA": 20, "CASH": 10}
+
+
+# ---------------------------------------------------------------------------
+# 백테스트 시뮬레이션
+# ---------------------------------------------------------------------------
 
 
 class TestPendingAction:
@@ -375,9 +383,167 @@ class TestPendingAction:
         assert tactical.pending_action(_strategy(last_regime=None), self._portfolio({})) is None
 
 
-# ---------------------------------------------------------------------------
-# 백테스트 시뮬레이션
-# ---------------------------------------------------------------------------
+def _item(ticker, weight, *, market="NYSE", group_key=None, label=None, members=()):
+    from app.models.portfolio import PortfolioItem, PortfolioItemMember
+
+    return PortfolioItem(
+        ticker=ticker,
+        name=ticker,
+        market=market,
+        weight=weight,
+        group_key=group_key,
+        group_label=label,
+        members=[
+            PortfolioItemMember(ticker=t, market=mk, name=t, role=role, leverage=lev) for t, mk, role, lev in members
+        ],
+    )
+
+
+def _suggestion(key, label, members, domestic_alt=None):
+    from app.schemas.portfolio import IndexGroupSuggestion, IndexGroupSuggestionMember
+
+    held = [IndexGroupSuggestionMember(ticker=t, market=mk, name=t, leverage=lev) for t, mk, lev in members]
+    alt = IndexGroupSuggestionMember(ticker=domestic_alt[0], market=domestic_alt[1]) if domestic_alt else None
+    return IndexGroupSuggestion(
+        key=key,
+        label=label,
+        value_krw=0,
+        exposure_krw=0,
+        pct_of_stock=0,
+        primary=held[0],
+        domestic_alt=alt,
+        members=held,
+        primary_candidates=held,
+        domestic_alt_candidates=[alt] if alt else [],
+    )
+
+
+_SP500_GROUP_MEMBERS = (("SPY", "NYSE", "MEMBER", 1.0), ("360750", "KOSPI", "DOMESTIC_ALT", 1.0))
+_LEV_TABLE = {
+    "RISK_ON": {"QQQ": 40.0, "SPY": 40.0, "QLD": 10.0, "CASH": 10.0},
+    "NEUTRAL": {"QQQ": 30.0, "SPY": 40.0, "CASH": 30.0},
+    "RISK_OFF": {"QQQ": 10.0, "SPY": 30.0, "CASH": 60.0},
+}
+
+
+def _keys_unique(items) -> bool:
+    """한 종목은 한 항목(단독 또는 그룹 하나)에만 — schemas._validators._validate_group_members 불변식."""
+    keys = [(i.ticker, i.market) for i in items] + [(m.ticker, m.market) for i in items for m in i.members]
+    return len(keys) == len(set(keys))
+
+
+class TestIndexGroups:
+    """전술 자산 = 지수 그룹(plans/76) — 기존 그룹 보존·자동 생성·레버리지 규칙."""
+
+    @staticmethod
+    async def _apply(items, strategy, regime, *, fraction=1.0, suggestions=None):
+        db = AsyncMock()
+        db.add = MagicMock()
+        portfolio = SimpleNamespace(id=uuid.uuid4(), items=list(items))
+        await tactical.apply_regime_to_portfolio(
+            portfolio, strategy, regime, db, fraction=fraction, group_suggestions=suggestions
+        )
+        db.execute.assert_awaited_once()  # 기존 항목 삭제
+        return [c.args[0] for c in db.add.call_args_list]
+
+    def test_group_items_map_to_assets(self):
+        portfolio = SimpleNamespace(
+            items=[
+                _item("VOO", 40, group_key="US_SP500", label="S&P 500", members=_SP500_GROUP_MEMBERS),
+                _item("QQQ", 50, market="NASDAQ"),
+                _item("CASH", 10, market="KRW"),
+            ]
+        )
+        assert tactical._current_weights(portfolio) == {"SPY": 40.0, "QQQ": 50.0, "CASH": 10.0}
+        assert tactical.is_tactical_managed(portfolio) is True
+        assert tactical.current_groups(portfolio) == {
+            "SPY": {"label": "S&P 500", "primary": "VOO", "member_count": 1, "domestic_alt": "360750"}
+        }
+        s = _strategy(last_regime="RISK_ON", applied_regime="RISK_ON")
+        assert tactical.pending_action(s, portfolio) is None
+
+    def test_other_index_group_is_not_tactical(self):
+        portfolio = SimpleNamespace(items=[_item("SCHD", 100, group_key="US_DIV_DOWJONES100")])
+        assert tactical.is_tactical_managed(portfolio) is False
+        assert tactical._current_weights(portfolio) == {"SCHD": 100.0}
+
+    @pytest.mark.asyncio
+    async def test_apply_preserves_existing_group_and_creates_missing_one(self):
+        items = [
+            _item("VOO", 30, group_key="US_SP500", label="S&P 500", members=_SP500_GROUP_MEMBERS),
+            _item("QQQ", 10, market="NASDAQ"),
+            _item("AAPL", 60, market="NASDAQ"),
+        ]
+        strategy = _strategy(last_regime="RISK_ON")
+        assert tactical.needs_group_suggestions(SimpleNamespace(items=items), strategy, "RISK_ON") is True
+        suggestions = {
+            "US_NASDAQ100": _suggestion(
+                "US_NASDAQ100",
+                "나스닥 100",
+                [("QQQ", "NASDAQ", 1.0), ("QQQM", "NASDAQ", 1.0), ("133690", "KOSPI", 1.0), ("QLD", "NYSE", 2.0)],
+                domestic_alt=("133690", "KOSPI"),
+            )
+        }
+        added = await self._apply(items, strategy, "RISK_ON", suggestions=suggestions)
+        by_key = {i.group_key or i.ticker: i for i in added}
+        assert set(by_key) == {"US_NASDAQ100", "US_SP500", "CASH"}  # AAPL 삭제
+
+        sp = by_key["US_SP500"]
+        assert (sp.ticker, float(sp.weight), sp.group_label) == ("VOO", 40.0, "S&P 500")
+        assert {(m.ticker, m.role) for m in sp.members} == {("SPY", "MEMBER"), ("360750", "DOMESTIC_ALT")}
+
+        nq = by_key["US_NASDAQ100"]
+        assert (nq.ticker, nq.market, float(nq.weight)) == ("QQQ", "NASDAQ", 50.0)
+        assert {(m.ticker, m.role, float(m.leverage)) for m in nq.members} == {
+            ("QQQM", "MEMBER", 1.0),
+            ("QLD", "MEMBER", 2.0),  # 비중표 QLD 0% → 노출 합산 멤버
+            ("133690", "DOMESTIC_ALT", 1.0),
+        }
+        assert _keys_unique(added)
+
+    @pytest.mark.asyncio
+    async def test_apply_without_suggestions_creates_primary_only_group(self):
+        added = await self._apply([], _strategy(last_regime="RISK_OFF"), "RISK_OFF")
+        nq = next(i for i in added if i.ticker == "QQQ")
+        assert (nq.group_key, nq.group_label, nq.members) == ("US_NASDAQ100", "나스닥 100", [])
+        assert next(i for i in added if i.ticker == "CASH").group_key is None
+
+    @pytest.mark.asyncio
+    async def test_leveraged_moves_between_standalone_and_group_member(self):
+        strategy = _strategy(last_regime="RISK_ON", regime_weights=_LEV_TABLE)
+        nq_members = (("QLD", "NYSE", "MEMBER", 2.0), ("QQQM", "NASDAQ", "MEMBER", 1.0))
+        start = [
+            _item("QQQ", 30, market="NASDAQ", group_key="US_NASDAQ100", members=nq_members),
+            _item("SPY", 40, group_key="US_SP500"),
+            _item("CASH", 30, market="KRW"),
+        ]
+        # 공격: QLD 10% → 단독 항목, 나스닥 그룹 멤버에서 빠짐
+        on = await self._apply(start, strategy, "RISK_ON")
+        assert {i.ticker: float(i.weight) for i in on} == {"QQQ": 40.0, "SPY": 40.0, "QLD": 10.0, "CASH": 10.0}
+        assert [m.ticker for m in next(i for i in on if i.ticker == "QQQ").members] == ["QQQM"]
+        assert next(i for i in on if i.ticker == "QLD").group_key is None
+        assert _keys_unique(on)
+
+        # 중립: QLD 0% → 단독 항목이던 QLD가 나스닥 그룹 레버리지 멤버로
+        neutral = await self._apply(on, strategy, "NEUTRAL")
+        assert "QLD" not in {i.ticker for i in neutral}
+        nq = next(i for i in neutral if i.ticker == "QQQ")
+        assert {(m.ticker, float(m.leverage)) for m in nq.members} == {("QQQM", 1.0), ("QLD", 2.0)}
+        assert _keys_unique(neutral)
+        assert tactical.needs_group_suggestions(SimpleNamespace(items=neutral), strategy, "RISK_ON") is False
+
+    @pytest.mark.asyncio
+    async def test_partial_apply_on_group_portfolio_interpolates_and_keeps_group(self):
+        items = [
+            _item("VOO", 40, group_key="US_SP500", members=_SP500_GROUP_MEMBERS),
+            _item("QQQ", 50, market="NASDAQ", group_key="US_NASDAQ100"),
+            _item("CASH", 10, market="KRW"),
+        ]
+        strategy = _strategy(last_regime="RISK_OFF")
+        added = await self._apply(items, strategy, "RISK_OFF", fraction=0.5)
+        assert {i.ticker: float(i.weight) for i in added} == {"QQQ": 30.0, "VOO": 35.0, "CASH": 35.0}
+        assert len(next(i for i in added if i.ticker == "VOO").members) == 2
+        assert strategy.partial_regime == "RISK_OFF"
 
 
 class TestSimulate:
@@ -582,11 +748,14 @@ class TestTacticalApi:
             patch.object(tactical, "get_owned_portfolio", AsyncMock(return_value=portfolio)),
             patch.object(tactical, "get_strategy", AsyncMock(return_value=strategy)),
             patch.object(tactical, "evaluate_market", AsyncMock(return_value=_MARKET)),
+            patch("app.api.v1.tactical._group_suggestions", AsyncMock(return_value=None)) as suggest,
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.post(f"/api/v1/tactical/{portfolio.id}/apply")
         assert resp.status_code == 200
+        suggest.assert_awaited_once()  # 빈 포트폴리오 → 나스닥·S&P 그룹을 새로 만들어야 함
         added = [c.args[0] for c in api_db.add.call_args_list]
+        assert {i.group_key for i in added} == {"US_NASDAQ100", "US_SP500", None}
         assert {(i.ticker, float(i.weight), i.market) for i in added} == {
             ("QQQ", 10.0, "NASDAQ"),
             ("SPY", 30.0, "NYSE"),
@@ -656,7 +825,7 @@ class TestRegimeCheckJob:
             last_regime="RISK_OFF", notified_regime="RISK_ON", last_tilt="FAVOR_SPY", tilt_shift_pct=10
         )
         dispatch, _ = await self._run(strategy)
-        assert "QQQ 0% · SPY 40% · 현금 60%" in dispatch.await_args.kwargs["history_message"]
+        assert "나스닥100 0% · S&P500 40% · 현금 60%" in dispatch.await_args.kwargs["history_message"]
 
     @pytest.mark.asyncio
     async def test_no_alert_while_pending(self):
