@@ -49,7 +49,7 @@ def _get_firebase_app() -> object | None:
 class PushResult(StrEnum):
     SENT = "sent"
     SKIPPED = "skipped"  # Firebase 미설정 또는 토큰 없음
-    INVALID_TOKEN = "invalid_token"  # 앱 삭제·재설치 등으로 FCM이 토큰을 폐기함
+    INVALID_TOKEN = "invalid_token"  # nosec B105 — 결과 코드; 앱 삭제·재설치 등으로 FCM이 토큰을 폐기함
     FAILED = "failed"
 
 
