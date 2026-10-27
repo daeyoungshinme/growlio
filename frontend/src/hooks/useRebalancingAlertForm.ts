@@ -59,14 +59,6 @@ export function useRebalancingAlertQueries({
 
   const { data: marketSignal } = useQuery(marketSignalQuery);
 
-  const brokerAccounts = accounts.filter(
-    (a) => isOrderExecutableAccount(a.asset_type) && a.is_active,
-  );
-
-  const executionEligibleAccounts = brokerAccounts.filter(
-    (a) => accountIds == null || accountIds.includes(a.id),
-  );
-
   const autoExecutionAccounts = accounts.filter(
     (a) =>
       isOrderExecutableAccount(a.asset_type) &&
@@ -84,8 +76,6 @@ export function useRebalancingAlertQueries({
   return {
     alert: alert ?? null,
     isLoading: isLoading || (targetAccountId ? accountsLoading : false),
-    brokerAccounts,
-    executionEligibleAccounts,
     autoExecutionAccounts,
     targetAccountIsAutoEligible,
     targetAccountTaxType: targetAccount?.tax_type,

@@ -29,8 +29,6 @@ interface Props {
   targetAccountName?: string;
   /** 연결 계좌가 2개 이상이라 계좌별 독립 설정(PER_ACCOUNT)으로 전환 가능한지 여부. */
   canSwitchToPerAccount?: boolean;
-  /** "계좌별로 독립 설정하기" 클릭 후 스코프 전환 성공 시 호출 — 부모가 계좌별 목록 화면으로 전환한다. */
-  onSwitchToPerAccount?: () => void;
   /** "dca"면 신규 AGGREGATE 알림일 때 선택 화면을 건너뛰고 정기 적립식 자동매수 프리셋으로 바로 연다
    * (계획탭 "자동매수 설정" → `openAlert=dca`). 기존 알림·계좌별 설정에서는 무시된다. */
   initialPreset?: "dca";
@@ -44,7 +42,6 @@ export default function RebalancingAlertModal({
   targetAccountId,
   targetAccountName,
   canSwitchToPerAccount,
-  onSwitchToPerAccount,
   initialPreset,
   onClose,
 }: Props) {
@@ -86,7 +83,6 @@ export default function RebalancingAlertModal({
             targetAccountTaxType={targetAccountTaxType}
             targetAccountInvestmentHorizon={targetAccountInvestmentHorizon}
             canSwitchToPerAccount={canSwitchToPerAccount}
-            onSwitchToPerAccount={onSwitchToPerAccount}
             initialPreset={initialPreset}
             onClose={onClose}
             marketSignal={marketSignal}
@@ -111,7 +107,6 @@ function AlertFormBody({
   targetAccountTaxType,
   targetAccountInvestmentHorizon,
   canSwitchToPerAccount,
-  onSwitchToPerAccount,
   initialPreset,
   onClose,
   marketSignal,
@@ -125,7 +120,6 @@ function AlertFormBody({
   targetAccountTaxType?: AccountTaxType;
   targetAccountInvestmentHorizon?: InvestmentHorizon | null;
   canSwitchToPerAccount?: boolean;
-  onSwitchToPerAccount?: () => void;
   initialPreset?: "dca";
   onClose: () => void;
   marketSignal?: MarketSignalResponse;
@@ -161,7 +155,7 @@ function AlertFormBody({
       // 전환은 AGGREGATE 알림을 지우거나 계좌별 행으로 바꾼다 — 알림 목록·배지·AUTO 배너 갱신
       void invalidateRebalancingAlertData(queryClient, portfolioId);
       toast("계좌별 독립 설정으로 전환되었습니다", "success");
-      onSwitchToPerAccount?.();
+      // 화면 전환은 RebalancingAlertModalRouter가 다시 조회된 포트폴리오의 alert_scope로 한다
     },
     onError: (e) => toast(extractErrorMessage(e, "전환에 실패했습니다"), "error"),
   });

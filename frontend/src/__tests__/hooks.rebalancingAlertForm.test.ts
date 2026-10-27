@@ -136,7 +136,7 @@ describe("useRebalancingAlertQueries", () => {
     expect(result.current.alert).toBeNull();
   });
 
-  it("brokerAccounts는 KIS/키움 활성 계좌만 필터한다", async () => {
+  it("autoExecutionAccounts는 KIS/키움 활성 계좌만 필터한다", async () => {
     vi.mocked(fetchRebalancingAlert).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([
       {
@@ -156,11 +156,10 @@ describe("useRebalancingAlertQueries", () => {
     });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.brokerAccounts).toHaveLength(2);
-    expect(result.current.brokerAccounts.map((a) => a.id)).toEqual(["a1", "a2"]);
+    expect(result.current.autoExecutionAccounts.map((a) => a.id)).toEqual(["a1", "a2"]);
   });
 
-  it("executionEligibleAccounts는 accountIds 필터를 적용한다", async () => {
+  it("autoExecutionAccounts는 accountIds 필터를 적용한다", async () => {
     vi.mocked(fetchRebalancingAlert).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([
       { id: "a1", asset_type: "STOCK_KIS", is_active: true, name: "KIS1" } as never,
@@ -173,8 +172,7 @@ describe("useRebalancingAlertQueries", () => {
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.executionEligibleAccounts).toHaveLength(1);
-    expect(result.current.executionEligibleAccounts[0].id).toBe("a1");
+    expect(result.current.autoExecutionAccounts.map((a) => a.id)).toEqual(["a1"]);
   });
 
   it("accountIds가 null이면 모든 KIS/키움 계좌를 반환한다", async () => {
@@ -190,7 +188,7 @@ describe("useRebalancingAlertQueries", () => {
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.executionEligibleAccounts).toHaveLength(2);
+    expect(result.current.autoExecutionAccounts).toHaveLength(2);
   });
 
   it("targetAccountId가 없으면 targetAccountIsAutoEligible는 true다", async () => {
