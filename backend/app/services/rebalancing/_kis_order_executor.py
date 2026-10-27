@@ -8,7 +8,12 @@ from app.kis.balance import get_domestic_balance, get_orderable_cash, get_overse
 from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
 from app.services.rebalancing._order_executor_common import execute_single_order
-from app.services.rebalancing._order_quantity_guard import clamp_buy_orders_to_budget, clamp_sell_orders
+from app.services.rebalancing._order_quantity_guard import (
+    budget_skipped_result,
+    clamp_buy_orders_to_budget,
+    clamp_sell_orders,
+    fit_buy_to_budget,
+)
 from app.services.rebalancing.krx_tick import domestic_limit_price
 from app.utils.masking import mask_account_no
 
@@ -231,18 +236,7 @@ async def _execute_two_phase_orders(
         )
         # 매도 후에도 살 수 없는 분량은 결과·이력에 SKIPPED로 남긴다 — 버리면 계획의 매수가
         # 어디에도 기록되지 않아 사용자가 미체결 사실을 알 수 없다(plans/62 A6)
-        phase3_results += [
-            OrderResult(
-                ticker=o.ticker,
-                name=o.name,
-                market=o.market,
-                side=o.side,
-                quantity=o.quantity,
-                status="SKIPPED",
-                error_msg="주문가능금액이 부족해 매수를 건너뜁니다.",
-            )
-            for o in unaffordable
-        ]
+        phase3_results += [budget_skipped_result(o) for o in unaffordable]
 
     return phase1_results + sell_results + phase3_results
 
@@ -267,56 +261,18 @@ async def _execute_buys_within_budget(
     remaining_budget = budget
 
     for order in buy_orders:
-        price = order.limit_price
-        if price and price > 0:
-            if remaining_budget <= 0:
-                remaining.append(order)
-                continue
-            affordable_qty = int(remaining_budget // price)
-            if affordable_qty <= 0:
-                remaining.append(order)
-                continue
-            execute_qty = min(order.quantity, affordable_qty)
-            leftover_qty = order.quantity - execute_qty
-        else:
-            # 시장가: 가격 모름, 전량 시도
-            execute_qty = order.quantity
-            leftover_qty = 0
-
-        if execute_qty <= 0:
+        fitted, leftover_qty = fit_buy_to_budget(order, remaining_budget)
+        if fitted is None:
             remaining.append(order)
             continue
-
         if leftover_qty > 0:
-            remaining.append(
-                ExecutionOrderItem(
-                    ticker=order.ticker,
-                    name=order.name,
-                    market=order.market,
-                    side=order.side,
-                    quantity=leftover_qty,
-                    account_id=order.account_id,
-                    order_type=order.order_type,
-                    limit_price=order.limit_price,
-                    reference_price=order.reference_price,
-                )
-            )
+            remaining.append(order.model_copy(update={"quantity": leftover_qty}))
 
-        exec_order = ExecutionOrderItem(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=execute_qty,
-            account_id=order.account_id,
-            order_type=order.order_type,
-            limit_price=order.limit_price,
-            reference_price=order.reference_price,
-        )
-        result = await _execute_single_order(exec_order, app_key, app_secret, access_token, account_no, is_mock)
+        result = await _execute_single_order(fitted, app_key, app_secret, access_token, account_no, is_mock)
         results.append(result)
 
-        if result.status == "SUCCESS" and price and price > 0:
-            remaining_budget -= execute_qty * price
+        # FULL과 달리 체결에 성공한 금액만 뺀다 — 실패분 예산은 다음 주문이 쓴다
+        if result.status == "SUCCESS" and fitted.limit_price and fitted.limit_price > 0:
+            remaining_budget -= fitted.quantity * fitted.limit_price
 
     return results, remaining, budget - remaining_budget

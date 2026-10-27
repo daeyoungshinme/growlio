@@ -72,6 +72,41 @@ def clamp_sell_orders(
     return adjusted, skipped
 
 
+BUDGET_SHORT_MSG = "주문가능금액이 부족해 매수를 건너뜁니다."
+
+
+def budget_skipped_result(order: ExecutionOrderItem) -> OrderResult:
+    """예산이 모자라 내지 못한 매수 주문의 SKIPPED 결과."""
+    return OrderResult(
+        ticker=order.ticker,
+        name=order.name,
+        market=order.market,
+        side=order.side,
+        quantity=order.quantity,
+        status="SKIPPED",
+        error_msg=BUDGET_SHORT_MSG,
+    )
+
+
+def fit_buy_to_budget(order: ExecutionOrderItem, budget: float) -> tuple[ExecutionOrderItem | None, int]:
+    """매수 주문 하나를 budget 안에 맞춘다 — (낼 주문 또는 None, 못 산 수량).
+
+    지정가는 `int(budget // 지정가)`주까지만 낸다. 1주도 못 사면 None과 전체 수량을 돌려준다.
+    시장가는 체결가를 미리 알 수 없어 그대로 통과시킨다(못 산 수량 0).
+    FULL 전략의 `clamp_buy_orders_to_budget`와 TWO_PHASE의 `_execute_buys_within_budget`가 같이 쓴다.
+    """
+    price = order.limit_price
+    if not price or price <= 0:
+        return order, 0
+    affordable_qty = int(budget // price) if budget > 0 else 0
+    if affordable_qty <= 0:
+        return None, order.quantity
+    execute_qty = min(order.quantity, affordable_qty)
+    if execute_qty == order.quantity:
+        return order, 0
+    return order.model_copy(update={"quantity": execute_qty}), order.quantity - execute_qty
+
+
 def clamp_buy_orders_to_budget(
     buy_orders: list[ExecutionOrderItem],
     budget: float,
@@ -83,6 +118,7 @@ def clamp_buy_orders_to_budget(
     실패·만료됐을 때 매수가 실제 가용 현금을 초과할 수 있다. 지정가 주문은 예산 초과분만큼
     수량을 줄이고 예산이 아예 없으면 SKIPPED 처리한다. 시장가 주문은 실행 시점 체결가를
     미리 알 수 없어 clamp 대상에서 제외한다 — 최종 안전장치는 브로커의 주문 거부에 있다.
+    예산은 계획 금액으로 바로 차감한다(체결 여부와 무관).
 
     Returns: (실행 가능한 조정된 주문 목록, SKIPPED 처리된 결과 목록)
     """
@@ -91,52 +127,20 @@ def clamp_buy_orders_to_budget(
     remaining_budget = budget
 
     for order in buy_orders:
-        price = order.limit_price
-        if not price or price <= 0:
-            adjusted.append(order)
+        fitted, leftover_qty = fit_buy_to_budget(order, remaining_budget)
+        if fitted is None:
+            skipped.append(budget_skipped_result(order))
             continue
-
-        if remaining_budget <= 0:
-            skipped.append(
-                OrderResult(
-                    ticker=order.ticker,
-                    name=order.name,
-                    market=order.market,
-                    side=order.side,
-                    quantity=order.quantity,
-                    status="SKIPPED",
-                    error_msg="주문가능금액이 부족해 매수를 건너뜁니다.",
-                )
-            )
-            continue
-
-        affordable_qty = int(remaining_budget // price)
-        if affordable_qty <= 0:
-            skipped.append(
-                OrderResult(
-                    ticker=order.ticker,
-                    name=order.name,
-                    market=order.market,
-                    side=order.side,
-                    quantity=order.quantity,
-                    status="SKIPPED",
-                    error_msg="주문가능금액이 부족해 매수를 건너뜁니다.",
-                )
-            )
-            continue
-
-        execute_qty = min(order.quantity, affordable_qty)
-        if execute_qty < order.quantity:
+        if leftover_qty > 0:
             logger.warning(
                 "buy_quantity_clamped_to_budget",
                 ticker=order.ticker,
                 market=order.market,
                 requested_qty=order.quantity,
-                clamped_qty=execute_qty,
+                clamped_qty=fitted.quantity,
             )
-            adjusted.append(order.model_copy(update={"quantity": execute_qty}))
-        else:
-            adjusted.append(order)
-        remaining_budget -= execute_qty * price
+        adjusted.append(fitted)
+        if fitted.limit_price and fitted.limit_price > 0:
+            remaining_budget -= fitted.quantity * fitted.limit_price
 
     return adjusted, skipped

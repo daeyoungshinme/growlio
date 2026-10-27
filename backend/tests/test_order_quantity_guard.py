@@ -1,7 +1,11 @@
 """_order_quantity_guard.clamp_sell_orders/clamp_buy_orders_to_budget 단위 테스트."""
 
 from app.schemas.rebalancing import ExecutionOrderItem
-from app.services.rebalancing._order_quantity_guard import clamp_buy_orders_to_budget, clamp_sell_orders
+from app.services.rebalancing._order_quantity_guard import (
+    clamp_buy_orders_to_budget,
+    clamp_sell_orders,
+    fit_buy_to_budget,
+)
 
 
 def _make_order(ticker: str = "005930", market: str = "KOSPI", quantity: int = 10) -> ExecutionOrderItem:
@@ -141,3 +145,28 @@ class TestFloorShares:
         assert floor_shares(2.5) == 2
         assert floor_shares(2.999) == 2
         assert floor_shares(0.0) == 0
+
+
+class TestFitBuyToBudget:
+    """FULL·TWO_PHASE가 공유하는 단건 예산 맞춤 (plans/79 C2)."""
+
+    def test_fits_whole_order_returns_same_object(self):
+        order = _make_buy_order(quantity=3, limit_price=1000.0)
+        fitted, leftover = fit_buy_to_budget(order, 5000.0)
+        assert fitted is order
+        assert leftover == 0
+
+    def test_partial_fit_returns_copy_and_leftover(self):
+        order = _make_buy_order(quantity=10, limit_price=1000.0)
+        fitted, leftover = fit_buy_to_budget(order, 4500.0)
+        assert fitted is not None
+        assert (fitted.quantity, leftover, order.quantity) == (4, 6, 10)
+
+    def test_cannot_afford_one_share(self):
+        order = _make_buy_order(quantity=2, limit_price=5000.0)
+        assert fit_buy_to_budget(order, 4999.0) == (None, 2)
+        assert fit_buy_to_budget(order, -1.0) == (None, 2)
+
+    def test_market_order_passes_through(self):
+        order = _make_buy_order(quantity=7)
+        assert fit_buy_to_budget(order, 0.0) == (order, 0)
