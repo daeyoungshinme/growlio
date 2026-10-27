@@ -54,6 +54,9 @@ export const QUERY_KEYS = {
   rebalancingAlertByAccount: (portfolioId: string, accountId: string) =>
     ["rebalancing-alert", portfolioId, "accounts", accountId] as const,
   rebalancingHistory: ["rebalancing-history"] as const,
+  /** 실행 1건 상세 — `rebalancingHistory` 프리픽스로 함께 무효화된다 */
+  rebalancingExecutionDetail: (executionId: string) =>
+    ["rebalancing-history", executionId] as const,
   rebalancingPlans: ["rebalancing-plans"] as const,
   rebalancingPlanPreview: (token: string) => ["rebalancing-plan-preview", token] as const,
   taxSummaryBase: ["tax-summary"] as const,
@@ -75,9 +78,8 @@ export const QUERY_KEYS = {
   alertHistory: ["alert-history"] as const,
   insights: ["insights"] as const,
   monthlyOptimization: ["monthly-optimization"] as const,
-  portfolioRisk: (id?: string) => ["portfolio-risk", id] as const,
-  /** 무효화 프리픽스 전용 */
-  portfolioRiskBase: ["portfolio-risk"] as const,
+  /** 유저 단위(전체 보유) 리스크 지표 — 포트폴리오별 조회는 없다 */
+  portfolioRisk: ["portfolio-risk"] as const,
   marketSignal: ["market-signal"] as const,
   rebalancingStrategy: (portfolioId: string) => ["rebalancing-strategy", portfolioId] as const,
   rebalancingStrategyBase: ["rebalancing-strategy"] as const,

@@ -110,7 +110,7 @@ export default function RebalancingPage() {
   const { data: signal, isError: signalError } = useQuery(marketSignalQuery);
 
   const { data: riskMetrics } = useQuery({
-    queryKey: QUERY_KEYS.portfolioRisk(),
+    queryKey: QUERY_KEYS.portfolioRisk,
     queryFn: () => fetchPortfolioRisk(),
     staleTime: STALE_TIME.LONG,
     enabled: localTab === "진단",

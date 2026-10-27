@@ -21,7 +21,7 @@ export function invalidateSyncData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRiskBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
     // 목표 역산 추천·후보 중복 점검("보유 중" 표시)이 보유 포지션 기준 — 백엔드 sync도 같은 캐시를 지운다
     qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),

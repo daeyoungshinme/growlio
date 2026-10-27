@@ -42,7 +42,7 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
   const [open, setOpen] = useState(false);
 
   const { data: detail, isLoading: loadingDetail } = useQuery({
-    queryKey: [...QUERY_KEYS.rebalancingHistory, item.id],
+    queryKey: QUERY_KEYS.rebalancingExecutionDetail(item.id),
     queryFn: () => fetchRebalancingExecutionDetail(item.id),
     enabled: open,
     staleTime: Infinity,

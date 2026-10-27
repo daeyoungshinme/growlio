@@ -324,6 +324,7 @@ _기타_
 | 포트폴리오 내 계좌별 알림 목록                                     | `["rebalancing-alert", portfolioId, "accounts"]`                                                                            |
 | 계좌별 개별 알림                                                   | `["rebalancing-alert", portfolioId, "accounts", accountId]`                                                                 |
 | 리밸런싱 실행 이력                                                 | `["rebalancing-history"]`                                                                                                   |
+| 리밸런싱 실행 1건 상세                                             | `["rebalancing-history", executionId]` — `rebalancingExecutionDetail(id)`, 이력 프리픽스로 함께 무효화                      |
 | 리밸런싱 대기 플랜 목록                                            | `["rebalancing-plans"]`                                                                                                     |
 | 이메일·푸시 승인 페이지 플랜 미리보기                              | `["rebalancing-plan-preview", token]`                                                                                       |
 | 리밸런싱 전략                                                      | `["rebalancing-strategy", portfolioId]` — `rebalancingStrategyBase`(`["rebalancing-strategy"]`)는 무효화 프리픽스 전용      |
@@ -338,7 +339,7 @@ _기타_
 | 자산배분 이력 (DashboardPage 전용, accountId 지정 시 계좌별)       | `["allocation-history", months, accountId]` — `allocationHistoryBase` 무효화 전용                                           |
 | 알림 발송 이력                                                     | `["alert-history"]`                                                                                                         |
 | 인사이트/진단                                                      | `["insights"]`                                                                                                              |
-| 포트폴리오 리스크 지표                                             | `["portfolio-risk", id]` — `portfolioRiskBase` 무효화 전용                                                                  |
+| 포트폴리오 리스크 지표                                             | `["portfolio-risk"]` (유저 단위)                                                                                            |
 | 시장 위험 신호                                                     | `["market-signal"]`                                                                                                         |
 | 복합신호 (시장/리스크) 상태                                        | `["composite-signal-status"]`                                                                                               |
 | 목표 역산 추천 (전체 자산)                                         | `["goal-recommendation", "overall"]` — `goalRecommendationBase`(`["goal-recommendation"]`)는 무효화 프리픽스 전용           |

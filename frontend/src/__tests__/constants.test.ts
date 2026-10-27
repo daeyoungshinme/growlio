@@ -52,7 +52,8 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.portfolioOverview()).toEqual(["portfolio-overview", "all"]);
     expect(QUERY_KEYS.portfolioOverview("acc-1")).toEqual(["portfolio-overview", "acc-1"]);
     expect(QUERY_KEYS.dividendSummary("acc-1")).toEqual(["dividend-summary", "acc-1"]);
-    expect(QUERY_KEYS.portfolioRisk("p-1")).toEqual(["portfolio-risk", "p-1"]);
+    expect(QUERY_KEYS.portfolioRisk).toEqual(["portfolio-risk"]);
+    expect(QUERY_KEYS.rebalancingExecutionDetail("e-1")).toEqual(["rebalancing-history", "e-1"]);
     expect(QUERY_KEYS.rebalancingStrategy("p-3")).toEqual(["rebalancing-strategy", "p-3"]);
   });
 });
