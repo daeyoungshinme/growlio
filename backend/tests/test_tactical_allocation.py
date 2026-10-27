@@ -697,6 +697,25 @@ class TestTacticalApi:
         assert lister.await_args.args[0] == user.id
         evaluate.assert_not_awaited()
 
+    def test_market_returns_inputs_without_portfolio_lookup(self, api_db):
+        app = _setup(_user(), api_db)
+        market = {**_MARKET, "technicals": {"QQQ": {"trend": "UP", "close": 500.0}}}
+        owned = AsyncMock()
+        with (
+            patch.object(tactical, "evaluate_market", AsyncMock(return_value=market)),
+            patch.object(tactical, "get_owned_portfolio", owned),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/tactical/market")
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "macro_level": market["macro_level"],
+            "macro_freshness": market["macro_freshness"],
+            "technicals": {"QQQ": {"trend": "UP", "close": 500.0}},
+        }
+        owned.assert_not_awaited()
+        api_db.commit.assert_not_awaited()
+
     def test_status_404_for_foreign_portfolio(self, api_db):
         app = _setup(_user(), api_db)
         with (

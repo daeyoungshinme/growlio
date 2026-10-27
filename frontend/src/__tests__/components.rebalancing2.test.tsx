@@ -189,7 +189,7 @@ describe("MarketSignalBanner", () => {
 
   it("renders signal banner with label", () => {
     renderBanner();
-    expect(screen.getByText("시장 위험 신호")).toBeDefined();
+    expect(screen.getByText("시장 상황")).toBeDefined();
   });
 
   it("자동 실행 판단 등급이 표시 등급과 다를 때만 안내한다 (plans/63 P1-5)", () => {
@@ -248,6 +248,40 @@ describe("MarketSignalBanner", () => {
     expect(onOpenTactical).toHaveBeenCalledTimes(1);
   });
 
+  it("technicals가 있으면 상세 영역에 차트 추세 섹션을 보여준다 (plans/82)", () => {
+    const { unmount } = renderBanner();
+    openDetail();
+    expect(screen.queryByText("차트 추세 (나스닥·S&P500)")).toBeNull();
+    unmount();
+    renderWithProviders(
+      <MemoryRouter>
+        <MarketSignalBanner
+          signal={mockSignal}
+          technicals={{
+            QQQ: {
+              close: 700,
+              sma50: 690,
+              sma200: 650,
+              rsi14: 55,
+              macd_hist: 1.2,
+              drawdown_pct: -3,
+              trend: "UP",
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+    openDetail();
+    expect(screen.getByText("차트 추세 (나스닥·S&P500)")).toBeDefined();
+    expect(screen.getByText("QQQ")).toBeDefined();
+  });
+
+  it("상세 영역에 자동 실행·전술 판단 기준(확정) 등급을 항상 보여준다 (plans/82)", () => {
+    renderBanner({ ...mockSignal, confirmed_level: mockSignal.composite_level });
+    openDetail();
+    expect(screen.getByText("자동 실행·전술 판단 기준(확정)")).toBeDefined();
+  });
+
   it("shows the on/off state text for the composite signal alert", async () => {
     renderBanner();
     expect(await screen.findByText("받는 중")).toBeDefined();
@@ -291,7 +325,7 @@ describe("MarketSignalBanner", () => {
     renderBanner(allCalm);
     openDetail();
     expect(screen.queryByText("원/달러 환율")).toBeNull();
-    expect(screen.getByText(/매크로 지표 5개 더보기/)).toBeDefined();
+    expect(screen.getByText(/지표 5개 더보기/)).toBeDefined();
   });
 
   it("expands the macro tier when the 더보기 toggle is clicked", () => {
@@ -304,7 +338,7 @@ describe("MarketSignalBanner", () => {
     };
     renderBanner(allCalm);
     openDetail();
-    fireEvent.click(screen.getByText(/매크로 지표 5개 더보기/));
+    fireEvent.click(screen.getByText(/지표 5개 더보기/));
     expect(screen.getByText("원/달러 환율")).toBeDefined();
   });
 });

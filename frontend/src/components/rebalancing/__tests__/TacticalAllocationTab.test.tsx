@@ -131,9 +131,9 @@ function renderTab(onGoToExecution = vi.fn()) {
   return { onGoToExecution };
 }
 
-/** 판정 근거·차트 지표는 기본 접힘(plans/69 P4) — 지표·근거를 보는 테스트는 먼저 펼친다 */
+/** 판정 근거는 기본 접힘(plans/69 P4) — 지표·근거를 보는 테스트는 먼저 펼친다 */
 async function openDetails() {
-  fireEvent.click(await screen.findByText("판정 근거·차트 지표"));
+  fireEvent.click(await screen.findByText("판정 근거"));
 }
 
 describe("TacticalAllocationTab", () => {
@@ -153,36 +153,24 @@ describe("TacticalAllocationTab", () => {
     expect(
       screen.getByText(/나스닥100·S&P500·다우존스·나스닥100 2배·S&P500 2배·현금 외 종목이 있어요/),
     ).toBeDefined();
-    // 지표는 접힘 안 — 펼치기 전엔 보이지 않는다
-    expect(screen.queryByText("추세 상승")).toBeNull();
-    await openDetails();
-    expect(screen.getAllByText("추세 상승")).toHaveLength(2);
-    // 비중표에 DIA가 없으면 DIA 참고 지표·비중 비교 행 모두 숨긴다
-    expect(screen.queryByText("참고 · 국면 판단 미반영")).toBeNull();
+    // 비중표에 DIA가 없으면 비중 비교 행을 숨긴다
     expect(screen.queryByText("다우존스")).toBeNull();
   });
 
-  it("비중표에 DIA가 있으면 DIA 참고 지표를 보여준다", async () => {
-    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
-      makeStatus({
-        regime_weights: {
-          ...DEFAULT_TABLE,
-          NEUTRAL: { ...DEFAULT_TABLE.NEUTRAL, SPY: 20, DIA: 20 },
-        },
-      }),
-    );
-    renderTab();
-    await openDetails();
-    expect(screen.getByText("참고 · 국면 판단 미반영")).toBeDefined();
-    expect(screen.getByText("추세 혼조")).toBeDefined();
-  });
-
-  it("매크로 확정 등급이 진단 탭 신호와 다를 수 있는 이유를 툴팁 없이 화면에 적는다", async () => {
+  it("판정 근거엔 근거 문장만 두고, 차트 지표는 진단 탭 시장 상황으로 보낸다 (plans/82)", async () => {
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
     renderTab();
+    // 웅덩이 투입폭 0이면 요약 줄은 "사용 안 함"
+    expect(await screen.findByText("사용 안 함")).toBeDefined();
     await openDetails();
 
-    expect(await screen.findByText(/진단 탭보다 늦게 바뀔 수 있어요/)).toBeDefined();
+    expect(await screen.findByText("SPY 추세: 상승 · QQQ 추세: 상승")).toBeDefined();
+    expect(screen.getByText("매크로(확정)")).toBeDefined();
+    // 지표 행(추세·RSI·이평 이격)은 진단 탭 ChartTrendList가 그린다
+    expect(screen.queryByText("추세 상승")).toBeNull();
+    expect(screen.queryByText("RSI(14)")).toBeNull();
+    const link = screen.getByRole("link", { name: /매크로·차트 지표 자세히 보기/ });
+    expect(link.getAttribute("href")).toContain("/rebalancing");
   });
 
   it("페이지에서 고른 포트폴리오(URL)를 쓰고, 바꾸면 부모에 알린다 (plans/63 P3-3)", async () => {
@@ -325,19 +313,6 @@ describe("TacticalAllocationTab", () => {
     await openDetails();
     expect(screen.getByText(/매크로 반영 안 함/)).toBeDefined();
     expect(screen.queryByText("매크로(확정)")).toBeNull();
-  });
-
-  it("웅덩이 단계 배지와 이평선 이격을 보여준다", async () => {
-    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
-    renderTab();
-    expect(await screen.findByText("사용 안 함")).toBeDefined();
-    await openDetails();
-
-    expect(await screen.findByText("60일선 웅덩이")).toBeDefined();
-    // QQQ 종가 716.19 / 20일선 730 → -1.9%
-    expect(screen.getByText("-1.9%")).toBeDefined();
-    // 웅덩이 배지는 투입 기준인 QQQ에만
-    expect(screen.getAllByText("60일선 웅덩이")).toHaveLength(1);
   });
 
   it("웅덩이 투입 중이면 서버가 계산한 실제 투입량을 보여준다", async () => {
