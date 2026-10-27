@@ -112,11 +112,11 @@ class RebalancingAnalysis(BaseModel):
     base_type: str
     base_value_krw: float
     items: list[RebalancingItem]
-    untracked_holdings: list[CurrentHolding]
+    # 항상 비어 있음 — 구버전 프론트(PWA 캐시 번들)가 `.forEach`로 읽어 남겨둔다. 다음 정리 때 제거(plans/78 A2).
+    untracked_holdings: list[CurrentHolding] = []
     analyzed_at: str  # ISO timestamp
     current_portfolio_annual_dividend: float = 0.0  # 목표 포트폴리오 항목 기준 현재 연간 배당
     target_portfolio_annual_dividend: float = 0.0  # 목표 포트폴리오 연간 배당 합계
-    total_current_annual_dividend: float = 0.0  # 미추적 종목 포함 전체 보유 기준 연간 배당
     target_weighted_cagr_10y_pct: float | None = None  # 목표 비중 기준 가중 CAGR (10년)
     current_weighted_cagr_10y_pct: float | None = None  # 현재 비중 기준 가중 CAGR (10년)
     ticker_account_map: dict[str, list[TickerAccountInfo]] = {}  # ticker → 보유 계좌 목록

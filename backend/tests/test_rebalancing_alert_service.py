@@ -971,7 +971,6 @@ async def test_process_rebalancing_alert_smtp_not_configured_fcm_succeeds(mock_d
             is_scheduled_report=True,
             threshold=5.0,
             email="user@example.com",
-            composite_level="GREEN",
             db=mock_db,
             fcm_token="fcm-token-xyz",
         )
@@ -1006,7 +1005,6 @@ async def test_process_rebalancing_alert_email_fails_fcm_still_runs(mock_db):
             is_scheduled_report=True,
             threshold=5.0,
             email="user@example.com",
-            composite_level="GREEN",
             db=mock_db,
             fcm_token="fcm-token-xyz",
         )
@@ -1043,7 +1041,6 @@ async def test_process_rebalancing_alert_both_channels_fail_returns_false(mock_d
             is_scheduled_report=True,
             threshold=5.0,
             email="user@example.com",
-            composite_level="GREEN",
             db=mock_db,
             fcm_token=None,
         )
@@ -1835,7 +1832,6 @@ async def test_process_rebalancing_alert_push_type_by_trigger(mock_db, drifting,
             is_scheduled_report=False,
             threshold=5.0,
             email="user@example.com",
-            composite_level="RED",
             db=mock_db,
             fcm_token="fcm-token-xyz",
             is_composite_triggered=composite,

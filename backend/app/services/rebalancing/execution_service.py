@@ -51,7 +51,7 @@ async def _load_account(
     return account
 
 
-async def _load_credentials(account: AssetAccount) -> tuple[str, str]:
+def _load_credentials(account: AssetAccount) -> tuple[str, str]:
     """KIS 계좌 자격증명 로드. 미설정 시 400 에러."""
     creds = decrypt_kis_credentials(account)
     if creds is None:
@@ -62,7 +62,7 @@ async def _load_credentials(account: AssetAccount) -> tuple[str, str]:
     return creds
 
 
-async def _load_kiwoom_credentials(account: AssetAccount) -> tuple[str, str]:
+def _load_kiwoom_credentials(account: AssetAccount) -> tuple[str, str]:
     """키움 계좌 자격증명 로드 (전역 폴백 없음)."""
     creds = decrypt_kiwoom_credentials(account)
     if creds is None:
@@ -259,7 +259,7 @@ async def _execute_kiwoom_account_orders(
     is_mock: bool,
 ) -> list[OrderResult]:
     """키움 계좌: 매도(보유수량 clamp) → 매수 순으로 주문을 실행한다."""
-    app_key, app_secret = await _load_kiwoom_credentials(account)
+    app_key, app_secret = _load_kiwoom_credentials(account)
     account_no = account.kiwoom_account_no
     if account_no is None:
         # _load_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적
@@ -320,7 +320,7 @@ async def _execute_kis_account_orders(
     strategy: str,
 ) -> list[OrderResult]:
     """KIS 계좌: strategy가 TWO_PHASE면 예수금→매도→잔여매수 3단계, 아니면 매도(clamp)→매수 순으로 실행한다."""
-    app_key, app_secret = await _load_credentials(account)
+    app_key, app_secret = _load_credentials(account)
     account_no = account.kis_account_no
     if account_no is None:
         # _load_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적

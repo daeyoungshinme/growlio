@@ -98,7 +98,6 @@ const mockAnalysis: RebalancingAnalysis = {
       current_price_krw: 180000,
     },
   ],
-  untracked_holdings: [],
   analyzed_at: "2024-01-01T00:00:00Z",
   current_portfolio_annual_dividend: 0,
   target_portfolio_annual_dividend: 0,
@@ -590,7 +589,7 @@ describe("useRebalancingPrices", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("loadAllPrices — 아이템이 없으면 아무 것도 하지 않는다", async () => {
-    const emptyAnalysis = { ...mockAnalysis, items: [], untracked_holdings: [] };
+    const emptyAnalysis = { ...mockAnalysis, items: [] };
     const dispatch = vi.fn();
     const { result } = renderHook(() => useRebalancingPrices(dispatch, emptyAnalysis));
 
@@ -633,7 +632,6 @@ describe("useRebalancingPrices", () => {
     const freshAnalysis: RebalancingAnalysis = {
       ...mockAnalysis,
       items: [{ ...mockAnalysis.items[0], ticker: "FRESH1" }],
-      untracked_holdings: [],
       ticker_account_map: {},
     };
     const { result } = renderHook(() => useRebalancingPrices(dispatch, freshAnalysis));
@@ -652,7 +650,6 @@ describe("useRebalancingPrices", () => {
     const freshAnalysis: RebalancingAnalysis = {
       ...mockAnalysis,
       items: [{ ...mockAnalysis.items[0], ticker: "RETRY_CACHE_TEST" }],
-      untracked_holdings: [],
       ticker_account_map: {},
     };
     const dispatch = vi.fn();
@@ -689,7 +686,6 @@ describe("useRebalancingPrices", () => {
     const freshAnalysis: RebalancingAnalysis = {
       ...mockAnalysis,
       items: [{ ...mockAnalysis.items[0], ticker: "KIS_TICKER" }],
-      untracked_holdings: [],
       ticker_account_map: {
         KIS_TICKER: [
           {

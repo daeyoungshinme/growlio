@@ -45,7 +45,6 @@ export function useRebalancingPrices(
     getActionableItems(analysis).forEach((i) => {
       if (i.ticker !== CASH_TICKER) tickerMarketMap.set(i.ticker, i.market);
     });
-    analysis.untracked_holdings.forEach((h) => tickerMarketMap.set(h.ticker, h.market));
     if (tickerMarketMap.size === 0) return;
 
     const entries = Array.from(tickerMarketMap.entries());
