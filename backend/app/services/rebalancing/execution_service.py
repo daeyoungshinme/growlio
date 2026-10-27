@@ -28,7 +28,7 @@ from app.services.rebalancing._kiwoom_order_executor import (
     _execute_kiwoom_sells_with_clamp,
 )
 from app.services.rebalancing.order_builder import ORDER_EXECUTABLE_ASSET_TYPES
-from app.utils.cache_keys import invalidate_rebalancing_analysis_cache, invalidate_rebalancing_strategy_cache
+from app.utils.cache_keys import invalidate_rebalancing_analysis_cache
 from app.utils.metrics import rebalancing_execution_count
 
 logger = structlog.get_logger()
@@ -243,7 +243,6 @@ async def execute_rebalancing(
 
     # 실행 후 전략·진단 캐시 무효화 (포트폴리오 구성이 변경되었으므로)
     if portfolio_id and cache:
-        await invalidate_rebalancing_strategy_cache(cache, user_id, portfolio_id)
         await invalidate_rebalancing_analysis_cache(cache, user_id, portfolio_id)
 
     rebalancing_execution_count.labels(status="success" if total_fail == 0 else "partial").inc()

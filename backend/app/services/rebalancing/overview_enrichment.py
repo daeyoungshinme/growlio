@@ -17,7 +17,7 @@ from app.services.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key
 from app.services.dividend.fetcher import fetch_ticker_dividend_info
 from app.services.price_service import fetch_prices_batch_krw
-from app.services.rebalancing.service import _item_attr
+from app.services.rebalancing.service import _item_attr, _item_get
 
 logger = structlog.get_logger()
 
@@ -74,7 +74,7 @@ def _target_names(portfolio: Portfolio) -> dict[tuple[str, str], str]:
         names[(str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))] = str(
             _item_attr(raw_item, "name")
         )
-        members = raw_item.get("members") if isinstance(raw_item, dict) else getattr(raw_item, "members", None)
+        members = _item_get(raw_item, "members")
         for m in members or []:
             names.setdefault((str(_item_attr(m, "ticker")), str(_item_attr(m, "market"))), str(_item_attr(m, "name")))
     return names

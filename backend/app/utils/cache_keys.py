@@ -523,8 +523,11 @@ async def invalidate_rebalancing_analysis_cache(
     """리밸런싱 진단(analyze) 캐시를 SCAN+UNLINK로 일괄 삭제한다 (계좌 조합·예수금 override 변형 전체).
 
     포트폴리오 수정, 리밸런싱 주문 실행 등 특정 포트폴리오가 특정된 이벤트에서 호출한다.
+    같은 목표·보유로 계산하는 전략 비교 캐시도 함께 지운다 — 예전엔 주문 실행만 따로 지워서 포트폴리오 수정·
+    전술 적용 뒤 1시간 동안 이전 목표 기준 거래 추천이 보였다(plans/77 B3).
     """
     await _scan_unlink(cache, f"{_env_prefix()}rebalancing_analysis:{user_id}:{portfolio_id}:*")
+    await invalidate_rebalancing_strategy_cache(cache, user_id, portfolio_id)
 
 
 async def invalidate_rebalancing_analysis_cache_all(cache: CacheStoreType, user_id: uuid.UUID) -> None:
@@ -533,6 +536,7 @@ async def invalidate_rebalancing_analysis_cache_all(cache: CacheStoreType, user_
     계좌 sync·CRUD처럼 어떤 포트폴리오가 영향받는지 특정할 수 없는 이벤트에서 호출한다.
     """
     await _scan_unlink(cache, f"{_env_prefix()}rebalancing_analysis:{user_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}rebalancing_strategy:{user_id}:*")
 
 
 async def invalidate_asset_account_caches(
