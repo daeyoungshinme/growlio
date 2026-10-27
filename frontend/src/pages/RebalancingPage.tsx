@@ -187,8 +187,6 @@ export default function RebalancingPage() {
                 <RebalancingStatusCard
                   marketSignal={signal ?? undefined}
                   onPortfolioSelect={handlePortfolioSelectFromDiagnosis}
-                  signalDisplay="none"
-                  showAllInsights={true}
                   emptyStateCta={openNewPortfolioEditor}
                 />
               </Suspense>

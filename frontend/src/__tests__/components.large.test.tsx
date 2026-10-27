@@ -753,7 +753,8 @@ describe("RebalancingStatusCard", () => {
     await waitFor(() => {
       expect(screen.getByText("리밸런싱 점검")).toBeInTheDocument();
     });
-    expect(screen.getByRole("link", { name: /분석하기/ })).toBeInTheDocument();
+    // 진단 탭 전용 카드라 리밸런싱 페이지로 가는 링크는 없다
+    expect(screen.queryByRole("link", { name: /분석하기/ })).not.toBeInTheDocument();
   });
 
   it("드리프트 데이터 없어도 카드 정상 렌더링", async () => {
