@@ -47,7 +47,7 @@ export default function TopLoadingBar({ isVisible }: Props) {
       aria-busy={isVisible}
       style={{
         position: "fixed",
-        top: 0,
+        top: "env(safe-area-inset-top)", // 상태바 아래(edge-to-edge) — 그 외 환경은 0
         left: 0,
         width: `${width}%`,
         height: "2px",

@@ -314,3 +314,67 @@ class TestExecuteBuysWithCashCheck:
             [], "key", "secret", "token", "12345678-01", True
         )
         assert results == []
+
+
+class TestExecuteBuysWithinBudget:
+    """TWO_PHASE Phase1/3 공용 — 체결 성공분만 예산에서 빼고, 못 산 수량은 다음 단계로 넘긴다 (plans/79 C1)."""
+
+    @staticmethod
+    def _executor(fail_tickers: frozenset[str] = frozenset()):
+        calls: list[tuple[str, int]] = []
+
+        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+            calls.append((order.ticker, order.quantity))
+            return OrderResult(
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="FAILED" if order.ticker in fail_tickers else "SUCCESS",
+            )
+
+        return calls, mock_execute_single
+
+    async def _run(self, orders, budget, fail_tickers=frozenset()):
+        calls, fake = self._executor(fail_tickers)
+        with patch.object(_kis_order_executor, "_execute_single_order", side_effect=fake):
+            results, remaining, used = await _kis_order_executor._execute_buys_within_budget(
+                orders, budget, "key", "secret", "token", "12345678-01", True
+            )
+        return calls, results, remaining, used
+
+    @pytest.mark.asyncio
+    async def test_partial_fit_returns_leftover_and_charges_budget(self):
+        order = _make_order(ticker="A", side="BUY", quantity=10, limit_price=1000.0)
+        calls, _, remaining, used = await self._run([order], 4500.0)
+        assert calls == [("A", 4)]
+        assert [(o.ticker, o.quantity, o.limit_price) for o in remaining] == [("A", 6, 1000.0)]
+        assert used == 4000.0
+
+    @pytest.mark.asyncio
+    async def test_failed_order_does_not_consume_budget(self):
+        first = _make_order(ticker="A", side="BUY", quantity=3, limit_price=1000.0)
+        second = _make_order(ticker="B", side="BUY", quantity=3, limit_price=1000.0)
+        calls, _, remaining, used = await self._run([first, second], 3000.0, frozenset({"A"}))
+        # A가 실패했으니 예산 3000이 그대로 남아 B를 3주 산다
+        assert calls == [("A", 3), ("B", 3)]
+        assert remaining == []
+        assert used == 3000.0
+
+    @pytest.mark.asyncio
+    async def test_unaffordable_order_carried_over_whole(self):
+        order = _make_order(ticker="A", side="BUY", quantity=2, limit_price=5000.0)
+        calls, results, remaining, used = await self._run([order], 1000.0)
+        assert calls == []
+        assert results == []
+        assert [(o.ticker, o.quantity) for o in remaining] == [("A", 2)]
+        assert used == 0.0
+
+    @pytest.mark.asyncio
+    async def test_market_order_passes_through_without_budget(self):
+        order = _make_order(ticker="A", side="BUY", quantity=5)
+        calls, _, remaining, used = await self._run([order], 0.0)
+        assert calls == [("A", 5)]
+        assert remaining == []
+        assert used == 0.0

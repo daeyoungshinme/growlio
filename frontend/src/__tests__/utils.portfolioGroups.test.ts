@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { IndexGroupSuggestion, PortfolioItem } from "@/api/portfolios";
 import type { GoalRecommendationItem } from "@/api/rebalancing";
-import type { RebalancingItem } from "@/api/rebalancing";
+import type { RebalancingAnalysis, RebalancingItem } from "@/api/rebalancing";
 import {
   applyIndexGroup,
   isLeveraged,
@@ -17,7 +17,12 @@ import {
   computeRecommendationDrift,
   toPortfolioItemsPreservingGroups,
 } from "@/utils/recommendationDrift";
-import { calcTradeSummary, flattenTradeItems } from "@/components/rebalancing/rebalancingTradeMath";
+import {
+  buyItemForAccount,
+  calcTradeSummary,
+  domesticAltCandidates,
+  flattenTradeItems,
+} from "@/components/rebalancing/rebalancingTradeMath";
 
 const m = (ticker: string, market: string, value_krw = 0) => ({
   ticker,
@@ -214,5 +219,87 @@ describe("out-of-scope suggestion members", () => {
     expect([...outside.keys()]).toEqual(["QLD|NASDAQ"]);
     expect(scopedMemberLabel(s.members[1], outside.get("QLD|NASDAQ"))).toBe("QLD ×2(해외)");
     expect(scopedMemberLabel(s.members[0], outside.get("379800|KOSPI"))).toBe("379800");
+  });
+});
+
+describe("buyItemForAccount (plans/79 E)", () => {
+  const base: RebalancingItem = {
+    ticker: "VOO",
+    name: "VOO",
+    market: "NYSE",
+    target_weight_pct: 50,
+    current_weight_pct: 40,
+    weight_diff_pct: 10,
+    current_value_krw: 400_000,
+    target_value_krw: 1_000_000,
+    diff_krw: 600_000,
+    shares_to_trade: null,
+    current_price_krw: 500_000,
+  };
+  const primary: RebalancingItem = {
+    ...base,
+    group_role: "PRIMARY",
+    current_qty: 0,
+    shares_to_trade: 1,
+    target_value_krw: 600_000,
+  };
+  const alt: RebalancingItem = {
+    ...base,
+    ticker: "360750",
+    name: "TIGER 미국S&P500",
+    market: "KOSPI",
+    group_role: "DOMESTIC_ALT",
+    current_value_krw: 40_000,
+    target_value_krw: 40_000,
+    current_qty: 2,
+    current_price_krw: 20_000,
+    shares_to_trade: 0,
+  };
+  const group: RebalancingItem = {
+    ...base,
+    current_value_krw: 400_000,
+    group_key: "US_SP500",
+    members: [primary, alt],
+  };
+
+  it("ISA·연금 계좌는 해외 대표 대신 국내 대체를 그룹 차액만큼 산다", () => {
+    for (const taxType of ["ISA", "PENSION_SAVINGS", "IRP"]) {
+      const item = buyItemForAccount(primary, [group], taxType);
+      // 차액 600,000 → 대체 목표 640,000 / 20,000 = 32주, 보유 2주 → 30주 매수
+      expect(item).toMatchObject({
+        ticker: "360750",
+        market: "KOSPI",
+        shares_to_trade: 30,
+        target_qty: 32,
+        substitute_for: "VOO",
+      });
+    }
+  });
+
+  it("일반 계좌·세제유형 미상이면 대표 종목 그대로", () => {
+    expect(buyItemForAccount(primary, [group], "GENERAL")).toBe(primary);
+    expect(buyItemForAccount(primary, [group], undefined)).toBe(primary);
+  });
+
+  it("대체 종목이 없거나 시세가 없으면 대표 종목 그대로", () => {
+    const noAlt = { ...group, members: [primary] };
+    expect(buyItemForAccount(primary, [noAlt], "ISA")).toBe(primary);
+    const noPrice = { ...group, members: [primary, { ...alt, current_price_krw: null }] };
+    expect(buyItemForAccount(primary, [noPrice], "ISA")).toBe(primary);
+  });
+
+  it("대표 종목이 국내면 바꾸지 않는다", () => {
+    const krPrimary = { ...primary, market: "KOSPI" };
+    expect(buyItemForAccount(krPrimary, [{ ...group, members: [krPrimary, alt] }], "ISA")).toBe(
+      krPrimary,
+    );
+  });
+
+  it("국내 대체 후보 시세 조회 대상", () => {
+    expect(
+      domesticAltCandidates({ items: [group] } as unknown as RebalancingAnalysis).map(
+        (i) => i.ticker,
+      ),
+    ).toEqual(["360750"]);
   });
 });

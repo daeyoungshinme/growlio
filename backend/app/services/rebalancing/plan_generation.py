@@ -242,8 +242,8 @@ async def generate_pending_plan_for_alert(
     """
     from app.utils.market_hours import korean_market_close_datetime, us_market_close_datetime
 
-    strategy = cast(str, strategy_override or getattr(alert, "strategy", "BUY_ONLY"))
-    order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
+    strategy = strategy_override or alert.strategy
+    order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], alert.order_type)
     account_id = account_id_override or alert.account_id
 
     if orders is None:
@@ -269,7 +269,7 @@ async def generate_pending_plan_for_alert(
     buy_tokens: list[tuple[str, str]] = []
     sell_tokens: list[tuple[str, str]] = []
 
-    buy_wait_minutes = getattr(alert, "buy_wait_minutes", 10)
+    buy_wait_minutes = alert.buy_wait_minutes
     buy_deadline = now + timedelta(minutes=buy_wait_minutes)
     for mkt, group in (("KR", buy_kr), ("US", buy_us)):
         if not group:
@@ -314,6 +314,98 @@ async def generate_pending_plan_for_alert(
     return plan, buy_tokens, sell_tokens
 
 
+async def _drifting_items_for_alert(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    db: AsyncSession,
+    buy_account_id: uuid.UUID | None,
+    cache: Any,
+) -> tuple[Any, Any, list] | None:
+    """분석 → 드리프트 필터 → 지수 그룹 펼침 → 라이브 시세 갱신. 드리프트가 없으면 None.
+
+    반환: (analysis, overview, drifting) — drifting은 analysis.items(그룹 members 포함)와 같은 객체를 가리킨다.
+    """
+    from app.services.portfolio_service import build_portfolio_overview
+    from app.services.rebalancing.alert_scope import resolve_effective_account_ids
+    from app.services.rebalancing.service import analyze_rebalancing
+
+    effective_account_ids = resolve_effective_account_ids(alert, portfolio)
+
+    overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, cache=cache)
+    analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+
+    # SCHEDULE_ONLY("스케줄일에 무조건")는 임계값과 무관하게 목표 비중 대비 차이가 있는 종목을 전부
+    # 대상으로 한다 — 정기 적립식 자동매수가 스케줄일에 쌓인 예수금을 목표 비중대로 매수하는 동작.
+    # (호출 시점이 스케줄일인지는 AUTO 잡이 is_auto_schedule_day로 이미 걸렀다)
+    threshold = 0.0 if alert.trigger_condition == "SCHEDULE_ONLY" else float(alert.threshold_pct)
+    drifting = filter_drifting_items(analysis.items, threshold)
+
+    if not drifting:
+        logger.info("rebalancing_plan_no_drift", alert_id=str(alert.id))
+        return None
+
+    # 지수 그룹 행(plans/74)은 매수 계좌의 세제유형에 맞춰 종목 단위 멤버 행으로 펼친다(ISA·연금이면 국내 대체 종목).
+    # 펼친 멤버 행은 analysis.items 그룹 행의 members와 같은 객체라 아래 시세 갱신이 세금영향 미리보기에도 반영된다
+    buy_tax_type = _flatten_account_tax_types(analysis.ticker_account_map).get(str(buy_account_id), "GENERAL")
+    drifting = expand_group_items(drifting, buy_tax_type)
+
+    # 게이트 판정(세금영향·하루합산한도) 이전에 라이브 시세로 갱신 — analysis.items와 drifting은
+    # 같은 객체를 참조하므로 여기서 갱신하면 세금영향 미리보기(_build_tax_preview(analysis, ...))에도 반영된다.
+    await refresh_live_prices(drifting, alert.user_id, db, cache)
+    return analysis, overview, drifting
+
+
+def _check_tax_gate(alert: RebalancingAlert, analysis: Any, overview: Any) -> TaxGateBlocked | None:
+    """세금영향 게이트 — 켜져 있고 추정 양도세가 상한을 넘으면 TaxGateBlocked."""
+    tax_gate_mode = alert.tax_impact_gate_mode
+    max_tax_impact_krw = alert.max_tax_impact_krw
+    if tax_gate_mode != "ENABLED" or max_tax_impact_krw is None:
+        return None
+    from app.services.rebalancing.diagnosis_service import _build_tax_preview
+
+    _total_gain, estimated_tax_krw, _fee, _notes, _items = _build_tax_preview(analysis, overview)
+    if not is_tax_impact_blocking_auto_mode(tax_gate_mode, estimated_tax_krw, max_tax_impact_krw):
+        return None
+    logger.info(
+        "rebalancing_plan_blocked_tax_impact",
+        alert_id=str(alert.id),
+        estimated_tax_krw=estimated_tax_krw,
+        max_tax_impact_krw=max_tax_impact_krw,
+    )
+    return TaxGateBlocked(estimated_tax_krw=estimated_tax_krw, max_tax_impact_krw=float(max_tax_impact_krw))
+
+
+async def _check_daily_value_cap(
+    alert: RebalancingAlert, orders: list, db: AsyncSession
+) -> DailyValueCapBlocked | None:
+    """하루 합산 거래한도 게이트 — 상한이 있고 오늘 누적 + 이번 주문이 넘으면 DailyValueCapBlocked."""
+    from app.models.user import UserSettings
+
+    daily_cap_krw = await db.scalar(
+        select(UserSettings.auto_rebalancing_daily_value_cap_krw).where(UserSettings.user_id == alert.user_id)
+    )
+    if daily_cap_krw is None:
+        return None
+    # 실제로 나갈 주문 기준 — 드리프트 diff 합은 현금·부동산 항목과 BUY_ONLY가 건너뛸 매도까지 더해
+    # 오늘 누적액(주문 수량 × 참조가)과 기준이 달랐고 약 2배로 과대 집계됐다(plans/62 A5)
+    attempted_value_krw = _orders_value_krw(orders)
+    today_total_krw = await sum_today_auto_plan_value_krw(alert.user_id, db)
+    if not is_daily_value_cap_blocking_auto_mode(today_total_krw, attempted_value_krw, float(daily_cap_krw)):
+        return None
+    logger.info(
+        "rebalancing_plan_blocked_daily_value_cap",
+        alert_id=str(alert.id),
+        today_total_krw=today_total_krw,
+        attempted_value_krw=attempted_value_krw,
+        cap_krw=float(daily_cap_krw),
+    )
+    return DailyValueCapBlocked(
+        today_total_krw=today_total_krw,
+        attempted_value_krw=attempted_value_krw,
+        cap_krw=float(daily_cap_krw),
+    )
+
+
 async def build_pending_plan_for_alert(
     alert: RebalancingAlert,
     portfolio: Portfolio,
@@ -338,52 +430,16 @@ async def build_pending_plan_for_alert(
     | DailyValueCapBlocked(하루 합산 거래한도 게이트 차단) | PlanGenerationInProgress(동시 요청 락 획득 실패).
     buy_tokens/sell_tokens는 [(market, raw_token), ...] — KR/US leg가 각각 있으면 최대 2개.
     """
-    from app.services.portfolio_service import build_portfolio_overview
-    from app.services.rebalancing.alert_scope import resolve_effective_account_ids
-    from app.services.rebalancing.service import analyze_rebalancing
-
-    effective_account_ids = resolve_effective_account_ids(alert, portfolio)
-
-    overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, cache=cache)
-    analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
-
-    # SCHEDULE_ONLY("스케줄일에 무조건")는 임계값과 무관하게 목표 비중 대비 차이가 있는 종목을 전부
-    # 대상으로 한다 — 정기 적립식 자동매수가 스케줄일에 쌓인 예수금을 목표 비중대로 매수하는 동작.
-    # (호출 시점이 스케줄일인지는 AUTO 잡이 is_auto_schedule_day로 이미 걸렀다)
-    threshold = 0.0 if getattr(alert, "trigger_condition", None) == "SCHEDULE_ONLY" else float(alert.threshold_pct)
-    drifting = filter_drifting_items(analysis.items, threshold)
-
-    if not drifting:
-        logger.info("rebalancing_plan_no_drift", alert_id=str(alert.id))
-        return None
-
-    # 지수 그룹 행(plans/74)은 매수 계좌의 세제유형에 맞춰 종목 단위 멤버 행으로 펼친다(ISA·연금이면 국내 대체 종목).
-    # 펼친 멤버 행은 analysis.items 그룹 행의 members와 같은 객체라 아래 시세 갱신이 세금영향 미리보기에도 반영된다
     buy_account_id = account_id_override or alert.account_id
-    buy_tax_type = _flatten_account_tax_types(analysis.ticker_account_map).get(str(buy_account_id), "GENERAL")
-    drifting = expand_group_items(drifting, buy_tax_type)
+    prepared = await _drifting_items_for_alert(alert, portfolio, db, buy_account_id, cache)
+    if prepared is None:
+        return None
+    analysis, overview, drifting = prepared
 
-    # 게이트 판정(세금영향·하루합산한도) 이전에 라이브 시세로 갱신 — analysis.items와 drifting은
-    # 같은 객체를 참조하므로 여기서 갱신하면 아래 _build_tax_preview(analysis, ...)에도 반영된다.
-    await refresh_live_prices(drifting, alert.user_id, db, cache)
-
-    tax_gate_mode = getattr(alert, "tax_impact_gate_mode", "DISABLED")
-    max_tax_impact_krw = getattr(alert, "max_tax_impact_krw", None)
-    if tax_gate_mode == "ENABLED" and max_tax_impact_krw is not None:
-        from app.services.rebalancing.diagnosis_service import _build_tax_preview
-
-        _total_gain, estimated_tax_krw, _fee, _notes, _items = _build_tax_preview(analysis, overview)
-        if is_tax_impact_blocking_auto_mode(tax_gate_mode, estimated_tax_krw, max_tax_impact_krw):
-            logger.info(
-                "rebalancing_plan_blocked_tax_impact",
-                alert_id=str(alert.id),
-                estimated_tax_krw=estimated_tax_krw,
-                max_tax_impact_krw=max_tax_impact_krw,
-            )
-            return TaxGateBlocked(estimated_tax_krw=estimated_tax_krw, max_tax_impact_krw=float(max_tax_impact_krw))
+    if blocked := _check_tax_gate(alert, analysis, overview):
+        return blocked
 
     from app.core.cache_store import get_cache_store
-    from app.models.user import UserSettings
     from app.utils.inproc_lock import inproc_lock
 
     # 하루 합산 거래한도 체크(조회→비교→플랜생성)는 AUTO 잡과 수동 "지금 실행"이 거의 동시에
@@ -395,38 +451,12 @@ async def build_pending_plan_for_alert(
             logger.info("rebalancing_plan_generation_lock_busy", alert_id=str(alert.id))
             return PlanGenerationInProgress()
 
-        strategy = cast(str, strategy_override or getattr(alert, "strategy", "BUY_ONLY"))
-        order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
-        orders = _build_plan_orders(
-            alert,
-            drifting,
-            analysis.ticker_account_map,
-            strategy,
-            order_type,
-            account_id_override or alert.account_id,
-        )
+        strategy = strategy_override or alert.strategy
+        order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], alert.order_type)
+        orders = _build_plan_orders(alert, drifting, analysis.ticker_account_map, strategy, order_type, buy_account_id)
 
-        daily_cap_krw = await db.scalar(
-            select(UserSettings.auto_rebalancing_daily_value_cap_krw).where(UserSettings.user_id == alert.user_id)
-        )
-        if daily_cap_krw is not None:
-            # 실제로 나갈 주문 기준 — 드리프트 diff 합은 현금·부동산 항목과 BUY_ONLY가 건너뛸 매도까지 더해
-            # 오늘 누적액(주문 수량 × 참조가)과 기준이 달랐고 약 2배로 과대 집계됐다(plans/62 A5)
-            attempted_value_krw = _orders_value_krw(orders)
-            today_total_krw = await sum_today_auto_plan_value_krw(alert.user_id, db)
-            if is_daily_value_cap_blocking_auto_mode(today_total_krw, attempted_value_krw, float(daily_cap_krw)):
-                logger.info(
-                    "rebalancing_plan_blocked_daily_value_cap",
-                    alert_id=str(alert.id),
-                    today_total_krw=today_total_krw,
-                    attempted_value_krw=attempted_value_krw,
-                    cap_krw=float(daily_cap_krw),
-                )
-                return DailyValueCapBlocked(
-                    today_total_krw=today_total_krw,
-                    attempted_value_krw=attempted_value_krw,
-                    cap_krw=float(daily_cap_krw),
-                )
+        if cap_blocked := await _check_daily_value_cap(alert, orders, db):
+            return cap_blocked
 
         plan, buy_tokens, sell_tokens = await generate_pending_plan_for_alert(
             alert,

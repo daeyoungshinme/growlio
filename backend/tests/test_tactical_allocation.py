@@ -955,7 +955,7 @@ class TestFetchWrappers:
         from app.services import tactical_backtest as bt
 
         obs = [{"date": "2026-10-02", "value": "18.5"}, {"date": "2026-10-01", "value": "."}]
-        with patch("app.services.economic_indicator_service._fred_get_observations", AsyncMock(return_value=obs)):
+        with patch("app.services.economic_indicator_service.fred_get_observations", AsyncMock(return_value=obs)):
             series = await bt._fetch_vix_history(30)
         assert series.to_dict() == {pd.Timestamp("2026-10-02"): 18.5}
 

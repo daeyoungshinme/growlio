@@ -2,7 +2,10 @@ import { fetchStockPrice, fetchStockPricesBatch } from "@/api/assets";
 import { CASH_TICKER } from "@/constants/assets";
 import { RebalancingAnalysis } from "@/api/rebalancing";
 import type { ExecutionAction } from "./rebalancingExecution/types";
-import { getActionableItems } from "@/components/rebalancing/rebalancingTradeMath";
+import {
+  domesticAltCandidates,
+  getActionableItems,
+} from "@/components/rebalancing/rebalancingTradeMath";
 import { toast } from "@/utils/toast";
 import { getHttpStatus } from "@/utils/error";
 import { isOrderExecutableAccount } from "@/utils/accounts";
@@ -42,7 +45,8 @@ export function useRebalancingPrices(
 ) {
   async function loadAllPrices() {
     const tickerMarketMap = new Map<string, string>();
-    getActionableItems(analysis).forEach((i) => {
+    // 국내 대체 후보도 함께 — ISA·연금 계좌 매수 행이 대체 종목으로 바뀌면 그 시세가 필요하다(plans/79 E)
+    [...getActionableItems(analysis), ...domesticAltCandidates(analysis)].forEach((i) => {
       if (i.ticker !== CASH_TICKER) tickerMarketMap.set(i.ticker, i.market);
     });
     if (tickerMarketMap.size === 0) return;

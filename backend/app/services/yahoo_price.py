@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from collections.abc import Callable
 from functools import partial
@@ -33,6 +34,20 @@ logger = structlog.get_logger()
 _T = TypeVar("_T")
 
 _yfinance_sem = asyncio.Semaphore(settings.api_semaphore_limit)
+
+# yfinance 0.2.x `download()`는 호출마다 전역 `shared._DFS`를 비우고 거기에 종목별 결과를 모은다.
+# executor에서 두 호출이 겹치면(공용 세마포어는 5칸) 한쪽이 다른 쪽 결과를 지워 종목이 조용히 빠졌다 —
+# 그래서 download만 프로세스 안에서 직렬화한다(plans/79 G). Ticker 단건 조회(`history`)는 전역 상태가 없어 대상 아님.
+_yf_download_lock = threading.Lock()
+
+
+def yf_download(tickers: Any, **kwargs: Any) -> Any:
+    """`yfinance.download` 직렬화 래퍼 — 앱 코드의 모든 배치 다운로드는 이것을 쓴다."""
+    import yfinance as yf
+
+    with _yf_download_lock:
+        return yf.download(tickers, **kwargs)
+
 
 _kosdaq_tickers: frozenset[str] = frozenset()
 """KOSDAQ 상장 코드 집합 — KIS/키움/토스 잔고 파서가 국내 보유종목 market을 전부 "KOSPI"로 채워
@@ -107,7 +122,6 @@ def _sync_yahoo_price(ticker: str, market: str) -> float | None:
 
 def _sync_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
     """여러 종목을 한 번의 download 호출로 조회. {ticker: price}"""
-    import yfinance as yf
 
     if not items:
         return {}
@@ -117,7 +131,7 @@ def _sync_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
 
     for attempt in range(3):
         try:
-            data = yf.download(
+            data = yf_download(
                 symbols,
                 period="5d",
                 auto_adjust=True,
@@ -241,8 +255,6 @@ def _sync_calc_returns_batch(items: list[tuple[str, str]], years: int = 10) -> d
     한 번의 `yf.download()`로 묶어 조회 속도를 높이고 Yahoo 요청 수를 줄인다.
     """
 
-    import yfinance as yf
-
     if not items:
         return {}
 
@@ -258,7 +270,7 @@ def _sync_calc_returns_batch(items: list[tuple[str, str]], years: int = 10) -> d
     result: dict[tuple[str, str], dict] = {}
     for attempt in range(3):
         try:
-            data = yf.download(
+            data = yf_download(
                 symbols,
                 start=start.isoformat(),
                 end=end.isoformat(),

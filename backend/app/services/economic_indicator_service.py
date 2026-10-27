@@ -82,7 +82,7 @@ FRED_BASE = "https://api.stlouisfed.org/fred"
 # ---------------------------------------------------------------------------
 
 
-async def _fred_get_observations(
+async def fred_get_observations(
     series_id: str, limit: int = 36, observation_start: date | None = None
 ) -> list[dict[str, Any]]:
     """FRED에서 최근 limit개 관측치를 가져온다.
@@ -171,7 +171,7 @@ async def _fred_get_release_dates(series_id: str, upcoming: bool = False) -> lis
 # ---------------------------------------------------------------------------
 
 
-def _parse_fred_obs(obs: list[dict]) -> list[dict[str, Any]]:
+def parse_fred_obs(obs: list[dict]) -> list[dict[str, Any]]:
     points = []
     for o in reversed(obs):  # FRED는 desc 정렬이므로 역전
         val_str = o.get("value", ".")
@@ -317,11 +317,11 @@ async def fetch_indicator_history(code: str, months: int = 24, cache=None) -> li
         logger.warning("fred_circuit_open", code=code)
         return []
     try:
-        raw = await fred_circuit.call(_fred_get_observations, meta["series"], limit=months + 3)
+        raw = await fred_circuit.call(fred_get_observations, meta["series"], limit=months + 3)
     except (CircuitOpenError, Exception) as exc:
         logger.warning("indicator_history_fetch_failed", code=code, error=str(exc))
         return []
-    points = _parse_fred_obs(raw)
+    points = parse_fred_obs(raw)
 
     # 최근 months개만 반환
     result = points[-months:] if len(points) > months else points

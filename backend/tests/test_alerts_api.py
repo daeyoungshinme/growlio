@@ -263,6 +263,13 @@ class TestRebalancingAlertExtended:
             deposit_accounts=[],
             deposit_trigger_min_amount_krw=None,
             last_deposit_checked_at=None,
+            auto_execution_time=None,
+            notify_time="08:30",
+            buy_wait_minutes=10,
+            tax_impact_gate_mode="DISABLED",
+            max_tax_impact_krw=None,
+            # db.scalar가 포트폴리오 조회에도 이 객체를 돌려주는 테스트용 — 스코프 검사 통과
+            alert_scope="AGGREGATE",
             created_at=now,
             updated_at=now,
         )
@@ -282,7 +289,7 @@ class TestRebalancingAlertExtended:
         user = _make_user()
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
-        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         now = datetime.now(UTC)
         # First scalar returns portfolio, second returns None (no existing alert)
         db.scalar = AsyncMock(side_effect=[portfolio_orm, None])
@@ -313,7 +320,7 @@ class TestRebalancingAlertExtended:
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
         exec_account_id = uuid.uuid4()
-        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         exec_account = SimpleNamespace(id=exec_account_id, user_id=user.id, asset_type="STOCK_KIS")
         now = datetime.now(UTC)
         # 1st scalar: portfolio, 2nd: AUTO 실행계좌 검증, 3rd: get_alert_by_portfolio(기존 알림 없음)
@@ -354,7 +361,7 @@ class TestRebalancingAlertExtended:
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
         exec_account_id = uuid.uuid4()
-        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         exec_account = SimpleNamespace(id=exec_account_id, user_id=user.id, asset_type="STOCK_KIWOOM")
         now = datetime.now(UTC)
         db.scalar = AsyncMock(side_effect=[portfolio_orm, exec_account, None])
@@ -397,7 +404,7 @@ class TestRebalancingAlertExtended:
         user = _make_user()
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
-        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
         alert_orm.alert_scope = "AGGREGATE"
         alert_orm.mode = "AUTO"
@@ -424,7 +431,7 @@ class TestRebalancingAlertExtended:
         user = _make_user()
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
-        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
         # First scalar returns portfolio, second returns existing alert
         db.scalar = AsyncMock(side_effect=[portfolio_orm, alert_orm])
@@ -460,7 +467,7 @@ class TestRebalancingAlertExtended:
         user = _make_user()
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
-        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         db.scalar = AsyncMock(return_value=portfolio_orm)
         app = _setup_app(user, db)
         payload = {"portfolio_id": str(portfolio_id), "threshold_pct": 99.0}
@@ -472,7 +479,7 @@ class TestRebalancingAlertExtended:
         user = _make_user()
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
-        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         db.scalar = AsyncMock(return_value=portfolio_orm)
         app = _setup_app(user, db)
         payload = {
@@ -490,7 +497,7 @@ class TestRebalancingAlertExtended:
         user = _make_user()
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
-        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         db.scalar = AsyncMock(return_value=portfolio_orm)
         app = _setup_app(user, db)
         payload = {
@@ -507,7 +514,7 @@ class TestRebalancingAlertExtended:
         user = _make_user()
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
-        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         now = datetime.now(UTC)
         db.scalar = AsyncMock(side_effect=[portfolio_orm, None])
 

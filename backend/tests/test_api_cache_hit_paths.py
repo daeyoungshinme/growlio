@@ -129,7 +129,7 @@ class TestRebalancingAlertAutoModeAccountValidation:
         portfolio_id = uuid.uuid4()
         account_id = uuid.uuid4()
 
-        mock_portfolio = SimpleNamespace(id=portfolio_id, user_id=user.id)
+        mock_portfolio = SimpleNamespace(id=portfolio_id, user_id=user.id, alert_scope="AGGREGATE")
         mock_non_kis = SimpleNamespace(id=account_id, user_id=user.id, asset_type="BANK_ACCOUNT")
         db.scalar = AsyncMock(side_effect=[mock_portfolio, mock_non_kis])
 
@@ -173,6 +173,12 @@ class TestRebalancingAlertGetSuccess:
             order_type="MARKET",
             market_condition_mode="DISABLED",
             auto_execution_time=None,
+            notify_time="08:30",
+            buy_wait_minutes=10,
+            tax_impact_gate_mode="DISABLED",
+            max_tax_impact_krw=None,
+            # db.scalar가 포트폴리오 조회에도 이 객체를 돌려주는 테스트용 — 스코프 검사 통과
+            alert_scope="AGGREGATE",
             last_triggered_at=None,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),

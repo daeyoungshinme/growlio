@@ -1,15 +1,20 @@
 import React from "react";
-import { RefreshCw } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import type { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
-import { SideBadge } from "./RebalancingBadges";
 import type { ExecutionAction, OrderType, PriceLoadState } from "@/hooks/useRebalancingExecution";
 import { isOverseasMarket } from "@/constants/markets";
-import { PriceCell } from "./RebalancingPriceCell";
-import { RebalancingPriceInput } from "./RebalancingPriceInput";
 import { RebalancingMobileCard } from "./RebalancingMobileCard";
-import { estimateLimitKrw, orderKey } from "./rebalancingTradeMath";
+import {
+  AllocationNote,
+  BuyHoldingNote,
+  DesktopOrderRow,
+  type OrderRowModel,
+  PriceErrorBanner,
+  QtyInput,
+  SectionLabel,
+} from "./RebalancingOrderRows";
+import { estimateLimitKrw, orderKey, type OrderSide } from "./rebalancingTradeMath";
 
 function getNativePrice(
   ticker: string,
@@ -61,48 +66,67 @@ export function RebalancingOrderTable({
   getEstimateKrw,
   getBuyTotalInfo,
 }: RebalancingOrderTableProps) {
+  const rowModel = (
+    side: OrderSide,
+    item: RebalancingItem,
+    suggestedQty: number,
+  ): OrderRowModel => {
+    const key = orderKey(side, item.ticker, accId);
+    const qty = qtyOverrides[key] ?? suggestedQty;
+    const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
+    const isMultiAccount = side === "buy" && (buyAccounts[item.ticker] ?? []).length > 1;
+    const { allocated, needed } = isMultiAccount
+      ? getBuyTotalInfo(item.ticker)
+      : { allocated: 0, needed: 0 };
+    return {
+      key,
+      qty,
+      nativeLimitPrice,
+      currentNativePrice: getNativePrice(item.ticker, item.market, livePricesKrw, livePricesUsd),
+      est: getEstimateKrw(key, item.ticker, item.market, qty),
+      estKrw: estimateLimitKrw(nativeLimitPrice, qty, item.market, globalUsdRate),
+      isMultiAccount,
+      allocated,
+      needed,
+    };
+  };
+  const removeBuyAccount = (ticker: string) =>
+    dispatch({ type: "REMOVE_BUY_ACCOUNT", ticker, accountId: accId });
+
+  const priceProps = {
+    orderType,
+    priceState,
+    livePricesKrw,
+    livePricesUsd,
+    priceRetrying,
+    onRetryPrice,
+    globalUsdRate,
+  };
+  const colSpan = orderType === "LIMIT" ? 7 : 6;
+  const marketEstimate = (est: number | null) =>
+    est != null &&
+    orderType === "MARKET" && (
+      <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 text-right">
+        ≈ {fmtKrw(est)}
+      </div>
+    );
+
   return (
     <ErrorBoundary variant="section">
-      {priceState === "error" && (
-        <div
-          role="alert"
-          className="mx-3 mb-2 px-3 py-2 flex items-center justify-between gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-700/40 rounded-lg"
-        >
-          <span>현재가 조회 실패 — 지정가를 직접 입력하거나 다시 시도하세요.</span>
-          <button
-            onClick={onRetryAllPrices}
-            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded bg-amber-200 dark:bg-amber-800/40 hover:bg-amber-300 dark:hover:bg-amber-800/60 text-amber-800 dark:text-amber-200 transition-colors"
-          >
-            <RefreshCw size={12} />
-            재조회
-          </button>
-        </div>
-      )}
+      {priceState === "error" && <PriceErrorBanner onRetry={onRetryAllPrices} />}
       {/* 모바일 카드 뷰 */}
       <div className="md:hidden divide-y divide-gray-200 dark:divide-gray-700/30">
         {sellRows.length > 0 && (
           <>
-            <div className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/30">
-              매도
-            </div>
+            <SectionLabel>매도</SectionLabel>
             {sellRows.map(({ item, currentQty, suggestedQty }) => {
-              const key = orderKey("sell", item.ticker, accId);
-              const qty = qtyOverrides[key] ?? suggestedQty;
-              const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
-              const currentNativePrice = getNativePrice(
-                item.ticker,
-                item.market,
-                livePricesKrw,
-                livePricesUsd,
-              );
-              const est = getEstimateKrw(key, item.ticker, item.market, qty);
-              const estKrw = estimateLimitKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
+              const row = rowModel("sell", item, suggestedQty);
               return (
                 <RebalancingMobileCard
-                  key={key}
-                  orderKey={key}
+                  key={row.key}
+                  orderKey={row.key}
                   item={item}
-                  qty={qty}
+                  qty={row.qty}
                   isBuy={false}
                   maxQty={currentQty}
                   extra={
@@ -111,17 +135,11 @@ export function RebalancingOrderTable({
                     </p>
                   }
                   selected={selected}
-                  orderType={orderType}
-                  priceState={priceState}
-                  livePricesKrw={livePricesKrw}
-                  livePricesUsd={livePricesUsd}
-                  priceRetrying={priceRetrying}
-                  onRetryPrice={onRetryPrice}
-                  globalUsdRate={globalUsdRate}
-                  nativeLimitPrice={nativeLimitPrice}
-                  currentNativePrice={currentNativePrice}
-                  estKrw={estKrw}
-                  marketOrderEst={est}
+                  {...priceProps}
+                  nativeLimitPrice={row.nativeLimitPrice}
+                  currentNativePrice={row.currentNativePrice}
+                  estKrw={row.estKrw}
+                  marketOrderEst={row.est}
                   dispatch={dispatch}
                 />
               );
@@ -130,81 +148,33 @@ export function RebalancingOrderTable({
         )}
         {buyRows.length > 0 && (
           <>
-            <div className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/30">
-              매수
-            </div>
+            <SectionLabel>매수</SectionLabel>
             {buyRows.map(({ item, suggestedQty, currentQty }) => {
-              const key = orderKey("buy", item.ticker, accId);
-              const qty = qtyOverrides[key] ?? suggestedQty;
-              const isMultiAccount = (buyAccounts[item.ticker] ?? []).length > 1;
-              const { allocated, needed } = isMultiAccount
-                ? getBuyTotalInfo(item.ticker)
-                : { allocated: 0, needed: 0 };
-              const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
-              const currentNativePrice = getNativePrice(
-                item.ticker,
-                item.market,
-                livePricesKrw,
-                livePricesUsd,
-              );
-              const est = getEstimateKrw(key, item.ticker, item.market, qty);
-              const estKrw = estimateLimitKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
+              const row = rowModel("buy", item, suggestedQty);
               return (
                 <RebalancingMobileCard
-                  key={key}
-                  orderKey={key}
+                  key={row.key}
+                  orderKey={row.key}
                   item={item}
-                  qty={qty}
+                  qty={row.qty}
                   isBuy={true}
                   extra={
-                    isMultiAccount ? (
-                      <div
-                        className={`text-xs mt-0.5 text-right ${
-                          allocated === needed
-                            ? "text-gray-500 dark:text-gray-500"
-                            : "text-amber-600 dark:text-amber-400"
-                        }`}
-                      >
-                        배분 {allocated} / {needed}주
-                      </div>
+                    row.isMultiAccount ? (
+                      <AllocationNote allocated={row.allocated} needed={row.needed} />
                     ) : (
                       <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 text-right">
-                        {item.target_qty != null ? (
-                          <>
-                            {currentQty > 0 ? `${currentQty.toLocaleString()}주` : "미보유"} → 목표{" "}
-                            {item.target_qty.toFixed(0)}주
-                          </>
-                        ) : currentQty > 0 ? (
-                          `현재 ${currentQty.toLocaleString()}주 보유`
-                        ) : (
-                          "현재 미보유"
-                        )}
+                        <BuyHoldingNote item={item} currentQty={currentQty} />
                       </p>
                     )
                   }
                   selected={selected}
-                  orderType={orderType}
-                  priceState={priceState}
-                  livePricesKrw={livePricesKrw}
-                  livePricesUsd={livePricesUsd}
-                  priceRetrying={priceRetrying}
-                  onRetryPrice={onRetryPrice}
-                  globalUsdRate={globalUsdRate}
-                  nativeLimitPrice={nativeLimitPrice}
-                  currentNativePrice={currentNativePrice}
-                  estKrw={estKrw}
+                  {...priceProps}
+                  nativeLimitPrice={row.nativeLimitPrice}
+                  currentNativePrice={row.currentNativePrice}
+                  estKrw={row.estKrw}
                   // 분할 매수는 배분 현황만 표시(데스크톱과 동일) — ≈ 추정액과 겹쳐 보이지 않게
-                  marketOrderEst={isMultiAccount ? null : est}
-                  onRemove={
-                    isMultiAccount
-                      ? () =>
-                          dispatch({
-                            type: "REMOVE_BUY_ACCOUNT",
-                            ticker: item.ticker,
-                            accountId: accId,
-                          })
-                      : undefined
-                  }
+                  marketOrderEst={row.isMultiAccount ? null : row.est}
+                  onRemove={row.isMultiAccount ? () => removeBuyAccount(item.ticker) : undefined}
                   dispatch={dispatch}
                 />
               );
@@ -253,103 +223,37 @@ export function RebalancingOrderTable({
               <>
                 <tr>
                   <td
-                    colSpan={orderType === "LIMIT" ? 7 : 6}
+                    colSpan={colSpan}
                     className="px-4 py-1.5 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/30"
                   >
                     매도
                   </td>
                 </tr>
                 {sellRows.map(({ item, currentQty, suggestedQty }) => {
-                  const key = orderKey("sell", item.ticker, accId);
-                  const qty = qtyOverrides[key] ?? suggestedQty;
-                  const est = getEstimateKrw(key, item.ticker, item.market, qty);
-                  const nativeVal = getLimitPriceNative(key, item.ticker, item.market);
-                  const currentNativePrice = getNativePrice(
-                    item.ticker,
-                    item.market,
-                    livePricesKrw,
-                    livePricesUsd,
-                  );
+                  const row = rowModel("sell", item, suggestedQty);
                   return (
-                    <tr
-                      key={key}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
-                      onClick={() => dispatch({ type: "TOGGLE_SELECTED", key })}
-                    >
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(key)}
-                          onChange={() => dispatch({ type: "TOGGLE_SELECTED", key })}
-                          onClick={(e) => e.stopPropagation()}
-                          className="accent-indigo-500"
+                    <DesktopOrderRow
+                      key={row.key}
+                      item={item}
+                      row={row}
+                      isBuy={false}
+                      note={`현재 ${currentQty.toLocaleString()}주 보유`}
+                      selected={selected.has(row.key)}
+                      {...priceProps}
+                      dispatch={dispatch}
+                      qtyInput={
+                        <QtyInput
+                          value={row.qty}
+                          max={currentQty}
+                          colorClass="text-blue-600 dark:text-blue-400"
+                          onChange={(qty) =>
+                            dispatch({ type: "SET_QTY", key: row.key, qty, max: currentQty })
+                          }
                         />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="text-gray-900 dark:text-white font-medium truncate">
-                          {item.name}
-                        </div>
-                        <div className="text-gray-500 dark:text-gray-400 text-xs">
-                          {item.ticker}
-                        </div>
-                        <div className="text-gray-500 dark:text-gray-500 text-xs">
-                          현재 {currentQty.toLocaleString()}주 보유
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <SideBadge isBuy={false} />
-                      </td>
-                      <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                        <PriceCell
-                          ticker={item.ticker}
-                          market={item.market}
-                          priceState={priceState}
-                          livePricesKrw={livePricesKrw}
-                          livePricesUsd={livePricesUsd}
-                          priceRetrying={priceRetrying}
-                          onRetryPrice={onRetryPrice}
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            max={currentQty}
-                            value={qty || ""}
-                            onFocus={(e) => e.target.select()}
-                            onChange={(e) =>
-                              dispatch({
-                                type: "SET_QTY",
-                                key,
-                                qty: parseInt(e.target.value) || 0,
-                                max: currentQty,
-                              })
-                            }
-                            className="w-16 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-right text-blue-600 dark:text-blue-400 font-medium focus:outline-none focus:border-indigo-500"
-                          />
-                          <span className="text-gray-500 dark:text-gray-400">주</span>
-                        </div>
-                        {est != null && orderType === "MARKET" && (
-                          <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 text-right">
-                            ≈ {fmtKrw(est)}
-                          </div>
-                        )}
-                      </td>
-                      <RebalancingPriceInput
-                        orderKey={key}
-                        market={item.market}
-                        qty={qty}
-                        orderType={orderType}
-                        priceState={priceState}
-                        nativeVal={nativeVal}
-                        currentNativePrice={currentNativePrice}
-                        globalUsdRate={globalUsdRate}
-                        dispatch={dispatch}
-                      />
-                      <td />
-                    </tr>
+                      }
+                      qtyFooter={marketEstimate(row.est)}
+                      trailing={<td />}
+                    />
                   );
                 })}
               </>
@@ -359,144 +263,54 @@ export function RebalancingOrderTable({
               <>
                 <tr>
                   <td
-                    colSpan={orderType === "LIMIT" ? 7 : 6}
+                    colSpan={colSpan}
                     className="px-4 py-1.5 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/30"
                   >
                     매수
                   </td>
                 </tr>
                 {buyRows.map(({ item, suggestedQty, currentQty }) => {
-                  const key = orderKey("buy", item.ticker, accId);
-                  const qty = qtyOverrides[key] ?? suggestedQty;
-                  const est = getEstimateKrw(key, item.ticker, item.market, qty);
-                  const nativeVal = getLimitPriceNative(key, item.ticker, item.market);
-                  const currentNativePrice = getNativePrice(
-                    item.ticker,
-                    item.market,
-                    livePricesKrw,
-                    livePricesUsd,
-                  );
-                  const isMultiAccount = (buyAccounts[item.ticker] ?? []).length > 1;
-                  const isOnlyAccount = !isMultiAccount;
-                  const { allocated, needed } = isMultiAccount
-                    ? getBuyTotalInfo(item.ticker)
-                    : { allocated: 0, needed: 0 };
+                  const row = rowModel("buy", item, suggestedQty);
                   return (
-                    <tr
-                      key={key}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
-                      onClick={() => dispatch({ type: "TOGGLE_SELECTED", key })}
-                    >
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(key)}
-                          onChange={() => dispatch({ type: "TOGGLE_SELECTED", key })}
-                          onClick={(e) => e.stopPropagation()}
-                          className="accent-indigo-500"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="text-gray-900 dark:text-white font-medium truncate">
-                          {item.name}
-                        </div>
-                        <div className="text-gray-500 dark:text-gray-400 text-xs">
-                          {item.ticker}
-                        </div>
-                        <div className="text-gray-500 dark:text-gray-500 text-xs">
-                          {item.target_qty != null ? (
-                            <>
-                              {currentQty > 0 ? `${currentQty.toLocaleString()}주` : "미보유"} →
-                              목표 {item.target_qty.toFixed(0)}주
-                            </>
-                          ) : currentQty > 0 ? (
-                            `현재 ${currentQty.toLocaleString()}주 보유`
-                          ) : (
-                            "현재 미보유"
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <SideBadge isBuy={true} />
-                      </td>
-                      <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                        <PriceCell
-                          ticker={item.ticker}
-                          market={item.market}
-                          priceState={priceState}
-                          livePricesKrw={livePricesKrw}
-                          livePricesUsd={livePricesUsd}
-                          priceRetrying={priceRetrying}
-                          onRetryPrice={onRetryPrice}
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            value={qty || ""}
-                            onFocus={(e) => e.target.select()}
-                            onChange={(e) =>
-                              dispatch({
-                                type: "SET_QTY_AND_SELECT",
-                                key,
-                                qty: parseInt(e.target.value) || 0,
-                              })
-                            }
-                            className="w-16 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-right text-red-600 dark:text-red-400 font-medium focus:outline-none focus:border-indigo-500"
-                          />
-                          <span className="text-gray-500 dark:text-gray-400">주</span>
-                        </div>
-                        {isMultiAccount ? (
-                          <div
-                            className={`text-xs mt-0.5 text-right ${
-                              allocated === needed
-                                ? "text-gray-500 dark:text-gray-500"
-                                : "text-amber-600 dark:text-amber-400"
-                            }`}
-                          >
-                            배분 {allocated} / {needed}주
-                          </div>
-                        ) : (
-                          est != null &&
-                          orderType === "MARKET" && (
-                            <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 text-right">
-                              ≈ {fmtKrw(est)}
-                            </div>
-                          )
-                        )}
-                      </td>
-                      <RebalancingPriceInput
-                        orderKey={key}
-                        market={item.market}
-                        qty={qty}
-                        orderType={orderType}
-                        priceState={priceState}
-                        nativeVal={nativeVal}
-                        currentNativePrice={currentNativePrice}
-                        globalUsdRate={globalUsdRate}
-                        dispatch={dispatch}
-                      />
-                      <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() =>
-                            dispatch({
-                              type: "REMOVE_BUY_ACCOUNT",
-                              ticker: item.ticker,
-                              accountId: accId,
-                            })
+                    <DesktopOrderRow
+                      key={row.key}
+                      item={item}
+                      row={row}
+                      isBuy={true}
+                      note={<BuyHoldingNote item={item} currentQty={currentQty} />}
+                      selected={selected.has(row.key)}
+                      {...priceProps}
+                      dispatch={dispatch}
+                      qtyInput={
+                        <QtyInput
+                          value={row.qty}
+                          colorClass="text-red-600 dark:text-red-400"
+                          onChange={(qty) =>
+                            dispatch({ type: "SET_QTY_AND_SELECT", key: row.key, qty })
                           }
-                          disabled={isOnlyAccount}
-                          title="이 계좌에서 제거"
-                          aria-label="이 계좌에서 제거"
-                          className="text-gray-400 dark:text-gray-600 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm leading-none px-1"
-                        >
-                          ×
-                        </button>
-                      </td>
-                    </tr>
+                        />
+                      }
+                      qtyFooter={
+                        row.isMultiAccount ? (
+                          <AllocationNote allocated={row.allocated} needed={row.needed} />
+                        ) : (
+                          marketEstimate(row.est)
+                        )
+                      }
+                      trailing={
+                        <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => removeBuyAccount(item.ticker)}
+                            disabled={!row.isMultiAccount}
+                            title="이 계좌에서 제거"
+                            aria-label="이 계좌에서 제거"
+                            className="text-gray-400 dark:text-gray-600 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm leading-none px-1"
+                          >
+                            ×
+                          </button>
+                        </td>
+                      }
+                    />
                   );
                 })}
               </>

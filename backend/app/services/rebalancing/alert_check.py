@@ -129,8 +129,8 @@ async def _process_rebalancing_alert(
     # 실제 매수/매도 수량 미리보기 — drift가 있을 때만 계산(실행/저장은 하지 않음, 표시 전용).
     order_preview_items: list = []
     if drifting:
-        strategy = getattr(alert, "strategy", "BUY_ONLY")
-        order_type = cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
+        strategy = alert.strategy
+        order_type = cast(Literal["MARKET", "LIMIT"], alert.order_type)
         buy_account_id = str(alert.account_id) if alert.account_id else ""
         order_preview_items = build_rebalancing_orders(
             drifting, ticker_account_map or {}, strategy, order_type, buy_account_id, alert_id=str(alert.id)
@@ -169,7 +169,7 @@ async def _process_rebalancing_alert(
             items_to_show=items_to_show,
             drifting_count=drift_count,
             is_scheduled_report=is_scheduled_report,
-            schedule_type=getattr(alert, "schedule_type", "DAILY"),
+            schedule_type=alert.schedule_type,
             is_composite_triggered=is_composite_triggered,
             composite_reason=composite_reason,
             order_preview_items=order_preview_items,
@@ -225,7 +225,7 @@ async def _get_composite_level(cache, db: AsyncSession) -> tuple[str, str]:
 
 def _should_skip_by_schedule(alert: RebalancingAlert, trigger_condition: str, is_schedule_day: bool) -> bool:
     """notify_time 실행창(±4분)·스케줄 요일·당일 중복발송 여부에 따라 이번 체크를 건너뛸지 판정한다."""
-    notify_time = getattr(alert, "notify_time", "08:30")
+    notify_time = alert.notify_time
     if not is_alert_execution_time(notify_time):
         return True
 
@@ -323,7 +323,7 @@ async def _load_active_alert_rows(db: AsyncSession, alert_ids: list[uuid.UUID] |
 async def _check_one_rebalancing_alert(row, composite_level, market_data_freshness, db: AsyncSession, _cache) -> bool:
     """알림 1건을 평가해 발송했으면 True."""
     alert, portfolio, user_email, notification_email, fcm_token, composite_signal_alerts_enabled = row
-    trigger_condition = getattr(alert, "trigger_condition", "DRIFT_ONLY")
+    trigger_condition = alert.trigger_condition
     is_schedule_day = should_fire_today(alert)
 
     if _should_skip_by_schedule(alert, trigger_condition, is_schedule_day):
@@ -357,8 +357,8 @@ async def _check_one_rebalancing_alert(row, composite_level, market_data_freshne
     items_to_show, is_scheduled_report, is_composite_triggered = selected
 
     automation_note = None
-    if getattr(alert, "mode", "NOTIFY") == "AUTO":
-        market_mode = getattr(alert, "market_condition_mode", "DISABLED")
+    if alert.mode == "AUTO":
+        market_mode = alert.market_condition_mode
         tactical_regime = await tactical_regime_for_gate(alert, db)
         if is_market_signal_blocking_auto_mode(market_mode, composite_level, market_data_freshness, tactical_regime):
             automation_note = (
@@ -405,7 +405,7 @@ async def _check_one_rebalancing_alert(row, composite_level, market_data_freshne
     # AUTO 모드는 last_triggered_at을 갱신하지 않는다.
     # 인트라데이 잡(rebalancing_auto_execution)에서 실제 실행 후 갱신하므로,
     # 여기서 갱신하면 already_fired_today()가 True → 당일 자동 실행 차단됨.
-    if getattr(alert, "mode", "NOTIFY") != "AUTO":
+    if alert.mode != "AUTO":
         alert.last_triggered_at = datetime.now(tz=UTC)
     # 발송 직후 항목별 commit — 루프 끝 일괄 commit은 중간 DB 오류 시 이미 보낸 알림의
     # last_triggered_at까지 롤백해 다음 실행에 중복 발송한다(expire_on_commit=False라 안전).

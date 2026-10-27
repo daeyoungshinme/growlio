@@ -14,6 +14,7 @@ import {
   executeRebalancing,
 } from "@/api/rebalancing";
 import {
+  buyItemForAccount,
   flattenTradeItems,
   getActionableItems,
   orderKey,
@@ -77,7 +78,11 @@ function computeInitialBuyAndSelected(
         .forEach((a) => selected.add(orderKey("sell", i.ticker, a.account_id)));
     } else if ((i.shares_to_trade ?? 0) > 0) {
       const accId = getPrimaryAccountId(i.ticker) || defaultAccId;
-      if (accId) selected.add(orderKey("buy", i.ticker, accId));
+      if (!accId) return;
+      // ISA·연금 계좌면 실제로 사는 종목(국내 대체)의 키로 선택해 둔다 — getBuyRows와 같은 판단
+      const taxType = tradableAccounts.find((a) => a.id === accId)?.tax_type;
+      const buyItem = buyItemForAccount(i, analysis.items, taxType);
+      selected.add(orderKey("buy", buyItem.ticker, accId));
     }
   });
 
@@ -247,8 +252,15 @@ export function useRebalancingExecution({
         (i) => (i.shares_to_trade ?? 0) > 0 && (buyAccounts[i.ticker] ?? []).includes(accountId),
       )
       .map((i) => {
-        const suggestedQty = Math.abs(Math.round(i.shares_to_trade!));
-        return { item: i, suggestedQty, currentQty: getAccountQuantity(i.ticker, accountId) };
+        // 지수 그룹의 해외 대표 종목을 ISA·연금 계좌 한 곳에서 사면 국내 대체 종목으로 바꾼다(plans/79 E).
+        // 여러 계좌로 나눠 사는 중이면 배분 수량 단위가 섞이므로 바꾸지 않는다
+        const single = (buyAccounts[i.ticker] ?? []).length === 1;
+        const taxType = single
+          ? tradableAccounts.find((a) => a.id === accountId)?.tax_type
+          : undefined;
+        const item = buyItemForAccount(i, analysis.items, taxType);
+        const suggestedQty = Math.abs(Math.round(item.shares_to_trade!));
+        return { item, suggestedQty, currentQty: getAccountQuantity(item.ticker, accountId) };
       });
   }
 

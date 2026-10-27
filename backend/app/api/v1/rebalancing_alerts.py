@@ -46,7 +46,7 @@ async def _get_portfolio_with_accounts(db: AsyncSession, portfolio_id: uuid.UUID
 
 
 def _reject_if_per_account_scope(portfolio: Portfolio) -> None:
-    if getattr(portfolio, "alert_scope", "AGGREGATE") == "PER_ACCOUNT":
+    if portfolio.alert_scope == "PER_ACCOUNT":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="계좌별 독립 설정 포트폴리오입니다. /accounts/{account_id} 엔드포인트를 사용해주세요",
@@ -120,7 +120,7 @@ def _format_test_alert_message(email_sent: bool, push_sent: bool) -> str:
 
 
 def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
-    max_tax_impact_krw = getattr(alert, "max_tax_impact_krw", None)
+    max_tax_impact_krw = alert.max_tax_impact_krw
     return RebalancingAlertResponse(
         id=alert.id,
         portfolio_id=alert.portfolio_id,
@@ -135,10 +135,10 @@ def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
         account_id=alert.account_id,
         order_type=alert.order_type,
         market_condition_mode=alert.market_condition_mode,
-        auto_execution_time=getattr(alert, "auto_execution_time", None),
-        notify_time=getattr(alert, "notify_time", "08:30"),
-        buy_wait_minutes=getattr(alert, "buy_wait_minutes", 10),
-        tax_impact_gate_mode=getattr(alert, "tax_impact_gate_mode", "DISABLED"),
+        auto_execution_time=alert.auto_execution_time,
+        notify_time=alert.notify_time,
+        buy_wait_minutes=alert.buy_wait_minutes,
+        tax_impact_gate_mode=alert.tax_impact_gate_mode,
         max_tax_impact_krw=(float(max_tax_impact_krw) if max_tax_impact_krw is not None else None),
         last_triggered_at=alert.last_triggered_at,
         created_at=alert.created_at,
@@ -316,7 +316,7 @@ async def upsert_account_rebalancing_alert(
 ):
     """특정 계좌 전용 리밸런싱 알림 생성 또는 수정 (upsert, PER_ACCOUNT 스코프 전용)."""
     portfolio = await _get_portfolio_with_accounts(db, portfolio_id, current_user.id)
-    if getattr(portfolio, "alert_scope", "AGGREGATE") != "PER_ACCOUNT":
+    if portfolio.alert_scope != "PER_ACCOUNT":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="이 포트폴리오는 계좌별 독립 설정(PER_ACCOUNT)이 아닙니다. 먼저 스코프를 전환해주세요",

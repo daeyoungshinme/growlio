@@ -1,4 +1,4 @@
-"""economic_indicator_service._parse_fred_obs / fetch_inflation_summary 단위 테스트."""
+"""economic_indicator_service.parse_fred_obs / fetch_inflation_summary 단위 테스트."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ import httpx
 import pytest
 
 from app.services.economic_indicator_service import (
-    _fred_get_observations,
-    _parse_fred_obs,
     fetch_indicator_history,
     fetch_inflation_summary,
+    fred_get_observations,
+    parse_fred_obs,
 )
 from app.utils.circuit_breaker import CircuitBreaker
 
@@ -19,7 +19,7 @@ from app.utils.circuit_breaker import CircuitBreaker
 class TestParseFredObs:
     def test_normal_observation_parsed(self):
         obs = [{"date": "2024-01-01", "value": "5.25"}]
-        result = _parse_fred_obs(obs)
+        result = parse_fred_obs(obs)
         assert len(result) == 1
         assert result[0]["date"] == "2024-01-01"
         assert result[0]["value"] == pytest.approx(5.25)
@@ -29,7 +29,7 @@ class TestParseFredObs:
             {"date": "2024-01-01", "value": "."},
             {"date": "2024-02-01", "value": "5.25"},
         ]
-        result = _parse_fred_obs(obs)
+        result = parse_fred_obs(obs)
         assert len(result) == 1
         assert result[0]["value"] == pytest.approx(5.25)
 
@@ -39,24 +39,24 @@ class TestParseFredObs:
             {"date": "2024-02-01", "value": "2.5"},
             {"date": "2024-01-01", "value": "2.0"},
         ]
-        result = _parse_fred_obs(obs)
+        result = parse_fred_obs(obs)
         assert len(result) == 3
         assert result[0]["date"] == "2024-01-01"
         assert result[-1]["date"] == "2024-03-01"
 
     def test_empty_input_returns_empty(self):
-        assert _parse_fred_obs([]) == []
+        assert parse_fred_obs([]) == []
 
     def test_all_dot_values_returns_empty(self):
         obs = [{"date": "2024-01-01", "value": "."} for _ in range(5)]
-        assert _parse_fred_obs(obs) == []
+        assert parse_fred_obs(obs) == []
 
     def test_non_numeric_value_skipped(self):
         obs = [
             {"date": "2024-01-01", "value": "N/A"},
             {"date": "2024-02-01", "value": "1.5"},
         ]
-        result = _parse_fred_obs(obs)
+        result = parse_fred_obs(obs)
         assert len(result) == 1
         assert result[0]["value"] == pytest.approx(1.5)
 
@@ -66,7 +66,7 @@ class TestParseFredObs:
             {"date": "2024-06-01", "value": "3.5"},
             {"date": "2024-01-01", "value": "3.0"},
         ]
-        result = _parse_fred_obs(obs)
+        result = parse_fred_obs(obs)
         dates = [r["date"] for r in result]
         assert dates == sorted(dates)
 
@@ -164,11 +164,11 @@ class TestFredGetObservations:
             patch("app.services.economic_indicator_service.settings.fred_api_key", "test-key"),
             pytest.raises(httpx.HTTPStatusError),
         ):
-            await _fred_get_observations("PCEPI")
+            await fred_get_observations("PCEPI")
 
     async def test_no_api_key_returns_empty_without_raising(self):
         with patch("app.services.economic_indicator_service.settings.fred_api_key", ""):
-            result = await _fred_get_observations("PCEPI")
+            result = await fred_get_observations("PCEPI")
 
         assert result == []
 
@@ -183,7 +183,7 @@ class TestFetchIndicatorHistoryCircuitBreaker:
         with (
             patch("app.services.economic_indicator_service.fred_circuit", test_circuit),
             patch(
-                "app.services.economic_indicator_service._fred_get_observations",
+                "app.services.economic_indicator_service.fred_get_observations",
                 new=AsyncMock(side_effect=httpx.HTTPStatusError("403", request=MagicMock(), response=MagicMock())),
             ),
         ):
@@ -197,7 +197,7 @@ class TestFetchIndicatorHistoryCircuitBreaker:
         with (
             patch("app.services.economic_indicator_service.fred_circuit", test_circuit),
             patch.object(test_circuit, "is_available", return_value=False),
-            patch("app.services.economic_indicator_service._fred_get_observations", new=mock_fetch),
+            patch("app.services.economic_indicator_service.fred_get_observations", new=mock_fetch),
         ):
             result = await fetch_indicator_history("CPI_US", months=13, cache=None)
 

@@ -3,9 +3,13 @@ import { useEffect, useRef } from "react";
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea, input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-// 모달이 겹쳐 열릴 수 있으므로(예: 계좌별 자동화 목록 위에 편집 모달) 참조 카운트로 body 스크롤 잠금 관리
+// 모달이 겹쳐 열릴 수 있으므로(예: 계좌별 자동화 목록 위에 편집 모달) 참조 카운트로 스크롤 잠금 관리.
+// 실제로 스크롤되는 요소는 AppLayout의 <main>(overflow-auto)이라 body와 함께 잠근다 — body만 잠그면
+// 모달 뒤 페이지가 계속 스크롤됐다(plans/79 F). 로그인 화면처럼 <main>이 없으면 body만.
 let bodyLockCount = 0;
 let savedBodyOverflow = "";
+let lockedMain: HTMLElement | null = null;
+let savedMainOverflow = "";
 // 열린 모달 목록 — Escape/포커스 트랩은 맨 위 모달만 처리한다.
 // (Android 뒤로가기는 Escape를 dispatch하므로, 이게 없으면 확인창 위에서 한 번 눌러도 아래 모달까지 함께 닫힘)
 interface ModalEntry {
@@ -40,12 +44,19 @@ export function useModalBehavior(onClose: () => void) {
     if (bodyLockCount === 0) {
       savedBodyOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
+      lockedMain = document.querySelector("main");
+      if (lockedMain) {
+        savedMainOverflow = lockedMain.style.overflow;
+        lockedMain.style.overflow = "hidden";
+      }
     }
     bodyLockCount++;
     return () => {
       bodyLockCount--;
       if (bodyLockCount === 0) {
         document.body.style.overflow = savedBodyOverflow;
+        if (lockedMain) lockedMain.style.overflow = savedMainOverflow;
+        lockedMain = null;
       }
     };
   }, []);

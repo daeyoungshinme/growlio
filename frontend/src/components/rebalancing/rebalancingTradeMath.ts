@@ -1,5 +1,5 @@
 import type { RebalancingAnalysis, RebalancingItem } from "@/api/rebalancing";
-import { isOverseasMarket } from "@/constants/markets";
+import { DOMESTIC_MARKETS, isOverseasMarket } from "@/constants/markets";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
 
 export const TRADING_FEE_RATE = 0.00014; // 0.014% 수수료 (한국투자증권 기준)
@@ -45,6 +45,62 @@ export function getActionableItems(analysis: RebalancingAnalysis): RebalancingIt
       i.shares_to_trade !== null &&
       Math.abs(i.shares_to_trade) >= 1,
   );
+}
+
+/** 해외 종목을 살 수 없는 절세 계좌 — 백엔드 `TAX_DEFERRED_TAX_TYPES`와 같은 집합 */
+const TAX_DEFERRED_TAX_TYPES = new Set(["ISA", "PENSION_SAVINGS", "IRP"]);
+
+function isDomesticMarket(market: string): boolean {
+  return DOMESTIC_MARKETS.includes(market.toUpperCase());
+}
+
+/** 그룹 행 중 매수할 금액이 있고 대표 종목이 해외인 것의 (그룹, 대표, 국내 대체) — 대체 후보 계산용 */
+function overseasPrimaryBuyGroups(items: RebalancingItem[]) {
+  return items.flatMap((g) => {
+    if (!isGroupItem(g) || g.target_value_krw - g.current_value_krw <= 0) return [];
+    const members = g.members ?? [];
+    const primary = members.find((m) => m.group_role === "PRIMARY");
+    const alt = members.find((m) => m.group_role === "DOMESTIC_ALT");
+    if (!primary || !alt || isDomesticMarket(primary.market)) return [];
+    return [{ group: g, primary, alt }];
+  });
+}
+
+/** 국내 대체로 바뀔 수 있는 종목 행 — 실행 화면이 대표 종목과 함께 시세를 미리 받는다 */
+export function domesticAltCandidates(analysis: RebalancingAnalysis): RebalancingItem[] {
+  return overseasPrimaryBuyGroups(analysis.items).map(({ alt }) => alt);
+}
+
+/**
+ * 매수 계좌가 ISA·연금이면 해외 대표 종목 매수 행을 그룹의 국내 대체 종목 행으로 바꾼다.
+ * 백엔드 `group_expansion._buy_target`/`allocate_group_trades`와 같은 규칙 — 그룹 금액 차이만큼 대체 종목을 산다.
+ * 해당 없거나(일반 계좌·국내 대표·대체 없음) 대체 종목 시세가 없거나 1주도 못 사면 원래 행을 그대로 돌려준다.
+ */
+export function buyItemForAccount(
+  item: RebalancingItem,
+  items: RebalancingItem[],
+  taxType: string | undefined,
+): RebalancingItem {
+  if (!taxType || !TAX_DEFERRED_TAX_TYPES.has(taxType) || item.group_role !== "PRIMARY")
+    return item;
+  const hit = overseasPrimaryBuyGroups(items).find(({ primary }) => primary.ticker === item.ticker);
+  if (!hit) return item;
+  const { group, alt } = hit;
+  const price = alt.current_price_krw;
+  if (!price || price <= 0) return item;
+  const diff = group.target_value_krw - group.current_value_krw;
+  const targetValue = alt.current_value_krw + diff;
+  const targetQty = Math.floor(targetValue / price + 1e-9);
+  const shares = targetQty - (alt.current_qty ?? 0);
+  if (shares < 1) return item;
+  return {
+    ...alt,
+    target_value_krw: targetValue,
+    diff_krw: diff,
+    target_qty: targetQty,
+    shares_to_trade: shares,
+    substitute_for: item.ticker,
+  };
 }
 
 export type OrderSide = "buy" | "sell";

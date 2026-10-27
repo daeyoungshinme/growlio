@@ -32,10 +32,10 @@ async def fetch_vix_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="vix")
         return None
-    from app.services.economic_indicator_service import _fred_get_observations
+    from app.services.economic_indicator_service import fred_get_observations
 
     try:
-        obs = await fred_circuit.call(_fred_get_observations, "VIXCLS", limit=5)
+        obs = await fred_circuit.call(fred_get_observations, "VIXCLS", limit=5)
     except (CircuitOpenError, Exception) as exc:
         logger.warning("vix_fetch_failed", error=str(exc))
         return None
@@ -69,10 +69,10 @@ async def fetch_yield_curve_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="yield_curve")
         return None
-    from app.services.economic_indicator_service import _fred_get_observations
+    from app.services.economic_indicator_service import fred_get_observations
 
     try:
-        obs = await fred_circuit.call(_fred_get_observations, "T10Y2Y", limit=5)
+        obs = await fred_circuit.call(fred_get_observations, "T10Y2Y", limit=5)
     except (CircuitOpenError, Exception) as exc:
         logger.warning("yield_curve_fetch_failed", error=str(exc))
         return None
@@ -106,10 +106,10 @@ async def fetch_high_yield_spread_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="high_yield_spread")
         return None
-    from app.services.economic_indicator_service import _fred_get_observations
+    from app.services.economic_indicator_service import fred_get_observations
 
     try:
-        obs = await fred_circuit.call(_fred_get_observations, "BAMLH0A0HYM2", limit=5)
+        obs = await fred_circuit.call(fred_get_observations, "BAMLH0A0HYM2", limit=5)
     except (CircuitOpenError, Exception) as exc:
         logger.warning("high_yield_spread_fetch_failed", error=str(exc))
         return None
@@ -146,15 +146,15 @@ async def fetch_dollar_index_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="dollar_index")
         return None
-    from app.services.economic_indicator_service import _fred_get_observations, _parse_fred_obs
+    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
 
     try:
-        obs = await fred_circuit.call(_fred_get_observations, "DTWEXBGS", limit=30)
+        obs = await fred_circuit.call(fred_get_observations, "DTWEXBGS", limit=30)
     except (CircuitOpenError, Exception) as exc:
         logger.warning("dollar_index_fetch_failed", error=str(exc))
         return None
 
-    points = _parse_fred_obs(obs)
+    points = parse_fred_obs(obs)
     if len(points) < 20:
         return None
 
@@ -199,12 +199,12 @@ async def fetch_rate_cut_expectation_signal() -> dict[str, Any] | None:
         return None
     import asyncio
 
-    from app.services.economic_indicator_service import _fred_get_observations
+    from app.services.economic_indicator_service import fred_get_observations
 
     try:
         dgs2_obs, fedfunds_obs = await asyncio.gather(
-            fred_circuit.call(_fred_get_observations, "DGS2", limit=5),
-            fred_circuit.call(_fred_get_observations, "FEDFUNDS", limit=5),
+            fred_circuit.call(fred_get_observations, "DGS2", limit=5),
+            fred_circuit.call(fred_get_observations, "FEDFUNDS", limit=5),
         )
     except (CircuitOpenError, Exception) as exc:
         logger.warning("rate_cut_expectation_fetch_failed", error=str(exc))
@@ -284,15 +284,15 @@ async def fetch_exchange_rate_signal(cache: CacheStore | None = None) -> dict[st
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="exchange_rate")
         return None
-    from app.services.economic_indicator_service import _fred_get_observations, _parse_fred_obs
+    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
 
     try:
-        obs = await fred_circuit.call(_fred_get_observations, "DEXKOUS", limit=30)
+        obs = await fred_circuit.call(fred_get_observations, "DEXKOUS", limit=30)
     except (CircuitOpenError, Exception) as exc:
         logger.warning("exchange_rate_fetch_failed", error=str(exc))
         return None
 
-    points = _parse_fred_obs(obs)
+    points = parse_fred_obs(obs)
     if len(points) < 20:
         return None
 
@@ -339,15 +339,15 @@ async def fetch_oil_price_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="oil_price")
         return None
-    from app.services.economic_indicator_service import _fred_get_observations, _parse_fred_obs
+    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
 
     try:
-        obs = await fred_circuit.call(_fred_get_observations, "DCOILWTICO", limit=30)
+        obs = await fred_circuit.call(fred_get_observations, "DCOILWTICO", limit=30)
     except (CircuitOpenError, Exception) as exc:
         logger.warning("oil_price_fetch_failed", error=str(exc))
         return None
 
-    points = _parse_fred_obs(obs)
+    points = parse_fred_obs(obs)
     if len(points) < 20:
         return None
 
@@ -482,15 +482,15 @@ async def fetch_employment_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="employment")
         return None
-    from app.services.economic_indicator_service import _fred_get_observations, _parse_fred_obs
+    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
 
     try:
-        obs = await fred_circuit.call(_fred_get_observations, "UNRATE", limit=13)
+        obs = await fred_circuit.call(fred_get_observations, "UNRATE", limit=13)
     except (CircuitOpenError, Exception) as exc:
         logger.warning("employment_fetch_failed", error=str(exc))
         return None
 
-    points = _parse_fred_obs(obs)
+    points = parse_fred_obs(obs)
     if len(points) < 13:
         return None
 
