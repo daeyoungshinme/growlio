@@ -945,3 +945,37 @@ class TestUpdateChallengeReminders:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put("/api/v1/settings/challenge-reminders", json={"enabled": True})
         assert resp.status_code == 401
+
+
+class TestPushToken:
+    """같은 기기 토큰이 다른 사용자 row에 남지 않게 한다 (plans/61 A4)."""
+
+    def _put(self, payload):
+        from unittest.mock import patch
+
+        user = _make_user()
+        db = _make_mock_db()
+        row = SimpleNamespace(fcm_token="old")
+        app = _setup_app(user, db)
+        with (
+            patch("app.api.v1.settings.get_or_create_settings", AsyncMock(return_value=row)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put("/api/v1/settings/push-token", json=payload)
+        return resp, db, row, user
+
+    def test_register_detaches_token_from_other_users(self, override_settings):
+        resp, db, row, user = self._put({"fcm_token": "device-token"})
+        assert resp.status_code == 200
+        assert row.fcm_token == "device-token"
+        stmt = db.execute.call_args_list[0][0][0]
+        sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+        assert sql.startswith("UPDATE user_settings SET fcm_token=NULL")
+        assert "fcm_token = 'device-token'" in sql
+        assert f"user_id != '{user.id.hex}'" in sql or f"user_id != '{user.id}'" in sql
+
+    def test_clear_does_not_touch_other_users(self, override_settings):
+        resp, db, row, _ = self._put({"fcm_token": None})
+        assert resp.status_code == 200
+        assert row.fcm_token is None
+        db.execute.assert_not_called()

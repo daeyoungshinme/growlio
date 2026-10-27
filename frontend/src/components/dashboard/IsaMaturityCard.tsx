@@ -6,16 +6,17 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
 import { INPUT_SM } from "@/constants/inputStyles";
-import { fmtKrw, fmtKrwPreview } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview, parseYmd } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
 
-function fmtMonthDay(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+/** 백엔드 date("YYYY-MM-DD") → "M/D". `new Date()`는 UTC 자정으로 해석해 UTC보다 늦은 타임존에서 전날이 된다. */
+function fmtMonthDay(ymd: string): string {
+  const { month, day } = parseYmd(ymd);
+  return `${month}/${day}`;
 }
 
 function MaturityBadge({ status }: { status: IsaAccountStatus }) {

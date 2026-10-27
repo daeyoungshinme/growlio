@@ -154,6 +154,24 @@ class TestInvalidateRebalancingStrategyCache:
         assert pattern.endswith(":*")
         cache.unlink.assert_called_once_with(written_key)
 
+    @pytest.mark.asyncio
+    async def test_analysis_invalidation_also_clears_strategy(self, override_settings):
+        """plans/77 B3 — 포트폴리오 수정·전술 적용(분석 캐시 무효화 경로)이 전략 비교 캐시도 지운다."""
+        from app.core.cache_store import CacheStore
+        from app.utils.cache_keys import invalidate_rebalancing_analysis_cache
+
+        uid = uuid.uuid4()
+        cache = CacheStore()
+        key = rebalancing_strategy_key(uid, "portfolio-1", "all")
+        other = rebalancing_strategy_key(uid, "portfolio-2", "all")
+        await cache.set(key, "{}")
+        await cache.set(other, "{}")
+
+        await invalidate_rebalancing_analysis_cache(cache, uid, "portfolio-1")
+
+        assert await cache.get(key) is None
+        assert await cache.get(other) == "{}"
+
 
 class TestInvalidateDividendCaches:
     """positions_changed 플래그로 종목별 배당 추정(외부 API 폴백 체인 필요) 캐시 무효화를

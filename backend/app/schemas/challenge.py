@@ -23,6 +23,41 @@ def _validate_month(v: str | None) -> str | None:
     return v
 
 
+def _validate_pct(v: float | None) -> float | None:
+    if v is not None and not (-100 <= v <= 1000):
+        raise ValueError("목표 수익률은 -100~1000% 범위여야 합니다")
+    return v
+
+
+def _validate_months(v: int | None) -> int | None:
+    if v is not None and not (1 <= v <= 600):
+        raise ValueError("연속 목표 개월수는 1~600 범위여야 합니다")
+    return v
+
+
+def check_type_targets(
+    challenge_type: str,
+    *,
+    target_amount: float | None,
+    target_pct: float | None,
+    target_months: int | None,
+    account_id: uuid.UUID | None,
+) -> None:
+    """유형별 목표 필드 규칙 — 생성 스키마와 수정 라우터(기존 값과 병합한 상태)가 함께 쓴다."""
+    if challenge_type == CHALLENGE_DEPOSIT:
+        if target_pct is not None:
+            raise ValueError("입금 챌린지에는 목표 수익률을 설정할 수 없습니다")
+    else:
+        if account_id is not None:
+            raise ValueError("수익률/평가금액 챌린지는 전체 투자자산 기준만 지원합니다")
+        if target_months is not None:
+            raise ValueError("이 유형에는 연속 목표 개월수를 설정할 수 없습니다")
+    if challenge_type == "RETURN_PCT" and target_pct is None:
+        raise ValueError("수익률 챌린지에는 목표 수익률이 필요합니다")
+    if challenge_type == "TARGET_VALUE" and not target_amount:
+        raise ValueError("평가금액 챌린지에는 목표 금액이 필요합니다")
+
+
 class ChallengeBase(BaseModel):
     title: str
     challenge_type: str
@@ -57,16 +92,12 @@ class ChallengeBase(BaseModel):
     @field_validator("target_pct")
     @classmethod
     def _validate_pct(cls, v: float | None) -> float | None:
-        if v is not None and not (-100 <= v <= 1000):
-            raise ValueError("목표 수익률은 -100~1000% 범위여야 합니다")
-        return v
+        return _validate_pct(v)
 
     @field_validator("target_months")
     @classmethod
     def _validate_months(cls, v: int | None) -> int | None:
-        if v is not None and not (1 <= v <= 600):
-            raise ValueError("연속 목표 개월수는 1~600 범위여야 합니다")
-        return v
+        return _validate_months(v)
 
     @field_validator("start_month", "deadline_month")
     @classmethod
@@ -75,18 +106,13 @@ class ChallengeBase(BaseModel):
 
     @model_validator(mode="after")
     def _validate_type_targets(self) -> ChallengeBase:
-        if self.challenge_type == CHALLENGE_DEPOSIT:
-            if self.target_pct is not None:
-                raise ValueError("입금 챌린지에는 목표 수익률을 설정할 수 없습니다")
-        else:
-            if self.account_id is not None:
-                raise ValueError("수익률/평가금액 챌린지는 전체 투자자산 기준만 지원합니다")
-            if self.target_months is not None:
-                raise ValueError("이 유형에는 연속 목표 개월수를 설정할 수 없습니다")
-        if self.challenge_type == "RETURN_PCT" and self.target_pct is None:
-            raise ValueError("수익률 챌린지에는 목표 수익률이 필요합니다")
-        if self.challenge_type == "TARGET_VALUE" and not self.target_amount:
-            raise ValueError("평가금액 챌린지에는 목표 금액이 필요합니다")
+        check_type_targets(
+            self.challenge_type,
+            target_amount=self.target_amount,
+            target_pct=self.target_pct,
+            target_months=self.target_months,
+            account_id=self.account_id,
+        )
         return self
 
 
@@ -102,6 +128,30 @@ class ChallengeUpdate(BaseModel):
     deadline_month: str | None = None
     reminder_enabled: bool | None = None
     status: str | None = None
+
+    # 명시적 null은 NOT NULL 컬럼(title·reminder_enabled·status)에 그대로 들어가 500이 났다 — 생략만 허용한다.
+    # 범위 검증은 생성과 같은 규칙을 쓴다(없으면 Numeric 오버플로 500·음수 진행률, plans/61 A3).
+    @field_validator("title", "reminder_enabled", "status", mode="before")
+    @classmethod
+    def _reject_null(cls, v: object) -> object:
+        if v is None:
+            raise ValueError("null로 비울 수 없는 필드입니다")
+        return v
+
+    @field_validator("target_amount")
+    @classmethod
+    def _validate_amount(cls, v: float | None) -> float | None:
+        return validate_non_negative_amount(v)
+
+    @field_validator("target_pct")
+    @classmethod
+    def _validate_pct(cls, v: float | None) -> float | None:
+        return _validate_pct(v)
+
+    @field_validator("target_months")
+    @classmethod
+    def _validate_months(cls, v: int | None) -> int | None:
+        return _validate_months(v)
 
     @field_validator("title")
     @classmethod

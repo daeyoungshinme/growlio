@@ -86,6 +86,7 @@ from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
+from app.services.rebalancing.group_expansion import group_owner_map
 from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
@@ -135,19 +136,13 @@ def fold_into_portfolio_groups(
     그룹 항목은 대표 종목 키 하나로 목표 비중을 가지므로, 추천이 같은 지수의 다른 종목(예: SPY ↔ 그룹 대표 VOO)을
     내도 "신규 후보"로 세지 않는다. 프론트 `recommendationDrift.ts`의 `foldIntoPortfolioGroups()`와 같은 규칙.
     """
-    owner: dict[tuple[str, str], tuple[str, str]] = {}
-    for item in portfolio_items:
-        if not getattr(item, "group_key", None):
-            continue
-        primary = (item.ticker, item.market)
-        owner[primary] = primary
-        for m in getattr(item, "members", None) or []:
-            owner[(m.ticker, m.market)] = primary
+    # 추천·저장 비중은 투자금 기준이라 레버리지 배수는 곱하지 않는다(그룹 합산 키만 사용)
+    owner = group_owner_map(portfolio_items)
     if not owner:
         return recommended
     folded: dict[tuple[str, str], float] = {}
     for t, m, w in recommended:
-        key = owner.get((t, m), (t, m))
+        key = owner[(t, m)][0] if (t, m) in owner else (t, m)
         folded[key] = folded.get(key, 0.0) + w
     return [(t, m, w) for (t, m), w in folded.items()]
 

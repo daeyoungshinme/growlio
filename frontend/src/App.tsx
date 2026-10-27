@@ -20,6 +20,7 @@ import { fetchDCAAnalysis } from "./api/invest";
 import { fetchSettings } from "./api/settings";
 import { QUERY_KEYS } from "./constants/queryKeys";
 import { storageRemove } from "./utils/safeStorage";
+import { CACHE_OWNER_CHANGED_EVENT } from "./utils/cacheOwner";
 
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
@@ -152,6 +153,13 @@ export default function App() {
     window.addEventListener("growlio:session-expired", handleSessionExpired);
     return () => window.removeEventListener("growlio:session-expired", handleSessionExpired);
   }, [logout, queryClient]);
+
+  useEffect(() => {
+    // 다른 사용자가 로그인함 — 이전 사용자의 메모리 캐시를 비운다(persist 키는 claimCacheOwner가 지움)
+    const handleOwnerChanged = () => queryClient.clear();
+    window.addEventListener(CACHE_OWNER_CHANGED_EVENT, handleOwnerChanged);
+    return () => window.removeEventListener(CACHE_OWNER_CHANGED_EVENT, handleOwnerChanged);
+  }, [queryClient]);
 
   return (
     <>

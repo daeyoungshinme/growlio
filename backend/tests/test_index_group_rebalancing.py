@@ -444,3 +444,28 @@ class TestSuggestionScope:
     def test_no_scope_means_all_in_scope(self):
         g = build_index_group_suggestions(self._exposure()).groups[0]
         assert all(m.in_scope for m in g.members)
+
+
+def test_group_owner_map_maps_members_to_primary_with_leverage():
+    """plans/77 B2 — 그룹 대표·멤버·국내 대체 → (대표 키, 배수). 일반 항목은 담지 않는다."""
+    from types import SimpleNamespace
+
+    from app.services.rebalancing.group_expansion import group_owner_map
+
+    items = [
+        SimpleNamespace(
+            ticker="QQQ",
+            market="NASDAQ",
+            group_key="NDX100",
+            members=[
+                SimpleNamespace(ticker="QLD", market="NYSE", leverage=2.0),
+                SimpleNamespace(ticker="133690", market="KOSPI", leverage=None),
+            ],
+        ),
+        SimpleNamespace(ticker="AAPL", market="NASDAQ", group_key=None, members=[]),
+    ]
+    assert group_owner_map(items) == {
+        ("QQQ", "NASDAQ"): (("QQQ", "NASDAQ"), 1.0),
+        ("QLD", "NYSE"): (("QQQ", "NASDAQ"), 2.0),
+        ("133690", "KOSPI"): (("QQQ", "NASDAQ"), 1.0),
+    }

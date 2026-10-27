@@ -232,7 +232,8 @@ async def generate_pending_plan_for_alert(
     """드리프트 항목으로부터 BUY/SELL leg를 가진 대기 플랜을 생성한다 (실행하지 않음).
 
     `*_override` 파라미터는 저장된 `alert` 설정 대신 사용할 값 — 화면에서 저장하지 않고
-    바로 테스트할 때 쓰인다. `alert` 객체 자체는 절대 mutate하지 않는다.
+    바로 테스트할 때 쓰인다. `alert`의 설정 필드는 mutate하지 않는다
+    (플랜을 만들면 `last_triggered_at`만 같은 트랜잭션으로 기록).
 
     국내(KR)/해외(US) 주문이 섞여 있으면 side당 최대 2개(KR/US) leg로 분리한다 — 두 시장은
     개장시간이 달라 하나의 leg로 묶으면 마감/실행 시각을 leg 단위로만 판단할 수 없다.
@@ -291,6 +292,9 @@ async def generate_pending_plan_for_alert(
         db.add_all(leg.items)
         sell_tokens.append((mkt, token))
 
+    # "오늘 이미 실행" 표시를 플랜과 같은 트랜잭션으로 저장한다 — commit 뒤에 메모리만 바꾸면 그 사이 크래시나
+    # 루프 내 다른 알림의 실패(rollback)로 표시가 사라져 같은 날 플랜이 또 생성될 수 있다(plans/61 C1)
+    alert.last_triggered_at = now
     await db.commit()
     # attribute_names=["legs"]로 명시 refresh해 실제 DB에 반영된 leg/item 수를 다시 조회한다 —
     # buy_items/sell_items(생성 의도)와 persisted_*_items(실제 저장치)가 다르면 저장 누락을 의미한다.
@@ -441,5 +445,4 @@ async def build_pending_plan_for_alert(
     if plan is None:
         return None
 
-    alert.last_triggered_at = plan.created_at
     return plan, buy_tokens, sell_tokens

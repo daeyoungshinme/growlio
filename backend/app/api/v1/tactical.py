@@ -87,7 +87,9 @@ async def get_tactical_status(
     """현재 국면(관측·확정), 매크로 등급, QQQ/SPY/DIA 차트 지표(웅덩이 단계 포함), 제안 비중·현재 목표 비중."""
     portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
-    # 서버가 잠들어 일일 점검 job이 못 돈 날도 앱을 열면 국면 확정이 진행되도록 조회 시에도 갱신한다
+    # 서버가 잠들어 일일 점검 job이 못 돈 날도 앱을 열면 국면 확정이 진행되도록 조회 시에도 갱신한다.
+    # 07:40 job과 겹쳐도 안전하다 — 확정 규칙(step_confirmation)이 같은 날·같은 관측에 같은 상태를 내고 알림은
+    # job만 notified_regime 비교로 보낸다(조회가 확정해도 다음 job이 놓친 알림을 보냄, plans/62 F2·77 C3 검토)
     return await _status(portfolio, strategy, db, advance=True)
 
 

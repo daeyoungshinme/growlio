@@ -124,6 +124,13 @@ export function invalidatePortfolioData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingStrategyBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+    // 알림 목록은 포트폴리오 이름을, 기대지표 미리보기는 목표 비중을 담는다 (plans/62 C2·77 C2).
+    // stale 표시만 한다 — 적용 직후 확인창이 열린 채 무거운 기대지표 재계산을 기다리지 않게(다음 마운트 때 조회)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts, refetchType: "none" }),
+    qc.invalidateQueries({
+      queryKey: QUERY_KEYS.portfolioExpectedMetricsBase,
+      refetchType: "none",
+    }),
   ]);
 }
 
@@ -167,6 +174,8 @@ export function invalidateRebalancingAlertData(qc: QueryClient, portfolioId: str
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlert(portfolioId) }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlertsByAccount(portfolioId) }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+    // drift-summary의 "알림 설정됨"·이탈 기준이 알림 설정을 따른다 — 저장 후 "알림 미설정"이 남던 문제 (plans/62 C1)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
   ]);
 }
 

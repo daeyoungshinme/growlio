@@ -153,6 +153,7 @@ _공통/입력_
 - `useStockSearch.ts` — 종목 검색
 - `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼(setter 참조 고정 — effect 의존성에 넣어도 됨). `CollapsibleCard`/`CollapsibleSection`과 함께 사용
+- `useLatestRef.ts` — 항상 최신 값을 가리키는 ref(`useLayoutEffect`로 갱신). 네이티브 리스너(푸시·Android 뒤로가기)처럼 한 번만 등록하고 콜백에서 최신 값을 읽을 때 쓴다 — 특히 `useNavigate()`는 non-data `BrowserRouter`에서 경로마다 새 함수라 effect deps에 넣으면 이동마다 재등록된다(plans/61 B1)
 - `useTimeout.ts` — 언마운트 시 자동 해제·재예약 시 이전 예약 취소되는 setTimeout(`scheduleTimeout(fn, ms)`). "3초 뒤 확인 해제"·blur 후 드롭다운 닫기처럼 상태를 바꾸는 지연 콜백은 맨 `setTimeout` 대신 이것을 쓴다
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`·`common/ConfirmModal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용. Escape·포커스 트랩은 **맨 위 모달만** 처리(DOM상 다른 열린 모달을 품은 쪽은 아래층, 형제끼리는 나중에 열린 쪽이 위) — Android 뒤로가기가 Escape를 dispatch하므로 확인창 위에서 한 번 눌러 아래 모달까지 닫히지 않게 함
 - `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용. `numberFieldPayload(value, initial)` — 부분 갱신 payload 값(값 있음→숫자, 원래 값을 지움→null, 처음부터 빈 칸→undefined로 키 생략). `PUT /settings/goal`은 보낸 키만 바꾸고 null은 비우므로, 초기 폼이 비어 있어도 기존 목표를 지우지 않으려면 이 헬퍼를 쓴다
@@ -228,7 +229,7 @@ _기타_
 **기타 상수 (`src/constants/`):**
 
 - `queryKeys.ts` — React Query queryKey 상수 (`QUERY_KEYS` 객체). 모든 queryKey는 여기서 import
-- `queryConfig.ts` — `STALE_TIME`, `REFETCH_INTERVAL` 상수. 매직 넘버 대신 이 상수 사용
+- `queryConfig.ts` — `STALE_TIME`, `REFETCH_INTERVAL` 상수. 매직 넘버 대신 이 상수 사용. persist(24h localStorage) 설정도 여기: `PERSIST_QUERY_KEYS`·`shouldPersistQuery`(기본 필터와 합쳐 성공한 쿼리만 저장)·`PERSIST_CACHE_BUSTER` — **persist 대상 응답 형태를 호환되지 않게 바꾸면 buster를 날짜로 올린다**(배포마다 자동 변경은 첫 부팅 콜드화로 채택 안 함, plans/61 B4)
 - `defaults.ts` — 백테스트 기본 날짜 상수 (`BACKTEST_DEFAULT_START_DATE` 등)
 - `tabs.ts` — 탭 배열 + 타입: `ASSETS_TOP_TABS`("투자현황"/"계좌관리", AssetsPage 상위 탭), `ASSET_MANAGEMENT_TABS`("은행계좌"/"증권계좌"/"부동산"/"내역", 계좌관리 내부 탭 — "내역"은 `AccountHistoryTab`), `PORTFOLIO_TABS`("종목 현황"/"배당", 세금은 계획탭 › 절세로 이동)
 - `transaction.ts` — 거래 유형 상수 (`TX_TYPES`, `TX_LABELS`/`TX_COLORS`: DEPOSIT/WITHDRAWAL/DIVIDEND/INTEREST) + `txDeleteConfirmMessage()`(입출금 기록 삭제 확인 문구)
@@ -269,7 +270,7 @@ _기타_
 
 **`src/lib/storedSession.ts`** — supabase-js가 저장한 `sb-*-auth-token`을 SDK 없이 동기로 읽음(`readValidStoredToken`/`hasStoredSession`/`readStoredSession`). `api/client.ts`가 부팅 시 토큰을 시드해 401→refresh 왕복을 없애고, `authStore`의 낙관적 로그인(7일, `/auth/me` 검증은 백그라운드)이 사용자 일치 확인에 씀. 형식 해석 실패 시 null(기존 경로로 폴백). **`src/lib/serviceWorker.ts`** — 웹에서만 SW 등록(`vite.config.ts`의 `injectRegister: null`), Capacitor에서는 기존 등록·캐시 해제. **`src/lib/sentry.ts`** — Sentry 지연 초기화(`initSentryDeferred`, 유휴 시간 동적 import) + `captureException` 래퍼. 앱 코드는 `@sentry/react`를 직접 import하지 말 것(엔트리 청크로 다시 끌려옴). 라우트 패턴 트랜잭션은 쓰지 않음(plans/72).
 
-**`src/lib/supabase.ts`** — `getSupabase()`(async 함수)를 통해 Supabase 클라이언트를 지연 초기화한다(env vars 필요). `@supabase/supabase-js`(약 200KB)를 top-level import하면 이 파일을 참조하는 모든 부팅 경로(authStore/api client)가 실제 렌더 전에 파싱·실행을 먼저 기다려야 해 모바일 저사양 기기에서 체감 로딩 지연을 유발했다 — 그래서 `await import("@supabase/supabase-js")`로 동적 로드하고 클라이언트를 메모이즈한다. 모든 소비 코드(`authStore.ts`, `api/client.ts`, `AuthCallbackPage.tsx` 등)는 `const supabase = await getSupabase();` 형태로 사용 — 동기 `supabase` export는 없음. 직접 확장 금지 — 토큰 첨부·갱신은 `api/client.ts` 인터셉터 소관. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장됨 — httpOnly 쿠키 전환은 Capacitor WebView SameSite 제약으로 보류, CSP + 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제로 경계강화만 적용(결정기록: `docs/plans/28-localstorage-token-decision.md`).
+**`src/lib/supabase.ts`** — `getSupabase()`(async 함수)를 통해 Supabase 클라이언트를 지연 초기화한다(env vars 필요). `@supabase/supabase-js`(약 200KB)를 top-level import하면 이 파일을 참조하는 모든 부팅 경로(authStore/api client)가 실제 렌더 전에 파싱·실행을 먼저 기다려야 해 모바일 저사양 기기에서 체감 로딩 지연을 유발했다 — 그래서 `await import("@supabase/supabase-js")`로 동적 로드하고 클라이언트를 메모이즈한다. 모든 소비 코드(`authStore.ts`, `api/client.ts`, `AuthCallbackPage.tsx` 등)는 `const supabase = await getSupabase();` 형태로 사용 — 동기 `supabase` export는 없음. 직접 확장 금지 — 토큰 첨부·갱신은 `api/client.ts` 인터셉터 소관. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장됨 — httpOnly 쿠키 전환은 Capacitor WebView SameSite 제약으로 보류, CSP + 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제 + 사용자 전환 감지(`utils/cacheOwner.ts`) + 로그아웃 시 푸시 토큰 삭제로 경계강화만 적용(결정기록: `docs/plans/28-localstorage-token-decision.md`).
 
 > **인증 구조:** 로그인·회원가입·토큰 갱신은 전부 Supabase Auth가 담당하고, 백엔드는 토큰을 발급하지 않는다. `api/client.ts`의 Axios 인터셉터가 Supabase 세션의 `access_token`을 `Authorization: Bearer`로 첨부하고(모듈 레벨 캐시), 401이면 `supabase.auth.refreshSession()` 후 대기 큐의 요청을 재시도, 갱신 실패 시 로그아웃. 백엔드는 이 토큰을 Supabase JWKS로 검증만 한다(`backend/app/services/auth_service.py`). 별도의 "백엔드 JWT"는 없다.
 
@@ -297,14 +298,14 @@ _기타_
 | 포트폴리오 overview (accountId 지정 시 계좌별, 미지정 시 "all")    | `["portfolio-overview", accountId]` — `portfolioOverviewBase`(`["portfolio-overview"]`)는 무효화 프리픽스 전용              |
 | 포트폴리오 overview (경량)                                         | `["portfolio-overview", "lite"]`                                                                                            |
 | 추종 지수별 비중 (자산탭 비중 분석 카드, accountId 지정 시 계좌별) | `["index-exposure", accountId]` — `indexExposureBase`(`["index-exposure"]`)는 무효화 프리픽스 전용(sync·계좌 CUD 시 무효화) |
-| 지수 그룹 제안 (포트폴리오 편집기 "지수로 묶기") | `["index-exposure", "group-suggestions", accountIds]` — `indexExposureBase` 하위라 같은 무효화를 공유 |
+| 지수 그룹 제안 (포트폴리오 편집기 "지수로 묶기")                   | `["index-exposure", "group-suggestions", accountIds]` — `indexExposureBase` 하위라 같은 무효화를 공유                       |
 | 포트폴리오/백테스트/리밸런싱 탭                                    | `["portfolios"]`                                                                                                            |
 | 전체 계좌 목록                                                     | `["accounts"]`                                                                                                              |
 | 계좌별 포지션                                                      | `["account-positions", accountId]`                                                                                          |
 | 계좌별 거래내역                                                    | `["transactions", accountId]` — `transactionsBase`(`["transactions"]`)는 무효화 프리픽스 전용(전체·연도별·계좌별 함께)      |
 | 전체 거래내역 (무기간)                                             | `["transactions", "all"]`                                                                                                   |
 | 연도별 거래내역                                                    | `["transactions", "all", year]`                                                                                             |
-| 기간별 매수 (계좌관리 › 내역 › 매수 내역)                          | `["period-purchases", period, year, month, accountId]` — `periodPurchasesBase` 무효화 전용(sync·계좌 CUD·매매기록 CUD 시)    |
+| 기간별 매수 (계좌관리 › 내역 › 매수 내역)                          | `["period-purchases", period, year, month, accountId]` — `periodPurchasesBase` 무효화 전용(sync·계좌 CUD·매매기록 CUD 시)   |
 | 수기 매매 기록 (종목별)                                            | `["trades", accountId, ticker, market]` — `trades` 프리픽스로 무효화                                                        |
 | 배당금 티커별 (accountId 지정 시 계좌별)                           | `["dividend-by-ticker", accountId]` — `dividendByTickerBase` 무효화 전용                                                    |
 | 배당금 요약 (accountId 지정 시 계좌별)                             | `["dividend-summary", accountId]` — `dividendSummaryBase` 무효화 전용                                                       |
@@ -327,7 +328,7 @@ _기타_
 | 이메일·푸시 승인 페이지 플랜 미리보기                              | `["rebalancing-plan-preview", token]`                                                                                       |
 | 리밸런싱 전략                                                      | `["rebalancing-strategy", portfolioId]` — `rebalancingStrategyBase`(`["rebalancing-strategy"]`)는 무효화 프리픽스 전용      |
 | 드리프트 경량 요약 (대시보드)                                      | `["drift-summary"]`                                                                                                         |
-| 홈 "지금 할 일" (행동 신호 집계)                                  | `["action-items"]`                                                                                                          |
+| 홈 "지금 할 일" (행동 신호 집계)                                   | `["action-items"]`                                                                                                          |
 | 세금 추정 요약 (accountId 지정 시 계좌별)                          | `["tax-summary", year, accountId]` — `taxSummaryBase` 무효화 전용                                                           |
 | 해외 포지션 양도세 계획 (accountId 지정 시 계좌별)                 | `["overseas-positions-tax", accountId]` — `overseasPositionsTaxBase` 무효화 전용                                            |
 | ISA 만기 현황                                                      | `["isa-status"]`                                                                                                            |
@@ -344,7 +345,7 @@ _기타_
 | 목표 역산 추천 (투자기간별)                                        | `["goal-recommendation", "by-horizon"]`                                                                                     |
 | 목표 역산 추천 (연령대별)                                          | `["goal-recommendation", "by-age"]`                                                                                         |
 | 추천 후보 ETF 중복·유사 점검                                       | `["goal-recommendation", "candidate-overlap", signature]` — goal-recommendation 프리픽스로 함께 무효화                      |
-| 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표)          | `["portfolio-expected-metrics", portfolioId]`                                                                               |
+| 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표)          | `["portfolio-expected-metrics", portfolioId]` — `portfolioExpectedMetricsBase`는 무효화 프리픽스 전용(포트폴리오 수정 시)   |
 | 목표 설정 마법사 필요수익률·적립액 가이드 프리뷰                   | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]`                                         |
 | CPI/Core CPI 인플레이션 요약                                       | `["inflation-summary"]`                                                                                                     |
 | QQQ/SPY 전술 배분 국면·제안 비중 (포트폴리오별)                    | `["tactical-status", portfolioId]` — `tacticalStatusBase` 무효화 전용                                                       |
@@ -413,6 +414,7 @@ _기타_
 - 분석 결과의 그룹 행은 `shares_to_trade`가 null이고 종목별 매매는 `members`에 있다 — 주문·거래 요약은 `components/rebalancing/rebalancingTradeMath.ts`의 `flattenTradeItems()`로 펼친 목록을 쓴다(`calcTradeSummary`·`getActionableItems`가 이미 사용).
 
 **리밸런싱 URL 유틸리티 (`src/utils/rebalancingUrl.ts`)**
+
 - `REBALANCING_TABS`(진단/포트폴리오/목표 조정/이력)·`GOAL_MODES`(추천/전술) — 탭 이름의 단일 정의. 백엔드 `email_service._rebalancing_link`·`insight_service`·`action_items_service`의 탭 문자열과 같아야 함
 - `parseRebalancingTab(params)` — 예전 `rtab=추천`/`rtab=전술`(이미 발송된 이메일·푸시)을 목표 조정 탭의 해당 모드로 매핑, 알 수 없는 값은 진단
 - `rebalancingUrl(options)` — `/rebalancing` 링크 빌더(공백은 `%20`). 링크 문자열을 직접 조립하지 말 것
@@ -477,6 +479,7 @@ _기타_
 - `dcaAutoBuy.ts` — `isDcaAutoBuyPreset(alert)`: AUTO·매월·SCHEDULE_ONLY·BUY_ONLY 조합이면 "정기 적립식 자동매수"로 표시 판정.
 - `actionPriority.ts` — 행동 항목 우선순위 배지 스타일(`ACTION_PRIORITY_STYLE`: HIGH 우선/MEDIUM 권장/LOW 참고)·마감 라벨(`deadlineLabel`). `TaxActionPlanCard`·`ActionItemsCard` 공용
 - `legacyTabRedirect.ts` — 탭 재편(plans/50)으로 옮겨진 옛 딥링크 변환: `legacyAssetsTaxRedirect()`(자산 세금 → 계획 › 절세), `legacyHistorySegment()`(계좌관리 옛 하위탭 → 내역 세그먼트). 이메일·푸시에 저장된 링크 호환용이라 지우지 말 것
+- `cacheOwner.ts` — `claimCacheOwner(userId)`: 쿼리 캐시를 채운 사용자 id를 기록하고, 다른 사용자가 로그인하면 persist 캐시를 지운 뒤 true(`authStore.setLoggedIn`이 `CACHE_OWNER_CHANGED_EVENT`를 보내 App이 `queryClient.clear()`). 쿼리키에 user id가 없어 공유 기기 사용자 전환 시 이전 사용자 캐시가 복원되던 문제 대응(plans/61 B3)
 - `safeStorage.ts` — `storageGet`/`storageSet`/`storageRemove`(localStorage), `sessionGet`/`sessionSet`(sessionStorage), `getLocalStorageOrUndefined`(객체 자체가 필요한 persister용). 저장소가 막힌 환경(사생활 보호 모드·사이트 데이터 차단)에서 예외를 삼키는 래퍼 — `localStorage`/`sessionStorage` 직접 접근 금지(차단 시 `window.localStorage` 접근만으로 throw해 부팅 실패).
 - `notificationAlertGroups.ts` — 알림 설정 페이지의 필드 그룹(`REPORT_ALERT_FIELDS`/`INSTANT_ALERT_FIELDS`).
 

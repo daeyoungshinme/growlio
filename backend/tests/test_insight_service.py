@@ -85,7 +85,7 @@ class TestCheckRebalancingOpportunity:
             id=uuid.uuid4(),
             name="테스트",
             base_type="STOCK_ONLY",
-            items=[SimpleNamespace(ticker="AAPL", market="NASDAQ", weight=100.0)],
+            items=[SimpleNamespace(ticker="AAPL", market="NASDAQ", name="애플", weight=100.0)],
             account_ids=None,
         )
         exec_result = MagicMock()
@@ -93,9 +93,49 @@ class TestCheckRebalancingOpportunity:
         mock_db.execute = AsyncMock(return_value=exec_result)
 
         overview = {
+            "total_assets_krw": 1_000_000,
             "total_stock_krw": 1_000_000,
             "all_positions": [
                 {"ticker": "AAPL", "market": "NASDAQ", "value_krw": 1_000_000},
+            ],
+        }
+        with patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)):
+            result = await _check_rebalancing_opportunity(uuid.uuid4(), mock_db)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_index_group_counts_member_holdings(self, mock_db, override_settings):
+        """plans/77 B1 — 지수 그룹(대표 VOO + 멤버 SPY)은 합계로 판정한다. 예전엔 대표 VOO만 봐 70%p 거짓 이탈."""
+        from app.services.insight_service import _check_rebalancing_opportunity
+
+        portfolio = SimpleNamespace(
+            id=uuid.uuid4(),
+            name="그룹",
+            base_type="STOCK_ONLY",
+            items=[
+                SimpleNamespace(
+                    ticker="VOO",
+                    market="NYSE",
+                    name="S&P500",
+                    weight=100.0,
+                    group_key="SP500",
+                    group_label="S&P500",
+                    members=[SimpleNamespace(ticker="SPY", market="NYSE", name="SPY", role="MEMBER", leverage=1.0)],
+                )
+            ],
+            account_ids=None,
+        )
+        exec_result = MagicMock()
+        exec_result.scalars.return_value.all.return_value = [portfolio]
+        mock_db.execute = AsyncMock(return_value=exec_result)
+
+        overview = {
+            "total_assets_krw": 1_000_000,
+            "total_stock_krw": 1_000_000,
+            "all_positions": [
+                {"ticker": "VOO", "market": "NYSE", "value_krw": 300_000},
+                {"ticker": "SPY", "market": "NYSE", "value_krw": 700_000},
             ],
         }
         with patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)):
@@ -228,7 +268,7 @@ class _Pf:
             "id": pid,
             "name": name,
             "base_type": "STOCK_ONLY",
-            "items": [SimpleNamespace(ticker="AAPL", market="NASDAQ", weight=100.0)],
+            "items": [SimpleNamespace(ticker="AAPL", market="NASDAQ", name="애플", weight=100.0)],
             "account_ids": None,
         }
 
@@ -268,7 +308,7 @@ class TestRebalancingOpportunityIsolation:
                 session.aborted = True
                 raise RuntimeError("OperationalError")
             # AAPL 0% → 목표 100%와 드리프트 100%p
-            return {"total_stock_krw": 1_000_000, "all_positions": []}
+            return {"total_assets_krw": 1_000_000, "total_stock_krw": 0, "all_positions": []}
 
         with patch("app.services.portfolio_service.build_portfolio_overview", new=overview):
             result = await _check_rebalancing_opportunity(uuid.uuid4(), session)  # type: ignore[arg-type]

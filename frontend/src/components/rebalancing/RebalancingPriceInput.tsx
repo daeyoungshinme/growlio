@@ -52,6 +52,12 @@ export function RebalancingPriceInput({
         />
         <span className="text-gray-500 text-xs">{overseas ? "USD" : "원"}</span>
       </div>
+      {!overseas && (
+        // 백엔드가 주문 직전에 호가 격자로 맞춘다(services/rebalancing/krx_tick.py, plans/61 C2)
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          호가단위로 보정(매수 내림·매도 올림)
+        </p>
+      )}
       {priceState === "loaded" && currentNativePrice != null && (
         <button
           onClick={() =>

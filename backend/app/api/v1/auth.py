@@ -32,6 +32,17 @@ async def me(request: Request, current_user: User = Depends(get_current_user)):
     return current_user
 
 
+async def _supabase_user_exists_or_503(user_id: str, *, event: str) -> bool:
+    try:
+        return await supabase_user_exists(user_id)
+    except httpx.HTTPError as e:
+        logger.error(event, user_id=user_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="계정 확인에 실패했습니다. 잠시 후 다시 시도해주세요.",
+        ) from e
+
+
 @router.post("/sync-profile", response_model=UserResponse, status_code=status.HTTP_200_OK)
 @limiter.limit("10/minute")
 async def sync_profile(
@@ -50,6 +61,12 @@ async def sync_profile(
     if existing:
         return existing
 
+    # 탈퇴 직후 다른 기기에 남은 access token(~1시간 유효, 서명만 검증됨)으로 호출되면 지운 계정이
+    # 이메일과 함께 다시 생긴다 — 새 row를 만들기 전에 Supabase Auth에 실제로 있는 사용자인지 본다(plans/61 A5).
+    if not await _supabase_user_exists_or_503(user_id, event="sync_profile_user_check_failed"):
+        logger.warning("sync_profile_deleted_user", user_id=user_id)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="탈퇴했거나 존재하지 않는 계정입니다")
+
     # 탈퇴 처리 중 Supabase Auth 삭제는 성공했으나 로컬 DB 삭제가 실패해 남은 고아 row 정리.
     # (같은 이메일로 재가입 시 Supabase가 새 sub를 발급하므로 위 id 조회로는 찾을 수 없음)
     orphan = await db.scalar(select(User).where(User.email == email))
@@ -57,14 +74,7 @@ async def sync_profile(
         # 이메일만 보고 지우면, 같은 이메일이 다른 sub로 들어오는 경로(nestlio와 공유하는 Supabase의
         # 미연결 OAuth identity·이메일 확인 설정 변경 등)에서 살아 있는 사용자의 데이터가 CASCADE로
         # 지워진다. 옛 sub가 Supabase Auth에서 실제로 사라졌을 때만 고아로 보고 정리한다.
-        try:
-            still_exists = await supabase_user_exists(str(orphan.id))
-        except httpx.HTTPError as e:
-            logger.error("sync_profile_orphan_check_failed", old_user_id=str(orphan.id), error=str(e))
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="계정 확인에 실패했습니다. 잠시 후 다시 시도해주세요.",
-            ) from e
+        still_exists = await _supabase_user_exists_or_503(str(orphan.id), event="sync_profile_orphan_check_failed")
         if still_exists:
             logger.error(
                 "sync_profile_email_conflict",
@@ -124,7 +134,7 @@ async def delete_account(
     """
     try:
         password_ok = await verify_password(current_user.email, req.password)
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
+    except httpx.HTTPError as e:
         logger.error("account_delete_password_verify_unreachable", error=str(e))
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="인증 서버에 연결할 수 없습니다"

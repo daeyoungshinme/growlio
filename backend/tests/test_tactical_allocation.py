@@ -157,6 +157,19 @@ class TestAdvanceRegime:
         assert s.last_regime == "RISK_OFF"
         assert s.pending_regime is None
 
+    def test_concurrent_advance_same_day_converges(self):
+        """plans/77 C3 — GET 조회와 07:40 job이 같은 날 같은 상태를 각자 갱신해도 결과가 같다(마지막 쓰기가 덮어써도
+        값이 동일). 확정일에 두 번째 호출은 변경 없음이라 확정 시각·분할 적용 초기화가 반복되지 않는다."""
+        d1, d2 = date(2026, 10, 1), date(2026, 10, 2)
+        a, b = _strategy(last_regime="RISK_ON"), _strategy(last_regime="RISK_ON")
+        for s in (a, b):
+            tactical.advance_regime(s, _m("RISK_OFF"), d1)
+        assert [tactical.advance_regime(s, _m("RISK_OFF"), d2) for s in (a, b)] == [True, True]
+        fields = ("last_regime", "pending_regime", "pending_first_seen", "partial_regime")
+        assert [getattr(a, f) for f in fields] == [getattr(b, f) for f in fields]
+        # 한쪽 커밋 뒤 다른 쪽이 그 상태를 다시 읽어 같은 날 또 갱신해도 바뀌지 않는다
+        assert tactical.advance_regime(a, _m("RISK_OFF"), d2) is False
+
     def test_reverting_clears_pending(self):
         s = _strategy(last_regime="RISK_ON")
         tactical.advance_regime(s, _m("NEUTRAL"), date(2026, 10, 1))

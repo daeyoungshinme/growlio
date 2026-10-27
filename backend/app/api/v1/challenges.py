@@ -4,20 +4,21 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.api.v1._account_deps import get_owned_account
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
-from app.models.challenge import CHALLENGE_DEPOSIT, InvestmentChallenge
+from app.models.challenge import InvestmentChallenge
 from app.models.user import User
 from app.schemas.challenge import (
     ChallengeCreate,
     ChallengeResponse,
     ChallengeSummary,
     ChallengeUpdate,
+    check_type_targets,
 )
 from app.services import challenge_service
 
@@ -77,10 +78,19 @@ async def update_challenge(
     challenge = await get_owned_or_404(
         db, InvestmentChallenge, challenge_id, current_user.id, "챌린지를 찾을 수 없습니다"
     )
-    if challenge.challenge_type != CHALLENGE_DEPOSIT and req.target_months is not None:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=422, detail="이 유형에는 연속 목표 개월수를 설정할 수 없습니다")
+    # 생략한 필드는 기존 값으로 채워 유형 규칙을 다시 본다 — 수정으로 RETURN_PCT의 목표 수익률을 비우는 등
+    # 생성 때 막힌 상태를 만들 수 없게 한다(plans/61 A3).
+    sent = req.model_fields_set
+    try:
+        check_type_targets(
+            challenge.challenge_type,
+            target_amount=req.target_amount if "target_amount" in sent else challenge.target_amount,
+            target_pct=req.target_pct if "target_pct" in sent else challenge.target_pct,
+            target_months=req.target_months if "target_months" in sent else challenge.target_months,
+            account_id=challenge.account_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     cache = await get_cache_store()
     updated = await challenge_service.update_challenge(challenge, db, req, cache)
     return await challenge_service.get_challenge_response(updated, current_user.id, db, cache)

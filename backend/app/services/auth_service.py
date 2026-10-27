@@ -65,9 +65,14 @@ async def verify_password(email: str, password: str) -> bool:
                 headers={"apikey": settings.supabase_anon_key},
                 json={"email": email, "password": password},
             )
-        except (httpx.ConnectError, httpx.TimeoutException) as e:
+        except httpx.TransportError as e:
+            # Connect/Timeout뿐 아니라 ReadError 등도 — 좁게 잡으면 나머지가 500으로 샜다
             logger.error("supabase_password_verify_unreachable", error=str(e))
             raise
+    if resp.status_code == 429 or resp.status_code >= 500:
+        # 레이트리밋·장애를 "비밀번호 불일치"로 보이지 않게 호출부(503)로 넘긴다(plans/61 D)
+        logger.error("supabase_password_verify_unavailable", status=resp.status_code)
+        resp.raise_for_status()
     return resp.status_code == 200
 
 

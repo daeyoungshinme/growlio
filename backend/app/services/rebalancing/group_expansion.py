@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 
 from app.constants import DOMESTIC_MARKETS, TAX_DEFERRED_TAX_TYPES
 from app.schemas.rebalancing import RebalancingItem
@@ -29,6 +30,23 @@ ROLE_DOMESTIC_ALT = "DOMESTIC_ALT"
 
 def is_group_item(item: object) -> bool:
     return bool(getattr(item, "group_key", None))
+
+
+def group_owner_map(items: Iterable[Any]) -> dict[tuple[str, str], tuple[tuple[str, str], float]]:
+    """(ticker, market) → (그룹 대표 키, 레버리지 배수) — 지수 그룹의 대표·멤버·국내 대체 종목만 담긴다.
+
+    보유 종목·추천 종목을 그룹 단위로 합산하는 곳(추천 이탈 판정·전략 비교)이 같은 매핑을 쓴다.
+    대표 종목과 국내 대체 종목은 1배, 멤버는 저장된 배수.
+    """
+    owner: dict[tuple[str, str], tuple[tuple[str, str], float]] = {}
+    for item in items:
+        if not is_group_item(item):
+            continue
+        primary = (str(item.ticker), str(item.market))
+        owner[primary] = (primary, 1.0)
+        for m in getattr(item, "members", None) or []:
+            owner[(str(m.ticker), str(m.market))] = (primary, float(getattr(m, "leverage", None) or 1.0))
+    return owner
 
 
 def _buy_target(members: list[RebalancingItem], buy_account_tax_type: str | None) -> RebalancingItem:
