@@ -91,8 +91,8 @@ class PortfolioItemMember(Base):
     item: Mapped[PortfolioItem] = relationship(back_populates="members")
 
     __table_args__ = (
+        # portfolio_item_id 조회는 이 제약의 선두 열 인덱스가 맡는다(별도 단일 인덱스는 pm1에서 제거)
         UniqueConstraint("portfolio_item_id", "ticker", "market", name="uq_portfolio_item_members_key"),
-        Index("idx_portfolio_item_members_item", "portfolio_item_id"),
     )
 
 
