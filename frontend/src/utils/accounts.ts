@@ -5,10 +5,17 @@ import {
   ORDER_EXECUTABLE_ASSET_TYPES,
   BROKER_BALANCE_ASSET_TYPES,
 } from "@/constants";
+import type { AccountRow } from "@/types";
 
 /** 주식 계좌 포트폴리오 뷰에 포함되는 계좌 유형 (예수금 포함) */
 export function isPortfolioAccount(assetType: string): boolean {
   return assetType.startsWith("STOCK") || assetType === "CASH_OTHER";
+}
+
+/** 투자기간별 자산현황 집계 대상: 투자기간 태그가 있는 증권 계좌만. 은행·부동산 계좌도 태그할 수 있지만
+ * 이 집계는 "주식 총평가액" 아래에 붙으므로 같은 범위(백엔드 portfolio_service.STOCK_TYPES)로 맞춘다. */
+export function horizonTaggedAccounts(accounts: AccountRow[]): AccountRow[] {
+  return accounts.filter((a) => a.investment_horizon && isPortfolioAccount(a.asset_type));
 }
 
 /** KIS/키움/토스/기타 증권계좌 유형인지 판별 */

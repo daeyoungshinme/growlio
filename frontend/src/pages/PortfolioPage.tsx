@@ -30,7 +30,12 @@ import {
   TOUCH_TARGET_COMPACT_MOBILE_ONLY,
 } from "@/constants/uiSizes";
 import { SELECT_SM } from "@/constants/inputStyles";
-import { isPortfolioAccount, isStockAccount, isSyncableAccount } from "@/utils/accounts";
+import {
+  horizonTaggedAccounts,
+  isPortfolioAccount,
+  isStockAccount,
+  isSyncableAccount,
+} from "@/utils/accounts";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPortfolioOverview } from "@/api/portfolios";
 
@@ -214,7 +219,7 @@ export default function PortfolioPage() {
       </div>
     );
 
-  const hasHorizonTags = data.accounts.some((a) => a.investment_horizon);
+  const hasHorizonTags = horizonTaggedAccounts(data.accounts).length > 0;
   const pnlSign = data.unrealized_pnl_krw >= 0 ? "+" : "";
   const returnSign = data.stock_return_pct >= 0 ? "+" : "";
   const stockSharePct =

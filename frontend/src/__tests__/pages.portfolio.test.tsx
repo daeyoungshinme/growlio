@@ -297,6 +297,8 @@ describe("PortfolioPage", () => {
           asset_type: "STOCK_KIS",
           name: "KIS 계좌",
           amount_krw: 30_000_000,
+          invested_krw: 25_000_000,
+          unrealized_pnl: 3_000_000,
           investment_horizon: "LONG_TERM",
         },
         {
@@ -304,6 +306,8 @@ describe("PortfolioPage", () => {
           asset_type: "STOCK_KIWOOM",
           name: "키움 계좌",
           amount_krw: 20_000_000,
+          invested_krw: 18_000_000,
+          unrealized_pnl: 0,
           investment_horizon: "SHORT_TERM",
         },
       ],
@@ -317,6 +321,70 @@ describe("PortfolioPage", () => {
     await waitFor(() => {
       expect(screen.getByText("투자기간별 자산현황")).toBeInTheDocument();
     });
+  });
+
+  it("투자기간별 금액은 예수금을 빼고 종목 평가액만, 증권 계좌만 합산한다", async () => {
+    const horizonData = {
+      ...mockPortfolioData,
+      accounts: [
+        {
+          id: "acc-1",
+          asset_type: "STOCK_KIS",
+          name: "KIS 계좌",
+          // 예수금 500만원 포함 — 평가액은 2,500만원
+          amount_krw: 30_000_000,
+          invested_krw: 22_000_000,
+          unrealized_pnl: 3_000_000,
+          investment_horizon: "LONG_TERM",
+        },
+        {
+          id: "bank-1",
+          asset_type: "BANK_ACCOUNT",
+          name: "은행 계좌",
+          amount_krw: 40_000_000,
+          invested_krw: 0,
+          unrealized_pnl: 0,
+          investment_horizon: "SHORT_TERM",
+        },
+      ],
+    };
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: horizonData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^장기 2,500만원, 1개 계좌, 100%$/)).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText(/^단기 /)).not.toBeInTheDocument();
+  });
+
+  it("투자기간 태그가 은행 계좌에만 있으면 투자기간별 자산현황을 표시하지 않는다", async () => {
+    const horizonData = {
+      ...mockPortfolioData,
+      accounts: [
+        {
+          id: "bank-1",
+          asset_type: "BANK_ACCOUNT",
+          name: "은행 계좌",
+          amount_krw: 40_000_000,
+          invested_krw: 0,
+          unrealized_pnl: 0,
+          investment_horizon: "SHORT_TERM",
+        },
+      ],
+    };
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: horizonData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio();
+    await waitFor(() => {
+      expect(screen.getByText("주식 총평가액")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("투자기간별 자산현황")).not.toBeInTheDocument();
   });
 
   it("특정 계좌를 선택하면 투자기간 태그가 있어도 투자기간별 자산현황을 표시하지 않는다", async () => {
