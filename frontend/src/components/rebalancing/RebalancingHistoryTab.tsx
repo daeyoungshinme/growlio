@@ -14,6 +14,7 @@ import {
   type RebalancingPlanLegSummary,
 } from "@/api/rebalancingPlan";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import { OrderResultList } from "./OrderResultList";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PLAN_LEG_STATUS_LABEL } from "@/constants/rebalancingConfig";
@@ -96,109 +97,9 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
               <Loader2 size={16} className="animate-spin text-gray-500" />
             </div>
           ) : detail?.results ? (
-            detail.results.map((result) => (
-              <div key={result.account_id} className="mt-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                    {result.account_name}
-                  </span>
-                  {result.is_mock && (
-                    <span className="text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 px-1.5 py-0.5 rounded">
-                      모의
-                    </span>
-                  )}
-                </div>
-                {/* ── 모바일 카드 뷰 (sm 미만) ── */}
-                <div className="sm:hidden divide-y divide-gray-200 dark:divide-gray-800">
-                  {result.orders.map((order, i) => (
-                    <div key={i} className="py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-gray-800 dark:text-gray-200">
-                          {order.name}{" "}
-                          <span className="text-gray-500 dark:text-gray-500">({order.ticker})</span>
-                        </span>
-                        <span
-                          className={`font-medium shrink-0 ${order.side === "BUY" ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}
-                        >
-                          {order.side === "BUY" ? "매수" : "매도"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-2 mt-1 text-gray-500 dark:text-gray-400">
-                        {/* 주문번호는 증권사 문의용 정보라 모바일에선 뺀다(데스크탑 표에 유지) — docs/plans/67 P1-10 */}
-                        <span>{order.quantity.toLocaleString()}주</span>
-                        {order.status === "SUCCESS" ? (
-                          <span className="text-emerald-600 dark:text-emerald-400">성공</span>
-                        ) : order.status === "FAILED" ? (
-                          <span className="text-red-600 dark:text-red-400">실패</span>
-                        ) : (
-                          <span className="text-gray-500 dark:text-gray-500">건너뜀</span>
-                        )}
-                      </div>
-                      {/* 실패 사유는 title(hover 전용)이 아니라 화면에 — docs/plans/67 P2-1 */}
-                      {order.status === "FAILED" && order.error_msg && (
-                        <p className="mt-1 text-red-600 dark:text-red-400 break-keep">
-                          {order.error_msg}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* ── 데스크탑 테이블 뷰 (sm 이상) ── */}
-                <div className="hidden sm:block overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-gray-500 dark:text-gray-500">
-                        <th className="text-left py-1 pr-3">종목</th>
-                        <th className="text-right py-1 pr-3">방향</th>
-                        <th className="text-right py-1 pr-3">수량</th>
-                        <th className="text-right py-1 pr-3">주문번호</th>
-                        <th className="text-right py-1">상태</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.orders.map((order, i) => (
-                        <tr key={i} className="border-t border-gray-200 dark:border-gray-800">
-                          <td className="py-1.5 pr-3 text-gray-800 dark:text-gray-200">
-                            {order.name}{" "}
-                            <span className="text-gray-500 dark:text-gray-500">
-                              ({order.ticker})
-                            </span>
-                          </td>
-                          <td
-                            className={`py-1.5 pr-3 text-right font-medium ${order.side === "BUY" ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}
-                          >
-                            {order.side === "BUY" ? "매수" : "매도"}
-                          </td>
-                          <td className="py-1.5 pr-3 text-right text-gray-700 dark:text-gray-300">
-                            {order.quantity.toLocaleString()}
-                          </td>
-                          <td className="py-1.5 pr-3 text-right text-gray-500 dark:text-gray-500 font-mono">
-                            {order.order_no ?? "—"}
-                          </td>
-                          <td className="py-1.5 text-right">
-                            {order.status === "SUCCESS" ? (
-                              <span className="text-emerald-600 dark:text-emerald-400">성공</span>
-                            ) : order.status === "FAILED" ? (
-                              <span className="text-red-600 dark:text-red-400">
-                                실패
-                                {order.error_msg && (
-                                  <span className="block max-w-[16rem] ml-auto text-left break-keep">
-                                    {order.error_msg}
-                                  </span>
-                                )}
-                              </span>
-                            ) : (
-                              <span className="text-gray-500 dark:text-gray-500">건너뜀</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))
+            <div className="mt-3">
+              <OrderResultList results={detail.results} />
+            </div>
           ) : (
             <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">
               상세 정보를 불러올 수 없습니다.
