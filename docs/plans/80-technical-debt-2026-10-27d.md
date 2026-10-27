@@ -6,7 +6,7 @@
 
 브랜치 `fix/tech-debt-2026-10-27d`, 배치별 커밋.
 
-상태: **A·B 완료, C는 사용자 확인 대기, 나머지 이관**.
+상태: **A·B·C 완료, 나머지 이관**.
 
 ## 감사 결과
 
@@ -62,7 +62,7 @@
 - `useRebalancingUrlState`: 이미 테스트된 `rebalancingUrl` 유틸을 얇게 감싼 훅이라 제외했다.
 - 남은 `mergeAlertsByPortfolio` 사용처(`AutoInvestStatusBanner`의 `account_id` 등): 표시용 첫 행 값이라 영향이 작아 그대로 둔다.
 
-## 배치 C — worktree 정리 (사용자 확인 대기)
+## 배치 C — worktree 정리 (완료)
 
 병합된 worktree 4개가 남아 있다. 넷 다 미커밋 변경과 미병합 커밋이 없다.
 
@@ -73,7 +73,7 @@
 | `growlio-mobile-ux` | `feat/mobile-ux-2026-10-14` |
 | `growlio-wt` | `feat/external-nestlio-goal-api` |
 
-다른 세션이 쓰고 있을 수 있어 사용자 확인 뒤 `git worktree remove`로 지운다.
+사용자 확인 뒤 `git worktree remove`로 지우고, 병합된 로컬 브랜치 4개도 `git branch -d`로 지웠다.
 
 ## 이관 (외부 조건 대기)
 
