@@ -116,7 +116,7 @@
 - **계획과 다르게 처리한 것**
   - 전술 배분 가드: 422 대신 `is_tactical_managed`가 그룹 항목을 "비호환"으로 판정한다. 기존 비호환 경고와 분할 적용 차단 경로를 그대로 탄다.
 - **남은 한계**
-  - 수동 실행 모달(`RebalancingExecutionModal`)은 국내 대체 종목으로 자동 전환하지 않는다. 대표 종목 기준 배분만 보여주므로, ISA·연금 계좌에서 해외 대표 종목은 기존 규칙대로 매수 불가로 표시된다. 자동 전환은 AUTO·지금 계획 생성 경로에서만 한다.
+  - ~~수동 실행 모달은 국내 대체 종목으로 자동 전환하지 않는다~~ → plans/79 E에서 해소. 매수 계좌가 ISA·연금저축·IRP 한 곳이면 해외 대표 종목 매수 행을 국내 대체 종목 행으로 바꾼다(`rebalancingTradeMath.buyItemForAccount`, 백엔드 `_buy_target`과 같은 규칙). 같은 종목을 여러 계좌로 나눠 사는 중이면 배분 수량 단위가 섞여 바꾸지 않는다.
   - 팩터 전략(`strategy_service._build_trade_recommendations`)·expected-metrics·백테스트는 그룹 항목을 대표 종목 하나로 근사한다(proxy).
   - plan_generation 통합 테스트는 추가하지 않았다. 주문 생성은 `build_rebalancing_orders` 단위 테스트로 검증했다.
 - **검증**

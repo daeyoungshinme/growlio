@@ -40,15 +40,27 @@ export function BuyHoldingNote({
   item: RebalancingItem;
   currentQty: number;
 }) {
+  // ISA·연금 계좌라 해외 대표 종목 대신 국내 대체 종목을 산다는 표시(plans/79 E) — title이 아니라 화면 문구로
+  const substitute = item.substitute_for && (
+    <span className="block text-amber-600 dark:text-amber-400">
+      국내 대체 (원래 {item.substitute_for})
+    </span>
+  );
   if (item.target_qty != null) {
     return (
       <>
+        {substitute}
         {currentQty > 0 ? `${currentQty.toLocaleString()}주` : "미보유"} → 목표{" "}
         {item.target_qty.toFixed(0)}주
       </>
     );
   }
-  return <>{currentQty > 0 ? `현재 ${currentQty.toLocaleString()}주 보유` : "현재 미보유"}</>;
+  return (
+    <>
+      {substitute}
+      {currentQty > 0 ? `현재 ${currentQty.toLocaleString()}주 보유` : "현재 미보유"}
+    </>
+  );
 }
 
 /** 분할 매수 배분 현황 — 다 배분하지 않았으면 주황 */

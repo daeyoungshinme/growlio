@@ -32,6 +32,8 @@ export interface RebalancingItem {
   /** 그룹 멤버 행의 레버리지 배수(노출 = 평가액 × 배수) */
   leverage?: number | null;
   members?: RebalancingItem[];
+  /** 프론트 전용 — 수동 실행에서 ISA·연금 계좌용 국내 대체 종목으로 바꾼 행이면 원래 대표 종목 티커(plans/79 E) */
+  substitute_for?: string;
 }
 
 export interface TickerAccountInfo {
