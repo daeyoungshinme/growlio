@@ -157,6 +157,7 @@ async def _check_rebalancing_opportunity(
     """저장된 포트폴리오 중 드리프트 > 5%인 항목이 있을 때 알림."""
     from app.models.portfolio import Portfolio
     from app.services.portfolio_service import build_portfolio_overview
+    from app.services.rebalancing.service import compute_portfolio_drift_summary
 
     async def _load_portfolios() -> dict[uuid.UUID, Portfolio]:
         result = await db.execute(
@@ -199,27 +200,9 @@ async def _check_rebalancing_opportunity(
                 break
             continue
 
-        # base_type에 따라 드리프트 분모 결정
-        if pf.base_type == "TOTAL_ASSETS":
-            base_krw = float(overview.get("total_assets_krw") or 0)
-        else:  # STOCK_ONLY (기본값)
-            base_krw = float(overview.get("total_stock_krw") or 0)
-
-        if base_krw <= 0:
-            continue
-
-        all_positions = overview.get("all_positions", [])
-        pos_map: dict[tuple[str, str], float] = {}
-        for p in all_positions:
-            key = (p.get("ticker", ""), p.get("market", ""))
-            pos_map[key] = pos_map.get(key, 0) + float(p.get("value_krw", 0))
-
-        max_drift = 0.0
-        for item in items:
-            target_w = float(item.weight)
-            cur_val = pos_map.get((item.ticker, item.market), 0.0)
-            cur_w = cur_val / base_krw * 100
-            max_drift = max(max_drift, abs(target_w - cur_w))
+        # 드리프트는 알림·진단과 같은 단일 판정(기준 자산·지수 그룹 합산 포함)으로 구한다 — 예전엔 여기서
+        # 티커 단위로 따로 계산해 지수 그룹(VOO+SPY)의 멤버 보유분이 빠져 거짓 "리밸런싱 필요"가 떴다(plans/77 B1)
+        max_drift = compute_portfolio_drift_summary(pf, overview).max_drift_pct
 
         if max_drift >= 10:
             insights.append(
