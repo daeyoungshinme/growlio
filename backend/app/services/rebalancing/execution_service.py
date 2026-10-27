@@ -9,6 +9,7 @@ import structlog
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES
 from app.core.logging import public_error_message, redact_secrets
 from app.exceptions import AppError, SyncError
 from app.kis.auth import get_access_token
@@ -249,6 +250,43 @@ async def execute_rebalancing(
     return results, execution_id
 
 
+TAX_DEFERRED_OVERSEAS_MSG = (
+    "ISA·연금 계좌는 해외 상장 종목을 살 수 없습니다. 국내 상장 대체 종목이나 일반 계좌로 매수하세요."
+)
+
+
+def _split_tax_deferred_overseas_buys(
+    account: AssetAccount, group_orders: list[ExecutionOrderItem]
+) -> tuple[list[ExecutionOrderItem], list[OrderResult]]:
+    """(낼 주문, SKIPPED 결과) — 절세 계좌의 해외 매수는 증권사가 거부하므로 보내지 않는다.
+
+    자동 실행은 주문 생성 단계(order_builder)에서 같은 주문을 빼지만, 수동 실행은 화면이 만든 주문을
+    그대로 받으므로 여기서 한 번 더 막는다(plans/80 A4).
+    """
+    if account.tax_type not in TAX_DEFERRED_TAX_TYPES:
+        return group_orders, []
+    executable: list[ExecutionOrderItem] = []
+    skipped: list[OrderResult] = []
+    for o in group_orders:
+        if o.side == "BUY" and o.market in OVERSEAS_MARKETS:
+            skipped.append(
+                OrderResult(
+                    ticker=o.ticker,
+                    name=o.name,
+                    market=o.market,
+                    side=o.side,
+                    quantity=o.quantity,
+                    status="SKIPPED",
+                    error_msg=TAX_DEFERRED_OVERSEAS_MSG,
+                    order_type=o.order_type,
+                    price=o.limit_price or o.reference_price,
+                )
+            )
+        else:
+            executable.append(o)
+    return executable, skipped
+
+
 async def _execute_kiwoom_account_orders(
     account: AssetAccount,
     group_orders: list[ExecutionOrderItem],
@@ -384,8 +422,11 @@ async def _execute_account_group(
     acc_uuid = uuid.UUID(acc_id_str)
     account = await _load_account(acc_uuid, user_id, db)
     is_mock = account.is_mock_mode
+    group_orders, blocked = _split_tax_deferred_overseas_buys(account, group_orders)
 
-    if account.asset_type == "STOCK_KIWOOM":
+    if not group_orders:
+        account_results: list[OrderResult] = []
+    elif account.asset_type == "STOCK_KIWOOM":
         # 키움은 주문가능금액 조회 API가 없어 TWO_PHASE(예수금 매수→매도→잔여 매수)를 지원하지 않는다 —
         # 매도→매수(예수금 근사 예산 clamp)로 실행한다. 결과(매도 후 가능한 만큼 매수)는 같은 방향이다.
         if strategy == "TWO_PHASE":
@@ -397,6 +438,7 @@ async def _execute_account_group(
         account_results = await _execute_kis_account_orders(
             account, group_orders, user_id, acc_uuid, db, cache, is_mock, strategy
         )
+    account_results = [*account_results, *blocked]
 
     success_count = sum(1 for r in account_results if r.status == "SUCCESS")
     fail_count = sum(1 for r in account_results if r.status == "FAILED")

@@ -30,6 +30,27 @@ describe("useAutoExecutionNotice (plans/63 P4-4)", () => {
     await waitFor(() => expect(result.current).toContain("(09:05)"));
   });
 
+  it("계좌별 알림 중 첫 행이 NOTIFY여도 AUTO 행의 실행 시각을 쓴다 (plans/80)", async () => {
+    vi.mocked(fetchRebalancingAlerts).mockResolvedValue([
+      {
+        portfolio_id: "p1",
+        is_active: true,
+        mode: "NOTIFY",
+        threshold_pct: 5,
+        auto_execution_time: null,
+      },
+      {
+        portfolio_id: "p1",
+        is_active: true,
+        mode: "AUTO",
+        threshold_pct: 5,
+        auto_execution_time: "10:30",
+      },
+    ] as never);
+    const { result } = renderHook(() => useAutoExecutionNotice("p1"), { wrapper });
+    await waitFor(() => expect(result.current).toContain("(10:30)"));
+  });
+
   it("꺼진 AUTO·NOTIFY 알림이면 안내하지 않는다", async () => {
     vi.mocked(fetchRebalancingAlerts).mockResolvedValue([
       { portfolio_id: "p1", is_active: false, mode: "AUTO", threshold_pct: 5 },

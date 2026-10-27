@@ -15,9 +15,11 @@ import {
 } from "@/api/rebalancing";
 import {
   buyItemForAccount,
+  canBuyInAccount,
   flattenTradeItems,
   getActionableItems,
   orderKey,
+  qtyInOriginalUnits,
 } from "@/components/rebalancing/rebalancingTradeMath";
 import { useRebalancingBalances } from "../useRebalancingBalances";
 import { useRebalancingPrices } from "../useRebalancingPrices";
@@ -60,6 +62,18 @@ function computeInitialBuyAndSelected(
     return infos.reduce((best, a) => (a.quantity > best.quantity ? a : best), infos[0]).account_id;
   }
 
+  const taxTypeOf = (accountId: string) =>
+    tradableAccounts.find((a) => a.id === accountId)?.tax_type;
+
+  // 기본 매수 계좌가 ISA·연금인데 그 종목을 살 수 없으면(해외 상장, 국내 대체 없음) 살 수 있는 첫 계좌로 바꾼다
+  function getBuyAccountId(item: RebalancingItem): string {
+    const primary = getPrimaryAccountId(item.ticker);
+    if (canBuyInAccount(item, analysis.items, taxTypeOf(primary))) return primary;
+    return (
+      tradableAccounts.find((a) => canBuyInAccount(item, analysis.items, a.tax_type))?.id ?? primary
+    );
+  }
+
   const buyAccounts: Record<string, string[]> = {};
   const selected = new Set<string>();
 
@@ -67,7 +81,7 @@ function computeInitialBuyAndSelected(
 
   actionableItems.forEach((i) => {
     if ((i.shares_to_trade ?? 0) > 0) {
-      buyAccounts[i.ticker] = [getPrimaryAccountId(i.ticker)];
+      buyAccounts[i.ticker] = [getBuyAccountId(i)];
     }
   });
 
@@ -77,11 +91,9 @@ function computeInitialBuyAndSelected(
         .filter((a) => isOrderExecutableAccount(a.asset_type))
         .forEach((a) => selected.add(orderKey("sell", i.ticker, a.account_id)));
     } else if ((i.shares_to_trade ?? 0) > 0) {
-      const accId = getPrimaryAccountId(i.ticker) || defaultAccId;
-      if (!accId) return;
+      const accId = buyAccounts[i.ticker][0];
       // ISA·연금 계좌면 실제로 사는 종목(국내 대체)의 키로 선택해 둔다 — getBuyRows와 같은 판단
-      const taxType = tradableAccounts.find((a) => a.id === accId)?.tax_type;
-      const buyItem = buyItemForAccount(i, analysis.items, taxType);
+      const buyItem = buyItemForAccount(i, analysis.items, taxTypeOf(accId));
       selected.add(orderKey("buy", buyItem.ticker, accId));
     }
   });
@@ -221,6 +233,13 @@ export function useRebalancingExecution({
     return priceKrw != null ? priceKrw * qty : null;
   }
 
+  // 이 계좌에서 실제로 사는 종목 행 — ISA·연금이면 해외 대표 종목 대신 국내 대체 종목(plans/79 E).
+  // 계좌마다 따로 판단한다: 여러 계좌로 나눠 살 때도 절세 계좌 행은 대체 종목이어야 증권사가 받는다(plans/80 A1)
+  function buyRowItem(item: RebalancingItem, accountId: string): RebalancingItem {
+    const taxType = tradableAccounts.find((a) => a.id === accountId)?.tax_type;
+    return buyItemForAccount(item, analysis.items, taxType);
+  }
+
   function getSellRows(
     accountId: string,
   ): { item: RebalancingItem; currentQty: number; suggestedQty: number }[] {
@@ -252,13 +271,7 @@ export function useRebalancingExecution({
         (i) => (i.shares_to_trade ?? 0) > 0 && (buyAccounts[i.ticker] ?? []).includes(accountId),
       )
       .map((i) => {
-        // 지수 그룹의 해외 대표 종목을 ISA·연금 계좌 한 곳에서 사면 국내 대체 종목으로 바꾼다(plans/79 E).
-        // 여러 계좌로 나눠 사는 중이면 배분 수량 단위가 섞이므로 바꾸지 않는다
-        const single = (buyAccounts[i.ticker] ?? []).length === 1;
-        const taxType = single
-          ? tradableAccounts.find((a) => a.id === accountId)?.tax_type
-          : undefined;
-        const item = buyItemForAccount(i, analysis.items, taxType);
+        const item = buyRowItem(i, accountId);
         const suggestedQty = Math.abs(Math.round(item.shares_to_trade!));
         return { item, suggestedQty, currentQty: getAccountQuantity(item.ticker, accountId) };
       });
@@ -282,15 +295,36 @@ export function useRebalancingExecution({
     // getBuyRows는 훅 스코프 함수 — 그 함수가 읽는 값(getAccountQuantity 경유 포함)을 전부 나열한다
   }, [actionableItems, liveBalances, overseasUnknown, analysis, buyAccounts, tradableAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** 여러 계좌에 나눠 사는 종목의 배분 합계 — 국내 대체 행 수량은 원래 종목 주수로 환산해 더한다. */
   function getBuyTotalInfo(ticker: string): { allocated: number; needed: number } {
     const item = actionableItems.find((i) => i.ticker === ticker);
     const needed = Math.abs(Math.round(item?.shares_to_trade ?? 0));
+    if (!item) return { allocated: 0, needed };
     const allocated = (buyAccounts[ticker] ?? []).reduce((sum, accId) => {
-      const key = orderKey("buy", ticker, accId);
+      const row = buyRowItem(item, accId);
+      const key = orderKey("buy", row.ticker, accId);
       if (!selected.has(key)) return sum;
-      return sum + (qtyOverrides[key] ?? needed);
+      const qty = qtyOverrides[key] ?? Math.abs(Math.round(row.shares_to_trade ?? 0));
+      return sum + qtyInOriginalUnits(row, item, qty);
     }, 0);
     return { allocated, needed };
+  }
+
+  /** "이 계좌에 매수 종목 추가" 후보 — 아직 이 계좌에 배정되지 않았고 이 계좌에서 살 수 있는 종목(plans/80 A2). */
+  function getAddableBuyItems(accountId: string): RebalancingItem[] {
+    const taxType = tradableAccounts.find((a) => a.id === accountId)?.tax_type;
+    return actionableItems.filter(
+      (i) =>
+        (i.shares_to_trade ?? 0) > 0 &&
+        !(buyAccounts[i.ticker] ?? []).includes(accountId) &&
+        canBuyInAccount(i, analysis.items, taxType),
+    );
+  }
+
+  function addBuyAccount(ticker: string, accountId: string) {
+    const item = actionableItems.find((i) => i.ticker === ticker);
+    const rowTicker = item ? buyRowItem(item, accountId).ticker : ticker;
+    dispatch({ type: "ADD_BUY_ACCOUNT", ticker, accountId, rowTicker });
   }
 
   function buildOrders(): ExecutionOrderItem[] {
@@ -546,6 +580,8 @@ export function useRebalancingExecution({
     getSellRows: getSellRowsCached,
     getBuyRows: getBuyRowsCached,
     getBuyTotalInfo,
+    getAddableBuyItems,
+    addBuyAccount,
     getAccountSummary,
     getCashAnalysis,
     globalCashSummary,

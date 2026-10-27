@@ -20,6 +20,8 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
     getSellRows,
     getBuyRows,
     getBuyTotalInfo,
+    getAddableBuyItems,
+    addBuyAccount,
     getAccountSummary,
     getLimitPriceNative,
     getEstimateKrw,
@@ -183,10 +185,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
             const sellRows = getSellRows(acc.id);
             const buyRows = getBuyRows(acc.id);
             const bState = balanceState[acc.id] ?? "idle";
-            const unassignedBuyItems = actionableItems.filter(
-              (i) =>
-                (i.shares_to_trade ?? 0) > 0 && !(buyAccounts[i.ticker] ?? []).includes(acc.id),
-            );
+            const unassignedBuyItems = getAddableBuyItems(acc.id);
             const hasData =
               sellRows.length > 0 || buyRows.length > 0 || unassignedBuyItems.length > 0;
             const { sells, buys } = getAccountSummary(acc.id);
@@ -299,12 +298,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                         <select
                           value=""
                           onChange={(e) => {
-                            if (e.target.value)
-                              dispatch({
-                                type: "ADD_BUY_ACCOUNT",
-                                ticker: e.target.value,
-                                accountId: acc.id,
-                              });
+                            if (e.target.value) addBuyAccount(e.target.value, acc.id);
                           }}
                           className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-xs text-gray-500 dark:text-gray-400 focus:outline-none focus:border-indigo-500 hover:border-gray-400 dark:hover:border-gray-600 cursor-pointer"
                         >

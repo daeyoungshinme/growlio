@@ -77,6 +77,7 @@ describe("RebalancingOrderTable", () => {
       type: "REMOVE_BUY_ACCOUNT",
       ticker: "005930",
       accountId: "acc-1",
+      rowTicker: "005930",
     });
   });
 

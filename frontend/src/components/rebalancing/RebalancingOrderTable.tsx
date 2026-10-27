@@ -74,9 +74,11 @@ export function RebalancingOrderTable({
     const key = orderKey(side, item.ticker, accId);
     const qty = qtyOverrides[key] ?? suggestedQty;
     const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
-    const isMultiAccount = side === "buy" && (buyAccounts[item.ticker] ?? []).length > 1;
+    // 국내 대체 행(substitute_for)의 배분 정보는 원래 대표 종목 기준이다
+    const baseTicker = item.substitute_for ?? item.ticker;
+    const isMultiAccount = side === "buy" && (buyAccounts[baseTicker] ?? []).length > 1;
     const { allocated, needed } = isMultiAccount
-      ? getBuyTotalInfo(item.ticker)
+      ? getBuyTotalInfo(baseTicker)
       : { allocated: 0, needed: 0 };
     return {
       key,
@@ -90,8 +92,13 @@ export function RebalancingOrderTable({
       needed,
     };
   };
-  const removeBuyAccount = (ticker: string) =>
-    dispatch({ type: "REMOVE_BUY_ACCOUNT", ticker, accountId: accId });
+  const removeBuyAccount = (item: RebalancingItem) =>
+    dispatch({
+      type: "REMOVE_BUY_ACCOUNT",
+      ticker: item.substitute_for ?? item.ticker,
+      accountId: accId,
+      rowTicker: item.ticker,
+    });
 
   const priceProps = {
     orderType,
@@ -160,7 +167,11 @@ export function RebalancingOrderTable({
                   isBuy={true}
                   extra={
                     row.isMultiAccount ? (
-                      <AllocationNote allocated={row.allocated} needed={row.needed} />
+                      <AllocationNote
+                        allocated={row.allocated}
+                        needed={row.needed}
+                        unitTicker={item.substitute_for}
+                      />
                     ) : (
                       <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 text-right">
                         <BuyHoldingNote item={item} currentQty={currentQty} />
@@ -174,7 +185,7 @@ export function RebalancingOrderTable({
                   estKrw={row.estKrw}
                   // 분할 매수는 배분 현황만 표시(데스크톱과 동일) — ≈ 추정액과 겹쳐 보이지 않게
                   marketOrderEst={row.isMultiAccount ? null : row.est}
-                  onRemove={row.isMultiAccount ? () => removeBuyAccount(item.ticker) : undefined}
+                  onRemove={row.isMultiAccount ? () => removeBuyAccount(item) : undefined}
                   dispatch={dispatch}
                 />
               );
@@ -292,7 +303,11 @@ export function RebalancingOrderTable({
                       }
                       qtyFooter={
                         row.isMultiAccount ? (
-                          <AllocationNote allocated={row.allocated} needed={row.needed} />
+                          <AllocationNote
+                            allocated={row.allocated}
+                            needed={row.needed}
+                            unitTicker={item.substitute_for}
+                          />
                         ) : (
                           marketEstimate(row.est)
                         )
@@ -300,7 +315,7 @@ export function RebalancingOrderTable({
                       trailing={
                         <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={() => removeBuyAccount(item.ticker)}
+                            onClick={() => removeBuyAccount(item)}
                             disabled={!row.isMultiAccount}
                             title="이 계좌에서 제거"
                             aria-label="이 계좌에서 제거"
