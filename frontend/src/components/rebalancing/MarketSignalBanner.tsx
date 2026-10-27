@@ -3,17 +3,21 @@ import { Bell, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { MarketSignalResponse, MarketRiskLevel } from "@/api/marketSignals";
 import type { InflationIndicatorSummary } from "@/api/economicIndicators";
+import type { TacticalMarket } from "@/api/tactical";
 import { buildSignalRows } from "@/utils/marketSignalRows";
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 import SignalRow from "./SignalRow";
 import InflationIndicatorList from "./InflationIndicatorList";
+import ChartTrendList from "./ChartTrendList";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 
 interface Props {
   signal: MarketSignalResponse;
   /** 미국 물가 지표 — 지정 시 상세 영역 하단에 함께 표시(별도 카드 대신, U9) */
   inflation?: InflationIndicatorSummary[];
+  /** QQQ·SPY(·DIA) 차트 지표 — 지정 시 상세 영역에 "차트 추세" 섹션(전술 국면의 차트 입력, plans/82) */
+  technicals?: TacticalMarket["technicals"];
   /** 지정 시 상세 영역 하단에 "목표 조정 › 전술" 이동 안내 — 이 신호로 목표 비중 자체를 바꾸는 곳 */
   onOpenTactical?: () => void;
 }
@@ -36,7 +40,12 @@ function scoreColor(level: MarketRiskLevel): string {
   return "text-red-600 dark:text-red-400";
 }
 
-export default function MarketSignalBanner({ signal, inflation, onOpenTactical }: Props) {
+export default function MarketSignalBanner({
+  signal,
+  inflation,
+  technicals,
+  onOpenTactical,
+}: Props) {
   const {
     composite_level,
     composite_score,
@@ -63,7 +72,7 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
       {/* 헤더 */}
       <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
         <span className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
-          시장 위험 신호
+          시장 상황
         </span>
         <MarketSignalLevelBadge level={composite_level} />
         <span className="text-xs text-gray-500 dark:text-gray-400 order-last basis-full sm:order-none sm:basis-auto sm:flex-1 sm:min-w-0 sm:truncate">
@@ -99,6 +108,16 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
       {/* 상세 내용 */}
       {isOpen && (
         <div className="px-4 pb-3 space-y-2.5 border-t border-inherit pt-2.5">
+          {/* 즉시 등급(헤더)과 확정 등급을 한곳에서 설명 — 전술 탭 "매크로(확정)" 배지가 이 값 */}
+          {confirmed_level && (
+            <div className="flex items-center gap-1.5 flex-wrap text-xs text-gray-500 dark:text-gray-400">
+              <span>자동 실행·전술 판단 기준(확정)</span>
+              <MarketSignalLevelBadge level={confirmed_level} />
+              <span>— 같은 등급이 연속 확인되면 바뀌어요</span>
+            </div>
+          )}
+
+          <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-300">매크로 지표</h3>
           {tierA.map((row) => (
             <SignalRow key={row.key} label={row.label} content={row.content} />
           ))}
@@ -108,7 +127,7 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
             className={`${TOUCH_TARGET_ROW} gap-0.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors`}
             aria-expanded={macroOpen}
           >
-            매크로 지표 {tierRest.length}개 {macroOpen ? "접기" : "더보기"}
+            지표 {tierRest.length}개 {macroOpen ? "접기" : "더보기"}
             <ChevronDown
               size={11}
               className={`transition-transform duration-200 ${macroOpen ? "rotate-180" : ""}`}
@@ -126,6 +145,15 @@ export default function MarketSignalBanner({ signal, inflation, onOpenTactical }
           {inflation && inflation.length > 0 && (
             <div className="pt-2.5 border-t border-inherit">
               <InflationIndicatorList data={inflation} />
+            </div>
+          )}
+
+          {technicals && (technicals.QQQ || technicals.SPY) && (
+            <div className="pt-2.5 border-t border-inherit">
+              <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                차트 추세 (나스닥·S&P500)
+              </h3>
+              <ChartTrendList technicals={technicals} />
             </div>
           )}
 

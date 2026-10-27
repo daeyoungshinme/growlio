@@ -146,6 +146,11 @@ export interface TacticalBacktestResult {
   assumptions: string;
 }
 
+/** 포트폴리오와 무관한 시장 입력 — 백엔드 GET /tactical/market(진단 탭 "시장 상황" 카드) */
+export type TacticalMarket = Pick<TacticalStatus, "macro_level" | "macro_freshness" | "technicals">;
+
+export const fetchTacticalMarket = () => apiGet<TacticalMarket>("/tactical/market");
+
 export const fetchTacticalStatus = (portfolioId: string) =>
   apiGet<TacticalStatus>(`/tactical/${portfolioId}`);
 

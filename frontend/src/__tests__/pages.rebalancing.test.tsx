@@ -14,6 +14,15 @@ vi.mock("@/api/economicIndicators", () => ({
   fetchInflationSummary: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock("@/api/tactical", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/tactical")>()),
+  fetchTacticalMarket: vi.fn().mockResolvedValue({
+    macro_level: "GREEN",
+    macro_freshness: "LIVE",
+    technicals: {},
+  }),
+}));
+
 vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
   default: () => React.createElement("div", { "data-testid": "rebalancing-status-card" }),
 }));

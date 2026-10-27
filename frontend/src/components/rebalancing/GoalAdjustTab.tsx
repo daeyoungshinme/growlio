@@ -14,7 +14,7 @@ const TacticalAllocationTab = lazy(loadTacticalAllocationTab);
 
 const MODE_INTRO: Record<GoalMode, string> = {
   추천: "목표 수익률·연령대·투자 기간에 맞춘 추천 비중을 포트폴리오 목표로 적용해요.",
-  전술: "시장 국면(매크로+차트 추세)에 따라 나스닥·S&P500 목표 비중을 조정하자고 제안해요.",
+  전술: "시장 국면(진단 탭 시장 상황의 매크로·차트 추세)에 따라 나스닥·S&P500 목표 비중을 조정하자고 제안해요.",
 };
 
 interface Props {
