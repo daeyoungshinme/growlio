@@ -69,6 +69,24 @@ describe("Modal", () => {
     expect(document.body.style.overflow).toBe("");
   });
 
+  it("실제 스크롤 요소인 <main>도 잠그고 원래 값으로 복원한다 (plans/79 F)", () => {
+    const main = document.createElement("main");
+    main.style.overflow = "auto";
+    document.body.appendChild(main);
+    try {
+      const { unmount } = render(
+        <Modal onClose={vi.fn()}>
+          <p>내용</p>
+        </Modal>,
+      );
+      expect(main.style.overflow).toBe("hidden");
+      unmount();
+      expect(main.style.overflow).toBe("auto");
+    } finally {
+      main.remove();
+    }
+  });
+
   it("모달이 중첩되어도 하나가 남아있으면 body 스크롤 잠금이 유지된다", () => {
     const outer = render(
       <Modal onClose={vi.fn()}>

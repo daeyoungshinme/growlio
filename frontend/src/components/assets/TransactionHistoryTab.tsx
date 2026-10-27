@@ -38,6 +38,9 @@ const TYPE_FILTER_OPTIONS: { value: string; label: string }[] = [
   ...TX_TYPES.map((t) => ({ value: t, label: TX_LABELS[t] })),
 ];
 
+// 모바일 카드는 페이지 스크롤 안 중첩 스크롤 대신 N건씩 "더 보기" (CLAUDE.md 모바일 규칙, plans/79 F)
+const MOBILE_PAGE_SIZE = 50;
+
 export default function TransactionHistoryTab({ accounts }: Props) {
   const qc = useQueryClient();
   const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -120,6 +123,10 @@ export default function TransactionHistoryTab({ accounts }: Props) {
       }),
     [txList, filterAccountId, filterType],
   );
+  // 필터가 바뀌면 다시 첫 페이지 — effect 없이 렌더 중 파생
+  const filterKey = `${selectedYear}|${filterAccountId}|${filterType}`;
+  const [mobileLimit, setMobileLimit] = useState({ key: filterKey, count: MOBILE_PAGE_SIZE });
+  const mobileCount = mobileLimit.key === filterKey ? mobileLimit.count : MOBILE_PAGE_SIZE;
 
   const accountMap = useMemo(
     () => Object.fromEntries(accounts.map((a) => [a.id, a.name])),
@@ -267,11 +274,8 @@ export default function TransactionHistoryTab({ accounts }: Props) {
           <>
             {/* 모바일 카드 뷰 — 실제로 보이는 쪽만 렌더(숨겨진 쪽도 전 건을 그리던 것 방지) */}
             {isSmUp !== true && (
-              <div
-                className="sm:hidden overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700"
-                style={{ maxHeight: "70vh" }}
-              >
-                {filtered.map((tx: Transaction) => (
+              <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
+                {filtered.slice(0, mobileCount).map((tx: Transaction) => (
                   <div key={tx.id} className="px-4 py-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -318,6 +322,17 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                     )}
                   </div>
                 ))}
+                {filtered.length > mobileCount && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMobileLimit({ key: filterKey, count: mobileCount + MOBILE_PAGE_SIZE })
+                    }
+                    className="w-full min-h-[44px] text-xs font-medium text-blue-600 dark:text-blue-400"
+                  >
+                    더 보기 ({filtered.length - mobileCount}건 남음)
+                  </button>
+                )}
               </div>
             )}
 

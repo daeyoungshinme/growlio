@@ -71,7 +71,9 @@ export default function AppLayout() {
   return (
     <ExchangeRateProvider>
       <RefreshContext.Provider value={{ registerRefresh }}>
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
+        {/* h-dvh: 모바일 주소창을 뺀 실제 높이(미지원 WebView는 h-screen 규칙이 남는다). 상단 safe-area는
+            Android 15+ edge-to-edge에서 상태바와 겹치지 않게(그 외 환경은 0) — plans/79 F */}
+        <div className="flex h-screen h-dvh pt-[env(safe-area-inset-top)] bg-gray-50 dark:bg-gray-950">
           <Sidebar />
           <div className="flex-1 flex flex-col overflow-hidden">
             {needsPasswordReset && (
@@ -89,7 +91,7 @@ export default function AppLayout() {
             {/* Pull-to-Refresh 인디케이터 */}
             {(isPulling || isRefreshing) && (
               <div
-                className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center pointer-events-none lg:hidden"
+                className="absolute top-[env(safe-area-inset-top)] left-0 right-0 z-50 flex items-center justify-center pointer-events-none lg:hidden"
                 style={{ height: `${Math.max(pullDistance, isRefreshing ? 40 : 0)}px` }}
               >
                 <div
