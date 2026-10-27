@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchSettings, updateGoalSettings } from "@/api/settings";
 import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
 import { invalidateDcaData, invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { numberFieldPayload, useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
 
@@ -30,7 +31,14 @@ export function useDividendPlanSettings() {
   } = useEditableSettingsForm<DividendPlanForm>(EMPTY_FORM);
 
   const openEdit = async () => {
-    const settingsData = await fetchSettings();
+    let settingsData: Awaited<ReturnType<typeof fetchSettings>>;
+    try {
+      settingsData = await fetchSettings();
+    } catch (e) {
+      // onClick에 직접 묶인 async라 실패하면 탭이 아무 반응 없이 끝나고 rejection이 처리되지 않았다
+      toast(extractErrorMessage(e), "error");
+      return;
+    }
     startEditing({
       annual_dividend_goal: settingsData.annual_dividend_goal
         ? String(settingsData.annual_dividend_goal)

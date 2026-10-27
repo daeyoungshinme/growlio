@@ -371,3 +371,23 @@ class TestExecuteKiwoomBuysWithCashCheck:
     async def test_empty_buys_returns_empty(self):
         results = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check([], "token", "1234567890", True)
         assert results == []
+
+
+class TestKiwoomDomesticLimitTickRounding:
+    """키움 경로도 같은 호가 보정을 거친다 (plans/61 C2)."""
+
+    @pytest.mark.asyncio
+    async def test_etf_uses_five_won_grid(self):
+        order = ExecutionOrderItem(
+            ticker="069500",
+            name="KODEX 200",
+            market="KOSPI",
+            side="BUY",
+            quantity=1,
+            order_type="LIMIT",
+            limit_price=38_233.0,
+        )
+        place = AsyncMock(return_value={"order_no": "1"})
+        with patch.object(_kiwoom_order_executor, "place_domestic_order", place):
+            await _kiwoom_order_executor._execute_kiwoom_single_order(order, "t", "1234567890", True)
+        assert place.call_args.kwargs["limit_price"] == 38_230.0

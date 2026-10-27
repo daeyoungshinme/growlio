@@ -9,7 +9,13 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import { STALE_TIME, PERSIST_CACHE_KEY, FOCUS_REFETCH_MIN_AGE } from "./constants/queryConfig";
+import {
+  STALE_TIME,
+  PERSIST_CACHE_BUSTER,
+  PERSIST_CACHE_KEY,
+  FOCUS_REFETCH_MIN_AGE,
+  shouldPersistQuery,
+} from "./constants/queryConfig";
 import { getLocalStorageOrUndefined } from "./utils/safeStorage";
 import { QUERY_KEYS } from "./constants/queryKeys";
 import { setupServiceWorker } from "./lib/serviceWorker";
@@ -46,24 +52,16 @@ const persister = createSyncStoragePersister({
   retry: removeOldestQuery,
 });
 
-const PERSIST_QUERY_KEYS = new Set([
-  "dashboard",
-  "portfolio-overview",
-  "accounts",
-  "dca-analysis",
-  "goal-recommendation",
-]);
-
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <PersistQueryClientProvider
       client={queryClient}
       persistOptions={{
         persister,
-        buster: "v1",
+        buster: PERSIST_CACHE_BUSTER,
         maxAge: 24 * 60 * 60 * 1000,
         dehydrateOptions: {
-          shouldDehydrateQuery: (query) => PERSIST_QUERY_KEYS.has(query.queryKey[0] as string),
+          shouldDehydrateQuery: shouldPersistQuery,
         },
       }}
     >

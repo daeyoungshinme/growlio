@@ -201,6 +201,80 @@ describe("authStore — logout", () => {
   });
 });
 
+describe("authStore — 사용자 전환 시 캐시 정리 (plans/61 B3)", () => {
+  it("다른 사용자로 로그인하면 cache-owner-changed 이벤트를 보낸다", async () => {
+    localStorage.clear();
+    localStorage.setItem("growlio:cache-owner", "user-a");
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
+      data: { user: { id: "user-b", email: "b@example.com" }, session: { access_token: "t" } },
+      error: null,
+    } as never);
+    vi.mocked(api.post).mockResolvedValue({ data: {} });
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    const handler = vi.fn();
+    window.addEventListener("growlio:cache-owner-changed", handler);
+    try {
+      const store = await getStore();
+      await store.login("b@example.com", "password123");
+    } finally {
+      window.removeEventListener("growlio:cache-owner-changed", handler);
+    }
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem("growlio:cache-owner")).toBe("user-b");
+  });
+});
+
+describe("authStore — logout clears device push token (plans/61 B2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("푸시가 등록된 기기면 signOut 전에 토큰 삭제를 보낸다", async () => {
+    const { usePushNotificationStore } = await import("@/stores/pushNotificationStore");
+    usePushNotificationStore.setState({ status: "registered" });
+    const order: string[] = [];
+    vi.mocked(api.put).mockImplementation(async () => {
+      order.push("put");
+      return { data: {} };
+    });
+    vi.mocked(mockSupabaseAuth.signOut).mockImplementation(async () => {
+      order.push("signOut");
+      return { error: null };
+    });
+
+    const store = await getStore();
+    await store.logout();
+
+    expect(api.put).toHaveBeenCalledWith("/settings/push-token", { fcm_token: null });
+    expect(order).toEqual(["put", "signOut"]);
+    expect(usePushNotificationStore.getState().status).toBe("idle");
+  });
+
+  it("토큰 삭제가 실패해도 로그아웃은 진행된다", async () => {
+    const { usePushNotificationStore } = await import("@/stores/pushNotificationStore");
+    usePushNotificationStore.setState({ status: "registered" });
+    vi.mocked(api.put).mockRejectedValue(new Error("network"));
+    vi.mocked(mockSupabaseAuth.signOut).mockResolvedValue({ error: null } as never);
+
+    const store = await getStore();
+    await store.logout();
+
+    expect(mockSupabaseAuth.signOut).toHaveBeenCalled();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it("푸시 미등록이면 토큰 삭제를 보내지 않는다", async () => {
+    const { usePushNotificationStore } = await import("@/stores/pushNotificationStore");
+    usePushNotificationStore.setState({ status: "unsupported" });
+    vi.mocked(mockSupabaseAuth.signOut).mockResolvedValue({ error: null } as never);
+
+    const store = await getStore();
+    await store.logout();
+
+    expect(api.put).not.toHaveBeenCalled();
+  });
+});
+
 describe("authStore — checkAuth", () => {
   beforeEach(() => {
     vi.clearAllMocks();

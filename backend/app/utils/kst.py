@@ -22,3 +22,12 @@ def now_kst() -> datetime:
 def today_kst() -> date:
     """KST 기준 오늘 날짜."""
     return now_kst().date()
+
+
+def kst_day_start(d: date) -> datetime:
+    """KST 날짜 d의 자정(tz-aware) — "오늘 이미 보냈나" 같은 하루 경계 비교용.
+
+    `datetime(d.year, d.month, d.day, tzinfo=UTC)`로 쓰면 경계가 KST 09:00이 되어, 08:30 KST 잡의
+    이력(전날 23:30 UTC)을 같은 날로 보지 못한다(plans/61 A2).
+    """
+    return datetime(d.year, d.month, d.day, tzinfo=KST)

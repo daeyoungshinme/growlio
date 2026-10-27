@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import math
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 import structlog
@@ -22,6 +23,15 @@ from app.utils.cache_keys import (
 from app.utils.circuit_breaker import CircuitOpenError, fred_circuit
 
 logger = structlog.get_logger()
+
+# FRED(St. Louis Fed)의 날짜 기준. 서버(UTC) 날짜는 00~06시 UTC(KST 09~15시)에 미국보다 하루 앞서
+# realtime_start가 "미래"가 되어 400이 난다(plans/61 D).
+_FRED_TZ = ZoneInfo("America/Chicago")
+
+
+def _fred_today() -> date:
+    return datetime.now(_FRED_TZ).date()
+
 
 # ---------------------------------------------------------------------------
 # 지표 메타데이터 정의
@@ -91,8 +101,7 @@ async def _fred_get_observations(
         "file_type": "json",
         "sort_order": "desc",
         "limit": limit,
-        # 조회 하한(limit×35일)이라 KST/UTC 하루 차이는 무관 — 서버 date.today() 그대로 둔다
-        "observation_start": (observation_start or date.today() - timedelta(days=limit * 35)).isoformat(),
+        "observation_start": (observation_start or _fred_today() - timedelta(days=limit * 35)).isoformat(),
     }
     try:
         async with httpx.AsyncClient(timeout=10) as client:
@@ -144,9 +153,8 @@ async def _fred_get_release_dates(series_id: str, upcoming: bool = False) -> lis
             "include_release_dates_with_no_data": "true" if upcoming else "false",
         }
         if upcoming:
-            # today_kst()가 아닌 서버 date.today() 유지: FRED는 미국 기준 날짜보다 미래인
-            # realtime_start를 400으로 거부하는데, KST는 대부분 시간대에 미국보다 하루 앞선다.
-            dates_params["realtime_start"] = date.today().isoformat()
+            # FRED는 미국 기준 날짜보다 미래인 realtime_start를 400으로 거부한다 — KST·UTC 날짜 모두 쓰면 안 된다
+            dates_params["realtime_start"] = _fred_today().isoformat()
 
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(dates_url, params=dates_params)
@@ -188,8 +196,8 @@ _CALENDAR_DAYS_AHEAD = 90
 
 async def _fetch_fred_calendar_events(days_ahead: int = _CALENDAR_DAYS_AHEAD) -> list[dict[str, Any]]:
     """FRED에서 각 지표의 향후 발표 예정일을 병렬로 조회해 캘린더 형식으로 반환한다."""
-    # FRED 발표일은 미국 기준 날짜 — realtime_start(`_fred_get_release_dates`)와 같은 이유로 today_kst()를 쓰지 않는다
-    today = date.today()
+    # FRED 발표일은 미국 기준 날짜 — realtime_start(`_fred_get_release_dates`)와 같은 기준을 쓴다
+    today = _fred_today()
     cutoff = today + timedelta(days=days_ahead)
 
     codes = list(INDICATORS.keys())

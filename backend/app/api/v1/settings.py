@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
@@ -14,7 +15,7 @@ from app.core.cache_store import get_cache_store
 from app.core.config import settings
 from app.enums import AgeGroup, GoalRiskTolerance, IncomeBracket
 from app.limiter import limiter
-from app.models.user import User
+from app.models.user import User, UserSettings
 from app.schemas._validators import validate_non_negative_amount, validate_positive_amount
 from app.schemas.asset import MAX_CREDENTIAL_LENGTH
 from app.schemas.rebalancing.goal import GoalCandidateTicker
@@ -571,6 +572,14 @@ async def update_push_token(
     db: AsyncSession = Depends(get_db),
 ):
     """FCM 푸시 알림 토큰 등록/삭제. fcm_token=null 전달 시 토큰 삭제."""
+    if req.fcm_token:
+        # FCM 토큰은 기기 단위다. 공유 기기에서 A가 로그아웃(토큰 미삭제)하고 B가 로그인하면 두 사용자가
+        # 같은 토큰을 갖게 되어 A의 포트폴리오·목표 알림이 B 기기로 간다 — 다른 사용자 row에서 먼저 뗀다(plans/61 A4).
+        await db.execute(
+            update(UserSettings)
+            .where(UserSettings.fcm_token == req.fcm_token, UserSettings.user_id != current_user.id)
+            .values(fcm_token=None)
+        )
     row = await get_or_create_settings(db, current_user.id)
     row.fcm_token = req.fcm_token or None
     await db.commit()

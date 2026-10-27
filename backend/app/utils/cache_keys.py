@@ -52,6 +52,7 @@ TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
 TTL_INSIGHTS = 3600  # 스마트 인사이트 & 포트폴리오 진단 1시간
 TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 TTL_JOB_LOCK_REBALANCING_AUTO = 3600  # 리밸런싱 자동 실행 분산 락 (중복 실행 방지)
+TTL_REBALANCING_AUTO_CLAIM = 2 * 86400  # AUTO 플랜 생성 claim — 일자 키라 하루만 지나면 다시 읽히지 않음(sweep이 정리)
 TTL_JOB_LOCK_REBALANCING_PLAN_BUY = 300  # 리밸런싱 매수 대기 플랜 실행 분산 락 (1분 간격 job, 중복 실행 방지)
 TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
 TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
@@ -359,6 +360,15 @@ def composite_alert_sent_key(user_id: uuid.UUID, day: str) -> str:
     포트폴리오 알림을 갖고 있어도 하루 1건만 발송하도록 제한한다.
     """
     return f"{_env_prefix()}rebalancing:composite_sent:{user_id}:{day}"
+
+
+def rebalancing_auto_claim_key(alert_id: uuid.UUID, day: str) -> str:
+    """AUTO 잡이 알림+KST 일자의 플랜 생성을 선점했음을 기록하는 durable claim 키(`claim_durable`).
+
+    플랜을 실제로 만든 경우에만 유지하고, 게이트 차단·생성 없음·락 경합이면 해제해 기존 재시도 의미를 지킨다.
+    배포가 겹친 두 인스턴스가 같은 알림으로 하루 두 번 플랜을 만들지 못하게 한다(plans/61 C1).
+    """
+    return f"{_env_prefix()}rebalancing:auto_claim:{alert_id}:{day}"
 
 
 def tax_impact_gate_alert_sent_key(alert_id: uuid.UUID, day: str) -> str:

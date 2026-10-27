@@ -88,6 +88,29 @@ class TestGeneratePendingPlanForAlert:
         assert plan.legs[0].items[0].quantity == 5
 
     @pytest.mark.asyncio
+    async def test_marks_last_triggered_in_same_commit_as_plan(self, mock_db):
+        """commit 뒤에 메모리만 바꾸면 크래시·루프 내 rollback으로 표시가 사라져 같은 날 재생성된다(plans/61 C1)."""
+        alert = _make_alert(strategy="BUY_ONLY")
+        alert.last_triggered_at = None
+        portfolio = _make_portfolio()
+        drifting = [_make_drift_item(ticker="005930", diff_krw=100000.0, shares_to_trade=5.0)]
+        seen_at_commit: list = []
+
+        async def _commit():
+            seen_at_commit.append(alert.last_triggered_at)
+
+        mock_db.commit = AsyncMock(side_effect=_commit)
+        with (
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+        ):
+            plan, _, _ = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
+
+        assert plan is not None
+        assert seen_at_commit
+        assert seen_at_commit[0] is not None
+
+    @pytest.mark.asyncio
     async def test_explicitly_registers_leg_and_items_with_session(self, mock_db):
         """back_populates만으로는 실 DB에 저장 안 되는 사례가 확인돼 db.add()로 명시 등록한다 —
         회귀 시 leg/item이 조용히 저장 누락되는 걸 막는 핵심 테스트."""
