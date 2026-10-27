@@ -1,7 +1,6 @@
 """AUTO 리밸런싱 플랜 leg 잠금/실행/취소/만료 — 앱 액션 및 스케줄러 job 진입점.
 
-`plan_service.py`(구 단일 파일, 1025줄)에서 분리된 서브모듈. 매수는 대기시간 경과 후
-자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 장마감 미응답 시 자동 만료)라는
+매수는 대기시간 경과 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 장마감 미응답 시 자동 만료)라는
 leg별 독립 생명주기를 관리한다.
 """
 
@@ -74,26 +73,25 @@ async def _lock_and_claim(leg_id: uuid.UUID, db: AsyncSession) -> RebalancingPla
     return locked
 
 
-async def cancel_buy_leg(leg: RebalancingPlanLeg, db: AsyncSession, decided_by: str) -> None:
+async def _decline_leg(
+    leg: RebalancingPlanLeg, db: AsyncSession, decided_by: str, new_status: str, history_message: str
+) -> None:
     locked = await _lock_and_claim(leg.id, db)
-    locked.status = "CANCELED"
+    locked.status = new_status
     locked.decided_at = datetime.now(tz=UTC)
     locked.decided_by = decided_by
     plan = await db.get(RebalancingPlan, locked.plan_id)
     if plan:
-        await save_alert_history(db, plan.user_id, "REBALANCING", "리밸런싱 자동화 매수 대기 취소")
+        await save_alert_history(db, plan.user_id, "REBALANCING", history_message)
     await db.commit()
+
+
+async def cancel_buy_leg(leg: RebalancingPlanLeg, db: AsyncSession, decided_by: str) -> None:
+    await _decline_leg(leg, db, decided_by, "CANCELED", "리밸런싱 자동화 매수 대기 취소")
 
 
 async def reject_sell_leg(leg: RebalancingPlanLeg, db: AsyncSession, decided_by: str) -> None:
-    locked = await _lock_and_claim(leg.id, db)
-    locked.status = "REJECTED"
-    locked.decided_at = datetime.now(tz=UTC)
-    locked.decided_by = decided_by
-    plan = await db.get(RebalancingPlan, locked.plan_id)
-    if plan:
-        await save_alert_history(db, plan.user_id, "REBALANCING", "리밸런싱 자동화 매도 계획 거부")
-    await db.commit()
+    await _decline_leg(leg, db, decided_by, "REJECTED", "리밸런싱 자동화 매도 계획 거부")
 
 
 async def _rebuild_orders_from_items(
