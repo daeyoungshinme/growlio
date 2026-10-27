@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { RebalancingAnalysis } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
+import { CASH_TICKER } from "@/constants/assets";
 import { DividendDiffCell } from "./RebalancingCells";
 
 interface Props {
@@ -17,7 +18,7 @@ export default function RebalancingDividendSection({ analysis }: Props) {
   const divDiffPct = currentDiv > 0 ? (divDiff / currentDiv) * 100 : 0;
 
   const dividendItems = useMemo(
-    () => analysis.items.filter((i) => i.ticker !== "CASH" && (i.dividend_yield ?? 0) > 0),
+    () => analysis.items.filter((i) => i.ticker !== CASH_TICKER && (i.dividend_yield ?? 0) > 0),
     [analysis.items],
   );
 
