@@ -453,6 +453,7 @@ _기타_
 - `isSyncableAccount(dataSource)` — KIS/키움/토스 API 연동 계좌(`data_source`)라 브로커 동기화 가능한지.
 - `isBrokerBalanceAccount(assetType)` — 실시간 잔고·리밸런싱 진단 대상 브로커 계좌(KIS·키움·토스, `BROKER_BALANCE_ASSET_TYPES`).
 - `isOrderExecutableAccount(assetType)` — 주문 실행 가능 계좌(KIS·키움, `ORDER_EXECUTABLE_ASSET_TYPES` — 토스는 주문 API 미구현). 백엔드 `order_builder.ORDER_EXECUTABLE_ASSET_TYPES`와 같은 집합.
+- `horizonTaggedAccounts(accounts)` — 투자기간 태그가 있는 증권 계좌(`isPortfolioAccount`)만. 자산탭 투자현황 "투자기간별 자산현황"(`HorizonSummaryCard`)은 이 계좌들의 `invested_krw + unrealized_pnl`(= `total_stock_krw`와 같은 공식, 예수금 제외)로 합산한다 — `amount_krw`(예수금 포함)나 은행 계좌를 쓰면 기간별 합이 주식 총평가액보다 커진다.
 
 **색상 유틸리티 (`src/utils/colors.ts`)**
 

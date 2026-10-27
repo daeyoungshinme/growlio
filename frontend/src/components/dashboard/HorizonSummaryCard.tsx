@@ -1,5 +1,6 @@
-import type { PortfolioOverview } from "@/types";
+import type { AccountRow, PortfolioOverview } from "@/types";
 import { INVESTMENT_HORIZON_LABELS, InvestmentHorizon } from "@/api/assets";
+import { horizonTaggedAccounts } from "@/utils/accounts";
 import { clampPct, fmtKrw, fmtKrwShort, pctOf } from "@/utils/format";
 
 interface Props {
@@ -19,19 +20,24 @@ const HORIZON_BAR_COLOR: Record<InvestmentHorizon, string> = {
   LONG_TERM: "bg-indigo-500",
 };
 
-/** 계좌에 태그된 투자기간(단기/중기/장기)별 평가액 합계를 보여준다. 태그된 계좌가 하나도 없으면
+/** 주식 총평가액(total_stock_krw)과 같은 공식 — 종목 평가액만, 예수금 제외.
+ * amount_krw는 예수금을 포함해 기간별 합이 헤드라인보다 커졌다. */
+function stockValue(a: AccountRow): number {
+  return a.invested_krw + a.unrealized_pnl;
+}
+
+/** 계좌에 태그된 투자기간(단기/중기/장기)별 주식 평가액 합계를 보여준다. 태그된 증권 계좌가 하나도 없으면
  * 표시하지 않는다. 항상 상위 섹션(자산 › 투자현황) 내부에 임베드되는 형태로만 렌더된다. */
 export default function HorizonSummaryCard({ overview }: Props) {
-  const accounts = overview?.accounts ?? [];
-  const tagged = accounts.filter((a) => a.investment_horizon);
+  const tagged = horizonTaggedAccounts(overview?.accounts ?? []);
   if (tagged.length === 0) return null;
 
-  const totalTagged = tagged.reduce((sum, a) => sum + a.amount_krw, 0);
+  const totalTagged = tagged.reduce((sum, a) => sum + stockValue(a), 0);
   const groups = HORIZON_ORDER.map((horizon) => {
     const group = tagged.filter((a) => a.investment_horizon === horizon);
     return {
       horizon,
-      amount: group.reduce((sum, a) => sum + a.amount_krw, 0),
+      amount: group.reduce((sum, a) => sum + stockValue(a), 0),
       count: group.length,
     };
   }).filter((g) => g.count > 0);
