@@ -111,11 +111,6 @@ export function invalidateSettingsData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 }
 
-/** 적립 챌린지 알림 수신 여부 설정 변경 후 */
-export function invalidateChallengeRemindersData(qc: QueryClient) {
-  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
-}
-
 /** 포트폴리오/백테스트/리밸런싱 CUD 후 */
 export function invalidatePortfolioData(qc: QueryClient) {
   return Promise.all([
@@ -200,31 +195,6 @@ export function invalidateCompositeSignalData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.compositeSignalStatus }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
   ]);
-}
-
-/** 시장신호 매일 요약 알림 수신 여부 설정 변경 후 */
-export function invalidateMarketSignalDigestData(qc: QueryClient) {
-  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
-}
-
-/** 연말 절세 리마인더 수신 여부 설정 변경 후 */
-export function invalidateYearEndTaxReminderData(qc: QueryClient) {
-  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
-}
-
-/** 목표 달성 알림(자산/입금/배당) 수신 여부 설정 변경 후 */
-export function invalidateGoalAchievementAlertsData(qc: QueryClient) {
-  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
-}
-
-/** 월간 리포트 수신 여부 설정 변경 후 */
-export function invalidateMonthlyReportAlertsData(qc: QueryClient) {
-  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
-}
-
-/** 추천 비중 변화 알림 수신 여부 설정 변경 후 */
-export function invalidateRecommendationDriftAlertData(qc: QueryClient) {
-  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 }
 
 /** 목표 역산 추천 후보 ETF/추천 엔진 설정(리스크성향·최대비중·CAGR기간) 변경 후 —

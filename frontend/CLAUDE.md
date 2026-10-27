@@ -202,7 +202,7 @@ _리밸런싱/추천_
 
 _알림 토글_ (설정 페이지, `["settings"]` boolean 필드 조회/PUT 패턴)
 
-- `useSettingsToggle.ts` — 조회+뮤테이션+무효화+에러토스트 패턴을 통합한 제네릭 팩토리(`{ field, defaultValue, mutationFn, invalidate }`). 아래 토글 훅 대부분이 필드명만 바꿔 얹어 씀. `useCompositeSignalToggle`/`useMarketSignalDigestToggle`은 전용 상태 조회 엔드포인트가 있어 이 팩토리 미사용
+- `useSettingsToggle.ts` — 조회+뮤테이션+무효화+에러토스트 패턴을 통합한 제네릭 팩토리(`{ field, defaultValue, mutationFn, invalidate? }` — `invalidate` 생략 시 `invalidateSettingsData`). 아래 토글 훅 대부분이 필드명만 바꿔 얹어 씀(`useMarketSignalDigestToggle` 포함). `useCompositeSignalToggle`은 전용 상태 조회 엔드포인트가 있어 이 팩토리 미사용
 - `useCompositeSignalToggle.ts` — 복합신호(시장/리스크) 등급 전환 시 즉시 알림 on/off. `MarketSignalAlertSection`(설정, 토글) + `MarketSignalBanner`(진단 탭, 읽기 전용) 공용
 - `useMarketSignalDigestToggle.ts` — 시장신호 매일 요약(08:30 KST) on/off. `["settings"]` 쿼리의 `market_signal_daily_digest_enabled` 직접 읽음. `MarketSignalAlertSection` 두 번째 토글
 - `useYearEndTaxReminderToggle.ts` — 연말 절세 리마인더 on/off. `year_end_tax_reminder_enabled` · `PUT /settings/year-end-tax-reminder`. 기본 `false`(옵트인)
@@ -585,7 +585,6 @@ _기타_
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard + dividend-plan + challenges + action-items 무효화.
 - 소득 구간 변경 후: `invalidateIncomeBracketData(queryClient)` — tax-action-plan + settings + action-items 무효화.
 - 적립 챌린지 CUD 후: `invalidateChallengeData(queryClient)` — challenges(+summary 프리픽스) + dashboard 무효화.
-- 적립 챌린지 알림 설정 변경 후: `invalidateChallengeRemindersData(queryClient)` — settings 무효화.
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
 - 배당 목표 변경 후: `invalidateDcaData` + `invalidateGoalRecommendationData` — `PUT /settings/goal`은 대시보드·DCA·챌린지·추천 캐시를 함께 지운다(배당 계획만 무효화하면 홈 목표 카드가 stale).
@@ -593,13 +592,8 @@ _기타_
 - 리밸런싱 주문 실행 후: `invalidateRebalancingHistoryData(queryClient)`.
 - 리밸런싱 대기 플랜 취소/승인 후: `invalidateRebalancingPlanData(queryClient, { executed })` — 대기 플랜 목록 + 실행 이력 무효화. 승인은 즉시 체결하므로 응답 `status === "EXECUTED"`면 `executed: true`로 넘겨 `invalidateSyncData`(보유·드리프트·지금 할 일)까지 갱신.
 - 복합신호(시장/리스크) 알림 설정 변경 후: `invalidateCompositeSignalData(queryClient)`.
-- 시장신호 매일 요약 알림 설정 변경 후: `invalidateMarketSignalDigestData(queryClient)`.
-- 연말 절세 리마인더 설정 변경 후: `invalidateYearEndTaxReminderData(queryClient)`.
-- 목표 달성 알림 설정 변경 후: `invalidateGoalAchievementAlertsData(queryClient)`.
-- 월간 리포트 설정 변경 후: `invalidateMonthlyReportAlertsData(queryClient)`.
-- 추천 비중 변화 알림 설정 변경 후: `invalidateRecommendationDriftAlertData(queryClient)`.
 - 목표 역산 추천 후보 변경 후: `invalidateGoalRecommendationData(queryClient)`.
-- 다른 화면에 영향 없는 설정 저장 후(또는 백엔드가 설정을 바꿨을 수 있을 때): `invalidateSettingsData(queryClient)` — settings만 재조회. 위의 알림 토글별 함수들(몸체 동일)은 plans/52 D(`PATCH /settings`)에서 이것으로 합친다.
+- 다른 화면에 영향 없는 설정 저장 후(또는 백엔드가 설정을 바꿨을 수 있을 때): `invalidateSettingsData(queryClient)` — settings만 재조회. 옵트인 알림 토글(챌린지 독려·시장신호 요약·연말 리마인더·목표 달성·월간 리포트·추천 비중 변화)은 `useSettingsToggle` 기본값으로 이것을 쓴다(토글별 래퍼는 plans/78 B1에서 제거).
 - 당겨서 새로고침처럼 화면 자신의 쿼리 하나만 다시 받을 때는 그 `useQuery`의 `refetch`를 쓴다.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 

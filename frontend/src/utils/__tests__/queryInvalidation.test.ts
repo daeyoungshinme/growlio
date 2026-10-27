@@ -13,7 +13,7 @@ import {
   invalidateRebalancingHistoryData,
   invalidateGoalRecommendationData,
   invalidateChallengeData,
-  invalidateChallengeRemindersData,
+  invalidateSettingsData,
   invalidateTradeData,
   invalidateRebalancingPlanData,
 } from "../queryInvalidation";
@@ -78,10 +78,10 @@ describe("invalidateChallengeData", () => {
   });
 });
 
-describe("invalidateChallengeRemindersData", () => {
+describe("invalidateSettingsData", () => {
   it("settings 무효화", async () => {
     const qc = makeQueryClient();
-    await invalidateChallengeRemindersData(qc as any);
+    await invalidateSettingsData(qc as any);
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
     expect(keys).toContain("settings");
   });
