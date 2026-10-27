@@ -8,7 +8,7 @@ from typing import Any
 
 import structlog
 
-from app.constants import CASH_EQUIVALENT_ACCOUNT_TYPES, CASH_EQUIVALENT_TICKER
+from app.constants import CASH_EQUIVALENT_ACCOUNT_TYPES, CASH_EQUIVALENT_TICKER, is_non_tradable
 from app.models.portfolio import Portfolio
 from app.schemas.rebalancing import (
     DriftedItem,
@@ -305,19 +305,19 @@ def _build_target_items(
         current_weight_pct = (current_value / base_krw * 100) if base_krw > 0 else 0.0
         diff_krw = target_value - current_value
 
-        is_non_tradable = ticker in ("CASH", CASH_EQUIVALENT_TICKER) or market == "KR_PROPERTY"
+        non_tradable = is_non_tradable(ticker, market)
 
         div_yield: float | None = None
         annual_div_current = 0.0
         annual_div_target = 0.0
-        if not is_non_tradable:
+        if not non_tradable:
             div_yield, annual_div_current = _div_info(ticker, market, dividend_map)
             if annual_div_current > 0 and current_value > 0:
                 annual_div_target = annual_div_current * (target_value / current_value)
             elif div_yield and div_yield > 0:
                 annual_div_target = target_value * (div_yield / 100)
 
-        ret = returns_map.get(key) if (returns_map and not is_non_tradable) else None
+        ret = returns_map.get(key) if (returns_map and not non_tradable) else None
 
         result_items.append(
             RebalancingItem(
@@ -405,9 +405,7 @@ def _calc_portfolio_cagrs(
 ) -> tuple[float | None, float | None]:
     """목표 포트폴리오와 현재 보유 포트폴리오의 가중 CAGR을 계산한다."""
     items_with_return = [
-        i
-        for i in result_items
-        if i.cagr_10y_pct is not None and i.ticker not in ("CASH", CASH_EQUIVALENT_TICKER) and i.market != "KR_PROPERTY"
+        i for i in result_items if i.cagr_10y_pct is not None and not is_non_tradable(i.ticker, i.market)
     ]
 
     target_weighted_cagr: float | None = None
@@ -592,11 +590,9 @@ def analyze_rebalancing(
         base_type=portfolio.base_type,
         base_value_krw=round(base_krw, 0),
         items=result_items,
-        untracked_holdings=[],
         analyzed_at=datetime.now(UTC).isoformat(),
         current_portfolio_annual_dividend=target_div_sum,
         target_portfolio_annual_dividend=round(sum(i.annual_dividend_target_krw for i in result_items), 0),
-        total_current_annual_dividend=target_div_sum,
         target_weighted_cagr_10y_pct=target_weighted_cagr,
         current_weighted_cagr_10y_pct=current_weighted_cagr,
         ticker_account_map=ticker_account_map,

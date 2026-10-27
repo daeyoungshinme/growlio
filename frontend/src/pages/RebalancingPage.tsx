@@ -1,15 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
-import {
-  fetchCompositeSignalStatus,
-  fetchDriftSummary,
-  fetchOverallGoalRecommendation,
-} from "@/api/rebalancing";
-import { fetchPortfolios } from "@/api/portfolios";
-import { fetchSettings } from "@/api/settings";
+import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
 import type { PortfolioItem } from "@/api/portfolios";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
@@ -20,6 +13,13 @@ import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useRebalancingUrlState } from "@/hooks/useRebalancingUrlState";
 import { useSelectedPortfolio } from "@/hooks/useSelectedPortfolio";
 import { REBALANCING_TABS, type GoalMode, type RebalancingTab } from "@/utils/rebalancingUrl";
+import {
+  compositeSignalStatusQuery,
+  driftSummaryQuery,
+  marketSignalQuery,
+  portfoliosQuery,
+  settingsQuery,
+} from "@/api/queryOptions";
 
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
@@ -107,14 +107,10 @@ export default function RebalancingPage() {
     return () => clearTimeout(timer);
   }, [portfolioId, localTab]);
 
-  const { data: signal, isError: signalError } = useQuery({
-    queryKey: QUERY_KEYS.marketSignal,
-    queryFn: fetchMarketSignal,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: signal, isError: signalError } = useQuery(marketSignalQuery);
 
   const { data: riskMetrics } = useQuery({
-    queryKey: QUERY_KEYS.portfolioRisk(),
+    queryKey: QUERY_KEYS.portfolioRisk,
     queryFn: () => fetchPortfolioRisk(),
     staleTime: STALE_TIME.LONG,
     enabled: localTab === "진단",
@@ -124,9 +120,7 @@ export default function RebalancingPage() {
   // 렌더 틱에 미리 발화해두면(캐시 dedup) 진단탭 첫 방문 시 카드가 즉시 "포트폴리오 0개" 여부를
   // 판별해 CTA/카드를 스태거링 없이 렌더한다.
   useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-    staleTime: STALE_TIME.MEDIUM,
+    ...portfoliosQuery,
     enabled: localTab === "진단",
   });
 
@@ -140,9 +134,7 @@ export default function RebalancingPage() {
   // MarketSignalBanner(useCompositeSignalToggle)는 signal 로딩 후에야 마운트되므로, 같은
   // queryKey로 여기서 signal과 병렬로 미리 조회해두면 배너 마운트 시 캐시로 즉시 표시된다.
   useQuery({
-    queryKey: QUERY_KEYS.compositeSignalStatus,
-    queryFn: fetchCompositeSignalStatus,
-    staleTime: STALE_TIME.LONG,
+    ...compositeSignalStatusQuery,
     enabled: localTab === "진단",
   });
 
@@ -150,9 +142,7 @@ export default function RebalancingPage() {
   // 렌더 틱에 미리 발화해두면(React Query 캐시 dedup) 콜드 캐시에서도 스태거링 없이 동시에 조회되어
   // 콜드 캐시 경쟁 창을 줄인다.
   useQuery({
-    queryKey: QUERY_KEYS.driftSummary,
-    queryFn: fetchDriftSummary,
-    staleTime: STALE_TIME.MEDIUM,
+    ...driftSummaryQuery,
     enabled: localTab === "진단",
   });
 
@@ -168,9 +158,7 @@ export default function RebalancingPage() {
     enabled: goalRecommendationTab,
   });
   useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
+    ...settingsQuery,
     enabled: goalRecommendationTab,
   });
 
@@ -199,8 +187,6 @@ export default function RebalancingPage() {
                 <RebalancingStatusCard
                   marketSignal={signal ?? undefined}
                   onPortfolioSelect={handlePortfolioSelectFromDiagnosis}
-                  signalDisplay="none"
-                  showAllInsights={true}
                   emptyStateCta={openNewPortfolioEditor}
                 />
               </Suspense>

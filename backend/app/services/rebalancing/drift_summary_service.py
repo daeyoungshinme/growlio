@@ -11,7 +11,7 @@ from app.schemas.rebalancing import PortfolioDriftSummary
 from app.services._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
 from app.services._settings_queries import get_settings_row
 from app.services.portfolio_service import build_portfolio_overview
-from app.services.rebalancing.diagnosis_service import check_composite_signal, fetch_market_and_risk_signal
+from app.services.rebalancing.diagnosis_service import fetch_composite_signal
 from app.services.rebalancing.service import compute_portfolio_drift_summary
 from app.utils.cache_keys import CacheStoreType
 
@@ -35,14 +35,7 @@ async def get_drift_summaries(
         settings_row = await get_settings_row(db, user_id)
         enable_composite_signals = settings_row.composite_signal_alerts_enabled if settings_row else True
         if enable_composite_signals:
-            market_level, risk = await fetch_market_and_risk_signal(user_id, db, cache)
-            has_composite_signal, composite_reason = check_composite_signal(
-                market_level,
-                bool(risk.get("data_available")),
-                risk.get("diversification_score"),
-                risk.get("top_holding_weight_pct"),
-                risk.get("annualized_volatility_pct"),
-            )
+            has_composite_signal, composite_reason = await fetch_composite_signal(user_id, db, cache)
     except Exception as e:
         logger.warning("drift_summary_composite_signal_failed", error=str(e))
 

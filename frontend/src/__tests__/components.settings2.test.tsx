@@ -168,7 +168,6 @@ const mockAnalysis: RebalancingAnalysis = {
   target_portfolio_annual_dividend: 300000,
   target_weighted_cagr_10y_pct: 8.5,
   items: [mockItem],
-  untracked_holdings: [],
   ticker_account_map: {},
 };
 

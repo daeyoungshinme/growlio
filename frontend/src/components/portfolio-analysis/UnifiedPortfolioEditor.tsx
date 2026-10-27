@@ -17,6 +17,7 @@ import {
 } from "@/constants/assets";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { CASH_TICKER } from "@/constants/assets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { PortfolioOverview } from "@/types";
@@ -379,7 +380,7 @@ export default function UnifiedPortfolioEditor({
                 </button>
                 <button
                   onClick={addCash}
-                  disabled={items.some((i) => i.ticker === "CASH")}
+                  disabled={items.some((i) => i.ticker === CASH_TICKER)}
                   className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-40`}
                 >
                   <Plus size={14} /> 현금 추가

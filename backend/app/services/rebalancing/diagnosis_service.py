@@ -14,7 +14,7 @@ from typing import Any
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import CASH_EQUIVALENT_TICKER, TAX_DEFERRED_TAX_TYPES
+from app.constants import TAX_DEFERRED_TAX_TYPES, is_non_tradable
 from app.models.user import UserSettings
 from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxImpactItem
 from app.services.market_signal_service import get_market_signal
@@ -33,8 +33,6 @@ RISK_VOLATILITY_MAX_PCT = 20.0
 _ASSUMED_FEE_RATE_DOMESTIC = 0.00015  # 국내 온라인 매매 수수료 대략치 (참고용, 증권사별 상이)
 _ASSUMED_FEE_RATE_OVERSEAS = 0.0025  # 해외 온라인 매매 수수료 대략치 (참고용)
 _TAX_DETAIL_LIMIT = 5
-_EXCLUDED_TICKERS = {"CASH", CASH_EQUIVALENT_TICKER}
-_EXCLUDED_MARKETS = {"KR_PROPERTY"}
 
 _MARKET_NOTES: dict[str, str | None] = {
     "GREEN": None,  # 평시엔 굳이 문구 노출 안 함 (노이즈 감소)
@@ -115,7 +113,7 @@ def _build_tax_preview(
     for item in iter_trade_items(analysis.items):
         if item.diff_krw >= 0:
             continue
-        if item.ticker in _EXCLUDED_TICKERS or item.market in _EXCLUDED_MARKETS:
+        if is_non_tradable(item.ticker, item.market):
             continue
 
         lots = cost_map.get((item.ticker, item.market), [])
@@ -284,6 +282,24 @@ async def fetch_market_and_risk_signal(
         risk = risk_result
 
     return market_level, risk
+
+
+async def fetch_composite_signal(
+    user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
+) -> tuple[bool, str | None]:
+    """유저 단위 복합신호(시장 RED·리스크 이상) 판정 — 조회+`check_composite_signal`을 한 번에.
+
+    진단 배너 API·drift-summary·알림 추가 트리거가 같은 판정을 쓴다(plans/78 A4). 예외 처리와 로그
+    이벤트 이름은 호출부마다 달라 호출부에 둔다.
+    """
+    market_level, risk = await fetch_market_and_risk_signal(user_id, db, cache)
+    return check_composite_signal(
+        market_level,
+        bool(risk.get("data_available")),
+        risk.get("diversification_score"),
+        risk.get("top_holding_weight_pct"),
+        risk.get("annualized_volatility_pct"),
+    )
 
 
 async def build_diagnosis_context(

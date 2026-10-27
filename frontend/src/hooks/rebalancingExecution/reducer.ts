@@ -1,3 +1,4 @@
+import { orderKey } from "@/components/rebalancing/rebalancingTradeMath";
 import type { ExecutionState, ExecutionAction, BalanceLoadState } from "./types";
 
 export function executionReducer(state: ExecutionState, action: ExecutionAction): ExecutionState {
@@ -135,10 +136,13 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
           ...state.buyAccounts,
           [action.ticker]: [...(state.buyAccounts[action.ticker] ?? []), action.accountId],
         },
-        qtyOverrides: { ...state.qtyOverrides, [`buy_${action.ticker}_${action.accountId}`]: 0 },
+        qtyOverrides: {
+          ...state.qtyOverrides,
+          [orderKey("buy", action.ticker, action.accountId)]: 0,
+        },
       };
     case "REMOVE_BUY_ACCOUNT": {
-      const key = `buy_${action.ticker}_${action.accountId}`;
+      const key = orderKey("buy", action.ticker, action.accountId);
       const next = new Set(state.selected);
       next.delete(key);
       const nextQty = { ...state.qtyOverrides };

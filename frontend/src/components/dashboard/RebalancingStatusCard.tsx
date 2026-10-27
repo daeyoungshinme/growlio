@@ -1,13 +1,9 @@
 import { useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, TriangleAlert, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
+import { ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
 
-import { fetchDriftSummary } from "@/api/rebalancing";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
-import { fetchPortfolios } from "@/api/portfolios";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { useInsights } from "@/hooks/useInsights";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import type { Insight, InsightType, InsightSeverity } from "@/api/insights";
@@ -17,17 +13,9 @@ import { DRIFT_STATUS_LABEL, getDriftStatus } from "@/utils/portfolio";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
-import { MARKET_SIGNAL_BADGE_CLASS, MARKET_SIGNAL_LABEL } from "@/utils/marketSignalBadge";
+import { driftSummaryQuery, portfoliosQuery } from "@/api/queryOptions";
 
 const OTHER_INSIGHTS_VISIBLE_LIMIT = 3;
-
-const SIGNAL_BG = {
-  GREEN:
-    "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/30 dark:border-blue-800/40 dark:text-blue-300",
-  YELLOW:
-    "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950/30 dark:border-yellow-800/40 dark:text-yellow-300",
-  RED: "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-300",
-};
 
 function PortfolioDriftRow({
   summary,
@@ -152,23 +140,16 @@ function InsightRow({ insight }: { insight: Insight }) {
   );
 }
 
+/** 리밸런싱 › 진단 탭 상단 카드 — 포트폴리오별 이탈 현황 + 전체 자산 진단. 시장 신호 표시는 탭의
+ * MarketSignalBanner가 맡고, 여기서는 이탈과 결합한 안내 문구에만 쓴다(홈 인스턴스는 plans/50에서 제거). */
 interface Props {
   marketSignal?: MarketSignalResponse | null;
   onPortfolioSelect?: (id: string, openAlert?: boolean) => void;
-  showAllInsights?: boolean;
-  signalDisplay?: "none" | "badge" | "banner";
-  showDriftRows?: boolean;
-  maxDriftRows?: number;
-  /** 접기/펼치기 상태 localStorage 키 — 미지정 시 저장하지 않음(RebalancingPage 진단탭처럼
-   * 같은 컴포넌트를 다른 맥락으로 재사용할 때 대시보드와 상태가 뒤섞이지 않도록 기본값 없음). */
-  storageKey?: string;
   /** 지정 시, 포트폴리오가 하나도 없을 때 `null` 대신 "포트폴리오 만들기" CTA 카드를 렌더한다.
    * 리밸런싱 진단 탭 전용(대시보드 인스턴스는 미지정 → 종전대로 아무것도 렌더하지 않음). */
   emptyStateCta?: () => void;
 }
 
-// 손실수확(TAX_LOSS_HARVEST)은 홈 "지금 할 일"(절세 액션 플랜 1순위)이 담당해 홈 인스턴스에선 뺀다 (docs/plans/50 M5)
-const DASHBOARD_TYPES: InsightType[] = ["CONCENTRATION"];
 const ALL_INSIGHT_TYPES: InsightType[] = [
   "CONCENTRATION",
   "UNDERPERFORMANCE",
@@ -181,42 +162,28 @@ const SEVERITY_ORDER: Record<InsightSeverity, number> = { ALERT: 0, WARNING: 1, 
 export default function RebalancingStatusCard({
   marketSignal,
   onPortfolioSelect,
-  showAllInsights = false,
-  signalDisplay = "banner",
-  showDriftRows = false,
-  maxDriftRows,
-  storageKey,
   emptyStateCta,
 }: Props) {
-  const [isOpen, toggleOpen] = useCollapsible(true, storageKey);
+  const [isOpen, toggleOpen] = useCollapsible(true);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
   const {
     data: portfoliosRaw,
     isLoading: portfoliosLoading,
     isError: portfoliosError,
     refetch: refetchPortfolios,
-  } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  } = useQuery(portfoliosQuery);
   const portfolioCount = Array.isArray(portfoliosRaw) ? portfoliosRaw.length : 0;
 
   // /drift-summary는 백엔드에서 자체적으로 포트폴리오 목록을 조회하므로(빈 목록이면 [] 반환),
   // 프론트의 portfolios 쿼리 완료를 기다릴 필요 없이 독립적으로 즉시 발화한다.
-  const { data: driftSummaries } = useQuery({
-    queryKey: QUERY_KEYS.driftSummary,
-    queryFn: fetchDriftSummary,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: driftSummaries } = useQuery(driftSummaryQuery);
 
   const { data: allInsights } = useInsights();
   const diagInsights = useMemo(() => {
-    const types = showAllInsights ? ALL_INSIGHT_TYPES : DASHBOARD_TYPES;
     return [...(allInsights ?? [])]
-      .filter((i) => types.includes(i.type))
+      .filter((i) => ALL_INSIGHT_TYPES.includes(i.type))
       .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3));
-  }, [allInsights, showAllInsights]);
+  }, [allInsights]);
   const concentrationInsight = diagInsights.find((i) => i.type === "CONCENTRATION");
   const otherInsights = diagInsights.filter((i) => i.type !== "CONCENTRATION");
   const hasDiagnosis = diagInsights.length > 0;
@@ -299,50 +266,10 @@ export default function RebalancingStatusCard({
           </span>
         ) : undefined
       }
-      headerRight={
-        <>
-          {marketSignal && signalDisplay === "badge" && (
-            <span
-              className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 ${MARKET_SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
-              {MARKET_SIGNAL_LABEL[marketSignal.composite_level]}
-            </span>
-          )}
-          {!showAllInsights && (
-            <Link
-              to="/rebalancing"
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1 -my-1 px-2 -mr-2 rounded-md text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 active:opacity-70 transition-colors`}
-            >
-              분석하기 <ArrowRight size={12} />
-            </Link>
-          )}
-        </>
-      }
       isOpen={isOpen}
       onToggle={toggleOpen}
       cardClassName={cardClass}
     >
-      {/* 시장 신호 배너 */}
-      {marketSignal && signalDisplay === "banner" && (
-        <Link
-          to="/rebalancing"
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium mb-3 transition-colors ${SIGNAL_BG[marketSignal.composite_level]}`}
-        >
-          {marketSignal.composite_level === "GREEN" ? (
-            <Activity size={13} className="flex-shrink-0" />
-          ) : (
-            <TriangleAlert size={13} className="flex-shrink-0" />
-          )}
-          <span>
-            시장 신호:{" "}
-            <span className="font-bold">{MARKET_SIGNAL_LABEL[marketSignal.composite_level]}</span>
-            {marketSignal.composite_level !== "GREEN" && " — 리밸런싱 전략을 확인하세요"}
-          </span>
-          <ArrowRight size={12} className="ml-auto flex-shrink-0" />
-        </Link>
-      )}
-
       {/* 이탈 종목 + 시장상황 결합 안내 */}
       {combinedStatusNote && (
         <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
@@ -351,15 +278,12 @@ export default function RebalancingStatusCard({
       )}
 
       {/* 포트폴리오별 드리프트 현황 */}
-      {(showAllInsights || showDriftRows) && driftSummaries && driftSummaries.length > 0 && (
+      {driftSummaries && driftSummaries.length > 0 && (
         <div className="space-y-0.5 mt-1 mb-2">
           <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-2.5 mb-1">
             포트폴리오 이탈 현황
           </p>
-          {(maxDriftRows != null
-            ? sortedDriftSummaries.slice(0, maxDriftRows)
-            : sortedDriftSummaries
-          ).map((s) => (
+          {sortedDriftSummaries.map((s) => (
             <PortfolioDriftRow key={s.portfolio_id} summary={s} onClick={onPortfolioSelect} />
           ))}
         </div>

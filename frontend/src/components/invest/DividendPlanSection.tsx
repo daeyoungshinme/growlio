@@ -4,7 +4,6 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend
 import { ArrowRight, CalendarRange, Settings2, TrendingUp } from "lucide-react";
 import { fetchDividendPlan } from "@/api/invest";
 import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
-import { fetchSettings } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
@@ -18,6 +17,7 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { settingsQuery } from "@/api/queryOptions";
 
 interface Props {
   onOpenSettings: () => void;
@@ -39,11 +39,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
     queryFn: fetchOverallGoalRecommendation,
     staleTime: STALE_TIME.LONG,
   });
-  const { data: settingsData } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: settingsData } = useQuery(settingsQuery);
   const addSuggestedMutation = useAddSuggestedCandidates(
     settingsData?.goal_candidate_tickers ?? [],
   );

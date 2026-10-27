@@ -1,7 +1,6 @@
 """AUTO 리밸런싱 대기 플랜 생성 — 드리프트 분석 → 게이트 판정 → BUY/SELL leg 생성.
 
-`plan_service.py`(구 단일 파일, 1025줄)에서 분리된 서브모듈. 계획 생성은
-rebalancing/order_builder.py의 build_rebalancing_orders/refresh_live_prices를 재사용한다.
+계획 생성은 rebalancing/order_builder.py의 build_rebalancing_orders/refresh_live_prices를 재사용한다.
 """
 
 from __future__ import annotations

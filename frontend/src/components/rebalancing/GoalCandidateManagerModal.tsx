@@ -3,15 +3,12 @@ import { Loader2, TriangleAlert, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchIndexRegion } from "@/api/assets";
 import {
-  fetchSettings,
   updateGoalCandidateTickers,
   type AssetClass,
   type GoalCandidateTicker,
   type IndexRegion,
 } from "@/api/settings";
 import { DOMESTIC_MARKETS } from "@/constants";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { useStockSearch } from "@/hooks/useStockSearch";
@@ -22,6 +19,7 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import Modal from "@/components/common/Modal";
 import { useTimeout } from "@/hooks/useTimeout";
+import { settingsQuery } from "@/api/queryOptions";
 
 // backend app/services/recommendation_universe.py의 MAX_GOAL_CANDIDATE_TICKERS와 동일하게 유지
 const MAX_CANDIDATE_TICKERS = 20;
@@ -50,9 +48,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
   // 있다 — refetchOnMount로 STALE_TIME 캐시와 무관하게 항상 최신 DB 상태를 가져와, 전체교체 저장이
   // 스테일 데이터로 그 추가분을 지워버리는 것을 방지한다.
   const { data: settingsData } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
+    ...settingsQuery,
     refetchOnMount: "always",
   });
 

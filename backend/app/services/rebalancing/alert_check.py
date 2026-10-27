@@ -29,7 +29,7 @@ from app.services.alerts.calculator import (
     should_fire_today,
 )
 from app.services.rebalancing.alert_scope import resolve_effective_account_ids
-from app.services.rebalancing.diagnosis_service import check_composite_signal, fetch_market_and_risk_signal
+from app.services.rebalancing.diagnosis_service import fetch_composite_signal
 from app.services.rebalancing.order_builder import (
     build_rebalancing_orders,
     filter_drifting_items,
@@ -109,9 +109,7 @@ async def _process_rebalancing_alert(
     is_scheduled_report: bool,
     threshold: float,
     email: str,
-    composite_level: str,
     db: AsyncSession,
-    data_freshness: str = "LIVE",
     fcm_token: str | None = None,
     is_composite_triggered: bool = False,
     composite_reason: str | None = None,
@@ -137,22 +135,6 @@ async def _process_rebalancing_alert(
         order_preview_items = build_rebalancing_orders(
             drifting, ticker_account_map or {}, strategy, order_type, buy_account_id, alert_id=str(alert.id)
         )
-
-    mode = getattr(alert, "mode", "NOTIFY")
-
-    # 시장 신호 기반 자동 실행 게이트
-    if mode == "AUTO":
-        market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-        tactical_regime = await tactical_regime_for_gate(alert, db)
-        if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness, tactical_regime):
-            logger.info(
-                "rebalancing_auto_skipped_market_signal",
-                alert_id=str(alert.id),
-                composite_level=composite_level,
-                data_freshness=data_freshness,
-                market_condition_mode=market_mode,
-            )
-            mode = "NOTIFY"
 
     # AUTO 모드 실행은 rebalancing_auto_execution 인트라데이 잡이 전담한다.
     # 10분 간격 job(check_rebalancing_alerts)은 각 알림의 notify_time 창에서만 이메일/FCM 리포트를 발송한다.
@@ -306,14 +288,7 @@ async def _evaluate_composite_trigger(
     extra_trigger = False
     composite_reason: str | None = None
     try:
-        market_level, risk = await fetch_market_and_risk_signal(alert.user_id, db, cache)
-        extra_trigger, composite_reason = check_composite_signal(
-            market_level,
-            bool(risk.get("data_available")),
-            risk.get("diversification_score"),
-            risk.get("top_holding_weight_pct"),
-            risk.get("annualized_volatility_pct"),
-        )
+        extra_trigger, composite_reason = await fetch_composite_signal(alert.user_id, db, cache)
     except Exception as exc:
         logger.warning("rebalancing_alert_composite_signal_failed", alert_id=str(alert.id), error=str(exc))
 
@@ -401,8 +376,6 @@ async def _check_one_rebalancing_alert(row, composite_level, market_data_freshne
         is_scheduled_report=is_scheduled_report,
         threshold=threshold,
         email=email,
-        composite_level=composite_level,
-        data_freshness=market_data_freshness,
         db=db,
         fcm_token=fcm_token,
         is_composite_triggered=is_composite_triggered,

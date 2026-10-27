@@ -1,6 +1,7 @@
 import React from "react";
 import { fmtKrw } from "@/utils/format";
 import { isOverseasMarket } from "@/constants/markets";
+import { estimateLimitKrw, limitPriceKrw } from "./rebalancingTradeMath";
 import type { ExecutionAction, OrderType, PriceLoadState } from "@/hooks/useRebalancingExecution";
 
 export interface RebalancingPriceInputProps {
@@ -29,8 +30,7 @@ export function RebalancingPriceInput({
   // 지정가 열(헤더·colgroup)은 LIMIT일 때만 있다 — 빈 칸을 내면 시장가 행이 헤더보다 한 칸 많아진다
   if (orderType !== "LIMIT") return null;
   const overseas = isOverseasMarket(market);
-  const estKrw =
-    overseas && globalUsdRate != null ? nativeVal * globalUsdRate * qty : nativeVal * qty;
+  const estKrw = estimateLimitKrw(nativeVal, qty, market, globalUsdRate);
   return (
     <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-end gap-1">
@@ -71,8 +71,7 @@ export function RebalancingPriceInput({
       {nativeVal > 0 && (
         <div className="text-xs text-gray-500 dark:text-gray-600 mt-0.5 text-right leading-tight">
           <div>
-            ≈ {fmtKrw(overseas && globalUsdRate != null ? nativeVal * globalUsdRate : nativeVal)} ×{" "}
-            {qty}주
+            ≈ {fmtKrw(limitPriceKrw(nativeVal, market, globalUsdRate))} × {qty}주
           </div>
           <div>= {fmtKrw(estKrw)}</div>
         </div>

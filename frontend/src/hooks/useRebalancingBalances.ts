@@ -3,7 +3,7 @@ import { AssetAccount } from "@/api/assets";
 import { KisBalanceResponse, fetchAllBrokerBalances, fetchBrokerBalance } from "@/api/rebalancing";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { toast } from "@/utils/toast";
-import type { ExecutionAction } from "./useRebalancingExecution";
+import type { ExecutionAction } from "./rebalancingExecution/types";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
 
 const OVERSEAS_UNKNOWN_MSG =
@@ -49,7 +49,7 @@ export function useRebalancingBalances(
       const deposits: Record<string, number> = {};
       const orderables: Record<string, number> = {};
       const overseasUnknown: Record<string, boolean> = {};
-      const states: Record<string, import("./useRebalancingExecution").BalanceLoadState> = {};
+      const states: Record<string, import("./rebalancingExecution/types").BalanceLoadState> = {};
       responses.forEach((res) => {
         if (res.error) {
           states[res.account_id] = "error";

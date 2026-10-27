@@ -29,6 +29,7 @@ from app.services.rebalancing._alert_queries import (
     get_alert_by_portfolio_and_account,
     list_alerts_by_portfolio_accounts,
 )
+from app.services.rebalancing.order_builder import ORDER_EXECUTABLE_ASSET_TYPES
 
 router = APIRouter()
 
@@ -52,16 +53,13 @@ def _reject_if_per_account_scope(portfolio: Portfolio) -> None:
         )
 
 
-_AUTO_EXECUTION_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
-
-
 async def _validate_auto_execution_account(db: AsyncSession, account_id: uuid.UUID, user_id: uuid.UUID) -> None:
     """AUTO 모드 실행 계좌(account_id 지정됨)가 활성 KIS/키움 연동 계좌인지 검증한다. 아니면 422.
 
     실행 경로(execution_service)는 활성 계좌만 주문하므로, 비활성 계좌를 받아두면 매번 조용히 실패한다.
     """
     exec_account = await db.scalar(active_accounts_stmt(user_id).where(AssetAccount.id == account_id))
-    if not exec_account or exec_account.asset_type not in _AUTO_EXECUTION_ASSET_TYPES:
+    if not exec_account or exec_account.asset_type not in ORDER_EXECUTABLE_ASSET_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="자동 실행 계좌는 KIS/키움 연동 계좌만 사용할 수 있습니다",

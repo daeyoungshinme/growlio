@@ -1,8 +1,8 @@
 import { fetchStockPrice, fetchStockPricesBatch } from "@/api/assets";
 import { CASH_TICKER } from "@/constants/assets";
 import { RebalancingAnalysis } from "@/api/rebalancing";
-import type { ExecutionAction } from "./useRebalancingExecution";
-import { getActionableItems } from "./useRebalancingExecution";
+import type { ExecutionAction } from "./rebalancingExecution/types";
+import { getActionableItems } from "@/components/rebalancing/rebalancingTradeMath";
 import { toast } from "@/utils/toast";
 import { getHttpStatus } from "@/utils/error";
 import { isOrderExecutableAccount } from "@/utils/accounts";
@@ -45,7 +45,6 @@ export function useRebalancingPrices(
     getActionableItems(analysis).forEach((i) => {
       if (i.ticker !== CASH_TICKER) tickerMarketMap.set(i.ticker, i.market);
     });
-    analysis.untracked_holdings.forEach((h) => tickerMarketMap.set(h.ticker, h.market));
     if (tickerMarketMap.size === 0) return;
 
     const entries = Array.from(tickerMarketMap.entries());

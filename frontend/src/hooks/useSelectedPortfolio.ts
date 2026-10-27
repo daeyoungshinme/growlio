@@ -1,10 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchPortfolios } from "@/api/portfolios";
 import { fetchAccounts } from "@/api/assets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { getPortfolioTargetState } from "@/utils/portfolio";
 import { isStockAccount } from "@/utils/accounts";
+import { portfoliosQuery } from "@/api/queryOptions";
 
 /** URL 선택값 → 첫 기준 포트폴리오 → 첫 포트폴리오. 목록에 없는 URL 값(삭제됨 등)은 무시한다. */
 export function resolveSelectedPortfolioId(
@@ -22,11 +21,7 @@ export function resolveSelectedPortfolioId(
  * 없음으로 탭마다 다른 포트폴리오가 보였다. 기본값은 URL에 쓰지 않고 파생만 한다.
  */
 export function useSelectedPortfolio(requestedId: string | undefined) {
-  const { data: portfoliosRaw, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: portfoliosRaw, isLoading } = useQuery(portfoliosQuery);
   const { data: accountsRaw } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,

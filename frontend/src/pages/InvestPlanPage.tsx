@@ -12,9 +12,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import { useDividendPlanSettings } from "@/hooks/useDividendPlanSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { fetchSettings } from "@/api/settings";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 
@@ -39,6 +36,7 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import GoalSettingWizard from "@/components/invest/GoalSettingWizard";
 import Tabs from "@/components/common/Tabs";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { settingsQuery } from "@/api/queryOptions";
 
 // 절세는 자산 › 투자현황 › 세금에서 이동(plans/50 M1) — 목표·배당·절세 "계획"을 한 탭에 모은다
 const TABS = ["적립 계획", "배당 계획", "절세", "챌린지"] as const;
@@ -82,11 +80,7 @@ export default function InvestPlanPage() {
     "growlio:invest:savingsSimulatorOpen",
   );
 
-  const { data: settingsData } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: settingsData } = useQuery(settingsQuery);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, activeTab, setActiveTab);

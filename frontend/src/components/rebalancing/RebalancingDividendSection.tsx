@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { RebalancingAnalysis } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
+import { CASH_TICKER } from "@/constants/assets";
 import { DividendDiffCell } from "./RebalancingCells";
 
 interface Props {
@@ -13,12 +14,11 @@ export default function RebalancingDividendSection({ analysis }: Props) {
 
   const currentDiv = analysis.current_portfolio_annual_dividend ?? 0;
   const targetDiv = analysis.target_portfolio_annual_dividend ?? 0;
-  const totalCurrentDiv = analysis.total_current_annual_dividend ?? currentDiv;
-  const divDiff = targetDiv - totalCurrentDiv;
-  const divDiffPct = totalCurrentDiv > 0 ? (divDiff / totalCurrentDiv) * 100 : 0;
+  const divDiff = targetDiv - currentDiv;
+  const divDiffPct = currentDiv > 0 ? (divDiff / currentDiv) * 100 : 0;
 
   const dividendItems = useMemo(
-    () => analysis.items.filter((i) => i.ticker !== "CASH" && (i.dividend_yield ?? 0) > 0),
+    () => analysis.items.filter((i) => i.ticker !== CASH_TICKER && (i.dividend_yield ?? 0) > 0),
     [analysis.items],
   );
 
@@ -53,7 +53,7 @@ export default function RebalancingDividendSection({ analysis }: Props) {
             <span className="hidden sm:inline">현재 연간 배당</span>
           </div>
           <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {fmtKrw(totalCurrentDiv)}
+            {fmtKrw(currentDiv)}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 hidden sm:block">
             전체 보유 기준
@@ -80,7 +80,7 @@ export default function RebalancingDividendSection({ analysis }: Props) {
             {divDiff >= 0 ? "+" : ""}
             {fmtKrw(divDiff)}
           </div>
-          {totalCurrentDiv > 0 && (
+          {currentDiv > 0 && (
             <div
               className={`text-xs ${divDiff >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500"}`}
             >

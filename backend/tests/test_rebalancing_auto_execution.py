@@ -1191,9 +1191,9 @@ class TestAutoExecutionPlanGenerationFailure:
 
     @pytest.mark.asyncio
     async def test_claim_released_when_no_plan_generated(self):
-        """게이트 차단·주문 없음이면 claim을 풀어 기존처럼 다음 tick에 다시 평가한다."""
+        """지정 시각 알림은 게이트 차단·주문 없음이면 claim을 풀어 다음 tick(±4분 창)에 다시 평가한다."""
         mock_db = _make_mock_db()
-        rows = [(_make_alert(), _make_portfolio(), "u@test.com", None, None)]
+        rows = [(_make_alert(auto_execution_time="09:30"), _make_portfolio(), "u@test.com", None, None)]
         release = AsyncMock()
 
         with (
@@ -1213,6 +1213,78 @@ class TestAutoExecutionPlanGenerationFailure:
 
             await _run_auto_execution()
 
+        release.assert_awaited_once()
+
+
+class TestOncePerDayEvaluation:
+    """plans/78 D1 — 실행 시각이 없는 AUTO 알림은 플랜 없이 끝난 평가도 그날 한 번으로 친다."""
+
+    @contextmanager
+    def _run(self, mock_db, alert, *, build_result, durable_value=None):
+        rows = [(alert, _make_portfolio(), "u@test.com", None, None)]
+        release = AsyncMock()
+        build = AsyncMock(return_value=build_result)
+        claim = AsyncMock(return_value=True)
+        with ExitStack() as stack:
+            stack.enter_context(_patch_common(mock_db))
+            for target, mock in [
+                ("_load_auto_alert_rows", AsyncMock(return_value=rows)),
+                ("is_alert_execution_time", MagicMock(return_value=True)),
+                ("already_fired_today", MagicMock(return_value=False)),
+                ("get_alert_ids_with_pending_plan", AsyncMock(return_value=set())),
+                ("get_durable", AsyncMock(return_value=durable_value)),
+                ("claim_durable", claim),
+                ("delete_durable", release),
+                ("build_pending_plan_for_alert", build),
+            ]:
+                stack.enter_context(patch(f"app.jobs.rebalancing_auto_execution.{target}", new=mock))
+            yield build, claim, release
+
+    @pytest.mark.asyncio
+    async def test_no_drift_keeps_claim_for_untimed_alert(self):
+        with self._run(_make_mock_db(), _make_alert(), build_result=None) as (build, _claim, release):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+        build.assert_awaited_once()
+        release.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_already_evaluated_today_skips_analysis(self):
+        with self._run(_make_mock_db(), _make_alert(), build_result=None, durable_value="1") as (
+            build,
+            claim,
+            _release,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+        build.assert_not_awaited()
+        claim.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_timed_alert_still_releases_claim(self):
+        with self._run(
+            _make_mock_db(), _make_alert(auto_execution_time="09:30"), build_result=None, durable_value="1"
+        ) as (_build, _claim, release):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+        # 지정 시각 알림은 저장된 평가 표시를 보지 않고 평가한 뒤, 플랜이 없으면 claim을 푼다
+        release.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_lock_contention_releases_claim_for_untimed_alert(self):
+        from app.services.rebalancing.plan_service import PlanGenerationInProgress
+
+        with self._run(_make_mock_db(), _make_alert(), build_result=PlanGenerationInProgress()) as (
+            _build,
+            _claim,
+            release,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
         release.assert_awaited_once()
 
 

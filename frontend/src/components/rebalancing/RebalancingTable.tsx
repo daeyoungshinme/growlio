@@ -5,7 +5,6 @@ import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { AssetAccount } from "@/api/assets";
-import { fmtKrw } from "@/utils/format";
 import { isOrderExecutableAccount } from "@/utils/accounts";
 import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -85,7 +84,7 @@ export default function RebalancingTable({
 
   const hasDividendData =
     (analysis.target_portfolio_annual_dividend ?? 0) > 0 ||
-    (analysis.total_current_annual_dividend ?? analysis.current_portfolio_annual_dividend ?? 0) > 0;
+    (analysis.current_portfolio_annual_dividend ?? 0) > 0;
 
   // 요약·비중테이블·거래비용 모두 calcTradeKrw 기준으로 통일 (거래 불가 항목은 calcTradeSummary가 제외)
   const { totalBuySummary, totalSellSummary } = calcTradeSummary(analysis.items);
@@ -181,14 +180,7 @@ export default function RebalancingTable({
           <span>
             상세 정보
             <span className="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">
-              {[
-                "집중도·CAGR",
-                hasDividendData && "배당",
-                (analysis.untracked_holdings ?? []).length > 0 &&
-                  `미포함 보유 ${(analysis.untracked_holdings ?? []).length}개`,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+              {["집중도·CAGR", hasDividendData && "배당"].filter(Boolean).join(" · ")}
             </span>
           </span>
           <ChevronDown
@@ -204,35 +196,6 @@ export default function RebalancingTable({
 
           {/* 배당 분석 섹션 */}
           {hasDividendData && <RebalancingDividendSection analysis={analysis} />}
-
-          {/* 미추적 보유 종목 */}
-          {(analysis.untracked_holdings ?? []).length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/30 rounded-xl p-4">
-              <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
-                포트폴리오 미포함 보유 종목 ({(analysis.untracked_holdings ?? []).length}개)
-              </div>
-              <div className="space-y-1.5">
-                {(analysis.untracked_holdings ?? []).map((h, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs">
-                    <div className="min-w-0">
-                      <span className="font-medium text-gray-800 dark:text-gray-200 truncate">
-                        {h.name}
-                      </span>
-                      <span className="text-gray-500 dark:text-gray-400 ml-1.5">{h.ticker}</span>
-                    </div>
-                    <div className="text-right shrink-0 ml-3">
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {fmtKrw(h.current_value_krw)}
-                      </span>
-                      <span className="text-gray-500 dark:text-gray-400 ml-1">
-                        ({h.current_weight_pct.toFixed(1)}%)
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
             분석 시점:{" "}

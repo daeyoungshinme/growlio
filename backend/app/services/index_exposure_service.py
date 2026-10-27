@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from app.constants import CASH_EQUIVALENT_MARKET
+from app.constants import is_non_tradable
 from app.schemas.portfolio import (
     IndexExposureGroup,
     IndexExposureMember,
@@ -31,8 +31,6 @@ if TYPE_CHECKING:
 
     from app.utils.cache_keys import CacheStoreType
 
-_EXCLUDED_TICKERS = frozenset({"CASH"})
-_EXCLUDED_MARKETS = frozenset({CASH_EQUIVALENT_MARKET, "KR_PROPERTY"})
 
 _STATIC_GROUPS: dict[str, tuple[str, str]] = {
     # kind → (group key, label)
@@ -52,7 +50,7 @@ def merge_holdings(positions: list[dict]) -> list[dict]:
     merged: dict[tuple[str, str], dict] = {}
     for p in positions:
         ticker, market = p["ticker"], p["market"]
-        if ticker in _EXCLUDED_TICKERS or str(market).upper() in _EXCLUDED_MARKETS:
+        if is_non_tradable(ticker, market):
             continue
         entry = merged.setdefault(
             (ticker, market), {"ticker": ticker, "market": market, "name": p.get("name") or ticker, "value_krw": 0.0}

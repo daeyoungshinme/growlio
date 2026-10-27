@@ -84,3 +84,21 @@ class TestEnrichOverviewWithPrices:
         assert qld_item.shares_to_trade == pytest.approx(expected_shares)
         # 회귀 방지: 버그가 있었다면 환율(~1,385)배 부풀려져 수만 주 단위가 됐을 것.
         assert qld_item.shares_to_trade < 1_000
+
+
+class TestNonTradableItemsSkipped:
+    @pytest.mark.asyncio
+    async def test_cash_equivalent_and_property_not_price_fetched(self, mock_db, mock_cache):
+        """현금성 자산(CASH_EQUIVALENT, market CASH)·부동산은 시세 조회 대상이 아니다(plans/78 A1)."""
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "QLD", "name": "ProShares Ultra QQQ", "market": "NASDAQ", "weight": 80},
+                {"ticker": "CASH_EQUIVALENT", "name": "현금성 자산", "market": "CASH", "weight": 10},
+                {"ticker": "REAL_ESTATE", "name": "자가", "market": "KR_PROPERTY", "weight": 10},
+            ]
+        )
+        fetch = AsyncMock(return_value={"QLD": 130_000.0})
+        with patch("app.services.rebalancing.overview_enrichment.fetch_prices_batch_krw", new=fetch):
+            await enrich_overview_with_prices(portfolio, {"all_positions": []}, uuid.uuid4(), mock_db, mock_cache)
+
+        assert fetch.await_args.args[1] == [("QLD", "NASDAQ")]

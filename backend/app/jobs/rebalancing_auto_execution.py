@@ -25,6 +25,7 @@ from app.services.rebalancing.order_builder import is_market_signal_blocking_aut
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
     MarketSignalGateBlocked,
+    PlanGenerationInProgress,
     TaxGateBlocked,
     build_pending_plan_for_alert,
     get_alert_ids_with_pending_plan,
@@ -38,7 +39,7 @@ from app.utils.cache_keys import (
     TTL_REBALANCING_AUTO_CLAIM,
     rebalancing_auto_claim_key,
 )
-from app.utils.durable_state import claim_durable, delete_durable
+from app.utils.durable_state import claim_durable, delete_durable, get_durable
 from app.utils.inproc_lock import inproc_lock
 from app.utils.kst import today_kst
 from app.utils.market_hours import is_alert_execution_time, is_korean_market_open, is_us_market_open
@@ -136,9 +137,16 @@ async def _process_one_alert(
 ) -> bool:
     """AUTO 알림 1건 — 플랜을 생성해 알렸으면 True."""
     alert, portfolio, user_email, notification_email, fcm_token = row
-    if not is_alert_execution_time(getattr(alert, "auto_execution_time", None)):
+    auto_execution_time = getattr(alert, "auto_execution_time", None)
+    if not is_alert_execution_time(auto_execution_time):
         return False
     if already_fired_today(alert):
+        return False
+    # 실행 시각이 없는 알림은 장중 매 tick이 대상이라, 플랜 없이 끝난 평가도 그날 한 번으로 친다 —
+    # 드리프트 없음·게이트 차단이면 claim을 남겨 같은 날 전체 분석을 5분마다 반복하지 않는다(plans/78 D1).
+    once_per_day = auto_execution_time is None
+    claim_key = rebalancing_auto_claim_key(alert.id, today_kst().isoformat())
+    if once_per_day and await get_durable(db, claim_key) is not None:
         return False
     # 스케줄 준수 — BOTH는 매일 드리프트 체크, DRIFT_ONLY/SCHEDULE_ONLY는 스케줄일에만(NOTIFY 경로
     # alert_check._should_skip_by_schedule와 동일 규칙). 도입 시점부터 이 체크가 빠져 있어 "매월 25일"
@@ -167,6 +175,8 @@ async def _process_one_alert(
             tactical_regime=tactical_regime,
         )
         await notify_market_signal_gate_blocked(alert, portfolio, blocked_by_signal, email, fcm_token, db)
+        if once_per_day:
+            await claim_durable(db, claim_key, TTL_REBALANCING_AUTO_CLAIM)
         return False
 
     # 이미 대기 중인 플랜이 있으면(취소/승인 대기) 중복 생성하지 않는다.
@@ -174,8 +184,8 @@ async def _process_one_alert(
         return False
 
     # 메모리의 last_triggered_at·pending 확인은 같은 프로세스 안에서만 유효하다 — 배포가 겹친 다른 인스턴스와
-    # 같은 tick에 둘 다 통과할 수 있어 DB에서 원자적으로 선점한다. 플랜을 만든 경우에만 claim을 남긴다.
-    claim_key = rebalancing_auto_claim_key(alert.id, today_kst().isoformat())
+    # 같은 tick에 둘 다 통과할 수 있어 DB에서 원자적으로 선점한다. 플랜을 만든 경우(실행 시각이 없는 알림은
+    # 플랜 없이 평가를 마친 경우도)에만 claim을 남긴다.
     if not await claim_durable(db, claim_key, TTL_REBALANCING_AUTO_CLAIM):
         logger.info("rebalancing_auto_claim_held", alert_id=str(alert.id))
         return False
@@ -190,8 +200,10 @@ async def _process_one_alert(
         raise
 
     if not isinstance(generated, tuple):
-        # 게이트 차단·생성할 주문 없음·수동 실행과 락 경합 — 이전과 같이 다음 tick에 다시 평가한다
-        await delete_durable(db, claim_key)
+        # 게이트 차단·생성할 주문 없음 — 지정 시각 알림은 다음 tick(±4분 창)에 다시 평가하고, 시각 없는 알림은
+        # 그날 평가를 마친 것으로 claim을 유지한다. 수동 실행과의 락 경합은 평가가 아니므로 항상 푼다.
+        if not once_per_day or isinstance(generated, PlanGenerationInProgress):
+            await delete_durable(db, claim_key)
         if isinstance(generated, TaxGateBlocked):
             await notify_tax_gate_blocked(alert, portfolio, generated, email, fcm_token, db)
         elif isinstance(generated, DailyValueCapBlocked):

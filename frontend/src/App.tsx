@@ -17,7 +17,7 @@ import { fetchDashboard } from "./api/dashboard";
 import { fetchAccounts, fetchExchangeRate } from "./api/assets";
 import { fetchPortfolioOverviewLite } from "./api/portfolios";
 import { fetchDCAAnalysis } from "./api/invest";
-import { fetchSettings } from "./api/settings";
+import { settingsQuery } from "./api/queryOptions";
 import { QUERY_KEYS } from "./constants/queryKeys";
 import { storageRemove } from "./utils/safeStorage";
 import { CACHE_OWNER_CHANGED_EVENT } from "./utils/cacheOwner";
@@ -132,7 +132,7 @@ export default function App() {
       queryKey: QUERY_KEYS.exchangeRate,
       queryFn: fetchExchangeRate,
     });
-    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.settings, queryFn: fetchSettings });
+    void queryClient.prefetchQuery(settingsQuery);
     import("./pages/DashboardPage").catch(() => {});
   }, [queryClient]);
 

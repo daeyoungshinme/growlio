@@ -2,18 +2,16 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  fetchSettings,
   updateGoalRecommendationOptions,
   type AgeGroup,
   type GoalRiskTolerance,
 } from "@/api/settings";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { RISK_TOLERANCE_OPTIONS } from "@/constants/goalRiskTolerance";
 import { invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import Modal from "@/components/common/Modal";
+import { settingsQuery } from "@/api/queryOptions";
 
 const CAGR_LOOKBACK_OPTIONS = [3, 5, 10];
 
@@ -34,11 +32,7 @@ interface Props {
 export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   const queryClient = useQueryClient();
 
-  const { data: settingsData } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: settingsData } = useQuery(settingsQuery);
 
   const [riskTolerance, setRiskTolerance] = useState<GoalRiskTolerance | null>(null);
   const [maxWeightPctInput, setMaxWeightPctInput] = useState<string | null>(null);

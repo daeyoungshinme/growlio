@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { fetchSettings, type SettingsData } from "@/api/settings";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import { type SettingsData } from "@/api/settings";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
+import { invalidateSettingsData } from "@/utils/queryInvalidation";
+import { settingsQuery } from "@/api/queryOptions";
 
 type BooleanSettingsField = {
   [K in keyof SettingsData]: SettingsData[K] extends boolean ? K : never;
@@ -13,7 +13,8 @@ interface UseSettingsToggleOptions {
   field: BooleanSettingsField;
   defaultValue: boolean;
   mutationFn: (enabled: boolean) => Promise<unknown>;
-  invalidate: (qc: QueryClient) => unknown;
+  /** 기본은 settings만 무효화 — 다른 화면 데이터가 이 설정에 따라 바뀔 때만 넘긴다 */
+  invalidate?: (qc: QueryClient) => unknown;
 }
 
 /** `["settings"]`의 boolean 필드 하나를 조회하고 PUT으로 토글하는 반복 패턴(조회+뮤테이션+무효화+에러토스트)을
@@ -22,14 +23,10 @@ export function useSettingsToggle({
   field,
   defaultValue,
   mutationFn,
-  invalidate,
+  invalidate = invalidateSettingsData,
 }: UseSettingsToggleOptions) {
   const qc = useQueryClient();
-  const { data: settings } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: settings } = useQuery(settingsQuery);
 
   const toggleMut = useMutation({
     mutationFn,

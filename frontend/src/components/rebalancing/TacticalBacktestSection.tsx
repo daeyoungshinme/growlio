@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { History } from "lucide-react";
-import type { TacticalBacktestResult, TacticalRegime } from "@/api/tactical";
+import type { TacticalBacktestResult } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
@@ -11,10 +11,12 @@ import { fmtPct } from "@/utils/format";
 import {
   REGIME_BADGE_CLASS,
   REGIME_LABEL,
+  REGIME_ORDER,
   TILT_LABEL,
   TILT_ORDER,
   toChartSeries,
 } from "./tacticalLabels";
+import { pnlColor } from "@/utils/colors";
 
 // recharts 청크는 카드를 펼쳐 결과가 왔을 때만 받는다
 const BacktestResultChart = lazy(() => import("@/components/backtest/BacktestResultChart"));
@@ -25,7 +27,6 @@ const YEAR_OPTIONS = [
 ] as const;
 type YearOption = (typeof YEAR_OPTIONS)[number]["value"];
 
-const REGIME_ORDER: TacticalRegime[] = ["RISK_ON", "NEUTRAL", "RISK_OFF"];
 const TIMELINE_PREVIEW = 5;
 
 function RegimeTimeline({ timeline }: { timeline: TacticalBacktestResult["regime_timeline"] }) {
@@ -125,9 +126,7 @@ export default function TacticalBacktestSection({ portfolioId }: Props) {
                       className={`border-t border-gray-100 dark:border-gray-700 ${idx === 0 ? "font-semibold" : ""}`}
                     >
                       <td className="py-1.5">{m.name}</td>
-                      <td
-                        className={`py-1.5 text-right ${m.cagr_pct >= 0 ? "text-red-500" : "text-blue-500"}`}
-                      >
+                      <td className={`py-1.5 text-right ${pnlColor(m.cagr_pct)}`}>
                         {fmtPct(m.cagr_pct, 1)}
                       </td>
                       <td className="py-1.5 text-right text-blue-500">-{m.mdd_pct.toFixed(1)}%</td>

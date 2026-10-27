@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
+from app.constants import is_non_tradable
 from app.core.cache_store import get_cache_store
 from app.core.logging import public_error_message
 from app.limiter import limiter
@@ -47,8 +48,7 @@ from app.services.price_service import get_historical_returns
 from app.services.rebalancing.broker_balance_service import fetch_broker_balance
 from app.services.rebalancing.diagnosis_service import (
     build_diagnosis_context,
-    check_composite_signal,
-    fetch_market_and_risk_signal,
+    fetch_composite_signal,
 )
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
 from app.services.rebalancing.overview_enrichment import collect_dividend_map, enrich_overview_with_prices
@@ -112,7 +112,7 @@ async def analyze_portfolio(
     target_tickers = [
         (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
         for raw_item in portfolio.items
-        if str(_item_attr(raw_item, "ticker")) != "CASH" and str(_item_attr(raw_item, "market")) != "KR_PROPERTY"
+        if not is_non_tradable(str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
     ]
     current_tickers = [
         (p["ticker"], p["market"])
@@ -278,7 +278,7 @@ async def get_portfolio_expected_metrics_endpoint(
             float(_item_attr(i, "weight")),
         )
         for i in portfolio.items
-        if str(_item_attr(i, "ticker")) not in ("CASH",) and str(_item_attr(i, "market")) != "KR_PROPERTY"
+        if not is_non_tradable(str(_item_attr(i, "ticker")), str(_item_attr(i, "market")))
     ]
 
     settings_row = await get_settings_row(db, current_user.id)
@@ -380,14 +380,7 @@ async def get_composite_signal_status(
     reason: str | None = None
     if enabled:
         try:
-            market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, cache)
-            triggered, reason = check_composite_signal(
-                market_level,
-                bool(risk.get("data_available")),
-                risk.get("diversification_score"),
-                risk.get("top_holding_weight_pct"),
-                risk.get("annualized_volatility_pct"),
-            )
+            triggered, reason = await fetch_composite_signal(current_user.id, db, cache)
         except Exception as e:
             logger.warning("composite_signal_status_failed", error=str(e))
 

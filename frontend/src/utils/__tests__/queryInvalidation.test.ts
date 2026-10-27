@@ -13,7 +13,7 @@ import {
   invalidateRebalancingHistoryData,
   invalidateGoalRecommendationData,
   invalidateChallengeData,
-  invalidateChallengeRemindersData,
+  invalidateSettingsData,
   invalidateTradeData,
   invalidateRebalancingPlanData,
 } from "../queryInvalidation";
@@ -78,10 +78,10 @@ describe("invalidateChallengeData", () => {
   });
 });
 
-describe("invalidateChallengeRemindersData", () => {
+describe("invalidateSettingsData", () => {
   it("settings 무효화", async () => {
     const qc = makeQueryClient();
-    await invalidateChallengeRemindersData(qc as any);
+    await invalidateSettingsData(qc as any);
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
     expect(keys).toContain("settings");
   });
@@ -213,7 +213,7 @@ describe("실제 QueryClient 프리픽스 매칭", () => {
     const qc = new QueryClient();
     qc.setQueryData(QUERY_KEYS.transactions("acc-1"), []);
     qc.setQueryData(QUERY_KEYS.allTransactions(2026), []);
-    qc.setQueryData(QUERY_KEYS.portfolioRisk("p-1"), {});
+    qc.setQueryData(QUERY_KEYS.portfolioRisk, {});
     return qc;
   }
   const invalidated = (qc: QueryClient, key: readonly unknown[]) =>
@@ -235,6 +235,6 @@ describe("실제 QueryClient 프리픽스 매칭", () => {
   it("sync 후 포트폴리오별 리스크 캐시도 무효화된다", async () => {
     const qc = seeded();
     await invalidateSyncData(qc);
-    expect(invalidated(qc, QUERY_KEYS.portfolioRisk("p-1"))).toBe(true);
+    expect(invalidated(qc, QUERY_KEYS.portfolioRisk)).toBe(true);
   });
 });

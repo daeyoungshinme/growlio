@@ -4,13 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import type { MarketConditionMode } from "@/api/alerts";
 import type { AssetAccount } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
-import { fetchSettings } from "@/api/settings";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { useTimeout } from "@/hooks/useTimeout";
 import { INPUT_SM } from "@/constants/inputStyles";
-import NoTradableAccountNotice from "./NoTradableAccountNotice";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import AutoExecutionAccountPicker from "./AutoExecutionAccountPicker";
 import {
   STRATEGY_OPTIONS,
   BUY_WAIT_MINUTES_OPTIONS,
@@ -20,6 +17,7 @@ import {
 import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 import { AutoDailyCapEditor } from "./AutoDailyCapEditor";
+import { settingsQuery } from "@/api/queryOptions";
 
 const inputClass = `w-full ${INPUT_SM}`;
 
@@ -55,11 +53,7 @@ export function AlertAutoModeSection({
       switchToPerAccountMut.mutate();
     }
   };
-  const { data: settingsData } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: settingsData } = useQuery(settingsQuery);
 
   return (
     <div className="space-y-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
@@ -110,26 +104,12 @@ export function AlertAutoModeSection({
               (계좌별 독립 설정 대상)
             </span>
           </div>
-        ) : autoExecutionAccounts.length === 0 ? (
-          <NoTradableAccountNotice />
-        ) : autoExecutionAccounts.length === 1 ? (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
-            <span>{autoExecutionAccounts[0].name}</span>
-            <span className="text-xs text-gray-400 dark:text-gray-500">(자동 선택)</span>
-          </div>
         ) : (
-          <select
-            className={inputClass}
+          <AutoExecutionAccountPicker
+            accounts={autoExecutionAccounts}
             value={form.accountId}
-            onChange={(e) => form.setAccountId(e.target.value)}
-          >
-            <option value="">계좌 선택</option>
-            {autoExecutionAccounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+            onChange={form.setAccountId}
+          />
         )}
       </div>
 

@@ -1,7 +1,7 @@
 import type { AssetAccount } from "@/api/assets";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { INPUT_SM } from "@/constants/inputStyles";
-import NoTradableAccountNotice from "./NoTradableAccountNotice";
+import AutoExecutionAccountPicker from "./AutoExecutionAccountPicker";
 
 const inputClass = `w-full ${INPUT_SM}`;
 
@@ -46,27 +46,11 @@ export function AlertQuickDcaSection({ form, autoExecutionAccounts, onSwitchToAd
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           실행 계좌
         </label>
-        {autoExecutionAccounts.length === 0 ? (
-          <NoTradableAccountNotice />
-        ) : autoExecutionAccounts.length === 1 ? (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
-            <span>{autoExecutionAccounts[0].name}</span>
-            <span className="text-xs text-gray-400 dark:text-gray-500">(자동 선택)</span>
-          </div>
-        ) : (
-          <select
-            className={inputClass}
-            value={form.accountId}
-            onChange={(e) => form.setAccountId(e.target.value)}
-          >
-            <option value="">계좌 선택</option>
-            {autoExecutionAccounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <AutoExecutionAccountPicker
+          accounts={autoExecutionAccounts}
+          value={form.accountId}
+          onChange={form.setAccountId}
+        />
       </div>
 
       <details className="text-xs text-gray-500 dark:text-gray-400">

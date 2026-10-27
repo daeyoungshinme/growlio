@@ -846,6 +846,12 @@ class TestExistingItemsHelpers:
                 "market": "KR_PROPERTY",
                 "value_krw": 300_000.0,
             },
+            "CASH_EQUIVALENT-CASH": {
+                "ticker": "CASH_EQUIVALENT",
+                "name": "현금성 자산",
+                "market": "CASH",
+                "value_krw": 200.0,
+            },
         }
         result = existing_items_from_positions(pos_map)
         assert result == [("SPY", "SPDR S&P 500 ETF", "NYSE")]

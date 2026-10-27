@@ -13,6 +13,7 @@ import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import {
+  REGIME_ORDER,
   DEFAULT_DIP_SHIFT_PCT,
   DEFAULT_TILT_SHIFT_PCT,
   LEVERAGED_ASSETS,
@@ -21,8 +22,6 @@ import {
   TACTICAL_PRESETS,
   type TacticalPreset,
 } from "./tacticalLabels";
-
-const REGIME_ORDER: TacticalRegime[] = ["RISK_ON", "NEUTRAL", "RISK_OFF"];
 
 const INPUT_LABEL: Record<TacticalAsset, string> = {
   QQQ: "나스닥100",

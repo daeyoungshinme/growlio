@@ -2,7 +2,6 @@ import { lazy, Suspense, useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Circle, RefreshCw, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
-import { fetchPortfolios } from "@/api/portfolios";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
@@ -14,9 +13,9 @@ import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfo
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { portfoliosQuery } from "@/api/queryOptions";
 
 const ActionItemsCard = lazy(() => import("../components/dashboard/ActionItemsCard"));
 
@@ -130,11 +129,7 @@ export default function DashboardPage() {
   } = useDashboardData();
 
   // SetupTargetPortfolioBanner와 동일 queryKey를 재사용 — 캐시 공유로 추가 네트워크 요청 없음.
-  const { data: portfolios } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: portfolios } = useQuery(portfoliosQuery);
   const isBrandNewUser =
     !data?.goal_amount &&
     !data?.annual_deposit_goal &&

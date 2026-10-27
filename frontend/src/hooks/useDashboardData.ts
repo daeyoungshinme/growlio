@@ -3,12 +3,12 @@ import { fetchAccounts } from "@/api/assets";
 import { fetchDashboard } from "@/api/dashboard";
 import { fetchDCAAnalysis } from "@/api/invest";
 import { fetchPortfolioOverviewLite } from "@/api/portfolios";
-import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchChallenges } from "@/api/challenges";
 import { useExchangeRate } from "./useExchangeRate";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
 import { isNativePlatform } from "@/utils/platform";
+import { marketSignalQuery } from "@/api/queryOptions";
 
 // 네이티브 앱은 포그라운드에 있는 동안만 쓰이고 복귀 시 갱신되므로 주기 폴링을 끈다(PortfolioPage와 동일) —
 // 화면을 켜 둔 채 두면 5분마다 대시보드·overview 재계산 요청이 이어졌다
@@ -52,9 +52,7 @@ export function useDashboardData() {
   const exchangeRate = useExchangeRate();
 
   const { data: marketSignal } = useQuery({
-    queryKey: QUERY_KEYS.marketSignal,
-    queryFn: fetchMarketSignal,
-    staleTime: STALE_TIME.MEDIUM,
+    ...marketSignalQuery,
     refetchOnWindowFocus: false,
   });
 

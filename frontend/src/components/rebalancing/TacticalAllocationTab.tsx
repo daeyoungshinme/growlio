@@ -2,7 +2,6 @@ import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ListChecks } from "lucide-react";
-import { fetchPortfolios } from "@/api/portfolios";
 import type { TacticalAsset, TacticalStatus, TechnicalSnapshot } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import Modal, { ModalFooter } from "@/components/common/Modal";
@@ -11,8 +10,6 @@ import SkeletonCard from "@/components/common/SkeletonCard";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { useDcaTacticalLink } from "@/hooks/useDcaTacticalLink";
@@ -42,6 +39,7 @@ import {
   TRANSITION_CONFIRM_NOTE,
   TREND_LABEL,
 } from "./tacticalLabels";
+import { portfoliosQuery } from "@/api/queryOptions";
 
 const TacticalBacktestSection = lazy(() => import("./TacticalBacktestSection"));
 
@@ -611,11 +609,7 @@ export default function TacticalAllocationTab({
   onCreatePortfolio,
   showPortfolioPicker = true,
 }: Props) {
-  const { data: portfolios, isLoading: portfoliosLoading } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: portfolios, isLoading: portfoliosLoading } = useQuery(portfoliosQuery);
   // 부모가 URL로 관리하면(onSelectPortfolio) URL이 단일 진실, 아니면 탭 내부 상태
   const [localPickedId, setLocalPickedId] = useState<string | undefined>(selectedPortfolioId);
   const pickedId = onSelectPortfolio ? selectedPortfolioId : localPickedId;

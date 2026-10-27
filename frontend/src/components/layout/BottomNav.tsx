@@ -2,25 +2,16 @@ import { useMemo } from "react";
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { NAV_ITEMS } from "@/constants/nav";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
-import { fetchPortfolios } from "@/api/portfolios";
-import { fetchDriftSummary } from "@/api/rebalancing";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeNudge } from "@/hooks/useChallengeNudge";
+import { driftSummaryQuery, portfoliosQuery } from "@/api/queryOptions";
 
 export default function BottomNav() {
-  const { data: portfoliosRaw } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: portfoliosRaw } = useQuery(portfoliosQuery);
   const portfolioCount = Array.isArray(portfoliosRaw) ? portfoliosRaw.length : 0;
 
   const { data: driftSummaries } = useQuery({
-    queryKey: QUERY_KEYS.driftSummary,
-    queryFn: fetchDriftSummary,
-    staleTime: STALE_TIME.MEDIUM,
+    ...driftSummaryQuery,
     enabled: portfolioCount > 0,
   });
 

@@ -9,6 +9,7 @@ import { isOverseasMarket } from "@/constants/markets";
 import { PriceCell } from "./RebalancingPriceCell";
 import { RebalancingPriceInput } from "./RebalancingPriceInput";
 import { RebalancingMobileCard } from "./RebalancingMobileCard";
+import { estimateLimitKrw, orderKey } from "./rebalancingTradeMath";
 
 function getNativePrice(
   ticker: string,
@@ -17,17 +18,6 @@ function getNativePrice(
   livePricesUsd: Record<string, number>,
 ): number | undefined {
   return isOverseasMarket(market) ? livePricesUsd[ticker] : livePricesKrw[ticker];
-}
-
-function getLimitEstKrw(
-  nativeLimitPrice: number,
-  qty: number,
-  market: string,
-  globalUsdRate: number | null,
-): number {
-  return isOverseasMarket(market) && globalUsdRate != null
-    ? nativeLimitPrice * globalUsdRate * qty
-    : nativeLimitPrice * qty;
 }
 
 export interface RebalancingOrderTableProps {
@@ -96,7 +86,7 @@ export function RebalancingOrderTable({
               매도
             </div>
             {sellRows.map(({ item, currentQty, suggestedQty }) => {
-              const key = `sell_${item.ticker}_${accId}`;
+              const key = orderKey("sell", item.ticker, accId);
               const qty = qtyOverrides[key] ?? suggestedQty;
               const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
               const currentNativePrice = getNativePrice(
@@ -106,7 +96,7 @@ export function RebalancingOrderTable({
                 livePricesUsd,
               );
               const est = getEstimateKrw(key, item.ticker, item.market, qty);
-              const estKrw = getLimitEstKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
+              const estKrw = estimateLimitKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
               return (
                 <RebalancingMobileCard
                   key={key}
@@ -144,7 +134,7 @@ export function RebalancingOrderTable({
               매수
             </div>
             {buyRows.map(({ item, suggestedQty, currentQty }) => {
-              const key = `buy_${item.ticker}_${accId}`;
+              const key = orderKey("buy", item.ticker, accId);
               const qty = qtyOverrides[key] ?? suggestedQty;
               const isMultiAccount = (buyAccounts[item.ticker] ?? []).length > 1;
               const { allocated, needed } = isMultiAccount
@@ -158,7 +148,7 @@ export function RebalancingOrderTable({
                 livePricesUsd,
               );
               const est = getEstimateKrw(key, item.ticker, item.market, qty);
-              const estKrw = getLimitEstKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
+              const estKrw = estimateLimitKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
               return (
                 <RebalancingMobileCard
                   key={key}
@@ -270,7 +260,7 @@ export function RebalancingOrderTable({
                   </td>
                 </tr>
                 {sellRows.map(({ item, currentQty, suggestedQty }) => {
-                  const key = `sell_${item.ticker}_${accId}`;
+                  const key = orderKey("sell", item.ticker, accId);
                   const qty = qtyOverrides[key] ?? suggestedQty;
                   const est = getEstimateKrw(key, item.ticker, item.market, qty);
                   const nativeVal = getLimitPriceNative(key, item.ticker, item.market);
@@ -376,7 +366,7 @@ export function RebalancingOrderTable({
                   </td>
                 </tr>
                 {buyRows.map(({ item, suggestedQty, currentQty }) => {
-                  const key = `buy_${item.ticker}_${accId}`;
+                  const key = orderKey("buy", item.ticker, accId);
                   const qty = qtyOverrides[key] ?? suggestedQty;
                   const est = getEstimateKrw(key, item.ticker, item.market, qty);
                   const nativeVal = getLimitPriceNative(key, item.ticker, item.market);

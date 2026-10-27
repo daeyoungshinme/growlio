@@ -8,11 +8,10 @@ import {
   PortfolioItem,
   createPortfolio,
   deletePortfolio,
-  fetchPortfolios,
   reorderPortfolios,
   updatePortfolio,
 } from "@/api/portfolios";
-import { fetchDriftSummary, PortfolioDriftSummary } from "@/api/rebalancing";
+import { PortfolioDriftSummary } from "@/api/rebalancing";
 import {
   fetchAccounts,
   batchSetTargetPortfolio,
@@ -33,6 +32,7 @@ import { isStockAccount } from "@/utils/accounts";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { driftSummaryQuery, portfoliosQuery } from "@/api/queryOptions";
 
 interface Props {
   selectedPortfolioId?: string;
@@ -55,14 +55,7 @@ export default function PortfolioManageTab({
 }: Props) {
   const qc = useQueryClient();
 
-  const {
-    data: portfoliosRaw,
-    isLoading,
-    refetch: refetchPortfolios,
-  } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-  });
+  const { data: portfoliosRaw, isLoading, refetch: refetchPortfolios } = useQuery(portfoliosQuery);
 
   const handleRefresh = useCallback(async () => {
     await refetchPortfolios();
@@ -118,9 +111,7 @@ export default function PortfolioManageTab({
   );
 
   const { data: driftSummaryRaw } = useQuery({
-    queryKey: QUERY_KEYS.driftSummary,
-    queryFn: fetchDriftSummary,
-    staleTime: STALE_TIME.MEDIUM,
+    ...driftSummaryQuery,
     enabled: portfolios.length > 0,
   });
   const driftByPortfolioId = useMemo<Record<string, PortfolioDriftSummary>>(() => {

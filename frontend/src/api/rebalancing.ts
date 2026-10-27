@@ -34,14 +34,6 @@ export interface RebalancingItem {
   members?: RebalancingItem[];
 }
 
-export interface CurrentHolding {
-  ticker: string;
-  name: string;
-  market: string;
-  current_value_krw: number;
-  current_weight_pct: number;
-}
-
 export interface TickerAccountInfo {
   account_id: string;
   account_name: string;
@@ -88,11 +80,9 @@ export interface RebalancingAnalysis {
   base_type: string;
   base_value_krw: number;
   items: RebalancingItem[];
-  untracked_holdings: CurrentHolding[];
   analyzed_at: string;
   current_portfolio_annual_dividend: number;
   target_portfolio_annual_dividend: number;
-  total_current_annual_dividend?: number;
   target_weighted_cagr_10y_pct?: number | null;
   current_weighted_cagr_10y_pct?: number | null;
   ticker_account_map: Record<string, TickerAccountInfo[]>;

@@ -366,6 +366,7 @@ def rebalancing_auto_claim_key(alert_id: uuid.UUID, day: str) -> str:
     """AUTO 잡이 알림+KST 일자의 플랜 생성을 선점했음을 기록하는 durable claim 키(`claim_durable`).
 
     플랜을 실제로 만든 경우에만 유지하고, 게이트 차단·생성 없음·락 경합이면 해제해 기존 재시도 의미를 지킨다.
+    단 `auto_execution_time`이 없는 알림은 게이트 차단·생성 없음에도 유지해 "그날 평가 완료" 표시로 쓴다(plans/78 D1).
     배포가 겹친 두 인스턴스가 같은 알림으로 하루 두 번 플랜을 만들지 못하게 한다(plans/61 C1).
     """
     return f"{_env_prefix()}rebalancing:auto_claim:{alert_id}:{day}"

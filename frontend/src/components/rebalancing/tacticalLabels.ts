@@ -17,6 +17,9 @@ export const REGIME_LABEL: Record<TacticalRegime, string> = {
   RISK_OFF: "방어",
 };
 
+/** 표·편집기의 국면 행 순서 */
+export const REGIME_ORDER: TacticalRegime[] = ["RISK_ON", "NEUTRAL", "RISK_OFF"];
+
 export const REGIME_BADGE_CLASS: Record<TacticalRegime, string> = {
   RISK_ON:
     "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700/40",
