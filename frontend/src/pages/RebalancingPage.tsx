@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
+import { fetchTacticalMarket } from "@/api/tactical";
 import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
 import type { PortfolioItem } from "@/api/portfolios";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -124,6 +125,14 @@ export default function RebalancingPage() {
     enabled: localTab === "진단",
   });
 
+  // 시장 상황 카드의 차트 추세(QQQ·SPY) — 포트폴리오 무관, 서버 6h 캐시. 실패해도 매크로 영역은 그대로
+  const { data: tacticalMarket } = useQuery({
+    queryKey: QUERY_KEYS.tacticalMarket,
+    queryFn: fetchTacticalMarket,
+    staleTime: STALE_TIME.LONG,
+    enabled: localTab === "진단",
+  });
+
   const { data: inflationSummary } = useQuery({
     queryKey: QUERY_KEYS.inflationSummary,
     queryFn: fetchInflationSummary,
@@ -179,8 +188,7 @@ export default function RebalancingPage() {
         {localTab === "진단" && (
           <>
             <TabIntro>
-              정해 둔 목표 비중에서 얼마나 벗어났는지와 지금 시장 위험도를 점검해요. 목표 비중은
-              바꾸지 않아요.
+              목표 비중 이탈·시장 상황·내 포트폴리오 위험을 점검해요. 목표 비중은 바꾸지 않아요.
             </TabIntro>
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
@@ -197,6 +205,7 @@ export default function RebalancingPage() {
                   <MarketSignalBanner
                     signal={signal}
                     inflation={inflationSummary}
+                    technicals={tacticalMarket?.technicals}
                     onOpenTactical={() => handleGoalModeChange("전술")}
                   />
                 </Suspense>

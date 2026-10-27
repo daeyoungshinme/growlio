@@ -1,24 +1,22 @@
 import { ListChecks } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { TacticalAsset, TacticalStatus, TechnicalSnapshot } from "@/api/tactical";
+import type { TacticalAsset, TacticalStatus } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 import {
   ASSET_LABEL,
   INDEX_GROUP_ASSETS,
   type NextActionTone,
   OPTIONAL_ASSETS,
-  PULLBACK_BADGE_CLASS,
-  PULLBACK_LABEL,
   REGIME_BADGE_CLASS,
   REGIME_LABEL,
   regimeDayCount,
   TACTICAL_ASSETS,
   TILT_LABEL,
   TRANSITION_CONFIRM_NOTE,
-  TREND_LABEL,
 } from "./tacticalLabels";
 
 /** 전술 탭(`TacticalAllocationTab`)의 표시 조각 — 국면 카드·판정 근거·비중 비교표·적립 연동 안내 (plans/79 D2) */
@@ -29,94 +27,7 @@ const NEXT_ACTION_CLASS: Record<NextActionTone, string> = {
   idle: "bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
 };
 
-function fmtNum(n: number | null | undefined, digits = 2): string {
-  return n == null ? "—" : n.toFixed(digits);
-}
-
-/** 종가의 이평선 대비 이격(%) — 음수면 이평선 아래(웅덩이) */
-function fmtGap(close: number | null | undefined, ma: number | null | undefined): string {
-  if (close == null || ma == null || ma <= 0) return "—";
-  const pct = (close / ma - 1) * 100;
-  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
-}
-
-function IndicatorRow({
-  ticker,
-  snap,
-  note,
-  showPullback = false,
-}: {
-  ticker: string;
-  snap?: TechnicalSnapshot;
-  note?: string;
-  /** 웅덩이 배지 — 투입 판정 기준인 QQQ에만 단다(SPY·DIA는 이격 수치만) */
-  showPullback?: boolean;
-}) {
-  const trend = snap?.trend ?? "UNKNOWN";
-  const stage = snap?.pullback_stage;
-  const trendCls =
-    trend === "UP"
-      ? "text-red-500"
-      : trend === "DOWN"
-        ? "text-blue-500"
-        : "text-gray-500 dark:text-gray-400";
-  return (
-    <div className="py-2 border-t border-gray-100 dark:border-gray-700 first:border-t-0">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">
-          {ticker}
-          {note && (
-            <span className="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500">
-              {note}
-            </span>
-          )}
-        </span>
-        <span className="flex items-center gap-2">
-          {showPullback && stage && stage !== "UNKNOWN" && (
-            <span className={`px-2 py-0.5 rounded-full text-xs ${PULLBACK_BADGE_CLASS[stage]}`}>
-              {PULLBACK_LABEL[stage]}
-            </span>
-          )}
-          <span className={`text-sm font-medium ${trendCls}`}>추세 {TREND_LABEL[trend]}</span>
-        </span>
-      </div>
-      <dl className="mt-1 grid grid-cols-3 gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-300">
-        <div>
-          <dt className="text-gray-400 dark:text-gray-500">종가</dt>
-          <dd>${fmtNum(snap?.close)}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-400 dark:text-gray-500">RSI(14)</dt>
-          <dd>{fmtNum(snap?.rsi14, 1)}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-400 dark:text-gray-500">52주 고점 대비</dt>
-          <dd>{snap?.drawdown_pct == null ? "—" : `${snap.drawdown_pct.toFixed(1)}%`}</dd>
-        </div>
-        {/* 이평선은 절대 가격 대신 종가 이격으로 — 어느 선까지 눌렸는지(웅덩이 깊이)가 한눈에 보이게 */}
-        {(
-          [
-            ["20일선", snap?.sma20],
-            ["60일선", snap?.sma60],
-            ["120일선", snap?.sma120],
-            ["200일선", snap?.sma200],
-          ] as const
-        ).map(([label, ma]) => (
-          <div key={label}>
-            <dt className="text-gray-400 dark:text-gray-500">{label} 대비</dt>
-            <dd>{fmtGap(snap?.close, ma)}</dd>
-          </div>
-        ))}
-        <div>
-          <dt className="text-gray-400 dark:text-gray-500">MACD 히스토그램</dt>
-          <dd>{fmtNum(snap?.macd_hist)}</dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
-/** 요약 한 줄(제목 + 값) — 근거 목록은 "판정 근거·차트 지표" 접힘 안에 둔다 */
+/** 요약 한 줄(제목 + 값) — 근거 목록은 "판정 근거" 접힘 안에 둔다 */
 export function SummaryLine({ title, value }: { title: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
@@ -148,18 +59,15 @@ export function ReasonList({ items }: { items: string[] }) {
   );
 }
 
-/** 판정 근거(매크로·추세)·차트 지표·틸트/웅덩이 근거 — 모바일 길이를 줄이려 기본 접힘(plans/69 P4) */
+/** 판정 근거(매크로·추세)·틸트/웅덩이 근거 — 모바일 길이를 줄이려 기본 접힘(plans/69 P4).
+ *  매크로·차트 지표 자체는 진단 탭 "시장 상황" 카드가 담당한다(plans/82) */
 function TacticalDetails({ status }: { status: TacticalStatus }) {
   const [isOpen, toggle] = useCollapsible(false, "growlio:rebalancing:tactical-details-open");
-  // DIA는 비중표 어느 국면에든 쓰일 때만 참고 지표로 보여준다
-  const usesDia =
-    Object.values(status.regime_weights).some((w) => (w.DIA ?? 0) > 0) ||
-    (status.current_weights.DIA ?? 0) > 0;
   const tiltOn = status.tilt_shift_pct > 0;
   return (
     <CollapsibleCard
       icon={ListChecks}
-      title="판정 근거·차트 지표"
+      title="판정 근거"
       isOpen={isOpen}
       onToggle={toggle}
       cardClassName="border-t border-gray-100 dark:border-gray-700 pt-1"
@@ -173,27 +81,18 @@ function TacticalDetails({ status }: { status: TacticalStatus }) {
               {status.macro_freshness === "STALE" && (
                 <span className="text-amber-600 dark:text-amber-400">지표 데이터 지연</span>
               )}
-              {/* 모바일은 title 툴팁이 안 뜬다 — 진단 탭 배지와 등급이 다를 수 있는 이유를 화면에 적는다 */}
-              <span className="basis-full text-gray-500 dark:text-gray-400">
-                연속 확인한 등급이라 진단 탭보다 늦게 바뀔 수 있어요
-              </span>
             </>
           ) : (
             <span>매크로 반영 안 함 — SPY·QQQ 200일선 추세만으로 판단해요</span>
           )}
         </div>
         <ReasonList items={status.reasons} />
-        <div>
-          <IndicatorRow ticker="QQQ" snap={status.technicals.QQQ} showPullback />
-          <IndicatorRow ticker="SPY" snap={status.technicals.SPY} />
-          {usesDia && (
-            <IndicatorRow
-              ticker="DIA"
-              snap={status.technicals.DIA}
-              note="참고 · 국면 판단 미반영"
-            />
-          )}
-        </div>
+        <Link
+          to={rebalancingUrl({ tab: "진단" })}
+          className={`${TOUCH_TARGET_ROW} text-xs text-blue-600 dark:text-blue-400`}
+        >
+          매크로·차트 지표 자세히 보기 → 진단 › 시장 상황
+        </Link>
         {tiltOn && (
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">

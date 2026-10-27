@@ -93,7 +93,7 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
             <ShieldAlert size={16} className="text-orange-600 dark:text-orange-400" />
           </div>
           <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-            포트폴리오 위험 지표
+            내 포트폴리오 위험 지표
           </h2>
           <ChevronDown
             size={14}

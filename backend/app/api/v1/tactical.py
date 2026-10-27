@@ -53,6 +53,45 @@ async def _status(
     return await tactical.build_status(portfolio, strategy, market)
 
 
+@router.get("")
+@limiter.limit("30/minute")
+async def list_tactical_strategies(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """전술 배분을 켠 포트폴리오 목록 — 저장된 상태만 읽는다(시세 조회·국면 갱신 없음)."""
+    strategies = await tactical.list_strategies(current_user.id, db)
+    return [
+        {
+            "portfolio_id": str(s.portfolio_id),
+            "confirmed_regime": s.last_regime,
+            "notify_enabled": s.notify_enabled,
+        }
+        for s in strategies
+    ]
+
+
+@router.get("/market")
+@limiter.limit("30/minute")
+async def get_tactical_market(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """포트폴리오와 무관한 시장 입력(매크로 확정 등급 + 차트 지표) — 진단 탭 "시장 상황" 카드용.
+
+    국면은 전략별 매크로 반영·히스테리시스에 달려 있어 여기서 내보내지 않는다.
+    `/{portfolio_id}`보다 먼저 선언해야 "market"이 uuid 파싱으로 422가 나지 않는다.
+    """
+    market = await tactical.evaluate_market(await get_cache_store(), db)
+    return {
+        "macro_level": market["macro_level"],
+        "macro_freshness": market["macro_freshness"],
+        "technicals": market["technicals"],
+    }
+
+
 @router.get("/{portfolio_id}")
 @limiter.limit("30/minute")
 async def get_tactical_status(
