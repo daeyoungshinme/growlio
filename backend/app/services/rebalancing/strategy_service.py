@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.services.factor_service import get_factor_analysis, get_factor_analysis_for_portfolio
 from app.services.portfolio_optimizer import get_efficient_frontier
 from app.services.position_aggregator import query_latest_position_map
+from app.services.rebalancing.group_expansion import group_owner_map
 from app.utils.cache_keys import (
     TTL_REBALANCING_STRATEGY,
     CacheStoreType,
@@ -116,12 +117,18 @@ def _build_trade_recommendations(
             "target_weight": float(item.weight),
         }
 
-    # 현재 포지션 총 가치 기준 비중
+    # 현재 포지션 총 가치 기준 비중 — 지수 그룹(plans/74) 멤버 보유분은 그룹 대표 키로 합산한다(레버리지는
+    # 리밸런싱 분석과 같이 평가액×배수 노출). 안 하면 멤버(SPY)는 "매도", 대표(VOO)는 "비중 확대"로 나온다.
+    owner = group_owner_map(target_items)
     total_value = sum(p["value_krw"] for p in current_pos_map.values())
     current_weights: dict[str, float] = {}
     if total_value > 0:
         for key, pos in current_pos_map.items():
-            current_weights[key] = pos["value_krw"] / total_value * 100.0
+            group = owner.get((pos["ticker"], pos["market"]))
+            weight_key, leverage = (f"{group[0][0]}-{group[0][1]}", group[1]) if group else (key, 1.0)
+            current_weights[weight_key] = (
+                current_weights.get(weight_key, 0.0) + pos["value_krw"] * leverage / total_value * 100.0
+            )
 
     recommendations: list[dict] = []
 

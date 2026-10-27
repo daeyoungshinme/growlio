@@ -125,6 +125,42 @@ class TestBuildTradeRecommendations:
         recs = _build_trade_recommendations({}, items, {}, [], [])
         assert len(recs) <= 10
 
+    @staticmethod
+    def _sp500_group(weight: float):
+        """S&P500 그룹 — 대표 VOO, 멤버 SPY, 레버리지 멤버 SSO(2배)."""
+        return SimpleNamespace(
+            ticker="VOO",
+            market="NYSE",
+            name="S&P500",
+            weight=weight,
+            group_key="SP500",
+            members=[
+                SimpleNamespace(ticker="SPY", market="NYSE", role="MEMBER", leverage=1.0),
+                SimpleNamespace(ticker="SSO", market="NYSE", role="MEMBER", leverage=2.0),
+            ],
+        )
+
+    def test_index_group_member_holdings_count_toward_group(self):
+        """plans/77 B2 — 멤버 SPY 보유분은 그룹(VOO) 비중으로 합산한다. 예전엔 SPY "전량 매도"·VOO "비중 확대"."""
+        current = {
+            "VOO-NYSE": {"ticker": "VOO", "market": "NYSE", "name": "VOO", "value_krw": 2_000_000.0},
+            "SPY-NYSE": {"ticker": "SPY", "market": "NYSE", "name": "SPY", "value_krw": 3_000_000.0},
+            "AAPL-NASDAQ": {"ticker": "AAPL", "market": "NASDAQ", "name": "애플", "value_krw": 5_000_000.0},
+        }
+        items = [self._sp500_group(50.0), self._make_item("AAPL", "NASDAQ", "애플", 50.0)]
+        assert _build_trade_recommendations(current, items, {}, [], []) == []
+
+    def test_leveraged_member_counts_exposure(self):
+        """레버리지 멤버(SSO 2배)는 리밸런싱 분석과 같이 평가액×배수로 그룹 노출에 더한다."""
+        current = {
+            "SSO-NYSE": {"ticker": "SSO", "market": "NYSE", "name": "SSO", "value_krw": 2_500_000.0},
+            "AAPL-NASDAQ": {"ticker": "AAPL", "market": "NASDAQ", "name": "애플", "value_krw": 7_500_000.0},
+        }
+        items = [self._sp500_group(50.0), self._make_item("AAPL", "NASDAQ", "애플", 50.0)]
+        recs = _build_trade_recommendations(current, items, {}, [], [])
+        # SSO 25% × 2 = 그룹 노출 50% → 그룹은 목표대로, AAPL만 75% → 50% 축소
+        assert [(r["ticker"], r["action"]) for r in recs] == [("AAPL", "비중 축소")]
+
 
 class TestDriftThreshold:
     def test_small_target_weight_uses_floor(self):
