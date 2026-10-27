@@ -12,6 +12,7 @@ import uuid
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import is_non_tradable
 from app.models.portfolio import Portfolio
 from app.services.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key
@@ -44,7 +45,7 @@ async def collect_dividend_map(
     async def _fetch_one(raw_item) -> None:
         ticker = str(_item_attr(raw_item, "ticker"))
         market = str(_item_attr(raw_item, "market"))
-        if ticker == "CASH" or market == "KR_PROPERTY":
+        if is_non_tradable(ticker, market):
             return
         key = (ticker, market)
         if key in dividend_map:
@@ -93,7 +94,7 @@ async def enrich_overview_with_prices(
     }
     names = _target_names(portfolio)
     unpriced: list[tuple[str, str]] = [
-        key for key in names if key[0] != "CASH" and key[1] != "KR_PROPERTY" and key not in existing_price_keys
+        key for key in names if not is_non_tradable(*key) and key not in existing_price_keys
     ]
     if not unpriced:
         return overview

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
+from app.constants import is_non_tradable
 from app.core.cache_store import get_cache_store
 from app.core.logging import public_error_message
 from app.limiter import limiter
@@ -112,7 +113,7 @@ async def analyze_portfolio(
     target_tickers = [
         (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
         for raw_item in portfolio.items
-        if str(_item_attr(raw_item, "ticker")) != "CASH" and str(_item_attr(raw_item, "market")) != "KR_PROPERTY"
+        if not is_non_tradable(str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
     ]
     current_tickers = [
         (p["ticker"], p["market"])
@@ -278,7 +279,7 @@ async def get_portfolio_expected_metrics_endpoint(
             float(_item_attr(i, "weight")),
         )
         for i in portfolio.items
-        if str(_item_attr(i, "ticker")) not in ("CASH",) and str(_item_attr(i, "market")) != "KR_PROPERTY"
+        if not is_non_tradable(str(_item_attr(i, "ticker")), str(_item_attr(i, "market")))
     ]
 
     settings_row = await get_settings_row(db, current_user.id)

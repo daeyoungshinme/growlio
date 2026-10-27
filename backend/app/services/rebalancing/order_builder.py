@@ -13,7 +13,7 @@ from typing import Any, Literal
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import CASH_EQUIVALENT_TICKER, TAX_DEFERRED_TAX_TYPES
+from app.constants import TAX_DEFERRED_TAX_TYPES, is_non_tradable
 from app.services.rebalancing._order_quantity_guard import floor_shares
 from app.services.rebalancing.group_expansion import expand_group_items, is_group_item
 from app.services.rebalancing.service import filter_drifting_items  # noqa: F401 — 이탈 판정 단일 기준 재노출
@@ -24,8 +24,6 @@ logger = structlog.get_logger()
 ORDER_EXECUTABLE_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
 """주문 실행 게이트 — 토스는 주문 API 미구현이라 제외.
 읽기·진단 경로의 `_account_queries._BROKER_ASSET_TYPES`(토스 포함)와 의도적으로 다르다."""
-_NON_TRADABLE_TICKERS = ("CASH", "REAL_ESTATE", CASH_EQUIVALENT_TICKER)
-"""실제 주문을 낼 수 없는 합성 포트폴리오 항목 티커 — 가격 조회·주문 생성 양쪽에서 제외."""
 
 
 def _build_sell_orders(
@@ -111,7 +109,7 @@ async def refresh_live_prices(
 
     # 지수 그룹 행은 수량이 없다(멤버 행이 매매 단위) — 호출부가 expand_group_items로 먼저 펼친다
     items = [item for item in items if not is_group_item(item)]
-    tickers = [(item.ticker, item.market) for item in items if item.ticker not in _NON_TRADABLE_TICKERS]
+    tickers = [(item.ticker, item.market) for item in items if not is_non_tradable(item.ticker, item.market)]
     if not tickers:
         return
 
@@ -125,7 +123,7 @@ async def refresh_live_prices(
         price = price_map.get(item.ticker)
         if price and price > 0:
             item.current_price_krw = float(price)
-            if item.ticker not in _NON_TRADABLE_TICKERS:
+            if not is_non_tradable(item.ticker, item.market):
                 current_qty = item.current_qty or 0
                 target_qty = floor_shares(item.target_value_krw / price)
                 item.shares_to_trade = target_qty - current_qty
@@ -301,7 +299,7 @@ def build_rebalancing_orders(
     drifting = expand_group_items(drifting, account_tax_type_map.get(buy_account_id, "GENERAL"))
     orders: list[ExecutionOrderItem] = []
     for item in drifting:
-        if item.ticker in _NON_TRADABLE_TICKERS or item.shares_to_trade is None:
+        if is_non_tradable(item.ticker, item.market) or item.shares_to_trade is None:
             logger.info(
                 "rebalancing_auto_item_skipped",
                 alert_id=alert_id,

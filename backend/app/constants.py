@@ -34,6 +34,18 @@ CASH_EQUIVALENT_MARKET: str = "CASH"
 """실제 시세 없는 현금성 자산 합성 sentinel. 목표 역산 추천(goal_recommendation_service)과
 포트폴리오 목표 항목(rebalancing/service.py) 양쪽에서 동일 문자열을 공유해야 하므로 여기서 단일 정의."""
 
+NON_TRADABLE_TICKERS: frozenset[str] = frozenset({"CASH", "REAL_ESTATE", CASH_EQUIVALENT_TICKER})
+NON_TRADABLE_MARKETS: frozenset[str] = frozenset({"KR_PROPERTY", CASH_EQUIVALENT_MARKET})
+
+
+def is_non_tradable(ticker: str | None, market: str | None) -> bool:
+    """시세·주문이 없는 합성 항목(예수금·현금성 자산·부동산)인지 — 가격 조회·배당·수익률·주문 대상에서 뺀다.
+
+    곳곳에 따로 적혀 있던 규칙(일부는 CASH_EQUIVALENT 누락)을 단일화했다(plans/78 A1).
+    """
+    return (ticker or "") in NON_TRADABLE_TICKERS or (market or "").upper() in NON_TRADABLE_MARKETS
+
+
 CASH_EQUIVALENT_ACCOUNT_TYPES: frozenset[str] = frozenset({"BANK_ACCOUNT", "DEPOSIT"})
 """CASH_EQUIVALENT 포트폴리오 항목의 현재가치를 집계할 때 합산 대상이 되는 계좌 asset_type
 (CMA·파킹통장·예적금 등 은행성 계좌). CASH_OTHER는 제외 — 개별 종목(Position)을 보유할 수 있는

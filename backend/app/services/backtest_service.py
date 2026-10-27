@@ -20,7 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.constants import CASH_EQUIVALENT_TICKER, POSITION_STOCK_ASSET_TYPES
+from app.constants import POSITION_STOCK_ASSET_TYPES, is_non_tradable
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.models.portfolio import Portfolio
 from app.schemas.backtest import (
@@ -36,8 +36,6 @@ from app.utils.circuit_breaker import yahoo_circuit
 
 logger = structlog.get_logger()
 
-_BACKTEST_SKIP_TICKERS = {"CASH", "REAL_ESTATE", CASH_EQUIVALENT_TICKER}
-_BACKTEST_SKIP_MARKETS = {"KR_PROPERTY"}
 
 # 테스트 backward-compatibility 별칭
 _compute_metrics = compute_metrics
@@ -167,7 +165,7 @@ async def _get_real_portfolio_holdings(
         market = p.market
         if not ticker or not market:
             continue
-        if ticker in _BACKTEST_SKIP_TICKERS or market in _BACKTEST_SKIP_MARKETS:
+        if is_non_tradable(ticker, market):
             continue
         value_krw = float(p.value_krw or 0) or (float(p.current_price or 0) * float(p.qty or 0))
         if value_krw and value_krw > 0:
@@ -199,7 +197,7 @@ async def _download_price_data(
     all_symbols: list[str] = []
     for p in portfolios:
         for h in p.items:
-            if h.ticker in _BACKTEST_SKIP_TICKERS or h.market in _BACKTEST_SKIP_MARKETS:
+            if is_non_tradable(h.ticker, h.market):
                 continue
             sym = _to_yf_symbol(h.ticker, h.market)
             if sym not in all_symbols:
@@ -257,7 +255,7 @@ def _compute_performance_metrics(
         investable = [
             {"ticker": h.ticker, "market": h.market, "weight": float(h.weight), "name": h.name}
             for h in p.items
-            if h.ticker not in _BACKTEST_SKIP_TICKERS and h.market not in _BACKTEST_SKIP_MARKETS
+            if not is_non_tradable(h.ticker, h.market)
         ]
         s, m = compute_portfolio_series(p.name, investable, price_data, dates)
         all_series.append(s)

@@ -754,6 +754,7 @@ class TestPortfolioExpectedMetricsEndpoint:
                 SimpleNamespace(ticker="SPY", market="NYSE", name="SPDR S&P 500", weight=70.0),
                 SimpleNamespace(ticker="CASH", market="KRW", name="현금", weight=20.0),
                 SimpleNamespace(ticker="MY_HOUSE", market="KR_PROPERTY", name="자가", weight=10.0),
+                SimpleNamespace(ticker="CASH_EQUIVALENT", market="CASH", name="현금성 자산", weight=5.0),
             ],
         )
         db.scalar = AsyncMock(return_value=portfolio)

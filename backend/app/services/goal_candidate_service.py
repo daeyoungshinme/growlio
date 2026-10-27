@@ -13,7 +13,13 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, MAX_GOAL_CANDIDATE_TICKERS, PENSION_TAX_TYPES
+from app.constants import (
+    CASH_EQUIVALENT_MARKET,
+    DOMESTIC_MARKETS,
+    MAX_GOAL_CANDIDATE_TICKERS,
+    PENSION_TAX_TYPES,
+    is_non_tradable,
+)
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
 from app.services.dividend.constants import is_korean_etf
@@ -268,7 +274,7 @@ def existing_items_from_positions(pos_map: dict[str, dict]) -> list[tuple[str, s
     return [
         (p["ticker"], p.get("name") or p["ticker"], p["market"])
         for p in pos_map.values()
-        if p["ticker"] != "CASH" and p["market"] != "KR_PROPERTY"
+        if not is_non_tradable(p["ticker"], p["market"])
     ]
 
 
