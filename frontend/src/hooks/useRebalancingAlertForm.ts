@@ -14,7 +14,6 @@ import {
   type TriggerCondition,
 } from "@/api/alerts";
 import { fetchAccounts, type AccountTaxType, type InvestmentHorizon } from "@/api/assets";
-import { fetchMarketSignal } from "@/api/marketSignals";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidateRebalancingAlertData } from "@/utils/queryInvalidation";
@@ -22,6 +21,7 @@ import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import { recommendDriftThresholdPct } from "@/utils/rebalancingThresholdRecommendation";
 import { isOrderExecutableAccount } from "@/utils/accounts";
+import { marketSignalQuery } from "@/api/queryOptions";
 
 const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
@@ -57,11 +57,7 @@ export function useRebalancingAlertQueries({
     queryFn: fetchAccounts,
   });
 
-  const { data: marketSignal } = useQuery({
-    queryKey: QUERY_KEYS.marketSignal,
-    queryFn: fetchMarketSignal,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: marketSignal } = useQuery(marketSignalQuery);
 
   const brokerAccounts = accounts.filter(
     (a) => isOrderExecutableAccount(a.asset_type) && a.is_active,

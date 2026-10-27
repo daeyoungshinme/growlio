@@ -1,21 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Anchor, X } from "lucide-react";
-import { fetchPortfolios } from "@/api/portfolios";
-import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { portfoliosQuery } from "@/api/queryOptions";
 
 export default function SetupTargetPortfolioBanner() {
   const [dismissed, , setDismissed] = useCollapsible(
     false,
     "growlio:dashboard:target-portfolio-banner-dismissed",
   );
-  const { data: portfolios } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-  });
+  const { data: portfolios } = useQuery(portfoliosQuery);
 
   if (dismissed || !portfolios || portfolios.length > 0) return null;
 

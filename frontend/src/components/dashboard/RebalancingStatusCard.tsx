@@ -3,11 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, TriangleAlert, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
 
-import { fetchDriftSummary } from "@/api/rebalancing";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
-import { fetchPortfolios } from "@/api/portfolios";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { useInsights } from "@/hooks/useInsights";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import type { Insight, InsightType, InsightSeverity } from "@/api/insights";
@@ -18,6 +14,7 @@ import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { MARKET_SIGNAL_BADGE_CLASS, MARKET_SIGNAL_LABEL } from "@/utils/marketSignalBadge";
+import { driftSummaryQuery, portfoliosQuery } from "@/api/queryOptions";
 
 const OTHER_INSIGHTS_VISIBLE_LIMIT = 3;
 
@@ -195,20 +192,12 @@ export default function RebalancingStatusCard({
     isLoading: portfoliosLoading,
     isError: portfoliosError,
     refetch: refetchPortfolios,
-  } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  } = useQuery(portfoliosQuery);
   const portfolioCount = Array.isArray(portfoliosRaw) ? portfoliosRaw.length : 0;
 
   // /drift-summary는 백엔드에서 자체적으로 포트폴리오 목록을 조회하므로(빈 목록이면 [] 반환),
   // 프론트의 portfolios 쿼리 완료를 기다릴 필요 없이 독립적으로 즉시 발화한다.
-  const { data: driftSummaries } = useQuery({
-    queryKey: QUERY_KEYS.driftSummary,
-    queryFn: fetchDriftSummary,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: driftSummaries } = useQuery(driftSummaryQuery);
 
   const { data: allInsights } = useInsights();
   const diagInsights = useMemo(() => {

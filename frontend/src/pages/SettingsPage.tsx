@@ -16,9 +16,8 @@ import {
 import { Link } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteDartApiKey, fetchSettings, saveDartApiKey } from "@/api/settings";
+import { deleteDartApiKey, saveDartApiKey } from "@/api/settings";
 import { fetchAccounts } from "@/api/assets";
-import { fetchCompositeSignalStatus } from "@/api/rebalancing";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import {
@@ -43,6 +42,7 @@ import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { compositeSignalStatusQuery, settingsQuery } from "@/api/queryOptions";
 
 const RISK_TOLERANCE_LABELS: Record<string, string> = {
   CONSERVATIVE: "보수적",
@@ -96,11 +96,7 @@ export default function SettingsPage() {
   const [confirmingDartDelete, setConfirmingDartDelete] = useState(false);
   const authEmail = useAuthStore((s) => s.email);
 
-  const { data: current } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: current } = useQuery(settingsQuery);
 
   const invalidateSettings = () => invalidateSettingsData(qc);
 
@@ -174,11 +170,7 @@ export default function SettingsPage() {
     ? countEnabled(INSTANT_ALERT_FIELDS.map((field) => Boolean(current[field])))
     : 0;
   // 시장 모니터링 알림 2종도 요약에 포함 — 누락 시 켜둔 사용자에게도 "꺼짐"처럼 보였음
-  const { data: compositeSignalStatus } = useQuery({
-    queryKey: QUERY_KEYS.compositeSignalStatus,
-    queryFn: fetchCompositeSignalStatus,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: compositeSignalStatus } = useQuery(compositeSignalStatusQuery);
   const marketAlertsEnabledCount = current
     ? countEnabled([
         Boolean(compositeSignalStatus?.enabled),

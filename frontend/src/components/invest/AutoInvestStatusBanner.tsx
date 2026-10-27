@@ -1,10 +1,8 @@
 import { ArrowRight, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchPortfolios } from "@/api/portfolios";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import { fetchAccounts } from "@/api/assets";
-import { fetchSettings } from "@/api/settings";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { fmtKrw } from "@/utils/format";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -18,16 +16,13 @@ import {
 } from "@/utils/dcaAutoBuy";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { portfoliosQuery, settingsQuery } from "@/api/queryOptions";
 
 /** "정기 적립식 자동매수"(리밸런싱 AUTO의 SCHEDULE_ONLY+BUY_ONLY 프리셋) 설정 여부를 한 줄로
  * 보여주고, /rebalancing 실행 화면으로 딥링크한다. 적립 계획 탭에서 이 기능의 존재를 알리는
  * 진입점 — 실제 설정 UI는 RebalancingAlertModal의 "빠른 설정"에 있다. */
 export default function AutoInvestStatusBanner() {
-  const { data: portfolios } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: portfolios } = useQuery(portfoliosQuery);
   const { data: alerts } = useQuery({
     queryKey: QUERY_KEYS.rebalancingAlerts,
     queryFn: fetchRebalancingAlerts,
@@ -38,11 +33,7 @@ export default function AutoInvestStatusBanner() {
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
   });
-  const { data: settings } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: settings } = useQuery(settingsQuery);
   const usdRate = useExchangeRate();
 
   if (!portfolios || portfolios.length === 0) return null;

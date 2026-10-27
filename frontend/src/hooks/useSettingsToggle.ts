@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { fetchSettings, type SettingsData } from "@/api/settings";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import { type SettingsData } from "@/api/settings";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
+import { settingsQuery } from "@/api/queryOptions";
 
 type BooleanSettingsField = {
   [K in keyof SettingsData]: SettingsData[K] extends boolean ? K : never;
@@ -27,11 +26,7 @@ export function useSettingsToggle({
   invalidate = invalidateSettingsData,
 }: UseSettingsToggleOptions) {
   const qc = useQueryClient();
-  const { data: settings } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: settings } = useQuery(settingsQuery);
 
   const toggleMut = useMutation({
     mutationFn,

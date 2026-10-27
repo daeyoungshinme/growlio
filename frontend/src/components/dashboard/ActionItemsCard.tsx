@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, ChevronDown, ChevronRight, ListChecks, RotateCw } from "lucide-react";
 import { fetchActionItems, REBALANCE_GROUP_ID, type ActionItem } from "@/api/dashboard";
-import { fetchDriftSummary } from "@/api/rebalancing";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -13,6 +12,7 @@ import { ACTION_PRIORITY_STYLE, deadlineLabel } from "@/utils/actionPriority";
 import { MARKET_SIGNAL_BADGE_CLASS, MARKET_SIGNAL_LABEL } from "@/utils/marketSignalBadge";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { driftSummaryQuery } from "@/api/queryOptions";
 
 const VISIBLE_LIMIT = 3;
 
@@ -20,11 +20,7 @@ type MarketSignal = MarketSignalResponse | null | undefined;
 
 // 리밸런싱 탭과 같은 queryKey — 캐시 공유. 묶음 행이 있을 때만 조회한다
 function useDriftSummaries() {
-  return useQuery({
-    queryKey: QUERY_KEYS.driftSummary,
-    queryFn: fetchDriftSummary,
-    staleTime: STALE_TIME.MEDIUM,
-  }).data;
+  return useQuery(driftSummaryQuery).data;
 }
 
 /** 리밸런싱 행 제목 옆 시장 신호 — 이탈을 지금 처리할지 판단할 때 함께 보는 정보라 리밸런싱 행에만 둔다(docs/plans/73) */

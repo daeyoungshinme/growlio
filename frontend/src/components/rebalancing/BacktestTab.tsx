@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { BacktestResult, runBacktest } from "@/api/backtest";
-import { fetchPortfolios } from "@/api/portfolios";
 import BacktestResultChart from "@/components/backtest/BacktestResultChart";
 import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -9,7 +8,7 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { BACKTEST_DEFAULT_END_DATE } from "@/constants/defaults";
 import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
-import { QUERY_KEYS } from "@/constants/queryKeys";
+import { portfoliosQuery } from "@/api/queryOptions";
 
 interface Props {
   /** 처음 체크해 둘 포트폴리오 — 분석 패널에서 열면 지금 보는 포트폴리오(plans/64 S3) */
@@ -17,10 +16,7 @@ interface Props {
 }
 
 export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
-  const { data: portfoliosRaw, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-  });
+  const { data: portfoliosRaw, isLoading } = useQuery(portfoliosQuery);
   const portfolios = useMemo(
     () => (Array.isArray(portfoliosRaw) ? portfoliosRaw : []),
     [portfoliosRaw],

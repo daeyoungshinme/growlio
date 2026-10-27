@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchPortfolios } from "@/api/portfolios";
 import { fetchAccounts } from "@/api/assets";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import { AnalysisPanel } from "./AnalysisPanel";
@@ -10,6 +9,7 @@ import EmptyState from "@/components/common/EmptyState";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { mergeAlertsByPortfolio } from "@/utils/portfolio";
+import { portfoliosQuery } from "@/api/queryOptions";
 
 interface Props {
   /** 분석 대상 — 페이지가 URL 선택값 또는 기본 포트폴리오(useSelectedPortfolio)로 정해 넘긴다 */
@@ -40,10 +40,7 @@ export default function PortfolioExecutionTab({ portfolioId, scrollToResult }: P
     isLoading: portfoliosLoading,
     isError: portfoliosError,
     refetch: refetchPortfolios,
-  } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-  });
+  } = useQuery(portfoliosQuery);
   const portfolios = useMemo(
     () => (Array.isArray(portfoliosRaw) ? portfoliosRaw : []),
     [portfoliosRaw],

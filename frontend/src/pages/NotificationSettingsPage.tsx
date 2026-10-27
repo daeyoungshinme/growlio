@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Bell, Mail, Activity } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchSettings } from "@/api/settings";
 import { fetchAlertHistory, type AlertHistoryItem } from "@/api/alerts";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -27,6 +26,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { settingsQuery } from "@/api/queryOptions";
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -186,11 +186,7 @@ export default function NotificationSettingsPage() {
     challengeRemindersEnabled,
   ]);
 
-  const { data: current } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: current } = useQuery(settingsQuery);
 
   const invalidateSettings = () => invalidateSettingsData(qc);
 

@@ -604,6 +604,7 @@ _기타_
 - `STALE_TIME.NONE` (0, 열 때마다 최신), `STALE_TIME.VERY_SHORT` (15s), `STALE_TIME.SHORT` (30s, 기본값), `STALE_TIME.MEDIUM` (60s), `STALE_TIME.FIVE_MINUTES`·`STALE_TIME.EXCHANGE_RATE` (5m), `STALE_TIME.LONG` (1h), `STALE_TIME.DAY` (24h — 영속 캐시 maxAge와 같음, 무거운 계산 결과의 `gcTime`용: 목표 역산 전체 추천)
 - `REFETCH_INTERVAL.DASHBOARD` (5분), `REFETCH_INTERVAL.PORTFOLIO` (5분)
 - staleTime/refetchInterval 매직 넘버 직접 작성 금지. 상수 import해 사용.
+- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status)는 `src/api/queryOptions.ts`의 공용 정의를 쓴다 — `useQuery(portfoliosQuery)`, 조건부면 `useQuery({ ...portfoliosQuery, enabled })`, 프리페치도 그대로. 화면마다 queryFn·staleTime을 다시 적지 말 것(plans/78 B2: 포트폴리오 13곳 중 6곳이 staleTime 누락). 새 공용 쿼리도 여기에 추가.
 
 ---
 

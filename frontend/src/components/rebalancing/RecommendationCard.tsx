@@ -7,8 +7,7 @@ import {
   fetchOverallGoalRecommendation,
   type GoalRecommendationItem,
 } from "@/api/rebalancing";
-import { fetchSettings } from "@/api/settings";
-import { fetchPortfolios, updatePortfolio, type PortfolioItem } from "@/api/portfolios";
+import { updatePortfolio, type PortfolioItem } from "@/api/portfolios";
 import {
   ACCOUNT_TAX_TYPE_LABELS,
   fetchAccounts,
@@ -44,6 +43,7 @@ import {
   type OverallTargetSelection,
   type RecommendationTabActions,
 } from "@/components/rebalancing/recommendationCardModel";
+import { portfoliosQuery, settingsQuery } from "@/api/queryOptions";
 
 /** 적용 확인창 안내 — 자동 실행이 켜진 포트폴리오면 다음 자동 실행이 새 목표로 주문함을 알린다(plans/63 P4-4) */
 function AutoExecutionNotice({ portfolioId }: { portfolioId: string }) {
@@ -134,10 +134,7 @@ export default function RecommendationCard({
     enabled: activeTab === "연령대",
   });
 
-  const { data: portfoliosRaw } = useQuery({
-    queryKey: QUERY_KEYS.portfolios,
-    queryFn: fetchPortfolios,
-  });
+  const { data: portfoliosRaw } = useQuery(portfoliosQuery);
   const portfolios = portfoliosRaw ?? [];
 
   const { data: accountsRaw } = useQuery({
@@ -151,11 +148,7 @@ export default function RecommendationCard({
     (a) => a.is_active && isBankAccount(a.asset_type),
   );
 
-  const { data: settingsData } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: fetchSettings,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: settingsData } = useQuery(settingsQuery);
   const candidateCount = settingsData?.goal_candidate_tickers?.length ?? 0;
 
   const horizonRecommendations = horizonData?.recommendations ?? [];
