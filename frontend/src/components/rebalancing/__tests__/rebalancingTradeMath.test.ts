@@ -3,7 +3,9 @@ import {
   calcTradeKrw,
   calcSignedTradeKrw,
   calcTradeSummary,
+  estimateLimitKrw,
   isTradableItem,
+  limitPriceKrw,
 } from "../rebalancingTradeMath";
 import type { RebalancingItem } from "@/api/rebalancing";
 
@@ -120,5 +122,17 @@ describe("calcTradeSummary", () => {
     const { totalBuySummary, totalSellSummary } = calcTradeSummary(items);
     expect(totalBuySummary).toBe(10 * 70000);
     expect(totalSellSummary).toBe(5 * 100000);
+  });
+});
+
+describe("estimateLimitKrw", () => {
+  it("해외는 USD 지정가 × 환율 × 수량", () => {
+    expect(estimateLimitKrw(100, 3, "NASDAQ", 1400)).toBe(420_000);
+    expect(limitPriceKrw(100, "NASDAQ", 1400)).toBe(140_000);
+  });
+
+  it("국내 또는 환율 미로딩이면 입력값 × 수량", () => {
+    expect(estimateLimitKrw(70_000, 2, "KOSPI", 1400)).toBe(140_000);
+    expect(estimateLimitKrw(100, 3, "NASDAQ", null)).toBe(300);
   });
 });

@@ -3,6 +3,7 @@ import type { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { SideBadge } from "./RebalancingBadges";
 import { isOverseasMarket } from "@/constants/markets";
+import { limitPriceKrw } from "./rebalancingTradeMath";
 import type { ExecutionAction, OrderType, PriceLoadState } from "@/hooks/useRebalancingExecution";
 import { PriceCell } from "./RebalancingPriceCell";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
@@ -179,13 +180,8 @@ export function RebalancingMobileCard({
           </div>
           {nativeLimitPrice > 0 && (
             <p className="text-xs text-gray-500 dark:text-gray-600 mt-0.5 text-right">
-              ≈{" "}
-              {fmtKrw(
-                overseas && globalUsdRate != null
-                  ? nativeLimitPrice * globalUsdRate
-                  : nativeLimitPrice,
-              )}{" "}
-              × {qty}주 = {fmtKrw(estKrw)}
+              ≈ {fmtKrw(limitPriceKrw(nativeLimitPrice, item.market, globalUsdRate))} × {qty}주 ={" "}
+              {fmtKrw(estKrw)}
             </p>
           )}
         </div>
