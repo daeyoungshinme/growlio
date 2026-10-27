@@ -109,6 +109,8 @@ export const QUERY_KEYS = {
   tacticalStatus: (portfolioId: string) => ["tactical-status", portfolioId] as const,
   /** 무효화 프리픽스 전용 */
   tacticalStatusBase: ["tactical-status"] as const,
+  /** 전술 배분을 켠 포트폴리오 목록 — tacticalStatusBase 하위라 켜기·끄기 무효화를 공유 */
+  tacticalStrategies: ["tactical-status", "list"] as const,
   /** 전술 배분 규칙 백테스트(포트폴리오별 비중표 × 기간) */
   tacticalBacktest: (portfolioId: string, years: number) =>
     ["tactical-backtest", portfolioId, years] as const,

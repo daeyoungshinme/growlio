@@ -81,8 +81,6 @@ interface Props {
   selectedPortfolioId?: string;
   /** 적용 대상 변경 시 호출 — 부모가 URL에 반영해 다른 탭과 선택을 공유한다(plans/63 P3-3) */
   onSelectPortfolio?: (portfolioId: string) => void;
-  /** false면 적용 섹션의 포트폴리오 select를 숨긴다 — 목표 조정 탭이 상단 공용 선택기를 그릴 때(plans/64 S2) */
-  showTargetPicker?: boolean;
 }
 
 /** 목표 역산 추천("전체")과 투자기간별 추천("단기"/"중기"/"장기")을 하나의 탭 카드로 합쳐 보여준다.
@@ -97,7 +95,6 @@ export default function RecommendationCard({
   onOptionsClosed,
   selectedPortfolioId,
   onSelectPortfolio,
-  showTargetPicker = true,
 }: Props) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ActiveTab>("전체");
@@ -291,12 +288,8 @@ export default function RecommendationCard({
     onCreatePortfolio,
   };
   const overallSelection: OverallTargetSelection = {
-    // 상단 공용 선택기가 있으면 고른 포트폴리오 하나만 대상으로 — 적용 버튼이 "○○에 적용"으로 바로 보인다
-    targetPortfolios: showTargetPicker
-      ? targetPortfolios
-      : overallConfirmTarget
-        ? [overallConfirmTarget]
-        : [],
+    // 추천 비중은 포트폴리오와 무관 — 대상은 적용 영역의 select에서만 고른다(목표 조정 탭에 상단 선택기 없음)
+    targetPortfolios,
     selectedTargetId: effectiveOverallTargetId,
     onSelectTarget: selectOverallTarget,
     anchoredTargetIds: anchoredPortfolioIds,

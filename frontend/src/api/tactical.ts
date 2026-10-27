@@ -146,6 +146,15 @@ export interface TacticalBacktestResult {
   assumptions: string;
 }
 
+/** 전술 배분을 켠 포트폴리오 — 백엔드 GET /tactical(저장 상태만, 시세 조회 없음) */
+export interface TacticalStrategySummary {
+  portfolio_id: string;
+  confirmed_regime: TacticalRegime | null;
+  notify_enabled: boolean;
+}
+
+export const fetchTacticalStrategies = () => apiGet<TacticalStrategySummary[]>("/tactical");
+
 export const fetchTacticalStatus = (portfolioId: string) =>
   apiGet<TacticalStatus>(`/tactical/${portfolioId}`);
 
