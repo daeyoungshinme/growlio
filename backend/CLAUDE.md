@@ -150,7 +150,7 @@ API Request
         ├── economic_indicators.py  # 미국 CPI/Core CPI 요약(GET /economic-indicators/inflation-summary) — 프론트 진단탭 MarketSignalBanner(InflationIndicatorList) 전용. 이 엔드포인트만 존재
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
         ├── market_signals.py       # VIX·미국 금리 커브·하이일드 스프레드 등 복합 신호 (/market-signals)
-        ├── tactical.py             # 나스닥100/S&P500 전술 배분(/tactical/{portfolio_id}) — GET 국면·차트지표·제안비중(조회 시에도 국면 확정 진행), PUT 켜기/설정, DELETE 끄기, POST /apply(제안 비중을 포트폴리오 목표로 저장 — **주문 없음**, 실행은 기존 리밸런싱 화면. 본문 `{fraction}` <1이면 현재 목표에서 제안 쪽으로 그만큼만 보간하는 분할 적용 — 전술 자산만 있는 포트폴리오만, `applied_regime` 대신 `partial_regime`/`partial_applied_on` 기록, 같은 국면 두 번째 분할은 400(나머지는 fraction=1)), GET /backtest(규칙 백테스트)
+        ├── tactical.py             # 나스닥100/S&P500 전술 배분(/tactical/{portfolio_id}) — GET /tactical/market(포트폴리오 무관 시장 입력 `{macro_level, macro_freshness, technicals}` — 진단 탭 "시장 상황" 카드의 차트 추세용, 국면은 전략별이라 미포함. `/{portfolio_id}`보다 먼저 선언, plans/82), GET 국면·차트지표·제안비중(조회 시에도 국면 확정 진행), PUT 켜기/설정, DELETE 끄기, POST /apply(제안 비중을 포트폴리오 목표로 저장 — **주문 없음**, 실행은 기존 리밸런싱 화면. 본문 `{fraction}` <1이면 현재 목표에서 제안 쪽으로 그만큼만 보간하는 분할 적용 — 전술 자산만 있는 포트폴리오만, `applied_regime` 대신 `partial_regime`/`partial_applied_on` 기록, 같은 국면 두 번째 분할은 400(나머지는 fraction=1)), GET /backtest(규칙 백테스트)
         ├── positions.py            # 포지션 CRUD + 현재가 sync (assets.py 하위, /assets/{id}/positions)
         ├── exchange_rate_alerts.py # 환율 알림 CRUD (alerts.py 하위, /alerts/exchange-rate)
         ├── rebalancing_alerts.py   # 리밸런싱 드리프트 알림 (alerts.py 하위, /alerts/rebalancing)
