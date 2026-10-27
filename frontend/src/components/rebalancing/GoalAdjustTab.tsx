@@ -45,8 +45,14 @@ export default function GoalAdjustTab({
   initialRecOptionsOpen,
   onRecOptionsClosed,
 }: Props) {
-  // 추천·전술이 같은 대상 포트폴리오를 보도록 선택기는 여기 하나만 둔다(plans/64 S2)
-  const { portfolios, anchoredIds, selectedId } = useSelectedPortfolio(selectedPortfolioId);
+  // 추천·전술이 같은 선택(URL portfolioId)을 공유한다. 상단 선택기는 전술만 — 추천 비중은 포트폴리오와
+  // 무관하게 계산되고 대상은 적용할 때만 의미가 있어, 추천 카드의 적용 영역에서 고른다.
+  // 직접 고르지 않았으면 전술 모드는 전술을 켠 포트폴리오를 먼저 고른다(plans/81)
+  const isTactical = mode === "전술";
+  const { portfolios, tacticalIds, selectedId, tacticalPending } = useSelectedPortfolio(
+    selectedPortfolioId,
+    { preferTactical: isTactical },
+  );
 
   // 반대쪽 모드 청크를 미리 받아 서브탭 전환 시 청크 대기가 없게 한다
   useEffect(() => {
@@ -61,7 +67,7 @@ export default function GoalAdjustTab({
       <Tabs tabs={GOAL_MODES} activeTab={mode} onChange={onModeChange} variant="underline" />
       <p className="text-xs text-gray-500 dark:text-gray-400 px-1">{MODE_INTRO[mode]}</p>
 
-      {portfolios.length > 0 && (
+      {isTactical && portfolios.length > 0 && (
         <label className="flex flex-col gap-1 px-1">
           <span className={LABEL_SM}>대상 포트폴리오</span>
           <select
@@ -71,15 +77,13 @@ export default function GoalAdjustTab({
           >
             {portfolios.map((p) => (
               <option key={p.id} value={p.id}>
-                {anchoredIds.includes(p.id) ? `${p.name} (기준)` : p.name}
+                {tacticalIds.includes(p.id) ? `${p.name} (전술 켜짐)` : p.name}
               </option>
             ))}
           </select>
-          {mode === "추천" && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              단기·중기·장기 추천은 계좌 투자기간이 맞는 포트폴리오에 적용돼요.
-            </span>
-          )}
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            시장 국면은 모든 포트폴리오에 같아요. 비중표 설정과 적용은 고른 포트폴리오에만 해당돼요.
+          </span>
         </label>
       )}
 
@@ -87,7 +91,9 @@ export default function GoalAdjustTab({
           이전 화면을 붙잡는다(탭 하이라이트까지 늦게 바뀜). 모드별 key로 새 경계를 만들어 즉시 fallback */}
       <ErrorBoundary variant="section" key={mode}>
         <Suspense fallback={<SkeletonCard />}>
-          {mode === "추천" ? (
+          {tacticalPending ? (
+            <SkeletonCard />
+          ) : mode === "추천" ? (
             <RecommendationCard
               onApplied={onGoToExecution}
               onCreatePortfolio={onCreatePortfolio}
@@ -95,7 +101,6 @@ export default function GoalAdjustTab({
               onOptionsClosed={onRecOptionsClosed}
               selectedPortfolioId={selectedId}
               onSelectPortfolio={onSelectPortfolio}
-              showTargetPicker={false}
             />
           ) : (
             <TacticalAllocationTab

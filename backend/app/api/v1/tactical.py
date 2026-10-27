@@ -53,6 +53,25 @@ async def _status(
     return await tactical.build_status(portfolio, strategy, market)
 
 
+@router.get("")
+@limiter.limit("30/minute")
+async def list_tactical_strategies(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """전술 배분을 켠 포트폴리오 목록 — 저장된 상태만 읽는다(시세 조회·국면 갱신 없음)."""
+    strategies = await tactical.list_strategies(current_user.id, db)
+    return [
+        {
+            "portfolio_id": str(s.portfolio_id),
+            "confirmed_regime": s.last_regime,
+            "notify_enabled": s.notify_enabled,
+        }
+        for s in strategies
+    ]
+
+
 @router.get("/market")
 @limiter.limit("30/minute")
 async def get_tactical_market(

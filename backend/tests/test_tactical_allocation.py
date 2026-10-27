@@ -678,6 +678,25 @@ def api_db():
 
 
 class TestTacticalApi:
+    def test_list_returns_own_strategies_without_market_lookup(self, api_db):
+        user = _user()
+        app = _setup(user, api_db)
+        strategy = _strategy(last_regime="RISK_OFF", notify_enabled=False)
+        lister = AsyncMock(return_value=[strategy])
+        evaluate = AsyncMock(return_value=_MARKET)
+        with (
+            patch.object(tactical, "list_strategies", lister),
+            patch.object(tactical, "evaluate_market", evaluate),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/tactical")
+        assert resp.status_code == 200
+        assert resp.json() == [
+            {"portfolio_id": str(strategy.portfolio_id), "confirmed_regime": "RISK_OFF", "notify_enabled": False}
+        ]
+        assert lister.await_args.args[0] == user.id
+        evaluate.assert_not_awaited()
+
     def test_market_returns_inputs_without_portfolio_lookup(self, api_db):
         app = _setup(_user(), api_db)
         market = {**_MARKET, "technicals": {"QQQ": {"trend": "UP", "close": 500.0}}}
