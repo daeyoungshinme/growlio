@@ -369,6 +369,14 @@ async def get_strategy(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSes
     return result.scalar_one_or_none()
 
 
+async def list_strategies(user_id: uuid.UUID, db: AsyncSession) -> list[TacticalStrategy]:
+    """사용자가 전술 배분을 켠 포트폴리오들의 전략 — 목표 조정 › 전술의 기본 선택·"(전술 켜짐)" 표시용."""
+    result = await db.execute(
+        select(TacticalStrategy).where(TacticalStrategy.user_id == user_id).order_by(TacticalStrategy.created_at)
+    )
+    return list(result.scalars().all())
+
+
 def tactical_asset_of(item: Any) -> str | None:
     """포트폴리오 항목이 어느 전술 자산인지 — 나스닥100·S&P500·다우 지수 그룹은 대표 종목과 무관하게 QQQ·SPY·DIA,
     그룹이 아닌 단독 항목은 ticker가 전술 자산일 때만. 그 외(다른 지수 그룹·개별 종목)는 None."""
