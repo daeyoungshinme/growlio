@@ -283,6 +283,7 @@ schemas/                      # Pydantic 요청/응답 스키마
   ├── trade.py                 # 수기 매매 기록 + 기간별 매수 현황 스키마 (trades.py 전용)
   ├── dashboard.py              # 대시보드 응답 스키마 (dashboard.py 전용)
   ├── action_items.py          # 홈 "지금 할 일" 카드 행(ActionItem) — action_items_service·dashboard.py
+  ├── tactical.py              # 전술 배분 요청: TacticalStrategyUpsert/TacticalApplyRequest (tactical.py 전용)
   ├── rebalancing/             # 리밸런싱 스키마 패키지 — `__init__.py`가 전체 재노출하므로 `from app.schemas.rebalancing import X`는 무변경
   │   ├── analysis.py          # 분석 결과: TickerAccountInfo/RebalancingItem/CurrentHolding/TaxImpactItem/DiagnosisContext/RebalancingAnalysis
   │   ├── execution.py         # 실행/실행이력: ExecutionOrderItem/ExecutionRequest/KisBalance*/OrderResult/ExecutionResult/RebalancingExecution*

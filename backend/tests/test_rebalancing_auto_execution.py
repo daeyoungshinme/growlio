@@ -57,6 +57,12 @@ def _make_alert(**kwargs) -> SimpleNamespace:
         "schedule_day_of_week": None,
         "schedule_day_of_month": None,
         "trigger_condition": "DRIFT_ONLY",
+        # 나머지 RebalancingAlert 컬럼 기본값 — 서비스가 getattr 기본값 없이 직접 읽는다(plans/79 A4)
+        "strategy": "BUY_ONLY",
+        "order_type": "MARKET",
+        "notify_time": "08:30",
+        "tax_impact_gate_mode": "DISABLED",
+        "max_tax_impact_krw": None,
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)

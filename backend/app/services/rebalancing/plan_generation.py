@@ -242,8 +242,8 @@ async def generate_pending_plan_for_alert(
     """
     from app.utils.market_hours import korean_market_close_datetime, us_market_close_datetime
 
-    strategy = cast(str, strategy_override or getattr(alert, "strategy", "BUY_ONLY"))
-    order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
+    strategy = strategy_override or alert.strategy
+    order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], alert.order_type)
     account_id = account_id_override or alert.account_id
 
     if orders is None:
@@ -269,7 +269,7 @@ async def generate_pending_plan_for_alert(
     buy_tokens: list[tuple[str, str]] = []
     sell_tokens: list[tuple[str, str]] = []
 
-    buy_wait_minutes = getattr(alert, "buy_wait_minutes", 10)
+    buy_wait_minutes = alert.buy_wait_minutes
     buy_deadline = now + timedelta(minutes=buy_wait_minutes)
     for mkt, group in (("KR", buy_kr), ("US", buy_us)):
         if not group:
@@ -350,7 +350,7 @@ async def build_pending_plan_for_alert(
     # SCHEDULE_ONLY("스케줄일에 무조건")는 임계값과 무관하게 목표 비중 대비 차이가 있는 종목을 전부
     # 대상으로 한다 — 정기 적립식 자동매수가 스케줄일에 쌓인 예수금을 목표 비중대로 매수하는 동작.
     # (호출 시점이 스케줄일인지는 AUTO 잡이 is_auto_schedule_day로 이미 걸렀다)
-    threshold = 0.0 if getattr(alert, "trigger_condition", None) == "SCHEDULE_ONLY" else float(alert.threshold_pct)
+    threshold = 0.0 if alert.trigger_condition == "SCHEDULE_ONLY" else float(alert.threshold_pct)
     drifting = filter_drifting_items(analysis.items, threshold)
 
     if not drifting:
@@ -367,8 +367,8 @@ async def build_pending_plan_for_alert(
     # 같은 객체를 참조하므로 여기서 갱신하면 아래 _build_tax_preview(analysis, ...)에도 반영된다.
     await refresh_live_prices(drifting, alert.user_id, db, cache)
 
-    tax_gate_mode = getattr(alert, "tax_impact_gate_mode", "DISABLED")
-    max_tax_impact_krw = getattr(alert, "max_tax_impact_krw", None)
+    tax_gate_mode = alert.tax_impact_gate_mode
+    max_tax_impact_krw = alert.max_tax_impact_krw
     if tax_gate_mode == "ENABLED" and max_tax_impact_krw is not None:
         from app.services.rebalancing.diagnosis_service import _build_tax_preview
 
@@ -395,8 +395,8 @@ async def build_pending_plan_for_alert(
             logger.info("rebalancing_plan_generation_lock_busy", alert_id=str(alert.id))
             return PlanGenerationInProgress()
 
-        strategy = cast(str, strategy_override or getattr(alert, "strategy", "BUY_ONLY"))
-        order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
+        strategy = strategy_override or alert.strategy
+        order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], alert.order_type)
         orders = _build_plan_orders(
             alert,
             drifting,

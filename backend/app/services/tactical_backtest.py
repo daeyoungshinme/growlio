@@ -289,17 +289,21 @@ def simulate(
 
 
 async def _fetch_fred_history(series_id: str, days: int) -> pd.Series:
-    from app.services.economic_indicator_service import _fred_get_observations, _parse_fred_obs
+    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
     from app.utils.circuit_breaker import fred_circuit
     from app.utils.kst import today_kst
 
+    # 서킷이 열려 있으면 바로 빈 시리즈 — 호출부는 예외와 같게 매크로 없이 계산하고 안내 문구를 붙인다
+    if not fred_circuit.is_available():
+        logger.warning("fred_circuit_open", signal=f"tactical_backtest_{series_id}")
+        return pd.Series(dtype=float)
     raw = await fred_circuit.call(
-        _fred_get_observations,
+        fred_get_observations,
         series_id,
         limit=days + 30,  # 일별 시리즈 — 달력일 수 이상이면 기간 전체를 덮는다
         observation_start=today_kst() - timedelta(days=days),
     )
-    points = _parse_fred_obs(raw)
+    points = parse_fred_obs(raw)
     if not points:
         return pd.Series(dtype=float)
     return pd.Series({pd.Timestamp(p["date"]): p["value"] for p in points}).sort_index()

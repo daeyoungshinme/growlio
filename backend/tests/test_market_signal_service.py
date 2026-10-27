@@ -278,7 +278,7 @@ class TestHighYieldSpreadSignal:
     async def test_normal_below_4(self):
         obs = [{"date": "2026-07-03", "value": "3.2"}]
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_high_yield_spread_signal()
@@ -290,7 +290,7 @@ class TestHighYieldSpreadSignal:
     async def test_stressed_between_5_and_7(self):
         obs = [{"date": "2026-07-03", "value": "6.2"}]
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_high_yield_spread_signal()
@@ -302,7 +302,7 @@ class TestHighYieldSpreadSignal:
     async def test_crisis_above_7(self):
         obs = [{"date": "2026-07-03", "value": "8.5"}]
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_high_yield_spread_signal()
@@ -331,7 +331,7 @@ class TestDollarIndexSignal:
     async def test_normal_within_1_pct(self):
         obs = self._make_obs(latest_value=100.5, base_value=100.0)
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_dollar_index_signal()
@@ -343,7 +343,7 @@ class TestDollarIndexSignal:
     async def test_breakout_above_5_pct(self):
         obs = self._make_obs(latest_value=120.0, base_value=100.0)
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_dollar_index_signal()
@@ -356,7 +356,7 @@ class TestDollarIndexSignal:
     async def test_returns_none_when_insufficient_history(self):
         obs = [{"date": "2026-07-03", "value": "105.0"}]
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_dollar_index_signal()
@@ -371,7 +371,7 @@ class TestRateCutExpectationSignal:
             return [{"date": "2026-07-03", "value": value}]
 
         return patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(side_effect=_fake),
         )
 
@@ -414,7 +414,7 @@ class TestExchangeRateSignal:
         obs = self._make_obs(latest_value=1355.0, base_value=1350.0)
         with (
             patch(
-                "app.services.economic_indicator_service._fred_get_observations",
+                "app.services.economic_indicator_service.fred_get_observations",
                 AsyncMock(return_value=obs),
             ),
             patch(
@@ -433,7 +433,7 @@ class TestExchangeRateSignal:
         obs = self._make_obs(latest_value=1450.0, base_value=1350.0)
         with (
             patch(
-                "app.services.economic_indicator_service._fred_get_observations",
+                "app.services.economic_indicator_service.fred_get_observations",
                 AsyncMock(return_value=obs),
             ),
             patch(
@@ -452,7 +452,7 @@ class TestExchangeRateSignal:
     async def test_returns_none_when_insufficient_history(self):
         obs = [{"date": "2026-07-03", "value": "1380.0"}]
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_exchange_rate_signal()
@@ -479,7 +479,7 @@ class TestOilPriceSignal:
     async def test_normal_within_5_pct(self):
         obs = self._make_obs(latest_value=77.0, base_value=75.0)
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_oil_price_signal()
@@ -491,7 +491,7 @@ class TestOilPriceSignal:
     async def test_breakout_above_15_pct_on_spike(self):
         obs = self._make_obs(latest_value=95.0, base_value=75.0)
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_oil_price_signal()
@@ -505,7 +505,7 @@ class TestOilPriceSignal:
         """유가 급락도 급등과 동일하게 위험 신호로 취급한다(절대 이격도 기준)."""
         obs = self._make_obs(latest_value=55.0, base_value=75.0)
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_oil_price_signal()
@@ -518,7 +518,7 @@ class TestOilPriceSignal:
     async def test_returns_none_when_insufficient_history(self):
         obs = [{"date": "2026-07-19", "value": "78.0"}]
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_oil_price_signal()
@@ -633,7 +633,7 @@ class TestEmploymentSignal:
     async def test_normal_when_rise_below_0_3pp(self):
         obs = self._make_obs(latest_value=4.1, historical_low=4.0)
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_employment_signal()
@@ -645,7 +645,7 @@ class TestEmploymentSignal:
     async def test_sahm_triggered_between_0_5pp_and_1pp(self):
         obs = self._make_obs(latest_value=4.1, historical_low=3.5)  # rise 0.6pp
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_employment_signal()
@@ -657,7 +657,7 @@ class TestEmploymentSignal:
     async def test_high_when_rise_at_least_1pp(self):
         obs = self._make_obs(latest_value=4.6, historical_low=3.5)  # rise 1.1pp
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_employment_signal()
@@ -669,7 +669,7 @@ class TestEmploymentSignal:
     async def test_returns_none_when_insufficient_history(self):
         obs = [{"date": "2026-01-01", "value": "4.1"}]
         with patch(
-            "app.services.economic_indicator_service._fred_get_observations",
+            "app.services.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_employment_signal()

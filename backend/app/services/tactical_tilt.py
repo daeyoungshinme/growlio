@@ -111,13 +111,13 @@ def real_yield_change(values: list[float]) -> float | None:
 
 
 async def _fetch_real_yields() -> list[float]:
-    from app.services.economic_indicator_service import _fred_get_observations, _parse_fred_obs
+    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
     from app.utils.circuit_breaker import fred_circuit
 
     if not fred_circuit.is_available():
         return []
-    raw = await fred_circuit.call(_fred_get_observations, "DFII10", limit=REAL_YIELD_LOOKBACK + 15)
-    return [p["value"] for p in _parse_fred_obs(raw)]
+    raw = await fred_circuit.call(fred_get_observations, "DFII10", limit=REAL_YIELD_LOOKBACK + 15)
+    return [p["value"] for p in parse_fred_obs(raw)]
 
 
 async def get_tilt_inputs(cache: CacheStore | None) -> TiltInputs:
