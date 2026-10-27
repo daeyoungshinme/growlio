@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.services.price_sync_sources import sync_pykrx_close_series, yf_symbol_to_krx_ticker
+from app.services.yahoo_price import yf_download
 from app.utils.circuit_breaker import yahoo_circuit
 from app.utils.kst import today_kst
 
@@ -74,10 +75,8 @@ def fetch_yf_daily_returns(
     result: dict[str, list[float]] = {}
 
     if yahoo_circuit.is_available():
-        import yfinance as yf
-
         try:
-            raw = yf.download(
+            raw = yf_download(
                 all_syms,
                 start=start.isoformat(),
                 end=end.isoformat(),
@@ -135,10 +134,8 @@ def fetch_yf_close_series(
     result: dict[str, pd.Series] = {}
 
     if yahoo_circuit.is_available():
-        import yfinance as yf
-
         try:
-            raw = yf.download(
+            raw = yf_download(
                 symbols,
                 start=start.isoformat(),
                 end=end.isoformat(),

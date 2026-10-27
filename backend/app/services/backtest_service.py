@@ -32,6 +32,7 @@ from app.schemas.backtest import (
 from app.services.backtest_metrics import compute_metrics, compute_portfolio_series
 from app.services.price_sync_sources import sync_pykrx_close_series, yf_symbol_to_krx_ticker
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
+from app.services.yahoo_price import yf_download
 from app.utils.circuit_breaker import yahoo_circuit
 
 logger = structlog.get_logger()
@@ -64,10 +65,8 @@ def _sync_download_history(
     result: dict[str, list[tuple[str, float]]] = {}
 
     if yahoo_circuit.is_available():
-        import yfinance as yf
-
         try:
-            raw = yf.download(
+            raw = yf_download(
                 symbols,
                 start=start.isoformat(),
                 end=end.isoformat(),
