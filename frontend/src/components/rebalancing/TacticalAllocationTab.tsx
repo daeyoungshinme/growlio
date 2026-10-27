@@ -677,7 +677,15 @@ export default function TacticalAllocationTab({
           </button>
         </div>
       )}
-      {status && <TacticalStatusView status={status} onGoToExecution={onGoToExecution} />}
+      {/* key — 포트폴리오를 바꾸면 확인창·"방금 적용" 상태를 버린다. 남으면 열린 확인창이 다른 포트폴리오에
+          적용되거나 새 포트폴리오가 이미 적용된 것처럼 보였다 (plans/62 F1·77 C1) */}
+      {status && (
+        <TacticalStatusView
+          key={status.portfolio_id}
+          status={status}
+          onGoToExecution={onGoToExecution}
+        />
+      )}
     </div>
   );
 }

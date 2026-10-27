@@ -459,6 +459,31 @@ describe("TacticalAllocationTab", () => {
     expect(screen.queryByText("비중표 편집")).toBeNull();
   });
 
+  it("포트폴리오를 바꾸면 방금 적용한 상태를 이어받지 않는다 (plans/77 C1)", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockImplementation(async (id: string) =>
+      makeStatus({ portfolio_id: id, portfolio_name: id }),
+    );
+    vi.mocked(tacticalApi.applyTacticalWeights).mockResolvedValue(makeStatus());
+    renderTab();
+    const select = async (id: string) => {
+      fireEvent.change(await screen.findByRole("combobox"), { target: { value: id } });
+      await waitFor(() => expect(tacticalApi.fetchTacticalStatus).toHaveBeenCalledWith(id));
+      await screen.findByText("제안 비중을 목표 비중으로 적용");
+    };
+    // p2를 한 번 열어 캐시에 둔다 — 캐시된 포트폴리오로 돌아갈 때는 로딩 없이 바로 그려져 상태가 이어졌다
+    await screen.findByText("제안 비중을 목표 비중으로 적용");
+    await select("p2");
+    await select("p1");
+
+    fireEvent.click(screen.getByText("제안 비중을 목표 비중으로 적용"));
+    fireEvent.click(screen.getByText("한 번에 적용"));
+    await screen.findByText("리밸런싱 분석·실행으로 이동");
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "p2" } });
+    expect(await screen.findByText("제안 비중을 목표 비중으로 적용")).toBeDefined();
+    expect(screen.queryByText("리밸런싱 분석·실행으로 이동")).toBeNull();
+  });
+
   it("포트폴리오를 바꾸면 그 포트폴리오로 다시 조회한다", async () => {
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
     renderTab();

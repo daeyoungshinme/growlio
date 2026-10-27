@@ -298,14 +298,14 @@ _기타_
 | 포트폴리오 overview (accountId 지정 시 계좌별, 미지정 시 "all")    | `["portfolio-overview", accountId]` — `portfolioOverviewBase`(`["portfolio-overview"]`)는 무효화 프리픽스 전용              |
 | 포트폴리오 overview (경량)                                         | `["portfolio-overview", "lite"]`                                                                                            |
 | 추종 지수별 비중 (자산탭 비중 분석 카드, accountId 지정 시 계좌별) | `["index-exposure", accountId]` — `indexExposureBase`(`["index-exposure"]`)는 무효화 프리픽스 전용(sync·계좌 CUD 시 무효화) |
-| 지수 그룹 제안 (포트폴리오 편집기 "지수로 묶기") | `["index-exposure", "group-suggestions", accountIds]` — `indexExposureBase` 하위라 같은 무효화를 공유 |
+| 지수 그룹 제안 (포트폴리오 편집기 "지수로 묶기")                   | `["index-exposure", "group-suggestions", accountIds]` — `indexExposureBase` 하위라 같은 무효화를 공유                       |
 | 포트폴리오/백테스트/리밸런싱 탭                                    | `["portfolios"]`                                                                                                            |
 | 전체 계좌 목록                                                     | `["accounts"]`                                                                                                              |
 | 계좌별 포지션                                                      | `["account-positions", accountId]`                                                                                          |
 | 계좌별 거래내역                                                    | `["transactions", accountId]` — `transactionsBase`(`["transactions"]`)는 무효화 프리픽스 전용(전체·연도별·계좌별 함께)      |
 | 전체 거래내역 (무기간)                                             | `["transactions", "all"]`                                                                                                   |
 | 연도별 거래내역                                                    | `["transactions", "all", year]`                                                                                             |
-| 기간별 매수 (계좌관리 › 내역 › 매수 내역)                          | `["period-purchases", period, year, month, accountId]` — `periodPurchasesBase` 무효화 전용(sync·계좌 CUD·매매기록 CUD 시)    |
+| 기간별 매수 (계좌관리 › 내역 › 매수 내역)                          | `["period-purchases", period, year, month, accountId]` — `periodPurchasesBase` 무효화 전용(sync·계좌 CUD·매매기록 CUD 시)   |
 | 수기 매매 기록 (종목별)                                            | `["trades", accountId, ticker, market]` — `trades` 프리픽스로 무효화                                                        |
 | 배당금 티커별 (accountId 지정 시 계좌별)                           | `["dividend-by-ticker", accountId]` — `dividendByTickerBase` 무효화 전용                                                    |
 | 배당금 요약 (accountId 지정 시 계좌별)                             | `["dividend-summary", accountId]` — `dividendSummaryBase` 무효화 전용                                                       |
@@ -328,7 +328,7 @@ _기타_
 | 이메일·푸시 승인 페이지 플랜 미리보기                              | `["rebalancing-plan-preview", token]`                                                                                       |
 | 리밸런싱 전략                                                      | `["rebalancing-strategy", portfolioId]` — `rebalancingStrategyBase`(`["rebalancing-strategy"]`)는 무효화 프리픽스 전용      |
 | 드리프트 경량 요약 (대시보드)                                      | `["drift-summary"]`                                                                                                         |
-| 홈 "지금 할 일" (행동 신호 집계)                                  | `["action-items"]`                                                                                                          |
+| 홈 "지금 할 일" (행동 신호 집계)                                   | `["action-items"]`                                                                                                          |
 | 세금 추정 요약 (accountId 지정 시 계좌별)                          | `["tax-summary", year, accountId]` — `taxSummaryBase` 무효화 전용                                                           |
 | 해외 포지션 양도세 계획 (accountId 지정 시 계좌별)                 | `["overseas-positions-tax", accountId]` — `overseasPositionsTaxBase` 무효화 전용                                            |
 | ISA 만기 현황                                                      | `["isa-status"]`                                                                                                            |
@@ -345,7 +345,7 @@ _기타_
 | 목표 역산 추천 (투자기간별)                                        | `["goal-recommendation", "by-horizon"]`                                                                                     |
 | 목표 역산 추천 (연령대별)                                          | `["goal-recommendation", "by-age"]`                                                                                         |
 | 추천 후보 ETF 중복·유사 점검                                       | `["goal-recommendation", "candidate-overlap", signature]` — goal-recommendation 프리픽스로 함께 무효화                      |
-| 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표)          | `["portfolio-expected-metrics", portfolioId]`                                                                               |
+| 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표)          | `["portfolio-expected-metrics", portfolioId]` — `portfolioExpectedMetricsBase`는 무효화 프리픽스 전용(포트폴리오 수정 시)   |
 | 목표 설정 마법사 필요수익률·적립액 가이드 프리뷰                   | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]`                                         |
 | CPI/Core CPI 인플레이션 요약                                       | `["inflation-summary"]`                                                                                                     |
 | QQQ/SPY 전술 배분 국면·제안 비중 (포트폴리오별)                    | `["tactical-status", portfolioId]` — `tacticalStatusBase` 무효화 전용                                                       |
@@ -414,6 +414,7 @@ _기타_
 - 분석 결과의 그룹 행은 `shares_to_trade`가 null이고 종목별 매매는 `members`에 있다 — 주문·거래 요약은 `components/rebalancing/rebalancingTradeMath.ts`의 `flattenTradeItems()`로 펼친 목록을 쓴다(`calcTradeSummary`·`getActionableItems`가 이미 사용).
 
 **리밸런싱 URL 유틸리티 (`src/utils/rebalancingUrl.ts`)**
+
 - `REBALANCING_TABS`(진단/포트폴리오/목표 조정/이력)·`GOAL_MODES`(추천/전술) — 탭 이름의 단일 정의. 백엔드 `email_service._rebalancing_link`·`insight_service`·`action_items_service`의 탭 문자열과 같아야 함
 - `parseRebalancingTab(params)` — 예전 `rtab=추천`/`rtab=전술`(이미 발송된 이메일·푸시)을 목표 조정 탭의 해당 모드로 매핑, 알 수 없는 값은 진단
 - `rebalancingUrl(options)` — `/rebalancing` 링크 빌더(공백은 `%20`). 링크 문자열을 직접 조립하지 말 것

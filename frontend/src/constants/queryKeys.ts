@@ -92,6 +92,8 @@ export const QUERY_KEYS = {
    * `signature`는 편집 중 목록의 식별자("saved"면 저장된 목록 기준). */
   candidateOverlap: (signature: string) =>
     ["goal-recommendation", "candidate-overlap", signature] as const,
+  // portfolioExpectedMetricsBase: 무효화 프리픽스 전용 — 포트폴리오별 변형 전체
+  portfolioExpectedMetricsBase: ["portfolio-expected-metrics"] as const,
   portfolioExpectedMetrics: (portfolioId: string) =>
     ["portfolio-expected-metrics", portfolioId] as const,
   goalFeasibility: (

@@ -94,6 +94,8 @@ describe("invalidatePortfolioData", () => {
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
     expect(keys).toContain("portfolios");
     expect(keys).toContain("accounts");
+    expect(keys).toContain("rebalancing-alerts");
+    expect(keys).toContain("portfolio-expected-metrics");
   });
 });
 
@@ -133,6 +135,7 @@ describe("invalidateRebalancingAlertData", () => {
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
     expect(keys).toContain("rebalancing-alerts");
     expect(keys).toContain("rebalancing-alert");
+    expect(keys).toContain("drift-summary");
     const alertCall = qc.invalidateQueries.mock.calls.find(
       (c) => c[0].queryKey[0] === "rebalancing-alert",
     );
