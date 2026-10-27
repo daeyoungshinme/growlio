@@ -95,8 +95,12 @@ export type ExecutionAction =
   | { type: "SET_QTY"; key: string; qty: number; max?: number }
   | { type: "SET_QTY_AND_SELECT"; key: string; qty: number }
   | { type: "TOGGLE_SELECTED"; key: string }
-  | { type: "ADD_BUY_ACCOUNT"; ticker: string; accountId: string }
-  | { type: "REMOVE_BUY_ACCOUNT"; ticker: string; accountId: string }
+  /**
+   * ticker: 분석 행(대표) 종목 — buyAccounts의 키. rowTicker: 그 계좌에서 실제로 사는 종목(ISA·연금의 국내 대체) —
+   * 수량·선택 키(orderKey)는 이 종목 기준이다. 대체가 없으면 생략(plans/80 A3).
+   */
+  | { type: "ADD_BUY_ACCOUNT"; ticker: string; accountId: string; rowTicker?: string }
+  | { type: "REMOVE_BUY_ACCOUNT"; ticker: string; accountId: string; rowTicker?: string }
   | { type: "EXECUTE_START" }
   | { type: "EXECUTE_SUCCESS"; results: ExecutionResult[] }
   | { type: "EXECUTE_ERROR"; msg: string }

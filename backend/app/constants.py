@@ -9,6 +9,9 @@ from __future__ import annotations
 DOMESTIC_MARKETS: frozenset[str] = frozenset({"KOSPI", "KOSDAQ", "KRX"})
 """국내 주식 시장 코드. 해외 vs 국내 분류 및 Yahoo Finance 심볼 변환에 사용."""
 
+OVERSEAS_MARKETS: frozenset[str] = frozenset({"NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "SSE", "SGX", "LSE"})
+"""해외 상장 시장 코드 — 해외주식 양도세 대상 판정, 절세 계좌(ISA·연금) 해외 매수 차단에 사용."""
+
 POSITION_STOCK_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS", "STOCK_OTHER"})
 """종목(Position) 단위로 평가금·매입원가를 추적하는 증권 계좌 asset_type. 브로커를 추가하면 여기에만
 추가한다 — 서비스마다 로컬 집합을 두던 시절 토스 연동(STOCK_TOSS)이 대시보드 주식평가액·자산구성·

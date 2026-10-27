@@ -327,7 +327,7 @@ utils/
   └── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)
 limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수). 키는 `rate_limit_key` — 로그인 요청은 JWT `sub`(서명 미검증, 버킷 구분용), 그 외 `X-Forwarded-For` 첫 hop. 운영은 Vercel→Render 프록시 뒤라 `request.client.host`는 프록시 주소(전원 공용 버킷이 됨). **인증 없이 상태를 바꾸거나 토큰을 받는 라우트**(find-account·플랜 토큰 3개)는 `key_func=ip_rate_limit_key` + `key_func=peer_rate_limit_key` 두 데코레이터를 겹쳐 단다 — 서명 미검증 `sub`는 누구나 만들 수 있고, `X-Forwarded-For` 첫 hop도 Render origin 직접 호출 시 위조 가능하므로 Render가 붙인 마지막 hop(peer, 위조 불가) 상한을 10배로 함께 건다. 종목 검색·지수지역·환율처럼 로그인 사용자가 주로 부르는 저가치 조회는 공용 IP(CGNAT) 버킷을 나눠 쓰지 않도록 기본 `rate_limit_key`(`tests/test_rate_limit_key.py`가 두 목록을 검사)
 enums.py                      # 도메인 StrEnum(AssetType/DataSource/TransactionType/AccountTaxType/InvestmentHorizon/AgeGroup 등) — 매직 스트링 대신 사용
-constants.py                  # 도메인 공통 상수 — `DOMESTIC_MARKETS`, `POSITION_STOCK_ASSET_TYPES`, `is_non_tradable(ticker, market)`(예수금·현금성 자산·부동산 등 시세·주문 없는 항목 판정 단일 기준 — 서비스별 로컬 집합 금지). **새 브로커 추가 시 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 집계 7곳 누락 사고)
+constants.py                  # 도메인 공통 상수 — `DOMESTIC_MARKETS`, `OVERSEAS_MARKETS`(해외 양도세 판정·절세 계좌 해외 매수 차단), `POSITION_STOCK_ASSET_TYPES`, `is_non_tradable(ticker, market)`(예수금·현금성 자산·부동산 등 시세·주문 없는 항목 판정 단일 기준 — 서비스별 로컬 집합 금지). **새 브로커 추가 시 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 집계 7곳 누락 사고)
 exceptions.py                 # `AppError` 계열(BadRequest/NotFound/ExternalAPI…, 전역 핸들러가 status_code/detail로 변환) + `SyncError` 계열(Provider{Credential,Token,Api,Network}Error)
 scheduler.py                  # APScheduler 초기화 — `init_scheduler()`의 jobs 스펙 리스트
 jobs/                         # APScheduler 정기 작업

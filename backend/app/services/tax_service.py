@@ -7,14 +7,18 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.constants import COMPREHENSIVE_TAX_THRESHOLD_KRW, POSITION_STOCK_ASSET_TYPES, TAX_DEFERRED_TAX_TYPES
+from app.constants import (
+    COMPREHENSIVE_TAX_THRESHOLD_KRW,
+    OVERSEAS_MARKETS,
+    POSITION_STOCK_ASSET_TYPES,
+    TAX_DEFERRED_TAX_TYPES,
+)
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.utils.kst import today_kst
 
 _T = TypeVar("_T")
 
-_OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "SSE", "SGX", "LSE"}
 _DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}
 
 _DOMESTIC_LARGE_HOLDER_THRESHOLD = 1_000_000_000
@@ -329,7 +333,7 @@ async def get_overseas_positions_detail(
         if acc.tax_type in TAX_DEFERRED_TAX_TYPES:
             continue
         for pos in snap.position_items:
-            if pos.market not in _OVERSEAS_MARKETS:
+            if pos.market not in OVERSEAS_MARKETS:
                 continue
             qty = float(pos.qty or 0)
             avg = float(pos.avg_price or 0)
@@ -492,7 +496,7 @@ async def _calc_stock_unrealized(
                 tax_deferred_value += cur * qty
                 continue
 
-            if market in _OVERSEAS_MARKETS:
+            if market in OVERSEAS_MARKETS:
                 overseas_value += cur * qty
                 overseas_invested += avg * qty
             elif market in _DOMESTIC_MARKETS:

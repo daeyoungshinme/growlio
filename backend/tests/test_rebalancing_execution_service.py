@@ -35,6 +35,7 @@ def _make_kis_account(
     account_id: uuid.UUID | None = None,
     user_id: uuid.UUID | None = None,
     is_mock: bool = True,
+    tax_type: str = "GENERAL",
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=account_id or uuid.uuid4(),
@@ -50,6 +51,7 @@ def _make_kis_account(
         kiwoom_account_no=None,
         kiwoom_app_key=None,
         kiwoom_app_secret=None,
+        tax_type=tax_type,
     )
 
 
@@ -536,6 +538,74 @@ class TestExecuteRebalancing:
         assert broken_result.fail_count == 1
         assert broken_result.orders[0].status == "FAILED"
         assert "찾을 수 없습니다" in (broken_result.orders[0].error_msg or "")
+
+
+class TestTaxDeferredOverseasBuyGuard:
+    """수동 실행도 ISA·연금 계좌의 해외 매수는 증권사로 보내지 않는다(plans/80 A4)."""
+
+    @pytest.mark.asyncio
+    async def test_isa_overseas_buy_skipped_domestic_executed(self, mock_db, mock_cache, override_settings):
+        from app.services.rebalancing.execution_service import TAX_DEFERRED_OVERSEAS_MSG, execute_rebalancing
+
+        user_id = uuid.uuid4()
+        account = _make_kis_account(user_id=user_id, tax_type="ISA")
+        acc_id = str(account.id)
+        overseas = _make_order(ticker="VOO", name="Vanguard S&P 500", market="NASDAQ", account_id=acc_id)
+        domestic = _make_order(ticker="360750", name="TIGER 미국S&P500", market="KOSPI", account_id=acc_id)
+        sent: list[str] = []
+
+        async def fake_buys(buys, *args):
+            sent.extend(o.ticker for o in buys)
+            return [
+                OrderResult(
+                    ticker=o.ticker, name=o.name, market=o.market, side=o.side, quantity=o.quantity, status="SUCCESS"
+                )
+                for o in buys
+            ]
+
+        mock_db.scalar = AsyncMock(return_value=account)
+        mock_db.flush = AsyncMock()
+        mock_db.commit = AsyncMock()
+        mock_db.add = MagicMock()
+
+        with (
+            patch(
+                "app.services.rebalancing.execution_service.decrypt_kis_credentials",
+                return_value=("decrypted", "decrypted"),
+            ),
+            patch(
+                "app.services.rebalancing.execution_service.get_access_token",
+                new_callable=AsyncMock,
+                return_value="token",
+            ),
+            patch(
+                "app.services.rebalancing.execution_service._execute_buys_with_cash_check",
+                side_effect=fake_buys,
+            ),
+        ):
+            results, _ = await execute_rebalancing(user_id, account.id, [overseas, domestic], mock_db, mock_cache)
+
+        assert sent == ["360750"]
+        by_ticker = {o.ticker: o for o in results[0].orders}
+        assert by_ticker["VOO"].status == "SKIPPED"
+        assert by_ticker["VOO"].error_msg == TAX_DEFERRED_OVERSEAS_MSG
+        assert by_ticker["360750"].status == "SUCCESS"
+
+    def test_general_account_passes_overseas_buy(self):
+        from app.services.rebalancing.execution_service import _split_tax_deferred_overseas_buys
+
+        order = _make_order(ticker="VOO", market="NASDAQ")
+        executable, skipped = _split_tax_deferred_overseas_buys(_make_kis_account(), [order])
+        assert executable == [order]
+        assert skipped == []
+
+    def test_pension_overseas_sell_not_blocked(self):
+        from app.services.rebalancing.execution_service import _split_tax_deferred_overseas_buys
+
+        order = _make_order(ticker="VOO", market="NASDAQ", side="SELL")
+        executable, skipped = _split_tax_deferred_overseas_buys(_make_kis_account(tax_type="IRP"), [order])
+        assert executable == [order]
+        assert skipped == []
 
 
 class TestRebalancingSchemaValidators:
