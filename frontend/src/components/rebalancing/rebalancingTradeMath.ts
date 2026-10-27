@@ -103,6 +103,35 @@ export function buyItemForAccount(
   };
 }
 
+/**
+ * 이 계좌에서 살 수 있는 종목인지 — ISA·연금은 해외 상장 종목을 직접 살 수 없다(국내 대체로 바뀌면 가능).
+ * "이 계좌에 매수 종목 추가" 목록이 거부될 주문을 만들지 않게 거른다(plans/80 A2).
+ */
+export function canBuyInAccount(
+  item: RebalancingItem,
+  items: RebalancingItem[],
+  taxType: string | undefined,
+): boolean {
+  if (!taxType || !TAX_DEFERRED_TAX_TYPES.has(taxType) || !isOverseasMarket(item.market))
+    return true;
+  return buyItemForAccount(item, items, taxType) !== item;
+}
+
+/**
+ * 매수 행 수량을 원래(대표) 종목 주수로 환산 — 대체 종목 행과 대표 종목 행을 함께 배분할 때 단위를 맞춘다.
+ * 대체 행이 아니거나 시세가 없으면 그대로 돌려준다.
+ */
+export function qtyInOriginalUnits(
+  row: RebalancingItem,
+  original: RebalancingItem,
+  qty: number,
+): number {
+  const rowPrice = row.current_price_krw;
+  const origPrice = original.current_price_krw;
+  if (row === original || !rowPrice || !origPrice) return qty;
+  return Math.round((qty * rowPrice) / origPrice);
+}
+
 export type OrderSide = "buy" | "sell";
 
 /** 실행 화면 주문 행 키(선택·수량·지정가 상태의 키) — `${side}_${ticker}_${accountId}` */

@@ -20,8 +20,10 @@ import {
 import {
   buyItemForAccount,
   calcTradeSummary,
+  canBuyInAccount,
   domesticAltCandidates,
   flattenTradeItems,
+  qtyInOriginalUnits,
 } from "@/components/rebalancing/rebalancingTradeMath";
 
 const m = (ticker: string, market: string, value_krw = 0) => ({
@@ -286,6 +288,20 @@ describe("buyItemForAccount (plans/79 E)", () => {
     expect(buyItemForAccount(primary, [noAlt], "ISA")).toBe(primary);
     const noPrice = { ...group, members: [primary, { ...alt, current_price_krw: null }] };
     expect(buyItemForAccount(primary, [noPrice], "ISA")).toBe(primary);
+  });
+
+  it("canBuyInAccount — 절세 계좌의 해외 종목은 국내 대체가 될 때만 (plans/80 A2)", () => {
+    expect(canBuyInAccount(primary, [group], "ISA")).toBe(true);
+    expect(canBuyInAccount(primary, [{ ...group, members: [primary] }], "IRP")).toBe(false);
+    expect(canBuyInAccount(primary, [group], "GENERAL")).toBe(true);
+    expect(canBuyInAccount(alt, [group], "PENSION_SAVINGS")).toBe(true);
+  });
+
+  it("qtyInOriginalUnits — 대체 행 수량을 대표 종목 주수로 환산", () => {
+    const row = buyItemForAccount(primary, [group], "ISA");
+    expect(qtyInOriginalUnits(row, primary, 25)).toBe(1); // 25 × 2만 ÷ 50만
+    expect(qtyInOriginalUnits(primary, primary, 3)).toBe(3);
+    expect(qtyInOriginalUnits({ ...row, current_price_krw: null }, primary, 25)).toBe(25);
   });
 
   it("대표 종목이 국내면 바꾸지 않는다", () => {

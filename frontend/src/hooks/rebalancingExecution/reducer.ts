@@ -138,11 +138,11 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
         },
         qtyOverrides: {
           ...state.qtyOverrides,
-          [orderKey("buy", action.ticker, action.accountId)]: 0,
+          [orderKey("buy", action.rowTicker ?? action.ticker, action.accountId)]: 0,
         },
       };
     case "REMOVE_BUY_ACCOUNT": {
-      const key = orderKey("buy", action.ticker, action.accountId);
+      const key = orderKey("buy", action.rowTicker ?? action.ticker, action.accountId);
       const next = new Set(state.selected);
       next.delete(key);
       const nextQty = { ...state.qtyOverrides };

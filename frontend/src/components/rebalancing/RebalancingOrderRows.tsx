@@ -64,7 +64,16 @@ export function BuyHoldingNote({
 }
 
 /** 분할 매수 배분 현황 — 다 배분하지 않았으면 주황 */
-export function AllocationNote({ allocated, needed }: { allocated: number; needed: number }) {
+/** unitTicker: 국내 대체 행이면 원래 종목 — 배분 주수가 그 종목 기준임을 밝힌다 */
+export function AllocationNote({
+  allocated,
+  needed,
+  unitTicker,
+}: {
+  allocated: number;
+  needed: number;
+  unitTicker?: string;
+}) {
   return (
     <div
       className={`text-xs mt-0.5 text-right ${
@@ -73,7 +82,7 @@ export function AllocationNote({ allocated, needed }: { allocated: number; neede
           : "text-amber-600 dark:text-amber-400"
       }`}
     >
-      배분 {allocated} / {needed}주
+      배분 {allocated} / {needed}주{unitTicker && ` (${unitTicker} 기준)`}
     </div>
   );
 }
