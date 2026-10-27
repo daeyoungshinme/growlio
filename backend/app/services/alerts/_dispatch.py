@@ -32,6 +32,7 @@ async def dispatch_dual_channel_alert(
     fcm_token: str | None,
     commit: bool = True,
     after_sent: Callable[[], Awaitable[None]] | None = None,
+    push_data: dict[str, str] | None = None,
 ) -> bool:
     """이메일·푸시를 각각 독립적으로 시도하고, 하나라도 성공하면 `AlertHistory`를 저장한다.
 
@@ -39,6 +40,7 @@ async def dispatch_dual_channel_alert(
     - 각 채널 실패는 `<event_prefix>_email_failed` / `<event_prefix>_push_failed`로 로깅하고 삼킨다.
     - `after_sent`: 발송 성공 시 커밋 전에 실행할 추가 작업(예: dedup 플래그 마킹).
     - `commit=False`면 커밋을 호출부에 위임한다(루프 후 일괄 커밋하는 경우).
+    - `push_data`: 푸시 data에 `type` 외에 더 실을 값(예: 탭 시 열 `portfolio_id`).
 
     반환: 이메일·푸시 중 하나라도 성공했으면 True.
     """
@@ -57,7 +59,7 @@ async def dispatch_dual_channel_alert(
             title=push_title,
             body=push_body,
             fcm_token=fcm_token,
-            data={"type": push_type},
+            data={"type": push_type, **(push_data or {})},
         )
     except Exception as exc:
         logger.error(f"{event_prefix}_push_failed", user_id=str(user_id), error=str(exc))

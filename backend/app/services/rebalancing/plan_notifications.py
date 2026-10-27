@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 
 import structlog
 from sqlalchemy import select
@@ -103,6 +104,54 @@ async def notify_plan_generated(
     return email_sent
 
 
+async def _notify_gate_blocked(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    db: AsyncSession,
+    *,
+    dedup_key: str,
+    ttl: int,
+    event_prefix: str,
+    send_email: Callable[[], Awaitable[bool]],
+    push_body: str,
+    push_type: str,
+    history_message: str,
+    fcm_token: str | None,
+) -> None:
+    """게이트 차단 보류 안내 공통 흐름 — 하루 1회(dedup) 이메일+푸시, 하나라도 성공하면 이력·dedup 저장.
+
+    dedup 플래그는 재시작에도 유지돼야 하므로(콜드스타트 후 오탐 방지) Postgres 기반 durable_state를 쓴다.
+    두 채널이 모두 실패하면 이력도 dedup도 남기지 않아 다음 평가 때 다시 시도한다(다른 알림과 같은 규칙, plans/79 B).
+    """
+    from app.services.alerts._dispatch import dispatch_dual_channel_alert
+    from app.utils.durable_state import get_durable, set_durable
+
+    if await get_durable(db, dedup_key):
+        return
+
+    async def _mark_sent() -> None:
+        await set_durable(db, dedup_key, "1", ttl=ttl, commit=False)
+
+    await dispatch_dual_channel_alert(
+        db,
+        alert.user_id,
+        event_prefix=event_prefix,
+        alert_type="REBALANCING",
+        history_message=history_message,
+        send_email=send_email,
+        push_title=f"리밸런싱 자동화 보류 — {portfolio.name}",
+        push_body=push_body,
+        push_type=push_type,
+        push_data={"portfolio_id": str(portfolio.id)},
+        fcm_token=fcm_token,
+        after_sent=_mark_sent,
+    )
+
+
+async def _no_email() -> bool:
+    return False
+
+
 async def notify_tax_gate_blocked(
     alert: RebalancingAlert,
     portfolio: Portfolio,
@@ -111,48 +160,36 @@ async def notify_tax_gate_blocked(
     fcm_token: str | None,
     db: AsyncSession,
 ) -> None:
-    """세금영향 게이트로 계획 생성이 보류됐음을 알린다 — 같은 알림에 대해 하루 1회만 발송(dedup).
-
-    dedup 플래그는 재시작에도 유지돼야 하므로(콜드스타트 후 오탐 방지) Postgres 기반
-    durable_state를 사용한다.
-    """
+    """세금영향 게이트로 계획 생성이 보류됐음을 알린다 — 같은 알림에 대해 하루 1회만 발송(dedup)."""
     from app.services.email_service import send_tax_impact_gate_blocked_email
-    from app.services.push_service import send_push_to_user
     from app.utils.cache_keys import TTL_TAX_IMPACT_GATE_ALERT_SENT, tax_impact_gate_alert_sent_key
-    from app.utils.durable_state import get_durable, set_durable
 
-    today = today_kst().isoformat()
-    dedup_key = tax_impact_gate_alert_sent_key(alert.id, today)
-    if await get_durable(db, dedup_key):
-        return
-
-    if email:
-        try:
-            await send_tax_impact_gate_blocked_email(
-                email, portfolio.name, blocked.estimated_tax_krw, blocked.max_tax_impact_krw
+    await _notify_gate_blocked(
+        alert,
+        portfolio,
+        db,
+        dedup_key=tax_impact_gate_alert_sent_key(alert.id, today_kst().isoformat()),
+        ttl=TTL_TAX_IMPACT_GATE_ALERT_SENT,
+        event_prefix="tax_impact_gate_blocked",
+        send_email=(
+            (
+                lambda: send_tax_impact_gate_blocked_email(
+                    email, portfolio.name, blocked.estimated_tax_krw, blocked.max_tax_impact_krw
+                )
             )
-        except Exception as exc:
-            logger.error("tax_impact_gate_blocked_email_error", alert_id=str(alert.id), error=str(exc))
-
-    push_body = f"세금영향 상한 초과로 이번 계획을 만들지 않았습니다 (추정 양도세 {blocked.estimated_tax_krw:,.0f}원)."
-    try:
-        await send_push_to_user(
-            user_id=alert.user_id,
-            title=f"리밸런싱 자동화 보류 — {portfolio.name}",
-            body=push_body,
-            fcm_token=fcm_token,
-            data={"type": "REBALANCING_TAX_GATE_BLOCKED", "portfolio_id": str(portfolio.id)},
-        )
-    except Exception as exc:
-        logger.warning("tax_impact_gate_blocked_push_failed", alert_id=str(alert.id), error=str(exc))
-
-    history_message = (
-        f"리밸런싱 자동화 보류(세금영향 상한 초과): {portfolio.name} — 추정 양도세 {blocked.estimated_tax_krw:,.0f}원"
+            if email
+            else _no_email
+        ),
+        push_body=(
+            f"세금영향 상한 초과로 이번 계획을 만들지 않았습니다 (추정 양도세 {blocked.estimated_tax_krw:,.0f}원)."
+        ),
+        push_type="REBALANCING_TAX_GATE_BLOCKED",
+        history_message=(
+            f"리밸런싱 자동화 보류(세금영향 상한 초과): {portfolio.name}"
+            f" — 추정 양도세 {blocked.estimated_tax_krw:,.0f}원"
+        ),
+        fcm_token=fcm_token,
     )
-    await save_alert_history(db, alert.user_id, "REBALANCING", history_message)
-    await db.commit()
-
-    await set_durable(db, dedup_key, "1", ttl=TTL_TAX_IMPACT_GATE_ALERT_SENT)
 
 
 async def notify_market_signal_gate_blocked(
@@ -163,55 +200,40 @@ async def notify_market_signal_gate_blocked(
     fcm_token: str | None,
     db: AsyncSession,
 ) -> None:
-    """시장신호 게이트로 계획 생성이 보류됐음을 알린다 — 같은 알림에 대해 하루 1회만 발송(dedup).
-
-    dedup 플래그는 재시작에도 유지돼야 하므로(콜드스타트 후 오탐 방지) Postgres 기반
-    durable_state를 사용한다.
-    """
+    """시장신호 게이트(전술 방어 국면 포함)로 계획 생성이 보류됐음을 알린다 — 같은 알림에 대해 하루 1회만 발송."""
     from app.services.email_service import send_market_signal_gate_blocked_email
-    from app.services.push_service import send_push_to_user
     from app.utils.cache_keys import TTL_MARKET_SIGNAL_GATE_ALERT_SENT, market_signal_gate_alert_sent_key
-    from app.utils.durable_state import get_durable, set_durable
-
-    today = today_kst().isoformat()
-    dedup_key = market_signal_gate_alert_sent_key(alert.id, today)
-    if await get_durable(db, dedup_key):
-        return
-
-    if email:
-        try:
-            await send_market_signal_gate_blocked_email(
-                email, portfolio.name, blocked.composite_level, blocked.market_condition_mode
-            )
-        except Exception as exc:
-            logger.error("market_signal_gate_blocked_email_error", alert_id=str(alert.id), error=str(exc))
 
     tactical = blocked.market_condition_mode == "TACTICAL"
-    push_body = (
-        "전술 배분이 방어 국면이라 이번 적립 매수를 보류했어요. 다음 매수일에 함께 매수해요."
-        if tactical
-        else f"시장신호 게이트({blocked.composite_level})로 이번 계획을 만들지 않았습니다."
+    await _notify_gate_blocked(
+        alert,
+        portfolio,
+        db,
+        dedup_key=market_signal_gate_alert_sent_key(alert.id, today_kst().isoformat()),
+        ttl=TTL_MARKET_SIGNAL_GATE_ALERT_SENT,
+        event_prefix="market_signal_gate_blocked",
+        send_email=(
+            (
+                lambda: send_market_signal_gate_blocked_email(
+                    email, portfolio.name, blocked.composite_level, blocked.market_condition_mode
+                )
+            )
+            if email
+            else _no_email
+        ),
+        push_body=(
+            "전술 배분이 방어 국면이라 이번 적립 매수를 보류했어요. 다음 매수일에 함께 매수해요."
+            if tactical
+            else f"시장신호 게이트({blocked.composite_level})로 이번 계획을 만들지 않았습니다."
+        ),
+        push_type="REBALANCING_MARKET_GATE_BLOCKED",
+        history_message=(
+            f"적립 매수 보류(전술 방어 국면): {portfolio.name}"
+            if tactical
+            else f"리밸런싱 자동화 보류(시장신호 게이트): {portfolio.name} — 현재 신호 {blocked.composite_level}"
+        ),
+        fcm_token=fcm_token,
     )
-    try:
-        await send_push_to_user(
-            user_id=alert.user_id,
-            title=f"리밸런싱 자동화 보류 — {portfolio.name}",
-            body=push_body,
-            fcm_token=fcm_token,
-            data={"type": "REBALANCING_MARKET_GATE_BLOCKED", "portfolio_id": str(portfolio.id)},
-        )
-    except Exception as exc:
-        logger.warning("market_signal_gate_blocked_push_failed", alert_id=str(alert.id), error=str(exc))
-
-    history_message = (
-        f"적립 매수 보류(전술 방어 국면): {portfolio.name}"
-        if tactical
-        else f"리밸런싱 자동화 보류(시장신호 게이트): {portfolio.name} — 현재 신호 {blocked.composite_level}"
-    )
-    await save_alert_history(db, alert.user_id, "REBALANCING", history_message)
-    await db.commit()
-
-    await set_durable(db, dedup_key, "1", ttl=TTL_MARKET_SIGNAL_GATE_ALERT_SENT)
 
 
 async def notify_daily_value_cap_blocked(
@@ -226,50 +248,38 @@ async def notify_daily_value_cap_blocked(
 
     이 게이트는 알림(alert) 단위가 아닌 유저 단위로 평가되므로, dedup 키도 alert.id가 아닌
     user_id 기준 — 같은 유저의 여러 PER_ACCOUNT 알림이 같은 날 같은 상한에 걸려도 중복 발송하지 않는다.
-    dedup 플래그는 재시작에도 유지돼야 하므로(콜드스타트 후 오탐 방지) Postgres 기반 durable_state를 사용한다.
     """
     from app.services.email_service import send_daily_value_cap_gate_blocked_email
-    from app.services.push_service import send_push_to_user
     from app.utils.cache_keys import TTL_DAILY_VALUE_CAP_ALERT_SENT, daily_value_cap_gate_alert_sent_key
-    from app.utils.durable_state import get_durable, set_durable
 
-    today = today_kst().isoformat()
-    dedup_key = daily_value_cap_gate_alert_sent_key(alert.user_id, today)
-    if await get_durable(db, dedup_key):
-        return
-
-    if email:
-        try:
-            await send_daily_value_cap_gate_blocked_email(
-                email, portfolio.name, blocked.today_total_krw, blocked.attempted_value_krw, blocked.cap_krw
+    await _notify_gate_blocked(
+        alert,
+        portfolio,
+        db,
+        dedup_key=daily_value_cap_gate_alert_sent_key(alert.user_id, today_kst().isoformat()),
+        ttl=TTL_DAILY_VALUE_CAP_ALERT_SENT,
+        event_prefix="daily_value_cap_gate_blocked",
+        send_email=(
+            (
+                lambda: send_daily_value_cap_gate_blocked_email(
+                    email, portfolio.name, blocked.today_total_krw, blocked.attempted_value_krw, blocked.cap_krw
+                )
             )
-        except Exception as exc:
-            logger.error("daily_value_cap_gate_blocked_email_error", alert_id=str(alert.id), error=str(exc))
-
-    push_body = (
-        f"하루 합산 거래한도({blocked.cap_krw:,.0f}원) 초과로 이번 계획을 만들지 않았습니다 "
-        f"(오늘 누적 약 {blocked.today_total_krw:,.0f}원)."
+            if email
+            else _no_email
+        ),
+        push_body=(
+            f"하루 합산 거래한도({blocked.cap_krw:,.0f}원) 초과로 이번 계획을 만들지 않았습니다 "
+            f"(오늘 누적 약 {blocked.today_total_krw:,.0f}원)."
+        ),
+        push_type="REBALANCING_DAILY_CAP_BLOCKED",
+        history_message=(
+            f"리밸런싱 자동화 보류(하루 합산 거래한도 초과): {portfolio.name} — "
+            f"오늘 누적 약 {blocked.today_total_krw:,.0f}원 + 이번 약 {blocked.attempted_value_krw:,.0f}원 "
+            f"> 상한 {blocked.cap_krw:,.0f}원"
+        ),
+        fcm_token=fcm_token,
     )
-    try:
-        await send_push_to_user(
-            user_id=alert.user_id,
-            title=f"리밸런싱 자동화 보류 — {portfolio.name}",
-            body=push_body,
-            fcm_token=fcm_token,
-            data={"type": "REBALANCING_DAILY_CAP_BLOCKED", "portfolio_id": str(portfolio.id)},
-        )
-    except Exception as exc:
-        logger.warning("daily_value_cap_gate_blocked_push_failed", alert_id=str(alert.id), error=str(exc))
-
-    history_message = (
-        f"리밸런싱 자동화 보류(하루 합산 거래한도 초과): {portfolio.name} — "
-        f"오늘 누적 약 {blocked.today_total_krw:,.0f}원 + 이번 약 {blocked.attempted_value_krw:,.0f}원 "
-        f"> 상한 {blocked.cap_krw:,.0f}원"
-    )
-    await save_alert_history(db, alert.user_id, "REBALANCING", history_message)
-    await db.commit()
-
-    await set_durable(db, dedup_key, "1", ttl=TTL_DAILY_VALUE_CAP_ALERT_SENT)
 
 
 async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UUID, db: AsyncSession) -> None:

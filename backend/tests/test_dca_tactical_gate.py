@@ -77,7 +77,7 @@ class TestBlockedNotice:
             patch("app.utils.durable_state.set_durable", AsyncMock()),
             patch("app.services.email_service.send_market_signal_gate_blocked_email", AsyncMock()),
             patch("app.services.push_service.send_push_to_user", push),
-            patch.object(pn, "save_alert_history", history),
+            patch("app.services.alerts._dispatch.save_alert_history", history),
         ):
             await pn.notify_market_signal_gate_blocked(alert, portfolio, blocked, "u@x.com", "tok", db)
         assert "적립 매수를 보류" in push.await_args.kwargs["body"]
