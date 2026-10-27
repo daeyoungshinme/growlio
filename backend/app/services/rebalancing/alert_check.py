@@ -29,7 +29,7 @@ from app.services.alerts.calculator import (
     should_fire_today,
 )
 from app.services.rebalancing.alert_scope import resolve_effective_account_ids
-from app.services.rebalancing.diagnosis_service import check_composite_signal, fetch_market_and_risk_signal
+from app.services.rebalancing.diagnosis_service import fetch_composite_signal
 from app.services.rebalancing.order_builder import (
     build_rebalancing_orders,
     filter_drifting_items,
@@ -288,14 +288,7 @@ async def _evaluate_composite_trigger(
     extra_trigger = False
     composite_reason: str | None = None
     try:
-        market_level, risk = await fetch_market_and_risk_signal(alert.user_id, db, cache)
-        extra_trigger, composite_reason = check_composite_signal(
-            market_level,
-            bool(risk.get("data_available")),
-            risk.get("diversification_score"),
-            risk.get("top_holding_weight_pct"),
-            risk.get("annualized_volatility_pct"),
-        )
+        extra_trigger, composite_reason = await fetch_composite_signal(alert.user_id, db, cache)
     except Exception as exc:
         logger.warning("rebalancing_alert_composite_signal_failed", alert_id=str(alert.id), error=str(exc))
 

@@ -48,8 +48,7 @@ from app.services.price_service import get_historical_returns
 from app.services.rebalancing.broker_balance_service import fetch_broker_balance
 from app.services.rebalancing.diagnosis_service import (
     build_diagnosis_context,
-    check_composite_signal,
-    fetch_market_and_risk_signal,
+    fetch_composite_signal,
 )
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
 from app.services.rebalancing.overview_enrichment import collect_dividend_map, enrich_overview_with_prices
@@ -381,14 +380,7 @@ async def get_composite_signal_status(
     reason: str | None = None
     if enabled:
         try:
-            market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, cache)
-            triggered, reason = check_composite_signal(
-                market_level,
-                bool(risk.get("data_available")),
-                risk.get("diversification_score"),
-                risk.get("top_holding_weight_pct"),
-                risk.get("annualized_volatility_pct"),
-            )
+            triggered, reason = await fetch_composite_signal(current_user.id, db, cache)
         except Exception as e:
             logger.warning("composite_signal_status_failed", error=str(e))
 

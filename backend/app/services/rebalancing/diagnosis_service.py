@@ -284,6 +284,24 @@ async def fetch_market_and_risk_signal(
     return market_level, risk
 
 
+async def fetch_composite_signal(
+    user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
+) -> tuple[bool, str | None]:
+    """유저 단위 복합신호(시장 RED·리스크 이상) 판정 — 조회+`check_composite_signal`을 한 번에.
+
+    진단 배너 API·drift-summary·알림 추가 트리거가 같은 판정을 쓴다(plans/78 A4). 예외 처리와 로그
+    이벤트 이름은 호출부마다 달라 호출부에 둔다.
+    """
+    market_level, risk = await fetch_market_and_risk_signal(user_id, db, cache)
+    return check_composite_signal(
+        market_level,
+        bool(risk.get("data_available")),
+        risk.get("diversification_score"),
+        risk.get("top_holding_weight_pct"),
+        risk.get("annualized_volatility_pct"),
+    )
+
+
 async def build_diagnosis_context(
     user_id: uuid.UUID,
     db: AsyncSession,

@@ -412,7 +412,7 @@ class TestDriftSummary:
                     return_value={"all_positions": [], "total_assets_krw": 0, "total_stock_krw": 0},
                 ),
                 patch(
-                    "app.services.rebalancing.drift_summary_service.fetch_market_and_risk_signal",
+                    "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
                     new_callable=AsyncMock,
                 ) as mock_fetch,
                 TestClient(app, raise_server_exceptions=False) as client,
@@ -455,7 +455,7 @@ class TestCompositeSignalStatus:
         try:
             with (
                 patch(
-                    "app.api.v1.rebalancing.fetch_market_and_risk_signal",
+                    "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
                     new_callable=AsyncMock,
                 ) as mock_fetch,
                 patch(
@@ -491,7 +491,7 @@ class TestCompositeSignalStatus:
         try:
             with (
                 patch(
-                    "app.api.v1.rebalancing.fetch_market_and_risk_signal",
+                    "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
                     new_callable=AsyncMock,
                     return_value=("RED", {"data_available": False}),
                 ),
