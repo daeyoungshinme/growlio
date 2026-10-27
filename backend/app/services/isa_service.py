@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.constants import OVERSEAS_MARKETS
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services._account_queries import active_accounts_stmt
 from app.services._snapshot_queries import latest_snapshot_subquery
@@ -18,10 +19,9 @@ ISA_MATURITY_YEARS = 3
 _ISA_TAX_FREE_LIMIT: dict[str, int] = {"GENERAL": 2_000_000, "PREFERENTIAL": 4_000_000}
 _ISA_EXCESS_TAX_RATE = 0.099  # 비과세 한도 초과분 9.9% 분리과세 (지방소득세 포함)
 
-# 일반계좌 대비 절세액 계산용 — tax_service.py와 동일 해외시장 분류/세율(값 변경 시 두 파일 함께 수정).
-# 이 집합에 없는 시장(국내 KOSPI/KOSDAQ/KONEX 포함)은 전부 국내로 취급 — 기존 손익통산 합계(시장 구분 없이 전량 합산)를
-# 그대로 보존하기 위함(미분류 시장을 누락시키지 않음).
-_OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "SSE", "SGX", "LSE"}
+# 일반계좌 대비 절세액 계산용 — tax_service.py와 동일 세율(값 변경 시 두 파일 함께 수정).
+# 해외시장 분류는 app.constants.OVERSEAS_MARKETS. 여기 없는 시장(국내 KOSPI/KOSDAQ/KONEX 포함)은 전부 국내로
+# 취급 — 기존 손익통산 합계(시장 구분 없이 전량 합산)를 그대로 보존하기 위함(미분류 시장을 누락시키지 않음).
 _GENERAL_DIVIDEND_TAX_RATE = 0.154  # 일반계좌 배당/이자소득세 원천징수율 (tax_service.py dividend 세율과 동일)
 _OVERSEAS_GAIN_TAX_RATE = 0.22  # 일반계좌 해외주식 양도세율 (tax_service.py overseas_gain과 동일)
 _OVERSEAS_GAIN_DEDUCTION_KRW = 2_500_000  # 해외주식 양도세 연간 공제 (tax_service.py overseas_deduction과 동일)
@@ -179,7 +179,7 @@ async def _calc_unrealized_by_account_and_market(
             avg = float(pos.avg_price or 0)
             cur = float(pos.current_price or avg)
             gain = (cur - avg) * qty
-            if pos.market in _OVERSEAS_MARKETS:
+            if pos.market in OVERSEAS_MARKETS:
                 overseas += gain
             else:
                 domestic += gain

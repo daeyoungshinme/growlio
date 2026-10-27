@@ -13,11 +13,10 @@ from typing import Any, Literal
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import TAX_DEFERRED_TAX_TYPES, is_non_tradable
+from app.constants import OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES, is_non_tradable
 from app.services.rebalancing._order_quantity_guard import floor_shares
 from app.services.rebalancing.group_expansion import expand_group_items, is_group_item
 from app.services.rebalancing.service import filter_drifting_items  # noqa: F401 — 이탈 판정 단일 기준 재노출
-from app.services.tax_service import _OVERSEAS_MARKETS
 
 logger = structlog.get_logger()
 
@@ -358,7 +357,7 @@ def build_rebalancing_orders(
 
         # ISA/연금저축/IRP 계좌는 해외 개별 종목을 직접 매수할 수 없다 — 실행 불가능한 주문 생성 방지.
         buy_account_tax_type = account_tax_type_map.get(buy_account_id, "GENERAL")
-        if item.market in _OVERSEAS_MARKETS and buy_account_tax_type in TAX_DEFERRED_TAX_TYPES:
+        if item.market in OVERSEAS_MARKETS and buy_account_tax_type in TAX_DEFERRED_TAX_TYPES:
             logger.info(
                 "rebalancing_auto_item_skipped",
                 alert_id=alert_id,

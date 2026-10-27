@@ -14,13 +14,13 @@ from typing import Any
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import TAX_DEFERRED_TAX_TYPES, is_non_tradable
+from app.constants import OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES, is_non_tradable
 from app.models.user import UserSettings
 from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxImpactItem
 from app.services.market_signal_service import get_market_signal
 from app.services.rebalancing.group_expansion import iter_trade_items
 from app.services.risk_service import get_portfolio_risk_metrics
-from app.services.tax_service import _OVERSEAS_MARKETS, estimate_overseas_transfer_tax
+from app.services.tax_service import estimate_overseas_transfer_tax
 from app.utils.cache_keys import CacheStoreType
 
 logger = structlog.get_logger()
@@ -118,7 +118,7 @@ def _build_tax_preview(
 
         lots = cost_map.get((item.ticker, item.market), [])
         total_qty = sum(lot["qty"] for lot in lots)
-        is_overseas = item.market in _OVERSEAS_MARKETS
+        is_overseas = item.market in OVERSEAS_MARKETS
 
         # shares_to_trade가 None(가격 데이터 누락)이면 보유수량 전체를 매도한다고 가정해 폴백한다.
         if item.shares_to_trade is not None:
