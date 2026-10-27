@@ -9,7 +9,7 @@ import { isOverseasMarket } from "@/constants/markets";
 import { PriceCell } from "./RebalancingPriceCell";
 import { RebalancingPriceInput } from "./RebalancingPriceInput";
 import { RebalancingMobileCard } from "./RebalancingMobileCard";
-import { estimateLimitKrw } from "./rebalancingTradeMath";
+import { estimateLimitKrw, orderKey } from "./rebalancingTradeMath";
 
 function getNativePrice(
   ticker: string,
@@ -86,7 +86,7 @@ export function RebalancingOrderTable({
               매도
             </div>
             {sellRows.map(({ item, currentQty, suggestedQty }) => {
-              const key = `sell_${item.ticker}_${accId}`;
+              const key = orderKey("sell", item.ticker, accId);
               const qty = qtyOverrides[key] ?? suggestedQty;
               const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
               const currentNativePrice = getNativePrice(
@@ -134,7 +134,7 @@ export function RebalancingOrderTable({
               매수
             </div>
             {buyRows.map(({ item, suggestedQty, currentQty }) => {
-              const key = `buy_${item.ticker}_${accId}`;
+              const key = orderKey("buy", item.ticker, accId);
               const qty = qtyOverrides[key] ?? suggestedQty;
               const isMultiAccount = (buyAccounts[item.ticker] ?? []).length > 1;
               const { allocated, needed } = isMultiAccount
@@ -260,7 +260,7 @@ export function RebalancingOrderTable({
                   </td>
                 </tr>
                 {sellRows.map(({ item, currentQty, suggestedQty }) => {
-                  const key = `sell_${item.ticker}_${accId}`;
+                  const key = orderKey("sell", item.ticker, accId);
                   const qty = qtyOverrides[key] ?? suggestedQty;
                   const est = getEstimateKrw(key, item.ticker, item.market, qty);
                   const nativeVal = getLimitPriceNative(key, item.ticker, item.market);
@@ -366,7 +366,7 @@ export function RebalancingOrderTable({
                   </td>
                 </tr>
                 {buyRows.map(({ item, suggestedQty, currentQty }) => {
-                  const key = `buy_${item.ticker}_${accId}`;
+                  const key = orderKey("buy", item.ticker, accId);
                   const qty = qtyOverrides[key] ?? suggestedQty;
                   const est = getEstimateKrw(key, item.ticker, item.market, qty);
                   const nativeVal = getLimitPriceNative(key, item.ticker, item.market);

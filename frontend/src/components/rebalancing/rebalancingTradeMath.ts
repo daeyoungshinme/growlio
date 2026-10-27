@@ -1,5 +1,6 @@
-import { RebalancingItem } from "@/api/rebalancing";
+import type { RebalancingAnalysis, RebalancingItem } from "@/api/rebalancing";
 import { isOverseasMarket } from "@/constants/markets";
+import { CASH_EQUIVALENT_TICKER, CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
 
 export const TRADING_FEE_RATE = 0.00014; // 0.014% 수수료 (한국투자증권 기준)
 
@@ -31,6 +32,26 @@ export function flattenTradeItems(items: RebalancingItem[]): RebalancingItem[] {
       ? (i.members ?? []).filter((m) => m.target_value_krw !== m.current_value_krw)
       : [i],
   );
+}
+
+/** 실행 화면에서 주문을 낼 수 있는 종목 행 — 현금·현금성 자산·부동산과 1주 미만 차이는 뺀다.
+ *  (실행 훅과 가격 조회 훅이 함께 써서 여기 둔다 — 훅끼리 서로 import하면 순환이 생긴다, plans/78 C6) */
+export function getActionableItems(analysis: RebalancingAnalysis): RebalancingItem[] {
+  return flattenTradeItems(analysis.items).filter(
+    (i) =>
+      i.ticker !== CASH_TICKER &&
+      i.ticker !== CASH_EQUIVALENT_TICKER &&
+      i.market !== KR_PROPERTY_MARKET &&
+      i.shares_to_trade !== null &&
+      Math.abs(i.shares_to_trade) >= 1,
+  );
+}
+
+export type OrderSide = "buy" | "sell";
+
+/** 실행 화면 주문 행 키(선택·수량·지정가 상태의 키) — `${side}_${ticker}_${accountId}` */
+export function orderKey(side: OrderSide, ticker: string, accountId: string): string {
+  return `${side}_${ticker}_${accountId}`;
 }
 
 // 반올림된 주수 기준 실제 거래금액 — 요약·거래계획·거래비용 전체에서 동일하게 사용

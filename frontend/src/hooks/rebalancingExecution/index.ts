@@ -6,7 +6,6 @@ import { invalidateRebalancingHistoryData, invalidateSyncData } from "@/utils/qu
 import { isOrderExecutableAccount } from "@/utils/accounts";
 import { triggerHaptic } from "../useHaptic";
 import { isOverseasMarket } from "@/constants/markets";
-import { CASH_EQUIVALENT_TICKER, CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
 import {
   type ExecutionOrderItem,
   type ExecutionResult,
@@ -14,7 +13,11 @@ import {
   type RebalancingItem,
   executeRebalancing,
 } from "@/api/rebalancing";
-import { flattenTradeItems } from "@/components/rebalancing/rebalancingTradeMath";
+import {
+  flattenTradeItems,
+  getActionableItems,
+  orderKey,
+} from "@/components/rebalancing/rebalancingTradeMath";
 import { useRebalancingBalances } from "../useRebalancingBalances";
 import { useRebalancingPrices } from "../useRebalancingPrices";
 import type {
@@ -27,6 +30,8 @@ import type {
 } from "./types";
 import { executionReducer } from "./reducer";
 
+export { getActionableItems };
+
 export type {
   Phase,
   BalanceLoadState,
@@ -38,17 +43,6 @@ export type {
   ExecutionState,
   ExecutionAction,
 } from "./types";
-
-export function getActionableItems(analysis: RebalancingAnalysis): RebalancingItem[] {
-  return flattenTradeItems(analysis.items).filter(
-    (i) =>
-      i.ticker !== CASH_TICKER &&
-      i.ticker !== CASH_EQUIVALENT_TICKER &&
-      i.market !== KR_PROPERTY_MARKET &&
-      i.shares_to_trade !== null &&
-      Math.abs(i.shares_to_trade) >= 1,
-  );
-}
 
 function computeInitialBuyAndSelected(
   analysis: RebalancingAnalysis,
@@ -80,10 +74,10 @@ function computeInitialBuyAndSelected(
     if ((i.shares_to_trade ?? 0) < 0) {
       (analysis.ticker_account_map[i.ticker] ?? [])
         .filter((a) => isOrderExecutableAccount(a.asset_type))
-        .forEach((a) => selected.add(`sell_${i.ticker}_${a.account_id}`));
+        .forEach((a) => selected.add(orderKey("sell", i.ticker, a.account_id)));
     } else if ((i.shares_to_trade ?? 0) > 0) {
       const accId = getPrimaryAccountId(i.ticker) || defaultAccId;
-      if (accId) selected.add(`buy_${i.ticker}_${accId}`);
+      if (accId) selected.add(orderKey("buy", i.ticker, accId));
     }
   });
 
@@ -280,7 +274,7 @@ export function useRebalancingExecution({
     const item = actionableItems.find((i) => i.ticker === ticker);
     const needed = Math.abs(Math.round(item?.shares_to_trade ?? 0));
     const allocated = (buyAccounts[ticker] ?? []).reduce((sum, accId) => {
-      const key = `buy_${ticker}_${accId}`;
+      const key = orderKey("buy", ticker, accId);
       if (!selected.has(key)) return sum;
       return sum + (qtyOverrides[key] ?? needed);
     }, 0);
@@ -291,7 +285,7 @@ export function useRebalancingExecution({
     const orders: ExecutionOrderItem[] = [];
     tradableAccounts.forEach((acc) => {
       (sellRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty, currentQty }) => {
-        const key = `sell_${item.ticker}_${acc.id}`;
+        const key = orderKey("sell", item.ticker, acc.id);
         if (!selected.has(key)) return;
         // 보유량 초과 매도는 백엔드가 잘라 내므로, 확인 화면 수량과 실제 주문 수량이 어긋나지 않게 여기서도 자른다
         const qty = Math.min(qtyOverrides[key] ?? suggestedQty, currentQty);
@@ -311,7 +305,7 @@ export function useRebalancingExecution({
           });
       });
       (buyRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty }) => {
-        const key = `buy_${item.ticker}_${acc.id}`;
+        const key = orderKey("buy", item.ticker, acc.id);
         if (!selected.has(key)) return;
         const qty = qtyOverrides[key] ?? suggestedQty;
         if (qty > 0)
@@ -340,7 +334,7 @@ export function useRebalancingExecution({
       : (state.depositKrw[accountId] ?? null);
     let sellProceeds: number | null = 0;
     for (const { item, suggestedQty } of sellRowsByAccount[accountId] ?? []) {
-      const key = `sell_${item.ticker}_${accountId}`;
+      const key = orderKey("sell", item.ticker, accountId);
       if (!selected.has(key)) continue;
       const qty = qtyOverrides[key] ?? suggestedQty;
       const est = getEstimateKrw(key, item.ticker, item.market, qty);
@@ -352,7 +346,7 @@ export function useRebalancingExecution({
     }
     let buyCost: number | null = 0;
     for (const { item, suggestedQty } of buyRowsByAccount[accountId] ?? []) {
-      const key = `buy_${item.ticker}_${accountId}`;
+      const key = orderKey("buy", item.ticker, accountId);
       if (!selected.has(key)) continue;
       const qty = qtyOverrides[key] ?? suggestedQty;
       const est = getEstimateKrw(key, item.ticker, item.market, qty);
@@ -393,7 +387,7 @@ export function useRebalancingExecution({
     let totalSellProceeds: number | null = 0;
     loop: for (const acc of tradableAccounts) {
       for (const { item, suggestedQty } of sellRowsByAccount[acc.id] ?? []) {
-        const key = `sell_${item.ticker}_${acc.id}`;
+        const key = orderKey("sell", item.ticker, acc.id);
         if (!selected.has(key)) continue;
         const qty = qtyOverrides[key] ?? suggestedQty;
         const est = getEstimateKrw(key, item.ticker, item.market, qty);
@@ -408,7 +402,7 @@ export function useRebalancingExecution({
     let totalBuyCost: number | null = 0;
     loop2: for (const acc of tradableAccounts) {
       for (const { item, suggestedQty } of buyRowsByAccount[acc.id] ?? []) {
-        const key = `buy_${item.ticker}_${acc.id}`;
+        const key = orderKey("buy", item.ticker, acc.id);
         if (!selected.has(key)) continue;
         const qty = qtyOverrides[key] ?? suggestedQty;
         const est = getEstimateKrw(key, item.ticker, item.market, qty);
@@ -460,7 +454,7 @@ export function useRebalancingExecution({
 
     for (const acc of tradableAccounts) {
       for (const { item, suggestedQty } of buyRowsByAccount[acc.id] ?? []) {
-        const key = `buy_${item.ticker}_${acc.id}`;
+        const key = orderKey("buy", item.ticker, acc.id);
         if (!selected.has(key)) continue;
         const originalQty = qtyOverrides[key] ?? suggestedQty;
         const newQty = Math.floor(originalQty * ratio);
@@ -473,10 +467,10 @@ export function useRebalancingExecution({
 
   function getAccountSummary(accountId: string) {
     const sells = (sellRowsByAccount[accountId] ?? []).filter((r) =>
-      selected.has(`sell_${r.item.ticker}_${accountId}`),
+      selected.has(orderKey("sell", r.item.ticker, accountId)),
     ).length;
     const buys = (buyRowsByAccount[accountId] ?? []).filter((r) =>
-      selected.has(`buy_${r.item.ticker}_${accountId}`),
+      selected.has(orderKey("buy", r.item.ticker, accountId)),
     ).length;
     return { sells, buys };
   }
