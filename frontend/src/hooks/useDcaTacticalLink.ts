@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { mergeAlertsByPortfolio } from "@/utils/portfolio";
 
 export interface DcaTacticalLink {
   /** 활성 AUTO + BUY_ONLY(매수만) 자동매수 — 적립식 코어로 운용 중 */
@@ -23,7 +22,16 @@ export function useDcaTacticalLink(portfolioId: string | undefined): DcaTactical
     enabled: !!portfolioId,
   });
   if (!portfolioId || !Array.isArray(data)) return { dcaAuto: false, linked: false };
-  const alert = mergeAlertsByPortfolio(data)[portfolioId];
-  const dcaAuto = !!alert?.is_active && alert.mode === "AUTO" && alert.strategy === "BUY_ONLY";
-  return { dcaAuto, linked: dcaAuto && alert?.market_condition_mode === "TACTICAL" };
+  // 계좌별 알림이 여러 개일 수 있다 — mergeAlertsByPortfolio는 strategy·market_condition_mode를 첫 행 값으로
+  // 남겨 다른 계좌의 적립식 자동매수를 놓치므로, 행 단위로 본다(plans/80)
+  const dca = data.filter(
+    (a) =>
+      a.portfolio_id === portfolioId &&
+      a.is_active &&
+      a.mode === "AUTO" &&
+      a.strategy === "BUY_ONLY",
+  );
+  const dcaAuto = dca.length > 0;
+  // 적립식 자동매수가 모두 전술 연동일 때만 "연동됨" — 하나라도 빠지면 연동 안내를 계속 보여준다
+  return { dcaAuto, linked: dcaAuto && dca.every((a) => a.market_condition_mode === "TACTICAL") };
 }
