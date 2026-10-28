@@ -12,6 +12,8 @@ interface Props {
   data: Slice[];
   /** 접근성 레이블 접두어 */
   label?: string;
+  /** 금액을 숨김 — 조각 툴팁에 이름·비중만 표시(홈 금액 숨김 상태) */
+  hideValues?: boolean;
 }
 
 // 반지름 25, 두께 15 → 안쪽 17.5 / 바깥 32.5 (viewBox 100 기준) — 예전 recharts 도넛(35%/65%)과 같은 비율
@@ -24,7 +26,7 @@ const GAP = 1.6; // 조각 사이 간격(원주 길이 단위, 약 3도)
  * 의존성 없는 SVG 도넛. 홈 첫 카드에서 이 작은 도넛 하나 때문에 recharts 청크(약 435KB)를 받아
  * 파싱하던 것을 대체한다. 조각을 누르면 가운데에 이름·비중·금액을 보여준다(recharts 툴팁 대체).
  */
-export default memo(function MiniDonut({ data, label = "자산 구성" }: Props) {
+export default memo(function MiniDonut({ data, label = "자산 구성", hideValues }: Props) {
   const [active, setActive] = useState<number | null>(null);
   const total = data.reduce((sum, d) => sum + Math.max(d.value, 0), 0);
   if (total <= 0) return null;
@@ -66,7 +68,10 @@ export default memo(function MiniDonut({ data, label = "자산 구성" }: Props)
             onClick={() => setActive(active === i ? null : i)}
             className="cursor-pointer transition-[stroke-width] duration-150"
           >
-            <title>{`${data[i].name} ${data[i].pct.toFixed(1)}% (${fmtKrwShort(data[i].value)}원)`}</title>
+            <title>
+              {`${data[i].name} ${data[i].pct.toFixed(1)}%` +
+                (hideValues ? "" : ` (${fmtKrwShort(data[i].value)}원)`)}
+            </title>
           </circle>
         ))}
       </g>
