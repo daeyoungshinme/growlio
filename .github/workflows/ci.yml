@@ -80,7 +80,7 @@ jobs:
         run: .venv/bin/alembic downgrade -1
 
       - name: Test (pytest + coverage)
-        run: .venv/bin/pytest -x -v --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=80
+        run: .venv/bin/pytest -x -v --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=89
 
       - name: Coverage comment (PR only)
         if: github.event_name == 'pull_request'

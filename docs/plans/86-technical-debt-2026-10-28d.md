@@ -38,7 +38,7 @@ dev 의존성에 `httpx2`(pydantic/httpx2, httpx 원작자)를 추가했다. Sta
 | 경고 | 출처 | 비고 |
 |---|---|---|
 | FCM `Message.token` 폐기 예고 | firebase-admin 7 | 이관 유지 |
-| NumPy generic timedelta 폐기 예고 | pandas 2.3 내부(numpy 2.5 조합) | pandas 3는 pykrx가 막고 있음. numpy가 오류로 바꾸는 릴리스는 Dependabot PR의 CI에서 잡힌다 |
+| NumPy generic timedelta 폐기 예고 | pandas 2.3 내부(numpy 2.5 조합) — **87에서 정정**: 절반은 테스트의 `pd.Timedelta(days=)`가 출처였음 | pandas 3는 pykrx가 막고 있음. numpy가 오류로 바꾸는 릴리스는 Dependabot PR의 CI에서 잡힌다 |
 | sqlite `ResourceWarning: unclosed database` | yfinance 내부 캐시(Python 3.13부터 경고) | 결과 영향 없음 |
 
 ## 이관

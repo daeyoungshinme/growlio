@@ -211,7 +211,10 @@ class TestSyncYahooBatch:
     def test_returns_empty_on_exception(self, override_settings):
         from app.services.yahoo_price import _sync_yahoo_batch
 
-        with patch("yfinance.download", side_effect=Exception("rate limit")):
+        with (
+            patch("yfinance.download", side_effect=Exception("rate limit")),
+            patch("time.sleep"),
+        ):
             result = _sync_yahoo_batch([("AAPL", "NASDAQ")])
 
         assert result == {}
@@ -347,7 +350,10 @@ class TestSyncCalcReturnsBatch:
     def test_returns_empty_on_exception(self, override_settings):
         from app.services.yahoo_price import _sync_calc_returns_batch
 
-        with patch("yfinance.download", side_effect=Exception("rate limit")):
+        with (
+            patch("yfinance.download", side_effect=Exception("rate limit")),
+            patch("time.sleep"),
+        ):
             result = _sync_calc_returns_batch([("AAPL", "NASDAQ")])
 
         assert result == {}

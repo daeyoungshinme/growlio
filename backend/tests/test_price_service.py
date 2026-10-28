@@ -44,11 +44,7 @@ class TestFetchCurrentPrice:
         with (
             patch("app.services.price_service.domestic_price_fallback", new=AsyncMock(return_value=None)),
             patch("app.services.yahoo_price._sync_yahoo_price", return_value=75000.0),
-            patch("asyncio.get_event_loop") as mock_loop,
         ):
-            mock_executor = AsyncMock(return_value=75000.0)
-            mock_loop.return_value.run_in_executor = mock_executor
-
             from app.services.price_service import fetch_current_price
 
             # DB 조회 없이 Yahoo가 성공하면 DB 없어도 됨
@@ -63,14 +59,13 @@ class TestFetchCurrentPrice:
     async def test_returns_none_when_all_providers_fail(self, mock_db, mock_cache, override_settings):
         """모든 provider 실패 시 None 반환 (예외 없음)."""
         import uuid
-        from unittest.mock import AsyncMock, patch
+        from unittest.mock import patch
 
         user_id = uuid.uuid4()
         mock_db.scalar.return_value = None  # UserSettings 없음
 
-        with patch("asyncio.get_event_loop") as mock_loop:
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
-
+        # Yahoo 조회 함수 자체를 막는다 — 막지 않으면 실제 yfinance 네트워크 호출이 나간다
+        with patch("app.services.yahoo_price._sync_yahoo_price", return_value=None):
             from app.services.price_service import fetch_current_price
 
             price = await fetch_current_price(user_id, "UNKNOWN", "NYSE", mock_db, mock_cache)

@@ -18,7 +18,7 @@ cd backend && uv run alembic current / history --verbose
 cd backend && uv run pytest
 cd backend && uv run pytest tests/test_asset_service.py -v
 cd backend && uv run pytest -k "test_name" -x --tb=short
-cd backend && uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=80   # CI 게이트
+cd backend && uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=89   # CI 게이트
 
 # Lint & Type
 cd backend && uv run ruff check .    # E/F/I/UP/B/SIM/C90/ASYNC/PT/RUF100, E712·B008·SIM108·PT001 제외, max-complexity 15
