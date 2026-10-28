@@ -29,6 +29,12 @@ class TestKisApiError:
 
 
 class TestKisRequestTransientRetry:
+    @pytest.fixture(autouse=True)
+    def _no_retry_sleep(self):
+        """재시도 전 1초 대기 제거 — 재시도 횟수 검증만 남긴다."""
+        with patch("asyncio.sleep", AsyncMock()):
+            yield
+
     @pytest.mark.asyncio
     async def test_retries_on_transient_rt_cd_1(self, mock_rate_limiter, override_settings):
         """rt_cd='1' (MCI오류) 발생 시 1회 재시도 후 성공한다."""

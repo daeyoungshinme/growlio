@@ -299,3 +299,16 @@ def _mock_scheduler(monkeypatch):
     monkeypatch.setattr(sched.scheduler, "start", lambda: None)
     monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)
     monkeypatch.setattr("app.main.init_scheduler", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def _no_naver_retry_wait(monkeypatch):
+    """Naver 재시도 백오프(1~8초) 제거 — `@retry(**NAVER_RETRY)`는 호출마다 데코레이트되므로 dict를 패치한다.
+
+    재시도 횟수(stop)·대상(retry)은 그대로라 재시도 검증 테스트는 유지된다.
+    """
+    from tenacity import wait_none
+
+    from app.utils.naver_retry import NAVER_RETRY
+
+    monkeypatch.setitem(NAVER_RETRY, "wait", wait_none())
