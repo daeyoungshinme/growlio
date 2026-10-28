@@ -71,6 +71,8 @@ dev = [
     # pytest-httpx는 httpx 마이너 버전에 강하게 묶여 있어 상한 필요
     "pytest-httpx>=0.30.0,<0.37.0",
     "pytest-timeout>=2.3.0,<3.0.0",
+    # starlette.testclient(=fastapi.testclient)가 우선 import — 없으면 httpx 폴백 + 폐기 경고
+    "httpx2>=2.16.0,<3.0.0",
     "ruff>=0.15.13,<0.18.0",
     "mypy>=1.10.0,<3.0.0",
     "bandit>=1.7.0,<2.0.0",
