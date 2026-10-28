@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Prerequisites
 
-Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.11+, Node 22+, [uv](https://docs.astral.sh/uv/) 필수.
+Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.13+, Node 22+, [uv](https://docs.astral.sh/uv/) 필수.
 
 > Android 빌드 시 추가 필요: JDK 17+, Android Studio (SDK 포함).
 
@@ -76,7 +76,7 @@ make build-android-release  # npm build + cap sync + gradlew assembleRelease
 ### Monorepo Structure
 ```
 growlio/
-├── backend/          # FastAPI (Python 3.11+)
+├── backend/          # FastAPI (Python 3.13+)
 ├── frontend/         # React 18 + Vite (TypeScript)
 │   └── android/      # Capacitor Android 프로젝트
 ├── nginx/            # 자체 호스팅용 대안 구성 — 운영(Render+Vercel)·로컬 개발 모두 미사용 (아래 "배포 & CI")

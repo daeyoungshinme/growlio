@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
-
-T = TypeVar("T")
 
 
-async def with_token_refresh(
+async def with_token_refresh[T](
     fetch: Callable[[str], Awaitable[T]],
     get_token: Callable[[bool], Awaitable[str]],
     expired_exc_type: type[Exception],

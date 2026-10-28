@@ -17,7 +17,7 @@ migrate-down:
 
 install-backend:
 	cd backend && uv sync --extra dev
-	pre-commit install
+	uv run --project backend pre-commit install
 
 format-backend:
 	cd backend && uv run ruff format . && uv run ruff check . --fix

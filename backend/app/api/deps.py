@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, Any
 
 import structlog
 from fastapi import Depends, Header, HTTPException, Query, status
@@ -10,8 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.user import User
 from app.services.auth_service import verify_supabase_token
-
-T = TypeVar("T")
 
 logger = structlog.get_logger()
 
@@ -66,7 +64,7 @@ class PaginationParams(BaseModel):
 PaginationDep = Annotated[PaginationParams, Depends(PaginationParams)]
 
 
-async def get_owned_or_404(
+async def get_owned_or_404[T](
     db: AsyncSession,
     model: type[T],
     resource_id: Any,

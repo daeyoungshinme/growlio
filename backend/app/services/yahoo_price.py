@@ -16,7 +16,7 @@ import threading
 import time
 from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -30,8 +30,6 @@ if TYPE_CHECKING:
     from datetime import date
 
 logger = structlog.get_logger()
-
-_T = TypeVar("_T")
 
 _yfinance_sem = asyncio.Semaphore(settings.api_semaphore_limit)
 
@@ -168,7 +166,7 @@ def _sync_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
 # 서킷이 열려 있으면 조회 없이 실패값(0.0 / None / {})을 돌려주므로 호출부 폴백 경로를 그대로 탄다.
 
 
-async def run_yf_bounded(func: Callable[..., _T], *args: Any) -> _T:
+async def run_yf_bounded[T](func: Callable[..., T], *args: Any) -> T:
     """동기 Yahoo/pykrx 조회를 공유 동시성 슬롯(`_yfinance_sem`) 안에서 executor로 실행한다.
 
     서킷 브레이커는 다루지 않는다 — `fetch_yf_close_series`/`fetch_yf_info`처럼 스스로 서킷을 기록하는

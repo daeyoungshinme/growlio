@@ -25,7 +25,7 @@ async def inproc_lock(
     cache: CacheStore,
     key: str,
     ttl: int = 60,
-) -> AsyncGenerator[bool, None]:
+) -> AsyncGenerator[bool]:
     """SET NX EX 기반 락 컨텍스트 매니저.
 
     락 획득 성공 시 True를 yield, 실패 시 False를 yield.

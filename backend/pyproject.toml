@@ -2,7 +2,7 @@
 name = "growlio"
 version = "0.1.0"
 description = "Growlio — 자산관리 + 포트폴리오 자동매매 앱"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 
 dependencies = [
     # Web framework
@@ -66,6 +66,8 @@ dev = [
     "bandit>=1.7.0,<2.0.0",
     "pip-audit>=2.7.0,<3.0.0",
     "pytest-cov>=5.0.0,<8.0.0",
+    # make install-backend가 훅 설치에 사용 — venv 재생성 시 사라지지 않게 명시
+    "pre-commit>=4.0.0,<5.0.0",
 ]
 
 [build-system]
@@ -104,7 +106,7 @@ exclude_lines = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py313"
 line-length = 120
 # ruff 0.17부터 Markdown 코드블록도 포맷 대상 — CLAUDE.md의 한 줄 압축 예시가 쪼개지지 않게 제외
 extend-exclude = ["*.md"]
@@ -125,7 +127,7 @@ max-complexity = 15
 "alembic/*" = ["F401", "F811"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 platform = "linux"
 strict = false
 ignore_missing_imports = true

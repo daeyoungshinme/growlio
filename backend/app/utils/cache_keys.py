@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
 
-CacheStoreType: TypeAlias = "CacheStore | None"
+type CacheStoreType = CacheStore | None
 
 
 def _env_prefix() -> str:
