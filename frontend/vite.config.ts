@@ -159,13 +159,13 @@ export default defineConfig({
         "src/hooks/useRegisterRefresh.ts",
         "src/hooks/rebalancingExecution/types.ts",
       ],
-      // 2026-09-13 실측(lines 69.04/functions 55.87/branches 55.08/statements 67.78%)에서
+      // 2026-10-28 실측(lines 79.38/functions 67.33/branches 67.75/statements 77.97%)에서
       // ~3%p 안전 마진을 두고 상향 — 임의 목표치가 아니라 측정값 기반.
       thresholds: {
-        lines: 66,
-        functions: 52,
-        branches: 52,
-        statements: 64,
+        lines: 76,
+        functions: 64,
+        branches: 64,
+        statements: 75,
       },
     },
   },

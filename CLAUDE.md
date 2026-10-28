@@ -56,7 +56,7 @@ make dev-keep-port    # 위와 동일하되, 8000 포트가 이미 사용 중이
 make dev-backend      # 백엔드만 (localhost:8000)
 make dev-frontend     # 프론트엔드만 (localhost:5173)
 make test-backend     # cd backend && uv run pytest (커버리지 없이 빠르게)
-make test-backend-cov # cd backend && uv run pytest --cov=app --cov-fail-under=80 (CI와 동일한 80% 게이트)
+make test-backend-cov # cd backend && uv run pytest --cov=app --cov-fail-under=89 (CI와 동일한 89% 게이트)
 make test-frontend    # cd frontend && npm run test
 make lint             # ruff check + format --check (backend) + eslint --max-warnings 0 + prettier --check (frontend) — CI와 같은 기준
 make typecheck        # mypy (backend) + tsc --noEmit (frontend)
@@ -126,7 +126,7 @@ CI(`ci.yml`)와 같은 기준 — 커밋/PR 전에 변경 영역에 맞춰 실�
 ```bash
 make lint            # ruff + eslint --max-warnings 0
 make typecheck       # mypy + tsc --noEmit
-make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-cov (80% 게이트)
+make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-cov (89% 게이트)
 make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.config.ts
 ```
 

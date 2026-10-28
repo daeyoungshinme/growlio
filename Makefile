@@ -41,7 +41,7 @@ test-backend:
 	cd backend && uv run pytest
 
 test-backend-cov:
-	cd backend && uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=80
+	cd backend && uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=89
 
 test-frontend:
 	cd frontend && npm run test
