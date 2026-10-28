@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -24,6 +24,16 @@ vi.mock("@/api/tactical", async (importOriginal) => ({
   }),
 }));
 
+vi.mock("@/api/portfolios", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/portfolios")>()),
+  fetchPortfolios: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("@/api/assets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/assets")>()),
+  fetchAccounts: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
   default: () => React.createElement("div", { "data-testid": "rebalancing-status-card" }),
 }));
@@ -32,13 +42,19 @@ vi.mock("@/components/portfolio-analysis/PortfolioManageTab", () => ({
   default: ({
     prefillName,
     onPrefillConsumed,
+    selectedPortfolioId,
   }: {
     prefillName?: string;
     onPrefillConsumed?: () => void;
+    selectedPortfolioId?: string;
   }) =>
     React.createElement(
       "div",
-      { "data-testid": "portfolio-manage-tab", "data-prefill-name": prefillName ?? "" },
+      {
+        "data-testid": "portfolio-manage-tab",
+        "data-prefill-name": prefillName ?? "",
+        "data-selected": selectedPortfolioId ?? "",
+      },
       React.createElement("button", { onClick: onPrefillConsumed }, "consume-prefill"),
     ),
 }));
@@ -82,6 +98,9 @@ vi.mock("@/components/portfolio-analysis/PortfolioExecutionTab", () => ({
 import RebalancingPage from "@/pages/RebalancingPage";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
+import { fetchPortfolios } from "@/api/portfolios";
+import { fetchAccounts } from "@/api/assets";
+import { fetchTacticalStrategies } from "@/api/tactical";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -136,6 +155,55 @@ describe("RebalancingPage", () => {
     renderPage("?rtab=전술");
     expect(await screen.findByTestId("tactical-tab")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "전술" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("URL 선택 없이 전술에서 포트폴리오 탭으로 가면 전술이 고른 포트폴리오가 유지된다 (plans/83 A)", async () => {
+    // p1=기준 포트폴리오(계좌 목표), p2=전술 켜짐 — 전술은 p2, 다른 탭 기본값은 p1
+    vi.mocked(fetchPortfolios).mockResolvedValue([
+      { id: "p1", name: "국내 배당", account_ids: [] },
+      { id: "p2", name: "미국 전술", account_ids: [] },
+    ] as unknown as Awaited<ReturnType<typeof fetchPortfolios>>);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "a1", is_active: true, asset_type: "STOCK_KIS", target_portfolio_id: "p1" },
+    ] as unknown as Awaited<ReturnType<typeof fetchAccounts>>);
+    vi.mocked(fetchTacticalStrategies).mockResolvedValue([
+      { portfolio_id: "p2", confirmed_regime: null, notify_enabled: true },
+    ]);
+    try {
+      renderPage("?rtab=전술");
+      expect(
+        await screen.findByRole("option", { name: "미국 전술 (전술 켜짐)" }),
+      ).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("combobox")).toHaveValue("p2"));
+      fireEvent.click(screen.getByRole("tab", { name: "포트폴리오" }));
+      expect(await screen.findByTestId("portfolio-manage-tab")).toHaveAttribute(
+        "data-selected",
+        "p2",
+      );
+    } finally {
+      vi.mocked(fetchPortfolios).mockResolvedValue([]);
+      vi.mocked(fetchAccounts).mockResolvedValue([]);
+      vi.mocked(fetchTacticalStrategies).mockResolvedValue([]);
+    }
+  });
+
+  it("전술을 거치지 않으면 포트폴리오 탭 기본값은 기준 포트폴리오다 (plans/64 S3)", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValue([
+      { id: "p1", name: "국내 배당", account_ids: [] },
+      { id: "p2", name: "미국 전술", account_ids: [] },
+    ] as unknown as Awaited<ReturnType<typeof fetchPortfolios>>);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "a1", is_active: true, asset_type: "STOCK_KIS", target_portfolio_id: "p1" },
+    ] as unknown as Awaited<ReturnType<typeof fetchAccounts>>);
+    try {
+      renderPage("?rtab=포트폴리오");
+      await waitFor(() =>
+        expect(screen.getByTestId("portfolio-manage-tab")).toHaveAttribute("data-selected", "p1"),
+      );
+    } finally {
+      vi.mocked(fetchPortfolios).mockResolvedValue([]);
+      vi.mocked(fetchAccounts).mockResolvedValue([]);
+    }
   });
 
   it("목표 조정 탭에서 전술 모드로 바꾸면 전술 화면이 보인다", async () => {

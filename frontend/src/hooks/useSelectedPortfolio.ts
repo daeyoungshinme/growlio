@@ -24,6 +24,8 @@ export function resolveSelectedPortfolioId(
  *
  * `preferTactical`이면 전술 배분을 켠 포트폴리오를 기준 포트폴리오보다 먼저 고른다 — 기준 포트폴리오는 대개
  * 전술과 무관해(국내 배당·ISA 등) 전술 모드에 들어가자마자 "꺼짐"과 종목 삭제 경고가 보였다(plans/81).
+ * 이렇게 하면 전술 모드만 기본값이 달라지므로, `RebalancingPage`가 전술에서 다른 탭으로 떠날 때 보이던 id를
+ * 기억해 `requestedId`로 넘긴다(plans/83 A).
  */
 export function useSelectedPortfolio(
   requestedId: string | undefined,
@@ -60,5 +62,5 @@ export function useSelectedPortfolio(
   const requestedValid = !!requestedId && portfolioIds.includes(requestedId);
   const tacticalPending = preferTactical && strategiesPending && !requestedValid;
 
-  return { portfolios, anchoredIds, tacticalIds, selectedId, isLoading, tacticalPending };
+  return { portfolios, tacticalIds, selectedId, isLoading, tacticalPending };
 }

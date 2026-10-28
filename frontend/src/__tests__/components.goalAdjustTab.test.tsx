@@ -8,7 +8,6 @@ import React from "react";
 const selection = vi.hoisted(() => ({
   current: {
     portfolios: [] as { id: string; name: string }[],
-    anchoredIds: [] as string[],
     tacticalIds: [] as string[],
     selectedId: undefined as string | undefined,
     tacticalPending: false,
@@ -89,7 +88,6 @@ describe("GoalAdjustTab", () => {
         { id: "p1", name: "국내 배당" },
         { id: "p2", name: "미국 전술" },
       ],
-      anchoredIds: ["p1"],
       tacticalIds: ["p2"],
       selectedId: "p2",
       tacticalPending: false,

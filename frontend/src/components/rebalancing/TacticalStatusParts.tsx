@@ -28,7 +28,7 @@ const NEXT_ACTION_CLASS: Record<NextActionTone, string> = {
 };
 
 /** 요약 한 줄(제목 + 값) — 근거 목록은 "판정 근거" 접힘 안에 둔다 */
-export function SummaryLine({ title, value }: { title: string; value: string }) {
+function SummaryLine({ title, value }: { title: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-sm font-semibold">{title}</span>
@@ -49,7 +49,7 @@ function dipValue(status: TacticalStatus): string {
   return status.dip_level > 0 ? "투입할 현금 없음" : "대기";
 }
 
-export function ReasonList({ items }: { items: string[] }) {
+function ReasonList({ items }: { items: string[] }) {
   return (
     <ul className="text-xs text-gray-500 dark:text-gray-400 list-disc pl-4 space-y-0.5">
       {items.map((r) => (
