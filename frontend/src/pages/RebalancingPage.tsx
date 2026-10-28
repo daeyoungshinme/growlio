@@ -55,7 +55,28 @@ export default function RebalancingPage() {
     clearParam,
   } = useRebalancingUrlState();
 
-  const handleTabChange = useCallback((tab: RebalancingTab) => navigateTo({ tab }), [navigateTo]);
+  // 전술 모드의 기본값(전술 켠 포트폴리오 우선, plans/81)은 다른 탭과 달라, 전술에서 떠날 때 보이던 포트폴리오를
+  // 기억해 이후 기본값으로 쓴다 — 아니면 다음 탭이 기준 포트폴리오로 돌아가 탭마다 다른 포트폴리오가 보인다
+  // (plans/64 S2·83 A). URL에는 쓰지 않는다 — URL portfolioId는 "직접 고름"이라 분석 결과로 스크롤된다
+  const [tacticalDefaultId, setTacticalDefaultId] = useState<string>();
+  const requestedPortfolioId = portfolioId ?? tacticalDefaultId;
+
+  // URL이 비어 있으면 기준 포트폴리오를 기본으로 — 예전엔 아무것도 선택되지 않아 분석·실행 영역이 숨겨졌다.
+  // 기본값은 URL에 쓰지 않고 파생만 한다(plans/64 S3)
+  const inTacticalMode = localTab === "목표 조정" && goalMode === "전술";
+  const { selectedId: effectivePortfolioId } = useSelectedPortfolio(requestedPortfolioId, {
+    preferTactical: inTacticalMode,
+  });
+
+  const handleTabChange = useCallback(
+    (tab: RebalancingTab) => {
+      if (inTacticalMode && !requestedPortfolioId && effectivePortfolioId) {
+        setTacticalDefaultId(effectivePortfolioId);
+      }
+      navigateTo({ tab });
+    },
+    [navigateTo, inTacticalMode, requestedPortfolioId, effectivePortfolioId],
+  );
 
   const handleGoalModeChange = useCallback(
     (mode: GoalMode) => navigateTo({ tab: "목표 조정", mode }),
@@ -89,9 +110,6 @@ export default function RebalancingPage() {
     setPrefill({ items: [], name: "", accountIds: null });
     handleTabChange("포트폴리오");
   }, [handleTabChange]);
-  // URL이 비어 있으면 기준 포트폴리오를 기본으로 — 예전엔 아무것도 선택되지 않아 분석·실행 영역이 숨겨졌다.
-  // 기본값은 URL에 쓰지 않고 파생만 한다(plans/64 S3)
-  const { selectedId: effectivePortfolioId } = useSelectedPortfolio(portfolioId);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, REBALANCING_TABS, localTab, handleTabChange);
@@ -270,7 +288,7 @@ export default function RebalancingPage() {
             <GoalAdjustTab
               mode={goalMode}
               onModeChange={handleGoalModeChange}
-              selectedPortfolioId={portfolioId}
+              selectedPortfolioId={requestedPortfolioId}
               onSelectPortfolio={handlePortfolioChange}
               onGoToExecution={(id) => handlePortfolioSelectFromDiagnosis(id)}
               onCreatePortfolio={(items, name, accountIds) => {

@@ -180,7 +180,7 @@ _배당_
 
 _리밸런싱/추천_
 
-- `useSelectedPortfolio.ts` — 리밸런싱 페이지의 "지금 보는 포트폴리오"(URL `portfolioId` → 첫 기준 포트폴리오 → 첫 포트폴리오, `resolveSelectedPortfolioId`). `{ preferTactical: true }`면 전술 켠 포트폴리오(`GET /tactical`)를 기준 포트폴리오보다 앞에 두고 `tacticalIds`·`tacticalPending`을 함께 반환(목표 조정 › 전술). 목표 조정(추천·전술)과 포트폴리오 탭이 같은 기본값을 쓴다. 기본값은 URL에 쓰지 않고 파생만
+- `useSelectedPortfolio.ts` — 리밸런싱 페이지의 "지금 보는 포트폴리오"(URL `portfolioId` → 첫 기준 포트폴리오 → 첫 포트폴리오, `resolveSelectedPortfolioId`). `{ preferTactical: true }`면 전술 켠 포트폴리오(`GET /tactical`)를 기준 포트폴리오보다 앞에 두고 `tacticalIds`·`tacticalPending`을 함께 반환(목표 조정 › 전술). 목표 조정(추천·전술)과 포트폴리오 탭이 같은 기본값을 쓴다 — 전술 모드만 기본값이 달라 `RebalancingPage`가 전술에서 떠날 때 보이던 id를 state(`tacticalDefaultId`)로 기억해 요청값으로 넘긴다(plans/83 A). 기본값은 URL에 쓰지 않고 파생만
 - `useAnalysisState.ts`는 `AnalysisPanel`(포트폴리오 1개 전용 — 다중선택 잔재 제거, plans/64 S3)이 사용. 포트폴리오 탭 분석 영역은 기본 선택으로 열려도 결과로 자동 스크롤하지 않고(`scrollToResult`), URL로 직접 고른 경우만 스크롤
 - `useRebalancingUrlState.ts` — 리밸런싱 페이지 URL 상태(rtab·gmode·portfolioId 읽기, `navigateTo`/`clearParam` 쓰기). 탭은 state로 복사하지 않고 URL에서 파생
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
