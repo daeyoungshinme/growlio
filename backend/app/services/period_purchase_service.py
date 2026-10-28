@@ -302,7 +302,7 @@ async def _load_series(
         .where(AssetSnapshot.account_id.in_(account_ids), AssetSnapshot.snapshot_date < start)
         .group_by(AssetSnapshot.account_id)
     )
-    baseline_date: dict[uuid.UUID, date] = {acc_id: d for acc_id, d in baseline_rows.all()}
+    baseline_date: dict[uuid.UUID, date] = {acc_id: d for acc_id, d in baseline_rows.all() if acc_id is not None}
     lower = min([start, *baseline_date.values()])
 
     snap_rows = await db.execute(
@@ -314,6 +314,8 @@ async def _load_series(
     )
     snap_meta: dict[uuid.UUID, tuple[uuid.UUID, date]] = {}
     for snap_id, acc_id, snap_date in snap_rows.all():
+        if acc_id is None:  # account_id.in_() 필터로 실제론 없음 — 타입 좁히기
+            continue
         floor = baseline_date.get(acc_id, start)
         if snap_date >= floor:
             snap_meta[snap_id] = (acc_id, snap_date)
