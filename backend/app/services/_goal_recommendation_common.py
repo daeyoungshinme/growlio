@@ -22,7 +22,7 @@ import asyncio
 import functools
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import NamedTuple, TypeVar
+from typing import NamedTuple
 
 import structlog
 
@@ -344,9 +344,6 @@ class _GoalCandidate(NamedTuple):
     dividend_yield_pct: float
 
 
-_ResultT = TypeVar("_ResultT", GoalRecommendation, HorizonGoalRecommendation)
-
-
 def _join_notes(*notes: str | None) -> str | None:
     """비어 있지 않은 안내 문구를 순서대로 공백으로 잇는다(전부 비면 None)."""
     return " ".join(n for n in notes if n) or None
@@ -494,10 +491,10 @@ def _includes_cash_equivalent(items: list[dict]) -> bool:
     return any(i["ticker"] == _CASH_EQUIVALENT_TICKER for i in items)
 
 
-def _apply_dividend_suggestions(
-    result: _ResultT,
+def _apply_dividend_suggestions[ResultT: (GoalRecommendation, HorizonGoalRecommendation)](
+    result: ResultT,
     suggestion: tuple[list[dict[str, object]], str | None, str | None],
-) -> _ResultT:
+) -> ResultT:
     """`_suggest_for_dividend_goal()` 결과(제안 후보·안내·상태)를 추천 결과에 병합한다."""
     suggested, dividend_note, dividend_goal_status = suggestion
     result.suggested_candidates = [SuggestedGoalCandidate(**s) for s in suggested]

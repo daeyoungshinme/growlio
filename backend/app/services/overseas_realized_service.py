@@ -240,7 +240,8 @@ async def load_trade_record_realized(
             AssetSnapshot.snapshot_date <= end,
         )
     )
-    snaps_by_account: dict[uuid.UUID, list[tuple[date, uuid.UUID]]] = defaultdict(list)
+    # 키가 UUID | None인 건 컬럼이 nullable이라서일 뿐 — account_id.in_() 필터로 None은 오지 않는다
+    snaps_by_account: dict[uuid.UUID | None, list[tuple[date, uuid.UUID]]] = defaultdict(list)
     for snap_id, acc_id, snap_date in snap_rows.all():
         snaps_by_account[acc_id].append((snap_date, snap_id))
     for snaps in snaps_by_account.values():

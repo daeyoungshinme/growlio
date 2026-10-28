@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, TypedDict, TypeVar
+from typing import Any, TypedDict
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,8 +16,6 @@ from app.constants import (
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.utils.kst import today_kst
-
-_T = TypeVar("_T")
 
 _DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}
 
@@ -67,7 +65,7 @@ _TAX_RATES: dict[int, _TaxRates] = {
 }
 
 
-def pick_year_rule(table: dict[int, _T], year: int) -> _T:
+def pick_year_rule[T](table: dict[int, T], year: int) -> T:
     """연도별 세법 테이블에서 해당 연도 값을, 없으면 가장 가까운 연도 값을 반환한다."""
     if year in table:
         return table[year]

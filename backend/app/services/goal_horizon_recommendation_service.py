@@ -377,6 +377,8 @@ async def _accounts_by_horizon_tax_pair(db: AsyncSession, user_id: uuid.UUID) ->
     ).all()
     accounts_by_pair: dict[tuple[str, str], list[uuid.UUID]] = {}
     for horizon_value, tax_type_value, account_id in rows:
+        if horizon_value is None:  # isnot(None) 필터로 실제론 없음 — 타입 좁히기
+            continue
         key = (horizon_value, tax_type_value or AccountTaxType.GENERAL.value)
         accounts_by_pair.setdefault(key, []).append(account_id)
     return accounts_by_pair

@@ -199,7 +199,7 @@ async def _calc_dividend_total_by_account(
         )
         .group_by(Transaction.account_id)
     )
-    return {row[0]: float(row[1] or 0) for row in result.all()}
+    return {row[0]: float(row[1] or 0) for row in result.all() if row[0] is not None}
 
 
 # ISA 납입한도 — 연 2,000만원, 총 1억원, 미납입분은 다음 해로 이월(조세특례제한법 §91의18, 2026년 기준).

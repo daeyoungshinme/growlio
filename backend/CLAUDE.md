@@ -27,6 +27,7 @@ cd backend && uv run mypy app/
 
 - **RUF100**: 불필요한 `# noqa`도 오류 — 필요 없어진 noqa는 지운다.
 - **mypy `platform = "linux"` 고정**: CI(Linux)와 로컬(Windows)의 `sys.platform` stub 분기 차이 방지.
+- **pyproject 의존성에 extras 표기(`pkg[extra]`) 금지**: Dependabot(uv)이 `No update possible`로 조용히 건너뛰어 영영 갱신되지 않는다. extra가 끌어오는 패키지를 직접 나열한다(`uvicorn[standard]` 등을 이렇게 풀어 둠).
 
 ### Alembic 주의
 

@@ -16,7 +16,7 @@ from app.models.asset import AssetAccount
 _BROKER_ASSET_TYPES = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS"]
 
 
-def active_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
+def active_accounts_stmt(user_id: uuid.UUID) -> Select[AssetAccount]:
     """user_id의 활성 계좌를 조회하는 SELECT 구문 반환."""
     return select(AssetAccount).where(
         AssetAccount.user_id == user_id,
@@ -24,7 +24,7 @@ def active_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
     )
 
 
-def active_broker_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
+def active_broker_accounts_stmt(user_id: uuid.UUID) -> Select[AssetAccount]:
     """user_id의 활성 KIS/키움/토스 연동 계좌를 조회하는 SELECT 구문 반환 (실시간 잔고 조회용).
 
     주문 실행 경로는 이 헬퍼를 쓰지 않는다 — execution_service.py/order_builder.py가
@@ -33,7 +33,7 @@ def active_broker_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount
     return active_accounts_stmt(user_id).where(AssetAccount.asset_type.in_(_BROKER_ASSET_TYPES))
 
 
-def portfolio_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
+def portfolio_accounts_stmt(user_id: uuid.UUID) -> Select[AssetAccount]:
     """user_id의 "전체 갱신" 대상 계좌(주식형 + 기타현금)를 조회하는 SELECT 구문 반환.
 
     프론트 isPortfolioAccount(frontend/src/utils/accounts.ts)와 동일한 기준
