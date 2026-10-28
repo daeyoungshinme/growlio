@@ -26,7 +26,7 @@ dependencies = [
     # Encryption (KIS credentials)
     "cryptography>=42.0.0,<51.0.0",
     # Logging
-    "structlog>=24.0.0,<26.0.0",
+    "structlog>=24.0.0,<27.0.0",
     # Date utils
     "python-dateutil>=2.9.0,<4.0.0",
     # Stock price data (API 키 불필요 — Yahoo Finance). 비공식 스크래핑 기반이라 breaking change 잦음 — 상한 필수
@@ -38,13 +38,13 @@ dependencies = [
     # Rate limiting
     "slowapi>=0.1.9,<0.2.0",
     # Retry logic for external APIs
-    "tenacity>=8.3.0,<9.0.0",
+    "tenacity>=8.3.0,<10.0.0",
     # Error tracking
     "sentry-sdk[fastapi]>=2.0.0,<3.0.0",
     # Metrics
     "prometheus-client>=0.20.0,<1.0.0",
     # FCM 푸시 알림 (선택적 — FIREBASE_CREDENTIALS_JSON 환경변수 설정 시 활성화)
-    "firebase-admin>=6.5.0,<7.0.0",
+    "firebase-admin>=6.5.0,<8.0.0",
     # 포트폴리오 최적화 — 효율적 프론티어 MVO
     "scipy>=1.12.0,<2.0.0",
     # 수치 계산 — estimation.py 등에서 직접 import (scipy/yfinance/pykrx 전이 의존이 아닌 직접 의존이므로 명시)
@@ -61,7 +61,7 @@ dev = [
     # pytest-httpx는 httpx 마이너 버전에 강하게 묶여 있어 상한 필요
     "pytest-httpx>=0.30.0,<0.37.0",
     "pytest-timeout>=2.3.0,<3.0.0",
-    "ruff>=0.15.13,<0.16.0",
+    "ruff>=0.15.13,<0.18.0",
     "mypy>=1.10.0,<3.0.0",
     "bandit>=1.7.0,<2.0.0",
     "pip-audit>=2.7.0,<3.0.0",
@@ -83,6 +83,11 @@ addopts = "--tb=short"
 timeout = 60
 timeout_method = "thread"
 asyncio_default_fixture_loop_scope = "function"
+# 동기 메서드(db.add 등)를 AsyncMock으로 둬서 코루틴이 버려지는 테스트 mock 실수를 실패로 잡는다
+filterwarnings = [
+    "error:coroutine .* was never awaited:RuntimeWarning",
+    "error::pytest.PytestUnraisableExceptionWarning",
+]
 
 [tool.coverage.run]
 source = ["app"]
@@ -101,6 +106,8 @@ exclude_lines = [
 [tool.ruff]
 target-version = "py311"
 line-length = 120
+# ruff 0.17부터 Markdown 코드블록도 포맷 대상 — CLAUDE.md의 한 줄 압축 예시가 쪼개지지 않게 제외
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C90", "ASYNC", "PT", "RUF100"]

@@ -352,10 +352,8 @@ class TestSendMarketSignalDailyDigest:
         history_result = MagicMock()
         history_result.scalar.return_value = None
 
-        per_user_session = AsyncMock()
+        per_user_session = _per_user_session()
         per_user_session.execute = AsyncMock(return_value=history_result)
-        per_user_session.__aenter__ = AsyncMock(return_value=per_user_session)
-        per_user_session.__aexit__ = AsyncMock(return_value=None)
 
         with (
             patch(
@@ -391,10 +389,8 @@ class TestSendMarketSignalDailyDigest:
         history_result = MagicMock()
         history_result.scalar.return_value = uuid.uuid4()  # 이미 발송됨
 
-        per_user_session = AsyncMock()
+        per_user_session = _per_user_session()
         per_user_session.execute = AsyncMock(return_value=history_result)
-        per_user_session.__aenter__ = AsyncMock(return_value=per_user_session)
-        per_user_session.__aexit__ = AsyncMock(return_value=None)
 
         with (
             patch(
