@@ -7,7 +7,8 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import prettier from "eslint-config-prettier";
 
 export default [
-  { ignores: ["dist", "node_modules", "src/test/setup.tsx"] },
+  // android: cap sync가 복사한 빌드 산출물(gitignore)
+  { ignores: ["dist", "node_modules", "coverage", "android", "src/test/setup.tsx"] },
   js.configs.recommended,
   {
     files: ["src/**/*.{ts,tsx}"],
@@ -46,6 +47,12 @@ export default [
     files: ["src/**/__tests__/**/*.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: globals.node,
     },
   },
   prettier,
