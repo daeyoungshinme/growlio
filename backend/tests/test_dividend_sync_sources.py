@@ -104,7 +104,8 @@ class TestSyncYahooDividendInfoOutlierExclusion:
         import pandas as pd
 
         today = pd.Timestamp.today().normalize()
-        idx = pd.DatetimeIndex([today - pd.Timedelta(days=d) for _, d in amounts_and_days_ago])
+        # pd.Timedelta(days=d) 키워드 형식은 numpy 2.5에서 generic timedelta 폐기 경고 → 단위 명시
+        idx = pd.DatetimeIndex([today - pd.Timedelta(d, unit="D") for _, d in amounts_and_days_ago])
         values = [amt for amt, _ in amounts_and_days_ago]
         return pd.Series(values, index=idx)
 
