@@ -25,12 +25,12 @@ updates:
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
-      # ruff: 0.x 릴리스라 minor(0.15→0.16)가 사실상 breaking(새 lint 룰) → 0.15.x 패치만
+      # ruff: 0.x 릴리스라 minor(0.17→0.18)가 사실상 breaking(새 lint 룰·포맷 대상 확대) → 0.17.x 패치만
       - dependency-name: "ruff"
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
-      # tenacity: pyproject 상한(<9)과 일치 — 재시도 데코레이터를 5개 모듈에서 쓰므로 9.x는
+      # tenacity: pyproject 상한(<10)과 일치 — 재시도 데코레이터를 5개 모듈에서 쓰므로 10.x는
       # 상한을 넓히고 재시도 테스트를 확인하는 별도 PR로 올린다
       - dependency-name: "tenacity"
         update-types:

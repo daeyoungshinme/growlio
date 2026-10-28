@@ -182,7 +182,7 @@ class TestVerifySupabaseToken:
 
         from app.services.auth_service import verify_supabase_token
 
-        secret = "test-hmac-secret"
+        secret = "test-hmac-secret-0123456789abcdef"
         expired_at = int(time.time()) - 100  # 100초 전 만료
 
         token = pyjwt.encode(
@@ -210,7 +210,7 @@ class TestVerifySupabaseToken:
 
         from app.services.auth_service import verify_supabase_token
 
-        secret = "test-hmac-secret"
+        secret = "test-hmac-secret-0123456789abcdef"
         future = int(time.time()) + 3600
         user_id = str(uuid.uuid4())
 
@@ -241,12 +241,12 @@ class TestVerifySupabaseToken:
 
         token = pyjwt.encode(
             {"sub": "user-123", "exp": int(time.time()) + 3600},
-            "wrong-secret",
+            "wrong-secret-0123456789abcdefghij",
             algorithm="HS256",
         )
 
         mock_signing_key = MagicMock()
-        mock_signing_key.key = "correct-secret"
+        mock_signing_key.key = "correct-secret-0123456789abcdefgh"
         mock_signing_key.algorithm_name = "HS256"
 
         mock_jwks = MagicMock()
