@@ -79,7 +79,7 @@ growlio/
 ├── backend/          # FastAPI (Python 3.11+)
 ├── frontend/         # React 18 + Vite (TypeScript)
 │   └── android/      # Capacitor Android 프로젝트
-├── nginx/            # nginx 리버스 프록시 (자체 호스팅용 Docker Compose 배포 대안 경로 — 실제 운영은 Render+Vercel 사용, 로컬 개발에서도 미사용; Vite dev server가 /api/* 프록시 처리)
+├── nginx/            # 자체 호스팅용 대안 구성 — 운영(Render+Vercel)·로컬 개발 모두 미사용 (아래 "배포 & CI")
 ├── monitoring/       # Prometheus 설정(prometheus.yml) + Grafana 대시보드
 ├── .github/          # GitHub Actions (CI: lint/test/build, Android APK)
 ├── render.yaml       # Render 백엔드 배포 설정
@@ -132,6 +132,7 @@ make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.co
 
 - Windows에서 전체 pytest가 `N passed` 후 종료 코드 `-1073741819`로 끝나는 건 테스트 실패가 아님 (`backend/CLAUDE.md` Tests 참고).
 - 파일 추가·삭제·이동 시 `backend/CLAUDE.md`·`frontend/CLAUDE.md`의 해당 목록(라우터·서비스·훅·유틸·queryKey 표 등)도 함께 갱신 — 각 목록이 "추가/삭제 시 갱신"을 전제로 유지됨.
+- CLAUDE.md 항목은 **한 줄 요약 + 코드만 봐선 모르는 함정**까지만. 구현 세부·설계 경위·`plans/NN` 이력은 계획서와 커밋 메시지에 남기고 여기엔 쓰지 않는다(하위 CLAUDE.md는 해당 디렉토리 작업 때마다 통째로 컨텍스트에 로드됨).
 
 ---
 
