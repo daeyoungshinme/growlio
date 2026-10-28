@@ -535,6 +535,7 @@ _기타_
 **콜랩스 기본값 일관성 규칙**
 
 - 정보 밀도가 낮은 헤드라인 카드(`HeroSummaryCard`, `InvestmentGoalCard` 최상위 등)는 콜랩스 불가로 항상 펼침 유지 — 접었다 폈다 할 만큼 내용이 많지 않음.
+  단, `HeroSummaryCard`의 전체 자산 총액·범례 금액(+도넛 툴팁 금액, `MiniDonut` `hideValues`)은 **기본 숨김** — 총액을 탭하면 표시, 상태는 저장하지 않아 홈에 올 때마다 다시 숨김(비중 %·수익률·환율은 항상 표시).
 - 보조/상세 카드(`InvestmentSnapshotCard`, `RebalancingStatusCard`, `TaxLimitsSection` 등)는 `useCollapsible`로 접기 가능하게 하되, 최초 방문 시 기본값은 **열림**(`true`)으로 시작 — 사용자가 직접 접으면 그 상태가 `localStorage`로 유지된다.
 - 단, 이미 펼쳐진 부모 카드 내부의 2차 상세 토글(`MarketSignalBanner` 매크로 지표 더보기, `RebalancingDetailMetrics` 등 영속화 키 없는 세션 한정 토글)은 이 규칙 대상이 아님 — "최상위 카드"에만 적용되는 규칙이므로 중첩된 하위 토글까지 강제로 펼칠 필요는 없다.
 - 새 카드 추가 시 이 규칙을 따를 것.

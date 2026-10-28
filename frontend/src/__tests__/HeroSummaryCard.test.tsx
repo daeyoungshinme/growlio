@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { DashboardData } from "@/api/dashboard";
@@ -36,9 +36,25 @@ const baseDashboard: DashboardData = {
 };
 
 describe("HeroSummaryCard", () => {
-  it("전체 자산이 억원 단위로 포맷되어 표시된다", () => {
+  it("전체 자산 금액은 기본 숨김이고 title·범례 금액도 노출하지 않는다", () => {
     renderWithProviders(<HeroSummaryCard data={baseDashboard} exchangeRate={1350} />);
+    const toggle = screen.getByRole("button", { name: "전체 자산 금액 보기" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).not.toHaveAttribute("title");
+    expect(screen.queryByText("1.50억원")).toBeNull();
+    expect(screen.queryByText(/· 1.0억/)).toBeNull();
+  });
+
+  it("누르면 전체 자산이 억원 단위로 표시되고 다시 누르면 숨긴다", () => {
+    renderWithProviders(<HeroSummaryCard data={baseDashboard} exchangeRate={1350} />);
+    fireEvent.click(screen.getByRole("button", { name: "전체 자산 금액 보기" }));
     expect(screen.getByText("1.50억원")).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "전체 자산 금액 숨기기" });
+    expect(toggle).toHaveAttribute("title", "150,000,000원");
+    expect(screen.getByText(/· 1.0억/)).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText("1.50억원")).toBeNull();
   });
 
   it("exchangeRate가 null이면 환율 셀에 '—'가 표시된다", () => {

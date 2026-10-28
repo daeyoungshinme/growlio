@@ -1,5 +1,5 @@
-import { memo, useMemo } from "react";
-import { RefreshCw } from "lucide-react";
+import { memo, useMemo, useState } from "react";
+import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { pnlColor, PIE_COLORS } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
@@ -25,6 +25,8 @@ export default memo(function HeroSummaryCard({
   onSync,
   syncing,
 }: Props) {
+  // 금액은 기본 숨김, 탭하면 표시 — 남이 화면을 볼 수 있는 상황 대비. 저장하지 않아 홈에 올 때마다 다시 숨김
+  const [amountVisible, setAmountVisible] = useState(false);
   const updatedLabel = useMemo(() => {
     if (!dataUpdatedAt) return null;
     const mins = Math.floor((Date.now() - dataUpdatedAt) / 60_000);
@@ -104,13 +106,24 @@ export default memo(function HeroSummaryCard({
               )}
             </div>
           </div>
-          {/* 원 단위 전체 금액은 같은 값의 이중 표기라 title로만 제공(U1) */}
-          <p
-            className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50"
-            title={`${Math.floor(data.total_assets_krw).toLocaleString()}원`}
+          {/* 원 단위 전체 금액은 같은 값의 이중 표기라 title로만 제공(U1) — 숨김 중엔 title도 생략 */}
+          <button
+            type="button"
+            onClick={() => setAmountVisible((v) => !v)}
+            aria-pressed={amountVisible}
+            aria-label={amountVisible ? "전체 자산 금액 숨기기" : "전체 자산 금액 보기"}
+            title={
+              amountVisible ? `${Math.floor(data.total_assets_krw).toLocaleString()}원` : undefined
+            }
+            className="self-start min-h-[44px] sm:min-h-0 flex items-center gap-2 text-left rounded-lg text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            {fmtKrw(Math.floor(data.total_assets_krw))}
-          </p>
+            <span>{amountVisible ? fmtKrw(Math.floor(data.total_assets_krw)) : "••••••"}</span>
+            {amountVisible ? (
+              <EyeOff size={16} className="text-gray-400 dark:text-gray-500 shrink-0" />
+            ) : (
+              <Eye size={16} className="text-gray-400 dark:text-gray-500 shrink-0" />
+            )}
+          </button>
           <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-1.5 sm:pt-2">
             <div>
               {/* 기준을 화면에 표시 — 주식 평가손익률(매입원가)·목표 연수익률(XIRR)과 구분 (67 P1-1) */}
@@ -139,7 +152,7 @@ export default memo(function HeroSummaryCard({
         {/* 우: 도넛 */}
         <div className="w-32 h-32 sm:w-[180px] sm:h-44 lg:w-[196px] lg:h-48 xl:w-[208px]">
           {allocationChartData.length > 0 ? (
-            <MiniDonut data={allocationChartData} />
+            <MiniDonut data={allocationChartData} hideValues={!amountVisible} />
           ) : (
             <div className="flex items-center justify-center w-full h-full text-gray-400 dark:text-gray-500 text-xs text-center">
               자산 데이터 없음
@@ -163,9 +176,11 @@ export default memo(function HeroSummaryCard({
                 />
                 <span className="text-xs text-gray-600 dark:text-gray-400 leading-tight truncate min-w-0">
                   {item.name} {item.pct.toFixed(0)}%
-                  <span className="hidden sm:inline text-gray-500 ml-0.5">
-                    · {fmtKrwShort(item.value)}
-                  </span>
+                  {amountVisible && (
+                    <span className="hidden sm:inline text-gray-500 ml-0.5">
+                      · {fmtKrwShort(item.value)}
+                    </span>
+                  )}
                 </span>
               </li>
             ))}
