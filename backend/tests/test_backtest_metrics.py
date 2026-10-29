@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.backtest_metrics import compute_metrics, compute_portfolio_series
+from app.services.backtest.backtest_metrics import compute_metrics, compute_portfolio_series
 
 
 class TestComputeMetrics:

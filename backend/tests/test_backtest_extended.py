@@ -8,13 +8,13 @@ from unittest.mock import patch
 
 class TestFetchPricesSync:
     def test_empty_symbols_returns_empty_dict(self, override_settings):
-        from app.services.backtest_service import _sync_download_history
+        from app.services.backtest.backtest_service import _sync_download_history
 
         result = _sync_download_history([], date(2020, 1, 1), date(2021, 1, 1))
         assert result == {}
 
     def test_yfinance_download_exception_returns_empty(self, override_settings):
-        from app.services.backtest_service import _sync_download_history
+        from app.services.backtest.backtest_service import _sync_download_history
 
         with patch("yfinance.download", side_effect=Exception("network error")):
             result = _sync_download_history(["AAPL"], date(2020, 1, 1), date(2021, 1, 1))
@@ -24,7 +24,7 @@ class TestFetchPricesSync:
     def test_returns_empty_on_empty_dataframe(self, override_settings):
         import pandas as pd
 
-        from app.services.backtest_service import _sync_download_history
+        from app.services.backtest.backtest_service import _sync_download_history
 
         empty_df = pd.DataFrame()
         with patch("yfinance.download", return_value=empty_df):
@@ -35,7 +35,7 @@ class TestFetchPricesSync:
     def test_single_symbol_returns_price_series(self, override_settings):
         import pandas as pd
 
-        from app.services.backtest_service import _sync_download_history
+        from app.services.backtest.backtest_service import _sync_download_history
 
         idx = pd.date_range("2020-01-01", periods=5)
         prices = [150.0, 155.0, 153.0, 157.0, 160.0]
@@ -51,7 +51,7 @@ class TestFetchPricesSync:
     def test_multi_symbol_returns_multiindex_df(self, override_settings):
         import pandas as pd
 
-        from app.services.backtest_service import _sync_download_history
+        from app.services.backtest.backtest_service import _sync_download_history
 
         idx = pd.date_range("2020-01-01", periods=3)
         columns = pd.MultiIndex.from_tuples([("Close", "AAPL"), ("Close", "TSLA")])
@@ -68,7 +68,7 @@ class TestFetchPricesSync:
         """Yahoo가 실패해도 국내(.KS) 심볼은 pykrx로 보완된다."""
         import pandas as pd
 
-        from app.services.backtest_service import _sync_download_history
+        from app.services.backtest.backtest_service import _sync_download_history
 
         idx = pd.date_range("2020-01-01", periods=3)
         pykrx_df = pd.DataFrame({"종가": [70000.0, 71000.0, 69000.0]}, index=idx)

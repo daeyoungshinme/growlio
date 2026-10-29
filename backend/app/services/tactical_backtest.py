@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 import structlog
 
-from app.services.backtest_metrics import compute_metrics
+from app.services.backtest.backtest_metrics import compute_metrics
 from app.services.market_signal.technical_indicators import pullback_series, trend_series
 from app.services.market_signal.technical_signal_service import fetch_close_history
 from app.services.tactical_allocation_service import (
