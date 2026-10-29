@@ -4,6 +4,7 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -370,6 +371,56 @@ class TestGoalRecommendationEndpoint:
                 )
             assert resp.status_code == 200
             assert resp.json()["required_return_pct"] == 7.0
+            mock_compute.assert_not_called()
+            mock_refresh.assert_awaited_once()
+            assert mock_refresh.call_args.args[0] == user.id
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+
+class TestSubRecommendationStaleWhileRevalidate:
+    """by-horizon·by-age도 전체 추천과 같은 SWR을 쓴다(plans/90 C6)."""
+
+    @pytest.mark.parametrize(
+        ("path", "kind", "stale"),
+        [
+            (
+                "/api/v1/rebalancing/goal-recommendation/by-horizon",
+                "horizon_recommendations",
+                {"generated_at": "2024-01-01T00:00:00Z", "recommendations": []},
+            ),
+            (
+                "/api/v1/rebalancing/goal-recommendation/by-age",
+                "age_based_recommendation",
+                {"generated_at": "2024-01-01T00:00:00Z", "is_configured": True, "required_return_pct": 7.0},
+            ),
+        ],
+    )
+    def test_stale_hit_returns_immediately_and_schedules_refresh(self, override_settings, path, kind, stale):
+        from app.schemas.rebalancing import GoalRecommendation, HorizonRecommendationResponse
+
+        model = HorizonRecommendationResponse if kind == "horizon_recommendations" else GoalRecommendation
+        compute_name = (
+            "get_horizon_recommendations" if kind == "horizon_recommendations" else ("get_age_based_recommendation")
+        )
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(f"app.api.v1.rebalancing.get_cached_{kind}", new_callable=AsyncMock, return_value=None),
+                patch(f"app.api.v1.rebalancing.get_stale_{kind}", new_callable=AsyncMock, return_value=model(**stale)),
+                patch(f"app.api.v1.rebalancing.refresh_{kind}_in_background", new_callable=AsyncMock) as mock_refresh,
+                patch(f"app.api.v1.rebalancing.{compute_name}", new_callable=AsyncMock) as mock_compute,
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(path, headers={"Authorization": "Bearer fake"})
+            assert resp.status_code == 200
+            assert resp.json()["generated_at"] == stale["generated_at"]
             mock_compute.assert_not_called()
             mock_refresh.assert_awaited_once()
             assert mock_refresh.call_args.args[0] == user.id

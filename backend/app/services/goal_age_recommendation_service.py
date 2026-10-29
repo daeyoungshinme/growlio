@@ -24,22 +24,26 @@ from app.enums import AgeGroup
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation
 from app.services import _goal_recommendation_common as _grc
+from app.services._settings_queries import get_settings_row
 from app.services.goal_candidate_service import (
     _get_or_seed_candidates,
     detect_duplicate_tracking_index_note,
     existing_items_from_positions,
 )
 from app.services.goal_portfolio_optimizer import _MIN_CANDIDATES
+from app.services.goal_recommendation_service import refresh_recommendation_in_background
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
+    TTL_GOAL_RECOMMENDATION_STALE,
     CacheStoreType,
     get_cached_json,
     get_goal_recommendation_generation,
     goal_recommendation_age_key,
+    goal_recommendation_age_stale_key,
     set_cached_json,
 )
 from app.utils.inproc_lock import single_flight_fetch
@@ -112,6 +116,7 @@ async def get_age_based_recommendation(
     if gen is None:
         gen = await get_goal_recommendation_generation(cache, user_id)
     cache_key = goal_recommendation_age_key(user_id, gen)
+    stale_key = goal_recommendation_age_stale_key(user_id, gen)
 
     async def _read_cache() -> GoalRecommendation | None:
         cached = await get_cached_json(cache, cache_key)
@@ -124,13 +129,48 @@ async def get_age_based_recommendation(
     async def _fetch_and_cache() -> GoalRecommendation:
         result = await _compute_age_based_recommendation(cache, db, user_id, settings_row)
         if result.recommended_items:
-            await set_cached_json(cache, cache_key, result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION)
+            payload = result.model_dump(mode="json")
+            await set_cached_json(cache, cache_key, payload, TTL_GOAL_RECOMMENDATION)
+            await set_cached_json(cache, stale_key, payload, TTL_GOAL_RECOMMENDATION_STALE)
         return result
 
     if cache is None:
         return await _fetch_and_cache()
 
     return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
+
+
+async def get_cached_age_based_recommendation(
+    cache: CacheStoreType, user_id: uuid.UUID, gen: str
+) -> GoalRecommendation | None:
+    """1시간 키만 조회한다 — 엔드포인트가 설정 조회·stale 판단 전에 먼저 확인한다."""
+    cached = await get_cached_json(cache, goal_recommendation_age_key(user_id, gen))
+    return GoalRecommendation(**cached) if cached is not None else None
+
+
+async def get_stale_age_based_recommendation(
+    cache: CacheStoreType, user_id: uuid.UUID, gen: str
+) -> GoalRecommendation | None:
+    """1시간 키가 만료된 뒤에도 남는 마지막 정상 결과(1일) — 전체 추천 SWR과 같은 규칙(plans/66·90 C6)."""
+    cached = await get_cached_json(cache, goal_recommendation_age_stale_key(user_id, gen))
+    return GoalRecommendation(**cached) if cached is not None else None
+
+
+async def refresh_age_based_recommendation_in_background(user_id: uuid.UUID, cache: CacheStoreType) -> None:
+    """stale 응답 뒤 연령대별 추천을 다시 계산한다(`refresh_recommendation_in_background`)."""
+
+    async def _recompute(db: AsyncSession, gen: str) -> None:
+        settings_row = await get_settings_row(db, user_id)
+        if settings_row is not None:
+            await get_age_based_recommendation(cache, db, user_id, settings_row, gen=gen)
+
+    await refresh_recommendation_in_background(
+        cache,
+        user_id,
+        goal_recommendation_age_key,
+        _recompute,
+        "goal_recommendation_age_background_refresh_failed",
+    )
 
 
 async def _compute_age_based_recommendation(

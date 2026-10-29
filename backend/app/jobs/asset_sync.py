@@ -1,76 +1,15 @@
-import asyncio
-from collections.abc import Awaitable, Callable
-
 import structlog
 from sqlalchemy import select
 
-from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
 from app.jobs._job_helpers import peak_rss_mb
 from app.models.asset import AssetAccount
-from app.services.asset_service import sync_account
+from app.services.sync_all_service import sync_accounts
 
 logger = structlog.get_logger()
 
 # 잔고 동기화 가능한 증권사 API 계좌 전부 — 주문 실행 가능 여부(토스 제외)와는 별개다
 _STOCK_SOURCES = ("KIS_API", "KIWOOM_API", "TOSS_API")
-_ACCOUNT_SYNC_CONCURRENCY = 3
-
-ProgressCallback = Callable[[int, int, int], Awaitable[None]]
-
-
-async def _sync_accounts(
-    accounts: list[AssetAccount],
-    job_name: str,
-    on_progress: ProgressCallback | None = None,
-) -> list[tuple[str, str, str]]:
-    """세마포어(3)로 동시성을 제한하며 계좌들을 동기화한다.
-
-    각 계좌는 자신만의 짧게 스코프된 AsyncSessionLocal을 열어서 사용하므로,
-    이 함수를 호출하는 쪽의 요청 DB 커넥션을 오래 붙잡지 않는다.
-    """
-    cache = await get_cache_store()
-    failed: list[tuple[str, str, str]] = []
-    sem = asyncio.Semaphore(_ACCOUNT_SYNC_CONCURRENCY)
-    done_count = 0
-    progress_lock = asyncio.Lock()
-
-    async def sync_one(account: AssetAccount) -> None:
-        nonlocal done_count
-        async with sem:
-            try:
-                async with AsyncSessionLocal() as db:
-                    # account는 이 함수 호출 전 다른(이미 닫힌) 세션에서 조회되어 detached 상태이므로,
-                    # merge로 새 세션에 편입해야 sync_account() 내부의 account.deposit_krw 등
-                    # 속성 변경이 commit 시 실제로 반영된다.
-                    merged_account = await db.merge(account)
-                    await sync_account(merged_account, db, cache)
-                logger.info("account_synced", job=job_name, account_id=str(account.id), name=account.name)
-            except Exception as e:
-                logger.error(
-                    "account_sync_failed",
-                    job=job_name,
-                    account_id=str(account.id),
-                    name=account.name,
-                    error=str(e),
-                )
-                failed.append((str(account.id), account.name, str(e)))
-        if on_progress:
-            async with progress_lock:
-                done_count += 1
-                await on_progress(done_count, len(accounts), len(failed))
-
-    await asyncio.gather(*(sync_one(account) for account in accounts))
-
-    if failed:
-        logger.warning(
-            f"{job_name}_partial_failure",
-            total=len(accounts),
-            failed=len(failed),
-            failed_accounts=[{"id": fid, "name": fname} for fid, fname, _ in failed],
-        )
-
-    return failed
 
 
 async def run_daily_asset_sync() -> None:
@@ -80,7 +19,7 @@ async def run_daily_asset_sync() -> None:
         accounts = result.scalars().all()
 
     logger.info("daily_asset_sync_start", account_count=len(accounts), peak_rss_mb=peak_rss_mb())
-    await _sync_accounts(list(accounts), "daily_sync")
+    await sync_accounts(list(accounts), "daily_sync")
     logger.info("daily_asset_sync_done", peak_rss_mb=peak_rss_mb())
 
 
@@ -96,5 +35,5 @@ async def run_intraday_asset_sync() -> None:
         accounts = result.scalars().all()
 
     logger.info("intraday_asset_sync_start", account_count=len(accounts), peak_rss_mb=peak_rss_mb())
-    await _sync_accounts(list(accounts), "intraday_sync")
+    await sync_accounts(list(accounts), "intraday_sync")
     logger.info("intraday_asset_sync_done", peak_rss_mb=peak_rss_mb())

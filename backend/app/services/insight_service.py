@@ -12,10 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.services.asset_aggregator import get_dashboard_summary
-from app.services.tax_service import (
-    _get_rates,
-    get_overseas_positions_detail,
-)
+from app.services.tax_service import get_overseas_positions_detail, get_tax_summary
 from app.utils.cache_keys import TTL_INSIGHTS, CacheStoreType, get_cached_json, insights_key, set_cached_json
 from app.utils.kst import today_kst
 
@@ -243,30 +240,17 @@ async def _check_tax_loss_harvest(
     user_id: uuid.UUID,
     db: AsyncSession,
 ) -> list[Insight]:
-    """해외 손실 종목이 있고 과세 이익도 있을 때 절세 기회 알림."""
+    """해외 손실 종목이 있고 과세 이익도 있을 때 절세 기회 알림.
+
+    손실 수확 후보·절세액은 절세 탭·지금 할 일과 같은 `get_tax_summary`의 `harvesting_recommendations`를
+    쓴다 — 따로 계산하면 기본공제·손익통산 기준이 달라 화면마다 절세액이 어긋났다(plans/90 C4)."""
     positions = await get_overseas_positions_detail(user_id, db)
-    if not positions:
+    if not any(p["unrealized_pnl_krw"] < 0 for p in positions):
         return []
 
-    total_gain = sum(p["unrealized_pnl_krw"] for p in positions if p["unrealized_pnl_krw"] > 0)
-    loss_positions = [p for p in positions if p["unrealized_pnl_krw"] < 0]
-
-    if not loss_positions or total_gain <= 0:
-        return []
-
-    rates = _get_rates(today_kst().year)
-
-    # 연 250만원 기본 공제 적용 — 공제 후 과세 이익이 없으면 절세 불필요
-    taxable_gain = max(0.0, total_gain - rates["overseas_deduction"])
-    if taxable_gain <= 0:
-        return []
-
-    # 절세액 큰 순(손실 큰 순)으로 정렬
-    loss_positions.sort(key=lambda p: p["unrealized_pnl_krw"])
-
-    total_loss = sum(abs(p["unrealized_pnl_krw"]) for p in loss_positions)
-    offsettable = min(total_loss, taxable_gain)
-    tax_saved = offsettable * rates["overseas_gain"]
+    summary = await get_tax_summary(user_id, today_kst().year, db, overseas_positions=positions)
+    loss_positions = summary.get("harvesting_recommendations", [])
+    tax_saved = sum(float(p["tax_saved_krw"]) for p in loss_positions)
 
     if tax_saved < 50_000:
         return []

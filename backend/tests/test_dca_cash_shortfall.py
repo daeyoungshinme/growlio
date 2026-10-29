@@ -1,4 +1,7 @@
-"""정기 적립식 자동매수 예수금 부족 사전 알림 Job(jobs/dca_cash_shortfall) — 계획 37 E5."""
+"""정기 적립식 자동매수 예수금 부족 사전 알림 — 잡(jobs/dca_cash_shortfall)과 판정(services/dca_cash_shortfall_service).
+
+계획 37 E5.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.jobs import dca_cash_shortfall as job
+from app.services import dca_cash_shortfall_service as svc
 
 
 def _alert(day=25):
@@ -67,11 +71,11 @@ async def _run(rows, today, *, durable=None, usd_krw=1400.0, dispatch=None):
     dispatch = dispatch or AsyncMock(return_value=True)
     with (
         patch.object(job, "AsyncSessionLocal", new=_session_factory()),
-        patch.object(job, "today_kst", return_value=today),
+        patch.object(svc, "today_kst", return_value=today),
         patch.object(job, "get_durable", new=AsyncMock(return_value=durable)),
         patch.object(job, "set_durable", new=AsyncMock()),
         patch.object(job, "dispatch_dual_channel_alert", new=dispatch),
-        patch.object(job, "fetch_usd_krw", new=AsyncMock(return_value=usd_krw)),
+        patch.object(svc, "fetch_usd_krw", new=AsyncMock(return_value=usd_krw)),
     ):
         await job._run_dca_cash_shortfall_check(_db(rows), MagicMock())
     return dispatch
@@ -140,20 +144,20 @@ async def test_weekend_run_date_uses_rolled_monday():
 )
 def test_is_cash_short(cash, expected, short):
     """월 적립액 미설정이면 1만원 미만(사실상 빈 계좌)일 때만 부족으로 본다."""
-    assert job.is_cash_short(cash, expected) is short
+    assert svc.is_cash_short(cash, expected) is short
 
 
 def test_usd_counted_only_when_portfolio_has_overseas_items():
     account = _account(deposit_krw=100_000, deposit_usd=100)
-    assert job.account_cash_krw(account, _portfolio(("KOSPI",)), 1400.0) == 100_000
-    assert job.account_cash_krw(account, _portfolio(("KOSPI", "NASDAQ")), 1400.0) == 240_000
+    assert svc.account_cash_krw(account, _portfolio(("KOSPI",)), 1400.0) == 100_000
+    assert svc.account_cash_krw(account, _portfolio(("KOSPI", "NASDAQ")), 1400.0) == 240_000
 
 
 def test_is_dca_auto_buy_matches_frontend_preset():
-    assert job.is_dca_auto_buy(_alert())
+    assert svc.is_dca_auto_buy(_alert())
     notify = _alert()
     notify.mode = "NOTIFY"
-    assert not job.is_dca_auto_buy(notify)
+    assert not svc.is_dca_auto_buy(notify)
 
 
 def test_email_template_shows_shortfall_and_run_date():

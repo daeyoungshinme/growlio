@@ -9,6 +9,7 @@ from __future__ import annotations
 DOMESTIC_MARKETS: frozenset[str] = frozenset({"KOSPI", "KOSDAQ", "KRX"})
 """국내 주식 시장 코드. 해외 vs 국내 분류 및 Yahoo Finance 심볼 변환에 사용."""
 
+# 프론트 `frontend/src/constants/markets.ts::OVERSEAS_MARKETS`와 동기화할 것(빠지면 프론트가 국내로 판정)
 OVERSEAS_MARKETS: frozenset[str] = frozenset({"NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "SSE", "SGX", "LSE"})
 """해외 상장 시장 코드 — 해외주식 양도세 대상 판정, 절세 계좌(ISA·연금) 해외 매수 차단에 사용."""
 

@@ -3799,7 +3799,10 @@ class TestGetHorizonRecommendations:
         assert len(result.recommendations) == 1
         assert result.recommendations[0].recommended_items
         # 일별수익률 심볼 캐시를 뺀 결과 캐시는 1건
-        assert len([c for c in mock_cache.setex.await_args_list if "daily_returns" not in c.args[0]]) == 1
+        result_keys = [c.args[0] for c in mock_cache.setex.await_args_list if "daily_returns" not in c.args[0]]
+        # 1시간 키 + SWR용 stale 키(plans/90 C6)
+        assert len(result_keys) == 2
+        assert any("_stale:" in k for k in result_keys)
 
 
 class TestAgeGroupProfile:
@@ -4062,7 +4065,10 @@ class TestGetAgeBasedRecommendation:
 
         assert result.recommended_items
         # 일별수익률 심볼 캐시를 뺀 결과 캐시는 1건
-        assert len([c for c in mock_cache.setex.await_args_list if "daily_returns" not in c.args[0]]) == 1
+        result_keys = [c.args[0] for c in mock_cache.setex.await_args_list if "daily_returns" not in c.args[0]]
+        # 1시간 키 + SWR용 stale 키(plans/90 C6)
+        assert len(result_keys) == 2
+        assert any("_stale:" in k for k in result_keys)
 
     async def test_age_default_dividend_floor_shifts_weight_to_high_yield_candidate(self):
         """annual_dividend_goal 미설정 + 40대 → 연령대 기본 배당수익률 하한(1.5%)이
@@ -4600,3 +4606,63 @@ class TestRefreshGoalRecommendationInBackground:
         # 다음 stale 응답이 다시 갱신을 시도할 수 있어야 한다
         gen = await get_goal_recommendation_generation(cache, uid)
         assert await cache.get(f"refresh:{goal_recommendation_key(uid, gen)}") is None
+
+
+class TestRefreshSubRecommendationsInBackground:
+    """by-horizon·by-age stale 응답 뒤 백그라운드 재계산(plans/90 C6)."""
+
+    @pytest.mark.parametrize(
+        ("module", "refresh_name", "compute_name"),
+        [
+            (
+                "app.services.goal_horizon_recommendation_service",
+                "refresh_horizon_recommendations_in_background",
+                "get_horizon_recommendations",
+            ),
+            (
+                "app.services.goal_age_recommendation_service",
+                "refresh_age_based_recommendation_in_background",
+                "get_age_based_recommendation",
+            ),
+        ],
+    )
+    async def test_recomputes_with_own_session_and_current_generation(self, module, refresh_name, compute_name):
+        import importlib
+
+        from app.core.cache_store import CacheStore
+
+        mod = importlib.import_module(module)
+        uid = uuid.uuid4()
+        cache = CacheStore()
+        gen = await get_goal_recommendation_generation(cache, uid)
+        session = AsyncMock()
+        session_cm = MagicMock()
+        session_cm.__aenter__ = AsyncMock(return_value=session)
+        session_cm.__aexit__ = AsyncMock(return_value=False)
+        settings_row = SimpleNamespace(user_id=uid)
+        with (
+            patch("app.services.goal_recommendation_service.AsyncSessionLocal", return_value=session_cm),
+            patch(f"{module}.get_settings_row", new_callable=AsyncMock, return_value=settings_row),
+            patch(f"{module}.{compute_name}", new_callable=AsyncMock) as mock_compute,
+        ):
+            await getattr(mod, refresh_name)(uid, cache)
+
+        mock_compute.assert_awaited_once()
+        assert mock_compute.call_args.args[1:4] == (session, uid, settings_row)
+        assert mock_compute.call_args.kwargs["gen"] == gen
+
+    async def test_skips_without_settings_row(self):
+        from app.core.cache_store import CacheStore
+        from app.services import goal_horizon_recommendation_service as svc
+
+        session_cm = MagicMock()
+        session_cm.__aenter__ = AsyncMock(return_value=AsyncMock())
+        session_cm.__aexit__ = AsyncMock(return_value=False)
+        with (
+            patch("app.services.goal_recommendation_service.AsyncSessionLocal", return_value=session_cm),
+            patch.object(svc, "get_settings_row", new_callable=AsyncMock, return_value=None),
+            patch.object(svc, "get_horizon_recommendations", new_callable=AsyncMock) as mock_compute,
+        ):
+            await svc.refresh_horizon_recommendations_in_background(uuid.uuid4(), CacheStore())
+
+        mock_compute.assert_not_called()

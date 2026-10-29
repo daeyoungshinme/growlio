@@ -1,4 +1,4 @@
-"""trend_calculator.py 단위 테스트."""
+"""asset_aggregator.get_monthly_trend(월별 자산 추이) 단위 테스트."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.trend_calculator import _trend_window_start, get_monthly_trend
+from app.services.asset_aggregator import _trend_window_start, get_monthly_trend
 
 
 class TestGetMonthlyTrend:
@@ -110,7 +110,7 @@ class TestTrendWindowStart:
 
     @pytest.mark.asyncio
     async def test_query_binds_kst_start_date(self, monkeypatch):
-        from app.services import trend_calculator as tc
+        from app.services import asset_aggregator as tc
 
         monkeypatch.setattr(tc, "today_kst", lambda: date(2026, 11, 1))
         execute_result = MagicMock()

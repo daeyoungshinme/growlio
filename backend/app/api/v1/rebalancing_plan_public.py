@@ -7,8 +7,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,23 +18,18 @@ from app.models.portfolio import Portfolio
 from app.schemas.rebalancing import (
     PlanActionResponse,
     PlanTokenPreview,
-    RebalancingPlanItemOut,
-    RebalancingPlanLegSummary,
     SellDecisionRequest,
 )
 from app.services.rebalancing.plan_execution import leg_executed_message
 from app.services.rebalancing.plan_service import (
     approve_sell_leg,
+    build_leg_summary,
     cancel_buy_leg,
     get_plan_leg_by_token,
     reject_sell_leg,
 )
 
 router = APIRouter(prefix="/rebalancing/plan-actions", tags=["rebalancing-plan-public"])
-
-
-def _aware(dt: datetime) -> datetime:
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 async def _build_preview(leg, db: AsyncSession) -> PlanTokenPreview:
@@ -48,33 +41,14 @@ async def _build_preview(leg, db: AsyncSession) -> PlanTokenPreview:
     if plan.account_id:
         account_name = await db.scalar(select(AssetAccount.name).where(AssetAccount.id == plan.account_id))
 
-    now = datetime.now(tz=UTC)
-    if leg.status == "PENDING" and now >= _aware(leg.deadline_at):
-        actionable, reason = False, "EXPIRED"
-    elif leg.status == "PENDING":
-        actionable, reason = True, None
-    elif leg.status == "EXPIRED":
-        actionable, reason = False, "EXPIRED"
+    summary = build_leg_summary(leg, plan, portfolio_name, account_name)
+    if summary.actionable:
+        reason = None
+    elif leg.status in ("PENDING", "EXPIRED"):
+        reason = "EXPIRED"
     else:
-        actionable, reason = False, "ALREADY_DECIDED"
-
-    summary = RebalancingPlanLegSummary(
-        plan_id=plan.id,
-        leg_id=leg.id,
-        portfolio_id=plan.portfolio_id,
-        portfolio_name=portfolio_name,
-        account_id=plan.account_id,
-        account_name=account_name,
-        side=leg.side,
-        status=leg.status,
-        deadline_at=leg.deadline_at,
-        decided_at=leg.decided_at,
-        execution_id=leg.execution_id,
-        error_message=leg.error_message,
-        actionable=actionable,
-        items=[RebalancingPlanItemOut.model_validate(item) for item in leg.items],
-    )
-    return PlanTokenPreview(valid=True, reason=reason, actionable=actionable, leg=summary)
+        reason = "ALREADY_DECIDED"
+    return PlanTokenPreview(valid=True, reason=reason, actionable=summary.actionable, leg=summary)
 
 
 @router.get("/{token}", response_model=PlanTokenPreview)

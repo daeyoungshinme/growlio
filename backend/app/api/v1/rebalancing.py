@@ -34,8 +34,18 @@ from app.services._account_queries import active_broker_accounts_stmt, get_accou
 from app.services._settings_queries import get_or_create_settings, get_settings_row
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.etf_overlap_service import analyze_candidate_overlap_for_user
-from app.services.goal_age_recommendation_service import get_age_based_recommendation
-from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
+from app.services.goal_age_recommendation_service import (
+    get_age_based_recommendation,
+    get_cached_age_based_recommendation,
+    get_stale_age_based_recommendation,
+    refresh_age_based_recommendation_in_background,
+)
+from app.services.goal_horizon_recommendation_service import (
+    get_cached_horizon_recommendations,
+    get_horizon_recommendations,
+    get_stale_horizon_recommendations,
+    refresh_horizon_recommendations_in_background,
+)
 from app.services.goal_recommendation_service import (
     compute_portfolio_expected_metrics,
     get_cached_goal_recommendation,
@@ -202,6 +212,7 @@ async def get_overall_goal_recommendation_endpoint(
 @limiter.limit("5/minute")
 async def get_horizon_goal_recommendation_endpoint(
     request: Request,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     cache=Depends(get_cache_store),
@@ -212,6 +223,14 @@ async def get_horizon_goal_recommendation_endpoint(
     별개의 기능이며, 두 엔드포인트 모두 그대로 유지된다.
     """
     gen = await get_goal_recommendation_generation(cache, current_user.id)
+    cached = await get_cached_horizon_recommendations(cache, current_user.id, gen)
+    if cached is not None:
+        return cached
+    # 1시간 키가 만료됐어도 마지막 정상 결과가 있으면 바로 돌려주고 응답 뒤에 재계산한다(plans/90 C6)
+    stale = await get_stale_horizon_recommendations(cache, current_user.id, gen)
+    if stale is not None:
+        background_tasks.add_task(refresh_horizon_recommendations_in_background, current_user.id, cache)
+        return stale
     settings_row = await get_or_create_settings(db, current_user.id)
     return await get_horizon_recommendations(cache, db, current_user.id, settings_row, gen=gen)
 
@@ -220,6 +239,7 @@ async def get_horizon_goal_recommendation_endpoint(
 @limiter.limit("5/minute")
 async def get_age_based_goal_recommendation_endpoint(
     request: Request,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     cache=Depends(get_cache_store),
@@ -231,6 +251,14 @@ async def get_age_based_goal_recommendation_endpoint(
     구간에서 유도한 리스크 성향/주식비중 상하한만으로 결과를 결정한다.
     """
     gen = await get_goal_recommendation_generation(cache, current_user.id)
+    cached = await get_cached_age_based_recommendation(cache, current_user.id, gen)
+    if cached is not None:
+        return cached
+    # 1시간 키가 만료됐어도 마지막 정상 결과가 있으면 바로 돌려주고 응답 뒤에 재계산한다(plans/90 C6)
+    stale = await get_stale_age_based_recommendation(cache, current_user.id, gen)
+    if stale is not None:
+        background_tasks.add_task(refresh_age_based_recommendation_in_background, current_user.id, cache)
+        return stale
     settings_row = await get_or_create_settings(db, current_user.id)
     return await get_age_based_recommendation(cache, db, current_user.id, settings_row, gen=gen)
 
