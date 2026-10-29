@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.returns_calculator import calc_returns, calc_xirr, xirr
+from app.services.portfolio.returns_calculator import calc_returns, calc_xirr, xirr
 from app.utils.kst import today_kst
 
 

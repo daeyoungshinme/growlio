@@ -14,7 +14,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.market_data_fetcher import fetch_yf_daily_returns
-from app.services.position_aggregator import query_latest_position_map
+from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
 from app.utils.cache_keys import TTL_RISK_ANALYSIS, CacheStoreType, get_cached_json, risk_key, set_cached_json
 from app.utils.inproc_lock import single_flight_fetch

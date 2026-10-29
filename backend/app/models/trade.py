@@ -2,7 +2,7 @@
 
 브로커 sync는 체결내역을 가져오지 않으므로(잔고·보유종목만) 기간별 매수분은 기본적으로 일별 스냅샷
 포지션 비교로 추정한다. 사용자가 이 테이블에 매수/매도를 직접 기록하면 해당 (계좌, 종목)은 추정 대신
-기록 값으로 정확히 계산된다(`services/period_purchase_service.py`).
+기록 값으로 정확히 계산된다(`services/portfolio/period_purchase_service.py`).
 
 `Transaction`(현금흐름: 입출금·배당·이자)과 의도적으로 분리 — BUY/SELL을 섞으면 유형 필터가 없는
 입출금 집계가 오염된다. 보유 포지션(Position)은 이 기록으로 자동 수정하지 않는다.

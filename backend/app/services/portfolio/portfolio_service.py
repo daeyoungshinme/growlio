@@ -13,7 +13,7 @@ from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.accounts._snapshot_queries import latest_snapshot_subquery
-from app.services.composition_calculator import fetch_position_maps
+from app.services.portfolio.composition_calculator import fetch_position_maps
 from app.utils.cache_keys import (
     TTL_PORTFOLIO_OVERVIEW,
     CacheStoreType,

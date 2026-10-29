@@ -22,7 +22,7 @@ from app.schemas.trade import (
     TradeResponse,
     TradeUpdate,
 )
-from app.services.period_purchase_service import get_period_purchases, resolve_period
+from app.services.portfolio.period_purchase_service import get_period_purchases, resolve_period
 from app.utils.cache_keys import invalidate_tax_overseas_caches
 from app.utils.kst import today_kst
 

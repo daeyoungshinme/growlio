@@ -14,8 +14,8 @@ from app.limiter import limiter
 from app.models.user import User
 from app.schemas.portfolio import IndexExposureResponse
 from app.services.etf.index_exposure_service import get_index_exposure
-from app.services.portfolio_history_service import get_allocation_history
-from app.services.portfolio_service import build_portfolio_overview
+from app.services.portfolio.portfolio_history_service import get_allocation_history
+from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.rebalancing.strategy_service import get_rebalancing_strategy
 from app.services.risk_service import get_portfolio_risk_metrics
 

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import UserSettings
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
-from app.services.portfolio_service import build_portfolio_overview
+from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.utils.kst import today_kst
 
 if TYPE_CHECKING:

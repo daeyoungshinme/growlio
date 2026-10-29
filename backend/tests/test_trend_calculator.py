@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.asset_aggregator import _trend_window_start, get_monthly_trend
+from app.services.portfolio.asset_aggregator import _trend_window_start, get_monthly_trend
 
 
 class TestGetMonthlyTrend:
@@ -110,7 +110,7 @@ class TestTrendWindowStart:
 
     @pytest.mark.asyncio
     async def test_query_binds_kst_start_date(self, monkeypatch):
-        from app.services import asset_aggregator as tc
+        from app.services.portfolio import asset_aggregator as tc
 
         monkeypatch.setattr(tc, "today_kst", lambda: date(2026, 11, 1))
         execute_result = MagicMock()

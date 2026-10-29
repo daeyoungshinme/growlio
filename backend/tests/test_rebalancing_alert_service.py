@@ -70,7 +70,9 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
@@ -123,7 +125,9 @@ async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
@@ -166,7 +170,8 @@ async def test_check_rebalancing_alerts_overview_failure_continues(mock_db):
 
     with (
         patch(
-            "app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(side_effect=Exception("DB Error"))
+            "app.services.portfolio.portfolio_service.build_portfolio_overview",
+            new=AsyncMock(side_effect=Exception("DB Error")),
         ),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
@@ -220,7 +225,9 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
@@ -330,7 +337,10 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
             patch(
@@ -370,7 +380,10 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
             patch(
@@ -408,7 +421,10 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.alert_check.fetch_composite_signal", new=AsyncMock()) as mock_fetch,
@@ -440,7 +456,10 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
             patch(
@@ -495,7 +514,10 @@ class TestCheckRebalancingAlertsCompositeTrigger:
             composite_flag_store[key] = value
 
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
             patch(
@@ -554,7 +576,10 @@ class TestCheckRebalancingAlertsCompositeTrigger:
 
         # 이미 오늘 이 유저에게 복합신호 알림이 발송된 것처럼 플래그를 세팅해도 drift 알림엔 영향 없어야 함.
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
             patch("app.services.rebalancing.alert_check.get_durable", new=AsyncMock(return_value="1")),
@@ -590,7 +615,10 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
             patch("app.services.rebalancing.alert_check.fetch_composite_signal", new=AsyncMock()) as mock_fetch,
@@ -623,7 +651,10 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
             patch(
@@ -683,7 +714,10 @@ class TestAutoModeUnaffectedByCompositeTrigger:
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
             patch("app.services.rebalancing.alert_check.fetch_composite_signal", new=AsyncMock()) as mock_fetch,
@@ -739,7 +773,10 @@ class TestAutoModeUnaffectedByCompositeTrigger:
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
-            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=overview),
+            ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
             patch(
@@ -813,7 +850,9 @@ async def test_check_rebalancing_alerts_both_on_schedule_day_sends_full_report(m
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
@@ -861,7 +900,9 @@ async def test_check_rebalancing_alerts_both_non_schedule_with_drift(mock_db):
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
@@ -908,7 +949,9 @@ async def test_check_rebalancing_alerts_both_non_schedule_no_drift_skips(mock_db
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(

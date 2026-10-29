@@ -8,7 +8,7 @@ from app.models.user import User
 from app.schemas.action_items import ActionItem
 from app.schemas.dashboard import DashboardResponse
 from app.services.action_items_service import get_action_items
-from app.services.asset_aggregator import get_dashboard_summary
+from app.services.portfolio.asset_aggregator import get_dashboard_summary
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 

@@ -38,7 +38,7 @@ from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.models.trade import TradeRecord
 from app.providers._retry import with_token_refresh
 from app.services.accounts.credential_service import decrypt_kis_credentials
-from app.services.period_purchase_service import Lot
+from app.services.portfolio.period_purchase_service import Lot
 from app.services.tax.tax_service import get_overseas_positions_detail
 from app.utils.cache_keys import (
     TTL_TAX_OVERSEAS_REALIZED,

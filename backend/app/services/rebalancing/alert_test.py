@@ -38,7 +38,7 @@ async def send_test_rebalancing_alert(
     """
     from app.services.alerts._dispatch import send_push_safely
     from app.services.email_service import send_rebalancing_alert
-    from app.services.portfolio_service import build_portfolio_overview
+    from app.services.portfolio.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.service import analyze_rebalancing
 
     account_filter = (

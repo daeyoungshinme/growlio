@@ -120,7 +120,9 @@ async def test_check_rebalancing_alerts_analysis_failure_continues(mock_db):
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ),
         patch("app.services.rebalancing.service.analyze_rebalancing", side_effect=ValueError("분석 오류")),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(

@@ -53,13 +53,13 @@ from app.services.accounts.snapshot_service import (
     get_latest_snapshot_with_positions,
     get_latest_snapshots_by_account,
 )
-from app.services.asset_aggregator import get_dashboard_summary, get_monthly_trend
 from app.services.external_queries import (
     account_scoped_performance,
     find_by_external_ref,
     monthly_net_deposits_by_account,
 )
 from app.services.goal.goal_return_solver import build_feasibility_preview
+from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_monthly_trend
 from app.utils.cache_keys import (
     challenge_progress_key,
     invalidate_asset_account_caches,

@@ -17,8 +17,8 @@ from app.limiter import limiter
 from app.models.asset import Position
 from app.models.user import User
 from app.schemas.asset import ManualPosition, PositionListResponse
-from app.services._position_queries import fetch_manual_positions
 from app.services.accounts.snapshot_service import _upsert_snapshot, sync_snapshot_positions
+from app.services.portfolio._position_queries import fetch_manual_positions
 from app.services.price_service import fetch_prices_batch
 from app.utils.cache_keys import invalidate_asset_account_caches, sync_lock_key
 from app.utils.currency import fetch_usd_krw

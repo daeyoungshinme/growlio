@@ -8,9 +8,9 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.rebalancing import PortfolioDriftSummary
-from app.services._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
 from app.services._settings_queries import get_settings_row
-from app.services.portfolio_service import build_portfolio_overview
+from app.services.portfolio._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
+from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.rebalancing.diagnosis_service import fetch_composite_signal
 from app.services.rebalancing.service import compute_portfolio_drift_summary
 from app.utils.cache_keys import CacheStoreType

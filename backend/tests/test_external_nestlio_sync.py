@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
 from app.services.external_queries import build_account_cashflows
-from app.services.returns_calculator import xirr
+from app.services.portfolio.returns_calculator import xirr
 
 
 def _make_user():

@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.services.asset_aggregator import get_dashboard_summary
+from app.services.portfolio.asset_aggregator import get_dashboard_summary
 from app.services.tax.tax_service import get_overseas_positions_detail, get_tax_summary
 from app.utils.cache_keys import TTL_INSIGHTS, CacheStoreType, get_cached_json, insights_key, set_cached_json
 from app.utils.kst import today_kst
@@ -153,7 +153,7 @@ async def _check_rebalancing_opportunity(
 ) -> list[Insight]:
     """저장된 포트폴리오 중 드리프트 > 5%인 항목이 있을 때 알림."""
     from app.models.portfolio import Portfolio
-    from app.services.portfolio_service import build_portfolio_overview
+    from app.services.portfolio.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.service import compute_portfolio_drift_summary
 
     async def _load_portfolios() -> dict[uuid.UUID, Portfolio]:

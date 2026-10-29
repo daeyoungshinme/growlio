@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount, Transaction
 from app.services.accounts.snapshot_service import get_latest_snapshots_by_account
-from app.services.returns_calculator import xirr
+from app.services.portfolio.returns_calculator import xirr
 from app.utils.kst import today_kst
 
 _FLOW_TYPES = ("DEPOSIT", "WITHDRAWAL")

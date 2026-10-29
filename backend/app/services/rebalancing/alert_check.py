@@ -244,7 +244,7 @@ def _should_skip_by_schedule(alert: RebalancingAlert, trigger_condition: str, is
 
 async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db: AsyncSession, cache: Any = None):
     """알림 대상 포트폴리오의 현재 배분을 조회·분석한다. 실패 시 None(호출부에서 skip)."""
-    from app.services.portfolio_service import build_portfolio_overview
+    from app.services.portfolio.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.service import analyze_rebalancing
 
     effective_account_ids = resolve_effective_account_ids(alert, portfolio)

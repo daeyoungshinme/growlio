@@ -53,7 +53,7 @@ from app.services.goal.goal_recommendation_service import (
     get_stale_goal_recommendation,
     refresh_goal_recommendation_in_background,
 )
-from app.services.portfolio_service import build_portfolio_overview
+from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.price_service import get_historical_returns
 from app.services.rebalancing.broker_balance_service import fetch_broker_balance
 from app.services.rebalancing.diagnosis_service import (

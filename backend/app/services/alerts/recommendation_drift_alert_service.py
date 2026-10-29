@@ -31,7 +31,6 @@ from app.models.alert import AlertHistory
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
-from app.services._portfolio_queries import get_linked_portfolios
 from app.services._settings_queries import get_settings_row
 from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.goal.goal_horizon_recommendation_service import get_horizon_recommendations
@@ -42,6 +41,7 @@ from app.services.goal.goal_recommendation_service import (
     fold_into_portfolio_groups,
     get_goal_recommendation,
 )
+from app.services.portfolio._portfolio_queries import get_linked_portfolios
 from app.utils.cache_keys import CacheStoreType, get_goal_recommendation_generation
 from app.utils.kst import kst_day_start, today_kst
 

@@ -83,8 +83,8 @@ from app.services.goal.goal_candidate_service import (
 from app.services.goal.goal_portfolio_optimizer import _MIN_CANDIDATES, compute_weighted_expected_metrics
 from app.services.goal.goal_return_solver import months_until_year_end, solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
-from app.services.portfolio_service import build_portfolio_overview
-from app.services.position_aggregator import query_latest_position_map
+from app.services.portfolio.portfolio_service import build_portfolio_overview
+from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
 from app.services.rebalancing.group_expansion import group_owner_map
 from app.services.yahoo_price import run_yf_bounded, to_yf_symbol

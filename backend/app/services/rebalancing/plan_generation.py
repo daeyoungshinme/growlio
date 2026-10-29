@@ -325,7 +325,7 @@ async def _drifting_items_for_alert(
 
     반환: (analysis, overview, drifting) — drifting은 analysis.items(그룹 members 포함)와 같은 객체를 가리킨다.
     """
-    from app.services.portfolio_service import build_portfolio_overview
+    from app.services.portfolio.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.alert_scope import resolve_effective_account_ids
     from app.services.rebalancing.service import analyze_rebalancing
 
