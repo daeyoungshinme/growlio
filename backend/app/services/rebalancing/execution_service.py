@@ -161,10 +161,15 @@ async def _save_execution_history(
         db.add(execution)
         await db.flush()  # execution.id 생성
 
+        saved: list[tuple[OrderResult, uuid.UUID]] = []
         for exec_result in results:
             for placed in exec_result.orders:
+                # id를 미리 정해 두어 커밋 뒤 응답 주문에 result_id를 붙인다(미체결 취소 대상 지정용)
+                result_id = uuid.uuid4()
+                saved.append((placed, result_id))
                 db.add(
                     RebalancingExecutionResult(
+                        id=result_id,
                         execution_id=execution.id,
                         account_id=exec_result.account_id,
                         account_name=exec_result.account_name,
@@ -176,12 +181,16 @@ async def _save_execution_history(
                         quantity=placed.quantity,
                         status=placed.status,
                         order_no=placed.order_no,
+                        order_org_no=placed.order_org_no,
                         error_message=placed.error_msg,
                         order_type=placed.order_type,
                     )
                 )
 
         await db.commit()
+        for placed, result_id in saved:
+            placed.result_id = result_id
+            placed.cancelable = placed.status == "SUCCESS" and bool(placed.order_no)
         return execution.id
     except Exception as e:
         # 실주문은 이미 나갔는데 기록이 없는 상태 — 경고가 아니라 오류로 알린다. flush 이후 실패면 세션이

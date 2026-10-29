@@ -139,7 +139,23 @@ export interface OrderResult {
   error_msg: string | null;
   order_type?: string;
   price?: number | null;
+  /** 저장된 주문 결과 id — 미체결 취소 대상 지정용 (이력 저장 실패 시 없음) */
+  result_id?: string | null;
+  cancel_status?: "CANCELED" | "CANCEL_FAILED" | null;
+  cancel_message?: string | null;
+  /** 서버 판정: 접수된 당일 주문 등 취소 요청이 가능한 주문. 체결 여부는 증권사 응답으로만 확정된다 */
+  cancelable?: boolean;
 }
+
+export interface OrderCancelResponse {
+  result_id: string;
+  cancel_status: "CANCELED" | "CANCEL_FAILED";
+  message: string;
+}
+
+/** 실행된 주문의 미체결 수량 취소 — 이미 체결된 수량은 취소되지 않는다 */
+export const cancelExecutionOrder = (resultId: string): Promise<OrderCancelResponse> =>
+  apiPost<OrderCancelResponse>(`/rebalancing/history/results/${resultId}/cancel`);
 
 export interface ExecutionResult {
   account_id: string;

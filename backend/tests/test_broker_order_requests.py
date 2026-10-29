@@ -15,8 +15,10 @@ import pytest
 from pytest_httpx import HTTPXMock
 
 from app.kis import order as kis_order
+from app.kis.client import KisApiError
 from app.kis.constants import KIS_MOCK_BASE_URL, KIS_REAL_BASE_URL
 from app.kiwoom import order as kiwoom_order
+from app.kiwoom.client import KiwoomApiError
 from app.kiwoom.constants import KIWOOM_MOCK_BASE_URL, KIWOOM_REAL_BASE_URL
 
 KIS_DOMESTIC_PATH = "/uapi/domestic-stock/v1/trading/order-cash"
@@ -340,3 +342,126 @@ class TestKiwoomOverseasOrder:
 
         body = _body(httpx_mock.get_requests()[0])
         assert (body["trde_tp"], body["ord_uv"]) == ("00", "431.10")
+
+
+# ── 미체결 취소 (plans/89) ────────────────────────────────────────────────────
+
+
+class TestKisCancelOrder:
+    @pytest.mark.asyncio
+    async def test_domestic_order_returns_org_no(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(json={"rt_cd": "0", "output": {"ODNO": "0001", "KRX_FWDG_ORD_ORGNO": "91252"}})
+
+        result = await kis_order.place_domestic_order(
+            "key", "secret", "tok", "12345678-01", side="BUY", ticker="069500", quantity=1, is_mock=True
+        )
+
+        assert result["order_org_no"] == "91252"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("is_mock", "tr_id"), [(False, "TTTC0803U"), (True, "VTTC0803U")])
+    async def test_domestic_cancel_request(self, httpx_mock: HTTPXMock, is_mock, tr_id):
+        base_url = KIS_MOCK_BASE_URL if is_mock else KIS_REAL_BASE_URL
+        httpx_mock.add_response(
+            method="POST",
+            url=f"{base_url}/uapi/domestic-stock/v1/trading/order-rvsecncl",
+            json={"rt_cd": "0", "output": {"ODNO": "0009"}},
+        )
+
+        await kis_order.cancel_domestic_order(
+            "key", "secret", "tok", "12345678-01", order_org_no="91252", order_no="0001", is_mock=is_mock
+        )
+
+        (request,) = httpx_mock.get_requests()
+        assert request.headers["tr_id"] == tr_id
+        assert _body(request) == {
+            "CANO": "12345678",
+            "ACNT_PRDT_CD": "01",
+            "KRX_FWDG_ORD_ORGNO": "91252",
+            "ORGN_ODNO": "0001",
+            "ORD_DVSN": "00",
+            "RVSE_CNCL_DVSN_CD": "02",
+            "ORD_QTY": "0",
+            "ORD_UNPR": "0",
+            "QTY_ALL_ORD_YN": "Y",
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("is_mock", "tr_id"), [(False, "TTTT1004U"), (True, "VTTT1004U")])
+    async def test_overseas_cancel_request(self, httpx_mock: HTTPXMock, is_mock, tr_id):
+        base_url = KIS_MOCK_BASE_URL if is_mock else KIS_REAL_BASE_URL
+        httpx_mock.add_response(
+            method="POST",
+            url=f"{base_url}/uapi/overseas-stock/v1/trading/order-rvsecncl",
+            json={"rt_cd": "0", "output": {}},
+        )
+
+        await kis_order.cancel_overseas_order(
+            "key",
+            "secret",
+            "tok",
+            "12345678-01",
+            ticker="SPY",
+            market="AMEX",
+            order_no="0002",
+            quantity=4,
+            is_mock=is_mock,
+        )
+
+        (request,) = httpx_mock.get_requests()
+        assert request.headers["tr_id"] == tr_id
+        body = _body(request)
+        assert body["OVRS_EXCG_CD"] == "AMEX"
+        assert (body["PDNO"], body["ORGN_ODNO"], body["ORD_QTY"]) == ("SPY", "0002", "4")
+        assert (body["RVSE_CNCL_DVSN_CD"], body["OVRS_ORD_UNPR"]) == ("02", "0")
+
+    @pytest.mark.asyncio
+    async def test_cancel_rejection_raises_with_broker_message(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(json={"rt_cd": "7", "msg1": "정정취소가능수량이 없습니다"})
+
+        with pytest.raises(KisApiError, match="정정취소가능수량"):
+            await kis_order.cancel_domestic_order(
+                "key", "secret", "tok", "12345678-01", order_org_no="1", order_no="2", is_mock=True
+            )
+        assert len(httpx_mock.get_requests()) == 1  # 재시도하지 않는다
+
+
+class TestKiwoomCancelOrder:
+    @pytest.mark.asyncio
+    async def test_domestic_cancel_request(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(
+            method="POST", url=f"{KIWOOM_MOCK_BASE_URL}{KIWOOM_DOMESTIC_PATH}", json={"return_code": 0, "ord_no": "C1"}
+        )
+
+        await kiwoom_order.cancel_domestic_order("tok", "5012345678", ticker="069500", order_no="K1", is_mock=True)
+
+        request = httpx_mock.get_requests()[0]
+        assert request.headers["api-id"] == "kt10003"
+        assert _body(request) == {
+            "acnt_no": "5012345678",
+            "dmst_stex_tp": "KRX",
+            "orig_ord_no": "K1",
+            "stk_cd": "069500",
+            "cncl_qty": "0",
+        }
+
+    @pytest.mark.asyncio
+    async def test_overseas_cancel_request(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(
+            method="POST", url=f"{KIWOOM_REAL_BASE_URL}{KIWOOM_OVERSEAS_PATH}", json={"return_code": 0}
+        )
+
+        await kiwoom_order.cancel_overseas_order(
+            "tok", "5012345678", ticker="SPY", market="NYSE", order_no="U1", is_mock=False
+        )
+
+        request = httpx_mock.get_requests()[0]
+        assert request.headers["api-id"] == "ust20003"
+        assert _body(request) == {"acnt_no": "5012345678", "orig_ord_no": "U1", "stex_tp": "NY", "stk_cd": "SPY"}
+
+    @pytest.mark.asyncio
+    async def test_cancel_rejection_raises(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(json={"return_code": 20, "return_msg": "취소가능수량이 없습니다"})
+
+        with pytest.raises(KiwoomApiError, match="취소가능수량"):
+            await kiwoom_order.cancel_domestic_order("tok", "1", ticker="069500", order_no="K1", is_mock=True)
