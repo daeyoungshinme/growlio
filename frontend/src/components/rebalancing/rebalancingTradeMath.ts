@@ -1,4 +1,4 @@
-import type { RebalancingAnalysis, RebalancingItem } from "@/api/rebalancing";
+import type { ExecutionOrderItem, RebalancingAnalysis, RebalancingItem } from "@/api/rebalancing";
 import { DOMESTIC_MARKETS, isOverseasMarket } from "@/constants/markets";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
 
@@ -178,4 +178,20 @@ export function calcTradeSummary(items: RebalancingItem[]): {
     .filter((i) => i.diff_krw < 0)
     .reduce((s, i) => s + calcTradeKrw(i), 0);
   return { totalBuySummary, totalSellSummary };
+}
+
+/** 지정가가 현재가에서 이만큼(%) 넘게 벗어나면 확인창에서 강조 — 오타(0 하나 더/덜)를 잡는 용도 */
+export const LIMIT_DEVIATION_WARN_PCT = 5;
+/** 지정가의 현재가 대비 이탈률(%) — 현재가를 모르면 null */
+export function limitDeviationPct(
+  order: ExecutionOrderItem,
+  livePricesKrw: Record<string, number>,
+  livePricesUsd: Record<string, number>,
+): number | null {
+  if (order.order_type !== "LIMIT" || !order.limit_price) return null;
+  const live = isOverseasMarket(order.market)
+    ? livePricesUsd[order.ticker]
+    : livePricesKrw[order.ticker];
+  if (!live || live <= 0) return null;
+  return ((order.limit_price - live) / live) * 100;
 }

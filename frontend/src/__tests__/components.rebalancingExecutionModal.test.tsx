@@ -1,6 +1,6 @@
 import { createContext } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 
@@ -35,6 +35,8 @@ function setExec(over: {
   missing?: string[];
   orders?: unknown[];
   priceState?: string;
+  orderType?: "MARKET" | "LIMIT";
+  hasRealAccount?: boolean;
 }) {
   const dispatch = vi.fn();
   const handleExecute = vi.fn();
@@ -43,10 +45,15 @@ function setExec(over: {
       phase: "confirm",
       results: [],
       confirmed: over.confirmed ?? false,
-      orderType: "LIMIT",
+      orderType: over.orderType ?? "LIMIT",
+      strategy: "FULL",
+      livePricesKrw: {},
+      livePricesUsd: {},
       priceState: over.priceState ?? "done",
       priceLoadProgress: { loaded: 0, total: 0 },
     },
+    hasRealAccount: over.hasRealAccount ?? false,
+    globalCashSummary: { totalSellProceeds: null, totalBuyCost: 1_000_000 },
     orders: over.orders ?? [LIMIT_ORDER],
     missingLimitPriceTickers: over.missing ?? [],
     dispatch,
@@ -88,13 +95,41 @@ describe("RebalancingExecutionModal 실행 게이트", () => {
     expect(screen.getByRole("button", { name: /지정가 주문 확인/ })).toBeDisabled();
   });
 
-  it("최종 실행 단계에서도 지정가 누락이면 실행하지 않는다", () => {
-    const { handleExecute } = setExec({ confirmed: true, missing: ["AAPL"] });
+  it("지정가 누락이면 확인 상태여도 최종 확인창을 띄우지 않는다", () => {
+    setExec({ confirmed: true, missing: ["AAPL"] });
     renderModal();
 
-    const execute = screen.getByRole("button", { name: /최종 실행/ });
-    expect(execute).toBeDisabled();
-    fireEvent.click(execute);
+    expect(screen.queryByRole("button", { name: /주문 실행/ })).not.toBeInTheDocument();
+  });
+
+  it("확인 상태면 요약 확인창을 띄우고, 실행을 눌러야 주문한다", () => {
+    const { handleExecute } = setExec({
+      confirmed: true,
+      orders: [{ ...LIMIT_ORDER, limit_price: 200 }],
+    });
+    renderModal();
+
+    expect(screen.getByText(/지정가로 1건을 주문합니다/)).toBeInTheDocument();
+    expect(screen.getByText(/미체결로 남을 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByText("모의투자 주문")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "지정가 주문 실행" }));
+    expect(handleExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("확인창을 취소하면 확인 상태를 해제한다", () => {
+    const { dispatch, handleExecute } = setExec({
+      confirmed: true,
+      orderType: "MARKET",
+      hasRealAccount: true,
+      orders: [{ ...LIMIT_ORDER, order_type: "MARKET" }],
+    });
+    renderModal();
+
+    expect(screen.getByText(/예상가와 크게 다를 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByText(/실계좌 주문/)).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: /시장가로 1건을 주문합니다/ });
+    fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+    expect(dispatch).toHaveBeenCalledWith({ type: "UNCONFIRM" });
     expect(handleExecute).not.toHaveBeenCalled();
   });
 

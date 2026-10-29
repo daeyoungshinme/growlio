@@ -45,7 +45,6 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
     selected,
     buyAccounts,
     errorMsg,
-    confirmed,
   } = state;
   const skippedSellCount = actionableItems.filter((i) => (i.shares_to_trade ?? 0) < 0).length;
 
@@ -95,12 +94,6 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
         <div className="rounded-lg bg-red-50 border border-red-200 dark:bg-red-900/30 dark:border-red-700/50 px-4 py-3 text-xs text-red-700 dark:text-red-300">
           {errorMsg}
         </div>
-      )}
-
-      {confirmed && (
-        <p className="text-xs text-red-600 dark:text-red-400 text-right">
-          아래 버튼으로 즉시 주문이 실행됩니다.
-        </p>
       )}
 
       {/* 전체 예수금 요약 배너 */}
