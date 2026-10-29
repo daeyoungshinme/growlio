@@ -53,7 +53,7 @@ function AlertHistorySection() {
   // skip으로 다음 페이지를 이어 붙인다 — limit을 키우면 백엔드 상한(200)을 넘는 순간 422로 섹션 전체가 오류가 됐다(plans/90 B1)
   const { data, isLoading, isFetchingNextPage, isError, refetch, hasNextPage, fetchNextPage } =
     useInfiniteQuery({
-      queryKey: [...QUERY_KEYS.alertHistory, "pages"],
+      queryKey: QUERY_KEYS.alertHistoryPages,
       queryFn: ({ pageParam }) =>
         fetchAlertHistory({ skip: pageParam, limit: ALERT_HISTORY_PAGE_SIZE }),
       initialPageParam: 0,

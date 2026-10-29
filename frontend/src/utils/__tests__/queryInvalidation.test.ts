@@ -16,6 +16,7 @@ import {
   invalidateSettingsData,
   invalidateTradeData,
   invalidateRebalancingPlanData,
+  invalidateTacticalData,
 } from "../queryInvalidation";
 
 function makeQueryClient() {
@@ -107,6 +108,31 @@ describe("invalidateDcaData", () => {
     expect(keys).toContain("dca-analysis");
     expect(keys).toContain("settings");
     expect(keys).toContain("dashboard");
+    expect(keys).not.toContain("goal-recommendation");
+  });
+
+  it("goalRecommendation 옵션이면 추천도 무효화하고 settings는 한 번만", async () => {
+    const qc = makeQueryClient();
+    await invalidateDcaData(qc as any, { goalRecommendation: true });
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toContain("goal-recommendation");
+    expect(keys.filter((k) => k === "settings")).toHaveLength(1);
+  });
+});
+
+describe("invalidateTacticalData", () => {
+  it("dcaLinked 옵션일 때만 리밸런싱 알림 무효화", async () => {
+    const plain = makeQueryClient();
+    await invalidateTacticalData(plain as any);
+    expect(plain.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0])).not.toContain(
+      "rebalancing-alerts",
+    );
+
+    const linked = makeQueryClient();
+    await invalidateTacticalData(linked as any, { dcaLinked: true });
+    expect(linked.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0])).toContain(
+      "rebalancing-alerts",
+    );
   });
 });
 

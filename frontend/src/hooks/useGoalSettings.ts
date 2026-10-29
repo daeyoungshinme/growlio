@@ -211,9 +211,7 @@ export function useGoalSettings() {
       }
       // 목표 금액·연도·출생연도는 마법사 밖(편집 모달)에서도 바뀌고 추천 결과를 바꾼다 — 백엔드도
       // 저장 시 추천 캐시를 지우므로 프론트도 모드와 무관하게 무효화한다(persist 대상 키).
-      // settings는 invalidateDcaData가 함께 무효화한다(추천 쪽에서 또 무효화하면 두 번 재조회)
-      const dcaInvalidation = invalidateDcaData(queryClient);
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase });
+      const dcaInvalidation = invalidateDcaData(queryClient, { goalRecommendation: true });
       toast("설정이 저장되었습니다", "success");
       if (!wizardMode) setEditing(false);
       await dcaInvalidation;

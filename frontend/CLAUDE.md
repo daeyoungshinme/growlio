@@ -188,7 +188,7 @@ _기타_
 | 드리프트 요약 / 지금 할 일 | `["drift-summary"]` / `["action-items"]` |
 | 세금 | `["tax-summary", year, accountId]` · `["overseas-positions-tax", accountId]` · `["isa-status"]` · `["pension-contribution", year]` · `["overseas-realized", year, accountId]` · `["tax-action-plan"]` |
 | 자산배분 이력 | `["allocation-history", months, accountId]` |
-| 알림 발송 이력 / 인사이트 | `["alert-history"]` / `["insights"]` |
+| 알림 발송 이력(무한 스크롤은 `alertHistoryPages`) / 인사이트 | `["alert-history"]` / `["insights"]` |
 | 리스크 / 시장 신호 / 복합신호 | `["portfolio-risk"]` / `["market-signal"]` / `["composite-signal-status"]` |
 | 목표 역산 추천 | `["goal-recommendation", "overall" \| "by-horizon" \| "by-age"]` · 후보 중복 `["goal-recommendation", "candidate-overlap", signature]` |
 | 적용 전 비교 | `["portfolio-expected-metrics", portfolioId]` |
@@ -210,8 +210,8 @@ _기타_
 | 거래내역 CUD | `invalidateTransactionData` |
 | 수기 매매 기록 CUD | `invalidateTradeData` (해외 SELL이 양도세 실현손익이 되므로 세금·지금 할 일 포함) |
 | 포트폴리오/리밸런싱 CUD | `invalidatePortfolioData` |
-| 전술 설정 / 제안 비중 적용 | `invalidateTacticalData` / `{ portfolioChanged: true }` |
-| DCA·배당 목표 변경 | `invalidateDcaData` (+ 배당 목표는 `invalidateGoalRecommendationData`) |
+| 전술 설정 / 제안 비중 적용 / 전술 연동 자동매수 해제 | `invalidateTacticalData` / `{ portfolioChanged: true }` / `{ dcaLinked: true }` |
+| DCA·배당 목표 변경 | `invalidateDcaData` (목표 금액·연도 변경은 `{ goalRecommendation: true }`, 배당 목표는 + `invalidateGoalRecommendationData`) |
 | 소득 구간 변경 | `invalidateIncomeBracketData` |
 | 챌린지 CUD | `invalidateChallengeData` |
 | 환율 / 주가 / 리밸런싱 알림 CUD | `invalidateAlertData` / `invalidateStockPriceAlertData` / `invalidateRebalancingAlertData(qc, portfolioId)` |

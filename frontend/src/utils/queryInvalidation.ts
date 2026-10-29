@@ -131,19 +131,28 @@ export function invalidatePortfolioData(qc: QueryClient) {
 
 /** 전술 배분 설정 변경 후 — 국면 상태 + 백테스트(비중표가 바뀌면 결과도 바뀜) + 홈 "지금 할 일"(전술 적용 항목).
  * 제안 비중 적용 시엔 포트폴리오 목표가 바뀌므로 `invalidatePortfolioData`도 함께(포트폴리오 목록·드리프트·리밸런싱 전략). */
-export function invalidateTacticalData(qc: QueryClient, opts: { portfolioChanged?: boolean } = {}) {
+export function invalidateTacticalData(
+  qc: QueryClient,
+  opts: { portfolioChanged?: boolean; dcaLinked?: boolean } = {},
+) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.tacticalStatusBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.tacticalBacktestBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
     ...(opts.portfolioChanged ? [invalidatePortfolioData(qc)] : []),
+    // 전술 연동 자동매수를 끄면 서버가 그 알림을 일반 모드로 되돌린다
+    ...(opts.dcaLinked ? [qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts })] : []),
   ]);
 }
 
 /** DCA 목표 변경 후 — dca-analysis + settings + dashboard + dividend-plan + 적립 챌린지(수익률/평가금액 진행률 기준값 변경) */
-export function invalidateDcaData(qc: QueryClient) {
+export function invalidateDcaData(qc: QueryClient, opts: { goalRecommendation?: boolean } = {}) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
+    // 목표 금액·연도가 추천 결과도 바꿀 때 — settings는 여기서 이미 무효화하므로 invalidateGoalRecommendationData를 따로 부르지 않는다
+    ...(opts.goalRecommendation
+      ? [qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase })]
+      : []),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
