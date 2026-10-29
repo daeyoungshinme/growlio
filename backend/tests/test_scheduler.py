@@ -90,14 +90,14 @@ def test_job_event_listener_logs_missed_and_error():
 
 
 def test_report_job_failure_logs_and_captures_to_sentry():
-    from app.jobs import _job_helpers
+    from app.core import job_runner
 
     exc = RuntimeError("boom")
     with (
-        patch.object(_job_helpers, "logger") as mock_logger,
-        patch.object(_job_helpers.sentry_sdk, "capture_exception") as mock_capture,
+        patch.object(job_runner, "logger") as mock_logger,
+        patch.object(job_runner.sentry_sdk, "capture_exception") as mock_capture,
     ):
-        _job_helpers.report_job_failure("x_failed", exc, user_id="u1")
+        job_runner.report_job_failure("x_failed", exc, user_id="u1")
 
     mock_logger.error.assert_called_once_with("x_failed", error="boom", user_id="u1")
     mock_capture.assert_called_once_with(exc)

@@ -12,7 +12,6 @@ UserSettings.composite_signal_alerts_enabled가 True(기본값 포함)인 활성
 
 from __future__ import annotations
 
-import asyncio
 from functools import partial
 
 import structlog
@@ -20,6 +19,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
+from app.core.job_runner import report_job_failure, run_per_user
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.market_signal.market_signal_service import (
@@ -100,7 +100,7 @@ async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreTy
                     after_sent=partial(_mark_composite_alert_sent_today, user_db, user.id),
                 )
         except Exception as exc:
-            logger.error("market_signal_change_user_failed", user_id=str(user.id), error=str(exc))
+            report_job_failure("market_signal_change_user_failed", exc, user_id=str(user.id))
             continue
         if sent:
             sent_count += 1
@@ -144,32 +144,27 @@ async def _already_sent_digest_today(db: AsyncSession, user_id) -> bool:
 
 
 async def _send_digest_to_user(
-    user: User, user_settings: UserSettings, level: str, reason: str, sem: asyncio.Semaphore
+    user: User, user_settings: UserSettings, to_email: str, *, level: str, reason: str
 ) -> None:
     from app.services.alerts._dispatch import dispatch_dual_channel_alert
     from app.services.email_service import send_market_signal_daily_digest_alert
 
-    async with sem:
-        try:
-            async with AsyncSessionLocal() as db:
-                if await _already_sent_digest_today(db, user.id):
-                    return
+    async with AsyncSessionLocal() as db:
+        if await _already_sent_digest_today(db, user.id):
+            return
 
-                to_email = user_settings.notification_email or user.email
-                await dispatch_dual_channel_alert(
-                    db,
-                    user.id,
-                    event_prefix="market_signal_daily_digest",
-                    alert_type="MARKET_SIGNAL_DIGEST",
-                    history_message=f"오늘의 시장 신호: {level}",
-                    send_email=partial(send_market_signal_daily_digest_alert, to_email, level, reason),
-                    push_title="오늘의 시장 신호",
-                    push_body=f"오늘의 시장 위험 신호: {level}. {reason}",
-                    push_type="MARKET_SIGNAL_DIGEST",
-                    fcm_token=user_settings.fcm_token,
-                )
-        except Exception as exc:
-            logger.error("market_signal_daily_digest_user_failed", user_id=str(user.id), error=str(exc))
+        await dispatch_dual_channel_alert(
+            db,
+            user.id,
+            event_prefix="market_signal_daily_digest",
+            alert_type="MARKET_SIGNAL_DIGEST",
+            history_message=f"오늘의 시장 신호: {level}",
+            send_email=partial(send_market_signal_daily_digest_alert, to_email, level, reason),
+            push_title="오늘의 시장 신호",
+            push_body=f"오늘의 시장 위험 신호: {level}. {reason}",
+            push_type="MARKET_SIGNAL_DIGEST",
+            fcm_token=user_settings.fcm_token,
+        )
 
 
 async def send_market_signal_daily_digest(db: AsyncSession, cache: CacheStoreType) -> None:
@@ -189,8 +184,10 @@ async def send_market_signal_daily_digest(db: AsyncSession, cache: CacheStoreTyp
     reason = _MARKET_NOTES.get(level) or "오늘도 안정적입니다."
     subscribers = await _get_daily_digest_subscribers(db)
 
-    sem = asyncio.Semaphore(_DIGEST_CONCURRENCY)
-    await asyncio.gather(
-        *(_send_digest_to_user(user, user_settings, level, reason, sem) for user, user_settings in subscribers)
+    await run_per_user(
+        subscribers,
+        partial(_send_digest_to_user, level=level, reason=reason),
+        concurrency=_DIGEST_CONCURRENCY,
+        failure_event="market_signal_daily_digest_user_failed",
     )
     logger.info("market_signal_daily_digest_completed", level=level, subscriber_count=len(subscribers))

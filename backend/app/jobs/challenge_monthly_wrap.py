@@ -13,7 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import report_job_failure, run_alert_job, run_per_user
+from app.core.job_runner import report_job_failure, run_per_user
+from app.jobs._job_helpers import run_alert_job
 from app.models.challenge import (
     CHALLENGE_ACTIVE,
     CHALLENGE_COMPLETED,

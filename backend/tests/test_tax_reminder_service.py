@@ -227,3 +227,46 @@ class TestSendYearEndTaxReminder:
             await send_year_end_tax_reminder(mock_db)
 
         mock_email.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_one_user_failure_is_reported_and_others_still_sent(self, mock_db):
+        """유저 하나가 실패해도 다른 유저는 발송되고, 실패는 Sentry로 보고된다 (plans/92 0-1)."""
+        bad = SimpleNamespace(id=uuid.uuid4(), email="bad@example.com", is_active=True)
+        good = SimpleNamespace(id=uuid.uuid4(), email="good@example.com", is_active=True)
+        user_settings = SimpleNamespace(notification_email=None, fcm_token=None)
+
+        subscribers_result = MagicMock()
+        subscribers_result.all.return_value = [(bad, user_settings), (good, user_settings)]
+        mock_db.execute = AsyncMock(return_value=subscribers_result)
+
+        def session_factory():
+            history_result = MagicMock()
+            history_result.scalar.return_value = None
+            session = AsyncMock()
+            session.execute = AsyncMock(return_value=history_result)
+            session.add = MagicMock()
+            session.__aenter__ = AsyncMock(return_value=session)
+            session.__aexit__ = AsyncMock(return_value=None)
+            return session
+
+        content = {"actions": [_action("pension", 150_000.0)], "total_benefit_krw": 150_000.0, "has_content": True}
+
+        async def build(user_id, _db):
+            if user_id == bad.id:
+                raise RuntimeError("boom")
+            return content
+
+        with (
+            patch("app.services.alerts.tax_reminder_service.AsyncSessionLocal", side_effect=session_factory),
+            patch("app.services.alerts.tax_reminder_service.build_reminder_content", new=build),
+            patch(
+                "app.services.email_service.send_year_end_tax_reminder_email", new=AsyncMock(return_value=True)
+            ) as mock_email,
+            patch("app.core.job_runner.report_job_failure") as mock_report,
+        ):
+            await send_year_end_tax_reminder(mock_db)
+
+        mock_email.assert_called_once_with("good@example.com", content)
+        mock_report.assert_called_once()
+        assert mock_report.call_args.args[0] == "year_end_tax_reminder_user_failed"
+        assert mock_report.call_args.kwargs == {"user_id": str(bad.id)}

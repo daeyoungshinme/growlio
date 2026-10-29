@@ -414,3 +414,48 @@ class TestSendRecommendationDriftAlerts:
         args = find.await_args.args
         assert args[3] is fresh_settings
         assert args[4] == "g2"
+
+
+@pytest.mark.asyncio
+async def test_one_user_failure_is_reported_and_others_still_sent(mock_db):
+    """유저 하나가 실패해도 다른 유저는 발송되고, 실패는 Sentry로 보고된다 (plans/92 0-1)."""
+    bad = SimpleNamespace(id=uuid.uuid4(), email="bad@example.com", is_active=True)
+    good = SimpleNamespace(id=uuid.uuid4(), email="good@example.com", is_active=True)
+    user_settings = SimpleNamespace(notification_email=None, fcm_token=None)
+
+    subscribers_result = MagicMock()
+    subscribers_result.all.return_value = [(bad, user_settings), (good, user_settings)]
+    mock_db.execute = AsyncMock(return_value=subscribers_result)
+
+    def session_factory():
+        history_result = MagicMock()
+        history_result.scalar.return_value = None
+        session = AsyncMock()
+        session.execute = AsyncMock(return_value=history_result)
+        session.add = MagicMock()
+        session.__aenter__ = AsyncMock(return_value=session)
+        session.__aexit__ = AsyncMock(return_value=None)
+        return session
+
+    async def find(user_id, *_args):
+        if user_id == bad.id:
+            raise RuntimeError("boom")
+        return ["내포트폴리오"]
+
+    with (
+        patch(f"{_MODULE}.AsyncSessionLocal", side_effect=session_factory),
+        patch("app.core.cache_store.get_cache_store", AsyncMock(return_value=None)),
+        patch(f"{_MODULE}.get_goal_recommendation_generation", AsyncMock(return_value="g1")),
+        patch(f"{_MODULE}.get_settings_row", AsyncMock(return_value=None)),
+        patch(f"{_MODULE}._find_drifted_portfolios", new=find),
+        patch(
+            "app.services.email_service.send_recommendation_drift_alert_email", new=AsyncMock(return_value=True)
+        ) as mock_email,
+        patch("app.core.job_runner.report_job_failure") as mock_report,
+    ):
+        await send_recommendation_drift_alerts(mock_db)
+
+    mock_email.assert_called_once_with("good@example.com", ["내포트폴리오"])
+    mock_report.assert_called_once()
+    assert mock_report.call_args.args[0] == "recommendation_drift_alert_user_failed"
+    assert mock_report.call_args.kwargs == {"user_id": str(bad.id)}

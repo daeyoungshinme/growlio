@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import report_job_failure
+from app.core.job_runner import report_job_failure
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.models.user import User, UserSettings

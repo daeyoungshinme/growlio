@@ -19,7 +19,8 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import report_job_failure, run_alert_job
+from app.core.job_runner import report_job_failure
+from app.jobs._job_helpers import run_alert_job
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio

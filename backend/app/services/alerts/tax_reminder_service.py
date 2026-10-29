@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from functools import partial
 from typing import TypedDict
@@ -19,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
+from app.core.job_runner import run_per_user
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.tax.tax_action_service import TaxAction, get_tax_action_plan
@@ -76,46 +76,44 @@ async def _already_sent_reminder_today(db: AsyncSession, user_id: uuid.UUID) -> 
     return result.scalar() is not None
 
 
-async def _send_reminder_to_user(user: User, user_settings: UserSettings, sem: asyncio.Semaphore) -> None:
+async def _send_reminder_to_user(user: User, user_settings: UserSettings, to_email: str) -> None:
     from app.services.alerts._dispatch import dispatch_dual_channel_alert
     from app.services.email_service import send_year_end_tax_reminder_email
 
-    async with sem:
-        try:
-            async with AsyncSessionLocal() as db:
-                if await _already_sent_reminder_today(db, user.id):
-                    return
+    async with AsyncSessionLocal() as db:
+        if await _already_sent_reminder_today(db, user.id):
+            return
 
-                content = await build_reminder_content(user.id, db)
-                if not content["has_content"]:
-                    return
+        content = await build_reminder_content(user.id, db)
+        if not content["has_content"]:
+            return
 
-                to_email = user_settings.notification_email or user.email
+        top = content["actions"][0]
+        push_body = top["title"]
+        if len(content["actions"]) > 1:
+            push_body += f" 외 {len(content['actions']) - 1}건"
 
-                top = content["actions"][0]
-                push_body = top["title"]
-                if len(content["actions"]) > 1:
-                    push_body += f" 외 {len(content['actions']) - 1}건"
-
-                await dispatch_dual_channel_alert(
-                    db,
-                    user.id,
-                    event_prefix="year_end_tax_reminder",
-                    alert_type="YEAR_END_TAX_REMINDER",
-                    history_message="연말 절세 리마인더 발송",
-                    send_email=partial(send_year_end_tax_reminder_email, to_email, content),
-                    push_title="연말 절세 리마인더",
-                    push_body=push_body,
-                    push_type="YEAR_END_TAX_REMINDER",
-                    fcm_token=user_settings.fcm_token,
-                )
-        except Exception as exc:
-            logger.error("year_end_tax_reminder_user_failed", user_id=str(user.id), error=str(exc))
+        await dispatch_dual_channel_alert(
+            db,
+            user.id,
+            event_prefix="year_end_tax_reminder",
+            alert_type="YEAR_END_TAX_REMINDER",
+            history_message="연말 절세 리마인더 발송",
+            send_email=partial(send_year_end_tax_reminder_email, to_email, content),
+            push_title="연말 절세 리마인더",
+            push_body=push_body,
+            push_type="YEAR_END_TAX_REMINDER",
+            fcm_token=user_settings.fcm_token,
+        )
 
 
 async def send_year_end_tax_reminder(db: AsyncSession) -> None:
     """11~12월 매주 월요일 09:00 KST — 옵트인 유저에게 활용 가능한 절세 방법을 요약 발송한다."""
     subscribers = await _get_reminder_subscribers(db)
-    sem = asyncio.Semaphore(_REMINDER_CONCURRENCY)
-    await asyncio.gather(*(_send_reminder_to_user(user, user_settings, sem) for user, user_settings in subscribers))
+    await run_per_user(
+        subscribers,
+        _send_reminder_to_user,
+        concurrency=_REMINDER_CONCURRENCY,
+        failure_event="year_end_tax_reminder_user_failed",
+    )
     logger.info("year_end_tax_reminder_completed", subscriber_count=len(subscribers))
