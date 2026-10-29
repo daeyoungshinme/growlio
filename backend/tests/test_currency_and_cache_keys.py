@@ -264,7 +264,9 @@ class TestInvalidateGoalRecommendationCaches:
         from app.utils.cache_keys import (
             get_goal_recommendation_generation,
             goal_recommendation_age_key,
+            goal_recommendation_age_stale_key,
             goal_recommendation_horizon_key,
+            goal_recommendation_horizon_stale_key,
             goal_recommendation_key,
             goal_recommendation_stale_key,
             invalidate_goal_recommendation_caches,
@@ -277,14 +279,16 @@ class TestInvalidateGoalRecommendationCaches:
             goal_recommendation_key(uid, gen),
             goal_recommendation_stale_key(uid, gen),
             goal_recommendation_horizon_key(uid, gen),
+            goal_recommendation_horizon_stale_key(uid, gen),
             goal_recommendation_age_key(uid, gen),
+            goal_recommendation_age_stale_key(uid, gen),
         ]
         for key in keys:
             await cache.set(key, "{}")
 
         await invalidate_goal_recommendation_caches(cache, uid)
 
-        assert [await cache.get(k) for k in keys] == [None] * 4
+        assert [await cache.get(k) for k in keys] == [None] * len(keys)
 
     @pytest.mark.asyncio
     async def test_invalidation_rotates_generation(self, override_settings):

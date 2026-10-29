@@ -177,11 +177,34 @@ class TestCheckTaxLossHarvest:
             {"ticker": "AAPL", "unrealized_pnl_krw": 3_000_000, "qty": 5},
             {"ticker": "TSLA", "unrealized_pnl_krw": -1_500_000, "qty": 3},
         ]
-        with patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=positions)):
+        summary = {"harvesting_recommendations": [{"ticker": "TSLA", "tax_saved_krw": 330_000}]}
+        tax_summary = AsyncMock(return_value=summary)
+        with (
+            patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=positions)),
+            patch("app.services.insight_service.get_tax_summary", new=tax_summary),
+        ):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
 
         assert len(result) == 1
         assert result[0].type == "TAX_LOSS_HARVEST"
+        assert result[0].metric_value == 330_000
+        # 같은 포지션을 넘겨 세금 요약이 포지션을 다시 읽지 않게 한다
+        assert tax_summary.call_args.kwargs["overseas_positions"] is positions
+
+    @pytest.mark.asyncio
+    async def test_small_tax_saving_returns_empty(self, mock_db, override_settings):
+        """절세액이 5만 원 미만이면(기본공제 안쪽 이익 등) 인사이트를 띄우지 않는다."""
+        from app.services.insight_service import _check_tax_loss_harvest
+
+        positions = [{"ticker": "TSLA", "unrealized_pnl_krw": -100_000, "qty": 1}]
+        summary = {"harvesting_recommendations": [{"ticker": "TSLA", "tax_saved_krw": 22_000}]}
+        with (
+            patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=positions)),
+            patch("app.services.insight_service.get_tax_summary", new=AsyncMock(return_value=summary)),
+        ):
+            result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
+
+        assert result == []
 
 
 # ── generate_insights ─────────────────────────────────────────

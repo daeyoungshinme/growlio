@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
@@ -13,11 +12,12 @@ from app.api.deps import get_current_user, get_db
 from app.limiter import limiter
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanLeg
 from app.models.user import User
-from app.schemas.rebalancing import PlanActionResponse, RebalancingPlanItemOut, RebalancingPlanLegSummary
+from app.schemas.rebalancing import PlanActionResponse, RebalancingPlanLegSummary
 from app.services.rebalancing.plan_execution import leg_executed_message
 from app.services.rebalancing.plan_service import (
     approve_buy_leg,
     approve_sell_leg,
+    build_leg_summary,
     cancel_buy_leg,
     executed_plan_ids,
     list_recent_plan_legs,
@@ -25,38 +25,6 @@ from app.services.rebalancing.plan_service import (
 )
 
 router = APIRouter(prefix="/rebalancing/plans", tags=["rebalancing-plans"])
-
-
-# 실행되지 않고 종료된 leg 상태 — 형제 leg가 체결됐다면 "반쪽 실행"이다(PENDING은 아직 진행 중이라 제외)
-_TERMINAL_UNEXECUTED_STATUSES = {"FAILED", "EXPIRED", "REJECTED", "CANCELED"}
-
-
-def _build_summary(
-    leg: RebalancingPlanLeg,
-    plan: RebalancingPlan,
-    portfolio_name,
-    account_name,
-    sibling_executed: bool = False,
-):
-    now = datetime.now(tz=UTC)
-    deadline = leg.deadline_at if leg.deadline_at.tzinfo else leg.deadline_at.replace(tzinfo=UTC)
-    return RebalancingPlanLegSummary(
-        plan_id=plan.id,
-        leg_id=leg.id,
-        portfolio_id=plan.portfolio_id,
-        portfolio_name=portfolio_name,
-        account_id=plan.account_id,
-        account_name=account_name,
-        side=leg.side,
-        status=leg.status,
-        deadline_at=leg.deadline_at,
-        decided_at=leg.decided_at,
-        execution_id=leg.execution_id,
-        error_message=leg.error_message,
-        actionable=(leg.status == "PENDING" and now < deadline),
-        partially_executed=sibling_executed and leg.status in _TERMINAL_UNEXECUTED_STATUSES,
-        items=[RebalancingPlanItemOut.model_validate(item) for item in leg.items],
-    )
 
 
 async def _get_owned_leg(
@@ -88,7 +56,7 @@ async def list_plans(
     rows = await list_recent_plan_legs(current_user.id, db, limit=limit)
     executed = await executed_plan_ids({plan.id for _, plan, _, _ in rows}, db)
     return [
-        _build_summary(leg, plan, name, acc_name, sibling_executed=plan.id in executed)
+        build_leg_summary(leg, plan, name, acc_name, sibling_executed=plan.id in executed)
         for leg, plan, name, acc_name in rows
     ]
 

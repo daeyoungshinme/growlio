@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +14,7 @@ from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User
+from app.schemas.alert import ExchangeRateAlertCreate, ExchangeRateAlertResponse
 from app.utils.cache_keys import (
     TTL_EXCHANGE_RATE_ALERTS,
     exchange_rate_alerts_key,
@@ -28,41 +26,7 @@ from app.utils.cache_keys import (
 router = APIRouter()
 
 
-class AlertCreate(BaseModel):
-    # target_rate 컬럼은 Numeric(10,2) — 상한이 없으면 큰 값이 DB 오버플로 500이 됐다(계획 57 C5)
-    target_rate: float = Field(le=100_000, allow_inf_nan=False)
-    direction: Literal["BELOW", "ABOVE"]
-    max_trigger_count: int = Field(default=1, le=1000)
-
-    @field_validator("target_rate")
-    @classmethod
-    def validate_rate(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("목표환율은 0보다 커야 합니다")
-        return v
-
-    @field_validator("max_trigger_count")
-    @classmethod
-    def validate_count(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError("알림 횟수는 1 이상이어야 합니다")
-        return v
-
-
-class AlertResponse(BaseModel):
-    model_config = {"from_attributes": True}
-
-    id: uuid.UUID
-    target_rate: float
-    direction: str
-    is_active: bool
-    max_trigger_count: int
-    trigger_count: int
-    triggered_at: datetime | None
-    created_at: datetime
-
-
-@router.get("/exchange-rate", response_model=list[AlertResponse])
+@router.get("/exchange-rate", response_model=list[ExchangeRateAlertResponse])
 @limiter.limit("30/minute")
 async def list_exchange_rate_alerts(
     request: Request,
@@ -86,7 +50,7 @@ async def list_exchange_rate_alerts(
         .offset(skip)
         .limit(limit)
     )
-    alerts_list = [AlertResponse.model_validate(a) for a in result.scalars().all()]
+    alerts_list = [ExchangeRateAlertResponse.model_validate(a) for a in result.scalars().all()]
 
     if skip == 0 and limit == 50:
         payload = [a.model_dump(mode="json") for a in alerts_list]
@@ -94,11 +58,11 @@ async def list_exchange_rate_alerts(
     return alerts_list
 
 
-@router.post("/exchange-rate", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/exchange-rate", response_model=ExchangeRateAlertResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/minute")
 async def create_exchange_rate_alert(
     request: Request,
-    req: AlertCreate,
+    req: ExchangeRateAlertCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -113,7 +77,7 @@ async def create_exchange_rate_alert(
     await db.commit()
     await db.refresh(alert)
     await invalidate_exchange_rate_alert_caches(await get_cache_store(), current_user.id)
-    return AlertResponse.model_validate(alert)
+    return ExchangeRateAlertResponse.model_validate(alert)
 
 
 async def _invalidate_exchange_rate_caches(user_id: uuid.UUID) -> None:
@@ -124,6 +88,6 @@ register_alert_reactivate_delete(
     router,
     path_prefix="/exchange-rate",
     model=ExchangeRateAlert,
-    response_model=AlertResponse,
+    response_model=ExchangeRateAlertResponse,
     invalidate_cache=_invalidate_exchange_rate_caches,
 )

@@ -29,13 +29,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.jobs.dca_cash_shortfall import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.schemas.action_items import ActionItem
 from app.services import tactical_allocation_service as tactical
 from app.services.challenge_service import get_challenge_summary
+from app.services.dca_cash_shortfall_service import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
 from app.services.tax_action_service import get_tax_action_plan_with_summary
 from app.utils.cache_keys import CacheStoreType

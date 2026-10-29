@@ -111,11 +111,11 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 **자산·동기화**
 - `asset_service.py` — 계좌별 sync + `sync_account_now`(assets `/sync` 전용)
 - `asset_credential_service.py` — 브로커 자격증명 검증·삭제
-- `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 브로커 응답 대기 중 커넥션 점유로 풀 고갈 방지. 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
+- `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). `sync_accounts`(세마포어 3)는 `jobs/asset_sync`도 재사용. 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 브로커 응답 대기 중 커넥션 점유로 풀 고갈 방지. 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
 - `snapshot_service.py` — 스냅샷 upsert·포지션 sync 헬퍼
-- `asset_aggregator.py` — 대시보드 집계, XIRR·연환산·벤치마크
+- `asset_aggregator.py` — 대시보드 집계, XIRR·연환산·벤치마크, 월별 추이(`get_monthly_trend`)
 - `portfolio_service.py` — overview 집계. 부분집합 총자산 반복 계산은 `prefetch_accounts_snapshot_positions()`/`compute_total_assets_krw()`로 1회 조회 재사용
-- `portfolio_history_service.py` · `position_aggregator.py` · `trend_calculator.py` · `returns_calculator.py`
+- `portfolio_history_service.py` · `position_aggregator.py` · `returns_calculator.py`
 - `composition_calculator.py` — 자산 구성. `exclude_real_estate()`는 목표 진행률·필요수익률 등 "투자자산" 계산 전용(대시보드 총자산 표시엔 미적용)
 - `period_purchase_service.py` — 기간별 매수 수익률. 스냅샷 수량·평단 변화로 추정, 수기 BUY 기록 있으면 기록 우선. **해외는 `avg_price_usd`로 역산 후 그 스냅샷 `usd_rate`로 환산**(원화 평단은 매일 재환산돼 역산 불가). 기록 market과 브로커 포지션 market이 달라 `_position_key_aligner`로 정렬
 - `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR)
@@ -145,13 +145,13 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `broker_balance_service.py` — 3사 실시간 잔고. **주문 실행은 KIS/키움만**(토스 주문 API 미구현)
 
 **목표 역산 추천**
-- `goal_recommendation_service.py` — 전체 자산 기준 진입점. 필요수익률 역산 → MVO. 추천은 자동 반영 안 됨(수동 적용). 결과 1h 캐시 + stale 키(1d) — 미스여도 stale 즉시 반환 후 `BackgroundTasks`로 재계산. 무효화 함수는 stale 키도 함께 지운다. **추천 캐시 키(전체/stale/기간별/연령대)는 사용자별 세대를 포함 — 무효화는 `invalidate_goal_recommendation_caches`(세대 교체)로만, 세대는 설정을 읽기 *전에* `get_goal_recommendation_generation`으로 잡아 넘긴다**(계산 중 저장된 설정을 옛 결과가 덮던 경합). sync 무효화는 `positions_changed=True`일 때만 추천 캐시 삭제. `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 **동일 로직 — 임계값 함께 맞출 것**
+- `goal_recommendation_service.py` — 전체 자산 기준 진입점. 필요수익률 역산 → MVO. 추천은 자동 반영 안 됨(수동 적용). 결과 1h 캐시 + stale 키(1d) — 미스여도 stale 즉시 반환 후 `BackgroundTasks`로 재계산(기간별·연령대도 같은 SWR, 갱신은 `refresh_recommendation_in_background` 공용). 무효화 함수는 stale 키도 함께 지운다. **추천 캐시 키(전체·기간별·연령대 각 1h/stale)는 사용자별 세대를 포함 — 무효화는 `invalidate_goal_recommendation_caches`(세대 교체)로만, 세대는 설정을 읽기 *전에* `get_goal_recommendation_generation`으로 잡아 넘긴다**(계산 중 저장된 설정을 옛 결과가 덮던 경합). sync 무효화는 `positions_changed=True`일 때만 추천 캐시 삭제. `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 **동일 로직 — 임계값 함께 맞출 것**
 - `_goal_recommendation_common.py` — 세 진입점 공용 헬퍼·계산 골격(`import ... as _grc`, patch 경로도 여기 하나). **단 외부 조회(`get_historical_returns`/`fetch_yf_daily_returns`/`build_portfolio_overview`)는 테스트가 진입점 모듈 경로로 patch하므로 진입점에 남기고 인자로 넘긴다**(옮기면 patch 수백 곳 무효화). 추천 출력은 `tests/test_goal_recommendation_snapshots.py`가 고정 — 리팩터링 후 반드시 통과, 의도적 변경 시만 `UPDATE_GOAL_SNAPSHOTS=1`
 - `goal_age_recommendation_service.py`(연령대) · `goal_horizon_recommendation_service.py`(투자기간 × 세제유형, 최대 15조합, IRP 안전자산 30% 하한)
 - `goal_portfolio_optimizer.py` — MVO(SLSQP). **배당 목표 사전검증은 `class_bounds` 그룹 예산도 반영 필수** — 종목 상한만 보면 SLSQP 전체 실패(빈 추천)
 - `estimation.py` — Ledoit-Wolf 공분산·James-Stein 기대수익률 축소(고정 노이즈분산 사용 — 표본분산 재사용 시 축소 상쇄 버그)
 - `goal_candidate_service.py` — 후보 관리(락). `pension_ineligibility_reason()`은 종목명 브랜드 휴리스틱 — 신규 ETF 브랜드는 `_KR_ETF_BRAND_PREFIXES`에 추가
-- `goal_feasibility.py`(마법사·nestlio 공유) · `goal_return_solver.py`(역산 순수 함수)
+- `goal_return_solver.py` — 역산 순수 함수 + `build_feasibility_preview`(마법사·nestlio 공유)
 - `recommendation_universe.py` — 큐레이션 ETF 유니버스. `index_key_from_base_index`는 중복 분석·지수 분류 공용 — **복제 금지**
 
 **ETF·지수**
@@ -192,7 +192,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 ### 그 외 패키지
 
 ```
-schemas/        Pydantic. rebalancing/ 패키지는 __init__.py 재노출(from app.schemas.rebalancing import X 유지). service_dtypes.py는 서비스 내부 TypedDict
+schemas/        Pydantic(라우터 인라인 스키마 금지 — 알림은 schemas/alert.py). rebalancing/ 패키지는 __init__.py 재노출(from app.schemas.rebalancing import X 유지). service_dtypes.py는 서비스 내부 TypedDict
 core/
   config.py     Settings(pydantic-settings)
   database.py   async engine/session, Base
@@ -234,7 +234,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트
 | `rebalancing_plan_sell_expiry.py` | 15분 | 매도 승인 만료 + stuck leg 마감 |
 | `market_signal_alert.py` / `market_signal_daily_digest.py` | 1시간 / 08:30 | 등급 전환 / 요약(옵트인) |
 | `tactical_regime_check.py` | 07:40 | 국면 확정·틸트 + 국면/웅덩이 알림. 주문 없음 |
-| `dca_cash_shortfall.py` | 18:30 | 적립 자동매수 1~3일 전 예수금 부족 알림. 판정부 `find_dca_cash_shortfalls`는 action-items가 재사용 |
+| `dca_cash_shortfall.py` | 18:30 | 적립 자동매수 1~3일 전 예수금 부족 알림. 판정은 `services/dca_cash_shortfall_service.py`(action-items와 공유) |
 | `goal_achievement.py` | 18:45 | |
 | `monthly_report.py` / `challenge_monthly_wrap.py` | 매월 1일 09:00 / 09:30 | |
 | `challenge_deposit_reminder.py` | 매월 25일 09:00 | 옵트인 |

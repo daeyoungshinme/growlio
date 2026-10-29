@@ -55,7 +55,7 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -203,24 +203,41 @@ _REFRESH_LOCK_TTL = 300
 """백그라운드 재계산 중복 방지 락 TTL(초) — 콜드 계산이 수십 초 걸릴 수 있어 single-flight 기본(15초)보다 길게."""
 
 
-async def refresh_goal_recommendation_in_background(user_id: uuid.UUID, cache: CacheStoreType) -> None:
+async def refresh_recommendation_in_background(
+    cache: CacheStoreType,
+    user_id: uuid.UUID,
+    result_key: Callable[[uuid.UUID, str], str],
+    recompute: Callable[[AsyncSession, str], Awaitable[object]],
+    failure_event: str,
+) -> None:
     """stale 결과를 반환한 뒤 1시간 키를 다시 채운다(FastAPI BackgroundTasks — 응답 전송 후 실행).
 
+    전체·기간별·연령대 추천이 공유한다 — `recompute(db, gen)`이 해당 추천을 다시 계산해 `gen` 세대 키에 쓴다.
     요청의 DB 세션은 응답과 함께 닫히므로 자기 세션을 연다. 같은 유저의 갱신이 이미 돌고 있으면
     (여러 탭·기기에서 동시에 stale을 받은 경우) 건너뛴다. 실패해도 stale 결과가 남으니 로그만 남긴다.
     """
     if cache is None:
         return
     gen = await get_goal_recommendation_generation(cache, user_id)
-    lock_key = f"refresh:{goal_recommendation_key(user_id, gen)}"
+    lock_key = f"refresh:{result_key(user_id, gen)}"
     async with inproc_lock(cache, lock_key, ttl=_REFRESH_LOCK_TTL) as acquired:
         if not acquired:
             return
         try:
             async with AsyncSessionLocal() as db:
-                await get_overall_goal_recommendation_for_user(user_id, db, cache, gen)
+                await recompute(db, gen)
         except Exception as e:
-            logger.warning("goal_recommendation_background_refresh_failed", user_id=str(user_id), error=str(e))
+            logger.warning(failure_event, user_id=str(user_id), error=str(e))
+
+
+async def refresh_goal_recommendation_in_background(user_id: uuid.UUID, cache: CacheStoreType) -> None:
+    await refresh_recommendation_in_background(
+        cache,
+        user_id,
+        goal_recommendation_key,
+        lambda db, gen: get_overall_goal_recommendation_for_user(user_id, db, cache, gen),
+        "goal_recommendation_background_refresh_failed",
+    )
 
 
 async def get_goal_recommendation(

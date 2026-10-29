@@ -2,12 +2,7 @@
 
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
-from typing import Literal
-
 from fastapi import APIRouter, Depends, Request, status
-from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,49 +11,9 @@ from app.api.v1._alert_crud import register_alert_reactivate_delete
 from app.limiter import limiter
 from app.models.alert import StockPriceAlert
 from app.models.user import User
-from app.schemas._validators import MAX_AMOUNT_KRW
+from app.schemas.alert import StockPriceAlertCreate, StockPriceAlertResponse
 
 router = APIRouter()
-
-
-class StockPriceAlertCreate(BaseModel):
-    # 길이·범위 상한 = DB 컬럼(String(20)/String(100)/Numeric(18,2)) — 넘으면 422 대신 500이 났다(계획 57 C5)
-    ticker: str = Field(min_length=1, max_length=20)
-    market: str = Field(min_length=1, max_length=20)
-    name: str = Field(max_length=100)
-    target_price: float = Field(le=MAX_AMOUNT_KRW, allow_inf_nan=False)
-    direction: Literal["BELOW", "ABOVE"]
-    max_trigger_count: int = Field(default=1, le=1000)
-
-    @field_validator("target_price")
-    @classmethod
-    def validate_price(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("목표가는 0보다 커야 합니다")
-        return v
-
-    @field_validator("max_trigger_count")
-    @classmethod
-    def validate_count(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError("알림 횟수는 1 이상이어야 합니다")
-        return v
-
-
-class StockPriceAlertResponse(BaseModel):
-    model_config = {"from_attributes": True}
-
-    id: uuid.UUID
-    ticker: str
-    market: str
-    name: str
-    target_price: float
-    direction: str
-    is_active: bool
-    max_trigger_count: int
-    trigger_count: int
-    triggered_at: datetime | None
-    created_at: datetime
 
 
 @router.get("/stock-price", response_model=list[StockPriceAlertResponse])

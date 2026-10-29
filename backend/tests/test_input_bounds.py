@@ -55,13 +55,12 @@ def test_execution_order_side_must_be_buy_or_sell():
 
 
 def test_alert_inputs_bounded_by_columns():
-    from app.api.v1.exchange_rate_alerts import AlertCreate
-    from app.api.v1.stock_price_alerts import StockPriceAlertCreate
+    from app.schemas.alert import ExchangeRateAlertCreate, StockPriceAlertCreate
 
     with pytest.raises(ValidationError):
         StockPriceAlertCreate(ticker="X" * 21, market="KOSPI", name="n", target_price=1000, direction="ABOVE")
     with pytest.raises(ValidationError):
-        AlertCreate(target_rate=1e9, direction="ABOVE")
+        ExchangeRateAlertCreate(target_rate=1e9, direction="ABOVE")
 
 
 def test_backtest_start_date_and_portfolio_count_bounded():

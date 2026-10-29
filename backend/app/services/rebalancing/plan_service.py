@@ -1,6 +1,6 @@
 """AUTO 리밸런싱 2단계 플랜(계획 생성 → 매수 대기/매도 승인 → 실행) 서비스 — API 진입점.
 
-책임별 서브모듈로 분리되어 있다(이 파일에는 조회 함수만 있다):
+책임별 서브모듈로 분리되어 있다(이 파일에는 조회·응답 요약 함수만 있다):
 - `plan_generation.py` — 드리프트 분석 → 게이트 판정 → BUY/SELL leg 생성
 - `plan_execution.py` — leg 잠금/실행/취소/만료 (앱 액션 + 스케줄러 job 진입점)
 - `plan_notifications.py` — 플랜 생성/게이트 차단/leg 실행 결과 이메일·푸시·이력 알림
@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,7 @@ from sqlalchemy.orm import selectinload
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanLeg
+from app.schemas.rebalancing import RebalancingPlanItemOut, RebalancingPlanLegSummary
 from app.services.rebalancing.plan_execution import (
     approve_buy_leg,
     approve_sell_leg,
@@ -59,6 +61,7 @@ __all__ = [
     "TaxGateBlocked",
     "approve_buy_leg",
     "approve_sell_leg",
+    "build_leg_summary",
     "build_pending_plan_for_alert",
     "cancel_buy_leg",
     "execute_due_buy_legs",
@@ -68,6 +71,7 @@ __all__ = [
     "get_alert_ids_with_pending_plan",
     "get_plan_leg_by_token",
     "has_pending_plan_for_alert",
+    "is_leg_past_deadline",
     "executed_plan_ids",
     "list_recent_plan_legs",
     "notify_daily_value_cap_blocked",
@@ -77,6 +81,41 @@ __all__ = [
     "reject_sell_leg",
     "sum_today_auto_plan_value_krw",
 ]
+
+# 실행되지 않고 종료된 leg 상태 — 형제 leg가 체결됐다면 "반쪽 실행"이다(PENDING은 아직 진행 중이라 제외)
+_TERMINAL_UNEXECUTED_STATUSES = {"FAILED", "EXPIRED", "REJECTED", "CANCELED"}
+
+
+def is_leg_past_deadline(leg: RebalancingPlanLeg) -> bool:
+    deadline = leg.deadline_at if leg.deadline_at.tzinfo else leg.deadline_at.replace(tzinfo=UTC)
+    return datetime.now(tz=UTC) >= deadline
+
+
+def build_leg_summary(
+    leg: RebalancingPlanLeg,
+    plan: RebalancingPlan,
+    portfolio_name: str | None,
+    account_name: str | None,
+    sibling_executed: bool = False,
+) -> RebalancingPlanLegSummary:
+    """앱 플랜 목록과 이메일 토큰 미리보기가 같은 leg 요약을 쓴다."""
+    return RebalancingPlanLegSummary(
+        plan_id=plan.id,
+        leg_id=leg.id,
+        portfolio_id=plan.portfolio_id,
+        portfolio_name=portfolio_name,
+        account_id=plan.account_id,
+        account_name=account_name,
+        side=leg.side,
+        status=leg.status,
+        deadline_at=leg.deadline_at,
+        decided_at=leg.decided_at,
+        execution_id=leg.execution_id,
+        error_message=leg.error_message,
+        actionable=(leg.status == "PENDING" and not is_leg_past_deadline(leg)),
+        partially_executed=sibling_executed and leg.status in _TERMINAL_UNEXECUTED_STATUSES,
+        items=[RebalancingPlanItemOut.model_validate(item) for item in leg.items],
+    )
 
 
 async def list_recent_plan_legs(user_id: uuid.UUID, db: AsyncSession, limit: int = 30):

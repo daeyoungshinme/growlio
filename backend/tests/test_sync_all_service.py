@@ -53,7 +53,7 @@ class TestIsSyncAllRunning:
 class TestRunSyncAll:
     @pytest.mark.asyncio
     async def test_skips_when_lock_already_held(self, make_user_id, make_account, mock_cache):
-        """이미 락이 걸려 있으면 _sync_accounts를 호출하지 않고 조용히 반환한다."""
+        """이미 락이 걸려 있으면 sync_accounts를 호출하지 않고 조용히 반환한다."""
         from app.services.sync_all_service import run_sync_all
 
         mock_cache.set = AsyncMock(return_value=None)  # SET NX 실패 → 락 획득 실패
@@ -61,7 +61,7 @@ class TestRunSyncAll:
 
         with (
             patch("app.services.sync_all_service.get_cache_store", AsyncMock(return_value=mock_cache)),
-            patch("app.services.sync_all_service._sync_accounts", new_callable=AsyncMock) as mock_sync,
+            patch("app.services.sync_all_service.sync_accounts", new_callable=AsyncMock) as mock_sync,
         ):
             await run_sync_all(make_user_id, accounts)
 
@@ -69,7 +69,7 @@ class TestRunSyncAll:
 
     @pytest.mark.asyncio
     async def test_runs_batch_sync_and_marks_done(self, make_user_id, make_account, mock_cache):
-        """락 획득에 성공하면 _sync_accounts를 실행하고 상태를 done으로 남긴다."""
+        """락 획득에 성공하면 sync_accounts를 실행하고 상태를 done으로 남긴다."""
         from app.services.sync_all_service import run_sync_all
 
         mock_cache.set = AsyncMock(return_value=True)  # SET NX 성공 → 락 획득
@@ -78,7 +78,7 @@ class TestRunSyncAll:
 
         with (
             patch("app.services.sync_all_service.get_cache_store", AsyncMock(return_value=mock_cache)),
-            patch("app.services.sync_all_service._sync_accounts", new_callable=AsyncMock, return_value=[]) as mock_sync,
+            patch("app.services.sync_all_service.sync_accounts", new_callable=AsyncMock, return_value=[]) as mock_sync,
         ):
             await run_sync_all(make_user_id, accounts)
 
@@ -90,7 +90,7 @@ class TestRunSyncAll:
 
     @pytest.mark.asyncio
     async def test_marks_error_status_when_sync_raises(self, make_user_id, make_account, mock_cache):
-        """_sync_accounts가 예외를 던지면 status를 error로 남기고 예외를 흡수한다."""
+        """sync_accounts가 예외를 던지면 status를 error로 남기고 예외를 흡수한다."""
         from app.services.sync_all_service import run_sync_all
 
         mock_cache.set = AsyncMock(return_value=True)
@@ -100,7 +100,7 @@ class TestRunSyncAll:
         with (
             patch("app.services.sync_all_service.get_cache_store", AsyncMock(return_value=mock_cache)),
             patch(
-                "app.services.sync_all_service._sync_accounts",
+                "app.services.sync_all_service.sync_accounts",
                 new_callable=AsyncMock,
                 side_effect=Exception("boom"),
             ),
@@ -128,7 +128,7 @@ class TestRunSyncAll:
         with (
             patch("app.services.sync_all_service.get_cache_store", AsyncMock(return_value=mock_cache)),
             patch(
-                "app.services.sync_all_service._sync_accounts",
+                "app.services.sync_all_service.sync_accounts",
                 new_callable=AsyncMock,
                 return_value=failed,
             ),
@@ -159,7 +159,7 @@ class TestRunSyncAll:
         with (
             patch("app.services.sync_all_service.get_cache_store", AsyncMock(return_value=mock_cache)),
             patch(
-                "app.services.sync_all_service._sync_accounts",
+                "app.services.sync_all_service.sync_accounts",
                 new_callable=AsyncMock,
                 return_value=failed,
             ),

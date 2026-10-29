@@ -47,20 +47,19 @@ from app.models.user import User
 from app.schemas._validators import validate_positive_amount
 from app.schemas.invest import GoalFeasibilityPreview
 from app.services._settings_queries import get_settings_row
-from app.services.asset_aggregator import get_dashboard_summary
+from app.services.asset_aggregator import get_dashboard_summary, get_monthly_trend
 from app.services.asset_service import list_accounts as _list_accounts
 from app.services.external_queries import (
     account_scoped_performance,
     find_by_external_ref,
     monthly_net_deposits_by_account,
 )
-from app.services.goal_feasibility import build_feasibility_preview
+from app.services.goal_return_solver import build_feasibility_preview
 from app.services.snapshot_service import (
     _upsert_snapshot,
     get_latest_snapshot_with_positions,
     get_latest_snapshots_by_account,
 )
-from app.services.trend_calculator import get_monthly_trend
 from app.utils.cache_keys import (
     challenge_progress_key,
     invalidate_asset_account_caches,

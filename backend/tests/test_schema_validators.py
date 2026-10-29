@@ -81,23 +81,23 @@ def test_validate_auto_execution_time_accepts_full_day_range():
         assert model.auto_execution_time == value
 
 
-# ── AlertCreate (exchange_rate_alerts) 검증 ──────────────────
+# ── ExchangeRateAlertCreate 검증 ──────────────────
 
 
 def test_exchange_rate_alert_validate_count_raise_when_zero():
     from pydantic import ValidationError
 
-    from app.api.v1.exchange_rate_alerts import AlertCreate
+    from app.schemas.alert import ExchangeRateAlertCreate
 
     with pytest.raises(ValidationError, match="max_trigger_count"):
-        AlertCreate(target_rate=1300.0, direction="BELOW", max_trigger_count=0)
+        ExchangeRateAlertCreate(target_rate=1300.0, direction="BELOW", max_trigger_count=0)
 
 
 # ── StockPriceAlertCreate 검증 ───────────────────────────────
 
 
 def test_stock_price_alert_validate_count_returns_valid():
-    from app.api.v1.stock_price_alerts import StockPriceAlertCreate
+    from app.schemas.alert import StockPriceAlertCreate
 
     model = StockPriceAlertCreate(
         ticker="005930", market="KRX", name="삼성전자", target_price=80000.0, direction="ABOVE", max_trigger_count=3
