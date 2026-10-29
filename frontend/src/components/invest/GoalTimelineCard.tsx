@@ -2,13 +2,11 @@ import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { GoalTimeline } from "@/api/invest";
-import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { fmtKrw, fmtMonth, fmtPct } from "@/utils/format";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { goalRecommendationOverallQuery } from "@/api/queryOptions";
 
 interface Props {
   timeline: GoalTimeline;
@@ -34,9 +32,7 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
   // (이미 캐시돼 있으면 접혀 있어도 그 값을 쓴다). 예전엔 적립 계획 탭을 열 때마다 불렀다.
   // 단축 시나리오가 없으면 섹션 노출 여부 자체가 추천 결과에 달려 있어 그때는 바로 조회한다.
   const { data: recommendation } = useQuery({
-    queryKey: QUERY_KEYS.goalRecommendationOverall,
-    queryFn: fetchOverallGoalRecommendation,
-    staleTime: STALE_TIME.LONG,
+    ...goalRecommendationOverallQuery,
     enabled: fasterOpen || acceleration_scenarios.length === 0,
   });
   const recommendationExpectedReturnPct =

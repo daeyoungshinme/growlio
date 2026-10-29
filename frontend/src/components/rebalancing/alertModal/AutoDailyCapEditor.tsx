@@ -3,7 +3,7 @@ import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import { useAutoRebalancingDailyCap } from "@/hooks/useAutoRebalancingDailyCap";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { fmtKrw } from "@/utils/format";
-import { inputClass, labelClass } from "@/components/settings/shared";
+import { FORM_INPUT_SM, LABEL_MD } from "@/constants/inputStyles";
 
 /** AUTO 리밸런싱 하루 합산 거래한도 — 유저 단위(모든 포트폴리오 공통) 안전장치. 비워 두면 무제한(기본값).
  * 알림이 아니라 매매 안전장치라 알림 설정 페이지에서 자동화 설정 모달의 AUTO 섹션으로 옮겼다(계획 37 U13). */
@@ -40,7 +40,7 @@ function DailyCapForm({ dailyCapKrw, maxOrderValueKrw, onSave, isSaving }: FormP
   return (
     <div className="space-y-3">
       <div>
-        <label htmlFor="auto-daily-cap" className={labelClass}>
+        <label htmlFor="auto-daily-cap" className={LABEL_MD}>
           하루 합산 최대 거래대금 (원)
         </label>
         <input
@@ -48,7 +48,7 @@ function DailyCapForm({ dailyCapKrw, maxOrderValueKrw, onSave, isSaving }: FormP
           type="number"
           inputMode="numeric"
           min={1}
-          className={inputClass}
+          className={FORM_INPUT_SM}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="비워두면 무제한"

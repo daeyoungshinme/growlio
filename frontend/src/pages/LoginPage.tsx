@@ -5,11 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { INPUT_SM } from "@/constants/inputStyles";
-import { fetchDashboard } from "@/api/dashboard";
-import { fetchAccounts, fetchExchangeRate } from "@/api/assets";
-import { fetchPortfolioOverviewLite } from "@/api/portfolios";
-import { fetchDCAAnalysis } from "@/api/invest";
-import { QUERY_KEYS } from "@/constants/queryKeys";
+import { prefetchDashboardData } from "@/api/prefetch";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export default function LoginPage() {
@@ -30,20 +26,7 @@ export default function LoginPage() {
       await login(email, password);
       // 로그인 직후 대시보드 데이터를 백그라운드에서 미리 가져온다.
       // await 없이 실행하므로 navigate와 병렬 진행 — 청크 로드 완료 시점에 캐시가 채워짐.
-      void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
-      void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
-      void queryClient.prefetchQuery({
-        queryKey: QUERY_KEYS.portfolioOverviewLite,
-        queryFn: fetchPortfolioOverviewLite,
-      });
-      void queryClient.prefetchQuery({
-        queryKey: QUERY_KEYS.dcaAnalysis,
-        queryFn: fetchDCAAnalysis,
-      });
-      void queryClient.prefetchQuery({
-        queryKey: QUERY_KEYS.exchangeRate,
-        queryFn: fetchExchangeRate,
-      });
+      prefetchDashboardData(queryClient);
       void navigate("/dashboard");
     } catch {
       setError("이메일 또는 비밀번호가 올바르지 않습니다");

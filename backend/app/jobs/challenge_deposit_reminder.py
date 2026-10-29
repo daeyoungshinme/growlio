@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +19,7 @@ from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.notifications.email_service import send_challenge_reminder_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
-from app.utils.kst import KST as _KST
+from app.utils.kst import now_kst
 
 logger = structlog.get_logger()
 
@@ -62,7 +60,7 @@ async def _run_challenge_deposit_reminder(db: AsyncSession, cache: CacheStoreTyp
 
 
 async def _check_user(user: User, settings_row: UserSettings, to_email: str, cache: CacheStoreType) -> None:
-    month = datetime.now(_KST).strftime("%Y-%m")
+    month = now_kst().strftime("%Y-%m")
     async with AsyncSessionLocal() as db:
         challenges = (
             (

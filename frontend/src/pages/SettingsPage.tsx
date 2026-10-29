@@ -17,7 +17,6 @@ import { Link } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteDartApiKey, saveDartApiKey } from "@/api/settings";
-import { fetchAccounts } from "@/api/assets";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import {
@@ -36,13 +35,11 @@ import DeleteAccountModal from "@/components/settings/DeleteAccountModal";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
-import { compositeSignalStatusQuery, settingsQuery } from "@/api/queryOptions";
+import { accountsQuery, compositeSignalStatusQuery, settingsQuery } from "@/api/queryOptions";
 
 const RISK_TOLERANCE_LABELS: Record<string, string> = {
   CONSERVATIVE: "보수적",
@@ -142,11 +139,7 @@ export default function SettingsPage() {
       : "설정된 목표 없음";
 
   // 키움·토스 API 키는 계좌 단위로 저장돼 has_kis(전역 KIS 키)만 보면 연결된 사용자도 "미연결"로 보였음
-  const { data: accountsRaw } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-    staleTime: STALE_TIME.EXCHANGE_RATE,
-  });
+  const { data: accountsRaw } = useQuery(accountsQuery);
   const apiLinkedCount = Array.isArray(accountsRaw)
     ? accountsRaw.filter((a) => a.data_source !== "MANUAL").length
     : 0;

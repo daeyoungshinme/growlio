@@ -205,11 +205,14 @@ class TestCancelExecutionOrder:
         _wire_db(mock_db, row, _execution(), _account(row))
         with (
             patch(f"{SVC}.kis_order.cancel_domestic_order", new=AsyncMock(side_effect=TimeoutError("boom"))),
+            patch(f"{SVC}.report_handled_failure") as report,
             pytest.raises(HTTPException) as exc,
         ):
             await cancel_execution_order(uuid.uuid4(), row.id, mock_db, mock_cache)
 
         assert exc.value.status_code == 502
+        # 응답 유실이라 실제 주문 상태를 모른다 — Sentry로 보고한다
+        assert report.call_args.args[0] == "rebalancing_order_cancel_failed"
         assert row.cancel_status is None
         mock_db.commit.assert_not_awaited()
         mock_db.rollback.assert_awaited_once()

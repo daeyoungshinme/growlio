@@ -1,11 +1,11 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchPortfolioOverviewLite } from "@/api/portfolios";
 import { fetchGoalFeasibility } from "@/api/invest";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { classifyGoalFeasibility } from "@/utils/goalFeasibility";
 import type { GoalForm } from "@/hooks/useGoalSettings";
+import { portfolioOverviewLiteQuery } from "@/api/queryOptions";
 
 /** 위저드 1~4단계가 쓰는 현재 자산·목표 실현 가능성 조회. 4단계 진입 시 필요 수익률을 목표 연수익률로 1회 prefill한다. */
 export function useGoalWizardFeasibility(
@@ -13,11 +13,7 @@ export function useGoalWizardFeasibility(
   setForm: Dispatch<SetStateAction<GoalForm>>,
   step: number,
 ) {
-  const { data: overview } = useQuery({
-    queryKey: QUERY_KEYS.portfolioOverviewLite,
-    queryFn: fetchPortfolioOverviewLite,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: overview } = useQuery(portfolioOverviewLiteQuery);
   // 부동산은 목표 역산 추천/DCA 복리 곡선이 성장을 모델링하지 않으므로 투자자산
   // 초기값에서 제외 — 목표 진행률 추적 기준(dca_service.py)과 일치시킨다.
   const realEstateKrw =

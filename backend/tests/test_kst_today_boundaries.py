@@ -25,7 +25,7 @@ _INSTANT = datetime(2026, 12, 31, 20, 0, tzinfo=UTC)
 
 class _FrozenDatetime(datetime):
     @classmethod
-    def now(cls, tz=None):  # type: ignore[override]
+    def now(cls, tz=None):
         return _INSTANT.astimezone(tz) if tz else _INSTANT.replace(tzinfo=None)
 
 

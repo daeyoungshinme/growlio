@@ -729,3 +729,25 @@ async def test_send_rebalancing_plan_pending_email_sell_only_no_buy_token(monkey
     assert "매수" not in captured["subject"]
     assert "token=None" not in captured["html"]
     assert "sell-token" in captured["html"]
+
+
+@pytest.mark.asyncio
+async def test_send_failure_reports_to_sentry(monkeypatch):
+    """발송 실패(Resend 키 만료·4xx/5xx)는 False와 함께 Sentry로 보고한다 — 모든 알림 메일이 조용히 사라지지 않게."""
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+
+    import app.services.notifications.email_service as em
+
+    with (
+        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))),
+        patch.object(em, "report_handled_failure") as report,
+    ):
+        result = await em.send_exchange_rate_alert(
+            to_email="user@example.com",
+            target_rate=1300.0,
+            direction="BELOW",
+            current_rate=1295.0,
+        )
+
+    assert result is False
+    report.assert_called_once()

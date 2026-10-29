@@ -2,9 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Archive, Plus } from "lucide-react";
 import type { Challenge, ChallengeCreatePayload } from "@/api/challenges";
-import { fetchAccounts } from "@/api/assets";
 import type { SettingsData } from "@/api/settings";
-import { QUERY_KEYS } from "@/constants/queryKeys";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeMutations } from "@/hooks/useChallengeMutations";
 import ChallengeCard from "@/components/invest/ChallengeCard";
@@ -15,6 +13,7 @@ import ConfirmModal from "@/components/common/ConfirmModal";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { accountsQuery } from "@/api/queryOptions";
 
 interface Props {
   settings?: SettingsData;
@@ -22,10 +21,7 @@ interface Props {
 
 export default function ChallengeSection({ settings }: Props) {
   const { data: challenges, isLoading, isError } = useChallenges();
-  const { data: accounts } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-  });
+  const { data: accounts } = useQuery(accountsQuery);
   const { create, update, remove } = useChallengeMutations();
 
   const [formOpen, setFormOpen] = useState(false);

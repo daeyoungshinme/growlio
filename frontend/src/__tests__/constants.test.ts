@@ -33,7 +33,7 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.stockPriceAlerts).toEqual(["stock-price-alerts"]);
     expect(QUERY_KEYS.rebalancingAlerts).toEqual(["rebalancing-alerts"]);
     expect(QUERY_KEYS.rebalancingHistory).toEqual(["rebalancing-history"]);
-    expect(QUERY_KEYS.alertHistory).toEqual(["alert-history"]);
+    expect(QUERY_KEYS.alertHistoryPages).toEqual(["alert-history", "pages"]);
     expect(QUERY_KEYS.insights).toEqual(["insights"]);
     expect(QUERY_KEYS.monthlyOptimization).toEqual(["monthly-optimization"]);
     expect(QUERY_KEYS.marketSignal).toEqual(["market-signal"]);

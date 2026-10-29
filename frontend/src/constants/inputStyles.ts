@@ -7,6 +7,8 @@ export const INPUT_SM = BASE + " px-3 py-2 text-sm min-h-[44px]";
 export const INPUT_MD = BASE + " px-3 py-2.5 text-base min-h-[44px]";
 export const LABEL_SM = "text-xs text-gray-500 dark:text-gray-400";
 export const LABEL_MD = "text-sm font-medium text-gray-700 dark:text-gray-300";
+/** 라벨 아래 폭을 꽉 채우는 입력(설정·알림 폼) */
+export const FORM_INPUT_SM = `mt-1 w-full ${INPUT_SM}`;
 export const SELECT_SM = INPUT_SM;
 export const TEXTAREA_SM = INPUT_SM + " resize-none";
 

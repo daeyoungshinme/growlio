@@ -76,7 +76,6 @@ export const QUERY_KEYS = {
   allocationHistoryBase: ["allocation-history"] as const,
   allocationHistory: (months: number, accountId?: string | null) =>
     ["allocation-history", months, accountId ?? "all"] as const,
-  alertHistory: ["alert-history"] as const,
   /** useInfiniteQuery 전용 — 예전 단일 조회 캐시(배열)와 데이터 모양이 달라 키를 분리한다(plans/90 B1) */
   alertHistoryPages: ["alert-history", "pages"] as const,
   insights: ["insights"] as const,

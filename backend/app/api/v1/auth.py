@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_token_payload
 from app.core.cache_store import get_cache_store
+from app.core.job_runner import report_handled_failure
 from app.limiter import ip_rate_limit_key, limiter, peer_rate_limit_key
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
@@ -176,7 +177,10 @@ async def delete_account(
         await db.delete(current_user)
         await db.commit()
     except Exception as e:
-        logger.critical("account_delete_local_cleanup_failed", user_id=str(user_id), email=user_email, error=str(e))
+        # Supabase 유저는 이미 삭제됐다 — 로컬 데이터가 고아로 남으므로 Sentry로 알린다
+        report_handled_failure(
+            "account_delete_local_cleanup_failed", e, user_id=str(user_id), email=mask_email(user_email)
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요"
         ) from e

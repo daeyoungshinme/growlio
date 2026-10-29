@@ -12,13 +12,7 @@ import {
   updatePortfolio,
 } from "@/api/portfolios";
 import { PortfolioDriftSummary } from "@/api/rebalancing";
-import {
-  fetchAccounts,
-  batchSetTargetPortfolio,
-  type AccountTaxType,
-  type InvestmentHorizon,
-} from "@/api/assets";
-import { fetchRebalancingAlerts } from "@/api/alerts";
+import { batchSetTargetPortfolio, type AccountTaxType, type InvestmentHorizon } from "@/api/assets";
 import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import PortfolioListSection from "./PortfolioListSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -30,9 +24,12 @@ import { invalidatePortfolioData, invalidateAccountData } from "@/utils/queryInv
 import { activeAlertsOnly, mergeAlertsByPortfolio } from "@/utils/portfolio";
 import { isStockAccount } from "@/utils/accounts";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
-import { driftSummaryQuery, portfoliosQuery } from "@/api/queryOptions";
+import {
+  accountsQuery,
+  driftSummaryQuery,
+  portfoliosQuery,
+  rebalancingAlertsQuery,
+} from "@/api/queryOptions";
 
 interface Props {
   selectedPortfolioId?: string;
@@ -75,19 +72,12 @@ export default function PortfolioManageTab({
     );
   }, [portfolios, localOrder]);
 
-  const { data: accountsRaw } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-  });
+  const { data: accountsRaw } = useQuery(accountsQuery);
   const accounts = Array.isArray(accountsRaw) ? accountsRaw : [];
   const activeAccounts = accounts.filter((a) => a.is_active);
   const stockAccounts = activeAccounts.filter((a) => isStockAccount(a.asset_type));
 
-  const { data: rebalancingAlertsRaw } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingAlerts,
-    queryFn: fetchRebalancingAlerts,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: rebalancingAlertsRaw } = useQuery(rebalancingAlertsQuery);
   const rebalancingAlerts = useMemo(
     () => (Array.isArray(rebalancingAlertsRaw) ? rebalancingAlertsRaw : []),
     [rebalancingAlertsRaw],

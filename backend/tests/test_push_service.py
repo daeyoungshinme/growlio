@@ -114,21 +114,26 @@ class TestGetFirebaseApp:
             ps._firebase_app = None
             cfg.settings.firebase_credentials_json = '{"type": "service_account"}'
 
-            with patch.dict(
-                "sys.modules",
-                {
-                    "firebase_admin": MagicMock(
-                        initialize_app=MagicMock(side_effect=Exception("init failed")),
-                    ),
-                    "firebase_admin.credentials": MagicMock(
-                        Certificate=MagicMock(return_value=MagicMock()),
-                    ),
-                },
+            with (
+                patch.dict(
+                    "sys.modules",
+                    {
+                        "firebase_admin": MagicMock(
+                            initialize_app=MagicMock(side_effect=Exception("init failed")),
+                        ),
+                        "firebase_admin.credentials": MagicMock(
+                            Certificate=MagicMock(return_value=MagicMock()),
+                        ),
+                    },
+                ),
+                patch.object(ps, "report_handled_failure") as report,
             ):
                 result = ps._get_firebase_app()
 
             # After failed init, _firebase_initialized=True, app=None
             assert result is None
+            # 재시도하지 않으므로 Sentry로 보고한다
+            assert report.call_args.args[0] == "firebase_init_failed"
         finally:
             ps._firebase_initialized = original_initialized
             ps._firebase_app = original_app

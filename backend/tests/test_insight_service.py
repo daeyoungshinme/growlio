@@ -324,7 +324,7 @@ class TestRebalancingOpportunityIsolation:
             result.scalars.return_value.all.return_value = fresh
             return result
 
-        session.execute = execute  # type: ignore[attr-defined]
+        session.execute = execute
         calls = {"n": 0}
 
         async def overview(*_a, **_k):
@@ -338,7 +338,7 @@ class TestRebalancingOpportunityIsolation:
             return {"total_assets_krw": 1_000_000, "total_stock_krw": 0, "all_positions": []}
 
         with patch("app.services.portfolio.portfolio_service.build_portfolio_overview", new=overview):
-            result = await _check_rebalancing_opportunity(uuid.uuid4(), session)  # type: ignore[arg-type]
+            result = await _check_rebalancing_opportunity(uuid.uuid4(), session)
 
         assert len(result) == 1
         assert "두번째" in result[0].detail

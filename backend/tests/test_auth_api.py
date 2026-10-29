@@ -504,6 +504,7 @@ class TestDeleteAccount:
         with (
             patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
             patch("app.api.v1.auth.delete_supabase_user", AsyncMock(return_value=None)),
+            patch("app.api.v1.auth.report_handled_failure") as report,
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.post(
@@ -514,4 +515,7 @@ class TestDeleteAccount:
 
         assert resp.status_code == 502
         db.delete.assert_called_once_with(user)
+        # 고아 데이터는 Sentry로 보고하고, 이메일은 마스킹해서 남긴다
+        assert report.call_args.args[0] == "account_delete_local_cleanup_failed"
+        assert report.call_args.kwargs["email"] != user.email
         app.dependency_overrides.clear()

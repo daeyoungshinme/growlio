@@ -21,6 +21,7 @@ from tenacity import (
 )
 
 from app.core.config import settings
+from app.core.job_runner import report_handled_failure
 from app.services.notifications.email_templates import (
     account_deletion_template,
     challenge_reminder_template,
@@ -94,7 +95,7 @@ async def _send_templated(
         logger.info(ok_event, to=to_email, **log_fields)
         return True
     except Exception as e:
-        logger.error(fail_event, to=to_email, error=str(e))
+        report_handled_failure(fail_event, e, to=to_email)
         return False
 
 

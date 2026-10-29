@@ -14,13 +14,13 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-import sentry_sdk
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, TAX_DEFERRED_TAX_TYPES
+from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
 from app.models.portfolio import GROUP_ROLE_DOMESTIC_ALT, Portfolio
@@ -149,6 +149,5 @@ async def find_dca_cash_shortfalls(
                     )
                 )
         except Exception as e:
-            logger.error("dca_cash_shortfall_evaluate_failed", error=str(e), alert_id=str(alert.id))
-            sentry_sdk.capture_exception(e)
+            report_handled_failure("dca_cash_shortfall_evaluate_failed", e, alert_id=str(alert.id))
     return shortfalls

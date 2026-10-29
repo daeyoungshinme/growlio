@@ -2,7 +2,8 @@ import { useState } from "react";
 import { sendTestEmail as requestTestEmail, updateNotificationEmail } from "@/api/settings";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import { SectionCard, inputClass, labelClass } from "./shared";
+import { SectionCard } from "./shared";
+import { FORM_INPUT_SM, LABEL_MD } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
@@ -42,10 +43,10 @@ export function NotificationEmailSection({ userEmail, onSettingsChange }: Props)
   return (
     <SectionCard title="알림 수신 이메일">
       <div>
-        <label className={labelClass}>이메일 주소</label>
+        <label className={LABEL_MD}>이메일 주소</label>
         <input
           type="email"
-          className={inputClass}
+          className={FORM_INPUT_SM}
           value={notificationEmail}
           onChange={(e) => setNotificationEmail(e.target.value)}
           placeholder={userEmail ?? "이메일 주소"}

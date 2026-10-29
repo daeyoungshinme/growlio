@@ -133,11 +133,11 @@ class TestRouteLabel:
         from app.main import _route_label
 
         req = SimpleNamespace(scope={"route": SimpleNamespace(path="/api/v1/dashboard/action-items")})
-        assert _route_label(req) == "/api/v1/dashboard/action-items"  # type: ignore[arg-type]
+        assert _route_label(req) == "/api/v1/dashboard/action-items"
 
     def test_unmatched_route_collapses(self):
         from types import SimpleNamespace
 
         from app.main import _route_label
 
-        assert _route_label(SimpleNamespace(scope={})) == "unmatched"  # type: ignore[arg-type]
+        assert _route_label(SimpleNamespace(scope={})) == "unmatched"

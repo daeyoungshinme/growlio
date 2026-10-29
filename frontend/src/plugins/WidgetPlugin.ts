@@ -5,12 +5,11 @@ export interface WidgetUpdateOptions {
   stockReturn: string;
 }
 
-export interface WidgetPlugin {
+export interface WidgetPluginApi {
   update(options: WidgetUpdateOptions): Promise<void>;
 }
 
-// eslint-disable-next-line no-redeclare
-export const WidgetPlugin = registerPlugin<WidgetPlugin>("Widget", {
+export const WidgetPlugin = registerPlugin<WidgetPluginApi>("Widget", {
   web: {
     update: async () => {
       // 웹/PWA 환경에서는 위젯 없음 — no-op

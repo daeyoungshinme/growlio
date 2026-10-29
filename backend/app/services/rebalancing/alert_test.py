@@ -15,7 +15,8 @@ from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.alert_scope import resolve_effective_account_ids
-from app.services.rebalancing.order_builder import build_rebalancing_orders, filter_drifting_items
+from app.services.rebalancing.order_builder import build_rebalancing_orders
+from app.services.rebalancing.service import filter_drifting_items
 
 __all__ = ["send_test_rebalancing_alert"]
 

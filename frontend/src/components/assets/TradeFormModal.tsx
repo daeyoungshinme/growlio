@@ -15,7 +15,7 @@ import {
 } from "@/api/trades";
 import { tradeSchema } from "@/schemas/trade";
 import { useStockSearch } from "@/hooks/useStockSearch";
-import { useExchangeRateContext } from "@/context/ExchangeRateContext";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { isOverseasMarket } from "@/constants/markets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
@@ -49,7 +49,7 @@ const SIDE_OPTIONS: { value: TradeSide; label: string }[] = [
 
 export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
   const qc = useQueryClient();
-  const { rate } = useExchangeRateContext();
+  const rate = useExchangeRate();
   const [accountId, setAccountId] = useState(prefill?.account_id ?? accounts[0]?.id ?? "");
   const [side, setSide] = useState<TradeSide>("BUY");
   const [stock, setStock] = useState<{ ticker: string; market: string; name: string } | null>(

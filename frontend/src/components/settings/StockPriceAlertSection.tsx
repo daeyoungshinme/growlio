@@ -20,7 +20,8 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { invalidateStockPriceAlertData } from "@/utils/queryInvalidation";
-import { SectionCard, DeleteIcon, inputClass, labelClass } from "./shared";
+import { SectionCard, DeleteIcon } from "./shared";
+import { FORM_INPUT_SM, LABEL_MD } from "@/constants/inputStyles";
 
 export function StockPriceAlertSection() {
   const qc = useQueryClient();
@@ -81,10 +82,10 @@ export function StockPriceAlertSection() {
       </p>
       <div className="space-y-3">
         <div className="relative">
-          <label className={labelClass}>종목 검색</label>
+          <label className={LABEL_MD}>종목 검색</label>
           <input
             type="text"
-            className={inputClass}
+            className={FORM_INPUT_SM}
             value={form.query}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="종목명 또는 티커 (예: SCHD, 삼성전자)"
@@ -120,11 +121,11 @@ export function StockPriceAlertSection() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <div className="flex-1 min-w-[120px]">
-            <label className={labelClass}>목표가 (원)</label>
+            <label className={LABEL_MD}>목표가 (원)</label>
             <input
               type="number"
               inputMode="decimal"
-              className={inputClass}
+              className={FORM_INPUT_SM}
               value={form.target_price}
               onChange={(e) => setForm((f) => ({ ...f, target_price: e.target.value }))}
               placeholder="예: 30000"
@@ -132,9 +133,9 @@ export function StockPriceAlertSection() {
             />
           </div>
           <div className="flex-1 min-w-[100px]">
-            <label className={labelClass}>조건</label>
+            <label className={LABEL_MD}>조건</label>
             <select
-              className={inputClass}
+              className={FORM_INPUT_SM}
               value={form.direction}
               onChange={(e) =>
                 setForm((f) => ({ ...f, direction: e.target.value as "BELOW" | "ABOVE" }))
@@ -145,11 +146,11 @@ export function StockPriceAlertSection() {
             </select>
           </div>
           <div className="flex-1 min-w-[80px]">
-            <label className={labelClass}>알림 횟수</label>
+            <label className={LABEL_MD}>알림 횟수</label>
             <input
               type="number"
               inputMode="numeric"
-              className={inputClass}
+              className={FORM_INPUT_SM}
               value={form.max_trigger_count}
               onChange={(e) => setForm((f) => ({ ...f, max_trigger_count: e.target.value }))}
               min="1"

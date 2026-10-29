@@ -41,20 +41,19 @@ def _dividend_floor_constraint(
     import numpy as np
 
     divs = np.array(dividend_list, dtype=float)
-    use_group_budget = asset_classes is not None and group_budget is not None
     group_used: dict[str, float] = {}
     achievable = 0.0
     remaining = 1.0
     for idx in np.argsort(-divs):
         cap = bounds[idx][1]
-        if use_group_budget:
-            cls = asset_classes[idx]  # type: ignore[index]
-            cap = min(cap, group_budget[cls] - group_used.get(cls, 0.0))  # type: ignore[index]
+        if asset_classes is not None and group_budget is not None:
+            cls = asset_classes[idx]
+            cap = min(cap, group_budget[cls] - group_used.get(cls, 0.0))
         take = max(min(cap, remaining), 0.0)
         achievable += take * float(divs[idx])
         remaining -= take
-        if use_group_budget:
-            cls = asset_classes[idx]  # type: ignore[index]
+        if asset_classes is not None and group_budget is not None:
+            cls = asset_classes[idx]
             group_used[cls] = group_used.get(cls, 0.0) + take
         if remaining <= 1e-9:
             break
