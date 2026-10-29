@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES, is_non_tradable
 from app.models.user import UserSettings
 from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxImpactItem
-from app.services.market_signal_service import get_market_signal
+from app.services.market_signal.market_signal_service import get_market_signal
 from app.services.rebalancing.group_expansion import iter_trade_items
 from app.services.risk_service import get_portfolio_risk_metrics
 from app.services.tax_service import estimate_overseas_transfer_tax

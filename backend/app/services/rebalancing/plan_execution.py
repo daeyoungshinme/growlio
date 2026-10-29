@@ -259,7 +259,7 @@ async def execute_due_buy_legs(db: AsyncSession, cache) -> int:
     if not due_leg_ids:
         return 0
 
-    from app.services.market_signal_service import get_confirmed_composite_level
+    from app.services.market_signal.market_signal_service import get_confirmed_composite_level
 
     composite_level, data_freshness = await get_confirmed_composite_level(cache, db)
 

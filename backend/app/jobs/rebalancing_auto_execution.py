@@ -85,7 +85,7 @@ async def _load_auto_alert_rows(db: AsyncSession, alert_ids: list[uuid.UUID] | N
 
 
 async def _run_auto_execution() -> None:
-    from app.services.market_signal_service import get_confirmed_composite_level
+    from app.services.market_signal.market_signal_service import get_confirmed_composite_level
 
     cache = await get_cache_store()
 

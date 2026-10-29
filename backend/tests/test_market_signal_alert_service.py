@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.market_signal_service import get_last_composite_level, set_last_composite_level
+from app.services.market_signal.market_signal_service import get_last_composite_level, set_last_composite_level
 from app.services.rebalancing.diagnosis_service import _MARKET_NOTES
 
 

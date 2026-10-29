@@ -81,7 +81,7 @@ class TestExecutionPlanGates:
                 new=AsyncMock(return_value=False),
             ),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "RED"}),
             ),
             patch("app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert", new=mock_build_plan),
@@ -124,7 +124,7 @@ class TestExecutionPlanGates:
                 new=AsyncMock(return_value=False),
             ),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "STALE"}),
             ),
             patch("app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert", new=mock_build_plan),
@@ -162,7 +162,7 @@ class TestExecutionPlanGates:
                 new=AsyncMock(return_value=False),
             ),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
@@ -204,7 +204,7 @@ class TestExecutionPlanGates:
                 new=AsyncMock(return_value=False),
             ),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
@@ -252,7 +252,7 @@ class TestExecutionPlanGates:
                 new=AsyncMock(return_value=False),
             ),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
@@ -298,7 +298,7 @@ class TestExecutionPlanGates:
                 new=AsyncMock(return_value=False),
             ),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
@@ -344,7 +344,7 @@ class TestExecutionPlanGenerated:
                 new=AsyncMock(return_value=False),
             ),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
@@ -399,7 +399,7 @@ class TestExecutionPlanGenerated:
                 new=AsyncMock(return_value=False),
             ),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
@@ -451,7 +451,7 @@ class TestExecutionPlanGenerated:
                 new=AsyncMock(return_value=False),
             ),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch("app.services.rebalancing.quick_execute_service.build_pending_plan_for_alert", new=mock_build_plan),

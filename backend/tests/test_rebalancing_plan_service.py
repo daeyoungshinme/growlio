@@ -989,7 +989,7 @@ class TestExecuteDueBuyLegs:
         with (
             patch("app.utils.market_hours.is_korean_market_open", return_value=True),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "YELLOW", "data_freshness": "LIVE"}),
             ),
         ):

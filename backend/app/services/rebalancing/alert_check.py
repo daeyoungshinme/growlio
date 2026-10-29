@@ -212,7 +212,7 @@ async def _get_composite_level(cache, db: AsyncSession) -> tuple[str, str]:
     composite_level만 보면 "안전"으로 오인되므로, data_freshness="STALE"을 함께 반환해
     `is_market_signal_blocking_auto_mode`가 AUTO를 보수적으로 차단할 수 있게 한다.
     """
-    from app.services.market_signal_service import get_confirmed_composite_level
+    from app.services.market_signal.market_signal_service import get_confirmed_composite_level
 
     try:
         return await get_confirmed_composite_level(cache, db)

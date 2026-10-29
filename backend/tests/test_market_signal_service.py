@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.services.market_signal_service import (
+from app.services.market_signal.market_signal_service import (
     compute_composite_signal,
     fetch_cpi_inflation_signal,
     fetch_dollar_index_signal,
@@ -227,11 +227,11 @@ class TestUsRateCurveSignal:
         }
         with (
             patch(
-                "app.services.market_signal_indicators.fetch_yield_curve_signal",
+                "app.services.market_signal.market_signal_indicators.fetch_yield_curve_signal",
                 AsyncMock(return_value=yc_signal),
             ),
             patch(
-                "app.services.market_signal_indicators.fetch_rate_cut_expectation_signal",
+                "app.services.market_signal.market_signal_indicators.fetch_rate_cut_expectation_signal",
                 AsyncMock(return_value=rate_signal),
             ),
         ):
@@ -244,9 +244,12 @@ class TestUsRateCurveSignal:
     @pytest.mark.asyncio
     async def test_returns_none_when_both_signals_unavailable(self):
         with (
-            patch("app.services.market_signal_indicators.fetch_yield_curve_signal", AsyncMock(return_value=None)),
             patch(
-                "app.services.market_signal_indicators.fetch_rate_cut_expectation_signal",
+                "app.services.market_signal.market_signal_indicators.fetch_yield_curve_signal",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.services.market_signal.market_signal_indicators.fetch_rate_cut_expectation_signal",
                 AsyncMock(return_value=None),
             ),
         ):
@@ -258,11 +261,11 @@ class TestUsRateCurveSignal:
         yc_signal = {"value": 0.6, "state": "POSITIVE", "date": "2026-07-03", "sub_score": 0}
         with (
             patch(
-                "app.services.market_signal_indicators.fetch_yield_curve_signal",
+                "app.services.market_signal.market_signal_indicators.fetch_yield_curve_signal",
                 AsyncMock(return_value=yc_signal),
             ),
             patch(
-                "app.services.market_signal_indicators.fetch_rate_cut_expectation_signal",
+                "app.services.market_signal.market_signal_indicators.fetch_rate_cut_expectation_signal",
                 AsyncMock(return_value=None),
             ),
         ):
@@ -278,7 +281,7 @@ class TestHighYieldSpreadSignal:
     async def test_normal_below_4(self):
         obs = [{"date": "2026-07-03", "value": "3.2"}]
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_high_yield_spread_signal()
@@ -290,7 +293,7 @@ class TestHighYieldSpreadSignal:
     async def test_stressed_between_5_and_7(self):
         obs = [{"date": "2026-07-03", "value": "6.2"}]
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_high_yield_spread_signal()
@@ -302,7 +305,7 @@ class TestHighYieldSpreadSignal:
     async def test_crisis_above_7(self):
         obs = [{"date": "2026-07-03", "value": "8.5"}]
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_high_yield_spread_signal()
@@ -312,7 +315,7 @@ class TestHighYieldSpreadSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_indicators
+        from app.services.market_signal import market_signal_indicators
 
         with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_high_yield_spread_signal()
@@ -331,7 +334,7 @@ class TestDollarIndexSignal:
     async def test_normal_within_1_pct(self):
         obs = self._make_obs(latest_value=100.5, base_value=100.0)
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_dollar_index_signal()
@@ -343,7 +346,7 @@ class TestDollarIndexSignal:
     async def test_breakout_above_5_pct(self):
         obs = self._make_obs(latest_value=120.0, base_value=100.0)
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_dollar_index_signal()
@@ -356,7 +359,7 @@ class TestDollarIndexSignal:
     async def test_returns_none_when_insufficient_history(self):
         obs = [{"date": "2026-07-03", "value": "105.0"}]
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_dollar_index_signal()
@@ -371,7 +374,7 @@ class TestRateCutExpectationSignal:
             return [{"date": "2026-07-03", "value": value}]
 
         return patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(side_effect=_fake),
         )
 
@@ -394,7 +397,7 @@ class TestRateCutExpectationSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_indicators
+        from app.services.market_signal import market_signal_indicators
 
         with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_rate_cut_expectation_signal()
@@ -414,7 +417,7 @@ class TestExchangeRateSignal:
         obs = self._make_obs(latest_value=1355.0, base_value=1350.0)
         with (
             patch(
-                "app.services.economic_indicator_service.fred_get_observations",
+                "app.services.market_signal.economic_indicator_service.fred_get_observations",
                 AsyncMock(return_value=obs),
             ),
             patch(
@@ -433,7 +436,7 @@ class TestExchangeRateSignal:
         obs = self._make_obs(latest_value=1450.0, base_value=1350.0)
         with (
             patch(
-                "app.services.economic_indicator_service.fred_get_observations",
+                "app.services.market_signal.economic_indicator_service.fred_get_observations",
                 AsyncMock(return_value=obs),
             ),
             patch(
@@ -452,7 +455,7 @@ class TestExchangeRateSignal:
     async def test_returns_none_when_insufficient_history(self):
         obs = [{"date": "2026-07-03", "value": "1380.0"}]
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_exchange_rate_signal()
@@ -460,7 +463,7 @@ class TestExchangeRateSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_indicators
+        from app.services.market_signal import market_signal_indicators
 
         with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_exchange_rate_signal()
@@ -479,7 +482,7 @@ class TestOilPriceSignal:
     async def test_normal_within_5_pct(self):
         obs = self._make_obs(latest_value=77.0, base_value=75.0)
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_oil_price_signal()
@@ -491,7 +494,7 @@ class TestOilPriceSignal:
     async def test_breakout_above_15_pct_on_spike(self):
         obs = self._make_obs(latest_value=95.0, base_value=75.0)
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_oil_price_signal()
@@ -505,7 +508,7 @@ class TestOilPriceSignal:
         """유가 급락도 급등과 동일하게 위험 신호로 취급한다(절대 이격도 기준)."""
         obs = self._make_obs(latest_value=55.0, base_value=75.0)
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_oil_price_signal()
@@ -518,7 +521,7 @@ class TestOilPriceSignal:
     async def test_returns_none_when_insufficient_history(self):
         obs = [{"date": "2026-07-19", "value": "78.0"}]
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_oil_price_signal()
@@ -526,7 +529,7 @@ class TestOilPriceSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_indicators
+        from app.services.market_signal import market_signal_indicators
 
         with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_oil_price_signal()
@@ -547,7 +550,7 @@ class TestInflationSignal:
     async def test_cpi_normal_within_1pp_of_target(self):
         points = self._points(base_value=300.0, latest_value=309.0)  # YoY 3.0% → 이격 1.0pp
         with patch(
-            "app.services.economic_indicator_service.fetch_indicator_history",
+            "app.services.market_signal.economic_indicator_service.fetch_indicator_history",
             AsyncMock(return_value=points),
         ):
             result = await fetch_cpi_inflation_signal()
@@ -560,7 +563,7 @@ class TestInflationSignal:
     async def test_cpi_breakout_above_5_5_pct_yoy(self):
         points = self._points(base_value=300.0, latest_value=318.0)  # YoY 6.0%
         with patch(
-            "app.services.economic_indicator_service.fetch_indicator_history",
+            "app.services.market_signal.economic_indicator_service.fetch_indicator_history",
             AsyncMock(return_value=points),
         ):
             result = await fetch_cpi_inflation_signal()
@@ -571,7 +574,7 @@ class TestInflationSignal:
     @pytest.mark.asyncio
     async def test_cpi_returns_none_when_insufficient_history(self):
         with patch(
-            "app.services.economic_indicator_service.fetch_indicator_history",
+            "app.services.market_signal.economic_indicator_service.fetch_indicator_history",
             AsyncMock(return_value=self._points(300.0, 309.0)[:5]),
         ):
             result = await fetch_cpi_inflation_signal()
@@ -581,7 +584,7 @@ class TestInflationSignal:
     async def test_pce_elevated_between_1pp_and_2pp(self):
         points = self._points(base_value=300.0, latest_value=312.0)  # YoY 4.0% → 이격 2.0pp
         with patch(
-            "app.services.economic_indicator_service.fetch_indicator_history",
+            "app.services.market_signal.economic_indicator_service.fetch_indicator_history",
             AsyncMock(return_value=points),
         ):
             result = await fetch_pce_inflation_signal()
@@ -595,11 +598,11 @@ class TestInflationSignal:
         pce_signal = {"yoy_change_pct": 6.0, "level": "BREAKOUT", "date": "2026-01-01", "sub_score": 3}
         with (
             patch(
-                "app.services.market_signal_indicators.fetch_cpi_inflation_signal",
+                "app.services.market_signal.market_signal_indicators.fetch_cpi_inflation_signal",
                 AsyncMock(return_value=cpi_signal),
             ),
             patch(
-                "app.services.market_signal_indicators.fetch_pce_inflation_signal",
+                "app.services.market_signal.market_signal_indicators.fetch_pce_inflation_signal",
                 AsyncMock(return_value=pce_signal),
             ),
         ):
@@ -612,8 +615,14 @@ class TestInflationSignal:
     @pytest.mark.asyncio
     async def test_merged_signal_returns_none_when_both_unavailable(self):
         with (
-            patch("app.services.market_signal_indicators.fetch_cpi_inflation_signal", AsyncMock(return_value=None)),
-            patch("app.services.market_signal_indicators.fetch_pce_inflation_signal", AsyncMock(return_value=None)),
+            patch(
+                "app.services.market_signal.market_signal_indicators.fetch_cpi_inflation_signal",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.services.market_signal.market_signal_indicators.fetch_pce_inflation_signal",
+                AsyncMock(return_value=None),
+            ),
         ):
             result = await fetch_inflation_signal()
         assert result is None
@@ -633,7 +642,7 @@ class TestEmploymentSignal:
     async def test_normal_when_rise_below_0_3pp(self):
         obs = self._make_obs(latest_value=4.1, historical_low=4.0)
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_employment_signal()
@@ -645,7 +654,7 @@ class TestEmploymentSignal:
     async def test_sahm_triggered_between_0_5pp_and_1pp(self):
         obs = self._make_obs(latest_value=4.1, historical_low=3.5)  # rise 0.6pp
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_employment_signal()
@@ -657,7 +666,7 @@ class TestEmploymentSignal:
     async def test_high_when_rise_at_least_1pp(self):
         obs = self._make_obs(latest_value=4.6, historical_low=3.5)  # rise 1.1pp
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_employment_signal()
@@ -669,7 +678,7 @@ class TestEmploymentSignal:
     async def test_returns_none_when_insufficient_history(self):
         obs = [{"date": "2026-01-01", "value": "4.1"}]
         with patch(
-            "app.services.economic_indicator_service.fred_get_observations",
+            "app.services.market_signal.economic_indicator_service.fred_get_observations",
             AsyncMock(return_value=obs),
         ):
             result = await fetch_employment_signal()
@@ -677,7 +686,7 @@ class TestEmploymentSignal:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_circuit_open(self):
-        from app.services import market_signal_indicators
+        from app.services.market_signal import market_signal_indicators
 
         with patch.object(market_signal_indicators.fred_circuit, "is_available", return_value=False):
             result = await fetch_employment_signal()
@@ -711,7 +720,7 @@ class TestGetMarketSignalCachingTtl:
             {"sub_score": 0},
         )
         with patch(
-            "app.services.market_signal_service._fetch_all_signals",
+            "app.services.market_signal.market_signal_service._fetch_all_signals",
             AsyncMock(return_value=live_signals),
         ):
             result = await get_market_signal(mock_cache)
@@ -725,7 +734,7 @@ class TestGetMarketSignalCachingTtl:
         from app.utils.cache_keys import TTL_MARKET_SIGNAL_DEGRADED
 
         with patch(
-            "app.services.market_signal_service._fetch_all_signals",
+            "app.services.market_signal.market_signal_service._fetch_all_signals",
             AsyncMock(return_value=self._all_none_signals()),
         ):
             result = await get_market_signal(mock_cache)
@@ -742,7 +751,7 @@ class TestGetMarketSignalCachingTtl:
         # (4개 미만이면 STALE로 재분류됨 — TestDataFreshness 참고)
         partial_signals = (_vix(0), _rate_curve(0), _hy(0), _usd(0), None, None, None, None)
         with patch(
-            "app.services.market_signal_service._fetch_all_signals",
+            "app.services.market_signal.market_signal_service._fetch_all_signals",
             AsyncMock(return_value=partial_signals),
         ):
             result = await get_market_signal(mock_cache)
@@ -762,7 +771,7 @@ class TestConfirmedCompositeLevel:
     @pytest.mark.asyncio
     async def test_stale_returns_raw_immediately_without_db_lookup(self, mock_db, mock_cache):
         with patch(
-            "app.services.market_signal_service.get_market_signal",
+            "app.services.market_signal.market_signal_service.get_market_signal",
             AsyncMock(return_value=self._raw_signal("RED", "STALE")),
         ):
             level, freshness = await get_confirmed_composite_level(mock_cache, mock_db)
@@ -773,7 +782,7 @@ class TestConfirmedCompositeLevel:
     async def test_first_run_bootstraps_confirmed_to_raw(self, mock_db, mock_cache):
         mock_db.get = AsyncMock(return_value=None)
         with patch(
-            "app.services.market_signal_service.get_market_signal",
+            "app.services.market_signal.market_signal_service.get_market_signal",
             AsyncMock(return_value=self._raw_signal("YELLOW")),
         ):
             level, freshness = await get_confirmed_composite_level(mock_cache, mock_db)
@@ -791,7 +800,7 @@ class TestConfirmedCompositeLevel:
 
         mock_db.get = AsyncMock(side_effect=db_get)
         with patch(
-            "app.services.market_signal_service.get_market_signal",
+            "app.services.market_signal.market_signal_service.get_market_signal",
             AsyncMock(return_value=self._raw_signal("GREEN")),
         ):
             level, freshness = await get_confirmed_composite_level(mock_cache, mock_db)
@@ -809,7 +818,7 @@ class TestConfirmedCompositeLevel:
 
         mock_db.get = AsyncMock(side_effect=db_get)
         with patch(
-            "app.services.market_signal_service.get_market_signal",
+            "app.services.market_signal.market_signal_service.get_market_signal",
             AsyncMock(return_value=self._raw_signal("RED")),
         ):
             level, freshness = await get_confirmed_composite_level(mock_cache, mock_db)
@@ -829,7 +838,7 @@ class TestConfirmedCompositeLevel:
 
         mock_db.get = AsyncMock(side_effect=db_get)
         with patch(
-            "app.services.market_signal_service.get_market_signal",
+            "app.services.market_signal.market_signal_service.get_market_signal",
             AsyncMock(return_value=self._raw_signal("RED", observed_at="2026-07-23T01:00:00+00:00")),
         ):
             level, freshness = await get_confirmed_composite_level(mock_cache, mock_db)
@@ -850,7 +859,7 @@ class TestConfirmedCompositeLevel:
 
         mock_db.get = AsyncMock(side_effect=db_get)
         with patch(
-            "app.services.market_signal_service.get_market_signal",
+            "app.services.market_signal.market_signal_service.get_market_signal",
             AsyncMock(return_value=self._raw_signal("RED", observed_at=observed_at)),
         ):
             level, freshness = await get_confirmed_composite_level(mock_cache, mock_db)
@@ -873,7 +882,7 @@ class TestConfirmedCompositeLevel:
 
         mock_db.get = AsyncMock(side_effect=db_get)
         with patch(
-            "app.services.market_signal_service.get_market_signal",
+            "app.services.market_signal.market_signal_service.get_market_signal",
             AsyncMock(return_value=self._raw_signal("RED", observed_at="2026-07-23T01:00:00+00:00")),
         ):
             level, freshness = await get_confirmed_composite_level(mock_cache, mock_db)
@@ -882,7 +891,7 @@ class TestConfirmedCompositeLevel:
     @pytest.mark.asyncio
     async def test_fetch_failure_falls_back_to_green_stale(self, mock_db, mock_cache):
         with patch(
-            "app.services.market_signal_service.get_market_signal",
+            "app.services.market_signal.market_signal_service.get_market_signal",
             AsyncMock(side_effect=RuntimeError("boom")),
         ):
             level, freshness = await get_confirmed_composite_level(mock_cache, mock_db)

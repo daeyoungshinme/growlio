@@ -137,7 +137,7 @@ async def quick_execute_plan(
     `verify_account_owned`는 화면에서 고른 override 계좌의 소유권 검증(라우터의 `get_owned_account`) —
     서비스가 API 계층을 import하지 않도록 주입받는다.
     """
-    from app.services.market_signal_service import get_confirmed_composite_level
+    from app.services.market_signal.market_signal_service import get_confirmed_composite_level
 
     portfolio = await _load_portfolio(portfolio_id, user_id, db)
     alert_row = await _load_alert_row(portfolio, portfolio_id, account_id, user_id, db)

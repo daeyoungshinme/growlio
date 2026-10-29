@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from app.models.tactical import TacticalStrategy
 from app.services import tactical_allocation_service as tactical
 from app.services import tactical_dip as dip
-from app.services import technical_indicators as ti
+from app.services.market_signal import technical_indicators as ti
 from app.services.tactical_backtest import leveraged_returns, simulate
 
 

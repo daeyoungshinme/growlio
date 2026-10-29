@@ -171,7 +171,7 @@ def _patch_common(mock_db, composite_level="GREEN"):
         stack.enter_context(patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db))
         stack.enter_context(
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": composite_level}),
             )
         )
@@ -210,7 +210,7 @@ class TestRunAutoExecution:
             patch("app.jobs.rebalancing_auto_execution.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(side_effect=RuntimeError("timeout")),
             ),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
@@ -618,7 +618,7 @@ class TestRunAutoExecution:
             patch("app.jobs.rebalancing_auto_execution.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "STALE"}),
             ),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
@@ -653,7 +653,7 @@ class TestRunAutoExecution:
             patch("app.jobs.rebalancing_auto_execution.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch(
-                "app.services.market_signal_service.get_market_signal",
+                "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(side_effect=RuntimeError("timeout")),
             ),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),

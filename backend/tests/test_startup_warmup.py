@@ -14,8 +14,8 @@ async def test_warmup_isolates_failures():
     tech = AsyncMock(return_value={})
     with (
         patch("app.utils.currency.fetch_usd_krw", fx),
-        patch("app.services.market_signal_service.get_market_signal", signal),
-        patch("app.services.technical_signal_service.get_technical_signals", tech),
+        patch("app.services.market_signal.market_signal_service.get_market_signal", signal),
+        patch("app.services.market_signal.technical_signal_service.get_technical_signals", tech),
         patch.object(startup_warmup, "_warm_jwks", AsyncMock()),
         patch.object(startup_warmup, "logger") as log,
     ):
