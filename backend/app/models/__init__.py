@@ -12,7 +12,6 @@ from app.models.asset import (
     RebalancingExecution,
     RebalancingExecutionResult,
     Transaction,
-    UserTickerSettings,
 )
 from app.models.challenge import InvestmentChallenge
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem, PortfolioItemMember
@@ -31,7 +30,6 @@ __all__ = [
     "Position",
     "Transaction",
     "TradeRecord",
-    "UserTickerSettings",
     "RebalancingExecution",
     "RebalancingExecutionResult",
     "KisToken",

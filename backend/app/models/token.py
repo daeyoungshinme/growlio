@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,7 +27,6 @@ class KisToken(Base):
         UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="CASCADE"), nullable=True
     )
     access_token: Mapped[str] = mapped_column(Text, nullable=False)
-    token_type: Mapped[str] = mapped_column(String(50), default="Bearer", nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_mock_mode: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -66,7 +65,6 @@ class KiwoomToken(Base):
         UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="CASCADE"), nullable=False
     )
     access_token: Mapped[str] = mapped_column(Text, nullable=False)
-    token_type: Mapped[str] = mapped_column(String(50), default="Bearer", nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_mock_mode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -92,7 +90,6 @@ class TossToken(Base):
         UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="CASCADE"), nullable=False
     )
     access_token: Mapped[str] = mapped_column(Text, nullable=False)
-    token_type: Mapped[str] = mapped_column(String(50), default="Bearer", nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
