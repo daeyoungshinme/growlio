@@ -66,6 +66,7 @@ describe("OrderResultList — 미체결 취소", () => {
     cancelExecutionOrder.mockResolvedValue({
       result_id: "r1",
       cancel_status: "CANCELED",
+      cancel_message: null,
       message: "미체결 수량이 취소되었습니다.",
     });
     renderWithProviders(
@@ -77,7 +78,9 @@ describe("OrderResultList — 미체결 취소", () => {
     expect(within(dialog).getByText(/이미 체결된 수량은 취소되지 않습니다/)).toBeDefined();
     fireEvent.click(within(dialog).getByRole("button", { name: "미체결 취소" }));
 
-    await waitFor(() => expect(screen.getByText("미체결 취소됨")).toBeDefined());
+    // 모바일 카드·데스크탑 표 두 벌이 같은 취소 상태를 보여 준다 — 화면 폭을 바꿔도 버튼이 되살아나지 않게(plans/90 A6)
+    await waitFor(() => expect(screen.getAllByText("미체결 취소됨")).toHaveLength(2));
+    expect(screen.queryByRole("button", { name: "미체결 취소" })).toBeNull();
     expect(cancelExecutionOrder).toHaveBeenCalledWith("r1");
     expect(toast).toHaveBeenCalledWith("미체결 수량이 취소되었습니다.", "success");
   });
@@ -86,6 +89,7 @@ describe("OrderResultList — 미체결 취소", () => {
     cancelExecutionOrder.mockResolvedValue({
       result_id: "r1",
       cancel_status: "CANCEL_FAILED",
+      cancel_message: "취소가능수량이 없습니다",
       message: "취소하지 못했습니다: 취소가능수량이 없습니다",
     });
     renderWithProviders(
@@ -97,8 +101,9 @@ describe("OrderResultList — 미체결 취소", () => {
       within(screen.getByRole("dialog")).getByRole("button", { name: "미체결 취소" }),
     );
 
+    // 원 사유만 붙는다 — "취소 실패: 취소하지 못했습니다: …" 이중 접두가 아니다(plans/90 B6)
     await waitFor(() =>
-      expect(screen.getAllByText(/취소 실패: .*취소가능수량이 없습니다/).length).toBeGreaterThan(0),
+      expect(screen.getAllByText("취소 실패: 취소가능수량이 없습니다")).toHaveLength(2),
     );
     expect(toast).toHaveBeenCalledWith(expect.stringContaining("취소가능수량"), "error");
     expect(firstCancelButton()).toBeDefined();
@@ -114,5 +119,15 @@ describe("OrderResultList — 미체결 취소", () => {
     );
     expect(screen.getAllByText("미체결 취소됨").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "미체결 취소" })).toBeNull();
+  });
+
+  it("확인창은 body로 portal된다 — 하단 네비를 피하는 실행 모달 안에서 네비 아래로 깔리지 않게 (plans/90 A1)", () => {
+    const { container } = renderWithProviders(
+      <OrderResultList results={results([order({ result_id: "r1", cancelable: true })])} />,
+    );
+    fireEvent.click(firstCancelButton());
+    const dialog = screen.getByRole("dialog");
+    expect(container.contains(dialog)).toBe(false);
+    expect(document.body.contains(dialog)).toBe(true);
   });
 });

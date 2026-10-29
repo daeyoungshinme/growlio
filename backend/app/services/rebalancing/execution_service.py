@@ -29,6 +29,7 @@ from app.services.rebalancing._kiwoom_order_executor import (
     _execute_kiwoom_sells_with_clamp,
 )
 from app.services.rebalancing.order_builder import ORDER_EXECUTABLE_ASSET_TYPES
+from app.services.rebalancing.order_cancel_rules import active_account_asset_types, cancel_block_reason
 from app.utils.cache_keys import invalidate_rebalancing_analysis_cache
 from app.utils.metrics import rebalancing_execution_count
 
@@ -161,38 +162,32 @@ async def _save_execution_history(
         db.add(execution)
         await db.flush()  # execution.id 생성
 
-        saved: list[tuple[OrderResult, uuid.UUID]] = []
+        saved: list[tuple[OrderResult, RebalancingExecutionResult]] = []
         for exec_result in results:
             for placed in exec_result.orders:
                 # id를 미리 정해 두어 커밋 뒤 응답 주문에 result_id를 붙인다(미체결 취소 대상 지정용)
-                result_id = uuid.uuid4()
-                saved.append((placed, result_id))
-                db.add(
-                    RebalancingExecutionResult(
-                        id=result_id,
-                        execution_id=execution.id,
-                        account_id=exec_result.account_id,
-                        account_name=exec_result.account_name,
-                        is_mock=exec_result.is_mock,
-                        action=placed.side,
-                        ticker=placed.ticker,
-                        name=placed.name,
-                        market=placed.market,
-                        quantity=placed.quantity,
-                        status=placed.status,
-                        order_no=placed.order_no,
-                        order_org_no=placed.order_org_no,
-                        error_message=placed.error_msg,
-                        order_type=placed.order_type,
-                        price=placed.price,
-                    )
+                result_row = RebalancingExecutionResult(
+                    id=uuid.uuid4(),
+                    execution_id=execution.id,
+                    account_id=exec_result.account_id,
+                    account_name=exec_result.account_name,
+                    is_mock=exec_result.is_mock,
+                    action=placed.side,
+                    ticker=placed.ticker,
+                    name=placed.name,
+                    market=placed.market,
+                    quantity=placed.quantity,
+                    status=placed.status,
+                    order_no=placed.order_no,
+                    order_org_no=placed.order_org_no,
+                    error_message=placed.error_msg,
+                    order_type=placed.order_type,
+                    price=placed.price,
                 )
+                saved.append((placed, result_row))
+                db.add(result_row)
 
         await db.commit()
-        for placed, result_id in saved:
-            placed.result_id = result_id
-            placed.cancelable = placed.status == "SUCCESS" and bool(placed.order_no)
-        return execution.id
     except Exception as e:
         # 실주문은 이미 나갔는데 기록이 없는 상태 — 경고가 아니라 오류로 알린다. flush 이후 실패면 세션이
         # 실패 상태라 호출부의 후속 commit(leg 상태 기록 등)이 PendingRollbackError로 깨지므로 되돌린다.
@@ -205,6 +200,27 @@ async def _save_execution_history(
         sentry_sdk.capture_message(f"rebalancing_history_save_failed: {type(e).__name__}", level="error")
         await db.rollback()
         return None
+
+    await _mark_cancelable(db, user_id, saved)
+    return execution.id
+
+
+async def _mark_cancelable(
+    db: AsyncSession, user_id: uuid.UUID, saved: list[tuple[OrderResult, RebalancingExecutionResult]]
+) -> None:
+    """응답 주문에 result_id·취소 가능 여부를 붙인다 — 이력 상세와 같은 규칙(`cancel_block_reason`, plans/90 A4).
+
+    계좌 유형 조회가 실패해도 이미 저장된 이력에는 영향이 없으므로 취소 버튼만 숨긴다(이력 탭에서 다시 판정).
+    """
+    try:
+        asset_types = await active_account_asset_types(db, user_id, (row.account_id for _, row in saved))
+    except Exception as e:
+        logger.warning("rebalancing_cancelable_lookup_failed", user_id=str(user_id), error_type=type(e).__name__)
+        asset_types = {}
+    now = datetime.now(UTC)
+    for placed, row in saved:
+        placed.result_id = row.id
+        placed.cancelable = cancel_block_reason(row, now, asset_types.get(row.account_id or ""), now=now) is None
 
 
 async def execute_rebalancing(

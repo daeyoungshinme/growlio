@@ -369,3 +369,48 @@ class TestSendRecommendationDriftAlerts:
             await send_recommendation_drift_alerts(mock_db)
 
         mock_email.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_captures_generation_before_rereading_settings(self, mock_db):
+        """잡 시작 때 읽은 설정 대신, 세대를 먼저 잡고 다시 읽은 설정으로 계산한다(plans/90 A3).
+
+        세마포어 대기 중 설정이 저장되면 옛 설정 결과가 새 세대 캐시에 들어가 화면에 옛 추천이 보였다."""
+        user = SimpleNamespace(id=uuid.uuid4(), email="user@example.com", is_active=True)
+        stale_settings = SimpleNamespace(notification_email=None, fcm_token=None, risk_tolerance="LOW")
+        fresh_settings = SimpleNamespace(notification_email=None, fcm_token=None, risk_tolerance="HIGH")
+
+        subscribers_result = MagicMock()
+        subscribers_result.all.return_value = [(user, stale_settings)]
+        mock_db.execute = AsyncMock(return_value=subscribers_result)
+
+        history_result = MagicMock()
+        history_result.scalar.return_value = None
+        per_user_session = AsyncMock()
+        per_user_session.execute = AsyncMock(return_value=history_result)
+        per_user_session.__aenter__ = AsyncMock(return_value=per_user_session)
+        per_user_session.__aexit__ = AsyncMock(return_value=None)
+
+        calls: list[str] = []
+
+        async def _gen(*_a, **_kw):
+            calls.append("gen")
+            return "g2"
+
+        async def _settings(*_a, **_kw):
+            calls.append("settings")
+            return fresh_settings
+
+        find = AsyncMock(return_value=[])
+        with (
+            patch(f"{_MODULE}.AsyncSessionLocal", return_value=per_user_session),
+            patch("app.core.cache_store.get_cache_store", AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_goal_recommendation_generation", new=_gen),
+            patch(f"{_MODULE}.get_settings_row", new=_settings),
+            patch(f"{_MODULE}._find_drifted_portfolios", find),
+        ):
+            await send_recommendation_drift_alerts(mock_db)
+
+        assert calls == ["gen", "settings"]
+        args = find.await_args.args
+        assert args[3] is fresh_settings
+        assert args[4] == "g2"

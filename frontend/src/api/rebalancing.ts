@@ -120,6 +120,8 @@ export interface ExecutionOrderItem {
   account_id?: string | null;
   order_type: "MARKET" | "LIMIT";
   limit_price?: number | null; // 국내=KRW, 해외=USD
+  /** 주문 시점 참고 시세(시장 통화) — 결과·이력 가격 표시용, 브로커 주문에는 쓰이지 않는다 */
+  reference_price?: number | null;
 }
 
 export interface ExecutionRequest {
@@ -150,6 +152,9 @@ export interface OrderResult {
 export interface OrderCancelResponse {
   result_id: string;
   cancel_status: "CANCELED" | "CANCEL_FAILED";
+  /** 실패 사유 원문(이력의 cancel_message와 같은 형태) — 성공이면 null */
+  cancel_message: string | null;
+  /** 토스트용 안내 문장 */
   message: string;
 }
 

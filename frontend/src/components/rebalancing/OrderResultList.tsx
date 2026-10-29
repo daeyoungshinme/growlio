@@ -1,7 +1,8 @@
+import { useState } from "react";
 import type { ExecutionResult, OrderResult } from "@/api/rebalancing";
 import { isOverseasMarket } from "@/constants/markets";
 import { fmtKrw } from "@/utils/format";
-import { OrderCancelAction } from "./OrderCancelAction";
+import { OrderCancelAction, type CancelOutcome } from "./OrderCancelAction";
 import { SideBadge, StatusBadge } from "./RebalancingBadges";
 
 /** 취소 버튼이나 취소 결과 중 보여 줄 것이 있는 주문 — 없으면 쿼리 훅을 쓰는 OrderCancelAction을 그리지 않는다 */
@@ -16,6 +17,14 @@ function fmtOrderPrice(price: number | null | undefined, market: string): string
 
 /** 계좌별 주문 결과(모바일 카드·데스크탑 표) — 실행 직후 결과 화면과 실행 이력 상세가 함께 쓴다. */
 export function OrderResultList({ results }: { results: ExecutionResult[] }) {
+  // 결과 행 id → 방금 받은 취소 응답. 카드·표 두 벌이 같은 값을 읽는다
+  const [cancelOutcomes, setCancelOutcomes] = useState<Record<string, CancelOutcome>>({});
+  const cancelProps = (o: OrderResult) => ({
+    order: o,
+    override: o.result_id ? cancelOutcomes[o.result_id] : undefined,
+    onOutcome: (outcome: CancelOutcome) =>
+      setCancelOutcomes((prev) => ({ ...prev, [o.result_id!]: outcome })),
+  });
   return (
     <div className="space-y-4">
       {results.map((result) => (
@@ -85,7 +94,7 @@ export function OrderResultList({ results }: { results: ExecutionResult[] }) {
                 )}
                 {hasCancelInfo(o) && (
                   <div className="mt-1.5">
-                    <OrderCancelAction order={o} />
+                    <OrderCancelAction {...cancelProps(o)} />
                   </div>
                 )}
               </div>
@@ -143,7 +152,7 @@ export function OrderResultList({ results }: { results: ExecutionResult[] }) {
                     )}
                     {hasCancelInfo(o) && (
                       <div className="mt-1">
-                        <OrderCancelAction order={o} />
+                        <OrderCancelAction {...cancelProps(o)} />
                       </div>
                     )}
                     {!o.order_no && !o.error_msg && !hasCancelInfo(o) && "-"}

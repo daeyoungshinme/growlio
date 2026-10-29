@@ -14,7 +14,7 @@ from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.api.v1._account_deps import get_owned_account
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
-from app.models.asset import AssetAccount, RebalancingExecution
+from app.models.asset import RebalancingExecution
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.rebalancing import (
@@ -28,7 +28,8 @@ from app.schemas.rebalancing import (
     RebalancingExecutionSummary,
 )
 from app.services.rebalancing.execution_service import execute_rebalancing
-from app.services.rebalancing.order_cancel_service import CANCELED, cancel_block_reason, cancel_execution_order
+from app.services.rebalancing.order_cancel_rules import CANCELED, active_account_asset_types, cancel_block_reason
+from app.services.rebalancing.order_cancel_service import cancel_execution_order
 from app.services.rebalancing.quick_execute_service import (
     QuickExecuteOutcome,
     QuickExecuteStatus,
@@ -177,24 +178,6 @@ async def get_rebalancing_history(
     return result.scalars().all()
 
 
-async def _account_asset_types(db: AsyncSession, user_id: uuid.UUID, items) -> dict[str, str]:
-    """이력 주문들의 계좌 id(문자열) → asset_type. 삭제됐거나 UUID가 아닌 계좌는 빠진다(취소 불가)."""
-    ids: set[uuid.UUID] = set()
-    for ri in items:
-        try:
-            ids.add(uuid.UUID(ri.account_id or ""))
-        except ValueError:
-            continue
-    if not ids:
-        return {}
-    rows = await db.execute(
-        select(AssetAccount.id, AssetAccount.asset_type).where(
-            AssetAccount.user_id == user_id, AssetAccount.id.in_(ids)
-        )
-    )
-    return {str(acc_id): asset_type for acc_id, asset_type in rows.all()}
-
-
 @router.get("/history/{execution_id}", response_model=RebalancingExecutionDetail)
 @limiter.limit("30/minute")
 async def get_rebalancing_execution_detail(
@@ -218,7 +201,9 @@ async def get_rebalancing_execution_detail(
 
     detail = RebalancingExecutionDetail.model_validate(execution)
     if execution.result_items:
-        asset_types = await _account_asset_types(db, current_user.id, execution.result_items)
+        asset_types = await active_account_asset_types(
+            db, current_user.id, (ri.account_id for ri in execution.result_items)
+        )
         by_account: dict[str, dict] = defaultdict(
             lambda: {"orders": [], "is_mock": False, "account_name": "", "executed_at": ""}
         )
@@ -272,7 +257,13 @@ async def cancel_rebalancing_order(
     """실행 이력의 주문 한 건에서 아직 체결되지 않은 수량을 취소한다(이미 체결된 수량은 취소되지 않음)."""
     row = await cancel_execution_order(current_user.id, result_id, db, cache)
     if row.cancel_status == CANCELED:
-        message = "미체결 수량이 취소되었습니다."
-    else:
-        message = f"취소하지 못했습니다: {row.cancel_message or '증권사가 거부했습니다.'}"
-    return OrderCancelResponse(result_id=row.id, cancel_status=row.cancel_status or "", message=message)
+        return OrderCancelResponse(
+            result_id=row.id, cancel_status=CANCELED, cancel_message=None, message="미체결 수량이 취소되었습니다."
+        )
+    reason = row.cancel_message or "증권사가 거부했습니다."
+    return OrderCancelResponse(
+        result_id=row.id,
+        cancel_status=row.cancel_status or "",
+        cancel_message=reason,
+        message=f"취소하지 못했습니다: {reason}",
+    )

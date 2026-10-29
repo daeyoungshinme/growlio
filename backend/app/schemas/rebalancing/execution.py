@@ -122,7 +122,8 @@ class OrderResult(BaseModel):
 class OrderCancelResponse(BaseModel):
     result_id: uuid.UUID
     cancel_status: str  # "CANCELED" | "CANCEL_FAILED"
-    message: str
+    cancel_message: str | None = None  # 실패 사유 원문 — 이력 상세의 cancel_message와 같은 형태
+    message: str  # 토스트용 안내 문장
 
 
 class ExecutionResult(BaseModel):

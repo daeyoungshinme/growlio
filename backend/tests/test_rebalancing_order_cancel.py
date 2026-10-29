@@ -236,6 +236,40 @@ class TestCancelExecutionOrder:
         assert exc.value.status_code == 400
         cancel.assert_not_awaited()
 
+    @pytest.mark.asyncio
+    async def test_token_before_lock_and_recheck_after(self, mock_db, mock_cache):
+        """토큰 발급 commit이 잠금을 풀지 않게 토큰을 먼저 받고, 잠근 뒤 다시 확인한다(plans/90 A2).
+
+        토큰을 받는 사이 다른 요청이 취소를 끝냈으면 두 번째 요청은 증권사를 부르지 않고 400으로 끝난다.
+        """
+        row = _row()
+        execution = _execution()
+        first, locked = MagicMock(), MagicMock()
+        first.first.return_value = (row, execution)
+        locked.first.return_value = (row, execution)
+        mock_db.execute = AsyncMock(side_effect=[first, locked])
+        mock_db.scalar = AsyncMock(return_value=_account(row))
+        mock_db.rollback = AsyncMock()
+
+        async def token_then_other_request_cancels(*_a, **_kw):
+            assert mock_db.execute.await_count == 1  # 아직 잠그기 전
+            row.cancel_status = CANCELED
+            return "tok"
+
+        cancel = AsyncMock()
+        with (
+            patch(f"{SVC}.get_access_token", new=AsyncMock(side_effect=token_then_other_request_cancels)),
+            patch(f"{SVC}.kis_order.cancel_domestic_order", new=cancel),
+            pytest.raises(HTTPException) as exc,
+        ):
+            await cancel_execution_order(uuid.uuid4(), row.id, mock_db, mock_cache)
+
+        assert exc.value.status_code == 400
+        assert exc.value.detail == "이미 취소된 주문입니다."
+        cancel.assert_not_awaited()
+        locked_stmt = mock_db.execute.await_args_list[1].args[0]
+        assert locked_stmt._for_update_arg is not None
+
 
 class TestSaveExecutionHistory:
     @pytest.mark.asyncio
@@ -267,6 +301,10 @@ class TestSaveExecutionHistory:
             )
         ]
 
+        types_result = MagicMock()
+        types_result.all.return_value = [(uuid.UUID(results[0].account_id), "STOCK_KIS")]
+        mock_db.execute = AsyncMock(return_value=types_result)
+
         await _save_execution_history(mock_db, uuid.uuid4(), None, "MANUAL", "FULL", results, 1, 1, 0)
 
         rows = [c.args[0] for c in mock_db.add.call_args_list if isinstance(c.args[0], RebalancingExecutionResult)]
@@ -278,6 +316,102 @@ class TestSaveExecutionHistory:
         assert failed.cancelable is False
         # 조직번호는 응답 JSON에 내보내지 않는다
         assert "order_org_no" not in placed.model_dump()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("org_no", "asset_type", "expected"),
+        [
+            # 조직번호 없는 KIS 국내 주문은 취소 요청이 항상 400 — 실행 직후에도 버튼을 내지 않는다(plans/90 A4)
+            (None, "STOCK_KIS", False),
+            (None, "STOCK_KIWOOM", True),
+            # 비활성·삭제 계좌는 조회에서 빠진다
+            ("91252", None, False),
+        ],
+    )
+    async def test_cancelable_follows_cancel_rules(self, mock_db, org_no, asset_type, expected):
+        from app.services.rebalancing.execution_service import _save_execution_history
+
+        placed = OrderResult(
+            ticker="069500",
+            name="KODEX 200",
+            market="KOSPI",
+            side="BUY",
+            quantity=1,
+            status="SUCCESS",
+            order_no="1",
+            order_org_no=org_no,
+        )
+        acc_id = str(uuid.uuid4())
+        results = [
+            ExecutionResult(
+                account_id=acc_id,
+                account_name="a",
+                is_mock=True,
+                orders=[placed],
+                success_count=1,
+                fail_count=0,
+                executed_at="",
+            )
+        ]
+        types_result = MagicMock()
+        types_result.all.return_value = [(uuid.UUID(acc_id), asset_type)] if asset_type else []
+        mock_db.execute = AsyncMock(return_value=types_result)
+
+        await _save_execution_history(mock_db, uuid.uuid4(), None, "MANUAL", "FULL", results, 1, 0, 0)
+
+        assert placed.result_id is not None
+        assert placed.cancelable is expected
+
+    @pytest.mark.asyncio
+    async def test_cancelable_lookup_failure_keeps_history(self, mock_db):
+        from app.services.rebalancing.execution_service import _save_execution_history
+
+        placed = OrderResult(
+            ticker="069500", name="K", market="KOSPI", side="BUY", quantity=1, status="SUCCESS", order_no="1"
+        )
+        results = [
+            ExecutionResult(
+                account_id=str(uuid.uuid4()),
+                account_name="a",
+                is_mock=True,
+                orders=[placed],
+                success_count=1,
+                fail_count=0,
+                executed_at="",
+            )
+        ]
+        mock_db.execute = AsyncMock(side_effect=RuntimeError("db"))
+
+        await _save_execution_history(mock_db, uuid.uuid4(), None, "MANUAL", "FULL", results, 1, 0, 0)
+
+        # 이력은 이미 commit됐다 — 저장 실패 경로(rollback)로 빠지지 않고 버튼만 숨긴다
+        mock_db.commit.assert_awaited_once()
+        assert placed.result_id is not None
+        assert placed.cancelable is False
+        mock_db.rollback.assert_not_awaited()
+
+
+class TestActiveAccountAssetTypes:
+    @pytest.mark.asyncio
+    async def test_filters_inactive_accounts(self, mock_db):
+        from app.services.rebalancing.order_cancel_rules import active_account_asset_types
+
+        result = MagicMock()
+        result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=result)
+
+        await active_account_asset_types(mock_db, uuid.uuid4(), [str(uuid.uuid4()), "default", None])
+
+        sql = str(mock_db.execute.await_args.args[0])
+        assert "is_active" in sql
+
+    @pytest.mark.asyncio
+    async def test_no_valid_ids_skips_query(self, mock_db):
+        from app.services.rebalancing.order_cancel_rules import active_account_asset_types
+
+        mock_db.execute = AsyncMock()
+        assert await active_account_asset_types(mock_db, uuid.uuid4(), ["default", None]) == {}
+        mock_db.execute.assert_not_awaited()
 
 
 class TestRouter:
@@ -296,6 +430,8 @@ class TestRouter:
                 )
             assert resp.cancel_status == status
             assert expected in resp.message
+            # 화면에 붙는 실패 사유는 원문만 — "취소 실패: 취소하지 못했습니다: …" 이중 접두 방지(plans/90 B6)
+            assert resp.cancel_message == (None if status == CANCELED else "취소가능수량이 없습니다")
 
     @pytest.mark.asyncio
     async def test_history_detail_exposes_cancel_fields(self, mock_db, mock_request):

@@ -221,6 +221,13 @@ export function useRebalancingExecution({
     return isOverseasMarket(market) ? Math.round(raw * 100) / 100 : raw;
   }
 
+  // 시장가 주문의 결과·이력 "가격" 칸용 참고 시세(시장 통화 — 해외 USD). 브로커에는 보내지 않는다(plans/90 B7)
+  function referencePriceNative(ticker: string, market: string): number | null {
+    const raw = isOverseasMarket(market) ? livePricesUsd[ticker] : livePricesKrw[ticker];
+    if (raw == null || raw <= 0) return null;
+    return isOverseasMarket(market) ? Math.round(raw * 100) / 100 : raw;
+  }
+
   function getEstimateKrw(key: string, ticker: string, market: string, qty: number): number | null {
     if (orderType === "LIMIT") {
       const native = getLimitPriceNative(key, ticker, market);
@@ -348,6 +355,7 @@ export function useRebalancingExecution({
               orderType === "LIMIT"
                 ? getLimitPriceNative(key, item.ticker, item.market) || null
                 : null,
+            reference_price: referencePriceNative(item.ticker, item.market),
           });
       });
       (buyRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty }) => {
@@ -367,6 +375,7 @@ export function useRebalancingExecution({
               orderType === "LIMIT"
                 ? getLimitPriceNative(key, item.ticker, item.market) || null
                 : null,
+            reference_price: referencePriceNative(item.ticker, item.market),
           });
       });
     });
@@ -432,10 +441,11 @@ export function useRebalancingExecution({
 
     let totalSellProceeds: number | null = 0;
     loop: for (const acc of tradableAccounts) {
-      for (const { item, suggestedQty } of sellRowsByAccount[acc.id] ?? []) {
+      for (const { item, suggestedQty, currentQty } of sellRowsByAccount[acc.id] ?? []) {
         const key = orderKey("sell", item.ticker, acc.id);
         if (!selected.has(key)) continue;
-        const qty = qtyOverrides[key] ?? suggestedQty;
+        // buildOrders와 같은 보유량 상한 — 실제로 나갈 매도분만 대금으로 잡는다
+        const qty = Math.min(qtyOverrides[key] ?? suggestedQty, currentQty);
         const est = getEstimateKrw(key, item.ticker, item.market, qty);
         if (est === null) {
           totalSellProceeds = null;
