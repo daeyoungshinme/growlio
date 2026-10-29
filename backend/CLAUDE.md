@@ -107,6 +107,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 ### Services (`services/`)
 
 > 접미사 관례: `*_service.py`(DB/외부 API 유스케이스), `*_calculator.py`/`*_aggregator.py`(순수 계산), 접미사 없음(도메인 유틸). 강제 아님. 파일 추가/삭제 시 이 목록도 갱신.
+> 도메인 패키지(`goal/`·`etf/`·`tactical/`·`tax/`·`market_signal/`·`backtest/`, 기존 `rebalancing/`·`alerts/`·`dividend/`)는 re-export shim 없이 `app.services.<pkg>.<module>`로 import·patch한다. 공용 계층(시세·자산·포트폴리오·알림 발송)은 아직 평면 모듈.
 
 **자산·동기화**
 - `asset_service.py` — 계좌별 sync + `sync_account_now`(assets `/sync` 전용)
@@ -144,7 +145,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `strategy_service.py` · `alert_scope.py` · `alert_test.py` · `diagnosis_service.py`(설명 전용, alert 아님) · `overview_enrichment.py` · `_alert_queries.py`
 - `broker_balance_service.py` — 3사 실시간 잔고. **주문 실행은 KIS/키움만**(토스 주문 API 미구현)
 
-**목표 역산 추천**
+**목표 역산 추천 (`goal/`)**
 - `goal_recommendation_service.py` — 전체 자산 기준 진입점. 필요수익률 역산 → MVO. 추천은 자동 반영 안 됨(수동 적용). 결과 1h 캐시 + stale 키(1d) — 미스여도 stale 즉시 반환 후 `BackgroundTasks`로 재계산(기간별·연령대도 같은 SWR, 갱신은 `refresh_recommendation_in_background` 공용). 무효화 함수는 stale 키도 함께 지운다. **추천 캐시 키(전체·기간별·연령대 각 1h/stale)는 사용자별 세대를 포함 — 무효화는 `invalidate_goal_recommendation_caches`(세대 교체)로만, 세대는 설정을 읽기 *전에* `get_goal_recommendation_generation`으로 잡아 넘긴다**(계산 중 저장된 설정을 옛 결과가 덮던 경합). sync 무효화는 `positions_changed=True`일 때만 추천 캐시 삭제. `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 **동일 로직 — 임계값 함께 맞출 것**
 - `_goal_recommendation_common.py` — 세 진입점 공용 헬퍼·계산 골격(`import ... as _grc`, patch 경로도 여기 하나). **단 외부 조회(`get_historical_returns`/`fetch_yf_daily_returns`/`build_portfolio_overview`)는 테스트가 진입점 모듈 경로로 patch하므로 진입점에 남기고 인자로 넘긴다**(옮기면 patch 수백 곳 무효화). 추천 출력은 `tests/test_goal_recommendation_snapshots.py`가 고정 — 리팩터링 후 반드시 통과, 의도적 변경 시만 `UPDATE_GOAL_SNAPSHOTS=1`
 - `goal_age_recommendation_service.py`(연령대) · `goal_horizon_recommendation_service.py`(투자기간 × 세제유형, 최대 15조합, IRP 안전자산 30% 하한)
@@ -154,19 +155,18 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `goal_return_solver.py` — 역산 순수 함수 + `build_feasibility_preview`(마법사·nestlio 공유)
 - `recommendation_universe.py` — 큐레이션 ETF 유니버스. `index_key_from_base_index`는 중복 분석·지수 분류 공용 — **복제 금지**
 
-**ETF·지수**
+**ETF·지수 (`etf/`)**
 - `etf_profile_service.py` — 총보수·기초지수(국내 Naver `totalFee`, 해외 yfinance `netExpenseRatio` — 둘 다 이미 % 단위)
 - `etf_overlap_service.py` — 후보 중복(SAME_INDEX + 주간 상관 ≥0.97 & 변동성비 ≤1.5). 상장시장이 다른 후보끼리는 비교 안 함(의도된 병존)
 - `etf_index_classifier.py` — 보유 종목 → 추종 지수 분류. 지수 패턴은 `recommendation_universe.py`와 공유 — 수정 시 중복 분석·dedup에도 반영됨
 - `index_exposure_service.py` — 지수별 비중 + 리밸런싱 지수 그룹 제안
 
-**전술 배분 (QQQ/SPY)**
+**전술 배분 (`tactical/`, QQQ/SPY)**
 - `tactical_allocation_service.py` — 국면 판정(매크로 확정등급 × 추세, 서로 다른 KST 날짜 2회 확정 — 백테스트도 같은 함수), 제안 비중(비중표 → 틸트 → 웅덩이), 목표 교체. **QQQ·SPY·DIA는 지수 그룹 비중** — 적용 시 기존 그룹은 보존하고 비중만. QLD·SSO 0%면 짝 그룹의 레버리지 멤버로(전량 매도 방지). `ASSET_LABELS`는 프론트 `tacticalLabels.ASSET_LABEL`과 같게. 알림 판정은 `last_regime != notified_regime`
 - `tactical_tilt.py`(QQQ↔SPY 월 1회, 기본 끔) · `tactical_dip.py`(웅덩이 투입, 공격 국면만, 기본 끔) · `tactical_hints.py`(다음 전환 조건)
 - `tactical_backtest.py` — 실시간과 같은 판정 함수 사용. 매크로는 VIX로만 근사(`macro_note` 고지). **계산 방식 변경 시 `tactical_backtest_key` 버전을 올려 캐시 무효화**
-- `technical_indicators.py`(순수, pandas는 함수 내부 import — 기동 시 로드 방지) · `technical_signal_service.py`(QQQ/SPY/DIA 6h 캐시)
 
-**세금**
+**세금 (`tax/`)**
 - `tax_service.py` — 연도별 세금 추정·종합과세·건보 피부양자. 해외 실현손익은 직접 조회하지 않고 `overseas_realized_krw` 인자로 받음
 - `overseas_realized_service.py` — 해외 실현손익. KIS 실전은 브로커(TTTS3039R), 그 외는 해외 SELL `TradeRecord`(KIS 실전 계좌 기록은 이중 집계 방지로 무시). 성공 시만 1h 캐시
 - `tax_action_service.py` — 절세 액션 플랜(조합만). 세법 수치는 `_DEDUCTION_RULES` 연도별 테이블
@@ -179,12 +179,16 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `_dispatch.py` — 이메일+푸시 2채널, 하나라도 성공하면 AlertHistory 저장
 - `tax_reminder_service.py` · `recommendation_drift_alert_service.py`(추천 변화 3%p↑ — 프론트와 임계값 동일)
 
-**시장 신호·기타**
+**시장 신호 (`market_signal/`)**
 - `market_signal_service.py` — 8종 지표 복합 점수. `get_confirmed_composite_level()`(hysteresis 2회)은 AUTO 게이트·알림 전용, raw는 배너용. 지표 조회는 `market_signal_indicators.py`, 점수는 `market_signal_scoring.py` — 외부는 `market_signal_service`에서 import. **지표끼리 내부 호출하므로 patch는 `market_signal_indicators.*` 경로**
-- `economic_indicator_service.py`(CPI) · `factor_service.py` · `insight_service.py` · `risk_service.py` · `portfolio_optimizer.py`(효율적 프론티어)
+- `economic_indicator_service.py`(CPI)
+- `technical_indicators.py`(순수, pandas는 함수 내부 import — 기동 시 로드 방지) · `technical_signal_service.py`(QQQ/SPY/DIA 6h 캐시)
+
+**기타**
+- `factor_service.py` · `insight_service.py` · `risk_service.py` · `portfolio_optimizer.py`(효율적 프론티어)
 - `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
-- `dca_service.py` · `backtest_service.py` + `backtest_metrics.py` · `dart_service.py`
+- `dca_service.py` · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
 - `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → pykrx → FDR → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_dividend_data`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
 - `credential_service.py`(AES-256) · `email_service.py` · `email_templates/`(`_shared`·`alerts`·`rebalancing`·`market_signal`·`reports`, `__init__.py` 전체 재노출) · `push_service.py`(폐기 토큰 별도 세션 삭제, 토큰은 기기 단위)

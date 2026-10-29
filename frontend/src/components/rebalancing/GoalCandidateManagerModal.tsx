@@ -21,7 +21,7 @@ import Modal from "@/components/common/Modal";
 import { useTimeout } from "@/hooks/useTimeout";
 import { settingsQuery } from "@/api/queryOptions";
 
-// backend app/services/recommendation_universe.py의 MAX_GOAL_CANDIDATE_TICKERS와 동일하게 유지
+// backend app/constants.py의 MAX_GOAL_CANDIDATE_TICKERS와 동일하게 유지
 const MAX_CANDIDATE_TICKERS = 20;
 
 const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
