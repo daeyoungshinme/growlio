@@ -111,6 +111,8 @@ vi.mock("@/api/alerts", () => ({
 
 vi.mock("@/api/transactions", () => ({
   fetchTransactions: vi.fn().mockResolvedValue([]),
+  fetchAllTransactions: vi.fn().mockResolvedValue([]),
+  fetchTransactionSummary: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/api/dividends", () => ({

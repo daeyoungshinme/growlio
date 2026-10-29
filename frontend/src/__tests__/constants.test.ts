@@ -22,7 +22,7 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.portfolioOverviewLite).toEqual(["portfolio-overview", "lite"]);
     expect(QUERY_KEYS.portfolios).toEqual(["portfolios"]);
     expect(QUERY_KEYS.accounts).toEqual(["accounts"]);
-    expect(QUERY_KEYS.transactionsAll).toEqual(["transactions", "all"]);
+    expect(QUERY_KEYS.transactionSummary).toEqual(["transactions", "summary"]);
     expect(QUERY_KEYS.dividendByTickerBase).toEqual(["dividend-by-ticker"]);
     expect(QUERY_KEYS.dividendSummaryBase).toEqual(["dividend-summary"]);
     expect(QUERY_KEYS.dividendPositionsBase).toEqual(["dividend-positions"]);

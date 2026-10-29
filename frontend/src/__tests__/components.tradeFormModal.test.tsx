@@ -3,12 +3,12 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import TradeFormModal from "@/components/assets/TradeFormModal";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
-import { createTrade, deleteTrade, fetchTrades, updateTrade } from "@/api/trades";
+import { createTrade, deleteTrade, fetchAllTrades, updateTrade } from "@/api/trades";
 
 vi.mock("../api/trades", () => ({
   createTrade: vi.fn(),
   deleteTrade: vi.fn(),
-  fetchTrades: vi.fn(),
+  fetchAllTrades: vi.fn(),
   updateTrade: vi.fn(),
 }));
 
@@ -29,7 +29,7 @@ describe("TradeFormModal", () => {
     vi.mocked(createTrade)
       .mockReset()
       .mockResolvedValue({} as never);
-    vi.mocked(fetchTrades).mockReset().mockResolvedValue([]);
+    vi.mocked(fetchAllTrades).mockReset().mockResolvedValue([]);
   });
 
   it("해외 종목은 USD 단가를 원화로 환산해 저장", async () => {
@@ -65,7 +65,7 @@ describe("TradeFormModal", () => {
   });
 
   it("기존 기록 목록 표시", async () => {
-    vi.mocked(fetchTrades).mockResolvedValue([
+    vi.mocked(fetchAllTrades).mockResolvedValue([
       {
         id: "t1",
         account_id: "acc-1",
@@ -96,7 +96,7 @@ describe("TradeFormModal", () => {
     vi.mocked(updateTrade)
       .mockReset()
       .mockResolvedValue({} as never);
-    vi.mocked(fetchTrades).mockResolvedValue([
+    vi.mocked(fetchAllTrades).mockResolvedValue([
       {
         id: "t9",
         account_id: "acc-1",
@@ -158,7 +158,7 @@ describe("TradeFormModal", () => {
     vi.mocked(updateTrade)
       .mockReset()
       .mockResolvedValue({} as never);
-    vi.mocked(fetchTrades).mockResolvedValue([feeRecord]);
+    vi.mocked(fetchAllTrades).mockResolvedValue([feeRecord]);
     renderWithRecord();
     fireEvent.click(await screen.findByRole("button", { name: "2026-10-03 기록 수정" }));
     fireEvent.change(screen.getByLabelText("수수료 (원, 선택)"), { target: { value: "" } });
@@ -172,7 +172,7 @@ describe("TradeFormModal", () => {
     vi.mocked(deleteTrade)
       .mockReset()
       .mockResolvedValue(undefined as never);
-    vi.mocked(fetchTrades).mockResolvedValue([feeRecord]);
+    vi.mocked(fetchAllTrades).mockResolvedValue([feeRecord]);
     renderWithRecord();
     fireEvent.click(await screen.findByRole("button", { name: "2026-10-03 기록 수정" }));
     expect(screen.getByRole("button", { name: "기록 수정" })).toBeInTheDocument();
@@ -190,7 +190,7 @@ describe("TradeFormModal", () => {
     vi.mocked(deleteTrade)
       .mockReset()
       .mockResolvedValue(undefined as never);
-    vi.mocked(fetchTrades).mockResolvedValue([feeRecord]);
+    vi.mocked(fetchAllTrades).mockResolvedValue([feeRecord]);
     renderWithRecord();
     fireEvent.click(await screen.findByRole("button", { name: "2026-10-03 기록 삭제" }));
     fireEvent.click(screen.getByRole("button", { name: "취소" }));

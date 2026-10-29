@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchAccounts, type AssetAccount } from "@/api/assets";
 import { fetchPortfolioOverviewLite } from "@/api/portfolios";
-import { fetchTransactions } from "@/api/transactions";
+import { fetchTransactionSummary } from "@/api/transactions";
 import { useExchangeRate } from "./useExchangeRate";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import type { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
@@ -27,13 +27,14 @@ export function useAssetManagementData(tab: Tab) {
     enabled: isStockTab,
   });
 
-  const { data: allTx = [] } = useQuery({
-    queryKey: QUERY_KEYS.transactionsAll,
-    queryFn: () => fetchTransactions(),
+  // 계좌 카드의 입금·배당 누계 — 목록 첫 페이지(100건)를 더하면 오래된 기록이 빠져 서버에서 합산한다(plans/90 B2)
+  const { data: txTotals = [] } = useQuery({
+    queryKey: QUERY_KEYS.transactionSummary,
+    queryFn: () => fetchTransactionSummary(),
     enabled: isStockTab,
   });
 
   const usdRate = useExchangeRate();
 
-  return { accounts: accounts as AssetAccount[], isLoading, error, overview, allTx, usdRate };
+  return { accounts: accounts as AssetAccount[], isLoading, error, overview, txTotals, usdRate };
 }

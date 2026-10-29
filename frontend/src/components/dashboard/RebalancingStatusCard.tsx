@@ -150,13 +150,8 @@ interface Props {
   emptyStateCta?: () => void;
 }
 
-const ALL_INSIGHT_TYPES: InsightType[] = [
-  "CONCENTRATION",
-  "UNDERPERFORMANCE",
-  "HIGH_COST",
-  "TAX_LOSS_HARVEST",
-  "DEPOSIT_SHORTFALL",
-];
+// 리밸런싱 기회는 이 카드의 포트폴리오 이탈 행(drift-summary)이 따로 보여 주므로 뺀다
+const ALL_INSIGHT_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
 const SEVERITY_ORDER: Record<InsightSeverity, number> = { ALERT: 0, WARNING: 1, INFO: 2 };
 
 export default function RebalancingStatusCard({

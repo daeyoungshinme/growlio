@@ -273,6 +273,30 @@ describe("NotificationSettingsPage", () => {
     });
   });
 
+  it("'더 보기'는 skip으로 다음 페이지를 이어 붙이고, 마지막 페이지면 버튼을 숨긴다 (plans/90 B1)", async () => {
+    const page = (start: number, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        id: `h-${start + i}`,
+        alert_type: "TACTICAL_REGIME",
+        message: `알림 ${start + i}`,
+        created_at: "2026-10-01T10:00:00Z",
+      }));
+    vi.mocked(fetchAlertHistory).mockImplementation(
+      (params) => Promise.resolve((params?.skip ?? 0) === 0 ? page(0, 50) : page(50, 3)) as never,
+    );
+    renderNotificationSettings();
+    fireEvent.click(screen.getByRole("tab", { name: "발송 이력" }));
+    await waitFor(() => expect(screen.getByText("알림 49")).toBeInTheDocument());
+    // 전술 국면 알림도 영문 코드 대신 한국어 라벨(plans/90 B3)
+    expect(screen.getAllByText("전술 배분 국면 전환").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+    await waitFor(() => expect(screen.getByText("알림 52")).toBeInTheDocument());
+    expect(screen.getByText("알림 0")).toBeInTheDocument();
+    expect(vi.mocked(fetchAlertHistory)).toHaveBeenLastCalledWith({ skip: 50, limit: 50 });
+    expect(screen.queryByRole("button", { name: "더 보기" })).toBeNull();
+  });
+
   it("NotificationEmailSection에 user_email을 전달한다", async () => {
     vi.mocked(api.get).mockResolvedValue({
       data: { ...mockSettings, user_email: "test@test.com" },

@@ -7,7 +7,7 @@ import type { AssetAccount } from "@/api/assets";
 import {
   createTrade,
   deleteTrade,
-  fetchTrades,
+  fetchAllTrades,
   updateTrade,
   type TradeRecord,
   type TradeSide,
@@ -74,7 +74,7 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
   const { data: records = [] } = useQuery<TradeRecord[]>({
     queryKey: QUERY_KEYS.tradesFor(accountId, stock?.ticker ?? "", stock?.market ?? ""),
     queryFn: () =>
-      fetchTrades({ account_id: accountId, ticker: stock?.ticker, market: stock?.market }),
+      fetchAllTrades({ account_id: accountId, ticker: stock?.ticker, market: stock?.market }),
     enabled: !!accountId && !!stock,
   });
 

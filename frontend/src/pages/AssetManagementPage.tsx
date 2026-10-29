@@ -103,7 +103,7 @@ export default function AssetManagementPage() {
     await invalidateAccountData(queryClient);
   }, [queryClient]);
   useRegisterRefresh(handleRefresh);
-  const { accounts, isLoading, error, overview, allTx, usdRate } = useAssetManagementData(tab);
+  const { accounts, isLoading, error, overview, txTotals, usdRate } = useAssetManagementData(tab);
 
   const {
     createMutation,
@@ -144,7 +144,7 @@ export default function AssetManagementPage() {
   const realEstateAccounts = accounts.filter((a) => REAL_ESTATE_TYPES.includes(a.asset_type));
   const currentBankOrStock = tab === "은행계좌" ? bankAccounts : stockAccounts;
 
-  const stockAccountStats = useStockAccountStats(stockAccounts, overview, allTx);
+  const stockAccountStats = useStockAccountStats(stockAccounts, overview, txTotals);
 
   if (error)
     return (

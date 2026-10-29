@@ -603,6 +603,31 @@ describe("RebalancingHistoryTab", () => {
     ],
   };
 
+  it("2단계 실행 기록은 'TWO_PHASE' 대신 한국어 전략 라벨을 보여준다 (plans/90 B4)", async () => {
+    const { fetchRebalancingHistory } = await import("@/api/rebalancing");
+    vi.mocked(fetchRebalancingHistory).mockResolvedValueOnce([
+      {
+        id: "e1",
+        portfolio_id: "p1",
+        triggered_by: "MANUAL",
+        strategy: "TWO_PHASE",
+        total_success: 2,
+        total_fail: 0,
+        total_skipped: 0,
+        executed_at: "2026-10-29T01:00:00Z",
+      },
+    ]);
+    mockFetchRecentPlanLegs.mockResolvedValue([]);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("2단계 매수·매도")).toBeDefined();
+    expect(screen.queryByText("TWO_PHASE")).toBeNull();
+  });
+
   it("실행 완료 leg는 영문 상태 코드 대신 한글 라벨을 보여준다", async () => {
     mockFetchRecentPlanLegs.mockResolvedValue([
       { ...buyLeg, status: "EXECUTED" as const, actionable: false },

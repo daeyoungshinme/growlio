@@ -15,10 +15,11 @@ export const QUERY_KEYS = {
   accounts: ["accounts"] as const,
   accountPositions: (accountId: string) => ["account-positions", accountId] as const,
   transactions: (accountId: string) => ["transactions", accountId] as const,
-  transactionsAll: ["transactions", "all"] as const,
-  /** 무효화 프리픽스 전용 — 전체(`transactionsAll`·`allTransactions`)와 계좌별(`transactions(id)`)을 함께 지운다 */
+  /** 무효화 프리픽스 전용 — 연도별(`allTransactions`)·합계(`transactionSummary`)·계좌별(`transactions(id)`)을 함께 지운다 */
   transactionsBase: ["transactions"] as const,
   allTransactions: (year: number) => ["transactions", "all", year] as const,
+  /** 계좌·유형별 거래 합계 — transactionsBase 프리픽스로 함께 무효화된다 */
+  transactionSummary: ["transactions", "summary"] as const,
   // 기간별 매수(계좌관리 › 기간별 매수). periodPurchasesBase는 무효화 프리픽스 전용
   periodPurchasesBase: ["period-purchases"] as const,
   periodPurchases: (

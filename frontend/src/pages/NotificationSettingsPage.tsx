@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Bell, Mail, Activity } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchAlertHistory, type AlertHistoryItem } from "@/api/alerts";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -43,23 +43,27 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   CHALLENGE_WRAPUP: "적립 챌린지 월간 결산",
   DCA_CASH_SHORTFALL: "적립매수 예수금 부족",
   YEAR_END_TAX_REMINDER: "연말 절세 리마인더",
+  TACTICAL_REGIME: "전술 배분 국면 전환",
+  TACTICAL_DIP: "전술 배분 웅덩이 매수",
 };
 
 const ALERT_HISTORY_PAGE_SIZE = 50;
 
 function AlertHistorySection() {
-  const [limit, setLimit] = useState(ALERT_HISTORY_PAGE_SIZE);
-  const {
-    data: history,
-    isLoading,
-    isFetching,
-    isError,
-    refetch,
-  } = useQuery({
-    queryKey: [...QUERY_KEYS.alertHistory, limit],
-    queryFn: () => fetchAlertHistory({ limit }),
-    staleTime: STALE_TIME.SHORT,
-  });
+  // skip으로 다음 페이지를 이어 붙인다 — limit을 키우면 백엔드 상한(200)을 넘는 순간 422로 섹션 전체가 오류가 됐다(plans/90 B1)
+  const { data, isLoading, isFetchingNextPage, isError, refetch, hasNextPage, fetchNextPage } =
+    useInfiniteQuery({
+      queryKey: [...QUERY_KEYS.alertHistory, "pages"],
+      queryFn: ({ pageParam }) =>
+        fetchAlertHistory({ skip: pageParam, limit: ALERT_HISTORY_PAGE_SIZE }),
+      initialPageParam: 0,
+      getNextPageParam: (lastPage, pages) =>
+        lastPage.length < ALERT_HISTORY_PAGE_SIZE
+          ? undefined
+          : pages.length * ALERT_HISTORY_PAGE_SIZE,
+      staleTime: STALE_TIME.SHORT,
+    });
+  const history = data?.pages.flat();
 
   return (
     <SectionCard title="알림 발송 이력">
@@ -106,13 +110,13 @@ function AlertHistorySection() {
               </div>
             ))}
           </div>
-          {history.length >= limit && (
+          {hasNextPage && (
             <button
-              onClick={() => setLimit((l) => l + ALERT_HISTORY_PAGE_SIZE)}
-              disabled={isFetching}
+              onClick={() => void fetchNextPage()}
+              disabled={isFetchingNextPage}
               className="w-full mt-2 min-h-[44px] text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors disabled:opacity-50"
             >
-              {isFetching ? "불러오는 중..." : "더 보기"}
+              {isFetchingNextPage ? "불러오는 중..." : "더 보기"}
             </button>
           )}
         </>

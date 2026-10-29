@@ -89,7 +89,6 @@ export interface AssetAccountCreate {
   toss_account_no?: string;
   toss_client_id?: string;
   toss_client_secret?: string;
-  ob_fintech_use_no?: string;
   is_mock_mode?: boolean;
   manual_amount?: number;
   deposit_krw?: number;

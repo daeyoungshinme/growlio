@@ -702,13 +702,13 @@ describe("useAssetManagementData", () => {
     expect(result.current.usdRate).toBe(1350);
   });
 
-  it("증권계좌 탭에서는 overview와 allTx도 조회한다", async () => {
+  it("증권계좌 탭에서는 overview와 거래 합계(txTotals)도 조회한다", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });
     const { result } = renderHook(() => useAssetManagementData("증권계좌"), {
       wrapper: createWrapper(),
     });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.allTx).toBeDefined();
+    expect(result.current.txTotals).toBeDefined();
   });
 });
 
