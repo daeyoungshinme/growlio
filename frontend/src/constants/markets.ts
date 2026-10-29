@@ -2,6 +2,7 @@ export const DOMESTIC_MARKETS: string[] = ["KOSPI", "KOSDAQ", "KRX"];
 
 /** 포지션 편집 마켓 드롭다운용 — KRX·_US 변형 제외 */
 export const POSITION_MARKETS = ["KOSPI", "KOSDAQ", "NYSE", "NASDAQ", "AMEX"] as const;
+/** 백엔드 `app/constants.py::OVERSEAS_MARKETS`와 같은 집합(+ `_US` 변형) — 빠지면 그 시장 종목을 국내로 판정한다 */
 export const OVERSEAS_MARKETS: string[] = [
   "NYSE",
   "NASDAQ",
@@ -9,6 +10,11 @@ export const OVERSEAS_MARKETS: string[] = [
   "NYSE_US",
   "NASDAQ_US",
   "AMEX_US",
+  "TSE",
+  "HKEX",
+  "SSE",
+  "SGX",
+  "LSE",
 ];
 
 export const OVERSEAS_MARKET_SET = new Set<string>(OVERSEAS_MARKETS);

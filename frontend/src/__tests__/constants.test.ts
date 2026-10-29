@@ -98,6 +98,12 @@ describe("markets constants", () => {
     expect(isOverseasMarket("nasdaq_us")).toBe(true);
   });
 
+  it("isOverseasMarket — 백엔드 해외 시장 집합(TSE·HKEX 등)과 맞춘다", () => {
+    for (const market of ["TSE", "HKEX", "SSE", "SGX", "LSE"]) {
+      expect(isOverseasMarket(market)).toBe(true);
+    }
+  });
+
   it("isOverseasMarket — 국내 거래소는 false를 반환한다", () => {
     expect(isOverseasMarket("KOSPI")).toBe(false);
     expect(isOverseasMarket("KOSDAQ")).toBe(false);
