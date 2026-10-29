@@ -22,8 +22,8 @@ import structlog
 from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS
 from app.services.dividend.sync_sources import fetch_naver_etf_analysis
 from app.services.goal.goal_candidate_service import looks_like_korean_etf
-from app.services.market_data_fetcher import fetch_yf_info
-from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
+from app.services.market_data.market_data_fetcher import fetch_yf_info
+from app.services.market_data.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_ETF_PROFILE,
     TTL_ETF_PROFILE_MISSING,

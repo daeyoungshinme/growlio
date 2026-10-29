@@ -219,7 +219,7 @@ def _fresh_yfinance_semaphore():
     """모듈 전역 `_yfinance_sem`은 처음 대기가 걸린 이벤트 루프에 묶인다 — 투자기간별 조합이 5개를 넘어
     실제로 대기하면 다음 테스트(새 루프)에서 RuntimeError가 나므로 테스트마다 새 세마포어로 바꾼다."""
     # 호출부는 모두 `yahoo_price.run_yf_bounded`를 거치므로 세마포어 소유 모듈 하나만 교체하면 된다
-    with patch("app.services.yahoo_price._yfinance_sem", asyncio.Semaphore(5)):
+    with patch("app.services.market_data.yahoo_price._yfinance_sem", asyncio.Semaphore(5)):
         yield
 
 
@@ -513,7 +513,7 @@ async def test_horizon_snapshot(name, market_signal_level):
 
 
 def _optimizer_inputs(cands: list[dict]) -> tuple[list[str], list[tuple[str, str, str]], list[float], list[float]]:
-    from app.services.yahoo_price import to_yf_symbol
+    from app.services.market_data.yahoo_price import to_yf_symbol
 
     symbols = [to_yf_symbol(c["ticker"], c["market"]) for c in cands]
     tickers = [(c["ticker"], c["name"], c["market"]) for c in cands]

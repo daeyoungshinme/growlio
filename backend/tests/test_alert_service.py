@@ -276,7 +276,7 @@ async def test_check_stock_price_alerts_no_alerts(mock_db, mock_cache):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     # fetch_prices_batch는 함수 내부에서 로컬 임포트됨 → 소스 모듈 경로로 패치
-    with patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={})):
+    with patch("app.services.market_data.price_service.fetch_prices_batch", AsyncMock(return_value={})):
         from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
         await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
@@ -310,7 +310,7 @@ async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_cache):
 
     with (
         patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             AsyncMock(return_value={"005930": current_price}),
         ),
         patch("app.services.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
@@ -350,7 +350,7 @@ async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_cache):
 
     with (
         patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             AsyncMock(return_value={}),  # ticker 없음
         ),
         patch("app.services.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
@@ -410,7 +410,10 @@ async def test_stock_price_alert_multi_trigger_cooldown(mock_db, mock_cache):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"005930": current_price})),
+        patch(
+            "app.services.market_data.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={"005930": current_price}),
+        ),
         patch("app.services.email_service.send_stock_price_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
@@ -445,7 +448,10 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_cache):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"005930": current_price})),
+        patch(
+            "app.services.market_data.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={"005930": current_price}),
+        ),
         patch("app.services.email_service.send_stock_price_alert", new=AsyncMock(return_value=False)),
     ):
         from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts

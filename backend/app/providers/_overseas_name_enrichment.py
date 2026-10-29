@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from app.services.stock_search_service import resolve_ticker_meta
+from app.services.market_data.stock_search_service import resolve_ticker_meta
 from app.utils.cache_keys import (
     TTL_OVERSEAS_STOCK_META,
     TTL_OVERSEAS_STOCK_META_PARTIAL,

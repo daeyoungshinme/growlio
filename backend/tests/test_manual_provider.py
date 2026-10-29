@@ -155,7 +155,9 @@ class TestManualProviderSync:
 
         provider = ManualProvider()
         with (
-            patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={"005930": 75000.0})),
+            patch(
+                "app.services.market_data.price_service.fetch_prices_batch", AsyncMock(return_value={"005930": 75000.0})
+            ),
             patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
         ):
             result = await provider.sync(account, db, cache)
@@ -173,7 +175,7 @@ class TestManualProviderSync:
 
         provider = ManualProvider()
         with (
-            patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={"AAPL": 210.0})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", AsyncMock(return_value={"AAPL": 210.0})),
             patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
         ):
             await provider.sync(account, db, cache)
@@ -240,7 +242,7 @@ class TestManualProviderSync:
 
         provider = ManualProvider()
         with (
-            patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", AsyncMock(return_value={})),
             patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
         ):
             result = await provider.sync(account, db, cache)

@@ -12,22 +12,22 @@ import pytest
 
 class TestYfSymbolToKrxTicker:
     def test_kospi_symbol(self, override_settings):
-        from app.services.price_sync_sources import yf_symbol_to_krx_ticker
+        from app.services.market_data.price_sync_sources import yf_symbol_to_krx_ticker
 
         assert yf_symbol_to_krx_ticker("005930.KS") == "005930"
 
     def test_kosdaq_symbol(self, override_settings):
-        from app.services.price_sync_sources import yf_symbol_to_krx_ticker
+        from app.services.market_data.price_sync_sources import yf_symbol_to_krx_ticker
 
         assert yf_symbol_to_krx_ticker("035720.KQ") == "035720"
 
     def test_overseas_symbol_returns_none(self, override_settings):
-        from app.services.price_sync_sources import yf_symbol_to_krx_ticker
+        from app.services.market_data.price_sync_sources import yf_symbol_to_krx_ticker
 
         assert yf_symbol_to_krx_ticker("AAPL") is None
 
     def test_index_symbol_returns_none(self, override_settings):
-        from app.services.price_sync_sources import yf_symbol_to_krx_ticker
+        from app.services.market_data.price_sync_sources import yf_symbol_to_krx_ticker
 
         assert yf_symbol_to_krx_ticker("^GSPC") is None
 
@@ -42,7 +42,7 @@ class TestSyncNaverPrice:
         mock_resp.json.return_value = {"closePrice": "286,000"}
 
         with patch("requests.get", return_value=mock_resp):
-            from app.services.price_sync_sources import sync_naver_price
+            from app.services.market_data.price_sync_sources import sync_naver_price
 
             result = sync_naver_price("005930")
 
@@ -54,7 +54,7 @@ class TestSyncNaverPrice:
         mock_resp.json.return_value = {}
 
         with patch("requests.get", return_value=mock_resp):
-            from app.services.price_sync_sources import sync_naver_price
+            from app.services.market_data.price_sync_sources import sync_naver_price
 
             result = sync_naver_price("005930")
 
@@ -64,7 +64,7 @@ class TestSyncNaverPrice:
         import requests.exceptions as _req_exc
 
         with patch("requests.get", side_effect=_req_exc.ConnectionError("network down")):
-            from app.services.price_sync_sources import sync_naver_price
+            from app.services.market_data.price_sync_sources import sync_naver_price
 
             result = sync_naver_price("005930")
 
@@ -76,7 +76,7 @@ class TestSyncNaverPrice:
         mock_resp.json.side_effect = ValueError("bad json")
 
         with patch("requests.get", return_value=mock_resp):
-            from app.services.price_sync_sources import sync_naver_price
+            from app.services.market_data.price_sync_sources import sync_naver_price
 
             result = sync_naver_price("005930")
 
@@ -93,7 +93,7 @@ class TestSyncPykrxPrice:
         mock_df = pd.DataFrame({"종가": [284000, 285500, 286000]})
 
         with patch("pykrx.stock.get_market_ohlcv_by_date", return_value=mock_df):
-            from app.services.price_sync_sources import sync_pykrx_price
+            from app.services.market_data.price_sync_sources import sync_pykrx_price
 
             result = sync_pykrx_price("005930")
 
@@ -103,7 +103,7 @@ class TestSyncPykrxPrice:
         import pandas as pd
 
         with patch("pykrx.stock.get_market_ohlcv_by_date", return_value=pd.DataFrame()):
-            from app.services.price_sync_sources import sync_pykrx_price
+            from app.services.market_data.price_sync_sources import sync_pykrx_price
 
             result = sync_pykrx_price("005930")
 
@@ -111,7 +111,7 @@ class TestSyncPykrxPrice:
 
     def test_exception_returns_none(self, override_settings):
         with patch("pykrx.stock.get_market_ohlcv_by_date", side_effect=Exception("krx down")):
-            from app.services.price_sync_sources import sync_pykrx_price
+            from app.services.market_data.price_sync_sources import sync_pykrx_price
 
             result = sync_pykrx_price("005930")
 
@@ -128,7 +128,7 @@ class TestSyncPykrxCloseSeries:
         mock_df = pd.DataFrame({"종가": [100.0, 101.0, 0.0, 103.0]})
 
         with patch("pykrx.stock.get_market_ohlcv_by_date", return_value=mock_df):
-            from app.services.price_sync_sources import sync_pykrx_close_series
+            from app.services.market_data.price_sync_sources import sync_pykrx_close_series
 
             result = sync_pykrx_close_series("005930", date(2024, 1, 1), date(2024, 1, 31))
 
@@ -137,7 +137,7 @@ class TestSyncPykrxCloseSeries:
 
     def test_none_dataframe_returns_none(self, override_settings):
         with patch("pykrx.stock.get_market_ohlcv_by_date", return_value=None):
-            from app.services.price_sync_sources import sync_pykrx_close_series
+            from app.services.market_data.price_sync_sources import sync_pykrx_close_series
 
             result = sync_pykrx_close_series("005930", date(2024, 1, 1), date(2024, 1, 31))
 
@@ -145,7 +145,7 @@ class TestSyncPykrxCloseSeries:
 
     def test_exception_returns_none(self, override_settings):
         with patch("pykrx.stock.get_market_ohlcv_by_date", side_effect=Exception("krx down")):
-            from app.services.price_sync_sources import sync_pykrx_close_series
+            from app.services.market_data.price_sync_sources import sync_pykrx_close_series
 
             result = sync_pykrx_close_series("005930", date(2024, 1, 1), date(2024, 1, 31))
 
@@ -175,7 +175,7 @@ class TestSyncPykrxCloseSeries:
             return pd.DataFrame({"종가": [100.0, 101.0]})
 
         with patch("pykrx.stock.get_market_ohlcv_by_date", side_effect=fake_get_market_ohlcv_by_date):
-            from app.services.price_sync_sources import sync_pykrx_close_series
+            from app.services.market_data.price_sync_sources import sync_pykrx_close_series
 
             threads = [
                 threading.Thread(target=sync_pykrx_close_series, args=(str(i), date(2024, 1, 1), date(2024, 1, 31)))

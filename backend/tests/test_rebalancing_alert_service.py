@@ -1489,7 +1489,7 @@ class TestRefreshLivePrices:
         item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
 
         with patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             new=AsyncMock(return_value={"005930": 71500.0}),
         ):
             await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
@@ -1503,7 +1503,7 @@ class TestRefreshLivePrices:
         item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
 
         with patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             new=AsyncMock(return_value={}),
         ):
             await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
@@ -1517,7 +1517,7 @@ class TestRefreshLivePrices:
         item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
 
         with patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             new=AsyncMock(side_effect=RuntimeError("network error")),
         ):
             await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
@@ -1532,7 +1532,7 @@ class TestRefreshLivePrices:
         stock_item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
 
         fetch_mock = AsyncMock(return_value={"005930": 71500.0})
-        with patch("app.services.price_service.fetch_prices_batch", new=fetch_mock):
+        with patch("app.services.market_data.price_service.fetch_prices_batch", new=fetch_mock):
             await refresh_live_prices([cash_item, stock_item], uuid.uuid4(), mock_db, MagicMock())
 
         called_tickers = fetch_mock.call_args.args[1]
@@ -1555,7 +1555,7 @@ class TestRefreshLivePrices:
         )
 
         with patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             new=AsyncMock(return_value={"367380": 50000.0}),
         ):
             await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
@@ -1576,7 +1576,7 @@ class TestRefreshLivePrices:
         )
 
         with patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             new=AsyncMock(return_value={"367380": 50000.0}),
         ):
             await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
@@ -1596,7 +1596,7 @@ class TestRefreshLivePrices:
         )
 
         with patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             new=AsyncMock(return_value={}),
         ):
             await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
@@ -1620,7 +1620,7 @@ class TestRefreshLivePrices:
         )
 
         with patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             new=AsyncMock(return_value={"005930": 71500.0}),
         ):
             await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
@@ -1645,11 +1645,11 @@ class TestRefreshLivePrices:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new=AsyncMock(return_value={"QLD": 95.0}),
             ),
             patch(
-                "app.services.price_service.get_usd_krw_rate",
+                "app.services.market_data.price_service.get_usd_krw_rate",
                 new=AsyncMock(return_value=1385.0),
             ),
         ):

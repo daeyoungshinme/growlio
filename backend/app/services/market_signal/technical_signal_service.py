@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from app.services.market_data_fetcher import fetch_yf_close_series
+from app.services.market_data.market_data_fetcher import fetch_yf_close_series
+from app.services.market_data.yahoo_price import run_yf_bounded
 from app.services.market_signal.technical_indicators import TechnicalSnapshot, compute_snapshot
-from app.services.yahoo_price import run_yf_bounded
 from app.utils.cache_keys import (
     TTL_TECHNICAL_SIGNAL,
     TTL_TECHNICAL_SIGNAL_DEGRADED,

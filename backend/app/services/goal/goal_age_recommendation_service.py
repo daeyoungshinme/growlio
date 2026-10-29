@@ -32,10 +32,10 @@ from app.services.goal.goal_candidate_service import (
 )
 from app.services.goal.goal_portfolio_optimizer import _MIN_CANDIDATES
 from app.services.goal.goal_recommendation_service import refresh_recommendation_in_background
-from app.services.market_data_fetcher import fetch_yf_daily_returns
+from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
+from app.services.market_data.price_service import get_historical_returns
 from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.portfolio.position_aggregator import query_latest_position_map
-from app.services.price_service import get_historical_returns
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
     TTL_GOAL_RECOMMENDATION_STALE,

@@ -22,7 +22,7 @@ import structlog
 
 from app.constants import DOMESTIC_MARKETS
 from app.core.config import settings
-from app.services.price_sync_sources import sync_fdr_kosdaq_tickers, sync_pykrx_close_series
+from app.services.market_data.price_sync_sources import sync_fdr_kosdaq_tickers, sync_pykrx_close_series
 from app.utils.circuit_breaker import yahoo_circuit
 from app.utils.kst import today_kst
 

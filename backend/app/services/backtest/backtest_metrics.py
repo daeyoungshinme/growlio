@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 
 from app.schemas.backtest import PortfolioMetrics, SeriesData
-from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
+from app.services.market_data.yahoo_price import to_yf_symbol as _to_yf_symbol
 
 _TRADING_DAYS_PER_YEAR = 252
 

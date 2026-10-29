@@ -18,7 +18,7 @@ class TestFetchYfDailyReturns:
         mock_raw.__class__ = pd.DataFrame
 
         with patch("yfinance.download", return_value=mock_df):
-            from app.services.market_data_fetcher import fetch_yf_daily_returns
+            from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
             result = fetch_yf_daily_returns(["AAPL"])
 
@@ -27,7 +27,7 @@ class TestFetchYfDailyReturns:
 
     def test_empty_symbols_returns_empty(self):
         """빈 심볼 목록은 빈 dict를 반환한다."""
-        from app.services.market_data_fetcher import fetch_yf_daily_returns
+        from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
         result = fetch_yf_daily_returns([])
         assert result == {}
@@ -35,7 +35,7 @@ class TestFetchYfDailyReturns:
     def test_download_exception_returns_empty(self):
         """다운로드 실패 시 빈 dict를 반환하고 예외가 전파되지 않는다."""
         with patch("yfinance.download", side_effect=Exception("network error")):
-            from app.services.market_data_fetcher import fetch_yf_daily_returns
+            from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
             result = fetch_yf_daily_returns(["AAPL"])
 
@@ -51,7 +51,7 @@ class TestFetchYfDailyReturns:
         mock_df = pd.DataFrame({"AAPL": [100.0, float("nan"), 102.0, 104.0]})
 
         with patch("yfinance.download", return_value=mock_df):
-            from app.services.market_data_fetcher import fetch_yf_daily_returns
+            from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
             result = fetch_yf_daily_returns(["AAPL"])
 
@@ -65,7 +65,7 @@ class TestFetchYfDailyReturns:
         mock_df = pd.DataFrame({"AAPL": [100.0, 101.0, 102.0], "^GSPC": [4000.0, 4020.0, 4010.0]})
 
         with patch("yfinance.download", return_value=mock_df):
-            from app.services.market_data_fetcher import fetch_yf_daily_returns
+            from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
             result = fetch_yf_daily_returns(["AAPL"], extra_symbols=["^GSPC"])
 
@@ -83,7 +83,7 @@ class TestFetchYfDailyReturns:
         multi_raw.get.return_value = close_df
 
         with patch("yfinance.download", return_value=multi_raw):
-            from app.services.market_data_fetcher import fetch_yf_daily_returns
+            from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
             result = fetch_yf_daily_returns(["AAPL"])
 
@@ -100,7 +100,7 @@ class TestFetchYfDailyReturns:
             patch("yfinance.download", side_effect=Exception("401 Unauthorized")),
             patch("pykrx.stock.get_market_ohlcv_by_date", return_value=pykrx_df),
         ):
-            from app.services.market_data_fetcher import fetch_yf_daily_returns
+            from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
             result = fetch_yf_daily_returns(["005930.KS"])
 
@@ -110,7 +110,7 @@ class TestFetchYfDailyReturns:
     def test_overseas_symbol_stays_empty_when_yahoo_fails(self):
         """해외 심볼은 대체 소스가 없어 Yahoo 실패 시 빈 결과를 유지한다."""
         with patch("yfinance.download", side_effect=Exception("401 Unauthorized")):
-            from app.services.market_data_fetcher import fetch_yf_daily_returns
+            from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
             result = fetch_yf_daily_returns(["AAPL"])
 
@@ -125,7 +125,7 @@ class TestFetchYfDailyReturns:
         mock_df = pd.DataFrame({"AAPL": [100.0, 102.0, 101.0]})
 
         with patch("yfinance.download", return_value=mock_df) as mock_download:
-            from app.services.market_data_fetcher import fetch_yf_daily_returns
+            from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
             fetch_yf_daily_returns(["AAPL"])
 
@@ -138,12 +138,12 @@ class TestFetchYfDailyReturns:
         pykrx_df = pd.DataFrame({"종가": [70000.0, 71000.0, 69000.0]})
 
         with (
-            patch("app.services.market_data_fetcher.yahoo_circuit") as mock_circuit,
+            patch("app.services.market_data.market_data_fetcher.yahoo_circuit") as mock_circuit,
             patch("pykrx.stock.get_market_ohlcv_by_date", return_value=pykrx_df),
         ):
             mock_circuit.is_available.return_value = False
 
-            from app.services.market_data_fetcher import fetch_yf_daily_returns
+            from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 
             result = fetch_yf_daily_returns(["005930.KS"])
 
@@ -158,7 +158,7 @@ class TestFetchYfCloseSeries:
         mock_df = pd.DataFrame({"AAPL": [100.0, 102.0, 104.0]})
 
         with patch("yfinance.download", return_value=mock_df):
-            from app.services.market_data_fetcher import fetch_yf_close_series
+            from app.services.market_data.market_data_fetcher import fetch_yf_close_series
 
             result = fetch_yf_close_series(["AAPL"], date(2024, 1, 1), date(2024, 1, 31))
 
@@ -166,14 +166,14 @@ class TestFetchYfCloseSeries:
         assert len(result["AAPL"]) == 3
 
     def test_empty_symbols_returns_empty(self):
-        from app.services.market_data_fetcher import fetch_yf_close_series
+        from app.services.market_data.market_data_fetcher import fetch_yf_close_series
 
         result = fetch_yf_close_series([], date(2024, 1, 1), date(2024, 1, 31))
         assert result == {}
 
     def test_download_exception_returns_empty(self):
         with patch("yfinance.download", side_effect=RuntimeError("timeout")):
-            from app.services.market_data_fetcher import fetch_yf_close_series
+            from app.services.market_data.market_data_fetcher import fetch_yf_close_series
 
             result = fetch_yf_close_series(["AAPL"], date(2024, 1, 1), date(2024, 1, 31))
 
@@ -189,7 +189,7 @@ class TestFetchYfCloseSeries:
             patch("yfinance.download", side_effect=Exception("401 Unauthorized")),
             patch("pykrx.stock.get_market_ohlcv_by_date", return_value=pykrx_df),
         ):
-            from app.services.market_data_fetcher import fetch_yf_close_series
+            from app.services.market_data.market_data_fetcher import fetch_yf_close_series
 
             result = fetch_yf_close_series(["005930.KS"], date(2024, 1, 1), date(2024, 1, 31))
 
@@ -203,7 +203,7 @@ class TestFetchYfCloseSeries:
         mock_df = pd.DataFrame({"AAPL": [100.0, 102.0, 104.0]})
 
         with patch("yfinance.download", return_value=mock_df) as mock_download:
-            from app.services.market_data_fetcher import fetch_yf_close_series
+            from app.services.market_data.market_data_fetcher import fetch_yf_close_series
 
             fetch_yf_close_series(["AAPL"], date(2024, 1, 1), date(2024, 1, 31))
 
@@ -217,7 +217,7 @@ class TestFetchYfInfo:
         mock_ticker.info = {"trailingPE": 28.5, "marketCap": 3_000_000_000_000}
 
         with patch("yfinance.Ticker", return_value=mock_ticker):
-            from app.services.market_data_fetcher import fetch_yf_info
+            from app.services.market_data.market_data_fetcher import fetch_yf_info
 
             result = fetch_yf_info(["AAPL"])
 
@@ -231,7 +231,7 @@ class TestFetchYfInfo:
         type(mock_ticker).info = property(lambda self: (_ for _ in ()).throw(Exception("fail")))
 
         with patch("yfinance.Ticker", return_value=mock_ticker):
-            from app.services.market_data_fetcher import fetch_yf_info
+            from app.services.market_data.market_data_fetcher import fetch_yf_info
 
             result = fetch_yf_info(["AAPL"])
 

@@ -31,11 +31,11 @@ class TestEnrichOverviewWithPrices:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new=AsyncMock(return_value={"QLD": 95.0}),
             ),
             patch(
-                "app.services.price_service.get_usd_krw_rate",
+                "app.services.market_data.price_service.get_usd_krw_rate",
                 new=AsyncMock(return_value=1385.0),
             ),
         ):
@@ -63,11 +63,11 @@ class TestEnrichOverviewWithPrices:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new=AsyncMock(return_value={"QLD": 95.0}),
             ),
             patch(
-                "app.services.price_service.get_usd_krw_rate",
+                "app.services.market_data.price_service.get_usd_krw_rate",
                 new=AsyncMock(return_value=1385.0),
             ),
         ):

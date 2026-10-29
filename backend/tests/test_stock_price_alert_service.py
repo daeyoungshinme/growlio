@@ -58,7 +58,7 @@ class TestCheckAndTriggerStockPriceAlerts:
         mock_db.execute.return_value.all.return_value = [_make_row(alert)]
 
         with patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             new_callable=AsyncMock,
             return_value={},
         ):
@@ -77,7 +77,7 @@ class TestCheckAndTriggerStockPriceAlerts:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new_callable=AsyncMock,
                 return_value={"005930": 58000.0},
             ),
@@ -101,7 +101,7 @@ class TestCheckAndTriggerStockPriceAlerts:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new_callable=AsyncMock,
                 return_value={"AAPL": 205.0},
             ),
@@ -123,7 +123,7 @@ class TestCheckAndTriggerStockPriceAlerts:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new_callable=AsyncMock,
                 return_value={"005930": 55000.0},
             ),
@@ -145,7 +145,7 @@ class TestCheckAndTriggerStockPriceAlerts:
         mock_db.execute.return_value.all.return_value = [_make_row(alert)]
 
         with patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             new_callable=AsyncMock,
             return_value={"005930": 65000.0},
         ):
@@ -164,7 +164,7 @@ class TestCheckAndTriggerStockPriceAlerts:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new_callable=AsyncMock,
                 return_value={"005930": 55000.0},
             ),

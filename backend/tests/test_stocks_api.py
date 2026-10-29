@@ -21,7 +21,7 @@ class TestSearchNaverUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.services.stock_search_service import _search_naver
+        from app.services.market_data.stock_search_service import _search_naver
 
         mock_resp = MM()
         mock_resp.json.return_value = {"items": [{"code": "005930", "name": "삼성전자", "typeCode": "KOSPI"}]}
@@ -42,7 +42,7 @@ class TestSearchNaverUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.services.stock_search_service import _search_naver
+        from app.services.market_data.stock_search_service import _search_naver
 
         with p("httpx.AsyncClient") as mock_client_cls:
             mock_ctx = MM()
@@ -59,7 +59,7 @@ class TestSearchNaverUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.services.stock_search_service import _search_naver
+        from app.services.market_data.stock_search_service import _search_naver
 
         many_items = [{"code": f"00593{i}", "name": f"종목{i}", "typeCode": "KOSPI"} for i in range(10)]
         mock_resp = MM()
@@ -80,7 +80,7 @@ class TestSearchNaverUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.services.stock_search_service import _search_naver
+        from app.services.market_data.stock_search_service import _search_naver
 
         mock_resp = MM()
         mock_resp.json.return_value = {
@@ -110,7 +110,7 @@ class TestSearchYahooUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.services.stock_search_service import _search_yahoo
+        from app.services.market_data.stock_search_service import _search_yahoo
 
         mock_resp = MM()
         mock_resp.json.return_value = {
@@ -133,7 +133,7 @@ class TestSearchYahooUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.services.stock_search_service import _search_yahoo
+        from app.services.market_data.stock_search_service import _search_yahoo
 
         with p("httpx.AsyncClient") as mock_client_cls:
             mock_ctx = MM()
@@ -150,7 +150,7 @@ class TestSearchYahooUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.services.stock_search_service import _search_yahoo
+        from app.services.market_data.stock_search_service import _search_yahoo
 
         mock_resp = MM()
         mock_resp.json.return_value = {
@@ -301,7 +301,7 @@ class TestExchangeRate:
         with (
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.api.v1.stocks.get_cache_store", new_callable=AsyncMock, return_value=mock_cache),
-            patch("app.services.yahoo_price._sync_usdkrw", return_value=0.0),
+            patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=0.0),
             patch("app.utils.currency.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
         ):
             resp = client.get("/api/v1/stocks/exchange-rate")
@@ -351,7 +351,7 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=75000.0),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=75000.0),
         ):
             resp = client.get("/api/v1/stocks/price?ticker=005930&market=KOSPI")
         assert resp.status_code == 200
@@ -380,7 +380,7 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=75000.0),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=75000.0),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock) as mock_domestic,
         ):
             resp = client.get("/api/v1/stocks/price?ticker=005930&market=KOSPI")
@@ -394,7 +394,7 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=None),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=15500.0),
         ):
             resp = client.get("/api/v1/stocks/price?ticker=402970&market=KOSPI")
@@ -407,8 +407,8 @@ class TestStockPrice:
         with (
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock) as mock_domestic,
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=180.0),
-            patch("app.services.yahoo_price._sync_usdkrw", return_value=1350.0),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=180.0),
+            patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=1350.0),
         ):
             resp = client.get("/api/v1/stocks/price?ticker=AAPL&market=NASDAQ")
         assert resp.status_code == 200
@@ -421,8 +421,8 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=180.336789),
-            patch("app.services.yahoo_price._sync_usdkrw", return_value=1350.0),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=180.336789),
+            patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=1350.0),
         ):
             resp = client.get("/api/v1/stocks/price?ticker=AAPL&market=NASDAQ")
         assert resp.status_code == 200
@@ -436,7 +436,7 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=None),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
             patch("app.api.v1.stocks._price_via_kis", new_callable=AsyncMock, return_value=15490.0),
         ):
@@ -449,7 +449,7 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=None),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
             patch("app.api.v1.stocks._price_via_kis", new_callable=AsyncMock) as mock_kis,
         ):
@@ -465,7 +465,7 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=None),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
         ):
             resp = client.get(f"/api/v1/stocks/price?ticker=402970&market=KOSPI&account_id={uuid.uuid4()}")
@@ -480,7 +480,7 @@ class TestStockPricesBatch:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_batch", return_value={"005930": 75000.0}),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={"005930": 75000.0}),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock) as mock_domestic,
         ):
             resp = client.post(
@@ -496,7 +496,7 @@ class TestStockPricesBatch:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_batch", return_value={}),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={}),
             patch(
                 "app.api.v1.stocks.domestic_price_fallback",
                 new_callable=AsyncMock,
@@ -516,8 +516,8 @@ class TestStockPricesBatch:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_batch", return_value={"AAPL": 180.336789}),
-            patch("app.services.yahoo_price._sync_usdkrw", return_value=1350.0),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={"AAPL": 180.336789}),
+            patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=1350.0),
         ):
             resp = client.post(
                 "/api/v1/stocks/prices-batch",
@@ -533,7 +533,7 @@ class TestStockPricesBatch:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.yahoo_price._sync_yahoo_batch", return_value={}),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={}),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
             patch("app.api.v1.stocks._price_via_kis", new_callable=AsyncMock, return_value=15490.0),
         ):

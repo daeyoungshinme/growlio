@@ -107,7 +107,7 @@ async def _rebuild_orders_from_items(
     조회해 limit_price를 갱신한다 — 그 사이 대기시간 동안 벌어진 가격 변동을 반영하기 위함.
     """
     from app.schemas.rebalancing import ExecutionOrderItem
-    from app.services.price_service import fetch_prices_batch
+    from app.services.market_data.price_service import fetch_prices_batch
 
     limit_tickers = [(item.ticker, item.market or "") for item in items if item.order_type == "LIMIT" and item.ticker]
     price_map: dict[str, float] = {}

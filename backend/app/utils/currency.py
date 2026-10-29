@@ -32,7 +32,7 @@ async def get_live_or_cached_usd_krw(cache: CacheStore | None) -> tuple[float, b
         cached = await cache.get(_USD_KRW_KEY)
         if cached:
             return float(cached), True
-    from app.services.yahoo_price import fetch_usdkrw  # 순환 import 방지
+    from app.services.market_data.yahoo_price import fetch_usdkrw  # 순환 import 방지
 
     fetched = await fetch_usdkrw()
     if fetched:
@@ -57,7 +57,7 @@ async def fetch_usd_krw(cache: CacheStore | None, *, force_refresh: bool = False
     if not force_refresh:
         return await get_usd_krw_rate(cache)
 
-    from app.services.yahoo_price import fetch_usdkrw  # 순환 import 방지
+    from app.services.market_data.yahoo_price import fetch_usdkrw  # 순환 import 방지
 
     fetched = await fetch_usdkrw()
     if fetched:
