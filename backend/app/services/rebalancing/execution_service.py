@@ -184,6 +184,7 @@ async def _save_execution_history(
                         order_org_no=placed.order_org_no,
                         error_message=placed.error_msg,
                         order_type=placed.order_type,
+                        price=placed.price,
                     )
                 )
 

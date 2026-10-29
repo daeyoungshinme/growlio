@@ -251,6 +251,8 @@ class TestSaveExecutionHistory:
             status="SUCCESS",
             order_no="1",
             order_org_no="91252",
+            order_type="LIMIT",
+            price=35050.0,
         )
         failed = OrderResult(ticker="X", name="X", market="KOSPI", side="BUY", quantity=1, status="FAILED")
         results = [
@@ -269,6 +271,7 @@ class TestSaveExecutionHistory:
 
         rows = [c.args[0] for c in mock_db.add.call_args_list if isinstance(c.args[0], RebalancingExecutionResult)]
         assert rows[0].order_org_no == "91252"
+        assert rows[0].price == 35050.0
         assert placed.result_id == rows[0].id
         assert placed.cancelable is True
         assert failed.result_id == rows[1].id
@@ -299,8 +302,8 @@ class TestRouter:
         from app.api.v1.rebalancing_execution import get_rebalancing_execution_detail
 
         user = SimpleNamespace(id=uuid.uuid4())
-        cancelable = _row()
-        legacy = _row(account_id=cancelable.account_id, order_org_no=None)
+        cancelable = _row(price=35050.0)
+        legacy = _row(account_id=cancelable.account_id, order_org_no=None, market="NASDAQ", price=None)
         execution = SimpleNamespace(
             id=uuid.uuid4(),
             portfolio_id=None,
@@ -324,4 +327,6 @@ class TestRouter:
 
         orders = detail.results[0].orders
         assert [o.result_id for o in orders] == [cancelable.id, legacy.id]
-        assert [o.cancelable for o in orders] == [True, False]
+        assert [o.cancelable for o in orders] == [True, True]  # 해외는 조직번호 없이도 취소 가능
+        # 이력에도 주문 가격이 나온다 — 가격 컬럼 이전 기록은 None
+        assert [o.price for o in orders] == [35050.0, None]

@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import type { ExecutionOrderItem } from "@/api/rebalancing";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { isOverseasMarket } from "@/constants/markets";
@@ -44,7 +45,8 @@ export function RebalancingFinalConfirmDialog({
   const listed = orders.slice(0, MAX_LISTED_ORDERS);
   const hiddenCount = orders.length - listed.length;
 
-  return (
+  // body로 포털 — avoidBottomNav 실행 모달(모바일 z-40) 안에 두면 z-[70]이어도 하단 네비(z-50) 아래로 깔린다
+  return createPortal(
     <ConfirmModal
       message={`${typeLabel}로 ${orders.length}건을 주문합니다. 실행 후에는 이 화면에서 되돌릴 수 없습니다.`}
       confirmLabel={`${typeLabel} 주문 실행`}
@@ -134,6 +136,7 @@ export function RebalancingFinalConfirmDialog({
             : "지정한 가격에 도달하지 않으면 체결되지 않고 미체결로 남을 수 있어요."}
         </p>
       </div>
-    </ConfirmModal>
+    </ConfirmModal>,
+    document.body,
   );
 }

@@ -238,6 +238,7 @@ async def get_rebalancing_execution_detail(
                     order_no=ri.order_no,
                     error_msg=ri.error_message,
                     order_type=ri.order_type,
+                    price=ri.price,
                     result_id=ri.id,
                     cancel_status=ri.cancel_status,
                     cancel_message=ri.cancel_message,
