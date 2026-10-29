@@ -152,7 +152,7 @@ async def test_check_and_trigger_alerts_below_condition(mock_db):
     # send_exchange_rate_alert는 함수 내부에서 로컬 임포트됨 → 소스 모듈 경로로 패치
     with (
         patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
-        patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
@@ -187,7 +187,7 @@ async def test_check_and_trigger_alerts_above_not_met(mock_db):
 
     with (
         patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
-        patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
@@ -220,7 +220,7 @@ async def test_check_and_trigger_alerts_multi_trigger_cooldown(mock_db):
 
     with (
         patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
-        patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
@@ -253,7 +253,7 @@ async def test_check_and_trigger_alerts_email_failure_continues(mock_db):
     with (
         patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch(
-            "app.services.email_service.send_exchange_rate_alert",
+            "app.services.notifications.email_service.send_exchange_rate_alert",
             AsyncMock(return_value=False),
         ),
     ):
@@ -276,7 +276,7 @@ async def test_check_stock_price_alerts_no_alerts(mock_db, mock_cache):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     # fetch_prices_batch는 함수 내부에서 로컬 임포트됨 → 소스 모듈 경로로 패치
-    with patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={})):
+    with patch("app.services.market_data.price_service.fetch_prices_batch", AsyncMock(return_value={})):
         from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
         await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
@@ -310,10 +310,10 @@ async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_cache):
 
     with (
         patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             AsyncMock(return_value={"005930": current_price}),
         ),
-        patch("app.services.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
@@ -350,10 +350,10 @@ async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_cache):
 
     with (
         patch(
-            "app.services.price_service.fetch_prices_batch",
+            "app.services.market_data.price_service.fetch_prices_batch",
             AsyncMock(return_value={}),  # ticker 없음
         ),
-        patch("app.services.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
@@ -410,8 +410,11 @@ async def test_stock_price_alert_multi_trigger_cooldown(mock_db, mock_cache):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"005930": current_price})),
-        patch("app.services.email_service.send_stock_price_alert", new=AsyncMock()) as mock_email,
+        patch(
+            "app.services.market_data.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={"005930": current_price}),
+        ),
+        patch("app.services.notifications.email_service.send_stock_price_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
@@ -445,8 +448,11 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_cache):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"005930": current_price})),
-        patch("app.services.email_service.send_stock_price_alert", new=AsyncMock(return_value=False)),
+        patch(
+            "app.services.market_data.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={"005930": current_price}),
+        ),
+        patch("app.services.notifications.email_service.send_stock_price_alert", new=AsyncMock(return_value=False)),
     ):
         from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
@@ -486,7 +492,9 @@ async def test_isolated_alert_loop_continues_after_item_failure_and_refreshes(mo
 async def test_send_push_safely_swallows_exception_and_returns_false():
     from app.services.alerts._dispatch import send_push_safely
 
-    with patch("app.services.push_service.send_push_to_user", new=AsyncMock(side_effect=RuntimeError("fcm down"))):
+    with patch(
+        "app.services.notifications.push_service.send_push_to_user", new=AsyncMock(side_effect=RuntimeError("fcm down"))
+    ):
         sent = await send_push_safely(
             uuid.uuid4(), title="t", body="b", fcm_token="tok", data=None, failure_event="x_push_failed"
         )
@@ -502,7 +510,7 @@ async def test_notify_and_record_trigger_updates_trigger_even_if_push_raises(moc
         user_id=uuid.uuid4(), trigger_count=0, max_trigger_count=1, triggered_at=None, is_active=True
     )
     push = AsyncMock(side_effect=RuntimeError("fcm down"))
-    with patch("app.services.push_service.send_push_to_user", new=push):
+    with patch("app.services.notifications.push_service.send_push_to_user", new=push):
         await notify_and_record_trigger(mock_db, alert, "EXCHANGE_RATE", "msg", alert.user_id, "t", "b", "tok")
 
     push.assert_awaited_once()

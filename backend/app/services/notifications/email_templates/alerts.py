@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.services.email_templates._shared import _email_div, _kv_table
+from app.services.notifications.email_templates._shared import _email_div, _kv_table
 
 
 def exchange_rate_alert_template(

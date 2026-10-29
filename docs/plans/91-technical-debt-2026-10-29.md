@@ -6,7 +6,7 @@
 
 브랜치는 두 개다.
 - `chore/tech-debt-2026-10-29`: 아래 커밋 전부
-- `chore/drop-dead-columns-2026-10-29`: 그 위에 쌓은 G1-2 하나. **G1-1 배포가 끝난 뒤 머지한다**
+- `chore/drop-dead-columns-2026-10-29`: 그 위에 쌓은 G1-2 하나. G1-1 배포 뒤 머지할 예정이었으나 #179 직후 함께 머지됐다(계획 92 0-0)
 
 ## 결과
 
@@ -14,7 +14,7 @@
 |---|---|---|
 | E | 알림 계층 | **완료.** `send_push_safely`로 수동 푸시 try/except 6곳과 `dispatch_dual_channel_alert`를 통일했다. **실버그**: `notify_and_record_trigger`(환율·주가 알림)는 푸시 예외가 trigger 갱신을 막아, 이미 나간 이메일이 다음 실행에 재발송될 수 있었다. 이제 푸시 실패는 로깅만 한다. `run_per_user` 러너로 잡 4개(목표 달성·월간 리포트·챌린지 독려/결산)의 Semaphore·유저별 실패 보고·수신 이메일 결정을 하나로 모았다 |
 | B3 | KIS·키움 주문 흐름 | **완료.** `_broker_order_flow.py`가 매도 보유수량 clamp와 FULL 매수 예산 clamp를 맡고, 브로커별 차이는 `BrokerOrderOps`로 주입한다. 기존 executor 테스트는 **한 줄도 바꾸지 않고** 통과했다. ops 콜러블이 모듈 이름을 호출 시점에 조회해 `patch.object`가 유지된다. 해외 키 차이(KIS `ticker:거래소`, 키움 ticker 단독) 회귀 테스트를 추가했다 |
-| G1 | 죽은 컬럼 | **부분 완료.** G1-1: 모델에서 `amount_original`·`token_type`×3을 제거하고 `user_ticker_settings`를 드롭했다(`dc1`, 조회 코드가 없어 한 번에 처리). G1-2: 컬럼 드롭(`dc2`)은 별도 브랜치에 있다. 두 컬럼 모두 server_default가 있어 INSERT는 영향이 없다 |
+| G1 | 죽은 컬럼 | **부분 완료.** G1-1: 모델에서 `amount_original`·`token_type`×3을 제거하고 `user_ticker_settings`를 드롭했다(`dc1`, 조회 코드가 없어 한 번에 처리). G1-2: 컬럼 드롭(`dc2`)은 별도 브랜치(PR #180)로 냈고 #179 직후 머지됐다(배포 간격 없이 — 계획 92 0-0 참고). 두 컬럼 모두 server_default가 있어 INSERT는 영향이 없다 |
 | D | 설정 API | **방향 변경 후 완료.** 아래 "계획과 달라진 점" 참고. on/off PUT 7개를 테이블 등록(`_TOGGLE_SETTINGS`)으로 통합했다. 경로·응답·엔드포인트별 rate limit은 그대로다. 경로→컬럼 매핑을 테이블과 독립된 기대값으로 고정하는 테스트 14건을 추가했다 |
 | F | services 패키지 | **6개 클러스터 완료**: `market_signal/`·`etf/`·`backtest/`·`tactical/`·`tax/`·`goal/`. 평면 모듈은 66→36개다. 파일명은 유지하고 shim은 두지 않았다. 클러스터마다 patch 대상 문자열 439개가 전부 resolve되는지 검사했고, 수집 테스트 수(3126)가 전후 동일했다. goal 스냅샷 하네스는 무변경으로 통과했다 |
 | 프론트 | 대형 컴포넌트 | **완료.** `StockHoldingsTable` 705→270줄(`stockHoldings/`), `InvestmentGoalCard` 571→105줄(`investmentGoal/`). 마크업·동작은 바뀌지 않았다 |
@@ -33,7 +33,7 @@
 
 ## 이관
 
-- **G1-2 머지**: G1-1 배포 확인 후
+- ~~**G1-2 머지**: G1-1 배포 확인 후~~ → PR #179와 9초 간격으로 머지됨(계획 92 0-0)
 - **D 본편**(PATCH 단일화 + PUT 삭제): APK 재배포 뒤
 - **F 나머지**: market_data(`yahoo_price`·`price_service` 등)·portfolio·accounts·notifications(`push_service`·`email_service`). 테스트에서 수십 곳 patch되는 공용 계층이라 클러스터마다 영향이 크다
 - **`noUncheckedIndexedAccess`**: 소스 104건부터. 테스트는 별도 tsconfig로 분리하는 방안을 검토한다

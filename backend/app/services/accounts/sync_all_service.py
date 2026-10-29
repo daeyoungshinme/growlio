@@ -22,7 +22,7 @@ from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
 from app.core.logging import format_sync_error
 from app.models.asset import AssetAccount
-from app.services.asset_service import sync_account
+from app.services.accounts.asset_service import sync_account
 from app.utils.cache_keys import TTL_SYNC_ALL_STATUS, get_cached_json, set_cached_json, sync_all_status_key
 from app.utils.inproc_lock import inproc_lock
 

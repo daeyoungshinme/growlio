@@ -63,7 +63,7 @@ export default function RecommendationApplySection({
           >
             {applyPending ? <Loader2 size={12} className="animate-spin" /> : <Anchor size={12} />}
             {targetPortfolios.length === 1
-              ? `${targetPortfolios[0].name}에 적용`
+              ? `${targetPortfolios[0]?.name}에 적용`
               : "선택한 포트폴리오에 적용"}
           </button>
         </div>

@@ -82,9 +82,10 @@ export function getPortfolioHorizonTaxType(
     return { horizon: portfolio.investment_horizon, taxType: portfolio.tax_type };
   }
   const assigned = stockAccounts.filter((a) => a.target_portfolio_id === portfolio.id);
-  if (assigned.length === 0) return null;
-  const horizon = assigned[0].investment_horizon;
-  const taxType = assigned[0].tax_type;
+  const first = assigned[0];
+  if (!first) return null;
+  const horizon = first.investment_horizon;
+  const taxType = first.tax_type;
   if (!horizon || !taxType) return null;
   const matches = assigned.every((a) => a.investment_horizon === horizon && a.tax_type === taxType);
   return matches ? { horizon, taxType } : null;
@@ -98,9 +99,10 @@ export function getPortfolioHorizonTaxType(
 export function inferHorizonTaxTypeFromAccounts(
   accounts: AssetAccount[],
 ): { horizon: InvestmentHorizon; taxType: AccountTaxType } | null {
-  if (accounts.length === 0) return null;
-  const horizon = accounts[0].investment_horizon;
-  const taxType = accounts[0].tax_type;
+  const first = accounts[0];
+  if (!first) return null;
+  const horizon = first.investment_horizon;
+  const taxType = first.tax_type;
   if (!horizon || !taxType) return null;
   const matches = accounts.every((a) => a.investment_horizon === horizon && a.tax_type === taxType);
   return matches ? { horizon, taxType } : null;
@@ -122,21 +124,20 @@ export function mergeAlertsByPortfolio(
     list.push(a);
     map.set(a.portfolio_id, list);
   }
-  return Object.fromEntries(
-    Array.from(map.entries()).map(([portfolioId, rows]) => {
-      const active = rows.filter((r) => r.is_active);
-      const basis = active.length > 0 ? active : rows;
-      return [
-        portfolioId,
-        {
-          ...basis[0],
-          is_active: active.length > 0,
-          mode: basis.some((r) => r.mode === "AUTO") ? ("AUTO" as const) : basis[0].mode,
-          threshold_pct: Math.min(...basis.map((r) => r.threshold_pct)),
-        },
-      ];
-    }),
-  );
+  const merged: Record<string, RebalancingAlert> = {};
+  for (const [portfolioId, rows] of map) {
+    const active = rows.filter((r) => r.is_active);
+    const basis = active.length > 0 ? active : rows;
+    const head = basis[0];
+    if (!head) continue;
+    merged[portfolioId] = {
+      ...head,
+      is_active: active.length > 0,
+      mode: basis.some((r) => r.mode === "AUTO") ? "AUTO" : head.mode,
+      threshold_pct: Math.min(...basis.map((r) => r.threshold_pct)),
+    };
+  }
+  return merged;
 }
 
 /** 켜져 있는 알림만 — 합친 결과(mergeAlertsByPortfolio)에서 "설정됨" 개수·판정에 쓴다. */

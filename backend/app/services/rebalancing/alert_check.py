@@ -124,7 +124,7 @@ async def _process_rebalancing_alert(
     `automation_note`는 AUTO 모드가 시장신호 게이트로 이번만 NOTIFY로 강등됐을 때 그 사유를
     담아 이메일 본문에 노출하기 위한 것 — 호출부(`check_rebalancing_alerts`)가 계산해 전달한다.
     """
-    from app.services.email_service import send_rebalancing_alert
+    from app.services.notifications.email_service import send_rebalancing_alert
 
     # 실제 매수/매도 수량 미리보기 — drift가 있을 때만 계산(실행/저장은 하지 않음, 표시 전용).
     order_preview_items: list = []
@@ -244,7 +244,7 @@ def _should_skip_by_schedule(alert: RebalancingAlert, trigger_condition: str, is
 
 async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db: AsyncSession, cache: Any = None):
     """알림 대상 포트폴리오의 현재 배분을 조회·분석한다. 실패 시 None(호출부에서 skip)."""
-    from app.services.portfolio_service import build_portfolio_overview
+    from app.services.portfolio.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.service import analyze_rebalancing
 
     effective_account_ids = resolve_effective_account_ids(alert, portfolio)

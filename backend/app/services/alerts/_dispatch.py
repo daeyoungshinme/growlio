@@ -33,7 +33,7 @@ async def send_push_safely(
     이메일 성공 여부·이력 저장 규칙이 알림마다 달라 `dispatch_dual_channel_alert`로 묶을 수 없는
     곳(플랜 생성·leg 실행 결과·드리프트 리포트·목표 달성·가격 알림)도 푸시 시도부는 이 함수 하나를 쓴다.
     """
-    from app.services.push_service import send_push_to_user
+    from app.services.notifications.push_service import send_push_to_user
 
     try:
         return await send_push_to_user(user_id=user_id, title=title, body=body, fcm_token=fcm_token, data=data)

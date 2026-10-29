@@ -30,9 +30,9 @@ from app.schemas.backtest import (
     SeriesData,
 )
 from app.services.backtest.backtest_metrics import compute_metrics, compute_portfolio_series
-from app.services.price_sync_sources import sync_pykrx_close_series, yf_symbol_to_krx_ticker
-from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.services.yahoo_price import yf_download
+from app.services.market_data.price_sync_sources import sync_pykrx_close_series, yf_symbol_to_krx_ticker
+from app.services.market_data.yahoo_price import to_yf_symbol as _to_yf_symbol
+from app.services.market_data.yahoo_price import yf_download
 from app.utils.circuit_breaker import yahoo_circuit
 
 logger = structlog.get_logger()

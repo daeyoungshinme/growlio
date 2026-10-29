@@ -59,7 +59,9 @@ export default function RebalancingTable({
   useEffect(() => {
     const el = rootRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(([entry]) => setResultsInView(entry.isIntersecting));
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry) setResultsInView(entry.isIntersecting);
+    });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);

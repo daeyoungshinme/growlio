@@ -50,8 +50,9 @@ export function usePullToRefresh({
   const handleTouchStart = useCallback(
     (e: TouchEvent) => {
       const el = containerRef.current;
-      if (disabled || !el || el.scrollTop > 0) return;
-      startYRef.current = e.touches[0].clientY;
+      const touch = e.touches[0];
+      if (disabled || !el || el.scrollTop > 0 || !touch) return;
+      startYRef.current = touch.clientY;
       hapticFiredRef.current = false;
     },
     [disabled, containerRef],
@@ -60,9 +61,10 @@ export function usePullToRefresh({
   const handleTouchMove = useCallback(
     (e: TouchEvent) => {
       const el = containerRef.current;
-      if (disabled || !el || el.scrollTop > 0) return;
+      const touch = e.touches[0];
+      if (disabled || !el || el.scrollTop > 0 || !touch) return;
 
-      const delta = e.touches[0].clientY - startYRef.current;
+      const delta = touch.clientY - startYRef.current;
       if (delta <= 0) return;
 
       // 기본 스크롤 방지 (당기는 중일 때만)

@@ -12,38 +12,38 @@ import pytest
 
 class TestToYahooSymbol:
     def test_kospi(self, override_settings):
-        from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+        from app.services.market_data.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
         assert _to_yahoo_symbol("005930", "KOSPI") == "005930.KS"
 
     def test_krx(self, override_settings):
-        from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+        from app.services.market_data.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
         assert _to_yahoo_symbol("069500", "KRX") == "069500.KS"
 
     def test_kosdaq(self, override_settings):
-        from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+        from app.services.market_data.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
         assert _to_yahoo_symbol("035720", "KOSDAQ") == "035720.KQ"
 
     def test_nasdaq_unchanged(self, override_settings):
-        from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+        from app.services.market_data.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
         assert _to_yahoo_symbol("AAPL", "NASDAQ") == "AAPL"
 
     def test_short_kospi_padded(self, override_settings):
-        from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+        from app.services.market_data.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
         assert _to_yahoo_symbol("5930", "KOSPI") == "005930.KS"
 
     def test_case_insensitive(self, override_settings):
-        from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+        from app.services.market_data.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
         assert _to_yahoo_symbol("005930", "kospi") == "005930.KS"
 
     def test_kosdaq_code_labeled_kospi_uses_kq(self, override_settings, monkeypatch):
         """브로커 잔고가 KOSDAQ 종목도 market="KOSPI"로 채우므로 상장 코드 집합으로 .KQ 교정."""
-        from app.services import yahoo_price
+        from app.services.market_data import yahoo_price
 
         monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset({"039560"}))
         assert yahoo_price.to_yf_symbol("039560", "KOSPI") == "039560.KQ"
@@ -53,7 +53,7 @@ class TestToYahooSymbol:
 
 class TestRefreshKosdaqTickers:
     async def test_loads_listing(self, override_settings, monkeypatch):
-        from app.services import yahoo_price
+        from app.services.market_data import yahoo_price
 
         monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset())
         with patch.object(yahoo_price, "sync_fdr_kosdaq_tickers", return_value=frozenset({"039560"})):
@@ -61,7 +61,7 @@ class TestRefreshKosdaqTickers:
         assert yahoo_price.to_yf_symbol("039560", "KOSPI") == "039560.KQ"
 
     async def test_keeps_previous_set_on_failure(self, override_settings, monkeypatch):
-        from app.services import yahoo_price
+        from app.services.market_data import yahoo_price
 
         monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset({"039560"}))
         with patch.object(yahoo_price, "sync_fdr_kosdaq_tickers", return_value=None):
@@ -70,7 +70,7 @@ class TestRefreshKosdaqTickers:
 
     async def test_retries_once_when_never_loaded(self, override_settings, monkeypatch):
         """기동 직후 첫 로드가 실패해 집합이 비어 있으면 1회 재시도한다."""
-        from app.services import yahoo_price
+        from app.services.market_data import yahoo_price
 
         monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset())
         with patch.object(
@@ -81,7 +81,7 @@ class TestRefreshKosdaqTickers:
         assert yahoo_price._kosdaq_tickers == frozenset({"039560"})
 
     async def test_no_retry_when_previous_set_exists(self, override_settings, monkeypatch):
-        from app.services import yahoo_price
+        from app.services.market_data import yahoo_price
 
         monkeypatch.setattr(yahoo_price, "_kosdaq_tickers", frozenset({"039560"}))
         with patch.object(yahoo_price, "sync_fdr_kosdaq_tickers", return_value=None) as mock_fdr:
@@ -91,7 +91,7 @@ class TestRefreshKosdaqTickers:
 
 class TestSyncFdrKosdaqTickers:
     def test_returns_zero_padded_codes(self):
-        from app.services.price_sync_sources import sync_fdr_kosdaq_tickers
+        from app.services.market_data.price_sync_sources import sync_fdr_kosdaq_tickers
 
         fdr = MagicMock()
         fdr.StockListing.return_value = pd.DataFrame({"Code": ["039560", "196170"]})
@@ -99,7 +99,7 @@ class TestSyncFdrKosdaqTickers:
             assert sync_fdr_kosdaq_tickers() == frozenset({"039560", "196170"})
 
     def test_failure_returns_none(self):
-        from app.services.price_sync_sources import sync_fdr_kosdaq_tickers
+        from app.services.market_data.price_sync_sources import sync_fdr_kosdaq_tickers
 
         fdr = MagicMock()
         fdr.StockListing.side_effect = RuntimeError("blocked")
@@ -112,7 +112,7 @@ class TestSyncFdrKosdaqTickers:
 
 class TestSyncUsdkrw:
     def test_returns_rate_from_yfinance(self, override_settings):
-        from app.services.yahoo_price import _sync_usdkrw
+        from app.services.market_data.yahoo_price import _sync_usdkrw
 
         hist_df = pd.DataFrame({"Close": [1320.0]})
         mock_ticker = MagicMock()
@@ -124,7 +124,7 @@ class TestSyncUsdkrw:
         assert result == 1320.0
 
     def test_returns_zero_on_empty_hist(self, override_settings):
-        from app.services.yahoo_price import _sync_usdkrw
+        from app.services.market_data.yahoo_price import _sync_usdkrw
 
         mock_ticker = MagicMock()
         mock_ticker.history.return_value = pd.DataFrame()
@@ -135,7 +135,7 @@ class TestSyncUsdkrw:
         assert result == 0.0
 
     def test_returns_zero_on_exception(self, override_settings):
-        from app.services.yahoo_price import _sync_usdkrw
+        from app.services.market_data.yahoo_price import _sync_usdkrw
 
         mock_ticker = MagicMock()
         mock_ticker.history.side_effect = Exception("network error")
@@ -151,7 +151,7 @@ class TestSyncUsdkrw:
 
 class TestSyncYahooPrice:
     def test_returns_price_from_history(self, override_settings):
-        from app.services.yahoo_price import _sync_yahoo_price
+        from app.services.market_data.yahoo_price import _sync_yahoo_price
 
         hist_df = pd.DataFrame({"Close": [185.0, 187.0]})
         mock_ticker = MagicMock()
@@ -163,7 +163,7 @@ class TestSyncYahooPrice:
         assert result == 187.0
 
     def test_returns_none_on_empty(self, override_settings):
-        from app.services.yahoo_price import _sync_yahoo_price
+        from app.services.market_data.yahoo_price import _sync_yahoo_price
 
         mock_ticker = MagicMock()
         mock_ticker.history.return_value = pd.DataFrame()
@@ -174,7 +174,7 @@ class TestSyncYahooPrice:
         assert result is None
 
     def test_returns_none_on_exception(self, override_settings):
-        from app.services.yahoo_price import _sync_yahoo_price
+        from app.services.market_data.yahoo_price import _sync_yahoo_price
 
         mock_ticker = MagicMock()
         mock_ticker.history.side_effect = Exception("timeout")
@@ -190,13 +190,13 @@ class TestSyncYahooPrice:
 
 class TestSyncYahooBatch:
     def test_empty_items_returns_empty(self, override_settings):
-        from app.services.yahoo_price import _sync_yahoo_batch
+        from app.services.market_data.yahoo_price import _sync_yahoo_batch
 
         result = _sync_yahoo_batch([])
         assert result == {}
 
     def test_returns_prices_from_download(self, override_settings):
-        from app.services.yahoo_price import _sync_yahoo_batch
+        from app.services.market_data.yahoo_price import _sync_yahoo_batch
 
         close_df = pd.DataFrame({"AAPL": [180.0, 185.0]})
         download_data = MagicMock()
@@ -209,7 +209,7 @@ class TestSyncYahooBatch:
         assert "AAPL" in result
 
     def test_returns_empty_on_exception(self, override_settings):
-        from app.services.yahoo_price import _sync_yahoo_batch
+        from app.services.market_data.yahoo_price import _sync_yahoo_batch
 
         with (
             patch("yfinance.download", side_effect=Exception("rate limit")),
@@ -220,7 +220,7 @@ class TestSyncYahooBatch:
         assert result == {}
 
     def test_close_none_returns_empty_after_all_retries(self, override_settings):
-        from app.services.yahoo_price import _sync_yahoo_batch
+        from app.services.market_data.yahoo_price import _sync_yahoo_batch
 
         download_data = MagicMock()
         download_data.get.return_value = None  # close is None → triggers retry path
@@ -234,7 +234,7 @@ class TestSyncYahooBatch:
         assert result == {}
 
     def test_key_error_in_price_parse_skipped(self, override_settings):
-        from app.services.yahoo_price import _sync_yahoo_batch
+        from app.services.market_data.yahoo_price import _sync_yahoo_batch
 
         close_df = MagicMock(spec=pd.DataFrame)
         close_df.empty = False
@@ -256,7 +256,7 @@ class TestCagrFromPrices:
     def test_returns_none_when_start_price_zero(self, override_settings):
         from datetime import date
 
-        from app.services.yahoo_price import _cagr_from_prices
+        from app.services.market_data.yahoo_price import _cagr_from_prices
 
         result = _cagr_from_prices(0.0, 100.0, date(2015, 1, 1), date(2025, 1, 1))
         assert result is None
@@ -264,7 +264,7 @@ class TestCagrFromPrices:
     def test_returns_none_when_actual_years_too_short(self, override_settings):
         from datetime import date
 
-        from app.services.yahoo_price import _cagr_from_prices
+        from app.services.market_data.yahoo_price import _cagr_from_prices
 
         # 1일 차이 → ~1/365 years < 0.1
         result = _cagr_from_prices(100.0, 105.0, date(2025, 1, 1), date(2025, 1, 2))
@@ -273,7 +273,7 @@ class TestCagrFromPrices:
     def test_returns_dict_on_valid_range(self, override_settings):
         from datetime import date
 
-        from app.services.yahoo_price import _cagr_from_prices
+        from app.services.market_data.yahoo_price import _cagr_from_prices
 
         result = _cagr_from_prices(100.0, 200.0, date(2015, 1, 1), date(2025, 1, 1))
 
@@ -291,7 +291,7 @@ class TestPykrxCalcReturn:
     def test_returns_none_for_overseas_market(self, override_settings):
         from datetime import date
 
-        from app.services.yahoo_price import _pykrx_calc_return
+        from app.services.market_data.yahoo_price import _pykrx_calc_return
 
         result = _pykrx_calc_return("AAPL", "NASDAQ", date(2015, 1, 1), date(2025, 1, 1))
         assert result is None
@@ -299,9 +299,9 @@ class TestPykrxCalcReturn:
     def test_returns_none_when_series_missing(self, override_settings):
         from datetime import date
 
-        from app.services.yahoo_price import _pykrx_calc_return
+        from app.services.market_data.yahoo_price import _pykrx_calc_return
 
-        with patch("app.services.yahoo_price.sync_pykrx_close_series", return_value=None):
+        with patch("app.services.market_data.yahoo_price.sync_pykrx_close_series", return_value=None):
             result = _pykrx_calc_return("005930", "KOSPI", date(2015, 1, 1), date(2025, 1, 1))
 
         assert result is None
@@ -309,12 +309,12 @@ class TestPykrxCalcReturn:
     def test_returns_dict_for_domestic_ticker(self, override_settings):
         from datetime import date
 
-        from app.services.yahoo_price import _pykrx_calc_return
+        from app.services.market_data.yahoo_price import _pykrx_calc_return
 
         dates = pd.date_range("2015-01-01", periods=300, freq="B")
         series = pd.Series([50000.0 + i * 10 for i in range(300)], index=dates)
 
-        with patch("app.services.yahoo_price.sync_pykrx_close_series", return_value=series):
+        with patch("app.services.market_data.yahoo_price.sync_pykrx_close_series", return_value=series):
             result = _pykrx_calc_return("5930", "KOSPI", date(2015, 1, 1), date(2025, 1, 1))
 
         assert result is not None
@@ -326,7 +326,7 @@ class TestPykrxCalcReturn:
 
 class TestSyncCalcReturnsBatch:
     def test_empty_items_returns_empty(self, override_settings):
-        from app.services.yahoo_price import _sync_calc_returns_batch
+        from app.services.market_data.yahoo_price import _sync_calc_returns_batch
 
         result = _sync_calc_returns_batch([])
         assert result == {}
@@ -334,7 +334,7 @@ class TestSyncCalcReturnsBatch:
     def test_returns_dict_on_valid_download(self, override_settings):
         from datetime import date
 
-        from app.services.yahoo_price import _sync_calc_returns_batch
+        from app.services.market_data.yahoo_price import _sync_calc_returns_batch
 
         dates = pd.date_range(end=date.today().isoformat(), periods=300, freq="B", tz="UTC")
         close_df = pd.DataFrame({"AAPL": [100.0 + i * 0.05 for i in range(300)]}, index=dates)
@@ -348,7 +348,7 @@ class TestSyncCalcReturnsBatch:
         assert "cagr_pct" in result[("AAPL", "NASDAQ")]
 
     def test_returns_empty_on_exception(self, override_settings):
-        from app.services.yahoo_price import _sync_calc_returns_batch
+        from app.services.market_data.yahoo_price import _sync_calc_returns_batch
 
         with (
             patch("yfinance.download", side_effect=Exception("rate limit")),
@@ -359,7 +359,7 @@ class TestSyncCalcReturnsBatch:
         assert result == {}
 
     def test_close_none_returns_empty_after_all_retries(self, override_settings):
-        from app.services.yahoo_price import _sync_calc_returns_batch
+        from app.services.market_data.yahoo_price import _sync_calc_returns_batch
 
         download_data = MagicMock()
         download_data.get.return_value = None
@@ -373,7 +373,7 @@ class TestSyncCalcReturnsBatch:
         assert result == {}
 
     def test_key_error_in_parse_skipped(self, override_settings):
-        from app.services.yahoo_price import _sync_calc_returns_batch
+        from app.services.market_data.yahoo_price import _sync_calc_returns_batch
 
         close_df = MagicMock(spec=pd.DataFrame)
         close_df.empty = False
@@ -393,18 +393,18 @@ class TestSyncCalcReturnsBatch:
 
 class TestSyncPykrxReturnsBatch:
     def test_empty_items_returns_empty(self, override_settings):
-        from app.services.yahoo_price import _sync_pykrx_returns_batch
+        from app.services.market_data.yahoo_price import _sync_pykrx_returns_batch
 
         result = _sync_pykrx_returns_batch([])
         assert result == {}
 
     def test_skips_overseas_and_fills_domestic(self, override_settings):
-        from app.services.yahoo_price import _sync_pykrx_returns_batch
+        from app.services.market_data.yahoo_price import _sync_pykrx_returns_batch
 
         dates = pd.date_range("2015-01-01", periods=300, freq="B")
         series = pd.Series([50000.0 + i * 10 for i in range(300)], index=dates)
 
-        with patch("app.services.yahoo_price.sync_pykrx_close_series", return_value=series):
+        with patch("app.services.market_data.yahoo_price.sync_pykrx_close_series", return_value=series):
             result = _sync_pykrx_returns_batch([("005930", "KOSPI"), ("AAPL", "NASDAQ")], years=10)
 
         assert ("005930", "KOSPI") in result
@@ -417,7 +417,7 @@ class TestSyncPykrxReturnsBatch:
 class TestGuardedEntrypoints:
     @pytest.mark.asyncio
     async def test_circuit_open_skips_yahoo_and_returns_fallback(self):
-        from app.services import yahoo_price
+        from app.services.market_data import yahoo_price
 
         with (
             patch.object(yahoo_price.yahoo_circuit, "is_available", return_value=False),
@@ -432,7 +432,7 @@ class TestGuardedEntrypoints:
 
     @pytest.mark.asyncio
     async def test_records_success_and_failure(self):
-        from app.services import yahoo_price
+        from app.services.market_data import yahoo_price
 
         with (
             patch.object(yahoo_price.yahoo_circuit, "record_success") as ok,
@@ -446,7 +446,7 @@ class TestGuardedEntrypoints:
 
     @pytest.mark.asyncio
     async def test_empty_batch_does_not_touch_circuit(self):
-        from app.services import yahoo_price
+        from app.services.market_data import yahoo_price
 
         with patch.object(yahoo_price.yahoo_circuit, "record_failure") as fail:
             assert await yahoo_price.fetch_yahoo_batch([]) == {}

@@ -39,7 +39,7 @@ class ManualProvider(BrokerProvider):
         db_positions = pos_result.scalars().all()
 
         if db_positions and cache is not None:
-            from app.services.price_service import fetch_prices_batch
+            from app.services.market_data.price_service import fetch_prices_batch
 
             tickers = [(p.ticker, p.market) for p in db_positions]
             price_map = await fetch_prices_batch(account.user_id, tickers, db, cache)

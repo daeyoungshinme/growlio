@@ -52,7 +52,11 @@ export default function RebalancingAlertSummaryCard() {
   // 대상이 하나로 정해지면(포트폴리오 1개, 또는 자동화된 포트폴리오 1개) 그 포트폴리오의 자동화 설정까지
   // 바로 연다 — 목록에서 다시 찾아 모달을 열던 단계를 없앤다(plans/63 P3-4). 여럿이면 목록으로.
   const targetId =
-    totalCount === 1 ? portfolios![0].id : alertedCount === 1 ? Object.keys(merged)[0] : null;
+    totalCount === 1
+      ? (portfolios?.[0]?.id ?? null)
+      : alertedCount === 1
+        ? (Object.keys(merged)[0] ?? null)
+        : null;
   const linkTo = targetId
     ? rebalancingUrl({ tab: "포트폴리오", portfolioId: targetId, openAlert: "1" })
     : rebalancingUrl({ tab: "포트폴리오" });

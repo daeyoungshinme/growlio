@@ -55,7 +55,7 @@ def init_scheduler() -> None:
     from app.jobs.tactical_regime_check import run_tactical_regime_check
     from app.jobs.token_refresh import refresh_all_user_tokens
     from app.jobs.year_end_tax_reminder import run_year_end_tax_reminder
-    from app.services.yahoo_price import refresh_kosdaq_tickers
+    from app.services.market_data.yahoo_price import refresh_kosdaq_tickers
 
     def kst(**kwargs: str | int) -> CronTrigger:
         return CronTrigger(timezone="Asia/Seoul", **kwargs)

@@ -1,4 +1,4 @@
-"""services/_snapshot_queries.py 단위 테스트."""
+"""services/accounts/_snapshot_queries.py 단위 테스트."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy.dialects import postgresql
 
-from app.services._snapshot_queries import latest_snapshot_subquery
+from app.services.accounts._snapshot_queries import latest_snapshot_subquery
 
 
 def _where_sql(subq) -> str:

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.portfolio_service import build_portfolio_overview
+from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.utils.kst import today_kst
 
 

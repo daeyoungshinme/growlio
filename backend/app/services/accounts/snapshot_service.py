@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetSnapshot, Position
-from app.services._snapshot_queries import latest_snapshot_subquery
+from app.services.accounts._snapshot_queries import latest_snapshot_subquery
 
 
 async def _upsert_snapshot(

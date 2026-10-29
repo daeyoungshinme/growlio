@@ -35,7 +35,7 @@ def test_is_retryable(exc, expected):
 
 def test_404_fails_fast_without_retry():
     """없는 종목(404)은 한 번만 호출하고 None으로 폴백한다 — 과거엔 3회·~3초."""
-    from app.services.price_sync_sources import sync_naver_price
+    from app.services.market_data.price_sync_sources import sync_naver_price
 
     resp = MagicMock()
     resp.raise_for_status.side_effect = _http_error(404)

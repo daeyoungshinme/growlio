@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+from app.services.market_data.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
 # ── Yahoo 심볼 변환 테스트 ──────────────────────────────────
 
@@ -42,10 +42,10 @@ class TestFetchCurrentPrice:
         user_id = uuid.uuid4()
 
         with (
-            patch("app.services.price_service.domestic_price_fallback", new=AsyncMock(return_value=None)),
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=75000.0),
+            patch("app.services.market_data.price_service.domestic_price_fallback", new=AsyncMock(return_value=None)),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=75000.0),
         ):
-            from app.services.price_service import fetch_current_price
+            from app.services.market_data.price_service import fetch_current_price
 
             # DB 조회 없이 Yahoo가 성공하면 DB 없어도 됨
             # (실제 내부 구현상 DB 조회 후 KIS/LS 체인이므로 mock 필요)
@@ -65,8 +65,8 @@ class TestFetchCurrentPrice:
         mock_db.scalar.return_value = None  # UserSettings 없음
 
         # Yahoo 조회 함수 자체를 막는다 — 막지 않으면 실제 yfinance 네트워크 호출이 나간다
-        with patch("app.services.yahoo_price._sync_yahoo_price", return_value=None):
-            from app.services.price_service import fetch_current_price
+        with patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None):
+            from app.services.market_data.price_service import fetch_current_price
 
             price = await fetch_current_price(user_id, "UNKNOWN", "NYSE", mock_db, mock_cache)
             assert price is None
@@ -83,7 +83,7 @@ class TestFetchPricesBatch:
         """빈 목록 입력 시 빈 딕셔너리 반환."""
         import uuid
 
-        from app.services.price_service import fetch_prices_batch
+        from app.services.market_data.price_service import fetch_prices_batch
 
         result = await fetch_prices_batch(uuid.uuid4(), [], mock_db, mock_cache)
         assert result == {}
@@ -97,10 +97,10 @@ class TestFetchPricesBatch:
         user_id = uuid.uuid4()
         mock_db.scalar = AsyncMock(return_value=None)
 
-        with patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit:
+        with patch("app.services.market_data.yahoo_price.yahoo_circuit") as mock_circuit:
             mock_circuit.is_available.return_value = False
 
-            from app.services.price_service import fetch_prices_batch
+            from app.services.market_data.price_service import fetch_prices_batch
 
             result = await fetch_prices_batch(user_id, [("AAPL", "NASDAQ")], mock_db, mock_cache)
 
@@ -116,7 +116,7 @@ class TestFetchPricesBatch:
         mock_db.scalar = AsyncMock(return_value=None)
 
         with (
-            patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
+            patch("app.services.market_data.yahoo_price.yahoo_circuit") as mock_circuit,
         ):
             mock_circuit.is_available.return_value = True
 
@@ -124,7 +124,7 @@ class TestFetchPricesBatch:
             loop_mock.run_in_executor = AsyncMock(return_value={"AAPL": 180.0})
 
             with patch("asyncio.get_running_loop", return_value=loop_mock):
-                from app.services.price_service import fetch_prices_batch
+                from app.services.market_data.price_service import fetch_prices_batch
 
                 result = await fetch_prices_batch(user_id, [("AAPL", "NASDAQ")], mock_db, mock_cache)
 
@@ -140,10 +140,10 @@ class TestFetchPricesBatch:
         mock_db.scalar = AsyncMock(return_value=None)
 
         with (
-            patch("app.services.price_service.sync_naver_price", return_value=286000.0),
-            patch("app.services.yahoo_price._sync_yahoo_batch") as mock_yahoo_batch,
+            patch("app.services.market_data.price_service.sync_naver_price", return_value=286000.0),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_batch") as mock_yahoo_batch,
         ):
-            from app.services.price_service import fetch_prices_batch
+            from app.services.market_data.price_service import fetch_prices_batch
 
             result = await fetch_prices_batch(user_id, [("005930", "KOSPI")], mock_db, mock_cache)
 
@@ -161,7 +161,7 @@ class TestReadCachedPricesMalformedEntry:
     async def test_skips_malformed_entry_and_returns_valid_ones(self, mock_cache, override_settings):
         from unittest.mock import AsyncMock
 
-        from app.services.price_service import _read_cached_prices
+        from app.services.market_data.price_service import _read_cached_prices
 
         mock_cache.mget = AsyncMock(
             return_value=[
@@ -194,15 +194,15 @@ class TestFetchPricesBatchKrw:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new=AsyncMock(return_value={"QLD": 95.0}),
             ),
             patch(
-                "app.services.price_service.get_usd_krw_rate",
+                "app.services.market_data.price_service.get_usd_krw_rate",
                 new=AsyncMock(return_value=1385.0),
             ),
         ):
-            from app.services.price_service import fetch_prices_batch_krw
+            from app.services.market_data.price_service import fetch_prices_batch_krw
 
             result = await fetch_prices_batch_krw(user_id, [("QLD", "NASDAQ")], mock_db, mock_cache)
 
@@ -218,12 +218,12 @@ class TestFetchPricesBatchKrw:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new=AsyncMock(return_value={"005930": 75000.0}),
             ),
-            patch("app.services.price_service.get_usd_krw_rate") as mock_rate,
+            patch("app.services.market_data.price_service.get_usd_krw_rate") as mock_rate,
         ):
-            from app.services.price_service import fetch_prices_batch_krw
+            from app.services.market_data.price_service import fetch_prices_batch_krw
 
             result = await fetch_prices_batch_krw(user_id, [("005930", "KOSPI")], mock_db, mock_cache)
 
@@ -240,15 +240,15 @@ class TestFetchPricesBatchKrw:
 
         with (
             patch(
-                "app.services.price_service.fetch_prices_batch",
+                "app.services.market_data.price_service.fetch_prices_batch",
                 new=AsyncMock(return_value={"005930": 75000.0, "QLD": 95.0}),
             ),
             patch(
-                "app.services.price_service.get_usd_krw_rate",
+                "app.services.market_data.price_service.get_usd_krw_rate",
                 new=AsyncMock(return_value=1385.0),
             ),
         ):
-            from app.services.price_service import fetch_prices_batch_krw
+            from app.services.market_data.price_service import fetch_prices_batch_krw
 
             result = await fetch_prices_batch_krw(
                 user_id, [("005930", "KOSPI"), ("QLD", "NASDAQ")], mock_db, mock_cache
@@ -264,7 +264,7 @@ class TestFetchPricesBatchKrw:
 class TestGetHistoricalReturns:
     @pytest.mark.asyncio
     async def test_empty_tickers_returns_empty(self, override_settings):
-        from app.services.price_service import get_historical_returns
+        from app.services.market_data.price_service import get_historical_returns
 
         result = await get_historical_returns([])
         assert result == {}
@@ -278,7 +278,7 @@ class TestGetHistoricalReturns:
         cached_data = {"cumulative_pct": 120.0, "annual_pct": 8.5}
         cache.mget = AsyncMock(return_value=[json.dumps(cached_data).encode()])
 
-        from app.services.price_service import get_historical_returns
+        from app.services.market_data.price_service import get_historical_returns
 
         result = await get_historical_returns([("AAPL", "NASDAQ")], cache=cache)
 
@@ -290,10 +290,10 @@ class TestGetHistoricalReturns:
         """회로 OPEN + 해외 종목(대체 소스 없음)이면 빈 결과."""
         from unittest.mock import patch
 
-        with patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit:
+        with patch("app.services.market_data.yahoo_price.yahoo_circuit") as mock_circuit:
             mock_circuit.is_available.return_value = False
 
-            from app.services.price_service import get_historical_returns
+            from app.services.market_data.price_service import get_historical_returns
 
             result = await get_historical_returns([("AAPL", "NASDAQ")])
 
@@ -307,7 +307,7 @@ class TestGetHistoricalReturns:
         pykrx_data = {("005930", "KOSPI"): {"cumulative_return_pct": 50.0, "cagr_pct": 5.0, "actual_years": 10.0}}
 
         with (
-            patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
+            patch("app.services.market_data.yahoo_price.yahoo_circuit") as mock_circuit,
         ):
             mock_circuit.is_available.return_value = False
 
@@ -315,7 +315,7 @@ class TestGetHistoricalReturns:
             loop_mock.run_in_executor = AsyncMock(return_value=pykrx_data)
 
             with patch("asyncio.get_running_loop", return_value=loop_mock):
-                from app.services.price_service import get_historical_returns
+                from app.services.market_data.price_service import get_historical_returns
 
                 result = await get_historical_returns([("005930", "KOSPI")])
 
@@ -329,7 +329,7 @@ class TestGetHistoricalReturns:
         batch_data = {("AAPL", "NASDAQ"): {"cumulative_pct": 200.0, "annual_pct": 10.0}}
 
         with (
-            patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
+            patch("app.services.market_data.yahoo_price.yahoo_circuit") as mock_circuit,
         ):
             mock_circuit.is_available.return_value = True
 
@@ -337,7 +337,7 @@ class TestGetHistoricalReturns:
             loop_mock.run_in_executor = AsyncMock(return_value=batch_data)
 
             with patch("asyncio.get_running_loop", return_value=loop_mock):
-                from app.services.price_service import get_historical_returns
+                from app.services.market_data.price_service import get_historical_returns
 
                 result = await get_historical_returns([("AAPL", "NASDAQ")])
 
@@ -349,13 +349,13 @@ class TestGetHistoricalReturns:
         from unittest.mock import AsyncMock, patch
 
         with (
-            patch("app.services.yahoo_price.yahoo_circuit") as mock_circuit,
+            patch("app.services.market_data.yahoo_price.yahoo_circuit") as mock_circuit,
             patch(
-                "app.services.yahoo_price._sync_calc_returns_batch",
+                "app.services.market_data.yahoo_price._sync_calc_returns_batch",
                 return_value={},
             ),
             patch(
-                "app.services.price_service._sync_pykrx_returns_batch",
+                "app.services.market_data.price_service._sync_pykrx_returns_batch",
                 return_value={
                     ("005930", "KOSPI"): {"cumulative_return_pct": 30.0, "cagr_pct": 3.0, "actual_years": 10.0}
                 },
@@ -371,7 +371,7 @@ class TestGetHistoricalReturns:
             loop_mock.run_in_executor = _run_in_executor
 
             with patch("asyncio.get_running_loop", return_value=loop_mock):
-                from app.services.price_service import get_historical_returns
+                from app.services.market_data.price_service import get_historical_returns
 
                 result = await get_historical_returns([("005930", "KOSPI")])
 
@@ -391,7 +391,7 @@ class TestFetchCurrentPriceCacheHit:
         cache = AsyncMock()
         cache.get = AsyncMock(return_value=b"75000.0")
 
-        from app.services.price_service import fetch_current_price
+        from app.services.market_data.price_service import fetch_current_price
 
         price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, cache)
 
@@ -408,10 +408,10 @@ class TestDomesticPriceFallback:
         from unittest.mock import patch
 
         with (
-            patch("app.services.price_service.sync_naver_price", return_value=286000.0),
-            patch("app.services.price_service.sync_pykrx_price") as mock_pykrx,
+            patch("app.services.market_data.price_service.sync_naver_price", return_value=286000.0),
+            patch("app.services.market_data.price_service.sync_pykrx_price") as mock_pykrx,
         ):
-            from app.services.price_service import domestic_price_fallback
+            from app.services.market_data.price_service import domestic_price_fallback
 
             loop = asyncio.get_running_loop()
             price = await domestic_price_fallback("005930", loop)
@@ -425,10 +425,10 @@ class TestDomesticPriceFallback:
         from unittest.mock import patch
 
         with (
-            patch("app.services.price_service.sync_naver_price", return_value=None),
-            patch("app.services.price_service.sync_pykrx_price", return_value=284000.0),
+            patch("app.services.market_data.price_service.sync_naver_price", return_value=None),
+            patch("app.services.market_data.price_service.sync_pykrx_price", return_value=284000.0),
         ):
-            from app.services.price_service import domestic_price_fallback
+            from app.services.market_data.price_service import domestic_price_fallback
 
             loop = asyncio.get_running_loop()
             price = await domestic_price_fallback("005930", loop)
@@ -441,10 +441,10 @@ class TestDomesticPriceFallback:
         from unittest.mock import patch
 
         with (
-            patch("app.services.price_service.sync_naver_price", return_value=None),
-            patch("app.services.price_service.sync_pykrx_price", return_value=None),
+            patch("app.services.market_data.price_service.sync_naver_price", return_value=None),
+            patch("app.services.market_data.price_service.sync_pykrx_price", return_value=None),
         ):
-            from app.services.price_service import domestic_price_fallback
+            from app.services.market_data.price_service import domestic_price_fallback
 
             loop = asyncio.get_running_loop()
             price = await domestic_price_fallback("005930", loop)
@@ -464,10 +464,10 @@ class TestFetchCurrentPriceDomesticPriority:
         mock_db.scalar.return_value = None
 
         with (
-            patch("app.services.price_service.sync_naver_price", return_value=286000.0),
-            patch("app.services.yahoo_price._sync_yahoo_price") as mock_yahoo,
+            patch("app.services.market_data.price_service.sync_naver_price", return_value=286000.0),
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price") as mock_yahoo,
         ):
-            from app.services.price_service import fetch_current_price
+            from app.services.market_data.price_service import fetch_current_price
 
             price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_cache)
 
@@ -484,10 +484,10 @@ class TestFetchCurrentPriceDomesticPriority:
         mock_db.scalar.return_value = None
 
         with (
-            patch("app.services.price_service.domestic_price_fallback") as mock_domestic,
-            patch("app.services.yahoo_price._sync_yahoo_price", return_value=180.0),
+            patch("app.services.market_data.price_service.domestic_price_fallback") as mock_domestic,
+            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=180.0),
         ):
-            from app.services.price_service import fetch_current_price
+            from app.services.market_data.price_service import fetch_current_price
 
             price = await fetch_current_price(user_id, "AAPL", "NASDAQ", mock_db, mock_cache)
 

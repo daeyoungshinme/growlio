@@ -12,7 +12,7 @@ def patch_encryption_key(monkeypatch):
     monkeypatch 격리가 깨지는 부작용이 있다.
     """
     import app.core.config as config_mod
-    import app.services.credential_service as cs_mod
+    import app.services.accounts.credential_service as cs_mod
 
     test_key = "a" * 64
     monkeypatch.setattr(config_mod.settings, "kis_cred_encryption_key", test_key)
@@ -31,7 +31,7 @@ def patch_encryption_key(monkeypatch):
 )
 def test_encrypt_decrypt_roundtrip(plaintext):
     """암호화 후 복호화하면 원문이 복원된다."""
-    from app.services.credential_service import decrypt, encrypt
+    from app.services.accounts.credential_service import decrypt, encrypt
 
     ciphertext = encrypt(plaintext)
     assert ciphertext != plaintext
@@ -40,7 +40,7 @@ def test_encrypt_decrypt_roundtrip(plaintext):
 
 def test_encrypt_produces_different_ciphertext_each_time():
     """같은 평문도 매번 다른 암호문을 생성한다 (nonce 무작위)."""
-    from app.services.credential_service import decrypt, encrypt
+    from app.services.accounts.credential_service import decrypt, encrypt
 
     plaintext = "same-key-value"
     c1 = encrypt(plaintext)
@@ -51,7 +51,7 @@ def test_encrypt_produces_different_ciphertext_each_time():
 
 def test_decrypt_invalid_ciphertext_raises():
     """손상된 암호문 복호화 시 예외 발생."""
-    from app.services.credential_service import decrypt
+    from app.services.accounts.credential_service import decrypt
 
     with pytest.raises(ValueError, match="Decryption failed"):
         decrypt("invalid_hex_data_that_cannot_be_decrypted_0000")
@@ -59,7 +59,7 @@ def test_decrypt_invalid_ciphertext_raises():
 
 def test_ciphertext_is_hex_string():
     """암호문이 hex 문자열 형태여야 한다."""
-    from app.services.credential_service import encrypt
+    from app.services.accounts.credential_service import encrypt
 
     ciphertext = encrypt("test-value")
     assert all(c in "0123456789abcdef" for c in ciphertext.lower())
@@ -74,7 +74,7 @@ class TestGetKisUserCredentials:
         import uuid
         from unittest.mock import AsyncMock
 
-        from app.services.credential_service import get_kis_user_credentials
+        from app.services.accounts.credential_service import get_kis_user_credentials
 
         db = AsyncMock()
         db.scalar = AsyncMock(return_value=None)
@@ -88,7 +88,7 @@ class TestGetKisUserCredentials:
         from types import SimpleNamespace
         from unittest.mock import AsyncMock, patch
 
-        from app.services.credential_service import encrypt, get_kis_user_credentials
+        from app.services.accounts.credential_service import encrypt, get_kis_user_credentials
 
         raw_key = "test-app-key"
         raw_secret = "test-app-secret"
@@ -119,7 +119,7 @@ class TestGetKisUserCredentials:
         from types import SimpleNamespace
         from unittest.mock import AsyncMock, patch
 
-        from app.services.credential_service import encrypt, get_kis_user_credentials
+        from app.services.accounts.credential_service import encrypt, get_kis_user_credentials
 
         account = SimpleNamespace(
             id=uuid.uuid4(),

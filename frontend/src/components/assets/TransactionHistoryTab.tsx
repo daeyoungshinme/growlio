@@ -35,7 +35,7 @@ interface Props {
 // 거래 유형은 TX_TYPES/TX_LABELS 단일 출처 — 유형 추가 시 필터 칩이 자동으로 따라간다
 const TYPE_FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "전체" },
-  ...TX_TYPES.map((t) => ({ value: t, label: TX_LABELS[t] })),
+  ...TX_TYPES.map((t) => ({ value: t, label: TX_LABELS[t] ?? t })),
 ];
 
 // 모바일 카드는 페이지 스크롤 안 중첩 스크롤 대신 N건씩 "더 보기" (CLAUDE.md 모바일 규칙, plans/79 F)
@@ -143,11 +143,10 @@ export default function TransactionHistoryTab({ accounts }: Props) {
     overscan: 10,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
-  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
-  const paddingBottom =
-    virtualItems.length > 0
-      ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
-      : 0;
+  const firstVirtual = virtualItems[0];
+  const lastVirtual = virtualItems[virtualItems.length - 1];
+  const paddingTop = firstVirtual ? firstVirtual.start : 0;
+  const paddingBottom = lastVirtual ? rowVirtualizer.getTotalSize() - lastVirtual.end : 0;
 
   return (
     <div className="space-y-5">
@@ -372,6 +371,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                     )}
                     {virtualItems.map((virtualRow) => {
                       const tx = filtered[virtualRow.index];
+                      if (!tx) return null;
                       return (
                         <tr
                           key={tx.id}

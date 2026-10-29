@@ -78,7 +78,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
   // 월별 실수령 맵 (YYYY-MM → amount)
   const receivedByMonth: Record<number, number> = {};
   for (const r of monthly_received) {
-    const monthNum = parseInt(r.month.split("-")[1], 10);
+    const monthNum = parseInt(r.month.split("-")[1] ?? "", 10);
     receivedByMonth[monthNum] = (receivedByMonth[monthNum] ?? 0) + r.amount;
   }
 
@@ -408,16 +408,17 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
           <div className="h-[130px] sm:h-[160px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={yearly_received.map((y, i) => ({
-                  name: `${y.year}년`,
-                  배당: y.amount_krw,
-                  growth:
-                    i > 0 && yearly_received[i - 1].amount_krw > 0
-                      ? ((y.amount_krw - yearly_received[i - 1].amount_krw) /
-                          yearly_received[i - 1].amount_krw) *
-                        100
-                      : null,
-                }))}
+                data={yearly_received.map((y, i) => {
+                  const prev = i > 0 ? yearly_received[i - 1] : undefined;
+                  return {
+                    name: `${y.year}년`,
+                    배당: y.amount_krw,
+                    growth:
+                      prev && prev.amount_krw > 0
+                        ? ((y.amount_krw - prev.amount_krw) / prev.amount_krw) * 100
+                        : null,
+                  };
+                })}
                 margin={{ top: 0, right: 4, left: 0, bottom: 0 }}
               >
                 <XAxis

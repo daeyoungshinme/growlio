@@ -11,7 +11,7 @@ import pytest
 class TestSyncSnapshotPositions:
     @pytest.mark.asyncio
     async def test_sync_positions_calls_db_add_for_each(self, mock_db, override_settings):
-        from app.services.snapshot_service import sync_snapshot_positions
+        from app.services.accounts.snapshot_service import sync_snapshot_positions
 
         pos1 = SimpleNamespace(
             ticker="AAPL",
@@ -49,7 +49,7 @@ class TestSyncSnapshotPositions:
 
     @pytest.mark.asyncio
     async def test_empty_positions_no_adds(self, mock_db, override_settings):
-        from app.services.snapshot_service import sync_snapshot_positions
+        from app.services.accounts.snapshot_service import sync_snapshot_positions
 
         await sync_snapshot_positions(
             mock_db,
@@ -62,7 +62,7 @@ class TestSyncSnapshotPositions:
 
     @pytest.mark.asyncio
     async def test_deletes_existing_before_insert(self, mock_db, override_settings):
-        from app.services.snapshot_service import sync_snapshot_positions
+        from app.services.accounts.snapshot_service import sync_snapshot_positions
 
         await sync_snapshot_positions(
             mock_db,

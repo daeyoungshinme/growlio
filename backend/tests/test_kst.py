@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from unittest.mock import patch
 
-from app.services.email_templates.rebalancing import _to_kst
+from app.services.notifications.email_templates.rebalancing import _to_kst
 from app.utils.kst import KST, kst_day_start, today_kst
 
 

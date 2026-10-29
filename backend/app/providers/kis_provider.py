@@ -19,7 +19,7 @@ from app.providers._overseas_name_enrichment import enrich_overseas_positions
 from app.providers._retry import with_token_refresh
 from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
 from app.providers.http_client import MaxRetriesExceededError
-from app.services.credential_service import decrypt
+from app.services.accounts.credential_service import decrypt
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 from app.utils.kst import today_kst
 from app.utils.masking import mask_account_no

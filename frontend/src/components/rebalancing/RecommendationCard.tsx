@@ -381,7 +381,7 @@ export default function RecommendationCard({
         ) : (
           <RecommendationHorizonTab
             horizon={effectiveTab}
-            taxType={activeTaxType}
+            taxType={activeTaxType ?? "GENERAL"}
             rec={activeHorizonRec}
             fetching={horizonFetching}
             targetPortfolio={horizonTargetPortfolio}

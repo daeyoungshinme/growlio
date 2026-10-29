@@ -46,11 +46,10 @@ export function TransactionList({
     overscan: 10,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
-  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
-  const paddingBottom =
-    virtualItems.length > 0
-      ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
-      : 0;
+  const firstVirtual = virtualItems[0];
+  const lastVirtual = virtualItems[virtualItems.length - 1];
+  const paddingTop = firstVirtual ? firstVirtual.start : 0;
+  const paddingBottom = lastVirtual ? rowVirtualizer.getTotalSize() - lastVirtual.end : 0;
 
   if (isLoading) {
     return (
@@ -160,6 +159,7 @@ export function TransactionList({
               )}
               {virtualItems.map((virtualRow) => {
                 const tx = filtered[virtualRow.index];
+                if (!tx) return null;
                 return (
                   <tr
                     key={tx.id}

@@ -84,8 +84,8 @@ export function overlapWarningFor(
   const others = group.members
     .filter((m) => itemKey(m.ticker, m.market) !== key)
     .sort((a, b) => Number(b.held) - Number(a.held));
-  if (others.length === 0) return null;
   const first = others[0];
+  if (!first) return null;
   const label = `${first.held ? "보유 중인 " : "후보 "}${first.name}`;
   const more = others.length > 1 ? ` 외 ${others.length - 1}개` : "";
   return `${label}${more}와(과) ${reasonLabel(group)}`;

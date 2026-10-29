@@ -14,9 +14,9 @@ export function useStockAccountStats(
     const txByAcc: Record<string, { deposit: number; dividend: number }> = {};
     for (const t of txTotals) {
       if (!t.account_id) continue;
-      if (!txByAcc[t.account_id]) txByAcc[t.account_id] = { deposit: 0, dividend: 0 };
-      if (t.transaction_type === "DEPOSIT") txByAcc[t.account_id].deposit += t.total_amount;
-      if (t.transaction_type === "DIVIDEND") txByAcc[t.account_id].dividend += t.total_amount;
+      const acc = (txByAcc[t.account_id] ??= { deposit: 0, dividend: 0 });
+      if (t.transaction_type === "DEPOSIT") acc.deposit += t.total_amount;
+      if (t.transaction_type === "DIVIDEND") acc.dividend += t.total_amount;
     }
     return stockAccounts.map((account) => {
       const pa = portfolioAccMap[account.id];

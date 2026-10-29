@@ -16,9 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.schemas.service_dtypes import FactorData
-from app.services.market_data_fetcher import fetch_yf_close_series, fetch_yf_info
-from app.services.position_aggregator import query_latest_position_map
-from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
+from app.services.market_data.market_data_fetcher import fetch_yf_close_series, fetch_yf_info
+from app.services.market_data.yahoo_price import to_yf_symbol as _to_yf_symbol
+from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import (
     TTL_FACTOR_ANALYSIS,
     CacheStoreType,

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from app.services.email_templates._shared import _SIGNAL_LEVEL_COLOR, _SIGNAL_LEVEL_LABEL, _email_div, _kv_table
+from app.services.notifications.email_templates._shared import (
+    _SIGNAL_LEVEL_COLOR,
+    _SIGNAL_LEVEL_LABEL,
+    _email_div,
+    _kv_table,
+)
 
 
 def market_signal_change_template(old_level: str, new_level: str, reason: str | None) -> tuple[str, str]:

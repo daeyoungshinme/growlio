@@ -138,7 +138,7 @@ async def test_dashboard_summary_concurrent_cold_cache_computes_once():
     from unittest.mock import patch
 
     from app.core.cache_store import CacheStore
-    from app.services import asset_aggregator
+    from app.services.portfolio import asset_aggregator
     from app.utils.cache_keys import dashboard_summary_key, set_cached_json
 
     store = CacheStore()

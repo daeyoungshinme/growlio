@@ -10,12 +10,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import run_alert_job, run_per_user
+from app.core.job_runner import run_per_user
+from app.jobs._job_helpers import run_alert_job
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.alerts._dispatch import send_push_safely
-from app.services.asset_aggregator import get_dashboard_summary
-from app.services.email_service import send_goal_achievement_email
+from app.services.notifications.email_service import send_goal_achievement_email
+from app.services.portfolio.asset_aggregator import get_dashboard_summary
 from app.utils.cache_keys import CacheStoreType
 from app.utils.kst import KST, today_kst
 

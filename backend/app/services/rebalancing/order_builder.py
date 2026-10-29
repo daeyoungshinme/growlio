@@ -104,7 +104,7 @@ async def refresh_live_prices(
     건드리지 않아, 지정가는 라이브인데 수량·게이트 판정금액은 스냅샷 시점 그대로인 문제가 있었다).
     조회 실패 종목은 기존 값을 그대로 둔다(폴백).
     """
-    from app.services.price_service import fetch_prices_batch_krw
+    from app.services.market_data.price_service import fetch_prices_batch_krw
 
     # 지수 그룹 행은 수량이 없다(멤버 행이 매매 단위) — 호출부가 expand_group_items로 먼저 펼친다
     items = [item for item in items if not is_group_item(item)]

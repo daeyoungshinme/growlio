@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.period_purchase_service import (
+from app.services.portfolio.period_purchase_service import (
     SOURCE_ESTIMATED,
     SOURCE_MANUAL,
     PosState,
@@ -274,7 +274,7 @@ async def test_get_period_purchases_out_of_period_manual_keeps_estimate(account)
 
 class TestMergeState:
     def test_usd_avg_dropped_when_only_one_row_has_it(self):
-        from app.services.period_purchase_service import _merge_state
+        from app.services.portfolio.period_purchase_service import _merge_state
 
         states: dict = {}
         a = _pos(None, None, 10, 1_300_000, None, ticker="AAPL", market="NASDAQ")
@@ -289,7 +289,7 @@ class TestMergeState:
         assert merged.avg_price_usd is None
 
     def test_usd_avg_weighted_when_both_rows_have_it(self):
-        from app.services.period_purchase_service import _merge_state
+        from app.services.portfolio.period_purchase_service import _merge_state
 
         states: dict = {}
         for qty, usd in ((10, 100.0), (30, 200.0)):

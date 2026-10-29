@@ -13,7 +13,7 @@ import pytest
 class TestGetAllocationHistory:
     @pytest.mark.asyncio
     async def test_cache_cache_hit_skips_db(self, mock_db, override_settings):
-        from app.services.portfolio_history_service import get_allocation_history
+        from app.services.portfolio.portfolio_history_service import get_allocation_history
 
         cached = [{"month": "2024-01-01", "total_krw": 10_000_000, "allocations": []}]
         cache = AsyncMock()
@@ -26,7 +26,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_empty_result_returns_empty_list(self, mock_db, override_settings):
-        from app.services.portfolio_history_service import get_allocation_history
+        from app.services.portfolio.portfolio_history_service import get_allocation_history
 
         exec_result = MagicMock()
         exec_result.all.return_value = []
@@ -38,7 +38,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_aggregates_monthly_data(self, mock_db, override_settings):
-        from app.services.portfolio_history_service import get_allocation_history
+        from app.services.portfolio.portfolio_history_service import get_allocation_history
 
         row1 = SimpleNamespace(month="2024-01-01", asset_type="STOCK_KIS", amount_krw=5_000_000.0)
         row2 = SimpleNamespace(month="2024-01-01", asset_type="BANK_ACCOUNT", amount_krw=3_000_000.0)
@@ -67,7 +67,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_position_data_overrides_stock_types(self, mock_db, override_settings):
-        from app.services.portfolio_history_service import get_allocation_history
+        from app.services.portfolio.portfolio_history_service import get_allocation_history
 
         row1 = SimpleNamespace(month="2024-01-01", asset_type="STOCK_KIS", amount_krw=5_000_000.0)
 
@@ -101,7 +101,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_result_stored_in_cache(self, mock_db, override_settings):
-        from app.services.portfolio_history_service import get_allocation_history
+        from app.services.portfolio.portfolio_history_service import get_allocation_history
 
         row1 = SimpleNamespace(month="2024-01-01", asset_type="BANK_ACCOUNT", amount_krw=1_000_000.0)
 
@@ -129,7 +129,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_account_id_passed_as_query_param(self, mock_db, override_settings):
-        from app.services.portfolio_history_service import get_allocation_history
+        from app.services.portfolio.portfolio_history_service import get_allocation_history
 
         captured_params = []
 
@@ -149,7 +149,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_no_account_id_passes_none(self, mock_db, override_settings):
-        from app.services.portfolio_history_service import get_allocation_history
+        from app.services.portfolio.portfolio_history_service import get_allocation_history
 
         captured_params = []
 
@@ -167,7 +167,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_account_id_uses_separate_cache_key(self, mock_db, override_settings):
-        from app.services.portfolio_history_service import get_allocation_history
+        from app.services.portfolio.portfolio_history_service import get_allocation_history
 
         cache = AsyncMock()
         cache.get = AsyncMock(return_value=None)
@@ -187,7 +187,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_zero_total_months_excluded(self, mock_db, override_settings):
-        from app.services.portfolio_history_service import get_allocation_history
+        from app.services.portfolio.portfolio_history_service import get_allocation_history
 
         # A month with 0 total should be excluded
         row1 = SimpleNamespace(month="2024-01-01", asset_type="BANK_ACCOUNT", amount_krw=0.0)
@@ -222,7 +222,7 @@ class TestMergeStockBreakdown:
         return monthly
 
     def test_residual_becomes_cash_stock(self):
-        from app.services.portfolio_history_service import _merge_stock_breakdown
+        from app.services.portfolio.portfolio_history_service import _merge_stock_breakdown
 
         monthly = self._monthly({"STOCK_KIS": 10_000_000.0})
         _merge_stock_breakdown(monthly, {"2024-01-01": {"STOCK_DOMESTIC": 7_000_000.0}})
@@ -234,7 +234,7 @@ class TestMergeStockBreakdown:
         assert sum(jan.values()) == pytest.approx(10_000_000.0)
 
     def test_residual_added_to_existing_manual_cash_stock(self):
-        from app.services.portfolio_history_service import _merge_stock_breakdown
+        from app.services.portfolio.portfolio_history_service import _merge_stock_breakdown
 
         monthly = self._monthly({"STOCK_KIWOOM": 10_000_000.0, "CASH_STOCK": 1_000_000.0})
         _merge_stock_breakdown(monthly, {"2024-01-01": {"STOCK_DOMESTIC": 7_000_000.0}})
@@ -242,7 +242,7 @@ class TestMergeStockBreakdown:
         assert monthly["2024-01-01"]["CASH_STOCK"] == pytest.approx(4_000_000.0)
 
     def test_negative_residual_not_added(self):
-        from app.services.portfolio_history_service import _merge_stock_breakdown
+        from app.services.portfolio.portfolio_history_service import _merge_stock_breakdown
 
         monthly = self._monthly({"STOCK_TOSS": 5_000_000.0})
         _merge_stock_breakdown(monthly, {"2024-01-01": {"STOCK_FOREIGN": 5_200_000.0}})
@@ -252,7 +252,7 @@ class TestMergeStockBreakdown:
         assert jan["STOCK_FOREIGN"] == pytest.approx(5_200_000.0)
 
     def test_sub_won_rounding_residual_ignored(self):
-        from app.services.portfolio_history_service import _merge_stock_breakdown
+        from app.services.portfolio.portfolio_history_service import _merge_stock_breakdown
 
         monthly = self._monthly({"STOCK_KIS": 5_000_000.4})
         _merge_stock_breakdown(monthly, {"2024-01-01": {"STOCK_DOMESTIC": 5_000_000.0}})
@@ -261,7 +261,7 @@ class TestMergeStockBreakdown:
 
     def test_cash_only_stock_account_preserved(self):
         """포지션 없는(전액 현금) 증권계좌 금액이 다른 계좌 포지션 분해 때문에 사라지지 않는다."""
-        from app.services.portfolio_history_service import _merge_stock_breakdown
+        from app.services.portfolio.portfolio_history_service import _merge_stock_breakdown
 
         # KIS 800만(전부 포지션) + 토스 200만(전액 예수금, 포지션 0)
         monthly = self._monthly({"STOCK_KIS": 8_000_000.0, "STOCK_TOSS": 2_000_000.0})
@@ -272,7 +272,7 @@ class TestMergeStockBreakdown:
         assert sum(jan.values()) == pytest.approx(10_000_000.0)
 
     def test_months_without_position_data_untouched(self):
-        from app.services.portfolio_history_service import _merge_stock_breakdown
+        from app.services.portfolio.portfolio_history_service import _merge_stock_breakdown
 
         monthly = self._monthly({"STOCK_KIS": 5_000_000.0})
         _merge_stock_breakdown(monthly, {})

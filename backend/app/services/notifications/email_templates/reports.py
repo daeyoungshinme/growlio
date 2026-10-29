@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from html import escape
 from typing import Any
 
-from app.services.email_templates._shared import _email_div, _kv_table
+from app.services.notifications.email_templates._shared import _email_div, _kv_table
 
 _ASSET_TYPE_LABEL: dict[str, str] = {
     "BANK_ACCOUNT": "예금/적금",

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.portfolio_service import (
+from app.services.portfolio.portfolio_service import (
     _build_position_details,
     _build_stock_allocation,
     _calc_account_amounts,

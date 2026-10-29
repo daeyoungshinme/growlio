@@ -7,7 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
-from app.services.yahoo_price import yf_download
+from app.services.market_data.yahoo_price import yf_download
 
 
 def test_concurrent_downloads_never_overlap():

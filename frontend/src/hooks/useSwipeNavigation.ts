@@ -20,9 +20,11 @@ function useSwipeGesture(
   const touchRef = useRef<TouchState | null>(null);
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
     touchRef.current = {
-      startX: e.touches[0].clientX,
-      startY: e.touches[0].clientY,
+      startX: touch.clientX,
+      startY: touch.clientY,
       startTime: performance.now(),
     };
   }, []);
@@ -36,8 +38,10 @@ function useSwipeGesture(
       // 모달이 열려 있으면 스와이프 무시
       if (document.body.style.overflow === "hidden") return;
 
-      const deltaX = e.changedTouches[0].clientX - start.startX;
-      const deltaY = e.changedTouches[0].clientY - start.startY;
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      const deltaX = touch.clientX - start.startX;
+      const deltaY = touch.clientY - start.startY;
       const elapsed = performance.now() - start.startTime;
       const velocity = Math.abs(deltaX) / elapsed;
 
@@ -75,13 +79,16 @@ export function useSwipeNavigation(containerRef: React.RefObject<HTMLElement | n
       const currentIndex = NAV_ORDER.findIndex((p) => pathname.startsWith(p));
       if (currentIndex === -1) return;
 
-      if (deltaX < 0 && currentIndex < NAV_ORDER.length - 1) {
-        void triggerHaptic("light");
-        void navigate(NAV_ORDER[currentIndex + 1]);
-      } else if (deltaX > 0 && currentIndex > 0) {
-        void triggerHaptic("light");
-        void navigate(NAV_ORDER[currentIndex - 1]);
-      }
+      // 범위 밖 인덱스는 undefined — 첫/마지막 탭에서는 넘어가지 않는다
+      const target =
+        deltaX < 0
+          ? NAV_ORDER[currentIndex + 1]
+          : deltaX > 0
+            ? NAV_ORDER[currentIndex - 1]
+            : undefined;
+      if (target === undefined) return;
+      void triggerHaptic("light");
+      void navigate(target);
     },
     [pathname, navigate],
   );
@@ -104,13 +111,11 @@ export function useSwipeTabs<T extends string>(
       const currentIndex = tabs.indexOf(activeTab);
       if (currentIndex === -1) return;
 
-      if (deltaX < 0 && currentIndex < tabs.length - 1) {
-        void triggerHaptic("light");
-        onChange(tabs[currentIndex + 1]);
-      } else if (deltaX > 0 && currentIndex > 0) {
-        void triggerHaptic("light");
-        onChange(tabs[currentIndex - 1]);
-      }
+      const target =
+        deltaX < 0 ? tabs[currentIndex + 1] : deltaX > 0 ? tabs[currentIndex - 1] : undefined;
+      if (target === undefined) return;
+      void triggerHaptic("light");
+      onChange(target);
     },
     [tabs, activeTab, onChange],
   );

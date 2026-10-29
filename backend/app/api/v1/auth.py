@@ -186,7 +186,7 @@ async def delete_account(
         await invalidate_user_caches(cache, f"kis_token:account:{account_id}", f"kiwoom_token:account:{account_id}")
     await invalidate_all_user_caches(cache, user_id)
 
-    from app.services.email_service import send_account_deletion_email
+    from app.services.notifications.email_service import send_account_deletion_email
 
     await send_account_deletion_email(user_email)
 

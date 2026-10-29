@@ -183,7 +183,7 @@ class TestComputeProgressOther:
         challenge = _ns(challenge_type="RETURN_PCT", target_pct=10.0)
         db = AsyncMock()
         summary = {"xirr_pct": 5.0, "annual_return_pct": None, "cumulative_return_pct": None}
-        with patch("app.services.asset_aggregator.get_dashboard_summary", AsyncMock(return_value=summary)):
+        with patch("app.services.portfolio.asset_aggregator.get_dashboard_summary", AsyncMock(return_value=summary)):
             progress = await cs.compute_progress(challenge, challenge.user_id, db)
         assert progress.current_return_pct == 5.0
         assert progress.progress_pct == 50.0

@@ -4,23 +4,23 @@
 `_shared.py`(공용 헬퍼/상수), `alerts.py`(환율/주가 단순 알림), `rebalancing.py`(드리프트·자동실행·
 AUTO 플랜 게이트, 가장 큰 그룹), `market_signal.py`(시장신호 등급전환·매일요약), `reports.py`(월간
 리포트·목표달성·연말절세·추천비중변화·회원탈퇴). 이 `__init__.py`가 전체를 재노출하므로
-`from app.services.email_templates import X` 호출부(email_service.py 등)는 변경 없이 그대로 동작한다.
+`from app.services.notifications.email_templates import X` 호출부(email_service.py 등)는 변경 없이 그대로 동작한다.
 """
 
 from __future__ import annotations
 
-from app.services.email_templates.alerts import (
+from app.services.notifications.email_templates.alerts import (
     exchange_rate_alert_template,
     stock_price_alert_template,
     test_email_template,
 )
-from app.services.email_templates.market_signal import (
+from app.services.notifications.email_templates.market_signal import (
     market_signal_change_template,
     market_signal_daily_digest_template,
     tactical_dip_template,
     tactical_regime_change_template,
 )
-from app.services.email_templates.rebalancing import (
+from app.services.notifications.email_templates.rebalancing import (
     daily_value_cap_gate_blocked_template,
     dca_cash_shortfall_template,
     market_signal_gate_blocked_template,
@@ -30,7 +30,7 @@ from app.services.email_templates.rebalancing import (
     rebalancing_plan_pending_template,
     tax_impact_gate_blocked_template,
 )
-from app.services.email_templates.reports import (
+from app.services.notifications.email_templates.reports import (
     account_deletion_template,
     challenge_reminder_template,
     challenge_wrap_template,

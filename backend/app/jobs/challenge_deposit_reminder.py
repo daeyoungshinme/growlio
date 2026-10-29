@@ -12,12 +12,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import report_job_failure, run_alert_job, run_per_user
+from app.core.job_runner import report_job_failure, run_per_user
+from app.jobs._job_helpers import run_alert_job
 from app.models.challenge import CHALLENGE_ACTIVE, CHALLENGE_DEPOSIT, InvestmentChallenge
 from app.models.user import User, UserSettings
 from app.services import challenge_service
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
-from app.services.email_service import send_challenge_reminder_email
+from app.services.notifications.email_service import send_challenge_reminder_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
 from app.utils.kst import KST as _KST

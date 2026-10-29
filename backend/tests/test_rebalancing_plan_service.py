@@ -74,7 +74,7 @@ class TestGeneratePendingPlanForAlert:
 
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, buy_tokens, sell_tokens = await svc.generate_pending_plan_for_alert(
                 alert, portfolio, drifting, mock_db, {}, "GREEN"
@@ -102,7 +102,7 @@ class TestGeneratePendingPlanForAlert:
         mock_db.commit = AsyncMock(side_effect=_commit)
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, _, _ = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
 
@@ -120,7 +120,7 @@ class TestGeneratePendingPlanForAlert:
 
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, _, _ = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
 
@@ -144,7 +144,7 @@ class TestGeneratePendingPlanForAlert:
         before = datetime.now(tz=UTC)
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, buy_token, sell_token = await svc.generate_pending_plan_for_alert(
                 alert, portfolio, drifting, mock_db, ticker_account_map, "GREEN"
@@ -175,7 +175,7 @@ class TestGeneratePendingPlanForAlert:
 
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch.object(settings, "auto_rebalancing_max_order_value_krw", 100_000.0),
         ):
             plan, buy_token, _ = await svc.generate_pending_plan_for_alert(
@@ -194,7 +194,7 @@ class TestGeneratePendingPlanForAlert:
 
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             result = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
 
@@ -209,7 +209,7 @@ class TestGeneratePendingPlanForAlert:
 
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, buy_tokens, sell_tokens = await svc.generate_pending_plan_for_alert(
                 alert, portfolio, drifting, mock_db, {}, "GREEN"
@@ -228,7 +228,7 @@ class TestGeneratePendingPlanForAlert:
 
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, _, _ = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
 
@@ -249,7 +249,7 @@ class TestGeneratePendingPlanForAlert:
 
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, buy_tokens, sell_tokens = await svc.generate_pending_plan_for_alert(
                 alert, portfolio, drifting, mock_db, {}, "GREEN"
@@ -284,7 +284,7 @@ class TestGeneratePendingPlanForAlert:
 
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             result = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
 
@@ -311,7 +311,7 @@ class TestGeneratePendingPlanForAlert:
 
         with (
             patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, buy_tokens, sell_tokens = await svc.generate_pending_plan_for_alert(
                 alert, portfolio, drifting, mock_db, ticker_account_map, "GREEN"
@@ -359,8 +359,8 @@ class TestNotifyPlanGenerated:
 
         mock_email = AsyncMock(return_value=True)
         with (
-            patch("app.services.email_service.send_rebalancing_plan_pending_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_rebalancing_plan_pending_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
@@ -382,8 +382,8 @@ class TestNotifyPlanGenerated:
 
         mock_email = AsyncMock()
         with (
-            patch("app.services.email_service.send_rebalancing_plan_pending_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_rebalancing_plan_pending_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
@@ -404,8 +404,8 @@ class TestNotifyPlanGenerated:
 
         mock_email = AsyncMock()
         with (
-            patch("app.services.email_service.send_rebalancing_plan_pending_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_rebalancing_plan_pending_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
@@ -428,8 +428,8 @@ class TestNotifyTaxGateBlocked:
 
         mock_email = AsyncMock(return_value=True)
         with (
-            patch("app.services.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
             patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value=None)),
             patch("app.utils.durable_state.set_durable", new=AsyncMock()) as mock_set_durable,
@@ -448,7 +448,7 @@ class TestNotifyTaxGateBlocked:
 
         mock_email = AsyncMock()
         with (
-            patch("app.services.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
+            patch("app.services.notifications.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
             patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value="1")),
         ):
             await svc.notify_tax_gate_blocked(alert, portfolio, blocked, "user@test.com", "fcm-token", mock_db)
@@ -467,8 +467,8 @@ class TestNotifyDailyValueCapBlocked:
 
         mock_email = AsyncMock(return_value=True)
         with (
-            patch("app.services.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
             patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value=None)),
             patch("app.utils.durable_state.set_durable", new=AsyncMock()) as mock_set_durable,
@@ -489,7 +489,7 @@ class TestNotifyDailyValueCapBlocked:
 
         mock_email = AsyncMock()
         with (
-            patch("app.services.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
+            patch("app.services.notifications.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
             patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value="1")),
         ):
             await svc.notify_daily_value_cap_blocked(alert, portfolio, blocked, "user@test.com", "fcm-token", mock_db)
@@ -658,7 +658,7 @@ class TestApproveSellLeg:
 
         execution_id = uuid.uuid4()
         with (
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
                 "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(return_value=([], execution_id)),
@@ -690,7 +690,7 @@ class TestApproveSellLeg:
 
         mock_notify_failed = AsyncMock()
         with (
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
                 "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(side_effect=RuntimeError("broker error")),
@@ -733,7 +733,7 @@ class TestApproveSellLeg:
 
         mock_email = AsyncMock()
         with (
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
                 "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(return_value=([], None)),
@@ -819,7 +819,7 @@ class TestApproveBuyLeg:
 
         execution_id = uuid.uuid4()
         with (
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
                 "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(return_value=([], execution_id)),
@@ -928,7 +928,7 @@ class TestExecuteDueBuyLegs:
         execution_id = uuid.uuid4()
         with (
             patch("app.utils.market_hours.is_korean_market_open", return_value=True),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
                 "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(return_value=([], execution_id)),
@@ -1084,7 +1084,9 @@ class TestExecuteDueBuyLegs:
             patch("app.utils.market_hours.is_korean_market_open", return_value=False),
             patch("app.utils.market_hours.is_us_market_open", return_value=True),
             # 해외 LIMIT은 실행 직전 현지통화(USD) 시세가 있어야 주문한다 — 저장값은 원화
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"AAPL": 150.0})),
+            patch(
+                "app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={"AAPL": 150.0})
+            ),
             patch(
                 "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(return_value=([], execution_id)),
@@ -1296,7 +1298,9 @@ class TestRebuildOrdersOverseasLimitCurrency:
     async def test_overseas_limit_uses_fresh_native_price(self, mock_db):
         from app.services.rebalancing.plan_execution import _rebuild_orders_from_items
 
-        with patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"AAPL": 201.5})):
+        with patch(
+            "app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={"AAPL": 201.5})
+        ):
             orders = await _rebuild_orders_from_items([_make_plan_item()], "BUY", uuid.uuid4(), mock_db, None)
 
         assert orders[0].limit_price == 201.5
@@ -1307,7 +1311,10 @@ class TestRebuildOrdersOverseasLimitCurrency:
         from app.services.rebalancing.plan_execution import _rebuild_orders_from_items
 
         with (
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(side_effect=RuntimeError("yahoo"))),
+            patch(
+                "app.services.market_data.price_service.fetch_prices_batch",
+                new=AsyncMock(side_effect=RuntimeError("yahoo")),
+            ),
             pytest.raises(ValueError, match="현재가"),
         ):
             await _rebuild_orders_from_items([_make_plan_item()], "BUY", uuid.uuid4(), mock_db, None)
@@ -1317,7 +1324,7 @@ class TestRebuildOrdersOverseasLimitCurrency:
         from app.services.rebalancing.plan_execution import _rebuild_orders_from_items
 
         item = _make_plan_item(ticker="005930", market="KOSPI", limit_price=70000.0, reference_price=70000.0)
-        with patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})):
+        with patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={})):
             orders = await _rebuild_orders_from_items([item], "BUY", uuid.uuid4(), mock_db, None)
 
         assert orders[0].limit_price == 70000.0

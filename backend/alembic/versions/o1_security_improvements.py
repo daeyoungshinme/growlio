@@ -20,7 +20,7 @@ def upgrade() -> None:
 
     # 1. OB 토큰 암호화 — 평문으로 저장된 기존 값을 AES-256-GCM으로 암호화
     try:
-        from app.services.credential_service import encrypt
+        from app.services.accounts.credential_service import encrypt
 
         rows = conn.execute(
             text(

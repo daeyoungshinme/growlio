@@ -35,7 +35,7 @@ from app.constants import DOMESTIC_MARKETS, POSITION_STOCK_ASSET_TYPES
 from app.enums import TradeSide
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.models.trade import TradeRecord
-from app.services._account_queries import active_accounts_stmt
+from app.services.accounts._account_queries import active_accounts_stmt
 
 SOURCE_ESTIMATED = "ESTIMATED"
 SOURCE_MANUAL = "MANUAL"

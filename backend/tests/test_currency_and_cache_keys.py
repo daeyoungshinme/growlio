@@ -466,7 +466,7 @@ class TestFetchUsdKrw:
         cache = AsyncMock()
         cache.setex = AsyncMock()
 
-        with patch("app.services.yahoo_price._sync_usdkrw", return_value=1380.0):
+        with patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=1380.0):
             loop_mock = AsyncMock()
             loop_mock.run_in_executor = AsyncMock(return_value=1380.0)
 

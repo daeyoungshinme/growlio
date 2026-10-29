@@ -29,9 +29,9 @@ from app.providers.kis_provider import KISProvider
 from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.manual_provider import ManualProvider
 from app.providers.toss_provider import TossProvider
-from app.services._account_queries import active_accounts_stmt
-from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
-from app.services.yahoo_price import fetch_yahoo_batch
+from app.services.accounts._account_queries import active_accounts_stmt
+from app.services.accounts.snapshot_service import _upsert_snapshot, sync_snapshot_positions
+from app.services.market_data.yahoo_price import fetch_yahoo_batch
 from app.utils.cache_keys import (
     CacheStoreType,
     invalidate_asset_account_caches,

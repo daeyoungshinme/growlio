@@ -14,10 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import is_non_tradable
 from app.models.portfolio import Portfolio
-from app.services.credential_service import get_kis_user_credentials
+from app.services.accounts.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key
 from app.services.dividend.fetcher import fetch_ticker_dividend_info
-from app.services.price_service import fetch_prices_batch_krw
+from app.services.market_data.price_service import fetch_prices_batch_krw
 from app.services.rebalancing.service import _item_attr, _item_get
 
 logger = structlog.get_logger()

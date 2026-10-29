@@ -302,7 +302,7 @@ class TestCreateAccount:
         with TestClient(app, raise_server_exceptions=False) as client:
             client.post("/api/v1/assets", json=payload)
 
-        from app.services.credential_service import decrypt
+        from app.services.accounts.credential_service import decrypt
 
         added = db.add.call_args.args[0]
         assert added.asset_type == "STOCK_KIWOOM"

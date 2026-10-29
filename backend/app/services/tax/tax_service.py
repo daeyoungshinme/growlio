@@ -14,7 +14,7 @@ from app.constants import (
     TAX_DEFERRED_TAX_TYPES,
 )
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
-from app.services._snapshot_queries import latest_snapshot_subquery
+from app.services.accounts._snapshot_queries import latest_snapshot_subquery
 from app.utils.kst import today_kst
 
 _DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}

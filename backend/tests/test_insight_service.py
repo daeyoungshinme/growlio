@@ -99,7 +99,9 @@ class TestCheckRebalancingOpportunity:
                 {"ticker": "AAPL", "market": "NASDAQ", "value_krw": 1_000_000},
             ],
         }
-        with patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)):
+        with patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ):
             result = await _check_rebalancing_opportunity(uuid.uuid4(), mock_db)
 
         assert result == []
@@ -138,7 +140,9 @@ class TestCheckRebalancingOpportunity:
                 {"ticker": "SPY", "market": "NYSE", "value_krw": 700_000},
             ],
         }
-        with patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)):
+        with patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ):
             result = await _check_rebalancing_opportunity(uuid.uuid4(), mock_db)
 
         assert result == []
@@ -333,7 +337,7 @@ class TestRebalancingOpportunityIsolation:
             # AAPL 0% → 목표 100%와 드리프트 100%p
             return {"total_assets_krw": 1_000_000, "total_stock_krw": 0, "all_positions": []}
 
-        with patch("app.services.portfolio_service.build_portfolio_overview", new=overview):
+        with patch("app.services.portfolio.portfolio_service.build_portfolio_overview", new=overview):
             result = await _check_rebalancing_opportunity(uuid.uuid4(), session)  # type: ignore[arg-type]
 
         assert len(result) == 1

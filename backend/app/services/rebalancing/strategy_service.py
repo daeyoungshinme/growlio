@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.services.factor_service import get_factor_analysis, get_factor_analysis_for_portfolio
+from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.services.portfolio_optimizer import get_efficient_frontier
-from app.services.position_aggregator import query_latest_position_map
 from app.services.rebalancing.group_expansion import group_owner_map
 from app.utils.cache_keys import (
     TTL_REBALANCING_STRATEGY,

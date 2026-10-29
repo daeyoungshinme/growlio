@@ -231,7 +231,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                       <span className="text-xs text-gray-500 dark:text-gray-500">
                         {state.orderableKrw[acc.id] != null ? "주문가능" : "예수금"}{" "}
                         <span className="text-gray-700 dark:text-gray-300">
-                          {fmtKrwPrice(state.orderableKrw[acc.id] ?? depositKrw[acc.id])}
+                          {fmtKrwPrice(state.orderableKrw[acc.id] ?? depositKrw[acc.id] ?? 0)}
                         </span>
                       </span>
                     )}

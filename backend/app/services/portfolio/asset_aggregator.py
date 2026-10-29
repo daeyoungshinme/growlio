@@ -12,13 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.models.user import UserSettings
-from app.services.composition_calculator import (
+from app.services.dividend.aggregator import get_dividend_summary
+from app.services.portfolio.composition_calculator import (
     build_asset_totals,
     exclude_real_estate,
 )
-from app.services.dividend.aggregator import get_dividend_summary
-from app.services.returns_calculator import calc_returns
-from app.services.returns_calculator import calc_xirr as _calc_xirr
+from app.services.portfolio.returns_calculator import calc_returns
+from app.services.portfolio.returns_calculator import calc_xirr as _calc_xirr
 from app.utils.cache_keys import (
     TTL_DASHBOARD_SUMMARY,
     TTL_MONTHLY_TREND,

@@ -369,12 +369,12 @@ async def test_live_or_cached_usd_krw():
     from app.utils import currency
 
     store = CacheStore()
-    with patch("app.services.yahoo_price.fetch_usdkrw", new=AsyncMock(return_value=1400.0)) as live:
+    with patch("app.services.market_data.yahoo_price.fetch_usdkrw", new=AsyncMock(return_value=1400.0)) as live:
         assert await currency.get_live_or_cached_usd_krw(store) == (1400.0, True)
         assert await currency.get_live_or_cached_usd_krw(store) == (1400.0, True)  # 두 번째는 캐시
     live.assert_awaited_once()
 
-    with patch("app.services.yahoo_price.fetch_usdkrw", new=AsyncMock(return_value=0.0)):
+    with patch("app.services.market_data.yahoo_price.fetch_usdkrw", new=AsyncMock(return_value=0.0)):
         rate, is_live = await currency.get_live_or_cached_usd_krw(CacheStore())
     assert is_live is False
     assert rate == currency.settings.usd_krw_fallback_rate

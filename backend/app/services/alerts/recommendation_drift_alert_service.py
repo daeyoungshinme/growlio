@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from functools import partial
 
@@ -27,13 +26,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.core.database import AsyncSessionLocal
+from app.core.job_runner import run_per_user
 from app.models.alert import AlertHistory
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
-from app.services._account_queries import active_accounts_stmt
-from app.services._portfolio_queries import get_linked_portfolios
 from app.services._settings_queries import get_settings_row
+from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.goal.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal.goal_recommendation_service import (
     _RECOMMENDATION_DRIFT_THRESHOLD_PCT,
@@ -42,6 +41,7 @@ from app.services.goal.goal_recommendation_service import (
     fold_into_portfolio_groups,
     get_goal_recommendation,
 )
+from app.services.portfolio._portfolio_queries import get_linked_portfolios
 from app.utils.cache_keys import CacheStoreType, get_goal_recommendation_generation
 from app.utils.kst import kst_day_start, today_kst
 
@@ -147,47 +147,46 @@ async def _find_drifted_portfolios(
     return drifted_names
 
 
-async def _send_alert_to_user(user: User, user_settings: UserSettings, sem: asyncio.Semaphore) -> None:
+async def _send_alert_to_user(user: User, user_settings: UserSettings, to_email: str) -> None:
     from app.core.cache_store import get_cache_store
     from app.services.alerts._dispatch import dispatch_dual_channel_alert
-    from app.services.email_service import send_recommendation_drift_alert_email
+    from app.services.notifications.email_service import send_recommendation_drift_alert_email
 
-    async with sem:
-        try:
-            async with AsyncSessionLocal() as db:
-                if await _already_sent_this_week(db, user.id):
-                    return
+    async with AsyncSessionLocal() as db:
+        if await _already_sent_this_week(db, user.id):
+            return
 
-                cache = await get_cache_store()
-                # 구독자 목록의 설정은 잡 시작 시점 값이라 세마포어 대기 중 저장된 설정을 놓친다 — 세대를 먼저
-                # 잡고 설정을 다시 읽어야 옛 설정 결과가 새 세대 캐시에 들어가지 않는다(plans/88·90 A3)
-                gen = await get_goal_recommendation_generation(cache, user.id)
-                settings_row = await get_settings_row(db, user.id) or user_settings
-                drifted_names = await _find_drifted_portfolios(user.id, db, cache, settings_row, gen)
-                if not drifted_names:
-                    return
+        cache = await get_cache_store()
+        # 구독자 목록의 설정은 잡 시작 시점 값이라 세마포어 대기 중 저장된 설정을 놓친다 — 세대를 먼저
+        # 잡고 설정을 다시 읽어야 옛 설정 결과가 새 세대 캐시에 들어가지 않는다(plans/88·90 A3)
+        gen = await get_goal_recommendation_generation(cache, user.id)
+        settings_row = await get_settings_row(db, user.id) or user_settings
+        drifted_names = await _find_drifted_portfolios(user.id, db, cache, settings_row, gen)
+        if not drifted_names:
+            return
 
-                to_email = user_settings.notification_email or user.email
-                names = ", ".join(drifted_names)
-                await dispatch_dual_channel_alert(
-                    db,
-                    user.id,
-                    event_prefix="recommendation_drift_alert",
-                    alert_type="RECOMMENDATION_DRIFT",
-                    history_message=f"추천 비중 변화 알림 발송 ({names})",
-                    send_email=partial(send_recommendation_drift_alert_email, to_email, drifted_names),
-                    push_title="추천 비중이 달라졌어요",
-                    push_body=f"{names} 포트폴리오의 추천 비중을 확인해보세요.",
-                    push_type="RECOMMENDATION_DRIFT",
-                    fcm_token=user_settings.fcm_token,
-                )
-        except Exception as exc:
-            logger.error("recommendation_drift_alert_user_failed", user_id=str(user.id), error=str(exc))
+        names = ", ".join(drifted_names)
+        await dispatch_dual_channel_alert(
+            db,
+            user.id,
+            event_prefix="recommendation_drift_alert",
+            alert_type="RECOMMENDATION_DRIFT",
+            history_message=f"추천 비중 변화 알림 발송 ({names})",
+            send_email=partial(send_recommendation_drift_alert_email, to_email, drifted_names),
+            push_title="추천 비중이 달라졌어요",
+            push_body=f"{names} 포트폴리오의 추천 비중을 확인해보세요.",
+            push_type="RECOMMENDATION_DRIFT",
+            fcm_token=user_settings.fcm_token,
+        )
 
 
 async def send_recommendation_drift_alerts(db: AsyncSession) -> None:
     """매주 월요일 09:15 KST — 옵트인 유저 중 추천 비중이 유의미하게 달라진 유저에게 안내 발송."""
     subscribers = await _get_subscribers(db)
-    sem = asyncio.Semaphore(_ALERT_CONCURRENCY)
-    await asyncio.gather(*(_send_alert_to_user(user, user_settings, sem) for user, user_settings in subscribers))
+    await run_per_user(
+        subscribers,
+        _send_alert_to_user,
+        concurrency=_ALERT_CONCURRENCY,
+        failure_event="recommendation_drift_alert_user_failed",
+    )
     logger.info("recommendation_drift_alert_completed", subscriber_count=len(subscribers))

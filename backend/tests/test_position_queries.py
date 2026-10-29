@@ -11,7 +11,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_fetch_manual_positions_returns_matching_rows(mock_db):
-    from app.services._position_queries import fetch_manual_positions
+    from app.services.portfolio._position_queries import fetch_manual_positions
 
     pos = SimpleNamespace(snapshot_id=None, account_id=uuid4())
     execute_result = MagicMock()
@@ -26,7 +26,7 @@ async def test_fetch_manual_positions_returns_matching_rows(mock_db):
 
 @pytest.mark.asyncio
 async def test_fetch_manual_positions_returns_empty_list_when_no_rows(mock_db):
-    from app.services._position_queries import fetch_manual_positions
+    from app.services.portfolio._position_queries import fetch_manual_positions
 
     execute_result = MagicMock()
     execute_result.scalars.return_value.all.return_value = []
@@ -39,7 +39,7 @@ async def test_fetch_manual_positions_returns_empty_list_when_no_rows(mock_db):
 
 @pytest.mark.asyncio
 async def test_fetch_manual_positions_returns_multiple_rows(mock_db):
-    from app.services._position_queries import fetch_manual_positions
+    from app.services.portfolio._position_queries import fetch_manual_positions
 
     positions = [SimpleNamespace(snapshot_id=None) for _ in range(3)]
     execute_result = MagicMock()

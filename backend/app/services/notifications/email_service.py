@@ -21,7 +21,7 @@ from tenacity import (
 )
 
 from app.core.config import settings
-from app.services.email_templates import (
+from app.services.notifications.email_templates import (
     account_deletion_template,
     challenge_reminder_template,
     challenge_wrap_template,

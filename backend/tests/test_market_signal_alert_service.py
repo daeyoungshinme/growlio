@@ -89,7 +89,9 @@ class TestCheckMarketSignalLevelChange:
                 "app.services.alerts.market_signal_alert_service.get_confirmed_composite_level",
                 new=AsyncMock(return_value=("GREEN", "LIVE")),
             ),
-            patch("app.services.email_service.send_market_signal_change_alert", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_market_signal_change_alert", new=AsyncMock()
+            ) as mock_email,
         ):
             await check_market_signal_level_change(mock_db, mock_cache)
 
@@ -109,7 +111,9 @@ class TestCheckMarketSignalLevelChange:
                 "app.services.alerts.market_signal_alert_service.get_confirmed_composite_level",
                 new=AsyncMock(return_value=("GREEN", "LIVE")),
             ),
-            patch("app.services.email_service.send_market_signal_change_alert", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_market_signal_change_alert", new=AsyncMock()
+            ) as mock_email,
         ):
             await check_market_signal_level_change(mock_db, mock_cache)
 
@@ -139,11 +143,11 @@ class TestCheckMarketSignalLevelChange:
             ),
             patch("app.services.alerts.market_signal_alert_service.AsyncSessionLocal", return_value=user_db),
             patch(
-                "app.services.email_service.send_market_signal_change_alert",
+                "app.services.notifications.email_service.send_market_signal_change_alert",
                 new=AsyncMock(return_value=True),
             ) as mock_email,
             patch(
-                "app.services.push_service.send_push_to_user",
+                "app.services.notifications.push_service.send_push_to_user",
                 new=AsyncMock(return_value=True),
             ) as mock_push,
         ):
@@ -189,12 +193,19 @@ class TestCheckMarketSignalLevelChange:
                 "app.services.alerts.market_signal_alert_service.AsyncSessionLocal",
                 side_effect=[broken, healthy],
             ),
-            patch("app.services.email_service.send_market_signal_change_alert", new=AsyncMock(return_value=True)),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.notifications.email_service.send_market_signal_change_alert",
+                new=AsyncMock(return_value=True),
+            ),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=False)),
+            patch("app.services.alerts.market_signal_alert_service.report_job_failure") as mock_report,
         ):
             await check_market_signal_level_change(mock_db, mock_cache)
 
         assert healthy.commit.call_count == 2
+        mock_report.assert_called_once()
+        assert mock_report.call_args.args[0] == "market_signal_change_user_failed"
+        assert mock_report.call_args.kwargs == {"user_id": str(users[0].id)}
 
     @pytest.mark.asyncio
     async def test_no_subscribers_sends_nothing(self, mock_db, mock_cache):
@@ -282,7 +293,9 @@ class TestSendMarketSignalDailyDigest:
                 "app.services.alerts.market_signal_alert_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
-            patch("app.services.email_service.send_market_signal_daily_digest_alert", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_market_signal_daily_digest_alert", new=AsyncMock()
+            ) as mock_email,
         ):
             await send_market_signal_daily_digest(mock_db, mock_cache)
 
@@ -320,11 +333,11 @@ class TestSendMarketSignalDailyDigest:
                 return_value=per_user_session,
             ),
             patch(
-                "app.services.email_service.send_market_signal_daily_digest_alert",
+                "app.services.notifications.email_service.send_market_signal_daily_digest_alert",
                 new=AsyncMock(return_value=True),
             ) as mock_email,
             patch(
-                "app.services.push_service.send_push_to_user",
+                "app.services.notifications.push_service.send_push_to_user",
                 new=AsyncMock(return_value=True),
             ) as mock_push,
         ):
@@ -365,10 +378,10 @@ class TestSendMarketSignalDailyDigest:
                 return_value=per_user_session,
             ),
             patch(
-                "app.services.email_service.send_market_signal_daily_digest_alert",
+                "app.services.notifications.email_service.send_market_signal_daily_digest_alert",
                 new=AsyncMock(return_value=True),
             ) as mock_email,
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=False)),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=False)),
         ):
             await send_market_signal_daily_digest(mock_db, mock_cache)
 
@@ -401,7 +414,9 @@ class TestSendMarketSignalDailyDigest:
                 "app.services.alerts.market_signal_alert_service.AsyncSessionLocal",
                 return_value=per_user_session,
             ),
-            patch("app.services.email_service.send_market_signal_daily_digest_alert", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_market_signal_daily_digest_alert", new=AsyncMock()
+            ) as mock_email,
         ):
             await send_market_signal_daily_digest(mock_db, mock_cache)
 
@@ -437,9 +452,15 @@ class TestSendMarketSignalDailyDigest:
                 "app.services.alerts.market_signal_alert_service.AsyncSessionLocal",
                 side_effect=session_factory,
             ),
-            patch("app.services.email_service.send_market_signal_daily_digest_alert", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_market_signal_daily_digest_alert", new=AsyncMock()
+            ) as mock_email,
+            patch("app.core.job_runner.report_job_failure") as mock_report,
         ):
             # 두 유저 모두 세션 조회 단계에서 실패하지만 예외가 전체를 막지 않아야 한다.
             await send_market_signal_daily_digest(mock_db, mock_cache)
 
         mock_email.assert_not_called()
+        # 유저 단위 실패가 Sentry로 보고된다 (plans/92 0-1)
+        assert mock_report.call_count == 2
+        assert {c.args[0] for c in mock_report.call_args_list} == {"market_signal_daily_digest_user_failed"}

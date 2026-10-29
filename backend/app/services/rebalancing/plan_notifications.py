@@ -41,7 +41,7 @@ async def notify_plan_generated(
     `buy_tokens`/`sell_tokens`는 [(market, raw_token), ...] — KR/US leg가 각각 있으면 최대 2개.
     """
     from app.models.asset import AssetAccount
-    from app.services.email_service import send_rebalancing_plan_pending_email
+    from app.services.notifications.email_service import send_rebalancing_plan_pending_email
 
     await db.refresh(plan, attribute_names=["legs"])
     buy_token_map = dict(buy_tokens)
@@ -160,7 +160,7 @@ async def notify_tax_gate_blocked(
     db: AsyncSession,
 ) -> None:
     """세금영향 게이트로 계획 생성이 보류됐음을 알린다 — 같은 알림에 대해 하루 1회만 발송(dedup)."""
-    from app.services.email_service import send_tax_impact_gate_blocked_email
+    from app.services.notifications.email_service import send_tax_impact_gate_blocked_email
     from app.utils.cache_keys import TTL_TAX_IMPACT_GATE_ALERT_SENT, tax_impact_gate_alert_sent_key
 
     await _notify_gate_blocked(
@@ -200,7 +200,7 @@ async def notify_market_signal_gate_blocked(
     db: AsyncSession,
 ) -> None:
     """시장신호 게이트(전술 방어 국면 포함)로 계획 생성이 보류됐음을 알린다 — 같은 알림에 대해 하루 1회만 발송."""
-    from app.services.email_service import send_market_signal_gate_blocked_email
+    from app.services.notifications.email_service import send_market_signal_gate_blocked_email
     from app.utils.cache_keys import TTL_MARKET_SIGNAL_GATE_ALERT_SENT, market_signal_gate_alert_sent_key
 
     tactical = blocked.market_condition_mode == "TACTICAL"
@@ -248,7 +248,7 @@ async def notify_daily_value_cap_blocked(
     이 게이트는 알림(alert) 단위가 아닌 유저 단위로 평가되므로, dedup 키도 alert.id가 아닌
     user_id 기준 — 같은 유저의 여러 PER_ACCOUNT 알림이 같은 날 같은 상한에 걸려도 중복 발송하지 않는다.
     """
-    from app.services.email_service import send_daily_value_cap_gate_blocked_email
+    from app.services.notifications.email_service import send_daily_value_cap_gate_blocked_email
     from app.utils.cache_keys import TTL_DAILY_VALUE_CAP_ALERT_SENT, daily_value_cap_gate_alert_sent_key
 
     await _notify_gate_blocked(
@@ -285,7 +285,7 @@ async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UU
     """leg 실행 완료 후 결과 이메일/푸시 발송 (기존 실행완료 템플릿 재사용)."""
     from app.models.asset import RebalancingExecution
     from app.models.user import User, UserSettings
-    from app.services.email_service import send_rebalancing_execution_email
+    from app.services.notifications.email_service import send_rebalancing_execution_email
 
     exec_result = await db.scalar(
         select(RebalancingExecution)
@@ -345,7 +345,7 @@ async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_m
     아예 생성되지 않아 사용자가 이력 탭을 직접 열어보지 않으면 알 방법이 없었다 — 그 공백을 메운다.
     """
     from app.models.user import User, UserSettings
-    from app.services.email_service import send_rebalancing_plan_execution_failed_email
+    from app.services.notifications.email_service import send_rebalancing_plan_execution_failed_email
 
     row = await db.execute(
         select(Portfolio.name, User.email, UserSettings.notification_email, UserSettings.fcm_token)

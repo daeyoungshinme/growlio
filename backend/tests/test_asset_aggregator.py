@@ -17,7 +17,7 @@ class TestXirr:
 
     def test_simple_annual_return(self):
         """1년 후 10% 수익 → XIRR ≈ 10%."""
-        from app.services.returns_calculator import xirr as _xirr
+        from app.services.portfolio.returns_calculator import xirr as _xirr
 
         today = today_kst()
         start = today.replace(year=today.year - 1)
@@ -28,14 +28,14 @@ class TestXirr:
 
     def test_returns_none_for_single_cashflow(self):
         """단일 캐시플로는 None 반환."""
-        from app.services.returns_calculator import xirr as _xirr
+        from app.services.portfolio.returns_calculator import xirr as _xirr
 
         cashflows = [(today_kst(), -1_000_000.0)]
         assert _xirr(cashflows) is None
 
     def test_returns_none_for_all_positive(self):
         """모두 양수인 경우 None 반환 (입금만 있는 경우)."""
-        from app.services.returns_calculator import xirr as _xirr
+        from app.services.portfolio.returns_calculator import xirr as _xirr
 
         today = today_kst()
         cashflows = [(today - timedelta(days=365), 500_000.0), (today, 500_000.0)]
@@ -43,7 +43,7 @@ class TestXirr:
 
     def test_returns_none_for_all_negative(self):
         """모두 음수인 경우 None 반환 (출금만 있는 경우)."""
-        from app.services.returns_calculator import xirr as _xirr
+        from app.services.portfolio.returns_calculator import xirr as _xirr
 
         today = today_kst()
         cashflows = [(today - timedelta(days=365), -500_000.0), (today, -500_000.0)]
@@ -51,7 +51,7 @@ class TestXirr:
 
     def test_reasonable_range_enforced(self):
         """비현실적인 수익률(-99% 초과 또는 1000% 초과)은 None 반환."""
-        from app.services.returns_calculator import xirr as _xirr
+        from app.services.portfolio.returns_calculator import xirr as _xirr
 
         today = today_kst()
         # 극단적인 손실: -99.9% → 반환 불가 범위
@@ -62,7 +62,7 @@ class TestXirr:
 
     def test_estimated_path_two_points(self):
         """스냅샷 기반 추정(2개 포인트)도 수렴해야 한다."""
-        from app.services.returns_calculator import xirr as _xirr
+        from app.services.portfolio.returns_calculator import xirr as _xirr
 
         start = date(2024, 1, 1)
         end = date(2025, 1, 1)
@@ -82,7 +82,7 @@ class TestCalcXirr:
     @pytest.mark.asyncio
     async def test_returns_estimated_when_no_transactions(self, mock_db):
         """트랜잭션 없을 때 스냅샷 기반 추정 경로."""
-        from app.services.asset_aggregator import _calc_xirr
+        from app.services.portfolio.asset_aggregator import _calc_xirr
 
         user_id = uuid.uuid4()
         current_total = 11_000_000.0
@@ -110,7 +110,7 @@ class TestCalcXirr:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_transactions_and_no_snapshot(self, mock_db):
         """트랜잭션도 스냅샷도 없으면 None 반환."""
-        from app.services.asset_aggregator import _calc_xirr
+        from app.services.portfolio.asset_aggregator import _calc_xirr
 
         user_id = uuid.uuid4()
 
@@ -129,7 +129,7 @@ class TestCalcXirr:
     @pytest.mark.asyncio
     async def test_uses_transactions_when_available(self, mock_db):
         """트랜잭션이 있으면 직접 계산."""
-        from app.services.asset_aggregator import _calc_xirr
+        from app.services.portfolio.asset_aggregator import _calc_xirr
 
         user_id = uuid.uuid4()
         current_total = 11_000_000.0
@@ -156,7 +156,7 @@ class TestCalcXirr:
         삭제 계좌의 입금만 남으면 XIRR이 크게 음수로 왜곡된다. 계좌 미지정 입출금은 유지."""
         from sqlalchemy.dialects import postgresql
 
-        from app.services.asset_aggregator import _calc_xirr
+        from app.services.portfolio.asset_aggregator import _calc_xirr
 
         tx_result = MagicMock()
         tx_result.all.return_value = [
@@ -189,7 +189,7 @@ class TestGetMonthlyTrend:
         """Cache 캐시 히트 시 DB 쿼리 없이 반환."""
         import json
 
-        from app.services.asset_aggregator import get_monthly_trend
+        from app.services.portfolio.asset_aggregator import get_monthly_trend
 
         user_id = uuid.uuid4()
         cached_data = [{"month": "2025-01-01", "total_krw": 10_000_000.0}]
@@ -203,7 +203,7 @@ class TestGetMonthlyTrend:
     @pytest.mark.asyncio
     async def test_cache_miss_queries_db(self, mock_db, mock_cache):
         """Cache 캐시 미스 시 DB 쿼리 후 캐시 저장."""
-        from app.services.asset_aggregator import get_monthly_trend
+        from app.services.portfolio.asset_aggregator import get_monthly_trend
 
         user_id = uuid.uuid4()
         mock_cache.get = AsyncMock(return_value=None)
@@ -225,7 +225,7 @@ class TestGetMonthlyTrend:
     @pytest.mark.asyncio
     async def test_no_cache_queries_db_directly(self, mock_db):
         """cache=None이면 캐시 없이 DB 직접 조회."""
-        from app.services.asset_aggregator import get_monthly_trend
+        from app.services.portfolio.asset_aggregator import get_monthly_trend
 
         user_id = uuid.uuid4()
 
@@ -249,7 +249,7 @@ class TestGetNoSnapAccounts:
     @pytest.mark.asyncio
     async def test_empty_snapped_ids_no_not_in_clause(self, mock_db):
         """snapped_ids가 비어있으면 NOT IN 조건 없이 쿼리."""
-        from app.services.composition_calculator import get_no_snap_accounts
+        from app.services.portfolio.composition_calculator import get_no_snap_accounts
 
         user_id = uuid.uuid4()
         mock_db.execute.return_value.scalars.return_value.all.return_value = []
@@ -262,7 +262,7 @@ class TestGetNoSnapAccounts:
     @pytest.mark.asyncio
     async def test_snapped_ids_excluded_via_sql(self, mock_db):
         """snapped_ids가 있으면 SQL NOT IN으로 처리 후 모두 반환."""
-        from app.services.composition_calculator import get_no_snap_accounts
+        from app.services.portfolio.composition_calculator import get_no_snap_accounts
 
         user_id = uuid.uuid4()
         acc_id = uuid.uuid4()

@@ -1,4 +1,4 @@
-"""services/position_aggregator.py 단위 테스트."""
+"""services/portfolio/position_aggregator.py 단위 테스트."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.position_aggregator import query_latest_position_map
+from app.services.portfolio.position_aggregator import query_latest_position_map
 
 
 def _snapshot(snapshot_id):

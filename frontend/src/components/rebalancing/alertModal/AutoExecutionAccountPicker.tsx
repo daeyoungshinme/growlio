@@ -14,7 +14,7 @@ export default function AutoExecutionAccountPicker({ accounts, value, onChange }
   if (accounts.length === 1) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
-        <span>{accounts[0].name}</span>
+        <span>{accounts[0]?.name}</span>
         <span className="text-xs text-gray-400 dark:text-gray-500">(자동 선택)</span>
       </div>
     );

@@ -32,7 +32,7 @@ def test_portfolio_name_and_item_lengths_follow_columns():
 def test_credential_length_fits_encrypted_column():
     # AES-GCM hex 저장값이 String(512)를 넘지 않는 평문 길이까지만 받는다
     from app.schemas.asset import MAX_CREDENTIAL_LENGTH, AssetAccountUpdate
-    from app.services.credential_service import encrypt
+    from app.services.accounts.credential_service import encrypt
 
     with pytest.raises(ValidationError):
         AssetAccountUpdate(kis_app_secret="s" * (MAX_CREDENTIAL_LENGTH + 1))

@@ -51,9 +51,9 @@ from app.services.goal.recommendation_universe import (
     resolve_distribution_frequency,
     resolve_tracking_index,
 )
-from app.services.market_data_fetcher import fetch_yf_close_series
-from app.services.position_aggregator import query_latest_position_map
-from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
+from app.services.market_data.market_data_fetcher import fetch_yf_close_series
+from app.services.market_data.yahoo_price import run_yf_bounded, to_yf_symbol
+from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import (
     TTL_CANDIDATE_OVERLAP,
     CacheStoreType,

@@ -107,22 +107,25 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 ### Services (`services/`)
 
 > 접미사 관례: `*_service.py`(DB/외부 API 유스케이스), `*_calculator.py`/`*_aggregator.py`(순수 계산), 접미사 없음(도메인 유틸). 강제 아님. 파일 추가/삭제 시 이 목록도 갱신.
-> 도메인 패키지(`goal/`·`etf/`·`tactical/`·`tax/`·`market_signal/`·`backtest/`, 기존 `rebalancing/`·`alerts/`·`dividend/`)는 re-export shim 없이 `app.services.<pkg>.<module>`로 import·patch한다. 공용 계층(시세·자산·포트폴리오·알림 발송)은 아직 평면 모듈.
+> 도메인 패키지(`accounts/`·`portfolio/`·`market_data/`·`notifications/`·`goal/`·`etf/`·`tactical/`·`tax/`·`market_signal/`·`backtest/`·`rebalancing/`·`alerts/`·`dividend/`)는 re-export shim 없이 `app.services.<pkg>.<module>`로 import·patch한다. 평면에 남은 건 단일 도메인 모듈뿐(아래 "기타").
 
-**자산·동기화**
+**계좌·동기화 (`accounts/`)**
+- `credential_service.py` — AES-256 암복호화
 - `asset_service.py` — 계좌별 sync + `sync_account_now`(assets `/sync` 전용)
 - `asset_credential_service.py` — 브로커 자격증명 검증·삭제
 - `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). `sync_accounts`(세마포어 3)는 `jobs/asset_sync`도 재사용. 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 브로커 응답 대기 중 커넥션 점유로 풀 고갈 방지. 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
 - `snapshot_service.py` — 스냅샷 upsert·포지션 sync 헬퍼
+- 쿼리 헬퍼: `_snapshot_queries.py`(최신 스냅샷 서브쿼리), `_account_queries.py`(활성 계좌 — `active_accounts_stmt()`/`active_broker_accounts_stmt()`)
+
+**포트폴리오·자산 집계 (`portfolio/`)**
 - `asset_aggregator.py` — 대시보드 집계, XIRR·연환산·벤치마크, 월별 추이(`get_monthly_trend`)
 - `portfolio_service.py` — overview 집계. 부분집합 총자산 반복 계산은 `prefetch_accounts_snapshot_positions()`/`compute_total_assets_krw()`로 1회 조회 재사용
 - `portfolio_history_service.py` · `position_aggregator.py` · `returns_calculator.py`
 - `composition_calculator.py` — 자산 구성. `exclude_real_estate()`는 목표 진행률·필요수익률 등 "투자자산" 계산 전용(대시보드 총자산 표시엔 미적용)
 - `period_purchase_service.py` — 기간별 매수 수익률. 스냅샷 수량·평단 변화로 추정, 수기 BUY 기록 있으면 기록 우선. **해외는 `avg_price_usd`로 역산 후 그 스냅샷 `usd_rate`로 환산**(원화 평단은 매일 재환산돼 역산 불가). 기록 market과 브로커 포지션 market이 달라 `_position_key_aligner`로 정렬
-- `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR)
-- 쿼리 헬퍼: `_snapshot_queries.py`(최신 스냅샷 서브쿼리), `_account_queries.py`(활성 계좌 — `active_accounts_stmt()`/`active_broker_accounts_stmt()`), `_position_queries.py`, `_settings_queries.py`, `_portfolio_queries.py`
+- 쿼리 헬퍼: `_position_queries.py`, `_portfolio_queries.py`
 
-**시세·환율**
+**시세 (`market_data/`)**
 - `price_service.py` — 현재가(Yahoo → KIS). `yahoo_price.py` — Yahoo 유틸. **브로커 잔고는 국내 market을 전부 "KOSPI"로 채운다** — `to_yf_symbol()`이 `_kosdaq_tickers`(FDR, 매일 07:00 갱신)로 `.KQ` 교정. 저장된 market은 매칭 키라 바꾸지 않음. pykrx 상장목록은 KRX 로그인 요구로 사용 불가
 - `price_sync_sources.py` — 국내 Naver/pykrx 폴백 (Yahoo 클라우드 IP 차단 대비)
 - `stock_search_service.py` — 네이버(한글)/Yahoo(영문·티커) 검색
@@ -137,7 +140,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
   - `plan_execution.py` — leg 실행/취소/만료. 매수는 대기 후 자동(실행 직전 시장 게이트 재확인), 매도는 이메일 승인. 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 방지. `token_consumed_at`만 찍힌 채 30분 넘은 PENDING은 `fail_stuck_consumed_legs()`가 FAILED 마감(재실행 안 함)
   - `plan_notifications.py` — 플랜 알림 (차단 안내는 하루 1회 durable dedup)
 - `quick_execute_service.py` — "지금 계획 생성". 상태 enum만 반환, 문구는 라우터가 조립. 계좌 소유권 검증은 콜백 주입(**서비스→API 계층 import 금지**)
-- `execution_service.py` — 주문 조율. 실제 주문은 `_kis_order_executor.py`/`_kiwoom_order_executor.py`(FULL 매수는 실행 직전 가용현금으로 예산 clamp), 공용 `_order_executor_common.py`, `_order_quantity_guard.py`(매도→보유수량, 매수→예산)
+- `execution_service.py` — 주문 조율. 실제 주문은 `_kis_order_executor.py`/`_kiwoom_order_executor.py`(FULL 매수는 실행 직전 가용현금으로 예산 clamp), 공용 `_order_executor_common.py`(국내 지정가 호가 보정 `snap_domestic_limit_price` 포함), `_order_quantity_guard.py`(매도→보유수량, 매수→예산), `_broker_order_flow.py`(매도 clamp·FULL 예산 clamp 흐름 — 브로커 차이는 `BrokerOrderOps`로 주입)
 - `order_cancel_service.py` — 실행 주문의 미체결분 취소(체결 조회 없이 요청, 증권사 거부=CANCEL_FAILED). **KIS 국내 취소는 주문 응답의 `KRX_FWDG_ORD_ORGNO`(`order_org_no`) 저장이 필수** — 없으면 취소 불가. 증권사 거부는 `BrokerOrderRejectedError`가 아니라 클라이언트의 `KisApiError`/`KiwoomApiError`로 먼저 온다. 취소 가능 판정(`cancel_block_reason`·활성 계좌 유형)은 `order_cancel_rules.py` — 실행 직후 결과·이력 상세·취소 요청이 같은 규칙을 쓴다. **토큰 발급은 DB commit을 하므로 주문 행 `FOR UPDATE` 전에** 받고 잠근 뒤 재확인
 - `krx_tick.py` — 국내 지정가 호가단위 보정(ETF·ETN 5원, 매수 내림·매도 올림)
 - `alert_check.py` — 드리프트 알림(10분 job). 복합신호 on/off는 **유저 단위**
@@ -150,7 +153,6 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `_goal_recommendation_common.py` — 세 진입점 공용 헬퍼·계산 골격(`import ... as _grc`, patch 경로도 여기 하나). **단 외부 조회(`get_historical_returns`/`fetch_yf_daily_returns`/`build_portfolio_overview`)는 테스트가 진입점 모듈 경로로 patch하므로 진입점에 남기고 인자로 넘긴다**(옮기면 patch 수백 곳 무효화). 추천 출력은 `tests/test_goal_recommendation_snapshots.py`가 고정 — 리팩터링 후 반드시 통과, 의도적 변경 시만 `UPDATE_GOAL_SNAPSHOTS=1`
 - `goal_age_recommendation_service.py`(연령대) · `goal_horizon_recommendation_service.py`(투자기간 × 세제유형, 최대 15조합, IRP 안전자산 30% 하한)
 - `goal_portfolio_optimizer.py` — MVO(SLSQP). **배당 목표 사전검증은 `class_bounds` 그룹 예산도 반영 필수** — 종목 상한만 보면 SLSQP 전체 실패(빈 추천)
-- `estimation.py` — Ledoit-Wolf 공분산·James-Stein 기대수익률 축소(고정 노이즈분산 사용 — 표본분산 재사용 시 축소 상쇄 버그)
 - `goal_candidate_service.py` — 후보 관리(락). `pension_ineligibility_reason()`은 종목명 브랜드 휴리스틱 — 신규 ETF 브랜드는 `_KR_ETF_BRAND_PREFIXES`에 추가
 - `goal_return_solver.py` — 역산 순수 함수 + `build_feasibility_preview`(마법사·nestlio 공유)
 - `recommendation_universe.py` — 큐레이션 ETF 유니버스. `index_key_from_base_index`는 중복 분석·지수 분류 공용 — **복제 금지**
@@ -176,7 +178,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `alert_service.py` — 공통 저장·조회·격리 루프(rollback 뒤 행 객체는 refresh 후 사용). 체크 함수 re-export 없음 — 구현 모듈에서 직접 import
 - `exchange_rate_service.py` · `stock_price_service.py` · `calculator.py`(조건 판단)
 - `market_signal_alert_service.py` — 등급 전환 즉시 알림 + 08:30 요약. `check_composite_signal`을 alert_check·diagnosis와 공유
-- `_dispatch.py` — 이메일+푸시 2채널, 하나라도 성공하면 AlertHistory 저장
+- `_dispatch.py` — 이메일+푸시 2채널, 하나라도 성공하면 AlertHistory 저장. 단독 푸시는 `send_push_safely`(예외 로깅 후 삼킴)
 - `tax_reminder_service.py` · `recommendation_drift_alert_service.py`(추천 변화 3%p↑ — 프론트와 임계값 동일)
 
 **시장 신호 (`market_signal/`)**
@@ -186,12 +188,16 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 
 **기타**
 - `factor_service.py` · `insight_service.py` · `risk_service.py` · `portfolio_optimizer.py`(효율적 프론티어)
+- `estimation.py` — Ledoit-Wolf 공분산·James-Stein 기대수익률 축소(고정 노이즈분산 사용 — 표본분산 재사용 시 축소 상쇄 버그). `goal/goal_portfolio_optimizer`·`portfolio_optimizer` 공용이라 평면
 - `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
 - `dca_service.py` · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
 - `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → pykrx → FDR → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_dividend_data`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
-- `credential_service.py`(AES-256) · `email_service.py` · `email_templates/`(`_shared`·`alerts`·`rebalancing`·`market_signal`·`reports`, `__init__.py` 전체 재노출) · `push_service.py`(폐기 토큰 별도 세션 삭제, 토큰은 기기 단위)
+- `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR) · `_settings_queries.py`
+
+**알림 발송 채널 (`notifications/`)**
+- `email_service.py` · `email_templates/`(`_shared`·`alerts`·`rebalancing`·`market_signal`·`reports`, `__init__.py` 전체 재노출) · `push_service.py`(폐기 토큰 별도 세션 삭제, 토큰은 기기 단위)
 
 ### 그 외 패키지
 
@@ -200,6 +206,7 @@ schemas/        Pydantic(라우터 인라인 스키마 금지 — 알림은 sche
 core/
   config.py     Settings(pydantic-settings)
   database.py   async engine/session, Base
+  job_runner.py report_job_failure(로그+Sentry) · run_per_user(유저별 동시성·실패 격리) — jobs와 알림 서비스 공용
   logging.py    structlog 시크릿 redact + yfinance 404 소음 필터. 계좌번호·이메일은 utils/masking.py.
                 **응답·DB·알림에 예외 사유는 str(e) 대신 public_error_message(e)** (SQL 파라미터·URL의 계좌번호 유출 방지)
   cache_store.py in-memory TTL 캐시(LRU 20,000). **프로세스 로컬** — 워커/인스턴스 2개↑면 적중률 급락·무효화 미전파(render.yaml은 단일 전제)
@@ -247,7 +254,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트
 | `token_refresh.py` | 06:00 | 실패는 스택 없는 capture_message(자격증명 지역변수 전송 방지) |
 | `startup_warmup.py` | 기동 직후 1회 | 환율·시장신호·JWKS 예열 |
 | `cache_sweep.py` / `app_state_sweep.py` | 15분 / 04:10 | 만료 캐시 / durable row 청소 |
-| `_job_helpers.py` | — | job 공통 헬퍼 |
+| `_job_helpers.py` | — | job 공통 헬퍼(`run_alert_job`·`peak_rss_mb`). 유저별 루프 `run_per_user`·`report_job_failure`는 `core/job_runner.py`(알림 서비스도 쓰므로 core) |
 
 - **새 job**: 파일 생성 → `scheduler.py` `init_scheduler()` jobs 리스트에 `(함수, 트리거, id)` 추가(cron은 `kst(...)` 헬퍼) → `tests/test_scheduler.py` `EXPECTED_JOB_IDS` 갱신.
 

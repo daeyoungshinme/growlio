@@ -36,10 +36,10 @@ def _run(notify, blocked, *, email_ok: bool, push_ok: bool):
             patch("app.utils.durable_state.get_durable", AsyncMock(return_value=None)),
             patch("app.utils.durable_state.set_durable", mocks["set_durable"]),
             patch("app.services.alerts._dispatch.save_alert_history", mocks["history"]),
-            patch("app.services.push_service.send_push_to_user", mocks["push"]),
-            patch("app.services.email_service.send_tax_impact_gate_blocked_email", mocks["email"]),
-            patch("app.services.email_service.send_market_signal_gate_blocked_email", mocks["email"]),
-            patch("app.services.email_service.send_daily_value_cap_gate_blocked_email", mocks["email"]),
+            patch("app.services.notifications.push_service.send_push_to_user", mocks["push"]),
+            patch("app.services.notifications.email_service.send_tax_impact_gate_blocked_email", mocks["email"]),
+            patch("app.services.notifications.email_service.send_market_signal_gate_blocked_email", mocks["email"]),
+            patch("app.services.notifications.email_service.send_daily_value_cap_gate_blocked_email", mocks["email"]),
         ):
             await notify(alert, portfolio, blocked, "u@x.com", "tok", AsyncMock())
 

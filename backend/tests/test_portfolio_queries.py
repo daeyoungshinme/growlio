@@ -1,4 +1,4 @@
-"""services/_portfolio_queries.py 단위 테스트."""
+"""services/portfolio/_portfolio_queries.py 단위 테스트."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from app.services._portfolio_queries import get_active_alert_thresholds
+from app.services.portfolio._portfolio_queries import get_active_alert_thresholds
 
 
 class TestGetActiveAlertThresholds:

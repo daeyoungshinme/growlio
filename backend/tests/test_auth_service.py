@@ -148,7 +148,7 @@ class TestCredentialServiceGetKey:
     def test_raises_if_key_not_32_bytes(self, monkeypatch):
         """decryption 키가 32바이트가 아니면 ValueError 발생."""
         import app.core.config as config_mod
-        import app.services.credential_service as cs_mod
+        import app.services.accounts.credential_service as cs_mod
 
         # 10바이트 (20자 hex) — unhexlify 후 10바이트여서 != 32 에러
         short_hex = "aa" * 10

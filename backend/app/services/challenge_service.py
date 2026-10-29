@@ -31,7 +31,7 @@ from app.schemas.challenge import (
     ChallengeUpdate,
 )
 from app.services._settings_queries import get_or_create_settings
-from app.services.composition_calculator import build_asset_totals, exclude_real_estate
+from app.services.portfolio.composition_calculator import build_asset_totals, exclude_real_estate
 from app.utils.cache_keys import (
     TTL_CHALLENGE_PROGRESS,
     CacheStoreType,
@@ -183,7 +183,7 @@ async def compute_progress(
         )
 
     if challenge.challenge_type == CHALLENGE_RETURN_PCT:
-        from app.services.asset_aggregator import get_dashboard_summary
+        from app.services.portfolio.asset_aggregator import get_dashboard_summary
 
         summary = await get_dashboard_summary(user_id, db, cache)
         cur = _current_return_pct(summary)

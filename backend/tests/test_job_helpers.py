@@ -66,7 +66,7 @@ async def test_run_alert_job_logs_exception_without_propagating():
 async def test_run_per_user_isolates_failures_and_resolves_email():
     from types import SimpleNamespace
 
-    from app.jobs._job_helpers import run_per_user
+    from app.core.job_runner import run_per_user
 
     ok_user = SimpleNamespace(id="u1", email="signup@example.com")
     bad_user = SimpleNamespace(id="u2", email="b@example.com")
@@ -81,7 +81,7 @@ async def test_run_per_user_isolates_failures_and_resolves_email():
             raise RuntimeError("boom")
         seen.append((user.id, to_email))
 
-    with patch("app.jobs._job_helpers.report_job_failure") as report:
+    with patch("app.core.job_runner.report_job_failure") as report:
         await run_per_user(rows, handle, concurrency=2, failure_event="x_failed")
 
     assert seen == [("u1", "alerts@example.com")]

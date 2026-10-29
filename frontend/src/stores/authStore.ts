@@ -91,8 +91,8 @@ async function markPasswordResetDone(): Promise<void> {
         JSON.stringify({ ...cached, needsPasswordReset: false } satisfies AuthMeCache),
       );
     }
-  } catch {
-    /* ignore */
+  } catch (e) {
+    console.warn("[auth] password-reset-complete failed", e);
   }
 }
 
@@ -306,6 +306,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+      // 설정 화면의 일반 변경은 대부분 플래그가 이미 꺼져 있다 — 켜져 있을 때만 서버에 알린다
+      if (!get().needsPasswordReset) return;
       set({ needsPasswordReset: false });
       await markPasswordResetDone();
     },

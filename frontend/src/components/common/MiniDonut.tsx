@@ -37,6 +37,7 @@ export default memo(function MiniDonut({ data, label = "자산 구성", hideValu
     const length = (Math.max(d.value, 0) / total) * CIRCUMFERENCE;
     const seg = {
       key: `${d.name}-${i}`,
+      datum: d,
       color: PIE_COLORS[i % PIE_COLORS.length],
       dash: single ? length : Math.max(length - GAP, 0),
       offset,
@@ -69,8 +70,8 @@ export default memo(function MiniDonut({ data, label = "자산 구성", hideValu
             className="cursor-pointer transition-[stroke-width] duration-150"
           >
             <title>
-              {`${data[i].name} ${data[i].pct.toFixed(1)}%` +
-                (hideValues ? "" : ` (${fmtKrwShort(data[i].value)}원)`)}
+              {`${s.datum.name} ${s.datum.pct.toFixed(1)}%` +
+                (hideValues ? "" : ` (${fmtKrwShort(s.datum.value)}원)`)}
             </title>
           </circle>
         ))}

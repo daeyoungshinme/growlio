@@ -124,7 +124,8 @@ export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
     }));
     // 반올림 오차 보정: 마지막 항목에 나머지 비중 합산
     const diff = Math.round((100 - newItems.reduce((s, i) => s + i.weight, 0)) * 10) / 10;
-    if (newItems.length > 0 && diff !== 0) newItems[newItems.length - 1].weight += diff;
+    const last = newItems[newItems.length - 1];
+    if (last && diff !== 0) last.weight += diff;
 
     setItems(newItems);
   }

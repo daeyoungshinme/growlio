@@ -98,12 +98,12 @@ export function useModalBehavior(onClose: () => void) {
       if (e.shiftKey) {
         if (document.activeElement === els[0]) {
           e.preventDefault();
-          els[els.length - 1].focus();
+          els[els.length - 1]?.focus();
         }
       } else {
         if (document.activeElement === els[els.length - 1]) {
           e.preventDefault();
-          els[0].focus();
+          els[0]?.focus();
         }
       }
     };

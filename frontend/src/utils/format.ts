@@ -77,7 +77,7 @@ export function fmtMonth(monthStr: string): string {
  * KST 외 타임존에서 하루 밀릴 수 있으므로, 로컬 날짜가 필요하면 이 값으로 `new Date(y, m - 1, d)`를 만든다.
  */
 export function parseYmd(dateStr: string): { year: number; month: number; day: number } {
-  const [year, month, day] = dateStr.split("-").map(Number);
+  const [year = NaN, month = NaN, day = NaN] = dateStr.split("-").map(Number);
   return { year, month, day };
 }
 

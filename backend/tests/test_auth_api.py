@@ -475,7 +475,7 @@ class TestDeleteAccount:
             patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
             patch("app.api.v1.auth.delete_supabase_user", AsyncMock(return_value=None)),
             patch("app.api.v1.auth.get_cache_store", AsyncMock(return_value=cache_mock)),
-            patch("app.services.email_service.send_account_deletion_email", AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_account_deletion_email", AsyncMock(return_value=True)),
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.post(

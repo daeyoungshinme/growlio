@@ -47,7 +47,7 @@ class TestRegimeLookup:
 
 class TestBlockedNotice:
     def test_email_labels_match_gate_rules(self):
-        from app.services.email_templates.rebalancing import market_signal_gate_blocked_template
+        from app.services.notifications.email_templates.rebalancing import market_signal_gate_blocked_template
 
         _, cautious = market_signal_gate_blocked_template("P", "RED", "CAUTIOUS")
         _, strict = market_signal_gate_blocked_template("P", "YELLOW", "STRICT")
@@ -55,7 +55,7 @@ class TestBlockedNotice:
         assert "엄격(YELLOW·RED 차단)" in strict
 
     def test_tactical_email(self):
-        from app.services.email_templates.rebalancing import market_signal_gate_blocked_template
+        from app.services.notifications.email_templates.rebalancing import market_signal_gate_blocked_template
 
         subject, html = market_signal_gate_blocked_template("적립", "GREEN", "TACTICAL")
         assert "적립 매수 보류" in subject
@@ -75,8 +75,8 @@ class TestBlockedNotice:
         with (
             patch("app.utils.durable_state.get_durable", AsyncMock(return_value=None)),
             patch("app.utils.durable_state.set_durable", AsyncMock()),
-            patch("app.services.email_service.send_market_signal_gate_blocked_email", AsyncMock()),
-            patch("app.services.push_service.send_push_to_user", push),
+            patch("app.services.notifications.email_service.send_market_signal_gate_blocked_email", AsyncMock()),
+            patch("app.services.notifications.push_service.send_push_to_user", push),
             patch("app.services.alerts._dispatch.save_alert_history", history),
         ):
             await pn.notify_market_signal_gate_blocked(alert, portfolio, blocked, "u@x.com", "tok", db)

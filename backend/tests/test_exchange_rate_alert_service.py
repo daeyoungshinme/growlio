@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 _FETCH_RATE = "app.services.alerts.exchange_rate_service.fetch_usd_krw"
-_SEND_EMAIL = "app.services.email_service.send_exchange_rate_alert"
-_SEND_PUSH = "app.services.push_service.send_push_to_user"
+_SEND_EMAIL = "app.services.notifications.email_service.send_exchange_rate_alert"
+_SEND_PUSH = "app.services.notifications.push_service.send_push_to_user"
 _SAVE_HIST = "app.services.alerts.alert_service.save_alert_history"
 
 

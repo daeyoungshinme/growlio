@@ -109,7 +109,7 @@ interface GoalChipsInput {
   expectedGoalYear: number | null;
 }
 
-export interface GoalChipsResult {
+interface GoalChipsResult {
   chips: GoalChip[];
   /** 모바일에서 기본 노출할 "가장 뒤처진 목표" — 모두 순항이면 null */
   laggingKey: string | null;

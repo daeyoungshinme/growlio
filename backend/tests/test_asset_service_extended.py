@@ -12,7 +12,7 @@ import pytest
 class TestGetProvider:
     def test_kis_api_returns_kis_provider(self, override_settings, make_account):
         from app.providers.kis_provider import KISProvider
-        from app.services.asset_service import get_provider
+        from app.services.accounts.asset_service import get_provider
 
         account = make_account(data_source="KIS_API")
         provider = get_provider(account)
@@ -20,7 +20,7 @@ class TestGetProvider:
 
     def test_kiwoom_api_returns_kiwoom_provider(self, override_settings, make_account):
         from app.providers.kiwoom_provider import KiwoomProvider
-        from app.services.asset_service import get_provider
+        from app.services.accounts.asset_service import get_provider
 
         account = make_account(data_source="KIWOOM_API")
         provider = get_provider(account)
@@ -28,7 +28,7 @@ class TestGetProvider:
 
     def test_manual_returns_manual_provider(self, override_settings, make_account):
         from app.providers.manual_provider import ManualProvider
-        from app.services.asset_service import get_provider
+        from app.services.accounts.asset_service import get_provider
 
         account = make_account(data_source="MANUAL")
         provider = get_provider(account)
@@ -36,7 +36,7 @@ class TestGetProvider:
 
     def test_unknown_raises_credential_error(self, override_settings, make_account):
         from app.exceptions import ProviderCredentialError
-        from app.services.asset_service import get_provider
+        from app.services.accounts.asset_service import get_provider
 
         account = make_account(data_source="UNKNOWN_SOURCE")
         with pytest.raises(ProviderCredentialError):
@@ -47,7 +47,7 @@ class TestSyncAccount:
     @pytest.mark.asyncio
     async def test_sync_account_calls_provider_and_returns_snapshot(self, mock_db, override_settings, make_account):
         from app.providers.base import BalanceResult
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="MANUAL")
 
@@ -62,10 +62,10 @@ class TestSyncAccount:
         fake_snapshot = SimpleNamespace(id=uuid.uuid4())
 
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             result = await sync_account(account, mock_db, cache=MagicMock())
 
@@ -76,7 +76,7 @@ class TestSyncAccount:
     @pytest.mark.asyncio
     async def test_sync_account_updates_deposit_krw(self, mock_db, override_settings, make_account):
         from app.providers.base import BalanceResult
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="MANUAL")
 
@@ -91,10 +91,10 @@ class TestSyncAccount:
         fake_snapshot = SimpleNamespace(id=uuid.uuid4())
 
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
 
@@ -104,7 +104,7 @@ class TestSyncAccount:
     async def test_sync_account_updates_deposit_usd_from_foreign(self, mock_db, override_settings, make_account):
         """deposit_foreign 있으면 account.deposit_usd에 반영 (line 99)."""
         from app.providers.base import BalanceResult
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="MANUAL")
 
@@ -119,10 +119,10 @@ class TestSyncAccount:
         fake_snapshot = SimpleNamespace(id=uuid.uuid4())
 
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
 
@@ -134,7 +134,7 @@ class TestSyncAccount:
     ):
         """deposit_foreign=None(해외 조회 실패/미조회) → 기존 account.deposit_usd 유지."""
         from app.providers.base import BalanceResult
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="KIWOOM_API")
         account.deposit_usd = 777.0
@@ -144,14 +144,14 @@ class TestSyncAccount:
         mock_provider.sync = AsyncMock(return_value=balance)
 
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._CIRCUITS", {}),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._CIRCUITS", {}),
             patch(
-                "app.services.asset_service._upsert_snapshot",
+                "app.services.accounts.asset_service._upsert_snapshot",
                 new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
 
@@ -161,7 +161,7 @@ class TestSyncAccount:
     async def test_sync_account_deposit_foreign_zero_clears_stale_usd(self, mock_db, override_settings, make_account):
         """deposit_foreign=0.0(확정값) → stale account.deposit_usd를 0으로 갱신."""
         from app.providers.base import BalanceResult
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="KIWOOM_API")
         account.deposit_usd = 777.0
@@ -171,14 +171,14 @@ class TestSyncAccount:
         mock_provider.sync = AsyncMock(return_value=balance)
 
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._CIRCUITS", {}),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._CIRCUITS", {}),
             patch(
-                "app.services.asset_service._upsert_snapshot",
+                "app.services.accounts.asset_service._upsert_snapshot",
                 new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
 
@@ -187,7 +187,7 @@ class TestSyncAccount:
     @pytest.mark.asyncio
     async def test_sync_account_with_positions_deletes_old_positions(self, mock_db, override_settings, make_account):
         from app.providers.base import BalanceResult, Position
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="MANUAL")
 
@@ -211,11 +211,11 @@ class TestSyncAccount:
         fake_snapshot = SimpleNamespace(id=uuid.uuid4())
 
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.sync_snapshot_positions", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
 
@@ -226,7 +226,7 @@ class TestSyncAccount:
     async def test_sync_account_positions_changed_true_for_new_ticker(self, mock_db, override_settings, make_account):
         """기존 보유가 없던 계좌가 신규 매수하면 positions_changed=True → 배당 캐시 전체 무효화."""
         from app.providers.base import BalanceResult, Position
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="MANUAL")
         pos = Position(
@@ -247,11 +247,13 @@ class TestSyncAccount:
 
         # mock_db.execute 기본값(빈 리스트) = 동기화 전 보유 종목 없음
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()) as mock_invalidate,
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.sync_snapshot_positions", new=AsyncMock()),
+            patch(
+                "app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()
+            ) as mock_invalidate,
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             result = await sync_account(account, mock_db, cache=MagicMock())
 
@@ -265,7 +267,7 @@ class TestSyncAccount:
         """이미 보유 중인 종목의 가격/수량만 갱신되는 일반 동기화는 positions_changed=False →
         종목별 배당 추정(외부 API 폴백 체인) 캐시는 그대로 유지해 재계산을 피한다."""
         from app.providers.base import BalanceResult, Position
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="MANUAL")
         pos = Position(
@@ -288,11 +290,13 @@ class TestSyncAccount:
         fake_snapshot = SimpleNamespace(id=uuid.uuid4())
 
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()) as mock_invalidate,
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.sync_snapshot_positions", new=AsyncMock()),
+            patch(
+                "app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()
+            ) as mock_invalidate,
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             result = await sync_account(account, mock_db, cache=MagicMock())
 
@@ -305,7 +309,7 @@ class TestSyncAccount:
     ):
         """성공 시 last_synced_at이 갱신되고, 이전 실패로 남아있던 last_sync_error는 초기화된다."""
         from app.providers.base import BalanceResult
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="MANUAL", last_sync_error="이전 동기화 실패 메시지")
         balance = BalanceResult(total_value_krw=1_000_000.0, positions=[])
@@ -315,10 +319,10 @@ class TestSyncAccount:
         fake_snapshot = SimpleNamespace(id=uuid.uuid4())
 
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
 
@@ -331,7 +335,7 @@ class TestSyncAccount:
     ):
         """provider 호출 실패 시 last_sync_error를 커밋하고 원래 예외를 그대로 재-raise한다."""
         from app.exceptions import ProviderCredentialError
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="KIS_API")
 
@@ -339,8 +343,8 @@ class TestSyncAccount:
         mock_provider.sync = AsyncMock(side_effect=ProviderCredentialError("KIS 자격증명이 없습니다"))
 
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
             pytest.raises(ProviderCredentialError),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
@@ -361,20 +365,20 @@ class TestSyncAccountPositionReplacement:
     """브로커 동기화 결과로 현재 포지션을 교체하는 규칙 (전량 매도 / 해외 조회 실패)."""
 
     async def _run(self, account, balance, mock_db):
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         mock_provider = AsyncMock()
         mock_provider.sync = AsyncMock(return_value=balance)
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._CIRCUITS", {}),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._CIRCUITS", {}),
             patch(
-                "app.services.asset_service._upsert_snapshot",
+                "app.services.accounts.asset_service._upsert_snapshot",
                 new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
-            patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.sync_snapshot_positions", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
 
@@ -411,7 +415,7 @@ class TestSyncAccountPositionReplacement:
         """해외 조회 실패 시 스냅샷 금액·포지션에 보존된 해외 포지션과 기존 외화예수금을 합산한다.
         확정(True)이면 balance 값 그대로."""
         from app.providers.base import BalanceResult, Position
-        from app.services.asset_service import sync_account
+        from app.services.accounts.asset_service import sync_account
 
         account = make_account(data_source="KIS_API")
         account.deposit_usd = 100.0
@@ -440,14 +444,17 @@ class TestSyncAccountPositionReplacement:
         upsert = AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4()))
         snap_positions = AsyncMock()
         with (
-            patch("app.services.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.asset_service._CIRCUITS", {}),
-            patch("app.services.asset_service._upsert_snapshot", new=upsert),
-            patch("app.services.asset_service.sync_snapshot_positions", new=snap_positions),
-            patch("app.services.asset_service._preserved_overseas_positions", new=AsyncMock(return_value=[preserved])),
-            patch("app.services.asset_service.fetch_yahoo_batch", new=AsyncMock(return_value={})),
-            patch("app.services.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
-            patch("app.services.asset_service.broker_sync_duration"),
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.accounts.asset_service._CIRCUITS", {}),
+            patch("app.services.accounts.asset_service._upsert_snapshot", new=upsert),
+            patch("app.services.accounts.asset_service.sync_snapshot_positions", new=snap_positions),
+            patch(
+                "app.services.accounts.asset_service._preserved_overseas_positions",
+                new=AsyncMock(return_value=[preserved]),
+            ),
+            patch("app.services.accounts.asset_service.fetch_yahoo_batch", new=AsyncMock(return_value={})),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, cache=MagicMock())
 
@@ -466,11 +473,13 @@ class TestSyncAccountPositionReplacement:
     @pytest.mark.asyncio
     async def test_revalue_preserved_overseas_uses_yahoo_price(self, override_settings):
         """보존 해외 포지션은 Yahoo 현재가(USD) × 이번 환율로 재평가, 가격 없는 종목은 기존 값 유지."""
-        from app.services.asset_service import _revalue_preserved_overseas
+        from app.services.accounts.asset_service import _revalue_preserved_overseas
 
         aapl = SimpleNamespace(ticker="AAPL", market="NASD", qty=2, current_price=1.0, value_krw=2.0, usd_rate=1.0)
         msft = SimpleNamespace(ticker="MSFT", market="NASD", qty=1, current_price=5.0, value_krw=5.0, usd_rate=1.0)
-        with patch("app.services.asset_service.fetch_yahoo_batch", new=AsyncMock(return_value={"AAPL": 300.0})):
+        with patch(
+            "app.services.accounts.asset_service.fetch_yahoo_batch", new=AsyncMock(return_value={"AAPL": 300.0})
+        ):
             await _revalue_preserved_overseas([aapl, msft], 1_400.0)
 
         assert aapl.current_price == 420_000.0
@@ -482,7 +491,7 @@ class TestSyncAccountPositionReplacement:
     @pytest.mark.asyncio
     async def test_revalue_preserved_overseas_keeps_values_on_failure(self, override_settings, failure):
         from app.core.config import settings
-        from app.services.asset_service import _revalue_preserved_overseas
+        from app.services.accounts.asset_service import _revalue_preserved_overseas
 
         pos = SimpleNamespace(ticker="AAPL", market="NASD", qty=2, current_price=1.0, value_krw=2.0, usd_rate=1.0)
         if failure == "fallback_rate":
@@ -490,7 +499,7 @@ class TestSyncAccountPositionReplacement:
         else:
             yahoo = AsyncMock(side_effect=RuntimeError("boom"))
         rate = settings.usd_krw_fallback_rate if failure == "fallback_rate" else 1_400.0
-        with patch("app.services.asset_service.fetch_yahoo_batch", new=yahoo):
+        with patch("app.services.accounts.asset_service.fetch_yahoo_batch", new=yahoo):
             await _revalue_preserved_overseas([pos], rate)
 
         assert (pos.current_price, pos.value_krw) == (1.0, 2.0)
@@ -512,7 +521,7 @@ class TestSyncAccountNow:
     async def test_uses_own_short_lived_session_and_merges_account(self, mock_db, override_settings, make_account):
         """요청 세션이 아닌 AsyncSessionLocal()로 연 별도 세션을 사용하고, account를 merge해야 한다
         (커넥션 풀 슬롯을 브로커 HTTP 호출 동안 오래 붙잡지 않기 위한 구조 — QueuePool 고갈 수정)."""
-        from app.services.asset_service import sync_account_now
+        from app.services.accounts.asset_service import sync_account_now
 
         account = make_account(data_source="MANUAL")
         fake_snapshot = SimpleNamespace(id=uuid.uuid4(), snapshot_date="2026-09-12", amount_krw=1_000_000.0)
@@ -521,13 +530,15 @@ class TestSyncAccountNow:
         mock_db.__aexit__ = AsyncMock(return_value=None)
         mock_db.merge = AsyncMock(return_value=account)
 
-        from app.services.asset_service import SyncAccountResult
+        from app.services.accounts.asset_service import SyncAccountResult
 
         cache = MagicMock()
         fake_result = SyncAccountResult(snapshot=fake_snapshot, positions_changed=False)
         with (
-            patch("app.services.asset_service.AsyncSessionLocal", return_value=mock_db),
-            patch("app.services.asset_service.sync_account", new=AsyncMock(return_value=fake_result)) as mock_sync,
+            patch("app.services.accounts.asset_service.AsyncSessionLocal", return_value=mock_db),
+            patch(
+                "app.services.accounts.asset_service.sync_account", new=AsyncMock(return_value=fake_result)
+            ) as mock_sync,
         ):
             result = await sync_account_now(account, cache=cache)
 

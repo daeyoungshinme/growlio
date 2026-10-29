@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-from app.services.email_templates import (
+from app.services.notifications.email_templates import (
     exchange_rate_alert_template,
     market_signal_change_template,
     rebalancing_alert_template,
