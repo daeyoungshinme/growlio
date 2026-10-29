@@ -8,7 +8,7 @@
 cd frontend && npm install
 cd frontend && npm run dev            # localhost:5173, /api/* → localhost:8000 프록시
 cd frontend && npm run build          # tsc -b && vite build
-cd frontend && npm run typecheck      # tsc --noEmit(앱, noUncheckedIndexedAccess on) + -p tsconfig.test.json(테스트, off) — build의 tsc -b는 앱만 본다
+cd frontend && npm run typecheck      # tsc --noEmit(앱) + -p tsconfig.test.json(테스트 포함, 같은 엄격도·noUncheckedIndexedAccess on) — build의 tsc -b는 앱만 본다
 cd frontend && npm run lint           # eslint src
 cd frontend && npm run format         # prettier --write src  (검사만: format:check — CI·make lint와 동일)
 cd frontend && npm run test           # vitest run

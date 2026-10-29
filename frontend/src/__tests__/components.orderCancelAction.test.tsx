@@ -73,7 +73,7 @@ describe("OrderResultList — 미체결 취소", () => {
       <OrderResultList results={results([order({ result_id: "r1", cancelable: true })])} />,
     );
 
-    fireEvent.click(firstCancelButton());
+    fireEvent.click(firstCancelButton()!);
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(/이미 체결된 수량은 취소되지 않습니다/)).toBeDefined();
     fireEvent.click(within(dialog).getByRole("button", { name: "미체결 취소" }));
@@ -96,7 +96,7 @@ describe("OrderResultList — 미체결 취소", () => {
       <OrderResultList results={results([order({ result_id: "r1", cancelable: true })])} />,
     );
 
-    fireEvent.click(firstCancelButton());
+    fireEvent.click(firstCancelButton()!);
     fireEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", { name: "미체결 취소" }),
     );
@@ -125,7 +125,7 @@ describe("OrderResultList — 미체결 취소", () => {
     const { container } = renderWithProviders(
       <OrderResultList results={results([order({ result_id: "r1", cancelable: true })])} />,
     );
-    fireEvent.click(firstCancelButton());
+    fireEvent.click(firstCancelButton()!);
     const dialog = screen.getByRole("dialog");
     expect(container.contains(dialog)).toBe(false);
     expect(document.body.contains(dialog)).toBe(true);

@@ -45,7 +45,7 @@ describe("TradeFormModal", () => {
     fireEvent.change(screen.getByLabelText("단가 (USD)"), { target: { value: "200" } });
     fireEvent.click(screen.getByRole("button", { name: "기록 추가" }));
     await waitFor(() => expect(vi.mocked(createTrade)).toHaveBeenCalled());
-    expect(vi.mocked(createTrade).mock.calls[0][0]).toMatchObject({
+    expect(vi.mocked(createTrade).mock.calls[0]![0]).toMatchObject({
       account_id: "acc-1",
       side: "BUY",
       ticker: "AAPL",
@@ -165,7 +165,7 @@ describe("TradeFormModal", () => {
     fireEvent.change(screen.getByLabelText(/메모/), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "기록 수정" }));
     await waitFor(() => expect(vi.mocked(updateTrade)).toHaveBeenCalled());
-    expect(vi.mocked(updateTrade).mock.calls[0][1]).toMatchObject({ fee: null, notes: null });
+    expect(vi.mocked(updateTrade).mock.calls[0]![1]).toMatchObject({ fee: null, notes: null });
   });
 
   it("수정 중인 기록을 삭제하면 deleteTrade 호출 + 수정 모드 해제", async () => {
@@ -182,7 +182,7 @@ describe("TradeFormModal", () => {
     expect(vi.mocked(deleteTrade)).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "삭제" }));
     await waitFor(() => expect(vi.mocked(deleteTrade)).toHaveBeenCalled());
-    expect(vi.mocked(deleteTrade).mock.calls[0][0]).toBe("t5");
+    expect(vi.mocked(deleteTrade).mock.calls[0]![0]).toBe("t5");
     expect(screen.getByRole("button", { name: "기록 추가" })).toBeInTheDocument();
   });
 

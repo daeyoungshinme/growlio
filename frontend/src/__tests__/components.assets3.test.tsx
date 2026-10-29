@@ -368,7 +368,7 @@ describe("TransactionList", () => {
       />,
     );
     const editBtns = document.querySelectorAll('[class*="hover:text-blue-400"]');
-    if (editBtns.length > 0) fireEvent.click(editBtns[0]);
+    if (editBtns.length > 0) fireEvent.click(editBtns[0]!);
     expect(onEdit).toHaveBeenCalledWith(mockTransactions[0]);
   });
 

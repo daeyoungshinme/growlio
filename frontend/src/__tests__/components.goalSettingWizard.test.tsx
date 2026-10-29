@@ -166,7 +166,7 @@ describe("GoalSettingWizard", () => {
     await waitFor(() => {
       expect(screen.getByText("월 58만원")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getAllByRole("button", { name: "이 값으로 채우기" })[1]);
+    fireEvent.click(screen.getAllByRole("button", { name: "이 값으로 채우기" })[1]!);
     expect(screen.getByLabelText("월 적립액 (원)")).toHaveValue(580000);
     expect(screen.getByLabelText("연간 입금 목표 (원)")).toHaveValue(6960000);
   });

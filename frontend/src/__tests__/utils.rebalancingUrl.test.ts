@@ -42,6 +42,6 @@ describe("rebalancingUrl", () => {
 
   it("만든 링크를 다시 읽으면 같은 탭·모드가 나온다", () => {
     const url = rebalancingUrl({ tab: "목표 조정", mode: "전술" });
-    expect(parse(url.split("?")[1])).toEqual({ tab: "목표 조정", mode: "전술" });
+    expect(parse(url.split("?")[1]!)).toEqual({ tab: "목표 조정", mode: "전술" });
   });
 });

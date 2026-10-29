@@ -14,8 +14,8 @@ describe("useStockAccountStats", () => {
       { account_id: null, transaction_type: "DEPOSIT", total_amount: 999, count: 1 },
     ];
     const { result } = renderHook(() => useStockAccountStats(accounts, undefined, totals));
-    expect(result.current[0].stats.deposit_total).toBe(12_000_000);
-    expect(result.current[0].stats.dividend_total).toBe(35_000);
-    expect(result.current[1].stats.deposit_total).toBe(0);
+    expect(result.current[0]!.stats.deposit_total).toBe(12_000_000);
+    expect(result.current[0]!.stats.dividend_total).toBe(35_000);
+    expect(result.current[1]!.stats.deposit_total).toBe(0);
   });
 });

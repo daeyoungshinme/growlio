@@ -69,7 +69,7 @@ describe("useStockSearch", () => {
       result.current.search("삼성");
     });
     await waitFor(() => expect(result.current.suggestions).toEqual(mockSuggestions));
-    expect(vi.mocked(searchStocks).mock.calls[0][0]).toBe("삼성");
+    expect(vi.mocked(searchStocks).mock.calls[0]![0]).toBe("삼성");
   });
 
   it("검색 실패 시 isSearchError가 true가 되고 toast를 호출한다", async () => {
@@ -130,7 +130,7 @@ describe("useStockSearch", () => {
       });
 
       expect(searchStocks).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(searchStocks).mock.calls[0][0]).toBe("삼성전");
+      expect(vi.mocked(searchStocks).mock.calls[0]![0]).toBe("삼성전");
     } finally {
       vi.useRealTimers();
     }

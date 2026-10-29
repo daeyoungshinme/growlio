@@ -349,7 +349,7 @@ describe("TacticalAllocationTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "나머지 적용" }));
     expect(screen.queryByText("절반 먼저 적용")).toBeNull();
     const buttons = screen.getAllByRole("button", { name: "나머지 적용" });
-    fireEvent.click(buttons[buttons.length - 1]);
+    fireEvent.click(buttons[buttons.length - 1]!);
     await waitFor(() => expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 1));
   });
 

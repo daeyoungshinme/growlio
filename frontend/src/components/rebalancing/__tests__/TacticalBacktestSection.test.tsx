@@ -66,14 +66,14 @@ describe("toChartSeries", () => {
       "SPY 보유",
       "QQQ 보유",
     ]);
-    expect(out.series[1].values).toEqual([100, 290]);
+    expect(out.series[1]!.values).toEqual([100, 290]);
 
     const withDia = toChartSeries(
       makeResult({
         series: [{ date: "2016-10-24", strategy: 100, static: 100, spy: 100, qqq: 100, dia: 100 }],
       }),
     );
-    expect(withDia.series[withDia.series.length - 1].name).toBe("DIA 보유");
+    expect(withDia.series[withDia.series.length - 1]!.name).toBe("DIA 보유");
   });
 });
 

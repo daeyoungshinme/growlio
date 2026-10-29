@@ -34,7 +34,7 @@ describe("transactionSchema", () => {
     const result = transactionSchema.safeParse({ ...valid, amount: -1000 });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].message).toBe("금액은 0보다 커야 합니다");
+      expect(result.error.issues[0]!.message).toBe("금액은 0보다 커야 합니다");
     }
   });
 
@@ -47,7 +47,7 @@ describe("transactionSchema", () => {
     const result = transactionSchema.safeParse({ ...valid, transaction_date: "2024/06/01" });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].message).toBe("날짜 형식이 올바르지 않습니다");
+      expect(result.error.issues[0]!.message).toBe("날짜 형식이 올바르지 않습니다");
     }
   });
 
@@ -59,7 +59,7 @@ describe("transactionSchema", () => {
     const result = transactionSchema.safeParse({ ...valid, notes: "a".repeat(501) });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].message).toBe("메모는 500자 이하여야 합니다");
+      expect(result.error.issues[0]!.message).toBe("메모는 500자 이하여야 합니다");
     }
   });
 
@@ -87,7 +87,7 @@ describe("tradeSchema", () => {
   it("종목 미선택(공백 ticker)은 거부", () => {
     const r = tradeSchema.safeParse({ ...valid, ticker: "  " });
     expect(r.success).toBe(false);
-    expect(r.error?.issues[0].message).toBe("종목을 선택해주세요");
+    expect(r.error?.issues[0]!.message).toBe("종목을 선택해주세요");
   });
 
   it("수량·단가 미입력은 입력 안내 메시지", () => {

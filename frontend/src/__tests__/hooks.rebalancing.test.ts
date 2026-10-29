@@ -427,7 +427,7 @@ describe("getActionableItems", () => {
       ...mockAnalysis,
       items: [
         ...mockAnalysis.items,
-        { ...mockAnalysis.items[0], ticker: "CASH", shares_to_trade: null },
+        { ...mockAnalysis.items[0]!, ticker: "CASH", shares_to_trade: null },
       ],
     };
     const result = getActionableItems(analysis);
@@ -438,13 +438,13 @@ describe("getActionableItems", () => {
     const analysis = {
       ...mockAnalysis,
       items: [
-        { ...mockAnalysis.items[0], shares_to_trade: 0 },
-        { ...mockAnalysis.items[1], shares_to_trade: 5 },
+        { ...mockAnalysis.items[0]!, shares_to_trade: 0 },
+        { ...mockAnalysis.items[1]!, shares_to_trade: 5 },
       ],
     };
     const result = getActionableItems(analysis);
     expect(result).toHaveLength(1);
-    expect(result[0].ticker).toBe("AAPL");
+    expect(result[0]!.ticker).toBe("AAPL");
   });
 
   it("매수·매도 아이템을 모두 반환한다", () => {
@@ -631,7 +631,7 @@ describe("useRebalancingPrices", () => {
     // Use a fresh analysis with unique tickers to avoid price cache
     const freshAnalysis: RebalancingAnalysis = {
       ...mockAnalysis,
-      items: [{ ...mockAnalysis.items[0], ticker: "FRESH1" }],
+      items: [{ ...mockAnalysis.items[0]!, ticker: "FRESH1" }],
       ticker_account_map: {},
     };
     const { result } = renderHook(() => useRebalancingPrices(dispatch, freshAnalysis));
@@ -649,7 +649,7 @@ describe("useRebalancingPrices", () => {
     const { fetchStockPricesBatch } = await import("@/api/assets");
     const freshAnalysis: RebalancingAnalysis = {
       ...mockAnalysis,
-      items: [{ ...mockAnalysis.items[0], ticker: "RETRY_CACHE_TEST" }],
+      items: [{ ...mockAnalysis.items[0]!, ticker: "RETRY_CACHE_TEST" }],
       ticker_account_map: {},
     };
     const dispatch = vi.fn();
@@ -685,7 +685,7 @@ describe("useRebalancingPrices", () => {
 
     const freshAnalysis: RebalancingAnalysis = {
       ...mockAnalysis,
-      items: [{ ...mockAnalysis.items[0], ticker: "KIS_TICKER" }],
+      items: [{ ...mockAnalysis.items[0]!, ticker: "KIS_TICKER" }],
       ticker_account_map: {
         KIS_TICKER: [
           {
@@ -1045,10 +1045,10 @@ describe("useRebalancingExecution — 매도 수량은 실행 계좌 보유량�
   // 주문 불가(수동) 계좌 보유분까지 합친 매도 권장량(-50)이 KIS 계좌 보유량(5)보다 크다
   const analysis: RebalancingAnalysis = {
     ...mockAnalysis,
-    items: [{ ...mockAnalysis.items[1], shares_to_trade: -50 }],
+    items: [{ ...mockAnalysis.items[1]!, shares_to_trade: -50 }],
     ticker_account_map: {
       AAPL: [
-        { ...mockAnalysis.ticker_account_map.AAPL[0], quantity: 5 },
+        { ...mockAnalysis.ticker_account_map.AAPL![0]!, quantity: 5 },
         {
           account_id: "manual1",
           account_name: "수동 계좌",

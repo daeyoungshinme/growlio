@@ -748,7 +748,7 @@ describe("RebalancingHistoryTab", () => {
     expect(await screen.findByRole("dialog")).toBeDefined();
     expect(mockCancelPlanLeg).not.toHaveBeenCalled();
     const confirmButtons = screen.getAllByRole("button", { name: "매수 취소" });
-    fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
     await waitFor(() => expect(mockCancelPlanLeg).toHaveBeenCalledWith("plan-1", "leg-1"));
   });
 });

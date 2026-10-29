@@ -134,7 +134,7 @@ describe("PortfolioAccountSelector", () => {
       />,
     );
     const checkboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[0]!);
     expect(onToggle).toHaveBeenCalledWith("acc1");
   });
 
@@ -175,7 +175,7 @@ describe("PortfolioListSection - 기준 지정 재지정", () => {
     updated_at: "2024-01-01",
   };
   const targetedAccount: AssetAccount = {
-    ...mockAccounts[0],
+    ...mockAccounts[0]!,
     id: "acc1",
     name: "한국투자 주식계좌",
     target_portfolio_id: "pA",
@@ -205,7 +205,7 @@ describe("PortfolioListSection - 기준 지정 재지정", () => {
 
   function clickAssignButton(index: number) {
     const buttons = screen.getAllByRole("button", { name: "기준 포트폴리오 지정" });
-    fireEvent.click(buttons[index]);
+    fireEvent.click(buttons[index]!);
   }
 
   it("이미 다른 포트폴리오에 지정된 계좌를 선택하면 확인 모달을 띄우고 즉시 재지정하지 않는다", () => {

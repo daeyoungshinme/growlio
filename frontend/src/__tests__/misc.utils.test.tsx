@@ -105,7 +105,7 @@ describe("toast util", () => {
     window.addEventListener("growlio:toast", spy as EventListener);
     toast("테스트 메시지", "success");
     expect(spy).toHaveBeenCalled();
-    const detail = spy.mock.calls[0][0].detail;
+    const detail = spy.mock.calls[0]![0].detail;
     expect(detail.message).toBe("테스트 메시지");
     expect(detail.type).toBe("success");
   });
@@ -115,7 +115,7 @@ describe("toast util", () => {
     listener = spy;
     window.addEventListener("growlio:toast", spy as EventListener);
     toast("에러 메시지");
-    const detail = spy.mock.calls[0][0].detail;
+    const detail = spy.mock.calls[0]![0].detail;
     expect(detail.type).toBe("error");
   });
 });

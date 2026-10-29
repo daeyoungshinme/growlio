@@ -240,7 +240,7 @@ describe("BacktestMetricsTable", () => {
   });
 
   it("renders with single metric", () => {
-    renderWithProviders(<BacktestMetricsTable metrics={[mockMetrics[0]]} />);
+    renderWithProviders(<BacktestMetricsTable metrics={[mockMetrics[0]!]} />);
     expect(screen.getAllByText("테스트 포트폴리오").length).toBeGreaterThan(0);
   });
 

@@ -51,7 +51,7 @@ describe("api/rebalancing", () => {
   it("analyzePortfolio passes accountIds as URLSearchParams", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await analyzePortfolio("port-1", ["acc-1", "acc-2"]);
-    const [url, config] = vi.mocked(api.get).mock.calls[0];
+    const [url, config] = vi.mocked(api.get).mock.calls[0]!;
     expect(url).toBe("/rebalancing/portfolios/port-1/analyze");
     const params = config!.params as URLSearchParams;
     expect(params.getAll("account_ids")).toEqual(["acc-1", "acc-2"]);
@@ -60,7 +60,7 @@ describe("api/rebalancing", () => {
   it("analyzePortfolio passes depositKrwOverride as URLSearchParam", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await analyzePortfolio("port-1", undefined, 500000);
-    const [, config] = vi.mocked(api.get).mock.calls[0];
+    const [, config] = vi.mocked(api.get).mock.calls[0]!;
     const params = config!.params as URLSearchParams;
     expect(params.get("deposit_krw_override")).toBe("500000");
   });

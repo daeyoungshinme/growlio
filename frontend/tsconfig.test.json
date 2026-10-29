@@ -1,9 +1,6 @@
 {
-  // 테스트 전용 — noUncheckedIndexedAccess는 아직 끈다(테스트 145건, plans/92 이관). 앱 코드는 tsconfig.json에서 켜져 있다.
+  // 테스트 전용 — tsconfig.json은 테스트를 exclude하므로 src 전체(테스트 포함)를 같은 엄격도로 검사한다.
   "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "noUncheckedIndexedAccess": false
-  },
   "include": ["src"],
   "exclude": []
 }

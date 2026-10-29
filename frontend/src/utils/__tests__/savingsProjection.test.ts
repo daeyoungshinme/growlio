@@ -34,9 +34,9 @@ describe("buildSavingsProjectionSeries", () => {
     const series = buildSavingsProjectionSeries(50_000, 7, [1, 10]);
     expect(series).toHaveLength(2);
     expect(series[0]).toEqual({ year: 1, principal: 600_000, value: expect.any(Number) });
-    expect(series[1].principal).toBe(50_000 * 12 * 10);
+    expect(series[1]!.principal).toBe(50_000 * 12 * 10);
     // 복리 반영 시 원금보다 미래가치가 크다 (수익률 > 0)
-    expect(series[1].value).toBeGreaterThan(series[1].principal);
+    expect(series[1]!.value).toBeGreaterThan(series[1]!.principal);
   });
 
   it("기본 연도 배열(1/5/10/20/30)을 사용한다", () => {
@@ -65,9 +65,9 @@ describe("buildLumpSumProjectionSeries", () => {
   it("각 연도의 principal은 항상 원금과 동일하고 value는 복리 반영되어 원금보다 크다", () => {
     const series = buildLumpSumProjectionSeries(3_000_000, 7, [1, 10]);
     expect(series).toHaveLength(2);
-    expect(series[0].principal).toBe(3_000_000);
-    expect(series[1].principal).toBe(3_000_000);
-    expect(series[1].value).toBeGreaterThan(series[1].principal);
+    expect(series[0]!.principal).toBe(3_000_000);
+    expect(series[1]!.principal).toBe(3_000_000);
+    expect(series[1]!.value).toBeGreaterThan(series[1]!.principal);
   });
 
   it("기본 연도 배열(1/5/10/20/30)을 사용한다", () => {
