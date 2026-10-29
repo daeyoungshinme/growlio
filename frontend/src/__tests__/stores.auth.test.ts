@@ -616,4 +616,14 @@ describe("authStore — 재설정 완료 시 needs_password_reset 해제", () =>
     expect(api.post).toHaveBeenCalledWith("/auth/password-reset-complete");
     expect(useAuthStore.getState().needsPasswordReset).toBe(false);
   });
+
+  it("플래그가 이미 꺼져 있으면 changePassword가 서버를 호출하지 않는다", async () => {
+    useAuthStore.setState({ email: "a@example.com", needsPasswordReset: false });
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({ error: null } as never);
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({ error: null } as never);
+
+    await useAuthStore.getState().changePassword("old", "new-password-1");
+
+    expect(api.post).not.toHaveBeenCalledWith("/auth/password-reset-complete");
+  });
 });

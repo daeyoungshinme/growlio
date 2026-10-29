@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import structlog
-
 from app.kis.order import is_overseas_market
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.kiwoom.balance import get_overseas_balance as kiwoom_get_overseas_balance
@@ -14,10 +12,7 @@ from app.services.rebalancing._broker_order_flow import (
     execute_buys_with_cash_check,
     execute_sells_with_clamp,
 )
-from app.services.rebalancing._order_executor_common import execute_single_order
-from app.services.rebalancing.krx_tick import domestic_limit_price
-
-logger = structlog.get_logger()
+from app.services.rebalancing._order_executor_common import execute_single_order, snap_domestic_limit_price
 
 
 async def _execute_kiwoom_single_order(
@@ -28,12 +23,7 @@ async def _execute_kiwoom_single_order(
 ) -> OrderResult:
     """키움 단건 주문 실행 — 국내/해외를 market으로 분기해 실행한다."""
 
-    # 수동 입력 지정가가 호가 격자에서 벗어나면 broker가 거부한다 — 주문 전에 맞추고, 결과(OrderResult.price)에도
-    # 실제 주문가가 남도록 사본을 쓴다(plans/61 C2). 실시간 현재가는 이미 격자 위라 값이 바뀌지 않는다.
-    if order.order_type == "LIMIT" and not is_overseas_market(order.market):
-        order = order.model_copy(
-            update={"limit_price": domestic_limit_price(order.limit_price, order.side, order.name)}
-        )
+    order = snap_domestic_limit_price(order)
 
     async def _place() -> dict:
         if is_overseas_market(order.market):
