@@ -1,7 +1,7 @@
 """공용 Pydantic 검증 함수."""
 
 import math
-from typing import Any
+from typing import Any, overload
 
 MAX_AMOUNT_KRW = 100_000_000_000  # 1000억 KRW
 
@@ -12,6 +12,10 @@ def _require_finite(v: float | None) -> None:
         raise ValueError("금액이 올바른 숫자가 아닙니다")
 
 
+@overload
+def validate_positive_amount(v: float) -> float: ...
+@overload
+def validate_positive_amount(v: None) -> None: ...
 def validate_positive_amount(v: float | None) -> float | None:
     _require_finite(v)
     if v is not None and v <= 0:
@@ -21,6 +25,10 @@ def validate_positive_amount(v: float | None) -> float | None:
     return v
 
 
+@overload
+def validate_non_negative_amount(v: float) -> float: ...
+@overload
+def validate_non_negative_amount(v: None) -> None: ...
 def validate_non_negative_amount(v: float | None) -> float | None:
     _require_finite(v)
     if v is not None and v < 0:

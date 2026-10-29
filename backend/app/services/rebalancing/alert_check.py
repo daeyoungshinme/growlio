@@ -39,7 +39,7 @@ from app.services.rebalancing.order_builder import (
 )
 from app.utils.cache_keys import TTL_COMPOSITE_ALERT_SENT, composite_alert_sent_key
 from app.utils.durable_state import get_durable, set_durable
-from app.utils.kst import KST as _KST
+from app.utils.kst import today_kst
 from app.utils.market_hours import is_alert_execution_time
 from app.utils.metrics import alert_trigger_count
 
@@ -58,13 +58,13 @@ async def _composite_alert_sent_today(db: AsyncSession, user_id: uuid.UUID) -> b
     dedup 플래그는 재시작에도 유지돼야 하므로(콜드스타트 후 오탐 방지) Postgres 기반
     durable_state를 사용한다.
     """
-    today = datetime.now(tz=_KST).date().isoformat()
+    today = today_kst().isoformat()
     return bool(await get_durable(db, composite_alert_sent_key(user_id, today)))
 
 
 async def _mark_composite_alert_sent_today(db: AsyncSession, user_id: uuid.UUID) -> None:
     """복합신호만으로 발송한 뒤, 오늘 이 유저에게는 더 이상 중복 발송하지 않도록 표시한다."""
-    today = datetime.now(tz=_KST).date().isoformat()
+    today = today_kst().isoformat()
     await set_durable(db, composite_alert_sent_key(user_id, today), "1", ttl=TTL_COMPOSITE_ALERT_SENT)
 
 

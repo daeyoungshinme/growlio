@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
-class TestSendPush:
+class TestDeliverPush:
     @pytest.mark.asyncio
     async def test_returns_false_when_no_token(self, override_settings):
-        from app.services.notifications.push_service import send_push
+        from app.services.notifications.push_service import PushResult, deliver_push
 
-        result = await send_push(None, "제목", "내용")
-        assert result is False
+        result = await deliver_push(None, "제목", "내용")
+        assert result is PushResult.SKIPPED
 
     @pytest.mark.asyncio
     async def test_returns_false_when_firebase_not_configured(self, override_settings):
@@ -28,18 +28,18 @@ class TestSendPush:
             ps._firebase_initialized = True
             ps._firebase_app = None
 
-            result = await push_service.send_push("some-token", "제목", "내용")
-            assert result is False
+            result = await push_service.deliver_push("some-token", "제목", "내용")
+            assert result is push_service.PushResult.SKIPPED
         finally:
             ps._firebase_initialized = original_initialized
             ps._firebase_app = original_app
 
     @pytest.mark.asyncio
     async def test_returns_false_when_empty_token(self, override_settings):
-        from app.services.notifications.push_service import send_push
+        from app.services.notifications.push_service import PushResult, deliver_push
 
-        result = await send_push("", "제목", "내용")
-        assert result is False
+        result = await deliver_push("", "제목", "내용")
+        assert result is PushResult.SKIPPED
 
     @pytest.mark.asyncio
     async def test_returns_true_on_successful_send(self, override_settings):
@@ -63,10 +63,9 @@ class TestSendPush:
                         "firebase_admin.messaging": MagicMock(),
                     },
                 ):
-                    result = await ps.send_push("valid-token", "제목", "내용")
+                    result = await ps.deliver_push("valid-token", "제목", "내용")
 
-            # Either True or False depending on whether the mock executed correctly
-            assert isinstance(result, bool)
+            assert result is ps.PushResult.SENT
         finally:
             ps._firebase_initialized = original_initialized
             ps._firebase_app = original_app
@@ -81,7 +80,7 @@ class TestSendPushToUser:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_delegates_to_send_push(self, override_settings):
+    async def test_delegates_to_deliver_push(self, override_settings):
         from app.services.notifications.push_service import PushResult, send_push_to_user
 
         with patch(
@@ -166,9 +165,9 @@ class TestSendPushException:
                 mock_loop.return_value.run_in_executor = AsyncMock(
                     side_effect=Exception("registration-token-not-registered")
                 )
-                result = await ps.send_push("invalid-token", "제목", "내용")
+                result = await ps.deliver_push("invalid-token", "제목", "내용")
 
-            assert result is False
+            assert result is ps.PushResult.INVALID_TOKEN
         finally:
             ps._firebase_initialized = original_initialized
             ps._firebase_app = original_app
@@ -187,9 +186,9 @@ class TestSendPushException:
 
             with patch("asyncio.get_running_loop") as mock_loop:
                 mock_loop.return_value.run_in_executor = AsyncMock(side_effect=Exception("some other error"))
-                result = await ps.send_push("valid-token", "제목", "내용")
+                result = await ps.deliver_push("valid-token", "제목", "내용")
 
-            assert result is False
+            assert result is ps.PushResult.FAILED
         finally:
             ps._firebase_initialized = original_initialized
             ps._firebase_app = original_app

@@ -82,7 +82,9 @@ function computeAnnualReturns(dates: string[], series: SeriesData[]): AnnualRow[
             : null;
       });
     } else {
-      const prevMap = yearLastVal.get(years[idx - 1]!)!;
+      const prevYear = years[idx - 1];
+      const prevMap =
+        (prevYear !== undefined && yearLastVal.get(prevYear)) || new Map<string, number>();
       series.forEach((s) => {
         const start = prevMap.get(s.name);
         const end = curMap.get(s.name);

@@ -267,7 +267,7 @@ class ExternalTransactionCreate(BaseModel):
     @field_validator("amount")
     @classmethod
     def amount_positive(cls, v: float) -> float:
-        return validate_positive_amount(v)  # type: ignore[return-value]
+        return validate_positive_amount(v)
 
 
 class ExternalTransactionResult(BaseModel):

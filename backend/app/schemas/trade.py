@@ -32,7 +32,7 @@ class TradeCreate(BaseModel):
     @field_validator("price_krw")
     @classmethod
     def price_positive(cls, v: float) -> float:
-        return validate_positive_amount(v)  # type: ignore[return-value]
+        return validate_positive_amount(v)
 
     @field_validator("fee")
     @classmethod

@@ -161,7 +161,7 @@ class TestComputeProgressDeposit:
     async def test_deposit_progress_with_target_months(self):
         challenge = _ns(challenge_type="DEPOSIT", target_months=6, start_month="2026-01")
         db = _mock_db_with_net({"2026-01": 500000.0, "2026-02": 500000.0})
-        with patch.object(cs, "_now_kst_date", return_value=__import__("datetime").date(2026, 3, 15)):
+        with patch.object(cs, "today_kst", return_value=__import__("datetime").date(2026, 3, 15)):
             progress = await cs.compute_progress(challenge, challenge.user_id, db)
         assert progress.current_streak == 2
         assert progress.progress_pct == pytest.approx(33.3, abs=0.1)
@@ -171,7 +171,7 @@ class TestComputeProgressDeposit:
     async def test_deposit_progress_open_ended_has_no_progress_pct(self):
         challenge = _ns(challenge_type="DEPOSIT", target_months=None, start_month="2026-01")
         db = _mock_db_with_net({"2026-01": 100.0})
-        with patch.object(cs, "_now_kst_date", return_value=__import__("datetime").date(2026, 1, 20)):
+        with patch.object(cs, "today_kst", return_value=__import__("datetime").date(2026, 1, 20)):
             progress = await cs.compute_progress(challenge, challenge.user_id, db)
         assert progress.progress_pct is None
         assert progress.current_streak == 1
@@ -209,7 +209,7 @@ class TestChallengeSummary:
         net_result.all.return_value = []  # 이번 달 입금 없음
 
         db.execute = AsyncMock(side_effect=[scalars_result, net_result])
-        with patch.object(cs, "_now_kst_date", return_value=__import__("datetime").date(2026, 3, 25)):
+        with patch.object(cs, "today_kst", return_value=__import__("datetime").date(2026, 3, 25)):
             summary = await cs.get_challenge_summary(challenge.user_id, db)
         assert summary.needs_attention is True
         assert summary.count == 1
@@ -223,7 +223,7 @@ class TestChallengeSummary:
         net_result = MagicMock()
         net_result.all.return_value = []
         db.execute = AsyncMock(side_effect=[scalars_result, net_result])
-        with patch.object(cs, "_now_kst_date", return_value=__import__("datetime").date(2026, 3, 5)):
+        with patch.object(cs, "today_kst", return_value=__import__("datetime").date(2026, 3, 5)):
             summary = await cs.get_challenge_summary(challenge.user_id, db)
         assert summary.needs_attention is False
         assert summary.count == 1
@@ -247,7 +247,7 @@ class TestListAndSerialize:
         net_result.all.return_value = [SimpleNamespace(month="2026-01", net=100.0)]
         db.execute = AsyncMock(side_effect=[list_result, net_result])
         mock_cache.get = AsyncMock(return_value=None)
-        with patch.object(cs, "_now_kst_date", return_value=_dt.date(2026, 2, 10)):
+        with patch.object(cs, "today_kst", return_value=_dt.date(2026, 2, 10)):
             out = await cs.list_challenges_with_progress(challenge.user_id, db, mock_cache)
         assert len(out) == 1
         assert out[0].title == "테스트 챌린지"
