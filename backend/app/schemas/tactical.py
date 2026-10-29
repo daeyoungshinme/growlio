@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.services.tactical_dip import DEFAULT_DIP_SHIFT_PCT, MAX_DIP_SHIFT_PCT
-from app.services.tactical_tilt import DEFAULT_TILT_SHIFT_PCT, MAX_TILT_SHIFT_PCT
+from app.services.tactical.tactical_dip import DEFAULT_DIP_SHIFT_PCT, MAX_DIP_SHIFT_PCT
+from app.services.tactical.tactical_tilt import DEFAULT_TILT_SHIFT_PCT, MAX_TILT_SHIFT_PCT
 
 
 class TacticalStrategyUpsert(BaseModel):
@@ -22,7 +22,7 @@ class TacticalStrategyUpsert(BaseModel):
     @classmethod
     def _validate_weights(cls, v: dict[str, dict[str, float]] | None) -> dict[str, dict[str, float]] | None:
         # 지연 import — 스키마 모듈이 전술 서비스 전체(기술지표·시세 조회)를 끌고 오지 않게
-        from app.services.tactical_allocation_service import validate_regime_weights
+        from app.services.tactical.tactical_allocation_service import validate_regime_weights
 
         return None if v is None else validate_regime_weights(v)
 

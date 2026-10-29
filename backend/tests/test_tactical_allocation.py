@@ -13,10 +13,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.models.tactical import TacticalStrategy
-from app.services import tactical_allocation_service as tactical
-from app.services import tactical_tilt as tilt
 from app.services.market_signal import technical_indicators as ti
-from app.services.tactical_backtest import simulate, vix_to_macro_level
+from app.services.tactical import tactical_allocation_service as tactical
+from app.services.tactical import tactical_tilt as tilt
+from app.services.tactical.tactical_backtest import simulate, vix_to_macro_level
 
 # ---------------------------------------------------------------------------
 # 기술적 지표
@@ -941,7 +941,7 @@ class TestFetchWrappers:
     @pytest.mark.asyncio
     async def test_backtest_without_vix_notes_fallback(self):
         from app.core.cache_store import CacheStore
-        from app.services import tactical_backtest as bt
+        from app.services.tactical import tactical_backtest as bt
 
         cache = CacheStore()
         with (
@@ -960,7 +960,7 @@ class TestFetchWrappers:
     @pytest.mark.asyncio
     async def test_backtest_simulate_runs_off_event_loop(self):
         """simulate는 CPU 루프라 이벤트 루프를 막지 않도록 asyncio.to_thread로 실행돼야 한다."""
-        from app.services import tactical_backtest as bt
+        from app.services.tactical import tactical_backtest as bt
 
         calls: list[object] = []
         real_to_thread = bt.asyncio.to_thread
@@ -980,7 +980,7 @@ class TestFetchWrappers:
 
     @pytest.mark.asyncio
     async def test_backtest_missing_prices_raises(self):
-        from app.services import tactical_backtest as bt
+        from app.services.tactical import tactical_backtest as bt
 
         with (
             patch.object(bt, "fetch_close_history", AsyncMock(return_value={})),
@@ -990,7 +990,7 @@ class TestFetchWrappers:
 
     @pytest.mark.asyncio
     async def test_vix_history_parsing(self):
-        from app.services import tactical_backtest as bt
+        from app.services.tactical import tactical_backtest as bt
 
         obs = [{"date": "2026-10-02", "value": "18.5"}, {"date": "2026-10-01", "value": "."}]
         with patch(

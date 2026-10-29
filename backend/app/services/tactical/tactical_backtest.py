@@ -40,15 +40,15 @@ import structlog
 from app.services.backtest.backtest_metrics import compute_metrics
 from app.services.market_signal.technical_indicators import pullback_series, trend_series
 from app.services.market_signal.technical_signal_service import fetch_close_history
-from app.services.tactical_allocation_service import (
+from app.services.tactical.tactical_allocation_service import (
     LEVERAGED_ASSETS,
     TACTICAL_ASSETS,
     ConfirmState,
     classify_regime,
     step_confirmation,
 )
-from app.services.tactical_dip import DIP_EXIT_STAGES, advance_dip_level, apply_dip
-from app.services.tactical_tilt import REAL_YIELD_LOOKBACK, RS_SMA, apply_tilt, classify_tilt
+from app.services.tactical.tactical_dip import DIP_EXIT_STAGES, advance_dip_level, apply_dip
+from app.services.tactical.tactical_tilt import REAL_YIELD_LOOKBACK, RS_SMA, apply_tilt, classify_tilt
 from app.utils.cache_keys import TTL_TACTICAL_BACKTEST, get_cached_json, set_cached_json, tactical_backtest_key
 
 if TYPE_CHECKING:

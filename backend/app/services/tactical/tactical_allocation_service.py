@@ -50,10 +50,10 @@ from app.models.portfolio import (
 from app.models.tactical import TacticalStrategy
 from app.services.market_signal.technical_indicators import TechnicalSnapshot, TrendState
 from app.services.market_signal.technical_signal_service import get_technical_signals
-from app.services.tactical_dip import ACTIVE_REGIMES as DIP_ACTIVE_REGIMES
-from app.services.tactical_dip import DEFAULT_DIP_SHIFT_PCT, advance_dip_level, apply_dip, dip_reasons
-from app.services.tactical_hints import transition_hints
-from app.services.tactical_tilt import (
+from app.services.tactical.tactical_dip import ACTIVE_REGIMES as DIP_ACTIVE_REGIMES
+from app.services.tactical.tactical_dip import DEFAULT_DIP_SHIFT_PCT, advance_dip_level, apply_dip, dip_reasons
+from app.services.tactical.tactical_hints import transition_hints
+from app.services.tactical.tactical_tilt import (
     DEFAULT_TILT_SHIFT_PCT,
     apply_tilt,
     classify_tilt,
