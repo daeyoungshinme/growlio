@@ -72,6 +72,7 @@ TTL_ETF_PROFILE_MISSING = 86400  # ETF 아님/데이터 없음 확정 1일 — �
 TTL_CANDIDATE_OVERLAP = 86400  # 후보·보유 ETF 중복 분석 1일 — 입력 목록 해시가 키라 목록이 바뀌면 자동으로 새 키
 TTL_GOAL_RECOMMENDATION = 3600  # 목표 역산 추천(전체/기간별) 1시간 — 프론트 staleTime과 정합, 설정 변경 시 무효화됨
 TTL_GOAL_RECOMMENDATION_STALE = 86400  # 전체 추천 마지막 정상 결과 1일 — 1시간 키 만료 시 즉시 응답+백그라운드 재계산
+TTL_GOAL_RECOMMENDATION_GEN = 7 * 24 * 3600  # 추천 캐시 세대 토큰 7일 — 결과 키(최대 1일)보다 길게
 TTL_GOAL_CANDIDATE_DIVIDEND_YIELD = 86400  # 목표 역산 추천 후보 배당수익률 1일 — ticker+market 전역 공유(유저 무관)
 TTL_REBALANCING_ANALYSIS = 90  # 리밸런싱 진단(analyze) 응답 90초 — 포트폴리오 선택 시 자동 실행되어 재방문마다
 # 전체 파이프라인(배당·수익률·현재가 다중 조회)이 재실행되는 것을 막기 위한 단기 캐시
@@ -286,20 +287,25 @@ def tax_overseas_realized_key(user_id: uuid.UUID, year: int, acct_suffix: str = 
     return f"{_env_prefix()}tax:overseas_realized:{user_id}:{year}:{acct_suffix}"
 
 
-def goal_recommendation_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}goal_recommendation:{user_id}"
+def goal_recommendation_gen_key(user_id: uuid.UUID) -> str:
+    """추천 캐시 세대 토큰 — 아래 결과 키들이 이 값을 포함한다(`get_goal_recommendation_generation` 참고)."""
+    return f"{_env_prefix()}goal_recommendation_gen:{user_id}"
 
 
-def goal_recommendation_stale_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}goal_recommendation_stale:{user_id}"
+def goal_recommendation_key(user_id: uuid.UUID, gen: str) -> str:
+    return f"{_env_prefix()}goal_recommendation:{user_id}:{gen}"
 
 
-def goal_recommendation_horizon_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}goal_recommendation_horizon:{user_id}"
+def goal_recommendation_stale_key(user_id: uuid.UUID, gen: str) -> str:
+    return f"{_env_prefix()}goal_recommendation_stale:{user_id}:{gen}"
 
 
-def goal_recommendation_age_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}goal_recommendation_age:{user_id}"
+def goal_recommendation_horizon_key(user_id: uuid.UUID, gen: str) -> str:
+    return f"{_env_prefix()}goal_recommendation_horizon:{user_id}:{gen}"
+
+
+def goal_recommendation_age_key(user_id: uuid.UUID, gen: str) -> str:
+    return f"{_env_prefix()}goal_recommendation_age:{user_id}:{gen}"
 
 
 def economic_indicator_history_key(code: str, months: int) -> str:
@@ -486,15 +492,45 @@ async def invalidate_dividend_caches(
     await _scan_unlink(cache, f"{_env_prefix()}dividends:positions:{user_id}:*")
 
 
+async def get_goal_recommendation_generation(cache: CacheStoreType, user_id: uuid.UUID) -> str:
+    """현재 추천 캐시 세대를 반환한다(없으면 새로 만든다).
+
+    추천 계산은 수십 초 걸리므로, 계산 도중 설정이 저장돼 키를 지워도 끝난 옛 계산이 옛 설정 결과를
+    다시 써 넣었다(저장 직후 재요청은 그 계산의 single-flight 락을 기다려 옛 결과를 받기도 함).
+    결과 키에 세대를 넣고 무효화는 세대를 바꾸게 해, 옛 계산은 아무도 읽지 않는 옛 세대 키에만 쓰게 한다.
+    호출부는 **설정을 읽기 전에** 세대를 잡아야 한다 — 설정 읽기 뒤에 잡으면 그 사이 저장된 새 세대 키에
+    옛 설정 결과가 들어간다. 축출·재시작 후 옛 세대와 겹치지 않도록 고정 기본값 대신 랜덤 값을 쓴다.
+    """
+    candidate = uuid.uuid4().hex
+    if cache is None:
+        return candidate
+    key = goal_recommendation_gen_key(user_id)
+    gen = await cache.get(key)
+    if gen:
+        return gen
+    await cache.set(key, candidate, nx=True, ex=TTL_GOAL_RECOMMENDATION_GEN)
+    return await cache.get(key) or candidate
+
+
 async def invalidate_goal_recommendation_caches(cache: CacheStoreType, user_id: uuid.UUID) -> None:
-    """목표 역산 추천(전체/기간별) 캐시를 삭제한다 — 목표 설정, 후보 ETF, 계좌 포지션 변경 시 호출."""
-    await invalidate_user_caches(
-        cache,
-        goal_recommendation_key(user_id),
-        goal_recommendation_stale_key(user_id),
-        goal_recommendation_horizon_key(user_id),
-        goal_recommendation_age_key(user_id),
-    )
+    """목표 역산 추천(전체/stale/기간별/연령대) 캐시를 무효화한다 — 목표 설정, 후보 ETF, 계좌 포지션 변경 시 호출.
+
+    현재 세대 키를 지우고 세대를 새로 바꾼다 — 진행 중인 옛 계산은 옛 세대 키에만 쓰게 된다
+    (`get_goal_recommendation_generation` 참고). 결과 키를 직접 지우지 말고 이 함수를 쓸 것.
+    """
+    if cache is None:
+        return
+    gen_key = goal_recommendation_gen_key(user_id)
+    old_gen = await cache.get(gen_key)
+    if old_gen:
+        await invalidate_user_caches(
+            cache,
+            goal_recommendation_key(user_id, old_gen),
+            goal_recommendation_stale_key(user_id, old_gen),
+            goal_recommendation_horizon_key(user_id, old_gen),
+            goal_recommendation_age_key(user_id, old_gen),
+        )
+    await cache.set(gen_key, uuid.uuid4().hex, ex=TTL_GOAL_RECOMMENDATION_GEN)
 
 
 async def invalidate_portfolio_overview_cache(cache: CacheStoreType, user_id: uuid.UUID) -> None:
@@ -574,12 +610,7 @@ async def invalidate_asset_account_caches(
         risk_key(user_id),
     ]
     if positions_changed:
-        keys += [
-            goal_recommendation_key(user_id),
-            goal_recommendation_stale_key(user_id),
-            goal_recommendation_horizon_key(user_id),
-            goal_recommendation_age_key(user_id),
-        ]
+        await invalidate_goal_recommendation_caches(cache, user_id)
     await invalidate_user_caches(cache, *keys)
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)

@@ -8,6 +8,7 @@ import {
 } from "@/components/rebalancing/RecommendationEmptyStates";
 import {
   buildOverallApplySection,
+  RISK_TOLERANCE_LABELS,
   SETUP_CTA_ACTION_CLASS,
   significantDrift,
   type OverallTargetSelection,
@@ -54,6 +55,11 @@ export default function RecommendationOverallTab({ data, selection, actions }: P
         를 기대할 수 있습니다.
         {data.expected_volatility_pct != null &&
           ` 예상 변동성은 연 ${data.expected_volatility_pct.toFixed(1)}%입니다.`}
+      </p>
+      {/* 저장한 추천 설정이 실제 계산에 쓰였는지 확인할 수 있게 — 성향·상한이 안 묶여 비중이 그대로인 경우와 구분 */}
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        적용된 설정: 투자성향 {RISK_TOLERANCE_LABELS[data.risk_tolerance] ?? data.risk_tolerance} ·
+        종목당 최대 {data.max_weight_pct}%
       </p>
 
       <RecommendationResultPanel

@@ -59,6 +59,7 @@ from app.services.rebalancing.service import (
 from app.utils.cache_keys import (
     TTL_REBALANCING_ANALYSIS,
     get_cached_json,
+    get_goal_recommendation_generation,
     portfolio_overview_acct_suffix,
     rebalancing_analysis_key,
     set_cached_json,
@@ -181,16 +182,18 @@ async def get_overall_goal_recommendation_endpoint(
 ):
     """전체 계좌(전체 투자현황) 기준으로 목표 역산 추천을 반환한다 (자동 적용 아님)."""
     started = time.perf_counter()
+    # 캐시 세대는 설정을 읽기 전에 잡는다 — 계산 중 설정이 저장되면 결과가 옛 세대 키로만 가게(plans/88)
+    gen = await get_goal_recommendation_generation(cache, current_user.id)
     # 캐시 히트면 overview·포지션 조회(캐시 미스 시 계산 입력)를 건너뛴다
-    cached = await get_cached_goal_recommendation(cache, current_user.id)
+    cached = await get_cached_goal_recommendation(cache, current_user.id, gen)
     if cached is not None:
         return cached
     # 1시간 키가 만료됐어도 마지막 정상 결과가 있으면 바로 돌려주고 응답 뒤에 재계산한다(plans/66)
-    stale = await get_stale_goal_recommendation(cache, current_user.id)
+    stale = await get_stale_goal_recommendation(cache, current_user.id, gen)
     if stale is not None:
         background_tasks.add_task(refresh_goal_recommendation_in_background, current_user.id, cache)
         return stale
-    result = await get_overall_goal_recommendation_for_user(current_user.id, db, cache)
+    result = await get_overall_goal_recommendation_for_user(current_user.id, db, cache, gen)
     logger.info("goal_recommendation_cold_request", total_ms=round((time.perf_counter() - started) * 1000))
     return result
 
@@ -208,8 +211,9 @@ async def get_horizon_goal_recommendation_endpoint(
     목표금액/목표연도 설정과 무관하게 동작한다 — `/goal-recommendation`(전체 자산 기준 목표 역산)과는
     별개의 기능이며, 두 엔드포인트 모두 그대로 유지된다.
     """
+    gen = await get_goal_recommendation_generation(cache, current_user.id)
     settings_row = await get_or_create_settings(db, current_user.id)
-    return await get_horizon_recommendations(cache, db, current_user.id, settings_row)
+    return await get_horizon_recommendations(cache, db, current_user.id, settings_row, gen=gen)
 
 
 @router.get("/goal-recommendation/by-age", response_model=GoalRecommendation)
@@ -226,8 +230,9 @@ async def get_age_based_goal_recommendation_endpoint(
     목표금액/목표연도 역산은 하지 않는다 — `/goal-recommendation/by-horizon`과 동일하게 나이
     구간에서 유도한 리스크 성향/주식비중 상하한만으로 결과를 결정한다.
     """
+    gen = await get_goal_recommendation_generation(cache, current_user.id)
     settings_row = await get_or_create_settings(db, current_user.id)
-    return await get_age_based_recommendation(cache, db, current_user.id, settings_row)
+    return await get_age_based_recommendation(cache, db, current_user.id, settings_row, gen=gen)
 
 
 @router.post("/candidates/overlap", response_model=CandidateOverlapResponse)
