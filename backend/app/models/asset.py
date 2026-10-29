@@ -3,7 +3,6 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     Date,
     DateTime,
@@ -138,7 +137,6 @@ class AssetSnapshot(Base):
     )
     snapshot_date: Mapped[date] = mapped_column(Date, nullable=False)
     amount_krw: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
-    amount_original: Mapped[float | None] = mapped_column(Numeric(18, 2))
     currency: Mapped[str] = mapped_column(String(3), default="KRW", nullable=False)
     usd_krw_rate: Mapped[float | None] = mapped_column(Numeric(10, 4))
 
@@ -292,30 +290,6 @@ class RebalancingExecutionResult(Base):
     execution: Mapped["RebalancingExecution"] = relationship(back_populates="result_items")
 
     __table_args__ = (Index("idx_rebalancing_results_execution", "execution_id"),)
-
-
-class UserTickerSettings(Base):
-    """사용자별 종목 설정 — 배당월 수동 override였으나 기능은 plans/52 배치 A에서 제거됐다(읽고 쓰는 코드 없음).
-
-    테이블 드롭은 plans/52 배치 G에서 한다. 그때까지 모델만 남겨 alembic autogenerate가 드롭을 만들지 않게 한다.
-    """
-
-    __tablename__ = "user_ticker_settings"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    ticker: Mapped[str] = mapped_column(String(50), nullable=False)
-    market: Mapped[str] = mapped_column(String(20), nullable=False)
-    dividend_months: Mapped[list | None] = mapped_column(ARRAY(Integer), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "ticker", "market", name="uq_user_ticker_settings"),
-        Index("idx_user_ticker_settings_user", "user_id"),
-    )
 
 
 class Position(Base):

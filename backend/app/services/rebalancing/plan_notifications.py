@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan
+from app.services.alerts._dispatch import send_push_safely
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.plan_generation import DailyValueCapBlocked, MarketSignalGateBlocked, TaxGateBlocked
 from app.utils.kst import today_kst
@@ -41,7 +42,6 @@ async def notify_plan_generated(
     """
     from app.models.asset import AssetAccount
     from app.services.email_service import send_rebalancing_plan_pending_email
-    from app.services.push_service import send_push_to_user
 
     await db.refresh(plan, attribute_names=["legs"])
     buy_token_map = dict(buy_tokens)
@@ -79,16 +79,15 @@ async def notify_plan_generated(
     push_body = f"매수 {buy_count}건"
     if sell_count:
         push_body += f", 매도 승인대기 {sell_count}건"
-    try:
-        await send_push_to_user(
-            user_id=alert.user_id,
-            title=f"리밸런싱 자동화 플랜 생성 — {portfolio.name}",
-            body=push_body,
-            fcm_token=fcm_token,
-            data={"type": "REBALANCING_PLAN_PENDING", "portfolio_id": str(portfolio.id)},
-        )
-    except Exception as exc:
-        logger.error("rebalancing_plan_pending_push_failed", alert_id=str(alert.id), error=str(exc))
+    await send_push_safely(
+        alert.user_id,
+        title=f"리밸런싱 자동화 플랜 생성 — {portfolio.name}",
+        body=push_body,
+        fcm_token=fcm_token,
+        data={"type": "REBALANCING_PLAN_PENDING", "portfolio_id": str(portfolio.id)},
+        failure_event="rebalancing_plan_pending_push_failed",
+        alert_id=str(alert.id),
+    )
 
     history_note = f", {note}" if note else ""
     await save_alert_history(
@@ -287,7 +286,6 @@ async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UU
     from app.models.asset import RebalancingExecution
     from app.models.user import User, UserSettings
     from app.services.email_service import send_rebalancing_execution_email
-    from app.services.push_service import send_push_to_user
 
     exec_result = await db.scalar(
         select(RebalancingExecution)
@@ -325,19 +323,18 @@ async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UU
         except Exception as exc:
             logger.error("rebalancing_plan_execution_email_failed", execution_id=str(execution_id), error=str(exc))
 
-    try:
-        await send_push_to_user(
-            user_id=plan.user_id,
-            title=f"리밸런싱 자동 실행 완료 — {portfolio_name}",
-            body=(
-                f"{exec_result.total_success}건 완료"
-                + (f", {exec_result.total_fail}건 실패" if exec_result.total_fail else "")
-            ),
-            fcm_token=fcm_token,
-            data={"type": "REBALANCING_EXECUTED", "portfolio_id": str(plan.portfolio_id or "")},
-        )
-    except Exception as exc:
-        logger.warning("rebalancing_plan_execution_push_failed", execution_id=str(execution_id), error=str(exc))
+    await send_push_safely(
+        plan.user_id,
+        title=f"리밸런싱 자동 실행 완료 — {portfolio_name}",
+        body=(
+            f"{exec_result.total_success}건 완료"
+            + (f", {exec_result.total_fail}건 실패" if exec_result.total_fail else "")
+        ),
+        fcm_token=fcm_token,
+        data={"type": "REBALANCING_EXECUTED", "portfolio_id": str(plan.portfolio_id or "")},
+        failure_event="rebalancing_plan_execution_push_failed",
+        execution_id=str(execution_id),
+    )
 
 
 async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_message: str, db: AsyncSession) -> None:
@@ -349,7 +346,6 @@ async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_m
     """
     from app.models.user import User, UserSettings
     from app.services.email_service import send_rebalancing_plan_execution_failed_email
-    from app.services.push_service import send_push_to_user
 
     row = await db.execute(
         select(Portfolio.name, User.email, UserSettings.notification_email, UserSettings.fcm_token)
@@ -372,13 +368,12 @@ async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_m
             logger.error("rebalancing_plan_execution_failed_email_error", plan_id=str(plan.id), error=str(exc))
 
     side_label = "매수" if side == "BUY" else "매도"
-    try:
-        await send_push_to_user(
-            user_id=plan.user_id,
-            title=f"리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}",
-            body="이번 계획은 체결되지 않았습니다. 앱에서 확인해주세요.",
-            fcm_token=fcm_token,
-            data={"type": "REBALANCING_PLAN_EXECUTION_FAILED", "portfolio_id": str(plan.portfolio_id or "")},
-        )
-    except Exception as exc:
-        logger.warning("rebalancing_plan_execution_failed_push_failed", plan_id=str(plan.id), error=str(exc))
+    await send_push_safely(
+        plan.user_id,
+        title=f"리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}",
+        body="이번 계획은 체결되지 않았습니다. 앱에서 확인해주세요.",
+        fcm_token=fcm_token,
+        data={"type": "REBALANCING_PLAN_EXECUTION_FAILED", "portfolio_id": str(plan.portfolio_id or "")},
+        failure_event="rebalancing_plan_execution_failed_push_failed",
+        plan_id=str(plan.id),
+    )

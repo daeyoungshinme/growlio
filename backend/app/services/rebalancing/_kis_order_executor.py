@@ -7,13 +7,13 @@ import structlog
 from app.kis.balance import get_domestic_balance, get_orderable_cash, get_overseas_balance
 from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
-from app.services.rebalancing._order_executor_common import execute_single_order
-from app.services.rebalancing._order_quantity_guard import (
-    budget_skipped_result,
-    clamp_buy_orders_to_budget,
-    clamp_sell_orders,
-    fit_buy_to_budget,
+from app.services.rebalancing._broker_order_flow import (
+    BrokerOrderOps,
+    execute_buys_with_cash_check,
+    execute_sells_with_clamp,
 )
+from app.services.rebalancing._order_executor_common import execute_single_order
+from app.services.rebalancing._order_quantity_guard import budget_skipped_result, fit_buy_to_budget
 from app.services.rebalancing.krx_tick import domestic_limit_price
 from app.utils.masking import mask_account_no
 
@@ -66,6 +66,21 @@ async def _execute_single_order(
     return await execute_single_order(order, _place, is_mock, log_prefix="order")
 
 
+def _kis_ops(app_key: str, app_secret: str, access_token: str, account_no: str, is_mock: bool) -> BrokerOrderOps:
+    async def _budget() -> float:
+        return await get_orderable_cash(app_key, app_secret, access_token, account_no, is_mock=is_mock)
+
+    return BrokerOrderOps(
+        place=lambda order: _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock),
+        domestic_balance=lambda: get_domestic_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock),
+        overseas_balance=lambda: get_overseas_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock),
+        domestic_buy_budget=_budget,
+        # KIS 해외잔고는 실제 거래소명을 준다 — 같은 티커가 다른 거래소에 있으면 따로 센다
+        overseas_position_key=lambda p: f"{p['ticker']}:{str(p.get('market', '')).upper()}",
+        overseas_order_key=lambda o: f"{o.ticker}:{o.market.upper()}",
+    )
+
+
 async def _execute_sells_with_clamp(
     sells: list[ExecutionOrderItem],
     app_key: str,
@@ -74,54 +89,8 @@ async def _execute_sells_with_clamp(
     account_no: str,
     is_mock: bool,
 ) -> list[OrderResult]:
-    """매도 주문을 실행 계좌의 실제 보유수량으로 clamp한 뒤 실행한다.
-
-    포트폴리오 합산 기준으로 계산된 매도 수량이 실행 계좌의 실제 보유수량을 초과하면
-    KIS가 주문을 거부하므로, 실행 직전 실시간 잔고를 조회해 수량을 조정한다.
-    잔고 조회 자체가 실패하면 clamp 없이 원래 수량으로 주문을 시도한다(기존 동작 유지).
-    """
-    if not sells:
-        return []
-
-    domestic_sells = [o for o in sells if not is_overseas_market(o.market)]
-    overseas_sells = [o for o in sells if is_overseas_market(o.market)]
-
-    results: list[OrderResult] = []
-
-    if domestic_sells:
-        try:
-            balance = await get_domestic_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock)
-            held: dict[str, int] = {}
-            for p in balance.get("positions", []):
-                held[p["ticker"]] = held.get(p["ticker"], 0) + int(p.get("qty", 0))
-            adjusted, skipped = clamp_sell_orders(domestic_sells, held)
-        except Exception as exc:
-            logger.warning("sell_clamp_domestic_balance_failed", error=str(exc))
-            adjusted, skipped = domestic_sells, []
-
-        results.extend(skipped)
-        for order in adjusted:
-            results.append(await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock))
-
-    if overseas_sells:
-        try:
-            balance = await get_overseas_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock)
-            held_overseas: dict[str, int] = {}
-            for p in balance.get("positions", []):
-                key = f"{p['ticker']}:{str(p.get('market', '')).upper()}"
-                held_overseas[key] = held_overseas.get(key, 0) + int(p.get("qty", 0))
-            adjusted_o, skipped_o = clamp_sell_orders(
-                overseas_sells, held_overseas, key_fn=lambda o: f"{o.ticker}:{o.market.upper()}"
-            )
-        except Exception as exc:
-            logger.warning("sell_clamp_overseas_balance_failed", error=str(exc))
-            adjusted_o, skipped_o = overseas_sells, []
-
-        results.extend(skipped_o)
-        for order in adjusted_o:
-            results.append(await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock))
-
-    return results
+    """매도 주문을 실행 계좌의 실제 보유수량으로 clamp한 뒤 실행한다(`execute_sells_with_clamp`)."""
+    return await execute_sells_with_clamp(_kis_ops(app_key, app_secret, access_token, account_no, is_mock), sells)
 
 
 async def _execute_buys_with_cash_check(
@@ -132,38 +101,8 @@ async def _execute_buys_with_cash_check(
     account_no: str,
     is_mock: bool,
 ) -> list[OrderResult]:
-    """FULL 전략 매수 실행 — 매도 완료 후 실제 주문가능금액을 재조회해 예산 내로 clamp한다.
-
-    포트폴리오 합산 계획 수량을 그대로 밀어붙이면, 이번 리밸런싱의 매도 leg가 실패·부분체결·
-    (AUTO 2단계 플랜의 경우) 만료됐을 때 매수가 실제 가용 현금을 초과해 브로커에 거부당하거나
-    남은 주문이 줄줄이 실패로 떨어질 수 있다. TWO_PHASE 전략(Phase1/3)과 동일한 개념의 clamp를
-    여기서도 1회 적용한다(공용 헬퍼는 `clamp_buy_orders_to_budget`).
-
-    해외 주식 포함 시 `get_orderable_cash()`가 국내 전용이므로 clamp를 건너뛰고 원래 수량
-    그대로 실행한다(TWO_PHASE의 `has_overseas` 폴백과 동일 정책). 주문가능금액 조회 자체가
-    실패해도 마찬가지로 clamp 없이 원래 수량으로 시도한다(기존 동작 유지).
-    """
-    if not buys:
-        return []
-
-    if any(is_overseas_market(o.market) for o in buys):
-        return [
-            await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock) for order in buys
-        ]
-
-    try:
-        orderable_cash = await get_orderable_cash(app_key, app_secret, access_token, account_no, is_mock=is_mock)
-    except Exception as exc:
-        logger.warning("full_strategy_orderable_cash_failed", error=str(exc))
-        return [
-            await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock) for order in buys
-        ]
-
-    adjusted, skipped = clamp_buy_orders_to_budget(buys, orderable_cash)
-    results: list[OrderResult] = list(skipped)
-    for order in adjusted:
-        results.append(await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock))
-    return results
+    """FULL 전략 매수 — 주문가능금액(`get_orderable_cash`)으로 clamp한다(`execute_buys_with_cash_check`)."""
+    return await execute_buys_with_cash_check(_kis_ops(app_key, app_secret, access_token, account_no, is_mock), buys)
 
 
 async def _execute_two_phase_orders(

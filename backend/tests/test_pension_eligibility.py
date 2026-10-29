@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.goal_candidate_service import pension_exclusion_note, pension_ineligibility_reason
+from app.services.goal.goal_candidate_service import pension_exclusion_note, pension_ineligibility_reason
 
 
 def _c(ticker: str, name: str, market: str = "KOSPI") -> dict[str, str]:

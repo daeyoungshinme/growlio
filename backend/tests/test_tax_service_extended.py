@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.tax_service import _get_rates
+from app.services.tax.tax_service import _get_rates
 
 _RATES_2025 = _get_rates(2025)
 
@@ -44,7 +44,7 @@ def _make_snap_acc(positions, tax_type="GENERAL"):
 class TestGetOverseasPositionsDetail:
     @pytest.mark.asyncio
     async def test_empty_rows_returns_empty_list(self, mock_db, override_settings):
-        from app.services.tax_service import get_overseas_positions_detail
+        from app.services.tax.tax_service import get_overseas_positions_detail
 
         mock_db.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
         result = await get_overseas_positions_detail(uuid.uuid4(), mock_db)
@@ -52,7 +52,7 @@ class TestGetOverseasPositionsDetail:
 
     @pytest.mark.asyncio
     async def test_domestic_market_positions_excluded(self, mock_db, override_settings):
-        from app.services.tax_service import get_overseas_positions_detail
+        from app.services.tax.tax_service import get_overseas_positions_detail
 
         pos = _make_position(ticker="005930", market="KOSPI")
         snap, acc = _make_snap_acc([pos])
@@ -63,7 +63,7 @@ class TestGetOverseasPositionsDetail:
 
     @pytest.mark.asyncio
     async def test_overseas_position_returns_pnl(self, mock_db, override_settings):
-        from app.services.tax_service import get_overseas_positions_detail
+        from app.services.tax.tax_service import get_overseas_positions_detail
 
         pos = _make_position(avg_price=100_000.0, current_price=150_000.0, qty=10)
         snap, acc = _make_snap_acc([pos])
@@ -79,7 +79,7 @@ class TestGetOverseasPositionsDetail:
 
     @pytest.mark.asyncio
     async def test_position_with_loss_has_negative_pnl(self, mock_db, override_settings):
-        from app.services.tax_service import get_overseas_positions_detail
+        from app.services.tax.tax_service import get_overseas_positions_detail
 
         pos = _make_position(avg_price=200_000.0, current_price=150_000.0, qty=5)
         snap, acc = _make_snap_acc([pos])
@@ -92,7 +92,7 @@ class TestGetOverseasPositionsDetail:
 
     @pytest.mark.asyncio
     async def test_avg_price_usd_included_when_present(self, mock_db, override_settings):
-        from app.services.tax_service import get_overseas_positions_detail
+        from app.services.tax.tax_service import get_overseas_positions_detail
 
         pos = _make_position(avg_price_usd=100.0)
         snap, acc = _make_snap_acc([pos])
@@ -104,7 +104,7 @@ class TestGetOverseasPositionsDetail:
 
     @pytest.mark.asyncio
     async def test_tax_deferred_account_excluded(self, mock_db, override_settings):
-        from app.services.tax_service import get_overseas_positions_detail
+        from app.services.tax.tax_service import get_overseas_positions_detail
 
         pos = _make_position(avg_price=100_000.0, current_price=150_000.0, qty=10)
         snap, acc = _make_snap_acc([pos], tax_type="IRP")
@@ -117,7 +117,7 @@ class TestGetOverseasPositionsDetail:
 class TestCalcStockUnrealized:
     @pytest.mark.asyncio
     async def test_empty_rows_returns_zero_tuple(self, mock_db, override_settings):
-        from app.services.tax_service import _calc_stock_unrealized
+        from app.services.tax.tax_service import _calc_stock_unrealized
 
         mock_db.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
         overseas, domestic_val, domestic_unrealized, tax_deferred = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
@@ -128,7 +128,7 @@ class TestCalcStockUnrealized:
 
     @pytest.mark.asyncio
     async def test_overseas_position_unrealized_gain(self, mock_db, override_settings):
-        from app.services.tax_service import _calc_stock_unrealized
+        from app.services.tax.tax_service import _calc_stock_unrealized
 
         pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=150_000.0, qty=10)
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos])
@@ -145,7 +145,7 @@ class TestCalcStockUnrealized:
 
     @pytest.mark.asyncio
     async def test_domestic_position_value_and_unrealized(self, mock_db, override_settings):
-        from app.services.tax_service import _calc_stock_unrealized
+        from app.services.tax.tax_service import _calc_stock_unrealized
 
         pos = _make_position(ticker="005930", market="KOSPI", avg_price=60_000.0, current_price=70_000.0, qty=100)
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos])
@@ -161,7 +161,7 @@ class TestCalcStockUnrealized:
 
     @pytest.mark.asyncio
     async def test_mixed_positions(self, mock_db, override_settings):
-        from app.services.tax_service import _calc_stock_unrealized
+        from app.services.tax.tax_service import _calc_stock_unrealized
 
         pos_overseas = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=120_000.0, qty=5)
         pos_domestic = _make_position(
@@ -180,7 +180,7 @@ class TestCalcStockUnrealized:
 
     @pytest.mark.asyncio
     async def test_tax_deferred_account_excluded_from_gain_and_counted_separately(self, mock_db, override_settings):
-        from app.services.tax_service import _calc_stock_unrealized
+        from app.services.tax.tax_service import _calc_stock_unrealized
 
         pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=150_000.0, qty=10)
         snap, acc = _make_snap_acc([pos], tax_type="ISA")
@@ -196,29 +196,29 @@ class TestCalcStockUnrealized:
 
 class TestCalcGeumtTax:
     def test_zero_gain_returns_zero(self):
-        from app.services.tax_service import _calc_geumt_tax
+        from app.services.tax.tax_service import _calc_geumt_tax
 
         assert _calc_geumt_tax(0.0, _RATES_2025) == 0.0
 
     def test_negative_gain_returns_zero(self):
-        from app.services.tax_service import _calc_geumt_tax
+        from app.services.tax.tax_service import _calc_geumt_tax
 
         assert _calc_geumt_tax(-1_000_000.0, _RATES_2025) == 0.0
 
     def test_below_300m_applies_standard_rate(self):
-        from app.services.tax_service import _calc_geumt_tax
+        from app.services.tax.tax_service import _calc_geumt_tax
 
         # 1억 * 20% = 2천만
         assert _calc_geumt_tax(100_000_000.0, _RATES_2025) == pytest.approx(20_000_000.0)
 
     def test_exactly_300m_applies_standard_rate(self):
-        from app.services.tax_service import _calc_geumt_tax
+        from app.services.tax.tax_service import _calc_geumt_tax
 
         # 3억 * 20% = 6천만
         assert _calc_geumt_tax(300_000_000.0, _RATES_2025) == pytest.approx(60_000_000.0)
 
     def test_above_300m_applies_excess_rate(self):
-        from app.services.tax_service import _calc_geumt_tax
+        from app.services.tax.tax_service import _calc_geumt_tax
 
         # 3억 * 20% + 1억 * 25% = 6천만 + 2천5백만 = 8천5백만
         assert _calc_geumt_tax(400_000_000.0, _RATES_2025) == pytest.approx(85_000_000.0)
@@ -226,7 +226,7 @@ class TestCalcGeumtTax:
 
 class TestSimulateGeumtTax:
     def test_no_gain_returns_zero_tax(self):
-        from app.services.tax_service import _simulate_geumt_tax
+        from app.services.tax.tax_service import _simulate_geumt_tax
 
         result = _simulate_geumt_tax(0.0, 0.0, _RATES_2025)
         assert result["total_tax_krw"] == 0.0
@@ -234,7 +234,7 @@ class TestSimulateGeumtTax:
         assert result["domestic_tax_krw"] == 0.0
 
     def test_overseas_below_deduction_no_tax(self):
-        from app.services.tax_service import _simulate_geumt_tax
+        from app.services.tax.tax_service import _simulate_geumt_tax
 
         # 200만 < 250만 공제
         result = _simulate_geumt_tax(2_000_000.0, 0.0, _RATES_2025)
@@ -242,7 +242,7 @@ class TestSimulateGeumtTax:
         assert result["overseas_taxable_krw"] == 0.0
 
     def test_overseas_above_deduction_applies_tax(self):
-        from app.services.tax_service import _simulate_geumt_tax
+        from app.services.tax.tax_service import _simulate_geumt_tax
 
         # 1250만 - 250만 = 1000만 * 20% = 200만
         result = _simulate_geumt_tax(12_500_000.0, 0.0, _RATES_2025)
@@ -250,7 +250,7 @@ class TestSimulateGeumtTax:
         assert result["overseas_tax_krw"] == pytest.approx(2_000_000.0)
 
     def test_domestic_below_deduction_no_tax(self):
-        from app.services.tax_service import _simulate_geumt_tax
+        from app.services.tax.tax_service import _simulate_geumt_tax
 
         # 3천만 < 5천만 공제
         result = _simulate_geumt_tax(0.0, 30_000_000.0, _RATES_2025)
@@ -258,7 +258,7 @@ class TestSimulateGeumtTax:
         assert result["domestic_taxable_krw"] == 0.0
 
     def test_domestic_above_deduction_applies_tax(self):
-        from app.services.tax_service import _simulate_geumt_tax
+        from app.services.tax.tax_service import _simulate_geumt_tax
 
         # 1억 - 5천만 = 5천만 * 20% = 1천만
         result = _simulate_geumt_tax(0.0, 100_000_000.0, _RATES_2025)
@@ -266,14 +266,14 @@ class TestSimulateGeumtTax:
         assert result["domestic_tax_krw"] == pytest.approx(10_000_000.0)
 
     def test_tax_difference_vs_current_regime(self):
-        from app.services.tax_service import _simulate_geumt_tax
+        from app.services.tax.tax_service import _simulate_geumt_tax
 
         # 해외 1000만: 현행 (1000만-250만)*22%=165만, 금투세 (1000만-250만)*20%=150만 → 차이 -15만
         result = _simulate_geumt_tax(10_000_000.0, 0.0, _RATES_2025)
         assert result["tax_difference_krw"] == pytest.approx(-150_000.0, rel=1e-3)
 
     def test_simulation_contains_required_keys(self):
-        from app.services.tax_service import _simulate_geumt_tax
+        from app.services.tax.tax_service import _simulate_geumt_tax
 
         result = _simulate_geumt_tax(5_000_000.0, 60_000_000.0, _RATES_2025)
         required = {
@@ -296,14 +296,14 @@ class TestSimulateGeumtTax:
 
 class TestEstimateOverseasTransferTax:
     def test_gain_below_deduction_no_tax(self):
-        from app.services.tax_service import estimate_overseas_transfer_tax
+        from app.services.tax.tax_service import estimate_overseas_transfer_tax
 
         result = estimate_overseas_transfer_tax(2_000_000.0, year=2025)
         assert result["taxable_gain_krw"] == 0.0
         assert result["estimated_tax_krw"] == 0.0
 
     def test_gain_above_deduction_applies_22_pct(self):
-        from app.services.tax_service import estimate_overseas_transfer_tax
+        from app.services.tax.tax_service import estimate_overseas_transfer_tax
 
         # (1250만 - 250만) * 22% = 220만
         result = estimate_overseas_transfer_tax(12_500_000.0, year=2025)
@@ -313,14 +313,14 @@ class TestEstimateOverseasTransferTax:
         assert result["deduction_krw"] == pytest.approx(2_500_000.0)
 
     def test_negative_gain_no_tax(self):
-        from app.services.tax_service import estimate_overseas_transfer_tax
+        from app.services.tax.tax_service import estimate_overseas_transfer_tax
 
         result = estimate_overseas_transfer_tax(-1_000_000.0, year=2025)
         assert result["taxable_gain_krw"] == 0.0
         assert result["estimated_tax_krw"] == 0.0
 
     def test_year_none_uses_current_year(self):
-        from app.services.tax_service import estimate_overseas_transfer_tax
+        from app.services.tax.tax_service import estimate_overseas_transfer_tax
         from app.utils.kst import today_kst
 
         result = estimate_overseas_transfer_tax(12_500_000.0, year=None)
@@ -328,7 +328,7 @@ class TestEstimateOverseasTransferTax:
         assert result == current_year_rates_result
 
     def test_future_year_falls_back_to_closest(self):
-        from app.services.tax_service import estimate_overseas_transfer_tax
+        from app.services.tax.tax_service import estimate_overseas_transfer_tax
 
         # 2030년은 정의되지 않았으므로 가장 가까운 연도(2026)로 폴백
         result_future = estimate_overseas_transfer_tax(12_500_000.0, year=2030)

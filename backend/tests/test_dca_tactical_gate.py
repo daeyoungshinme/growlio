@@ -115,7 +115,7 @@ class TestTacticalDisableUnlinks:
         from app.api.deps import get_current_user
         from app.core.database import get_db
         from app.main import app
-        from app.services import tactical_allocation_service as tactical
+        from app.services.tactical import tactical_allocation_service as tactical
 
         user = SimpleNamespace(id=uuid.uuid4(), email="t@example.com", is_active=True, needs_password_reset=False)
         db = AsyncMock(spec=AsyncSession)

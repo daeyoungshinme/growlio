@@ -36,9 +36,9 @@ async def send_test_rebalancing_alert(
     테스트할지 지정한다(AGGREGATE면 무시하고 alert_scope == "AGGREGATE" 행을 조회).
     반환: {"email_sent": bool, "push_sent": bool}
     """
+    from app.services.alerts._dispatch import send_push_safely
     from app.services.email_service import send_rebalancing_alert
     from app.services.portfolio_service import build_portfolio_overview
-    from app.services.push_service import send_push_to_user
     from app.services.rebalancing.service import analyze_rebalancing
 
     account_filter = (
@@ -106,18 +106,16 @@ async def send_test_rebalancing_alert(
     except Exception as exc:
         logger.error("test_rebalancing_alert_email_failed", portfolio_id=str(portfolio_id), error=str(exc))
 
-    push_sent = False
     drift_info = f"{len(drifting)}개 종목이 ±{threshold:.1f}% 이상 이탈" if drifting else "현재 이탈 없음"
-    try:
-        push_sent = await send_push_to_user(
-            user_id=user_id,
-            title=f"[테스트] 리밸런싱 알림 — {portfolio.name}",
-            body=f"테스트 알림입니다. {drift_info}.",
-            fcm_token=fcm_token,
-            data={"type": "REBALANCING", "portfolio_id": str(portfolio.id)},
-        )
-    except Exception as exc:
-        logger.warning("test_rebalancing_alert_push_failed", portfolio_id=str(portfolio_id), error=str(exc))
+    push_sent = await send_push_safely(
+        user_id,
+        title=f"[테스트] 리밸런싱 알림 — {portfolio.name}",
+        body=f"테스트 알림입니다. {drift_info}.",
+        fcm_token=fcm_token,
+        data={"type": "REBALANCING", "portfolio_id": str(portfolio.id)},
+        failure_event="test_rebalancing_alert_push_failed",
+        portfolio_id=str(portfolio_id),
+    )
 
     await save_alert_history(db, user_id, "REBALANCING", f"[테스트] 리밸런싱 알림: {portfolio.name}")
     await db.commit()

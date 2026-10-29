@@ -23,7 +23,7 @@ from app.models.tactical import TacticalStrategy
 from app.models.user import User
 from app.schemas.portfolio import IndexGroupSuggestion
 from app.schemas.tactical import TacticalApplyRequest, TacticalStrategyUpsert
-from app.services import tactical_allocation_service as tactical
+from app.services.tactical import tactical_allocation_service as tactical
 from app.utils.cache_keys import invalidate_rebalancing_analysis_cache, invalidate_user_caches, portfolio_list_key
 from app.utils.kst import today_kst
 
@@ -178,7 +178,7 @@ async def _group_suggestions(
 
     실패해도 적용은 막지 않는다(대표 종목만으로 그룹 생성).
     """
-    from app.services.index_exposure_service import get_index_group_suggestions
+    from app.services.etf.index_exposure_service import get_index_group_suggestions
 
     try:
         rows = await db.execute(
@@ -259,7 +259,7 @@ async def backtest_tactical_rules(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """이 포트폴리오의 국면별 비중표·틸트·웅덩이 투입폭으로 과거 규칙을 재현한 백테스트(SPY·QQQ·DIA 단순보유와 비교)."""
-    from app.services.tactical_backtest import run_tactical_backtest
+    from app.services.tactical.tactical_backtest import run_tactical_backtest
 
     await _portfolio_or_404(portfolio_id, current_user, db)
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)

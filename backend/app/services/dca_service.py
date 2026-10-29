@@ -14,7 +14,7 @@ from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import UserSettings
 from app.services.composition_calculator import build_asset_totals, exclude_real_estate
-from app.services.goal_return_solver import solve_required_annual_return_pct, solve_required_monthly_deposit
+from app.services.goal.goal_return_solver import solve_required_annual_return_pct, solve_required_monthly_deposit
 from app.utils.cache_keys import (
     TTL_DCA_ANALYSIS,
     CacheStoreType,

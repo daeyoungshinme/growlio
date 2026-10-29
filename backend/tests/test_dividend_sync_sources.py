@@ -488,7 +488,7 @@ class TestIsKoreanEtf:
 
     def test_all_curated_domestic_etfs_are_recognized(self):
         from app.services.dividend.constants import is_korean_etf
-        from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
+        from app.services.goal.recommendation_universe import RECOMMENDATION_UNIVERSE
 
         domestic_etf_tickers = {
             c["ticker"] for c in RECOMMENDATION_UNIVERSE if c["market"].upper() in ("KOSPI", "KOSDAQ")

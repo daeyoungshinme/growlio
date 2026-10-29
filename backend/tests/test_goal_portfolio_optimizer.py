@@ -9,7 +9,7 @@ import random
 
 import pytest
 
-from app.services.goal_portfolio_optimizer import (
+from app.services.goal.goal_portfolio_optimizer import (
     _dividend_floor_constraint,
     _optimize_goal_portfolio,
 )

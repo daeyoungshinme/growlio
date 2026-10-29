@@ -11,7 +11,7 @@ from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
 from app.schemas.backtest import BacktestResult, BacktestRunRequest
-from app.services.backtest_service import run_backtest
+from app.services.backtest.backtest_service import run_backtest
 from app.utils.cache_keys import TTL_BACKTEST, backtest_key
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])

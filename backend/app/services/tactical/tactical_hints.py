@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Literal, TypedDict
 
-from app.services.technical_indicators import TREND_BAND_PCT
+from app.services.market_signal.technical_indicators import TREND_BAND_PCT
 
 HintKind = Literal["TO_RISK_OFF", "TO_NEUTRAL", "TO_RISK_ON"]
 

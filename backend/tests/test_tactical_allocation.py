@@ -13,10 +13,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.models.tactical import TacticalStrategy
-from app.services import tactical_allocation_service as tactical
-from app.services import tactical_tilt as tilt
-from app.services import technical_indicators as ti
-from app.services.tactical_backtest import simulate, vix_to_macro_level
+from app.services.market_signal import technical_indicators as ti
+from app.services.tactical import tactical_allocation_service as tactical
+from app.services.tactical import tactical_tilt as tilt
+from app.services.tactical.tactical_backtest import simulate, vix_to_macro_level
 
 # ---------------------------------------------------------------------------
 # 기술적 지표
@@ -268,7 +268,7 @@ class TestTilt:
 
         with (
             patch.object(tilt, "set_cached_json", spy_set),
-            patch("app.services.technical_signal_service.fetch_close_history", fetch),
+            patch("app.services.market_signal.technical_signal_service.fetch_close_history", fetch),
             patch.object(tilt, "_fetch_real_yields", AsyncMock(side_effect=RuntimeError("fred"))),
         ):
             partial = await tilt.get_tilt_inputs(cache)
@@ -282,7 +282,7 @@ class TestTilt:
         await cache.delete(tilt.tactical_tilt_key())  # 짧은 TTL 경과
         with (
             patch.object(tilt, "set_cached_json", spy_set),
-            patch("app.services.technical_signal_service.fetch_close_history", fetch),
+            patch("app.services.market_signal.technical_signal_service.fetch_close_history", fetch),
             patch.object(tilt, "_fetch_real_yields", AsyncMock(return_value=[2.0] * 20 + [1.8])),
         ):
             full = await tilt.get_tilt_inputs(cache)
@@ -293,7 +293,7 @@ class TestTilt:
     async def test_get_inputs_survive_price_failure(self):
         with (
             patch(
-                "app.services.technical_signal_service.fetch_close_history",
+                "app.services.market_signal.technical_signal_service.fetch_close_history",
                 AsyncMock(side_effect=RuntimeError("yahoo")),
             ),
             patch.object(tilt, "_fetch_real_yields", AsyncMock(return_value=[])),
@@ -901,7 +901,7 @@ class TestFetchWrappers:
     @pytest.mark.asyncio
     async def test_technical_signals_cached_and_partial_failure(self):
         from app.core.cache_store import CacheStore
-        from app.services import technical_signal_service as svc
+        from app.services.market_signal import technical_signal_service as svc
 
         closes = _trend_closes()
         fetch = AsyncMock(return_value={"QQQ": closes["QQQ"]})  # SPY 실패
@@ -916,7 +916,7 @@ class TestFetchWrappers:
 
     @pytest.mark.asyncio
     async def test_technical_signals_dia_failure_keeps_normal_ttl(self):
-        from app.services import technical_signal_service as svc
+        from app.services.market_signal import technical_signal_service as svc
 
         closes = _trend_closes()
         cache = MagicMock()
@@ -932,7 +932,7 @@ class TestFetchWrappers:
 
     @pytest.mark.asyncio
     async def test_technical_signals_fetch_exception(self):
-        from app.services import technical_signal_service as svc
+        from app.services.market_signal import technical_signal_service as svc
 
         with patch.object(svc, "fetch_close_history", AsyncMock(side_effect=RuntimeError("yahoo down"))):
             result = await svc.get_technical_signals(None)
@@ -941,7 +941,7 @@ class TestFetchWrappers:
     @pytest.mark.asyncio
     async def test_backtest_without_vix_notes_fallback(self):
         from app.core.cache_store import CacheStore
-        from app.services import tactical_backtest as bt
+        from app.services.tactical import tactical_backtest as bt
 
         cache = CacheStore()
         with (
@@ -960,7 +960,7 @@ class TestFetchWrappers:
     @pytest.mark.asyncio
     async def test_backtest_simulate_runs_off_event_loop(self):
         """simulate는 CPU 루프라 이벤트 루프를 막지 않도록 asyncio.to_thread로 실행돼야 한다."""
-        from app.services import tactical_backtest as bt
+        from app.services.tactical import tactical_backtest as bt
 
         calls: list[object] = []
         real_to_thread = bt.asyncio.to_thread
@@ -980,7 +980,7 @@ class TestFetchWrappers:
 
     @pytest.mark.asyncio
     async def test_backtest_missing_prices_raises(self):
-        from app.services import tactical_backtest as bt
+        from app.services.tactical import tactical_backtest as bt
 
         with (
             patch.object(bt, "fetch_close_history", AsyncMock(return_value={})),
@@ -990,10 +990,12 @@ class TestFetchWrappers:
 
     @pytest.mark.asyncio
     async def test_vix_history_parsing(self):
-        from app.services import tactical_backtest as bt
+        from app.services.tactical import tactical_backtest as bt
 
         obs = [{"date": "2026-10-02", "value": "18.5"}, {"date": "2026-10-01", "value": "."}]
-        with patch("app.services.economic_indicator_service.fred_get_observations", AsyncMock(return_value=obs)):
+        with patch(
+            "app.services.market_signal.economic_indicator_service.fred_get_observations", AsyncMock(return_value=obs)
+        ):
             series = await bt._fetch_vix_history(30)
         assert series.to_dict() == {pd.Timestamp("2026-10-02"): 18.5}
 
@@ -1001,7 +1003,7 @@ class TestFetchWrappers:
     async def test_evaluate_market_macro_failure_is_stale(self):
         with (
             patch(
-                "app.services.market_signal_service.get_confirmed_composite_level",
+                "app.services.market_signal.market_signal_service.get_confirmed_composite_level",
                 AsyncMock(side_effect=RuntimeError("fred")),
             ),
             patch.object(

@@ -4,6 +4,7 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -979,3 +980,45 @@ class TestPushToken:
         assert resp.status_code == 200
         assert row.fcm_token is None
         db.execute.assert_not_called()
+
+
+# 경로 → 컬럼 매핑을 고정한다(plans/91 D). 테이블(_TOGGLE_SETTINGS)을 읽지 않고 기대값을 따로 적어 오배선을 잡는다.
+_TOGGLE_CASES = [
+    ("composite-signal-alerts", "composite_signal_alerts_enabled", True),
+    ("market-signal-digest", "market_signal_daily_digest_enabled", False),
+    ("year-end-tax-reminder", "year_end_tax_reminder_enabled", False),
+    ("goal-achievement-alerts", "goal_achievement_alerts_enabled", False),
+    ("monthly-report-alerts", "monthly_report_enabled", False),
+    ("recommendation-drift-alert", "recommendation_drift_alert_enabled", False),
+    ("challenge-reminders", "challenge_reminders_enabled", False),
+]
+
+
+@pytest.mark.parametrize(("path", "column", "invalidates_analysis"), _TOGGLE_CASES)
+@pytest.mark.parametrize("enabled", [True, False])
+def test_toggle_put_sets_only_its_column(override_settings, monkeypatch, path, column, invalidates_analysis, enabled):
+    user = _make_user()
+    db = _make_mock_db()
+    row = SimpleNamespace(**{c: None for _, c, _ in _TOGGLE_CASES})
+    db.scalar = AsyncMock(return_value=row)
+    invalidate = AsyncMock()
+    monkeypatch.setattr("app.api.v1.settings.invalidate_rebalancing_analysis_cache_all", invalidate)
+
+    app = _setup_app(user, db)
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put(
+                f"/api/v1/settings/{path}", json={"enabled": enabled}, headers={"Authorization": "Bearer fake"}
+            )
+        assert resp.status_code == 200
+        assert resp.json()["detail"].endswith("저장되었습니다")
+        assert getattr(row, column) is enabled
+        assert all(getattr(row, c) is None for _, c, _ in _TOGGLE_CASES if c != column)
+        db.commit.assert_awaited_once()
+        assert invalidate.await_count == (1 if invalidates_analysis else 0)
+    finally:
+        from app.api.deps import get_current_user
+        from app.core.database import get_db
+
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)

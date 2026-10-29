@@ -12,10 +12,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.models.tactical import TacticalStrategy
-from app.services import tactical_allocation_service as tactical
-from app.services import tactical_dip as dip
-from app.services import technical_indicators as ti
-from app.services.tactical_backtest import leveraged_returns, simulate
+from app.services.market_signal import technical_indicators as ti
+from app.services.tactical import tactical_allocation_service as tactical
+from app.services.tactical import tactical_dip as dip
+from app.services.tactical.tactical_backtest import leveraged_returns, simulate
 
 
 def _series(values) -> pd.Series:
@@ -479,7 +479,7 @@ class TestBacktestCosts:
         return idx, pd.DataFrame({"QQQ": up, "SPY": up}, index=idx)
 
     def test_rebalance_charges_cost_on_traded_equity(self):
-        from app.services.tactical_backtest import _COST_RATE, _rebalance
+        from app.services.tactical.tactical_backtest import _COST_RATE, _rebalance
 
         holdings, turnover = _rebalance({}, 100.0, {"QQQ": 60.0, "SPY": 0.0, "CASH": 40.0})
         assert sum(holdings.values()) == pytest.approx(100 * (1 - 0.6 * _COST_RATE))
@@ -515,7 +515,7 @@ class TestBacktestCosts:
         assert result["turnover_pct_per_year"] == 0.0  # 국면 전환 없음 — 최초 진입 매수는 회전율에서 제외
 
     def test_settings_hash_includes_macro_option(self):
-        from app.services import tactical_backtest as bt
+        from app.services.tactical import tactical_backtest as bt
 
         on = bt._settings_hash(tactical.DEFAULT_REGIME_WEIGHTS, 10, 0)
         assert bt._settings_hash(tactical.DEFAULT_REGIME_WEIGHTS, 10, 0, use_macro=False) != on

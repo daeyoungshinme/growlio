@@ -78,6 +78,55 @@ class TestMe:
         assert resp.status_code == 401
 
 
+# ── POST /auth/password-reset-complete ────────────────────────
+
+
+class TestPasswordResetComplete:
+    """재설정을 마치면 DB 플래그를 꺼야 다음 /auth/me에서 배너가 다시 뜨지 않는다."""
+
+    def _call(self, user, db):
+        from app.api.deps import get_current_user
+        from app.core.database import get_db
+        from app.main import app
+
+        async def override_user():
+            return user
+
+        async def override_db():
+            yield db
+
+        app.dependency_overrides[get_current_user] = override_user
+        app.dependency_overrides[get_db] = override_db
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                return client.post(
+                    "/api/v1/auth/password-reset-complete", headers={"Authorization": "Bearer faketoken"}
+                )
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    @pytest.mark.parametrize(("initial", "commits"), [(True, 1), (False, 0)])
+    def test_clears_flag(self, initial, commits):
+        user = _make_user()
+        user.needs_password_reset = initial
+        db = _make_mock_db(existing_user=user)
+
+        resp = self._call(user, db)
+
+        assert resp.status_code == 200
+        assert resp.json()["needs_password_reset"] is False
+        assert user.needs_password_reset is False
+        assert db.commit.await_count == commits
+
+    def test_without_token_returns_401(self):
+        from app.main import app
+
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post("/api/v1/auth/password-reset-complete")
+        assert resp.status_code == 401
+
+
 # ── POST /auth/sync-profile ───────────────────────────────────
 
 

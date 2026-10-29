@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import AsyncSessionLocal
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
-from app.services.market_signal_service import (
+from app.services.market_signal.market_signal_service import (
     get_confirmed_composite_level,
     get_last_composite_level,
     get_market_signal,

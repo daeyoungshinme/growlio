@@ -30,8 +30,8 @@ async def _warm_jwks() -> None:
 
 
 async def run_startup_warmup() -> None:
-    from app.services.market_signal_service import get_market_signal
-    from app.services.technical_signal_service import get_technical_signals
+    from app.services.market_signal.market_signal_service import get_market_signal
+    from app.services.market_signal.technical_signal_service import get_technical_signals
     from app.utils.currency import fetch_usd_krw
 
     cache = await get_cache_store()

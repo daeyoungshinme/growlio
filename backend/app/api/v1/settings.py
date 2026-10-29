@@ -21,7 +21,7 @@ from app.schemas.asset import MAX_CREDENTIAL_LENGTH
 from app.schemas.rebalancing.goal import GoalCandidateTicker
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
-from app.services.goal_age_recommendation_service import age_group_from_birth_year
+from app.services.goal.goal_age_recommendation_service import age_group_from_birth_year
 from app.utils.cache_keys import (
     challenge_progress_key,
     dashboard_summary_key,
@@ -155,15 +155,7 @@ class PushTokenUpdate(BaseModel):
     fcm_token: str | None = Field(default=None, max_length=512)
 
 
-class CompositeSignalAlertsUpdate(BaseModel):
-    enabled: bool
-
-
-class MarketSignalDigestUpdate(BaseModel):
-    enabled: bool
-
-
-class YearEndTaxReminderUpdate(BaseModel):
+class ToggleUpdate(BaseModel):
     enabled: bool
 
 
@@ -171,22 +163,6 @@ class IncomeBracketUpdate(BaseModel):
     """절세 액션 플랜의 연금 세액공제율 분기용 소득 구간. None이면 미입력(13.2% 하한값 추정)."""
 
     income_bracket: IncomeBracket | None = None
-
-
-class GoalAchievementAlertsUpdate(BaseModel):
-    enabled: bool
-
-
-class MonthlyReportAlertsUpdate(BaseModel):
-    enabled: bool
-
-
-class RecommendationDriftAlertUpdate(BaseModel):
-    enabled: bool
-
-
-class ChallengeRemindersUpdate(BaseModel):
-    enabled: bool
 
 
 class AutoRebalancingDailyCapUpdate(BaseModel):
@@ -425,53 +401,6 @@ async def update_notification_email(
     return {"detail": "알림 이메일이 저장되었습니다"}
 
 
-@router.put("/composite-signal-alerts")
-@limiter.limit("10/minute")
-async def update_composite_signal_alerts(
-    request: Request,
-    req: CompositeSignalAlertsUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """시장/리스크 복합신호 알림(이메일·푸시) 수신 여부 — 신호가 유저 단위이므로 계정 단일 설정."""
-    row = await get_or_create_settings(db, current_user.id)
-    row.composite_signal_alerts_enabled = req.enabled
-    await db.commit()
-    # 진단 결과(diagnosis_context)가 이 설정으로 계산돼 캐시되므로 함께 비운다
-    await invalidate_rebalancing_analysis_cache_all(await get_cache_store(), current_user.id)
-    return {"detail": "복합신호 알림 설정이 저장되었습니다"}
-
-
-@router.put("/market-signal-digest")
-@limiter.limit("10/minute")
-async def update_market_signal_digest(
-    request: Request,
-    req: MarketSignalDigestUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """시장신호 매일 요약(08:30 KST) 수신 여부 — 등급 전환 시 즉시 알림과 별개의 옵트인 설정."""
-    row = await get_or_create_settings(db, current_user.id)
-    row.market_signal_daily_digest_enabled = req.enabled
-    await db.commit()
-    return {"detail": "시장신호 매일 요약 설정이 저장되었습니다"}
-
-
-@router.put("/year-end-tax-reminder")
-@limiter.limit("10/minute")
-async def update_year_end_tax_reminder(
-    request: Request,
-    req: YearEndTaxReminderUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """11~12월 매주 월요일 발송되는 연말 절세 리마인더 수신 여부."""
-    row = await get_or_create_settings(db, current_user.id)
-    row.year_end_tax_reminder_enabled = req.enabled
-    await db.commit()
-    return {"detail": "연말 절세 리마인더 설정이 저장되었습니다"}
-
-
 @router.put("/income-bracket")
 @limiter.limit("10/minute")
 async def update_income_bracket(
@@ -487,67 +416,6 @@ async def update_income_bracket(
     return {"detail": "소득 구간이 저장되었습니다"}
 
 
-@router.put("/goal-achievement-alerts")
-@limiter.limit("10/minute")
-async def update_goal_achievement_alerts(
-    request: Request,
-    req: GoalAchievementAlertsUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """자산/입금/배당 목표 달성 알림(이메일·푸시) 수신 여부."""
-    row = await get_or_create_settings(db, current_user.id)
-    row.goal_achievement_alerts_enabled = req.enabled
-    await db.commit()
-    return {"detail": "목표 달성 알림 설정이 저장되었습니다"}
-
-
-@router.put("/monthly-report-alerts")
-@limiter.limit("10/minute")
-async def update_monthly_report_alerts(
-    request: Request,
-    req: MonthlyReportAlertsUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """매월 1일 발송되는 월간 포트폴리오 리포트 수신 여부."""
-    row = await get_or_create_settings(db, current_user.id)
-    row.monthly_report_enabled = req.enabled
-    await db.commit()
-    return {"detail": "월간 리포트 설정이 저장되었습니다"}
-
-
-@router.put("/recommendation-drift-alert")
-@limiter.limit("10/minute")
-async def update_recommendation_drift_alert(
-    request: Request,
-    req: RecommendationDriftAlertUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
-    달라지면 이메일/푸시로 알리는 기능의 수신 여부."""
-    row = await get_or_create_settings(db, current_user.id)
-    row.recommendation_drift_alert_enabled = req.enabled
-    await db.commit()
-    return {"detail": "추천 비중 변화 알림 설정이 저장되었습니다"}
-
-
-@router.put("/challenge-reminders")
-@limiter.limit("10/minute")
-async def update_challenge_reminders(
-    request: Request,
-    req: ChallengeRemindersUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """적립 챌린지 독려(매월 25일)·월간 결산(매월 1일) 알림 수신 여부 — 옵트인(기본 OFF)."""
-    row = await get_or_create_settings(db, current_user.id)
-    row.challenge_reminders_enabled = req.enabled
-    await db.commit()
-    return {"detail": "적립 챌린지 알림 설정이 저장되었습니다"}
-
-
 @router.put("/auto-rebalancing-daily-cap")
 @limiter.limit("10/minute")
 async def update_auto_rebalancing_daily_cap(
@@ -561,6 +429,86 @@ async def update_auto_rebalancing_daily_cap(
     row.auto_rebalancing_daily_value_cap_krw = req.daily_value_cap_krw
     await db.commit()
     return {"detail": "하루 합산 거래한도 설정이 저장되었습니다"}
+
+
+# 계정 단위 on/off 알림 설정 — 경로마다 컬럼 하나를 그대로 저장한다. URL·응답은 기존과 같다(설치된 APK가 호출).
+# (경로, UserSettings 컬럼, 응답 문구, 설명, 저장 후 리밸런싱 분석 캐시 무효화 여부)
+_TOGGLE_SETTINGS: tuple[tuple[str, str, str, str, bool], ...] = (
+    (
+        "composite-signal-alerts",
+        "composite_signal_alerts_enabled",
+        "복합신호 알림 설정이 저장되었습니다",
+        "시장/리스크 복합신호 알림(이메일·푸시) 수신 여부 — 신호가 유저 단위이므로 계정 단일 설정.",
+        # 진단 결과(diagnosis_context)가 이 설정으로 계산돼 캐시되므로 함께 비운다
+        True,
+    ),
+    (
+        "market-signal-digest",
+        "market_signal_daily_digest_enabled",
+        "시장신호 매일 요약 설정이 저장되었습니다",
+        "시장신호 매일 요약(08:30 KST) 수신 여부 — 등급 전환 시 즉시 알림과 별개의 옵트인 설정.",
+        False,
+    ),
+    (
+        "year-end-tax-reminder",
+        "year_end_tax_reminder_enabled",
+        "연말 절세 리마인더 설정이 저장되었습니다",
+        "11~12월 매주 월요일 발송되는 연말 절세 리마인더 수신 여부.",
+        False,
+    ),
+    (
+        "goal-achievement-alerts",
+        "goal_achievement_alerts_enabled",
+        "목표 달성 알림 설정이 저장되었습니다",
+        "자산/입금/배당 목표 달성 알림(이메일·푸시) 수신 여부.",
+        False,
+    ),
+    (
+        "monthly-report-alerts",
+        "monthly_report_enabled",
+        "월간 리포트 설정이 저장되었습니다",
+        "매월 1일 발송되는 월간 포트폴리오 리포트 수신 여부.",
+        False,
+    ),
+    (
+        "recommendation-drift-alert",
+        "recommendation_drift_alert_enabled",
+        "추천 비중 변화 알림 설정이 저장되었습니다",
+        "매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게 달라지면 "
+        "이메일/푸시로 알리는 기능의 수신 여부.",
+        False,
+    ),
+    (
+        "challenge-reminders",
+        "challenge_reminders_enabled",
+        "적립 챌린지 알림 설정이 저장되었습니다",
+        "적립 챌린지 독려(매월 25일)·월간 결산(매월 1일) 알림 수신 여부 — 옵트인(기본 OFF).",
+        False,
+    ),
+)
+
+
+def _register_toggle(path: str, column: str, detail: str, description: str, invalidate_analysis: bool) -> None:
+    async def update_toggle(
+        request: Request,
+        req: ToggleUpdate,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ):
+        row = await get_or_create_settings(db, current_user.id)
+        setattr(row, column, req.enabled)
+        await db.commit()
+        if invalidate_analysis:
+            await invalidate_rebalancing_analysis_cache_all(await get_cache_store(), current_user.id)
+        return {"detail": detail}
+
+    name = f"update_{column}"
+    update_toggle.__name__ = name
+    router.put(f"/{path}", name=name, description=description)(limiter.limit("10/minute")(update_toggle))
+
+
+for _toggle in _TOGGLE_SETTINGS:
+    _register_toggle(*_toggle)
 
 
 @router.put("/push-token")

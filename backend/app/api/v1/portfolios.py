@@ -28,7 +28,7 @@ from app.schemas.portfolio import (
     PortfolioUpdate,
 )
 from app.schemas.portfolio import PortfolioItem as PortfolioItemSchema
-from app.services.index_exposure_service import get_index_group_suggestions
+from app.services.etf.index_exposure_service import get_index_group_suggestions
 from app.utils.cache_keys import (
     TTL_PORTFOLIO_LIST,
     get_cached_json,

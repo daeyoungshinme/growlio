@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.tax_action_service import (
+from app.services.tax.tax_action_service import (
     _DEDUCTION_RULES,
     _priority,
     _sort_actions,
@@ -309,7 +309,7 @@ class TestGetTaxActionPlan:
     @pytest.fixture(autouse=True)
     def realized_mock(self):
         with patch(
-            "app.services.tax_action_service.get_overseas_realized_summary",
+            "app.services.tax.tax_action_service.get_overseas_realized_summary",
             new=AsyncMock(return_value=_NO_REALIZED),
         ) as m:
             yield m
@@ -321,20 +321,20 @@ class TestGetTaxActionPlan:
         isa_mock = AsyncMock()
         with (
             patch(
-                "app.services.tax_action_service.today_kst",
+                "app.services.tax.tax_action_service.today_kst",
                 return_value=TODAY,
             ),
             patch(
-                "app.services.tax_action_service.calc_pension_contribution_status",
+                "app.services.tax.tax_action_service.calc_pension_contribution_status",
                 new=AsyncMock(return_value=_pension(2_000_000, 6_000_000)),
             ),
-            patch("app.services.tax_action_service.get_isa_status_summary", new=isa_mock),
+            patch("app.services.tax.tax_action_service.get_isa_status_summary", new=isa_mock),
             patch(
-                "app.services.tax_action_service.get_tax_summary",
+                "app.services.tax.tax_action_service.get_tax_summary",
                 new=AsyncMock(return_value=_TAX_SUMMARY),
             ),
             patch(
-                "app.services.tax_action_service.get_overseas_positions_detail",
+                "app.services.tax.tax_action_service.get_overseas_positions_detail",
                 new=AsyncMock(return_value=[{"unrealized_pnl_krw": 1_000_000}]),
             ),
         ):
@@ -352,10 +352,10 @@ class TestGetTaxActionPlan:
         mock_db.execute = AsyncMock(side_effect=[_result(scalar=None), _result(rows=[("GENERAL",)])])
         summary_mock = AsyncMock(return_value=_TAX_SUMMARY)
         with (
-            patch("app.services.tax_action_service.today_kst", return_value=TODAY),
-            patch("app.services.tax_action_service.get_tax_summary", new=summary_mock),
+            patch("app.services.tax.tax_action_service.today_kst", return_value=TODAY),
+            patch("app.services.tax.tax_action_service.get_tax_summary", new=summary_mock),
             patch(
-                "app.services.tax_action_service.get_overseas_positions_detail",
+                "app.services.tax.tax_action_service.get_overseas_positions_detail",
                 new=AsyncMock(return_value=[{"unrealized_pnl_krw": 1_000_000}]),
             ),
         ):
@@ -372,9 +372,9 @@ class TestGetTaxActionPlan:
         positions_mock = AsyncMock(return_value=positions)
         summary_mock = AsyncMock(return_value=_TAX_SUMMARY)
         with (
-            patch("app.services.tax_action_service.today_kst", return_value=TODAY),
-            patch("app.services.tax_action_service.get_tax_summary", new=summary_mock),
-            patch("app.services.tax_action_service.get_overseas_positions_detail", new=positions_mock),
+            patch("app.services.tax.tax_action_service.today_kst", return_value=TODAY),
+            patch("app.services.tax.tax_action_service.get_tax_summary", new=summary_mock),
+            patch("app.services.tax.tax_action_service.get_overseas_positions_detail", new=positions_mock),
         ):
             await get_tax_action_plan(uuid.uuid4(), 2026, mock_db)
 
@@ -387,11 +387,11 @@ class TestGetTaxActionPlan:
         mock_db.execute = AsyncMock(side_effect=[_result(scalar=None), _result(rows=[])])
         with (
             patch(
-                "app.services.tax_action_service.get_tax_summary",
+                "app.services.tax.tax_action_service.get_tax_summary",
                 new=AsyncMock(return_value=_TAX_SUMMARY),
             ),
             patch(
-                "app.services.tax_action_service.get_overseas_positions_detail",
+                "app.services.tax.tax_action_service.get_overseas_positions_detail",
                 new=AsyncMock(return_value=[]),
             ),
         ):

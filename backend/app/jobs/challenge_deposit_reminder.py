@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 
 import structlog
@@ -13,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import report_job_failure, run_alert_job
+from app.jobs._job_helpers import report_job_failure, run_alert_job, run_per_user
 from app.models.challenge import CHALLENGE_ACTIVE, CHALLENGE_DEPOSIT, InvestmentChallenge
 from app.models.user import User, UserSettings
 from app.services import challenge_service
@@ -53,43 +52,42 @@ async def _run_challenge_deposit_reminder(db: AsyncSession, cache: CacheStoreTyp
         )
     )
     users = result.all()
-    sem = asyncio.Semaphore(_CONCURRENCY)
-    await asyncio.gather(*(_check_user(user, settings_row, cache, sem) for user, settings_row in users))
+    await run_per_user(
+        users,
+        lambda user, settings_row, to_email: _check_user(user, settings_row, to_email, cache),
+        concurrency=_CONCURRENCY,
+        failure_event="challenge_deposit_reminder_failed",
+    )
 
 
-async def _check_user(user: User, settings_row: UserSettings, cache: CacheStoreType, sem: asyncio.Semaphore) -> None:
-    async with sem:
-        month = datetime.now(_KST).strftime("%Y-%m")
-        to_email = settings_row.notification_email or user.email
-        try:
-            async with AsyncSessionLocal() as db:
-                challenges = (
-                    (
-                        await db.execute(
-                            select(InvestmentChallenge).where(
-                                InvestmentChallenge.user_id == user.id,
-                                InvestmentChallenge.status == CHALLENGE_ACTIVE,
-                                InvestmentChallenge.challenge_type == CHALLENGE_DEPOSIT,
-                                InvestmentChallenge.reminder_enabled == True,
-                            )
-                        )
+async def _check_user(user: User, settings_row: UserSettings, to_email: str, cache: CacheStoreType) -> None:
+    month = datetime.now(_KST).strftime("%Y-%m")
+    async with AsyncSessionLocal() as db:
+        challenges = (
+            (
+                await db.execute(
+                    select(InvestmentChallenge).where(
+                        InvestmentChallenge.user_id == user.id,
+                        InvestmentChallenge.status == CHALLENGE_ACTIVE,
+                        InvestmentChallenge.challenge_type == CHALLENGE_DEPOSIT,
+                        InvestmentChallenge.reminder_enabled == True,
                     )
-                    .scalars()
-                    .all()
                 )
-                for challenge in challenges:
-                    # 챌린지 단위 savepoint — 한 챌린지의 예외가 같은 유저의 나머지 챌린지 발송을 막지 않게.
-                    # 내부 헬퍼는 전부 commit=False라 savepoint 해제 뒤 챌린지마다 커밋한다.
-                    try:
-                        async with db.begin_nested():
-                            await _remind_one(db, user, settings_row, challenge, to_email, month)
-                        await db.commit()
-                    except Exception as e:
-                        report_job_failure(
-                            "challenge_deposit_reminder_failed", e, user_id=str(user.id), challenge_id=str(challenge.id)
-                        )
-        except Exception as e:
-            report_job_failure("challenge_deposit_reminder_failed", e, user_id=str(user.id))
+            )
+            .scalars()
+            .all()
+        )
+        for challenge in challenges:
+            # 챌린지 단위 savepoint — 한 챌린지의 예외가 같은 유저의 나머지 챌린지 발송을 막지 않게.
+            # 내부 헬퍼는 전부 commit=False라 savepoint 해제 뒤 챌린지마다 커밋한다.
+            try:
+                async with db.begin_nested():
+                    await _remind_one(db, user, settings_row, challenge, to_email, month)
+                await db.commit()
+            except Exception as e:
+                report_job_failure(
+                    "challenge_deposit_reminder_failed", e, user_id=str(user.id), challenge_id=str(challenge.id)
+                )
 
 
 async def _remind_one(db, user, settings_row, challenge, to_email: str, month: str) -> None:

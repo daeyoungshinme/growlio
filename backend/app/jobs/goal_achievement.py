@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -11,12 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.jobs._job_helpers import report_job_failure, run_alert_job
+from app.jobs._job_helpers import run_alert_job, run_per_user
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
+from app.services.alerts._dispatch import send_push_safely
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_goal_achievement_email
-from app.services.push_service import send_push_to_user
 from app.utils.cache_keys import CacheStoreType
 from app.utils.kst import KST, today_kst
 
@@ -56,8 +55,12 @@ async def _run_goal_achievement_check(db: AsyncSession, cache: CacheStoreType) -
     )
     users = result.all()
 
-    sem = asyncio.Semaphore(_GOAL_CHECK_CONCURRENCY)
-    await asyncio.gather(*(_check_user_goals(user, settings_row, cache, sem) for user, settings_row in users))
+    await run_per_user(
+        users,
+        lambda user, settings_row, to_email: _check_user_goals(user, settings_row, to_email, cache),
+        concurrency=_GOAL_CHECK_CONCURRENCY,
+        failure_event="goal_achievement_check_failed",
+    )
 
 
 async def run_goal_achievement_check() -> None:
@@ -144,25 +147,18 @@ async def _notify_goal(
     db.add(AlertHistory(user_id=user.id, alert_type=spec.alert_type, message=msg))
     await db.commit()
     logger.info(f"{spec.log_prefix}_sent", user_id=str(user.id), pct=pct)
-    try:
-        await send_push_to_user(
-            user_id=user.id,
-            title=spec.push_title,
-            body=msg,
-            fcm_token=settings_row.fcm_token,
-            data={"type": spec.alert_type},
-        )
-    except Exception as exc:
-        logger.warning(f"{spec.log_prefix}_push_failed", user_id=str(user.id), error=str(exc))
+    await send_push_safely(
+        user.id,
+        title=spec.push_title,
+        body=msg,
+        fcm_token=settings_row.fcm_token,
+        data={"type": spec.alert_type},
+        failure_event=f"{spec.log_prefix}_push_failed",
+    )
 
 
-async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: asyncio.Semaphore) -> None:
-    async with sem:
-        to_email = settings_row.notification_email or user.email
-        try:
-            async with AsyncSessionLocal() as db:
-                summary = await get_dashboard_summary(user.id, db, cache)
-                for spec in _GOAL_SPECS:
-                    await _notify_goal(db, user, settings_row, spec, summary, to_email)
-        except Exception as e:
-            report_job_failure("goal_achievement_check_failed", e, user_id=str(user.id))
+async def _check_user_goals(user: User, settings_row: UserSettings, to_email: str, cache: CacheStoreType) -> None:
+    async with AsyncSessionLocal() as db:
+        summary = await get_dashboard_summary(user.id, db, cache)
+        for spec in _GOAL_SPECS:
+            await _notify_goal(db, user, settings_row, spec, summary, to_email)

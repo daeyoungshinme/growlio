@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from app.services.economic_indicator_service import (
+from app.services.market_signal.economic_indicator_service import (
     fetch_indicator_history,
     fetch_inflation_summary,
     fred_get_observations,
@@ -91,11 +91,11 @@ class TestFetchInflationSummary:
         ]
         with (
             patch(
-                "app.services.economic_indicator_service.fetch_indicator_history",
+                "app.services.market_signal.economic_indicator_service.fetch_indicator_history",
                 new=AsyncMock(return_value=points),
             ),
             patch(
-                "app.services.economic_indicator_service.get_calendar_events",
+                "app.services.market_signal.economic_indicator_service.get_calendar_events",
                 new=AsyncMock(return_value=calendar_events),
             ),
         ):
@@ -113,11 +113,11 @@ class TestFetchInflationSummary:
         points = _monthly_points(300.0, 6)
         with (
             patch(
-                "app.services.economic_indicator_service.fetch_indicator_history",
+                "app.services.market_signal.economic_indicator_service.fetch_indicator_history",
                 new=AsyncMock(return_value=points),
             ),
             patch(
-                "app.services.economic_indicator_service.get_calendar_events",
+                "app.services.market_signal.economic_indicator_service.get_calendar_events",
                 new=AsyncMock(return_value=[]),
             ),
         ):
@@ -131,11 +131,11 @@ class TestFetchInflationSummary:
     async def test_no_history_skips_indicator(self):
         with (
             patch(
-                "app.services.economic_indicator_service.fetch_indicator_history",
+                "app.services.market_signal.economic_indicator_service.fetch_indicator_history",
                 new=AsyncMock(return_value=[]),
             ),
             patch(
-                "app.services.economic_indicator_service.get_calendar_events",
+                "app.services.market_signal.economic_indicator_service.get_calendar_events",
                 new=AsyncMock(return_value=[]),
             ),
         ):
@@ -161,13 +161,13 @@ class TestFredGetObservations:
 
         with (
             patch("httpx.AsyncClient", return_value=mock_client),
-            patch("app.services.economic_indicator_service.settings.fred_api_key", "test-key"),
+            patch("app.services.market_signal.economic_indicator_service.settings.fred_api_key", "test-key"),
             pytest.raises(httpx.HTTPStatusError),
         ):
             await fred_get_observations("PCEPI")
 
     async def test_no_api_key_returns_empty_without_raising(self):
-        with patch("app.services.economic_indicator_service.settings.fred_api_key", ""):
+        with patch("app.services.market_signal.economic_indicator_service.settings.fred_api_key", ""):
             result = await fred_get_observations("PCEPI")
 
         assert result == []
@@ -181,9 +181,9 @@ class TestFetchIndicatorHistoryCircuitBreaker:
     async def test_returns_empty_when_fred_call_fails(self):
         test_circuit = CircuitBreaker("FREDAPI", fail_max=4, reset_timeout=300)
         with (
-            patch("app.services.economic_indicator_service.fred_circuit", test_circuit),
+            patch("app.services.market_signal.economic_indicator_service.fred_circuit", test_circuit),
             patch(
-                "app.services.economic_indicator_service.fred_get_observations",
+                "app.services.market_signal.economic_indicator_service.fred_get_observations",
                 new=AsyncMock(side_effect=httpx.HTTPStatusError("403", request=MagicMock(), response=MagicMock())),
             ),
         ):
@@ -195,9 +195,9 @@ class TestFetchIndicatorHistoryCircuitBreaker:
         test_circuit = CircuitBreaker("FREDAPI", fail_max=4, reset_timeout=300)
         mock_fetch = AsyncMock(side_effect=AssertionError("circuit open인데도 라이브 호출을 시도함"))
         with (
-            patch("app.services.economic_indicator_service.fred_circuit", test_circuit),
+            patch("app.services.market_signal.economic_indicator_service.fred_circuit", test_circuit),
             patch.object(test_circuit, "is_available", return_value=False),
-            patch("app.services.economic_indicator_service.fred_get_observations", new=mock_fetch),
+            patch("app.services.market_signal.economic_indicator_service.fred_get_observations", new=mock_fetch),
         ):
             result = await fetch_indicator_history("CPI_US", months=13, cache=None)
 

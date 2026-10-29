@@ -566,3 +566,54 @@ describe("authStore — resendConfirmationEmail", () => {
     await expect(store.resendConfirmationEmail("user@example.com")).rejects.toThrow("rate limited");
   });
 });
+
+describe("authStore — 재설정 완료 시 needs_password_reset 해제", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it("resetPassword 성공 후 서버 플래그와 /auth/me 캐시를 끈다", async () => {
+    localStorage.setItem(
+      "growlio:auth-me",
+      JSON.stringify({ userId: "u1", needsPasswordReset: true, cachedAt: Date.now() }),
+    );
+    useAuthStore.setState({ needsPasswordReset: true });
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({ error: null } as never);
+    vi.mocked(api.post).mockResolvedValue({ data: {} });
+
+    await useAuthStore.getState().resetPassword("new-password-1");
+
+    expect(api.post).toHaveBeenCalledWith("/auth/password-reset-complete");
+    expect(useAuthStore.getState().needsPasswordReset).toBe(false);
+    expect(JSON.parse(localStorage.getItem("growlio:auth-me")!).needsPasswordReset).toBe(false);
+  });
+
+  it("서버 호출이 실패해도 재설정 자체는 성공으로 끝난다", async () => {
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({ error: null } as never);
+    vi.mocked(api.post).mockRejectedValue(new Error("network"));
+
+    await expect(useAuthStore.getState().resetPassword("new-password-1")).resolves.toBeUndefined();
+  });
+
+  it("Supabase 변경이 실패하면 플래그를 건드리지 않는다", async () => {
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({
+      error: new Error("weak password"),
+    } as never);
+
+    await expect(useAuthStore.getState().resetPassword("x")).rejects.toThrow();
+    expect(api.post).not.toHaveBeenCalledWith("/auth/password-reset-complete");
+  });
+
+  it("changePassword 성공 후에도 플래그를 끈다", async () => {
+    useAuthStore.setState({ email: "a@example.com", needsPasswordReset: true });
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({ error: null } as never);
+    vi.mocked(mockSupabaseAuth.updateUser).mockResolvedValue({ error: null } as never);
+    vi.mocked(api.post).mockResolvedValue({ data: {} });
+
+    await useAuthStore.getState().changePassword("old", "new-password-1");
+
+    expect(api.post).toHaveBeenCalledWith("/auth/password-reset-complete");
+    expect(useAuthStore.getState().needsPasswordReset).toBe(false);
+  });
+});

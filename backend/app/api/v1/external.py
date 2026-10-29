@@ -54,7 +54,7 @@ from app.services.external_queries import (
     find_by_external_ref,
     monthly_net_deposits_by_account,
 )
-from app.services.goal_return_solver import build_feasibility_preview
+from app.services.goal.goal_return_solver import build_feasibility_preview
 from app.services.snapshot_service import (
     _upsert_snapshot,
     get_latest_snapshot_with_positions,

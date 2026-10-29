@@ -18,6 +18,30 @@ from app.services.alerts.alert_service import save_alert_history
 logger = structlog.get_logger()
 
 
+async def send_push_safely(
+    user_id: uuid.UUID,
+    *,
+    title: str,
+    body: str,
+    fcm_token: str | None,
+    data: dict[str, str] | None,
+    failure_event: str,
+    **log_context: str,
+) -> bool:
+    """푸시 1건을 보내고 예외는 `failure_event`로 로깅한 뒤 삼킨다. 반환: 발송 성공 여부.
+
+    이메일 성공 여부·이력 저장 규칙이 알림마다 달라 `dispatch_dual_channel_alert`로 묶을 수 없는
+    곳(플랜 생성·leg 실행 결과·드리프트 리포트·목표 달성·가격 알림)도 푸시 시도부는 이 함수 하나를 쓴다.
+    """
+    from app.services.push_service import send_push_to_user
+
+    try:
+        return await send_push_to_user(user_id=user_id, title=title, body=body, fcm_token=fcm_token, data=data)
+    except Exception as exc:
+        logger.error(failure_event, user_id=str(user_id), error=str(exc), **log_context)
+        return False
+
+
 async def dispatch_dual_channel_alert(
     db: AsyncSession,
     user_id: uuid.UUID,
@@ -44,25 +68,20 @@ async def dispatch_dual_channel_alert(
 
     반환: 이메일·푸시 중 하나라도 성공했으면 True.
     """
-    from app.services.push_service import send_push_to_user
-
     email_sent = False
     try:
         email_sent = await send_email()
     except Exception as exc:
         logger.error(f"{event_prefix}_email_failed", user_id=str(user_id), error=str(exc))
 
-    push_sent = False
-    try:
-        push_sent = await send_push_to_user(
-            user_id=user_id,
-            title=push_title,
-            body=push_body,
-            fcm_token=fcm_token,
-            data={"type": push_type, **(push_data or {})},
-        )
-    except Exception as exc:
-        logger.error(f"{event_prefix}_push_failed", user_id=str(user_id), error=str(exc))
+    push_sent = await send_push_safely(
+        user_id,
+        title=push_title,
+        body=push_body,
+        fcm_token=fcm_token,
+        data={"type": push_type, **(push_data or {})},
+        failure_event=f"{event_prefix}_push_failed",
+    )
 
     if not (email_sent or push_sent):
         return False

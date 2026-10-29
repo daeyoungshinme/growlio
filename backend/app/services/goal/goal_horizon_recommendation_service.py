@@ -36,9 +36,9 @@ from app.schemas.rebalancing import (
     HorizonGoalRecommendation,
     HorizonRecommendationResponse,
 )
-from app.services import _goal_recommendation_common as _grc
 from app.services._settings_queries import get_settings_row
-from app.services.goal_candidate_service import (
+from app.services.goal import _goal_recommendation_common as _grc
+from app.services.goal.goal_candidate_service import (
     _TAX_TYPE_MARKET_GROUP,
     _apply_index_region_preference,
     _get_or_seed_candidates,
@@ -49,8 +49,8 @@ from app.services.goal_candidate_service import (
     pension_exclusion_note,
     pension_ineligibility_reason,
 )
-from app.services.goal_portfolio_optimizer import _MIN_CANDIDATES
-from app.services.goal_recommendation_service import refresh_recommendation_in_background
+from app.services.goal.goal_portfolio_optimizer import _MIN_CANDIDATES
+from app.services.goal.goal_recommendation_service import refresh_recommendation_in_background
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import (
     build_portfolio_overview,

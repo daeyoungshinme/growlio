@@ -10,7 +10,7 @@ from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
-from app.services.market_signal_service import get_last_composite_level, get_market_signal
+from app.services.market_signal.market_signal_service import get_last_composite_level, get_market_signal
 
 router = APIRouter(prefix="/market-signals", tags=["market_signals"])
 logger = structlog.get_logger()

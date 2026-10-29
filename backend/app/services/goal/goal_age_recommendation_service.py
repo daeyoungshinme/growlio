@@ -23,15 +23,15 @@ from app.constants import MAX_GOAL_CANDIDATE_TICKERS
 from app.enums import AgeGroup
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation
-from app.services import _goal_recommendation_common as _grc
 from app.services._settings_queries import get_settings_row
-from app.services.goal_candidate_service import (
+from app.services.goal import _goal_recommendation_common as _grc
+from app.services.goal.goal_candidate_service import (
     _get_or_seed_candidates,
     detect_duplicate_tracking_index_note,
     existing_items_from_positions,
 )
-from app.services.goal_portfolio_optimizer import _MIN_CANDIDATES
-from app.services.goal_recommendation_service import refresh_recommendation_in_background
+from app.services.goal.goal_portfolio_optimizer import _MIN_CANDIDATES
+from app.services.goal.goal_recommendation_service import refresh_recommendation_in_background
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map

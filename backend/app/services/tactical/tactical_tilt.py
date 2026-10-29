@@ -111,7 +111,7 @@ def real_yield_change(values: list[float]) -> float | None:
 
 
 async def _fetch_real_yields() -> list[float]:
-    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
+    from app.services.market_signal.economic_indicator_service import fred_get_observations, parse_fred_obs
     from app.utils.circuit_breaker import fred_circuit
 
     if not fred_circuit.is_available():
@@ -125,7 +125,7 @@ async def get_tilt_inputs(cache: CacheStore | None) -> TiltInputs:
     if cached := await get_cached_json(cache, key):
         return cached
 
-    from app.services.technical_signal_service import fetch_close_history
+    from app.services.market_signal.technical_signal_service import fetch_close_history
 
     try:
         yields = await _fetch_real_yields()

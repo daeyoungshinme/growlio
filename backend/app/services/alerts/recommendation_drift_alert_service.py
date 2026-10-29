@@ -34,8 +34,8 @@ from app.models.user import User, UserSettings
 from app.services._account_queries import active_accounts_stmt
 from app.services._portfolio_queries import get_linked_portfolios
 from app.services._settings_queries import get_settings_row
-from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
-from app.services.goal_recommendation_service import (
+from app.services.goal.goal_horizon_recommendation_service import get_horizon_recommendations
+from app.services.goal.goal_recommendation_service import (
     _RECOMMENDATION_DRIFT_THRESHOLD_PCT,
     build_overall_recommendation_inputs,
     compute_recommendation_drift,

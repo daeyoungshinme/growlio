@@ -48,10 +48,12 @@ from app.models.portfolio import (
     PortfolioItemMember,
 )
 from app.models.tactical import TacticalStrategy
-from app.services.tactical_dip import ACTIVE_REGIMES as DIP_ACTIVE_REGIMES
-from app.services.tactical_dip import DEFAULT_DIP_SHIFT_PCT, advance_dip_level, apply_dip, dip_reasons
-from app.services.tactical_hints import transition_hints
-from app.services.tactical_tilt import (
+from app.services.market_signal.technical_indicators import TechnicalSnapshot, TrendState
+from app.services.market_signal.technical_signal_service import get_technical_signals
+from app.services.tactical.tactical_dip import ACTIVE_REGIMES as DIP_ACTIVE_REGIMES
+from app.services.tactical.tactical_dip import DEFAULT_DIP_SHIFT_PCT, advance_dip_level, apply_dip, dip_reasons
+from app.services.tactical.tactical_hints import transition_hints
+from app.services.tactical.tactical_tilt import (
     DEFAULT_TILT_SHIFT_PCT,
     apply_tilt,
     classify_tilt,
@@ -59,8 +61,6 @@ from app.services.tactical_tilt import (
     is_new_month,
     tilt_reasons,
 )
-from app.services.technical_indicators import TechnicalSnapshot, TrendState
-from app.services.technical_signal_service import get_technical_signals
 from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
@@ -304,7 +304,7 @@ def format_weights(weights: dict[str, float]) -> str:
 
 async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[str, Any]:
     """유저 무관 공통 입력(매크로 확정 등급 + 차트 지표)과 관측 국면."""
-    from app.services.market_signal_service import get_confirmed_composite_level
+    from app.services.market_signal.market_signal_service import get_confirmed_composite_level
 
     try:
         macro_level, freshness = await get_confirmed_composite_level(cache, db)
@@ -561,7 +561,7 @@ def _group_from_item(item: Any) -> _GroupSpec:
 
 def _group_from_suggestion(asset: str, suggestion: IndexGroupSuggestion | None) -> _GroupSpec:
     """새 그룹 — 대표 종목은 전술 자산(판정·백테스트 기준 ETF), 멤버·국내 대체는 보유 종목 기반 제안에서."""
-    from app.services.etf_index_classifier import index_label
+    from app.services.etf.etf_index_classifier import index_label
 
     name, market = _ASSET_META[asset]
     label = suggestion.label if suggestion else index_label(ASSET_GROUP_KEYS[asset])

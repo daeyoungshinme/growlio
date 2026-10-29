@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.tactical_hints import transition_hints
+from app.services.tactical.tactical_hints import transition_hints
 
 
 def _snap(close, sma50, sma200, trend):

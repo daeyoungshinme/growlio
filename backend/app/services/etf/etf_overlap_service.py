@@ -43,16 +43,16 @@ from app.schemas.rebalancing.goal import (
     OverlapMember,
 )
 from app.services._settings_queries import get_settings_row
-from app.services.etf_profile_service import EtfProfile, get_etf_profiles
-from app.services.goal_candidate_service import LEVERAGED_INVERSE_RE, existing_items_from_positions
-from app.services.market_data_fetcher import fetch_yf_close_series
-from app.services.position_aggregator import query_latest_position_map
-from app.services.recommendation_universe import (
+from app.services.etf.etf_profile_service import EtfProfile, get_etf_profiles
+from app.services.goal.goal_candidate_service import LEVERAGED_INVERSE_RE, existing_items_from_positions
+from app.services.goal.recommendation_universe import (
     guess_tracking_index,
     index_key_from_base_index,
     resolve_distribution_frequency,
     resolve_tracking_index,
 )
+from app.services.market_data_fetcher import fetch_yf_close_series
+from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_CANDIDATE_OVERLAP,

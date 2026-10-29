@@ -34,20 +34,20 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.goal_age_recommendation_service import get_age_based_recommendation
-from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
-from app.services.goal_portfolio_optimizer import _optimize_goal_portfolio
-from app.services.goal_recommendation_service import get_goal_recommendation
+from app.services.goal.goal_age_recommendation_service import get_age_based_recommendation
+from app.services.goal.goal_horizon_recommendation_service import get_horizon_recommendations
+from app.services.goal.goal_portfolio_optimizer import _optimize_goal_portfolio
+from app.services.goal.goal_recommendation_service import get_goal_recommendation
 
 _SNAPSHOT_PATH = Path(__file__).parent / "snapshots" / "goal_recommendation.json"
 _UPDATE = os.environ.get("UPDATE_GOAL_SNAPSHOTS") == "1"
 _FLOAT_TOL = 0.15
 
-_GRS = "app.services.goal_recommendation_service"
-_AGE = "app.services.goal_age_recommendation_service"
-_HOR = "app.services.goal_horizon_recommendation_service"
-_GRC = "app.services._goal_recommendation_common"
-_GCS = "app.services.goal_candidate_service"
+_GRS = "app.services.goal.goal_recommendation_service"
+_AGE = "app.services.goal.goal_age_recommendation_service"
+_HOR = "app.services.goal.goal_horizon_recommendation_service"
+_GRC = "app.services.goal._goal_recommendation_common"
+_GCS = "app.services.goal.goal_candidate_service"
 
 
 def _c(ticker: str, name: str, market: str, asset_class: str = "EQUITY", index_region: str | None = None) -> dict:

@@ -39,7 +39,7 @@ def stock_tick_size(price: float) -> int:
 
 
 def is_etf_or_etn_name(name: str | None) -> bool:
-    from app.services.goal_candidate_service import has_korean_etf_name
+    from app.services.goal.goal_candidate_service import has_korean_etf_name
 
     return has_korean_etf_name(name) or "ETN" in (name or "").upper()
 

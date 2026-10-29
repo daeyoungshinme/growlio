@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from app.services.technical_indicators import PullbackStage
+from app.services.market_signal.technical_indicators import PullbackStage
 
 DIP_MAX_LEVEL = 3
 MAX_DIP_SHIFT_PCT = 30.0

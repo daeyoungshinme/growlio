@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.isa_service import calc_account_auto_pnl, calc_isa_contribution_status, get_isa_status_summary
+from app.services.tax.isa_service import calc_account_auto_pnl, calc_isa_contribution_status, get_isa_status_summary
 from app.utils.kst import today_kst
 
 

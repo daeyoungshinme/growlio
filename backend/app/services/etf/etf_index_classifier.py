@@ -21,9 +21,9 @@ from dataclasses import dataclass, replace
 from typing import Literal
 
 from app.constants import DOMESTIC_MARKETS
-from app.services.etf_profile_service import EtfProfile
-from app.services.goal_candidate_service import LEVERAGED_INVERSE_RE, looks_like_korean_etf
-from app.services.recommendation_universe import (
+from app.services.etf.etf_profile_service import EtfProfile
+from app.services.goal.goal_candidate_service import LEVERAGED_INVERSE_RE, looks_like_korean_etf
+from app.services.goal.recommendation_universe import (
     COVERED_CALL_RE,
     RAW_INDEX_KEY_PREFIX,
     guess_tracking_index,

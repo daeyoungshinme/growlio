@@ -32,7 +32,7 @@ async def fetch_vix_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="vix")
         return None
-    from app.services.economic_indicator_service import fred_get_observations
+    from app.services.market_signal.economic_indicator_service import fred_get_observations
 
     try:
         obs = await fred_circuit.call(fred_get_observations, "VIXCLS", limit=5)
@@ -69,7 +69,7 @@ async def fetch_yield_curve_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="yield_curve")
         return None
-    from app.services.economic_indicator_service import fred_get_observations
+    from app.services.market_signal.economic_indicator_service import fred_get_observations
 
     try:
         obs = await fred_circuit.call(fred_get_observations, "T10Y2Y", limit=5)
@@ -106,7 +106,7 @@ async def fetch_high_yield_spread_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="high_yield_spread")
         return None
-    from app.services.economic_indicator_service import fred_get_observations
+    from app.services.market_signal.economic_indicator_service import fred_get_observations
 
     try:
         obs = await fred_circuit.call(fred_get_observations, "BAMLH0A0HYM2", limit=5)
@@ -146,7 +146,7 @@ async def fetch_dollar_index_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="dollar_index")
         return None
-    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
+    from app.services.market_signal.economic_indicator_service import fred_get_observations, parse_fred_obs
 
     try:
         obs = await fred_circuit.call(fred_get_observations, "DTWEXBGS", limit=30)
@@ -199,7 +199,7 @@ async def fetch_rate_cut_expectation_signal() -> dict[str, Any] | None:
         return None
     import asyncio
 
-    from app.services.economic_indicator_service import fred_get_observations
+    from app.services.market_signal.economic_indicator_service import fred_get_observations
 
     try:
         dgs2_obs, fedfunds_obs = await asyncio.gather(
@@ -284,7 +284,7 @@ async def fetch_exchange_rate_signal(cache: CacheStore | None = None) -> dict[st
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="exchange_rate")
         return None
-    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
+    from app.services.market_signal.economic_indicator_service import fred_get_observations, parse_fred_obs
 
     try:
         obs = await fred_circuit.call(fred_get_observations, "DEXKOUS", limit=30)
@@ -339,7 +339,7 @@ async def fetch_oil_price_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="oil_price")
         return None
-    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
+    from app.services.market_signal.economic_indicator_service import fred_get_observations, parse_fred_obs
 
     try:
         obs = await fred_circuit.call(fred_get_observations, "DCOILWTICO", limit=30)
@@ -404,7 +404,7 @@ async def fetch_cpi_inflation_signal() -> dict[str, Any] | None:
     `economic_indicator_service.fetch_indicator_history`를 재사용해 `fetch_inflation_summary`와
     동일한 13개월 윈도우 YoY 산식을 그대로 적용한다(중복 구현 방지).
     """
-    from app.services.economic_indicator_service import fetch_indicator_history
+    from app.services.market_signal.economic_indicator_service import fetch_indicator_history
 
     points = await fetch_indicator_history("CPI_US", months=13)
     if len(points) < 13:
@@ -426,7 +426,7 @@ async def fetch_pce_inflation_signal() -> dict[str, Any] | None:
 
     CPI 신호와 동일한 산식·버킷을 사용 — `fetch_inflation_signal()`이 둘을 worst-case로 병합한다.
     """
-    from app.services.economic_indicator_service import fetch_indicator_history
+    from app.services.market_signal.economic_indicator_service import fetch_indicator_history
 
     points = await fetch_indicator_history("PCE_US", months=13)
     if len(points) < 13:
@@ -482,7 +482,7 @@ async def fetch_employment_signal() -> dict[str, Any] | None:
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="employment")
         return None
-    from app.services.economic_indicator_service import fred_get_observations, parse_fred_obs
+    from app.services.market_signal.economic_indicator_service import fred_get_observations, parse_fred_obs
 
     try:
         obs = await fred_circuit.call(fred_get_observations, "UNRATE", limit=13)

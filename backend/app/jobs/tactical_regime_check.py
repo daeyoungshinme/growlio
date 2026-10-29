@@ -22,10 +22,10 @@ from app.jobs._job_helpers import report_job_failure
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.models.user import User, UserSettings
-from app.services import tactical_allocation_service as tactical
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.email_service import send_tactical_dip_email, send_tactical_regime_change_email
-from app.services.tactical_dip import DIP_LEVEL_LABELS, dip_reasons
+from app.services.tactical import tactical_allocation_service as tactical
+from app.services.tactical.tactical_dip import DIP_LEVEL_LABELS, dip_reasons
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()

@@ -56,16 +56,25 @@ async def notify_and_record_trigger(
     push_body: str,
     fcm_token: str | None,
 ) -> None:
-    """알림 발동 시 공용 후속 처리: 푸시 발송 → trigger 상태 갱신 → 이력 저장.
+    """알림 발동 시 공용 후속 처리: 푸시 발송(실패는 로깅만) → trigger 상태 갱신 → 이력 저장.
 
     alerts/exchange_rate_service.py/alerts/stock_price_service.py가 이메일 발송 성공 후
     공유하는 마무리 단계 — 이메일 발송 자체는 알림 종류별 템플릿이 달라 호출부에서 처리한다.
     `history_alert_type`은 AlertHistory.alert_type에 저장되는 값(예: "EXCHANGE_RATE")으로,
     Prometheus 메트릭 라벨(소문자, 예: "exchange_rate")과는 별개다 — 후자는 finalize_alert_batch에 전달한다.
     """
-    from app.services.push_service import send_push_to_user
+    # _dispatch가 이 모듈(save_alert_history)을 import하므로 지연 import한다.
+    # 푸시 예외는 삼킨다 — 이메일은 이미 나갔으므로 여기서 예외가 나면 trigger 갱신이 빠져 다음 실행에 메일이 또 간다.
+    from app.services.alerts._dispatch import send_push_safely
 
-    await send_push_to_user(user_id=user_id, title=push_title, body=push_body, fcm_token=fcm_token)
+    await send_push_safely(
+        user_id,
+        title=push_title,
+        body=push_body,
+        fcm_token=fcm_token,
+        data=None,
+        failure_event=f"{history_alert_type.lower()}_alert_push_failed",
+    )
     await apply_alert_trigger(db, alert, history_alert_type, history_message)
     # 발송 직후 항목별로 commit한다 — 루프 끝에서 한 번만 commit하면 중간 DB 오류 시 이미 보낸 알림의
     # trigger 갱신까지 롤백돼 다음 실행(5~10분 뒤)에 같은 메일이 다시 간다. expire_on_commit=False라

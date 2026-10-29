@@ -8,7 +8,7 @@ from app.api.deps import get_current_user
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
-from app.services.economic_indicator_service import fetch_inflation_summary
+from app.services.market_signal.economic_indicator_service import fetch_inflation_summary
 
 router = APIRouter(prefix="/economic-indicators", tags=["economic_indicators"])
 

@@ -2,9 +2,9 @@
 
 import pytest
 
-from app.services.etf_index_classifier import classify_holding, index_label
-from app.services.etf_profile_service import EtfProfile
-from app.services.recommendation_universe import guess_tracking_index, resolve_tracking_index
+from app.services.etf.etf_index_classifier import classify_holding, index_label
+from app.services.etf.etf_profile_service import EtfProfile
+from app.services.goal.recommendation_universe import guess_tracking_index, resolve_tracking_index
 
 
 def _etf(long_name: str | None = None, base_index: str | None = None) -> EtfProfile:
