@@ -20,21 +20,20 @@
 | 프론트 | 대형 컴포넌트 | **완료.** `StockHoldingsTable` 705→270줄(`stockHoldings/`), `InvestmentGoalCard` 571→105줄(`investmentGoal/`). 마크업·동작은 바뀌지 않았다 |
 | 프론트 | `noUncheckedIndexedAccess` | **측정 후 이관.** 켜면 오류 249건(소스 104, 테스트 145)이다. 기준(150건)을 넘었다. 소스 오류는 `TransactionHistoryTab`(15)·`TransactionList`(12)·`useSwipeNavigation`(8)·`rebalancingExecution/index`(8)에 몰려 있다 |
 
-검증: 백엔드 3126 tests 92.03%, ruff/format/mypy 클린. 프론트 1878 tests(coverage 게이트 통과), tsc/eslint/prettier/build 클린. 마이그레이션은 로컬 `.env`가 공유 Supabase를 가리키고 Docker가 없어 로컬에서 돌리지 않았다. CI의 upgrade head → downgrade -1이 검증한다.
+검증: 백엔드 3129 tests 92.04%, ruff/format/mypy 클린. 프론트 1882 tests(coverage 게이트 통과), tsc/eslint/prettier/build 클린. 마이그레이션은 로컬 `.env`가 공유 Supabase를 가리키고 Docker가 없어 로컬에서 돌리지 않았다. CI의 upgrade head → downgrade -1이 검증한다.
 
 ## 계획과 달라진 점 (정정)
 
 - **D — `PATCH /settings` 단일화 보류.** 설치된 APK가 기존 PUT을 호출하므로 PUT을 지울 수 없다. 지금 PATCH를 더하면 경로가 15→16개로 늘어 부채만 커진다. 실제 중복이던 on/off 토글 7개만 통합했다. 단일화는 APK 재배포 뒤 `untracked_holdings` 제거와 함께 한다.
 - **E — 수신 이메일 헬퍼 15곳 치환 생략.** `a or b` 한 줄을 함수로 감싸면 간접층만 늘어난다. 잡 4곳은 `run_per_user`가 대신 결정한다. 알림 서비스 2곳(digest·drift)은 services→jobs import 금지(90 C5) 때문에 러너를 적용하지 않았다.
 - **G1 — `composite_level_at_plan` 유지.** "쓰기만 함"이지만 AUTO 플랜 생성 시점의 시장등급 감사 기록이다. 생성 함수 시그니처(위치 인자)에 걸려 있어 제거 이득이 작다.
-- **G1 — `needs_password_reset`는 죽은 컬럼이 아니다.** `/auth/me`가 DB 값을 그대로 내린다. m1 마이그레이션이 기존 유저를 TRUE로 채웠고 DB에서 FALSE로 바꾸는 코드가 없다(`resetPassword`는 프론트 상태만 끈다). 그래서 m1 이전 유저에게는 재설정 배너가 계속 뜰 수 있다. 제거할지, 재설정 시 DB를 갱신할지는 사용자 판단이 필요하다.
+- **G1 — `needs_password_reset`는 죽은 컬럼이 아니다.** `/auth/me`가 DB 값을 그대로 내린다. m1 마이그레이션이 기존 유저를 TRUE로 채웠고 DB에서 FALSE로 바꾸는 코드가 없다(`resetPassword`는 프론트 상태만 끈다). 그래서 m1 이전 유저에게는 재설정 배너가 계속 뜰 수 있었다. **사용자 결정으로 수정 완료**: `POST /auth/password-reset-complete`(멱등)가 플래그를 끈다. 프론트 `resetPassword`·`changePassword`가 Supabase 변경 성공 뒤 이 엔드포인트를 호출하고 `/auth/me` 캐시도 갱신한다(실패해도 비밀번호 변경은 막지 않음).
 - **B3 — `is_overseas_market` 이동 철회.** KIS 주문 거래소(US 3곳) 기준이다. `app.constants.OVERSEAS_MARKETS`(TSE·HKEX 등 포함)로 옮기면 그 거래소 주문이 해외 주문 API로 라우팅된다. 공용 모듈에 주석으로 남겼다.
 - **B3 — 로그 이벤트명.** FULL 매수 예산 조회 실패 이벤트를 `{prefix}full_strategy_buy_budget_failed`로 통일했다. 이전 이름은 `full_strategy_orderable_cash_failed` / `kiwoom_full_strategy_deposit_lookup_failed`다.
 
 ## 이관
 
 - **G1-2 머지**: G1-1 배포 확인 후
-- **`needs_password_reset` 처리 방향**: 사용자 결정 필요(위 정정 참고)
 - **D 본편**(PATCH 단일화 + PUT 삭제): APK 재배포 뒤
 - **F 나머지**: market_data(`yahoo_price`·`price_service` 등)·portfolio·accounts·notifications(`push_service`·`email_service`). 테스트에서 수십 곳 patch되는 공용 계층이라 클러스터마다 영향이 크다
 - **`noUncheckedIndexedAccess`**: 소스 104건부터. 테스트는 별도 tsconfig로 분리하는 방안을 검토한다

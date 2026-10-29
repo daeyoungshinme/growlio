@@ -78,6 +78,24 @@ function getOptimisticAuthState(): OptimisticAuth {
   }
 }
 
+/** 비밀번호를 새로 정한 뒤 재설정 안내 배너 플래그를 서버·/auth/me 캐시 양쪽에서 끈다.
+ * 비밀번호 변경은 이미 끝났으므로 실패해도 막지 않는다(배너는 다음 재설정 때 다시 시도된다). */
+async function markPasswordResetDone(): Promise<void> {
+  try {
+    await api.post("/auth/password-reset-complete");
+    const raw = storageGet(AUTH_ME_CACHE_KEY);
+    if (raw) {
+      const cached: AuthMeCache = JSON.parse(raw);
+      storageSet(
+        AUTH_ME_CACHE_KEY,
+        JSON.stringify({ ...cached, needsPasswordReset: false } satisfies AuthMeCache),
+      );
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export const useAuthStore = create<AuthState>((set, get) => {
   const setLoggedIn = (user: { email?: string | null; id: string }, needsReset = false) => {
     // 이벤트는 동기로 처리되므로 새 사용자 상태로 렌더하기 전에 이전 사용자 캐시가 비워진다
@@ -271,6 +289,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       set({ needsPasswordReset: false });
+      await markPasswordResetDone();
     },
 
     changePassword: async (currentPassword: string, newPassword: string) => {
@@ -287,6 +306,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+      set({ needsPasswordReset: false });
+      await markPasswordResetDone();
     },
 
     resendConfirmationEmail: async (email: string) => {

@@ -111,6 +111,24 @@ async def sync_profile(
     return user
 
 
+@router.post("/password-reset-complete", response_model=UserResponse)
+@limiter.limit("10/minute")
+async def password_reset_complete(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """비밀번호를 새로 설정했음을 기록한다 — 재설정 안내 배너(needs_password_reset)를 끈다.
+
+    m1(Supabase Auth 전환)이 기존 유저를 TRUE로 채웠는데 DB에서 끄는 경로가 없어, 재설정을 마쳐도
+    다음 /auth/me마다 배너가 다시 떴다. 비밀번호 변경 자체는 Supabase가 처리하므로 여기선 플래그만 바꾼다(멱등).
+    """
+    if current_user.needs_password_reset:
+        current_user.needs_password_reset = False
+        await db.commit()
+    return current_user
+
+
 @router.post("/find-account", response_model=FindAccountResponse)
 @limiter.limit("3/hour", key_func=ip_rate_limit_key)
 @limiter.limit("30/hour", key_func=peer_rate_limit_key)
