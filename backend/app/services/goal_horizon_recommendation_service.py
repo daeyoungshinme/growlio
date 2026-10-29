@@ -61,6 +61,7 @@ from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
     CacheStoreType,
     get_cached_json,
+    get_goal_recommendation_generation,
     goal_recommendation_horizon_key,
     set_cached_json,
 )
@@ -307,6 +308,8 @@ async def get_horizon_recommendations(
     db: AsyncSession,
     user_id: uuid.UUID,
     settings_row: UserSettings,
+    *,
+    gen: str | None = None,
 ) -> HorizonRecommendationResponse:
     """`_compute_horizon_recommendations()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(1시간) 캐싱한다.
 
@@ -323,7 +326,9 @@ async def get_horizon_recommendations(
     콜드 캐시에서 동일 유저의 동시 요청은 `single_flight_fetch`로 한 건만 실제 계산한다 — 이
     경로는 최대 15콤보를 동시 실행하는 가장 무거운 계산이라 중복 실행을 막는 효과가 특히 크다.
     """
-    cache_key = goal_recommendation_horizon_key(user_id)
+    if gen is None:
+        gen = await get_goal_recommendation_generation(cache, user_id)
+    cache_key = goal_recommendation_horizon_key(user_id, gen)
 
     async def _read_cache() -> HorizonRecommendationResponse | None:
         cached = await get_cached_json(cache, cache_key)

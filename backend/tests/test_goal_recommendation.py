@@ -49,7 +49,12 @@ from app.services.recommendation_universe import (
     resolve_index_region,
     resolve_tracking_index,
 )
-from app.utils.cache_keys import daily_returns_key, goal_recommendation_key, goal_recommendation_stale_key
+from app.utils.cache_keys import (
+    daily_returns_key,
+    get_goal_recommendation_generation,
+    goal_recommendation_key,
+    goal_recommendation_stale_key,
+)
 from app.utils.kst import today_kst
 
 
@@ -2137,13 +2142,13 @@ class TestGetGoalRecommendation:
                 return_value=returns_map,
             ),
         ):
-            result = await get_goal_recommendation(mock_cache, 10_000_000.0, [], settings_row, AsyncMock())
+            result = await get_goal_recommendation(mock_cache, 10_000_000.0, [], settings_row, AsyncMock(), gen="g1")
 
         assert result.recommended_items
         # 결과 1건 + 심볼별 일별수익률(SPY·QQQ) 캐시
         keys = [c.args[0] for c in mock_cache.setex.await_args_list]
-        assert keys.count(goal_recommendation_key(settings_row.user_id)) == 1
-        assert keys.count(goal_recommendation_stale_key(settings_row.user_id)) == 1
+        assert keys.count(goal_recommendation_key(settings_row.user_id, "g1")) == 1
+        assert keys.count(goal_recommendation_stale_key(settings_row.user_id, "g1")) == 1
         assert sorted(k for k in keys if "daily_returns" in k) == sorted(
             [daily_returns_key("QQQ"), daily_returns_key("SPY")]
         )
@@ -4476,6 +4481,63 @@ class TestComputeRecommendationDrift:
         assert new_candidate_count == 1
 
 
+class TestGoalRecommendationSettingsSavedMidCompute:
+    """계산 도중 추천 설정을 저장하면 옛 설정 결과가 새 세대 캐시에 남지 않아야 한다(plans/88)."""
+
+    @staticmethod
+    def _result(ticker: str):
+        from app.schemas.rebalancing import GoalRecommendation, GoalRecommendationItem
+
+        return GoalRecommendation(
+            generated_at="2026-10-28T00:00:00+00:00",
+            is_configured=True,
+            recommended_items=[GoalRecommendationItem(ticker=ticker, name=ticker, market="NYSE", weight=100.0)],
+        )
+
+    async def test_old_computation_does_not_leak_into_new_generation(self):
+        import asyncio
+
+        from app.core.cache_store import CacheStore
+        from app.services.goal_recommendation_service import get_cached_goal_recommendation, get_goal_recommendation
+        from app.utils.cache_keys import invalidate_goal_recommendation_caches
+
+        cache = CacheStore()
+        settings_row = SimpleNamespace(user_id=uuid.uuid4())
+        uid = settings_row.user_id
+        release_old = asyncio.Event()
+        calls: list[str] = []
+
+        async def _fake_compute(*_args, **_kwargs):
+            if not calls:
+                calls.append("old")
+                await release_old.wait()
+                return self._result("OLD")
+            calls.append("new")
+            return self._result("NEW")
+
+        with patch("app.services.goal_recommendation_service._compute_goal_recommendation", side_effect=_fake_compute):
+            old_gen = await get_goal_recommendation_generation(cache, uid)
+            old_task = asyncio.create_task(
+                get_goal_recommendation(cache, 0.0, [], settings_row, AsyncMock(), gen=old_gen)
+            )
+            await asyncio.sleep(0)  # 옛 계산이 single-flight 락을 잡고 대기
+
+            await invalidate_goal_recommendation_caches(cache, uid)  # 설정 저장
+            new_gen = await get_goal_recommendation_generation(cache, uid)
+            # 저장 직후 요청은 옛 계산의 락을 기다리지 않고 바로 새로 계산한다
+            new = await asyncio.wait_for(
+                get_goal_recommendation(cache, 0.0, [], settings_row, AsyncMock(), gen=new_gen), timeout=1
+            )
+
+            release_old.set()
+            await old_task  # 옛 계산이 나중에 끝나도
+
+        assert new.recommended_items[0].ticker == "NEW"
+        cached = await get_cached_goal_recommendation(cache, uid, new_gen)
+        assert cached is not None
+        assert cached.recommended_items[0].ticker == "NEW"
+
+
 class TestRefreshGoalRecommendationInBackground:
     """stale 응답 뒤 백그라운드 재계산(plans/66)."""
 
@@ -4506,7 +4568,8 @@ class TestRefreshGoalRecommendationInBackground:
 
         uid = uuid.uuid4()
         cache = CacheStore()
-        await cache.set(f"refresh:{goal_recommendation_key(uid)}", "other", nx=True, ex=60)
+        gen = await get_goal_recommendation_generation(cache, uid)
+        await cache.set(f"refresh:{goal_recommendation_key(uid, gen)}", "other", nx=True, ex=60)
         with patch(
             "app.services.goal_recommendation_service.get_overall_goal_recommendation_for_user",
             new_callable=AsyncMock,
@@ -4535,4 +4598,5 @@ class TestRefreshGoalRecommendationInBackground:
             await refresh_goal_recommendation_in_background(uid, cache)
 
         # 다음 stale 응답이 다시 갱신을 시도할 수 있어야 한다
-        assert await cache.get(f"refresh:{goal_recommendation_key(uid)}") is None
+        gen = await get_goal_recommendation_generation(cache, uid)
+        assert await cache.get(f"refresh:{goal_recommendation_key(uid, gen)}") is None

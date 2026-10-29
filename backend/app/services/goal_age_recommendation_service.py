@@ -38,6 +38,7 @@ from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
     CacheStoreType,
     get_cached_json,
+    get_goal_recommendation_generation,
     goal_recommendation_age_key,
     set_cached_json,
 )
@@ -99,6 +100,8 @@ async def get_age_based_recommendation(
     db: AsyncSession,
     user_id: uuid.UUID,
     settings_row: UserSettings,
+    *,
+    gen: str | None = None,
 ) -> GoalRecommendation:
     """`_compute_age_based_recommendation()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(1시간) 캐싱한다.
 
@@ -106,7 +109,9 @@ async def get_age_based_recommendation(
     `invalidate_goal_recommendation_caches()`가 `age_group` 변경(설정 저장) 시에도 함께 호출된다.
     콜드 캐시에서 동일 유저의 동시 요청은 `single_flight_fetch`로 한 건만 실제 계산한다.
     """
-    cache_key = goal_recommendation_age_key(user_id)
+    if gen is None:
+        gen = await get_goal_recommendation_generation(cache, user_id)
+    cache_key = goal_recommendation_age_key(user_id, gen)
 
     async def _read_cache() -> GoalRecommendation | None:
         cached = await get_cached_json(cache, cache_key)

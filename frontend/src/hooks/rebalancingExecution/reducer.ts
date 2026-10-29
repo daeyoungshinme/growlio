@@ -164,7 +164,7 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
     case "EXECUTE_SUCCESS":
       return { ...state, phase: "result", results: action.results };
     case "EXECUTE_ERROR":
-      return { ...state, phase: "confirm", errorMsg: action.msg };
+      return { ...state, phase: "confirm", errorMsg: action.msg, confirmed: false };
     case "CONFIRM_CLICK":
       return { ...state, confirmed: true };
     case "UNCONFIRM":

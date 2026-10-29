@@ -58,6 +58,7 @@ async def execute_single_order(
             quantity=order.quantity,
             status="SUCCESS",
             order_no=result.get("order_no"),
+            order_org_no=result.get("order_org_no"),
             order_type=order.order_type,
             price=price,
         )

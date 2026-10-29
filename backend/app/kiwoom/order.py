@@ -11,8 +11,10 @@ from app.exceptions import BrokerOrderRejectedError
 from app.kiwoom.client import auth_headers, kiwoom_request
 from app.kiwoom.constants import (
     API_ID_DOMESTIC_BUY,
+    API_ID_DOMESTIC_CANCEL,
     API_ID_DOMESTIC_SELL,
     API_ID_OVERSEAS_BUY,
+    API_ID_OVERSEAS_CANCEL,
     API_ID_OVERSEAS_SELL,
     KIWOOM_OVERSEAS_MARKET_CODES,
 )
@@ -125,5 +127,76 @@ async def place_overseas_order(
 
     if str(data.get("return_code", "0")) != "0":
         raise BrokerOrderRejectedError(data.get("return_msg") or "키움 해외주식 주문 실패")
+
+    return {"order_no": data.get("ord_no"), "raw": data}
+
+
+async def cancel_domestic_order(
+    access_token: str,
+    account_no: str,
+    *,
+    ticker: str,
+    order_no: str,
+    is_mock: bool,
+) -> dict[str, Any]:
+    """국내주식 미체결 잔량 전부 취소 (kt10003, cncl_qty "0" = 잔량 전부)."""
+    headers = auth_headers(access_token, API_ID_DOMESTIC_CANCEL)
+    body: dict[str, Any] = {
+        "acnt_no": account_no,
+        "dmst_stex_tp": "KRX",
+        "orig_ord_no": order_no,
+        "stk_cd": ticker,
+        "cncl_qty": "0",
+    }
+
+    data = await kiwoom_request(
+        "POST",
+        "/api/dostk/ordr",
+        is_mock=is_mock,
+        headers=headers,
+        json=body,
+        retry_on_request_error=False,
+    )
+
+    if str(data.get("return_code", "0")) != "0":
+        raise BrokerOrderRejectedError(data.get("return_msg") or "키움 국내주식 주문 취소 실패")
+
+    return {"order_no": data.get("ord_no"), "raw": data}
+
+
+async def cancel_overseas_order(
+    access_token: str,
+    account_no: str,
+    *,
+    ticker: str,
+    market: str,
+    order_no: str,
+    is_mock: bool,
+) -> dict[str, Any]:
+    """미국주식 미체결 주문 취소 (ust20003). 수량 필드 없이 원주문의 잔량 전부를 취소한다."""
+    headers = auth_headers(access_token, API_ID_OVERSEAS_CANCEL)
+    exchange_cd = KIWOOM_OVERSEAS_MARKET_CODES.get(market.upper())
+    if exchange_cd is None:
+        logger.warning("kiwoom_overseas_cancel_unknown_market", ticker=ticker, market=market)
+        exchange_cd = "ND"
+
+    body: dict[str, Any] = {
+        "acnt_no": account_no,
+        "orig_ord_no": order_no,
+        "stex_tp": exchange_cd,
+        "stk_cd": ticker,
+    }
+
+    data = await kiwoom_request(
+        "POST",
+        "/api/us/ordr",
+        is_mock=is_mock,
+        headers=headers,
+        json=body,
+        retry_on_request_error=False,
+    )
+
+    if str(data.get("return_code", "0")) != "0":
+        raise BrokerOrderRejectedError(data.get("return_msg") or "키움 해외주식 주문 취소 실패")
 
     return {"order_no": data.get("ord_no"), "raw": data}

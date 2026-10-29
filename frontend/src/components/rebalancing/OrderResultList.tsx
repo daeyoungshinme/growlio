@@ -1,7 +1,13 @@
-import type { ExecutionResult } from "@/api/rebalancing";
+import type { ExecutionResult, OrderResult } from "@/api/rebalancing";
 import { isOverseasMarket } from "@/constants/markets";
 import { fmtKrw } from "@/utils/format";
+import { OrderCancelAction } from "./OrderCancelAction";
 import { SideBadge, StatusBadge } from "./RebalancingBadges";
+
+/** 취소 버튼이나 취소 결과 중 보여 줄 것이 있는 주문 — 없으면 쿼리 훅을 쓰는 OrderCancelAction을 그리지 않는다 */
+function hasCancelInfo(o: OrderResult): boolean {
+  return (!!o.cancelable && !!o.result_id) || !!o.cancel_status;
+}
 
 function fmtOrderPrice(price: number | null | undefined, market: string): string {
   if (price == null) return "-";
@@ -77,6 +83,11 @@ export function OrderResultList({ results }: { results: ExecutionResult[] }) {
                     {o.error_msg}
                   </p>
                 )}
+                {hasCancelInfo(o) && (
+                  <div className="mt-1.5">
+                    <OrderCancelAction order={o} />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -130,7 +141,12 @@ export function OrderResultList({ results }: { results: ExecutionResult[] }) {
                         {o.error_msg}
                       </span>
                     )}
-                    {!o.order_no && !o.error_msg && "-"}
+                    {hasCancelInfo(o) && (
+                      <div className="mt-1">
+                        <OrderCancelAction order={o} />
+                      </div>
+                    )}
+                    {!o.order_no && !o.error_msg && !hasCancelInfo(o) && "-"}
                   </td>
                 </tr>
               ))}

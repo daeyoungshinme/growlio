@@ -86,7 +86,7 @@ challenges.py            적립 챌린지 CRUD + 진행률 (/challenges/summary�
 portfolios.py            포트폴리오 CRUD — 항목은 단독 종목 또는 지수 그룹(group). index-group-suggestions는 **항상 전체 계좌 기준**, 범위 밖 종목은 in_scope=False
 portfolio_analysis.py    /portfolio/{overview,allocation-history,risk,rebalancing-strategy,index-exposure}
 rebalancing.py           리밸런싱 추천 + 목표 역산 추천(goal-recommendation/{by-horizon,by-age}) + expected-metrics
-rebalancing_execution.py 주문 실행·이력
+rebalancing_execution.py 주문 실행·이력 + 미체결 취소(POST /history/results/{id}/cancel)
 rebalancing_plan.py      대기 플랜 조회/취소/승인 (인증 필요)
 rebalancing_plan_public.py 이메일 링크 토큰 액션 — **인증 없음, Depends(get_current_user) 사용 금지**
 settings.py              DART 키 + 목표/알림 설정 (브로커 자격증명은 assets.py 소관)
@@ -137,6 +137,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
   - `plan_notifications.py` — 플랜 알림 (차단 안내는 하루 1회 durable dedup)
 - `quick_execute_service.py` — "지금 계획 생성". 상태 enum만 반환, 문구는 라우터가 조립. 계좌 소유권 검증은 콜백 주입(**서비스→API 계층 import 금지**)
 - `execution_service.py` — 주문 조율. 실제 주문은 `_kis_order_executor.py`/`_kiwoom_order_executor.py`(FULL 매수는 실행 직전 가용현금으로 예산 clamp), 공용 `_order_executor_common.py`, `_order_quantity_guard.py`(매도→보유수량, 매수→예산)
+- `order_cancel_service.py` — 실행 주문의 미체결분 취소(체결 조회 없이 요청, 증권사 거부=CANCEL_FAILED). **KIS 국내 취소는 주문 응답의 `KRX_FWDG_ORD_ORGNO`(`order_org_no`) 저장이 필수** — 없으면 취소 불가. 증권사 거부는 `BrokerOrderRejectedError`가 아니라 클라이언트의 `KisApiError`/`KiwoomApiError`로 먼저 온다
 - `krx_tick.py` — 국내 지정가 호가단위 보정(ETF·ETN 5원, 매수 내림·매도 올림)
 - `alert_check.py` — 드리프트 알림(10분 job). 복합신호 on/off는 **유저 단위**
 - `drift_summary_service.py` — 이탈 요약(drift-summary·action-items 공유, 같은 세션이라 순차)
@@ -144,7 +145,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `broker_balance_service.py` — 3사 실시간 잔고. **주문 실행은 KIS/키움만**(토스 주문 API 미구현)
 
 **목표 역산 추천**
-- `goal_recommendation_service.py` — 전체 자산 기준 진입점. 필요수익률 역산 → MVO. 추천은 자동 반영 안 됨(수동 적용). 결과 1h 캐시 + stale 키(1d) — 미스여도 stale 즉시 반환 후 `BackgroundTasks`로 재계산. 무효화 함수는 stale 키도 함께 지운다. sync 무효화는 `positions_changed=True`일 때만 추천 캐시 삭제. `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 **동일 로직 — 임계값 함께 맞출 것**
+- `goal_recommendation_service.py` — 전체 자산 기준 진입점. 필요수익률 역산 → MVO. 추천은 자동 반영 안 됨(수동 적용). 결과 1h 캐시 + stale 키(1d) — 미스여도 stale 즉시 반환 후 `BackgroundTasks`로 재계산. 무효화 함수는 stale 키도 함께 지운다. **추천 캐시 키(전체/stale/기간별/연령대)는 사용자별 세대를 포함 — 무효화는 `invalidate_goal_recommendation_caches`(세대 교체)로만, 세대는 설정을 읽기 *전에* `get_goal_recommendation_generation`으로 잡아 넘긴다**(계산 중 저장된 설정을 옛 결과가 덮던 경합). sync 무효화는 `positions_changed=True`일 때만 추천 캐시 삭제. `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 **동일 로직 — 임계값 함께 맞출 것**
 - `_goal_recommendation_common.py` — 세 진입점 공용 헬퍼·계산 골격(`import ... as _grc`, patch 경로도 여기 하나). **단 외부 조회(`get_historical_returns`/`fetch_yf_daily_returns`/`build_portfolio_overview`)는 테스트가 진입점 모듈 경로로 patch하므로 진입점에 남기고 인자로 넘긴다**(옮기면 patch 수백 곳 무효화). 추천 출력은 `tests/test_goal_recommendation_snapshots.py`가 고정 — 리팩터링 후 반드시 통과, 의도적 변경 시만 `UPDATE_GOAL_SNAPSHOTS=1`
 - `goal_age_recommendation_service.py`(연령대) · `goal_horizon_recommendation_service.py`(투자기간 × 세제유형, 최대 15조합, IRP 안전자산 30% 하한)
 - `goal_portfolio_optimizer.py` — MVO(SLSQP). **배당 목표 사전검증은 `class_bounds` 그룹 예산도 반영 필수** — 종목 상한만 보면 SLSQP 전체 실패(빈 추천)

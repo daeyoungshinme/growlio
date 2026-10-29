@@ -215,61 +215,107 @@ class TestInvalidateAssetAccountCachesGoalRecommendation:
 
     @pytest.mark.asyncio
     async def test_positions_changed_invalidates_goal_recommendation(self, override_settings):
+        from app.core.cache_store import CacheStore
         from app.utils.cache_keys import (
+            get_goal_recommendation_generation,
             goal_recommendation_key,
             goal_recommendation_stale_key,
             invalidate_asset_account_caches,
         )
 
-        cache = AsyncMock()
-        cache.scan = AsyncMock(return_value=(0, []))
+        cache = CacheStore()
         uid = uuid.uuid4()
+        gen = await get_goal_recommendation_generation(cache, uid)
+        await cache.set(goal_recommendation_key(uid, gen), "{}")
+        await cache.set(goal_recommendation_stale_key(uid, gen), "{}")
 
         await invalidate_asset_account_caches(cache, uid)
 
-        deleted = self._deleted_keys(cache)
-        assert goal_recommendation_key(uid) in deleted
+        assert await cache.get(goal_recommendation_key(uid, gen)) is None
         # 보유 종목이 바뀌면 stale 결과도 틀린 답이라 함께 지운다(plans/66)
-        assert goal_recommendation_stale_key(uid) in deleted
+        assert await cache.get(goal_recommendation_stale_key(uid, gen)) is None
+        assert await get_goal_recommendation_generation(cache, uid) != gen
 
     @pytest.mark.asyncio
     async def test_positions_unchanged_keeps_goal_recommendation(self, override_settings):
+        from app.core.cache_store import CacheStore
         from app.utils.cache_keys import (
-            dashboard_summary_key,
+            get_goal_recommendation_generation,
             goal_recommendation_key,
-            goal_recommendation_stale_key,
             invalidate_asset_account_caches,
         )
 
-        cache = AsyncMock()
-        cache.scan = AsyncMock(return_value=(0, []))
+        cache = CacheStore()
         uid = uuid.uuid4()
+        gen = await get_goal_recommendation_generation(cache, uid)
+        await cache.set(goal_recommendation_key(uid, gen), "{}")
 
         await invalidate_asset_account_caches(cache, uid, positions_changed=False)
 
-        deleted = self._deleted_keys(cache)
-        assert goal_recommendation_key(uid) not in deleted
-        assert goal_recommendation_stale_key(uid) not in deleted
-        assert dashboard_summary_key(uid) in deleted
+        assert await cache.get(goal_recommendation_key(uid, gen)) == "{}"
+        assert await get_goal_recommendation_generation(cache, uid) == gen
 
 
 class TestInvalidateGoalRecommendationCaches:
     @pytest.mark.asyncio
     async def test_settings_change_invalidates_stale_result_too(self, override_settings):
         """목표·후보·옵션 변경 후 stale 결과를 돌려주면 바뀌기 전 설정의 답이 보인다 — 함께 지운다."""
+        from app.core.cache_store import CacheStore
         from app.utils.cache_keys import (
+            get_goal_recommendation_generation,
+            goal_recommendation_age_key,
+            goal_recommendation_horizon_key,
             goal_recommendation_key,
             goal_recommendation_stale_key,
             invalidate_goal_recommendation_caches,
         )
 
-        cache = AsyncMock()
+        cache = CacheStore()
         uid = uuid.uuid4()
+        gen = await get_goal_recommendation_generation(cache, uid)
+        keys = [
+            goal_recommendation_key(uid, gen),
+            goal_recommendation_stale_key(uid, gen),
+            goal_recommendation_horizon_key(uid, gen),
+            goal_recommendation_age_key(uid, gen),
+        ]
+        for key in keys:
+            await cache.set(key, "{}")
 
         await invalidate_goal_recommendation_caches(cache, uid)
 
-        deleted = {k for call in cache.delete.call_args_list for k in call.args}
-        assert {goal_recommendation_key(uid), goal_recommendation_stale_key(uid)} <= deleted
+        assert [await cache.get(k) for k in keys] == [None] * 4
+
+    @pytest.mark.asyncio
+    async def test_invalidation_rotates_generation(self, override_settings):
+        """계산 도중 무효화되면 끝난 옛 계산은 옛 세대 키에 쓴다 — 새 세대 조회에는 보이지 않아야 한다(plans/88)."""
+        from app.core.cache_store import CacheStore
+        from app.utils.cache_keys import (
+            get_goal_recommendation_generation,
+            goal_recommendation_key,
+            invalidate_goal_recommendation_caches,
+        )
+
+        cache = CacheStore()
+        uid = uuid.uuid4()
+        old_gen = await get_goal_recommendation_generation(cache, uid)
+        assert await get_goal_recommendation_generation(cache, uid) == old_gen  # 같은 세대 안에서는 고정
+
+        await invalidate_goal_recommendation_caches(cache, uid)
+        new_gen = await get_goal_recommendation_generation(cache, uid)
+        await cache.set(goal_recommendation_key(uid, old_gen), "old")  # 늦게 끝난 옛 계산
+
+        assert new_gen != old_gen
+        assert await cache.get(goal_recommendation_key(uid, new_gen)) is None
+
+    @pytest.mark.asyncio
+    async def test_generation_without_cache_is_random(self, override_settings):
+        from app.utils.cache_keys import get_goal_recommendation_generation
+
+        uid = uuid.uuid4()
+        assert await get_goal_recommendation_generation(None, uid) != await get_goal_recommendation_generation(
+            None, uid
+        )
 
 
 class TestInvalidateUserCaches:

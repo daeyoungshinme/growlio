@@ -281,6 +281,11 @@ class RebalancingExecutionResult(Base):
     order_no: Mapped[str | None] = mapped_column(String(50))
     error_message: Mapped[str | None] = mapped_column(Text)
     order_type: Mapped[str] = mapped_column(String(20), nullable=False, default="MARKET")
+    # KIS 국내 취소에 필요한 주문 조직번호(KRX_FWDG_ORD_ORGNO) — 없으면 그 주문은 앱에서 취소할 수 없다
+    order_org_no: Mapped[str | None] = mapped_column(String(20))
+    cancel_status: Mapped[str | None] = mapped_column(String(20))  # CANCELED | CANCEL_FAILED
+    cancel_message: Mapped[str | None] = mapped_column(Text)
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     execution: Mapped["RebalancingExecution"] = relationship(back_populates="result_items")
 

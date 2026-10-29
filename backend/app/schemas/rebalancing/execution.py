@@ -110,6 +110,19 @@ class OrderResult(BaseModel):
     error_msg: str | None = None
     order_type: str = "MARKET"
     price: float | None = None  # 지정가 또는 주문 생성 시점 참고 시세 (국내=KRW, 해외=USD)
+    # KIS 국내 취소용 주문 조직번호 — 저장만 하고 응답에는 내보내지 않는다
+    order_org_no: str | None = Field(default=None, exclude=True)
+    # 미체결 취소(plans/89) — result_id는 저장된 RebalancingExecutionResult.id
+    result_id: uuid.UUID | None = None
+    cancel_status: str | None = None  # "CANCELED" | "CANCEL_FAILED"
+    cancel_message: str | None = None
+    cancelable: bool = False
+
+
+class OrderCancelResponse(BaseModel):
+    result_id: uuid.UUID
+    cancel_status: str  # "CANCELED" | "CANCEL_FAILED"
+    message: str
 
 
 class ExecutionResult(BaseModel):

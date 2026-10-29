@@ -368,6 +368,16 @@ describe("RecommendationCard", () => {
       expect(screen.getByText(/예상 변동성은 연 12\.3%입니다/)).toBeDefined();
     });
 
+    it("shows which saved settings the overall recommendation was computed with", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(
+        makeOverallRecommendation({ risk_tolerance: "AGGRESSIVE", max_weight_pct: 25 }),
+      );
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText(/적용된 설정: 투자성향 공격적/)).toBeDefined();
+      expect(screen.getByText(/종목당 최대 25%/)).toBeDefined();
+    });
+
     it("shows the target (required) dividend yield when a dividend goal is set", async () => {
       fetchOverallGoalRecommendation.mockResolvedValue(
         makeOverallRecommendation({ required_dividend_yield_pct: 5.0 }),

@@ -3,6 +3,7 @@ import { AssetAccount } from "@/api/assets";
 import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { RebalancingResultSection } from "./RebalancingResultSection";
 import { RebalancingConfirmStep } from "./RebalancingConfirmStep";
+import { RebalancingFinalConfirmDialog } from "./RebalancingFinalConfirmDialog";
 import {
   RebalancingExecutionContext,
   useRebalancingExecution,
@@ -128,39 +129,20 @@ export function RebalancingExecutionModal({
         <div className="shrink-0 px-4 sm:px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex flex-row gap-2">
           {phase === "confirm" && (
             <>
-              {!confirmed ? (
-                <>
-                  <button
-                    onClick={onClose}
-                    className="shrink-0 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    취소
-                  </button>
-                  <button
-                    onClick={() => dispatch({ type: "CONFIRM_CLICK" })}
-                    disabled={blocked}
-                    className="flex-1 px-4 py-2.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
-                  >
-                    {orderType === "LIMIT" ? "지정가" : "시장가"} 주문 확인 ({orders.length}건) →
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => dispatch({ type: "UNCONFIRM" })}
-                    className="shrink-0 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    ← 수정
-                  </button>
-                  <button
-                    onClick={exec.handleExecute}
-                    disabled={blocked}
-                    className="flex-1 px-4 py-2.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
-                  >
-                    {orderType === "LIMIT" ? "지정가" : "시장가"} 최종 실행 ({orders.length}건)
-                  </button>
-                </>
-              )}
+              <button
+                onClick={onClose}
+                className="shrink-0 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                취소
+              </button>
+              {/* 같은 자리 버튼이 '최종 실행'으로 바뀌던 방식은 두 번 탭으로 요약도 못 보고 주문됐다 — 요약 확인창을 거친다 */}
+              <button
+                onClick={() => dispatch({ type: "CONFIRM_CLICK" })}
+                disabled={blocked}
+                className="flex-1 px-4 py-2.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+              >
+                {orderType === "LIMIT" ? "지정가" : "시장가"} 주문 확인 ({orders.length}건) →
+              </button>
             </>
           )}
           {phase === "result" && (
@@ -172,6 +154,20 @@ export function RebalancingExecutionModal({
             </button>
           )}
         </div>
+        {phase === "confirm" && confirmed && !blocked && (
+          <RebalancingFinalConfirmDialog
+            orders={orders}
+            orderType={orderType}
+            strategy={state.strategy}
+            hasRealAccount={exec.hasRealAccount}
+            livePricesKrw={state.livePricesKrw}
+            livePricesUsd={state.livePricesUsd}
+            totalSellProceeds={exec.globalCashSummary.totalSellProceeds}
+            totalBuyCost={exec.globalCashSummary.totalBuyCost}
+            onConfirm={() => void exec.handleExecute()}
+            onCancel={() => dispatch({ type: "UNCONFIRM" })}
+          />
+        )}
       </Modal>
     </RebalancingExecutionContext.Provider>
   );
