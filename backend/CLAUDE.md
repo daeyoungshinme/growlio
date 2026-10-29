@@ -107,22 +107,25 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 ### Services (`services/`)
 
 > 접미사 관례: `*_service.py`(DB/외부 API 유스케이스), `*_calculator.py`/`*_aggregator.py`(순수 계산), 접미사 없음(도메인 유틸). 강제 아님. 파일 추가/삭제 시 이 목록도 갱신.
-> 도메인 패키지(`goal/`·`etf/`·`tactical/`·`tax/`·`market_signal/`·`backtest/`, 기존 `rebalancing/`·`alerts/`·`dividend/`)는 re-export shim 없이 `app.services.<pkg>.<module>`로 import·patch한다. 공용 계층(시세·자산·포트폴리오·알림 발송)은 아직 평면 모듈.
+> 도메인 패키지(`accounts/`·`portfolio/`·`market_data/`·`notifications/`·`goal/`·`etf/`·`tactical/`·`tax/`·`market_signal/`·`backtest/`·`rebalancing/`·`alerts/`·`dividend/`)는 re-export shim 없이 `app.services.<pkg>.<module>`로 import·patch한다. 평면에 남은 건 단일 도메인 모듈뿐(아래 "기타").
 
-**자산·동기화**
+**계좌·동기화 (`accounts/`)**
+- `credential_service.py` — AES-256 암복호화
 - `asset_service.py` — 계좌별 sync + `sync_account_now`(assets `/sync` 전용)
 - `asset_credential_service.py` — 브로커 자격증명 검증·삭제
 - `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). `sync_accounts`(세마포어 3)는 `jobs/asset_sync`도 재사용. 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 브로커 응답 대기 중 커넥션 점유로 풀 고갈 방지. 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
 - `snapshot_service.py` — 스냅샷 upsert·포지션 sync 헬퍼
+- 쿼리 헬퍼: `_snapshot_queries.py`(최신 스냅샷 서브쿼리), `_account_queries.py`(활성 계좌 — `active_accounts_stmt()`/`active_broker_accounts_stmt()`)
+
+**포트폴리오·자산 집계 (`portfolio/`)**
 - `asset_aggregator.py` — 대시보드 집계, XIRR·연환산·벤치마크, 월별 추이(`get_monthly_trend`)
 - `portfolio_service.py` — overview 집계. 부분집합 총자산 반복 계산은 `prefetch_accounts_snapshot_positions()`/`compute_total_assets_krw()`로 1회 조회 재사용
 - `portfolio_history_service.py` · `position_aggregator.py` · `returns_calculator.py`
 - `composition_calculator.py` — 자산 구성. `exclude_real_estate()`는 목표 진행률·필요수익률 등 "투자자산" 계산 전용(대시보드 총자산 표시엔 미적용)
 - `period_purchase_service.py` — 기간별 매수 수익률. 스냅샷 수량·평단 변화로 추정, 수기 BUY 기록 있으면 기록 우선. **해외는 `avg_price_usd`로 역산 후 그 스냅샷 `usd_rate`로 환산**(원화 평단은 매일 재환산돼 역산 불가). 기록 market과 브로커 포지션 market이 달라 `_position_key_aligner`로 정렬
-- `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR)
-- 쿼리 헬퍼: `_snapshot_queries.py`(최신 스냅샷 서브쿼리), `_account_queries.py`(활성 계좌 — `active_accounts_stmt()`/`active_broker_accounts_stmt()`), `_position_queries.py`, `_settings_queries.py`, `_portfolio_queries.py`
+- 쿼리 헬퍼: `_position_queries.py`, `_portfolio_queries.py`
 
-**시세·환율**
+**시세 (`market_data/`)**
 - `price_service.py` — 현재가(Yahoo → KIS). `yahoo_price.py` — Yahoo 유틸. **브로커 잔고는 국내 market을 전부 "KOSPI"로 채운다** — `to_yf_symbol()`이 `_kosdaq_tickers`(FDR, 매일 07:00 갱신)로 `.KQ` 교정. 저장된 market은 매칭 키라 바꾸지 않음. pykrx 상장목록은 KRX 로그인 요구로 사용 불가
 - `price_sync_sources.py` — 국내 Naver/pykrx 폴백 (Yahoo 클라우드 IP 차단 대비)
 - `stock_search_service.py` — 네이버(한글)/Yahoo(영문·티커) 검색
@@ -191,7 +194,10 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `dca_service.py` · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
 - `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → pykrx → FDR → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_dividend_data`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
-- `credential_service.py`(AES-256) · `email_service.py` · `email_templates/`(`_shared`·`alerts`·`rebalancing`·`market_signal`·`reports`, `__init__.py` 전체 재노출) · `push_service.py`(폐기 토큰 별도 세션 삭제, 토큰은 기기 단위)
+- `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR) · `_settings_queries.py`
+
+**알림 발송 채널 (`notifications/`)**
+- `email_service.py` · `email_templates/`(`_shared`·`alerts`·`rebalancing`·`market_signal`·`reports`, `__init__.py` 전체 재노출) · `push_service.py`(폐기 토큰 별도 세션 삭제, 토큰은 기기 단위)
 
 ### 그 외 패키지
 
