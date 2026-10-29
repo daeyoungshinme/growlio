@@ -37,7 +37,7 @@ from app.services.challenge_service import get_challenge_summary
 from app.services.dca_cash_shortfall_service import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
 from app.services.tactical import tactical_allocation_service as tactical
-from app.services.tax_action_service import get_tax_action_plan_with_summary
+from app.services.tax.tax_action_service import get_tax_action_plan_with_summary
 from app.utils.cache_keys import CacheStoreType
 from app.utils.kst import today_kst
 

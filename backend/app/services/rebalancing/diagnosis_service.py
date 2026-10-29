@@ -20,7 +20,7 @@ from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxIm
 from app.services.market_signal.market_signal_service import get_market_signal
 from app.services.rebalancing.group_expansion import iter_trade_items
 from app.services.risk_service import get_portfolio_risk_metrics
-from app.services.tax_service import estimate_overseas_transfer_tax
+from app.services.tax.tax_service import estimate_overseas_transfer_tax
 from app.utils.cache_keys import CacheStoreType
 
 logger = structlog.get_logger()

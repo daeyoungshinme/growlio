@@ -20,7 +20,7 @@ from app.constants import COMPREHENSIVE_TAX_THRESHOLD_KRW
 from app.enums import IncomeBracket
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
-from app.services.isa_service import (
+from app.services.tax.isa_service import (
     ISA_ANNUAL_CONTRIBUTION_LIMIT_KRW,
     ISA_TOTAL_CONTRIBUTION_LIMIT_KRW,
     IsaAccountStatus,
@@ -28,9 +28,9 @@ from app.services.isa_service import (
     calc_isa_contribution_status,
     get_isa_status_summary,
 )
-from app.services.overseas_realized_service import get_overseas_realized_summary
-from app.services.pension_contribution_service import PensionContributionStatus, calc_pension_contribution_status
-from app.services.tax_service import get_overseas_positions_detail, get_tax_summary, pick_year_rule
+from app.services.tax.overseas_realized_service import get_overseas_realized_summary
+from app.services.tax.pension_contribution_service import PensionContributionStatus, calc_pension_contribution_status
+from app.services.tax.tax_service import get_overseas_positions_detail, get_tax_summary, pick_year_rule
 from app.utils.kst import today_kst
 
 ActionCategory = Literal[

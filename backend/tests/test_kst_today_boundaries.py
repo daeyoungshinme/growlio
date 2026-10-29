@@ -14,10 +14,10 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.enums import AgeGroup
-from app.services import tax_service
 from app.services.goal_age_recommendation_service import age_group_from_birth_year
 from app.services.rebalancing import plan_notifications
 from app.services.rebalancing.plan_generation import MarketSignalGateBlocked, TaxGateBlocked
+from app.services.tax import tax_service
 
 # 2026-12-31 20:00 UTC == 2027-01-01 05:00 KST
 _INSTANT = datetime(2026, 12, 31, 20, 0, tzinfo=UTC)

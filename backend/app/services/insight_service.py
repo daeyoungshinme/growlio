@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.services.asset_aggregator import get_dashboard_summary
-from app.services.tax_service import get_overseas_positions_detail, get_tax_summary
+from app.services.tax.tax_service import get_overseas_positions_detail, get_tax_summary
 from app.utils.cache_keys import TTL_INSIGHTS, CacheStoreType, get_cached_json, insights_key, set_cached_json
 from app.utils.kst import today_kst
 

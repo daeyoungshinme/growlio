@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import AsyncSessionLocal
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
-from app.services.tax_action_service import TaxAction, get_tax_action_plan
+from app.services.tax.tax_action_service import TaxAction, get_tax_action_plan
 from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()

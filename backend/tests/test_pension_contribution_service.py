@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.pension_contribution_service import calc_pension_contribution_status
+from app.services.tax.pension_contribution_service import calc_pension_contribution_status
 
 
 class TestCalcPensionContributionStatus:

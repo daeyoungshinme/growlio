@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.kis.realized import get_overseas_realized_pnl
-from app.services.overseas_realized_service import get_overseas_realized_summary, resolve_source
+from app.services.tax.overseas_realized_service import get_overseas_realized_summary, resolve_source
 
 TODAY = date(2026, 9, 26)
 
@@ -95,9 +95,9 @@ class TestGetOverseasRealizedSummary:
     def _today(self):
         # 수기 매매 기록 집계는 TestTradeRecordRealized가 따로 검증 — 여기선 기록 없음으로 고정
         with (
-            patch("app.services.overseas_realized_service.today_kst", return_value=TODAY),
+            patch("app.services.tax.overseas_realized_service.today_kst", return_value=TODAY),
             patch(
-                "app.services.overseas_realized_service.load_trade_record_realized",
+                "app.services.tax.overseas_realized_service.load_trade_record_realized",
                 new=AsyncMock(return_value={}),
             ) as self.load_records,
         ):
@@ -115,9 +115,9 @@ class TestGetOverseasRealizedSummary:
 
         fetch = AsyncMock(return_value=1_300_000.0)
         with (
-            patch("app.services.overseas_realized_service._fetch_kis_realized", new=fetch),
+            patch("app.services.tax.overseas_realized_service._fetch_kis_realized", new=fetch),
             patch(
-                "app.services.overseas_realized_service.get_overseas_positions_detail",
+                "app.services.tax.overseas_realized_service.get_overseas_positions_detail",
                 new=AsyncMock(return_value=positions),
             ),
         ):
@@ -141,9 +141,9 @@ class TestGetOverseasRealizedSummary:
         db = _db_with_accounts([ok, broken])
         fetch = AsyncMock(side_effect=[500_000.0, RuntimeError("boom")])
         with (
-            patch("app.services.overseas_realized_service._fetch_kis_realized", new=fetch),
+            patch("app.services.tax.overseas_realized_service._fetch_kis_realized", new=fetch),
             patch(
-                "app.services.overseas_realized_service.get_overseas_positions_detail",
+                "app.services.tax.overseas_realized_service.get_overseas_positions_detail",
                 new=AsyncMock(return_value=[]),
             ),
         ):
@@ -160,7 +160,7 @@ class TestGetOverseasRealizedSummary:
     async def test_no_supported_accounts_returns_none(self, make_account, mock_cache):
         db = _db_with_accounts([_acc(make_account, "수기", asset_type="STOCK_OTHER")])
         with patch(
-            "app.services.overseas_realized_service.get_overseas_positions_detail",
+            "app.services.tax.overseas_realized_service.get_overseas_positions_detail",
             new=AsyncMock(return_value=[]),
         ):
             summary = await get_overseas_realized_summary(uuid.uuid4(), 2025, db, cache=mock_cache)
@@ -172,7 +172,7 @@ class TestGetOverseasRealizedSummary:
     @pytest.mark.asyncio
     async def test_returns_cached_value(self, mock_cache):
         cached = {"year": 2026, "realized_gain_krw": 1.0, "source": "BROKER"}
-        with patch("app.services.overseas_realized_service.get_cached_json", new=AsyncMock(return_value=cached)):
+        with patch("app.services.tax.overseas_realized_service.get_cached_json", new=AsyncMock(return_value=cached)):
             db = MagicMock()
             db.execute = AsyncMock()
             summary = await get_overseas_realized_summary(uuid.uuid4(), 2026, db, cache=mock_cache)
@@ -182,15 +182,15 @@ class TestGetOverseasRealizedSummary:
     @pytest.mark.asyncio
     async def test_fetch_kis_realized_refreshes_expired_token(self, make_account, mock_cache):
         from app.kis.client import KisTokenExpiredError
-        from app.services.overseas_realized_service import _fetch_kis_realized
+        from app.services.tax.overseas_realized_service import _fetch_kis_realized
 
         acc = _acc(make_account, "KIS")
         token = AsyncMock(side_effect=["old", "new"])
         pnl = AsyncMock(side_effect=[KisTokenExpiredError(), {"total_krw": 42.0, "trades": []}])
         with (
-            patch("app.services.overseas_realized_service.decrypt_kis_credentials", return_value=("k", "s")),
-            patch("app.services.overseas_realized_service.get_access_token", new=token),
-            patch("app.services.overseas_realized_service.get_overseas_realized_pnl", new=pnl),
+            patch("app.services.tax.overseas_realized_service.decrypt_kis_credentials", return_value=("k", "s")),
+            patch("app.services.tax.overseas_realized_service.get_access_token", new=token),
+            patch("app.services.tax.overseas_realized_service.get_overseas_realized_pnl", new=pnl),
         ):
             total = await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, MagicMock(), mock_cache)
 
@@ -203,7 +203,7 @@ class TestGetOverseasRealizedSummary:
         """토큰 발급(내부 commit)은 타임아웃 대상이 아니다 — 조회 HTTP에만 wait_for가 걸린다."""
         import asyncio
 
-        from app.services.overseas_realized_service import _fetch_kis_realized
+        from app.services.tax.overseas_realized_service import _fetch_kis_realized
 
         acc = _acc(make_account, "KIS")
 
@@ -216,15 +216,15 @@ class TestGetOverseasRealizedSummary:
             return {"total_krw": 1.0, "trades": []}
 
         with (
-            patch("app.services.overseas_realized_service.decrypt_kis_credentials", return_value=("k", "s")),
-            patch("app.services.overseas_realized_service._FETCH_TIMEOUT_SECONDS", 0.01),
-            patch("app.services.overseas_realized_service.get_access_token", new=slow_token),
+            patch("app.services.tax.overseas_realized_service.decrypt_kis_credentials", return_value=("k", "s")),
+            patch("app.services.tax.overseas_realized_service._FETCH_TIMEOUT_SECONDS", 0.01),
+            patch("app.services.tax.overseas_realized_service.get_access_token", new=slow_token),
         ):
             fast_pnl = AsyncMock(return_value={"total_krw": 7.0, "trades": []})
-            with patch("app.services.overseas_realized_service.get_overseas_realized_pnl", new=fast_pnl):
+            with patch("app.services.tax.overseas_realized_service.get_overseas_realized_pnl", new=fast_pnl):
                 assert await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, MagicMock(), mock_cache) == 7.0
             with (
-                patch("app.services.overseas_realized_service.get_overseas_realized_pnl", new=slow_pnl),
+                patch("app.services.tax.overseas_realized_service.get_overseas_realized_pnl", new=slow_pnl),
                 pytest.raises(TimeoutError),
             ):
                 await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, MagicMock(), mock_cache)
@@ -269,7 +269,7 @@ START, END = date(2026, 1, 1), TODAY
 
 class TestComputeTradeRealized:
     def test_uses_buy_record_cost_and_fee(self):
-        from app.services.overseas_realized_service import compute_trade_realized
+        from app.services.tax.overseas_realized_service import compute_trade_realized
 
         trades = [
             _trade("SELL", 4, 150_000, date(2026, 3, 1), fee=1_000),
@@ -280,7 +280,7 @@ class TestComputeTradeRealized:
         assert (r.sell_count, r.missing_basis_count, r.estimated) == (1, 0, False)
 
     def test_falls_back_to_snapshot_avg_when_buys_do_not_cover(self):
-        from app.services.overseas_realized_service import compute_trade_realized
+        from app.services.tax.overseas_realized_service import compute_trade_realized
 
         trades = [_trade("BUY", 1, 90_000, date(2026, 2, 1)), _trade("SELL", 3, 150_000, date(2026, 3, 1))]
         r = compute_trade_realized(trades, START, END, lambda t: 120_000.0)
@@ -288,13 +288,13 @@ class TestComputeTradeRealized:
         assert r.estimated is True
 
     def test_missing_basis_is_excluded(self):
-        from app.services.overseas_realized_service import compute_trade_realized
+        from app.services.tax.overseas_realized_service import compute_trade_realized
 
         r = compute_trade_realized([_trade("SELL", 3, 150_000, date(2026, 3, 1))], START, END, lambda t: None)
         assert (r.realized_krw, r.sell_count, r.missing_basis_count) == (0.0, 0, 1)
 
     def test_prior_year_sell_consumes_lot_and_future_sell_ignored(self):
-        from app.services.overseas_realized_service import compute_trade_realized
+        from app.services.tax.overseas_realized_service import compute_trade_realized
 
         trades = [
             _trade("BUY", 10, 100_000, date(2025, 6, 1)),
@@ -307,7 +307,7 @@ class TestComputeTradeRealized:
         assert r.sell_count == 1
 
     def test_tickers_have_separate_lots(self):
-        from app.services.overseas_realized_service import compute_trade_realized
+        from app.services.tax.overseas_realized_service import compute_trade_realized
 
         trades = [
             _trade("BUY", 1, 100_000, date(2026, 1, 5), ticker="AAPL"),
@@ -328,7 +328,7 @@ def _result(*, scalars=None, rows=None) -> MagicMock:
 class TestLoadTradeRecordRealized:
     @pytest.mark.asyncio
     async def test_filters_domestic_and_uses_snapshot_before_sell_date(self, make_account):
-        from app.services.overseas_realized_service import load_trade_record_realized
+        from app.services.tax.overseas_realized_service import load_trade_record_realized
 
         acc = make_account(account_id=uuid.uuid4(), asset_type="STOCK_KIWOOM")
         sell_day = date(2026, 3, 10)
@@ -354,7 +354,7 @@ class TestLoadTradeRecordRealized:
 
     @pytest.mark.asyncio
     async def test_current_position_fallback_and_no_sells(self, make_account):
-        from app.services.overseas_realized_service import load_trade_record_realized
+        from app.services.tax.overseas_realized_service import load_trade_record_realized
 
         acc = make_account(account_id=uuid.uuid4(), asset_type="STOCK_TOSS")
         trades = [_trade("SELL", 1, 150_000, date(2026, 3, 10), account_id=acc.id)]
@@ -375,7 +375,7 @@ class TestLoadTradeRecordRealized:
 class TestSummaryWithTradeRecords:
     @pytest.mark.asyncio
     async def test_records_cover_unsupported_accounts_without_double_counting_kis(self, make_account, mock_cache):
-        from app.services.overseas_realized_service import TradeRealized
+        from app.services.tax.overseas_realized_service import TradeRealized
 
         kis = _acc(make_account, "KIS 일반")
         kiwoom = _acc(make_account, "키움", asset_type="STOCK_KIWOOM")
@@ -389,11 +389,13 @@ class TestSummaryWithTradeRecords:
         }
         load = AsyncMock(return_value=records)
         with (
-            patch("app.services.overseas_realized_service.today_kst", return_value=TODAY),
-            patch("app.services.overseas_realized_service.load_trade_record_realized", new=load),
-            patch("app.services.overseas_realized_service._fetch_kis_realized", new=AsyncMock(return_value=500_000.0)),
+            patch("app.services.tax.overseas_realized_service.today_kst", return_value=TODAY),
+            patch("app.services.tax.overseas_realized_service.load_trade_record_realized", new=load),
             patch(
-                "app.services.overseas_realized_service.get_overseas_positions_detail",
+                "app.services.tax.overseas_realized_service._fetch_kis_realized", new=AsyncMock(return_value=500_000.0)
+            ),
+            patch(
+                "app.services.tax.overseas_realized_service.get_overseas_positions_detail",
                 new=AsyncMock(return_value=[{"account_id": str(kiwoom.id)}]),
             ),
         ):
