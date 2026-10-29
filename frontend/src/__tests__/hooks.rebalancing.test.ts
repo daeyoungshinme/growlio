@@ -845,6 +845,36 @@ describe("useRebalancingExecution", () => {
     expect(invalidateRebalancingHistoryData).toHaveBeenCalledTimes(1);
   });
 
+  it("시장가 주문에도 조회한 현재가를 reference_price로 실어 결과·이력 가격이 비지 않는다 (plans/90 B7)", async () => {
+    const { fetchAllBrokerBalances } = await import("@/api/rebalancing");
+    const { fetchStockPricesBatch } = await import("@/api/assets");
+    vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
+    vi.mocked(fetchStockPricesBatch).mockResolvedValue({
+      "005930": { price_krw: 70000, price_usd: null, usd_rate: null },
+    });
+
+    const { result } = renderHook(
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: mockAnalysis,
+          accounts: mockKisAccounts,
+        }),
+      { wrapper: createWrapper() },
+    );
+    await act(async () => {
+      await result.current.loadAllPrices();
+    });
+
+    const buy = result.current.orders.find((o) => o.ticker === "005930");
+    expect(buy?.order_type).toBe("MARKET");
+    expect(buy?.limit_price).toBeNull();
+    // 모듈 가격 캐시가 앞 테스트 값을 줄 수 있어 고정값 대신 화면이 쓰는 실시간 가격과 비교한다
+    const live = result.current.state.livePricesKrw["005930"];
+    expect(live).toBeGreaterThan(0);
+    expect(buy?.reference_price).toBe(live);
+  });
+
   it("매수만(BUY_ONLY)을 고르면 매도 주문이 빠지고 매수만 남는다 (plans/63 P0-1)", async () => {
     const { fetchAllBrokerBalances } = await import("@/api/rebalancing");
     vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);

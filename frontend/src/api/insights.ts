@@ -2,13 +2,8 @@ import { apiGet } from "./client";
 
 export type InsightSeverity = "INFO" | "WARNING" | "ALERT";
 
-export type InsightType =
-  | "CONCENTRATION"
-  | "UNDERPERFORMANCE"
-  | "DEPOSIT_SHORTFALL"
-  | "REBALANCING_OPPORTUNITY"
-  | "TAX_LOSS_HARVEST"
-  | "HIGH_COST";
+// 백엔드 insight_service.InsightType과 같은 집합
+export type InsightType = "CONCENTRATION" | "REBALANCING_OPPORTUNITY" | "TAX_LOSS_HARVEST";
 
 export interface Insight {
   type: InsightType;

@@ -6,7 +6,7 @@ import EmptyState from "@/components/common/EmptyState";
 import { useIsSmUp } from "@/hooks/useMediaQuery";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { updateAccount, type AssetAccount } from "@/api/assets";
-import { fetchTransactions, deleteTransaction, type Transaction } from "@/api/transactions";
+import { fetchAllTransactions, deleteTransaction, type Transaction } from "@/api/transactions";
 import { TransactionForm } from "./TransactionForm";
 import DepositReflectPrompt from "./DepositReflectPrompt";
 import { fmtKrw } from "@/utils/format";
@@ -64,7 +64,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
     refetch,
   } = useQuery<Transaction[]>({
     queryKey: QUERY_KEYS.allTransactions(selectedYear),
-    queryFn: () => fetchTransactions({ year: selectedYear }),
+    queryFn: () => fetchAllTransactions({ year: selectedYear }),
   });
 
   const deleteMut = useMutation({

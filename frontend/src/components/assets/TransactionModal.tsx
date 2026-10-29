@@ -5,7 +5,7 @@ import { fetchAccountPositions } from "@/api/assets";
 import {
   createTransaction,
   deleteTransaction,
-  fetchTransactions,
+  fetchAllTransactions,
   Transaction,
   updateTransaction,
 } from "@/api/transactions";
@@ -73,7 +73,7 @@ export default function TransactionModal({
 
   const { data: txList, isLoading } = useQuery<Transaction[]>({
     queryKey: QUERY_KEYS.transactions(accountId),
-    queryFn: () => fetchTransactions({ account_id: accountId }),
+    queryFn: () => fetchAllTransactions({ account_id: accountId }),
   });
 
   const { data: positionsData } = useQuery<{

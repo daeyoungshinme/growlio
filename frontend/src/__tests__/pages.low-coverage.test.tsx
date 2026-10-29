@@ -150,7 +150,7 @@ vi.mock("@/hooks/useAssetManagementData", () => ({
     accounts: [],
     isLoading: false,
     overview: null,
-    allTx: [],
+    txTotals: [],
     usdRate: 1350,
   })),
 }));
@@ -257,6 +257,8 @@ vi.mock("@/api/portfolios", () => ({
 
 vi.mock("@/api/transactions", () => ({
   fetchTransactions: vi.fn().mockResolvedValue([]),
+  fetchAllTransactions: vi.fn().mockResolvedValue([]),
+  fetchTransactionSummary: vi.fn().mockResolvedValue([]),
 }));
 
 // ── imports ───────────────────────────────────────────────────────────────────
@@ -337,7 +339,7 @@ describe("AssetManagementPage", () => {
         all_positions: [],
         accounts: [],
       },
-      allTx: [],
+      txTotals: [],
       usdRate: 1350,
     });
 

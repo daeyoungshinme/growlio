@@ -5,7 +5,7 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
 
 vi.mock("../api/transactions", () => ({
-  fetchTransactions: vi.fn().mockResolvedValue([]),
+  fetchAllTransactions: vi.fn().mockResolvedValue([]),
   deleteTransaction: vi.fn().mockResolvedValue({}),
 }));
 
@@ -113,8 +113,8 @@ describe("TransactionHistoryTab", () => {
     };
 
     it("휴지통을 눌러도 바로 삭제하지 않고 확인 후 삭제한다", async () => {
-      const { fetchTransactions, deleteTransaction } = await import("../api/transactions");
-      vi.mocked(fetchTransactions).mockResolvedValue([tx]);
+      const { fetchAllTransactions, deleteTransaction } = await import("../api/transactions");
+      vi.mocked(fetchAllTransactions).mockResolvedValue([tx]);
       virtualCount = 1;
       renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
 
@@ -132,8 +132,8 @@ describe("TransactionHistoryTab", () => {
     });
 
     it("확인창에서 취소하면 삭제하지 않는다", async () => {
-      const { fetchTransactions, deleteTransaction } = await import("../api/transactions");
-      vi.mocked(fetchTransactions).mockResolvedValue([tx]);
+      const { fetchAllTransactions, deleteTransaction } = await import("../api/transactions");
+      vi.mocked(fetchAllTransactions).mockResolvedValue([tx]);
       virtualCount = 1;
       renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
 
@@ -146,13 +146,13 @@ describe("TransactionHistoryTab", () => {
   });
 
   it("조회 실패를 '내역 없음'이 아니라 오류+다시 시도로 보여준다", async () => {
-    const { fetchTransactions } = await import("../api/transactions");
-    vi.mocked(fetchTransactions).mockRejectedValueOnce(new Error("network"));
+    const { fetchAllTransactions } = await import("../api/transactions");
+    vi.mocked(fetchAllTransactions).mockRejectedValueOnce(new Error("network"));
     renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
 
     expect(await screen.findByText("거래 내역을 불러오지 못했습니다.")).toBeInTheDocument();
     expect(screen.queryByText("등록된 내역이 없습니다.")).not.toBeInTheDocument();
-    vi.mocked(fetchTransactions).mockResolvedValueOnce([]);
+    vi.mocked(fetchAllTransactions).mockResolvedValueOnce([]);
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(await screen.findByText("등록된 내역이 없습니다.")).toBeInTheDocument();
   });
@@ -228,7 +228,7 @@ describe("TransactionHistoryTab", () => {
   });
 
   it("연도를 변경하면 해당 연도로 필터가 변경된다", async () => {
-    const { fetchTransactions } = await import("../api/transactions");
+    const { fetchAllTransactions } = await import("../api/transactions");
     renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
     const yearSelects = screen.getAllByRole("combobox");
     const yearSelect =
@@ -239,7 +239,7 @@ describe("TransactionHistoryTab", () => {
     fireEvent.change(yearSelect, { target: { value: String(prevYear) } });
 
     await waitFor(() => {
-      expect(vi.mocked(fetchTransactions)).toHaveBeenCalledWith(
+      expect(vi.mocked(fetchAllTransactions)).toHaveBeenCalledWith(
         expect.objectContaining({ year: prevYear }),
       );
     });

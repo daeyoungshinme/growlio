@@ -67,4 +67,11 @@ describe("resolvePushDeepLink", () => {
     }
     expect(link({ type: "REBALANCING_PLAN_EXECUTION_FAILED" })).toBe("/rebalancing?rtab=이력");
   });
+
+  it("챌린지·시장 요약·연말 절세 알림도 해당 화면으로 연다 (plans/90 B5)", () => {
+    expect(link({ type: "CHALLENGE_REMINDER" })).toBe("/invest-plan?tab=챌린지");
+    expect(link({ type: "CHALLENGE_WRAPUP" })).toBe("/invest-plan?tab=챌린지");
+    expect(link({ type: "YEAR_END_TAX_REMINDER" })).toBe("/invest-plan?tab=절세");
+    expect(link({ type: "MARKET_SIGNAL_DIGEST" })).toBe("/rebalancing?rtab=진단");
+  });
 });

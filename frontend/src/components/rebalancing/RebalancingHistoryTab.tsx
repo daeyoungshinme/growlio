@@ -37,6 +37,8 @@ const TRIGGER_COLOR: Record<string, string> = {
 const STRATEGY_LABEL: Record<string, string> = {
   FULL: "매도+매수",
   BUY_ONLY: "매수만",
+  // 설정 화면의 "2단계 자동실행"은 수동 실행 기록에 붙으면 어긋나 실행 방식만 적는다(plans/90 B4)
+  TWO_PHASE: "2단계 매수·매도",
 };
 
 function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {

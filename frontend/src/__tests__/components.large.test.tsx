@@ -67,6 +67,8 @@ vi.mock("@/api/rebalancing", () => ({
 
 vi.mock("@/api/transactions", () => ({
   fetchTransactions: vi.fn().mockResolvedValue([]),
+  fetchAllTransactions: vi.fn().mockResolvedValue([]),
+  fetchTransactionSummary: vi.fn().mockResolvedValue([]),
   deleteTransaction: vi.fn().mockResolvedValue({}),
   createTransaction: vi.fn().mockResolvedValue({}),
   updateTransaction: vi.fn().mockResolvedValue({}),

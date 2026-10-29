@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "./client";
+import { fetchAllPages } from "./fetchAllPages";
 
 export type TradeSide = "BUY" | "SELL";
 export type PeriodType = "month" | "year";
@@ -89,8 +90,14 @@ export const fetchPeriodPurchases = (params: {
   account_id?: string;
 }) => apiGet<PeriodPurchaseSummary>("/trades/period-summary", { params });
 
-export const fetchTrades = (params?: { account_id?: string; ticker?: string; market?: string }) =>
+type TradeListParams = { account_id?: string; ticker?: string; market?: string };
+
+export const fetchTrades = (params?: TradeListParams & { skip?: number; limit?: number }) =>
   apiGet<TradeRecord[]>("/trades", { params });
+
+/** 조건에 맞는 매매 기록 전체(페이지를 끝까지 이어 받음) */
+export const fetchAllTrades = (params?: TradeListParams) =>
+  fetchAllPages((page) => fetchTrades({ ...params, ...page }));
 
 export const createTrade = (data: TradeCreate) => apiPost<TradeRecord>("/trades", data);
 

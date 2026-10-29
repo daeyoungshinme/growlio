@@ -58,3 +58,12 @@ class TransactionResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TransactionTotal(BaseModel):
+    """계좌·유형별 거래 합계 — 목록 한 페이지(기본 100건)를 화면에서 더하면 오래된 기록이 빠졌다(plans/90 B2)."""
+
+    account_id: UUID | None
+    transaction_type: TransactionType
+    total_amount: float
+    count: int

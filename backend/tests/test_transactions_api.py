@@ -77,6 +77,54 @@ def _cleanup_app():
     app.dependency_overrides.pop(get_db, None)
 
 
+class TestSummarizeTransactions:
+    """GET /transactions/summary — 화면이 목록 한 페이지를 더하지 않게 서버에서 합산한다(plans/90 B2)."""
+
+    def test_returns_grouped_totals_scoped_to_user(self, override_settings):
+        from decimal import Decimal
+
+        user = _make_user()
+        db = _make_mock_db()
+        acc = uuid.uuid4()
+        result = MagicMock()
+        result.all.return_value = [(acc, "DEPOSIT", Decimal("1500000.00"), 3), (acc, "DIVIDEND", Decimal("12.5"), 1)]
+        db.execute = AsyncMock(return_value=result)
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.get(
+                    f"/api/v1/transactions/summary?year=2026&account_id={acc}",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert resp.json() == [
+                {"account_id": str(acc), "transaction_type": "DEPOSIT", "total_amount": 1500000.0, "count": 3},
+                {"account_id": str(acc), "transaction_type": "DIVIDEND", "total_amount": 12.5, "count": 1},
+            ]
+            sql = str(db.execute.await_args.args[0])
+            assert "user_id" in sql
+            assert "GROUP BY" in sql
+            # 목록과 달리 offset/limit가 없다 — 전부 합산
+            assert "LIMIT" not in sql
+        finally:
+            _cleanup_app()
+
+    def test_not_shadowed_by_tx_id_routes(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        result = MagicMock()
+        result.all.return_value = []
+        db.execute = AsyncMock(return_value=result)
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.get("/api/v1/transactions/summary", headers={"Authorization": "Bearer fake"})
+            assert resp.status_code == 200
+            assert resp.json() == []
+        finally:
+            _cleanup_app()
+
+
 class TestListTransactions:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user

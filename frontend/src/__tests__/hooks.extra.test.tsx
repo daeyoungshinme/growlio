@@ -99,6 +99,8 @@ vi.mock("@/api/portfolios", () => ({
 
 vi.mock("@/api/transactions", () => ({
   fetchTransactions: vi.fn().mockResolvedValue([]),
+  fetchAllTransactions: vi.fn().mockResolvedValue([]),
+  fetchTransactionSummary: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/api/insights", () => ({
@@ -314,7 +316,7 @@ describe("useAssetManagementData", () => {
     const wrapper = createWrapper();
     const { result } = renderHook(() => useAssetManagementData("증권계좌"), { wrapper });
     expect(result.current).toHaveProperty("overview");
-    expect(result.current).toHaveProperty("allTx");
+    expect(result.current).toHaveProperty("txTotals");
   });
 });
 

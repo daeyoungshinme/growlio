@@ -1,22 +1,22 @@
 import { useMemo } from "react";
 import type { AssetAccount } from "@/api/assets";
-import type { Transaction } from "@/api/transactions";
+import type { TransactionTotal } from "@/api/transactions";
 import type { PortfolioOverview } from "@/types";
 import type { AccountStats } from "@/components/assets/StockAccountCard";
 
 export function useStockAccountStats(
   stockAccounts: AssetAccount[],
   overview: PortfolioOverview | undefined,
-  allTx: Transaction[],
+  txTotals: TransactionTotal[],
 ): { account: AssetAccount; stats: AccountStats }[] {
   return useMemo(() => {
     const portfolioAccMap = Object.fromEntries((overview?.accounts ?? []).map((a) => [a.id, a]));
     const txByAcc: Record<string, { deposit: number; dividend: number }> = {};
-    for (const t of allTx) {
+    for (const t of txTotals) {
       if (!t.account_id) continue;
       if (!txByAcc[t.account_id]) txByAcc[t.account_id] = { deposit: 0, dividend: 0 };
-      if (t.transaction_type === "DEPOSIT") txByAcc[t.account_id].deposit += t.amount;
-      if (t.transaction_type === "DIVIDEND") txByAcc[t.account_id].dividend += t.amount;
+      if (t.transaction_type === "DEPOSIT") txByAcc[t.account_id].deposit += t.total_amount;
+      if (t.transaction_type === "DIVIDEND") txByAcc[t.account_id].dividend += t.total_amount;
     }
     return stockAccounts.map((account) => {
       const pa = portfolioAccMap[account.id];
@@ -32,5 +32,5 @@ export function useStockAccountStats(
         } as AccountStats,
       };
     });
-  }, [stockAccounts, overview, allTx]);
+  }, [stockAccounts, overview, txTotals]);
 }

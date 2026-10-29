@@ -5,7 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from sqlalchemy import extract, select
+from sqlalchemy import extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import PaginationDep, get_current_user, get_db, get_owned_or_404
@@ -14,7 +14,7 @@ from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
-from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate
+from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionTotal, TransactionUpdate
 from app.utils.cache_keys import (
     challenge_progress_key,
     dashboard_summary_key,
@@ -52,6 +52,34 @@ async def list_transactions(
     )
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+@router.get("/summary", response_model=list[TransactionTotal])
+@limiter.limit("60/minute")
+async def summarize_transactions(
+    request: Request,
+    account_id: UUID | None = None,
+    year: int | None = Query(None, ge=1900, le=2100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """계좌·거래 유형별 금액 합계와 건수 — 필터는 목록(`GET /transactions`)과 같다."""
+    stmt = select(
+        Transaction.account_id,
+        Transaction.transaction_type,
+        func.coalesce(func.sum(Transaction.amount), 0),
+        func.count(Transaction.id),
+    ).where(Transaction.user_id == current_user.id)
+    if account_id:
+        stmt = stmt.where(Transaction.account_id == account_id)
+    if year:
+        stmt = stmt.where(extract("year", Transaction.transaction_date) == year)
+    stmt = stmt.group_by(Transaction.account_id, Transaction.transaction_type)
+    rows = (await db.execute(stmt)).all()
+    return [
+        TransactionTotal(account_id=acc_id, transaction_type=tx_type, total_amount=float(total), count=int(cnt))
+        for acc_id, tx_type, total, cnt in rows
+    ]
 
 
 @router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)

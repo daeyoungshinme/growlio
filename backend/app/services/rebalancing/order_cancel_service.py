@@ -6,7 +6,7 @@
 """
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import structlog
 from fastapi import HTTPException
@@ -24,44 +24,28 @@ from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.client import KiwoomApiError
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
 from app.services.rebalancing.execution_service import _load_account, _load_credentials, _load_kiwoom_credentials
+from app.services.rebalancing.order_cancel_rules import CANCEL_FAILED, CANCELED, cancel_block_reason
 from app.utils.cache_keys import invalidate_rebalancing_analysis_cache
-from app.utils.kst import KST
 
 logger = structlog.get_logger()
 
-CANCELED = "CANCELED"
-CANCEL_FAILED = "CANCEL_FAILED"
 
-# 미국 정규장은 KST 자정을 넘기므로 해외 주문은 날짜 대신 경과 시간으로 본다
-_OVERSEAS_CANCEL_WINDOW = timedelta(hours=24)
-
-
-def cancel_block_reason(
-    row: RebalancingExecutionResult, executed_at: datetime, asset_type: str | None, now: datetime | None = None
-) -> str | None:
-    """앱에서 취소를 요청할 수 없는 사유(한국어), 요청 가능하면 None. 체결 여부는 판단하지 않는다."""
-    if row.status != "SUCCESS" or row.action not in ("BUY", "SELL") or not row.order_no:
-        return "접수된 주문만 취소할 수 있습니다."
-    if row.cancel_status == CANCELED:
-        return "이미 취소된 주문입니다."
-    if asset_type not in ("STOCK_KIS", "STOCK_KIWOOM"):
-        return "이 계좌는 앱에서 주문을 취소할 수 없습니다."
-    is_overseas = (row.market or "").upper() in OVERSEAS_MARKETS
-    now = now or datetime.now(UTC)
-    if is_overseas:
-        if now - executed_at > _OVERSEAS_CANCEL_WINDOW:
-            return "유효기간이 지난 주문입니다."
-    elif executed_at.astimezone(KST).date() != now.astimezone(KST).date():
-        # 국내 주문은 당일 장 마감과 함께 소멸한다
-        return "당일 주문만 취소할 수 있습니다."
-    if asset_type == "STOCK_KIS" and not is_overseas and not row.order_org_no:
-        return "이 주문은 앱에서 취소할 수 없습니다. 증권사 앱에서 취소하세요."
-    return None
-
-
-async def _request_broker_cancel(
+async def _get_broker_token(
     row: RebalancingExecutionResult, account: AssetAccount, user_id: uuid.UUID, db: AsyncSession, cache
-) -> None:
+) -> str:
+    """취소 요청에 쓸 접근 토큰. 새로 발급하면 DB 저장소에 commit하므로 주문 행을 잠그기 전에 부른다(plans/90 A2)."""
+    if account.asset_type == "STOCK_KIWOOM":
+        app_key, app_secret = _load_kiwoom_credentials(account)
+        getter = kiwoom_get_access_token
+    else:
+        app_key, app_secret = _load_credentials(account)
+        getter = get_access_token
+    return await getter(
+        app_key, app_secret, is_mock=row.is_mock, cache=cache, db=db, user_id=str(user_id), account_id=str(account.id)
+    )
+
+
+async def _request_broker_cancel(row: RebalancingExecutionResult, account: AssetAccount, token: str) -> None:
     is_mock = row.is_mock
     is_overseas = (row.market or "").upper() in OVERSEAS_MARKETS
     order_no = row.order_no or ""
@@ -69,10 +53,6 @@ async def _request_broker_cancel(
     market = row.market or ""
 
     if account.asset_type == "STOCK_KIWOOM":
-        app_key, app_secret = _load_kiwoom_credentials(account)
-        token = await kiwoom_get_access_token(
-            app_key, app_secret, is_mock=is_mock, cache=cache, db=db, user_id=str(user_id), account_id=str(account.id)
-        )
         kiwoom_no = account.kiwoom_account_no or ""
         if is_overseas:
             await kiwoom_order.cancel_overseas_order(
@@ -85,9 +65,6 @@ async def _request_broker_cancel(
         return
 
     app_key, app_secret = _load_credentials(account)
-    token = await get_access_token(
-        app_key, app_secret, is_mock=is_mock, cache=cache, db=db, user_id=str(user_id), account_id=str(account.id)
-    )
     kis_no = account.kis_account_no or ""
     if is_overseas:
         await kis_order.cancel_overseas_order(
@@ -115,14 +92,19 @@ async def cancel_execution_order(
     증권사 거부(이미 체결 등)는 CANCEL_FAILED로 기록해 돌려준다. 네트워크 등 그 밖의 실패는 기록하지 않고
     502로 올려 다시 시도할 수 있게 한다 — 응답 유실이면 실제로는 취소됐을 수 있어 "실패"로 단정하지 않는다.
     """
-    row_with_exec = (
-        await db.execute(
+
+    def _order_stmt(lock: bool):
+        stmt = (
             select(RebalancingExecutionResult, RebalancingExecution)
             .join(RebalancingExecution, RebalancingExecution.id == RebalancingExecutionResult.execution_id)
             .where(RebalancingExecutionResult.id == result_id, RebalancingExecution.user_id == user_id)
-            .with_for_update(of=RebalancingExecutionResult)  # 연속 클릭으로 같은 주문을 두 번 취소 요청하지 않게
         )
-    ).first()
+        # 잠근 뒤 다시 읽을 때는 세션에 남은 옛 값 대신 DB 값을 쓴다(다른 요청이 방금 취소했을 수 있다)
+        if not lock:
+            return stmt
+        return stmt.with_for_update(of=RebalancingExecutionResult).execution_options(populate_existing=True)
+
+    row_with_exec = (await db.execute(_order_stmt(lock=False))).first()
     if row_with_exec is None:
         raise HTTPException(status_code=404, detail="주문을 찾을 수 없습니다.")
     row, execution = row_with_exec
@@ -136,8 +118,19 @@ async def cancel_execution_order(
     if reason:
         raise HTTPException(status_code=400, detail=reason)
 
+    # 토큰 발급의 commit이 행 잠금을 풀지 않도록 토큰을 먼저 받고, 그다음 잠가서 다시 확인한다 —
+    # 연속 클릭·다른 기기의 두 번째 요청은 잠금에서 기다렸다가 "이미 취소된 주문"으로 끝난다(plans/90 A2)
+    token = await _get_broker_token(row, account, user_id, db, cache)
+    locked = (await db.execute(_order_stmt(lock=True))).first()
+    if locked is None:
+        raise HTTPException(status_code=404, detail="주문을 찾을 수 없습니다.")
+    row, execution = locked
+    reason = cancel_block_reason(row, execution.executed_at, account.asset_type)
+    if reason:
+        raise HTTPException(status_code=400, detail=reason)
+
     try:
-        await _request_broker_cancel(row, account, user_id, db, cache)
+        await _request_broker_cancel(row, account, token)
     except HTTPException:
         raise
     except (BrokerOrderRejectedError, KisApiError, KiwoomApiError) as e:

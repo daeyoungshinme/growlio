@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "./client";
+import { fetchAllPages } from "./fetchAllPages";
 import type { TxType } from "@/constants/transaction";
 
 export interface Transaction {
@@ -23,11 +24,30 @@ export interface TransactionCreate {
   notes?: string;
 }
 
-export const fetchTransactions = (params?: {
+type TransactionListParams = {
   account_id?: string;
   year?: number;
   transaction_type?: string;
-}) => apiGet<Transaction[]>("/transactions", { params });
+};
+
+export const fetchTransactions = (
+  params?: TransactionListParams & { skip?: number; limit?: number },
+) => apiGet<Transaction[]>("/transactions", { params });
+
+/** 조건에 맞는 거래 전체(페이지를 끝까지 이어 받음) — 화면에서 거르거나 더하는 목록용 */
+export const fetchAllTransactions = (params?: TransactionListParams) =>
+  fetchAllPages((page) => fetchTransactions({ ...params, ...page }));
+
+export interface TransactionTotal {
+  account_id: string | null;
+  transaction_type: TxType;
+  total_amount: number;
+  count: number;
+}
+
+/** 계좌·유형별 거래 합계(서버 집계) — 필터는 목록과 같다 */
+export const fetchTransactionSummary = (params?: { account_id?: string; year?: number }) =>
+  apiGet<TransactionTotal[]>("/transactions/summary", { params });
 
 export const createTransaction = (data: TransactionCreate) =>
   apiPost<Transaction>("/transactions", data);

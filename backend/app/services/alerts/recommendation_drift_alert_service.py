@@ -33,6 +33,7 @@ from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services._account_queries import active_accounts_stmt
 from app.services._portfolio_queries import get_linked_portfolios
+from app.services._settings_queries import get_settings_row
 from app.services.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal_recommendation_service import (
     _RECOMMENDATION_DRIFT_THRESHOLD_PCT,
@@ -41,7 +42,7 @@ from app.services.goal_recommendation_service import (
     fold_into_portfolio_groups,
     get_goal_recommendation,
 )
-from app.utils.cache_keys import CacheStoreType
+from app.utils.cache_keys import CacheStoreType, get_goal_recommendation_generation
 from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
@@ -89,9 +90,11 @@ def _is_full_target(portfolio: Portfolio, stock_accounts: list[AssetAccount]) ->
 
 
 async def _find_drifted_portfolios(
-    user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType, settings_row: UserSettings
+    user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType, settings_row: UserSettings, gen: str | None = None
 ) -> list[str]:
-    """추천이 유의미하게 달라진 타겟 포트폴리오의 이름 목록을 반환한다."""
+    """추천이 유의미하게 달라진 타겟 포트폴리오의 이름 목록을 반환한다.
+
+    `gen`은 `settings_row`를 읽기 전에 잡은 추천 캐시 세대(plans/88) — 없으면 계산 시점 세대를 쓴다."""
     portfolios = await get_linked_portfolios(db, user_id)
     if not portfolios:
         return []
@@ -108,7 +111,7 @@ async def _find_drifted_portfolios(
 
     # 전체(overall) 경로 — /rebalancing?rtab=포트폴리오의 "전체" 탭과 동일한 입력 구성
     base_krw, existing_items = await build_overall_recommendation_inputs(user_id, db, cache)
-    overall_rec = await get_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
+    overall_rec = await get_goal_recommendation(cache, base_krw, existing_items, settings_row, db, gen=gen)
     if overall_rec.recommended_items:
         overall_target = next((p for p in portfolios if _is_full_target(p, stock_accounts)), None)
         if overall_target is not None:
@@ -123,7 +126,7 @@ async def _find_drifted_portfolios(
     # 기간별 경로 — 명시적으로 investment_horizon+tax_type이 지정된 포트폴리오만 대상(계좌 태그
     # 추론 폴백은 생략). 현금성 자산(CMA·파킹통장) 합성 후보만 있는 추천은 실제 매수 대상이 아니라
     # 화면에서도 "적용" 버튼이 숨겨지므로 여기서도 건너뛴다.
-    horizon_resp = await get_horizon_recommendations(cache, db, user_id, settings_row)
+    horizon_resp = await get_horizon_recommendations(cache, db, user_id, settings_row, gen=gen)
     for rec in horizon_resp.recommendations:
         if not rec.recommended_items or rec.includes_cash_equivalent:
             continue
@@ -156,7 +159,11 @@ async def _send_alert_to_user(user: User, user_settings: UserSettings, sem: asyn
                     return
 
                 cache = await get_cache_store()
-                drifted_names = await _find_drifted_portfolios(user.id, db, cache, user_settings)
+                # 구독자 목록의 설정은 잡 시작 시점 값이라 세마포어 대기 중 저장된 설정을 놓친다 — 세대를 먼저
+                # 잡고 설정을 다시 읽어야 옛 설정 결과가 새 세대 캐시에 들어가지 않는다(plans/88·90 A3)
+                gen = await get_goal_recommendation_generation(cache, user.id)
+                settings_row = await get_settings_row(db, user.id) or user_settings
+                drifted_names = await _find_drifted_portfolios(user.id, db, cache, settings_row, gen)
                 if not drifted_names:
                     return
 

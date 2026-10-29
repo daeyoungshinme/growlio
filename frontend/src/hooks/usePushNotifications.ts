@@ -72,6 +72,7 @@ export function resolvePushDeepLink(
         : rebalancingUrl({ tab: "포트폴리오" });
     }
     case "MARKET_SIGNAL":
+    case "MARKET_SIGNAL_DIGEST":
       return rebalancingUrl({ tab: "진단" });
     case "GOAL_ASSET":
     case "GOAL_DEPOSIT":
@@ -80,6 +81,12 @@ export function resolvePushDeepLink(
       return `/invest-plan?tab=${encodeURIComponent("배당 계획")}`;
     case "DCA_CASH_SHORTFALL":
       return `/invest-plan?tab=${encodeURIComponent("적립 계획")}`;
+    // 예전엔 매핑이 없어 눌러도 첫 화면에 머물렀다(plans/90 B5)
+    case "CHALLENGE_REMINDER":
+    case "CHALLENGE_WRAPUP":
+      return `/invest-plan?tab=${encodeURIComponent("챌린지")}`;
+    case "YEAR_END_TAX_REMINDER":
+      return `/invest-plan?tab=${encodeURIComponent("절세")}`;
     case "RECOMMENDATION_DRIFT":
       return rebalancingUrl({ tab: "목표 조정", mode: "추천" });
     // 전술 국면 변경 — 백엔드 push_type이 소문자(tactical_regime_check.py)라 그대로 매핑

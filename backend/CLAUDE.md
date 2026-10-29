@@ -137,7 +137,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
   - `plan_notifications.py` — 플랜 알림 (차단 안내는 하루 1회 durable dedup)
 - `quick_execute_service.py` — "지금 계획 생성". 상태 enum만 반환, 문구는 라우터가 조립. 계좌 소유권 검증은 콜백 주입(**서비스→API 계층 import 금지**)
 - `execution_service.py` — 주문 조율. 실제 주문은 `_kis_order_executor.py`/`_kiwoom_order_executor.py`(FULL 매수는 실행 직전 가용현금으로 예산 clamp), 공용 `_order_executor_common.py`, `_order_quantity_guard.py`(매도→보유수량, 매수→예산)
-- `order_cancel_service.py` — 실행 주문의 미체결분 취소(체결 조회 없이 요청, 증권사 거부=CANCEL_FAILED). **KIS 국내 취소는 주문 응답의 `KRX_FWDG_ORD_ORGNO`(`order_org_no`) 저장이 필수** — 없으면 취소 불가. 증권사 거부는 `BrokerOrderRejectedError`가 아니라 클라이언트의 `KisApiError`/`KiwoomApiError`로 먼저 온다
+- `order_cancel_service.py` — 실행 주문의 미체결분 취소(체결 조회 없이 요청, 증권사 거부=CANCEL_FAILED). **KIS 국내 취소는 주문 응답의 `KRX_FWDG_ORD_ORGNO`(`order_org_no`) 저장이 필수** — 없으면 취소 불가. 증권사 거부는 `BrokerOrderRejectedError`가 아니라 클라이언트의 `KisApiError`/`KiwoomApiError`로 먼저 온다. 취소 가능 판정(`cancel_block_reason`·활성 계좌 유형)은 `order_cancel_rules.py` — 실행 직후 결과·이력 상세·취소 요청이 같은 규칙을 쓴다. **토큰 발급은 DB commit을 하므로 주문 행 `FOR UPDATE` 전에** 받고 잠근 뒤 재확인
 - `krx_tick.py` — 국내 지정가 호가단위 보정(ETF·ETN 5원, 매수 내림·매도 올림)
 - `alert_check.py` — 드리프트 알림(10분 job). 복합신호 on/off는 **유저 단위**
 - `drift_summary_service.py` — 이탈 요약(drift-summary·action-items 공유, 같은 세션이라 순차)
