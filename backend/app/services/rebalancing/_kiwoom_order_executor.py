@@ -9,8 +9,12 @@ from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balan
 from app.kiwoom.balance import get_overseas_balance as kiwoom_get_overseas_balance
 from app.kiwoom.order import place_domestic_order, place_overseas_order
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
+from app.services.rebalancing._broker_order_flow import (
+    BrokerOrderOps,
+    execute_buys_with_cash_check,
+    execute_sells_with_clamp,
+)
 from app.services.rebalancing._order_executor_common import execute_single_order
-from app.services.rebalancing._order_quantity_guard import clamp_buy_orders_to_budget, clamp_sell_orders
 from app.services.rebalancing.krx_tick import domestic_limit_price
 
 logger = structlog.get_logger()
@@ -58,61 +62,34 @@ async def _execute_kiwoom_single_order(
     return await execute_single_order(order, _place, is_mock, log_prefix="kiwoom_order")
 
 
+def _kiwoom_ops(access_token: str, account_no: str, is_mock: bool) -> BrokerOrderOps:
+    async def _budget() -> float:
+        # kt00001의 orderable_krw(100stk_ord_alow_amt = 미수 없는 현금 매수여력)는 KIS `get_orderable_cash()`의
+        # nrcvb_buy_amt와 대칭이며 매도예정금(D+2)을 포함한다. 없으면 deposit_krw(D+2 추정예수금)로 폴백한다.
+        balance = await kiwoom_get_domestic_balance(access_token, account_no, is_mock=is_mock)
+        return float(balance.get("orderable_krw") or balance.get("deposit_krw") or 0.0)
+
+    return BrokerOrderOps(
+        place=lambda order: _execute_kiwoom_single_order(order, access_token, account_no, is_mock),
+        domestic_balance=lambda: kiwoom_get_domestic_balance(access_token, account_no, is_mock=is_mock),
+        overseas_balance=lambda: kiwoom_get_overseas_balance(access_token, account_no, is_mock=is_mock),
+        domestic_buy_budget=_budget,
+        # 키움 해외잔고는 거래소를 주지 않아 market이 "US" 센티널이고(kiwoom/balance.py), 주문은 NYSE/NASDAQ/AMEX다 —
+        # market까지 키에 넣으면 전부 보유 0으로 오판한다. 해외 매도만 비교하므로 ticker 단독 키로 충분하다.
+        overseas_position_key=lambda p: p["ticker"],
+        overseas_order_key=lambda o: o.ticker,
+        log_prefix="kiwoom_",
+    )
+
+
 async def _execute_kiwoom_sells_with_clamp(
     sells: list[ExecutionOrderItem],
     access_token: str,
     account_no: str,
     is_mock: bool,
 ) -> list[OrderResult]:
-    """키움 매도 주문을 실행 계좌의 실제 보유수량으로 clamp한 뒤 실행한다.
-
-    포트폴리오 합산 기준으로 계산된 매도 수량이 실행 계좌의 실제 보유수량을 초과하면
-    주문이 거부되므로, 실행 직전 실시간 잔고를 조회해 수량을 조정한다.
-    잔고 조회 자체가 실패하면 clamp 없이 원래 수량으로 주문을 시도한다(기존 동작 유지).
-    국내/해외 매도는 잔고 조회 API가 분리되어 있어 각각 clamp한다(KIS 실행기와 동일 패턴).
-    """
-    if not sells:
-        return []
-
-    domestic_sells = [o for o in sells if not is_overseas_market(o.market)]
-    overseas_sells = [o for o in sells if is_overseas_market(o.market)]
-
-    results: list[OrderResult] = []
-
-    if domestic_sells:
-        try:
-            balance = await kiwoom_get_domestic_balance(access_token, account_no, is_mock=is_mock)
-            held: dict[str, int] = {}
-            for p in balance.get("positions", []):
-                held[p["ticker"]] = held.get(p["ticker"], 0) + int(p.get("qty", 0))
-            adjusted, skipped = clamp_sell_orders(domestic_sells, held)
-        except Exception as exc:
-            logger.warning("kiwoom_sell_clamp_domestic_balance_failed", error=str(exc))
-            adjusted, skipped = domestic_sells, []
-
-        results.extend(skipped)
-        for order in adjusted:
-            results.append(await _execute_kiwoom_single_order(order, access_token, account_no, is_mock))
-
-    if overseas_sells:
-        try:
-            balance = await kiwoom_get_overseas_balance(access_token, account_no, is_mock=is_mock)
-            # 키움 해외잔고는 거래소를 주지 않아 market이 "US" 센티널이고(kiwoom/balance.py),
-            # 주문은 NYSE/NASDAQ/AMEX다 — market까지 키에 넣으면 전부 보유 0으로 오판한다.
-            # overseas_sells는 이미 해외만 걸렀으므로 ticker 단독 키로 비교한다.
-            held_overseas: dict[str, int] = {}
-            for p in balance.get("positions", []):
-                held_overseas[p["ticker"]] = held_overseas.get(p["ticker"], 0) + int(p.get("qty", 0))
-            adjusted_o, skipped_o = clamp_sell_orders(overseas_sells, held_overseas)
-        except Exception as exc:
-            logger.warning("kiwoom_sell_clamp_overseas_balance_failed", error=str(exc))
-            adjusted_o, skipped_o = overseas_sells, []
-
-        results.extend(skipped_o)
-        for order in adjusted_o:
-            results.append(await _execute_kiwoom_single_order(order, access_token, account_no, is_mock))
-
-    return results
+    """키움 매도 주문을 실행 계좌의 실제 보유수량으로 clamp한 뒤 실행한다(`execute_sells_with_clamp`)."""
+    return await execute_sells_with_clamp(_kiwoom_ops(access_token, account_no, is_mock), sells)
 
 
 async def _execute_kiwoom_buys_with_cash_check(
@@ -121,34 +98,5 @@ async def _execute_kiwoom_buys_with_cash_check(
     account_no: str,
     is_mock: bool,
 ) -> list[OrderResult]:
-    """키움 FULL 전략 매수 실행 — 매도 완료 후 실제 예수금을 재조회해 예산 내로 clamp한다.
-
-    KIS 실행기의 `_execute_buys_with_cash_check`와 동일한 목적(매도 leg가 예상보다 적게
-    체결되거나 실패해도 매수가 실제 가용 현금을 초과하지 않도록)의 대응 함수. 예산으로는
-    `get_domestic_balance()`가 kt00001에서 함께 반환하는 `orderable_krw`
-    (100stk_ord_alow_amt = 미수 없는 현금 매수여력)를 쓴다 — KIS `get_orderable_cash()`의
-    `nrcvb_buy_amt`와 대칭이며 매도예정금(D+2)을 포함한다. 조회 실패 시 `deposit_krw`(D+2
-    추정예수금)로 폴백한다.
-
-    해외 주식 포함 시 국내 예수금으로 clamp하는 것이 의미가 없어(통화·계좌가 다름) 원래 수량
-    그대로 실행한다. 예수금 조회 자체가 실패해도 마찬가지로 clamp 없이 원래 수량으로 시도한다
-    (기존 동작 유지).
-    """
-    if not buys:
-        return []
-
-    if any(is_overseas_market(o.market) for o in buys):
-        return [await _execute_kiwoom_single_order(order, access_token, account_no, is_mock) for order in buys]
-
-    try:
-        balance = await kiwoom_get_domestic_balance(access_token, account_no, is_mock=is_mock)
-        budget_krw = float(balance.get("orderable_krw") or balance.get("deposit_krw") or 0.0)
-    except Exception as exc:
-        logger.warning("kiwoom_full_strategy_deposit_lookup_failed", error=str(exc))
-        return [await _execute_kiwoom_single_order(order, access_token, account_no, is_mock) for order in buys]
-
-    adjusted, skipped = clamp_buy_orders_to_budget(buys, budget_krw)
-    results: list[OrderResult] = list(skipped)
-    for order in adjusted:
-        results.append(await _execute_kiwoom_single_order(order, access_token, account_no, is_mock))
-    return results
+    """키움 FULL 전략 매수 — 현금 매수여력으로 clamp한다(`execute_buys_with_cash_check`)."""
+    return await execute_buys_with_cash_check(_kiwoom_ops(access_token, account_no, is_mock), buys)
