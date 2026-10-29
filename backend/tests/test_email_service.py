@@ -30,7 +30,7 @@ async def test_send_html_email_calls_resend_api(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import _send_html_email
+        from app.services.notifications.email_service import _send_html_email
 
         await _send_html_email("user@example.com", "테스트 제목", "<p>본문</p>")
 
@@ -51,7 +51,7 @@ async def test_send_exchange_rate_alert_email_not_configured(monkeypatch):
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        from app.services.email_service import send_exchange_rate_alert
+        from app.services.notifications.email_service import send_exchange_rate_alert
 
         await send_exchange_rate_alert(
             to_email="user@example.com",
@@ -75,7 +75,7 @@ async def test_send_exchange_rate_alert_success(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_exchange_rate_alert
+        from app.services.notifications.email_service import send_exchange_rate_alert
 
         await send_exchange_rate_alert(
             to_email="user@example.com",
@@ -101,7 +101,7 @@ async def test_send_exchange_rate_alert_above_direction(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_exchange_rate_alert
+        from app.services.notifications.email_service import send_exchange_rate_alert
 
         await send_exchange_rate_alert(
             to_email="user@example.com",
@@ -122,7 +122,7 @@ async def test_send_stock_price_alert_email_not_configured(monkeypatch):
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        from app.services.email_service import send_stock_price_alert
+        from app.services.notifications.email_service import send_stock_price_alert
 
         await send_stock_price_alert(
             to_email="user@example.com",
@@ -148,7 +148,7 @@ async def test_send_stock_price_alert_includes_ticker(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_stock_price_alert
+        from app.services.notifications.email_service import send_stock_price_alert
 
         await send_stock_price_alert(
             to_email="user@example.com",
@@ -172,7 +172,7 @@ async def test_send_monthly_report_email_not_configured(monkeypatch):
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        from app.services.email_service import send_monthly_report_email
+        from app.services.notifications.email_service import send_monthly_report_email
 
         await send_monthly_report_email(
             to_email="user@example.com",
@@ -206,7 +206,7 @@ async def test_send_monthly_report_email_includes_month(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_monthly_report_email
+        from app.services.notifications.email_service import send_monthly_report_email
 
         await send_monthly_report_email(
             to_email="user@example.com",
@@ -250,7 +250,7 @@ async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_monthly_report_email
+        from app.services.notifications.email_service import send_monthly_report_email
 
         await send_monthly_report_email(
             to_email="user@example.com",
@@ -292,7 +292,7 @@ async def test_send_goal_achievement_email_asset_type(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_goal_achievement_email
+        from app.services.notifications.email_service import send_goal_achievement_email
 
         await send_goal_achievement_email(
             to_email="user@example.com",
@@ -318,7 +318,7 @@ async def test_send_goal_achievement_email_deposit_type(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_goal_achievement_email
+        from app.services.notifications.email_service import send_goal_achievement_email
 
         await send_goal_achievement_email(
             to_email="user@example.com",
@@ -344,7 +344,7 @@ async def test_send_goal_achievement_email_dividend_type(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_goal_achievement_email
+        from app.services.notifications.email_service import send_goal_achievement_email
 
         await send_goal_achievement_email(
             to_email="user@example.com",
@@ -365,7 +365,7 @@ async def test_send_test_email_raises_when_not_configured(monkeypatch):
     """이메일 미설정 시 send_test_email은 RuntimeError를 발생시킨다."""
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
-    from app.services.email_service import send_test_email
+    from app.services.notifications.email_service import send_test_email
 
     with pytest.raises(RuntimeError, match="email_not_configured"):
         await send_test_email("user@example.com")
@@ -379,7 +379,7 @@ async def test_send_test_email_success(monkeypatch):
 
     mock_post = AsyncMock(return_value=_ok_response("https://api.resend.com/emails"))
     with patch("httpx.AsyncClient.post", new=mock_post):
-        from app.services.email_service import send_test_email
+        from app.services.notifications.email_service import send_test_email
 
         await send_test_email("user@example.com")
         mock_post.assert_called_once()
@@ -394,7 +394,7 @@ async def test_send_rebalancing_alert_email_not_configured(monkeypatch):
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        from app.services.email_service import send_rebalancing_alert
+        from app.services.notifications.email_service import send_rebalancing_alert
 
         await send_rebalancing_alert(
             to_email="user@example.com",
@@ -432,7 +432,7 @@ async def test_send_rebalancing_alert_scheduled_report(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_rebalancing_alert
+        from app.services.notifications.email_service import send_rebalancing_alert
 
         await send_rebalancing_alert(
             to_email="user@example.com",
@@ -462,7 +462,7 @@ async def test_send_rebalancing_alert_includes_app_cta_link(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_rebalancing_alert
+        from app.services.notifications.email_service import send_rebalancing_alert
 
         await send_rebalancing_alert(
             to_email="user@example.com",
@@ -481,7 +481,7 @@ def test_rebalancing_link_targets_match_frontend_tabs(monkeypatch):
     해당 모드(plans/64 S1). 탭 이름은 frontend utils/rebalancingUrl.ts와 같아야 한다."""
     from urllib.parse import parse_qs, urlparse
 
-    from app.services.email_service import _rebalancing_link
+    from app.services.notifications.email_service import _rebalancing_link
 
     monkeypatch.setattr("app.core.config.settings.frontend_url", "https://growlio.app")
 
@@ -518,7 +518,7 @@ async def test_send_rebalancing_alert_drift_branch(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_rebalancing_alert
+        from app.services.notifications.email_service import send_rebalancing_alert
 
         await send_rebalancing_alert(
             to_email="user@example.com",
@@ -545,7 +545,7 @@ async def test_send_monthly_report_with_all_values(monkeypatch):
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_monthly_report_email
+        from app.services.notifications.email_service import send_monthly_report_email
 
         await send_monthly_report_email(
             to_email="user@example.com",
@@ -576,7 +576,7 @@ async def test_send_exchange_rate_alert_exception_returns_false(monkeypatch):
     """_send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
-    import app.services.email_service as em
+    import app.services.notifications.email_service as em
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_exchange_rate_alert(
@@ -594,7 +594,7 @@ async def test_send_rebalancing_alert_exception_returns_false(monkeypatch):
     """_send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
-    import app.services.email_service as em
+    import app.services.notifications.email_service as em
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_rebalancing_alert(
@@ -613,7 +613,7 @@ async def test_send_monthly_report_exception_returns_false(monkeypatch):
     """월간 리포트 이메일 발송 실패 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
-    import app.services.email_service as em
+    import app.services.notifications.email_service as em
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_monthly_report_email(
@@ -640,7 +640,7 @@ async def test_send_stock_price_alert_exception_returns_false(monkeypatch):
     """send_stock_price_alert _send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
-    import app.services.email_service as em
+    import app.services.notifications.email_service as em
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_stock_price_alert(
@@ -660,7 +660,7 @@ async def test_send_goal_achievement_exception_returns_false(monkeypatch):
     """send_goal_achievement_email 예외 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
-    import app.services.email_service as em
+    import app.services.notifications.email_service as em
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_goal_achievement_email(
@@ -679,7 +679,7 @@ async def test_send_test_email_exception_returns_false(monkeypatch):
     """send_test_email은 이메일 설정이 되어 있는데 발송 자체가 실패하면 False를 반환한다."""
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
-    import app.services.email_service as em
+    import app.services.notifications.email_service as em
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_test_email("user@example.com")
@@ -714,7 +714,7 @@ async def test_send_rebalancing_plan_pending_email_sell_only_no_buy_token(monkey
         return _ok_response(url)
 
     with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_rebalancing_plan_pending_email
+        from app.services.notifications.email_service import send_rebalancing_plan_pending_email
 
         result = await send_rebalancing_plan_pending_email(
             to_email="user@example.com",

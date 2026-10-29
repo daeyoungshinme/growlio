@@ -28,7 +28,7 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
     비롯해 앱 전역에서 "현재 환율"로 참조하는 유일한 소스이므로, cache=None으로 호출하면
     이 job이 5분마다 실시간 값을 가져오고도 캐시에 저장하지 않아 fallback 값으로 굳어진다.
     """
-    from app.services.email_service import send_exchange_rate_alert
+    from app.services.notifications.email_service import send_exchange_rate_alert
 
     current_rate = await fetch_usd_krw(cache, force_refresh=True)
     if current_rate <= 0:

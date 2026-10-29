@@ -543,7 +543,7 @@ async def send_test_email_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """알림 이메일 설정 확인용 테스트 이메일 발송."""
-    from app.services.email_service import send_test_email
+    from app.services.notifications.email_service import send_test_email
 
     row = await get_settings_row(db, current_user.id)
     to_email = (row.notification_email if row else None) or current_user.email

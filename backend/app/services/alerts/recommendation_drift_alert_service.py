@@ -150,7 +150,7 @@ async def _find_drifted_portfolios(
 async def _send_alert_to_user(user: User, user_settings: UserSettings, to_email: str) -> None:
     from app.core.cache_store import get_cache_store
     from app.services.alerts._dispatch import dispatch_dual_channel_alert
-    from app.services.email_service import send_recommendation_drift_alert_email
+    from app.services.notifications.email_service import send_recommendation_drift_alert_email
 
     async with AsyncSessionLocal() as db:
         if await _already_sent_this_week(db, user.id):

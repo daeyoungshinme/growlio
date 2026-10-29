@@ -27,7 +27,7 @@ from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.dca_cash_shortfall_service import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls
-from app.services.email_service import send_dca_cash_shortfall_email
+from app.services.notifications.email_service import send_dca_cash_shortfall_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
 from app.utils.kst import KST

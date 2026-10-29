@@ -61,7 +61,7 @@ class TestBuildReminderContent:
 
 class TestReminderTemplate:
     def test_renders_actions_escaped_with_benefit_and_deadline(self):
-        from app.services.email_templates import year_end_tax_reminder_template
+        from app.services.notifications.email_templates import year_end_tax_reminder_template
 
         action = _action("x", 99_000.0)
         action["title"] = "<b>ISA</b> 이전"
@@ -112,7 +112,9 @@ class TestSendYearEndTaxReminder:
         execute_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        with patch("app.services.email_service.send_year_end_tax_reminder_email", new=AsyncMock()) as mock_email:
+        with patch(
+            "app.services.notifications.email_service.send_year_end_tax_reminder_email", new=AsyncMock()
+        ) as mock_email:
             await send_year_end_tax_reminder(mock_db)
 
         mock_email.assert_not_called()
@@ -143,7 +145,9 @@ class TestSendYearEndTaxReminder:
                 "app.services.alerts.tax_reminder_service.build_reminder_content",
                 new=AsyncMock(return_value={"has_content": False}),
             ),
-            patch("app.services.email_service.send_year_end_tax_reminder_email", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_year_end_tax_reminder_email", new=AsyncMock()
+            ) as mock_email,
         ):
             await send_year_end_tax_reminder(mock_db)
 
@@ -183,11 +187,11 @@ class TestSendYearEndTaxReminder:
                 new=AsyncMock(return_value=content),
             ),
             patch(
-                "app.services.email_service.send_year_end_tax_reminder_email",
+                "app.services.notifications.email_service.send_year_end_tax_reminder_email",
                 new=AsyncMock(return_value=True),
             ) as mock_email,
             patch(
-                "app.services.push_service.send_push_to_user",
+                "app.services.notifications.push_service.send_push_to_user",
                 new=AsyncMock(return_value=True),
             ) as mock_push,
         ):
@@ -222,7 +226,9 @@ class TestSendYearEndTaxReminder:
                 "app.services.alerts.tax_reminder_service.AsyncSessionLocal",
                 return_value=per_user_session,
             ),
-            patch("app.services.email_service.send_year_end_tax_reminder_email", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_year_end_tax_reminder_email", new=AsyncMock()
+            ) as mock_email,
         ):
             await send_year_end_tax_reminder(mock_db)
 
@@ -260,7 +266,8 @@ class TestSendYearEndTaxReminder:
             patch("app.services.alerts.tax_reminder_service.AsyncSessionLocal", side_effect=session_factory),
             patch("app.services.alerts.tax_reminder_service.build_reminder_content", new=build),
             patch(
-                "app.services.email_service.send_year_end_tax_reminder_email", new=AsyncMock(return_value=True)
+                "app.services.notifications.email_service.send_year_end_tax_reminder_email",
+                new=AsyncMock(return_value=True),
             ) as mock_email,
             patch("app.core.job_runner.report_job_failure") as mock_report,
         ):

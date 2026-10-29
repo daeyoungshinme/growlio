@@ -359,8 +359,8 @@ class TestNotifyPlanGenerated:
 
         mock_email = AsyncMock(return_value=True)
         with (
-            patch("app.services.email_service.send_rebalancing_plan_pending_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_rebalancing_plan_pending_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
@@ -382,8 +382,8 @@ class TestNotifyPlanGenerated:
 
         mock_email = AsyncMock()
         with (
-            patch("app.services.email_service.send_rebalancing_plan_pending_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_rebalancing_plan_pending_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
@@ -404,8 +404,8 @@ class TestNotifyPlanGenerated:
 
         mock_email = AsyncMock()
         with (
-            patch("app.services.email_service.send_rebalancing_plan_pending_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_rebalancing_plan_pending_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
@@ -428,8 +428,8 @@ class TestNotifyTaxGateBlocked:
 
         mock_email = AsyncMock(return_value=True)
         with (
-            patch("app.services.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
             patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value=None)),
             patch("app.utils.durable_state.set_durable", new=AsyncMock()) as mock_set_durable,
@@ -448,7 +448,7 @@ class TestNotifyTaxGateBlocked:
 
         mock_email = AsyncMock()
         with (
-            patch("app.services.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
+            patch("app.services.notifications.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
             patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value="1")),
         ):
             await svc.notify_tax_gate_blocked(alert, portfolio, blocked, "user@test.com", "fcm-token", mock_db)
@@ -467,8 +467,8 @@ class TestNotifyDailyValueCapBlocked:
 
         mock_email = AsyncMock(return_value=True)
         with (
-            patch("app.services.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
-            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
+            patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_notifications.save_alert_history", new=AsyncMock()),
             patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value=None)),
             patch("app.utils.durable_state.set_durable", new=AsyncMock()) as mock_set_durable,
@@ -489,7 +489,7 @@ class TestNotifyDailyValueCapBlocked:
 
         mock_email = AsyncMock()
         with (
-            patch("app.services.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
+            patch("app.services.notifications.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
             patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value="1")),
         ):
             await svc.notify_daily_value_cap_blocked(alert, portfolio, blocked, "user@test.com", "fcm-token", mock_db)

@@ -78,7 +78,7 @@ async def _already_sent_reminder_today(db: AsyncSession, user_id: uuid.UUID) -> 
 
 async def _send_reminder_to_user(user: User, user_settings: UserSettings, to_email: str) -> None:
     from app.services.alerts._dispatch import dispatch_dual_channel_alert
-    from app.services.email_service import send_year_end_tax_reminder_email
+    from app.services.notifications.email_service import send_year_end_tax_reminder_email
 
     async with AsyncSessionLocal() as db:
         if await _already_sent_reminder_today(db, user.id):

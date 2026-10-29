@@ -81,8 +81,8 @@ class TestCheckAndTriggerStockPriceAlerts:
                 new_callable=AsyncMock,
                 return_value={"005930": 58000.0},
             ),
-            patch("app.services.email_service.send_stock_price_alert", new_callable=AsyncMock),
-            patch("app.services.push_service.send_push_to_user", new_callable=AsyncMock),
+            patch("app.services.notifications.email_service.send_stock_price_alert", new_callable=AsyncMock),
+            patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock),
             patch("app.services.alerts.alert_service.save_alert_history", new_callable=AsyncMock),
         ):
             from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
@@ -105,8 +105,8 @@ class TestCheckAndTriggerStockPriceAlerts:
                 new_callable=AsyncMock,
                 return_value={"AAPL": 205.0},
             ),
-            patch("app.services.email_service.send_stock_price_alert", new_callable=AsyncMock),
-            patch("app.services.push_service.send_push_to_user", new_callable=AsyncMock),
+            patch("app.services.notifications.email_service.send_stock_price_alert", new_callable=AsyncMock),
+            patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock),
             patch("app.services.alerts.alert_service.save_alert_history", new_callable=AsyncMock),
         ):
             from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
@@ -127,8 +127,8 @@ class TestCheckAndTriggerStockPriceAlerts:
                 new_callable=AsyncMock,
                 return_value={"005930": 55000.0},
             ),
-            patch("app.services.email_service.send_stock_price_alert", new_callable=AsyncMock),
-            patch("app.services.push_service.send_push_to_user", new_callable=AsyncMock),
+            patch("app.services.notifications.email_service.send_stock_price_alert", new_callable=AsyncMock),
+            patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock),
             patch("app.services.alerts.alert_service.save_alert_history", new_callable=AsyncMock),
         ):
             from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
@@ -169,7 +169,7 @@ class TestCheckAndTriggerStockPriceAlerts:
                 return_value={"005930": 55000.0},
             ),
             patch(
-                "app.services.email_service.send_stock_price_alert",
+                "app.services.notifications.email_service.send_stock_price_alert",
                 new_callable=AsyncMock,
                 return_value=False,
             ),

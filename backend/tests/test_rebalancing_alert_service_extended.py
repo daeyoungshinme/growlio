@@ -39,7 +39,7 @@ async def test_check_rebalancing_alerts_skips_when_should_not_fire_today(mock_db
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "STALE"}),
@@ -79,7 +79,7 @@ async def test_check_rebalancing_alerts_skips_when_already_fired_today(mock_db):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "STALE"}),
@@ -124,7 +124,7 @@ async def test_check_rebalancing_alerts_analysis_failure_continues(mock_db):
             "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
         ),
         patch("app.services.rebalancing.service.analyze_rebalancing", side_effect=ValueError("분석 오류")),
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "STALE"}),

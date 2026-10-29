@@ -74,7 +74,7 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
             "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
         ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
@@ -129,7 +129,7 @@ async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
             "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
         ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
@@ -173,7 +173,7 @@ async def test_check_rebalancing_alerts_overview_failure_continues(mock_db):
             "app.services.portfolio.portfolio_service.build_portfolio_overview",
             new=AsyncMock(side_effect=Exception("DB Error")),
         ),
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
@@ -229,7 +229,7 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
             "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
         ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
@@ -342,7 +342,9 @@ class TestCheckRebalancingAlertsCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)
+            ) as mock_email,
             patch(
                 "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
                 new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
@@ -385,7 +387,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+            patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
             patch(
                 "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
                 new=AsyncMock(return_value=("GREEN", {"data_available": False})),
@@ -426,7 +428,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)),
+            patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.alert_check.fetch_composite_signal", new=AsyncMock()) as mock_fetch,
             patch(
                 "app.services.market_signal.market_signal_service.get_market_signal",
@@ -461,7 +463,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+            patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
             patch(
                 "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
                 new=AsyncMock(side_effect=RuntimeError("boom")),
@@ -519,7 +521,9 @@ class TestCheckRebalancingAlertsCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)
+            ) as mock_email,
             patch(
                 "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
                 new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
@@ -581,7 +585,9 @@ class TestCheckRebalancingAlertsCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)
+            ) as mock_email,
             patch("app.services.rebalancing.alert_check.get_durable", new=AsyncMock(return_value="1")),
             patch(
                 "app.services.market_signal.market_signal_service.get_market_signal",
@@ -620,7 +626,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+            patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
             patch("app.services.rebalancing.alert_check.fetch_composite_signal", new=AsyncMock()) as mock_fetch,
             patch(
                 "app.services.market_signal.market_signal_service.get_market_signal",
@@ -656,7 +662,9 @@ class TestCheckRebalancingAlertsCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)
+            ) as mock_email,
             patch(
                 "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
                 new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
@@ -719,7 +727,9 @@ class TestAutoModeUnaffectedByCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)
+            ) as mock_email,
             patch("app.services.rebalancing.alert_check.fetch_composite_signal", new=AsyncMock()) as mock_fetch,
             patch(
                 "app.services.market_signal.market_signal_service.get_market_signal",
@@ -778,7 +788,9 @@ class TestAutoModeUnaffectedByCompositeTrigger:
                 new=AsyncMock(return_value=overview),
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)
+            ) as mock_email,
             patch(
                 "app.services.market_signal.market_signal_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "RED", "data_freshness": "LIVE"}),
@@ -854,7 +866,7 @@ async def test_check_rebalancing_alerts_both_on_schedule_day_sends_full_report(m
             "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
         ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
@@ -904,7 +916,7 @@ async def test_check_rebalancing_alerts_both_non_schedule_with_drift(mock_db):
             "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
         ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
@@ -953,7 +965,7 @@ async def test_check_rebalancing_alerts_both_non_schedule_no_drift_skips(mock_db
             "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
         ),
         patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
         patch(
             "app.services.market_signal.market_signal_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
@@ -998,11 +1010,11 @@ async def test_process_rebalancing_alert_smtp_not_configured_fcm_succeeds(mock_d
 
     with (
         patch(
-            "app.services.email_service.send_rebalancing_alert",
+            "app.services.notifications.email_service.send_rebalancing_alert",
             new=AsyncMock(return_value=False),
         ),
         patch(
-            "app.services.push_service.send_push_to_user",
+            "app.services.notifications.push_service.send_push_to_user",
             new=AsyncMock(return_value=True),
         ),
     ):
@@ -1032,11 +1044,11 @@ async def test_process_rebalancing_alert_email_fails_fcm_still_runs(mock_db):
 
     with (
         patch(
-            "app.services.email_service.send_rebalancing_alert",
+            "app.services.notifications.email_service.send_rebalancing_alert",
             new=AsyncMock(side_effect=Exception("SMTP 연결 오류")),
         ),
         patch(
-            "app.services.push_service.send_push_to_user",
+            "app.services.notifications.push_service.send_push_to_user",
             new=AsyncMock(return_value=True),
         ) as mock_push,
     ):
@@ -1068,11 +1080,11 @@ async def test_process_rebalancing_alert_both_channels_fail_returns_false(mock_d
 
     with (
         patch(
-            "app.services.email_service.send_rebalancing_alert",
+            "app.services.notifications.email_service.send_rebalancing_alert",
             new=AsyncMock(return_value=False),
         ),
         patch(
-            "app.services.push_service.send_push_to_user",
+            "app.services.notifications.push_service.send_push_to_user",
             new=AsyncMock(return_value=False),
         ),
     ):
@@ -1864,8 +1876,8 @@ async def test_process_rebalancing_alert_push_type_by_trigger(mock_db, drifting,
 
     push = AsyncMock(return_value=True)
     with (
-        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=False)),
-        patch("app.services.push_service.send_push_to_user", new=push),
+        patch("app.services.notifications.email_service.send_rebalancing_alert", new=AsyncMock(return_value=False)),
+        patch("app.services.notifications.push_service.send_push_to_user", new=push),
     ):
         await _process_rebalancing_alert(
             alert=alert,

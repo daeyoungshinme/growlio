@@ -18,7 +18,7 @@ from app.models.challenge import CHALLENGE_ACTIVE, CHALLENGE_DEPOSIT, Investment
 from app.models.user import User, UserSettings
 from app.services import challenge_service
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
-from app.services.email_service import send_challenge_reminder_email
+from app.services.notifications.email_service import send_challenge_reminder_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
 from app.utils.kst import KST as _KST

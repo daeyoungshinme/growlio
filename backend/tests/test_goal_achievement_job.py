@@ -142,7 +142,7 @@ class TestRunGoalAchievementCheck:
                 return_value=_MOCK_SUMMARY_ACHIEVED,
             ),
             patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock) as mock_email,
-            patch("app.services.push_service.send_push_to_user", new_callable=AsyncMock) as mock_push,
+            patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock) as mock_push,
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
 
@@ -194,7 +194,7 @@ class TestRunGoalAchievementCheck:
                 return_value=_MOCK_SUMMARY_ACHIEVED,
             ),
             patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock) as mock_email,
-            patch("app.services.push_service.send_push_to_user", new_callable=AsyncMock) as mock_push,
+            patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock) as mock_push,
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
 
@@ -245,7 +245,7 @@ class TestRunGoalAchievementCheck:
                 return_value=_MOCK_SUMMARY_ACHIEVED,
             ),
             patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock) as mock_email,
-            patch("app.services.push_service.send_push_to_user", new_callable=AsyncMock) as mock_push,
+            patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock) as mock_push,
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
 

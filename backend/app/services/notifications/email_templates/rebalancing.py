@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from app.services.email_templates._shared import _SIGNAL_LEVEL_COLOR, _SIGNAL_LEVEL_LABEL, _email_div, _kv_table
+from app.services.notifications.email_templates._shared import (
+    _SIGNAL_LEVEL_COLOR,
+    _SIGNAL_LEVEL_LABEL,
+    _email_div,
+    _kv_table,
+)
 from app.utils.kst import KST
 
 

@@ -20,8 +20,8 @@ logger = structlog.get_logger()
 
 async def check_and_trigger_stock_price_alerts(db: AsyncSession, cache) -> None:
     """활성 주가 알림을 조회하고 조건 충족 시 이메일/푸시 발송 후 비활성화."""
-    from app.services.email_service import send_stock_price_alert
     from app.services.market_data.price_service import fetch_prices_batch
+    from app.services.notifications.email_service import send_stock_price_alert
 
     result = await db.execute(
         select(

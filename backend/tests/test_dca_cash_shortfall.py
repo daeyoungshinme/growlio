@@ -161,7 +161,7 @@ def test_is_dca_auto_buy_matches_frontend_preset():
 
 
 def test_email_template_shows_shortfall_and_run_date():
-    from app.services.email_templates import dca_cash_shortfall_template
+    from app.services.notifications.email_templates import dca_cash_shortfall_template
 
     subject, html = dca_cash_shortfall_template(
         "성장 적립", "키움 연금", "11월 25일(수)", 300_000, 1_000_000, "11/23 18:00"

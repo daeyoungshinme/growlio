@@ -13,7 +13,7 @@ from app.core.job_runner import run_per_user
 from app.jobs._job_helpers import run_alert_job
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
-from app.services.email_service import send_monthly_report_email
+from app.services.notifications.email_service import send_monthly_report_email
 from app.services.portfolio.asset_aggregator import get_dashboard_summary
 from app.utils.cache_keys import TTL_MONTHLY_REPORT_SENT, CacheStoreType, monthly_report_sent_key
 from app.utils.durable_state import get_durable, set_durable

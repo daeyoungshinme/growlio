@@ -58,7 +58,7 @@ async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreTy
     (이전 관측값 없음)은 저장만 하고 발송하지 않는다 — 배포 직후 스팸 방지.
     """
     from app.services.alerts._dispatch import dispatch_dual_channel_alert
-    from app.services.email_service import send_market_signal_change_alert
+    from app.services.notifications.email_service import send_market_signal_change_alert
     from app.services.rebalancing.alert_check import _mark_composite_alert_sent_today
 
     old_level = await get_last_composite_level(db)
@@ -147,7 +147,7 @@ async def _send_digest_to_user(
     user: User, user_settings: UserSettings, to_email: str, *, level: str, reason: str
 ) -> None:
     from app.services.alerts._dispatch import dispatch_dual_channel_alert
-    from app.services.email_service import send_market_signal_daily_digest_alert
+    from app.services.notifications.email_service import send_market_signal_daily_digest_alert
 
     async with AsyncSessionLocal() as db:
         if await _already_sent_digest_today(db, user.id):

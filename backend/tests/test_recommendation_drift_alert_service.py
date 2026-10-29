@@ -275,7 +275,9 @@ class TestSendRecommendationDriftAlerts:
         execute_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        with patch("app.services.email_service.send_recommendation_drift_alert_email", new=AsyncMock()) as mock_email:
+        with patch(
+            "app.services.notifications.email_service.send_recommendation_drift_alert_email", new=AsyncMock()
+        ) as mock_email:
             await send_recommendation_drift_alerts(mock_db)
 
         mock_email.assert_not_called()
@@ -300,7 +302,9 @@ class TestSendRecommendationDriftAlerts:
             patch(f"{_MODULE}.AsyncSessionLocal", return_value=per_user_session),
             patch("app.core.cache_store.get_cache_store", AsyncMock(return_value=None)),
             patch(f"{_MODULE}._find_drifted_portfolios", AsyncMock(return_value=[])),
-            patch("app.services.email_service.send_recommendation_drift_alert_email", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_recommendation_drift_alert_email", new=AsyncMock()
+            ) as mock_email,
         ):
             await send_recommendation_drift_alerts(mock_db)
 
@@ -329,11 +333,11 @@ class TestSendRecommendationDriftAlerts:
             patch("app.core.cache_store.get_cache_store", AsyncMock(return_value=None)),
             patch(f"{_MODULE}._find_drifted_portfolios", AsyncMock(return_value=["내포트폴리오"])),
             patch(
-                "app.services.email_service.send_recommendation_drift_alert_email",
+                "app.services.notifications.email_service.send_recommendation_drift_alert_email",
                 new=AsyncMock(return_value=True),
             ) as mock_email,
             patch(
-                "app.services.push_service.send_push_to_user",
+                "app.services.notifications.push_service.send_push_to_user",
                 new=AsyncMock(return_value=True),
             ) as mock_push,
         ):
@@ -364,7 +368,9 @@ class TestSendRecommendationDriftAlerts:
 
         with (
             patch(f"{_MODULE}.AsyncSessionLocal", return_value=per_user_session),
-            patch("app.services.email_service.send_recommendation_drift_alert_email", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.notifications.email_service.send_recommendation_drift_alert_email", new=AsyncMock()
+            ) as mock_email,
         ):
             await send_recommendation_drift_alerts(mock_db)
 
@@ -449,7 +455,8 @@ async def test_one_user_failure_is_reported_and_others_still_sent(mock_db):
         patch(f"{_MODULE}.get_settings_row", AsyncMock(return_value=None)),
         patch(f"{_MODULE}._find_drifted_portfolios", new=find),
         patch(
-            "app.services.email_service.send_recommendation_drift_alert_email", new=AsyncMock(return_value=True)
+            "app.services.notifications.email_service.send_recommendation_drift_alert_email",
+            new=AsyncMock(return_value=True),
         ) as mock_email,
         patch("app.core.job_runner.report_job_failure") as mock_report,
     ):
