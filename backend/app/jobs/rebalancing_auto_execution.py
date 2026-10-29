@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import uuid
 
-import sentry_sdk
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
-from app.core.logging import redact_secrets
+from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
@@ -108,14 +107,7 @@ async def _run_auto_execution() -> None:
             except Exception as e:
                 # 알림 하나의 실패(내부 commit 실패·알림 발송 오류)가 같은 세션의 남은 알림 전부를
                 # PendingRollbackError로 막지 않게 격리한다 — alert_check와 같은 패턴(rollback 후 남은 row 재조회).
-                # 스택 지역변수를 보내는 capture_exception 대신 타입명만(AUTO 경로는 자격증명을 지역변수로 다룬다).
-                logger.error(
-                    "rebalancing_auto_item_failed",
-                    alert_id=str(alert_id),
-                    error=redact_secrets(str(e)),
-                    error_type=type(e).__name__,
-                )
-                sentry_sdk.capture_message(f"rebalancing_auto_item_failed: {type(e).__name__}", level="error")
+                report_handled_failure("rebalancing_auto_item_failed", e, alert_id=str(alert_id))
                 await db.rollback()
                 remaining_ids = alert_ids[index + 1 :]
                 rows = await _load_auto_alert_rows(db, remaining_ids) if remaining_ids else []

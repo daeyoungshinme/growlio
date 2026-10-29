@@ -88,3 +88,21 @@ async def test_run_per_user_isolates_failures_and_resolves_email():
     report.assert_called_once()
     assert report.call_args.args[0] == "x_failed"
     assert report.call_args.kwargs == {"user_id": "u2"}
+
+
+def test_report_handled_failure_logs_redacted_and_captures_type_only():
+    """스택 지역변수(자격증명)를 보내지 않게 capture_exception 대신 이벤트·타입명만 보낸다(계획 93 A)."""
+    from app.core.job_runner import report_handled_failure
+
+    with (
+        patch("app.core.job_runner.logger") as log,
+        patch("app.core.job_runner.sentry_sdk") as sentry,
+    ):
+        report_handled_failure("x_failed", ValueError("appsecret=abc123"), leg_id="L1")
+
+    sentry.capture_message.assert_called_once_with("x_failed: ValueError", level="error")
+    sentry.capture_exception.assert_not_called()
+    kwargs = log.error.call_args.kwargs
+    assert kwargs["error_type"] == "ValueError"
+    assert kwargs["leg_id"] == "L1"
+    assert "abc123" not in kwargs["error"]

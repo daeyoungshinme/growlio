@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan
@@ -74,7 +75,7 @@ async def notify_plan_generated(
             )
             email_sent = True
         except Exception as exc:
-            logger.error("rebalancing_plan_pending_email_failed", alert_id=str(alert.id), error=str(exc))
+            report_handled_failure("rebalancing_plan_pending_email_failed", exc, alert_id=str(alert.id))
 
     push_body = f"매수 {buy_count}건"
     if sell_count:
@@ -321,7 +322,7 @@ async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UU
                 total_skipped=exec_result.total_skipped,
             )
         except Exception as exc:
-            logger.error("rebalancing_plan_execution_email_failed", execution_id=str(execution_id), error=str(exc))
+            report_handled_failure("rebalancing_plan_execution_email_failed", exc, execution_id=str(execution_id))
 
     await send_push_safely(
         plan.user_id,
@@ -365,7 +366,7 @@ async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_m
         try:
             await send_rebalancing_plan_execution_failed_email(email, portfolio_name, side, error_message)
         except Exception as exc:
-            logger.error("rebalancing_plan_execution_failed_email_error", plan_id=str(plan.id), error=str(exc))
+            report_handled_failure("rebalancing_plan_execution_failed_email_error", exc, plan_id=str(plan.id))
 
     side_label = "매수" if side == "BUY" else "매도"
     await send_push_safely(

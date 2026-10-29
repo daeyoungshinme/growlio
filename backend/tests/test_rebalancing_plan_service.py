@@ -697,11 +697,14 @@ class TestApproveSellLeg:
             ),
             patch("app.services.rebalancing.plan_execution._notify_leg_execution_failed", new=mock_notify_failed),
             patch("app.services.rebalancing.plan_execution.save_alert_history", new=AsyncMock()),
+            patch("app.core.job_runner.sentry_sdk.capture_message") as capture,
         ):
             result = await svc.approve_sell_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_EMAIL")
 
         assert result is None
         assert locked_leg.status == "FAILED"
+        # 처리된 실패도 Sentry에 남긴다 — 스택 없이 이벤트·타입명만(계획 93 A)
+        capture.assert_called_once_with("rebalancing_plan_leg_execute_failed: RuntimeError", level="error")
         # 예상 밖 예외의 원문(SQL·URL이 섞일 수 있음)은 DB·알림에 남기지 않는다(계획 57 D1)
         assert locked_leg.error_message == "내부 오류가 발생했습니다(RuntimeError)"
         mock_notify_failed.assert_awaited_once_with(plan, "SELL", locked_leg.error_message, mock_db)
@@ -1352,12 +1355,16 @@ class TestPlanLegFailureIsolation:
         mock_db.execute = AsyncMock(return_value=due_result)
         mock_db.scalar = AsyncMock(side_effect=[RuntimeError("db connection lost"), good_leg])
 
-        with patch("app.utils.market_hours.is_korean_market_open", return_value=False):
+        with (
+            patch("app.utils.market_hours.is_korean_market_open", return_value=False),
+            patch("app.core.job_runner.sentry_sdk.capture_message") as capture,
+        ):
             count = await svc.execute_due_buy_legs(mock_db, MagicMock())
 
         assert count == 1
         assert good_leg.status == "EXPIRED"
         mock_db.rollback.assert_awaited()
+        capture.assert_called_once_with("rebalancing_plan_buy_leg_tick_failed: RuntimeError", level="error")
 
     @pytest.mark.asyncio
     async def test_one_sell_expiry_error_does_not_block_remaining_legs(self, mock_db):
@@ -1370,10 +1377,12 @@ class TestPlanLegFailureIsolation:
         mock_db.execute = AsyncMock(return_value=due_result)
         mock_db.scalar = AsyncMock(side_effect=[RuntimeError("db connection lost"), good_leg])
 
-        count = await svc.expire_due_sell_legs(mock_db)
+        with patch("app.core.job_runner.sentry_sdk.capture_message") as capture:
+            count = await svc.expire_due_sell_legs(mock_db)
 
         assert count == 1
         assert good_leg.status == "EXPIRED"
+        capture.assert_called_once_with("rebalancing_plan_sell_expiry_leg_failed: RuntimeError", level="error")
 
     @pytest.mark.asyncio
     async def test_sell_expiry_skips_leg_being_executed(self, mock_db):

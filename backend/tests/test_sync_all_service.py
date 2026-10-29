@@ -106,8 +106,11 @@ class TestRunSyncAll:
                 new_callable=AsyncMock,
                 side_effect=Exception("boom"),
             ),
+            patch("app.core.job_runner.sentry_sdk.capture_message") as capture,
         ):
             await run_sync_all(make_user_id, accounts)  # 예외 전파 없이 종료되어야 함
+
+        capture.assert_called_once_with("sync_all_failed: Exception", level="error")
 
         last_call = mock_cache.setex.await_args_list[-1]
         import json

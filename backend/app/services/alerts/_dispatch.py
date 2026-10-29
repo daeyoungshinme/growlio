@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.job_runner import report_handled_failure
 from app.services.alerts.alert_service import save_alert_history
 
 logger = structlog.get_logger()
@@ -38,7 +39,7 @@ async def send_push_safely(
     try:
         return await send_push_to_user(user_id=user_id, title=title, body=body, fcm_token=fcm_token, data=data)
     except Exception as exc:
-        logger.error(failure_event, user_id=str(user_id), error=str(exc), **log_context)
+        report_handled_failure(failure_event, exc, user_id=str(user_id), **log_context)
         return False
 
 
@@ -72,7 +73,7 @@ async def dispatch_dual_channel_alert(
     try:
         email_sent = await send_email()
     except Exception as exc:
-        logger.error(f"{event_prefix}_email_failed", user_id=str(user_id), error=str(exc))
+        report_handled_failure(f"{event_prefix}_email_failed", exc, user_id=str(user_id))
 
     push_sent = await send_push_safely(
         user_id,

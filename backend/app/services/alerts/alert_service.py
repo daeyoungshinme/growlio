@@ -16,7 +16,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.logging import redact_secrets
+from app.core.job_runner import report_handled_failure
 from app.models.alert import AlertHistory
 from app.utils.metrics import alert_trigger_count
 
@@ -103,7 +103,7 @@ async def run_isolated_alert_loop(
             if await handle_row(row):
                 triggered += 1
         except Exception as e:
-            logger.error(event, error=redact_secrets(str(e)), error_type=type(e).__name__)
+            report_handled_failure(event, e)
             await db.rollback()
             needs_refresh = True
     return triggered

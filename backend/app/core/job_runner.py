@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 import structlog
 
+from app.core.logging import redact_secrets
+
 if TYPE_CHECKING:
     from app.models.user import User, UserSettings
 
@@ -30,6 +32,17 @@ def report_job_failure(event: str, exc: BaseException, **context: str) -> None:
     """
     logger.error(event, error=str(exc), **context)
     sentry_sdk.capture_exception(exc)
+
+
+def report_handled_failure(event: str, exc: BaseException, **context: str) -> None:
+    """루프 안에서 삼키는 항목 단위 실패의 로그 + 스택 없는 Sentry 보고.
+
+    `report_job_failure`와 달리 `capture_exception`(스택 지역변수 전송)을 쓰지 않는다 — 주문·동기화·알림
+    경로는 자격증명을 지역변수로 다루므로 이벤트명과 예외 타입명만 보낸다(계획 54 A4). 같은 이벤트·타입은
+    Sentry에서 한 이슈로 묶인다.
+    """
+    logger.error(event, error=redact_secrets(str(exc)), error_type=type(exc).__name__, **context)
+    sentry_sdk.capture_message(f"{event}: {type(exc).__name__}", level="error")
 
 
 async def run_per_user(

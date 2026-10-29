@@ -13,13 +13,12 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
-import sentry_sdk
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.logging import redact_secrets
+from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
@@ -178,7 +177,7 @@ async def _process_rebalancing_alert(
             portfolio_id=push_data.get("portfolio_id"),
         )
     except Exception as exc:
-        logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
+        report_handled_failure("rebalancing_alert_email_failed", exc, alert_id=str(alert.id))
 
     # FCM 독립 처리 — 이메일 실패와 무관하게 항상 시도
     push_sent = await send_push_safely(
@@ -252,13 +251,13 @@ async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db
     try:
         overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, cache=cache)
     except Exception as exc:
-        logger.error("rebalancing_alert_overview_failed", alert_id=str(alert.id), error=str(exc))
+        report_handled_failure("rebalancing_alert_overview_failed", exc, alert_id=str(alert.id))
         return None
 
     try:
         return analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
     except Exception as exc:
-        logger.error("rebalancing_alert_analysis_failed", alert_id=str(alert.id), error=str(exc))
+        report_handled_failure("rebalancing_alert_analysis_failed", exc, alert_id=str(alert.id))
         return None
 
 
@@ -433,14 +432,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             index += 1
         except Exception as e:
             # 알림 하나의 실패(주문 계산 버그·DB 오류)가 남은 사용자 알림 전체를 막지 않게 격리한다.
-            # 스택 지역변수를 보내는 capture_exception 대신 타입명만(AUTO 경로는 자격증명을 지역변수로 다룬다).
-            logger.error(
-                "rebalancing_alert_check_item_failed",
-                alert_id=str(alert_id),
-                error=redact_secrets(str(e)),
-                error_type=type(e).__name__,
-            )
-            sentry_sdk.capture_message(f"rebalancing_alert_check_item_failed: {type(e).__name__}", level="error")
+            report_handled_failure("rebalancing_alert_check_item_failed", e, alert_id=str(alert_id))
             await db.rollback()
             remaining_ids = alert_ids[index + 1 :]
             rows = await _load_active_alert_rows(db, remaining_ids) if remaining_ids else []

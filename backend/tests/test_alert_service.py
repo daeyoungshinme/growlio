@@ -479,9 +479,11 @@ async def test_isolated_alert_loop_continues_after_item_failure_and_refreshes(mo
             raise RuntimeError("commit failed")
         return True
 
-    count = await run_isolated_alert_loop(mock_db, rows, _handle, "test_item_failed")
+    with patch("app.core.job_runner.sentry_sdk.capture_message") as capture:
+        count = await run_isolated_alert_loop(mock_db, rows, _handle, "test_item_failed")
 
     assert count == 2
+    capture.assert_called_once_with("test_item_failed: RuntimeError", level="error")
     assert handled == [0, 1, 2]
     mock_db.rollback.assert_awaited_once()
     # rollback 이후 행의 알림 객체는 expire됐으므로 쓰기 전에 refresh한다
@@ -492,13 +494,18 @@ async def test_isolated_alert_loop_continues_after_item_failure_and_refreshes(mo
 async def test_send_push_safely_swallows_exception_and_returns_false():
     from app.services.alerts._dispatch import send_push_safely
 
-    with patch(
-        "app.services.notifications.push_service.send_push_to_user", new=AsyncMock(side_effect=RuntimeError("fcm down"))
+    with (
+        patch(
+            "app.services.notifications.push_service.send_push_to_user",
+            new=AsyncMock(side_effect=RuntimeError("fcm down")),
+        ),
+        patch("app.core.job_runner.sentry_sdk.capture_message") as capture,
     ):
         sent = await send_push_safely(
             uuid.uuid4(), title="t", body="b", fcm_token="tok", data=None, failure_event="x_push_failed"
         )
     assert sent is False
+    capture.assert_called_once_with("x_push_failed: RuntimeError", level="error")
 
 
 @pytest.mark.asyncio
