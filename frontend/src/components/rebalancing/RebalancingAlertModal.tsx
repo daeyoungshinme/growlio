@@ -141,8 +141,9 @@ function AlertFormBody({
       setAccountId(targetAccountId);
       return;
     }
-    if (autoExecutionAccounts.length !== 1) return;
-    setAccountId(autoExecutionAccounts[0].id);
+    const only = autoExecutionAccounts[0];
+    if (autoExecutionAccounts.length !== 1 || !only) return;
+    setAccountId(only.id);
   }, [mode, setAccountId, autoExecutionAccounts, targetAccountId]);
 
   const hasAlert = !!alert;

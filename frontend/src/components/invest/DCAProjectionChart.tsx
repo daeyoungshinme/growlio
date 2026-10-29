@@ -16,8 +16,8 @@ import { buildScenarioCurve } from "@/utils/dcaScenarioProjection";
 import { SAVINGS_RETURN_PRESETS } from "@/constants/savingsPresets";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
-const CONSERVATIVE_RETURN_PCT = SAVINGS_RETURN_PRESETS[0].pct;
-const AGGRESSIVE_RETURN_PCT = SAVINGS_RETURN_PRESETS[SAVINGS_RETURN_PRESETS.length - 1].pct;
+const CONSERVATIVE_RETURN_PCT = Math.min(...SAVINGS_RETURN_PRESETS.map((p) => p.pct));
+const AGGRESSIVE_RETURN_PCT = Math.max(...SAVINGS_RETURN_PRESETS.map((p) => p.pct));
 
 interface Props {
   data: DCAProjectionPoint[];

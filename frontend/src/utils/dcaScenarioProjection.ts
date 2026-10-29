@@ -29,8 +29,9 @@ export function buildScenarioCurve(
   monthlyDepositAmount: number,
   annualReturnPct: number,
 ): Record<string, number> {
-  if (points.length === 0) return {};
-  const initial = points[0].projected_krw;
+  const first = points[0];
+  if (!first) return {};
+  const initial = first.projected_krw;
   const result: Record<string, number> = {};
   points.forEach((point, n) => {
     result[point.month] = projectedValueAtMonth(initial, monthlyDepositAmount, annualReturnPct, n);

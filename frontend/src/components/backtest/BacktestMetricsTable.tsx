@@ -14,10 +14,10 @@ function fmt(n: number, suffix = "%") {
 
 function bestIdx(values: number[], higherIsBetter: boolean): number {
   if (values.length <= 1) return 0;
-  return values.reduce(
-    (best, v, i) => ((higherIsBetter ? v > values[best] : v < values[best]) ? i : best),
-    0,
-  );
+  return values.reduce((best, v, i) => {
+    const cur = values[best] ?? v;
+    return (higherIsBetter ? v > cur : v < cur) ? i : best;
+  }, 0);
 }
 
 const HIGHLIGHT = "bg-blue-50 dark:bg-blue-950/40 rounded";

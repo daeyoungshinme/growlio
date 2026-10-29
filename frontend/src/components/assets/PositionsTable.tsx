@@ -169,7 +169,7 @@ export function PositionsTable({
               <EditableMobilePositionCard
                 key={row._rowKey ?? String(i)}
                 row={row}
-                rawRow={rows[i]}
+                rawRow={rows[i] ?? row}
                 index={i}
                 priceLoading={priceLoadingRows.has(i)}
                 {...sharedProps}
@@ -201,7 +201,7 @@ export function PositionsTable({
                   <EditableDesktopPositionRow
                     key={row._rowKey ?? String(i)}
                     row={row}
-                    rawRow={rows[i]}
+                    rawRow={rows[i] ?? row}
                     index={i}
                     priceLoading={priceLoadingRows.has(i)}
                     {...sharedProps}

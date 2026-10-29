@@ -59,7 +59,7 @@ function computeInitialBuyAndSelected(
       isOrderExecutableAccount(a.asset_type),
     );
     if (infos.length === 0) return defaultAccId;
-    return infos.reduce((best, a) => (a.quantity > best.quantity ? a : best), infos[0]).account_id;
+    return infos.reduce((best, a) => (a.quantity > best.quantity ? a : best)).account_id;
   }
 
   const taxTypeOf = (accountId: string) =>
@@ -91,7 +91,8 @@ function computeInitialBuyAndSelected(
         .filter((a) => isOrderExecutableAccount(a.asset_type))
         .forEach((a) => selected.add(orderKey("sell", i.ticker, a.account_id)));
     } else if ((i.shares_to_trade ?? 0) > 0) {
-      const accId = buyAccounts[i.ticker][0];
+      const accId = buyAccounts[i.ticker]?.[0];
+      if (!accId) return;
       // ISA·연금 계좌면 실제로 사는 종목(국내 대체)의 키로 선택해 둔다 — getBuyRows와 같은 판단
       const buyItem = buyItemForAccount(i, analysis.items, taxTypeOf(accId));
       selected.add(orderKey("buy", buyItem.ticker, accId));
@@ -203,7 +204,7 @@ export function useRebalancingExecution({
 
   function accountHoldsTicker(ticker: string, accountId: string): boolean {
     if (hasLiveBalanceFor(ticker, accountId)) {
-      return liveBalances[accountId].some((p) => p.ticker === ticker && p.quantity > 0);
+      return (liveBalances[accountId] ?? []).some((p) => p.ticker === ticker && p.quantity > 0);
     }
     return (analysis.ticker_account_map[ticker] ?? []).some(
       (a) => a.account_id === accountId && isOrderExecutableAccount(a.asset_type) && a.quantity > 0,
@@ -213,7 +214,7 @@ export function useRebalancingExecution({
   function getLimitPriceNative(key: string, ticker: string, market: string): number {
     const raw =
       key in limitPriceOverrides
-        ? limitPriceOverrides[key]
+        ? (limitPriceOverrides[key] ?? 0)
         : isOverseasMarket(market)
           ? (livePricesUsd[ticker] ?? 0)
           : (livePricesKrw[ticker] ?? 0);

@@ -14,6 +14,7 @@ export default function ChallengeProgressCard({ challenges }: Props) {
 
   // 입금 챌린지를 우선 노출 (스트릭이 습관 지표로 가장 직관적)
   const primary = active.find((c) => c.challenge_type === "DEPOSIT") ?? active[0];
+  if (!primary) return null;
   const { progress } = primary;
   const isDeposit = primary.challenge_type === "DEPOSIT";
 

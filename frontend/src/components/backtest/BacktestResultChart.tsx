@@ -66,7 +66,7 @@ function computeAnnualReturns(dates: string[], series: SeriesData[]): AnnualRow[
       const firstIdx = dates.findIndex((d) => d.startsWith(year));
       const firstValMap: Map<string, number> = new Map();
       series.forEach((s) => {
-        for (let i = firstIdx; i < dates.length && dates[i].startsWith(year); i++) {
+        for (let i = firstIdx; i < dates.length && dates[i]?.startsWith(year); i++) {
           if (s.values[i] != null) {
             firstValMap.set(s.name, s.values[i]!);
             break;
@@ -82,7 +82,7 @@ function computeAnnualReturns(dates: string[], series: SeriesData[]): AnnualRow[
             : null;
       });
     } else {
-      const prevMap = yearLastVal.get(years[idx - 1])!;
+      const prevMap = yearLastVal.get(years[idx - 1]!)!;
       series.forEach((s) => {
         const start = prevMap.get(s.name);
         const end = curMap.get(s.name);
@@ -117,8 +117,8 @@ function BacktestResultChart({ dates, series }: Props) {
         return row;
       });
     return {
-      cumulativeData: toRows((si, i) => series[si].values[i]),
-      drawdownData: toRows((si, i) => drawdowns[si][i]),
+      cumulativeData: toRows((si, i) => series[si]?.values[i]),
+      drawdownData: toRows((si, i) => drawdowns[si]?.[i]),
       annualData: computeAnnualReturns(dates, series),
     };
   }, [dates, series]);

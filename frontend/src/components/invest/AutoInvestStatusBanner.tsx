@@ -42,7 +42,10 @@ export default function AutoInvestStatusBanner() {
   const alertByPortfolioId = activeAlertsOnly(mergeAlertsByPortfolio(alerts ?? []));
   const activeEntry = portfolios
     .map((p) => ({ portfolio: p, alert: alertByPortfolioId[p.id] }))
-    .find(({ alert }) => isDcaAutoBuyPreset(alert));
+    .find(
+      (e): e is { portfolio: (typeof portfolios)[number]; alert: NonNullable<typeof e.alert> } =>
+        isDcaAutoBuyPreset(e.alert),
+    );
 
   // 실행 계좌 예수금이 월 적립액보다 적으면 경고 — 자동매수는 계좌에 있는 예수금으로만 산다(계획 37 E5).
   // 실행 1~3일 전엔 백엔드가 이메일·푸시로도 알린다(jobs/dca_cash_shortfall.py).
@@ -63,7 +66,8 @@ export default function AutoInvestStatusBanner() {
   // 대상 포트폴리오가 하나로 정해지면(DCA 설정된 포트폴리오, 또는 포트폴리오가 1개뿐) 알림 설정 모달까지
   // 바로 연다 — 미설정이면 `openAlert=dca`로 정기 적립식 프리셋 화면에 직행(M6), 설정돼 있으면 편집 화면.
   // 여러 개 중 고르는 경우만 목록으로 보낸다.
-  const targetId = activeEntry?.portfolio.id ?? (portfolios.length === 1 ? portfolios[0].id : null);
+  const targetId =
+    activeEntry?.portfolio.id ?? (portfolios.length === 1 ? (portfolios[0]?.id ?? null) : null);
   const linkTo = targetId
     ? rebalancingUrl({
         tab: "포트폴리오",

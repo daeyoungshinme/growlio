@@ -149,6 +149,7 @@ export function normalizeWeights(items: GoalRecommendationItem[]): PortfolioItem
     weight: Math.round(i.weight * 10) / 10,
   }));
   const diff = Math.round((100 - normalized.reduce((s, i) => s + i.weight, 0)) * 10) / 10;
-  if (normalized.length > 0 && diff !== 0) normalized[normalized.length - 1].weight += diff;
+  const last = normalized[normalized.length - 1];
+  if (last && diff !== 0) last.weight += diff;
   return normalized;
 }

@@ -225,7 +225,7 @@ export default function ActionItemsCard({ marketSignal }: Props) {
       }
       isOpen={isOpen}
       onToggle={toggleOpen}
-      collapsedHint={data[0].title}
+      collapsedHint={data[0]?.title}
     >
       <ul className={data.length > VISIBLE_LIMIT ? undefined : "-mb-3"}>
         {(showAll ? data : data.slice(0, VISIBLE_LIMIT)).map((item) => (

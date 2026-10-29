@@ -39,8 +39,7 @@ export default function MonthlyOptimizationCard() {
   }
 
   const byMonth = suggestions.reduce<Record<number, typeof suggestions>>((acc, item) => {
-    if (!acc[item.month]) acc[item.month] = [];
-    acc[item.month].push(item);
+    (acc[item.month] ??= []).push(item);
     return acc;
   }, {});
 

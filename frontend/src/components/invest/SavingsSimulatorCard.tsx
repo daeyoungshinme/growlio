@@ -70,7 +70,7 @@ export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
       : futureValueOfMonthlySavings(monthlyAmount, returnPct, year),
   }));
   const totalPrincipalAt30 = isLumpSum ? lumpAmount : monthlyAmount * 12 * 30;
-  const valueAt30 = stats[2].value;
+  const valueAt30 = stats[2]?.value ?? 0;
   const compoundEffect = valueAt30 - totalPrincipalAt30;
 
   return (

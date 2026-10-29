@@ -137,7 +137,7 @@ export default function DividendTab({
         return {
           month: m,
           actual: actual?.amount ?? null,
-          estimated: monthlyEstimateByMonth[i],
+          estimated: monthlyEstimateByMonth[i] ?? 0,
           isPast: m < currentMonth,
         };
       }),
@@ -147,7 +147,7 @@ export default function DividendTab({
   const barData = useMemo(
     () =>
       monthCells.map((cell) => ({
-        name: MONTH_LABELS[cell.month - 1],
+        name: MONTH_LABELS[cell.month - 1] ?? `${cell.month}월`,
         month: cell.month,
         isPast: cell.isPast,
         actual: cell.actual && cell.actual > 0 ? cell.actual : 0,
@@ -248,10 +248,8 @@ export default function DividendTab({
                   totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0;
                 const rowKey = `${d.ticker}-${d.market}`;
                 const posDiv = positionsDivMap[rowKey] ?? tickerOnlyDivMap[d.ticker ?? ""];
-                const investmentYield =
-                  (posDiv?.investment_yield ?? 0) > 0
-                    ? posDiv.investment_yield
-                    : (d.investment_yield ?? 0);
+                const posYield = posDiv?.investment_yield ?? 0;
+                const investmentYield = posYield > 0 ? posYield : (d.investment_yield ?? 0);
                 const barColor = weightBarColor(pct);
                 const freqInfo = dividendFreqInfo(d.dividend_months);
                 return (
@@ -341,10 +339,8 @@ export default function DividendTab({
                       totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0;
                     const rowKey = `${d.ticker}-${d.market}`;
                     const posDiv = positionsDivMap[rowKey] ?? tickerOnlyDivMap[d.ticker ?? ""];
-                    const investmentYield =
-                      (posDiv?.investment_yield ?? 0) > 0
-                        ? posDiv.investment_yield
-                        : (d.investment_yield ?? 0);
+                    const posYield = posDiv?.investment_yield ?? 0;
+                    const investmentYield = posYield > 0 ? posYield : (d.investment_yield ?? 0);
                     const barColor = weightBarColor(pct);
                     const freqInfo = dividendFreqInfo(d.dividend_months);
                     return (
@@ -431,7 +427,7 @@ export default function DividendTab({
             selectedMonthTickers={selectedMonthTickers}
             selectedMonthActual={selectedMonthActual}
             monthStr={monthStr}
-            monthlyEstimate={monthlyEstimateByMonth[selectedMonth - 1]}
+            monthlyEstimate={monthlyEstimateByMonth[selectedMonth - 1] ?? 0}
             monthTickerActualMap={monthTickerActualMap}
           />
           <Link

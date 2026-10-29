@@ -199,6 +199,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError, sort
                     >
                       {mobileVirtualizer.getVirtualItems().map((virtualItem) => {
                         const agg = sorted[virtualItem.index];
+                        if (!agg) return null;
                         const key = holdingKey(agg);
                         return (
                           <div
