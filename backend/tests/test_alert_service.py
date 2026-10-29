@@ -480,3 +480,32 @@ async def test_isolated_alert_loop_continues_after_item_failure_and_refreshes(mo
     mock_db.rollback.assert_awaited_once()
     # rollback 이후 행의 알림 객체는 expire됐으므로 쓰기 전에 refresh한다
     assert [c.args[0].id for c in mock_db.refresh.await_args_list] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_send_push_safely_swallows_exception_and_returns_false():
+    from app.services.alerts._dispatch import send_push_safely
+
+    with patch("app.services.push_service.send_push_to_user", new=AsyncMock(side_effect=RuntimeError("fcm down"))):
+        sent = await send_push_safely(
+            uuid.uuid4(), title="t", body="b", fcm_token="tok", data=None, failure_event="x_push_failed"
+        )
+    assert sent is False
+
+
+@pytest.mark.asyncio
+async def test_notify_and_record_trigger_updates_trigger_even_if_push_raises(mock_db):
+    """푸시 예외가 trigger 갱신을 막으면 이미 나간 이메일이 다음 실행에 또 나간다."""
+    from app.services.alerts.alert_service import notify_and_record_trigger
+
+    alert = SimpleNamespace(
+        user_id=uuid.uuid4(), trigger_count=0, max_trigger_count=1, triggered_at=None, is_active=True
+    )
+    push = AsyncMock(side_effect=RuntimeError("fcm down"))
+    with patch("app.services.push_service.send_push_to_user", new=push):
+        await notify_and_record_trigger(mock_db, alert, "EXCHANGE_RATE", "msg", alert.user_id, "t", "b", "tok")
+
+    push.assert_awaited_once()
+    assert alert.trigger_count == 1
+    assert alert.is_active is False
+    mock_db.commit.assert_awaited_once()

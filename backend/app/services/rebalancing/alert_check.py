@@ -23,6 +23,7 @@ from app.core.logging import redact_secrets
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
+from app.services.alerts._dispatch import send_push_safely
 from app.services.alerts.alert_service import save_alert_history
 from app.services.alerts.calculator import (
     already_fired_today,
@@ -124,7 +125,6 @@ async def _process_rebalancing_alert(
     담아 이메일 본문에 노출하기 위한 것 — 호출부(`check_rebalancing_alerts`)가 계산해 전달한다.
     """
     from app.services.email_service import send_rebalancing_alert
-    from app.services.push_service import send_push_to_user
 
     # 실제 매수/매도 수량 미리보기 — drift가 있을 때만 계산(실행/저장은 하지 않음, 표시 전용).
     order_preview_items: list = []
@@ -181,17 +181,15 @@ async def _process_rebalancing_alert(
         logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
 
     # FCM 독립 처리 — 이메일 실패와 무관하게 항상 시도
-    push_sent = False
-    try:
-        push_sent = await send_push_to_user(
-            user_id=alert.user_id,
-            title=push_title,
-            body=push_body,
-            fcm_token=fcm_token,
-            data=push_data,
-        )
-    except Exception as exc:
-        logger.warning("rebalancing_alert_push_failed", alert_id=str(alert.id), error=str(exc))
+    push_sent = await send_push_safely(
+        alert.user_id,
+        title=push_title,
+        body=push_body,
+        fcm_token=fcm_token,
+        data=push_data,
+        failure_event="rebalancing_alert_push_failed",
+        alert_id=str(alert.id),
+    )
 
     any_sent = email_sent or push_sent
     if not any_sent:
