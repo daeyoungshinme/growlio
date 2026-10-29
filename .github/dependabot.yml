@@ -78,6 +78,8 @@ updates:
       # minor/patch는 한 PR로 묶는다. major(recharts 3, tailwind 4,
       # lucide-react, @sentry/react)는 개별 PR 유지 — docs/plans/20 #5 로드맵이
       # "하나씩 별도 PR로 검증"을 원함. @capacitor/* minor는 이 그룹으로 묶여 함께 올라감.
+      # recharts 3.10.1(#30)·tailwind 4.3.3(#31) PR은 2026-09-06 닫았다 — 닫힌 버전만 건너뛰고
+      # 다음 major 릴리스에서 PR이 다시 열린다(ignore로 막지 않음, 착수 시점은 그때 판단).
       # react/react-dom/typescript major는 아래 ignore로 보류(React 18 고정).
       # @vitejs/plugin-react 6·vite major도 ignore — Rolldown 전환 검증이 필요해 건별 처리.
       frontend-dependencies:

@@ -72,6 +72,6 @@ async def test_db_error_on_first_portfolio_does_not_drop_the_rest():
         patch.object(svc, "build_portfolio_overview", new=overview),
         patch.object(svc, "compute_portfolio_drift_summary", new=compute),
     ):
-        summaries = await svc.get_drift_summaries(uuid.uuid4(), db)  # type: ignore[arg-type]
+        summaries = await svc.get_drift_summaries(uuid.uuid4(), db)
 
     assert [s.portfolio_id for s in summaries] == [str(ids[1])]

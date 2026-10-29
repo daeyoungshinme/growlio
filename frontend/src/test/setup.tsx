@@ -1,3 +1,5 @@
+import "@testing-library/jest-dom/vitest";
+import { vi } from "vitest";
 // Global recharts mock — prevents canvas/SVG errors in jsdom
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (

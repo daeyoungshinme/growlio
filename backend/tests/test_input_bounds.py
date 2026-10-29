@@ -100,7 +100,7 @@ def test_public_error_message_hides_pydantic_validation_input():
         quantity: int
 
     try:
-        _M(quantity="SECRET-INPUT-1.5")  # type: ignore[arg-type]
+        _M(quantity="SECRET-INPUT-1.5")
     except ValidationError as e:
         msg = public_error_message(e)
     assert "SECRET-INPUT" not in msg

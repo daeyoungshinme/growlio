@@ -19,7 +19,8 @@ import { invalidateAlertData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { SectionCard, DeleteIcon, inputClass, labelClass } from "./shared";
+import { SectionCard, DeleteIcon } from "./shared";
+import { FORM_INPUT_SM, LABEL_MD } from "@/constants/inputStyles";
 
 export function ExchangeRateAlertSection() {
   const queryClient = useQueryClient();
@@ -75,11 +76,11 @@ export function ExchangeRateAlertSection() {
       </p>
       <div className="flex gap-2 flex-wrap">
         <div className="flex-1 min-w-[120px]">
-          <label className={labelClass}>목표환율 (원)</label>
+          <label className={LABEL_MD}>목표환율 (원)</label>
           <input
             type="number"
             inputMode="decimal"
-            className={inputClass}
+            className={FORM_INPUT_SM}
             value={alertForm.target_rate}
             onChange={(e) => setAlertForm((f) => ({ ...f, target_rate: e.target.value }))}
             placeholder="예: 1300"
@@ -87,9 +88,9 @@ export function ExchangeRateAlertSection() {
           />
         </div>
         <div className="flex-1 min-w-[100px]">
-          <label className={labelClass}>조건</label>
+          <label className={LABEL_MD}>조건</label>
           <select
-            className={inputClass}
+            className={FORM_INPUT_SM}
             value={alertForm.direction}
             onChange={(e) =>
               setAlertForm((f) => ({ ...f, direction: e.target.value as "BELOW" | "ABOVE" }))
@@ -100,11 +101,11 @@ export function ExchangeRateAlertSection() {
           </select>
         </div>
         <div className="flex-1 min-w-[80px]">
-          <label className={labelClass}>알림 횟수</label>
+          <label className={LABEL_MD}>알림 횟수</label>
           <input
             type="number"
             inputMode="numeric"
-            className={inputClass}
+            className={FORM_INPUT_SM}
             value={alertForm.max_trigger_count}
             onChange={(e) => setAlertForm((f) => ({ ...f, max_trigger_count: e.target.value }))}
             min="1"

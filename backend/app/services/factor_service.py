@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import math
 import uuid
+from typing import Any
 
 import structlog
 from sqlalchemy import select
@@ -32,9 +33,9 @@ from app.utils.kst import today_kst
 logger = structlog.get_logger()
 
 
-def _safe_float(v: object) -> float | None:
+def _safe_float(v: Any) -> float | None:
     try:
-        f = float(v)  # type: ignore[arg-type]
+        f = float(v)
         return f if math.isfinite(f) else None
     except (TypeError, ValueError):
         return None

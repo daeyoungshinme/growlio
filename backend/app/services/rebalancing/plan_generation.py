@@ -25,14 +25,14 @@ from app.services.rebalancing.order_builder import (
     _flatten_account_tax_types,
     build_rebalancing_orders,
     clamp_orders_to_max_value,
-    filter_drifting_items,
     is_daily_value_cap_blocking_auto_mode,
     is_tax_impact_blocking_auto_mode,
     market_group,
     refresh_live_prices,
     split_orders_by_market,
 )
-from app.utils.kst import KST as _KST
+from app.services.rebalancing.service import filter_drifting_items
+from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
 
@@ -160,8 +160,7 @@ async def sum_today_auto_plan_value_krw(user_id: uuid.UUID, db: AsyncSession) ->
     PENDING(대기중, 곧 실행될 수 있음)/EXECUTED(이미 실행됨) leg만 포함 — CANCELED/REJECTED/
     EXPIRED/FAILED는 자금이 이동하지 않(았)으므로 하루 합산 상한 계산에서 제외한다.
     """
-    today_start_kst = datetime.now(tz=_KST).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_start_utc = today_start_kst.astimezone(UTC)
+    today_start_utc = kst_day_start(today_kst()).astimezone(UTC)
 
     total = await db.scalar(
         select(func.coalesce(func.sum(RebalancingPlanItem.quantity * RebalancingPlanItem.reference_price), 0))

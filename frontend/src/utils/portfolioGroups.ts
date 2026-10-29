@@ -46,16 +46,6 @@ export const scopedMemberLabel = (m: PortfolioGroupMember, accounts: string[] | 
 export const memberLabel = (m: PortfolioGroupMember) =>
   `${m.name || m.ticker}${isLeveraged(m) ? ` ×${m.leverage}` : ""}`;
 
-/** 그룹 항목에 속한 모든 종목(대표·멤버·국내 대체). */
-export function groupKeys(item: PortfolioItem): Keyed[] {
-  if (!item.group) return [item];
-  return [
-    item,
-    ...item.group.members,
-    ...(item.group.domestic_alt ? [item.group.domestic_alt] : []),
-  ];
-}
-
 /** 제안을 그룹 항목으로 적용 — 같은 지수의 단독 행·같은 키의 기존 그룹은 합쳐지고 비중도 합산된다.
  *  새 그룹은 합쳐진 첫 행 자리에 들어간다(없으면 맨 끝, 비중 0). */
 export function applyIndexGroup(

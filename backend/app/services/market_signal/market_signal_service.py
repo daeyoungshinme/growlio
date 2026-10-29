@@ -243,4 +243,5 @@ async def _fetch_all_signals(
             return None
         return r
 
-    return tuple(_safe(r) for r in results)  # type: ignore[return-value]
+    vix, curve, hy, dxy, fx, oil, inflation, employment = (_safe(r) for r in results)
+    return vix, curve, hy, dxy, fx, oil, inflation, employment

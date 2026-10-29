@@ -93,10 +93,10 @@ class TestSettingsValidation:
         db = MagicMock()
         db.scalar = AsyncMock(return_value=None)
         with pytest.raises(HTTPException) as exc:
-            await _validate_tactical_gate(db, body, uuid.uuid4())  # type: ignore[arg-type]
+            await _validate_tactical_gate(db, body, uuid.uuid4())
         assert exc.value.status_code == 422
         db.scalar = AsyncMock(return_value=uuid.uuid4())
-        await _validate_tactical_gate(db, body, uuid.uuid4())  # type: ignore[arg-type]
+        await _validate_tactical_gate(db, body, uuid.uuid4())
 
     @pytest.mark.asyncio
     async def test_other_modes_skip_lookup(self):
@@ -104,7 +104,7 @@ class TestSettingsValidation:
 
         db = MagicMock()
         db.scalar = AsyncMock()
-        await _validate_tactical_gate(db, SimpleNamespace(market_condition_mode="STRICT"), uuid.uuid4())  # type: ignore[arg-type]
+        await _validate_tactical_gate(db, SimpleNamespace(market_condition_mode="STRICT"), uuid.uuid4())
         db.scalar.assert_not_awaited()
 
 

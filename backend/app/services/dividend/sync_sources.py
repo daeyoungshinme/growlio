@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import statistics
 from datetime import timedelta
+from typing import Any
 
 import structlog
 from tenacity import retry
@@ -34,7 +35,7 @@ def _yield_from_dps(dps: float, price: float) -> float:
 _CAPITAL_GAIN_OUTLIER_MULTIPLE = 2.5  # 최댓값이 나머지 median의 이 배수 이상이면 자본이득분배로 간주
 
 
-def _exclude_capital_gain_outlier(ticker: object) -> float | None:
+def _exclude_capital_gain_outlier(ticker: Any) -> float | None:
     """trailing 12개월 분배 이력에서 자본이득분배로 추정되는 이상치 1건을 제외한 합계를 반환.
 
     레버리지/파생상품 ETF(QLD 등)는 소액 정기배당과 별개로 연 1회 자본이득분배를 지급하는데,
@@ -42,7 +43,7 @@ def _exclude_capital_gain_outlier(ticker: object) -> float | None:
     분배 건수가 2건 미만이거나 뚜렷한 이상치가 없으면 None(보정 불필요)을 반환한다.
     """
     try:
-        divs = ticker.dividends  # type: ignore[attr-defined]
+        divs = ticker.dividends
         if divs is None or len(divs) == 0:
             return None
         cutoff = today_kst() - timedelta(days=365)

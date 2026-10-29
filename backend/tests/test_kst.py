@@ -11,7 +11,7 @@ from app.utils.kst import KST, kst_day_start, today_kst
 
 class _FakeDatetime(datetime):
     @classmethod
-    def now(cls, tz=None):  # type: ignore[override]
+    def now(cls, tz=None):
         # UTC 2026-09-30 23:30 = KST 2026-10-01 08:30
         base = datetime(2026, 9, 30, 23, 30, tzinfo=UTC)
         return base.astimezone(tz) if tz else base.replace(tzinfo=None)
@@ -43,7 +43,7 @@ def test_fred_today_uses_us_central_date():
 
     class _Fixed(datetime):
         @classmethod
-        def now(cls, tz=None):  # type: ignore[override]
+        def now(cls, tz=None):
             base = datetime(2026, 10, 20, 2, 0, tzinfo=UTC)
             return base.astimezone(tz) if tz else base
 

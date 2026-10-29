@@ -173,7 +173,7 @@ _기타_
 | 추종 지수별 비중 | `["index-exposure", accountId]` · 지수 그룹 제안 `["index-exposure", "group-suggestions", accountIds]` |
 | 포트폴리오/백테스트/리밸런싱 탭 | `["portfolios"]` |
 | 계좌 목록 / 계좌별 포지션 | `["accounts"]` / `["account-positions", accountId]` |
-| 거래내역 | 계좌별 `["transactions", accountId]` · 전체 `["transactions", "all"]` · 연도별 `["transactions", "all", year]` |
+| 거래내역 | 계좌별 `["transactions", accountId]` · 전체 `["transactions", "all"]` · 연도별 `["transactions", "all", year]` · 합계 `["transactions", "summary"]`(`transactionSummary`) |
 | 기간별 매수 | `["period-purchases", period, year, month, accountId]` |
 | 수기 매매 기록 | `["trades", accountId, ticker, market]` |
 | 배당 | `["dividend-by-ticker", accountId]` · `["dividend-summary", accountId]` · `["dividend-positions", accountId]` · `["dividend-plan"]` · `["monthly-optimization"]` |
@@ -188,7 +188,7 @@ _기타_
 | 드리프트 요약 / 지금 할 일 | `["drift-summary"]` / `["action-items"]` |
 | 세금 | `["tax-summary", year, accountId]` · `["overseas-positions-tax", accountId]` · `["isa-status"]` · `["pension-contribution", year]` · `["overseas-realized", year, accountId]` · `["tax-action-plan"]` |
 | 자산배분 이력 | `["allocation-history", months, accountId]` |
-| 알림 발송 이력(무한 스크롤은 `alertHistoryPages`) / 인사이트 | `["alert-history"]` / `["insights"]` |
+| 알림 발송 이력(무한 스크롤, `alertHistoryPages`) / 인사이트 | `["alert-history", "pages"]` / `["insights"]` |
 | 리스크 / 시장 신호 / 복합신호 | `["portfolio-risk"]` / `["market-signal"]` / `["composite-signal-status"]` |
 | 목표 역산 추천 | `["goal-recommendation", "overall" \| "by-horizon" \| "by-age"]` · 후보 중복 `["goal-recommendation", "candidate-overlap", signature]` |
 | 적용 전 비교 | `["portfolio-expected-metrics", portfolioId]` |

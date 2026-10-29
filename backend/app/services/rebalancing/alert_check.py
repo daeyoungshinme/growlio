@@ -32,11 +32,11 @@ from app.services.rebalancing.alert_scope import resolve_effective_account_ids
 from app.services.rebalancing.diagnosis_service import fetch_composite_signal
 from app.services.rebalancing.order_builder import (
     build_rebalancing_orders,
-    filter_drifting_items,
     is_market_signal_blocking_auto_mode,
     refresh_live_prices,
     tactical_regime_for_gate,
 )
+from app.services.rebalancing.service import filter_drifting_items
 from app.utils.cache_keys import TTL_COMPOSITE_ALERT_SENT, composite_alert_sent_key
 from app.utils.durable_state import get_durable, set_durable
 from app.utils.kst import today_kst

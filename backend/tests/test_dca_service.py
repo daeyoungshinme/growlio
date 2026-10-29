@@ -71,7 +71,7 @@ class TestCalcMonthsToGoal:
         """수익률이 있으면 순수 적립보다 빨리 목표 달성."""
         months_no_return = _calc_months_to_goal(0.0, 1_000_000.0, 0.0, 50_000_000.0)
         months_with_return = _calc_months_to_goal(0.0, 1_000_000.0, 0.05 / 12, 50_000_000.0)
-        assert months_with_return < months_no_return  # type: ignore[operator]
+        assert months_with_return < months_no_return
 
     def test_unreachable_goal_returns_none(self, override_settings):
         """600개월 내 달성 불가능하면 None 반환."""

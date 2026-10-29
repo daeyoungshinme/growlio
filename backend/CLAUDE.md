@@ -191,7 +191,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `estimation.py` — Ledoit-Wolf 공분산·James-Stein 기대수익률 축소(고정 노이즈분산 사용 — 표본분산 재사용 시 축소 상쇄 버그). `goal/goal_portfolio_optimizer`·`portfolio_optimizer` 공용이라 평면
 - `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
-- `dca_service.py` · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
+- `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
 - `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → pykrx → FDR → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_dividend_data`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
 - `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR) · `_settings_queries.py`

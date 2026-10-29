@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES, is_non_tradable
 from app.services.rebalancing._order_quantity_guard import floor_shares
 from app.services.rebalancing.group_expansion import expand_group_items, is_group_item
-from app.services.rebalancing.service import filter_drifting_items  # noqa: F401 — 이탈 판정 단일 기준 재노출
 
 logger = structlog.get_logger()
 
