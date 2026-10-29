@@ -4,12 +4,12 @@ import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
 
-import sentry_sdk
 import structlog
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES
+from app.core.job_runner import report_handled_failure
 from app.core.logging import public_error_message, redact_secrets
 from app.exceptions import AppError, SyncError
 from app.kis.auth import get_access_token
@@ -191,13 +191,7 @@ async def _save_execution_history(
     except Exception as e:
         # 실주문은 이미 나갔는데 기록이 없는 상태 — 경고가 아니라 오류로 알린다. flush 이후 실패면 세션이
         # 실패 상태라 호출부의 후속 commit(leg 상태 기록 등)이 PendingRollbackError로 깨지므로 되돌린다.
-        logger.error(
-            "rebalancing_history_save_failed",
-            user_id=str(user_id),
-            error=redact_secrets(str(e)),
-            error_type=type(e).__name__,
-        )
-        sentry_sdk.capture_message(f"rebalancing_history_save_failed: {type(e).__name__}", level="error")
+        report_handled_failure("rebalancing_history_save_failed", e, user_id=str(user_id))
         await db.rollback()
         return None
 

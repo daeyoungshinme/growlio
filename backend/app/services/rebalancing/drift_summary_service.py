@@ -63,7 +63,7 @@ async def get_drift_summaries(
             summary.has_alert_configured = str(portfolio.id) in alert_by_portfolio
             summaries.append(summary)
         except Exception as e:
-            logger.error(
+            logger.warning(
                 "drift_summary_failed",
                 portfolio_id=str(portfolio_id),
                 error=str(e),

@@ -14,7 +14,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import OVERSEAS_MARKETS
-from app.core.logging import public_error_message, redact_secrets
+from app.core.job_runner import report_handled_failure
+from app.core.logging import public_error_message
 from app.exceptions import BrokerOrderRejectedError
 from app.kis import order as kis_order
 from app.kis.auth import get_access_token
@@ -140,12 +141,7 @@ async def cancel_execution_order(
         logger.warning("rebalancing_order_cancel_rejected", result_id=str(result_id), message=row.cancel_message)
     except Exception as e:
         # 프레임 지역변수에 복호화된 자격증명이 있어 exc_info는 남기지 않는다(execution_service와 같은 이유)
-        logger.error(
-            "rebalancing_order_cancel_failed",
-            result_id=str(result_id),
-            error=redact_secrets(str(e)),
-            error_type=type(e).__name__,
-        )
+        report_handled_failure("rebalancing_order_cancel_failed", e, result_id=str(result_id))
         await db.rollback()
         raise HTTPException(
             status_code=502, detail="증권사 응답을 받지 못했습니다. 증권사 앱에서 주문 상태를 확인하세요."

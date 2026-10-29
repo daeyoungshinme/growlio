@@ -13,6 +13,8 @@ from enum import StrEnum
 import structlog
 from sqlalchemy import update
 
+from app.core.job_runner import report_handled_failure
+
 logger = structlog.get_logger()
 
 _firebase_app: object | None = None
@@ -42,7 +44,8 @@ def _get_firebase_app() -> object | None:
         logger.info("firebase_initialized")
         return _firebase_app
     except Exception as exc:
-        logger.error("firebase_init_failed", error=str(exc))
+        # 초기화 플래그가 이미 섰으므로 재기동 전까지 푸시가 꺼진다 — Sentry로 알린다
+        report_handled_failure("firebase_init_failed", exc)
         return None
 
 
