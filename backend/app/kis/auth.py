@@ -11,7 +11,7 @@ from app.kis.constants import (
 )
 from app.providers._token_cache import get_or_fetch_token, store_token
 from app.providers.http_client import _get_client
-from app.services.credential_service import decrypt, encrypt
+from app.services.accounts.credential_service import decrypt, encrypt
 
 logger = structlog.get_logger()
 

@@ -18,8 +18,8 @@ from sqlalchemy.orm import selectinload
 from app.core.cache_store import get_cache_store
 from app.core.config import settings
 from app.models.asset import AssetAccount, AssetSnapshot
-from app.services._snapshot_queries import latest_snapshot_subquery
-from app.services.credential_service import get_kis_user_credentials
+from app.services.accounts._snapshot_queries import latest_snapshot_subquery
+from app.services.accounts.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key
 from app.services.dividend.calculator import calculate_position_dividend
 from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES

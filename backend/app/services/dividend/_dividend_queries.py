@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.user import UserSettings
-from app.services.credential_service import decrypt
+from app.services.accounts.credential_service import decrypt
 
 
 async def fetch_dart_api_key(user_id: uuid.UUID, db: AsyncSession) -> str:

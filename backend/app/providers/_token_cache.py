@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.constants import TOKEN_CACHE_TTL_BUFFER
-from app.services.credential_service import decrypt, encrypt
+from app.services.accounts.credential_service import decrypt, encrypt
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount, AssetSnapshot, Position
-from app.services._snapshot_queries import latest_snapshot_subquery
+from app.services.accounts._snapshot_queries import latest_snapshot_subquery
 
 
 async def query_latest_position_map(

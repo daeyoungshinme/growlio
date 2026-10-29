@@ -19,7 +19,7 @@ import pytest
 def patch_encryption_key(monkeypatch):
     """test_credential_service.py와 동일한 패턴 — settings 속성을 직접 패치."""
     import app.core.config as config_mod
-    import app.services.credential_service as cs_mod
+    import app.services.accounts.credential_service as cs_mod
 
     test_key = "a" * 64
     monkeypatch.setattr(config_mod.settings, "kis_cred_encryption_key", test_key)
@@ -32,7 +32,7 @@ class TestGetOrFetchTokenDecryption:
     @pytest.mark.asyncio
     async def test_decrypts_encrypted_db_row_and_caches_plaintext(self):
         from app.providers._token_cache import get_or_fetch_token
-        from app.services.credential_service import encrypt
+        from app.services.accounts.credential_service import encrypt
 
         plaintext = "real-plaintext-access-token"
         row = SimpleNamespace(access_token=encrypt(plaintext), expires_at=datetime.now(UTC) + timedelta(hours=1))
@@ -103,7 +103,7 @@ class TestKisFetchAndStoreTokenEncryption:
     @pytest.mark.asyncio
     async def test_stores_encrypted_token_but_returns_plaintext(self):
         from app.kis.auth import _fetch_and_store_token
-        from app.services.credential_service import decrypt
+        from app.services.accounts.credential_service import decrypt
 
         fake_response = MagicMock()
         fake_response.raise_for_status = MagicMock()
@@ -140,7 +140,7 @@ class TestKiwoomFetchAndStoreTokenEncryption:
     @pytest.mark.asyncio
     async def test_stores_encrypted_token_but_returns_plaintext(self):
         from app.kiwoom.auth import _fetch_and_store_token
-        from app.services.credential_service import decrypt
+        from app.services.accounts.credential_service import decrypt
 
         fake_response = MagicMock()
         fake_response.status_code = 200
@@ -179,7 +179,7 @@ class TestPromoteUserTokenToAccount:
     @pytest.mark.asyncio
     async def test_copies_already_encrypted_ciphertext_as_is(self):
         from app.kis.auth import promote_user_token_to_account
-        from app.services.credential_service import encrypt
+        from app.services.accounts.credential_service import encrypt
 
         encrypted = encrypt("promoted-plaintext-token")
         row = SimpleNamespace(access_token=encrypted, expires_at=datetime.now(UTC) + timedelta(hours=1))
@@ -199,7 +199,7 @@ class TestPromoteUserTokenToAccount:
     async def test_encrypts_legacy_plaintext_row_on_promotion(self):
         """마이그레이션 이전 평문 row를 승격시킬 때도 새 row는 암호화되어야 한다."""
         from app.kis.auth import promote_user_token_to_account
-        from app.services.credential_service import decrypt
+        from app.services.accounts.credential_service import decrypt
 
         row = SimpleNamespace(access_token="legacy-plaintext-token", expires_at=datetime.now(UTC) + timedelta(hours=1))
         db = AsyncMock()
@@ -226,7 +226,7 @@ class TestStoreToken:
         from app.constants import TOKEN_CACHE_TTL_BUFFER
         from app.models.token import KisToken
         from app.providers._token_cache import store_token
-        from app.services.credential_service import decrypt
+        from app.services.accounts.credential_service import decrypt
 
         cache = AsyncMock()
         db = AsyncMock()

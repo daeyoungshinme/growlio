@@ -11,8 +11,8 @@ from sqlalchemy.orm import selectinload
 
 from app.constants import OVERSEAS_MARKETS
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
-from app.services._account_queries import active_accounts_stmt
-from app.services._snapshot_queries import latest_snapshot_subquery
+from app.services.accounts._account_queries import active_accounts_stmt
+from app.services.accounts._snapshot_queries import latest_snapshot_subquery
 from app.utils.kst import today_kst
 
 ISA_MATURITY_YEARS = 3

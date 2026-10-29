@@ -76,7 +76,7 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
     from app.core.cache_store import get_cache_store
     from app.kis.auth import get_access_token
     from app.models.asset import AssetAccount
-    from app.services._account_queries import active_accounts_stmt
+    from app.services.accounts._account_queries import active_accounts_stmt
 
     account = await db.scalar(
         active_accounts_stmt(user_id).where(

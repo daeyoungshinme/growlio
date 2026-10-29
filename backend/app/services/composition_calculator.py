@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
-from app.services._account_queries import active_accounts_stmt
-from app.services._snapshot_queries import latest_snapshot_subquery
+from app.services.accounts._account_queries import active_accounts_stmt
+from app.services.accounts._snapshot_queries import latest_snapshot_subquery
 from app.utils.cache_keys import CacheStoreType
 from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount

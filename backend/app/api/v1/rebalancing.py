@@ -30,8 +30,8 @@ from app.schemas.rebalancing import (
 )
 from app.schemas.rebalancing.goal import CandidateOverlapRequest
 from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
-from app.services._account_queries import active_broker_accounts_stmt, get_account_including_inactive
 from app.services._settings_queries import get_or_create_settings, get_settings_row
+from app.services.accounts._account_queries import active_broker_accounts_stmt, get_account_including_inactive
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.etf.etf_overlap_service import analyze_candidate_overlap_for_user
 from app.services.goal.goal_age_recommendation_service import (

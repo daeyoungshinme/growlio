@@ -21,8 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import DOMESTIC_MARKETS
 from app.models.asset import AssetAccount
-from app.services._account_queries import active_accounts_stmt
-from app.services.credential_service import decrypt_kis_credentials
+from app.services.accounts._account_queries import active_accounts_stmt
+from app.services.accounts.credential_service import decrypt_kis_credentials
 from app.services.price_sync_sources import sync_naver_price, sync_pykrx_price
 from app.services.yahoo_price import (
     _sync_pykrx_returns_batch,

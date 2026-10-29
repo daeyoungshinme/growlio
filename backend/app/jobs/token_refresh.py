@@ -8,7 +8,7 @@ from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
 from app.kis.auth import get_access_token
 from app.models.asset import AssetAccount
-from app.services.credential_service import decrypt_kis_credentials
+from app.services.accounts.credential_service import decrypt_kis_credentials
 
 logger = structlog.get_logger()
 

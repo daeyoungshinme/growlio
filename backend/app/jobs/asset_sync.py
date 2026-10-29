@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
 from app.jobs._job_helpers import peak_rss_mb
 from app.models.asset import AssetAccount
-from app.services.sync_all_service import sync_accounts
+from app.services.accounts.sync_all_service import sync_accounts
 
 logger = structlog.get_logger()
 

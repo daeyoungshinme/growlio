@@ -7,7 +7,7 @@ import pytest
 from app.enums import DataSource
 from app.models.asset import AssetAccount
 from app.schemas.asset import AssetAccountCreate, AssetAccountResponse, AssetAccountUpdate
-from app.services.asset_credential_service import BROKER_CREDENTIAL_SPECS, CREDENTIAL_FIELDS
+from app.services.accounts.asset_credential_service import BROKER_CREDENTIAL_SPECS, CREDENTIAL_FIELDS
 
 _SPECS = list(BROKER_CREDENTIAL_SPECS.values())
 

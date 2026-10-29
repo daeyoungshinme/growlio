@@ -23,7 +23,7 @@ from app.schemas.rebalancing import (
     RebalancingAlertResponse,
     TestAlertResponse,
 )
-from app.services._account_queries import active_accounts_stmt
+from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.rebalancing._alert_queries import (
     get_alert_by_portfolio,
     get_alert_by_portfolio_and_account,

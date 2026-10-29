@@ -18,7 +18,7 @@ from app.providers.kis_provider import KISProvider
 from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.toss_provider import TossProvider
 from app.schemas.rebalancing import KisBalancePosition, KisBalanceResponse
-from app.services.credential_service import decrypt_kis_credentials
+from app.services.accounts.credential_service import decrypt_kis_credentials
 
 logger = structlog.get_logger()
 
