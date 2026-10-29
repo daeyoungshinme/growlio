@@ -18,8 +18,8 @@ from app.core.database import get_db
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.user import User
+from app.services.goal.recommendation_universe import resolve_index_region
 from app.services.price_service import _price_via_kis, domestic_price_fallback
-from app.services.recommendation_universe import resolve_index_region
 from app.services.stock_search_service import _has_korean, _search_naver, _search_yahoo
 from app.utils.cache_keys import (
     TTL_ETF_INDEX_REGION,

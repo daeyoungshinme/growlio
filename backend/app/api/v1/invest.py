@@ -11,7 +11,7 @@ from app.schemas.invest import DCAAnalysisResponse, GoalFeasibilityPreview
 from app.services import dca_service
 from app.services.composition_calculator import build_asset_totals, exclude_real_estate
 from app.services.dividend import plan_service as dividend_plan_service
-from app.services.goal_return_solver import build_feasibility_preview, months_until_year_end
+from app.services.goal.goal_return_solver import build_feasibility_preview, months_until_year_end
 
 router = APIRouter(prefix="/invest", tags=["invest"])
 

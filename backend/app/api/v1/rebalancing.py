@@ -34,19 +34,19 @@ from app.services._account_queries import active_broker_accounts_stmt, get_accou
 from app.services._settings_queries import get_or_create_settings, get_settings_row
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.etf.etf_overlap_service import analyze_candidate_overlap_for_user
-from app.services.goal_age_recommendation_service import (
+from app.services.goal.goal_age_recommendation_service import (
     get_age_based_recommendation,
     get_cached_age_based_recommendation,
     get_stale_age_based_recommendation,
     refresh_age_based_recommendation_in_background,
 )
-from app.services.goal_horizon_recommendation_service import (
+from app.services.goal.goal_horizon_recommendation_service import (
     get_cached_horizon_recommendations,
     get_horizon_recommendations,
     get_stale_horizon_recommendations,
     refresh_horizon_recommendations_in_background,
 )
-from app.services.goal_recommendation_service import (
+from app.services.goal.goal_recommendation_service import (
     compute_portfolio_expected_metrics,
     get_cached_goal_recommendation,
     get_overall_goal_recommendation_for_user,

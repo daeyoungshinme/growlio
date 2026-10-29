@@ -44,9 +44,9 @@ from app.services.dividend.sync_sources import (
     sync_naver_stock_dividend_info,
     sync_yahoo_dividend_info,
 )
-from app.services.goal_portfolio_optimizer import _MAX_WEIGHT, _dividend_floor_constraint, _optimize_goal_portfolio
+from app.services.goal.goal_portfolio_optimizer import _MAX_WEIGHT, _dividend_floor_constraint, _optimize_goal_portfolio
+from app.services.goal.recommendation_universe import RECOMMENDATION_UNIVERSE
 from app.services.market_signal.market_signal_service import get_market_signal
-from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
 from app.services.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_DAILY_RETURNS,

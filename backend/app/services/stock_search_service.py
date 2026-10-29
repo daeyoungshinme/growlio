@@ -5,7 +5,7 @@ import re
 import httpx
 import structlog
 
-from app.services.recommendation_universe import guess_asset_class, resolve_index_region
+from app.services.goal.recommendation_universe import guess_asset_class, resolve_index_region
 
 logger = structlog.get_logger()
 

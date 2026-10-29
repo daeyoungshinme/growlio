@@ -21,7 +21,7 @@ from app.schemas.asset import MAX_CREDENTIAL_LENGTH
 from app.schemas.rebalancing.goal import GoalCandidateTicker
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
-from app.services.goal_age_recommendation_service import age_group_from_birth_year
+from app.services.goal.goal_age_recommendation_service import age_group_from_birth_year
 from app.utils.cache_keys import (
     challenge_progress_key,
     dashboard_summary_key,

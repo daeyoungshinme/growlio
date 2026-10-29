@@ -67,9 +67,9 @@ from app.core.database import AsyncSessionLocal
 from app.enums import AccountTaxType
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation, PortfolioExpectedMetrics
-from app.services import _goal_recommendation_common as _grc
 from app.services._settings_queries import get_settings_row
-from app.services.goal_candidate_service import (
+from app.services.goal import _goal_recommendation_common as _grc
+from app.services.goal.goal_candidate_service import (
     _active_account_tax_types,
     _apply_index_region_preference,
     _get_or_seed_candidates,
@@ -80,8 +80,8 @@ from app.services.goal_candidate_service import (
     pension_exclusion_note,
     pension_ineligibility_reason,
 )
-from app.services.goal_portfolio_optimizer import _MIN_CANDIDATES, compute_weighted_expected_metrics
-from app.services.goal_return_solver import months_until_year_end, solve_required_annual_return_pct
+from app.services.goal.goal_portfolio_optimizer import _MIN_CANDIDATES, compute_weighted_expected_metrics
+from app.services.goal.goal_return_solver import months_until_year_end, solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map

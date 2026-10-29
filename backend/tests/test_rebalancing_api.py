@@ -251,22 +251,22 @@ class TestGoalRecommendationEndpoint:
                     return_value=AsyncMock(),
                 ),
                 patch(
-                    "app.services.goal_recommendation_service.build_portfolio_overview",
+                    "app.services.goal.goal_recommendation_service.build_portfolio_overview",
                     new_callable=AsyncMock,
                     return_value=overview,
                 ),
                 patch(
-                    "app.services.goal_recommendation_service.get_settings_row",
+                    "app.services.goal.goal_recommendation_service.get_settings_row",
                     new_callable=AsyncMock,
                     return_value=settings_row,
                 ),
                 patch(
-                    "app.services.goal_recommendation_service.query_latest_position_map",
+                    "app.services.goal.goal_recommendation_service.query_latest_position_map",
                     new_callable=AsyncMock,
                     return_value={},
                 ),
                 patch(
-                    "app.services.goal_recommendation_service.get_goal_recommendation",
+                    "app.services.goal.goal_recommendation_service.get_goal_recommendation",
                     new_callable=AsyncMock,
                     return_value={
                         "generated_at": "2024-01-01T00:00:00Z",
@@ -308,13 +308,13 @@ class TestGoalRecommendationEndpoint:
                     return_value=GoalRecommendation(**cached),
                 ),
                 patch(
-                    "app.services.goal_recommendation_service.build_portfolio_overview", new_callable=AsyncMock
+                    "app.services.goal.goal_recommendation_service.build_portfolio_overview", new_callable=AsyncMock
                 ) as mock_overview,
                 patch(
-                    "app.services.goal_recommendation_service.query_latest_position_map", new_callable=AsyncMock
+                    "app.services.goal.goal_recommendation_service.query_latest_position_map", new_callable=AsyncMock
                 ) as mock_positions,
                 patch(
-                    "app.services.goal_recommendation_service.get_goal_recommendation", new_callable=AsyncMock
+                    "app.services.goal.goal_recommendation_service.get_goal_recommendation", new_callable=AsyncMock
                 ) as mock_get_rec,
                 TestClient(app, raise_server_exceptions=False) as client,
             ):

@@ -23,7 +23,7 @@ from app.constants import (
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
 from app.services.dividend.constants import is_korean_etf
-from app.services.recommendation_universe import (
+from app.services.goal.recommendation_universe import (
     RECOMMENDATION_UNIVERSE,
     guess_asset_class,
     resolve_distribution_frequency,
