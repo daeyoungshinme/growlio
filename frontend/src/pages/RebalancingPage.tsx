@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
 import { fetchTacticalMarket } from "@/api/tactical";
-import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
 import type { PortfolioItem } from "@/api/portfolios";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
@@ -17,6 +16,7 @@ import { REBALANCING_TABS, type GoalMode, type RebalancingTab } from "@/utils/re
 import {
   compositeSignalStatusQuery,
   driftSummaryQuery,
+  goalRecommendationOverallQuery,
   marketSignalQuery,
   portfoliosQuery,
   settingsQuery,
@@ -178,10 +178,7 @@ export default function RebalancingPage() {
   // 발화해 청크 로딩과 병렬로 돌린다(옵션은 RecommendationCard와 동일하게 유지).
   const goalRecommendationTab = localTab === "목표 조정" && goalMode === "추천";
   useQuery({
-    queryKey: QUERY_KEYS.goalRecommendationOverall,
-    queryFn: fetchOverallGoalRecommendation,
-    staleTime: STALE_TIME.LONG,
-    gcTime: STALE_TIME.DAY,
+    ...goalRecommendationOverallQuery,
     enabled: goalRecommendationTab,
   });
   useQuery({

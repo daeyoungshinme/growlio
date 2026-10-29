@@ -17,7 +17,6 @@ import {
   shouldPersistQuery,
 } from "./constants/queryConfig";
 import { getLocalStorageOrUndefined } from "./utils/safeStorage";
-import { QUERY_KEYS } from "./constants/queryKeys";
 import { setupServiceWorker } from "./lib/serviceWorker";
 import { initSentryDeferred } from "./lib/sentry";
 
@@ -37,10 +36,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-// 계좌 목록은 계좌 CRUD·sync 시 명시적으로 무효화되므로 오래 신선하게 둔다 — observer마다 30초~1시간이
-// 섞여 있어(staleTime 미지정 → 기본 30초) 리밸런싱·자산 화면에 들어갈 때마다 거의 매번 재조회됐다.
-queryClient.setQueryDefaults(QUERY_KEYS.accounts, { staleTime: STALE_TIME.FIVE_MINUTES });
 
 // 앱 재시작 시 대시보드·포트폴리오·계좌 캐시를 즉시 표시하기 위한 persistence (24h TTL)
 const persister = createSyncStoragePersister({

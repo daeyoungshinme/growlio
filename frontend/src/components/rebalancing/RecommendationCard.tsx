@@ -4,13 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchAgeGoalRecommendation,
   fetchHorizonGoalRecommendations,
-  fetchOverallGoalRecommendation,
   type GoalRecommendationItem,
 } from "@/api/rebalancing";
 import { updatePortfolio, type PortfolioItem } from "@/api/portfolios";
 import {
   ACCOUNT_TAX_TYPE_LABELS,
-  fetchAccounts,
   INVESTMENT_HORIZON_LABELS,
   type AccountTaxType,
   type InvestmentHorizon,
@@ -43,7 +41,12 @@ import {
   type OverallTargetSelection,
   type RecommendationTabActions,
 } from "@/components/rebalancing/recommendationCardModel";
-import { portfoliosQuery, settingsQuery } from "@/api/queryOptions";
+import {
+  accountsQuery,
+  goalRecommendationOverallQuery,
+  portfoliosQuery,
+  settingsQuery,
+} from "@/api/queryOptions";
 
 /** 적용 확인창 안내 — 자동 실행이 켜진 포트폴리오면 다음 자동 실행이 새 목표로 주문함을 알린다(plans/63 P4-4) */
 function AutoExecutionNotice({ portfolioId }: { portfolioId: string }) {
@@ -105,14 +108,7 @@ export default function RecommendationCard({
     isError: overallIsError,
     isFetching: overallFetching,
     refetch: refetchOverall,
-  } = useQuery({
-    queryKey: QUERY_KEYS.goalRecommendationOverall,
-    queryFn: fetchOverallGoalRecommendation,
-    staleTime: STALE_TIME.LONG,
-    // 영속 캐시(main.tsx PERSIST_QUERY_KEYS)에 남도록 — 기본 30분 gcTime이면 탭을 한동안 안 열 때
-    // 저장본에서 빠져 재방문이 다시 콜드 계산(수십 초)을 기다렸다
-    gcTime: STALE_TIME.DAY,
-  });
+  } = useQuery(goalRecommendationOverallQuery);
 
   // "기간별"/"연령대" 탭을 실제로 클릭하기 전까지는 지연 로딩 — 둘 다 MVO 최적화 + 외부
   // 가격/배당 API 호출을 수반하는 무거운 요청이라, 탭 마운트 즉시 3개를 전부 fetch하면
@@ -134,10 +130,7 @@ export default function RecommendationCard({
   const { data: portfoliosRaw } = useQuery(portfoliosQuery);
   const portfolios = portfoliosRaw ?? [];
 
-  const { data: accountsRaw } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-  });
+  const { data: accountsRaw } = useQuery(accountsQuery);
   const stockAccounts = (accountsRaw ?? []).filter(
     (a) => a.is_active && isStockAccount(a.asset_type),
   );

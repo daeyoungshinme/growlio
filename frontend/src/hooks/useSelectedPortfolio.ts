@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchAccounts } from "@/api/assets";
 import { fetchTacticalStrategies } from "@/api/tactical";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { getPortfolioTargetState } from "@/utils/portfolio";
 import { isStockAccount } from "@/utils/accounts";
-import { portfoliosQuery } from "@/api/queryOptions";
+import { accountsQuery, portfoliosQuery } from "@/api/queryOptions";
 
 /** URL 선택값 → 첫 우선 후보(기본은 기준 포트폴리오) → 첫 포트폴리오. 목록에 없는 URL 값(삭제됨 등)은 무시한다. */
 export function resolveSelectedPortfolioId(
@@ -32,10 +31,7 @@ export function useSelectedPortfolio(
   { preferTactical = false }: { preferTactical?: boolean } = {},
 ) {
   const { data: portfoliosRaw, isLoading } = useQuery(portfoliosQuery);
-  const { data: accountsRaw } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-  });
+  const { data: accountsRaw } = useQuery(accountsQuery);
   const { data: strategiesRaw, isPending: strategiesPending } = useQuery({
     queryKey: QUERY_KEYS.tacticalStrategies,
     queryFn: fetchTacticalStrategies,

@@ -13,12 +13,7 @@ import { useSyncAllWatcher } from "./hooks/useSyncAllWatcher";
 import { useWidget } from "./hooks/useWidget";
 import { useMainPageFetching } from "./hooks/usePortfolioTabFetching";
 import BiometricGuard from "./components/common/BiometricGuard";
-import { fetchDashboard } from "./api/dashboard";
-import { fetchAccounts, fetchExchangeRate } from "./api/assets";
-import { fetchPortfolioOverviewLite } from "./api/portfolios";
-import { fetchDCAAnalysis } from "./api/invest";
-import { settingsQuery } from "./api/queryOptions";
-import { QUERY_KEYS } from "./constants/queryKeys";
+import { prefetchDashboardData as prefetchQueries } from "./api/prefetch";
 import { storageRemove } from "./utils/safeStorage";
 import { CACHE_OWNER_CHANGED_EVENT } from "./utils/cacheOwner";
 
@@ -121,18 +116,7 @@ export default function App() {
   }, [isDark]);
 
   const prefetchDashboardData = useCallback(() => {
-    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
-    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
-    void queryClient.prefetchQuery({
-      queryKey: QUERY_KEYS.portfolioOverviewLite,
-      queryFn: fetchPortfolioOverviewLite,
-    });
-    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
-    void queryClient.prefetchQuery({
-      queryKey: QUERY_KEYS.exchangeRate,
-      queryFn: fetchExchangeRate,
-    });
-    void queryClient.prefetchQuery(settingsQuery);
+    prefetchQueries(queryClient);
     import("./pages/DashboardPage").catch(() => {});
   }, [queryClient]);
 

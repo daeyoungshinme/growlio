@@ -2,8 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { createPortfolio } from "@/api/portfolios";
-import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
-import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { fmtPct } from "@/utils/format";
 import { toast } from "@/utils/toast";
@@ -14,6 +12,7 @@ import GoalWizardLoading from "./GoalWizardLoading";
 import type { AutosaveStatus } from "./useRecommendationStepAutosave";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { goalRecommendationOverallQuery } from "@/api/queryOptions";
 
 /** 6단계 — 자동 저장이 끝난 뒤 전체 자산 기준 목표 역산 추천을 보여주고, 그 비중으로 새 포트폴리오를 만든다.
  * 저장이 실패하면 이전 설정 기준 추천이 되므로 추천 대신 재시도를 보여준다. */
@@ -34,8 +33,7 @@ export default function GoalWizardRecommendationStep({
     isError: recommendationError,
     refetch: refetchRecommendation,
   } = useQuery({
-    queryKey: QUERY_KEYS.goalRecommendationOverall,
-    queryFn: fetchOverallGoalRecommendation,
+    ...goalRecommendationOverallQuery,
     enabled: settingsPersisted,
     staleTime: STALE_TIME.NONE,
   });

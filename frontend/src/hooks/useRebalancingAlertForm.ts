@@ -13,7 +13,7 @@ import {
   type TaxImpactGateMode,
   type TriggerCondition,
 } from "@/api/alerts";
-import { fetchAccounts, type AccountTaxType, type InvestmentHorizon } from "@/api/assets";
+import { type AccountTaxType, type InvestmentHorizon } from "@/api/assets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidateRebalancingAlertData } from "@/utils/queryInvalidation";
@@ -21,7 +21,7 @@ import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import { recommendDriftThresholdPct } from "@/utils/rebalancingThresholdRecommendation";
 import { isOrderExecutableAccount } from "@/utils/accounts";
-import { marketSignalQuery } from "@/api/queryOptions";
+import { accountsQuery, marketSignalQuery } from "@/api/queryOptions";
 
 const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
@@ -52,10 +52,7 @@ export function useRebalancingAlertQueries({
     },
   });
 
-  const { data: accounts = [], isLoading: accountsLoading } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-  });
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery(accountsQuery);
 
   const { data: marketSignal } = useQuery(marketSignalQuery);
 

@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchAccounts } from "@/api/assets";
-import { fetchRebalancingAlerts } from "@/api/alerts";
 import { AnalysisPanel } from "./AnalysisPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import EmptyState from "@/components/common/EmptyState";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { mergeAlertsByPortfolio } from "@/utils/portfolio";
-import { portfoliosQuery } from "@/api/queryOptions";
+import { accountsQuery, portfoliosQuery, rebalancingAlertsQuery } from "@/api/queryOptions";
 
 interface Props {
   /** 분석 대상 — 페이지가 URL 선택값 또는 기본 포트폴리오(useSelectedPortfolio)로 정해 넘긴다 */
@@ -46,18 +42,11 @@ export default function PortfolioExecutionTab({ portfolioId, scrollToResult }: P
     [portfoliosRaw],
   );
 
-  const { data: accountsRaw, isLoading: accountsLoading } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-  });
+  const { data: accountsRaw, isLoading: accountsLoading } = useQuery(accountsQuery);
   const accounts = Array.isArray(accountsRaw) ? accountsRaw : [];
   const activeAccounts = accounts.filter((a) => a.is_active);
 
-  const { data: rebalancingAlertsRaw } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingAlerts,
-    queryFn: fetchRebalancingAlerts,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data: rebalancingAlertsRaw } = useQuery(rebalancingAlertsQuery);
   const alertByPortfolioId = useMemo(() => {
     const alerts = Array.isArray(rebalancingAlertsRaw) ? rebalancingAlertsRaw : [];
     return mergeAlertsByPortfolio(alerts);

@@ -3,7 +3,7 @@ import { useCallback, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw, X } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
-import { fetchAccounts, syncAccount, syncAllAccounts } from "@/api/assets";
+import { syncAccount, syncAllAccounts } from "@/api/assets";
 import { useSyncStore } from "@/stores/syncStore";
 import { useDividendData } from "@/hooks/useDividendData";
 import StockHoldingsTable, {
@@ -38,6 +38,7 @@ import {
 } from "@/utils/accounts";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPortfolioOverview } from "@/api/portfolios";
+import { accountsQuery } from "@/api/queryOptions";
 
 const AllocationCard = lazy(() => import("../components/portfolio/AllocationCard"));
 
@@ -107,11 +108,7 @@ export default function PortfolioPage() {
     holdingsRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }, []);
 
-  const { data: accountsList } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: accountsList } = useQuery(accountsQuery);
   const accountOptions = useMemo(
     () => (accountsList ?? []).filter((a) => isStockAccount(a.asset_type)),
     [accountsList],

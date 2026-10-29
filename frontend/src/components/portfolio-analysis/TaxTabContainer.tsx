@@ -1,14 +1,12 @@
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchAccounts } from "@/api/assets";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { SELECT_SM } from "@/constants/inputStyles";
 import { isStockAccount } from "@/utils/accounts";
 import Tabs from "@/components/common/Tabs";
 import TaxLimitsSection from "@/components/portfolio-analysis/TaxLimitsSection";
 import TaxOptimizationCard from "@/components/portfolio-analysis/TaxOptimizationCard";
+import { accountsQuery } from "@/api/queryOptions";
 
 const TAX_TABS = ["한도 현황", "세금 추정"] as const;
 type TaxTab = (typeof TAX_TABS)[number];
@@ -42,9 +40,7 @@ export default function TaxTabContainer() {
   );
 
   const { data: accountsList } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-    staleTime: STALE_TIME.LONG,
+    ...accountsQuery,
     enabled: taxTab === "세금 추정",
   });
   const stockAccounts = useMemo(

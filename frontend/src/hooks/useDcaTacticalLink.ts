@@ -1,7 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchRebalancingAlerts } from "@/api/alerts";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import { rebalancingAlertsQuery } from "@/api/queryOptions";
 
 export interface DcaTacticalLink {
   /** 활성 AUTO + BUY_ONLY(매수만) 자동매수 — 적립식 코어로 운용 중 */
@@ -16,9 +14,7 @@ export interface DcaTacticalLink {
  */
 export function useDcaTacticalLink(portfolioId: string | undefined): DcaTacticalLink {
   const { data } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingAlerts,
-    queryFn: fetchRebalancingAlerts,
-    staleTime: STALE_TIME.MEDIUM,
+    ...rebalancingAlertsQuery,
     enabled: !!portfolioId,
   });
   if (!portfolioId || !Array.isArray(data)) return { dcaAuto: false, linked: false };

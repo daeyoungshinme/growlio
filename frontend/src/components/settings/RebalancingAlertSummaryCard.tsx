@@ -1,13 +1,11 @@
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchRebalancingAlerts } from "@/api/alerts";
-import { QUERY_KEYS } from "@/constants/queryKeys";
 import { mergeAlertsByPortfolio } from "@/utils/portfolio";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
-import { portfoliosQuery } from "@/api/queryOptions";
+import { portfoliosQuery, rebalancingAlertsQuery } from "@/api/queryOptions";
 
 /** 설정 페이지 알림 섹션에 노출되는 리밸런싱 알림 현황 요약 — 실제 편집은 리밸런싱 탭에서 이뤄지므로
  * 여기서는 상태 요약 + 딥링크만 제공한다 (frontend/CLAUDE.md "다른 설정" 패턴과 동일). */
@@ -16,10 +14,7 @@ export default function RebalancingAlertSummaryCard() {
     data: alerts,
     isLoading: alertsLoading,
     isError: alertsError,
-  } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingAlerts,
-    queryFn: fetchRebalancingAlerts,
-  });
+  } = useQuery(rebalancingAlertsQuery);
   const {
     data: portfolios,
     isLoading: portfoliosLoading,

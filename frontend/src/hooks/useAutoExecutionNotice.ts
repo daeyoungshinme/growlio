@@ -1,7 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchRebalancingAlerts } from "@/api/alerts";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import { rebalancingAlertsQuery } from "@/api/queryOptions";
 
 /**
  * 목표 비중을 바꾸는 확인창(추천 적용·전술 적용)에 붙일 안내 — 그 포트폴리오에 켜진 자동 실행이 있으면
@@ -9,9 +7,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
  */
 export function useAutoExecutionNotice(portfolioId: string | undefined): string | null {
   const { data } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingAlerts,
-    queryFn: fetchRebalancingAlerts,
-    staleTime: STALE_TIME.MEDIUM,
+    ...rebalancingAlertsQuery,
     enabled: !!portfolioId,
   });
   if (!portfolioId || !Array.isArray(data)) return null;
