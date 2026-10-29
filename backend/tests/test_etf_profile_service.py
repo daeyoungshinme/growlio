@@ -9,8 +9,8 @@ import pytest
 import requests
 
 from app.core.cache_store import CacheStore
-from app.services import etf_profile_service as svc
-from app.services.etf_profile_service import parse_naver_etf_profile, parse_yahoo_etf_profile
+from app.services.etf import etf_profile_service as svc
+from app.services.etf.etf_profile_service import parse_naver_etf_profile, parse_yahoo_etf_profile
 
 _NAVER_360750 = {
     "itemCode": "360750",

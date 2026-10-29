@@ -178,7 +178,7 @@ async def _group_suggestions(
 
     실패해도 적용은 막지 않는다(대표 종목만으로 그룹 생성).
     """
-    from app.services.index_exposure_service import get_index_group_suggestions
+    from app.services.etf.index_exposure_service import get_index_group_suggestions
 
     try:
         rows = await db.execute(

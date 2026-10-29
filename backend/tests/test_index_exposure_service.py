@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.services.etf_index_classifier import classify_holding
-from app.services.etf_profile_service import EtfProfile
-from app.services.index_exposure_service import build_index_exposure, get_index_exposure, merge_holdings
+from app.services.etf.etf_index_classifier import classify_holding
+from app.services.etf.etf_profile_service import EtfProfile
+from app.services.etf.index_exposure_service import build_index_exposure, get_index_exposure, merge_holdings
 
 
 def _pos(ticker: str, market: str, name: str, value: float) -> dict:
@@ -100,12 +100,12 @@ class TestGetIndexExposure:
         profiles = {("TQQQ", "NASDAQ"): _etf("ProShares UltraPro QQQ")}
         with (
             patch(
-                "app.services.index_exposure_service.build_portfolio_overview",
+                "app.services.etf.index_exposure_service.build_portfolio_overview",
                 new_callable=AsyncMock,
                 return_value=overview,
             ) as overview_mock,
             patch(
-                "app.services.index_exposure_service.get_etf_profiles_with_status",
+                "app.services.etf.index_exposure_service.get_etf_profiles_with_status",
                 new_callable=AsyncMock,
                 return_value=(profiles, set()),
             ),
@@ -120,12 +120,12 @@ class TestGetIndexExposure:
         overview = {"all_positions": [_pos("ARKK", "AMEX", "ARK Innovation ETF", 100), _pos("SPY", "AMEX", "SPY", 100)]}
         with (
             patch(
-                "app.services.index_exposure_service.build_portfolio_overview",
+                "app.services.etf.index_exposure_service.build_portfolio_overview",
                 new_callable=AsyncMock,
                 return_value=overview,
             ),
             patch(
-                "app.services.index_exposure_service.get_etf_profiles_with_status",
+                "app.services.etf.index_exposure_service.get_etf_profiles_with_status",
                 new_callable=AsyncMock,
                 return_value=({}, {("ARKK", "AMEX"), ("SPY", "AMEX")}),
             ),
@@ -138,12 +138,12 @@ class TestGetIndexExposure:
     async def test_no_holdings_skips_profile_fetch(self, mock_db, mock_cache):
         with (
             patch(
-                "app.services.index_exposure_service.build_portfolio_overview",
+                "app.services.etf.index_exposure_service.build_portfolio_overview",
                 new_callable=AsyncMock,
                 return_value={"all_positions": []},
             ),
             patch(
-                "app.services.index_exposure_service.get_etf_profiles_with_status", new_callable=AsyncMock
+                "app.services.etf.index_exposure_service.get_etf_profiles_with_status", new_callable=AsyncMock
             ) as profiles_mock,
         ):
             result = await get_index_exposure(mock_cache, mock_db, uuid.uuid4())

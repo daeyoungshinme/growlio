@@ -21,8 +21,8 @@ from app.schemas.portfolio import (
     IndexGroupSuggestionResponse,
     RegionExposure,
 )
-from app.services.etf_index_classifier import IndexClass, classify_holding, index_label, is_domestic_listed
-from app.services.etf_profile_service import get_etf_profiles_with_status
+from app.services.etf.etf_index_classifier import IndexClass, classify_holding, index_label, is_domestic_listed
+from app.services.etf.etf_profile_service import get_etf_profiles_with_status
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
 

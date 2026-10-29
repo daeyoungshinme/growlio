@@ -561,7 +561,7 @@ def _group_from_item(item: Any) -> _GroupSpec:
 
 def _group_from_suggestion(asset: str, suggestion: IndexGroupSuggestion | None) -> _GroupSpec:
     """새 그룹 — 대표 종목은 전술 자산(판정·백테스트 기준 ETF), 멤버·국내 대체는 보유 종목 기반 제안에서."""
-    from app.services.etf_index_classifier import index_label
+    from app.services.etf.etf_index_classifier import index_label
 
     name, market = _ASSET_META[asset]
     label = suggestion.label if suggestion else index_label(ASSET_GROUP_KEYS[asset])

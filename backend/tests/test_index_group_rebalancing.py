@@ -13,8 +13,8 @@ from app.schemas.portfolio import (
     PortfolioCreate,
 )
 from app.schemas.rebalancing import TickerAccountInfo
+from app.services.etf.index_exposure_service import build_index_group_suggestions
 from app.services.goal_recommendation_service import fold_into_portfolio_groups
-from app.services.index_exposure_service import build_index_group_suggestions
 from app.services.rebalancing.group_expansion import expand_group_items, iter_trade_items
 from app.services.rebalancing.order_builder import build_rebalancing_orders
 from app.services.rebalancing.service import analyze_rebalancing
@@ -295,7 +295,7 @@ class TestLeveragedMembers:
         ],
     )
     def test_classifier(self, ticker, market, name, expected):
-        from app.services.etf_index_classifier import classify_holding
+        from app.services.etf.etf_index_classifier import classify_holding
 
         cls = classify_holding(ticker, market, name, None)
         assert cls.kind == "LEVERAGED"

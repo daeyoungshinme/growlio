@@ -9,8 +9,8 @@ import pandas as pd
 import pytest
 
 from app.core.cache_store import CacheStore
-from app.services import etf_overlap_service as svc
-from app.services.etf_overlap_service import _Item, build_items, find_overlap_groups, weekly_returns_frame
+from app.services.etf import etf_overlap_service as svc
+from app.services.etf.etf_overlap_service import _Item, build_items, find_overlap_groups, weekly_returns_frame
 
 
 def _profile(ter: float | None = None, base_index: str | None = None, long_name: str | None = None) -> dict:

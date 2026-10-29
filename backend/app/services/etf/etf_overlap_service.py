@@ -43,7 +43,7 @@ from app.schemas.rebalancing.goal import (
     OverlapMember,
 )
 from app.services._settings_queries import get_settings_row
-from app.services.etf_profile_service import EtfProfile, get_etf_profiles
+from app.services.etf.etf_profile_service import EtfProfile, get_etf_profiles
 from app.services.goal_candidate_service import LEVERAGED_INVERSE_RE, existing_items_from_positions
 from app.services.market_data_fetcher import fetch_yf_close_series
 from app.services.position_aggregator import query_latest_position_map
