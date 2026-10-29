@@ -174,7 +174,7 @@ describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
     fireEvent.click(await screen.findByText("후보에 추가"));
 
     await waitFor(() => expect(updateGoalCandidateTickers).toHaveBeenCalled());
-    expect(updateGoalCandidateTickers.mock.calls[0][0]).toEqual([
+    expect(updateGoalCandidateTickers.mock.calls[0]![0]).toEqual([
       { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", asset_class: "EQUITY" },
       {
         ticker: "JEPQ",

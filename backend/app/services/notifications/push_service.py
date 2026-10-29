@@ -85,16 +85,6 @@ async def deliver_push(
         return PushResult.FAILED
 
 
-async def send_push(
-    fcm_token: str | None,
-    title: str,
-    body: str,
-    data: dict[str, str] | None = None,
-) -> bool:
-    """FCM 토큰으로 푸시 알림 발송. Firebase 미설정·토큰 없음·실패 시 False."""
-    return await deliver_push(fcm_token, title, body, data) is PushResult.SENT
-
-
 async def _clear_invalid_token(user_id: uuid.UUID, fcm_token: str) -> None:
     """폐기된 토큰을 지워 이후 알림 잡(5~10분 주기)이 같은 토큰으로 FCM을 계속 부르지 않게 한다.
 

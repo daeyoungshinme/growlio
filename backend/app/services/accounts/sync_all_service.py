@@ -20,6 +20,7 @@ import structlog
 
 from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
+from app.core.job_runner import report_handled_failure
 from app.core.logging import format_sync_error
 from app.models.asset import AssetAccount
 from app.services.accounts.asset_service import sync_account
@@ -62,12 +63,8 @@ async def sync_accounts(
                     await sync_account(merged_account, db, cache)
                 logger.info("account_synced", job=job_name, account_id=str(account.id), name=account.name)
             except Exception as e:
-                logger.error(
-                    "account_sync_failed",
-                    job=job_name,
-                    account_id=str(account.id),
-                    name=account.name,
-                    error=str(e),
+                report_handled_failure(
+                    "account_sync_failed", e, job=job_name, account_id=str(account.id), name=account.name
                 )
                 failed.append((str(account.id), account.name, str(e)))
         if on_progress:
@@ -143,7 +140,7 @@ async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None
         try:
             failed = await sync_accounts(accounts, "sync_all", on_progress=on_progress)
         except Exception as e:
-            logger.error("sync_all_failed", user_id=str(user_id), error=str(e))
+            report_handled_failure("sync_all_failed", e, user_id=str(user_id))
             await set_cached_json(
                 cache,
                 status_key,

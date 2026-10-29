@@ -97,7 +97,7 @@ function render(taxType: AssetAccount["tax_type"]) {
 // 대체 종목이 없는 그룹 — ISA는 VOO를 살 방법이 없다
 const analysisNoAlt: RebalancingAnalysis = {
   ...analysis,
-  items: [{ ...analysis.items[0], members: [analysis.items[0].members![0]] }],
+  items: [{ ...analysis.items[0]!, members: [analysis.items[0]!.members![0]!] }],
 };
 
 describe("수동 실행 국내 대체 자동 전환 (plans/79 E)", () => {

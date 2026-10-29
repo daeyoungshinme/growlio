@@ -108,8 +108,8 @@ describe("useAccountPositions", () => {
     });
 
     await waitFor(() => expect(result.current).toHaveLength(1));
-    expect(result.current[0].ticker).toBe("005930");
-    expect(result.current[0].qty).toBe(10);
+    expect(result.current[0]!.ticker).toBe("005930");
+    expect(result.current[0]!.qty).toBe(10);
   });
 
   it("데이터 없으면 빈 배열을 반환한다", async () => {
@@ -247,8 +247,8 @@ describe("useAllocationHistory", () => {
     expect(result.current.allTypes).toContain("STOCK_KIS");
     expect(result.current.allTypes).toContain("BANK_ACCOUNT");
     expect(result.current.chartData).toHaveLength(1);
-    expect(result.current.chartData[0]["STOCK_KIS"]).toBe(700000);
-    expect(result.current.chartData[0]["BANK_ACCOUNT"]).toBe(300000);
+    expect(result.current.chartData[0]!["STOCK_KIS"]).toBe(700000);
+    expect(result.current.chartData[0]!["BANK_ACCOUNT"]).toBe(300000);
   });
 
   it("labelMap이 asset_type → label 매핑을 제공한다", async () => {
@@ -279,8 +279,8 @@ describe("useAllocationHistory", () => {
     const { result } = renderHook(() => useAllocationHistory(12), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.reversedMonthly[0].month).toBe("2024-02-01");
-    expect(result.current.reversedMonthly[1].month).toBe("2024-01-01");
+    expect(result.current.reversedMonthly[0]!.month).toBe("2024-02-01");
+    expect(result.current.reversedMonthly[1]!.month).toBe("2024-01-01");
   });
 
   it("데이터가 빈 배열이면 labelMap이 빈 객체다", async () => {
@@ -338,7 +338,7 @@ describe("useAlertCrud", () => {
       await result.current.reactivateMutation.mutateAsync("alert-1");
     });
 
-    expect(reactivateFn.mock.calls[0][0]).toBe("alert-1");
+    expect(reactivateFn.mock.calls[0]![0]).toBe("alert-1");
     expect(invalidateFn).toHaveBeenCalled();
     expect(toast).toHaveBeenCalledWith("알림이 재활성화되었습니다", "success");
   });
@@ -363,7 +363,7 @@ describe("useAlertCrud", () => {
       await result.current.deleteMutation.mutateAsync("alert-1");
     });
 
-    expect(deleteFn.mock.calls[0][0]).toBe("alert-1");
+    expect(deleteFn.mock.calls[0]![0]).toBe("alert-1");
     expect(invalidateFn).toHaveBeenCalled();
   });
 
@@ -690,7 +690,7 @@ describe("useAssetManagementData", () => {
     });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.accounts).toHaveLength(1);
-    expect(result.current.accounts[0].id).toBe("acc-1");
+    expect(result.current.accounts[0]!.id).toBe("acc-1");
   });
 
   it("usdRate를 ExchangeRateContext에서 제공받는다", async () => {

@@ -17,7 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.logging import public_error_message, redact_secrets
+from app.core.job_runner import report_handled_failure
+from app.core.logging import public_error_message
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.order_builder import market_group
@@ -165,12 +166,7 @@ async def _execute_leg(
             strategy=plan.strategy,
         )
     except Exception as exc:
-        logger.error(
-            "rebalancing_plan_leg_execute_failed",
-            leg_id=str(locked.id),
-            error=redact_secrets(str(exc)),
-            error_type=type(exc).__name__,
-        )
+        report_handled_failure("rebalancing_plan_leg_execute_failed", exc, leg_id=str(locked.id))
         reason = public_error_message(exc)
         # 원인이 DB 오류면 세션이 실패 상태라 rollback 없이는 FAILED 커밋도 PendingRollbackError로 깨지고, leg는
         # token_consumed_at만 찍힌 PENDING으로 영구히 남는다(어떤 경로도 다시 집지 않음). 주문 그룹 예외는
@@ -270,12 +266,7 @@ async def execute_due_buy_legs(db: AsyncSession, cache) -> int:
             if await _run_due_buy_leg(leg_id, now, composite_level, data_freshness, db, cache):
                 processed += 1
         except Exception as e:
-            logger.error(
-                "rebalancing_plan_buy_leg_tick_failed",
-                leg_id=str(leg_id),
-                error=redact_secrets(str(e)),
-                error_type=type(e).__name__,
-            )
+            report_handled_failure("rebalancing_plan_buy_leg_tick_failed", e, leg_id=str(leg_id))
             await db.rollback()
 
     return processed
@@ -370,12 +361,7 @@ async def fail_stuck_consumed_legs(db: AsyncSession) -> int:
                 await _notify_leg_execution_failed(plan, side, STUCK_LEG_MESSAGE, db)
             processed += 1
         except Exception as e:
-            logger.error(
-                "rebalancing_plan_stuck_leg_sweep_failed",
-                leg_id=str(leg_id),
-                error=redact_secrets(str(e)),
-                error_type=type(e).__name__,
-            )
+            report_handled_failure("rebalancing_plan_stuck_leg_sweep_failed", e, leg_id=str(leg_id))
             await db.rollback()
     return processed
 
@@ -416,12 +402,7 @@ async def expire_due_sell_legs(db: AsyncSession) -> int:
             await db.commit()
             processed += 1
         except Exception as e:
-            logger.error(
-                "rebalancing_plan_sell_expiry_leg_failed",
-                leg_id=str(leg_id),
-                error=redact_secrets(str(e)),
-                error_type=type(e).__name__,
-            )
+            report_handled_failure("rebalancing_plan_sell_expiry_leg_failed", e, leg_id=str(leg_id))
             await db.rollback()
 
     return processed

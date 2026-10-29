@@ -60,10 +60,7 @@ export function useTacticalMutations(portfolioId: string) {
           : "전술 배분을 껐습니다. 포트폴리오 목표 비중은 그대로 유지됩니다.",
         "info",
       );
-      await invalidateTacticalData(queryClient);
-      if (opts?.dcaLinked) {
-        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts });
-      }
+      await invalidateTacticalData(queryClient, { dcaLinked: opts?.dcaLinked });
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });

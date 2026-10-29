@@ -34,23 +34,23 @@ describe("usePositionsEditor", () => {
     const initial = [makePos()];
     const { result } = renderHook(() => usePositionsEditor(initial, null));
     expect(result.current.rows).toHaveLength(1);
-    expect(result.current.rows[0].ticker).toBe("005930");
+    expect(result.current.rows[0]!.ticker).toBe("005930");
   });
 
   it("liveRows가 P&L 계산 값을 포함한다", () => {
     const pos = makePos({ qty: 10, avg_price: 70000, current_price: 75000 });
     const { result } = renderHook(() => usePositionsEditor([pos], null));
     const liveRow = result.current.liveRows[0];
-    expect(liveRow.invested_amount).toBe(700000);
-    expect(liveRow.value_amount).toBe(750000);
-    expect(liveRow.pnl).toBe(50000);
-    expect(liveRow.pnl_pct).toBeCloseTo(7.14, 1);
+    expect(liveRow!.invested_amount).toBe(700000);
+    expect(liveRow!.value_amount).toBe(750000);
+    expect(liveRow!.pnl).toBe(50000);
+    expect(liveRow!.pnl_pct).toBeCloseTo(7.14, 1);
   });
 
   it("current_price가 없으면 avg_price를 사용한다", () => {
     const pos = makePos({ qty: 10, avg_price: 70000, current_price: null });
     const { result } = renderHook(() => usePositionsEditor([pos], null));
-    expect(result.current.liveRows[0].value_amount).toBe(700000);
+    expect(result.current.liveRows[0]!.value_amount).toBe(700000);
   });
 
   it("addRow가 새 빈 행을 추가한다", () => {
@@ -59,7 +59,7 @@ describe("usePositionsEditor", () => {
       result.current.addRow();
     });
     expect(result.current.rows).toHaveLength(1);
-    expect(result.current.rows[0].ticker).toBe("");
+    expect(result.current.rows[0]!.ticker).toBe("");
   });
 
   it("removeRow가 지정 인덱스 행을 삭제한다", () => {
@@ -69,7 +69,7 @@ describe("usePositionsEditor", () => {
       result.current.removeRow(0);
     });
     expect(result.current.rows).toHaveLength(1);
-    expect(result.current.rows[0].ticker).toBe("000660");
+    expect(result.current.rows[0]!.ticker).toBe("000660");
   });
 
   it("setRow가 특정 행의 필드를 업데이트한다", () => {
@@ -77,7 +77,7 @@ describe("usePositionsEditor", () => {
     act(() => {
       result.current.setRow(0, { qty: 20 });
     });
-    expect(result.current.rows[0].qty).toBe(20);
+    expect(result.current.rows[0]!.qty).toBe(20);
   });
 
   it("handleNameChange가 이름을 업데이트하고 종목 검색을 실행한다", async () => {
@@ -85,7 +85,7 @@ describe("usePositionsEditor", () => {
     act(() => {
       result.current.handleNameChange(0, "삼성");
     });
-    expect(result.current.rows[0].name).toBe("삼성");
+    expect(result.current.rows[0]!.name).toBe("삼성");
     expect(result.current.suggestIdx).toBe(0);
   });
 
@@ -113,10 +113,10 @@ describe("usePositionsEditor", () => {
     act(() => {
       result.current.handleSelectSuggestion(0, suggestion);
     });
-    expect(result.current.rows[0].ticker).toBe("000660");
-    expect(result.current.rows[0].name).toBe("SK하이닉스");
+    expect(result.current.rows[0]!.ticker).toBe("000660");
+    expect(result.current.rows[0]!.name).toBe("SK하이닉스");
     expect(result.current.suggestIdx).toBeNull();
-    await waitFor(() => expect(result.current.rows[0].current_price).toBe(75000));
+    await waitFor(() => expect(result.current.rows[0]!.current_price).toBe(75000));
   });
 
   it("handleAvgPriceUsd가 USD 가격을 KRW로 환산한다", () => {
@@ -124,9 +124,9 @@ describe("usePositionsEditor", () => {
     act(() => {
       result.current.handleAvgPriceUsd(0, "100");
     });
-    expect(result.current.rows[0].avg_price_usd).toBe(100);
-    expect(result.current.rows[0].avg_price).toBe(135000);
-    expect(result.current.rows[0].usd_rate).toBe(1350);
+    expect(result.current.rows[0]!.avg_price_usd).toBe(100);
+    expect(result.current.rows[0]!.avg_price).toBe(135000);
+    expect(result.current.rows[0]!.usd_rate).toBe(1350);
   });
 
   it("handleAvgPriceUsd 빈 문자열은 0으로 처리한다", () => {
@@ -134,8 +134,8 @@ describe("usePositionsEditor", () => {
     act(() => {
       result.current.handleAvgPriceUsd(0, "");
     });
-    expect(result.current.rows[0].avg_price_usd).toBeNull();
-    expect(result.current.rows[0].avg_price).toBe(0);
+    expect(result.current.rows[0]!.avg_price_usd).toBeNull();
+    expect(result.current.rows[0]!.avg_price).toBe(0);
   });
 
   it("handleCurrentPriceUsd가 현재가를 업데이트한다", () => {
@@ -143,8 +143,8 @@ describe("usePositionsEditor", () => {
     act(() => {
       result.current.handleCurrentPriceUsd(0, "50");
     });
-    expect(result.current.rows[0].current_price_usd).toBe(50);
-    expect(result.current.rows[0].current_price).toBe(67500);
+    expect(result.current.rows[0]!.current_price_usd).toBe(50);
+    expect(result.current.rows[0]!.current_price).toBe(67500);
   });
 
   it("handleCurrentPriceUsd 빈 문자열은 null로 처리한다", () => {
@@ -152,8 +152,8 @@ describe("usePositionsEditor", () => {
     act(() => {
       result.current.handleCurrentPriceUsd(0, "");
     });
-    expect(result.current.rows[0].current_price_usd).toBeNull();
-    expect(result.current.rows[0].current_price).toBeNull();
+    expect(result.current.rows[0]!.current_price_usd).toBeNull();
+    expect(result.current.rows[0]!.current_price).toBeNull();
   });
 
   it("enrichRows가 해외 종목 current_price_usd를 계산한다", () => {
@@ -165,14 +165,14 @@ describe("usePositionsEditor", () => {
       current_price_usd: null,
     });
     const enriched = result.current.enrichRows([pos]);
-    expect(enriched[0].current_price_usd).toBeCloseTo(100, 2);
+    expect(enriched[0]!.current_price_usd).toBeCloseTo(100, 2);
   });
 
   it("enrichRows가 _rowKey가 없으면 ticker-market 키를 생성한다", () => {
     const { result } = renderHook(() => usePositionsEditor([], null));
     const pos = makePos({ _rowKey: undefined });
     const enriched = result.current.enrichRows([pos]);
-    expect(enriched[0]._rowKey).toBe("005930-KOSPI");
+    expect(enriched[0]!._rowKey).toBe("005930-KOSPI");
   });
 
   it("handleSelectSuggestion에서 가격 조회 실패 시 toast를 호출한다", async () => {
@@ -271,8 +271,8 @@ describe("usePositionsEditor", () => {
       expect(result.current.priceLoadingRows.size).toBe(0);
 
       expect(result.current.rows).toHaveLength(1);
-      expect(result.current.rows[0].ticker).toBe("000660");
-      expect(result.current.rows[0].current_price).toBe(200000);
+      expect(result.current.rows[0]!.ticker).toBe("000660");
+      expect(result.current.rows[0]!.current_price).toBe(200000);
     });
 
     it("같은 행에서 종목을 다시 고르면 늦게 온 이전 종목 응답은 무시한다", async () => {
@@ -291,8 +291,8 @@ describe("usePositionsEditor", () => {
       await act(async () => second.resolve(price(2000)));
       await act(async () => first.resolve(price(1000)));
 
-      expect(result.current.rows[0].ticker).toBe("BBB");
-      expect(result.current.rows[0].current_price).toBe(2000);
+      expect(result.current.rows[0]!.ticker).toBe("BBB");
+      expect(result.current.rows[0]!.current_price).toBe(2000);
     });
   });
 });

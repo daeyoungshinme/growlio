@@ -637,7 +637,7 @@ describe("RecommendationCard", () => {
       fireEvent.click(screen.getByText("후보에 추가"));
 
       await waitFor(() => expect(updateGoalCandidateTickers).toHaveBeenCalled());
-      expect(updateGoalCandidateTickers.mock.calls[0][0]).toEqual([
+      expect(updateGoalCandidateTickers.mock.calls[0]![0]).toEqual([
         { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE" },
         {
           ticker: "JEPQ",
@@ -917,7 +917,7 @@ describe("RecommendationCard", () => {
         groups: [
           {
             ...spyOverlap.groups[0],
-            members: spyOverlap.groups[0].members.map((m, i) => ({ ...m, ticker: `X${i}` })),
+            members: spyOverlap.groups[0]!.members.map((m, i) => ({ ...m, ticker: `X${i}` })),
           },
         ],
       });
@@ -993,7 +993,7 @@ describe("RecommendationCard", () => {
       fireEvent.click(await screen.findByText("저장"));
 
       await waitFor(() => expect(updateGoalCandidateTickers).toHaveBeenCalled());
-      expect(updateGoalCandidateTickers.mock.calls[0][0]).toEqual([
+      expect(updateGoalCandidateTickers.mock.calls[0]![0]).toEqual([
         {
           ticker: "TLT",
           name: "iShares 20+ Year Treasury Bond ETF",
@@ -1028,7 +1028,7 @@ describe("RecommendationCard", () => {
       fireEvent.click(await screen.findByText("저장"));
 
       await waitFor(() => expect(updateGoalRecommendationOptions).toHaveBeenCalled());
-      expect(updateGoalRecommendationOptions.mock.calls[0][0]).toEqual({
+      expect(updateGoalRecommendationOptions.mock.calls[0]![0]).toEqual({
         risk_tolerance: "AGGRESSIVE",
         max_weight_pct: 40,
         cagr_lookback_years: 10,

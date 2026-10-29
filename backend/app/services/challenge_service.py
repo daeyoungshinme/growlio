@@ -40,13 +40,9 @@ from app.utils.cache_keys import (
     invalidate_user_caches,
     set_cached_json,
 )
-from app.utils.kst import KST as _KST
+from app.utils.kst import today_kst
 
 _NUDGE_DAY_OF_MONTH = 20  # 이 날짜 이후부터 "이번 달 아직 적립 안 함"을 네비 배지로 노출
-
-
-def _now_kst_date() -> date:
-    return datetime.now(_KST).date()
 
 
 def _month_key(d: date) -> str:
@@ -161,7 +157,7 @@ async def compute_progress(
     db: AsyncSession,
     cache: CacheStoreType = None,
 ) -> ChallengeProgress:
-    current_month = _month_key(_now_kst_date())
+    current_month = _month_key(today_kst())
 
     if challenge.challenge_type == CHALLENGE_DEPOSIT:
         target_amount = float(challenge.target_amount) if challenge.target_amount else None
@@ -318,7 +314,7 @@ async def delete_challenge(challenge: InvestmentChallenge, db: AsyncSession, cac
 
 
 async def get_challenge_summary(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> ChallengeSummary:
-    today = _now_kst_date()
+    today = today_kst()
     current_month = _month_key(today)
     result = await db.execute(
         select(InvestmentChallenge).where(

@@ -27,7 +27,7 @@ from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.notifications.email_service import send_challenge_wrap_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
-from app.utils.kst import KST as _KST
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -37,7 +37,7 @@ _MILESTONES = (3, 6, 12, 24, 36, 60)
 
 
 def _prev_month_str() -> str:
-    today = datetime.now(_KST).date()
+    today = today_kst()
     prev_last = today.replace(day=1) - timedelta(days=1)
     return prev_last.strftime("%Y-%m")
 

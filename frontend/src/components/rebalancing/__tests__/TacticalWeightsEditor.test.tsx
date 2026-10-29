@@ -81,7 +81,7 @@ describe("TacticalWeightsEditor", () => {
     fireEvent.change(cell("공격 국면 S&P500 비중"), { target: { value: "20" } });
     fireEvent.change(cell("공격 국면 다우 비중"), { target: { value: "20" } });
     fireEvent.click(saveBtn());
-    expect(onSave.mock.calls[0][0].regime_weights.RISK_ON).toEqual({
+    expect(onSave.mock.calls[0]![0].regime_weights.RISK_ON).toEqual({
       QQQ: 50,
       SPY: 20,
       DIA: 20,
@@ -166,7 +166,7 @@ describe("TacticalWeightsEditor", () => {
     expect(onSave).not.toHaveBeenCalled(); // 누르기만 해선 저장하지 않는다
 
     fireEvent.click(saveBtn());
-    const payload = onSave.mock.calls[0][0];
+    const payload = onSave.mock.calls[0]![0];
     expect(payload.use_macro).toBe(false);
     expect(payload.regime_weights.NEUTRAL).toEqual({
       QQQ: 50,

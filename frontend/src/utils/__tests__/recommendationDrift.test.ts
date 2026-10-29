@@ -160,9 +160,9 @@ describe("normalizeWeights", () => {
       recItem({ ticker: "B", weight: 33.33 }),
       recItem({ ticker: "C", weight: 33.34 }),
     ]);
-    expect(result[0].weight).toBe(33.3);
-    expect(result[1].weight).toBe(33.3);
-    expect(result[2].weight).toBeCloseTo(33.4, 5);
+    expect(result[0]!.weight).toBe(33.3);
+    expect(result[1]!.weight).toBe(33.3);
+    expect(result[2]!.weight).toBeCloseTo(33.4, 5);
     expect(result.reduce((s, i) => s + i.weight, 0)).toBeCloseTo(100, 5);
   });
 

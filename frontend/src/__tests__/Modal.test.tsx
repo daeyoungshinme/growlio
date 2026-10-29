@@ -25,7 +25,7 @@ describe("Modal", () => {
       </Modal>,
     );
     const buttons = getAllByRole(container, "button");
-    buttons[buttons.length - 1].focus();
+    buttons[buttons.length - 1]!.focus();
     fireEvent.keyDown(document, { key: "Tab" });
     // 포커스 트랩 실행 확인 (에러 없이 처리)
     expect(document.activeElement).toBeTruthy();
@@ -39,7 +39,7 @@ describe("Modal", () => {
       </Modal>,
     );
     const buttons = getAllByRole(container, "button");
-    buttons[0].focus();
+    buttons[0]!.focus();
     fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBeTruthy();
   });

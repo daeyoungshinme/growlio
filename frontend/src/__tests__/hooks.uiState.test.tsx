@@ -143,7 +143,7 @@ describe("useSettingsToggle", () => {
 
     act(() => result.current.toggle(false));
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith(qc));
-    expect(mutationFn.mock.calls[0][0]).toBe(false);
+    expect(mutationFn.mock.calls[0]![0]).toBe(false);
   });
 
   it("저장 실패 시 에러 토스트, 무효화하지 않는다", async () => {

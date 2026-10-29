@@ -41,9 +41,9 @@ describe("groupPositionsByTicker", () => {
   it("단일 포지션은 그대로 집계", () => {
     const result = groupPositionsByTicker([makePos()]);
     expect(result).toHaveLength(1);
-    expect(result[0].ticker).toBe("005930");
-    expect(result[0].total_qty).toBe(10);
-    expect(result[0].sub_positions).toHaveLength(1);
+    expect(result[0]!.ticker).toBe("005930");
+    expect(result[0]!.total_qty).toBe(10);
+    expect(result[0]!.sub_positions).toHaveLength(1);
   });
 
   it("같은 ticker+market은 합산", () => {
@@ -67,11 +67,11 @@ describe("groupPositionsByTicker", () => {
     ];
     const result = groupPositionsByTicker(positions);
     expect(result).toHaveLength(1);
-    expect(result[0].total_qty).toBe(15);
-    expect(result[0].total_value_krw).toBe(1125000);
-    expect(result[0].total_invested_krw).toBe(1050000);
-    expect(result[0].total_pnl).toBe(75000);
-    expect(result[0].sub_positions).toHaveLength(2);
+    expect(result[0]!.total_qty).toBe(15);
+    expect(result[0]!.total_value_krw).toBe(1125000);
+    expect(result[0]!.total_invested_krw).toBe(1050000);
+    expect(result[0]!.total_pnl).toBe(75000);
+    expect(result[0]!.sub_positions).toHaveLength(2);
   });
 
   it("다른 ticker는 별도 집계", () => {
@@ -97,13 +97,13 @@ describe("groupPositionsByTicker", () => {
       makePos({ qty: 10, value_krw: 1100000, invested_krw: 1000000, pnl: 100000 }),
     ];
     const result = groupPositionsByTicker(positions);
-    expect(result[0].pnl_pct).toBeCloseTo(10.0);
+    expect(result[0]!.pnl_pct).toBeCloseTo(10.0);
   });
 
   it("invested_krw가 0이면 pnl_pct는 0", () => {
     const positions = [makePos({ invested_krw: 0, pnl: 0 })];
     const result = groupPositionsByTicker(positions);
-    expect(result[0].pnl_pct).toBe(0);
+    expect(result[0]!.pnl_pct).toBe(0);
   });
 });
 
@@ -136,7 +136,7 @@ describe("mergeAlertsByPortfolio", () => {
   it("포트폴리오별로 1개 행이면 그대로 반환", () => {
     const alert = makeAlert({ portfolio_id: "p1", mode: "NOTIFY" });
     const result = mergeAlertsByPortfolio([alert]);
-    expect(result["p1"].mode).toBe("NOTIFY");
+    expect(result["p1"]!.mode).toBe("NOTIFY");
   });
 
   it("같은 포트폴리오에 AUTO 계좌가 하나라도 있으면 병합 결과는 AUTO", () => {
@@ -146,7 +146,7 @@ describe("mergeAlertsByPortfolio", () => {
     ];
     const result = mergeAlertsByPortfolio(alerts);
     expect(Object.keys(result)).toHaveLength(1);
-    expect(result["p1"].mode).toBe("AUTO");
+    expect(result["p1"]!.mode).toBe("AUTO");
   });
 
   it("모든 계좌가 NOTIFY면 병합 결과도 NOTIFY", () => {
@@ -155,7 +155,7 @@ describe("mergeAlertsByPortfolio", () => {
       makeAlert({ id: "a2", portfolio_id: "p1", account_id: "acc-2", mode: "NOTIFY" }),
     ];
     const result = mergeAlertsByPortfolio(alerts);
-    expect(result["p1"].mode).toBe("NOTIFY");
+    expect(result["p1"]!.mode).toBe("NOTIFY");
   });
 
   it("서로 다른 포트폴리오는 각각 별도로 집계", () => {
@@ -165,8 +165,8 @@ describe("mergeAlertsByPortfolio", () => {
     ];
     const result = mergeAlertsByPortfolio(alerts);
     expect(Object.keys(result)).toHaveLength(2);
-    expect(result["p1"].mode).toBe("AUTO");
-    expect(result["p2"].mode).toBe("NOTIFY");
+    expect(result["p1"]!.mode).toBe("AUTO");
+    expect(result["p2"]!.mode).toBe("NOTIFY");
   });
 });
 
@@ -352,14 +352,14 @@ describe("mergeAlertsByPortfolio — 활성 알림 기준 (plans/63 P1-4)", () =
       row({ id: "2", threshold_pct: 7 }),
       row({ id: "3", threshold_pct: 6 }),
     ]);
-    expect(merged.p1.threshold_pct).toBe(6);
-    expect(merged.p1.mode).toBe("NOTIFY");
-    expect(merged.p1.is_active).toBe(true);
+    expect(merged.p1!.threshold_pct).toBe(6);
+    expect(merged.p1!.mode).toBe("NOTIFY");
+    expect(merged.p1!.is_active).toBe(true);
   });
 
   it("전부 꺼져 있으면 is_active=false로 남고 activeAlertsOnly에서 빠진다", () => {
     const merged = mergeAlertsByPortfolio([row({ is_active: false })]);
-    expect(merged.p1.is_active).toBe(false);
+    expect(merged.p1!.is_active).toBe(false);
     expect(activeAlertsOnly(merged)).toEqual({});
   });
 });

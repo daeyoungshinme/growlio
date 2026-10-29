@@ -68,9 +68,9 @@ describe("applyIndexGroup", () => {
     ];
     const result = applyIndexGroup(items, suggestion);
     expect(result.map((i) => i.ticker)).toEqual(["QQQ", "SPY"]);
-    expect(result[1].weight).toBe(60);
-    expect(result[1].group?.members.map((x) => x.ticker)).toEqual(["VOO"]);
-    expect(result[1].group?.domestic_alt?.ticker).toBe("379800");
+    expect(result[1]!.weight).toBe(60);
+    expect(result[1]!.group?.members.map((x) => x.ticker)).toEqual(["VOO"]);
+    expect(result[1]!.group?.domestic_alt?.ticker).toBe("379800");
   });
 
   it("appends with weight 0 when no row matches", () => {
@@ -141,7 +141,7 @@ describe("recommendation folding", () => {
       current,
     );
     expect(items[0]).toMatchObject({ ticker: "SPY", weight: 50, group: groupItem.group });
-    expect(items[1].group).toBeUndefined();
+    expect(items[1]!.group).toBeUndefined();
   });
 });
 
@@ -200,10 +200,10 @@ describe("leveraged members", () => {
       domestic_alt: null,
       members: [m("QQQ", "NASDAQ", 100), { ...m("QLD", "NASDAQ", 100), leverage: 2 }],
     });
-    expect(result[0].group?.members).toEqual([
+    expect(result[0]!.group?.members).toEqual([
       { ticker: "QLD", market: "NASDAQ", name: "QLD", leverage: 2 },
     ]);
-    expect(memberLabel(result[0].group!.members[0])).toBe("QLD ×2");
+    expect(memberLabel(result[0]!.group!.members[0]!)).toBe("QLD ×2");
     expect(isLeveraged({ leverage: 1 })).toBe(false);
   });
 });
@@ -219,8 +219,8 @@ describe("out-of-scope suggestion members", () => {
     };
     const outside = outOfScopeAccounts(s);
     expect([...outside.keys()]).toEqual(["QLD|NASDAQ"]);
-    expect(scopedMemberLabel(s.members[1], outside.get("QLD|NASDAQ"))).toBe("QLD ×2(해외)");
-    expect(scopedMemberLabel(s.members[0], outside.get("379800|KOSPI"))).toBe("379800");
+    expect(scopedMemberLabel(s.members[1]!, outside.get("QLD|NASDAQ"))).toBe("QLD ×2(해외)");
+    expect(scopedMemberLabel(s.members[0]!, outside.get("379800|KOSPI"))).toBe("379800");
   });
 });
 

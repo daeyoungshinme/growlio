@@ -425,8 +425,8 @@ describe("StockHoldingsTable", () => {
     const firstIsApple = () =>
       Boolean(
         screen
-          .getAllByText("Apple Inc.")[0]
-          .compareDocumentPosition(screen.getAllByText("Small Co")[0]) &
+          .getAllByText("Apple Inc.")[0]!
+          .compareDocumentPosition(screen.getAllByText("Small Co")[0]!) &
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
     expect(firstIsApple()).toBe(true); // 기본: 평가금액순
@@ -550,8 +550,8 @@ describe("StockHoldingsTable", () => {
     const headerCount = subRow.closest("table")!.querySelectorAll("thead th").length;
     const cells = subRow.querySelectorAll("td");
     expect(cells).toHaveLength(headerCount);
-    expect(cells[0].textContent).toContain("다른 계좌");
-    expect(cells[1].textContent).toBe("7");
+    expect(cells[0]!.textContent).toContain("다른 계좌");
+    expect(cells[1]!.textContent).toBe("7");
   });
 
   it("shows error state for dividends", () => {

@@ -13,13 +13,12 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
-import sentry_sdk
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.logging import redact_secrets
+from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
@@ -40,7 +39,7 @@ from app.services.rebalancing.order_builder import (
 )
 from app.utils.cache_keys import TTL_COMPOSITE_ALERT_SENT, composite_alert_sent_key
 from app.utils.durable_state import get_durable, set_durable
-from app.utils.kst import KST as _KST
+from app.utils.kst import today_kst
 from app.utils.market_hours import is_alert_execution_time
 from app.utils.metrics import alert_trigger_count
 
@@ -59,13 +58,13 @@ async def _composite_alert_sent_today(db: AsyncSession, user_id: uuid.UUID) -> b
     dedup 플래그는 재시작에도 유지돼야 하므로(콜드스타트 후 오탐 방지) Postgres 기반
     durable_state를 사용한다.
     """
-    today = datetime.now(tz=_KST).date().isoformat()
+    today = today_kst().isoformat()
     return bool(await get_durable(db, composite_alert_sent_key(user_id, today)))
 
 
 async def _mark_composite_alert_sent_today(db: AsyncSession, user_id: uuid.UUID) -> None:
     """복합신호만으로 발송한 뒤, 오늘 이 유저에게는 더 이상 중복 발송하지 않도록 표시한다."""
-    today = datetime.now(tz=_KST).date().isoformat()
+    today = today_kst().isoformat()
     await set_durable(db, composite_alert_sent_key(user_id, today), "1", ttl=TTL_COMPOSITE_ALERT_SENT)
 
 
@@ -178,7 +177,7 @@ async def _process_rebalancing_alert(
             portfolio_id=push_data.get("portfolio_id"),
         )
     except Exception as exc:
-        logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
+        report_handled_failure("rebalancing_alert_email_failed", exc, alert_id=str(alert.id))
 
     # FCM 독립 처리 — 이메일 실패와 무관하게 항상 시도
     push_sent = await send_push_safely(
@@ -252,13 +251,13 @@ async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db
     try:
         overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, cache=cache)
     except Exception as exc:
-        logger.error("rebalancing_alert_overview_failed", alert_id=str(alert.id), error=str(exc))
+        report_handled_failure("rebalancing_alert_overview_failed", exc, alert_id=str(alert.id))
         return None
 
     try:
         return analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
     except Exception as exc:
-        logger.error("rebalancing_alert_analysis_failed", alert_id=str(alert.id), error=str(exc))
+        report_handled_failure("rebalancing_alert_analysis_failed", exc, alert_id=str(alert.id))
         return None
 
 
@@ -433,14 +432,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             index += 1
         except Exception as e:
             # 알림 하나의 실패(주문 계산 버그·DB 오류)가 남은 사용자 알림 전체를 막지 않게 격리한다.
-            # 스택 지역변수를 보내는 capture_exception 대신 타입명만(AUTO 경로는 자격증명을 지역변수로 다룬다).
-            logger.error(
-                "rebalancing_alert_check_item_failed",
-                alert_id=str(alert_id),
-                error=redact_secrets(str(e)),
-                error_type=type(e).__name__,
-            )
-            sentry_sdk.capture_message(f"rebalancing_alert_check_item_failed: {type(e).__name__}", level="error")
+            report_handled_failure("rebalancing_alert_check_item_failed", e, alert_id=str(alert_id))
             await db.rollback()
             remaining_ids = alert_ids[index + 1 :]
             rows = await _load_active_alert_rows(db, remaining_ids) if remaining_ids else []

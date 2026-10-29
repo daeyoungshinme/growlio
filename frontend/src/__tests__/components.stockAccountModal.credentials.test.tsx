@@ -270,7 +270,7 @@ describe("StockAccountModal — 데이터 소스 전환·제출 페이로드", (
     expect(document.getElementById("stock-isa-type")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
 
-    const payload = onSubmit.mock.calls[0][0];
+    const payload = onSubmit.mock.calls[0]![0];
     expect(payload).toMatchObject({ tax_type: "GENERAL", deposit_krw: 1000, deposit_usd: 0 });
     expect(payload.isa_type).toBeUndefined();
     expect(payload.isa_open_date).toBeUndefined();

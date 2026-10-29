@@ -43,7 +43,7 @@ describe("AlertActionsSection — 지금 계획 생성", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "계획 생성" }));
     await waitFor(() => expect(mockCreatePlan).toHaveBeenCalledTimes(1));
-    expect(mockCreatePlan.mock.calls[0][0]).toBe("pf-1");
+    expect(mockCreatePlan.mock.calls[0]![0]).toBe("pf-1");
   });
 
   it("확인창에서 취소하면 계획을 만들지 않는다", () => {

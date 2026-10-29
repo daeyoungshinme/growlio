@@ -306,7 +306,7 @@ describe("AllocationCard", () => {
     });
 
     it("ETF가 없으면 빈 상태 문구", async () => {
-      renderCard({ exposure: { ...EXPOSURE, total_etf_krw: 0, groups: [EXPOSURE.groups[2]] } });
+      renderCard({ exposure: { ...EXPOSURE, total_etf_krw: 0, groups: [EXPOSURE.groups[2]!] } });
       clickView("지수");
       expect(await screen.findByText("보유 중인 ETF가 없어요.")).toBeInTheDocument();
     });

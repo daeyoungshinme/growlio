@@ -19,9 +19,9 @@ describe("MiniDonut", () => {
   it("조각을 누르면 가운데에 이름·비중을 보여주고 다시 누르면 숨긴다", () => {
     const { container } = render(<MiniDonut data={data} />);
     const first = container.querySelectorAll("circle")[0];
-    fireEvent.click(first);
+    fireEvent.click(first!);
     expect(screen.getByText("60.0%")).toBeDefined();
-    fireEvent.click(first);
+    fireEvent.click(first!);
     expect(screen.queryByText("60.0%")).toBeNull();
   });
 

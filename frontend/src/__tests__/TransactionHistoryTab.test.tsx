@@ -119,7 +119,7 @@ describe("TransactionHistoryTab", () => {
       renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
 
       const [trash] = await screen.findAllByRole("button", { name: "삭제" });
-      fireEvent.click(trash);
+      fireEvent.click(trash!);
       const dialog = screen.getByRole("dialog");
       expect(
         within(dialog).getByText(/2026-10-01 입금 50만원 기록을 삭제할까요\?/),
@@ -128,7 +128,7 @@ describe("TransactionHistoryTab", () => {
 
       fireEvent.click(within(dialog).getByRole("button", { name: "삭제" }));
       await waitFor(() => expect(vi.mocked(deleteTransaction)).toHaveBeenCalled());
-      expect(vi.mocked(deleteTransaction).mock.calls[0][0]).toBe("tx-1");
+      expect(vi.mocked(deleteTransaction).mock.calls[0]![0]).toBe("tx-1");
     });
 
     it("확인창에서 취소하면 삭제하지 않는다", async () => {
@@ -138,7 +138,7 @@ describe("TransactionHistoryTab", () => {
       renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
 
       const [trash] = await screen.findAllByRole("button", { name: "삭제" });
-      fireEvent.click(trash);
+      fireEvent.click(trash!);
       fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "취소" }));
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(vi.mocked(deleteTransaction)).not.toHaveBeenCalled();
@@ -236,7 +236,7 @@ describe("TransactionHistoryTab", () => {
       yearSelects[yearSelects.length - 1];
 
     const prevYear = new Date().getFullYear() - 1;
-    fireEvent.change(yearSelect, { target: { value: String(prevYear) } });
+    fireEvent.change(yearSelect!, { target: { value: String(prevYear) } });
 
     await waitFor(() => {
       expect(vi.mocked(fetchAllTransactions)).toHaveBeenCalledWith(

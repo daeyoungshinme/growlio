@@ -219,7 +219,7 @@ describe("GoalTimelineCard", () => {
     expect(screen.getByText("이 방법으로는 달성이 어려워요")).toBeDefined();
     const ctas = screen.getAllByText(/수익률을 높이는 포트폴리오 추천 보기/);
     expect(ctas).toHaveLength(1);
-    expect(decodeURIComponent(ctas[0].closest("a")?.getAttribute("href") ?? "")).toBe(
+    expect(decodeURIComponent(ctas[0]!.closest("a")?.getAttribute("href") ?? "")).toBe(
       "/rebalancing?rtab=목표 조정&gmode=추천",
     );
   });
@@ -612,7 +612,7 @@ describe("TaxPositionTable", () => {
     );
     const inputs = screen.getAllByRole("spinbutton");
     if (inputs.length > 0) {
-      fireEvent.change(inputs[0], { target: { value: "3" } });
+      fireEvent.change(inputs[0]!, { target: { value: "3" } });
       expect(handleQtyChange).toHaveBeenCalled();
     }
   });

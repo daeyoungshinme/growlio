@@ -49,8 +49,8 @@ describe("useTaxSimulation", () => {
 
     expect(result.current.profitPositions).toHaveLength(1);
     expect(result.current.lossPositions).toHaveLength(1);
-    expect(result.current.profitPositions[0].ticker).toBe("AAPL");
-    expect(result.current.lossPositions[0].ticker).toBe("MSFT");
+    expect(result.current.profitPositions[0]!.ticker).toBe("AAPL");
+    expect(result.current.lossPositions[0]!.ticker).toBe("MSFT");
   });
 
   it("손실 합계가 올바르게 계산된다", () => {
@@ -144,7 +144,7 @@ describe("useTaxSimulation", () => {
     // 기공제 없음 → maxTaxFreeProfit = TAX_DEDUCTION + 0 = 2,500,000
     // profitPos.pnl (1,000,000) < 2,500,000 → 전량 매도 권장
     expect(result.current.recommendations).toHaveLength(1);
-    expect(result.current.recommendations[0].label).toContain("전량");
+    expect(result.current.recommendations[0]!.label).toContain("전량");
   });
 
   it("sellQtyMap에 입력이 있으면 recommendations가 비어있다", () => {

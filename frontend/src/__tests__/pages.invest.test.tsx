@@ -380,7 +380,7 @@ describe("InvestPlanPage", () => {
     // Modify a field to make form dirty
     const inputs = screen.getAllByRole("textbox");
     if (inputs.length > 0) {
-      fireEvent.change(inputs[0], { target: { value: "999999" } });
+      fireEvent.change(inputs[0]!, { target: { value: "999999" } });
     }
     // Click cancel
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
@@ -401,7 +401,7 @@ describe("InvestPlanPage", () => {
     });
     const inputs = screen.getAllByRole("textbox");
     if (inputs.length > 0) {
-      fireEvent.change(inputs[0], { target: { value: "888888" } });
+      fireEvent.change(inputs[0]!, { target: { value: "888888" } });
     }
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     await waitFor(() => {
