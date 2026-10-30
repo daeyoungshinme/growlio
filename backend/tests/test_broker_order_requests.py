@@ -8,6 +8,7 @@ httpx 요청을 가로채 브로커가 받는 요청 그대로를 검증한다 �
 from __future__ import annotations
 
 import json
+import re
 from unittest.mock import AsyncMock
 
 import httpx
@@ -414,6 +415,48 @@ class TestKisCancelOrder:
         assert body["OVRS_EXCG_CD"] == "AMEX"
         assert (body["PDNO"], body["ORGN_ODNO"], body["ORD_QTY"]) == ("SPY", "0002", "4")
         assert (body["RVSE_CNCL_DVSN_CD"], body["OVRS_ORD_UNPR"]) == ("02", "0")
+
+    @pytest.mark.asyncio
+    async def test_overseas_unfilled_qty_follows_pages_and_matches_order_no(self, httpx_mock: HTTPXMock):
+        url = re.compile(rf"{re.escape(KIS_REAL_BASE_URL)}/uapi/overseas-stock/v1/trading/inquire-nccs\?.*")
+        httpx_mock.add_response(
+            method="GET",
+            url=url,
+            json={"rt_cd": "0", "output": [{"odno": "0000001", "nccs_qty": "5"}], "ctx_area_nk200": "NK1"},
+        )
+        # 주문번호 앞자리 0은 응답마다 다를 수 있다 — 숫자 기준으로 맞춘다
+        httpx_mock.add_response(method="GET", url=url, json={"rt_cd": "0", "output": [{"odno": "2", "nccs_qty": "3"}]})
+
+        qty = await kis_order.get_overseas_unfilled_qty(
+            "key", "secret", "tok", "12345678-01", market="AMEX", order_no="0002", is_mock=False
+        )
+
+        assert qty == 3
+        first, second = httpx_mock.get_requests()
+        assert first.headers["tr_id"] == "TTTS3018R"
+        assert (first.url.params["CANO"], first.url.params["OVRS_EXCG_CD"]) == ("12345678", "AMEX")
+        assert second.headers["tr_cont"] == "N"
+        assert second.url.params["CTX_AREA_NK200"] == "NK1"
+
+    @pytest.mark.asyncio
+    async def test_overseas_unfilled_qty_absent_is_zero(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(method="GET", json={"rt_cd": "0", "output": []})
+
+        qty = await kis_order.get_overseas_unfilled_qty(
+            "key", "secret", "tok", "12345678-01", market="NASDAQ", order_no="9", is_mock=False
+        )
+
+        assert qty == 0
+
+    @pytest.mark.asyncio
+    async def test_overseas_unfilled_qty_mock_skips_request(self, httpx_mock: HTTPXMock):
+        """모의투자 서버는 TTTS3018R을 지원하지 않는다 — 요청 없이 None(호출자가 원수량으로 폴백)."""
+        qty = await kis_order.get_overseas_unfilled_qty(
+            "key", "secret", "tok", "12345678-01", market="NASDAQ", order_no="9", is_mock=True
+        )
+
+        assert qty is None
+        assert httpx_mock.get_requests() == []
 
     @pytest.mark.asyncio
     async def test_cancel_rejection_raises_with_broker_message(self, httpx_mock: HTTPXMock):

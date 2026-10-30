@@ -71,6 +71,12 @@ async def _request_broker_cancel(row: RebalancingExecutionResult, account: Asset
     app_key, app_secret = load_kis_credentials(account)
     kis_no = account.kis_account_no or ""
     if is_overseas:
+        # 부분 체결이면 원주문수량이 아니라 남은 수량을 보낸다. 모의투자는 조회 TR이 없어 원수량으로 보낸다.
+        unfilled = await kis_order.get_overseas_unfilled_qty(
+            app_key, app_secret, token, kis_no, market=market, order_no=order_no, is_mock=is_mock
+        )
+        if unfilled == 0:
+            raise BrokerOrderRejectedError("취소할 미체결 잔량이 없습니다(이미 체결되었을 수 있습니다).")
         await kis_order.cancel_overseas_order(
             app_key,
             app_secret,
@@ -79,7 +85,7 @@ async def _request_broker_cancel(row: RebalancingExecutionResult, account: Asset
             ticker=ticker,
             market=market,
             order_no=order_no,
-            quantity=row.quantity or 0,
+            quantity=unfilled if unfilled is not None else row.quantity or 0,
             is_mock=is_mock,
         )
     else:

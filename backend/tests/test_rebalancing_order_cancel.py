@@ -195,6 +195,56 @@ class TestCancelExecutionOrder:
         assert (kwargs["market"], kwargs["ticker"], kwargs["quantity"]) == ("AMEX", "SPY", 2)
 
     @pytest.mark.asyncio
+    async def test_kis_overseas_partial_fill_sends_unfilled_qty(self, mock_db, mock_cache):
+        """해외 취소는 수량을 직접 보낸다 — 부분 체결이면 원주문수량(10) 대신 남은 수량(3)을 보낸다(plans/100 B)."""
+        row = _row(market="NASDAQ", ticker="QQQ", quantity=10, order_org_no=None, is_mock=False)
+        _wire_db(mock_db, row, _execution(), _account(row))
+        lookup = AsyncMock(return_value=3)
+        cancel = AsyncMock(return_value={})
+        with (
+            patch(f"{SVC}.kis_order.get_overseas_unfilled_qty", new=lookup),
+            patch(f"{SVC}.kis_order.cancel_overseas_order", new=cancel),
+        ):
+            out = await cancel_execution_order(uuid.uuid4(), row.id, mock_db, mock_cache)
+
+        assert out.cancel_status == CANCELED
+        assert lookup.await_args.kwargs["order_no"] == "0000123"
+        assert cancel.await_args.kwargs["quantity"] == 3
+
+    @pytest.mark.asyncio
+    async def test_kis_overseas_nothing_unfilled_is_cancel_failed(self, mock_db, mock_cache):
+        row = _row(market="NASDAQ", ticker="QQQ", quantity=10, order_org_no=None, is_mock=False)
+        _wire_db(mock_db, row, _execution(), _account(row))
+        cancel = AsyncMock()
+        with (
+            patch(f"{SVC}.kis_order.get_overseas_unfilled_qty", new=AsyncMock(return_value=0)),
+            patch(f"{SVC}.kis_order.cancel_overseas_order", new=cancel),
+        ):
+            out = await cancel_execution_order(uuid.uuid4(), row.id, mock_db, mock_cache)
+
+        assert out.cancel_status == CANCEL_FAILED
+        assert "미체결 잔량이 없습니다" in out.cancel_message
+        cancel.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_kis_overseas_unfilled_lookup_network_error_is_502(self, mock_db, mock_cache):
+        """잔량을 확인하지 못하면 원수량으로 보내지 않는다 — 기록 없이 502로 올린다."""
+        row = _row(market="NASDAQ", ticker="QQQ", quantity=10, order_org_no=None, is_mock=False)
+        _wire_db(mock_db, row, _execution(), _account(row))
+        cancel = AsyncMock()
+        with (
+            patch(f"{SVC}.kis_order.get_overseas_unfilled_qty", new=AsyncMock(side_effect=TimeoutError("boom"))),
+            patch(f"{SVC}.kis_order.cancel_overseas_order", new=cancel),
+            patch(f"{SVC}.report_handled_failure"),
+            pytest.raises(AppError) as exc,
+        ):
+            await cancel_execution_order(uuid.uuid4(), row.id, mock_db, mock_cache)
+
+        assert exc.value.status_code == 502
+        assert row.cancel_status is None
+        cancel.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_missing_credentials_at_cancel_is_400_not_502(self, mock_db, mock_cache):
         """취소 요청 중 자격증명 오류(400)가 아래 except Exception의 502로 덮이지 않는다."""
         row = _row()
