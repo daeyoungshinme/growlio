@@ -306,11 +306,8 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
     """유저 무관 공통 입력(매크로 확정 등급 + 차트 지표)과 관측 국면."""
     from app.services.market_signal.market_signal_service import get_confirmed_composite_level
 
-    try:
-        macro_level, freshness = await get_confirmed_composite_level(cache, db)
-    except Exception as exc:
-        logger.warning("tactical_macro_fetch_failed", error=str(exc))
-        macro_level, freshness = "GREEN", "STALE"
+    # 실패하면 내부에서 (GREEN, STALE)로 폴백한다
+    macro_level, freshness = await get_confirmed_composite_level(cache, db)
     technicals: dict[str, TechnicalSnapshot] = await get_technical_signals(cache)
     trends = {t: s["trend"] for t, s in technicals.items()}
     qqq_snap = technicals.get("QQQ")

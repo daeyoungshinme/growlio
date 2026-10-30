@@ -11,9 +11,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.job_runner import report_handled_failure
 from app.services.portfolio.asset_aggregator import get_dashboard_summary
 from app.services.tax.tax_service import get_overseas_positions_detail, get_tax_summary
-from app.utils.cache_keys import TTL_INSIGHTS, CacheStoreType, get_cached_json, insights_key, set_cached_json
+from app.utils.cache_keys import (
+    TTL_INSIGHTS,
+    TTL_MARKET_SIGNAL_DEGRADED,
+    CacheStoreType,
+    get_cached_json,
+    insights_key,
+    set_cached_json,
+)
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -64,11 +72,14 @@ async def generate_insights(
         if cached is not None:
             return cached
 
+    # 일부가 실패한 목록을 1시간 캐싱하면 그동안 인사이트가 빠진 채 보인다 — 실패가 있으면 짧게만 둔다 (plans/99 A3)
+    degraded = False
     try:
         dashboard = await get_dashboard_summary(user_id, db, cache)
     except Exception as e:
-        logger.warning("insight_dashboard_summary_failed", user_id=str(user_id), error=str(e))
+        report_handled_failure("insight_dashboard_summary_failed", e, user_id=str(user_id))
         dashboard = {}
+        degraded = True
 
     # 체커 2개가 같은 AsyncSession을 쓰므로 순차 실행한다(동시 사용 불가). 체커 하나의 실패는 나머지에 영향 없음.
     checkers = (
@@ -81,7 +92,8 @@ async def generate_insights(
         try:
             insights.extend(await run_checker())
         except Exception as res:
-            logger.warning("insight_checker_failed", error=str(res))
+            report_handled_failure("insight_checker_failed", res, user_id=str(user_id))
+            degraded = True
             # 뒤 체커가 aborted 트랜잭션에서 실패하지 않게 되돌린다(체커는 ORM 객체를 새로 읽는다)
             try:
                 await db.rollback()
@@ -94,7 +106,7 @@ async def generate_insights(
 
     data = [asdict(i) for i in insights]
 
-    await set_cached_json(cache, insights_key(user_id), data, TTL_INSIGHTS)
+    await set_cached_json(cache, insights_key(user_id), data, TTL_MARKET_SIGNAL_DEGRADED if degraded else TTL_INSIGHTS)
     return data
 
 

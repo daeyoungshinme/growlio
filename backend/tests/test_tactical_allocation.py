@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
 from app.models.tactical import TacticalStrategy
 from app.services.market_signal import technical_indicators as ti
@@ -1003,8 +1004,8 @@ class TestFetchWrappers:
     async def test_evaluate_market_macro_failure_is_stale(self):
         with (
             patch(
-                "app.services.market_signal.market_signal_service.get_confirmed_composite_level",
-                AsyncMock(side_effect=RuntimeError("fred")),
+                "app.services.market_signal.market_signal_service._resolve_confirmed_level",
+                AsyncMock(side_effect=OperationalError("SELECT", {}, Exception("conn"))),
             ),
             patch.object(
                 tactical,
@@ -1017,9 +1018,22 @@ class TestFetchWrappers:
                 AsyncMock(return_value={"real_yield": 2.0, "real_yield_change_pp": 0.4, "relative_strength_pct": -2.0}),
             ),
         ):
-            market = await tactical.evaluate_market(None, AsyncMock())
+            db = AsyncMock()
+            market = await tactical.evaluate_market(None, db)
+        db.rollback.assert_awaited_once()  # aborted 세션을 남기지 않는다 (plans/99 A4)
         assert market["macro_freshness"] == "STALE"
         assert market["observed_regime"] == "NEUTRAL"
         assert market["observed_if_risk_on"] == "RISK_ON"
         assert market["observed_tilt"] == "FAVOR_SPY"
         assert market["tilt_inputs_complete"] is True
+
+
+@pytest.mark.asyncio
+async def test_confirmed_level_non_db_failure_keeps_caller_session():
+    """DB 오류가 아니면 호출자의 미커밋 변경을 지우지 않도록 rollback하지 않는다 (plans/99 A4)."""
+    from app.services.market_signal import market_signal_service as ms
+
+    db = AsyncMock()
+    with patch.object(ms, "_resolve_confirmed_level", AsyncMock(side_effect=RuntimeError("fred"))):
+        assert await ms.get_confirmed_composite_level(None, db) == ("GREEN", "STALE")
+    db.rollback.assert_not_awaited()

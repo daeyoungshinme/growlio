@@ -1357,6 +1357,10 @@ class TestPlanLegFailureIsolation:
 
         with (
             patch("app.utils.market_hours.is_korean_market_open", return_value=False),
+            patch(
+                "app.services.market_signal.market_signal_service.get_confirmed_composite_level",
+                new=AsyncMock(return_value=("GREEN", "LIVE")),
+            ),
             patch("app.core.job_runner.sentry_sdk.capture_message") as capture,
         ):
             count = await svc.execute_due_buy_legs(mock_db, MagicMock())
