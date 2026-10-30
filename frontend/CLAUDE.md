@@ -61,7 +61,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - `lib/storedSession.ts` — 저장된 `sb-*-auth-token`을 SDK 없이 동기로 읽어 부팅 시 토큰 시드.
 - `lib/sentry.ts` — 지연 초기화. **앱 코드는 `@sentry/react`를 직접 import 금지**(엔트리 청크로 다시 끌려옴).
 - `lib/serviceWorker.ts` — 웹에서만 SW 등록, Capacitor에선 해제.
-- `context/ExchangeRateContext.tsx` — 환율을 컨텍스트로 공유(`useExchangeRateContext()`).
+- `context/ExchangeRateContext.tsx` — 환율을 컨텍스트로 공유. 컴포넌트는 컨텍스트 훅을 직접 쓰지 말고 `useExchangeRate()`로 읽는다.
 - `asset_type_allocation`은 백엔드가 전 유형을 주고 PortfolioPage가 STOCK만 필터 — 의도된 동작.
 - 대시보드와 자산탭이 `portfolio-overview` queryKey를 공유 — sync 후 양쪽 자동 갱신.
 
@@ -87,7 +87,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 진입점은 `portfolioId=<id>&openAlert=1`(`openAlert=dca`는 적립식 자동매수 프리셋) URL 파라미터로 요청. 모달을 직접 마운트하지 말 것.
 - `invest/ChallengeSection` — 챌린지 탭. 홈 요약 `dashboard/ChallengeProgressCard`, 네비 빨간 점 `useChallengeNudge`.
 - `invest/GoalSettingWizard` — 목표 최초 설정 6단계 마법사(`InvestPlanPage`의 재설정 모달과 별개).
-- `invest/FxPlanCard` — 적립 계획 탭 접힘 카드 "달러 환전 계획"(`GET /invest/fx-plan`). 목표 환율 구간은 기존 `createExchangeRateAlert`(BELOW)로 등록, 같은 목표의 활성 알림은 건너뜀. 월 적립액 변경 시 `invalidateDcaData`가 `fxPlanBase`도 지운다.
+- `invest/FxPlanCard` — 적립 계획 탭 접힘 카드 "달러 환전 계획"(`GET /invest/fx-plan`). 목표 환율 구간은 기존 `createExchangeRateAlert`(BELOW)로 등록, 같은 목표의 활성 알림은 건너뜀. `fxPlanBase`는 적립(`invalidateDcaData`)·동기화·계좌·포트폴리오·리밸런싱 알림·전술 연동 해제 무효화가 함께 지운다. 환율이 없으면 서버가 `NO_RATE`(달러 계산 안 함).
 
 **Android 홈 위젯**: `useWidget.ts` ↔ `plugins/WidgetPlugin.ts` ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java` — 위젯 UI 변경 시 Java도 함께.
 
@@ -198,6 +198,7 @@ _기타_
 | 목표 역산 추천                                              | `["goal-recommendation", "overall" \| "by-horizon" \| "by-age"]` · 후보 중복 `["goal-recommendation", "candidate-overlap", signature]`                                                                |
 | 적용 전 비교                                                | `["portfolio-expected-metrics", portfolioId]`                                                                                                                                                         |
 | 마법사 프리뷰                                               | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]`                                                                                                                   |
+| 달러 환전 계획                                              | `["fx-plan", months, portfolioId ?? "auto"]` (무효화는 `fxPlanBase`)                                                                                                                                  |
 | 인플레이션 요약                                             | `["inflation-summary"]`                                                                                                                                                                               |
 | 전술 배분                                                   | 상태 `["tactical-status", portfolioId]` · 켠 목록 `["tactical-status", "list"]` · 시장 입력 `["tactical-market"]`(무효화 없음) · 백테스트 `["tactical-backtest", portfolioId, years]`                 |
 

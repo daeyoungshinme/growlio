@@ -64,7 +64,7 @@ updates:
         patterns:
           - "@types/react"
           - "@types/react-dom"
-      # vitest / @vitest/* 는 서로 exact-version 피어 의존(@vitest/ui, @vitest/coverage-v8가
+      # vitest / @vitest/* 는 서로 exact-version 피어 의존(@vitest/coverage-v8가
       # vitest 정확한 버전을 peer로 요구) → 하나씩 올리면 npm ERESOLVE로 CI(npm ci)가 깨진다.
       # major 포함해 한 PR로 묶어 함께 올린다(테스트 러너 전용이라 prod 번들 영향 없음).
       vitest:
@@ -128,6 +128,22 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "docker"
+    ignore:
+      # Node 홀수 버전(25·27…)은 LTS가 아니라 6개월 만에 EOL이다 — node:25가 그대로 운영 빌드에 남았다(plans/99 D1).
+      # CI·Android 빌드와 같은 LTS 짝수 major는 사람이 올린다
+      - dependency-name: "node"
+        update-types:
+          - "version-update:semver-major"
+
+  # docker-compose의 모니터링 이미지(prometheus·grafana) 핀 — 위 docker 항목은 Dockerfile만 본다
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
     labels:
       - "dependencies"
       - "docker"

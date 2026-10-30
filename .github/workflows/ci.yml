@@ -101,8 +101,12 @@ jobs:
       - name: Test (pytest + coverage)
         run: .venv/bin/pytest -x -v --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing
 
+      # Dependabot·fork PR은 토큰이 읽기 전용이라 PR 코멘트를 못 쓴다 — 코멘트 실패로 테스트 잡이 깨지지 않게 건너뛴다
       - name: Coverage comment (PR only)
-        if: github.event_name == 'pull_request'
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]'
         uses: MishaKav/pytest-coverage-comment@9516bf7f32a9229cf18d5e1717ae387c7154f279 # v1.13.0
         with:
           pytest-xml-coverage-path: backend/coverage.xml

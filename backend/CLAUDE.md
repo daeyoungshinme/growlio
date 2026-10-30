@@ -31,7 +31,7 @@ cd backend && uv run mypy app/
 
 ### Alembic 주의
 
-- autogenerate는 `alembic/env.py`에 모델 import가 있어야 인식한다.
+- autogenerate는 `app/models/__init__.py`에 모델 import가 있어야 인식한다(`env.py`는 `import app.models`로 패키지만 읽는다).
 - `env.py`의 `include_name`이 비교 대상을 growlio 테이블로 한정한다(nestlio와 `public` 공유 — 필터 없으면 nestlio 테이블 드롭 제안). 그래서 **모델에서 지운 테이블의 드롭은 autogenerate가 못 잡으니 직접 쓴다.**
 - 인덱스는 모델 `__table_args__`에도 선언 — 마이그레이션에만 있으면 다음 autogenerate가 드롭을 제안한다.
 - 버전 포인터는 `alembic_version`이 아니라 **`growlio_alembic_version`**(`env.py`의 `VERSION_TABLE`). 기본 테이블을 쓰면 nestlio와 리비전을 덮어써 `Can't locate revision ...`. 이 테이블이 없는 기존 DB는 `upgrade head` 전에 `python scripts/bootstrap_alembic.py` 1회(멱등) — `render.yaml` preDeployCommand도 이 순서. `public.alembic_version`(nestlio)은 건드리지 않는다.
@@ -310,7 +310,7 @@ db.add(obj); await db.commit(); await db.refresh(obj)
 
 **계좌 소유권**: account_id를 받는 라우터는 직접 조회 금지 → `get_owned_account`/`get_owned_or_404`(타 유저 계좌는 404로 통일).
 
-**새 라우터/모델**: 라우터는 `api/v1/router.py`에 `include_router()`. 모델은 `alembic/env.py`에 import. E2E 순서: 모델 → 스키마 → 서비스 → 라우터 → router 등록 → env.py import → 마이그레이션 → 테스트 → 이 문서 목록 갱신.
+**새 라우터/모델**: 라우터는 `api/v1/router.py`에 `include_router()`. 모델은 `app/models/__init__.py`에 import. E2E 순서: 모델 → 스키마 → 서비스 → 라우터 → router 등록 → models/__init__ import → 마이그레이션 → 테스트 → 이 문서 목록 갱신.
 
 **Rate Limiting**: `@limiter.limit("X/minute")`를 달면 시그니처에 `request: Request` 필수.
 ```python

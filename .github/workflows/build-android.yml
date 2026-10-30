@@ -113,9 +113,21 @@ jobs:
       - name: Decode Keystore
         if: env.BUILD_RELEASE == 'true'
         env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        # 비어 있으면 빈 키스토어로 Gradle 서명 단계에서 알기 어려운 오류가 난다 — Variables 검사와 같은 방식
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > /tmp/growlio.keystore
+          missing=""
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::저장소 Secrets 누락:$missing"
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > /tmp/growlio.keystore
 
       - name: Build Release APK
         if: env.BUILD_RELEASE == 'true'
