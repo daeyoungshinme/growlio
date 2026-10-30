@@ -201,6 +201,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                       key={c}
                       type="button"
                       onClick={() => switchCurrency(c)}
+                      aria-pressed={currency === c}
                       className={`px-2.5 py-2 rounded transition-colors ${currency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"}`}
                     >
                       {c}

@@ -298,7 +298,8 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                           <option value="">+ 이 계좌에 매수 종목 추가</option>
                           {unassignedBuyItems.map((i) => (
                             <option key={i.ticker} value={i.ticker}>
-                              {i.name} ({i.ticker}) — {Math.abs(Math.round(i.shares_to_trade!))}주
+                              {i.name} ({i.ticker}) — {Math.abs(Math.round(i.shares_to_trade ?? 0))}
+                              주
                             </option>
                           ))}
                         </select>

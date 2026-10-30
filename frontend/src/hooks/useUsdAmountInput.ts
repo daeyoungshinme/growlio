@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { convertUsdToKrw } from "@/utils/format";
 
-export type AmountCurrency = "KRW" | "USD";
+type AmountCurrency = "KRW" | "USD";
 
 export const USD_CONVERSION_ERROR =
   "환율 정보를 불러오지 못해 달러 금액을 원화로 환산할 수 없습니다";
