@@ -535,9 +535,9 @@ class TestExecutionPlanPortfolioQuery:
 
         mock_db.scalar = fake_scalar
 
-        from fastapi import HTTPException
+        from app.exceptions import NotFoundError
 
-        with pytest.raises(HTTPException):
+        with pytest.raises(NotFoundError):
             await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,

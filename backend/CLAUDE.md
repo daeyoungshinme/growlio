@@ -302,7 +302,7 @@ db.add(obj); await db.commit(); await db.refresh(obj)
 - DB 타임스탬프(`created_at` 등)는 `datetime.now(UTC)`.
 - `alert_history.alert_type`은 `String(40)` — 새 타입 문자열은 40자 이하(`tests/test_alert_type_length.py`가 검사, 초과 시 조용히 저장 실패).
 
-**HTTP 에러**: `HTTPException(detail="한국어 메시지")` — 사용자 노출 메시지는 한국어.
+**HTTP 에러**: 사용자 노출 메시지는 한국어. 서비스는 `app.exceptions`의 `AppError` 하위(`BadRequestError`·`NotFoundError`·`ConflictError`·`UnprocessableError` 등)를 raise — `HTTPException`은 라우터·의존성에서만. 서비스에서 `except AppError: raise`로 다시 올려야 하는 곳(아래 `except Exception`이 502로 덮는 경로)을 놓치지 말 것.
 
 **yfinance**: 동기 라이브러리 → `asyncio.get_running_loop().run_in_executor(None, fn)`. 동시성은 `yahoo_price._yfinance_sem` 재사용(새 세마포어 금지).
 

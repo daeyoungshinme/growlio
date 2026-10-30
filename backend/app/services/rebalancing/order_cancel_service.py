@@ -9,14 +9,13 @@ import uuid
 from datetime import UTC, datetime
 
 import structlog
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import OVERSEAS_MARKETS
 from app.core.job_runner import report_handled_failure
 from app.core.logging import public_error_message
-from app.exceptions import BrokerOrderRejectedError
+from app.exceptions import AppError, BadRequestError, BrokerOrderRejectedError, ExternalAPIError, NotFoundError
 from app.kis import order as kis_order
 from app.kis.auth import get_access_token
 from app.kis.client import KisApiError
@@ -111,32 +110,32 @@ async def cancel_execution_order(
 
     row_with_exec = (await db.execute(_order_stmt(lock=False))).first()
     if row_with_exec is None:
-        raise HTTPException(status_code=404, detail="주문을 찾을 수 없습니다.")
+        raise NotFoundError(detail="주문을 찾을 수 없습니다.")
     row, execution = row_with_exec
 
     try:
         account_uuid = uuid.UUID(row.account_id or "")
     except ValueError:
-        raise HTTPException(status_code=400, detail="이 주문은 앱에서 취소할 수 없습니다.") from None
+        raise BadRequestError(detail="이 주문은 앱에서 취소할 수 없습니다.") from None
     account = await load_executable_account(account_uuid, user_id, db)
     reason = cancel_block_reason(row, execution.executed_at, account.asset_type)
     if reason:
-        raise HTTPException(status_code=400, detail=reason)
+        raise BadRequestError(detail=reason)
 
     # 토큰 발급의 commit이 행 잠금을 풀지 않도록 토큰을 먼저 받고, 그다음 잠가서 다시 확인한다 —
     # 연속 클릭·다른 기기의 두 번째 요청은 잠금에서 기다렸다가 "이미 취소된 주문"으로 끝난다(plans/90 A2)
     token = await _get_broker_token(row, account, user_id, db, cache)
     locked = (await db.execute(_order_stmt(lock=True))).first()
     if locked is None:
-        raise HTTPException(status_code=404, detail="주문을 찾을 수 없습니다.")
+        raise NotFoundError(detail="주문을 찾을 수 없습니다.")
     row, execution = locked
     reason = cancel_block_reason(row, execution.executed_at, account.asset_type)
     if reason:
-        raise HTTPException(status_code=400, detail=reason)
+        raise BadRequestError(detail=reason)
 
     try:
         await _request_broker_cancel(row, account, token)
-    except HTTPException:
+    except AppError:
         raise
     except (BrokerOrderRejectedError, KisApiError, KiwoomApiError) as e:
         # 증권사 논리 오류는 클라이언트가 Kis/KiwoomApiError로 먼저 올린다("취소가능수량 없음" = 이미 체결 등)
@@ -147,9 +146,7 @@ async def cancel_execution_order(
         # 프레임 지역변수에 복호화된 자격증명이 있어 exc_info는 남기지 않는다(execution_service와 같은 이유)
         report_handled_failure("rebalancing_order_cancel_failed", e, result_id=str(result_id))
         await db.rollback()
-        raise HTTPException(
-            status_code=502, detail="증권사 응답을 받지 못했습니다. 증권사 앱에서 주문 상태를 확인하세요."
-        ) from None
+        raise ExternalAPIError(detail="증권사 응답을 받지 못했습니다. 증권사 앱에서 주문 상태를 확인하세요.") from None
     else:
         row.cancel_status = CANCELED
         row.cancel_message = None

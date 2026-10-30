@@ -1,4 +1,4 @@
-"""앱 전용 예외 클래스. 서비스 레이어에서 raise → API 레이어에서 HTTPException으로 변환."""
+"""앱 전용 예외 클래스. 서비스 레이어에서 raise → main.py의 전역 핸들러가 HTTP 응답으로 변환."""
 
 from __future__ import annotations
 
@@ -17,6 +17,21 @@ class AppError(Exception):
 class BadRequestError(AppError):
     status_code = 400
     detail = "잘못된 요청입니다."
+
+
+class NotFoundError(AppError):
+    status_code = 404
+    detail = "대상을 찾을 수 없습니다."
+
+
+class ConflictError(AppError):
+    status_code = 409
+    detail = "요청이 현재 상태와 충돌합니다."
+
+
+class UnprocessableError(AppError):
+    status_code = 422
+    detail = "처리할 수 없는 요청입니다."
 
 
 class ExternalAPIError(AppError):

@@ -13,11 +13,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 import structlog
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.exceptions import BadRequestError, NotFoundError, UnprocessableError
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
@@ -72,7 +72,7 @@ async def _load_portfolio(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: Async
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
+        raise NotFoundError(detail="포트폴리오를 찾을 수 없습니다")
     return portfolio
 
 
@@ -85,8 +85,7 @@ async def _load_alert_row(
 ) -> RebalancingAlert:
     is_per_account = getattr(portfolio, "alert_scope", "AGGREGATE") == "PER_ACCOUNT"
     if is_per_account and account_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        raise UnprocessableError(
             detail="계좌별 독립 설정 포트폴리오는 account_id를 지정해야 합니다",
         )
 
@@ -104,8 +103,7 @@ async def _load_alert_row(
         )
     )
     if not alert_row or not alert_row.account_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestError(
             detail="이 포트폴리오에 자동 실행 계좌가 설정되지 않았습니다. 자동화 설정에서 계좌를 선택해주세요.",
         )
     return alert_row
@@ -132,7 +130,7 @@ async def quick_execute_plan(
     cache,
     verify_account_owned: Callable[[uuid.UUID], Awaitable[object]],
 ) -> QuickExecuteOutcome:
-    """자동화 알림 설정 기준으로 대기 플랜을 생성한다 — 입력 오류는 HTTPException, 게이트 차단은 상태로 반환.
+    """자동화 알림 설정 기준으로 대기 플랜을 생성한다 — 입력 오류는 AppError 하위 예외, 게이트 차단은 상태로 반환.
 
     `verify_account_owned`는 화면에서 고른 override 계좌의 소유권 검증(라우터의 `get_owned_account`) —
     서비스가 API 계층을 import하지 않도록 주입받는다.

@@ -8,9 +8,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
 
 from app.core.config import settings
+from app.exceptions import AppError
 from app.services.rebalancing import plan_execution as svc_exec
 from app.services.rebalancing import plan_service as svc
 
@@ -562,7 +562,7 @@ class TestCancelBuyLeg:
         locked_leg = SimpleNamespace(id=uuid.uuid4(), status="CANCELED", token_consumed_at=None)
         mock_db.scalar = AsyncMock(return_value=locked_leg)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             await svc.cancel_buy_leg(locked_leg, mock_db, decided_by="USER_APP")
         assert exc_info.value.status_code == 409
 
@@ -571,7 +571,7 @@ class TestCancelBuyLeg:
         locked_leg = SimpleNamespace(id=uuid.uuid4(), status="PENDING", token_consumed_at=datetime.now(tz=UTC))
         mock_db.scalar = AsyncMock(return_value=locked_leg)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             await svc.cancel_buy_leg(locked_leg, mock_db, decided_by="USER_APP")
         assert exc_info.value.status_code == 409
 
@@ -580,7 +580,7 @@ class TestCancelBuyLeg:
         mock_db.scalar = AsyncMock(return_value=None)
         leg = SimpleNamespace(id=uuid.uuid4())
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             await svc.cancel_buy_leg(leg, mock_db, decided_by="USER_APP")
         assert exc_info.value.status_code == 404
 
@@ -718,7 +718,7 @@ class TestApproveSellLeg:
         )
         mock_db.scalar = AsyncMock(return_value=locked_leg)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             await svc.approve_sell_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_EMAIL")
         assert exc_info.value.status_code == 400
 
@@ -764,7 +764,7 @@ class TestApproveSellLeg:
         with (
             patch("app.services.rebalancing.execution_service.execute_rebalancing", new=mock_execute),
             patch("app.services.rebalancing.plan_execution.save_alert_history", new=AsyncMock()),
-            pytest.raises(HTTPException) as exc_info,
+            pytest.raises(AppError) as exc_info,
         ):
             await svc.approve_sell_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_EMAIL")
 
@@ -843,7 +843,7 @@ class TestApproveBuyLeg:
         )
         mock_db.scalar = AsyncMock(return_value=locked_leg)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             await svc.approve_buy_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_APP")
         assert exc_info.value.status_code == 400
 
@@ -854,7 +854,7 @@ class TestApproveBuyLeg:
         )
         mock_db.scalar = AsyncMock(return_value=locked_leg)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             await svc.approve_buy_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_APP")
         assert exc_info.value.status_code == 409
 

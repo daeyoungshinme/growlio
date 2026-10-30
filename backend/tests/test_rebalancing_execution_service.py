@@ -8,8 +8,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
 
+from app.exceptions import AppError, BadRequestError
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
 
 
@@ -69,7 +69,7 @@ class TestLoadAccount:
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()
 
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await load_executable_account(account_id, user_id, mock_db)
         assert exc.value.status_code == 404
 
@@ -81,7 +81,7 @@ class TestLoadAccount:
         account.asset_type = "BANK_ACCOUNT"
         mock_db.scalar = AsyncMock(return_value=account)
 
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await load_executable_account(account.id, account.user_id, mock_db)
         assert exc.value.status_code == 400
 
@@ -93,7 +93,7 @@ class TestLoadAccount:
         account.kis_account_no = None
         mock_db.scalar = AsyncMock(return_value=account)
 
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await load_executable_account(account.id, account.user_id, mock_db)
         assert exc.value.status_code == 400
 
@@ -345,7 +345,7 @@ class TestExecuteRebalancing:
         from app.services.rebalancing.execution_service import execute_rebalancing
 
         user_id = uuid.uuid4()
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await execute_rebalancing(user_id, None, [], mock_db, mock_cache)
         assert exc.value.status_code == 400
 
@@ -677,7 +677,7 @@ class TestBuildFailedGroupResult:
 
         with patch.object(execution_service, "logger") as mock_logger:
             result = execution_service._build_failed_group_result(
-                uuid.uuid4(), "acc-1", [_make_order()], HTTPException(status_code=400, detail="잔고 부족")
+                uuid.uuid4(), "acc-1", [_make_order()], BadRequestError(detail="잔고 부족")
             )
 
         mock_logger.warning.assert_called_once()

@@ -1,14 +1,22 @@
 """리밸런싱 실행 주문 미체결 취소 (plans/89) — order_cancel_service + 이력 저장·라우터 연결."""
 
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
 
-from app.exceptions import BrokerOrderRejectedError
+from app.exceptions import (
+    AppError,
+    BadRequestError,
+    BrokerOrderRejectedError,
+    ConflictError,
+    ExternalAPIError,
+    NotFoundError,
+    UnprocessableError,
+)
 from app.kis.client import KisApiError
 from app.models.asset import RebalancingExecutionResult
 from app.schemas.rebalancing import ExecutionResult, OrderResult
@@ -68,6 +76,27 @@ def _wire_db(mock_db, row, execution, account):
     mock_db.execute = AsyncMock(return_value=result)
     mock_db.scalar = AsyncMock(return_value=account)
     mock_db.rollback = AsyncMock()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("error", "status"),
+    [
+        (BadRequestError("잘못"), 400),
+        (NotFoundError("없음"), 404),
+        (ConflictError("충돌"), 409),
+        (UnprocessableError("불가"), 422),
+        (ExternalAPIError("외부"), 502),
+    ],
+)
+async def test_service_errors_keep_http_status_and_detail(error, status):
+    """서비스가 HTTPException 대신 도메인 예외를 올려도 응답은 그대로다(plans/100 A)."""
+    from app.main import app_error_handler
+
+    response = await app_error_handler(MagicMock(), error)
+
+    assert response.status_code == status
+    assert json.loads(response.body) == {"detail": error.detail}
 
 
 class TestCancelBlockReason:
@@ -166,6 +195,22 @@ class TestCancelExecutionOrder:
         assert (kwargs["market"], kwargs["ticker"], kwargs["quantity"]) == ("AMEX", "SPY", 2)
 
     @pytest.mark.asyncio
+    async def test_missing_credentials_at_cancel_is_400_not_502(self, mock_db, mock_cache):
+        """취소 요청 중 자격증명 오류(400)가 아래 except Exception의 502로 덮이지 않는다."""
+        row = _row()
+        _wire_db(mock_db, row, _execution(), _account(row))
+        creds = MagicMock(side_effect=[("k", "s"), None])  # 토큰 발급 때는 있고, 취소 요청 때 없음
+        with (
+            patch(f"{EXEC_SVC}.decrypt_kis_credentials", new=creds),
+            patch(f"{SVC}.report_handled_failure") as report,
+            pytest.raises(AppError) as exc,
+        ):
+            await cancel_execution_order(uuid.uuid4(), row.id, mock_db, mock_cache)
+
+        assert exc.value.status_code == 400
+        report.assert_not_called()
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         ("market", "fn"), [("KOSPI", "cancel_domestic_order"), ("NASDAQ", "cancel_overseas_order")]
     )
@@ -206,7 +251,7 @@ class TestCancelExecutionOrder:
         with (
             patch(f"{SVC}.kis_order.cancel_domestic_order", new=AsyncMock(side_effect=TimeoutError("boom"))),
             patch(f"{SVC}.report_handled_failure") as report,
-            pytest.raises(HTTPException) as exc,
+            pytest.raises(AppError) as exc,
         ):
             await cancel_execution_order(uuid.uuid4(), row.id, mock_db, mock_cache)
 
@@ -220,7 +265,7 @@ class TestCancelExecutionOrder:
     @pytest.mark.asyncio
     async def test_other_users_order_is_404(self, mock_db, mock_cache):
         _wire_db(mock_db, None, None, None)
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await cancel_execution_order(uuid.uuid4(), uuid.uuid4(), mock_db, mock_cache)
         assert exc.value.status_code == 404
 
@@ -233,7 +278,7 @@ class TestCancelExecutionOrder:
         account = _account(row) if kw.get("account_id") != "default" else None
         _wire_db(mock_db, row, _execution(), account)
         cancel = AsyncMock()
-        with patch(f"{SVC}.kis_order.cancel_domestic_order", new=cancel), pytest.raises(HTTPException) as exc:
+        with patch(f"{SVC}.kis_order.cancel_domestic_order", new=cancel), pytest.raises(AppError) as exc:
             await cancel_execution_order(uuid.uuid4(), row.id, mock_db, mock_cache)
 
         assert exc.value.status_code == 400
@@ -263,7 +308,7 @@ class TestCancelExecutionOrder:
         with (
             patch(f"{SVC}.get_access_token", new=AsyncMock(side_effect=token_then_other_request_cancels)),
             patch(f"{SVC}.kis_order.cancel_domestic_order", new=cancel),
-            pytest.raises(HTTPException) as exc,
+            pytest.raises(AppError) as exc,
         ):
             await cancel_execution_order(uuid.uuid4(), row.id, mock_db, mock_cache)
 
