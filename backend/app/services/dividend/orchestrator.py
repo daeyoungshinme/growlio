@@ -151,15 +151,18 @@ async def _fetch_received_dividends_by_ticker(
     account_ids 지정 시 해당 계좌들만 집계(미지정 시 전체 계좌 통합).
     """
     base_sql = """
-        SELECT COALESCE(ticker, '__unclassified__') AS ticker_key, SUM(amount) AS total
-        FROM transactions
-        WHERE user_id = :uid
-          AND transaction_type = 'DIVIDEND'
-          AND EXTRACT(year FROM transaction_date) = :yr
+        SELECT COALESCE(t.ticker, '__unclassified__') AS ticker_key, SUM(t.amount) AS total
+        FROM transactions t
+        LEFT JOIN asset_accounts a ON a.id = t.account_id
+        WHERE t.user_id = :uid
+          AND t.transaction_type = 'DIVIDEND'
+          AND EXTRACT(year FROM t.transaction_date) = :yr
+          -- 삭제(soft) 계좌 배당 제외 — 입출금 집계와 같은 기준(plans/95 A4), 세금 집계는 유지
+          AND (t.account_id IS NULL OR a.is_active = TRUE)
     """
     params: dict = {"uid": str(user_id), "yr": year}
     if account_ids:
-        stmt = text(base_sql + " AND account_id IN :account_ids GROUP BY 1").bindparams(
+        stmt = text(base_sql + " AND t.account_id IN :account_ids GROUP BY 1").bindparams(
             bindparam("account_ids", expanding=True)
         )
         params["account_ids"] = [str(a) for a in account_ids]

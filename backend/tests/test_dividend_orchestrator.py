@@ -173,8 +173,29 @@ class TestFetchReceivedDividendsByTicker:
 
         await _fetch_received_dividends_by_ticker(mock_db, uuid.uuid4(), 2026)
 
-        assert "account_id" not in str(captured["query"])
+        assert "account_id IN" not in str(captured["query"])
         assert "account_ids" not in captured["params"]
+
+    @pytest.mark.asyncio
+    async def test_excludes_soft_deleted_account_dividends(self, mock_db, override_settings):
+        """plans/95 A4 — 삭제(soft) 계좌 배당은 빼고 계좌 미지정 배당은 유지(입출금 집계와 같은 기준)."""
+        from app.services.dividend.orchestrator import _fetch_received_dividends_by_ticker
+
+        captured = {}
+
+        async def mock_execute(query, params=None):
+            captured["query"] = query
+            result = MagicMock()
+            result.__iter__ = MagicMock(return_value=iter([]))
+            return result
+
+        mock_db.execute = mock_execute
+
+        await _fetch_received_dividends_by_ticker(mock_db, uuid.uuid4(), 2026)
+
+        sql = str(captured["query"])
+        assert "LEFT JOIN asset_accounts a ON a.id = t.account_id" in sql
+        assert "t.account_id IS NULL OR a.is_active = TRUE" in sql
 
     @pytest.mark.asyncio
     async def test_single_account_id_adds_in_filter(self, mock_db, override_settings):
