@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useForm } from "@/hooks/useForm";
 import { useStockSearch } from "@/hooks/useStockSearch";
+import { useUsdAmountInput } from "@/hooks/useUsdAmountInput";
 import type { Transaction, TransactionCreate } from "@/api/transactions";
-import { convertUsdToKrw, localToday } from "@/utils/format";
+import { localToday } from "@/utils/format";
 import { TX_TYPES, type TxType } from "@/constants/transaction";
 
 const isValidTxType = (val: unknown): val is TxType => TX_TYPES.includes(val as TxType);
@@ -20,8 +20,6 @@ const makeEmptyForm = (accountId: string): TransactionCreate => ({
 export function useTransactionFormState(accountId: string) {
   const { form, set, setForm } = useForm<TransactionCreate>(makeEmptyForm(accountId));
   const [formError, setFormError] = useState<string | null>(null);
-  const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
-  const [amountUsd, setAmountUsd] = useState<number>(0);
   const [tickerDirect, setTickerDirect] = useState(false);
   const [tickerQuery, setTickerQuery] = useState("");
   const [showTickerSuggestions, setShowTickerSuggestions] = useState(false);
@@ -31,7 +29,7 @@ export function useTransactionFormState(accountId: string) {
     txType: TxType;
   } | null>(null);
 
-  const usdRate = useExchangeRate();
+  const usd = useUsdAmountInput(form.amount, (krw) => set("amount", krw));
   const {
     suggestions: tickerSuggestions,
     isSearching: tickerSearchLoading,
@@ -42,8 +40,7 @@ export function useTransactionFormState(accountId: string) {
   const resetForm = () => {
     setForm(makeEmptyForm(accountId));
     setFormError(null);
-    setCurrency("KRW");
-    setAmountUsd(0);
+    usd.reset();
     setTickerDirect(false);
     setTickerQuery("");
     clearTickerSuggestions();
@@ -62,8 +59,7 @@ export function useTransactionFormState(accountId: string) {
     });
     setTickerDirect(!!tx.ticker);
     setTickerQuery(tx.ticker ?? "");
-    setCurrency("KRW");
-    setAmountUsd(0);
+    usd.reset();
     clearTickerSuggestions();
     setShowTickerSuggestions(false);
   };
@@ -74,25 +70,9 @@ export function useTransactionFormState(accountId: string) {
     }
   };
 
-  const handleCurrencySwitch = (c: "KRW" | "USD") => {
-    if (c === currency) return;
-    if (c === "USD") {
-      setAmountUsd(usdRate && form.amount ? parseFloat((form.amount / usdRate).toFixed(2)) : 0);
-    } else {
-      setAmountUsd(0);
-    }
-    setCurrency(c);
-  };
-
-  const handleUsdAmountChange = (usd: number) => {
-    setAmountUsd(usd);
-    set("amount", convertUsdToKrw(usd, usdRate));
-  };
-
   const handleTxTypeChange = (t: TxType) => {
     set("transaction_type", t);
-    setCurrency("KRW");
-    setAmountUsd(0);
+    usd.reset();
     setTickerDirect(false);
     setTickerQuery("");
     clearTickerSuggestions();
@@ -116,9 +96,10 @@ export function useTransactionFormState(accountId: string) {
     setForm,
     formError,
     setFormError,
-    currency,
-    amountUsd,
-    usdRate,
+    currency: usd.currency,
+    amountUsd: usd.amountUsd,
+    usdRate: usd.usdRate,
+    usdConversionError: usd.conversionError,
     tickerDirect,
     setTickerDirect,
     tickerQuery,
@@ -135,8 +116,8 @@ export function useTransactionFormState(accountId: string) {
     resetForm,
     startEdit,
     triggerDepositPrompt,
-    handleCurrencySwitch,
-    handleUsdAmountChange,
+    handleCurrencySwitch: usd.switchCurrency,
+    handleUsdAmountChange: usd.changeUsd,
     handleTxTypeChange,
     handleTickerQueryChange,
   };
