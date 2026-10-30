@@ -149,7 +149,7 @@ export function invalidateTacticalData(
   ]);
 }
 
-/** DCA 목표 변경 후 — dca-analysis + settings + dashboard + dividend-plan + 적립 챌린지(수익률/평가금액 진행률 기준값 변경) */
+/** DCA 목표 변경 후 — dca-analysis + settings + dashboard + dividend-plan + 적립 챌린지(수익률/평가금액 진행률 기준값 변경) + 환전 계획(월 적립액 기준) */
 export function invalidateDcaData(qc: QueryClient, opts: { goalRecommendation?: boolean } = {}) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
@@ -160,6 +160,7 @@ export function invalidateDcaData(qc: QueryClient, opts: { goalRecommendation?: 
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);

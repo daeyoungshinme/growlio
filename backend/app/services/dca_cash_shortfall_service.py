@@ -56,7 +56,7 @@ def is_cash_short(cash_krw: float, expected_krw: float | None) -> bool:
     return cash_krw < _MIN_CASH_KRW
 
 
-def _buy_market(item: Any, tax_type: str | None) -> str:
+def buy_market(item: Any, tax_type: str | None) -> str:
     """실제로 매수될 종목의 시장 — 지수 그룹이 ISA·연금 계좌에서 국내 대체 종목으로 사는 경우 반영(plans/74)."""
     if tax_type in TAX_DEFERRED_TAX_TYPES and getattr(item, "group_key", None):
         alt = next((m for m in getattr(item, "members", None) or [] if m.role == GROUP_ROLE_DOMESTIC_ALT), None)
@@ -72,7 +72,7 @@ def account_cash_krw(account: AssetAccount, portfolio: Portfolio, usd_krw: float
     tax_type = getattr(account, "tax_type", None)
     has_overseas = any(
         (market or "").upper() not in DOMESTIC_MARKETS and market != CASH_EQUIVALENT_MARKET
-        for market in (_buy_market(item, tax_type) for item in portfolio.items)
+        for market in (buy_market(item, tax_type) for item in portfolio.items)
     )
     if has_overseas and account.deposit_usd and usd_krw:
         cash += float(account.deposit_usd) * usd_krw

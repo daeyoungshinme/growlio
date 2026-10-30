@@ -76,6 +76,9 @@ vi.mock("@/components/invest/YearlyAchievementTable", () => ({
 vi.mock("../components/invest/SavingsSimulatorCard", () => ({
   default: () => <div data-testid="savings-simulator">SavingsSimulatorCard</div>,
 }));
+vi.mock("../components/invest/FxPlanCard", () => ({
+  default: () => <div data-testid="fx-plan">FxPlanCard</div>,
+}));
 vi.mock("@/components/ErrorBoundary", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));

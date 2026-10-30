@@ -100,3 +100,53 @@ export const fetchGoalFeasibility = (params: {
   monthly_deposit_amount?: number;
   initial_amount?: number;
 }) => apiGet<GoalFeasibilityPreview>("/invest/goal-feasibility", { params });
+
+// ── 달러 환전 계획(plans/96) — 예측이 아닌 1년 통계적 위치 + 해외 적립 필요 달러 분할 ──
+
+export type FxZone = "CHEAP" | "NEUTRAL" | "EXPENSIVE";
+export type FxPlanStatus = "OK" | "SUFFICIENT" | "NO_DEPOSIT_GOAL" | "NO_OVERSEAS" | "NO_PORTFOLIO";
+
+export interface FxPosition {
+  rate: number;
+  low_1y: number;
+  high_1y: number;
+  /** 1년 종가 중 현재보다 낮았던 비율(%) — 낮을수록 달러가 싸다 */
+  percentile_1y: number;
+  ma20: number;
+  ma60: number;
+  deviation_ma20_pct: number;
+  deviation_ma60_pct: number;
+  sigma_1m: number;
+  range_1m_low: number;
+  range_1m_high: number;
+  zone: FxZone;
+}
+
+export interface FxTranche {
+  label: string;
+  /** null = 지금(또는 적립일) 환전 */
+  target_rate: number | null;
+  usd: number;
+  krw_estimate: number;
+}
+
+export interface FxPlanData {
+  position: FxPosition | null;
+  status: FxPlanStatus;
+  portfolio_id: string | null;
+  portfolio_name: string | null;
+  portfolio_options: { id: string; name: string }[];
+  months: number;
+  overseas_weight_pct: number;
+  monthly_deposit_krw: number | null;
+  monthly_need_usd: number;
+  held_usd: number;
+  need_usd: number;
+  tranches: FxTranche[];
+}
+
+export const fetchFxPlan = (months: number, portfolioId?: string | null) => {
+  const params = new URLSearchParams({ months: String(months) });
+  if (portfolioId) params.set("portfolio_id", portfolioId);
+  return apiGet<FxPlanData>(`/invest/fx-plan?${params.toString()}`);
+};

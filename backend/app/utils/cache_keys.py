@@ -85,6 +85,7 @@ TTL_CHALLENGE_PROGRESS = 300  # 적립 챌린지 진행률(진행률/스트릭) 
 TTL_KIS_AMEX_MASTER = 86400  # KIS 공식 아멕스(AMS) 종목마스터 티커 집합 1일 — KIS가 매일 갱신
 TTL_TECHNICAL_SIGNAL = 6 * 3600  # QQQ/SPY 일봉 기술적 지표 6시간 — 장중 변화 없음, 미국 장 마감 후 반나절 내 갱신
 TTL_TACTICAL_BACKTEST = 86400  # 전술 배분 백테스트 1일 — 과거 일봉 기반, 비중표 해시+기간이 키
+TTL_USD_KRW_HISTORY = 6 * 3600  # USD/KRW 1년 일봉(환전 계획 통계용) 6시간 — 유저 무관 전역 공유
 TTL_TECHNICAL_SIGNAL_DEGRADED = 600  # 일부 종목 종가 조회 실패 결과는 10분만 — Yahoo 일시 장애 후 빠른 복구
 
 # ---------------------------------------------------------------------------
@@ -200,6 +201,11 @@ def technical_signal_key(tickers: tuple[str, ...]) -> str:
     """차트 기술적 지표 스냅샷(일봉) 캐시 키 — 유저 무관 전역 공유. v2: 추세 히스테리시스 밴드 도입.
     v3: 20/60/120일선·웅덩이 단계 추가(스냅샷 모양 변경). v4: 추세 밴드 1%→2%(같은 모양, 추세 값이 달라짐)."""
     return f"{_env_prefix()}technical_signal:v4:{','.join(sorted(tickers))}"
+
+
+def usd_krw_history_key() -> str:
+    """USD/KRW 1년 일봉 종가 캐시 키 — 유저 무관 전역 공유(환전 계획 위치·변동성 계산용)."""
+    return f"{_env_prefix()}usd_krw_history:v1"
 
 
 def tactical_tilt_key() -> str:

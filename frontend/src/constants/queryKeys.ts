@@ -41,6 +41,10 @@ export const QUERY_KEYS = {
     ["dividend-positions", accountId ?? "all"] as const,
   dcaAnalysis: ["dca-analysis"] as const,
   dividendPlan: ["dividend-plan"] as const,
+  /** 달러 환전 계획 — fxPlanBase는 무효화 프리픽스 전용(월 적립액 변경 시) */
+  fxPlanBase: ["fx-plan"] as const,
+  fxPlan: (months: number, portfolioId: string | null) =>
+    ["fx-plan", months, portfolioId ?? "auto"] as const,
   challenges: ["challenges"] as const,
   challengeSummary: ["challenges", "summary"] as const,
   settings: ["settings"] as const,

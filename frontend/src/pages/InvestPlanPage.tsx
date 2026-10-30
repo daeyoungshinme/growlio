@@ -3,6 +3,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  DollarSign,
   PiggyBank,
   Settings2,
   WandSparkles,
@@ -20,6 +21,7 @@ const DividendPlanSection = lazy(() => import("../components/invest/DividendPlan
 const ChallengeSection = lazy(() => import("../components/invest/ChallengeSection"));
 const TaxTabContainer = lazy(() => import("../components/portfolio-analysis/TaxTabContainer"));
 const SavingsSimulatorCard = lazy(() => import("../components/invest/SavingsSimulatorCard"));
+const FxPlanCard = lazy(() => import("../components/invest/FxPlanCard"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
 import AutoInvestStatusBanner from "@/components/invest/AutoInvestStatusBanner";
@@ -79,6 +81,8 @@ export default function InvestPlanPage() {
     false,
     "growlio:invest:savingsSimulatorOpen",
   );
+  // 달러 환전 계획 — 해외 적립 보조 도구라 기본 접힘(plans/96)
+  const [isFxPlanOpen, toggleFxPlanOpen] = useCollapsible(false, "growlio:invest:fxPlanOpen");
 
   const { data: settingsData } = useQuery(settingsQuery);
 
@@ -330,6 +334,22 @@ export default function InvestPlanPage() {
                 </ErrorBoundary>
               )}
             </div>
+
+            <CollapsibleCard
+              icon={DollarSign}
+              iconWrapClassName="bg-sky-50 dark:bg-sky-950"
+              iconColorClassName="text-sky-600 dark:text-sky-400"
+              title="달러 환전 계획"
+              isOpen={isFxPlanOpen}
+              onToggle={toggleFxPlanOpen}
+              collapsedHint="지금 환율이 1년 중 어디쯤인지 보고 해외 적립용 달러를 나눠 환전"
+            >
+              <ErrorBoundary variant="section">
+                <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+                  <FxPlanCard flat onEditGoal={openEdit} />
+                </Suspense>
+              </ErrorBoundary>
+            </CollapsibleCard>
 
             <CollapsibleCard
               icon={PiggyBank}

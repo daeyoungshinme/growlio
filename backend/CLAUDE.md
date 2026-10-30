@@ -81,7 +81,7 @@ alerts.py                알림 목록·읽음 (+ 하위 /alerts/*: exchange_rat
 backtest.py              백테스트
 dashboard.py             대시보드 집계(구현은 asset_aggregator) + GET /dashboard/action-items
 dividends.py             배당 요약·예상·균등화 — ?account_id= 미지정 시 전체 통합
-invest.py                DCA 분석 + GET /invest/goal-feasibility(저장 없음)
+invest.py                DCA 분석 + GET /invest/goal-feasibility(저장 없음) + GET /invest/fx-plan(환전 계획, 저장 없음)
 challenges.py            적립 챌린지 CRUD + 진행률 (/challenges/summary는 네비 배지용 경량)
 portfolios.py            포트폴리오 CRUD — 항목은 단독 종목 또는 지수 그룹(group). index-group-suggestions는 **항상 전체 계좌 기준**, 범위 밖 종목은 in_scope=False
 portfolio_analysis.py    /portfolio/{overview,allocation-history,risk,rebalancing-strategy,index-exposure}
@@ -191,7 +191,8 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `estimation.py` — Ledoit-Wolf 공분산·James-Stein 기대수익률 축소(고정 노이즈분산 사용 — 표본분산 재사용 시 축소 상쇄 버그). `goal/goal_portfolio_optimizer`·`portfolio_optimizer` 공용이라 평면
 - `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
-- `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
+- `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유. 해외 매수 시장 판정 `buy_market`은 fx_plan도 사용) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
+- `fx_plan_service.py` — 환율 1년 위치(백분위·이평 이격·1개월 ±1σ)와 해외 적립 필요 달러의 분할 환전 구간. **예측 아님**. 현재값은 실시간 캐시, Yahoo `USDKRW=X` 1년 일봉은 통계용(6h 캐시). 구간 알림 등록은 프론트가 기존 환율 알림 API로
 - `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → pykrx → FDR → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_dividend_data`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
 - `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR) · `_settings_queries.py`
