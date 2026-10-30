@@ -55,13 +55,14 @@ export function QuantityCell({ item }: { item: RebalancingItem }) {
   const colorClass =
     shares === 0 ? "text-gray-500 dark:text-gray-400" : isBuy ? PROFIT_COLOR : LOSS_COLOR;
 
-  const hasQty = item.current_qty != null && item.target_qty != null;
+  const { current_qty: currentQty, target_qty: targetQty } = item;
+  const hasQty = currentQty != null && targetQty != null;
 
   return (
     <div className="text-right">
       {hasQty && (
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          {item.current_qty!.toFixed(0)}주 → {item.target_qty!.toFixed(0)}주
+          {currentQty.toFixed(0)}주 → {targetQty.toFixed(0)}주
         </div>
       )}
       <div className={`font-medium text-xs ${colorClass}`}>

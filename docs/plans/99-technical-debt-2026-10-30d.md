@@ -42,6 +42,8 @@
 
 ## 이관
 
+> 2026-10-30: 아래 항목은 [100](100-technical-debt-2026-10-30e.md)에서 처리하거나 다시 분류했다.
+
 - `order_cancel_service`·`execution_service`가 `fastapi.HTTPException`을 직접 던진다. 도메인 에러로 바꾸는 일은 실행 경로 전체에 걸쳐 있어 따로 한다.
 - KIS 해외 취소 수량: 부분 체결 시 원수량을 보내는데, KIS가 이를 허용하는지 문서로 확인해야 한다.
 - 이번에 하지 않은 것:

@@ -5,13 +5,12 @@ from collections import defaultdict
 from datetime import UTC, datetime
 
 import structlog
-from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import ORDER_EXECUTABLE_ASSET_TYPES, OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES
 from app.core.job_runner import report_handled_failure
 from app.core.logging import public_error_message, redact_secrets
-from app.exceptions import AppError, SyncError
+from app.exceptions import AppError, BadRequestError, NotFoundError, SyncError
 from app.kis.auth import get_access_token
 from app.kis.exchange_master import resolve_kis_overseas_market
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
@@ -42,13 +41,13 @@ async def load_executable_account(
 ) -> AssetAccount:
     account = await db.scalar(active_accounts_stmt(user_id).where(AssetAccount.id == account_id))
     if not account:
-        raise HTTPException(status_code=404, detail=f"계좌를 찾을 수 없습니다. (id={account_id})")
+        raise NotFoundError(detail=f"계좌를 찾을 수 없습니다. (id={account_id})")
     if account.asset_type not in ORDER_EXECUTABLE_ASSET_TYPES:
-        raise HTTPException(status_code=400, detail="KIS 또는 키움 계좌만 실행 주문이 가능합니다.")
+        raise BadRequestError(detail="KIS 또는 키움 계좌만 실행 주문이 가능합니다.")
     if account.asset_type == "STOCK_KIS" and not account.kis_account_no:
-        raise HTTPException(status_code=400, detail="KIS 계좌번호가 설정되지 않았습니다.")
+        raise BadRequestError(detail="KIS 계좌번호가 설정되지 않았습니다.")
     if account.asset_type == "STOCK_KIWOOM" and not account.kiwoom_account_no:
-        raise HTTPException(status_code=400, detail="키움 계좌번호가 설정되지 않았습니다.")
+        raise BadRequestError(detail="키움 계좌번호가 설정되지 않았습니다.")
     return account
 
 
@@ -56,8 +55,7 @@ def load_kis_credentials(account: AssetAccount) -> tuple[str, str]:
     """KIS 계좌 자격증명 로드. 미설정 시 400 에러."""
     creds = decrypt_kis_credentials(account)
     if creds is None:
-        raise HTTPException(
-            status_code=400,
+        raise BadRequestError(
             detail="KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.",
         )
     return creds
@@ -67,7 +65,7 @@ def load_kiwoom_credentials(account: AssetAccount) -> tuple[str, str]:
     """키움 계좌 자격증명 로드 (전역 폴백 없음)."""
     creds = decrypt_kiwoom_credentials(account)
     if creds is None:
-        raise HTTPException(status_code=400, detail="키움 자격증명이 설정되지 않았습니다.")
+        raise BadRequestError(detail="키움 자격증명이 설정되지 않았습니다.")
     return creds
 
 
@@ -79,8 +77,7 @@ def _group_orders_by_account(
     for order in orders:
         target_acc_id = order.account_id or (str(account_id) if account_id else None)
         if not target_acc_id:
-            raise HTTPException(
-                status_code=400,
+            raise BadRequestError(
                 detail=f"주문 계좌가 지정되지 않았습니다. (ticker={order.ticker})",
             )
         groups[target_acc_id].append(order)
@@ -95,7 +92,7 @@ def _build_failed_group_result(
     detail = public_error_message(error)
     # 예상 밖 예외는 원인 추적용으로 예외 타입을 남기고 error로 올린다. exc_info/Sentry 전송은 하지 않는다 —
     # 이 경로의 프레임 지역변수에 복호화된 증권사 자격증명이 있다(_job_helpers.report_job_failure 참고).
-    expected = isinstance(error, HTTPException | AppError | SyncError)
+    expected = isinstance(error, AppError | SyncError)
     log = logger.warning if expected else logger.error
     log(
         "rebalancing_group_failed",
@@ -236,7 +233,7 @@ async def execute_rebalancing(
     """
     groups = _group_orders_by_account(orders, account_id)
     if not groups:
-        raise HTTPException(status_code=400, detail="실행할 주문이 없습니다.")
+        raise BadRequestError(detail="실행할 주문이 없습니다.")
 
     results: list[ExecutionResult] = []
     for acc_id_str, group_orders in groups.items():
@@ -320,7 +317,7 @@ async def _execute_kiwoom_account_orders(
     account_no = account.kiwoom_account_no
     if account_no is None:
         # load_executable_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적
-        raise HTTPException(status_code=400, detail="키움 계좌번호가 설정되지 않았습니다.")
+        raise BadRequestError(detail="키움 계좌번호가 설정되지 않았습니다.")
     access_token = await kiwoom_get_access_token(
         app_key,
         app_secret,
@@ -381,7 +378,7 @@ async def _execute_kis_account_orders(
     account_no = account.kis_account_no
     if account_no is None:
         # load_executable_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적
-        raise HTTPException(status_code=400, detail="KIS 계좌번호가 설정되지 않았습니다.")
+        raise BadRequestError(detail="KIS 계좌번호가 설정되지 않았습니다.")
 
     access_token = await get_access_token(
         app_key,

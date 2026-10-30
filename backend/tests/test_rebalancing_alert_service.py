@@ -1739,13 +1739,12 @@ def _make_linked_portfolio(alert_scope: str, linked_account_ids: list) -> Simple
 class TestSwitchAlertScope:
     @pytest.mark.asyncio
     async def test_rejects_unknown_scope(self, mock_db):
-        from fastapi import HTTPException
-
+        from app.exceptions import AppError
         from app.services.rebalancing.alert_scope import switch_alert_scope
 
         portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
 
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await switch_alert_scope(mock_db, portfolio, "BOGUS")
         assert exc.value.status_code == 422
 
@@ -1761,13 +1760,12 @@ class TestSwitchAlertScope:
 
     @pytest.mark.asyncio
     async def test_to_per_account_rejects_fewer_than_two_linked_accounts(self, mock_db):
-        from fastapi import HTTPException
-
+        from app.exceptions import AppError
         from app.services.rebalancing.alert_scope import switch_alert_scope
 
         portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4()])
 
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(AppError) as exc:
             await switch_alert_scope(mock_db, portfolio, "PER_ACCOUNT")
         assert exc.value.status_code == 422
 

@@ -208,13 +208,14 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
       : null,
   });
 
+  const rateCurve = signals.us_rate_curve;
   rows.push({
     key: "us_rate_curve",
     label: "미국 금리 커브",
     tier: "B",
-    content: signals.us_rate_curve
+    content: rateCurve
       ? (() => {
-          const s = signals.us_rate_curve!;
+          const s = rateCurve;
           const ycRank = s.yield_curve_state ? YIELD_CURVE_RANK[s.yield_curve_state] : -1;
           const rateRank = s.rate_cut_level ? RATE_CUT_RANK[s.rate_cut_level] : -1;
           const ycHint = s.yield_curve_state ? YIELD_HINT[s.yield_curve_state] : "";
@@ -291,13 +292,14 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
       : null,
   });
 
+  const inflation = signals.inflation;
   rows.push({
     key: "inflation",
     label: "인플레이션",
     tier: "B",
-    content: signals.inflation
+    content: inflation
       ? (() => {
-          const s = signals.inflation!;
+          const s = inflation;
           const cpiRank = s.cpi_level ? INFLATION_RANK[s.cpi_level] : -1;
           const pceRank = s.pce_level ? INFLATION_RANK[s.pce_level] : -1;
           const cpiHint = s.cpi_level ? INFLATION_HINT[s.cpi_level] : "";

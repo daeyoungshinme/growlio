@@ -12,13 +12,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 import structlog
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.job_runner import report_handled_failure
 from app.core.logging import public_error_message
+from app.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.order_builder import market_group
@@ -65,9 +65,9 @@ async def _lock_and_claim(leg_id: uuid.UUID, db: AsyncSession) -> RebalancingPla
     """
     locked = await db.scalar(select(RebalancingPlanLeg).where(RebalancingPlanLeg.id == leg_id).with_for_update())
     if locked is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계획을 찾을 수 없습니다")
+        raise NotFoundError(detail="계획을 찾을 수 없습니다")
     if locked.status != "PENDING" or locked.token_consumed_at is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 처리되었거나 만료된 계획입니다")
+        raise ConflictError(detail="이미 처리되었거나 만료된 계획입니다")
     locked.token_consumed_at = datetime.now(tz=UTC)
     await db.commit()
     await db.refresh(locked)
@@ -205,10 +205,10 @@ async def _approve_leg_now(
     locked = await _lock_and_claim(leg.id, db)
     if locked.side != expected_side:
         label = "매도" if expected_side == "SELL" else "매수"
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{label} 계획이 아닙니다")
+        raise BadRequestError(detail=f"{label} 계획이 아닙니다")
     plan = await db.get(RebalancingPlan, locked.plan_id)
     if plan is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계획을 찾을 수 없습니다")
+        raise NotFoundError(detail="계획을 찾을 수 없습니다")
 
     # 매도 deadline_at은 당일 장마감 승인 기한이다 — 만료 job(15분 주기)이 돌기 전에 들어온 승인도
     # 기한이 지났으면 실행하지 않고 만료로 마감한다(plans/62 A4). 매수 deadline_at은 실행 예정 시각이라 해당 없음.
@@ -218,7 +218,7 @@ async def _approve_leg_now(
         locked.decided_by = "SYSTEM_EXPIRY"
         await save_alert_history(db, plan.user_id, "REBALANCING", "리밸런싱 자동화 매도 승인 만료 (장마감 미응답)")
         await db.commit()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="승인 기한(장마감)이 지나 만료된 계획입니다")
+        raise ConflictError(detail="승인 기한(장마감)이 지나 만료된 계획입니다")
 
     execution_id = await _execute_leg(locked, plan, db, cache, decided_by)
     if execution_id:

@@ -132,9 +132,10 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
   };
 
   const handleEditSubmit = () => {
+    if (!initialAccount) return;
     const data: AssetAccountCreate = {
       name: form.name,
-      asset_type: initialAccount!.asset_type,
+      asset_type: initialAccount.asset_type,
       institution: form.institution || undefined,
       notes: form.notes || undefined,
       include_in_total: form.include_in_total,

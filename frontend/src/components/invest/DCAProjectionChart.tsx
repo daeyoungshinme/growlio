@@ -32,7 +32,7 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
       typeof window.matchMedia === "function" && window.matchMedia("(max-width: 639px)").matches,
   );
   const [showScenarios, setShowScenarios] = useState(false);
-  const canShowScenarios = !!monthlyDepositAmount && monthlyDepositAmount > 0;
+  const canShowScenarios = monthlyDepositAmount != null && monthlyDepositAmount > 0;
   const today = localMonth();
   const pastPoints = data.filter((d) => d.month <= today);
   const futurePoints = data.filter((d) => d.month > today);
@@ -44,11 +44,11 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
   const boundaryPoint = recentPast.length > 0 ? recentPast[recentPast.length - 1] : null;
   const conservativeCurve =
     showScenarios && canShowScenarios
-      ? buildScenarioCurve(data, monthlyDepositAmount!, CONSERVATIVE_RETURN_PCT)
+      ? buildScenarioCurve(data, monthlyDepositAmount, CONSERVATIVE_RETURN_PCT)
       : {};
   const aggressiveCurve =
     showScenarios && canShowScenarios
-      ? buildScenarioCurve(data, monthlyDepositAmount!, AGGRESSIVE_RETURN_PCT)
+      ? buildScenarioCurve(data, monthlyDepositAmount, AGGRESSIVE_RETURN_PCT)
       : {};
 
   const chartData = [

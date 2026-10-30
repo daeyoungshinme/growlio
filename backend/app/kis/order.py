@@ -19,7 +19,10 @@ from app.kis.constants import (
     TR_OVERSEAS_CANCEL_REAL,
     TR_OVERSEAS_SELL_MOCK,
     TR_OVERSEAS_SELL_REAL,
+    TR_OVERSEAS_UNFILLED_REAL,
 )
+
+_UNFILLED_MAX_PAGES = 5  # 당일 미체결 목록 연속조회 상한 — 넘으면 "목록에 없음"(0)으로 본다
 
 
 def is_overseas_market(market: str) -> bool:
@@ -241,3 +244,52 @@ async def cancel_overseas_order(
 
     output = data.get("output") or {}
     return {"order_no": output.get("ODNO"), "raw": output}
+
+
+async def get_overseas_unfilled_qty(
+    app_key: str,
+    app_secret: str,
+    access_token: str,
+    account_no: str,
+    *,
+    market: str,
+    order_no: str,
+    is_mock: bool,
+) -> int | None:
+    """해외주식 미체결 잔량(TTTS3018R). 미체결 목록에 없으면 0, 모의투자(TR 미지원)면 None.
+
+    해외 취소 TR은 국내와 달리 "잔량 전부" 플래그가 없어 수량을 직접 보내야 한다 — 부분 체결된 주문에
+    원주문수량을 보내면 거부될 수 있어 취소 직전에 남은 수량을 확인한다(plans/100 B).
+    """
+    if is_mock:
+        return None
+    exchange_cd = OVERSEAS_MARKET_CODES.get(market.upper(), "NASD")
+    cano, acnt_prdt_cd = split_account_no(account_no)
+    headers = auth_headers(app_key, app_secret, access_token, TR_OVERSEAS_UNFILLED_REAL)
+    target = order_no.lstrip("0")
+
+    fk200 = nk200 = ""
+    for page in range(_UNFILLED_MAX_PAGES):
+        data = await kis_request(
+            "GET",
+            "/uapi/overseas-stock/v1/trading/inquire-nccs",
+            is_mock=False,
+            headers={**headers, "tr_cont": "N"} if page > 0 else headers,
+            params={
+                "CANO": cano,
+                "ACNT_PRDT_CD": acnt_prdt_cd,
+                "OVRS_EXCG_CD": exchange_cd,
+                "SORT_SQN": "DS",
+                "CTX_AREA_FK200": fk200,
+                "CTX_AREA_NK200": nk200,
+            },
+        )
+        rows = data.get("output") or []
+        for row in rows:
+            if str(row.get("odno") or "").lstrip("0") == target:
+                return int(float(row.get("nccs_qty") or 0))
+        next_nk = str(data.get("ctx_area_nk200") or "").strip()
+        if not rows or not next_nk or next_nk == nk200:
+            break
+        fk200, nk200 = str(data.get("ctx_area_fk200") or "").strip(), next_nk
+    return 0

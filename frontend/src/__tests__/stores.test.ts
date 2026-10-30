@@ -15,13 +15,16 @@ vi.mock("@/lib/supabase", () => ({
   getSupabase: async () => ({ auth: mockSupabaseAuth }),
 }));
 
-vi.mock("@/api/client", () => ({
-  api: {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-  },
-}));
+vi.mock("@/api/client", () => {
+  const mockApi = { get: vi.fn(), post: vi.fn(), put: vi.fn() };
+  return {
+    api: mockApi,
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+  };
+});
 
 vi.mock("@/utils/error", () => ({
   getHttpStatus: vi.fn(),

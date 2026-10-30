@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import UnprocessableError
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.services.rebalancing._alert_queries import get_alert_by_portfolio, list_alerts_by_portfolio_accounts
@@ -38,7 +38,7 @@ async def switch_alert_scope(db: AsyncSession, portfolio: Portfolio, target_scop
     `portfolio.linked_accounts`가 selectinload되어 있어야 한다.
     """
     if target_scope not in ("AGGREGATE", "PER_ACCOUNT"):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="알 수 없는 alert_scope입니다")
+        raise UnprocessableError(detail="알 수 없는 alert_scope입니다")
 
     current_scope = getattr(portfolio, "alert_scope", "AGGREGATE")
     if current_scope == target_scope:
@@ -48,8 +48,7 @@ async def switch_alert_scope(db: AsyncSession, portfolio: Portfolio, target_scop
 
     if target_scope == "PER_ACCOUNT":
         if len(linked_account_ids) < 2:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            raise UnprocessableError(
                 detail="계좌별 독립 설정은 연결된 계좌가 2개 이상이어야 합니다",
             )
         aggregate_alert = await get_alert_by_portfolio(db, portfolio.id, portfolio.user_id)
