@@ -1,8 +1,9 @@
 """달러 환전 계획 — 환율의 1년 통계적 위치와 해외 적립에 필요한 달러로 분할 환전 구간을 제안한다(plans/96).
 
 - 위치·범위는 예측이 아니라 과거 1년 종가 분포와 변동성으로 계산한 참고치다.
-- 현재값은 앱 전역 실시간 캐시(`get_usd_krw_rate`)를 쓰고, Yahoo 1년 일봉은 통계 계산에만 쓴다
-  (`market_signal_indicators.fetch_exchange_rate_signal`과 같은 원칙).
+- 현재값은 앱 전역 실시간 캐시(`get_live_or_cached_usd_krw`)를 쓰고, Yahoo 1년 일봉은 통계 계산에만 쓴다.
+  실값이 없으면(콜드스타트+Yahoo 장애) 설정 fallback 대신 1년 일봉 마지막 종가로 대체한다 —
+  고정 fallback(1300원)이면 "1년 최저" 판정과 그 아래 목표 환율이 나온다(plans/97 A2).
 - 아무것도 저장하지 않는다. 구간 목표 환율의 알림 등록은 프론트가 기존 `POST /alerts/exchange-rate`로 한다.
 """
 
@@ -33,7 +34,7 @@ from app.utils.cache_keys import (
     set_cached_json,
     usd_krw_history_key,
 )
-from app.utils.currency import get_usd_krw_rate
+from app.utils.currency import get_live_or_cached_usd_krw
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -120,11 +121,18 @@ def compute_fx_plan(position: FxPosition | None, need_usd: float, live_rate: flo
 
     now_usd = need_usd * _NOW_SHARE_BY_ZONE[position.zone]
     rest_each = (need_usd - now_usd) / len(_TARGET_SIGMA_MULTIPLIERS)
-    tranches = [FxTranche("지금", None, round(now_usd, 2), round(now_usd * live_rate))]
+    # σ가 작으면 0.5σ·1σ 목표가 10원 내림 후 같아진다 — 같은 목표는 한 구간으로 합친다(plans/97 B1).
+    # 목표는 현재 환율보다 최소 한 단계 아래(이미 닿은 값으로 알림을 걸지 않게).
+    ceiling = math.ceil(live_rate / _TARGET_RATE_STEP) * _TARGET_RATE_STEP - _TARGET_RATE_STEP
+    usd_by_target: dict[int, float] = {}
     for mult in _TARGET_SIGMA_MULTIPLIERS:
         target = math.floor((live_rate - position.sigma_1m * mult) / _TARGET_RATE_STEP) * _TARGET_RATE_STEP
-        label = f"{target:,.0f}원 이하"
-        tranches.append(FxTranche(label, float(target), round(rest_each, 2), round(rest_each * target)))
+        target = min(target, ceiling)
+        usd_by_target[target] = usd_by_target.get(target, 0.0) + rest_each
+
+    tranches = [FxTranche("지금", None, round(now_usd, 2), round(now_usd * live_rate))]
+    for target, usd in usd_by_target.items():
+        tranches.append(FxTranche(f"{target:,.0f}원 이하", float(target), round(usd, 2), round(usd * target)))
     return tranches
 
 
@@ -224,8 +232,10 @@ async def get_fx_plan(
     portfolio_id: uuid.UUID | None,
     months: int,
 ) -> dict[str, Any]:
-    live_rate = await get_usd_krw_rate(cache)
+    live_rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
     closes = await fetch_usd_krw_closes(cache)
+    if not rate_is_live and closes:
+        live_rate = closes[-1]
     position = compute_fx_position(closes, live_rate) if closes else None
 
     portfolio, candidates = await _pick_portfolio(db, user_id, portfolio_id)
@@ -234,6 +244,7 @@ async def get_fx_plan(
 
     result: dict[str, Any] = {
         "position": asdict(position) if position else None,
+        "rate_is_live": rate_is_live,
         "status": "OK",
         "portfolio_id": portfolio.id if portfolio else None,
         "portfolio_name": portfolio.name if portfolio else None,

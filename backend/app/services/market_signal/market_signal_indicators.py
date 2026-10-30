@@ -280,6 +280,8 @@ async def fetch_exchange_rate_signal(cache: CacheStore | None = None) -> dict[st
     (value)과 이격도 계산의 기준값은 앱 전역에서 쓰는 실시간 캐시(get_usd_krw_rate)를 쓰고,
     FRED 시계열은 원래 목적대로 ma20(20일 이동평균) 산출에만 사용한다 — 이동평균은 개별
     관측치가 며칠 지연되어 섞여도 방향성 판단에 미치는 영향이 작다.
+    단, 실시간 캐시가 비어 있으면 설정 fallback(1300원) 대신 FRED 최신 관측치를 쓴다 —
+    고정 fallback으로 이격도를 내면 항상 NORMAL로 오판한다(plans/97 A3).
     """
     if not fred_circuit.is_available():
         logger.warning("fred_circuit_open", signal="exchange_rate")
@@ -301,9 +303,9 @@ async def fetch_exchange_rate_signal(cache: CacheStore | None = None) -> dict[st
     if ma20 == 0:
         return None
 
-    from app.utils.currency import get_usd_krw_rate
+    from app.utils.currency import fetch_usd_krw
 
-    live_rate = await get_usd_krw_rate(cache)
+    live_rate = await fetch_usd_krw(cache, allow_fallback=False) or recent[-1]["value"]
     deviation_pct = (live_rate - ma20) / ma20 * 100
 
     if deviation_pct <= 1:

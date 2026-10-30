@@ -537,6 +537,31 @@ class TestFetchUsdKrw:
 
         assert rate == pytest.approx(1300.0)
 
+    @pytest.mark.asyncio
+    async def test_no_fallback_returns_zero_when_fetch_fails_and_cache_miss(self, override_settings):
+        """allow_fallback=False면 실시간·캐시 모두 없을 때 설정 fallback 대신 0.0 (plans/97 A1)."""
+        from app.utils.currency import fetch_usd_krw
+
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+
+        with patch("app.services.market_data.yahoo_price.fetch_usdkrw", AsyncMock(return_value=0.0)):
+            rate = await fetch_usd_krw(cache, force_refresh=True, allow_fallback=False)
+
+        assert rate == 0.0
+
+    @pytest.mark.asyncio
+    async def test_no_fallback_uses_cache_when_fetch_fails(self, override_settings):
+        from app.utils.currency import fetch_usd_krw
+
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=b"1412.5")
+
+        with patch("app.services.market_data.yahoo_price.fetch_usdkrw", AsyncMock(return_value=0.0)):
+            rate = await fetch_usd_krw(cache, force_refresh=True, allow_fallback=False)
+
+        assert rate == pytest.approx(1412.5)
+
 
 # ── inproc_lock ────────────────────────────────────────────────
 

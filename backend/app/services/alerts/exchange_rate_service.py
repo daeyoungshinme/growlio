@@ -27,10 +27,12 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
     캐시(usd_krw_rate)에 반영된다 — 이 캐시는 market_signal_service의 환율 신호를
     비롯해 앱 전역에서 "현재 환율"로 참조하는 유일한 소스이므로, cache=None으로 호출하면
     이 job이 5분마다 실시간 값을 가져오고도 캐시에 저장하지 않아 fallback 값으로 굳어진다.
+    allow_fallback=False — 실시간·캐시가 모두 없을 때(콜드스타트+Yahoo 장애) 고정 fallback으로
+    판정하면 그보다 높은 BELOW 알림이 전부 거짓 발동하므로 이번 회차를 건너뛴다(plans/97 A1).
     """
     from app.services.notifications.email_service import send_exchange_rate_alert
 
-    current_rate = await fetch_usd_krw(cache, force_refresh=True)
+    current_rate = await fetch_usd_krw(cache, force_refresh=True, allow_fallback=False)
     if current_rate <= 0:
         logger.warning("alert_check_skipped_no_rate")
         return

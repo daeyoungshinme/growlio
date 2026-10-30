@@ -105,6 +105,7 @@ class FxPortfolioOption(BaseModel):
 
 class FxPlanResponse(BaseModel):
     position: FxPositionResponse | None  # 1년 시계열 조회 실패 시 None
+    rate_is_live: bool = True  # False면 실시간 환율이 없어 1년 일봉 마지막 종가(없으면 설정 fallback) 기준
     status: Literal["OK", "SUFFICIENT", "NO_DEPOSIT_GOAL", "NO_OVERSEAS", "NO_PORTFOLIO"]
     portfolio_id: uuid.UUID | None
     portfolio_name: str | None

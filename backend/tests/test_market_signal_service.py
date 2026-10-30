@@ -421,7 +421,7 @@ class TestExchangeRateSignal:
                 AsyncMock(return_value=obs),
             ),
             patch(
-                "app.utils.currency.get_usd_krw_rate",
+                "app.utils.currency.fetch_usd_krw",
                 AsyncMock(return_value=1355.0),
             ),
         ):
@@ -440,7 +440,7 @@ class TestExchangeRateSignal:
                 AsyncMock(return_value=obs),
             ),
             patch(
-                "app.utils.currency.get_usd_krw_rate",
+                "app.utils.currency.fetch_usd_krw",
                 AsyncMock(return_value=1450.0),
             ),
         ):
@@ -450,6 +450,22 @@ class TestExchangeRateSignal:
         assert result["sub_score"] == 3
         assert result["deviation_pct"] > 5
         assert result["value"] == 1450.0
+
+    @pytest.mark.asyncio
+    async def test_uses_latest_fred_value_when_live_rate_missing(self):
+        """실시간 캐시가 비면 설정 fallback(1300) 대신 FRED 최신값 기준 (plans/97 A3)."""
+        obs = self._make_obs(latest_value=1450.0, base_value=1350.0)
+        with (
+            patch(
+                "app.services.market_signal.economic_indicator_service.fred_get_observations",
+                AsyncMock(return_value=obs),
+            ),
+            patch("app.utils.currency.fetch_usd_krw", AsyncMock(return_value=0.0)),
+        ):
+            result = await fetch_exchange_rate_signal()
+        assert result is not None
+        assert result["value"] == 1450.0
+        assert result["level"] == "BREAKOUT"
 
     @pytest.mark.asyncio
     async def test_returns_none_when_insufficient_history(self):
