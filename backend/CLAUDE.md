@@ -228,7 +228,7 @@ utils/
 limiter.py      slowapi. 키는 rate_limit_key(JWT sub / X-Forwarded-For 첫 hop — Vercel→Render 프록시라 client.host는 공용).
                 **인증 없이 상태를 바꾸거나 토큰을 받는 라우트는 ip_rate_limit_key + peer_rate_limit_key 두 데코레이터를 겹친다**(tests/test_rate_limit_key.py가 검사)
 enums.py        도메인 StrEnum — 매직 스트링 대신
-constants.py    DOMESTIC/OVERSEAS_MARKETS, POSITION_STOCK_ASSET_TYPES, is_non_tradable(). **새 브로커는 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 7곳 누락)
+constants.py    DOMESTIC/OVERSEAS_MARKETS, POSITION_STOCK_ASSET_TYPES, BROKER_API_ASSET_TYPES·BROKER_API_DATA_SOURCES(잔고 조회), ORDER_EXECUTABLE_ASSET_TYPES(주문·취소, 토스 제외), is_non_tradable(). **새 브로커는 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 7곳 누락)
 exceptions.py   AppError 계열(전역 핸들러가 변환) + SyncError 계열
 scheduler.py    init_scheduler()의 jobs 스펙 리스트
 ```
