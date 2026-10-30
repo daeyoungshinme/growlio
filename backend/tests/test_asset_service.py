@@ -214,12 +214,7 @@ class TestKISProvider:
                 new_callable=AsyncMock,
                 return_value=overseas_result,
             ),
-            patch(
-                "app.providers.kis_provider.get_overseas_price",
-                new_callable=AsyncMock,
-                return_value={"usd_krw_rate": 1300.0},
-            ),
-            patch("app.providers.kis_provider.cache_usd_krw_rate", new_callable=AsyncMock),
+            patch("app.providers.kis_provider.get_usd_krw_rate", new_callable=AsyncMock, return_value=1300.0),
         ):
             cache = AsyncMock()
             cache.get = AsyncMock(return_value=None)

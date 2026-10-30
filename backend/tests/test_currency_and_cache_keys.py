@@ -490,6 +490,14 @@ class TestCacheUsdKrwRate:
         await cache_usd_krw_rate(cache, 0)
         cache.setex.assert_not_called()
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("rate", [1.25, -0.8, 99999.0])
+    async def test_ignores_implausible_rate(self, override_settings, rate):
+        """등락률 같은 다른 필드를 잘못 읽은 값이 전역 환율 캐시에 들어가면 모든 환산이 오염된다 (plans/99 A1)."""
+        cache = AsyncMock()
+        await cache_usd_krw_rate(cache, rate)
+        cache.setex.assert_not_called()
+
 
 # ── fetch_usd_krw (force_refresh) ────────────────────────────
 

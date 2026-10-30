@@ -12,7 +12,6 @@ from app.exceptions import BalancePaginationError, ProviderApiError, ProviderCre
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisApiError, KisTokenExpiredError
-from app.kis.overseas_quote import get_overseas_price
 from app.providers._error_mapping import map_http_status_error, map_network_error
 from app.providers._overseas_cache import fetch_overseas_cached
 from app.providers._overseas_name_enrichment import enrich_overseas_positions
@@ -20,7 +19,7 @@ from app.providers._retry import with_token_refresh
 from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.accounts.credential_service import decrypt
-from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
+from app.utils.currency import get_usd_krw_rate
 from app.utils.kst import today_kst
 from app.utils.masking import mask_account_no
 
@@ -124,22 +123,8 @@ class KISProvider(BrokerProvider):
 
         if last_token is None:
             raise RuntimeError("last_token이 설정되지 않음: _get_token이 호출되지 않았습니다.")
+        # 해외 시세(HHDFS00000300)의 output.rate는 등락률(%)이지 환율이 아니다 — 키움·토스와 같은 공용 환율을 쓴다
         usd_krw_rate = await get_usd_krw_rate(cache)
-        if overseas["positions"]:
-            sample = overseas["positions"][0]
-            try:
-                quote = await get_overseas_price(
-                    app_key,
-                    app_secret,
-                    last_token,
-                    sample["ticker"],
-                    sample["market"],
-                    is_mock=is_mock,
-                )
-                usd_krw_rate = quote["usd_krw_rate"]
-                await cache_usd_krw_rate(cache, usd_krw_rate)
-            except Exception as e:
-                logger.warning("usd_krw_rate_fetch_failed", ticker=sample["ticker"], error=str(e))
 
         overseas_value_krw = overseas["total_value_usd"] * usd_krw_rate
         overseas_deposit_krw = overseas["deposit_usd"] * usd_krw_rate

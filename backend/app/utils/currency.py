@@ -10,6 +10,9 @@ from app.utils.cache_keys import USD_KRW_RATE as _USD_KRW_KEY
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
 
+_PLAUSIBLE_USD_KRW_MIN = 500.0
+_PLAUSIBLE_USD_KRW_MAX = 3000.0
+
 
 async def get_usd_krw_rate(cache: CacheStore | None, fallback_rate: float | None = None) -> float:
     """캐시에서 USD/KRW 환율 조회. 캐시 미적중 시 config fallback 반환."""
@@ -42,8 +45,9 @@ async def get_live_or_cached_usd_krw(cache: CacheStore | None) -> tuple[float, b
 
 
 async def cache_usd_krw_rate(cache: CacheStore | None, rate: float) -> None:
-    """USD/KRW 환율을 캐싱."""
-    if cache is None or rate <= 0:
+    """USD/KRW 환율을 캐싱. 범위를 벗어난 값(등락률 등 다른 필드를 잘못 읽은 값)은 버린다 — 전역 캐시라 한 번
+    들어가면 환산·환율 알림·환전 계획이 모두 그 값을 실환율로 쓴다(plans/99 A1)."""
+    if cache is None or not _PLAUSIBLE_USD_KRW_MIN < rate < _PLAUSIBLE_USD_KRW_MAX:
         return
     await cache.setex(_USD_KRW_KEY, settings.cache_ttl_seconds, str(rate))
 

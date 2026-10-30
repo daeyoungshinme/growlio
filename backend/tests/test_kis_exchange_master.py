@@ -97,10 +97,11 @@ async def test_overseas_quote_uses_3_letter_excd(httpx_mock: HTTPXMock, monkeypa
     from app.kis.overseas_quote import get_overseas_price
 
     monkeypatch.setattr(kis_client._rate_limiter, "acquire", AsyncMock())
-    httpx_mock.add_response(json={"rt_cd": "0", "output": {"last": "700.5", "rate": "1400"}})
+    httpx_mock.add_response(json={"rt_cd": "0", "output": {"last": "700.5", "rate": "1.25"}})
 
     result = await get_overseas_price("k", "s", "t", "SPY", "AMEX", is_mock=False)
 
     request = httpx_mock.get_requests()[0]
     assert request.url.params["EXCD"] == "AMS"
-    assert result["price_usd"] == 700.5
+    # output.rate는 등락률(%)이라 환율로 내보내지 않는다 (plans/99 A1)
+    assert result == {"price_usd": 700.5}
