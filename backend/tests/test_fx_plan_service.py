@@ -100,6 +100,21 @@ def test_plan_target_rates_floor_to_10_won():
     assert tranches[1].krw_estimate == round(tranches[1].usd * 1380)
 
 
+def test_plan_merges_targets_that_floor_to_same_rate():
+    # σ=6: 1400 − 3 = 1397 → 1390, 1400 − 6 = 1394 → 1390 → 한 구간으로 합침
+    tranches = svc.compute_fx_plan(_pos(sigma=6.0), 1000.0, 1400.0)
+    assert [t.target_rate for t in tranches] == [None, 1390.0]
+    assert sum(t.usd for t in tranches) == pytest.approx(1000.0, abs=0.02)
+
+
+def test_plan_target_strictly_below_live_rate():
+    # σ≈0이면 floor(1405)=1400 — 현재 환율 1405에서 한 단계 아래인 1400 이하로
+    tranches = svc.compute_fx_plan(_pos(sigma=0.0, rate=1405.0), 1000.0, 1405.0)
+    assert [t.target_rate for t in tranches[1:]] == [1400.0]
+    tranches = svc.compute_fx_plan(_pos(sigma=0.0, rate=1400.0), 1000.0, 1400.0)
+    assert [t.target_rate for t in tranches[1:]] == [1390.0]
+
+
 def test_plan_without_position_single_tranche():
     tranches = svc.compute_fx_plan(None, 500.0, 1400.0)
     assert len(tranches) == 1
@@ -176,9 +191,9 @@ def _db(portfolios, *, dca_portfolio_id=None, monthly=1_400_000.0, accounts=()):
     return db
 
 
-async def _plan(db, *, portfolio_id=None, months=3, closes=None, rate=1400.0):
+async def _plan(db, *, portfolio_id=None, months=3, closes=None, rate=1400.0, rate_is_live=True):
     with (
-        patch.object(svc, "get_usd_krw_rate", new=AsyncMock(return_value=rate)),
+        patch.object(svc, "get_live_or_cached_usd_krw", new=AsyncMock(return_value=(rate, rate_is_live))),
         patch.object(svc, "fetch_usd_krw_closes", new=AsyncMock(return_value=closes)),
     ):
         return await svc.get_fx_plan(db, None, uuid.uuid4(), portfolio_id, months)
@@ -249,6 +264,20 @@ async def test_plan_degrades_without_history():
     assert result["position"] is None
     assert len(result["tranches"]) == 1
     assert result["tranches"][0]["target_rate"] is None
+
+
+async def test_plan_uses_last_close_when_rate_not_live():
+    """실시간·캐시 환율이 없으면 설정 fallback(1300) 대신 1년 일봉 마지막 종가 기준 (plans/97 A2)."""
+    closes = _closes()
+    result = await _plan(_db([_portfolio()]), closes=closes, rate=1300.0, rate_is_live=False)
+    assert result["rate_is_live"] is False
+    assert result["position"]["rate"] == round(closes[-1], 2)
+    assert result["monthly_need_usd"] == round(1_400_000 * 0.6 / closes[-1], 2)
+
+
+async def test_plan_rate_is_live_flag_default():
+    result = await _plan(_db([_portfolio()]), closes=_closes())
+    assert result["rate_is_live"] is True
 
 
 async def test_held_usd_limited_to_linked_accounts():

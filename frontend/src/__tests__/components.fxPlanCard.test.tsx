@@ -34,6 +34,7 @@ const position: NonNullable<FxPlanData["position"]> = {
 
 const plan: FxPlanData = {
   position,
+  rate_is_live: true,
   status: "OK",
   portfolio_id: "p1",
   portfolio_name: "해외 적립",
@@ -157,5 +158,28 @@ describe("FxPlanCard", () => {
     renderWithProviders(<FxPlanCard flat />);
     fireEvent.change(await screen.findByLabelText("포트폴리오 선택"), { target: { value: "p2" } });
     await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(3, "p2"));
+  });
+
+  it("실시간 환율이 없으면 최근 종가 기준임을 알린다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, rate_is_live: false });
+    renderWithProviders(<FxPlanCard flat />);
+    expect(await screen.findByText(/최근 종가 기준/)).toBeInTheDocument();
+  });
+
+  it("고른 포트폴리오 조회가 실패하면 자동 선택으로 되돌린다", async () => {
+    const options = [
+      { id: "p1", name: "해외 적립" },
+      { id: "p2", name: "연금" },
+    ];
+    vi.mocked(fetchFxPlan).mockImplementation((_months, portfolioId) =>
+      portfolioId === "p2"
+        ? Promise.reject(new Error("404"))
+        : Promise.resolve({ ...plan, portfolio_options: options }),
+    );
+    renderWithProviders(<FxPlanCard flat />);
+    fireEvent.change(await screen.findByLabelText("포트폴리오 선택"), { target: { value: "p2" } });
+    await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(3, "p2"));
+    expect(await screen.findByLabelText("포트폴리오 선택")).toHaveValue("p1");
+    expect(screen.queryByText(/환전 계획을 불러오지 못했습니다/)).not.toBeInTheDocument();
   });
 });

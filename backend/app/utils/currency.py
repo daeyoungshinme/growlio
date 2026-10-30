@@ -48,19 +48,23 @@ async def cache_usd_krw_rate(cache: CacheStore | None, rate: float) -> None:
     await cache.setex(_USD_KRW_KEY, settings.cache_ttl_seconds, str(rate))
 
 
-async def fetch_usd_krw(cache: CacheStore | None, *, force_refresh: bool = False) -> float:
+async def fetch_usd_krw(cache: CacheStore | None, *, force_refresh: bool = False, allow_fallback: bool = True) -> float:
     """USD/KRW 환율 단일 진입점.
 
     force_refresh=False: 캐시 조회 → 미적중 시 settings fallback.
     force_refresh=True:  yfinance로 실시간 조회 → 캐시 갱신 → 실패 시 캐시/fallback.
+    allow_fallback=False: 실시간·캐시 모두 없으면 settings fallback 대신 0.0 — 환율로 알림 발동·판정을
+        하는 호출처용(고정 fallback 1300원이 실환율로 쓰이면 BELOW 알림이 거짓 발동한다).
     """
-    if not force_refresh:
+    if force_refresh:
+        from app.services.market_data.yahoo_price import fetch_usdkrw  # 순환 import 방지
+
+        fetched = await fetch_usdkrw()
+        if fetched:
+            await cache_usd_krw_rate(cache, fetched)
+            return fetched
+    if allow_fallback:
         return await get_usd_krw_rate(cache)
-
-    from app.services.market_data.yahoo_price import fetch_usdkrw  # 순환 import 방지
-
-    fetched = await fetch_usdkrw()
-    if fetched:
-        await cache_usd_krw_rate(cache, fetched)
-        return fetched
-    return await get_usd_krw_rate(cache)
+    if cache is not None and (cached := await cache.get(_USD_KRW_KEY)):
+        return float(cached)
+    return 0.0

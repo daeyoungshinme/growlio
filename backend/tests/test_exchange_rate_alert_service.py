@@ -172,7 +172,7 @@ class TestCheckAndTriggerAlerts:
 
             await check_and_trigger_alerts(mock_db, mock_cache)
 
-        mock_fetch.assert_called_once_with(mock_cache, force_refresh=True)
+        mock_fetch.assert_called_once_with(mock_cache, force_refresh=True, allow_fallback=False)
 
     @pytest.mark.asyncio
     async def test_email_failure_skips_alert(self, mock_db):

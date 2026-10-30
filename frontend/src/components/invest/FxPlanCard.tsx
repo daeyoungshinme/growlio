@@ -122,6 +122,9 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
     .filter((r): r is number => r !== null);
   const pendingTargets = targets.filter((r) => !registered.has(r));
 
+  // 고른 포트폴리오가 삭제되면 404가 계속 남는다 — 자동 선택으로 되돌린다 (plans/97 B3)
+  if (isError && portfolioId) setPortfolioId(null);
+
   const registerMutation = useMutation({
     mutationFn: async () => {
       for (const rate of pendingTargets) await createExchangeRateAlert(rate, "BELOW", 1);
@@ -155,7 +158,14 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
   return wrap(
     <>
       {data.position ? (
-        <PositionBlock position={data.position} />
+        <>
+          <PositionBlock position={data.position} />
+          {!data.rate_is_live && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              실시간 환율을 불러오지 못해 최근 종가 기준으로 계산했습니다.
+            </p>
+          )}
+        </>
       ) : (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           환율 1년 시세를 불러오지 못해 위치 판단 없이 계획만 보여드립니다.
@@ -221,7 +231,10 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
             <>
               <ul className="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-100 dark:border-gray-800">
                 {data.tranches.map((t) => (
-                  <li key={t.label} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <li
+                    key={t.target_rate ?? t.label}
+                    className="flex items-center justify-between gap-3 px-3 py-2.5"
+                  >
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                         {t.label}
