@@ -4,9 +4,11 @@ import { fmtKrwPrice } from "@/utils/format";
 export function CashSummaryBar({ analysis }: { analysis: CashAnalysis }) {
   const { deposit, isOrderableKnown, sellProceeds, totalAvailable, buyCost, surplus } = analysis;
   if (deposit === null) return null;
-  const hasSell = sellProceeds !== null && sellProceeds > 0;
-  const hasBuy = buyCost !== null && buyCost > 0;
-  const surplusKnown = surplus !== null;
+  // null(시세 미확인)은 0과 같이 "표시 안 함"으로 본다
+  const sell = sellProceeds ?? 0;
+  const buy = buyCost ?? 0;
+  const hasSell = sell > 0;
+  const hasBuy = buy > 0;
   return (
     <div className="px-4 py-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs bg-gray-50 dark:bg-gray-900/20 border-b border-gray-200 dark:border-gray-700/30">
       <span className="text-gray-500 dark:text-gray-500">
@@ -18,8 +20,7 @@ export function CashSummaryBar({ analysis }: { analysis: CashAnalysis }) {
       </span>
       {hasSell && (
         <span className="text-gray-500 dark:text-gray-500">
-          + 매도예상{" "}
-          <span className="text-blue-600 dark:text-blue-400">+{fmtKrwPrice(sellProceeds!)}</span>
+          + 매도예상 <span className="text-blue-600 dark:text-blue-400">+{fmtKrwPrice(sell)}</span>
         </span>
       )}
       {hasSell && totalAvailable !== null && (
@@ -31,20 +32,20 @@ export function CashSummaryBar({ analysis }: { analysis: CashAnalysis }) {
       {hasBuy && <span className="text-gray-400 dark:text-gray-600">|</span>}
       {hasBuy && (
         <span className="text-gray-500 dark:text-gray-500">
-          매수필요 <span className="text-red-600 dark:text-red-400">{fmtKrwPrice(buyCost!)}</span>
+          매수필요 <span className="text-red-600 dark:text-red-400">{fmtKrwPrice(buy)}</span>
         </span>
       )}
-      {surplusKnown && hasBuy && (
+      {surplus !== null && hasBuy && (
         <span
           className={
-            surplus! >= 0
+            surplus >= 0
               ? "text-green-600 dark:text-green-400"
               : "text-amber-600 dark:text-amber-400"
           }
         >
-          {surplus! >= 0
-            ? `여유 +${fmtKrwPrice(surplus!)}`
-            : `부족 ${fmtKrwPrice(Math.abs(surplus!))}`}
+          {surplus >= 0
+            ? `여유 +${fmtKrwPrice(surplus)}`
+            : `부족 ${fmtKrwPrice(Math.abs(surplus))}`}
         </span>
       )}
     </div>
