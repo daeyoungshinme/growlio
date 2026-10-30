@@ -5,9 +5,10 @@ from datetime import timedelta
 import httpx
 import jwt
 import structlog
-from jwt import PyJWKClient
+from jwt import PyJWKClient, PyJWKClientConnectionError, PyJWKClientError
 
 from app.core.config import settings
+from app.core.job_runner import report_handled_failure
 
 logger = structlog.get_logger()
 
@@ -15,6 +16,8 @@ _jwks_client: PyJWKClient | None = None
 
 _LEEWAY = timedelta(seconds=5)
 _SUPABASE_TIMEOUT = 10.0
+# JWKS fetch는 동기 urllib이라 이벤트 루프를 막는다 — 기본 30초 대신 짧게(키가 캐시돼 있으면 fetch 없음)
+_JWKS_TIMEOUT = 5
 
 
 def _get_jwks_client() -> PyJWKClient:
@@ -23,6 +26,7 @@ def _get_jwks_client() -> PyJWKClient:
         _jwks_client = PyJWKClient(
             f"{settings.supabase_project_url}/auth/v1/.well-known/jwks.json",
             cache_keys=True,
+            timeout=_JWKS_TIMEOUT,
         )
     return _jwks_client
 
@@ -47,8 +51,16 @@ def verify_supabase_token(token: str) -> dict:
     except jwt.InvalidTokenError as e:
         logger.warning("token_verification_failed", error_type=type(e).__name__, detail=str(e))
         raise ValueError("Invalid token") from e
+    except PyJWKClientConnectionError as e:
+        # JWKS 엔드포인트 장애면 모든 인증 요청이 401이 된다 — Sentry로 알린다(plans/95 B)
+        report_handled_failure("jwks_fetch_failed", e)
+        raise ValueError("Token verification failed") from e
+    except PyJWKClientError as e:
+        # 알 수 없는 kid 등 토큰 쪽 문제 — 장애가 아니므로 warning
+        logger.warning("jwks_signing_key_not_found", error=str(e))
+        raise ValueError("Invalid token") from e
     except Exception as e:
-        logger.error("jwks_fetch_failed", error=str(e))
+        report_handled_failure("jwks_fetch_failed", e)
         raise ValueError("Token verification failed") from e
 
 
