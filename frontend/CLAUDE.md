@@ -87,6 +87,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 진입점은 `portfolioId=<id>&openAlert=1`(`openAlert=dca`는 적립식 자동매수 프리셋) URL 파라미터로 요청. 모달을 직접 마운트하지 말 것.
 - `invest/ChallengeSection` — 챌린지 탭. 홈 요약 `dashboard/ChallengeProgressCard`, 네비 빨간 점 `useChallengeNudge`.
 - `invest/GoalSettingWizard` — 목표 최초 설정 6단계 마법사(`InvestPlanPage`의 재설정 모달과 별개).
+- `invest/FxPlanCard` — 적립 계획 탭 접힘 카드 "달러 환전 계획"(`GET /invest/fx-plan`). 목표 환율 구간은 기존 `createExchangeRateAlert`(BELOW)로 등록, 같은 목표의 활성 알림은 건너뜀. 월 적립액 변경 시 `invalidateDcaData`가 `fxPlanBase`도 지운다.
 
 **Android 홈 위젯**: `useWidget.ts` ↔ `plugins/WidgetPlugin.ts` ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java` — 위젯 UI 변경 시 Java도 함께.
 

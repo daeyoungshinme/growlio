@@ -1,14 +1,16 @@
 """적립식 투자(DCA) 복리계산 및 목표달성율 API."""
 
-from fastapi import APIRouter, Depends, Query, Request
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
-from app.schemas.invest import DCAAnalysisResponse, GoalFeasibilityPreview
-from app.services import dca_service
+from app.schemas.invest import DCAAnalysisResponse, FxPlanResponse, GoalFeasibilityPreview
+from app.services import dca_service, fx_plan_service
 from app.services.dividend import plan_service as dividend_plan_service
 from app.services.goal.goal_return_solver import build_feasibility_preview, months_until_year_end
 from app.services.portfolio.composition_calculator import build_asset_totals, exclude_real_estate
@@ -74,3 +76,20 @@ async def get_dividend_plan(
     """연배당/월배당 목표 달성 현황 및 월별·연도별 배당 분포."""
     cache = await get_cache_store()
     return await dividend_plan_service.get_dividend_plan(current_user.id, db, cache)
+
+
+@router.get("/fx-plan", response_model=FxPlanResponse)
+@limiter.limit("30/minute")
+async def get_fx_plan(
+    request: Request,
+    portfolio_id: uuid.UUID | None = Query(None),
+    months: int = Query(3, ge=1, le=12),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """환율 1년 위치·범위 + 해외 적립에 필요한 달러의 분할 환전 계획(저장 없음, 예측 아님)."""
+    cache = await get_cache_store()
+    try:
+        return await fx_plan_service.get_fx_plan(db, cache, current_user.id, portfolio_id, months)
+    except fx_plan_service.PortfolioNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다") from None

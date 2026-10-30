@@ -1,3 +1,6 @@
+import uuid
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -69,3 +72,47 @@ class GoalFeasibilityPreview(BaseModel):
     # 가정 수익률 프리셋(보수적/중립/공격적)별 필요 월/연 적립액 — monthly_deposit_amount와 무관하게
     # pv·목표금액·기간만으로 계산되는 별도 가이드(목표 달성에 필요한 월 적립액을 스스로 지어내지 않도록)
     deposit_guide: list[DepositGuideItem] = []
+
+
+class FxPositionResponse(BaseModel):
+    """USD/KRW 1년 통계적 위치 — 예측이 아닌 과거 분포·변동성 기반 참고치."""
+
+    rate: float
+    low_1y: float
+    high_1y: float
+    percentile_1y: float  # 1년 종가 중 현재보다 낮았던 비율(%) — 낮을수록 달러가 싸다
+    ma20: float
+    ma60: float
+    deviation_ma20_pct: float
+    deviation_ma60_pct: float
+    sigma_1m: float  # 일간 로그수익률 표준편차 × √21 × 현재 환율(원)
+    range_1m_low: float
+    range_1m_high: float
+    zone: Literal["CHEAP", "NEUTRAL", "EXPENSIVE"]
+
+
+class FxTrancheResponse(BaseModel):
+    label: str
+    target_rate: float | None  # None = 지금(또는 적립일) 환전
+    usd: float
+    krw_estimate: float
+
+
+class FxPortfolioOption(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class FxPlanResponse(BaseModel):
+    position: FxPositionResponse | None  # 1년 시계열 조회 실패 시 None
+    status: Literal["OK", "SUFFICIENT", "NO_DEPOSIT_GOAL", "NO_OVERSEAS", "NO_PORTFOLIO"]
+    portfolio_id: uuid.UUID | None
+    portfolio_name: str | None
+    portfolio_options: list[FxPortfolioOption]  # 해외 비중이 있는 포트폴리오
+    months: int
+    overseas_weight_pct: float
+    monthly_deposit_krw: float | None
+    monthly_need_usd: float
+    held_usd: float
+    need_usd: float
+    tranches: list[FxTrancheResponse]
