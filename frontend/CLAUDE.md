@@ -16,9 +16,6 @@ cd frontend && npm run test -- src/utils/__tests__/format.test.ts
 cd frontend && npm run test:watch
 cd frontend && npm run generate:icons # public/favicon*.svg → 웹 아이콘·Android 런처/스플래시 PNG 재생성 (sharp)
 
-# API 타입 생성 — 백엔드(localhost:8000) 실행 중일 때 수동. 결과 src/types/api.generated.ts는 gitignore, CI에서 생성 안 됨
-cd frontend && npm run generate:api-types   # 사용: import type { components } from "@/types/api.generated"
-
 # Android (Capacitor)
 cd frontend && npm run cap:sync       # 웹 빌드 → Android 동기화
 cd frontend && npm run cap:android    # Android Studio 열기
@@ -29,7 +26,7 @@ make build-android-debug / build-android-release
 
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — 없으면 Supabase 클라이언트 초기화 실패
 - `VITE_REDIRECT_URL` — OAuth/이메일 인증 후 리다이렉트
-- `VITE_API_DOMAIN` — API 도메인 (Vite 프록시·네이티브 절대 URL)
+- `VITE_API_DOMAIN` — 네이티브 앱의 절대 API URL 도메인 (웹은 상대 `/api`, Vite 프록시는 `VITE_DEV_BACKEND_PORT`)
 - `VITE_SENTRY_DSN`(선택), `VITE_SENTRY_RELEASE`
 - 소스맵 업로드(CI/배포 전용, `.env` 아님): `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_RELEASE`
 

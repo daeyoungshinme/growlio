@@ -59,7 +59,7 @@ make test-backend     # cd backend && uv run pytest (커버리지 없이 빠르�
 make test-backend-cov # cd backend && uv run pytest --cov=app --cov-fail-under=89 (CI와 동일한 89% 게이트)
 make test-frontend    # cd frontend && npm run test
 make lint             # ruff check + format --check (backend) + eslint --max-warnings 0 + prettier --check (frontend) — CI와 같은 기준
-make typecheck        # mypy (backend) + tsc --noEmit (frontend)
+make typecheck        # mypy (backend) + npm run typecheck (frontend 앱+테스트 tsconfig — CI와 동일)
 make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
 make format           # ruff format + ruff --fix (backend) + prettier --write (frontend)
 make format-backend   # ruff format + ruff --fix (backend만)
@@ -125,7 +125,7 @@ CI(`ci.yml`)와 같은 기준 — 커밋/PR 전에 변경 영역에 맞춰 실�
 
 ```bash
 make lint            # ruff + eslint --max-warnings 0
-make typecheck       # mypy + tsc --noEmit
+make typecheck       # mypy + tsc --noEmit (앱·테스트 tsconfig 둘 다)
 make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-cov (89% 게이트)
 make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.config.ts
 ```

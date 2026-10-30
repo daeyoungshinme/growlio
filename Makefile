@@ -52,7 +52,7 @@ lint:
 
 typecheck:
 	cd backend && uv run mypy app/ && \
-	cd ../frontend && npx tsc --noEmit
+	cd ../frontend && npm run typecheck
 
 clean:
 	rm -rf frontend/dist backend/.pytest_cache backend/.ruff_cache
