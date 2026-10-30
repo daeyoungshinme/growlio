@@ -62,7 +62,7 @@ services:
 
   # Monitoring — run: docker compose --profile monitoring up
   prometheus:
-    image: prom/prometheus:v2.53.0
+    image: prom/prometheus:v3.15.1
     restart: unless-stopped
     ports:
       - "9090:9090"
