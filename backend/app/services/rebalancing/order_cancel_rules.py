@@ -50,7 +50,7 @@ async def active_account_asset_types(
 ) -> dict[str, str]:
     """주문들의 계좌 id(문자열) → asset_type. 삭제·비활성이거나 UUID가 아닌 계좌는 빠진다(취소 불가).
 
-    비활성 계좌를 넣으면 취소 요청이 `_load_account`(활성 계좌만)에서 404가 되므로 같은 기준으로 거른다.
+    비활성 계좌를 넣으면 취소 요청이 `load_executable_account`(활성 계좌만)에서 404가 되므로 같은 기준으로 거른다.
     """
     ids: set[uuid.UUID] = set()
     for raw in account_ids:

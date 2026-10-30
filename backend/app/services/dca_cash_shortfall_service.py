@@ -36,7 +36,7 @@ NOTICE_WINDOW_DAYS = (1, 3)
 """다음 실행일까지 남은 일수가 이 범위(포함)일 때만 확인한다."""
 _MIN_CASH_KRW = 10_000.0
 
-_DCA_AUTO_BUY_PRESET: dict[str, str] = {
+DCA_AUTO_BUY_PRESET: dict[str, str] = {
     "schedule_type": "MONTHLY",
     "trigger_condition": "SCHEDULE_ONLY",
     "mode": "AUTO",
@@ -47,7 +47,7 @@ _DCA_AUTO_BUY_PRESET: dict[str, str] = {
 
 
 def is_dca_auto_buy(alert: RebalancingAlert) -> bool:
-    return all(getattr(alert, field) == value for field, value in _DCA_AUTO_BUY_PRESET.items())
+    return all(getattr(alert, field) == value for field, value in DCA_AUTO_BUY_PRESET.items())
 
 
 def is_cash_short(cash_krw: float, expected_krw: float | None) -> bool:
@@ -115,7 +115,7 @@ async def find_dca_cash_shortfalls(
         .options(selectinload(Portfolio.items))
         .where(
             RebalancingAlert.is_active == True,
-            *(getattr(RebalancingAlert, field) == value for field, value in _DCA_AUTO_BUY_PRESET.items()),
+            *(getattr(RebalancingAlert, field) == value for field, value in DCA_AUTO_BUY_PRESET.items()),
             AssetAccount.is_active == True,
             User.is_active == True,
         )

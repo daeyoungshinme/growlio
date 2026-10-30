@@ -55,56 +55,56 @@ def _make_kis_account(
     )
 
 
-# ── _load_account 테스트 ────────────────────────────────────
+# ── load_executable_account 테스트 ────────────────────────────────────
 
 
 class TestLoadAccount:
-    """_load_account: DB에서 계좌 유효성 검증."""
+    """load_executable_account: DB에서 계좌 유효성 검증."""
 
     @pytest.mark.asyncio
     async def test_raises_404_when_account_not_found(self, mock_db, override_settings):
-        from app.services.rebalancing.execution_service import _load_account
+        from app.services.rebalancing.execution_service import load_executable_account
 
         mock_db.scalar = AsyncMock(return_value=None)
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()
 
         with pytest.raises(HTTPException) as exc:
-            await _load_account(account_id, user_id, mock_db)
+            await load_executable_account(account_id, user_id, mock_db)
         assert exc.value.status_code == 404
 
     @pytest.mark.asyncio
     async def test_raises_400_for_non_broker_account(self, mock_db, override_settings):
-        from app.services.rebalancing.execution_service import _load_account
+        from app.services.rebalancing.execution_service import load_executable_account
 
         account = _make_kis_account()
         account.asset_type = "BANK_ACCOUNT"
         mock_db.scalar = AsyncMock(return_value=account)
 
         with pytest.raises(HTTPException) as exc:
-            await _load_account(account.id, account.user_id, mock_db)
+            await load_executable_account(account.id, account.user_id, mock_db)
         assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_raises_400_when_kis_account_no_missing(self, mock_db, override_settings):
-        from app.services.rebalancing.execution_service import _load_account
+        from app.services.rebalancing.execution_service import load_executable_account
 
         account = _make_kis_account()
         account.kis_account_no = None
         mock_db.scalar = AsyncMock(return_value=account)
 
         with pytest.raises(HTTPException) as exc:
-            await _load_account(account.id, account.user_id, mock_db)
+            await load_executable_account(account.id, account.user_id, mock_db)
         assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_returns_account_when_valid(self, mock_db, override_settings):
-        from app.services.rebalancing.execution_service import _load_account
+        from app.services.rebalancing.execution_service import load_executable_account
 
         account = _make_kis_account()
         mock_db.scalar = AsyncMock(return_value=account)
 
-        result = await _load_account(account.id, account.user_id, mock_db)
+        result = await load_executable_account(account.id, account.user_id, mock_db)
         assert result is account
 
 

@@ -24,7 +24,11 @@ from app.kiwoom import order as kiwoom_order
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.client import KiwoomApiError
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
-from app.services.rebalancing.execution_service import _load_account, _load_credentials, _load_kiwoom_credentials
+from app.services.rebalancing.execution_service import (
+    load_executable_account,
+    load_kis_credentials,
+    load_kiwoom_credentials,
+)
 from app.services.rebalancing.order_cancel_rules import CANCEL_FAILED, CANCELED, cancel_block_reason
 from app.utils.cache_keys import invalidate_rebalancing_analysis_cache
 
@@ -36,10 +40,10 @@ async def _get_broker_token(
 ) -> str:
     """취소 요청에 쓸 접근 토큰. 새로 발급하면 DB 저장소에 commit하므로 주문 행을 잠그기 전에 부른다(plans/90 A2)."""
     if account.asset_type == "STOCK_KIWOOM":
-        app_key, app_secret = _load_kiwoom_credentials(account)
+        app_key, app_secret = load_kiwoom_credentials(account)
         getter = kiwoom_get_access_token
     else:
-        app_key, app_secret = _load_credentials(account)
+        app_key, app_secret = load_kis_credentials(account)
         getter = get_access_token
     return await getter(
         app_key, app_secret, is_mock=row.is_mock, cache=cache, db=db, user_id=str(user_id), account_id=str(account.id)
@@ -65,7 +69,7 @@ async def _request_broker_cancel(row: RebalancingExecutionResult, account: Asset
             )
         return
 
-    app_key, app_secret = _load_credentials(account)
+    app_key, app_secret = load_kis_credentials(account)
     kis_no = account.kis_account_no or ""
     if is_overseas:
         await kis_order.cancel_overseas_order(
@@ -114,7 +118,7 @@ async def cancel_execution_order(
         account_uuid = uuid.UUID(row.account_id or "")
     except ValueError:
         raise HTTPException(status_code=400, detail="이 주문은 앱에서 취소할 수 없습니다.") from None
-    account = await _load_account(account_uuid, user_id, db)
+    account = await load_executable_account(account_uuid, user_id, db)
     reason = cancel_block_reason(row, execution.executed_at, account.asset_type)
     if reason:
         raise HTTPException(status_code=400, detail=reason)
