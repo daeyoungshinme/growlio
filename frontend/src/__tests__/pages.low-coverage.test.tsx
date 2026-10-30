@@ -312,6 +312,7 @@ describe("AssetManagementPage", () => {
       accounts: [],
       isLoading: false,
       error: null,
+      refetchAccounts: vi.fn(),
       overview: {
         total_assets_krw: 10_000_000,
         total_stock_krw: 6_000_000,

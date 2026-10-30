@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchIsaStatus, type IsaAccountStatus } from "@/api/tax";
+import type { IsaAccountStatus } from "@/api/tax";
+import { isaStatusQuery } from "@/api/queryOptions";
 import { updateIsaPnlOverride } from "@/api/assets";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { fmtKrw, fmtKrwPreview, parseYmd } from "@/utils/format";
@@ -188,11 +187,7 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
 /** ISA 계좌의 의무가입(3년) 진행 상황과 비과세 한도 대비 예상 세금을 보여준다. ISA 계좌가 없으면 표시하지 않는다.
  * `TaxLimitsSection`(`TaxTabContainer`의 "한도 현황" 탭)이 렌더하므로 이 컴포넌트는 헤더/보더 없이 본문만 그린다. */
 export default function IsaMaturityCard() {
-  const { data } = useQuery({
-    queryKey: QUERY_KEYS.isaStatus,
-    queryFn: fetchIsaStatus,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data } = useQuery(isaStatusQuery);
 
   if (!data || data.accounts.length === 0) return null;
 

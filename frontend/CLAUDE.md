@@ -93,6 +93,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 ### hooks/ (추가/삭제 시 해당 그룹 갱신)
 
 _공통/입력_
+
 - `useExchangeRate` · `useForm` · `useStockSearch` · `useCurrencyInput` · `useCapsLockWarning` · `useTransactionFormState`
 - `useCollapsible` — `[isOpen, toggle, setIsOpen]`(setter 참조 고정)
 - `useLatestRef` — 한 번 등록하는 네이티브 리스너에서 최신 값 읽기. `useNavigate()`는 경로마다 새 함수라 effect deps에 넣으면 이동마다 재등록됨
@@ -102,13 +103,16 @@ _공통/입력_
 - `useMediaQuery`(`useIsSmUp`) — 모바일 카드/데스크톱 표 중 보이는 쪽만 렌더
 
 _자산관리/대시보드_
+
 - `useAssetManagementData` · `useAssetModals` · `useDashboardData` · `useAccountMutations` · `useAccountPositions` · `useStockAccountStats` · `usePositionsEditor` · `usePortfolioItemsEditor`
 - `createCredentialVerify` — 자격증명 확인 상태 머신 팩토리. `useKisCredentialVerify`/`useKiwoomCredentialVerify`/`useTossCredentialVerify`는 얇은 래퍼, `useBrokerCredentialVerify`가 브로커별로 묶음(필드 정의 `constants/brokerCredentials.ts`)
 
 _세금·배당_
+
 - `useTaxSimulation` · `useDividendData` · `useDividendPlanSettings`
 
 _리밸런싱/추천_
+
 - `useSelectedPortfolio` — "지금 보는 포트폴리오"(URL → 기준 → 첫 번째). `{ preferTactical: true }`면 전술 켠 포트폴리오 우선. 기본값은 URL에 쓰지 않고 파생만
 - `useRebalancingUrlState` — rtab·gmode·portfolioId. 탭은 state로 복사하지 않고 URL에서 파생
 - `useRebalancingExecution` — **공개 진입점(barrel)**. 구현은 `rebalancingExecution/` 패키지지만 직접 import 금지
@@ -124,15 +128,18 @@ _리밸런싱/추천_
 - `usePortfolioTabFetching`(`useMainPageFetching`) — 새로고침 인디케이터용
 
 _알림 토글_ (`["settings"]` boolean 필드 조회/PUT)
+
 - `useSettingsToggle` — 제네릭 팩토리(`{ field, defaultValue, mutationFn, invalidate? }`). 아래 토글 대부분이 이것 위에 얹힘
 - `useCompositeSignalToggle`(전용 상태 엔드포인트라 팩토리 미사용) · `useMarketSignalDigestToggle` · `useYearEndTaxReminderToggle`(기본 off) · `useGoalAchievementAlertsToggle`(on) · `useMonthlyReportAlertsToggle`(on) · `useRecommendationDriftAlertToggle`(off) · `useChallengeRemindersToggle`(off)
 - `useAutoRebalancingDailyCap` — 금액 입력이지만 같은 패턴(null=무제한)
 
 _모바일/네이티브_
+
 - `useBiometric` · `useHaptic` · `usePullToRefresh` · `useSwipeNavigation` · `usePushNotifications` · `useRegisterRefresh` · `useWidget`
 - `useSyncAllWatcher` — "전체 갱신" 폴링. `App.tsx` `AppRoutes()`에서 **한 번만** 마운트(상태는 `stores/syncStore.ts`)
 
 _기타_
+
 - `useInsights` · `useLogout` · `useOnlineStatus`
 
 ### constants/
@@ -163,80 +170,84 @@ _기타_
 
 **React Query queryKey**
 
-| 데이터 | queryKey |
-| --- | --- |
-| 대시보드 집계 | `["dashboard"]` |
-| 포트폴리오 overview | `["portfolio-overview", accountId]` (미지정 "all") · 경량 `["portfolio-overview", "lite"]` |
-| 추종 지수별 비중 | `["index-exposure", accountId]` · 지수 그룹 제안 `["index-exposure", "group-suggestions", accountIds]` |
-| 포트폴리오/백테스트/리밸런싱 탭 | `["portfolios"]` |
-| 계좌 목록 / 계좌별 포지션 | `["accounts"]` / `["account-positions", accountId]` |
-| 거래내역 | 계좌별 `["transactions", accountId]` · 전체 `["transactions", "all"]` · 연도별 `["transactions", "all", year]` · 합계 `["transactions", "summary"]`(`transactionSummary`) |
-| 기간별 매수 | `["period-purchases", period, year, month, accountId]` |
-| 수기 매매 기록 | `["trades", accountId, ticker, market]` |
-| 배당 | `["dividend-by-ticker", accountId]` · `["dividend-summary", accountId]` · `["dividend-positions", accountId]` · `["dividend-plan"]` · `["monthly-optimization"]` |
-| DCA 분석 | `["dca-analysis"]` |
-| 챌린지 | `["challenges"]` · 넛지 `["challenges", "summary"]` |
-| 설정 / 환율 | `["settings"]` / `["exchange-rate"]` |
-| 환율·주가 알림 | `["exchange-rate-alerts"]` · `["stock-price-alerts"]` |
-| 리밸런싱 알림 | 목록 `["rebalancing-alerts"]` · 포트폴리오별 `["rebalancing-alert", portfolioId]` · 계좌 목록 `[..., "accounts"]` · 계좌별 `[..., "accounts", accountId]` |
-| 리밸런싱 실행 이력 | `["rebalancing-history"]` · 상세 `["rebalancing-history", executionId]` |
-| 대기 플랜 | `["rebalancing-plans"]` · 승인 페이지 미리보기 `["rebalancing-plan-preview", token]` |
-| 리밸런싱 전략 | `["rebalancing-strategy", portfolioId]` |
-| 드리프트 요약 / 지금 할 일 | `["drift-summary"]` / `["action-items"]` |
-| 세금 | `["tax-summary", year, accountId]` · `["overseas-positions-tax", accountId]` · `["isa-status"]` · `["pension-contribution", year]` · `["overseas-realized", year, accountId]` · `["tax-action-plan"]` |
-| 자산배분 이력 | `["allocation-history", months, accountId]` |
-| 알림 발송 이력(무한 스크롤, `alertHistoryPages`) / 인사이트 | `["alert-history", "pages"]` / `["insights"]` |
-| 리스크 / 시장 신호 / 복합신호 | `["portfolio-risk"]` / `["market-signal"]` / `["composite-signal-status"]` |
-| 목표 역산 추천 | `["goal-recommendation", "overall" \| "by-horizon" \| "by-age"]` · 후보 중복 `["goal-recommendation", "candidate-overlap", signature]` |
-| 적용 전 비교 | `["portfolio-expected-metrics", portfolioId]` |
-| 마법사 프리뷰 | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]` |
-| 인플레이션 요약 | `["inflation-summary"]` |
-| 전술 배분 | 상태 `["tactical-status", portfolioId]` · 켠 목록 `["tactical-status", "list"]` · 시장 입력 `["tactical-market"]`(무효화 없음) · 백테스트 `["tactical-backtest", portfolioId, years]` |
+| 데이터                                                      | queryKey                                                                                                                                                                                              |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 대시보드 집계                                               | `["dashboard"]`                                                                                                                                                                                       |
+| 포트폴리오 overview                                         | `["portfolio-overview", accountId]` (미지정 "all") · 경량 `["portfolio-overview", "lite"]`                                                                                                            |
+| 추종 지수별 비중                                            | `["index-exposure", accountId]` · 지수 그룹 제안 `["index-exposure", "group-suggestions", accountIds]`                                                                                                |
+| 포트폴리오/백테스트/리밸런싱 탭                             | `["portfolios"]`                                                                                                                                                                                      |
+| 계좌 목록 / 계좌별 포지션                                   | `["accounts"]` / `["account-positions", accountId]`                                                                                                                                                   |
+| 거래내역                                                    | 계좌별 `["transactions", accountId]` · 연도별 `["transactions", "all", year]` · 합계 `["transactions", "summary"]`(`transactionSummary`)                                                              |
+| 기간별 매수                                                 | `["period-purchases", period, year, month, accountId]`                                                                                                                                                |
+| 수기 매매 기록                                              | `["trades", accountId, ticker, market]`                                                                                                                                                               |
+| 배당                                                        | `["dividend-by-ticker", accountId]` · `["dividend-summary", accountId]` · `["dividend-positions", accountId]` · `["dividend-plan"]` · `["monthly-optimization"]`                                      |
+| DCA 분석                                                    | `["dca-analysis"]`                                                                                                                                                                                    |
+| 챌린지                                                      | `["challenges"]` · 넛지 `["challenges", "summary"]`                                                                                                                                                   |
+| 설정 / 환율                                                 | `["settings"]` / `["exchange-rate"]`                                                                                                                                                                  |
+| 환율·주가 알림                                              | `["exchange-rate-alerts"]` · `["stock-price-alerts"]`                                                                                                                                                 |
+| 리밸런싱 알림                                               | 목록 `["rebalancing-alerts"]` · 포트폴리오별 `["rebalancing-alert", portfolioId]` · 계좌 목록 `[..., "accounts"]` · 계좌별 `[..., "accounts", accountId]`                                             |
+| 리밸런싱 실행 이력                                          | `["rebalancing-history"]` · 상세 `["rebalancing-history", executionId]`                                                                                                                               |
+| 대기 플랜                                                   | `["rebalancing-plans"]` · 승인 페이지 미리보기 `["rebalancing-plan-preview", token]`                                                                                                                  |
+| 리밸런싱 전략                                               | `["rebalancing-strategy", portfolioId]`                                                                                                                                                               |
+| 드리프트 요약 / 지금 할 일                                  | `["drift-summary"]` / `["action-items"]`                                                                                                                                                              |
+| 세금                                                        | `["tax-summary", year, accountId]` · `["overseas-positions-tax", accountId]` · `["isa-status"]` · `["pension-contribution", year]` · `["overseas-realized", year, accountId]` · `["tax-action-plan"]` |
+| 자산배분 이력                                               | `["allocation-history", months, accountId]`                                                                                                                                                           |
+| 알림 발송 이력(무한 스크롤, `alertHistoryPages`) / 인사이트 | `["alert-history", "pages"]` / `["insights"]`                                                                                                                                                         |
+| 리스크 / 시장 신호 / 복합신호                               | `["portfolio-risk"]` / `["market-signal"]` / `["composite-signal-status"]`                                                                                                                            |
+| 목표 역산 추천                                              | `["goal-recommendation", "overall" \| "by-horizon" \| "by-age"]` · 후보 중복 `["goal-recommendation", "candidate-overlap", signature]`                                                                |
+| 적용 전 비교                                                | `["portfolio-expected-metrics", portfolioId]`                                                                                                                                                         |
+| 마법사 프리뷰                                               | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]`                                                                                                                   |
+| 인플레이션 요약                                             | `["inflation-summary"]`                                                                                                                                                                               |
+| 전술 배분                                                   | 상태 `["tactical-status", portfolioId]` · 켠 목록 `["tactical-status", "list"]` · 시장 입력 `["tactical-market"]`(무효화 없음) · 백테스트 `["tactical-backtest", portfolioId, years]`                 |
 
 - 문자열 하드코딩 금지 — `QUERY_KEYS`에서 import. 새 키 추가 시 이 표도 갱신.
 - 계좌·연도별로 분기되는 키는 무효화 전용 `xxxBase` 프리픽스 키(`portfolioOverviewBase`, `transactionsBase`, `taxSummaryBase` 등)가 따로 있다 — **무효화는 항상 Base 키로**(특정 accountId 키만 지우면 다른 조합이 stale).
-- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall)는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
+- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status)는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
 
 **캐시 무효화 (`src/utils/queryInvalidation.ts`)** — 컴포넌트·훅에서 `queryClient.invalidateQueries()` 직접 호출 금지. 새 함수는 `invalidate<Domain>Data(queryClient)` 형태로 여기에 추가. 각 함수의 정확한 대상은 소스 확인.
 
-| 상황 | 함수 |
-| --- | --- |
-| 계좌 sync | `invalidateSyncData` |
-| 계좌 CUD | `invalidateAccountData` |
-| 브로커 연동 해제 | `invalidateBrokerCredentialData` |
-| 거래내역 CUD | `invalidateTransactionData` |
-| 수기 매매 기록 CUD | `invalidateTradeData` (해외 SELL이 양도세 실현손익이 되므로 세금·지금 할 일 포함) |
-| 포트폴리오/리밸런싱 CUD | `invalidatePortfolioData` |
-| 전술 설정 / 제안 비중 적용 / 전술 연동 자동매수 해제 | `invalidateTacticalData` / `{ portfolioChanged: true }` / `{ dcaLinked: true }` |
-| DCA·배당 목표 변경 | `invalidateDcaData` (목표 금액·연도 변경은 `{ goalRecommendation: true }`, 배당 목표는 + `invalidateGoalRecommendationData`) |
-| 소득 구간 변경 | `invalidateIncomeBracketData` |
-| 챌린지 CUD | `invalidateChallengeData` |
-| 환율 / 주가 / 리밸런싱 알림 CUD | `invalidateAlertData` / `invalidateStockPriceAlertData` / `invalidateRebalancingAlertData(qc, portfolioId)` |
-| 주문 실행 | `invalidateRebalancingHistoryData` |
-| 대기 플랜 취소/승인 | `invalidateRebalancingPlanData(qc, { executed })` — 응답 `EXECUTED`면 `executed: true` |
-| 복합신호 설정 / 추천 후보 변경 | `invalidateCompositeSignalData` / `invalidateGoalRecommendationData` |
-| 다른 화면 영향 없는 설정 | `invalidateSettingsData` (옵트인 토글 기본값) |
+| 상황                                                 | 함수                                                                                                                         |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 계좌 sync                                            | `invalidateSyncData`                                                                                                         |
+| 계좌 CUD                                             | `invalidateAccountData`                                                                                                      |
+| 브로커 연동 해제                                     | `invalidateBrokerCredentialData`                                                                                             |
+| 거래내역 CUD                                         | `invalidateTransactionData`                                                                                                  |
+| 수기 매매 기록 CUD                                   | `invalidateTradeData` (해외 SELL이 양도세 실현손익이 되므로 세금·지금 할 일 포함)                                            |
+| 포트폴리오/리밸런싱 CUD                              | `invalidatePortfolioData`                                                                                                    |
+| 전술 설정 / 제안 비중 적용 / 전술 연동 자동매수 해제 | `invalidateTacticalData` / `{ portfolioChanged: true }` / `{ dcaLinked: true }`                                              |
+| DCA·배당 목표 변경                                   | `invalidateDcaData` (목표 금액·연도 변경은 `{ goalRecommendation: true }`, 배당 목표는 + `invalidateGoalRecommendationData`) |
+| 소득 구간 변경                                       | `invalidateIncomeBracketData`                                                                                                |
+| 챌린지 CUD                                           | `invalidateChallengeData`                                                                                                    |
+| 환율 / 주가 / 리밸런싱 알림 CUD                      | `invalidateAlertData` / `invalidateStockPriceAlertData` / `invalidateRebalancingAlertData(qc, portfolioId)`                  |
+| 주문 실행                                            | `invalidateRebalancingHistoryData`                                                                                           |
+| 대기 플랜 취소/승인                                  | `invalidateRebalancingPlanData(qc, { executed })` — 응답 `EXECUTED`면 `executed: true`                                       |
+| 복합신호 설정 / 추천 후보 변경                       | `invalidateCompositeSignalData` / `invalidateGoalRecommendationData`                                                         |
+| 다른 화면 영향 없는 설정                             | `invalidateSettingsData` (옵트인 토글 기본값)                                                                                |
 
 - 당겨서 새로고침처럼 자기 쿼리 하나만 다시 받을 땐 그 `useQuery`의 `refetch`.
 - 목표 비중 저장 후 열린 분석 화면은 `portfolioItemsSignature` 변경으로 자동 재분석된다 — **`Portfolio.updated_at`은 비중만 바뀐 저장에선 갱신되지 않으니 신선도 판단에 쓰지 말 것.**
 
 **쿼리 설정 상수 (`constants/queryConfig.ts`)** — staleTime/refetchInterval 매직 넘버 금지.
+
 - `STALE_TIME`: `NONE`(0) · `VERY_SHORT`(15s) · `SHORT`(30s, 기본) · `MEDIUM`(60s) · `FIVE_MINUTES`/`EXCHANGE_RATE`(5m) · `LONG`(1h) · `DAY`(24h, 무거운 계산의 `gcTime`)
 - `REFETCH_INTERVAL.DASHBOARD` / `.PORTFOLIO` (5분)
 
 **포맷 (`utils/format.ts`)** — 로컬 재정의 금지.
+
 - `fmtKrw`(억/만/원) · `fmtKrwPreview`(입력 중 "5,000,000원 (500만원)") · `fmtKrwShort`(차트 레이블) · `fmtKrwPrice` · `fmtMonth` · `fmtPct`(null → "—") · `fmtDateTime` · `relativeTime` · `convertUsdToKrw`/`formatUsdAsKrw`
 - `pctOf(part, total)` — 인라인 `total > 0 ? v / total * 100 : 0` 대신. `clampPct(pct)` — 진행률 바 width에 그대로 넣지 말 것
 - **날짜**: `localToday()`/`localMonth()` 사용 — `new Date().toISOString().slice(...)`는 UTC라 KST 09시 전엔 전날/전월. 모듈 최상위 상수로 고정하지 말고 폼을 열 때 호출. `parseYmd`/`daysUntilYmd`
 - 차트 X축은 `"YY.M"` — 직접 문자열 파싱(타임존 이슈 방지)
 
 **에러·토스트·스토리지**
+
 - `utils/error.ts` `extractErrorMessage(e, fallback?)` — API 에러 수동 파싱 금지
 - `utils/toast.ts` `toast(message, type?)` — 훅 아님, 어디서든 호출
 - `utils/safeStorage.ts` — **`localStorage`/`sessionStorage` 직접 접근 금지**(차단 환경에선 접근만으로 throw해 부팅 실패)
 - `utils/cacheOwner.ts` — 사용자 전환 시 persist 캐시 폐기(쿼리키에 user id가 없음)
 
 **도메인 유틸 (`utils/`)** — 인라인 재구현 금지, 백엔드 공식 포팅본은 **양쪽을 함께 수정**
+
 - `accounts.ts` — `isPortfolioAccount`/`isStockAccount`/`isBankAccount`(**`account.asset_type` 문자열을 전달**, 인라인 비교 금지), `isSyncableAccount`, `isBrokerBalanceAccount`(3사), `isOrderExecutableAccount`(KIS·키움만 — 백엔드 `ORDER_EXECUTABLE_ASSET_TYPES`와 같은 집합), `horizonTaggedAccounts`(기간별 합산은 `invested_krw + unrealized_pnl` — `amount_krw`는 예수금 포함이라 주식 총액보다 커짐)
 - `portfolio.ts` — `groupPositionsByTicker`, `getPortfolioTargetState`, `getPortfolioHorizon(TaxType)`, `inferHorizonTaxTypeFromAccounts`, `mergeAlertsByPortfolio`
 - `portfolioGroups.ts` — 지수 그룹 편집 순수 함수. 레버리지 멤버는 대표·국내 대체 후보에서 제외(백엔드 검증과 같은 규칙)
@@ -249,6 +260,7 @@ _기타_
 - 그 외: `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `riskLevel`, `dividendUtils`(`weightBarColor` — 비중 막대 색 인라인 금지), `savingsProjection`, `goalFeasibility`, `dcaAutoBuy`, `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
 
 **마켓 (`constants/markets.ts`)** — 인라인 문자열 비교 금지.
+
 - `isOverseasMarket(market)`, `marketLabel(market)`(화면엔 원시 코드 대신), `POSITION_MARKETS`
 - **토스 해외 포지션 market은 `"US"`라 `isOverseasMarket`이 못 잡는다** — 국내/해외 이분은 `DOMESTIC_MARKETS.includes(m.toUpperCase())`
 
@@ -259,6 +271,7 @@ _기타_
 **입력 스타일 (`constants/inputStyles.ts`)**: `INPUT_SM`/`INPUT_MD`, `LABEL_SM`/`LABEL_MD`, `SELECT_SM`, `TEXTAREA_SM` — 인라인 Tailwind 입력 스타일 금지.
 
 **모바일 UI**
+
 - `text-xs`(12px) 미만 임의값(`text-[10px]` 등) 금지. 차트 축·범례도 12px 이상.
 - 터치 타겟은 `constants/uiSizes.ts` 상수 — 인라인 `min-h-[44px] min-w-[44px]` 금지. `TOUCH_TARGET_MIN`(44px) 기본, `TOUCH_TARGET_MIN_MOBILE_ONLY`(sm 이상 축소), `TOUCH_TARGET_ROW`(좌측 정렬 행), `TOUCH_TARGET_COMPACT_MOBILE_ONLY`(36px — 배지·탭·칩처럼 조밀한 보조 요소).
 - 이미 44px로 정착된 삭제 아이콘 버튼(`StockAccountCard`·`BankAccountCard`·`PortfolioItemRow`)은 개별 화면에서 축소 금지.
@@ -271,10 +284,12 @@ _기타_
 **지연 로딩**: 페이지 내부의 무거운 탭·서브패널도 `React.lazy()`로 분리(최상위 라우트만이 아님). 로딩 표시는 `SkeletonCard`/`SkeletonStatBox` — 인라인 플레이스홀더 새로 작성 금지.
 
 **헤딩 (접근성)**
+
 - 각 페이지 최상위에 `<h1 className="sr-only">{페이지명}</h1>`.
 - 카드/섹션 제목은 `<h2>`/`<h3>`(공용 `CollapsibleCard`·`SectionCard`·`Modal`은 이미 h2). 단 반복 리스트 행(`RebalancingMobileCard` 등)은 헤딩으로 올리지 않는다.
 
 **콜랩스 기본값**
+
 - 헤드라인 카드(`HeroSummaryCard`, `InvestmentGoalCard`)는 접기 불가. 단 `HeroSummaryCard`의 총액·범례 금액은 **기본 숨김**(탭하면 표시, 저장 안 함).
 - 보조/상세 최상위 카드는 `useCollapsible`로 접기 가능, 첫 방문은 **열림**, 접은 상태는 localStorage 유지. 이미 펼친 카드 안의 2차 토글은 대상 아님.
 - **기본 접힘 예외**(보조 도구·상세): 진단 `RiskMetricsCard`, `MarketSignalBanner` 상세("자세히"), 전술 백테스트·판정 근거·비중표 편집, 절약 복리 시뮬레이터, `RebalancingDiagnosisCard`, 분석 "상세 정보", "더 빨리 달성하려면?", 절세 플래너, `AllocationCard`(모바일만). localStorage 키는 `growlio:<영역>:<이름>` 형식.

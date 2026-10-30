@@ -31,7 +31,6 @@ import { isSyncableAccount } from "@/utils/accounts";
 import { useStockAccountStats } from "@/hooks/useStockAccountStats";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
-import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import Tabs from "@/components/common/Tabs";
 
@@ -103,7 +102,8 @@ export default function AssetManagementPage() {
     await invalidateAccountData(queryClient);
   }, [queryClient]);
   useRegisterRefresh(handleRefresh);
-  const { accounts, isLoading, error, overview, txTotals, usdRate } = useAssetManagementData(tab);
+  const { accounts, isLoading, error, refetchAccounts, overview, txTotals, usdRate } =
+    useAssetManagementData(tab);
 
   const {
     createMutation,
@@ -151,7 +151,7 @@ export default function AssetManagementPage() {
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-sm text-red-500">계좌 정보를 불러오지 못했습니다</p>
         <button
-          onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts })}
+          onClick={() => void refetchAccounts()}
           className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
         >
           다시 시도

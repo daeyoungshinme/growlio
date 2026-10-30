@@ -11,7 +11,12 @@ type Tab = (typeof ASSET_MANAGEMENT_TABS)[number];
 export function useAssetManagementData(tab: Tab) {
   const isStockTab = tab === "증권계좌";
 
-  const { data: accounts = [], isLoading, error } = useQuery(accountsQuery);
+  const {
+    data: accounts = [],
+    isLoading,
+    error,
+    refetch: refetchAccounts,
+  } = useQuery(accountsQuery);
 
   // 증권계좌 카드의 계좌별 평가 통계에만 쓰인다(전체 자산 구성 카드는 plans/50 M3에서 제거)
   const { data: overview } = useQuery({
@@ -28,5 +33,13 @@ export function useAssetManagementData(tab: Tab) {
 
   const usdRate = useExchangeRate();
 
-  return { accounts: accounts as AssetAccount[], isLoading, error, overview, txTotals, usdRate };
+  return {
+    accounts: accounts as AssetAccount[],
+    isLoading,
+    error,
+    refetchAccounts,
+    overview,
+    txTotals,
+    usdRate,
+  };
 }

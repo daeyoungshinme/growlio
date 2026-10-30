@@ -33,7 +33,11 @@ export function OrderCancelAction({
     };
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => cancelExecutionOrder(order.result_id!),
+    // 버튼은 result_id가 있을 때만 보인다(showButton) — 그래도 null이면 요청하지 않는다
+    mutationFn: () => {
+      if (!order.result_id) return Promise.reject(new Error("취소할 주문 ID가 없습니다"));
+      return cancelExecutionOrder(order.result_id);
+    },
     onSuccess: (res) => {
       const canceled = res.cancel_status === "CANCELED";
       const next: CancelOutcome = {

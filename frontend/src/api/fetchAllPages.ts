@@ -1,5 +1,5 @@
 /** 백엔드 공용 페이지네이션(`PaginationDep`, limit 상한 500)의 최대 크기 */
-export const MAX_PAGE_SIZE = 500;
+const MAX_PAGE_SIZE = 500;
 // 무한 루프 방지 상한 — 500 × 20 = 1만 건
 const MAX_PAGES = 20;
 

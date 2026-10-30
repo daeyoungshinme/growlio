@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import Modal from "@/components/common/Modal";
-import { fetchAccountPositions } from "@/api/assets";
+import { useAccountPositions } from "@/hooks/useAccountPositions";
 import {
   createTransaction,
   deleteTransaction,
@@ -14,7 +14,6 @@ import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
 import { TransactionList } from "./TransactionList";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { transactionSchema } from "@/schemas/transaction";
 import { useTransactionFormState } from "@/hooks/useTransactionFormState";
@@ -76,15 +75,7 @@ export default function TransactionModal({
     queryFn: () => fetchAllTransactions({ account_id: accountId }),
   });
 
-  const { data: positionsData } = useQuery<{
-    positions: Array<{ ticker: string; name: string; qty: number }>;
-  }>({
-    queryKey: QUERY_KEYS.accountPositions(accountId),
-    queryFn: () => fetchAccountPositions(accountId),
-    enabled: !!accountId,
-    staleTime: STALE_TIME.MEDIUM,
-  });
-  const accountPositions = positionsData?.positions ?? [];
+  const accountPositions = useAccountPositions(accountId, true);
 
   const invalidate = () => void invalidateTransactionData(qc);
 
