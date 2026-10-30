@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from app.constants import POSITION_STOCK_ASSET_TYPES
+from app.constants import (
+    BROKER_API_ASSET_TYPES,
+    ORDER_EXECUTABLE_ASSET_TYPES,
+    POSITION_STOCK_ASSET_TYPES,
+)
 from app.enums import AssetType
-from app.services.rebalancing.order_builder import ORDER_EXECUTABLE_ASSET_TYPES
 
 
 def test_every_stock_asset_type_tracks_positions():
@@ -15,4 +18,4 @@ def test_every_stock_asset_type_tracks_positions():
 
 
 def test_order_executable_types_are_subset_of_position_types():
-    assert ORDER_EXECUTABLE_ASSET_TYPES <= POSITION_STOCK_ASSET_TYPES
+    assert ORDER_EXECUTABLE_ASSET_TYPES <= BROKER_API_ASSET_TYPES <= POSITION_STOCK_ASSET_TYPES

@@ -8,7 +8,7 @@ import structlog
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES
+from app.constants import ORDER_EXECUTABLE_ASSET_TYPES, OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES
 from app.core.job_runner import report_handled_failure
 from app.core.logging import public_error_message, redact_secrets
 from app.exceptions import AppError, SyncError
@@ -28,7 +28,6 @@ from app.services.rebalancing._kiwoom_order_executor import (
     _execute_kiwoom_buys_with_cash_check,
     _execute_kiwoom_sells_with_clamp,
 )
-from app.services.rebalancing.order_builder import ORDER_EXECUTABLE_ASSET_TYPES
 from app.services.rebalancing.order_cancel_rules import active_account_asset_types, cancel_block_reason
 from app.utils.cache_keys import invalidate_rebalancing_analysis_cache
 from app.utils.metrics import rebalancing_execution_count

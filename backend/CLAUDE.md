@@ -268,7 +268,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트
 
 - **현재가**: Yahoo(yfinance) → KIS. yfinance는 `run_in_executor`.
 - **USD/KRW**: `utils/currency.get_usd_krw_rate(cache)` → 캐시 없으면 `settings.usd_krw_fallback_rate`. KIS 성공 시 `cache_usd_krw_rate()`. 테스트 patch 경로 `app.utils.currency.cache_usd_krw_rate`.
-- **월별 추이 SQL(`_get_monthly_trend`)**: `asset_accounts` JOIN + `is_active = TRUE` 필수(누락 시 비활성 계좌 합산으로 수배 부풀림). 월말 스냅샷 없음 — 해당 월 마지막 sync일 값이 대표값.
+- **월별 추이 SQL(`get_monthly_trend`)**: `asset_accounts` JOIN + `is_active = TRUE` 필수(누락 시 비활성 계좌 합산으로 수배 부풀림). 월말 스냅샷 없음 — 해당 월 마지막 sync일 값이 대표값.
 - **브로커 예수금**: `deposit_krw`는 **D+2 정산 후 예수금**(키움 `d2_entra`, KIS `prvs_rcdl_excc_amt`) — D+0을 쓰면 매도대금이 빠져 며칠간 총자산이 어긋남. 부재 시 D+0 폴백 + 경고 로그. FULL 매수 예산은 별도(키움 `orderable_krw`, KIS `get_orderable_cash()`). `deposit_usd`는 해외 조회 실패 시 `None`으로 기존 값 유지, 확정 `0.0`일 때만 갱신.
 - **인증**: 백엔드는 토큰을 발급하지 않는다. `api/deps.py` `get_current_user`가 Supabase JWKS로 검증만. nestlio도 같은 JWT로 `/external/*`.
 - **미들웨어(`main.py`)**: slowapi, CORS, GZip, Request ID, 보안 헤더, 요청 로깅. `RequestValidationError`는 NaN/Infinity를 None으로 바꿔 422(기본 핸들러는 500). 그 외 예외는 `redact_secrets()` 후 500. 백엔드 CSP는 API 응답용 — 실제 프론트 CSP는 `frontend/vercel.json`.

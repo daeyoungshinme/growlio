@@ -13,15 +13,11 @@ from typing import Any, Literal
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES, is_non_tradable
+from app.constants import ORDER_EXECUTABLE_ASSET_TYPES, OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES, is_non_tradable
 from app.services.rebalancing._order_quantity_guard import floor_shares
 from app.services.rebalancing.group_expansion import expand_group_items, is_group_item
 
 logger = structlog.get_logger()
-
-ORDER_EXECUTABLE_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
-"""주문 실행 게이트 — 토스는 주문 API 미구현이라 제외.
-읽기·진단 경로의 `_account_queries._BROKER_ASSET_TYPES`(토스 포함)와 의도적으로 다르다."""
 
 
 def _build_sell_orders(

@@ -11,9 +11,8 @@ import uuid
 from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import BROKER_API_ASSET_TYPES
 from app.models.asset import AssetAccount
-
-_BROKER_ASSET_TYPES = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS"]
 
 
 def active_accounts_stmt(user_id: uuid.UUID) -> Select[AssetAccount]:
@@ -27,10 +26,10 @@ def active_accounts_stmt(user_id: uuid.UUID) -> Select[AssetAccount]:
 def active_broker_accounts_stmt(user_id: uuid.UUID) -> Select[AssetAccount]:
     """user_id의 활성 KIS/키움/토스 연동 계좌를 조회하는 SELECT 구문 반환 (실시간 잔고 조회용).
 
-    주문 실행 경로는 이 헬퍼를 쓰지 않는다 — execution_service.py/order_builder.py가
-    자체 _BROKER_ASSET_TYPES(KIS/키움 전용, 토스는 주문 API 미구현)로 게이팅한다.
+    주문 실행 경로는 이 헬퍼를 쓰지 않는다 — ORDER_EXECUTABLE_ASSET_TYPES(KIS/키움 전용,
+    토스는 주문 API 미구현)로 따로 게이팅한다.
     """
-    return active_accounts_stmt(user_id).where(AssetAccount.asset_type.in_(_BROKER_ASSET_TYPES))
+    return active_accounts_stmt(user_id).where(AssetAccount.asset_type.in_(BROKER_API_ASSET_TYPES))
 
 
 def portfolio_accounts_stmt(user_id: uuid.UUID) -> Select[AssetAccount]:

@@ -61,10 +61,7 @@ from app.services.external_queries import (
 from app.services.goal.goal_return_solver import build_feasibility_preview
 from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_monthly_trend
 from app.utils.cache_keys import (
-    challenge_progress_key,
     invalidate_asset_account_caches,
-    invalidate_user_caches,
-    monthly_trend_key,
 )
 from app.utils.currency import fetch_usd_krw
 from app.utils.kst import KST, today_kst
@@ -380,7 +377,6 @@ async def create_external_transaction(
 
     cache = await get_cache_store()
     await invalidate_asset_account_caches(cache, current_user.id)
-    await invalidate_user_caches(cache, monthly_trend_key(current_user.id), challenge_progress_key(current_user.id))
 
     return ExternalTransactionResult(
         transaction_id=str(tx.id),

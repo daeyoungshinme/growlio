@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
-from app.constants import is_non_tradable
+from app.constants import BROKER_API_ASSET_TYPES, is_non_tradable
 from app.core.cache_store import get_cache_store
 from app.core.logging import public_error_message
 from app.limiter import limiter
@@ -338,7 +338,7 @@ async def get_broker_account_balance(
             user_id=str(current_user.id),
         )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다")
-    if account.asset_type not in ("STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS"):
+    if account.asset_type not in BROKER_API_ASSET_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="KIS/키움/토스 계좌만 잔고 조회가 가능합니다",
