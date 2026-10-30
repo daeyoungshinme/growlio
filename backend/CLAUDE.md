@@ -35,6 +35,7 @@ cd backend && uv run mypy app/
 - `env.py`의 `include_name`이 비교 대상을 growlio 테이블로 한정한다(nestlio와 `public` 공유 — 필터 없으면 nestlio 테이블 드롭 제안). 그래서 **모델에서 지운 테이블의 드롭은 autogenerate가 못 잡으니 직접 쓴다.**
 - 인덱스는 모델 `__table_args__`에도 선언 — 마이그레이션에만 있으면 다음 autogenerate가 드롭을 제안한다.
 - 버전 포인터는 `alembic_version`이 아니라 **`growlio_alembic_version`**(`env.py`의 `VERSION_TABLE`). 기본 테이블을 쓰면 nestlio와 리비전을 덮어써 `Can't locate revision ...`. 이 테이블이 없는 기존 DB는 `upgrade head` 전에 `python scripts/bootstrap_alembic.py` 1회(멱등) — `render.yaml` preDeployCommand도 이 순서. `public.alembic_version`(nestlio)은 건드리지 않는다.
+- 운영 이미지(`backend/Dockerfile`)는 의존성만 설치하고 프로젝트는 설치하지 않는다(`--no-install-project`). `scripts/*`의 `import app`은 `ENV PYTHONPATH=/app`에 의존하므로 이 줄을 지우면 preDeploy가 `ModuleNotFoundError`로 실패한다. CI `docker-build` 잡이 scripts/ 작업 경로 import로 이를 확인한다.
 
 ### Tests 주의
 
