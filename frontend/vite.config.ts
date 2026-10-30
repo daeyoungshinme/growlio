@@ -4,19 +4,14 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-const apiDomain = process.env.VITE_API_DOMAIN ?? "localhost:8000";
 // dev.sh --keep-port가 8000 사용 중일 때 백엔드를 다른 포트로 띄우면 이 값으로 프록시 타겟을 넘겨줌
 const devBackendPort = process.env.VITE_DEV_BACKEND_PORT ?? "8000";
-const apiBase = `^https://${apiDomain.replace(/\./g, "\\.")}`;
-const apiPattern = new RegExp(`${apiBase}/.*`);
-const dashboardPattern = new RegExp(`${apiBase}/api/v1/dashboard(\\?.*)?$`);
-const portfolioOverviewPattern = new RegExp(`${apiBase}/api/v1/portfolio/overview(\\?.*)?$`);
-const accountsPattern = new RegExp(`${apiBase}/api/v1/assets(\\?.*)?$`);
 
 export default defineConfig({
   build: {
-    // "hidden": 소스맵 생성하되 번들에 참조 주석 미포함 — Sentry 업로드 후 삭제
-    sourcemap: "hidden",
+    // "hidden": 소스맵 생성하되 번들에 참조 주석 미포함 — Sentry 업로드 후 삭제.
+    // 업로드 토큰이 없으면(APK·nginx 이미지·로컬) 아예 만들지 않는다 — 삭제가 안 돼 .map이 그대로 배포됐다(plans/95 C)
+    sourcemap: process.env.SENTRY_AUTH_TOKEN ? "hidden" : false,
     rollupOptions: {
       output: {
         // Vite 8은 번들러가 Rollup → Rolldown으로 바뀌어 `manualChunks` 객체 형식 대신
@@ -83,36 +78,6 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
-        runtimeCaching: [
-          {
-            urlPattern: dashboardPattern,
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "api-dashboard",
-              expiration: { maxAgeSeconds: 300, maxEntries: 5 },
-            },
-          },
-          {
-            urlPattern: portfolioOverviewPattern,
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "api-portfolio",
-              expiration: { maxAgeSeconds: 300, maxEntries: 5 },
-            },
-          },
-          {
-            urlPattern: accountsPattern,
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "api-accounts",
-              expiration: { maxAgeSeconds: 300, maxEntries: 5 },
-            },
-          },
-          {
-            urlPattern: apiPattern,
-            handler: "NetworkOnly",
-          },
-        ],
       },
     }),
   ],

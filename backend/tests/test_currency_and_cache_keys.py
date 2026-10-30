@@ -172,6 +172,30 @@ class TestInvalidateRebalancingStrategyCache:
         assert await cache.get(key) is None
         assert await cache.get(other) == "{}"
 
+    @pytest.mark.asyncio
+    async def test_analysis_invalidation_clears_target_factor_and_frontier(self, override_settings):
+        """plans/95 A1 — 전략 재계산이 읽는 목표 팩터·프론티어 캐시가 남으면 옛 비중이 다시 조립된다."""
+        from app.core.cache_store import CacheStore
+        from app.utils.cache_keys import (
+            efficient_frontier_key,
+            factor_analysis_portfolio_key,
+            invalidate_rebalancing_analysis_cache,
+        )
+
+        uid = uuid.uuid4()
+        cache = CacheStore()
+        factor = factor_analysis_portfolio_key("portfolio-1")
+        frontier = efficient_frontier_key(uid, "portfolio-1", "acct-a")
+        other_frontier = efficient_frontier_key(uid, "portfolio-2", "all")
+        for k in (factor, frontier, other_frontier):
+            await cache.set(k, "{}")
+
+        await invalidate_rebalancing_analysis_cache(cache, uid, "portfolio-1")
+
+        assert await cache.get(factor) is None
+        assert await cache.get(frontier) is None
+        assert await cache.get(other_frontier) == "{}"
+
 
 class TestInvalidateDividendCaches:
     """positions_changed 플래그로 종목별 배당 추정(외부 API 폴백 체인 필요) 캐시 무효화를
@@ -254,6 +278,28 @@ class TestInvalidateAssetAccountCachesGoalRecommendation:
 
         assert await cache.get(goal_recommendation_key(uid, gen)) == "{}"
         assert await get_goal_recommendation_generation(cache, uid) == gen
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("positions_changed", [True, False])
+    async def test_holdings_factor_and_frontier_follow_positions_changed(self, positions_changed, override_settings):
+        """plans/95 A2 — 보유 기반 팩터·프론티어는 구성이 바뀐 경우에만 지우고, 포트폴리오 단위 팩터는 남긴다."""
+        from app.core.cache_store import CacheStore
+        from app.utils.cache_keys import efficient_frontier_key, factor_analysis_key, factor_analysis_portfolio_key
+
+        cache = CacheStore()
+        uid = uuid.uuid4()
+        holdings_factor = factor_analysis_key(uid, "all")
+        frontier = efficient_frontier_key(uid, None, "all")
+        portfolio_factor = factor_analysis_portfolio_key("portfolio-1")
+        for k in (holdings_factor, frontier, portfolio_factor):
+            await cache.set(k, "{}")
+
+        await invalidate_asset_account_caches(cache, uid, positions_changed=positions_changed)
+
+        expected = None if positions_changed else "{}"
+        assert await cache.get(holdings_factor) == expected
+        assert await cache.get(frontier) == expected
+        assert await cache.get(portfolio_factor) == "{}"
 
 
 class TestInvalidateGoalRecommendationCaches:

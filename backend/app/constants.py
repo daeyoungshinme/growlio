@@ -17,7 +17,16 @@ POSITION_STOCK_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIS", "STOCK_KIWO
 """종목(Position) 단위로 평가금·매입원가를 추적하는 증권 계좌 asset_type. 브로커를 추가하면 여기에만
 추가한다 — 서비스마다 로컬 집합을 두던 시절 토스 연동(STOCK_TOSS)이 대시보드 주식평가액·자산구성·
 세금·자산추이·추천드리프트 집계에서 전부 누락됐던 사고가 있었다(2026-09-25).
-주문 실행 가능 집합은 별개 — rebalancing/order_builder.ORDER_EXECUTABLE_ASSET_TYPES(토스 제외)."""
+주문 실행 가능 집합은 별개 — ORDER_EXECUTABLE_ASSET_TYPES(토스 제외)."""
+
+BROKER_API_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIS", "STOCK_KIWOOM", "STOCK_TOSS"})
+"""증권사 API로 잔고를 읽는 계좌 asset_type(실시간 잔고 조회·진단). 수기 STOCK_OTHER 제외."""
+
+BROKER_API_DATA_SOURCES: frozenset[str] = frozenset({"KIS_API", "KIWOOM_API", "TOSS_API"})
+"""BROKER_API_ASSET_TYPES에 대응하는 data_source — 잔고 동기화 잡이 고른다."""
+
+ORDER_EXECUTABLE_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIS", "STOCK_KIWOOM"})
+"""주문 실행·취소 게이트 — 토스는 주문 API 미구현이라 제외. 읽기 경로(BROKER_API_ASSET_TYPES)와 의도적으로 다르다."""
 
 MAX_GOAL_CANDIDATE_TICKERS = 20
 """사용자가 등록 가능한 목표 역산 추천 후보 종목 최대 개수 — 설정 저장 검증(`GoalCandidateTickersUpdate`)·

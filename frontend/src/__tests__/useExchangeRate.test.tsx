@@ -62,6 +62,19 @@ describe("useExchangeRate", () => {
     );
   });
 
+  it("소비 컴포넌트가 여러 개여도 오류 토스트는 한 번만 띄운다", async () => {
+    const { fetchExchangeRate } = await import("@/api/assets");
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(fetchExchangeRate).mockRejectedValue(new Error("네트워크 오류"));
+
+    renderHook(() => [useExchangeRate(), useExchangeRate(), useExchangeRate()], {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(vi.mocked(toast)).toHaveBeenCalled(), { timeout: 3000 });
+    expect(vi.mocked(toast)).toHaveBeenCalledTimes(1);
+  });
+
   it("usd_krw가 null이면 null을 반환한다", async () => {
     const { fetchExchangeRate } = await import("@/api/assets");
     vi.mocked(fetchExchangeRate).mockResolvedValue({ usd_krw: 0 });

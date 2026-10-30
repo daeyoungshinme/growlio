@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import OVERSEAS_MARKETS
+from app.constants import ORDER_EXECUTABLE_ASSET_TYPES, OVERSEAS_MARKETS
 from app.models.asset import AssetAccount, RebalancingExecutionResult
 from app.utils.kst import KST
 
@@ -30,7 +30,7 @@ def cancel_block_reason(
         return "접수된 주문만 취소할 수 있습니다."
     if row.cancel_status == CANCELED:
         return "이미 취소된 주문입니다."
-    if asset_type not in ("STOCK_KIS", "STOCK_KIWOOM"):
+    if asset_type not in ORDER_EXECUTABLE_ASSET_TYPES:
         return "이 계좌는 앱에서 주문을 취소할 수 없습니다."
     is_overseas = (row.market or "").upper() in OVERSEAS_MARKETS
     now = now or datetime.now(UTC)

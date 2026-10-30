@@ -1,12 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { DashboardData } from "@/api/dashboard";
-
-vi.mock("../components/dashboard/AssetAllocationChart", () => ({
-  default: () => <div data-testid="mock-allocation-chart" />,
-}));
 
 const baseDashboard: DashboardData = {
   total_assets_krw: 150_000_000,

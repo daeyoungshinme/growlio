@@ -81,3 +81,19 @@ class TestGetDividendSummary:
         assert result["annual_received"] == 0.0
         assert result["monthly_breakdown"] == []
         assert result["estimated_annual"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_aggregates_exclude_soft_deleted_accounts(mock_db, override_settings):
+    """plans/95 A4 — 연간·월별 수령 배당이 삭제(soft) 계좌 배당을 빼고 계좌 미지정 배당은 유지."""
+    from app.services.dividend.aggregator import _fetch_dividend_aggregates
+
+    exec_result = MagicMock()
+    exec_result.all.return_value = []
+    mock_db.execute = AsyncMock(return_value=exec_result)
+
+    await _fetch_dividend_aggregates(uuid.uuid4(), mock_db, 2026)
+
+    sql = str(mock_db.execute.call_args[0][0])
+    assert "LEFT JOIN asset_accounts a ON a.id = t.account_id" in sql
+    assert "t.account_id IS NULL OR a.is_active = TRUE" in sql

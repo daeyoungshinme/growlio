@@ -39,10 +39,11 @@ export function useAccountMutations({
         setSyncingStockIds((prev) => new Set(prev).add(data.id));
         try {
           await syncAccount(data.id);
-          void invalidateAll();
+          // 첫 sync로 보유 종목이 생기므로 수동 sync와 같은 범위(드리프트·리스크·인사이트 포함)를 무효화
+          void invalidateSyncData(queryClient);
           toast("계좌가 추가되었습니다", "success");
         } catch (e) {
-          void invalidateAll();
+          void invalidateSyncData(queryClient);
           const fallback = "초기 동기화 실패. 계좌 카드의 동기화 버튼으로 재시도하세요.";
           toast(getHttpStatus(e) != null ? extractErrorMessage(e, fallback) : fallback);
         } finally {

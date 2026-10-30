@@ -7,12 +7,10 @@ import {
   updateGoalSettings,
   type GoalRiskTolerance,
 } from "@/api/settings";
-import { fetchDCAAnalysis } from "@/api/invest";
+import { dcaAnalysisQuery } from "@/api/queryOptions";
 import { toast } from "@/utils/toast";
 import { localToday } from "@/utils/format";
 import { invalidateDcaData } from "@/utils/queryInvalidation";
-import { STALE_TIME } from "@/constants/queryConfig";
-import { QUERY_KEYS } from "@/constants/queryKeys";
 import { useQuery } from "@tanstack/react-query";
 import { numberFieldPayload, useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
 import { storageGet, storageSet } from "@/utils/safeStorage";
@@ -55,11 +53,7 @@ export function useGoalSettings() {
   const [wizardMode, setWizardMode] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: QUERY_KEYS.dcaAnalysis,
-    queryFn: fetchDCAAnalysis,
-    staleTime: STALE_TIME.EXCHANGE_RATE,
-  });
+  const { data, isLoading, isError } = useQuery(dcaAnalysisQuery);
 
   const {
     editing,

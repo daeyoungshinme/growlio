@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.13+, Node 22+, [uv](https://docs.astral.sh/uv/) 필수.
 
-> Android 빌드 시 추가 필요: JDK 17+, Android Studio (SDK 포함).
+> Android 빌드 시 추가 필요: JDK 21+, Android Studio (SDK 포함).
 
 > **pre-commit hooks**: `make install-backend`가 `pre-commit install`까지 실행함. commit 시 ruff/ruff-format(backend), mypy(backend, venv 있을 때), eslint/prettier(frontend, node_modules 있을 때), trailing-whitespace·end-of-file·merge-conflict·yaml/json 검사. 실패 시 commit 블록. 설정: `.pre-commit-config.yaml`.
 
@@ -56,17 +56,17 @@ make dev-keep-port    # 위와 동일하되, 8000 포트가 이미 사용 중이
 make dev-backend      # 백엔드만 (localhost:8000)
 make dev-frontend     # 프론트엔드만 (localhost:5173)
 make test-backend     # cd backend && uv run pytest (커버리지 없이 빠르게)
-make test-backend-cov # cd backend && uv run pytest --cov=app --cov-fail-under=89 (CI와 동일한 89% 게이트)
+make test-backend-cov # cd backend && uv run pytest --cov=app (pyproject fail_under=89 — CI와 동일한 게이트)
 make test-frontend    # cd frontend && npm run test
 make lint             # ruff check + format --check (backend) + eslint --max-warnings 0 + prettier --check (frontend) — CI와 같은 기준
-make typecheck        # mypy (backend) + tsc --noEmit (frontend)
+make typecheck        # mypy (backend) + npm run typecheck (frontend 앱+테스트 tsconfig — CI와 동일)
 make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
 make format           # ruff format + ruff --fix (backend) + prettier --write (frontend)
 make format-backend   # ruff format + ruff --fix (backend만)
 make db-reset         # docker compose down -v + up + migrate (**데이터 전체 삭제** — 개발 환경 전용)
 make build-android-debug    # npm build + cap sync + gradlew assembleDebug
 make build-android-release  # npm build + cap sync + gradlew assembleRelease
-# Android 빌드 전제: JDK 17+, Android Studio (SDK 설치 포함) 필요
+# Android 빌드 전제: JDK 21+, Android Studio (SDK 설치 포함) 필요
 ```
 
 ---
@@ -125,7 +125,7 @@ CI(`ci.yml`)와 같은 기준 — 커밋/PR 전에 변경 영역에 맞춰 실�
 
 ```bash
 make lint            # ruff + eslint --max-warnings 0
-make typecheck       # mypy + tsc --noEmit
+make typecheck       # mypy + tsc --noEmit (앱·테스트 tsconfig 둘 다)
 make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-cov (89% 게이트)
 make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.config.ts
 ```

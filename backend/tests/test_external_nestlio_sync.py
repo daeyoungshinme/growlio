@@ -66,7 +66,6 @@ def _common_tx_patches(stack: ExitStack, account):
     stack.enter_context(patch("app.api.v1.external._get_owned_account", AsyncMock(return_value=account)))
     stack.enter_context(patch("app.api.v1.external.get_cache_store", AsyncMock(return_value=None)))
     stack.enter_context(patch("app.api.v1.external.invalidate_asset_account_caches", AsyncMock()))
-    stack.enter_context(patch("app.api.v1.external.invalidate_user_caches", AsyncMock()))
 
 
 class TestExternalTransactionIdempotency:

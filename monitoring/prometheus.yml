@@ -7,8 +7,9 @@ scrape_configs:
     static_configs:
       - targets: ["backend:8000"]
     metrics_path: /metrics
-    # METRICS_TOKEN이 설정된 경우 아래 주석 해제
+    # METRICS_TOKEN이 설정된 경우 아래 주석 해제 — Prometheus는 설정 파일의 ${ENV}를 확장하지 않으므로
+    # 토큰을 파일로 마운트해 credentials_file로 읽는다(compose volumes에 ./monitoring/metrics_token 추가)
     # authorization:
-    #   credentials: "${METRICS_TOKEN}"
+    #   credentials_file: /etc/prometheus/metrics_token
     scrape_interval: 15s
     scrape_timeout: 10s

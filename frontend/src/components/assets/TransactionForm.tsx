@@ -93,6 +93,11 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // USD 입력은 환율로 원화 환산해야 amount가 갱신된다 — 환율 없이 제출하면 이전 원화 값이 저장됐다(plans/95 F3)
+    if (currency === "USD" && form.transaction_type === "DIVIDEND" && !usdRate) {
+      setFieldErrors({ amount: "환율 정보를 불러오지 못해 달러 금액을 원화로 환산할 수 없습니다" });
+      return;
+    }
     const result = transactionSchema.safeParse({
       transaction_type: form.transaction_type,
       amount: form.amount,
@@ -200,6 +205,8 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                       onClick={() => {
                         setCurrency(c);
                         setAmountUsd(0);
+                        // 통화를 바꾸면 이전 통화 기준 원화 금액이 남지 않게 함께 비운다
+                        setField("amount", 0);
                       }}
                       className={`px-2.5 py-2 rounded transition-colors ${currency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"}`}
                     >

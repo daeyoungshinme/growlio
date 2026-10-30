@@ -64,14 +64,17 @@ async def _fetch_dividend_aggregates(
         text("""
             WITH base AS (
                 SELECT
-                    to_char(transaction_date, 'YYYY-MM') AS month,
-                    ticker,
-                    amount
-                FROM transactions
-                WHERE user_id = :uid
-                  AND transaction_type = 'DIVIDEND'
-                  AND EXTRACT(year FROM transaction_date) = :yr
-                  AND (CAST(:account_id AS uuid) IS NULL OR account_id = CAST(:account_id AS uuid))
+                    to_char(t.transaction_date, 'YYYY-MM') AS month,
+                    t.ticker,
+                    t.amount
+                FROM transactions t
+                LEFT JOIN asset_accounts a ON a.id = t.account_id
+                WHERE t.user_id = :uid
+                  AND t.transaction_type = 'DIVIDEND'
+                  AND EXTRACT(year FROM t.transaction_date) = :yr
+                  AND (CAST(:account_id AS uuid) IS NULL OR t.account_id = CAST(:account_id AS uuid))
+                  -- 삭제(soft) 계좌 배당 제외 — 입출금 집계와 같은 기준(plans/95 A4), 세금 집계는 유지
+                  AND (t.account_id IS NULL OR a.is_active = TRUE)
             ),
             annual AS (
                 SELECT SUM(amount) AS total FROM base

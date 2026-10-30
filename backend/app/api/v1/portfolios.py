@@ -32,6 +32,7 @@ from app.services.etf.index_exposure_service import get_index_group_suggestions
 from app.utils.cache_keys import (
     TTL_PORTFOLIO_LIST,
     get_cached_json,
+    insights_key,
     invalidate_rebalancing_analysis_cache,
     invalidate_user_caches,
     portfolio_list_key,
@@ -177,7 +178,7 @@ async def create_portfolio(
     await db.commit()
 
     cache = await get_cache_store()
-    await invalidate_user_caches(cache, portfolio_list_key(current_user.id))
+    await invalidate_user_caches(cache, portfolio_list_key(current_user.id), insights_key(current_user.id))
 
     result = await db.execute(_with_relations(select(Portfolio).where(Portfolio.id == portfolio.id)))
     return result.scalar_one()
@@ -255,7 +256,7 @@ async def update_portfolio(
     await db.commit()
 
     cache = await get_cache_store()
-    await invalidate_user_caches(cache, portfolio_list_key(current_user.id))
+    await invalidate_user_caches(cache, portfolio_list_key(current_user.id), insights_key(current_user.id))
     await invalidate_rebalancing_analysis_cache(cache, current_user.id, portfolio_id)
 
     result2 = await db.execute(_with_relations(select(Portfolio).where(Portfolio.id == portfolio_id)))
@@ -277,7 +278,7 @@ async def delete_portfolio(
     await db.commit()
 
     cache = await get_cache_store()
-    await invalidate_user_caches(cache, portfolio_list_key(current_user.id))
+    await invalidate_user_caches(cache, portfolio_list_key(current_user.id), insights_key(current_user.id))
     await invalidate_rebalancing_analysis_cache(cache, current_user.id, portfolio_id)
 
 

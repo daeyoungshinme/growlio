@@ -119,7 +119,7 @@ export default function PortfolioPage() {
   );
   const canSyncSelected = !!selectedAccount && isSyncableAccount(selectedAccount.data_source);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview(selectedAccountId),
     queryFn: () => fetchPortfolioOverview(selectedAccountId),
     staleTime: STALE_TIME.EXCHANGE_RATE,
@@ -206,9 +206,7 @@ export default function PortfolioPage() {
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
         <button
-          onClick={() =>
-            qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview(selectedAccountId) })
-          }
+          onClick={() => void refetch()}
           className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
         >
           다시 시도

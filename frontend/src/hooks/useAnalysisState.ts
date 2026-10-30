@@ -30,7 +30,7 @@ const INITIAL_STATE: AnalysisState = {
  * "실시간 잔고로 다시 분석"(`triggerRebalancingAnalysis(id, { live: true })`)에서만 쓴다 — 예전엔 탭 진입마다
  * 계좌 수만큼 증권사 API를 호출해 분석이 그만큼 늦게 떴다(plans/72 2-5).
  */
-export async function fetchLiveDepositKrw(accounts: AssetAccount[]): Promise<number | undefined> {
+async function fetchLiveDepositKrw(accounts: AssetAccount[]): Promise<number | undefined> {
   const brokerAccounts = accounts.filter((a) => isBrokerBalanceAccount(a.asset_type));
   if (brokerAccounts.length === 0) return undefined;
   const results = await Promise.allSettled(brokerAccounts.map((a) => fetchBrokerBalance(a.id)));

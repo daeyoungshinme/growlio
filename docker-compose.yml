@@ -42,12 +42,17 @@ services:
 
   # 자체 호스팅용 nginx(정적 프론트 + /api 프록시) — run: docker compose --profile production up --build
   # 운영은 Vercel+Render라 쓰지 않는다. 프론트 로컬 개발은 컨테이너가 아니라 `make dev-frontend`/`dev.sh`.
-  # 이미지(frontend/Dockerfile)가 빌드 결과와 nginx/nginx.conf를 함께 담는다. VITE_* 값은 빌드 시점에
-  # frontend/.env에서 읽히지만 Dockerfile.dockerignore가 .env를 제외하므로, 실제로 쓰려면 build args로 넘겨야 한다.
+  # 이미지(frontend/Dockerfile)가 빌드 결과와 nginx/nginx.conf를 함께 담는다. Dockerfile.dockerignore가 .env를
+  # 제외하므로 VITE_* 값은 루트 .env(compose 변수)에서 build args로 넘긴다. 웹은 상대 /api라 VITE_API_DOMAIN 불필요.
   nginx:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_REDIRECT_URL: ${VITE_REDIRECT_URL:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     ports:
       - "80:80"
     depends_on:

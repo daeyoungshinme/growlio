@@ -153,9 +153,6 @@ vi.mock("@/context/ExchangeRateContext", () => ({
 vi.mock("../components/dashboard/AllocationHistoryCard", () => ({
   default: () => <div data-testid="allocation-chart">Allocation Chart</div>,
 }));
-vi.mock("../components/dashboard/DisclosureFeedCard", () => ({
-  default: () => <div data-testid="disclosure-feed">Disclosure Feed</div>,
-}));
 vi.mock("../components/portfolio-analysis/PortfolioManageTab", () => ({
   default: () => <div data-testid="portfolio-manage-tab">Portfolio Manage</div>,
 }));

@@ -65,9 +65,10 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
     () => metricList.find((m) => m.level === "high")?.label ?? null,
   );
 
-  if (!metrics.data_available) return null;
+  const risk = summarizeRiskLevel(metrics); // data_available이 아니면 null
+  if (!risk) return null;
 
-  const { highCount, level } = summarizeRiskLevel(metrics)!;
+  const { highCount, level } = risk;
   const summary = SUMMARY_CONFIG[level];
 
   const summaryText =

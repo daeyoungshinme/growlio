@@ -44,6 +44,37 @@ class TestVerifySupabaseToken:
             with pytest.raises(ValueError, match="Token verification failed"):
                 verify_supabase_token("any.token.value")
 
+    def test_jwks_connection_error_reported_to_sentry(self):
+        """plans/95 B — JWKS 장애는 모든 인증을 막으므로 Sentry에 보고한다."""
+        from jwt import PyJWKClientConnectionError
+
+        from app.services.auth_service import verify_supabase_token
+
+        with (
+            patch("app.services.auth_service._get_jwks_client") as mock_getter,
+            patch("app.services.auth_service.report_handled_failure") as report,
+        ):
+            mock_getter.return_value.get_signing_key_from_jwt.side_effect = PyJWKClientConnectionError("down")
+            with pytest.raises(ValueError, match="Token verification failed"):
+                verify_supabase_token("any.token.value")
+        report.assert_called_once()
+        assert report.call_args.args[0] == "jwks_fetch_failed"
+
+    def test_unknown_kid_is_invalid_token_not_reported(self):
+        """알 수 없는 kid는 토큰 문제 — 장애로 보고하지 않는다."""
+        from jwt import PyJWKClientError
+
+        from app.services.auth_service import verify_supabase_token
+
+        with (
+            patch("app.services.auth_service._get_jwks_client") as mock_getter,
+            patch("app.services.auth_service.report_handled_failure") as report,
+        ):
+            mock_getter.return_value.get_signing_key_from_jwt.side_effect = PyJWKClientError("no matching kid")
+            with pytest.raises(ValueError, match="Invalid token"):
+                verify_supabase_token("any.token.value")
+        report.assert_not_called()
+
 
 class TestVerifyPassword:
     @pytest.mark.asyncio

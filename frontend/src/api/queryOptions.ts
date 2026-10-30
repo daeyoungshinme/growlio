@@ -6,6 +6,8 @@ import { fetchRebalancingAlerts } from "@/api/alerts";
 import { fetchPortfolioOverviewLite, fetchPortfolios } from "@/api/portfolios";
 import { fetchSettings } from "@/api/settings";
 import { fetchMarketSignal } from "@/api/marketSignals";
+import { fetchDCAAnalysis } from "@/api/invest";
+import { fetchIsaStatus } from "@/api/tax";
 import {
   fetchCompositeSignalStatus,
   fetchDriftSummary,
@@ -77,4 +79,16 @@ export const goalRecommendationOverallQuery = queryOptions({
   // 영속 캐시(main.tsx PERSIST_QUERY_KEYS)에 남도록 — 기본 30분 gcTime이면 탭을 한동안 안 열 때
   // 저장본에서 빠져 재방문이 다시 콜드 계산(수십 초)을 기다렸다
   gcTime: STALE_TIME.DAY,
+});
+
+export const dcaAnalysisQuery = queryOptions({
+  queryKey: QUERY_KEYS.dcaAnalysis,
+  queryFn: () => fetchDCAAnalysis(),
+  staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 백엔드 캐시 TTL과 동기화
+});
+
+export const isaStatusQuery = queryOptions({
+  queryKey: QUERY_KEYS.isaStatus,
+  queryFn: () => fetchIsaStatus(),
+  staleTime: STALE_TIME.MEDIUM,
 });

@@ -12,7 +12,6 @@ import ChallengeEmptyStateCard from "@/components/dashboard/ChallengeEmptyStateC
 import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfolioBanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { portfoliosQuery } from "@/api/queryOptions";
@@ -118,6 +117,7 @@ export default function DashboardPage() {
     data,
     isLoading,
     dataUpdatedAt,
+    refetch,
     overview,
     dcaData,
     dcaLoading,
@@ -141,7 +141,7 @@ export default function DashboardPage() {
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
         <button
-          onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard })}
+          onClick={() => void refetch()}
           className="px-4 min-h-[44px] text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           다시 시도

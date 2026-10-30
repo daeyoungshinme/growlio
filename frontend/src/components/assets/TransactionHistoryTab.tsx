@@ -250,7 +250,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
               .then(() => {
                 void invalidateAccountData(qc);
               })
-              .catch(() => {});
+              .catch((e) => toast(extractErrorMessage(e, "예수금 반영에 실패했습니다"), "error"));
             setDepositPrompt(null);
           }}
           onSkip={() => setDepositPrompt(null)}

@@ -50,6 +50,13 @@ describe("invalidateAccountData", () => {
     // 연금·IRP 계좌 추가/삭제·tax_type 변경은 연금 납입 현황을 바꾼다
     expect(keys).toContain("pension-contribution");
   });
+
+  it("포지션 수정·계좌 삭제가 보유 기반 카드(drift·risk·insights)도 무효화 (plans/95 F1)", async () => {
+    const qc = makeQueryClient();
+    await invalidateAccountData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toEqual(expect.arrayContaining(["drift-summary", "portfolio-risk", "insights"]));
+  });
 });
 
 describe("invalidateTransactionData", () => {

@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1._account_deps import get_owned_or_404
+from app.constants import ORDER_EXECUTABLE_ASSET_TYPES
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.alert import RebalancingAlert
@@ -29,7 +30,6 @@ from app.services.rebalancing._alert_queries import (
     get_alert_by_portfolio_and_account,
     list_alerts_by_portfolio_accounts,
 )
-from app.services.rebalancing.order_builder import ORDER_EXECUTABLE_ASSET_TYPES
 
 router = APIRouter()
 

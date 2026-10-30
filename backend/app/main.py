@@ -116,7 +116,7 @@ async def add_security_headers(request: Request, call_next):
         "default-src 'self'; "
         "script-src 'self'; "
         "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: https://static.toss.im https://ssl.pstatic.net; "
+        "img-src 'self' data:; "
         "connect-src 'self' https://*.supabase.co wss://*.supabase.co; "
         "object-src 'none'; "
         "frame-ancestors 'none';"

@@ -4,8 +4,10 @@ import { TransactionForm } from "@/components/assets/TransactionForm";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
 
+const exchangeRate = vi.hoisted(() => ({ value: 1350 as number | null }));
+
 vi.mock("../hooks/useExchangeRate", () => ({
-  useExchangeRate: () => 1350,
+  useExchangeRate: () => exchangeRate.value,
 }));
 
 vi.mock("../hooks/useStockSearch", () => ({
@@ -72,6 +74,18 @@ const defaultProps = {
 describe("TransactionForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    exchangeRate.value = 1350;
+  });
+
+  it("USD 배당을 환율 없이 제출하면 이전 원화 금액을 저장하지 않고 오류를 표시한다 (plans/95 F3)", async () => {
+    exchangeRate.value = null;
+    const { createTransaction } = await import("../api/transactions");
+    const { container } = renderWithProviders(<TransactionForm {...defaultProps} />);
+    fireEvent.click(screen.getByText("배당"));
+    fireEvent.click(screen.getByRole("button", { name: "USD" }));
+    fireEvent.submit(container.querySelector("form")!);
+    expect(screen.getByText(/달러 금액을 원화로 환산할 수 없습니다/)).toBeInTheDocument();
+    expect(createTransaction).not.toHaveBeenCalled();
   });
 
   it("폼 초기 상태에서 거래 유형 버튼을 렌더링한다", () => {

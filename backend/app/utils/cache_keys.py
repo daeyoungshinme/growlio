@@ -574,9 +574,13 @@ async def invalidate_rebalancing_analysis_cache(
     포트폴리오 수정, 리밸런싱 주문 실행 등 특정 포트폴리오가 특정된 이벤트에서 호출한다.
     같은 목표·보유로 계산하는 전략 비교 캐시도 함께 지운다 — 예전엔 주문 실행만 따로 지워서 포트폴리오 수정·
     전술 적용 뒤 1시간 동안 이전 목표 기준 거래 추천이 보였다(plans/77 B3).
+    전략 캐시가 재계산 때 읽는 목표 팩터·프론티어 캐시도 지운다 — 남아 있으면 바깥 캐시만 지워도
+    목표 위치가 옛 비중으로 다시 조립됐다(plans/95 A1).
     """
     await _scan_unlink(cache, f"{_env_prefix()}rebalancing_analysis:{user_id}:{portfolio_id}:*")
     await invalidate_rebalancing_strategy_cache(cache, user_id, portfolio_id)
+    await invalidate_user_caches(cache, factor_analysis_portfolio_key(portfolio_id))
+    await _scan_unlink(cache, f"{_env_prefix()}efficient_frontier:{user_id}:{portfolio_id}:*")
 
 
 async def invalidate_rebalancing_analysis_cache_all(cache: CacheStoreType, user_id: uuid.UUID) -> None:
@@ -623,6 +627,10 @@ async def invalidate_asset_account_caches(
     ]
     if positions_changed:
         await invalidate_goal_recommendation_caches(cache, user_id)
+        # 보유 기반 팩터 분석·효율적 프론티어(현재 위치) — 무거운 yfinance 재계산이라 목표 추천처럼
+        # 구성이 바뀐 경우에만 지운다(plans/95 A2). 포트폴리오 단위 팩터 키는 목표 비중만 써서 대상 아님
+        await _scan_unlink(cache, f"{_env_prefix()}factor_analysis:{user_id}:*")
+        await _scan_unlink(cache, f"{_env_prefix()}efficient_frontier:{user_id}:*")
     await invalidate_user_caches(cache, *keys)
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)

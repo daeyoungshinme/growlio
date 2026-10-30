@@ -308,3 +308,19 @@ class TestGetDividendPlan:
         assert len(years) == 3
         assert years[0] == {"year": 2024, "amount_krw": 300_000}
         assert years[2] == {"year": 2026, "amount_krw": 500_000}
+
+
+@pytest.mark.asyncio
+async def test_yearly_received_excludes_soft_deleted_accounts(user_id, mock_db):
+    """plans/95 A4 — 연도별 수령 배당도 삭제(soft) 계좌 배당을 뺀다(입출금 집계와 같은 기준)."""
+    from app.services.dividend.plan_service import _fetch_yearly_received
+
+    execute_result = MagicMock()
+    execute_result.fetchall.return_value = []
+    mock_db.execute = AsyncMock(return_value=execute_result)
+
+    await _fetch_yearly_received(user_id, mock_db)
+
+    sql = str(mock_db.execute.call_args[0][0])
+    assert "LEFT JOIN asset_accounts a ON a.id = t.account_id" in sql
+    assert "t.account_id IS NULL OR a.is_active = TRUE" in sql

@@ -126,6 +126,6 @@ class TestRunIntradayAssetSync:
     def test_intraday_sources_include_all_broker_sync_sources(self):
         """토스도 잔고 동기화 대상이다(주문 실행 대상만 KIS/키움). 15:30 스냅샷에서 빠지면
         18:00 전까지 토스 포지션이 오래된 값으로 남는다."""
-        from app.jobs.asset_sync import _STOCK_SOURCES
+        from app.constants import BROKER_API_DATA_SOURCES
 
-        assert set(_STOCK_SOURCES) == {"KIS_API", "KIWOOM_API", "TOSS_API"}
+        assert {"KIS_API", "KIWOOM_API", "TOSS_API"} == BROKER_API_DATA_SOURCES

@@ -37,7 +37,8 @@ async def _supabase_user_exists_or_503(user_id: str, *, event: str) -> bool:
     try:
         return await supabase_user_exists(user_id)
     except httpx.HTTPError as e:
-        logger.error(event, user_id=user_id, error=str(e))
+        # Supabase Auth 장애는 HTTPException으로 바뀌어 Sentry 자동 수집에 안 잡힌다(plans/95 B)
+        report_handled_failure(event, e, user_id=user_id)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="계정 확인에 실패했습니다. 잠시 후 다시 시도해주세요.",
@@ -154,7 +155,7 @@ async def delete_account(
     try:
         password_ok = await verify_password(current_user.email, req.password)
     except httpx.HTTPError as e:
-        logger.error("account_delete_password_verify_unreachable", error=str(e))
+        report_handled_failure("account_delete_password_verify_unreachable", e)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="인증 서버에 연결할 수 없습니다"
         ) from e
@@ -168,7 +169,7 @@ async def delete_account(
     try:
         await delete_supabase_user(str(user_id))
     except httpx.HTTPError as e:
-        logger.error("account_delete_supabase_failed", user_id=str(user_id), error=str(e))
+        report_handled_failure("account_delete_supabase_failed", e, user_id=str(user_id))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요"
         ) from e

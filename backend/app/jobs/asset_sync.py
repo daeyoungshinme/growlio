@@ -1,15 +1,13 @@
 import structlog
 from sqlalchemy import select
 
+from app.constants import BROKER_API_DATA_SOURCES
 from app.core.database import AsyncSessionLocal
 from app.jobs._job_helpers import peak_rss_mb
 from app.models.asset import AssetAccount
 from app.services.accounts.sync_all_service import sync_accounts
 
 logger = structlog.get_logger()
-
-# 잔고 동기화 가능한 증권사 API 계좌 전부 — 주문 실행 가능 여부(토스 제외)와는 별개다
-_STOCK_SOURCES = ("KIS_API", "KIWOOM_API", "TOSS_API")
 
 
 async def run_daily_asset_sync() -> None:
@@ -29,7 +27,7 @@ async def run_intraday_asset_sync() -> None:
         result = await db.execute(
             select(AssetAccount).where(
                 AssetAccount.is_active == True,
-                AssetAccount.data_source.in_(_STOCK_SOURCES),
+                AssetAccount.data_source.in_(BROKER_API_DATA_SOURCES),
             )
         )
         accounts = result.scalars().all()

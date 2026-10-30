@@ -214,7 +214,6 @@ class TestCreateExternalTransaction:
             ),
             patch("app.api.v1.external._upsert_snapshot", AsyncMock()),
             patch("app.api.v1.external.invalidate_asset_account_caches", AsyncMock()),
-            patch("app.api.v1.external.invalidate_user_caches", AsyncMock()),
         )
 
     def test_returns_401_without_auth(self, override_settings):
@@ -248,7 +247,6 @@ class TestCreateExternalTransaction:
             patches[3],
             patches[4] as upsert_mock,
             patches[5],
-            patches[6],
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.post(
@@ -284,7 +282,6 @@ class TestCreateExternalTransaction:
             patches[3],
             patches[4],
             patches[5],
-            patches[6],
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.post(
@@ -316,7 +313,6 @@ class TestCreateExternalTransaction:
             patches[3],
             patches[4] as upsert_mock,
             patches[5],
-            patches[6],
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.post(
@@ -350,7 +346,6 @@ class TestCreateExternalTransaction:
             patches[3],
             patches[4],
             patches[5],
-            patches[6],
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.post(
@@ -381,7 +376,6 @@ class TestCreateExternalTransaction:
             patches[3],
             patches[4],
             patches[5],
-            patches[6],
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             # JSON 리터럴 NaN을 그대로 보내려고 json= 대신 원문 본문을 쓴다
