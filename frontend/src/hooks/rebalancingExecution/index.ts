@@ -5,7 +5,6 @@ import { extractErrorMessage } from "@/utils/error";
 import { invalidateRebalancingHistoryData, invalidateSyncData } from "@/utils/queryInvalidation";
 import { isOrderExecutableAccount } from "@/utils/accounts";
 import { triggerHaptic } from "../useHaptic";
-import { isOverseasMarket } from "@/constants/markets";
 import {
   type ExecutionOrderItem,
   type ExecutionResult,
@@ -16,7 +15,6 @@ import {
 import {
   buyItemForAccount,
   canBuyInAccount,
-  flattenTradeItems,
   getActionableItems,
   orderKey,
   qtyInOriginalUnits,
@@ -32,6 +30,20 @@ import type {
   Strategy,
 } from "./types";
 import { executionReducer } from "./reducer";
+import {
+  buyRowItem,
+  effectiveQty,
+  getAccountQuantity as getAccountQuantityOf,
+  getBuyRows,
+  getEstimateKrw as getEstimateKrwOf,
+  getLimitPriceNative as getLimitPriceNativeOf,
+  getSellRows,
+  referencePriceNative,
+  sumSelectedEstimates,
+  type PriceInput,
+  type TradeRow,
+  type TradeRowsInput,
+} from "./rows";
 
 export { getActionableItems };
 
@@ -183,125 +195,29 @@ export function useRebalancingExecution({
   );
   const { loadAllPrices, retryPrice } = useRebalancingPrices(dispatch, analysis);
 
-  // 해외 잔고 조회가 실패한 계좌의 해외 종목은 실시간 잔고에 없다 — 없음(0주)으로 보면 매도 행이 사라진다
-  function hasLiveBalanceFor(ticker: string, accountId: string): boolean {
-    if (!liveBalances[accountId]) return false;
-    if (!overseasUnknown[accountId]) return true;
-    const market = flattenTradeItems(analysis.items).find((i) => i.ticker === ticker)?.market ?? "";
-    return !isOverseasMarket(market);
-  }
-
-  function getAccountQuantity(ticker: string, accountId: string): number {
-    const livePos = hasLiveBalanceFor(ticker, accountId)
-      ? liveBalances[accountId]?.find((p) => p.ticker === ticker)
-      : undefined;
-    if (livePos !== undefined) return livePos.quantity;
-    return (
-      (analysis.ticker_account_map[ticker] ?? []).find((a) => a.account_id === accountId)
-        ?.quantity ?? 0
-    );
-  }
-
-  function accountHoldsTicker(ticker: string, accountId: string): boolean {
-    if (hasLiveBalanceFor(ticker, accountId)) {
-      return (liveBalances[accountId] ?? []).some((p) => p.ticker === ticker && p.quantity > 0);
-    }
-    return (analysis.ticker_account_map[ticker] ?? []).some(
-      (a) => a.account_id === accountId && isOrderExecutableAccount(a.asset_type) && a.quantity > 0,
-    );
-  }
-
-  function getLimitPriceNative(key: string, ticker: string, market: string): number {
-    const raw =
-      key in limitPriceOverrides
-        ? (limitPriceOverrides[key] ?? 0)
-        : isOverseasMarket(market)
-          ? (livePricesUsd[ticker] ?? 0)
-          : (livePricesKrw[ticker] ?? 0);
-    // 해외 주문 지정가는 센트 단위(소수점 2자리)까지만 허용 — Yahoo 등 원본 시세의 부동소수점 오차 제거.
-    return isOverseasMarket(market) ? Math.round(raw * 100) / 100 : raw;
-  }
-
-  // 시장가 주문의 결과·이력 "가격" 칸용 참고 시세(시장 통화 — 해외 USD). 브로커에는 보내지 않는다(plans/90 B7)
-  function referencePriceNative(ticker: string, market: string): number | null {
-    const raw = isOverseasMarket(market) ? livePricesUsd[ticker] : livePricesKrw[ticker];
-    if (raw == null || raw <= 0) return null;
-    return isOverseasMarket(market) ? Math.round(raw * 100) / 100 : raw;
-  }
-
-  function getEstimateKrw(key: string, ticker: string, market: string, qty: number): number | null {
-    if (orderType === "LIMIT") {
-      const native = getLimitPriceNative(key, ticker, market);
-      if (native <= 0) return null;
-      if (isOverseasMarket(market))
-        return globalUsdRate != null ? native * globalUsdRate * qty : null;
-      return native * qty;
-    }
-    const priceKrw = livePricesKrw[ticker] ?? null;
-    return priceKrw != null ? priceKrw * qty : null;
-  }
-
-  // 이 계좌에서 실제로 사는 종목 행 — ISA·연금이면 해외 대표 종목 대신 국내 대체 종목(plans/79 E).
-  // 계좌마다 따로 판단한다: 여러 계좌로 나눠 살 때도 절세 계좌 행은 대체 종목이어야 증권사가 받는다(plans/80 A1)
-  function buyRowItem(item: RebalancingItem, accountId: string): RebalancingItem {
-    const taxType = tradableAccounts.find((a) => a.id === accountId)?.tax_type;
-    return buyItemForAccount(item, analysis.items, taxType);
-  }
-
-  function getSellRows(
-    accountId: string,
-  ): { item: RebalancingItem; currentQty: number; suggestedQty: number }[] {
-    const rows: { item: RebalancingItem; currentQty: number; suggestedQty: number }[] = [];
-    for (const item of actionableItems) {
-      if ((item.shares_to_trade ?? 0) >= 0) continue;
-      if (!accountHoldsTicker(item.ticker, accountId)) continue;
-      const currentQty = getAccountQuantity(item.ticker, accountId);
-      if (currentQty <= 0) continue;
-      const allKisQty = tradableAccounts.reduce(
-        (sum, acc) => sum + getAccountQuantity(item.ticker, acc.id),
-        0,
-      );
-      const totalSuggested = Math.abs(Math.round(item.shares_to_trade!));
-      const suggested =
-        allKisQty > 0 ? Math.round((totalSuggested * currentQty) / allKisQty) : totalSuggested;
-      // 수동 계좌 등 주문 불가 계좌 보유분까지 합친 매도 권장량이 이 계좌 보유량을 넘을 수 있다
-      const capped = Math.min(suggested, currentQty);
-      if (capped > 0) rows.push({ item, currentQty, suggestedQty: capped });
-    }
-    return rows;
-  }
-
-  function getBuyRows(
-    accountId: string,
-  ): { item: RebalancingItem; suggestedQty: number; currentQty: number }[] {
-    return actionableItems
-      .filter(
-        (i) => (i.shares_to_trade ?? 0) > 0 && (buyAccounts[i.ticker] ?? []).includes(accountId),
-      )
-      .map((i) => {
-        const item = buyRowItem(i, accountId);
-        const suggestedQty = Math.abs(Math.round(item.shares_to_trade!));
-        return { item, suggestedQty, currentQty: getAccountQuantity(item.ticker, accountId) };
-      });
-  }
+  const prices: PriceInput = useMemo(
+    () => ({ orderType, limitPriceOverrides, livePricesKrw, livePricesUsd, globalUsdRate }),
+    [orderType, limitPriceOverrides, livePricesKrw, livePricesUsd, globalUsdRate],
+  );
+  const rowsInput: TradeRowsInput = useMemo(
+    () => ({ analysis, liveBalances, overseasUnknown, actionableItems, tradableAccounts }),
+    [analysis, liveBalances, overseasUnknown, actionableItems, tradableAccounts],
+  );
 
   // 매수만(BUY_ONLY)이면 매도 행 자체를 만들지 않는다 — 표·현금 계산·주문 목록이 모두 이 맵을 거치므로
   // 여기서 비워야 "매수만"을 골라도 매도 주문이 나가던 문제가 한 곳에서 막힌다(plans/63 P0-1)
   const sellRowsByAccount = useMemo(() => {
-    const map: Record<string, ReturnType<typeof getSellRows>> = {};
+    const map: Record<string, TradeRow[]> = {};
     for (const acc of tradableAccounts)
-      map[acc.id] = state.strategy === "BUY_ONLY" ? [] : getSellRows(acc.id);
+      map[acc.id] = state.strategy === "BUY_ONLY" ? [] : getSellRows(rowsInput, acc.id);
     return map;
-    // getSellRows는 훅 스코프 함수라 dep에 넣으면 매 렌더 재계산 — 대신 그 함수가 읽는 값을 전부 나열한다
-    // (getAccountQuantity·accountHoldsTicker → liveBalances·overseasUnknown·analysis)
-  }, [actionableItems, liveBalances, overseasUnknown, analysis, tradableAccounts, state.strategy]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rowsInput, tradableAccounts, state.strategy]);
 
   const buyRowsByAccount = useMemo(() => {
-    const map: Record<string, ReturnType<typeof getBuyRows>> = {};
-    for (const acc of tradableAccounts) map[acc.id] = getBuyRows(acc.id);
+    const map: Record<string, TradeRow[]> = {};
+    for (const acc of tradableAccounts) map[acc.id] = getBuyRows(rowsInput, buyAccounts, acc.id);
     return map;
-    // getBuyRows는 훅 스코프 함수 — 그 함수가 읽는 값(getAccountQuantity 경유 포함)을 전부 나열한다
-  }, [actionableItems, liveBalances, overseasUnknown, analysis, buyAccounts, tradableAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rowsInput, tradableAccounts, buyAccounts]);
 
   /** 여러 계좌에 나눠 사는 종목의 배분 합계 — 국내 대체 행 수량은 원래 종목 주수로 환산해 더한다. */
   function getBuyTotalInfo(ticker: string): { allocated: number; needed: number } {
@@ -309,7 +225,7 @@ export function useRebalancingExecution({
     const needed = Math.abs(Math.round(item?.shares_to_trade ?? 0));
     if (!item) return { allocated: 0, needed };
     const allocated = (buyAccounts[ticker] ?? []).reduce((sum, accId) => {
-      const row = buyRowItem(item, accId);
+      const row = buyRowItem(analysis, tradableAccounts, item, accId);
       const key = orderKey("buy", row.ticker, accId);
       if (!selected.has(key)) return sum;
       const qty = qtyOverrides[key] ?? Math.abs(Math.round(row.shares_to_trade ?? 0));
@@ -331,18 +247,20 @@ export function useRebalancingExecution({
 
   function addBuyAccount(ticker: string, accountId: string) {
     const item = actionableItems.find((i) => i.ticker === ticker);
-    const rowTicker = item ? buyRowItem(item, accountId).ticker : ticker;
+    const rowTicker = item
+      ? buyRowItem(analysis, tradableAccounts, item, accountId).ticker
+      : ticker;
     dispatch({ type: "ADD_BUY_ACCOUNT", ticker, accountId, rowTicker });
   }
 
   function buildOrders(): ExecutionOrderItem[] {
     const orders: ExecutionOrderItem[] = [];
     tradableAccounts.forEach((acc) => {
-      (sellRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty, currentQty }) => {
+      (sellRowsByAccount[acc.id] ?? []).forEach((row) => {
+        const { item } = row;
         const key = orderKey("sell", item.ticker, acc.id);
         if (!selected.has(key)) return;
-        // 보유량 초과 매도는 백엔드가 잘라 내므로, 확인 화면 수량과 실제 주문 수량이 어긋나지 않게 여기서도 자른다
-        const qty = Math.min(qtyOverrides[key] ?? suggestedQty, currentQty);
+        const qty = effectiveQty("sell", row, qtyOverrides[key]);
         if (qty > 0)
           orders.push({
             ticker: item.ticker,
@@ -354,15 +272,16 @@ export function useRebalancingExecution({
             order_type: orderType,
             limit_price:
               orderType === "LIMIT"
-                ? getLimitPriceNative(key, item.ticker, item.market) || null
+                ? getLimitPriceNativeOf(prices, key, item.ticker, item.market) || null
                 : null,
-            reference_price: referencePriceNative(item.ticker, item.market),
+            reference_price: referencePriceNative(prices, item.ticker, item.market),
           });
       });
-      (buyRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty }) => {
+      (buyRowsByAccount[acc.id] ?? []).forEach((row) => {
+        const { item } = row;
         const key = orderKey("buy", item.ticker, acc.id);
         if (!selected.has(key)) return;
-        const qty = qtyOverrides[key] ?? suggestedQty;
+        const qty = effectiveQty("buy", row, qtyOverrides[key]);
         if (qty > 0)
           orders.push({
             ticker: item.ticker,
@@ -374,9 +293,9 @@ export function useRebalancingExecution({
             order_type: orderType,
             limit_price:
               orderType === "LIMIT"
-                ? getLimitPriceNative(key, item.ticker, item.market) || null
+                ? getLimitPriceNativeOf(prices, key, item.ticker, item.market) || null
                 : null,
-            reference_price: referencePriceNative(item.ticker, item.market),
+            reference_price: referencePriceNative(prices, item.ticker, item.market),
           });
       });
     });
@@ -388,30 +307,22 @@ export function useRebalancingExecution({
     const deposit = isOrderableKnown
       ? (state.orderableKrw[accountId] ?? null)
       : (state.depositKrw[accountId] ?? null);
-    let sellProceeds: number | null = 0;
-    for (const { item, suggestedQty } of sellRowsByAccount[accountId] ?? []) {
-      const key = orderKey("sell", item.ticker, accountId);
-      if (!selected.has(key)) continue;
-      const qty = qtyOverrides[key] ?? suggestedQty;
-      const est = getEstimateKrw(key, item.ticker, item.market, qty);
-      if (est === null) {
-        sellProceeds = null;
-        break;
-      }
-      sellProceeds = (sellProceeds ?? 0) + est;
-    }
-    let buyCost: number | null = 0;
-    for (const { item, suggestedQty } of buyRowsByAccount[accountId] ?? []) {
-      const key = orderKey("buy", item.ticker, accountId);
-      if (!selected.has(key)) continue;
-      const qty = qtyOverrides[key] ?? suggestedQty;
-      const est = getEstimateKrw(key, item.ticker, item.market, qty);
-      if (est === null) {
-        buyCost = null;
-        break;
-      }
-      buyCost = (buyCost ?? 0) + est;
-    }
+    const sellProceeds = sumSelectedEstimates(
+      prices,
+      sellRowsByAccount[accountId] ?? [],
+      "sell",
+      accountId,
+      selected,
+      qtyOverrides,
+    );
+    const buyCost = sumSelectedEstimates(
+      prices,
+      buyRowsByAccount[accountId] ?? [],
+      "buy",
+      accountId,
+      selected,
+      qtyOverrides,
+    );
     const totalAvailable =
       deposit !== null && sellProceeds !== null ? deposit + sellProceeds : null;
     const surplus = totalAvailable !== null && buyCost !== null ? totalAvailable - buyCost : null;
@@ -440,36 +351,25 @@ export function useRebalancingExecution({
         : (state.depositKrw[acc.id] ?? 0);
     }
 
-    let totalSellProceeds: number | null = 0;
-    loop: for (const acc of tradableAccounts) {
-      for (const { item, suggestedQty, currentQty } of sellRowsByAccount[acc.id] ?? []) {
-        const key = orderKey("sell", item.ticker, acc.id);
-        if (!selected.has(key)) continue;
-        // buildOrders와 같은 보유량 상한 — 실제로 나갈 매도분만 대금으로 잡는다
-        const qty = Math.min(qtyOverrides[key] ?? suggestedQty, currentQty);
-        const est = getEstimateKrw(key, item.ticker, item.market, qty);
-        if (est === null) {
-          totalSellProceeds = null;
-          break loop;
-        }
-        totalSellProceeds = (totalSellProceeds ?? 0) + est;
+    // 계좌별 합 — 한 계좌라도 시세를 모르면 전체도 모름(null)
+    const sumAll = (byAccount: Record<string, TradeRow[]>, side: "sell" | "buy") => {
+      let total = 0;
+      for (const acc of tradableAccounts) {
+        const sub = sumSelectedEstimates(
+          prices,
+          byAccount[acc.id] ?? [],
+          side,
+          acc.id,
+          selected,
+          qtyOverrides,
+        );
+        if (sub === null) return null;
+        total += sub;
       }
-    }
-
-    let totalBuyCost: number | null = 0;
-    loop2: for (const acc of tradableAccounts) {
-      for (const { item, suggestedQty } of buyRowsByAccount[acc.id] ?? []) {
-        const key = orderKey("buy", item.ticker, acc.id);
-        if (!selected.has(key)) continue;
-        const qty = qtyOverrides[key] ?? suggestedQty;
-        const est = getEstimateKrw(key, item.ticker, item.market, qty);
-        if (est === null) {
-          totalBuyCost = null;
-          break loop2;
-        }
-        totalBuyCost = (totalBuyCost ?? 0) + est;
-      }
-    }
+      return total;
+    };
+    const totalSellProceeds = sumAll(sellRowsByAccount, "sell");
+    const totalBuyCost = sumAll(buyRowsByAccount, "buy");
 
     const totalAvailable = totalSellProceeds !== null ? totalDeposit + totalSellProceeds : null;
     const surplus =
@@ -483,8 +383,6 @@ export function useRebalancingExecution({
       isInsufficient: surplus !== null && surplus < 0,
       balancesLoaded: true,
     };
-    // getEstimateKrw는 훅 스코프 함수 — 실제 의존값(orderType, prices, limitPriceOverrides)은 아래에 포함됨.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     tradableAccounts,
     state.balanceState,
@@ -494,11 +392,7 @@ export function useRebalancingExecution({
     buyRowsByAccount,
     selected,
     qtyOverrides,
-    livePricesKrw,
-    livePricesUsd,
-    globalUsdRate,
-    orderType,
-    limitPriceOverrides,
+    prices,
   ]);
 
   function autoAdjustForCash() {
@@ -571,6 +465,14 @@ export function useRebalancingExecution({
       });
     }
   }
+
+  // 컴포넌트가 쓰는 기존 시그니처 유지
+  const getAccountQuantity = (ticker: string, accountId: string) =>
+    getAccountQuantityOf(rowsInput, ticker, accountId);
+  const getLimitPriceNative = (key: string, ticker: string, market: string) =>
+    getLimitPriceNativeOf(prices, key, ticker, market);
+  const getEstimateKrw = (key: string, ticker: string, market: string, qty: number) =>
+    getEstimateKrwOf(prices, key, ticker, market, qty);
 
   function getSellRowsCached(accountId: string) {
     return sellRowsByAccount[accountId] ?? [];
