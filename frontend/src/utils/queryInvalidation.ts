@@ -50,6 +50,10 @@ export function invalidateAccountData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasRealizedBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
+    // 포지션 수동 저장·계좌 삭제도 보유 구성을 바꾼다 — sync와 같이 보유 기반 카드를 지운다(plans/95 F1)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);

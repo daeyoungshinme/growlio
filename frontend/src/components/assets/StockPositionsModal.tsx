@@ -98,11 +98,19 @@ export default function StockPositionsModal({
       setError(`${badQty.name || badQty.ticker || "이름 없는 종목"}: 수량은 0보다 커야 합니다`);
       return;
     }
+    // 환율 로딩 전에 입력한 달러 평균단가는 원화 환산값이 0으로 남는다 — 422 대신 원인을 알려준다(plans/95 F4)
+    const unconverted = valid.find((r) => r.avg_price_usd && !(Number(r.avg_price) > 0));
+    if (unconverted) {
+      setError(
+        `${unconverted.name || unconverted.ticker || "이름 없는 종목"}: 환율을 불러오기 전에 입력한 달러 평균단가입니다. 평균단가를 다시 입력하세요`,
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       await replaceAccountPositions(accountId, valid);
-      void invalidateAccountData(queryClient);
+      // 무효화는 부모 onClose가 한다(닫기마다 invalidateAccountData) — 여기서 또 하면 두 번 돈다
       toast("저장되었습니다", "success");
       onClose();
     } catch (e) {
