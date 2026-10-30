@@ -105,6 +105,7 @@ vi.mock("@/hooks/useTransactionFormState", () => ({
     currency: "KRW",
     amountUsd: "",
     usdRate: 1350,
+    usdConversionError: vi.fn(() => null),
     tickerDirect: false,
     setTickerDirect: vi.fn(),
     tickerQuery: "",

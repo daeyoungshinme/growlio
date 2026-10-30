@@ -49,6 +49,7 @@ export default function TransactionModal({
     currency,
     amountUsd,
     usdRate,
+    usdConversionError,
     tickerDirect,
     setTickerDirect,
     tickerQuery,
@@ -108,6 +109,11 @@ export default function TransactionModal({
   });
 
   const handleSubmit = () => {
+    const conversionError = usdConversionError(form.transaction_type);
+    if (conversionError) {
+      setFormError(conversionError);
+      return;
+    }
     const result = transactionSchema.safeParse({
       transaction_type: form.transaction_type,
       amount: form.amount,

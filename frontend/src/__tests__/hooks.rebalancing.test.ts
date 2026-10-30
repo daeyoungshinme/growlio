@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
@@ -1077,5 +1077,24 @@ describe("useRebalancingExecution — 매도 수량은 실행 계좌 보유량�
     }
     const sell = result.current.orders.find((o) => o.side === "SELL" && o.ticker === "AAPL");
     expect(sell?.quantity).toBe(5);
+  });
+
+  // 계좌 현금 바만 상한 없이 override 수량으로 매도 대금을 잡아 전체 요약·실제 주문보다 크게 보였다(plans/98 C)
+  it("계좌별 매도 예상 대금도 보유량 기준으로 잡는다", async () => {
+    const { result } = renderHook(
+      () => useRebalancingExecution({ portfolioId: "p1", analysis, accounts: mockKisAccounts }),
+      { wrapper: createWrapper() },
+    );
+    await waitFor(() => expect(result.current.state.priceState).not.toBe("loading"));
+    act(() => {
+      result.current.dispatch({
+        type: "PRICES_DONE",
+        krw: { AAPL: 200000 },
+        usd: {},
+        usdRate: null,
+      });
+      result.current.dispatch({ type: "SET_QTY_AND_SELECT", key: "sell_AAPL_acc1", qty: 100 });
+    });
+    expect(result.current.getCashAnalysis("acc1").sellProceeds).toBe(5 * 200000);
   });
 });

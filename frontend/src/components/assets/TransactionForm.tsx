@@ -8,8 +8,8 @@ import {
   type Transaction,
   type TransactionCreate,
 } from "@/api/transactions";
-import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useForm } from "@/hooks/useForm";
+import { useUsdAmountInput } from "@/hooks/useUsdAmountInput";
 import { formatUsdAsKrw, fmtKrwPreview, localToday } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
@@ -41,7 +41,6 @@ interface Props {
 
 export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Props) {
   const qc = useQueryClient();
-  const usdRate = useExchangeRate();
 
   const initial: TransactionCreate = editingTx
     ? {
@@ -56,8 +55,8 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
     : makeEmptyForm();
 
   const { form, set: setField } = useForm<TransactionCreate>(initial);
-  const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
-  const [amountUsd, setAmountUsd] = useState(0);
+  const { currency, amountUsd, usdRate, switchCurrency, changeUsd, reset, conversionError } =
+    useUsdAmountInput(form.amount, (krw) => setField("amount", krw));
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof TransactionFormData, string>>
   >({});
@@ -93,9 +92,9 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // USD 입력은 환율로 원화 환산해야 amount가 갱신된다 — 환율 없이 제출하면 이전 원화 값이 저장됐다(plans/95 F3)
-    if (currency === "USD" && form.transaction_type === "DIVIDEND" && !usdRate) {
-      setFieldErrors({ amount: "환율 정보를 불러오지 못해 달러 금액을 원화로 환산할 수 없습니다" });
+    const usdError = conversionError(form.transaction_type);
+    if (usdError) {
+      setFieldErrors({ amount: usdError });
       return;
     }
     const result = transactionSchema.safeParse({
@@ -146,8 +145,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
               onClick={() => {
                 setField("transaction_type", t);
                 setField("ticker", "");
-                setCurrency("KRW");
-                setAmountUsd(0);
+                reset();
               }}
               className={`flex-1 py-3 text-sm font-medium rounded-lg border transition-colors ${
                 form.transaction_type === t
@@ -202,12 +200,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                     <button
                       key={c}
                       type="button"
-                      onClick={() => {
-                        setCurrency(c);
-                        setAmountUsd(0);
-                        // 통화를 바꾸면 이전 통화 기준 원화 금액이 남지 않게 함께 비운다
-                        setField("amount", 0);
-                      }}
+                      onClick={() => switchCurrency(c)}
                       className={`px-2.5 py-2 rounded transition-colors ${currency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"}`}
                     >
                       {c}
@@ -224,11 +217,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                     type="number"
                     inputMode="decimal"
                     value={amountUsd || ""}
-                    onChange={(e) => {
-                      const usd = parseFloat(e.target.value) || 0;
-                      setAmountUsd(usd);
-                      if (usdRate) setField("amount", Math.round(usd * usdRate));
-                    }}
+                    onChange={(e) => changeUsd(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
                     step="0.01"
                     min={0}

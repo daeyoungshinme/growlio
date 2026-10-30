@@ -12,7 +12,7 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_API_DOMAIN=$VITE_API_DOMAIN
 RUN npm run build
 
-FROM nginx:alpine AS runtime
+FROM nginx:1.29-alpine AS runtime
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 EXPOSE 80
