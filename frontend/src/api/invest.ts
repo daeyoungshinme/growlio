@@ -132,6 +132,8 @@ export interface FxTranche {
 
 export interface FxPlanData {
   position: FxPosition | null;
+  /** false = 실시간 환율이 없어 1년 일봉 마지막 종가 기준 */
+  rate_is_live: boolean;
   status: FxPlanStatus;
   portfolio_id: string | null;
   portfolio_name: string | null;

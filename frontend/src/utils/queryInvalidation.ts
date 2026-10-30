@@ -3,7 +3,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 
 // actionItems(홈 "지금 할 일")는 드리프트·예수금·세금·챌린지·알림 설정을 모두 읽으므로 그 원천 무효화 함수마다 함께 지운다.
 
-/** 계좌 sync 후 — accounts(last_synced_at/last_sync_error·예수금 등 갱신) + portfolio + dashboard + 배당 데이터 + 인사이트 + 드리프트 + 목표 추천 */
+/** 계좌 sync 후 — accounts(last_synced_at/last_sync_error·예수금 등 갱신) + portfolio + dashboard + 배당 데이터 + 인사이트 + 드리프트 + 목표 추천 + 환전 계획(달러 예수금) */
 export function invalidateSyncData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
@@ -25,11 +25,13 @@ export function invalidateSyncData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
     // 목표 역산 추천·후보 중복 점검("보유 중" 표시)이 보유 포지션 기준 — 백엔드 sync도 같은 캐시를 지운다
     qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
+    // 환전 계획의 보유 달러는 계좌 deposit_usd 합 (plans/97 B2)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
 
-/** 계좌 CUD 후 — accounts + portfolio + dashboard + transactions + 목표 추천
+/** 계좌 CUD 후 — accounts + portfolio + dashboard + transactions + 목표 추천 + 환전 계획
  * (현금성 계좌 잔액 수정 시 백엔드가 입출금 거래를 자동 생성할 수 있음) */
 export function invalidateAccountData(qc: QueryClient) {
   return Promise.all([
@@ -55,6 +57,8 @@ export function invalidateAccountData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
+    // 환전 계획의 보유 달러는 계좌 deposit_usd 합 (plans/97 B2)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
   ]);
 }
@@ -122,6 +126,8 @@ export function invalidatePortfolioData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingStrategyBase }),
+    // 환전 계획은 목표 비중의 해외 몫·연결 계좌를 읽는다 (plans/97 B2)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
     // 알림 목록은 포트폴리오 이름을, 기대지표 미리보기는 목표 비중을 담는다 (plans/62 C2·77 C2).
     // stale 표시만 한다 — 적용 직후 확인창이 열린 채 무거운 기대지표 재계산을 기다리지 않게(다음 마운트 때 조회)
@@ -183,6 +189,8 @@ export function invalidateRebalancingAlertData(qc: QueryClient, portfolioId: str
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlert(portfolioId) }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlertsByAccount(portfolioId) }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+    // 환전 계획의 기본 포트폴리오는 적립 자동매수 알림을 따른다 (plans/97 B2)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
     // drift-summary의 "알림 설정됨"·이탈 기준이 알림 설정을 따른다 — 저장 후 "알림 미설정"이 남던 문제 (plans/62 C1)
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
   ]);
