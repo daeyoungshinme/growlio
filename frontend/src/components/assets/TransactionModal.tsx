@@ -180,7 +180,8 @@ export default function TransactionModal({
         <div className="grid grid-cols-2 gap-3">
           {/* 금액 */}
           <div>
-            <div className="flex items-center justify-between h-5">
+            {/* 모바일 통화 토글(36px)이 h-5에 갇혀 아래 입력칸을 덮지 않게 최소 높이만 둔다 (plans/99 C) */}
+            <div className="flex items-center justify-between min-h-5">
               <label className="text-xs font-medium text-gray-600 dark:text-gray-400">금액 *</label>
               {form.transaction_type === "DIVIDEND" && (
                 <div className="flex gap-0.5 text-xs">
@@ -189,6 +190,7 @@ export default function TransactionModal({
                       key={c}
                       type="button"
                       onClick={() => handleCurrencySwitch(c)}
+                      aria-pressed={currency === c}
                       className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-1.5 rounded transition-colors ${
                         currency === c
                           ? "bg-blue-600 text-white"

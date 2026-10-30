@@ -1,9 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { AssetAccount } from "@/api/assets";
-import { KisBalanceResponse, fetchAllBrokerBalances, fetchBrokerBalance } from "@/api/rebalancing";
+import {
+  KisBalancePosition,
+  KisBalanceResponse,
+  fetchAllBrokerBalances,
+  fetchBrokerBalance,
+} from "@/api/rebalancing";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { toast } from "@/utils/toast";
-import type { ExecutionAction } from "./rebalancingExecution/types";
+import type { BalanceLoadState, ExecutionAction } from "./rebalancingExecution/types";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
 
 const OVERSEAS_UNKNOWN_MSG =
@@ -45,11 +50,11 @@ export function useRebalancingBalances(
     dispatch({ type: "BALANCES_START", accountIds: tradableAccounts.map((a) => a.id) });
     try {
       const responses: KisBalanceResponse[] = await fetchAllBrokerBalances();
-      const balances: Record<string, import("../api/rebalancing").KisBalancePosition[]> = {};
+      const balances: Record<string, KisBalancePosition[]> = {};
       const deposits: Record<string, number> = {};
       const orderables: Record<string, number> = {};
       const overseasUnknown: Record<string, boolean> = {};
-      const states: Record<string, import("./rebalancingExecution/types").BalanceLoadState> = {};
+      const states: Record<string, BalanceLoadState> = {};
       responses.forEach((res) => {
         if (res.error) {
           states[res.account_id] = "error";

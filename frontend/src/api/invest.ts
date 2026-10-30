@@ -104,7 +104,8 @@ export const fetchGoalFeasibility = (params: {
 // ── 달러 환전 계획(plans/96) — 예측이 아닌 1년 통계적 위치 + 해외 적립 필요 달러 분할 ──
 
 export type FxZone = "CHEAP" | "NEUTRAL" | "EXPENSIVE";
-export type FxPlanStatus = "OK" | "SUFFICIENT" | "NO_DEPOSIT_GOAL" | "NO_OVERSEAS" | "NO_PORTFOLIO";
+export type FxPlanStatus =
+  "OK" | "SUFFICIENT" | "NO_DEPOSIT_GOAL" | "NO_OVERSEAS" | "NO_PORTFOLIO" | "NO_RATE";
 
 export interface FxPosition {
   rate: number;

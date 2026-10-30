@@ -35,7 +35,7 @@ from app.utils.metrics import rebalancing_execution_count
 logger = structlog.get_logger()
 
 
-async def _load_account(
+async def load_executable_account(
     account_id: uuid.UUID,
     user_id: uuid.UUID,
     db: AsyncSession,
@@ -52,7 +52,7 @@ async def _load_account(
     return account
 
 
-def _load_credentials(account: AssetAccount) -> tuple[str, str]:
+def load_kis_credentials(account: AssetAccount) -> tuple[str, str]:
     """KIS 계좌 자격증명 로드. 미설정 시 400 에러."""
     creds = decrypt_kis_credentials(account)
     if creds is None:
@@ -63,7 +63,7 @@ def _load_credentials(account: AssetAccount) -> tuple[str, str]:
     return creds
 
 
-def _load_kiwoom_credentials(account: AssetAccount) -> tuple[str, str]:
+def load_kiwoom_credentials(account: AssetAccount) -> tuple[str, str]:
     """키움 계좌 자격증명 로드 (전역 폴백 없음)."""
     creds = decrypt_kiwoom_credentials(account)
     if creds is None:
@@ -316,10 +316,10 @@ async def _execute_kiwoom_account_orders(
     is_mock: bool,
 ) -> list[OrderResult]:
     """키움 계좌: 매도(보유수량 clamp) → 매수 순으로 주문을 실행한다."""
-    app_key, app_secret = _load_kiwoom_credentials(account)
+    app_key, app_secret = load_kiwoom_credentials(account)
     account_no = account.kiwoom_account_no
     if account_no is None:
-        # _load_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적
+        # load_executable_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적
         raise HTTPException(status_code=400, detail="키움 계좌번호가 설정되지 않았습니다.")
     access_token = await kiwoom_get_access_token(
         app_key,
@@ -377,10 +377,10 @@ async def _execute_kis_account_orders(
     strategy: str,
 ) -> list[OrderResult]:
     """KIS 계좌: strategy가 TWO_PHASE면 예수금→매도→잔여매수 3단계, 아니면 매도(clamp)→매수 순으로 실행한다."""
-    app_key, app_secret = _load_credentials(account)
+    app_key, app_secret = load_kis_credentials(account)
     account_no = account.kis_account_no
     if account_no is None:
-        # _load_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적
+        # load_executable_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적
         raise HTTPException(status_code=400, detail="KIS 계좌번호가 설정되지 않았습니다.")
 
     access_token = await get_access_token(
@@ -439,7 +439,7 @@ async def _execute_account_group(
 ) -> ExecutionResult:
     """단일 계좌 그룹의 주문을 실행하고 ExecutionResult를 반환한다."""
     acc_uuid = uuid.UUID(acc_id_str)
-    account = await _load_account(acc_uuid, user_id, db)
+    account = await load_executable_account(acc_uuid, user_id, db)
     is_mock = account.is_mock_mode
     group_orders, blocked = _split_tax_deferred_overseas_buys(account, group_orders)
 

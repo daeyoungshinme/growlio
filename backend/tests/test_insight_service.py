@@ -248,6 +248,33 @@ class TestGenerateInsights:
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("failing", ["dashboard", "checker"])
+    async def test_degraded_result_cached_briefly(self, mock_db, override_settings, failing):
+        """일부 실패로 줄어든 목록은 1시간이 아니라 짧게만 캐싱한다 (plans/99 A3)."""
+        from app.services.insight_service import generate_insights
+        from app.utils.cache_keys import TTL_INSIGHTS, TTL_MARKET_SIGNAL_DEGRADED
+
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        dashboard = (
+            AsyncMock(side_effect=RuntimeError("db"))
+            if failing == "dashboard"
+            else AsyncMock(return_value={"total_assets_krw": 0, "asset_allocation": []})
+        )
+        rebalancing = AsyncMock(side_effect=RuntimeError("x")) if failing == "checker" else AsyncMock(return_value=[])
+        with (
+            patch("app.services.insight_service.get_dashboard_summary", new=dashboard),
+            patch("app.services.insight_service._check_rebalancing_opportunity", new=rebalancing),
+            patch("app.services.insight_service._check_tax_loss_harvest", new=AsyncMock(return_value=[])),
+            patch("app.services.insight_service.set_cached_json", new=AsyncMock()) as set_cached,
+        ):
+            await generate_insights(uuid.uuid4(), mock_db, cache=cache)
+
+        ttl = set_cached.call_args.args[3]
+        assert ttl == TTL_MARKET_SIGNAL_DEGRADED
+        assert ttl < TTL_INSIGHTS
+
+    @pytest.mark.asyncio
     async def test_force_refresh_bypasses_cache(self, mock_db, override_settings):
         import json
 

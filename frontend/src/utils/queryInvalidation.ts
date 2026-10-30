@@ -150,8 +150,15 @@ export function invalidateTacticalData(
     qc.invalidateQueries({ queryKey: QUERY_KEYS.tacticalBacktestBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
     ...(opts.portfolioChanged ? [invalidatePortfolioData(qc)] : []),
-    // 전술 연동 자동매수를 끄면 서버가 그 알림을 일반 모드로 되돌린다
-    ...(opts.dcaLinked ? [qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts })] : []),
+    // 전술 연동 자동매수를 끄면 서버가 그 알림을 일반 모드로 되돌린다 — 포트폴리오·계좌별 알림 캐시까지 비워야
+    // 모달이 옛 TACTICAL 값을 다시 저장하지 않는다 (plans/99 B2). 환전 계획 기본 포트폴리오도 이 알림을 따른다
+    ...(opts.dcaLinked
+      ? [
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlertBase }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
+        ]
+      : []),
   ]);
 }
 

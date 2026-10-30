@@ -123,6 +123,40 @@ class TestKISProviderSync:
         assert result.positions[0].ticker == "005930"
 
     @pytest.mark.asyncio
+    async def test_sync_overseas_converts_with_shared_rate_not_quote(self, override_settings, make_account, mock_cache):
+        """해외 환산은 공용 환율을 쓴다 — 시세 TR의 output.rate(등락률 %)를 환율로 쓰던 버그 회귀 (plans/99 A1)."""
+        account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
+        provider = KISProvider()
+
+        with (
+            patch("app.providers.kis_provider.decrypt", side_effect=["key", "secret"]),
+            patch("app.providers.kis_provider.get_access_token", new=AsyncMock(return_value="token-1")),
+            patch(
+                "app.providers.kis_provider.get_domestic_balance",
+                new=AsyncMock(return_value=_domestic_balance()),
+            ),
+            patch(
+                "app.providers.kis_provider.get_overseas_balance",
+                new=AsyncMock(return_value=_overseas_balance()),
+            ),
+            patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch(
+                "app.kis.overseas_quote.kis_request",
+                new=AsyncMock(return_value={"output": {"last": "200", "rate": "1.25"}}),
+            ) as quote_request,
+            patch(
+                "app.providers._overseas_name_enrichment.resolve_ticker_meta",
+                new=AsyncMock(return_value=("Apple Inc.", "NASDAQ")),
+            ),
+        ):
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
+
+        quote_request.assert_not_called()
+        aapl = next(p for p in result.positions if p.ticker == "AAPL")
+        assert aapl.avg_price == 150.0 * 1300.0
+        assert result.total_value_krw == 1_100_000.0 + (1_000.0 + 100.0) * 1300.0
+
+    @pytest.mark.asyncio
     async def test_sync_overseas_failure_marks_overseas_unknown(self, override_settings, make_account, mock_cache):
         """해외 잔고 조회 실패 → deposit_foreign=None, overseas_known=False (asset_service가 해외 포지션 보존)."""
         account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
@@ -215,10 +249,6 @@ class TestKISProviderSync:
                 new=AsyncMock(return_value=_overseas_balance()),
             ),
             patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
-            patch(
-                "app.providers.kis_provider.get_overseas_price",
-                new=AsyncMock(side_effect=Exception("quote unavailable")),
-            ),
             patch(
                 "app.providers._overseas_name_enrichment.resolve_ticker_meta",
                 new=AsyncMock(return_value=("Apple Inc.", "NASDAQ")),

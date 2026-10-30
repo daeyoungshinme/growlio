@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+import warnings
 from enum import StrEnum
 
 import structlog
@@ -70,11 +71,15 @@ async def deliver_push(
     try:
         from firebase_admin import messaging
 
-        message = messaging.Message(
-            notification=messaging.Notification(title=title, body=body),
-            token=fcm_token,
-            data=data or {},
-        )
+        # firebase-admin 7.x는 token을 deprecated로 경고하지만 대체 인자 fid는 Firebase 설치 ID다 — 저장 값은
+        # Capacitor "registration" 리스너가 준 FCM 등록 토큰이라 fid로 바꾸면 발송이 깨진다 (plans/99 A7)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Message.token is deprecated", category=DeprecationWarning)
+            message = messaging.Message(
+                notification=messaging.Notification(title=title, body=body),
+                token=fcm_token,
+                data=data or {},
+            )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, lambda: messaging.send(message, app=app))
         logger.info("push_sent")

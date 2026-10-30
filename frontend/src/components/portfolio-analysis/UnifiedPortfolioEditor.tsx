@@ -19,6 +19,7 @@ import CollapsibleSection from "@/components/common/CollapsibleSection";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { CASH_TICKER } from "@/constants/assets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { PortfolioOverview } from "@/types";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -133,8 +134,9 @@ export default function UnifiedPortfolioEditor({
     queryKey: QUERY_KEYS.indexGroupSuggestions(suggestionAccountIds),
     queryFn: () => fetchIndexGroupSuggestions(suggestionAccountIds),
     // 보유 종목이 바뀌었거나 이전 응답이 남아 있을 수 있어 항상 새로 받는다(서버는 overview·ETF 프로필 캐시 재사용)
-    staleTime: 0,
-    enabled: groupPickerOpen || hasGroupItems,
+    staleTime: STALE_TIME.NONE,
+    // 계좌를 모두 해제하면 빈 목록은 파라미터 없이 나가 전체 계좌 기준 제안이 온다 — 조회하지 않는다 (plans/99 B3)
+    enabled: (groupPickerOpen || hasGroupItems) && suggestionAccountIds?.length !== 0,
   });
   const suggestionByKey = new Map((groupSuggestions.data?.groups ?? []).map((g) => [g.key, g]));
 

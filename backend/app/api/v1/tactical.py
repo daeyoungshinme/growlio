@@ -24,7 +24,12 @@ from app.models.user import User
 from app.schemas.portfolio import IndexGroupSuggestion
 from app.schemas.tactical import TacticalApplyRequest, TacticalStrategyUpsert
 from app.services.tactical import tactical_allocation_service as tactical
-from app.utils.cache_keys import invalidate_rebalancing_analysis_cache, invalidate_user_caches, portfolio_list_key
+from app.utils.cache_keys import (
+    insights_key,
+    invalidate_rebalancing_analysis_cache,
+    invalidate_user_caches,
+    portfolio_list_key,
+)
 from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/tactical", tags=["tactical"])
@@ -241,7 +246,8 @@ async def apply_tactical_weights(
     strategy.notified_regime = strategy.last_regime  # 이미 반영했으니 같은 국면으로 다시 알릴 필요 없음
     await db.commit()
 
-    await invalidate_user_caches(cache, portfolio_list_key(current_user.id))
+    # 홈 인사이트의 리밸런싱 기회도 목표 비중을 읽는다 — 포트폴리오 수정 경로와 같이 비운다 (plans/99 A2)
+    await invalidate_user_caches(cache, portfolio_list_key(current_user.id), insights_key(current_user.id))
     await invalidate_rebalancing_analysis_cache(cache, current_user.id, portfolio_id)
 
     db.expire(portfolio)

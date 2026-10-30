@@ -64,6 +64,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import MAX_GOAL_CANDIDATE_TICKERS
 from app.core.database import AsyncSessionLocal
+from app.core.job_runner import report_handled_failure
 from app.enums import AccountTaxType
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation, PortfolioExpectedMetrics
@@ -227,7 +228,8 @@ async def refresh_recommendation_in_background(
             async with AsyncSessionLocal() as db:
                 await recompute(db, gen)
         except Exception as e:
-            logger.warning(failure_event, user_id=str(user_id), error=str(e))
+            # stale 결과가 남아 사용자는 모른다 — 반복 실패를 알 수 있게 Sentry로 보낸다 (plans/99 A5)
+            report_handled_failure(failure_event, e, user_id=str(user_id))
 
 
 async def refresh_goal_recommendation_in_background(user_id: uuid.UUID, cache: CacheStoreType) -> None:

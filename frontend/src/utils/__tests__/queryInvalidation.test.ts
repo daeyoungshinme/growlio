@@ -137,9 +137,11 @@ describe("invalidateTacticalData", () => {
 
     const linked = makeQueryClient();
     await invalidateTacticalData(linked as any, { dcaLinked: true });
-    expect(linked.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0])).toContain(
-      "rebalancing-alerts",
-    );
+    const linkedKeys = linked.invalidateQueries.mock.calls.map((c) => c[0].queryKey);
+    expect(linkedKeys.map((k) => k[0])).toContain("rebalancing-alerts");
+    // 포트폴리오·계좌별 알림 캐시(["rebalancing-alert", pid, ...])를 prefix로 덮는다 (plans/99 B2)
+    expect(linkedKeys).toContainEqual(["rebalancing-alert"]);
+    expect(linkedKeys).toContainEqual(["fx-plan"]);
   });
 });
 

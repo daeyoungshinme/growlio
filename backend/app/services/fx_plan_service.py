@@ -26,7 +26,7 @@ from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import UserSettings
 from app.services.accounts._account_queries import active_broker_accounts_stmt
-from app.services.dca_cash_shortfall_service import _DCA_AUTO_BUY_PRESET, buy_market
+from app.services.dca_cash_shortfall_service import DCA_AUTO_BUY_PRESET, buy_market
 from app.utils.cache_keys import (
     TTL_USD_KRW_HISTORY,
     CacheStoreType,
@@ -203,7 +203,7 @@ async def _pick_portfolio(
         .where(
             RebalancingAlert.user_id == user_id,
             RebalancingAlert.is_active == True,
-            *(getattr(RebalancingAlert, field) == value for field, value in _DCA_AUTO_BUY_PRESET.items()),
+            *(getattr(RebalancingAlert, field) == value for field, value in DCA_AUTO_BUY_PRESET.items()),
         )
         .limit(1)
     )
@@ -272,6 +272,12 @@ async def get_fx_plan(
     )
     if not monthly_deposit or float(monthly_deposit) <= 0:
         result["status"] = "NO_DEPOSIT_GOAL"
+        return result
+
+    # 실시간·캐시 환율도 1년 종가도 없으면 live_rate는 설정 fallback(1300)이다 — 그 값으로 달러를 계산하면
+    # 실제 수치처럼 보인다 (plans/99 A6)
+    if not rate_is_live and not closes:
+        result["status"] = "NO_RATE"
         return result
 
     monthly_need_usd = float(monthly_deposit) * overseas_pct / 100 / live_rate

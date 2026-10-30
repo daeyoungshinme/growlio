@@ -1,16 +1,17 @@
 import { useState, type ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchFxPlan, type FxPlanData, type FxZone } from "@/api/invest";
 import { createExchangeRateAlert, fetchExchangeRateAlerts } from "@/api/alerts";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
-import { INPUT_SM } from "@/constants/inputStyles";
+import { SELECT_SM } from "@/constants/inputStyles";
+import { STALE_TIME } from "@/constants/queryConfig";
 import Tabs from "@/components/common/Tabs";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { fmtKrw, fmtPct, clampPct } from "@/utils/format";
 import { invalidateAlertData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
-import { extractErrorMessage } from "@/utils/error";
+import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 
 const MONTH_OPTIONS = ["1개월", "3개월", "6개월"] as const;
 type MonthOption = (typeof MONTH_OPTIONS)[number];
@@ -58,6 +59,7 @@ function PositionBlock({ position }: { position: NonNullable<FxPlanData["positio
       <div>
         <div
           className="relative h-2 rounded-full bg-gradient-to-r from-emerald-200 via-gray-200 to-rose-200 dark:from-emerald-900 dark:via-gray-700 dark:to-rose-900"
+          role="img"
           aria-label={`1년 범위 중 현재 위치 ${markerPct.toFixed(0)}%`}
         >
           <span
@@ -102,10 +104,12 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
   const [portfolioId, setPortfolioId] = useState<string | null>(null);
   const months = MONTHS[monthOption];
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: QUERY_KEYS.fxPlan(months, portfolioId),
     queryFn: () => fetchFxPlan(months, portfolioId),
-    staleTime: 5 * 60_000,
+    staleTime: STALE_TIME.FIVE_MINUTES,
+    // 월 탭·포트폴리오를 바꿀 때 카드 전체가 스켈레톤으로 바뀌며 탭 포커스가 사라지지 않게 (plans/99 B1)
+    placeholderData: keepPreviousData,
   });
   const { data: alerts } = useQuery({
     queryKey: QUERY_KEYS.exchangeRateAlerts,
@@ -122,8 +126,9 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
     .filter((r): r is number => r !== null);
   const pendingTargets = targets.filter((r) => !registered.has(r));
 
-  // 고른 포트폴리오가 삭제되면 404가 계속 남는다 — 자동 선택으로 되돌린다 (plans/97 B3)
-  if (isError && portfolioId) setPortfolioId(null);
+  // 고른 포트폴리오가 삭제되면 404가 계속 남는다 — 자동 선택으로 되돌린다 (plans/97 B3).
+  // 일시적인 5xx·네트워크 오류에는 사용자의 선택을 지우지 않는다 (plans/99 B1)
+  if (isError && portfolioId && getHttpStatus(error) === 404) setPortfolioId(null);
 
   const registerMutation = useMutation({
     mutationFn: async () => {
@@ -155,6 +160,29 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
     );
   }
 
+  // 선택한 포트폴리오가 후보(해외 종목 보유)에서 빠졌어도 선택 상태를 보여 준다
+  const pickerOptions =
+    data.portfolio_id && !data.portfolio_options.some((o) => o.id === data.portfolio_id)
+      ? [
+          { id: data.portfolio_id, name: data.portfolio_name ?? "선택한 포트폴리오" },
+          ...data.portfolio_options,
+        ]
+      : data.portfolio_options;
+  const portfolioPicker = pickerOptions.length > 1 && (
+    <select
+      aria-label="포트폴리오 선택"
+      className={SELECT_SM}
+      value={data.portfolio_id ?? ""}
+      onChange={(e) => setPortfolioId(e.target.value)}
+    >
+      {pickerOptions.map((o) => (
+        <option key={o.id} value={o.id}>
+          {o.name}
+        </option>
+      ))}
+    </select>
+  );
+
   return wrap(
     <>
       {data.position ? (
@@ -172,9 +200,22 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
         </p>
       )}
 
-      {data.status === "NO_PORTFOLIO" || data.status === "NO_OVERSEAS" ? (
+      {/* 고른 포트폴리오가 NO_OVERSEAS가 돼도 다른 후보로 옮길 수 있게 상태와 무관하게 보인다 (plans/99 B1) */}
+      {data.status !== "OK" && data.status !== "SUFFICIENT" && portfolioPicker}
+
+      {data.status === "NO_PORTFOLIO" ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           해외 종목이 들어 있는 포트폴리오가 없어 환전 계획을 세우지 않았습니다.
+        </p>
+      ) : data.status === "NO_OVERSEAS" ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {data.portfolio_options.length > 0
+            ? "선택한 포트폴리오에 해외 종목이 없습니다. 다른 포트폴리오를 골라 주세요."
+            : "해외 종목이 들어 있는 포트폴리오가 없어 환전 계획을 세우지 않았습니다."}
+        </p>
+      ) : data.status === "NO_RATE" ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          환율을 불러오지 못해 필요한 달러를 계산하지 않았습니다. 잠시 후 다시 시도해 주세요.
         </p>
       ) : data.status === "NO_DEPOSIT_GOAL" ? (
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500 dark:text-gray-400">
@@ -198,20 +239,7 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
               variant="pill"
               fullWidth
             />
-            {data.portfolio_options.length > 1 && (
-              <select
-                aria-label="포트폴리오 선택"
-                className={INPUT_SM}
-                value={data.portfolio_id ?? ""}
-                onChange={(e) => setPortfolioId(e.target.value)}
-              >
-                {data.portfolio_options.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
-            )}
+            {portfolioPicker}
           </div>
 
           <p className="text-sm text-gray-600 dark:text-gray-300">

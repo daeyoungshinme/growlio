@@ -275,6 +275,14 @@ async def test_plan_uses_last_close_when_rate_not_live():
     assert result["monthly_need_usd"] == round(1_400_000 * 0.6 / closes[-1], 2)
 
 
+async def test_plan_no_rate_when_neither_live_nor_history():
+    """환율도 종가도 없으면 fallback 1300으로 달러를 계산하지 않는다 (plans/99 A6)."""
+    result = await _plan(_db([_portfolio()]), closes=None, rate=1300.0, rate_is_live=False)
+    assert result["status"] == "NO_RATE"
+    assert result["need_usd"] == 0.0
+    assert result["tranches"] == []
+
+
 async def test_plan_rate_is_live_flag_default():
     result = await _plan(_db([_portfolio()]), closes=_closes())
     assert result["rate_is_live"] is True

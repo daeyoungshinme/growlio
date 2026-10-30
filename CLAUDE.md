@@ -64,8 +64,8 @@ make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
 make format           # ruff format + ruff --fix (backend) + prettier --write (frontend)
 make format-backend   # ruff format + ruff --fix (backend만)
 make db-reset         # docker compose down -v + up + migrate (**데이터 전체 삭제** — 개발 환경 전용)
-make build-android-debug    # npm build + cap sync + gradlew assembleDebug
-make build-android-release  # npm build + cap sync + gradlew assembleRelease
+make build-android-debug    # npm build + cap sync + gradlew assembleDebug (gradlew.bat 호출 — Windows 전용)
+make build-android-release  # npm build + cap sync + gradlew assembleRelease (Windows 전용)
 # Android 빌드 전제: JDK 21+, Android Studio (SDK 설치 포함) 필요
 ```
 
@@ -100,7 +100,7 @@ growlio/
 - **실제 운영 배포**: 백엔드는 `render.yaml`(Render, Docker runtime) — 프론트엔드는 `frontend/vercel.json`(Vercel)이 실제 배포 경로. `vercel.json`이 `/api/*` → Render 백엔드로 rewrite하고, CSP를 포함한 보안 헤더도 여기서 설정됨(**`nginx.conf`가 아님** — 보안 헤더 수정은 반드시 `vercel.json`에). 새 API prefix 추가 시 `frontend/vercel.json`의 `rewrites`도 함께 확인.
 - `nginx/` + `docker-compose.yml` — 위 Render/Vercel 조합을 쓰지 않고 자체 서버에 통째로 호스팅할 때를 위한 대안 구성(포트 80 리버스 프록시, `/api/*` → backend:8000, 그 외 → frontend 정적파일). 현재 운영에서는 사용하지 않음. 이 경로를 실제로 쓰게 되면 `nginx/nginx.conf`의 `location` 블록도 새 API prefix에 맞춰 수정 필요.
 - `monitoring/` — Prometheus 설정(`prometheus.yml`) + Grafana 대시보드. `docker compose --profile monitoring up -d` 로 실행 (Prometheus `:9090`, Grafana `:3000`).
-- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build, push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (10분마다 운영 백엔드 `/health` 호출).
+- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build + 이미지 빌드 스모크 `docker-build` + 보안 스캔(TruffleHog·bandit·pip-audit·npm audit), push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (10분마다 운영 백엔드 `/health` 호출).
 - **Render 무료 플랜 슬립 주의**: 15분 무요청 시 백엔드가 잠들면 같은 프로세스의 스케줄러(AUTO 리밸런싱·알림·일일 동기화)도 멈춘다. `keep-alive.yml`은 GitHub 스로틀로 실제 2~9시간 간격이라 사실상 효과 없음 — 외부 핑 서비스 필요 — 상세는 `backend/CLAUDE.md`의 "스케줄러 실행 제약".
 
 ---
@@ -143,6 +143,6 @@ make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.co
 - `make migrate`가 Supabase(nestlio와 `public` 스키마 공유) DB에서 버전 충돌/실패: growlio는 alembic 버전 포인터를 기본 `alembic_version`이 아닌 `growlio_alembic_version`에 저장함(`backend/alembic/env.py`의 `VERSION_TABLE`). 전환 이전부터 있던 기존 DB라면 `alembic upgrade head` 전에 `python backend/scripts/bootstrap_alembic.py` 1회 실행 필요(멱등, 신규 DB는 무동작) — `render.yaml`의 `preDeployCommand`도 이 순서. 상세는 `backend/CLAUDE.md` 참고
 - `dev.sh`는 기본적으로 8000/5173 포트를 점유한 이전(좀비) 프로세스를 강제 종료 후 재기동함. 다른 세션에서 의도적으로 띄워둔 백엔드까지 종료되는 게 문제라면 `bash dev.sh --keep-port`(또는 `make dev-keep-port`) 사용 — 8000이 사용 중이면 종료하지 않고 다음 빈 포트로 대신 구동, 프론트엔드 Vite 프록시도 자동으로 그 포트를 따라감
 - 백엔드(8000)만 뜨고 `localhost:5173` 연결 불가: dev.sh를 `Git\usr\bin\bash.exe`로 직접 실행하면 `/usr/bin`이 PATH에 없어 npm이 실패함 — dev.sh가 PATH를 자동 보정하므로, 재발 시 dev.sh 상단의 PATH 보정 블록을 먼저 확인
-- alembic revision 생성 후 반드시 `alembic/env.py`에 새 모델 import 추가 (누락 시 autogenerate에서 모델 인식 못함)
+- 새 모델은 `backend/app/models/__init__.py`에 import 추가 — `alembic/env.py`는 `import app.models`로 패키지만 읽음 (누락 시 autogenerate가 모델 인식 못함)
 - pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인
 - **동시 세션 작업**: 이 저장소는 여러 창/세션에서 병행 작업되는 경우가 잦음 — 계획 수립·구현 도중 `git status`가 대화 시작 시점과 달라져 있다면 다른 세션의 진행 중 작업일 가능성이 높음. 무시하거나 되돌리지 말고 먼저 `git diff`로 변경 내용을 확인할 것

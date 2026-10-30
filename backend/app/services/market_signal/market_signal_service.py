@@ -22,7 +22,9 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
 
+from app.core.job_runner import report_handled_failure
 from app.services.market_signal.market_signal_indicators import (
     fetch_cpi_inflation_signal,
     fetch_dollar_index_signal,
@@ -150,7 +152,12 @@ async def get_confirmed_composite_level(cache: CacheStore | None, db: AsyncSessi
     try:
         return await _resolve_confirmed_level(cache, db)
     except Exception as exc:
-        logger.warning("market_signal_confirmed_level_fetch_failed", error=str(exc))
+        report_handled_failure("market_signal_confirmed_level_fetch_failed", exc)
+        # durable 조회·저장이 DB 오류로 실패하면 세션이 aborted로 남아 호출자(전술 GET·국면 잡)의 다음 commit이
+        # 깨진다. DB 오류가 아니면 세션은 멀쩡하고 호출자(계획 실행 등)의 미커밋 변경이 있을 수 있어
+        # 되돌리지 않는다 (plans/99 A4)
+        if isinstance(exc, SQLAlchemyError):
+            await db.rollback()
         return "GREEN", "STALE"
 
 
