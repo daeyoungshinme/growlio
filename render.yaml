@@ -36,3 +36,11 @@ services:
         sync: false
       - key: FRED_API_KEY
         sync: false
+      # 아래 셋은 선택 — 비우면 Sentry·FCM 푸시 비활성, 마이그레이션은 DATABASE_URL 사용.
+      # Sentry release는 Render가 주입하는 RENDER_GIT_COMMIT으로 자동 설정된다(config.py)
+      - key: SENTRY_DSN
+        sync: false
+      - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
+      - key: MIGRATION_DATABASE_URL
+        sync: false

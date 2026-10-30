@@ -9,6 +9,15 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# 잡에 permissions가 없으면 저장소 기본 토큰 권한을 받는다 — 최소 권한을 기본으로 두고 필요한 잡만 넓힌다
+permissions:
+  contents: read
+
+# 같은 PR에 새 커밋이 오면 이전 실행을 취소한다(main push는 끝까지 실행)
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   backend:
     name: Backend — lint, typecheck, test
@@ -79,8 +88,18 @@ jobs:
       - name: Rollback check (alembic downgrade -1)
         run: .venv/bin/alembic downgrade -1
 
+      # 보안 스캔은 테스트 앞에 둔다 — 뒤에 두면 테스트가 하나만 실패해도 건너뛰어 결과가 안 보였다
+      - name: Security scan (bandit)
+        run: .venv/bin/bandit -r app/ -l -q
+
+      # 차단 단계 — continue-on-error로 두었을 때 69건이 쌓여도 아무도 보지 못했다(계획 57).
+      # 수정 버전이 아직 없는 항목은 `--ignore-vuln <ID>`로 사유와 함께 명시적으로 제외한다.
+      - name: Dependency vulnerability check (pip-audit)
+        run: .venv/bin/pip-audit --skip-editable
+
+      # 커버리지 게이트 임계값은 pyproject [tool.coverage.report] fail_under 한 곳에서만 관리한다
       - name: Test (pytest + coverage)
-        run: .venv/bin/pytest -x -v --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=89
+        run: .venv/bin/pytest -x -v --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing
 
       - name: Coverage comment (PR only)
         if: github.event_name == 'pull_request'
@@ -93,14 +112,6 @@ jobs:
           create-new-comment: false
           default-branch: main
           report-only-changed-files: true
-
-      - name: Security scan (bandit)
-        run: .venv/bin/bandit -r app/ -l -q
-
-      # 차단 단계 — continue-on-error로 두었을 때 69건이 쌓여도 아무도 보지 못했다(계획 57).
-      # 수정 버전이 아직 없는 항목은 `--ignore-vuln <ID>`로 사유와 함께 명시적으로 제외한다.
-      - name: Dependency vulnerability check (pip-audit)
-        run: .venv/bin/pip-audit --skip-editable
 
   secret-scan:
     name: Secret scan (TruffleHog)

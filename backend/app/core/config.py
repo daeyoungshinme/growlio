@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).parent.parent.parent / ".env"
@@ -71,8 +71,9 @@ class Settings(BaseSettings):
 
     # Sentry 에러 추적 (비어 있으면 비활성화)
     sentry_dsn: str = ""
-    # release 태그 — CI/CD에서 git SHA 등으로 주입. 비어 있으면 미설정
-    sentry_release: str = ""
+    # release 태그 — CI/CD에서 git SHA 등으로 주입. 비어 있으면 미설정.
+    # Render는 SENTRY_RELEASE를 채우지 않으므로 Render가 자동 주입하는 RENDER_GIT_COMMIT으로 폴백한다(plans/95 D)
+    sentry_release: str = Field(default="", validation_alias=AliasChoices("SENTRY_RELEASE", "RENDER_GIT_COMMIT"))
 
     # Prometheus /metrics 엔드포인트 보호 토큰 (비어 있으면 인증 없음)
     metrics_token: str = ""

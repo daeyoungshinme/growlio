@@ -120,6 +120,18 @@ updates:
         update-types:
           - "version-update:semver-major"
 
+  # Dockerfile 베이스 이미지(python·node) — 없으면 아무도 추적하지 않았다. Render가 backend/Dockerfile로 배포한다
+  - package-ecosystem: "docker"
+    directories:
+      - "/backend"
+      - "/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "docker"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
