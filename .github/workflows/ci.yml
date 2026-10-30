@@ -189,7 +189,8 @@ jobs:
           load: true
           tags: growlio-api:ci
           cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+          # 캐시 저장 실패(GHA 캐시 업로드 not_found 등)는 빌드 결과와 무관하다 — 잡을 실패시키지 않는다
+          cache-to: type=gha,mode=max,scope=backend,ignore-error=true
 
       # 이미지는 프로젝트를 설치하지 않는다 — preDeploy의 bootstrap_alembic.py처럼 scripts/에서 실행해도
       # PYTHONPATH로 app 패키지를 찾아야 한다
@@ -214,4 +215,5 @@ jobs:
             VITE_SUPABASE_URL=https://example.supabase.co
             VITE_SUPABASE_ANON_KEY=ci-dummy
           cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
+          # builder 단계 node_modules 레이어까지 올리는 mode=max는 업로드가 깨졌다 — 최종 레이어만 캐시
+          cache-to: type=gha,mode=min,scope=frontend,ignore-error=true
