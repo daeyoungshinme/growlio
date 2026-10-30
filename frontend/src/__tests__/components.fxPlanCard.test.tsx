@@ -120,7 +120,12 @@ describe("FxPlanCard", () => {
   });
 
   it("해외 포트폴리오가 없으면 계획 대신 안내한다", async () => {
-    vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, status: "NO_OVERSEAS", tranches: [] });
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      status: "NO_OVERSEAS",
+      portfolio_options: [],
+      tranches: [],
+    });
     renderWithProviders(<FxPlanCard flat />);
     expect(await screen.findByText(/해외 종목이 들어 있는 포트폴리오가 없어/)).toBeInTheDocument();
   });
@@ -173,7 +178,7 @@ describe("FxPlanCard", () => {
     ];
     vi.mocked(fetchFxPlan).mockImplementation((_months, portfolioId) =>
       portfolioId === "p2"
-        ? Promise.reject(new Error("404"))
+        ? Promise.reject({ response: { status: 404 } })
         : Promise.resolve({ ...plan, portfolio_options: options }),
     );
     renderWithProviders(<FxPlanCard flat />);
@@ -181,5 +186,50 @@ describe("FxPlanCard", () => {
     await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(3, "p2"));
     expect(await screen.findByLabelText("포트폴리오 선택")).toHaveValue("p1");
     expect(screen.queryByText(/환전 계획을 불러오지 못했습니다/)).not.toBeInTheDocument();
+  });
+
+  it("일시적 오류(5xx)에는 고른 포트폴리오를 지우지 않는다", async () => {
+    const options = [
+      { id: "p1", name: "해외 적립" },
+      { id: "p2", name: "연금" },
+    ];
+    vi.mocked(fetchFxPlan).mockImplementation((_months, portfolioId) =>
+      portfolioId === "p2"
+        ? Promise.reject({ response: { status: 503 } })
+        : Promise.resolve({ ...plan, portfolio_options: options }),
+    );
+    renderWithProviders(<FxPlanCard flat />);
+    fireEvent.change(await screen.findByLabelText("포트폴리오 선택"), { target: { value: "p2" } });
+    expect(await screen.findByText(/환전 계획을 불러오지 못했습니다/)).toBeInTheDocument();
+    expect(vi.mocked(fetchFxPlan).mock.calls.filter(([, pid]) => pid === null)).toHaveLength(1);
+  });
+
+  it("고른 포트폴리오에 해외 종목이 없어져도 선택기로 다른 후보를 고를 수 있다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      status: "NO_OVERSEAS",
+      portfolio_id: "p2",
+      portfolio_name: "연금",
+      tranches: [],
+    });
+    renderWithProviders(<FxPlanCard flat />);
+    expect(await screen.findByText(/선택한 포트폴리오에 해외 종목이 없습니다/)).toBeInTheDocument();
+    const picker = screen.getByLabelText("포트폴리오 선택");
+    expect(picker).toHaveValue("p2");
+    fireEvent.change(picker, { target: { value: "p1" } });
+    await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(3, "p1"));
+  });
+
+  it("환율을 못 받으면 달러 계산 대신 안내한다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      position: null,
+      rate_is_live: false,
+      status: "NO_RATE",
+      tranches: [],
+    });
+    renderWithProviders(<FxPlanCard flat />);
+    expect(await screen.findByText(/환율을 불러오지 못해 필요한 달러를/)).toBeInTheDocument();
+    expect(screen.queryByText(/필요$/)).not.toBeInTheDocument();
   });
 });
