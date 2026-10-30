@@ -1,8 +1,12 @@
 import { create } from "zustand";
 import { getSupabase } from "@/lib/supabase";
 import { hasStoredSession, readStoredSession } from "@/lib/storedSession";
-// 인증 부트스트랩(세션 복원·프로필 동기화·401 재시도) 전용이라 도메인 api 모듈을 거치지 않고 client를 직접 쓴다.
-import { api } from "@/api/client";
+import {
+  fetchAuthMe,
+  findAccount as requestFindAccount,
+  markPasswordResetComplete,
+  syncProfile,
+} from "@/api/auth";
 import { getHttpStatus } from "@/utils/error";
 import { BIOMETRIC_SESSION_KEY } from "@/hooks/useBiometric";
 import { sessionSet, storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
@@ -82,7 +86,7 @@ function getOptimisticAuthState(): OptimisticAuth {
  * 비밀번호 변경은 이미 끝났으므로 실패해도 막지 않는다(배너는 다음 재설정 때 다시 시도된다). */
 async function markPasswordResetDone(): Promise<void> {
   try {
-    await api.post("/auth/password-reset-complete");
+    await markPasswordResetComplete();
     const raw = storageGet(AUTH_ME_CACHE_KEY);
     if (raw) {
       const cached: AuthMeCache = JSON.parse(raw);
@@ -126,7 +130,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       if (error || !data.user) throw new Error(error?.message ?? "Login failed");
 
       // sync-profile은 멱등(이미 있으면 기존 반환)이므로 await 없이 백그라운드 실행해도 안전.
-      api.post("/auth/sync-profile", { display_name: null }).catch(() => {});
+      syncProfile(null).catch(() => {});
 
       // 이메일/비밀번호 인증 = 생체인증과 동급 → 이번 세션 마킹으로 BiometricGuard 통과
       sessionSet(BIOMETRIC_SESSION_KEY, "1");
@@ -137,13 +141,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const userId = data.user.id;
       void (async () => {
         try {
-          const res = await api.get("/auth/me");
-          if (!res?.data) return;
+          const me = await fetchAuthMe();
+          if (!me) return;
           storageSet(
             AUTH_ME_CACHE_KEY,
             JSON.stringify({
               userId,
-              needsPasswordReset: res.data.needs_password_reset ?? false,
+              needsPasswordReset: me.needs_password_reset ?? false,
               cachedAt: Date.now(),
             } satisfies AuthMeCache),
           );
@@ -169,7 +173,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         throw new Error("EMAIL_CONFIRMATION_REQUIRED");
       }
 
-      await api.post("/auth/sync-profile", { display_name: displayName ?? null });
+      await syncProfile(displayName ?? null);
       setLoggedIn(data.user);
     },
 
@@ -221,8 +225,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
         }
 
         try {
-          const { data } = await api.get("/auth/me");
-          const needsPasswordReset = data.needs_password_reset ?? false;
+          const me = await fetchAuthMe();
+          const needsPasswordReset = me.needs_password_reset ?? false;
           storageSet(
             AUTH_ME_CACHE_KEY,
             JSON.stringify({
@@ -247,9 +251,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
           }
           if (httpStatus === 401) {
             try {
-              await api.post("/auth/sync-profile", { display_name: null });
-              const { data } = await api.get("/auth/me");
-              const needsPasswordReset = data.needs_password_reset ?? false;
+              await syncProfile(null);
+              const me = await fetchAuthMe();
+              const needsPasswordReset = me.needs_password_reset ?? false;
               storageSet(
                 AUTH_ME_CACHE_KEY,
                 JSON.stringify({
@@ -271,10 +275,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       }
     },
 
-    findAccount: async (displayName: string) => {
-      const { data } = await api.post("/auth/find-account", { display_name: displayName });
-      return data.message as string;
-    },
+    findAccount: (displayName) => requestFindAccount(displayName),
 
     forgotPassword: async (email: string) => {
       const supabase = await getSupabase();

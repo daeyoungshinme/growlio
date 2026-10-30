@@ -40,9 +40,8 @@ interface Props {
 
 /** 분석·예수금 기준 계좌 — 포트폴리오에 연결 계좌가 있으면 그 계좌들, 없으면 활성 계좌 전체 */
 function portfolioAccounts(portfolio: Portfolio | undefined, activeAccounts: AssetAccount[]) {
-  return portfolio?.account_ids?.length
-    ? activeAccounts.filter((a) => portfolio.account_ids!.includes(a.id))
-    : activeAccounts;
+  const ids = portfolio?.account_ids;
+  return ids?.length ? activeAccounts.filter((a) => ids.includes(a.id)) : activeAccounts;
 }
 
 export function AnalysisPanel({

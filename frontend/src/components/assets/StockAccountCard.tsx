@@ -61,6 +61,8 @@ export default function StockAccountCard({
   const [showMoreStats, setShowMoreStats] = useState(false);
   const typeLabel = STOCK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
   const accountNo = account.kis_account_no ?? account.kiwoom_account_no ?? null;
+  const syncError = account.last_sync_error;
+  const lastSyncedAt = account.last_synced_at;
   const hasStats =
     stats && (stats.amount_krw > 0 || stats.deposit_total > 0 || stats.dividend_total > 0);
   const pnl = stats?.unrealized_pnl ?? 0;
@@ -88,25 +90,24 @@ export default function StockAccountCard({
             </div>
           )}
           {/* 줄2.5: 동기화 상태 (증권사 연동 계좌만) */}
-          {isSyncableAccount(account.data_source) &&
-            (account.last_sync_error || account.last_synced_at) && (
-              <div className="mt-0.5 min-w-0">
-                {account.last_sync_error ? (
-                  <button
-                    type="button"
-                    onClick={() => toast(account.last_sync_error!, "error")}
-                    title={account.last_sync_error}
-                    className="text-xs text-red-500 dark:text-red-400 truncate block text-left underline decoration-dotted underline-offset-2"
-                  >
-                    동기화 실패
-                  </button>
-                ) : (
-                  <span className="text-xs text-gray-400 dark:text-gray-500 truncate block">
-                    {relativeTime(account.last_synced_at!)} 동기화
-                  </span>
-                )}
-              </div>
-            )}
+          {isSyncableAccount(account.data_source) && (syncError || lastSyncedAt) && (
+            <div className="mt-0.5 min-w-0">
+              {syncError ? (
+                <button
+                  type="button"
+                  onClick={() => toast(syncError, "error")}
+                  title={syncError}
+                  className="text-xs text-red-500 dark:text-red-400 truncate block text-left underline decoration-dotted underline-offset-2"
+                >
+                  동기화 실패
+                </button>
+              ) : lastSyncedAt ? (
+                <span className="text-xs text-gray-400 dark:text-gray-500 truncate block">
+                  {relativeTime(lastSyncedAt)} 동기화
+                </span>
+              ) : null}
+            </div>
+          )}
           {/* 줄3: 배지 (넘치면 다음 줄로 — 현재 라벨 조합 기준 사실상 1줄) */}
           <div className="flex flex-wrap items-center gap-1.5 gap-y-1 mt-1 min-w-0">
             <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">
@@ -197,9 +198,9 @@ export default function StockAccountCard({
             <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
             <p
               className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5 truncate"
-              title={fmtKrw(stats!.amount_krw)}
+              title={fmtKrw(stats.amount_krw)}
             >
-              {fmtKrwShort(stats!.amount_krw)}원
+              {fmtKrwShort(stats.amount_krw)}원
             </p>
           </div>
           <div>
@@ -260,13 +261,13 @@ export default function StockAccountCard({
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>
                 <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
-                  {fmtKrw(stats!.deposit_total)}
+                  {fmtKrw(stats.deposit_total)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500">누적 배당</p>
                 <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
-                  {fmtKrw(stats!.dividend_total)}
+                  {fmtKrw(stats.dividend_total)}
                 </p>
               </div>
             </>

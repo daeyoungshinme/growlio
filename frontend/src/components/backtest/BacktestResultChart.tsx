@@ -46,8 +46,11 @@ function computeAnnualReturns(dates: string[], series: SeriesData[]): AnnualRow[
 
   dates.forEach((d, i) => {
     const year = d.slice(0, 4);
-    if (!yearLastVal.has(year)) yearLastVal.set(year, new Map());
-    const yMap = yearLastVal.get(year)!;
+    let yMap = yearLastVal.get(year);
+    if (!yMap) {
+      yMap = new Map();
+      yearLastVal.set(year, yMap);
+    }
     series.forEach((s) => {
       const v = s.values[i];
       if (v != null) yMap.set(s.name, v);
@@ -59,7 +62,7 @@ function computeAnnualReturns(dates: string[], series: SeriesData[]): AnnualRow[
 
   years.forEach((year, idx) => {
     const row: AnnualRow = { year };
-    const curMap = yearLastVal.get(year)!;
+    const curMap = yearLastVal.get(year) ?? new Map<string, number>();
 
     if (idx === 0) {
       // first year: start = first non-null in this year
@@ -67,8 +70,9 @@ function computeAnnualReturns(dates: string[], series: SeriesData[]): AnnualRow[
       const firstValMap: Map<string, number> = new Map();
       series.forEach((s) => {
         for (let i = firstIdx; i < dates.length && dates[i]?.startsWith(year); i++) {
-          if (s.values[i] != null) {
-            firstValMap.set(s.name, s.values[i]!);
+          const v = s.values[i];
+          if (v != null) {
+            firstValMap.set(s.name, v);
             break;
           }
         }
