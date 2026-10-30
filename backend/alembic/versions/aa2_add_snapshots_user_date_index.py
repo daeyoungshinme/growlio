@@ -1,7 +1,7 @@
 """add_snapshots_user_date_index: asset_snapshots(user_id, snapshot_date DESC) 인덱스 추가
 
 Revision ID: aa2_add_snapshots_user_date_index
-Revises: z2_positions_normalization
+Revises: ak1_add_deposit_trigger_to_rebalancing_alert
 Create Date: 2026-06-15
 """
 
