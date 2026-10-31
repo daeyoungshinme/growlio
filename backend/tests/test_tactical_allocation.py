@@ -1037,3 +1037,28 @@ async def test_confirmed_level_non_db_failure_keeps_caller_session():
     with patch.object(ms, "_resolve_confirmed_level", AsyncMock(side_effect=RuntimeError("fred"))):
         assert await ms.get_confirmed_composite_level(None, db) == ("GREEN", "STALE")
     db.rollback.assert_not_awaited()
+
+
+class TestDisableStrategy:
+    """plans/101 B4 — 라우터에서 옮긴 전략 중지: TACTICAL 알림을 일반 모드로 되돌리고 전략을 지운다."""
+
+    async def test_resets_tactical_alerts_and_deletes(self):
+        db = MagicMock()
+        db.execute, db.delete, db.commit = AsyncMock(), AsyncMock(), AsyncMock()
+        strategy = TacticalStrategy(user_id=uuid.uuid4(), portfolio_id=uuid.uuid4())
+        with patch.object(tactical, "get_strategy", AsyncMock(return_value=strategy)):
+            await tactical.disable_strategy(strategy.portfolio_id, strategy.user_id, db)
+
+        sql = str(db.execute.await_args.args[0])
+        assert sql.startswith("UPDATE rebalancing_alerts")
+        assert "market_condition_mode" in sql
+        db.delete.assert_awaited_once_with(strategy)
+        db.commit.assert_awaited_once()
+
+    async def test_no_strategy_is_noop(self):
+        db = MagicMock()
+        db.execute, db.commit = AsyncMock(), AsyncMock()
+        with patch.object(tactical, "get_strategy", AsyncMock(return_value=None)):
+            await tactical.disable_strategy(uuid.uuid4(), uuid.uuid4(), db)
+        db.execute.assert_not_awaited()
+        db.commit.assert_not_awaited()

@@ -8,7 +8,6 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +31,6 @@ from app.utils.cache_keys import (
 from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/tactical", tags=["tactical"])
-logger = structlog.get_logger()
 
 
 async def _portfolio_or_404(portfolio_id: uuid.UUID, user: User, db: AsyncSession) -> Portfolio:
