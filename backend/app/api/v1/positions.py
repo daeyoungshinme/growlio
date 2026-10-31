@@ -24,7 +24,7 @@ from app.utils.cache_keys import invalidate_asset_account_caches, sync_lock_key
 from app.utils.currency import fetch_usd_krw
 from app.utils.inproc_lock import inproc_lock
 from app.utils.kst import today_kst
-from app.utils.pnl import calc_position_pnl
+from app.utils.pnl import calc_position_pnl, reprice_positions_krw
 
 router = APIRouter(tags=["positions"])
 
@@ -186,18 +186,8 @@ async def sync_position_prices(
         if has_overseas or account.deposit_usd:
             usd_rate = await fetch_usd_krw(cache, force_refresh=True) or None
 
-        updated_dicts = []
-        for p in pos_objs:
-            raw_price = price_map.get(p.ticker)
-            if raw_price and p.market in OVERSEAS_MARKETS and usd_rate:
-                price_krw = raw_price * usd_rate
-            elif raw_price:
-                price_krw = raw_price
-            else:
-                price_krw = float(p.current_price or p.avg_price or 0)
-            p.current_price = price_krw
-            p.value_krw = price_krw * float(p.qty or 0)
-            updated_dicts.append(p.to_dict())
+        reprice_positions_krw(pos_objs, price_map, usd_rate)
+        updated_dicts = [p.to_dict() for p in pos_objs]
 
         account.manual_updated_at = datetime.now(UTC)
 

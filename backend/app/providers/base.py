@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from app.core.config import settings
+from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -131,3 +132,42 @@ class BrokerProvider(ABC):
         cache: CacheStore | None,
     ) -> BalanceResult:
         """잔고·보유종목을 조회해 BalanceResult를 반환한다."""
+
+
+def combine_domestic_overseas(
+    domestic: dict[str, Any],
+    overseas: dict[str, Any],
+    enriched_overseas_positions: list[dict[str, Any]],
+    usd_krw_rate: float,
+    source: str,
+    **extra_fields: Any,
+) -> BalanceResult:
+    """KIS·키움 공용 — 국내 잔고 + 해외 잔고(USD)를 원화로 합산한 BalanceResult.
+
+    `enriched_overseas_positions`는 `enrich_overseas_positions`를 거친 해외 포지션(value_usd 포함).
+    해외 조회가 실패(`overseas["ok"] is False`)하면 deposit_foreign=None·overseas_known=False라
+    asset_service가 기존 deposit_usd를 유지한다. `extra_fields`는 BalanceResult에 그대로 넘긴다(키움 orderable_krw 등).
+    """
+    overseas_value_krw = overseas["total_value_usd"] * usd_krw_rate
+    overseas_deposit_krw = overseas["deposit_usd"] * usd_krw_rate
+    overseas_invested_krw = sum(
+        float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate for p in overseas["positions"]
+    )
+    all_raw = domestic["positions"] + [
+        {**p, "value_krw": p["value_usd"] * usd_krw_rate} for p in enriched_overseas_positions
+    ]
+    stock_value_krw = domestic["total_value_krw"] + overseas_value_krw
+    total_invested = domestic["invested_krw"] + overseas_invested_krw
+    overseas_known = overseas.get("ok") is not False
+    return BalanceResult(
+        positions=[raw_to_position(p, usd_krw_rate) for p in all_raw],
+        total_value_krw=stock_value_krw + domestic["deposit_krw"] + overseas_deposit_krw,
+        deposit_krw=domestic["deposit_krw"],
+        deposit_foreign=overseas["deposit_usd"] if overseas_known else None,
+        overseas_known=overseas_known,
+        invested_krw=total_invested,
+        pnl_krw=stock_value_krw - total_invested,
+        usd_krw_rate=usd_krw_rate,
+        extra={"source": source, "snapshot_date": today_kst()},
+        **extra_fields,
+    )

@@ -14,6 +14,7 @@ from app.providers.base import Position as ProviderPosition
 from app.utils.currency import fetch_usd_krw
 from app.utils.kst import today_kst
 from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount
+from app.utils.pnl import reprice_positions_krw
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,16 +50,7 @@ class ManualProvider(BrokerProvider):
             if has_overseas:
                 usd_rate = await fetch_usd_krw(cache, force_refresh=True) or None
 
-            for p in db_positions:
-                raw_price = price_map.get(p.ticker)
-                if raw_price and p.market in OVERSEAS_MARKETS and usd_rate:
-                    price_krw = raw_price * usd_rate
-                elif raw_price:
-                    price_krw = raw_price
-                else:
-                    price_krw = float(p.current_price or p.avg_price or 0)
-                p.current_price = price_krw
-                p.value_krw = price_krw * float(p.qty or 0)
+            reprice_positions_krw(db_positions, price_map, usd_rate)
 
             account.manual_updated_at = datetime.now(UTC)
 
