@@ -5,7 +5,7 @@ import type { SettingsData } from "@/api/settings";
 import Modal, { ModalFooter } from "@/components/common/Modal";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import FormInput from "@/components/common/FormInput";
-import { ToggleSwitch } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleSwitch";
 import { challengeFormSchema } from "@/schemas/challenge";
 import { isStockAccount } from "@/utils/accounts";
 import { fmtKrw, fmtKrwPreview, localMonth } from "@/utils/format";
@@ -298,14 +298,11 @@ export default function ChallengeFormModal({
             error={errors.deadline_month}
           />
 
-          <div className="flex items-center justify-between">
-            <span className={LABEL_SM}>독려·결산 알림 받기</span>
-            <ToggleSwitch
-              checked={form.reminder_enabled}
-              onChange={(v) => set("reminder_enabled", v)}
-              ariaLabel="이 챌린지 알림"
-            />
-          </div>
+          <ToggleRow
+            title="독려·결산 알림 받기"
+            checked={form.reminder_enabled}
+            onChange={(v) => set("reminder_enabled", v)}
+          />
         </div>
         <ModalFooter>
           <button

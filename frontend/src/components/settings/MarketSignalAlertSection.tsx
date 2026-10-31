@@ -1,6 +1,6 @@
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import { useMarketSignalDigestToggle } from "@/hooks/useMarketSignalDigestToggle";
-import { ToggleSwitch } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleSwitch";
 import { SectionCard } from "./shared";
 
 /** `embedded`이면 자체 `SectionCard` 제목("시장 신호 알림")을 생략 — 부모(`SettingsPage`의 "시장 모니터링"
@@ -33,17 +33,13 @@ export function MarketSignalAlertSection({ embedded = false }: { embedded?: bool
 
       {status && (
         <>
-          <div className="flex items-center gap-3 pt-1">
-            <ToggleSwitch
-              checked={status.enabled}
-              disabled={isPending}
-              onChange={toggle}
-              ariaLabel="시장/리스크 신호 알림 받기"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              {status.enabled ? "알림 받는 중" : "알림 꺼짐"}
-            </span>
-          </div>
+          <ToggleRow
+            title="시장/리스크 신호 알림 받기"
+            description={status.enabled ? "알림 받는 중" : "알림 꺼짐"}
+            checked={status.enabled}
+            disabled={isPending}
+            onChange={toggle}
+          />
 
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {status.triggered && status.reason
@@ -59,16 +55,14 @@ export function MarketSignalAlertSection({ embedded = false }: { embedded?: bool
         <p className="text-xs text-gray-500 dark:text-gray-400">
           매일 08:30 현재 시장 위험 신호를 등급 변화와 무관하게 요약해 보내드립니다.
         </p>
-        <div className="flex items-center gap-3 pt-2">
-          <ToggleSwitch
+        <div className="pt-2">
+          <ToggleRow
+            title="매일 아침 시장신호 요약"
+            description={digestEnabled ? "받는 중" : "꺼짐"}
             checked={digestEnabled}
             disabled={digestPending}
             onChange={toggleDigest}
-            ariaLabel="매일 아침 시장신호 요약"
           />
-          <span className="text-sm text-gray-700 dark:text-gray-300">
-            {digestEnabled ? "매일 아침 시장신호 요약 받는 중" : "매일 아침 시장신호 요약 꺼짐"}
-          </span>
         </div>
       </div>
 

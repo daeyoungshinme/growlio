@@ -257,8 +257,9 @@ describe("MarketSignalAlertSection", () => {
 
   it("shows a separate daily digest toggle, defaulting to off", async () => {
     renderSection();
-    expect(await screen.findByLabelText("매일 아침 시장신호 요약")).toBeDefined();
-    expect(screen.getByText("매일 아침 시장신호 요약 꺼짐")).toBeDefined();
+    const digest = (await screen.findByLabelText("매일 아침 시장신호 요약")) as HTMLInputElement;
+    expect(digest.checked).toBe(false);
+    expect(screen.getByText("꺼짐")).toBeDefined();
   });
 
   it("reflects the daily digest opt-in state when already enabled", async () => {
@@ -267,7 +268,10 @@ describe("MarketSignalAlertSection", () => {
       market_signal_daily_digest_enabled: true,
     } as Awaited<ReturnType<typeof fetchSettings>>);
     renderSection();
-    expect(await screen.findByText("매일 아침 시장신호 요약 받는 중")).toBeDefined();
+    expect(await screen.findByText("받는 중")).toBeDefined();
+    expect((screen.getByLabelText("매일 아침 시장신호 요약") as HTMLInputElement).checked).toBe(
+      true,
+    );
   });
 });
 
