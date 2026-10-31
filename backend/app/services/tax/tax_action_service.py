@@ -79,7 +79,9 @@ _HIGH_PRIORITY_BENEFIT_KRW = 500_000
 _MEDIUM_PRIORITY_BENEFIT_KRW = 100_000
 _PRIORITY_ORDER: dict[ActionPriority, int] = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
-_LINK_ACCOUNTS = "/assets?tab=계좌관리"
+# 입금 기록은 계좌관리 › 내역 › 현금 흐름, ISA 현황은 절세 › 한도 현황의 ISA 카드(#isa-status)로 바로 보낸다
+_LINK_CASH_FLOW = "/assets?tab=계좌관리&atab=내역&history=현금 흐름"
+_LINK_ISA_STATUS = "/invest-plan?tab=절세&taxTab=한도 현황#isa-status"
 _LINK_TAX_ESTIMATE = "/invest-plan?tab=절세&taxTab=세금 추정"
 
 _ACTION_PLAN_NOTE = (
@@ -219,7 +221,7 @@ def build_pension_action(
         deadline=deadline,
         today=today,
         cta_label="입금 내역 기록",
-        cta_link=_LINK_ACCOUNTS,
+        cta_link=_LINK_CASH_FLOW,
         uses_income_bracket=True,
     )
 
@@ -259,7 +261,7 @@ def build_isa_transfer_actions(
                 deadline=window_end,
                 today=today,
                 cta_label="ISA 현황 보기",
-                cta_link=_LINK_ACCOUNTS,
+                cta_link=_LINK_ISA_STATUS,
                 uses_income_bracket=True,
             )
         )
@@ -291,7 +293,7 @@ def build_isa_contribution_actions(isa_contrib: list[IsaContributionStatus], tod
                 deadline=None,
                 today=today,
                 cta_label="입금 내역 기록",
-                cta_link=_LINK_ACCOUNTS,
+                cta_link=_LINK_CASH_FLOW,
             )
         )
     return actions

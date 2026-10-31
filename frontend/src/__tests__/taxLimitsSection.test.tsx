@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { IsaStatusSummary, TaxSummary } from "@/api/tax";
 import type { PortfolioOverview } from "@/types";
@@ -27,6 +28,14 @@ vi.mock("@/api/portfolios", () => ({
 }));
 
 import TaxLimitsSection from "@/components/portfolio-analysis/TaxLimitsSection";
+
+function renderSection(initialEntry = "/invest-plan?tab=절세") {
+  return renderWithProviders(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <TaxLimitsSection />
+    </MemoryRouter>,
+  );
+}
 
 function makeOverview(
   accounts: Array<{ investment_horizon?: string | null; tax_type?: string | null }>,
@@ -84,7 +93,7 @@ describe("TaxLimitsSection", () => {
     fetchIsaStatus.mockResolvedValue(emptyIsa);
     fetchTaxSummary.mockResolvedValue(emptyTaxSummary);
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([{ tax_type: "GENERAL" }]));
-    renderWithProviders(<TaxLimitsSection />);
+    renderSection();
     await waitFor(() => expect(fetchIsaStatus).toHaveBeenCalled());
     expect(await screen.findByText(/건강보험 피부양자 기준/)).toBeInTheDocument();
     expect(screen.queryByText("ISA 만기·세제 현황")).toBeNull();
@@ -105,7 +114,7 @@ describe("TaxLimitsSection", () => {
     });
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([]));
 
-    renderWithProviders(<TaxLimitsSection />);
+    renderSection();
     expect(await screen.findByText(/예상 월 보험료 약/)).toBeInTheDocument();
   });
 
@@ -133,8 +142,23 @@ describe("TaxLimitsSection", () => {
     } as IsaStatusSummary);
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([]));
 
-    renderWithProviders(<TaxLimitsSection />);
+    renderSection();
     expect(await screen.findByText("ISA 만기·세제 현황")).toBeInTheDocument();
+  });
+
+  it('#isa-status 해시로 들어오면 ISA 카드로 스크롤한다(절세 액션 "ISA 현황 보기")', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    fetchTaxSummary.mockResolvedValue(emptyTaxSummary);
+    fetchIsaStatus.mockResolvedValue({
+      accounts: [{ account_id: "acc1", account_name: "일반형 ISA", maturity_date: null }],
+      note: "",
+    } as unknown as IsaStatusSummary);
+    fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([]));
+
+    renderSection("/invest-plan?tab=절세&taxTab=한도 현황#isa-status");
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+    expect(document.getElementById("isa-status")).not.toBeNull();
   });
 
   it("연금저축 태그 계좌가 있으면 PensionContributionCard를 곧바로 렌더한다", async () => {
@@ -155,7 +179,7 @@ describe("TaxLimitsSection", () => {
     });
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([{ tax_type: "PENSION_SAVINGS" }]));
 
-    renderWithProviders(<TaxLimitsSection />);
+    renderSection();
     expect(await screen.findByText(/연금저축·IRP 납입 현황/)).toBeInTheDocument();
   });
 
@@ -164,7 +188,7 @@ describe("TaxLimitsSection", () => {
     fetchTaxSummary.mockResolvedValue(emptyTaxSummary);
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([]));
 
-    renderWithProviders(<TaxLimitsSection />);
+    renderSection();
     // 헤더는 로딩 중에도 먼저 렌더되므로 본문(빈 상태 문구)까지 기다린다
     expect(await screen.findByText(/지금 챙길 절세 액션이 없어요/)).toBeInTheDocument();
     expect(screen.getByText(/절세 액션 플랜/)).toBeInTheDocument();

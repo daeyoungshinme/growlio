@@ -165,14 +165,18 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("미연결")).toBeInTheDocument();
     });
-    expect(screen.getByText("설정된 목표 없음")).toBeInTheDocument();
+    expect(screen.getAllByText("설정된 목표 없음")).toHaveLength(2);
     expect(screen.getByText("중립 · 후보 0개")).toBeInTheDocument();
 
     const kisLink = screen.getByText("계좌 연동 (KIS·키움 / 토스 조회 전용)").closest("a");
     expect(kisLink).toHaveAttribute("href", "/assets?tab=계좌관리");
 
-    const goalLink = screen.getByText("투자·입금·배당 목표").closest("a");
+    const goalLink = screen.getByText("투자·입금 목표").closest("a");
     expect(goalLink).toHaveAttribute("href", "/invest-plan?tab=적립 계획");
+
+    // 배당 목표는 배당 계획에서 편집하므로 별도 행
+    const dividendGoalLink = screen.getByText("배당 목표").closest("a");
+    expect(dividendGoalLink).toHaveAttribute("href", "/invest-plan?tab=배당 계획");
 
     const recommendationLink = screen.getByText("목표 역산 추천 옵션").closest("a");
     expect(decodeURIComponent(recommendationLink?.getAttribute("href") ?? "")).toBe(

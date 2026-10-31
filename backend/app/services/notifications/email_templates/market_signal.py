@@ -31,7 +31,7 @@ def market_signal_change_template(old_level: str, new_level: str, reason: str | 
         body,
         "이 알림은 시장 위험 신호 등급이 바뀔 때마다(1시간 간격 점검) 발송됩니다.<br>"
         "Growlio 앱 리밸런싱 &gt; 진단 탭에서 상세 지표를 확인하세요.<br>"
-        "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 신호 알림에서 변경하세요.",
+        "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 모니터링에서 변경하세요.",
     )
     return subject, html
 
@@ -50,7 +50,7 @@ def market_signal_daily_digest_template(level: str, reason: str | None) -> tuple
         body,
         "이 알림은 매일 08:30 KST에 등급 전환 여부와 무관하게 발송됩니다.<br>"
         "Growlio 앱 리밸런싱 &gt; 진단 탭에서 상세 지표를 확인하세요.<br>"
-        "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 신호 알림에서 변경하세요.",
+        "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 모니터링에서 변경하세요.",
     )
     return subject, html
 

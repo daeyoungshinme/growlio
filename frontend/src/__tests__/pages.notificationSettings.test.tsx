@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // ── mocks ──
@@ -204,6 +204,27 @@ describe("NotificationSettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("market-signal-alert-section")).toBeInTheDocument();
     });
+  });
+
+  it("하위 탭은 ?atab=과 동기화된다 — 진입 시 해당 탭, 전환 시 URL 갱신", async () => {
+    let search = "";
+    function LocationProbe() {
+      search = new URLSearchParams(useLocation().search).get("atab") ?? "";
+      return null;
+    }
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/settings/notifications?atab=주가 알림"]}>
+          <NotificationSettingsPage />
+          <LocationProbe />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("tab", { name: "주가 알림" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "발송 이력" }));
+    await waitFor(() => expect(search).toBe("발송 이력"));
+    expect(screen.getByRole("tab", { name: "발송 이력" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("알림 이력이 없을 때 '발송된 알림 이력이 없습니다' 텍스트를 표시한다", async () => {

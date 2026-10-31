@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import IsaMaturityCard from "@/components/dashboard/IsaMaturityCard";
 import PensionContributionCard from "@/components/dashboard/PensionContributionCard";
@@ -11,6 +13,9 @@ import { isaStatusQuery, portfolioOverviewLiteQuery } from "@/api/queryOptions";
  * 항상 펼친 상태로 렌더하므로(2026-07-25 세금정보 3곳→2곳 통합) 자체 접기 카드는 두지 않는다.
  * `HealthInsuranceRiskCard`는 ISA/연금 계좌 유무와 무관하게 항상 렌더되므로(배당소득 기준) 이
  * 탭이 완전히 비어있는 상태는 이제 없다 — ISA/연금 계좌가 둘 다 없어도 건강보험 카드는 보인다. */
+/** 백엔드 `tax_action_service._LINK_ISA_STATUS`의 해시와 같아야 한다 */
+const ISA_STATUS_ANCHOR = "isa-status";
+
 export default function TaxLimitsSection() {
   const { data: overview } = useQuery(portfolioOverviewLiteQuery);
 
@@ -20,10 +25,22 @@ export default function TaxLimitsSection() {
   const { data: isaData } = useQuery(isaStatusQuery);
   const hasIsa = (isaData?.accounts.length ?? 0) > 0;
 
+  // 절세 액션 "ISA 현황 보기"(`#isa-status`)로 들어오면 ISA 카드로 스크롤 — 카드는 조회 뒤에야 렌더되므로 hasIsa도 의존
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash === `#${ISA_STATUS_ANCHOR}` && hasIsa) {
+      document.getElementById(ISA_STATUS_ANCHOR)?.scrollIntoView({ block: "start" });
+    }
+  }, [hash, hasIsa]);
+
   return (
     <div className="space-y-4 divide-y divide-gray-100 dark:divide-gray-700 [&>*:not(:first-child)]:pt-4">
       <TaxActionPlanCard />
-      {hasIsa && <IsaMaturityCard />}
+      {hasIsa && (
+        <div id={ISA_STATUS_ANCHOR} className="scroll-mt-4">
+          <IsaMaturityCard />
+        </div>
+      )}
       {hasPension && <PensionContributionCard overview={overview} />}
       <HealthInsuranceRiskCard />
     </div>
