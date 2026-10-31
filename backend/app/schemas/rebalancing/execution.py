@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -117,6 +117,23 @@ class OrderResult(BaseModel):
     cancel_status: str | None = None  # "CANCELED" | "CANCEL_FAILED"
     cancel_message: str | None = None
     cancelable: bool = False
+
+    @classmethod
+    def for_order(cls, order: ExecutionOrderItem, status: str, **fields: Any) -> "OrderResult":
+        """주문 하나의 실행 결과 — 종목·방향·수량·주문유형·가격(지정가, 없으면 참고 시세)을 주문에서 옮긴다.
+
+        `fields`로 error_msg·order_no 등을 덧붙인다(같은 이름이면 덮어쓴다).
+        """
+        base = {
+            "ticker": order.ticker,
+            "name": order.name,
+            "market": order.market,
+            "side": order.side,
+            "quantity": order.quantity,
+            "order_type": order.order_type,
+            "price": order.limit_price or order.reference_price,
+        }
+        return cls(**base, status=status, **fields)
 
 
 class OrderCancelResponse(BaseModel):

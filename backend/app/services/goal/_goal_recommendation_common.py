@@ -20,11 +20,12 @@ from __future__ import annotations
 
 import asyncio
 import functools
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import NamedTuple
 
 import structlog
+from pydantic import BaseModel
 
 from app.constants import (
     CASH_EQUIVALENT_MARKET,
@@ -51,12 +52,15 @@ from app.services.market_signal.market_signal_service import get_market_signal
 from app.utils.cache_keys import (
     TTL_DAILY_RETURNS,
     TTL_GOAL_CANDIDATE_DIVIDEND_YIELD,
+    TTL_GOAL_RECOMMENDATION,
+    TTL_GOAL_RECOMMENDATION_STALE,
     CacheStoreType,
     daily_returns_key,
     get_cached_json,
     goal_candidate_dividend_yield_key,
     set_cached_json,
 )
+from app.utils.inproc_lock import single_flight_fetch
 
 logger = structlog.get_logger()
 
@@ -357,6 +361,47 @@ def _max_weight_from_settings(settings_row: object) -> float:
 
 def _cagr_lookback_years_from_settings(settings_row: object) -> int:
     return int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
+
+
+async def read_cached_model[M: BaseModel](cache: CacheStoreType, key: str, model: type[M]) -> M | None:
+    """캐시 JSON을 `model`로 복원한다(없으면 None)."""
+    cached = await get_cached_json(cache, key)
+    return model(**cached) if cached is not None else None
+
+
+async def cached_recommendation[M: BaseModel](
+    cache: CacheStoreType,
+    cache_key: str,
+    stale_key: str,
+    model: type[M],
+    compute: Callable[[], Awaitable[M]],
+    cacheable: Callable[[M], bool],
+) -> M:
+    """추천 3종(전체·기간별·나이별) 공용 캐시 골격: 1시간 키 히트면 반환, 아니면 single-flight로 1건만 계산.
+
+    `cacheable(result)`가 참일 때만 1시간 키와 stale(1일) 키에 저장한다 — 빈 추천(일시적 외부 API 장애 등)을
+    캐싱하면 복구 뒤에도 TTL 동안 같은 실패를 돌려준다. cache가 None이면 매번 계산한다.
+    """
+
+    async def _read_cache() -> M | None:
+        return await read_cached_model(cache, cache_key, model)
+
+    cached = await _read_cache()
+    if cache is not None and cached is not None:
+        return cached
+
+    async def _fetch_and_cache() -> M:
+        result = await compute()
+        if cacheable(result):
+            payload = result.model_dump(mode="json")
+            await set_cached_json(cache, cache_key, payload, TTL_GOAL_RECOMMENDATION)
+            await set_cached_json(cache, stale_key, payload, TTL_GOAL_RECOMMENDATION_STALE)
+        return result
+
+    if cache is None:
+        return await _fetch_and_cache()
+
+    return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
 
 
 def investable_assets_krw(overview: dict) -> float:

@@ -38,18 +38,11 @@ async def execute_single_order(
     `place_order`는 브로커별 실제 주문 API 호출을 캡슐화한 콜백(인자 없이 호출)이다.
     수량<=0 skip, 성공/실패 로깅과 OrderResult 필드 구성은 KIS/Kiwoom이 동일했던 부분.
     """
-    price = order.limit_price or order.reference_price
-
     if order.quantity <= 0:
-        return OrderResult(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=order.quantity,
-            status="SKIPPED",
+        return OrderResult.for_order(
+            order,
+            "SKIPPED",
             error_msg="주문 수량이 0 이하입니다.",
-            price=price,
         )
 
     try:
@@ -63,17 +56,11 @@ async def execute_single_order(
             is_mock=is_mock,
             order_type=order.order_type,
         )
-        return OrderResult(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=order.quantity,
-            status="SUCCESS",
+        return OrderResult.for_order(
+            order,
+            "SUCCESS",
             order_no=result.get("order_no"),
             order_org_no=result.get("order_org_no"),
-            order_type=order.order_type,
-            price=price,
         )
     except Exception as e:
         logger.warning(
@@ -84,14 +71,8 @@ async def execute_single_order(
             error=redact_secrets(str(e)),
             error_type=type(e).__name__,
         )
-        return OrderResult(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=order.quantity,
-            status="FAILED",
+        return OrderResult.for_order(
+            order,
+            "FAILED",
             error_msg=public_error_message(e),
-            order_type=order.order_type,
-            price=price,
         )

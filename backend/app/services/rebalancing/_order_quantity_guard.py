@@ -45,13 +45,9 @@ def clamp_sell_orders(
 
         if actual <= 0:
             skipped.append(
-                OrderResult(
-                    ticker=order.ticker,
-                    name=order.name,
-                    market=order.market,
-                    side=order.side,
-                    quantity=order.quantity,
-                    status="SKIPPED",
+                OrderResult.for_order(
+                    order,
+                    "SKIPPED",
                     error_msg="해당 계좌에 보유 수량이 없어 매도를 건너뜁니다.",
                 )
             )
@@ -77,13 +73,9 @@ BUDGET_SHORT_MSG = "주문가능금액이 부족해 매수를 건너뜁니다."
 
 def budget_skipped_result(order: ExecutionOrderItem) -> OrderResult:
     """예산이 모자라 내지 못한 매수 주문의 SKIPPED 결과."""
-    return OrderResult(
-        ticker=order.ticker,
-        name=order.name,
-        market=order.market,
-        side=order.side,
-        quantity=order.quantity,
-        status="SKIPPED",
+    return OrderResult.for_order(
+        order,
+        "SKIPPED",
         error_msg=BUDGET_SHORT_MSG,
     )
 

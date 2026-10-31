@@ -60,16 +60,11 @@ from app.services.portfolio.portfolio_service import (
 )
 from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import (
-    TTL_GOAL_RECOMMENDATION,
-    TTL_GOAL_RECOMMENDATION_STALE,
     CacheStoreType,
-    get_cached_json,
     get_goal_recommendation_generation,
     goal_recommendation_horizon_key,
     goal_recommendation_horizon_stale_key,
-    set_cached_json,
 )
-from app.utils.inproc_lock import single_flight_fetch
 
 logger = structlog.get_logger()
 
@@ -332,45 +327,32 @@ async def get_horizon_recommendations(
     """
     if gen is None:
         gen = await get_goal_recommendation_generation(cache, user_id)
-    cache_key = goal_recommendation_horizon_key(user_id, gen)
-    stale_key = goal_recommendation_horizon_stale_key(user_id, gen)
-
-    async def _read_cache() -> HorizonRecommendationResponse | None:
-        cached = await get_cached_json(cache, cache_key)
-        return HorizonRecommendationResponse(**cached) if cached is not None else None
-
-    cached = await _read_cache()
-    if cache is not None and cached is not None:
-        return cached
-
-    async def _fetch_and_cache() -> HorizonRecommendationResponse:
-        result = await _compute_horizon_recommendations(cache, db, user_id, settings_row)
-        if all(rec.recommended_items for rec in result.recommendations):
-            payload = result.model_dump(mode="json")
-            await set_cached_json(cache, cache_key, payload, TTL_GOAL_RECOMMENDATION)
-            await set_cached_json(cache, stale_key, payload, TTL_GOAL_RECOMMENDATION_STALE)
-        return result
-
-    if cache is None:
-        return await _fetch_and_cache()
-
-    return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
+    return await _grc.cached_recommendation(
+        cache,
+        goal_recommendation_horizon_key(user_id, gen),
+        goal_recommendation_horizon_stale_key(user_id, gen),
+        HorizonRecommendationResponse,
+        lambda: _compute_horizon_recommendations(cache, db, user_id, settings_row),
+        lambda result: all(rec.recommended_items for rec in result.recommendations),
+    )
 
 
 async def get_cached_horizon_recommendations(
     cache: CacheStoreType, user_id: uuid.UUID, gen: str
 ) -> HorizonRecommendationResponse | None:
     """1시간 키만 조회한다 — 엔드포인트가 설정 조회·stale 판단 전에 먼저 확인한다."""
-    cached = await get_cached_json(cache, goal_recommendation_horizon_key(user_id, gen))
-    return HorizonRecommendationResponse(**cached) if cached is not None else None
+    return await _grc.read_cached_model(
+        cache, goal_recommendation_horizon_key(user_id, gen), HorizonRecommendationResponse
+    )
 
 
 async def get_stale_horizon_recommendations(
     cache: CacheStoreType, user_id: uuid.UUID, gen: str
 ) -> HorizonRecommendationResponse | None:
     """1시간 키가 만료된 뒤에도 남는 마지막 정상 결과(1일) — 전체 추천 SWR과 같은 규칙(plans/66·90 C6)."""
-    cached = await get_cached_json(cache, goal_recommendation_horizon_stale_key(user_id, gen))
-    return HorizonRecommendationResponse(**cached) if cached is not None else None
+    return await _grc.read_cached_model(
+        cache, goal_recommendation_horizon_stale_key(user_id, gen), HorizonRecommendationResponse
+    )
 
 
 async def refresh_horizon_recommendations_in_background(user_id: uuid.UUID, cache: CacheStoreType) -> None:

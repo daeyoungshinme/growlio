@@ -90,16 +90,12 @@ from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.services.rebalancing.group_expansion import group_owner_map
 from app.utils.cache_keys import (
-    TTL_GOAL_RECOMMENDATION,
-    TTL_GOAL_RECOMMENDATION_STALE,
     CacheStoreType,
-    get_cached_json,
     get_goal_recommendation_generation,
     goal_recommendation_key,
     goal_recommendation_stale_key,
-    set_cached_json,
 )
-from app.utils.inproc_lock import inproc_lock, single_flight_fetch
+from app.utils.inproc_lock import inproc_lock
 
 logger = structlog.get_logger()
 
@@ -154,8 +150,7 @@ async def get_cached_goal_recommendation(
 ) -> GoalRecommendation | None:
     """캐시된 전체 자산 기준 추천만 조회한다(없으면 None) — 엔드포인트가 `base_krw`/`existing_items`
     계산(overview·포지션 조회) 전에 먼저 확인해, 캐시 히트 시 그 앞단 조회를 건너뛰기 위함."""
-    cached = await get_cached_json(cache, goal_recommendation_key(user_id, gen))
-    return GoalRecommendation(**cached) if cached is not None else None
+    return await _grc.read_cached_model(cache, goal_recommendation_key(user_id, gen), GoalRecommendation)
 
 
 async def get_stale_goal_recommendation(
@@ -166,8 +161,7 @@ async def get_stale_goal_recommendation(
     엔드포인트는 이 값을 바로 반환하고 `refresh_goal_recommendation_in_background`로 재계산한다.
     목표·후보 변경, 포지션 변경 sync처럼 입력이 바뀌면 무효화 함수가 이 키도 함께 지우므로
     여기 남은 값은 "평가액만 조금 다른" 결과다(1시간 키와 같은 트레이드오프)."""
-    cached = await get_cached_json(cache, goal_recommendation_stale_key(user_id, gen))
-    return GoalRecommendation(**cached) if cached is not None else None
+    return await _grc.read_cached_model(cache, goal_recommendation_stale_key(user_id, gen), GoalRecommendation)
 
 
 async def build_overall_recommendation_inputs(
@@ -269,29 +263,14 @@ async def get_goal_recommendation(
 
     if gen is None:
         gen = await get_goal_recommendation_generation(cache, user_id)
-    cache_key = goal_recommendation_key(user_id, gen)
-    stale_key = goal_recommendation_stale_key(user_id, gen)
-
-    async def _fetch_and_cache() -> GoalRecommendation:
-        result = await _compute_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
-        if result.recommended_items:
-            payload = result.model_dump(mode="json")
-            await set_cached_json(cache, cache_key, payload, TTL_GOAL_RECOMMENDATION)
-            await set_cached_json(cache, stale_key, payload, TTL_GOAL_RECOMMENDATION_STALE)
-        return result
-
-    async def _read_cache() -> GoalRecommendation | None:
-        cached = await get_cached_json(cache, cache_key)
-        return GoalRecommendation(**cached) if cached is not None else None
-
-    cached = await _read_cache()
-    if cache is not None and cached is not None:
-        return cached
-
-    if cache is None:
-        return await _fetch_and_cache()
-
-    return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
+    return await _grc.cached_recommendation(
+        cache,
+        goal_recommendation_key(user_id, gen),
+        goal_recommendation_stale_key(user_id, gen),
+        GoalRecommendation,
+        lambda: _compute_goal_recommendation(cache, base_krw, existing_items, settings_row, db),
+        lambda result: bool(result.recommended_items),
+    )
 
 
 def _resolve_required_return(
