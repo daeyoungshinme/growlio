@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
+import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 
 interface Props {
   isOpen: boolean;
@@ -17,7 +18,7 @@ export default function CollapsibleSection({
   label,
   collapsedHint,
   children,
-  buttonClassName = "w-full flex items-center justify-between min-h-[44px] px-3 text-xs text-gray-500 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors",
+  buttonClassName = `w-full flex items-center justify-between ${TOUCH_HEIGHT_MIN} px-3 text-xs text-gray-500 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors`,
 }: Props) {
   return (
     <div>

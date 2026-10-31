@@ -17,6 +17,7 @@ import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
 import { STALE_TIME } from "@/constants/queryConfig";
 
+import AuthLayout from "@/components/layout/AuthLayout";
 const REASON_LABEL: Record<string, string> = {
   NOT_FOUND: "존재하지 않는 링크입니다.",
   ALREADY_DECIDED: "이미 처리된 계획입니다.",
@@ -109,7 +110,7 @@ export default function RebalancingPlanConfirmPage() {
   const isPending = cancelMut.isPending || decideMut.isPending;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4 py-6 sm:py-8">
+    <AuthLayout className="py-6 sm:py-8">
       <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-8">
         <div className="flex items-center gap-2 mb-6 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
@@ -211,6 +212,6 @@ export default function RebalancingPlanConfirmPage() {
           onCancel={() => setConfirmingApprove(false)}
         />
       )}
-    </div>
+    </AuthLayout>
   );
 }

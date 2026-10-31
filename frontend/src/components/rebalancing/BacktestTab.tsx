@@ -9,6 +9,10 @@ import { extractErrorMessage } from "@/utils/error";
 import { BACKTEST_DEFAULT_END_DATE } from "@/constants/defaults";
 import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
 import { portfoliosQuery } from "@/api/queryOptions";
+import {
+  TOUCH_HEIGHT_MIN_MOBILE_ONLY,
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+} from "@/constants/uiSizes";
 
 interface Props {
   /** 처음 체크해 둘 포트폴리오 — 분석 패널에서 열면 지금 보는 포트폴리오(plans/64 S3) */
@@ -67,13 +71,13 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setBacktestSelectedIds(new Set(portfolios.map((p) => p.id)))}
-                    className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-1 text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300`}
                   >
                     전체 선택
                   </button>
                   <button
                     onClick={() => setBacktestSelectedIds(new Set())}
-                    className="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                    className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-1 text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300`}
                   >
                     전체 해제
                   </button>
@@ -83,7 +87,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 {portfolios.map((p) => (
                   <label
                     key={p.id}
-                    className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
+                    className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer`}
                   >
                     <input
                       type="checkbox"
@@ -108,7 +112,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
               <button
                 key={y}
                 onClick={() => setPreset(y)}
-                className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+                className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
                   activePreset === y
                     ? "bg-blue-600 text-white"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -119,7 +123,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
             ))}
             <button
               onClick={() => setPreset(30)}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
                 activePreset === 30
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -138,7 +142,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 value={startDate}
                 max={endDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
             </div>
             <div>
@@ -151,12 +155,14 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 min={startDate}
                 max={BACKTEST_DEFAULT_END_DATE}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
             </div>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            <label
+              className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer`}
+            >
               <input
                 type="checkbox"
                 checked={includeSpy}
@@ -165,7 +171,9 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
               />
               S&P 500 포함
             </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            <label
+              className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer`}
+            >
               <input
                 type="checkbox"
                 checked={includeReal}
@@ -174,7 +182,9 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
               />
               실제 포트폴리오 포함
             </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            <label
+              className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer`}
+            >
               <input
                 type="checkbox"
                 checked={reinvestDividends}

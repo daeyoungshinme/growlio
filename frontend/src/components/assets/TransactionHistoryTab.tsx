@@ -22,7 +22,12 @@ import {
   type TxType,
 } from "@/constants/transaction";
 import { INPUT_SM } from "@/constants/inputStyles";
-import { TOUCH_TARGET_COMPACT_MOBILE_ONLY, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import {
+  TOUCH_HEIGHT_MIN,
+  TOUCH_HEIGHT_MIN_MOBILE_ONLY,
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+  TOUCH_TARGET_MIN,
+} from "@/constants/uiSizes";
 import { extractErrorMessage } from "@/utils/error";
 
 const currentYear = new Date().getFullYear();
@@ -222,7 +227,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="sm:ml-auto flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          className={`sm:ml-auto flex items-center justify-center gap-1.5 ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors`}
         >
           {showForm ? <ChevronUp size={16} /> : <Plus size={16} />}
           내역 추가
@@ -327,7 +332,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                     onClick={() =>
                       setMobileLimit({ key: filterKey, count: mobileCount + MOBILE_PAGE_SIZE })
                     }
-                    className="w-full min-h-[44px] text-xs font-medium text-blue-600 dark:text-blue-400"
+                    className={`w-full ${TOUCH_HEIGHT_MIN} text-xs font-medium text-blue-600 dark:text-blue-400`}
                   >
                     더 보기 ({filtered.length - mobileCount}건 남음)
                   </button>

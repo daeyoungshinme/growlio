@@ -3,6 +3,7 @@ import { fmtKrw, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { marketLabel } from "@/constants/markets";
 import { posKey } from "@/hooks/useTaxSimulation";
+import { TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   kind: "profit" | "loss";
@@ -36,7 +37,7 @@ function QtyInput({
         value={qty === 0 ? "" : qty}
         onChange={(e) => handleQtyChange(pos, e.target.value)}
         placeholder="0"
-        className="w-20 min-h-[40px] sm:min-h-0 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded px-2 py-1 text-sm sm:text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
+        className={`w-20 ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded px-2 py-1 text-sm sm:text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400`}
       />
       <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
         / {Math.floor(pos.qty)}주

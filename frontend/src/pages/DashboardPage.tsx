@@ -12,7 +12,7 @@ import ChallengeEmptyStateCard from "@/components/dashboard/ChallengeEmptyStateC
 import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfolioBanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { portfoliosQuery } from "@/api/queryOptions";
 
@@ -142,7 +142,7 @@ export default function DashboardPage() {
         <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
         <button
           onClick={() => void refetch()}
-          className="px-4 min-h-[44px] text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className={`px-4 ${TOUCH_HEIGHT_MIN} text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
         >
           다시 시도
         </button>

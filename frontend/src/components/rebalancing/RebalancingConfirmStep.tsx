@@ -4,7 +4,7 @@ import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 import { STRATEGY_OPTIONS } from "@/constants/rebalancingConfig";
 import { CashSummaryBar } from "./CashSummaryBar";
 import { RebalancingOrderTable } from "./RebalancingOrderTable";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   ordersCount: number;
@@ -62,7 +62,8 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
             <button
               key={opt.value}
               onClick={() => dispatch({ type: "SET_STRATEGY", strategy: opt.value })}
-              className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors border ${
+              aria-pressed={state.strategy === opt.value}
+              className={`${TOUCH_HEIGHT_MIN} w-full text-left px-3 py-2 rounded-lg text-xs transition-colors border ${
                 state.strategy === opt.value
                   ? "bg-indigo-100 dark:bg-indigo-600/30 border-indigo-300 dark:border-indigo-500/60 text-indigo-800 dark:text-indigo-200"
                   : "bg-white dark:bg-gray-700/40 border-gray-200 dark:border-gray-600/40 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/60"
@@ -293,7 +294,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                           onChange={(e) => {
                             if (e.target.value) addBuyAccount(e.target.value, acc.id);
                           }}
-                          className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-xs text-gray-500 dark:text-gray-400 focus:outline-none focus:border-indigo-500 hover:border-gray-400 dark:hover:border-gray-600 cursor-pointer"
+                          className={`${TOUCH_HEIGHT_MIN} w-full sm:w-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm sm:text-xs text-gray-500 dark:text-gray-400 focus:outline-none focus:border-indigo-500 hover:border-gray-400 dark:hover:border-gray-600 cursor-pointer`}
                         >
                           <option value="">+ 이 계좌에 매수 종목 추가</option>
                           {unassignedBuyItems.map((i) => (

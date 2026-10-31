@@ -4,6 +4,7 @@ import { RebalancingAnalysis } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { CASH_TICKER } from "@/constants/assets";
 import { DividendDiffCell } from "./RebalancingCells";
+import { TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   analysis: RebalancingAnalysis;
@@ -29,7 +30,7 @@ export default function RebalancingDividendSection({ analysis }: Props) {
         <div className="flex items-center gap-3 shrink-0">
           <Link
             to="/invest-plan?tab=배당 계획"
-            className="inline-flex items-center min-h-[44px] sm:min-h-0 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
           >
             배당 목표 확인
           </Link>
@@ -37,7 +38,7 @@ export default function RebalancingDividendSection({ analysis }: Props) {
             <button
               onClick={() => setShowDividendDetail((v) => !v)}
               aria-expanded={showDividendDetail}
-              className="min-h-[44px] sm:min-h-0 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors`}
             >
               {showDividendDetail ? "▲ 접기" : "▼ 종목별 상세"}
             </button>

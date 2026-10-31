@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { fmtKrw } from "@/utils/format";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
-
-/** 모바일에서 scrollable 표가 처음 보여줄 행 수 — 페이지 안 중첩 스크롤 대신 "더 보기" (docs/plans/67) */
-const MOBILE_INITIAL_ROWS = 6;
 import EmptyState from "@/components/common/EmptyState";
+
+/** scrollable 표가 처음 보여줄 행 수 — 페이지 안 중첩 스크롤 대신 "더 보기" (docs/plans/67, 데스크톱은 102 D4) */
+const MOBILE_INITIAL_ROWS = 6;
+const DESKTOP_INITIAL_ROWS = 12;
 
 function pctColor(pct: number) {
   if (pct >= 100) return "text-red-500";
@@ -28,7 +29,7 @@ interface Props {
   actualLabel: string;
   rows: AchievementRow[];
   flat?: boolean;
-  /** true면 행이 많은 표 — 데스크탑은 내부 스크롤(최대 440px), 모바일은 최근 6행 + "더 보기" */
+  /** true면 행이 많은 표 — 최근 행만(모바일 6·데스크톱 12) 보여주고 "더 보기" */
   scrollable?: boolean;
   /** "목표를 바꾸면 과거 수치도 다시 계산" 안내 — 같은 카드에 표가 둘이면 한쪽만 (docs/plans/67 P1-15) */
   showRecalcNote?: boolean;
@@ -45,7 +46,7 @@ export default function AchievementTable({
   scrollable,
   showRecalcNote = true,
 }: Props) {
-  const [showAllMobile, setShowAllMobile] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   if (rows.length === 0) {
     return (
       <div className={flat ? undefined : "card"}>
@@ -56,8 +57,20 @@ export default function AchievementTable({
   }
 
   const reversed = [...rows].reverse();
-  const mobileRows =
-    scrollable && !showAllMobile ? reversed.slice(0, MOBILE_INITIAL_ROWS) : reversed;
+  const mobileRows = scrollable && !showAll ? reversed.slice(0, MOBILE_INITIAL_ROWS) : reversed;
+  const desktopRows = scrollable && !showAll ? reversed.slice(0, DESKTOP_INITIAL_ROWS) : reversed;
+  const moreButton = (initial: number, visibilityClass: string) =>
+    scrollable &&
+    reversed.length > initial && (
+      <button
+        type="button"
+        onClick={() => setShowAll((v) => !v)}
+        aria-expanded={showAll}
+        className={`${visibilityClass} ${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400`}
+      >
+        {showAll ? "접기" : `${reversed.length - initial}개월 더 보기`}
+      </button>
+    );
 
   return (
     <div className={flat ? undefined : "card"}>
@@ -106,23 +119,12 @@ export default function AchievementTable({
         })}
       </div>
 
-      {scrollable && reversed.length > MOBILE_INITIAL_ROWS && (
-        <button
-          type="button"
-          onClick={() => setShowAllMobile((v) => !v)}
-          aria-expanded={showAllMobile}
-          className={`sm:hidden ${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400`}
-        >
-          {showAllMobile ? "접기" : `${reversed.length - MOBILE_INITIAL_ROWS}개월 더 보기`}
-        </button>
-      )}
+      {moreButton(MOBILE_INITIAL_ROWS, "sm:hidden")}
 
       {/* 데스크탑 테이블 */}
-      <div
-        className={`hidden sm:block overflow-x-auto ${scrollable ? "max-h-[440px] overflow-y-auto" : ""}`}
-      >
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className={scrollable ? "sticky top-0 bg-white dark:bg-gray-900" : undefined}>
+          <thead>
             <tr className="text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
               <th className="text-left py-2 pr-3 font-medium">기간</th>
               <th className="text-right py-2 px-3 font-medium">{projectedLabel}</th>
@@ -132,7 +134,7 @@ export default function AchievementTable({
             </tr>
           </thead>
           <tbody>
-            {reversed.map((row) => {
+            {desktopRows.map((row) => {
               const diff = row.actual !== null ? row.actual - row.projected : null;
               return (
                 <tr
@@ -174,6 +176,7 @@ export default function AchievementTable({
           </tbody>
         </table>
       </div>
+      {moreButton(DESKTOP_INITIAL_ROWS, "hidden sm:flex")}
     </div>
   );
 }

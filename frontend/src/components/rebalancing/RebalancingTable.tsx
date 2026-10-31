@@ -5,7 +5,8 @@ import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { AssetAccount } from "@/api/assets";
-import { isOrderExecutableAccount } from "@/utils/accounts";
+import { isOrderExecutableAccount, isSyncableAccount } from "@/utils/accounts";
+import { RebalancingAccountSyncSection } from "./RebalancingAccountSyncSection";
 import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import RebalancingDividendSection from "./RebalancingDividendSection";
@@ -14,6 +15,7 @@ import RebalancingSummaryCards from "./RebalancingSummaryCards";
 import RebalancingWeightTable from "./RebalancingWeightTable";
 import RebalancingDetailMetrics from "./RebalancingDetailMetrics";
 import { calcTradeSummary, TRADING_FEE_RATE } from "./rebalancingTradeMath";
+import { TOUCH_HEIGHT_MIN, TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   analysis: RebalancingAnalysis;
@@ -38,6 +40,7 @@ export default function RebalancingTable({
   cashIsLive = false,
 }: Props) {
   const tradableAccounts = accounts.filter((a) => isOrderExecutableAccount(a.asset_type));
+  const hasSyncable = accounts.some((a) => isSyncableAccount(a.data_source));
   const [executionOpen, setExecutionOpen] = useState(false);
   const [detailsOpen, toggleDetailsOpen] = useCollapsible(
     false,
@@ -113,7 +116,7 @@ export default function RebalancingTable({
             <button
               onClick={() => void syncAndReanalyze()}
               disabled={syncState === "syncing"}
-              className="inline-flex items-center justify-center gap-1.5 self-end sm:self-auto px-3 py-1.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors"
+              className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} inline-flex items-center justify-center gap-1.5 self-end sm:self-auto px-3 py-1.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors`}
             >
               {syncState === "syncing" ? (
                 <Loader2 size={12} className="animate-spin" />
@@ -172,12 +175,14 @@ export default function RebalancingTable({
           type="button"
           onClick={toggleDetailsOpen}
           aria-expanded={detailsOpen}
-          className="w-full flex items-center justify-between min-h-[44px] text-sm font-medium text-gray-700 dark:text-gray-300"
+          className={`w-full flex items-center justify-between ${TOUCH_HEIGHT_MIN} text-sm font-medium text-gray-700 dark:text-gray-300`}
         >
           <span>
             상세 정보
             <span className="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">
-              {["집중도·CAGR", hasDividendData && "배당"].filter(Boolean).join(" · ")}
+              {["집중도·CAGR", hasDividendData && "배당", hasSyncable && onReanalyze && "계좌 갱신"]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           </span>
           <ChevronDown
@@ -193,6 +198,11 @@ export default function RebalancingTable({
 
           {/* 배당 분석 섹션 */}
           {hasDividendData && <RebalancingDividendSection analysis={analysis} />}
+
+          {/* 계좌 갱신은 분석 직후 매번 쓰는 동작이 아니라 상세 안으로 (plans/102 D5) */}
+          {onReanalyze && (
+            <RebalancingAccountSyncSection accounts={accounts} onReanalyze={onReanalyze} />
+          )}
 
           <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
             분석 시점:{" "}

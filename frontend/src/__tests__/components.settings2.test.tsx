@@ -2,7 +2,7 @@
  * Tests for settings components, RebalancingTable, ResetPasswordPage, and other uncovered components.
  */
 import { describe, it, expect, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
 
@@ -257,8 +257,9 @@ describe("MarketSignalAlertSection", () => {
 
   it("shows a separate daily digest toggle, defaulting to off", async () => {
     renderSection();
-    expect(await screen.findByLabelText("매일 아침 시장신호 요약")).toBeDefined();
-    expect(screen.getByText("매일 아침 시장신호 요약 꺼짐")).toBeDefined();
+    const digest = (await screen.findByLabelText("매일 아침 시장신호 요약")) as HTMLInputElement;
+    expect(digest.checked).toBe(false);
+    expect(screen.getByText("꺼짐")).toBeDefined();
   });
 
   it("reflects the daily digest opt-in state when already enabled", async () => {
@@ -267,7 +268,10 @@ describe("MarketSignalAlertSection", () => {
       market_signal_daily_digest_enabled: true,
     } as Awaited<ReturnType<typeof fetchSettings>>);
     renderSection();
-    expect(await screen.findByText("매일 아침 시장신호 요약 받는 중")).toBeDefined();
+    expect(await screen.findByText("받는 중")).toBeDefined();
+    expect((screen.getByLabelText("매일 아침 시장신호 요약") as HTMLInputElement).checked).toBe(
+      true,
+    );
   });
 });
 
@@ -474,5 +478,24 @@ describe("RebalancingTable", () => {
       </MemoryRouter>,
     );
     expect(document.body).toBeDefined();
+  });
+
+  it("계좌 데이터 갱신은 기본 접힌 '상세 정보' 안에 있다 (plans/102 D5)", () => {
+    localStorage.clear();
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingTable
+          analysis={mockAnalysis}
+          portfolioId="p1"
+          accounts={[mockAccount]}
+          onReanalyze={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("계좌 데이터 갱신")).toBeNull();
+    const details = screen.getByRole("button", { name: /상세 정보/ });
+    expect(details.textContent).toContain("계좌 갱신");
+    fireEvent.click(details);
+    expect(screen.getByText("계좌 데이터 갱신")).toBeDefined();
   });
 });

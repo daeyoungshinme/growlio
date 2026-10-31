@@ -4,7 +4,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { Transaction, TransactionCreate } from "@/api/transactions";
 import { fmtKrw } from "@/utils/format";
 import { TX_LABELS, TX_COLORS, txDeleteConfirmMessage } from "@/constants/transaction";
-import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { useIsSmUp } from "@/hooks/useMediaQuery";
 
@@ -118,7 +118,7 @@ export function TransactionList({
               onClick={() =>
                 setMobileLimit({ type: activeType, count: mobileCount + MOBILE_PAGE_SIZE })
               }
-              className="w-full min-h-[44px] text-xs font-medium text-blue-600 dark:text-blue-400"
+              className={`w-full ${TOUCH_HEIGHT_MIN} text-xs font-medium text-blue-600 dark:text-blue-400`}
             >
               더 보기 ({filtered.length - mobileCount}건 남음)
             </button>

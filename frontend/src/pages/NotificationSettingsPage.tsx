@@ -23,7 +23,7 @@ import { SectionCard } from "@/components/settings/shared";
 import { REPORT_ALERT_FIELDS, countEnabled } from "@/utils/notificationAlertGroups";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { settingsQuery } from "@/api/queryOptions";
@@ -114,7 +114,7 @@ function AlertHistorySection() {
             <button
               onClick={() => void fetchNextPage()}
               disabled={isFetchingNextPage}
-              className="w-full mt-2 min-h-[44px] text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors disabled:opacity-50"
+              className={`w-full mt-2 ${TOUCH_HEIGHT_MIN} text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors disabled:opacity-50`}
             >
               {isFetchingNextPage ? "불러오는 중..." : "더 보기"}
             </button>

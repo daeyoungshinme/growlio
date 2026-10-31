@@ -69,7 +69,9 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 
 디렉토리: assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings, tax. 최상위 `ErrorBoundary.tsx`, `Toaster.tsx`(`growlio:toast` 이벤트 구독).
 
-**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 오버플로우 메뉴 — 아이콘+라벨 함께 렌더, 모바일 `title` 미동작 우회), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalBody`·`ModalFooter` — `Modal`은 스크롤을 두지 않아 **긴 본문은 `ModalBody`로 감싸야** 하단에 닿고, **입력 폼 모달의 저장 버튼은 `ModalFooter`에**(본문 끝이면 모바일 키보드에 가려짐, `<form id>` + 버튼 `form=`)), `OfflineBanner`, `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(의존성 없는 SVG 도넛 — 홈이 recharts 청크 없이 그림), `Tabs`, `ToggleSwitch`(+`ToggleRow` — 행 전체가 label, 설정 목록은 이것), `InfoTip`(탭으로 여는 설명 팝오버 — hover 전용 툴팁은 없앴다), `TopLoadingBar`, `TreemapCell`
+**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 오버플로우 메뉴 — 아이콘+라벨 함께 렌더, 모바일 `title` 미동작 우회), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalBody`·`ModalFooter` — `Modal`은 스크롤을 두지 않아 **긴 본문은 `ModalBody`로 감싸야** 하단에 닿고, **입력 폼 모달의 저장 버튼은 `ModalFooter`에**(본문 끝이면 모바일 키보드에 가려짐, `<form id>` + 버튼 `form=`)), `OfflineBanner`, `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(의존성 없는 SVG 도넛 — 홈이 recharts 청크 없이 그림), `Tabs`, `ToggleSwitch`(+`ToggleRow` — 행 전체가 label, 설정 목록은 이것), `SegmentedControl`(2~4개 보기 전환·시장가/지정가 같은 택일 — 칩 버튼 직접 만들지 말 것), `InfoTip`(탭으로 여는 설명 팝오버 — hover 전용 툴팁은 없앴다), `TopLoadingBar`, `TreemapCell`
+
+**`layout/`**: `AppLayout`(로그인 후 셸 — 모달 열림 판정은 `hasOpenModal()`(`useModalBehavior`), body overflow로 추정 금지), `AuthLayout`(AppLayout 밖 전체 화면 — 인증·딥링크 확인 페이지는 이걸로 감싸야 safe-area·dvh가 잡힘), `Sidebar`, `BottomNav`
 
 - `BiometricGuard` — Android 생체 인증 게이트. **UI 게이트일 뿐 보안 경계 아님**(캐시된 JWT로 API 호출은 막히지 않음).
 - `OfflineBanner` — PWA Workbox `StaleWhileRevalidate`(dashboard/portfolio-overview/accounts)와 함께 오프라인 안내.
@@ -136,7 +138,7 @@ _알림 토글_ (`["settings"]` boolean 필드 조회/PUT)
 
 _모바일/네이티브_
 
-- `useBiometric` · `useHaptic` · `usePullToRefresh` · `useSwipeNavigation` · `usePushNotifications` · `useRegisterRefresh` · `useWidget`
+- `useBiometric` · `useHaptic` · `usePullToRefresh` · `useSwipeNavigation` · `useRevealFocusedInput`(키보드에 가린 입력 올림 — AppLayout에서 1회만) · `usePushNotifications` · `useRegisterRefresh` · `useWidget`
 - `useSyncAllWatcher` — "전체 갱신" 폴링. `App.tsx` `AppRoutes()`에서 **한 번만** 마운트(상태는 `stores/syncStore.ts`)
 
 _기타_
@@ -275,7 +277,8 @@ _기타_
 **모바일 UI**
 
 - `text-xs`(12px) 미만 임의값(`text-[10px]` 등) 금지. 차트 축·범례도 12px 이상.
-- 터치 타겟은 `constants/uiSizes.ts` 상수 — 인라인 `min-h-[44px] min-w-[44px]` 금지. `TOUCH_TARGET_MIN`(44px) 기본, `TOUCH_TARGET_MIN_MOBILE_ONLY`(sm 이상 축소), `TOUCH_TARGET_ROW`(좌측 정렬 행), `TOUCH_TARGET_COMPACT_MOBILE_ONLY`(36px — 배지·탭·칩처럼 조밀한 보조 요소).
+- 터치 타겟은 `constants/uiSizes.ts` 상수 — 인라인 `min-h-[44px]` 금지. `TOUCH_TARGET_MIN`(44px) 기본, `TOUCH_TARGET_MIN_MOBILE_ONLY`(sm 이상 축소), `TOUCH_TARGET_ROW`(좌측 정렬 행), `TOUCH_TARGET_COMPACT_MOBILE_ONLY`(36px — 배지·탭·칩처럼 조밀한 보조 요소).
+- `TOUCH_TARGET_*`는 `min-w`·flex 정렬까지 붙인다 → 전폭 버튼·텍스트 링크·입력처럼 높이만 필요하면 `TOUCH_HEIGHT_MIN`/`TOUCH_HEIGHT_MIN_MOBILE_ONLY`.
 - 이미 44px로 정착된 삭제 아이콘 버튼(`StockAccountCard`·`BankAccountCard`·`PortfolioItemRow`)은 개별 화면에서 축소 금지.
 - 금융 기록 삭제·실주문/실계획 생성 등 되돌릴 수 없는 동작은 `ConfirmModal`(무엇이 일어나는지 문구 포함)을 거친다.
 - 하단 고정 요소는 `index.css`의 `--bottom-nav-h` 변수 사용(`bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))]`) — rem 하드코딩 금지.

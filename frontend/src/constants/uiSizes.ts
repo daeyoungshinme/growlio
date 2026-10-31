@@ -6,3 +6,6 @@ export const TOUCH_TARGET_ROW = "min-h-[44px] min-w-[44px] flex items-center jus
  * 단독으로 배치되는 명확한 액션 버튼(수정/삭제/닫기 등)에는 TOUCH_TARGET_MIN_MOBILE_ONLY(44px)를 우선 사용. */
 export const TOUCH_TARGET_COMPACT_MOBILE_ONLY =
   "min-h-9 min-w-9 sm:min-h-0 sm:min-w-0 flex items-center justify-center";
+/** 폭·정렬은 그대로 두고 높이만 44px 확보(전폭 버튼·텍스트 링크·행 버튼·입력). */
+export const TOUCH_HEIGHT_MIN = "min-h-[44px]";
+export const TOUCH_HEIGHT_MIN_MOBILE_ONLY = "min-h-[44px] sm:min-h-0";

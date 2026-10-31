@@ -37,7 +37,12 @@ function PortfolioDriftRow({
       tabIndex={0}
       onClick={() => onClick?.(summary.portfolio_id)}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onClick?.(summary.portfolio_id);
+        // 안쪽 "자동화 설정" 버튼의 키 입력은 그 버튼 몫 — 행 이동까지 겹쳐 실행하지 않는다
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault(); // Space 기본 동작(페이지 스크롤) 차단
+          onClick?.(summary.portfolio_id);
+        }
       }}
       className="w-full flex flex-col py-2.5 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40 text-left transition-colors cursor-pointer"
     >

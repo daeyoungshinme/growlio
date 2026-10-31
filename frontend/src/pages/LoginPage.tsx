@@ -6,8 +6,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { prefetchDashboardData } from "@/api/prefetch";
-import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
+import AuthLayout from "@/components/layout/AuthLayout";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +37,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+    <AuthLayout>
       <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
@@ -100,13 +101,13 @@ export default function LoginPage() {
         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-3">
           <Link
             to="/find-account"
-            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-blue-600 dark:text-blue-400 hover:underline`}
           >
             아이디 찾기
           </Link>
           <Link
             to="/forgot-password"
-            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-blue-600 dark:text-blue-400 hover:underline`}
           >
             비밀번호 찾기
           </Link>
@@ -116,12 +117,12 @@ export default function LoginPage() {
           계정이 없으신가요?{" "}
           <Link
             to="/register"
-            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-blue-600 dark:text-blue-400 hover:underline`}
           >
             회원가입
           </Link>
         </p>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

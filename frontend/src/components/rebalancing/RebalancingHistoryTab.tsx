@@ -14,6 +14,7 @@ import {
   type RebalancingPlanLegSummary,
 } from "@/api/rebalancingPlan";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import SkeletonCard from "@/components/common/SkeletonCard";
 import { OrderResultList } from "./OrderResultList";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -373,11 +374,7 @@ export default function RebalancingHistoryTab() {
   );
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 size={20} className="animate-spin text-gray-500" />
-      </div>
-    );
+    return <SkeletonCard rows={4} />;
   }
 
   if (history.length === 0 && planLegs.length === 0) {

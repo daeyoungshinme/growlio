@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Flame, ChevronRight } from "lucide-react";
 import type { Challenge } from "@/api/challenges";
 import { clampPct, fmtPct } from "@/utils/format";
+import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 
 interface Props {
   challenges: Challenge[];
@@ -22,7 +23,7 @@ export default function ChallengeProgressCard({ challenges }: Props) {
   return (
     <Link
       to="/invest-plan?tab=챌린지"
-      className="card flex items-center gap-3 min-h-[44px] active:opacity-70 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+      className={`card flex items-center gap-3 ${TOUCH_HEIGHT_MIN} active:opacity-70 hover:border-blue-300 dark:hover:border-blue-700 transition-colors`}
     >
       <div className="p-1.5 rounded-lg shrink-0 bg-orange-100/60 dark:bg-orange-900/30">
         <Flame size={16} className="text-orange-500 dark:text-orange-400" aria-hidden="true" />

@@ -9,7 +9,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import type { PortfolioOverview } from "@/types";
-import SegmentedControl from "./allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import RegionAllocationView, { type RegionBasis } from "./allocation/RegionAllocationView";
 import StockAllocationView from "./allocation/StockAllocationView";
 import IndexAllocationView from "./allocation/IndexAllocationView";

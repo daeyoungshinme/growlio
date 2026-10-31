@@ -8,7 +8,7 @@ import type {
 } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
-import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { useCollapsible } from "@/hooks/useCollapsible";

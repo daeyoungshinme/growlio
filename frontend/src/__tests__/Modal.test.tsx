@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, fireEvent, getAllByRole } from "@testing-library/react";
 import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
+import { hasOpenModal } from "@/hooks/useModalBehavior";
 
 afterEach(() => {
   document.body.style.overflow = "";
@@ -71,6 +72,21 @@ describe("Modal", () => {
     );
     fireEvent.click(getByRole("dialog").parentElement!);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("hasOpenModal은 body overflow와 무관하게 열린 모달 수로 판정한다 (Android 뒤로가기·스와이프)", () => {
+    expect(hasOpenModal()).toBe(false);
+    document.body.style.overflow = "hidden"; // 다른 코드가 잠가도 모달로 오판하지 않는다
+    expect(hasOpenModal()).toBe(false);
+
+    const { unmount } = render(
+      <Modal onClose={vi.fn()}>
+        <p>내용</p>
+      </Modal>,
+    );
+    expect(hasOpenModal()).toBe(true);
+    unmount();
+    expect(hasOpenModal()).toBe(false);
   });
 
   it("열려 있는 동안 body 스크롤을 잠그고 닫히면 복원한다", () => {

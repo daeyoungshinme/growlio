@@ -11,6 +11,7 @@ import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
 import {
+  TOUCH_HEIGHT_MIN,
   TOUCH_TARGET_COMPACT_MOBILE_ONLY,
   TOUCH_TARGET_MIN,
   TOUCH_TARGET_MIN_MOBILE_ONLY,
@@ -103,7 +104,7 @@ export function StockPriceAlertSection() {
               {suggestions.map((s) => (
                 <button
                   key={`${s.ticker}-${s.market}`}
-                  className="w-full text-left px-3 min-h-[44px] text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className={`w-full text-left px-3 ${TOUCH_HEIGHT_MIN} text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}
                   onClick={() => {
                     setSelectedStock(s);
                     setForm((f) => ({ ...f, query: `${s.name} (${s.ticker})` }));
@@ -119,8 +120,8 @@ export function StockPriceAlertSection() {
             </div>
           )}
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <div className="flex-1 min-w-[120px]">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="col-span-2 sm:col-span-1">
             <label className={LABEL_MD}>목표가 (원)</label>
             <input
               type="number"
@@ -132,7 +133,7 @@ export function StockPriceAlertSection() {
               min="0"
             />
           </div>
-          <div className="flex-1 min-w-[100px]">
+          <div>
             <label className={LABEL_MD}>조건</label>
             <select
               className={FORM_INPUT_SM}
@@ -145,7 +146,7 @@ export function StockPriceAlertSection() {
               <option value="ABOVE">이상 (↑)</option>
             </select>
           </div>
-          <div className="flex-1 min-w-[80px]">
+          <div>
             <label className={LABEL_MD}>알림 횟수</label>
             <input
               type="number"

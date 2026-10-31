@@ -5,13 +5,16 @@ import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
 
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
-import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
 import RebalancingStrategyCard from "@/components/rebalancing/RebalancingStrategyCard";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
-import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { useAnalysisState } from "@/hooks/useAnalysisState";
-import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import {
+  TOUCH_HEIGHT_MIN,
+  TOUCH_HEIGHT_MIN_MOBILE_ONLY,
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+} from "@/constants/uiSizes";
 
 const BacktestTab = lazy(() => import("@/components/rebalancing/BacktestTab"));
 
@@ -174,7 +177,7 @@ export function AnalysisPanel({
               <span>{error}</span>
               <button
                 onClick={handleRebalancingAnalysis}
-                className="flex-none flex items-center gap-1 font-medium hover:text-red-600 dark:hover:text-red-300 transition-colors"
+                className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} flex-none flex items-center gap-1 font-medium hover:text-red-600 dark:hover:text-red-300 transition-colors`}
               >
                 <RefreshCw size={12} /> 다시 시도
               </button>
@@ -200,10 +203,6 @@ export function AnalysisPanel({
                   cashIsLive={cashIsLive}
                   onReanalyze={() => triggerRebalancingAnalysis(analysis.portfolio_id)}
                 />
-                <RebalancingAccountSyncSection
-                  accounts={analysisAccounts}
-                  onReanalyze={() => triggerRebalancingAnalysis(analysis.portfolio_id)}
-                />
               </>
             );
           })()}
@@ -214,7 +213,7 @@ export function AnalysisPanel({
           <p className="text-sm text-red-500">{error}</p>
           <button
             onClick={handleRebalancingAnalysis}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className={`${TOUCH_HEIGHT_MIN} flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
           >
             <RefreshCw size={13} /> 다시 시도
           </button>

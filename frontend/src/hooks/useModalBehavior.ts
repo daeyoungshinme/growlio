@@ -17,6 +17,12 @@ interface ModalEntry {
 }
 const openModals: ModalEntry[] = [];
 
+/** 모달이 하나라도 열려 있는지 — Android 뒤로가기·스와이프 탭 전환이 모달 위에서 동작하지 않게 판정.
+ * body.style.overflow로 추정하면 다른 코드가 overflow를 건드릴 때 오판한다. */
+export function hasOpenModal(): boolean {
+  return openModals.length > 0;
+}
+
 // 맨 위 판정: DOM상 다른 열린 모달을 품고 있으면 아래층(같이 마운트되면 자식 effect가 먼저 돌아 등록 순서가 뒤집힘),
 // 서로 품지 않는 형제 모달끼리는 나중에 열린 쪽이 위.
 function isTopModal(me: ModalEntry): boolean {

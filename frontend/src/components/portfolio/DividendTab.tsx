@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrwShort } from "@/utils/format";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import SegmentedControl from "./allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 
 const TreemapChart = lazy(() => import("./TreemapChart"));
 const MonthlyDividendChart = lazy(() => import("./MonthlyDividendChart"));
@@ -16,7 +16,7 @@ import {
   yieldBadgeClass,
 } from "@/utils/dividendUtils";
 import EmptyState from "@/components/common/EmptyState";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { marketLabel } from "@/constants/markets";
 
 interface DividendSummary {
@@ -432,7 +432,7 @@ export default function DividendTab({
           />
           <Link
             to="/invest-plan?tab=배당 계획"
-            className="flex items-center min-h-[44px] text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            className={`flex items-center ${TOUCH_HEIGHT_MIN} text-sm text-blue-600 dark:text-blue-400 hover:underline`}
           >
             배당이 적은 달을 채우려면 계획 › 배당 계획의 월별 균등화 추천을 확인하세요 →
           </Link>

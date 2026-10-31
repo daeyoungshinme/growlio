@@ -5,6 +5,7 @@ import { getSupabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { REDIRECT_DELAY_MS } from "@/constants/timers";
 
+import AuthLayout from "@/components/layout/AuthLayout";
 // 다른 기기/브라우저에서 링크를 열어 PKCE code_verifier가 없는 경우 등
 // SIGNED_IN 이벤트가 영영 오지 않을 수 있어 무한 대기를 방지
 const AUTH_CALLBACK_TIMEOUT_MS = 5000;
@@ -94,7 +95,7 @@ export default function AuthCallbackPage() {
   }, [state, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+    <AuthLayout>
       <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
         <div className="flex items-center gap-2 mb-6 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
@@ -138,6 +139,6 @@ export default function AuthCallbackPage() {
           </div>
         )}
       </div>
-    </div>
+    </AuthLayout>
   );
 }
