@@ -13,8 +13,11 @@ from datetime import UTC, datetime
 from app.services.notifications.email_templates._shared import (
     _SIGNAL_LEVEL_COLOR,
     _SIGNAL_LEVEL_LABEL,
+    _data_table,
     _email_div,
     _kv_table,
+    _name_ticker_cell,
+    _notice_banner,
 )
 from app.utils.kst import KST
 
@@ -42,21 +45,15 @@ def _order_preview_table(items: list) -> str:
         price_str = f"{float(price):,.0f}" if price else "—"
         rows_html += (
             f"<tr>"
-            f"<td style='{td}'>{name}<br><span style='color:#6b7280;font-size:11px;'>{ticker}</span></td>"
+            f"{_name_ticker_cell(td, name, ticker)}"
             f"<td style='{td}text-align:center;color:{side_color};font-weight:bold;'>{side_label}</td>"
             f"<td style='{td}text-align:right;'>{qty:,}주</td>"
             f"<td style='{td}text-align:right;'>{price_str}</td>"
             f"</tr>"
         )
-    return (
-        f"<p style='color:#374151;margin-top:16px;font-weight:bold;'>예상 매수/매도 수량 (참고용)</p>"
-        f"<table style='width:100%;border-collapse:collapse;margin-top:4px;'>"
-        f"<thead><tr style='background:#f1f5f9;'>"
-        f"<th style='padding:8px;text-align:left;font-size:13px;'>종목</th>"
-        f"<th style='padding:8px;text-align:center;font-size:13px;'>구분</th>"
-        f"<th style='padding:8px;text-align:right;font-size:13px;'>수량</th>"
-        f"<th style='padding:8px;text-align:right;font-size:13px;'>참고가</th>"
-        f"</tr></thead><tbody>{rows_html}</tbody></table>"
+    headers = [("종목", "left"), ("구분", "center"), ("수량", "right"), ("참고가", "right")]
+    return "<p style='color:#374151;margin-top:16px;font-weight:bold;'>예상 매수/매도 수량 (참고용)</p>" + _data_table(
+        headers, rows_html, margin_top=4
     )
 
 
@@ -74,21 +71,14 @@ def _plan_items_table(items: list) -> str:
         price_str = f"{float(price):,.0f}" if price else "—"
         rows_html += (
             f"<tr>"
-            f"<td style='{td}'>{name}<br><span style='color:#6b7280;font-size:11px;'>{ticker}</span></td>"
+            f"{_name_ticker_cell(td, name, ticker)}"
             f"<td style='{td}text-align:right;'>{qty:,}주</td>"
             f"<td style='{td}text-align:center;'>{type_label}</td>"
             f"<td style='{td}text-align:right;'>{price_str}</td>"
             f"</tr>"
         )
-    return (
-        f"<table style='width:100%;border-collapse:collapse;margin-top:8px;'>"
-        f"<thead><tr style='background:#f1f5f9;'>"
-        f"<th style='padding:8px;text-align:left;font-size:13px;'>종목</th>"
-        f"<th style='padding:8px;text-align:right;font-size:13px;'>수량</th>"
-        f"<th style='padding:8px;text-align:center;font-size:13px;'>주문유형</th>"
-        f"<th style='padding:8px;text-align:right;font-size:13px;'>참고가</th>"
-        f"</tr></thead><tbody>{rows_html}</tbody></table>"
-    )
+    headers = [("종목", "left"), ("수량", "right"), ("주문유형", "center"), ("참고가", "right")]
+    return _data_table(headers, rows_html, margin_top=8)
 
 
 def rebalancing_alert_template(
@@ -117,25 +107,9 @@ def rebalancing_alert_template(
 
     test_prefix = "[테스트] " if is_test else ""
     test_banner = (
-        (
-            "<div style='background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;"
-            "padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e;'>"
-            "⚠️ 이것은 테스트 알림입니다. 실제 리밸런싱 조건과 무관하게 발송되었습니다."
-            "</div>"
-        )
-        if is_test
-        else ""
+        _notice_banner("⚠️ 이것은 테스트 알림입니다. 실제 리밸런싱 조건과 무관하게 발송되었습니다.") if is_test else ""
     )
-    automation_note_banner = (
-        (
-            "<div style='background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;"
-            "padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e;'>"
-            f"{automation_note}"
-            "</div>"
-        )
-        if automation_note
-        else ""
-    )
+    automation_note_banner = _notice_banner(automation_note) if automation_note else ""
 
     if is_composite_triggered and not drifting_count:
         # 복합신호는 특정 포트폴리오가 아닌 계정 전체 기준으로 평가되므로 포트폴리오명을 노출하지 않는다.
@@ -259,7 +233,7 @@ def rebalancing_execution_template(
         )
         rows_html += (
             f"<tr>"
-            f"<td style='{td}'>{name}<br><span style='color:#6b7280;font-size:11px;'>{ticker}</span></td>"
+            f"{_name_ticker_cell(td, name, ticker)}"
             f"<td style='{td}text-align:center;'>{action_label}</td>"
             f"<td style='{td}text-align:right;'>{qty_str}</td>"
             f"<td style='{td}text-align:center;color:{status_color};font-weight:bold;'>"
@@ -279,14 +253,9 @@ def rebalancing_execution_template(
         + (f" &nbsp;·&nbsp; 건너뜀 {total_skipped}건" if total_skipped else "")
         + "</div>"
         + (
-            f"<table style='width:100%;border-collapse:collapse;margin-top:8px;'>"
-            f"<thead><tr style='background:#f1f5f9;'>"
-            f"<th style='padding:8px;text-align:left;font-size:13px;'>종목</th>"
-            f"<th style='padding:8px;text-align:center;font-size:13px;'>구분</th>"
-            f"<th style='padding:8px;text-align:right;font-size:13px;'>수량</th>"
-            f"<th style='padding:8px;text-align:center;font-size:13px;'>결과</th>"
-            f"</tr></thead>"
-            f"<tbody>{rows_html}</tbody></table>"
+            _data_table(
+                [("종목", "left"), ("구분", "center"), ("수량", "right"), ("결과", "center")], rows_html, margin_top=8
+            )
             if rows_html
             else ""
         )
