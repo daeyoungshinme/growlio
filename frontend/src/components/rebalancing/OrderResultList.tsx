@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { ExecutionResult, OrderResult } from "@/api/rebalancing";
-import { isOverseasMarket } from "@/constants/markets";
-import { fmtKrw } from "@/utils/format";
+import { fmtNativePrice } from "@/utils/format";
 import { OrderCancelAction, type CancelOutcome } from "./OrderCancelAction";
 import { SideBadge, StatusBadge } from "./RebalancingBadges";
 
@@ -12,7 +11,7 @@ function hasCancelInfo(o: OrderResult): boolean {
 
 function fmtOrderPrice(price: number | null | undefined, market: string): string {
   if (price == null) return "-";
-  return isOverseasMarket(market) ? `$${price.toFixed(2)}` : fmtKrw(price);
+  return fmtNativePrice(price, market);
 }
 
 /** 계좌별 주문 결과(모바일 카드·데스크탑 표) — 실행 직후 결과 화면과 실행 이력 상세가 함께 쓴다. */

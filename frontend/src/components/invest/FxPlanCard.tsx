@@ -8,7 +8,7 @@ import { SELECT_SM } from "@/constants/inputStyles";
 import { STALE_TIME } from "@/constants/queryConfig";
 import Tabs from "@/components/common/Tabs";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { fmtKrw, fmtPct, clampPct } from "@/utils/format";
+import { fmtKrw, fmtPct, clampPct, fmtUsd } from "@/utils/format";
 import { invalidateAlertData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
@@ -33,7 +33,7 @@ const ZONE_LABEL: Record<FxZone, { text: string; className: string }> = {
 };
 
 const fmtRate = (n: number) => `${n.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}원`;
-const fmtUsd = (n: number) => `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
 
 interface Props {
   /** 접힘 카드 안에 임베드될 때 — 외곽 card 스타일 생략 */
@@ -244,10 +244,10 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
 
           <p className="text-sm text-gray-600 dark:text-gray-300">
             {data.portfolio_name} 해외 비중 {data.overseas_weight_pct.toFixed(0)}% × 월{" "}
-            {fmtKrw(data.monthly_deposit_krw ?? 0)} → 월 {fmtUsd(data.monthly_need_usd)} ×{" "}
-            {data.months}개월 − 보유 {fmtUsd(data.held_usd)} ={" "}
+            {fmtKrw(data.monthly_deposit_krw ?? 0)} → 월 {fmtUsdWhole(data.monthly_need_usd)} ×{" "}
+            {data.months}개월 − 보유 {fmtUsdWhole(data.held_usd)} ={" "}
             <span className="font-semibold text-gray-900 dark:text-gray-100">
-              {fmtUsd(data.need_usd)} 필요
+              {fmtUsdWhole(data.need_usd)} 필요
             </span>
           </p>
 
@@ -274,7 +274,7 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
                       )}
                     </div>
                     <div className="text-right tabular-nums">
-                      <p className="text-sm font-semibold">{fmtUsd(t.usd)}</p>
+                      <p className="text-sm font-semibold">{fmtUsdWhole(t.usd)}</p>
                       <p className="text-xs text-gray-400 dark:text-gray-500">
                         약 {fmtKrw(t.krw_estimate)}
                       </p>

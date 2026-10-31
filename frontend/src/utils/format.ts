@@ -1,5 +1,7 @@
 /** 공유 포맷팅 유틸리티 — 금액, 날짜, 퍼센트 표기 */
 
+import { isOverseasMarket } from "@/constants/markets";
+
 /**
  * 금액을 억원/만원/원 단위로 변환 (음수 지원)
  * 예: 150_000_000 → "1.50억원", 50_000 → "5만원", 3_000 → "3,000원"
@@ -16,6 +18,23 @@ export function fmtKrw(n: number): string {
  */
 export function fmtKrwPrice(n: number): string {
   return `${Math.floor(n).toLocaleString()}원`;
+}
+
+/**
+ * 달러 금액 — 예: fmtUsd(1234.5) → "$1,234.5", fmtUsd(1234.5, 0) → "$1,235"
+ */
+export function fmtUsd(n: number, maxFractionDigits = 2): string {
+  return `$${n.toLocaleString("en-US", { maximumFractionDigits: maxFractionDigits })}`;
+}
+
+/** 달러 주가 — 센트까지 고정 2자리. 예: 512.3 → "$512.30" */
+export function fmtUsdPrice(n: number): string {
+  return `$${n.toFixed(2)}`;
+}
+
+/** 주문가·체결가처럼 시장 통화 그대로인 주가 — 해외는 달러, 국내는 원 단위(만원 축약 없음) */
+export function fmtNativePrice(price: number, market: string): string {
+  return isOverseasMarket(market) ? fmtUsdPrice(price) : fmtKrwPrice(price);
 }
 
 /**
