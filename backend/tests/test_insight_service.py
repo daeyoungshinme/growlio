@@ -107,6 +107,33 @@ class TestCheckRebalancingOpportunity:
         assert result == []
 
     @pytest.mark.asyncio
+    async def test_portfolio_failure_reports_partial(self, mock_db, override_settings):
+        """포트폴리오 하나가 실패하면 호출자에게 알려 짧은 TTL로 캐싱하게 한다 (plans/101 A4)."""
+        from app.services.insight_service import _check_rebalancing_opportunity
+
+        portfolio = SimpleNamespace(
+            id=uuid.uuid4(),
+            name="실패",
+            base_type="STOCK_ONLY",
+            items=[SimpleNamespace(ticker="AAPL", market="NASDAQ", name="애플", weight=100.0)],
+            account_ids=None,
+        )
+        exec_result = MagicMock()
+        exec_result.scalars.return_value.all.return_value = [portfolio]
+        mock_db.execute = AsyncMock(return_value=exec_result)
+        mock_db.rollback = AsyncMock()
+        on_partial = MagicMock()
+
+        with patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
+        ):
+            result = await _check_rebalancing_opportunity(uuid.uuid4(), mock_db, on_partial_failure=on_partial)
+
+        assert result == []
+        on_partial.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_index_group_counts_member_holdings(self, mock_db, override_settings):
         """plans/77 B1 — 지수 그룹(대표 VOO + 멤버 SPY)은 합계로 판정한다. 예전엔 대표 VOO만 봐 70%p 거짓 이탈."""
         from app.services.insight_service import _check_rebalancing_opportunity
@@ -248,7 +275,7 @@ class TestGenerateInsights:
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("failing", ["dashboard", "checker"])
+    @pytest.mark.parametrize("failing", ["dashboard", "checker", "portfolio"])
     async def test_degraded_result_cached_briefly(self, mock_db, override_settings, failing):
         """일부 실패로 줄어든 목록은 1시간이 아니라 짧게만 캐싱한다 (plans/99 A3)."""
         from app.services.insight_service import generate_insights
@@ -262,6 +289,13 @@ class TestGenerateInsights:
             else AsyncMock(return_value={"total_assets_krw": 0, "asset_allocation": []})
         )
         rebalancing = AsyncMock(side_effect=RuntimeError("x")) if failing == "checker" else AsyncMock(return_value=[])
+        if failing == "portfolio":
+            # 체커는 성공했지만 포트폴리오 하나를 건너뛰었다 (plans/101 A4)
+            async def _partial(*_a, on_partial_failure, **_k):
+                on_partial_failure()
+                return []
+
+            rebalancing = AsyncMock(side_effect=_partial)
         with (
             patch("app.services.insight_service.get_dashboard_summary", new=dashboard),
             patch("app.services.insight_service._check_rebalancing_opportunity", new=rebalancing),
