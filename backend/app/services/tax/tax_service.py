@@ -5,7 +5,6 @@ from typing import Any, TypedDict
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.constants import (
     COMPREHENSIVE_TAX_THRESHOLD_KRW,
@@ -13,8 +12,8 @@ from app.constants import (
     POSITION_STOCK_ASSET_TYPES,
     TAX_DEFERRED_TAX_TYPES,
 )
-from app.models.asset import AssetAccount, AssetSnapshot, Transaction
-from app.services.accounts._snapshot_queries import latest_snapshot_subquery
+from app.models.asset import AssetAccount, Transaction
+from app.services.accounts._snapshot_queries import latest_snapshot_rows
 from app.utils.kst import today_kst
 
 _DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}
@@ -300,6 +299,17 @@ async def get_tax_summary(
     }
 
 
+async def _latest_stock_rows(user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None) -> list[Any]:
+    """활성 주식 계좌의 최신 스냅샷 행(포지션 포함). account_id 지정 시 그 계좌만."""
+    return await latest_snapshot_rows(
+        db,
+        user_id,
+        account_ids=[account_id] if account_id is not None else None,
+        asset_types=POSITION_STOCK_ASSET_TYPES,
+        with_positions=True,
+    )
+
+
 async def get_overseas_positions_detail(
     user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None = None
 ) -> list[dict]:
@@ -307,24 +317,7 @@ async def get_overseas_positions_detail(
 
     최신 스냅샷 기준. 수익·손실 종목 모두 포함. account_id 지정 시 해당 계좌만 집계.
     """
-    subq = latest_snapshot_subquery(user_id=user_id)
-    conditions = [
-        AssetAccount.is_active == True,
-        AssetAccount.asset_type.in_(POSITION_STOCK_ASSET_TYPES),
-    ]
-    if account_id is not None:
-        conditions.append(AssetAccount.id == account_id)
-    result = await db.execute(
-        select(AssetSnapshot, AssetAccount)
-        .options(selectinload(AssetSnapshot.position_items))
-        .join(
-            subq,
-            (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
-        )
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(*conditions)
-    )
-    rows = result.all()
+    rows = await _latest_stock_rows(user_id, db, account_id)
 
     positions: list[dict] = []
     for snap, acc in rows:
@@ -457,24 +450,7 @@ async def _calc_stock_unrealized(
 
     Returns: (overseas_unrealized_krw, domestic_stock_value_krw, domestic_unrealized_krw, tax_deferred_value_krw)
     """
-    subq = latest_snapshot_subquery(user_id=user_id)
-    conditions = [
-        AssetAccount.is_active == True,
-        AssetAccount.asset_type.in_(POSITION_STOCK_ASSET_TYPES),
-    ]
-    if account_id is not None:
-        conditions.append(AssetAccount.id == account_id)
-    result = await db.execute(
-        select(AssetSnapshot, AssetAccount)
-        .options(selectinload(AssetSnapshot.position_items))
-        .join(
-            subq,
-            (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
-        )
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(*conditions)
-    )
-    rows = result.all()
+    rows = await _latest_stock_rows(user_id, db, account_id)
 
     overseas_value = 0.0
     overseas_invested = 0.0

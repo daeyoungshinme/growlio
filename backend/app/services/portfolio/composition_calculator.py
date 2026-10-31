@@ -9,9 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.enums import AssetType
-from app.models.asset import AssetAccount, AssetSnapshot, Position
+from app.models.asset import AssetAccount, Position
 from app.services.accounts._account_queries import active_accounts_stmt
-from app.services.accounts._snapshot_queries import latest_snapshot_subquery
+from app.services.accounts._snapshot_queries import latest_snapshot_rows
 from app.utils.cache_keys import CacheStoreType
 from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount
@@ -23,16 +23,9 @@ _STOCK_TYPES = POSITION_STOCK_ASSET_TYPES
 
 async def get_latest_snapshot_rows(user_id: uuid.UUID, db: AsyncSession) -> tuple[list, set]:
     """활성 계좌의 최신 스냅샷 행과 스냅샷이 있는 계좌 ID 집합을 반환한다."""
-    subq = latest_snapshot_subquery(user_id=user_id)
-    result = await db.execute(
-        select(AssetSnapshot, AssetAccount)
-        .join(subq, (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date))
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(AssetAccount.is_active == True)
-    )
-    rows = result.all()
+    rows = await latest_snapshot_rows(db, user_id)
     snapped_ids = {acc.id for _, acc in rows}
-    return list(rows), snapped_ids
+    return rows, snapped_ids
 
 
 async def get_no_snap_accounts(user_id: uuid.UUID, db: AsyncSession, snapped_ids: set) -> list:

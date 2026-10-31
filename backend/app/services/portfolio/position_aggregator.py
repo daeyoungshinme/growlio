@@ -7,8 +7,8 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import AssetAccount, AssetSnapshot, Position
-from app.services.accounts._snapshot_queries import latest_snapshot_subquery
+from app.models.asset import Position
+from app.services.accounts._snapshot_queries import latest_snapshot_rows
 
 
 async def query_latest_position_map(
@@ -24,20 +24,7 @@ async def query_latest_position_map(
     Returns:
         {"{ticker}-{market}": {"ticker": ..., "market": ..., "value_krw": ..., ["name": ...]}}
     """
-    subq = latest_snapshot_subquery(user_id=user_id)
-    q = (
-        select(AssetSnapshot, AssetAccount)
-        .join(
-            subq,
-            (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
-        )
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(AssetAccount.is_active == True)
-    )
-    if account_ids:
-        q = q.where(AssetAccount.id.in_(account_ids))
-    result = await db.execute(q)
-    rows = result.all()
+    rows = await latest_snapshot_rows(db, user_id, account_ids=account_ids)
 
     snap_ids = [snap.id for snap, _ in rows]
     pos_map: dict[str, dict] = {}
