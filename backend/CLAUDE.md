@@ -145,8 +145,9 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `order_cancel_service.py` — 실행 주문의 미체결분 취소(체결 조회 없이 요청, 증권사 거부=CANCEL_FAILED). **KIS 국내 취소는 주문 응답의 `KRX_FWDG_ORD_ORGNO`(`order_org_no`) 저장이 필수** — 없으면 취소 불가. 증권사 거부는 `BrokerOrderRejectedError`가 아니라 클라이언트의 `KisApiError`/`KiwoomApiError`로 먼저 온다. 취소 가능 판정(`cancel_block_reason`·활성 계좌 유형)은 `order_cancel_rules.py` — 실행 직후 결과·이력 상세·취소 요청이 같은 규칙을 쓴다. **토큰 발급은 DB commit을 하므로 주문 행 `FOR UPDATE` 전에** 받고 잠근 뒤 재확인
 - `krx_tick.py` — 국내 지정가 호가단위 보정(ETF·ETN 5원, 매수 내림·매도 올림)
 - `alert_check.py` — 드리프트 알림(10분 job). 복합신호 on/off는 **유저 단위**
+- `portfolio_analysis_service.py` — analyze 파이프라인(overview→배당·수익률→현재가 보강→분석→진단, 계좌범위·예수금별 캐시). 라우터는 소유 확인만
 - `drift_summary_service.py` — 이탈 요약(drift-summary·action-items 공유, 같은 세션이라 순차)
-- `strategy_service.py` · `alert_scope.py` · `alert_test.py` · `diagnosis_service.py`(설명 전용, alert 아님) · `overview_enrichment.py` · `_alert_queries.py`
+- `strategy_service.py` · `alert_scope.py`(계좌 범위 + 알림용 overview·분석 `load_alert_overview`·`analyze_alert_overview`) · `alert_test.py` · `diagnosis_service.py`(설명 전용, alert 아님) · `overview_enrichment.py` · `_alert_queries.py`
 - `broker_balance_service.py` — 3사 실시간 잔고. **주문 실행은 KIS/키움만**(토스 주문 API 미구현)
 
 **목표 역산 추천 (`goal/`)**

@@ -3,11 +3,11 @@
 import asyncio
 import time
 import uuid
-from typing import cast
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -29,11 +29,10 @@ from app.schemas.rebalancing import (
     RebalancingAnalysis,
 )
 from app.schemas.rebalancing.goal import CandidateOverlapRequest
-from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
 from app.services._settings_queries import get_or_create_settings, get_settings_row
 from app.services.accounts._account_queries import active_broker_accounts_stmt, get_account_including_inactive
-from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.etf.etf_overlap_service import analyze_candidate_overlap_for_user
+from app.services.goal._goal_recommendation_common import _cagr_lookback_years_from_settings
 from app.services.goal.goal_age_recommendation_service import (
     get_age_based_recommendation,
     get_cached_age_based_recommendation,
@@ -53,26 +52,17 @@ from app.services.goal.goal_recommendation_service import (
     get_stale_goal_recommendation,
     refresh_goal_recommendation_in_background,
 )
-from app.services.market_data.price_service import get_historical_returns
-from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.rebalancing.broker_balance_service import fetch_broker_balance
 from app.services.rebalancing.diagnosis_service import (
-    build_diagnosis_context,
     fetch_composite_signal,
 )
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
-from app.services.rebalancing.overview_enrichment import collect_dividend_map, enrich_overview_with_prices
+from app.services.rebalancing.portfolio_analysis_service import analyze_portfolio_rebalancing
 from app.services.rebalancing.service import (
     _item_attr,
-    analyze_rebalancing,
 )
 from app.utils.cache_keys import (
-    TTL_REBALANCING_ANALYSIS,
-    get_cached_json,
     get_goal_recommendation_generation,
-    portfolio_overview_acct_suffix,
-    rebalancing_analysis_key,
-    set_cached_json,
 )
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
@@ -91,94 +81,40 @@ async def analyze_portfolio(
     cache=Depends(get_cache_store),
 ):
     """현재 자산과 목표 포트폴리오를 비교해 리밸런싱 제안을 반환한다."""
-    portfolio = await db.scalar(
-        select(Portfolio)
-        .options(
-            selectinload(Portfolio.linked_accounts),
-            selectinload(Portfolio.items),
-        )
-        .where(
-            Portfolio.id == portfolio_id,
-            Portfolio.user_id == current_user.id,
-        )
+    portfolio = await get_owned_or_404(
+        db,
+        Portfolio,
+        portfolio_id,
+        current_user.id,
+        "포트폴리오를 찾을 수 없습니다",
+        options=(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items)),
     )
-    if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
+    return await analyze_portfolio_rebalancing(db, cache, current_user.id, portfolio, account_ids, deposit_krw_override)
 
-    portfolio_acct_ids = [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
-    effective_ids = account_ids if account_ids is not None else portfolio_acct_ids
 
-    cache_key = rebalancing_analysis_key(
-        current_user.id, portfolio_id, portfolio_overview_acct_suffix(effective_ids), deposit_krw_override
-    )
-    cached = await get_cached_json(cache, cache_key)
+async def _serve_recommendation[R](
+    background_tasks: BackgroundTasks,
+    user_id: uuid.UUID,
+    cache: Any,
+    get_cached: Callable[[Any, uuid.UUID, str], Awaitable[R | None]],
+    get_stale: Callable[[Any, uuid.UUID, str], Awaitable[R | None]],
+    refresh_in_background: Callable[[uuid.UUID, Any], Awaitable[None]],
+    compute: Callable[[str], Awaitable[R]],
+) -> R:
+    """추천 3종 공통: 캐시 → (만료됐으면) 마지막 정상 결과 + 응답 뒤 재계산 → 계산.
+
+    캐시 세대는 설정을 읽기 전에 잡는다 — 계산 중 설정이 저장되면 결과가 옛 세대 키로만 가게(plans/88).
+    1시간 키가 만료됐어도 마지막 정상 결과가 있으면 바로 돌려준다(plans/66·90 C6).
+    """
+    gen = await get_goal_recommendation_generation(cache, user_id)
+    cached = await get_cached(cache, user_id, gen)
     if cached is not None:
-        return RebalancingAnalysis.model_validate(cached)
-
-    # 같은 AsyncSession을 쓰는 호출은 동시 실행 불가(SQLAlchemy) — 순차 실행한다.
-    overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids, cache=cache)
-    base_dividend_items = await get_ticker_dividend_summary(current_user.id, db, account_ids=effective_ids)
-    base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
-
-    target_tickers = [
-        (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
-        for raw_item in portfolio.items
-        if not is_non_tradable(str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
-    ]
-    current_tickers = [
-        (p["ticker"], p["market"])
-        for p in overview.get("all_positions", [])
-        if p.get("ticker") and p.get("ticker") != "CASH"
-    ]
-
-    # 과거 수익률은 세션을 쓰지 않으니 병렬로 돌리고, 세션을 쓰는 두 호출은 순차 실행한다.
-    returns_task = asyncio.create_task(
-        get_historical_returns(list(set(target_tickers) | set(current_tickers)), cache=cache)
-    )
-    try:
-        dividend_map = await collect_dividend_map(current_user.id, db, cache, portfolio, base_dividend_map)
-        overview = await enrich_overview_with_prices(portfolio, overview, current_user.id, db, cache)
-    except BaseException:
-        returns_task.cancel()
-        raise
-    returns_map = await returns_task
-
-    if deposit_krw_override is not None:
-        old_deposit = float(overview.get("total_deposit_krw") or 0)
-        delta = deposit_krw_override - old_deposit
-        overview = {
-            **overview,
-            "total_deposit_krw": deposit_krw_override,
-            "total_assets_krw": float(overview.get("total_assets_krw", 0)) + delta,
-        }
-
-    # 알림·대기 계획·진단 요약과 같은 분석 기준 — TOTAL_ASSETS면 목표 밖 예수금도 이탈 항목으로 본다(plans/63 P1-3)
-    analysis = analyze_rebalancing(
-        portfolio,
-        overview,
-        cast(dict[tuple[str, str], DividendMapEntry], dividend_map),
-        cast(dict[tuple[str, str], ReturnsMapEntry], returns_map),
-        include_implicit_cash=True,
-    )
-
-    try:
-        settings_row = await get_settings_row(db, current_user.id)
-        enable_composite_signals = settings_row.composite_signal_alerts_enabled if settings_row else True
-        analysis.diagnosis_context = await build_diagnosis_context(
-            current_user.id,
-            db,
-            cache,
-            analysis,
-            overview,
-            enable_composite_signals=enable_composite_signals,
-            settings_row=settings_row,
-        )
-    except Exception as e:
-        logger.warning("diagnosis_context_build_failed", portfolio_id=str(portfolio_id), error=str(e))
-        analysis.diagnosis_context = None
-
-    await set_cached_json(cache, cache_key, analysis.model_dump(mode="json"), TTL_REBALANCING_ANALYSIS)
-    return analysis
+        return cached
+    stale = await get_stale(cache, user_id, gen)
+    if stale is not None:
+        background_tasks.add_task(refresh_in_background, user_id, cache)
+        return stale
+    return await compute(gen)
 
 
 @router.get("/goal-recommendation", response_model=GoalRecommendation)
@@ -192,20 +128,22 @@ async def get_overall_goal_recommendation_endpoint(
 ):
     """전체 계좌(전체 투자현황) 기준으로 목표 역산 추천을 반환한다 (자동 적용 아님)."""
     started = time.perf_counter()
-    # 캐시 세대는 설정을 읽기 전에 잡는다 — 계산 중 설정이 저장되면 결과가 옛 세대 키로만 가게(plans/88)
-    gen = await get_goal_recommendation_generation(cache, current_user.id)
-    # 캐시 히트면 overview·포지션 조회(캐시 미스 시 계산 입력)를 건너뛴다
-    cached = await get_cached_goal_recommendation(cache, current_user.id, gen)
-    if cached is not None:
-        return cached
-    # 1시간 키가 만료됐어도 마지막 정상 결과가 있으면 바로 돌려주고 응답 뒤에 재계산한다(plans/66)
-    stale = await get_stale_goal_recommendation(cache, current_user.id, gen)
-    if stale is not None:
-        background_tasks.add_task(refresh_goal_recommendation_in_background, current_user.id, cache)
-        return stale
-    result = await get_overall_goal_recommendation_for_user(current_user.id, db, cache, gen)
-    logger.info("goal_recommendation_cold_request", total_ms=round((time.perf_counter() - started) * 1000))
-    return result
+
+    async def compute(gen: str):
+        # 캐시 히트면 이 계산(overview·포지션 조회)을 건너뛴다
+        result = await get_overall_goal_recommendation_for_user(current_user.id, db, cache, gen)
+        logger.info("goal_recommendation_cold_request", total_ms=round((time.perf_counter() - started) * 1000))
+        return result
+
+    return await _serve_recommendation(
+        background_tasks,
+        current_user.id,
+        cache,
+        get_cached_goal_recommendation,
+        get_stale_goal_recommendation,
+        refresh_goal_recommendation_in_background,
+        compute,
+    )
 
 
 @router.get("/goal-recommendation/by-horizon", response_model=HorizonRecommendationResponse)
@@ -222,17 +160,20 @@ async def get_horizon_goal_recommendation_endpoint(
     목표금액/목표연도 설정과 무관하게 동작한다 — `/goal-recommendation`(전체 자산 기준 목표 역산)과는
     별개의 기능이며, 두 엔드포인트 모두 그대로 유지된다.
     """
-    gen = await get_goal_recommendation_generation(cache, current_user.id)
-    cached = await get_cached_horizon_recommendations(cache, current_user.id, gen)
-    if cached is not None:
-        return cached
-    # 1시간 키가 만료됐어도 마지막 정상 결과가 있으면 바로 돌려주고 응답 뒤에 재계산한다(plans/90 C6)
-    stale = await get_stale_horizon_recommendations(cache, current_user.id, gen)
-    if stale is not None:
-        background_tasks.add_task(refresh_horizon_recommendations_in_background, current_user.id, cache)
-        return stale
-    settings_row = await get_or_create_settings(db, current_user.id)
-    return await get_horizon_recommendations(cache, db, current_user.id, settings_row, gen=gen)
+
+    async def compute(gen: str):
+        settings_row = await get_or_create_settings(db, current_user.id)
+        return await get_horizon_recommendations(cache, db, current_user.id, settings_row, gen=gen)
+
+    return await _serve_recommendation(
+        background_tasks,
+        current_user.id,
+        cache,
+        get_cached_horizon_recommendations,
+        get_stale_horizon_recommendations,
+        refresh_horizon_recommendations_in_background,
+        compute,
+    )
 
 
 @router.get("/goal-recommendation/by-age", response_model=GoalRecommendation)
@@ -250,17 +191,20 @@ async def get_age_based_goal_recommendation_endpoint(
     목표금액/목표연도 역산은 하지 않는다 — `/goal-recommendation/by-horizon`과 동일하게 나이
     구간에서 유도한 리스크 성향/주식비중 상하한만으로 결과를 결정한다.
     """
-    gen = await get_goal_recommendation_generation(cache, current_user.id)
-    cached = await get_cached_age_based_recommendation(cache, current_user.id, gen)
-    if cached is not None:
-        return cached
-    # 1시간 키가 만료됐어도 마지막 정상 결과가 있으면 바로 돌려주고 응답 뒤에 재계산한다(plans/90 C6)
-    stale = await get_stale_age_based_recommendation(cache, current_user.id, gen)
-    if stale is not None:
-        background_tasks.add_task(refresh_age_based_recommendation_in_background, current_user.id, cache)
-        return stale
-    settings_row = await get_or_create_settings(db, current_user.id)
-    return await get_age_based_recommendation(cache, db, current_user.id, settings_row, gen=gen)
+
+    async def compute(gen: str):
+        settings_row = await get_or_create_settings(db, current_user.id)
+        return await get_age_based_recommendation(cache, db, current_user.id, settings_row, gen=gen)
+
+    return await _serve_recommendation(
+        background_tasks,
+        current_user.id,
+        cache,
+        get_cached_age_based_recommendation,
+        get_stale_age_based_recommendation,
+        refresh_age_based_recommendation_in_background,
+        compute,
+    )
 
 
 @router.post("/candidates/overlap", response_model=CandidateOverlapResponse)
@@ -316,7 +260,7 @@ async def get_portfolio_expected_metrics_endpoint(
     ]
 
     settings_row = await get_settings_row(db, current_user.id)
-    cagr_lookback_years = int(getattr(settings_row, "goal_cagr_lookback_years", None) or 10)
+    cagr_lookback_years = _cagr_lookback_years_from_settings(settings_row)
 
     return await compute_portfolio_expected_metrics(cache, items, cagr_lookback_years=cagr_lookback_years)
 
