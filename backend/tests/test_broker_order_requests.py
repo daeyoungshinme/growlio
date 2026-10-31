@@ -15,6 +15,7 @@ import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
+from app.exceptions import BrokerOrderRejectedError
 from app.kis import order as kis_order
 from app.kis.client import KisApiError
 from app.kis.constants import KIS_MOCK_BASE_URL, KIS_REAL_BASE_URL
@@ -423,6 +424,7 @@ class TestKisCancelOrder:
             method="GET",
             url=url,
             json={"rt_cd": "0", "output": [{"odno": "0000001", "nccs_qty": "5"}], "ctx_area_nk200": "NK1"},
+            headers={"tr_cont": "M"},
         )
         # 주문번호 앞자리 0은 응답마다 다를 수 있다 — 숫자 기준으로 맞춘다
         httpx_mock.add_response(method="GET", url=url, json={"rt_cd": "0", "output": [{"odno": "2", "nccs_qty": "3"}]})
@@ -447,6 +449,53 @@ class TestKisCancelOrder:
         )
 
         assert qty == 0
+
+    @pytest.mark.asyncio
+    async def test_overseas_unfilled_qty_stops_on_last_page_header(self, httpx_mock: HTTPXMock):
+        """본문 연속키가 있어도 헤더 tr_cont가 마지막(D)이면 다음 페이지를 부르지 않는다 (plans/101 A3)."""
+        httpx_mock.add_response(
+            method="GET",
+            json={"rt_cd": "0", "output": [{"odno": "1", "nccs_qty": "5"}], "ctx_area_nk200": "NK1"},
+            headers={"tr_cont": "D"},
+        )
+
+        qty = await kis_order.get_overseas_unfilled_qty(
+            "key", "secret", "tok", "12345678-01", market="NASDAQ", order_no="9", is_mock=False
+        )
+
+        assert qty == 0
+        assert len(httpx_mock.get_requests()) == 1
+
+    @pytest.mark.asyncio
+    async def test_overseas_unfilled_qty_page_limit_raises(self, httpx_mock: HTTPXMock):
+        """상한까지 못 찾으면 0(이미 체결)으로 단정하지 않고 실패로 올린다."""
+        for i in range(kis_order._UNFILLED_MAX_PAGES):
+            httpx_mock.add_response(
+                method="GET",
+                json={"rt_cd": "0", "output": [{"odno": "1", "nccs_qty": "5"}], "ctx_area_nk200": f"NK{i}"},
+                headers={"tr_cont": "M"},
+            )
+
+        with pytest.raises(BrokerOrderRejectedError, match="끝까지 확인하지 못했습니다"):
+            await kis_order.get_overseas_unfilled_qty(
+                "key", "secret", "tok", "12345678-01", market="NASDAQ", order_no="9", is_mock=False
+            )
+
+    @pytest.mark.asyncio
+    async def test_overseas_unfilled_qty_repeated_key_raises(self, httpx_mock: HTTPXMock):
+        """같은 연속키가 반복되면(마지막 페이지 재전송) 멈추고 실패로 올린다."""
+        for _ in range(2):
+            httpx_mock.add_response(
+                method="GET",
+                json={"rt_cd": "0", "output": [{"odno": "1", "nccs_qty": "5"}], "ctx_area_nk200": "NK1"},
+                headers={"tr_cont": "M"},
+            )
+
+        with pytest.raises(BrokerOrderRejectedError):
+            await kis_order.get_overseas_unfilled_qty(
+                "key", "secret", "tok", "12345678-01", market="NASDAQ", order_no="9", is_mock=False
+            )
+        assert len(httpx_mock.get_requests()) == 2
 
     @pytest.mark.asyncio
     async def test_overseas_unfilled_qty_mock_skips_request(self, httpx_mock: HTTPXMock):
