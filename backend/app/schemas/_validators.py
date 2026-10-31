@@ -1,7 +1,9 @@
 """공용 Pydantic 검증 함수."""
 
 import math
-from typing import Any, overload
+from typing import Annotated, Any, overload
+
+from pydantic import AfterValidator
 
 MAX_AMOUNT_KRW = 100_000_000_000  # 1000억 KRW
 
@@ -36,6 +38,13 @@ def validate_non_negative_amount(v: float | None) -> float | None:
     if v is not None and v > MAX_AMOUNT_KRW:
         raise ValueError(f"금액은 {MAX_AMOUNT_KRW:,}원을 초과할 수 없습니다")
     return v
+
+
+PositiveAmount = Annotated[float, AfterValidator(validate_positive_amount)]
+"""0 초과·유한·상한 이하 금액(원). `PositiveAmount | None`이면 None은 통과."""
+
+NonNegativeAmount = Annotated[float, AfterValidator(validate_non_negative_amount)]
+"""0 이상·유한·상한 이하 금액(원). `NonNegativeAmount | None`이면 None은 통과."""
 
 
 def validate_portfolio_weights(items: list[Any]) -> list[Any]:

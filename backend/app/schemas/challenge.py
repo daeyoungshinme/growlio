@@ -12,7 +12,7 @@ from app.models.challenge import (
     CHALLENGE_STATUSES,
     CHALLENGE_TYPES,
 )
-from app.schemas._validators import validate_non_negative_amount
+from app.schemas._validators import NonNegativeAmount
 
 _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
@@ -61,7 +61,7 @@ def check_type_targets(
 class ChallengeBase(BaseModel):
     title: str
     challenge_type: str
-    target_amount: float | None = None
+    target_amount: NonNegativeAmount | None = None
     target_pct: float | None = None
     target_months: int | None = None
     account_id: uuid.UUID | None = None
@@ -83,11 +83,6 @@ class ChallengeBase(BaseModel):
         if v not in CHALLENGE_TYPES:
             raise ValueError("지원하지 않는 챌린지 유형입니다")
         return v
-
-    @field_validator("target_amount")
-    @classmethod
-    def _validate_amount(cls, v: float | None) -> float | None:
-        return validate_non_negative_amount(v)
 
     @field_validator("target_pct")
     @classmethod
@@ -122,7 +117,7 @@ class ChallengeCreate(ChallengeBase):
 
 class ChallengeUpdate(BaseModel):
     title: str | None = None
-    target_amount: float | None = None
+    target_amount: NonNegativeAmount | None = None
     target_pct: float | None = None
     target_months: int | None = None
     deadline_month: str | None = None
@@ -137,11 +132,6 @@ class ChallengeUpdate(BaseModel):
         if v is None:
             raise ValueError("null로 비울 수 없는 필드입니다")
         return v
-
-    @field_validator("target_amount")
-    @classmethod
-    def _validate_amount(cls, v: float | None) -> float | None:
-        return validate_non_negative_amount(v)
 
     @field_validator("target_pct")
     @classmethod

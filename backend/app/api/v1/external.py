@@ -33,7 +33,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,7 +44,7 @@ from app.enums import AssetType, DataSource, TransactionType
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
-from app.schemas._validators import validate_positive_amount
+from app.schemas._validators import PositiveAmount
 from app.schemas.invest import GoalFeasibilityPreview
 from app.services._settings_queries import get_settings_row
 from app.services.accounts.asset_service import list_accounts as _list_accounts
@@ -254,17 +254,13 @@ async def get_investment_goal(
 class ExternalTransactionCreate(BaseModel):
     account_id: UUID
     transaction_type: TransactionType
-    amount: float
+    amount: PositiveAmount
     transaction_date: date
     notes: str | None = Field(default=None, max_length=1000)
     # 멱등 키 — 같은 사용자가 같은 키로 다시 보내면 새로 기록하지 않는다(nestlio: "nestlio:{거래id}:{동작}").
     external_ref: str | None = Field(default=None, min_length=1, max_length=100)
 
     # 내부 TransactionCreate와 같은 규칙 — 음수 DEPOSIT이 MANUAL 계좌 예수금을 깎거나 Numeric 오버플로로 500이 나지 않게
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float) -> float:
-        return validate_positive_amount(v)
 
 
 class ExternalTransactionResult(BaseModel):
