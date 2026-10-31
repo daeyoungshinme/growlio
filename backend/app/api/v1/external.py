@@ -49,9 +49,9 @@ from app.schemas.invest import GoalFeasibilityPreview
 from app.services._settings_queries import get_settings_row
 from app.services.accounts.asset_service import list_accounts as _list_accounts
 from app.services.accounts.snapshot_service import (
-    _upsert_snapshot,
     get_latest_snapshot_with_positions,
     get_latest_snapshots_by_account,
+    write_manual_deposit_snapshot,
 )
 from app.services.external_queries import (
     account_scoped_performance,
@@ -64,7 +64,7 @@ from app.utils.cache_keys import (
     invalidate_asset_account_caches,
 )
 from app.utils.currency import fetch_usd_krw
-from app.utils.kst import KST, today_kst
+from app.utils.kst import KST
 
 router = APIRouter(prefix="/external", tags=["external"])
 logger = structlog.get_logger()
@@ -345,22 +345,7 @@ async def create_external_transaction(
         cache = await get_cache_store()
         usd_rate = await fetch_usd_krw(cache)
         latest_snap, pos_list = await get_latest_snapshot_with_positions(db, account.id)
-        pos_value = sum(
-            (float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0)
-            for p in pos_list
-        )
-        usd_as_krw = float(account.deposit_usd or 0) * usd_rate
-        total = pos_value + float(account.deposit_krw or 0) + usd_as_krw
-        await _upsert_snapshot(
-            db,
-            account_id=account.id,
-            user_id=account.user_id,
-            snapshot_date=today_kst(),
-            amount_krw=total,
-            invested_amount=latest_snap.invested_amount if latest_snap else None,
-            unrealized_pnl=latest_snap.unrealized_pnl if latest_snap else None,
-            source="MANUAL",
-        )
+        await write_manual_deposit_snapshot(db, account, latest_snap=latest_snap, positions=pos_list, usd_rate=usd_rate)
 
     try:
         await db.commit()

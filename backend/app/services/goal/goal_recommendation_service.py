@@ -176,15 +176,9 @@ async def build_overall_recommendation_inputs(
     """전체 자산 기준 추천의 입력 `(base_krw, existing_items)` — 엔드포인트·백그라운드 갱신·
     추천 변화 알림 job이 같은 입력을 쓰도록 한 곳에 둔다.
 
-    부동산은 MVO 후보에 포함되지 않으므로(성장 미모델링) 필요 수익률 역산의 원금(base_krw)에서
-    제외한다 — 그렇지 않으면 부동산 추가만으로 필요 수익률이 부당하게 낮아지거나 "이미 달성"으로
-    잘못 판정된다."""
+    필요 수익률 역산의 원금(base_krw)은 부동산을 뺀 투자자산이다(`_grc.investable_assets_krw`)."""
     overview = await build_portfolio_overview(user_id, db, cache=cache)
-    real_estate_krw = next(
-        (item["amount_krw"] for item in overview.get("asset_type_allocation", []) if item.get("type") == "REAL_ESTATE"),
-        0.0,
-    )
-    base_krw = float(overview.get("total_assets_krw", 0)) - real_estate_krw
+    base_krw = _grc.investable_assets_krw(overview)
     pos_map = await query_latest_position_map(user_id, db, include_name=True)
     return base_krw, existing_items_from_positions(pos_map)
 

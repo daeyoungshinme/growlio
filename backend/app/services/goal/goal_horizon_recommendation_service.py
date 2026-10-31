@@ -398,15 +398,15 @@ def _short_term_equity_floor_from_settings(settings_row: UserSettings) -> float:
 async def _horizon_required_dividend_yield_pct(
     cache: CacheStoreType, db: AsyncSession, user_id: uuid.UUID, settings_row: UserSettings
 ) -> float | None:
-    """배당목표(annual_dividend_goal)가 있으면 전체 자산 기준(오버롤 경로)과 동일한 필요배당수익률(%)을
-    계산한다 — 모든 (기간,세제유형) 조합에 동일하게 적용한다. 조합별 자산총액으로 비례배분해도 결과가
-    같은 퍼센트로 나오므로(목표배당금 × 조합비중 ÷ 조합자산 = 목표배당금 ÷ 전체자산) 조합마다
-    다시 계산할 필요가 없다."""
+    """배당목표(annual_dividend_goal)가 있으면 전체 자산 기준(오버롤 경로)과 같은 기준 자산(부동산 제외)으로
+    필요배당수익률(%)을 계산한다 — 모든 (기간,세제유형) 조합에 동일하게 적용한다.
+    조합별 자산총액으로 비례배분해도 결과가 같은 퍼센트로 나오므로
+    (목표배당금 × 조합비중 ÷ 조합자산 = 목표배당금 ÷ 전체자산) 조합마다 다시 계산할 필요가 없다."""
     annual_dividend_goal = getattr(settings_row, "annual_dividend_goal", None)
     if not annual_dividend_goal:
         return None
     overall_overview = await build_portfolio_overview(user_id, db, account_ids=None, cache=cache)
-    return _grc._required_dividend_yield_pct(annual_dividend_goal, float(overall_overview.get("total_assets_krw", 0)))
+    return _grc._required_dividend_yield_pct(annual_dividend_goal, _grc.investable_assets_krw(overall_overview))
 
 
 async def _accounts_by_horizon_tax_pair(db: AsyncSession, user_id: uuid.UUID) -> dict[tuple[str, str], list[uuid.UUID]]:

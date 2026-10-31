@@ -53,7 +53,7 @@ from app.services.accounts.credential_service import encrypt, encrypt_if_present
 from app.services.accounts.snapshot_service import (
     _upsert_snapshot,
     get_latest_snapshot_with_positions,
-    sync_snapshot_positions,
+    write_manual_deposit_snapshot,
 )
 from app.services.accounts.sync_all_service import get_sync_all_status, is_sync_all_running, run_sync_all
 from app.services.tax.isa_service import calc_account_auto_pnl
@@ -283,26 +283,9 @@ async def update_account(
     if deposit_trigger:
         cache = await get_cache_store()
         usd_rate = await fetch_usd_krw(cache)
-
-        pos_value = sum(
-            (float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0)
-            for p in pos_list
+        _, total = await write_manual_deposit_snapshot(
+            db, account, latest_snap=latest_snap, positions=pos_list, usd_rate=usd_rate
         )
-        usd_as_krw = float(account.deposit_usd or 0) * usd_rate
-        total = pos_value + float(account.deposit_krw or 0) + usd_as_krw
-        new_snap = await _upsert_snapshot(
-            db,
-            account_id=account.id,
-            user_id=account.user_id,
-            snapshot_date=today_kst(),
-            amount_krw=total,
-            invested_amount=latest_snap.invested_amount if latest_snap else None,
-            unrealized_pnl=latest_snap.unrealized_pnl if latest_snap else None,
-            source="MANUAL",
-        )
-        # 스냅샷 포지션 복사 (기존 포지션 → 새 스냅샷)
-        if pos_list:
-            await sync_snapshot_positions(db, snapshot_id=new_snap.id, account_id=account.id, positions=pos_list)
         if latest_snap is not None and account.asset_type in _CASH_ASSET_TYPES:
             # 현금성 계좌는 시장가 변동이 없으므로 잔액 변화 = 순수 입출금.
             # 거래내역으로 기록하지 않으면 이 변화분이 통째로 "투자 수익"으로 오인되어

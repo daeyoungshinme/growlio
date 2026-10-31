@@ -11,11 +11,11 @@ from datetime import timedelta
 from typing import Any
 
 import structlog
-from tenacity import retry
 
 from app.utils.circuit_breaker import yahoo_circuit
 from app.utils.kst import today_kst
-from app.utils.naver_retry import NAVER_MOBILE_UA, NAVER_RETRY
+from app.utils.naver_retry import NAVER_FAILURES, log_naver_failure, naver_get_json
+from app.utils.pykrx_util import quiet_pykrx
 
 logger = structlog.get_logger()
 
@@ -118,58 +118,8 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
         return {"ex_dividend_date": None, **_zero_div()}
 
 
-def sync_pykrx_etf_dividend_info(ticker: str) -> dict:
-    """pykrx로 ETF 분배수익률 조회.
-
-    KRX 로그인 불필요 — pykrx가 KRX_ID/KRX_PW 미설정 시 익명 폴백.
-    ETF가 아니거나 데이터 없으면 {"dps": 0.0, "dividend_yield": 0.0} 반환.
-    """
-    import contextlib
-    import io
-    from datetime import timedelta
-
-    # pykrx import 시 "KRX 로그인 실패" 메시지 억제 (기능 정상)
-    with contextlib.redirect_stdout(io.StringIO()):
-        from pykrx import stock
-
-    try:
-        today = today_kst()
-        end = today.strftime("%Y%m%d")
-        start = (today - timedelta(days=365)).strftime("%Y%m%d")
-
-        div_df = stock.get_market_dividend_by_date(start, end, ticker)
-        if div_df is None or div_df.empty:
-            return _zero_div()
-
-        dps_col = next((c for c in ["주당배당금", "DPS"] if c in div_df.columns), None)
-        if dps_col is None:
-            return _zero_div()
-
-        annual_dps = float(div_df[dps_col][div_df[dps_col] > 0].sum())
-        if annual_dps <= 0:
-            return _zero_div()
-
-        price_df = stock.get_etf_ohlcv_by_date(end, end, ticker)
-        current_price = float(price_df["종가"].iloc[-1]) if not price_df.empty else 0.0
-        yield_decimal = _yield_from_dps(annual_dps, current_price)
-
-        logger.info(
-            "pykrx_etf_dividend_fetched",
-            ticker=ticker,
-            annual_dps=annual_dps,
-            yield_decimal=yield_decimal,
-        )
-        return {"dps": annual_dps, "dividend_yield": yield_decimal}
-    except Exception as e:
-        logger.warning("pykrx_etf_dividend_failed", ticker=ticker, error=str(e))
-        return _zero_div()
-
-
 def sync_fdr_etf_dividend_info(ticker: str) -> dict:
     """fdr.StockListing('ETF/KR')으로 현재가 조회 + pykrx fundamental로 DIV/DPS 조회."""
-    import contextlib
-    import io
-
     try:
         import FinanceDataReader as fdr
 
@@ -182,11 +132,9 @@ def sync_fdr_etf_dividend_info(ticker: str) -> dict:
         if current_price == 0.0:
             return _zero_div()
 
-        with contextlib.redirect_stdout(io.StringIO()):
-            from pykrx import stock
-
         today_str = today_kst().strftime("%Y%m%d")
-        fund_df = stock.get_market_fundamental_by_ticker(today_str, market="ALL")
+        with quiet_pykrx() as stock:
+            fund_df = stock.get_market_fundamental_by_ticker(today_str, market="ALL")
 
         if fund_df is None or fund_df.empty or ticker not in fund_df.index:
             return _zero_div()
@@ -206,22 +154,11 @@ def sync_fdr_etf_dividend_info(ticker: str) -> dict:
 
 def fetch_naver_etf_analysis(ticker: str) -> dict:
     """Naver Finance 모바일 API(etfAnalysis) 원본 JSON 조회 — 배당·추종지수 판별이 공유하는 소스."""
-    import requests as _req
-
-    @retry(**NAVER_RETRY)
-    def _fetch() -> _req.Response:
-        url = f"https://m.stock.naver.com/api/stock/{ticker}/etfAnalysis"
-        r = _req.get(url, headers={"User-Agent": NAVER_MOBILE_UA}, timeout=10)
-        r.raise_for_status()
-        return r
-
-    return _fetch().json()
+    return naver_get_json(ticker, "etfAnalysis")
 
 
 def sync_naver_etf_dividend_info(ticker: str) -> dict:
     """Naver Finance 모바일 API(etfAnalysis)로 국내 ETF TTM 분배율·DPS·배당월 조회."""
-    import requests.exceptions as _req_exc
-
     try:
         data = fetch_naver_etf_analysis(ticker)
         div = data.get("dividend") or {}
@@ -245,18 +182,8 @@ def sync_naver_etf_dividend_info(ticker: str) -> dict:
             "dividend_yield": yield_pct / 100.0,
             "dividend_months": months,
         }
-    except _req_exc.HTTPError as exc:
-        logger.warning(
-            "naver_etf_dividend_http_error",
-            ticker=ticker,
-            status=exc.response.status_code if exc.response else None,
-        )
-        return _zero_div_with_months()
-    except _req_exc.RequestException as exc:
-        logger.warning("naver_etf_dividend_network_error", ticker=ticker, error=str(exc))
-        return _zero_div_with_months()
-    except (ValueError, KeyError, TypeError) as exc:
-        logger.warning("naver_etf_dividend_parse_error", ticker=ticker, error=str(exc))
+    except NAVER_FAILURES as exc:
+        log_naver_failure("naver_etf_dividend", ticker, exc)
         return _zero_div_with_months()
 
 
@@ -268,8 +195,6 @@ def sync_naver_etf_index_region(ticker: str) -> str | None:
     조회에 실패하면 `None`을 반환한다 — 호출측은 `resolve_index_region`의 기존 폴백(시장구분 →
     큐레이션 목록 → 기본값 DOMESTIC)으로 넘어가면 된다.
     """
-    import requests.exceptions as _req_exc
-
     try:
         data = fetch_naver_etf_analysis(ticker)
         countries = data.get("countryPortfolioList") or []
@@ -282,53 +207,22 @@ def sync_naver_etf_index_region(ticker: str) -> str | None:
         result = "DOMESTIC" if kr_weight >= 50.0 else "OVERSEAS"
         logger.info("naver_etf_index_region_fetched", ticker=ticker, kr_weight=kr_weight, result=result)
         return result
-    except _req_exc.HTTPError as exc:
-        logger.warning(
-            "naver_etf_index_region_http_error",
-            ticker=ticker,
-            status=exc.response.status_code if exc.response else None,
-        )
-        return None
-    except _req_exc.RequestException as exc:
-        logger.warning("naver_etf_index_region_network_error", ticker=ticker, error=str(exc))
-        return None
-    except (ValueError, KeyError, TypeError) as exc:
-        logger.warning("naver_etf_index_region_parse_error", ticker=ticker, error=str(exc))
+    except NAVER_FAILURES as exc:
+        log_naver_failure("naver_etf_index_region", ticker, exc)
         return None
 
 
 def sync_naver_stock_dividend_info(ticker: str) -> dict:
     """Naver Finance 모바일 API(summary)로 국내 일반주식 배당수익률 조회. DPS는 미제공."""
-    import requests as _req
-    import requests.exceptions as _req_exc
-
-    @retry(**NAVER_RETRY)
-    def _fetch() -> _req.Response:
-        url = f"https://m.stock.naver.com/api/stock/{ticker}/summary"
-        r = _req.get(url, headers={"User-Agent": NAVER_MOBILE_UA}, timeout=10)
-        r.raise_for_status()
-        return r
-
     try:
-        resp = _fetch()
-        detail = resp.json().get("stockItemDetail") or {}
+        detail = naver_get_json(ticker, "summary").get("stockItemDetail") or {}
         yield_pct = float(detail.get("dividendYield") or 0)
         if yield_pct <= 0:
             return _zero_div_with_months()
         logger.info("naver_stock_dividend_fetched", ticker=ticker, yield_pct=yield_pct)
         return {"dps": 0.0, "dividend_yield": yield_pct / 100.0, "dividend_months": []}
-    except _req_exc.HTTPError as exc:
-        logger.warning(
-            "naver_stock_dividend_http_error",
-            ticker=ticker,
-            status=exc.response.status_code if exc.response else None,
-        )
-        return _zero_div_with_months()
-    except _req_exc.RequestException as exc:
-        logger.warning("naver_stock_dividend_network_error", ticker=ticker, error=str(exc))
-        return _zero_div_with_months()
-    except (ValueError, KeyError, TypeError) as exc:
-        logger.warning("naver_stock_dividend_parse_error", ticker=ticker, error=str(exc))
+    except NAVER_FAILURES as exc:
+        log_naver_failure("naver_stock_dividend", ticker, exc)
         return _zero_div_with_months()
 
 

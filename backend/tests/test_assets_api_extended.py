@@ -176,7 +176,7 @@ class TestUpdateAccountCashTransaction:
                 AsyncMock(return_value=(latest_snap, [])),
             ),
             patch(
-                "app.api.v1.assets._upsert_snapshot",
+                "app.services.accounts.snapshot_service._upsert_snapshot",
                 AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -207,7 +207,7 @@ class TestUpdateAccountCashTransaction:
                 AsyncMock(return_value=(latest_snap, [])),
             ),
             patch(
-                "app.api.v1.assets._upsert_snapshot",
+                "app.services.accounts.snapshot_service._upsert_snapshot",
                 AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -237,7 +237,7 @@ class TestUpdateAccountCashTransaction:
                 AsyncMock(return_value=(latest_snap, [])),
             ),
             patch(
-                "app.api.v1.assets._upsert_snapshot",
+                "app.services.accounts.snapshot_service._upsert_snapshot",
                 AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -264,7 +264,7 @@ class TestUpdateAccountCashTransaction:
                 AsyncMock(return_value=(None, [])),
             ),
             patch(
-                "app.api.v1.assets._upsert_snapshot",
+                "app.services.accounts.snapshot_service._upsert_snapshot",
                 AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -294,7 +294,7 @@ class TestUpdateAccountCashTransaction:
                 AsyncMock(return_value=(latest_snap, [])),
             ),
             patch(
-                "app.api.v1.assets._upsert_snapshot",
+                "app.services.accounts.snapshot_service._upsert_snapshot",
                 AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -355,8 +355,11 @@ class TestUpdateAccountManualStockSnapshotConsistency:
             patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
             patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
             patch("app.api.v1.assets.get_latest_snapshot_with_positions", AsyncMock(side_effect=fake_get_latest)),
-            patch("app.api.v1.assets._upsert_snapshot", AsyncMock(side_effect=fake_upsert_snapshot)),
-            patch("app.api.v1.assets.sync_snapshot_positions", AsyncMock()) as mock_sync_pos,
+            patch(
+                "app.services.accounts.snapshot_service._upsert_snapshot",
+                AsyncMock(side_effect=fake_upsert_snapshot),
+            ),
+            patch("app.services.accounts.snapshot_service.sync_snapshot_positions", AsyncMock()) as mock_sync_pos,
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.put(

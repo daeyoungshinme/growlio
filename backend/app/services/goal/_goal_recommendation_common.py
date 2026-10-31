@@ -359,6 +359,19 @@ def _cagr_lookback_years_from_settings(settings_row: object) -> int:
     return int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
 
 
+def investable_assets_krw(overview: dict) -> float:
+    """overview 총자산에서 부동산을 뺀 값 — 필요 수익률·필요 배당수익률 역산의 기준 자산.
+
+    부동산은 MVO 후보에 포함되지 않으므로(성장 미모델링) 기준에 넣으면 부동산 추가만으로 필요 수익률이
+    부당하게 낮아지거나 "이미 달성"으로 잘못 판정된다. 전체·기간별·나이별 경로가 모두 이 값을 쓴다.
+    """
+    real_estate_krw = next(
+        (item["amount_krw"] for item in overview.get("asset_type_allocation", []) if item.get("type") == "REAL_ESTATE"),
+        0.0,
+    )
+    return float(overview.get("total_assets_krw", 0)) - real_estate_krw
+
+
 def _required_dividend_yield_pct(annual_dividend_goal: float | None, total_assets_krw: float) -> float | None:
     """연 배당목표(원) ÷ 기준 자산총액 → 필요 배당수익률(%). 목표가 없거나 자산이 0 이하면 None."""
     if not annual_dividend_goal or total_assets_krw <= 0:

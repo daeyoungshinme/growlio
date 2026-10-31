@@ -307,7 +307,7 @@ async def _resolve_age_dividend_target(
     if annual_dividend_goal:
         overall_overview = await build_portfolio_overview(user_id, db, account_ids=None, cache=cache)
         required_dividend_yield_pct = _grc._required_dividend_yield_pct(
-            annual_dividend_goal, float(overall_overview.get("total_assets_krw", 0))
+            annual_dividend_goal, _grc.investable_assets_krw(overall_overview)
         )
     if required_dividend_yield_pct is None and default_dividend_floor_pct > 0:
         return default_dividend_floor_pct, (
