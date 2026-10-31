@@ -9,6 +9,7 @@ import { REDIRECT_DELAY_MS } from "@/constants/timers";
 import { toast } from "@/utils/toast";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
+import AuthLayout from "@/components/layout/AuthLayout";
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
 
@@ -57,7 +58,7 @@ export default function ResetPasswordPage() {
 
   if (!sessionReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+      <AuthLayout>
         <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             비밀번호 재설정 링크를 확인 중입니다...
@@ -72,7 +73,7 @@ export default function ResetPasswordPage() {
             비밀번호 찾기로 돌아가기
           </Link>
         </div>
-      </div>
+      </AuthLayout>
     );
   }
 
@@ -114,7 +115,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+    <AuthLayout>
       <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
@@ -214,6 +215,6 @@ export default function ResetPasswordPage() {
           </p>
         )}
       </div>
-    </div>
+    </AuthLayout>
   );
 }

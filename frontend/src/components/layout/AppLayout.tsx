@@ -8,7 +8,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { toast } from "@/utils/toast";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
+import { useRevealFocusedInput } from "@/hooks/useRevealFocusedInput";
 import { useLatestRef } from "@/hooks/useLatestRef";
+import { hasOpenModal } from "@/hooks/useModalBehavior";
 import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
 import { isNativePlatform } from "@/utils/platform";
 import { RefreshContext } from "./RefreshContext";
@@ -37,13 +39,16 @@ export default function AppLayout() {
   // 모바일에서만 스와이프 탭 전환 (lg 이상은 Sidebar 사용)
   useSwipeNavigation(mainRef);
 
+  // 키보드에 가린 입력을 끌어올린다 (AndroidManifest adjustResize와 함께, plans/102 E3)
+  useRevealFocusedInput();
+
   // Android 물리 뒤로가기 버튼 처리 — navigate는 경로마다 바뀌므로 ref로 읽어 리스너를 한 번만 등록한다
   // (deps에 넣으면 이동마다 재등록되고, 비동기 해제 사이에 리스너가 겹쳐 뒤로가기가 두 번 될 수 있다)
   useEffect(() => {
     if (!isNativePlatform()) return;
     const handle = App.addListener("backButton", ({ canGoBack }) => {
       // 모달이 열려 있으면 Escape 이벤트로 닫기
-      if (document.body.style.overflow === "hidden") {
+      if (hasOpenModal()) {
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
         return;
       }

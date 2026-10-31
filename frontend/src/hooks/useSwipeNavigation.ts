@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NAV_ORDER } from "@/constants/nav";
 import { triggerHaptic } from "./useHaptic";
+import { hasOpenModal } from "./useModalBehavior";
 
 const SWIPE_THRESHOLD = 50; // px
 const VELOCITY_THRESHOLD = 0.3; // px/ms
@@ -36,7 +37,7 @@ function useSwipeGesture(
       touchRef.current = null;
 
       // 모달이 열려 있으면 스와이프 무시
-      if (document.body.style.overflow === "hidden") return;
+      if (hasOpenModal()) return;
 
       const touch = e.changedTouches[0];
       if (!touch) return;

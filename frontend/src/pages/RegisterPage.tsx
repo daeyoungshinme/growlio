@@ -8,6 +8,7 @@ import { toast } from "@/utils/toast";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
+import AuthLayout from "@/components/layout/AuthLayout";
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -86,7 +87,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+    <AuthLayout>
       <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
@@ -209,6 +210,6 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
-    </div>
+    </AuthLayout>
   );
 }
