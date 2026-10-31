@@ -159,7 +159,10 @@ export function calcSignedTradeKrw(item: RebalancingItem): number {
 
 // 증권사에 실제 매수/매도 주문이 가능한 항목인지 판별 — CASH/CASH_EQUIVALENT/KR_PROPERTY 등은
 // 백엔드가 shares_to_trade를 항상 null로 반환하므로 이 필터로 거래 계획·요약 합계에서 제외한다.
-export function isTradableItem(item: RebalancingItem): boolean {
+/** 매매 가능 항목 — true면 `shares_to_trade`·`current_price_krw`가 값이 있음을 타입으로도 좁힌다 */
+export function isTradableItem(
+  item: RebalancingItem,
+): item is RebalancingItem & { shares_to_trade: number; current_price_krw: number } {
   return item.shares_to_trade !== null && !!item.current_price_krw && item.current_price_krw > 0;
 }
 

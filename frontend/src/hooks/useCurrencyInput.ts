@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { convertUsdToKrw } from "@/utils/format";
 import { useExchangeRate } from "./useExchangeRate";
 
 export function useCurrencyInput(initialKrw?: number, initialUsd?: number) {
@@ -6,7 +7,7 @@ export function useCurrencyInput(initialKrw?: number, initialUsd?: number) {
   const [depositUsd, setDepositUsd] = useState<number | undefined>(initialUsd);
   const usdRate = useExchangeRate();
 
-  const usdAsKrw = depositUsd != null && usdRate != null ? Math.round(depositUsd * usdRate) : 0;
+  const usdAsKrw = convertUsdToKrw(depositUsd, usdRate);
   const totalKrw = (depositKrw ?? 0) + usdAsKrw;
   const hasAnyDeposit = (depositKrw ?? 0) > 0 || (depositUsd ?? 0) > 0;
   const usdPending = (depositUsd ?? 0) > 0 && usdRate == null;

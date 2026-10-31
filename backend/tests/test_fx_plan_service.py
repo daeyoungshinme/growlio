@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.exceptions import NotFoundError
 from app.services import fx_plan_service as svc
 
 
@@ -229,7 +230,7 @@ async def test_plan_falls_back_to_first_overseas_portfolio():
 
 async def test_plan_explicit_portfolio_not_owned_raises():
     db = _db([_portfolio()])
-    with pytest.raises(svc.PortfolioNotFound):
+    with pytest.raises(NotFoundError):
         await _plan(db, portfolio_id=uuid.uuid4())
 
 
@@ -348,9 +349,12 @@ def test_api_returns_plan(api):
 
 
 def test_api_not_owned_portfolio_404(api):
-    with patch.object(svc, "get_fx_plan", new=AsyncMock(side_effect=svc.PortfolioNotFound)):
+    with patch.object(
+        svc, "get_fx_plan", new=AsyncMock(side_effect=NotFoundError(detail="포트폴리오를 찾을 수 없습니다"))
+    ):
         res = api.get(f"/api/v1/invest/fx-plan?portfolio_id={uuid.uuid4()}")
     assert res.status_code == 404
+    assert res.json() == {"detail": "포트폴리오를 찾을 수 없습니다"}
 
 
 @pytest.mark.parametrize("months", [0, 13])

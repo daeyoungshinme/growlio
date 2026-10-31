@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
@@ -89,7 +89,4 @@ async def get_fx_plan(
 ):
     """환율 1년 위치·범위 + 해외 적립에 필요한 달러의 분할 환전 계획(저장 없음, 예측 아님)."""
     cache = await get_cache_store()
-    try:
-        return await fx_plan_service.get_fx_plan(db, cache, current_user.id, portfolio_id, months)
-    except fx_plan_service.PortfolioNotFound:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다") from None
+    return await fx_plan_service.get_fx_plan(db, cache, current_user.id, portfolio_id, months)

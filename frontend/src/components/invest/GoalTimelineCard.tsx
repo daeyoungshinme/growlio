@@ -178,10 +178,12 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
             {acceleration_scenarios.length > 0 && (
               <div className="space-y-2">
                 {acceleration_scenarios.map((s) => {
-                  const achievable =
+                  // 추천 기대수익률 − 필요 수익률(%p) — 둘 중 하나라도 없으면 판정하지 않는다
+                  const returnMarginPct =
                     s.required_return_pct !== null && recommendationExpectedReturnPct !== null
-                      ? recommendationExpectedReturnPct >= s.required_return_pct
+                      ? recommendationExpectedReturnPct - s.required_return_pct
                       : null;
+                  const achievable = returnMarginPct !== null ? returnMarginPct >= 0 : null;
                   return (
                     <div
                       key={s.years_earlier}
@@ -232,9 +234,9 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
                         <p
                           className={`text-xs font-medium ${achievable ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-500"}`}
                         >
-                          {achievable
+                          {returnMarginPct !== null && returnMarginPct >= 0
                             ? "추천 포트폴리오로 달성 가능"
-                            : `추천 포트폴리오로는 ${(s.required_return_pct! - recommendationExpectedReturnPct!).toFixed(1)}%p 부족`}
+                            : `추천 포트폴리오로는 ${(-(returnMarginPct ?? 0)).toFixed(1)}%p 부족`}
                         </p>
                       )}
                     </div>

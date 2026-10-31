@@ -1,11 +1,10 @@
 import { createPortal } from "react-dom";
 import type { ExecutionOrderItem } from "@/api/rebalancing";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import { isOverseasMarket } from "@/constants/markets";
 import { LIMIT_DEVIATION_WARN_PCT, limitDeviationPct } from "./rebalancingTradeMath";
 import { STRATEGY_OPTIONS } from "@/constants/rebalancingConfig";
 import type { ExecutionState, OrderType } from "@/hooks/useRebalancingExecution";
-import { fmtKrw, fmtKrwPrice } from "@/utils/format";
+import { fmtKrw, fmtNativePrice } from "@/utils/format";
 
 const MAX_LISTED_ORDERS = 6;
 
@@ -20,10 +19,6 @@ interface Props {
   totalBuyCost: number | null;
   onConfirm: () => void;
   onCancel: () => void;
-}
-
-function fmtNativePrice(price: number, market: string): string {
-  return isOverseasMarket(market) ? `$${price.toFixed(2)}` : fmtKrwPrice(price);
 }
 
 export function RebalancingFinalConfirmDialog({

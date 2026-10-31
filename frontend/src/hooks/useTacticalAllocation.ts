@@ -50,7 +50,8 @@ export function useTacticalMutations(portfolioId: string) {
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });
 
-  /** 인자 dcaLinked — 자동매수가 전술 연동이었으면 서버가 일반 모드로 되돌리므로 안내·알림 목록 갱신 */
+  /** 인자 dcaLinked — 안내 문구만 고른다. 서버는 적립식 여부와 상관없이 TACTICAL 알림을 모두 일반 모드로 되돌리므로
+   * 알림 캐시는 항상 갱신한다(plans/101 A1 — 일부만 연동된 경우 무효화가 빠졌다) */
   const disable = useMutation({
     mutationFn: (_opts?: { dcaLinked?: boolean }) => deleteTacticalStrategy(portfolioId),
     onSuccess: async (_data, opts) => {
@@ -60,7 +61,7 @@ export function useTacticalMutations(portfolioId: string) {
           : "전술 배분을 껐습니다. 포트폴리오 목표 비중은 그대로 유지됩니다.",
         "info",
       );
-      await invalidateTacticalData(queryClient, { dcaLinked: opts?.dcaLinked });
+      await invalidateTacticalData(queryClient, { alertsReset: true });
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });

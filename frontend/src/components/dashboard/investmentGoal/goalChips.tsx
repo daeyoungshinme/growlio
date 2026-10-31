@@ -133,9 +133,14 @@ export function buildGoalChips({ data, expectedGoalYear }: GoalChipsInput): Goal
       : data?.annual_return_pct != null
         ? "연환산"
         : "누적, 추적 90일 미만";
-  const hasReturnGoal = data?.goal_annual_return_pct != null;
-  const canShowReturnGap =
-    hasReturnGoal && actualReturnPct != null && data?.return_goal_gap_pct != null;
+  const goalReturnPct = data?.goal_annual_return_pct ?? null;
+  const hasReturnGoal = goalReturnPct != null;
+  const returnGapPct = data?.return_goal_gap_pct ?? null;
+  // 판정과 값을 한 번에 좁혀 아래에서 `!` 없이 쓴다
+  const returnGap =
+    goalReturnPct != null && actualReturnPct != null && returnGapPct != null
+      ? { goalPct: goalReturnPct, actualPct: actualReturnPct, gapPct: returnGapPct }
+      : null;
 
   const retirementGapYears =
     data?.retirement_target_year != null && expectedGoalYear != null
@@ -198,22 +203,21 @@ export function buildGoalChips({ data, expectedGoalYear }: GoalChipsInput): Goal
       shortLabel: "연수익률",
       isSet: hasReturnGoal,
       setupHref: "/invest-plan",
-      content: canShowReturnGap ? (
+      content: returnGap ? (
         <>
-          {gapBadge(data!.return_goal_gap_pct!, {
+          {gapBadge(returnGap.gapPct, {
             unit: "%p",
             aheadLabel: "초과달성",
             behindLabel: "미달",
           })}
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            목표 {data!.goal_annual_return_pct}% · 실제 {actualReturnPct!.toFixed(1)}% (
-            {returnSourceLabel})
+            목표 {returnGap.goalPct}% · 실제 {returnGap.actualPct.toFixed(1)}% ({returnSourceLabel})
           </p>
         </>
       ) : hasReturnGoal ? (
         <>
           <span className="text-sm font-bold text-gray-600 dark:text-gray-300">
-            목표 {data!.goal_annual_return_pct}%
+            목표 {goalReturnPct}%
           </span>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">실제 수익률 계산 중</p>
         </>
@@ -239,7 +243,7 @@ export function buildGoalChips({ data, expectedGoalYear }: GoalChipsInput): Goal
   const lagScore: Record<string, number | null> = {
     deposit: hasDepositGoal ? (data?.deposit_achievement_pct ?? null) : null,
     dividend: hasDividendGoal ? (data?.dividend_goal_achievement_pct ?? null) : null,
-    return: canShowReturnGap ? (data!.return_goal_gap_pct! < 0 ? 50 : 100) : null,
+    return: returnGap ? (returnGap.gapPct < 0 ? 50 : 100) : null,
     retirement: retirementGapYears != null ? (retirementGapYears < 0 ? 50 : 100) : null,
   };
   const laggingKey =

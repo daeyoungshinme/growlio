@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
 import type { StockSuggestion } from "@/api/assets";
-import { fmtKrwPrice, fmtKrwShort } from "@/utils/format";
+import { fmtKrwPrice, fmtKrwShort, fmtUsdPrice } from "@/utils/format";
 import { isOverseasMarket, marketLabel } from "@/constants/markets";
 import PriceCell from "@/components/common/PriceCell";
 import type { Position } from "@/hooks/usePositionsEditor";
@@ -58,7 +58,7 @@ function ReadonlyMobileCard({ row }: { row: Position }) {
           <p className="text-xs text-gray-400 dark:text-gray-500">평단가</p>
           <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">
             {overseas && row.avg_price_usd
-              ? `$${row.avg_price_usd.toFixed(2)}`
+              ? fmtUsdPrice(row.avg_price_usd)
               : fmtKrwPrice(row.avg_price ?? 0)}
           </p>
         </div>

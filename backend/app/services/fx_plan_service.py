@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS
+from app.exceptions import NotFoundError
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
@@ -47,7 +48,6 @@ _NOW_SHARE_BY_ZONE: dict[str, float] = {"CHEAP": 0.5, "NEUTRAL": 0.34, "EXPENSIV
 _TARGET_SIGMA_MULTIPLIERS = (0.5, 1.0)
 
 FxZone = Literal["CHEAP", "NEUTRAL", "EXPENSIVE"]
-FxPlanStatus = Literal["OK", "SUFFICIENT", "NO_DEPOSIT_GOAL", "NO_OVERSEAS", "NO_PORTFOLIO"]
 
 
 @dataclass(frozen=True)
@@ -221,10 +221,6 @@ async def _held_usd(db: AsyncSession, user_id: uuid.UUID, portfolio: Portfolio) 
     return sum(float(a.deposit_usd or 0) for a in accounts)
 
 
-class PortfolioNotFound(Exception):
-    """지정한 portfolio_id가 이 사용자 것이 아님 — 라우터가 404로 바꾼다."""
-
-
 async def get_fx_plan(
     db: AsyncSession,
     cache: CacheStoreType,
@@ -240,7 +236,7 @@ async def get_fx_plan(
 
     portfolio, candidates = await _pick_portfolio(db, user_id, portfolio_id)
     if portfolio_id is not None and portfolio is None:
-        raise PortfolioNotFound
+        raise NotFoundError(detail="포트폴리오를 찾을 수 없습니다")
 
     result: dict[str, Any] = {
         "position": asdict(position) if position else None,

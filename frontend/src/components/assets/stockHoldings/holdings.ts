@@ -1,6 +1,7 @@
 import type { DividendYield } from "@/types";
 import type { groupPositionsByTicker } from "@/utils/portfolio";
 import { DOMESTIC_MARKETS } from "@/constants/markets";
+import { fmtUsd } from "@/utils/format";
 
 export type AggSortKey = "total_value_krw" | "pnl_pct" | "total_pnl" | "weight_in_stock";
 type SortDir = "asc" | "desc";
@@ -22,5 +23,5 @@ export function annualDividendLabel(divData: DividendYield, qty: number): string
   const total = divData.dps * qty;
   return DOMESTIC_MARKETS.includes(divData.market.toUpperCase())
     ? `${Math.round(total).toLocaleString()}원`
-    : `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    : fmtUsd(total);
 }

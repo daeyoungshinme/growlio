@@ -53,6 +53,12 @@ describe("OrderResultList — 미체결 취소", () => {
     toast.mockReset();
   });
 
+  it("국내 주문가를 만원 축약 없이 원 단위로 보여준다 (plans/101 A2)", () => {
+    renderWithProviders(<OrderResultList results={results([order({ price: 54300 })])} />);
+    expect(screen.getAllByText(/54,300원/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/5만원/)).toBeNull();
+  });
+
   it("cancelable이 아닌 주문(과거 결과·실패 주문)에는 취소 버튼이 없다", () => {
     renderWithProviders(
       <OrderResultList

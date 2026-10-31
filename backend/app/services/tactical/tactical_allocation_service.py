@@ -34,12 +34,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import BadRequestError, ConflictError
+from app.models.alert import RebalancingAlert
 from app.models.portfolio import (
     GROUP_ROLE_DOMESTIC_ALT,
     GROUP_ROLE_MEMBER,
@@ -66,6 +69,7 @@ from app.utils.kst import today_kst
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
     from app.schemas.portfolio import IndexGroupSuggestion
+    from app.schemas.tactical import TacticalStrategyUpsert
 
 logger = structlog.get_logger()
 
@@ -372,6 +376,85 @@ async def list_strategies(user_id: uuid.UUID, db: AsyncSession) -> list[Tactical
         select(TacticalStrategy).where(TacticalStrategy.user_id == user_id).order_by(TacticalStrategy.created_at)
     )
     return list(result.scalars().all())
+
+
+async def save_strategy(
+    portfolio_id: uuid.UUID,
+    user_id: uuid.UUID,
+    body: TacticalStrategyUpsert,
+    cache: CacheStore | None,
+    db: AsyncSession,
+) -> tuple[TacticalStrategy, dict[str, Any]]:
+    """전략 사용 시작/설정 변경 후 커밋. 최초 생성 시 현재 관측 국면을 바로 확정 국면으로 삼는다(알림 없음).
+
+    상태 응답을 다시 계산하지 않도록 판정에 쓴 시장 지표를 함께 돌려준다.
+    """
+    strategy = await get_strategy(portfolio_id, user_id, db)
+    if strategy is None:
+        strategy = TacticalStrategy(user_id=user_id, portfolio_id=portfolio_id)
+        db.add(strategy)
+    strategy.notify_enabled = body.notify_enabled
+    strategy.regime_weights = body.regime_weights
+    strategy.tilt_shift_pct = Decimal(str(body.tilt_shift_pct))
+    strategy.dip_shift_pct = Decimal(str(body.dip_shift_pct))
+    strategy.use_macro = body.use_macro
+
+    market = await evaluate_market(cache, db)
+    today = today_kst()
+    advance_regime(strategy, market, today)
+    advance_tilt(strategy, market, today)
+    advance_dip(strategy, market)
+    if strategy.notified_regime is None:
+        strategy.notified_regime = strategy.last_regime  # 사용 시작 시점 국면은 알릴 필요 없음
+        strategy.notified_dip_level = strategy.dip_level or 0  # 진행 중인 웅덩이도 마찬가지
+    await db.commit()
+    return strategy, market
+
+
+async def disable_strategy(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> None:
+    """전략 사용 중지(포트폴리오 목표 비중은 그대로 둔다).
+
+    이 포트폴리오의 자동매수가 전술 연동(`market_condition_mode="TACTICAL"`)이면 일반 모드(DISABLED)로 되돌린다 —
+    국면이 없으면 게이트가 늘 통과라 연동 표시만 남아 오해를 부른다. 적립식 여부와 상관없이 TACTICAL인 알림은 모두
+    되돌리므로 프론트는 끌 때마다 알림 캐시를 비운다(plans/101 A1).
+    """
+    strategy = await get_strategy(portfolio_id, user_id, db)
+    if strategy is None:
+        return
+    await db.execute(
+        update(RebalancingAlert)
+        .where(
+            RebalancingAlert.portfolio_id == portfolio_id,
+            RebalancingAlert.user_id == user_id,
+            RebalancingAlert.market_condition_mode == "TACTICAL",
+        )
+        .values(market_condition_mode="DISABLED")
+    )
+    await db.delete(strategy)
+    await db.commit()
+
+
+def check_apply_allowed(
+    portfolio: Portfolio, strategy: TacticalStrategy | None, fraction: float
+) -> tuple[TacticalStrategy, Regime]:
+    """제안 비중 적용 전 검증 — None이 아님이 확인된 전략과 적용할 확정 국면을 돌려준다.
+
+    `fraction<1`(분할 적용)은 전술 자산만으로 구성된 포트폴리오에서만, 같은 국면에서 한 번만 허용한다 — 다른 종목을
+    절반만 줄이는 건 전술 배분이 관리하는 범위가 아니고, 두 번째부터는 나머지 적용(fraction=1)이다.
+    """
+    if strategy is None:
+        raise BadRequestError(detail="전술 배분을 먼저 켜주세요.")
+    regime = strategy.last_regime
+    if regime not in REGIMES:
+        raise ConflictError(detail="아직 국면이 확정되지 않았습니다. 잠시 후 다시 시도해주세요.")
+    if fraction < 1 and not is_tactical_managed(portfolio):
+        raise BadRequestError(
+            detail="전술 자산 외 종목이 있는 포트폴리오는 나눠서 적용할 수 없습니다. 한 번에 적용해주세요."
+        )
+    if fraction < 1 and strategy.partial_regime == regime:
+        # 현재 목표에서 다시 절반을 보간하면 75%가 된다 — 두 번째는 나머지(전체) 적용만 허용
+        raise BadRequestError(detail="이미 절반을 적용했어요. 나머지를 적용해주세요.")
+    return strategy, regime
 
 
 def tactical_asset_of(item: Any) -> str | None:

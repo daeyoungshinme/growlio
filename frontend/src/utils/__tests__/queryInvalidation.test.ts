@@ -128,7 +128,7 @@ describe("invalidateDcaData", () => {
 });
 
 describe("invalidateTacticalData", () => {
-  it("dcaLinked 옵션일 때만 리밸런싱 알림 무효화", async () => {
+  it("alertsReset 옵션일 때만 리밸런싱 알림 무효화", async () => {
     const plain = makeQueryClient();
     await invalidateTacticalData(plain as any);
     expect(plain.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0])).not.toContain(
@@ -136,7 +136,7 @@ describe("invalidateTacticalData", () => {
     );
 
     const linked = makeQueryClient();
-    await invalidateTacticalData(linked as any, { dcaLinked: true });
+    await invalidateTacticalData(linked as any, { alertsReset: true });
     const linkedKeys = linked.invalidateQueries.mock.calls.map((c) => c[0].queryKey);
     expect(linkedKeys.map((k) => k[0])).toContain("rebalancing-alerts");
     // 포트폴리오·계좌별 알림 캐시(["rebalancing-alert", pid, ...])를 prefix로 덮는다 (plans/99 B2)

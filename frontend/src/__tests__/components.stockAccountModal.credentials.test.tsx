@@ -247,7 +247,7 @@ describe("StockAccountModal — 데이터 소스 전환·제출 페이로드", (
     expect(screen.getByRole("button", { name: "등록" })).toBeEnabled();
   });
 
-  it("수동 입력 계좌는 예수금 합계를 manual_amount로 제출한다", () => {
+  it("수동 입력 계좌는 예수금 합계를 manual_amount로, 예수금은 통화별로도 제출한다", () => {
     const onSubmit = renderWithSubmit();
     fireEvent.change(byId("stock-data-source"), { target: { value: "MANUAL" } });
     fireEvent.change(byId("stock-name"), { target: { value: "기타 증권" } });
@@ -259,6 +259,9 @@ describe("StockAccountModal — 데이터 소스 전환·제출 페이로드", (
         data_source: "MANUAL",
         asset_type: "STOCK_OTHER",
         manual_amount: 500000,
+        // 종목 저장 시 manual_amount가 덮여도 예수금이 남도록 (plans/101 A6)
+        deposit_krw: 500000,
+        deposit_usd: 0,
       }),
     );
   });

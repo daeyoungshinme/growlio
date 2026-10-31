@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { ExecutionResult, OrderResult } from "@/api/rebalancing";
-import { isOverseasMarket } from "@/constants/markets";
-import { fmtKrw } from "@/utils/format";
+import { fmtNativePrice } from "@/utils/format";
 import { OrderCancelAction, type CancelOutcome } from "./OrderCancelAction";
 import { SideBadge, StatusBadge } from "./RebalancingBadges";
 
@@ -12,19 +11,24 @@ function hasCancelInfo(o: OrderResult): boolean {
 
 function fmtOrderPrice(price: number | null | undefined, market: string): string {
   if (price == null) return "-";
-  return isOverseasMarket(market) ? `$${price.toFixed(2)}` : fmtKrw(price);
+  return fmtNativePrice(price, market);
 }
 
 /** 계좌별 주문 결과(모바일 카드·데스크탑 표) — 실행 직후 결과 화면과 실행 이력 상세가 함께 쓴다. */
 export function OrderResultList({ results }: { results: ExecutionResult[] }) {
   // 결과 행 id → 방금 받은 취소 응답. 카드·표 두 벌이 같은 값을 읽는다
   const [cancelOutcomes, setCancelOutcomes] = useState<Record<string, CancelOutcome>>({});
-  const cancelProps = (o: OrderResult) => ({
-    order: o,
-    override: o.result_id ? cancelOutcomes[o.result_id] : undefined,
-    onOutcome: (outcome: CancelOutcome) =>
-      setCancelOutcomes((prev) => ({ ...prev, [o.result_id!]: outcome })),
-  });
+  const cancelProps = (o: OrderResult) => {
+    const resultId = o.result_id;
+    return {
+      order: o,
+      override: resultId ? cancelOutcomes[resultId] : undefined,
+      // 취소 버튼은 result_id가 있을 때만 뜬다(hasCancelInfo) — 없으면 기록할 키가 없다
+      onOutcome: (outcome: CancelOutcome) => {
+        if (resultId) setCancelOutcomes((prev) => ({ ...prev, [resultId]: outcome }));
+      },
+    };
+  };
   return (
     <div className="space-y-4">
       {results.map((result) => (

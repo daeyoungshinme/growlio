@@ -1,9 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { fetchDashboard } from "@/api/dashboard";
-import { fetchExchangeRate } from "@/api/assets";
 import {
   accountsQuery,
   dcaAnalysisQuery,
+  exchangeRateQuery,
   portfolioOverviewLiteQuery,
   settingsQuery,
 } from "@/api/queryOptions";
@@ -18,6 +18,6 @@ export function prefetchDashboardData(qc: QueryClient): void {
   void qc.prefetchQuery(accountsQuery);
   void qc.prefetchQuery(portfolioOverviewLiteQuery);
   void qc.prefetchQuery(dcaAnalysisQuery);
-  void qc.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: () => fetchExchangeRate() });
+  void qc.prefetchQuery(exchangeRateQuery);
   void qc.prefetchQuery(settingsQuery);
 }

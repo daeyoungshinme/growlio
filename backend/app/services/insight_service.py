@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 
@@ -81,10 +82,14 @@ async def generate_insights(
         dashboard = {}
         degraded = True
 
-    # 체커 2개가 같은 AsyncSession을 쓰므로 순차 실행한다(동시 사용 불가). 체커 하나의 실패는 나머지에 영향 없음.
+    def _mark_degraded() -> None:
+        nonlocal degraded
+        degraded = True
+
+    # 체커들이 같은 AsyncSession을 쓰므로 순차 실행한다(동시 사용 불가). 체커 하나의 실패는 나머지에 영향 없음.
     checkers = (
         lambda: _check_concentration(dashboard),
-        lambda: _check_rebalancing_opportunity(user_id, db, cache),
+        lambda: _check_rebalancing_opportunity(user_id, db, cache, on_partial_failure=_mark_degraded),
         lambda: _check_tax_loss_harvest(user_id, db),
     )
     insights: list[Insight] = []
@@ -162,8 +167,13 @@ async def _check_rebalancing_opportunity(
     user_id: uuid.UUID,
     db: AsyncSession,
     cache: CacheStoreType = None,
+    *,
+    on_partial_failure: Callable[[], None] | None = None,
 ) -> list[Insight]:
-    """저장된 포트폴리오 중 드리프트 > 5%인 항목이 있을 때 알림."""
+    """저장된 포트폴리오 중 드리프트 > 5%인 항목이 있을 때 알림.
+
+    포트폴리오 하나가 실패하면 건너뛰고 `on_partial_failure`를 부른다 — 호출자가 불완전한 목록을 짧게만 캐싱한다.
+    """
     from app.models.portfolio import Portfolio
     from app.services.portfolio.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.service import compute_portfolio_drift_summary
@@ -198,8 +208,10 @@ async def _check_rebalancing_opportunity(
 
         try:
             overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, cache=cache)
-        except Exception as e:  # 포트폴리오 단위 실패 무시, 나머지 계속
-            logger.warning("portfolio_overview_failed", portfolio_id=str(pf_id), error=str(e))
+        except Exception as e:  # 포트폴리오 단위 실패는 건너뛰고 나머지 계속
+            report_handled_failure("insight_portfolio_overview_failed", e, portfolio_id=str(pf_id))
+            if on_partial_failure is not None:
+                on_partial_failure()
             # aborted 트랜잭션을 되돌리고, rollback이 expire시킨 Portfolio 객체를 다시 읽는다
             try:
                 await db.rollback()

@@ -22,7 +22,8 @@ from app.kis.constants import (
     TR_OVERSEAS_UNFILLED_REAL,
 )
 
-_UNFILLED_MAX_PAGES = 5  # 당일 미체결 목록 연속조회 상한 — 넘으면 "목록에 없음"(0)으로 본다
+_UNFILLED_MAX_PAGES = 5  # 당일 미체결 목록 연속조회 상한 — 넘으면 확인 실패로 본다(0을 돌려주면 "이미 체결"로 오판)
+_TR_CONT_MORE = {"F", "M"}  # 응답 헤더 tr_cont: F/M=다음 페이지 있음, D/E=마지막 (balance.py와 같은 규칙)
 
 
 def is_overseas_market(market: str) -> bool:
@@ -268,8 +269,10 @@ async def get_overseas_unfilled_qty(
     headers = auth_headers(app_key, app_secret, access_token, TR_OVERSEAS_UNFILLED_REAL)
     target = order_no.lstrip("0")
 
+    # 다음 페이지 여부는 응답 헤더 tr_cont로 판정한다 — 본문 연속키는 마지막 페이지에도 채워져 올 수 있다
     fk200 = nk200 = ""
     for page in range(_UNFILLED_MAX_PAGES):
+        resp_headers: dict[str, str] = {}
         data = await kis_request(
             "GET",
             "/uapi/overseas-stock/v1/trading/inquire-nccs",
@@ -283,13 +286,17 @@ async def get_overseas_unfilled_qty(
                 "CTX_AREA_FK200": fk200,
                 "CTX_AREA_NK200": nk200,
             },
+            response_headers=resp_headers,
         )
-        rows = data.get("output") or []
-        for row in rows:
+        for row in data.get("output") or []:
             if str(row.get("odno") or "").lstrip("0") == target:
                 return int(float(row.get("nccs_qty") or 0))
-        next_nk = str(data.get("ctx_area_nk200") or "").strip()
-        if not rows or not next_nk or next_nk == nk200:
+        if resp_headers.get("tr_cont") not in _TR_CONT_MORE:
+            return 0
+        prev = (fk200, nk200)
+        fk200 = str(data.get("ctx_area_fk200") or "").strip()
+        nk200 = str(data.get("ctx_area_nk200") or "").strip()
+        if not nk200 or (fk200, nk200) == prev:
             break
-        fk200, nk200 = str(data.get("ctx_area_fk200") or "").strip(), next_nk
-    return 0
+    # 목록을 끝까지 보지 못했다 — 0(이미 체결)으로 단정하지 않고 취소 실패로 남겨 재시도·증권사 앱 확인을 유도한다
+    raise BrokerOrderRejectedError("미체결 목록을 끝까지 확인하지 못했습니다. 증권사 앱에서 주문 상태를 확인하세요.")

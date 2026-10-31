@@ -8,7 +8,6 @@ import { useBrokerCredentialVerify } from "@/hooks/useBrokerCredentialVerify";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
-import { convertUsdToKrw } from "@/utils/format";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { BROKER_CREDENTIAL_CONFIG, isBrokerDataSource } from "@/constants/brokerCredentials";
 import StockAccountTaxFields from "./StockAccountTaxFields";
@@ -124,9 +123,14 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
   const handleCreateSubmit = () => {
     let submitForm = form;
     if (form.data_source === "MANUAL") {
-      const usdConverted = convertUsdToKrw(depositUsd, usdRate);
-      const total = (depositKrw ?? 0) + usdConverted;
-      submitForm = { ...form, manual_amount: total > 0 ? total : undefined };
+      // 예수금도 따로 보낸다 — manual_amount만 보내면 종목 저장 시 매입금액 합계로 덮여 예수금이 사라지고,
+      // 달러가 원화로 합쳐져 환전 계획의 보유 달러에서도 빠진다 (plans/101 A6). manual_amount는 첫 스냅샷용
+      submitForm = {
+        ...form,
+        manual_amount: totalKrw > 0 ? totalKrw : undefined,
+        deposit_krw: depositKrw ?? 0,
+        deposit_usd: depositUsd ?? 0,
+      };
     }
     onSubmit(submitForm);
   };

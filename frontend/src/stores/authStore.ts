@@ -137,12 +137,17 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
       setLoggedIn(data.user);
 
-      // 백그라운드: /auth/me 결과를 캐시 → 다음 앱 재시작 시 낙관적 isAuthChecking=false 가능
+      // 백그라운드: /auth/me 결과를 store와 캐시에 반영 → 비밀번호 재설정 배너를 바로 띄우고(plans/101 A5),
+      // 다음 앱 재시작 시 낙관적 isAuthChecking=false 가능
       const userId = data.user.id;
       void (async () => {
         try {
           const me = await fetchAuthMe();
           if (!me) return;
+          // 응답 전에 로그아웃·계정 전환이 있었으면 다른 사용자 상태를 덮지 않는다
+          if (get().userId === userId) {
+            set({ needsPasswordReset: me.needs_password_reset ?? false });
+          }
           storageSet(
             AUTH_ME_CACHE_KEY,
             JSON.stringify({

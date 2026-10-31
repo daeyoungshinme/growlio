@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.exceptions import NotFoundError
 from app.services.factor_service import get_factor_analysis, get_factor_analysis_for_portfolio
 from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.services.portfolio_optimizer import get_efficient_frontier
@@ -237,7 +238,7 @@ async def get_rebalancing_strategy(
         .where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
     )
     if not portfolio:
-        return {"error": "포트폴리오를 찾을 수 없습니다"}
+        raise NotFoundError(detail="포트폴리오를 찾을 수 없습니다")
 
     portfolio_acct_ids: list[uuid.UUID] | None = (
         [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None

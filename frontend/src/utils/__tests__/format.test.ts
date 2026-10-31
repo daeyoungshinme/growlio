@@ -10,12 +10,29 @@ import {
   fmtKrwPreview,
   fmtKrwShort,
   fmtMonth,
+  fmtNativePrice,
   fmtPct,
+  fmtUsd,
+  fmtUsdPrice,
   fmtDateTime,
   localMonth,
   localToday,
   relativeTime,
 } from "@/utils/format";
+
+describe("fmtUsd / fmtUsdPrice / fmtNativePrice", () => {
+  it("fmtUsd는 소수 자릿수를 상한으로 쓴다", () => {
+    expect(fmtUsd(1234.5)).toBe("$1,234.5");
+    expect(fmtUsd(1234.5, 0)).toBe("$1,235");
+  });
+  it("fmtUsdPrice는 센트까지 고정", () => {
+    expect(fmtUsdPrice(512.3)).toBe("$512.30");
+  });
+  it("국내 주문가는 만원 축약 없이 원 단위 (plans/101 A2)", () => {
+    expect(fmtNativePrice(54300, "KOSPI")).toBe("54,300원");
+    expect(fmtNativePrice(512.3, "NASDAQ")).toBe("$512.30");
+  });
+});
 
 describe("fmtKrwPrice", () => {
   it("정수 주가를 원 단위로 표시한다", () => {

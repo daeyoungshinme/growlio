@@ -16,7 +16,7 @@ import {
 } from "@/api/assets";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useHaptic } from "@/hooks/useHaptic";
-import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime, fmtKrwShort } from "@/utils/format";
+import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime, fmtKrwShort, fmtUsd } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { isSyncableAccount } from "@/utils/accounts";
@@ -245,8 +245,8 @@ export default function StockAccountCard({
                       {hasUsd && (
                         <p className="text-xs text-gray-400 dark:text-gray-500">
                           {usdRate
-                            ? `${fmtKrw(krw)} + $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                            : `$${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })} (환율 조회 중)`}
+                            ? `${fmtKrw(krw)} + ${fmtUsd(usd)}`
+                            : `${fmtUsd(usd)} (환율 조회 중)`}
                         </p>
                       )}
                     </>

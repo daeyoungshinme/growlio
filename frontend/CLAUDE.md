@@ -121,7 +121,7 @@ _리밸런싱/추천_
 - `useRebalancingBalances` · `useRebalancingPrices` · `useAllocationHistory` · `useOptimizationSuggestions` · `useBacktestDateRange` · `useGoalSettings`
 - `useAlertCrud` · `useRebalancingAlertForm`(`useRebalancingAlertQueries`·`useRebalancingAlertFormState`)
 - `useSyncAccounts` — 여러 계좌 동기화 + 무효화(`run`이 전부 성공 여부 반환)
-- `useDcaTacticalLink` — 적립식 자동매수의 전술 연동 여부 `{dcaAuto, linked}`. 계좌별 알림이 여럿일 수 있어 `mergeAlertsByPortfolio` 대신 행 단위 판정
+- `useDcaTacticalLink` — 적립식 자동매수의 전술 연동 여부 `{dcaAuto, linked}`. 계좌별 알림이 여럿일 수 있어 `mergeAlertsByPortfolio` 대신 행 단위 판정. `linked`는 적립식 알림이 **모두** TACTICAL일 때만 참 — 안내 문구용이지 캐시 무효화 판정에 쓰면 안 됨
 - `useAutoExecutionNotice` — 켜진 AUTO가 있으면 "다음 자동 실행부터 새 목표로 주문" 문구
 - `useAddSuggestedCandidates` · `useCandidateOverlap`(디바운스 포함)
 - `useTacticalAllocation` — `useTacticalStatus`/`useTacticalBacktest`/`useTacticalMutations`(적용은 `invalidateTacticalData(qc, { portfolioChanged: true })`)
@@ -204,27 +204,27 @@ _기타_
 
 - 문자열 하드코딩 금지 — `QUERY_KEYS`에서 import. 새 키 추가 시 이 표도 갱신.
 - 계좌·연도별로 분기되는 키는 무효화 전용 `xxxBase` 프리픽스 키(`portfolioOverviewBase`, `transactionsBase`, `taxSummaryBase` 등)가 따로 있다 — **무효화는 항상 Base 키로**(특정 accountId 키만 지우면 다른 조합이 stale).
-- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status)는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
+- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status·exchange-rate·exchange-rate-alerts)는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
 
 **캐시 무효화 (`src/utils/queryInvalidation.ts`)** — 컴포넌트·훅에서 `queryClient.invalidateQueries()` 직접 호출 금지. 새 함수는 `invalidate<Domain>Data(queryClient)` 형태로 여기에 추가. 각 함수의 정확한 대상은 소스 확인.
 
-| 상황                                                 | 함수                                                                                                                         |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 계좌 sync                                            | `invalidateSyncData`                                                                                                         |
-| 계좌 CUD                                             | `invalidateAccountData`                                                                                                      |
-| 브로커 연동 해제                                     | `invalidateBrokerCredentialData`                                                                                             |
-| 거래내역 CUD                                         | `invalidateTransactionData`                                                                                                  |
-| 수기 매매 기록 CUD                                   | `invalidateTradeData` (해외 SELL이 양도세 실현손익이 되므로 세금·지금 할 일 포함)                                            |
-| 포트폴리오/리밸런싱 CUD                              | `invalidatePortfolioData`                                                                                                    |
-| 전술 설정 / 제안 비중 적용 / 전술 연동 자동매수 해제 | `invalidateTacticalData` / `{ portfolioChanged: true }` / `{ dcaLinked: true }`                                              |
-| DCA·배당 목표 변경                                   | `invalidateDcaData` (목표 금액·연도 변경은 `{ goalRecommendation: true }`, 배당 목표는 + `invalidateGoalRecommendationData`) |
-| 소득 구간 변경                                       | `invalidateIncomeBracketData`                                                                                                |
-| 챌린지 CUD                                           | `invalidateChallengeData`                                                                                                    |
-| 환율 / 주가 / 리밸런싱 알림 CUD                      | `invalidateAlertData` / `invalidateStockPriceAlertData` / `invalidateRebalancingAlertData(qc, portfolioId)`                  |
-| 주문 실행                                            | `invalidateRebalancingHistoryData`                                                                                           |
-| 대기 플랜 취소/승인                                  | `invalidateRebalancingPlanData(qc, { executed })` — 응답 `EXECUTED`면 `executed: true`                                       |
-| 복합신호 설정 / 추천 후보 변경                       | `invalidateCompositeSignalData` / `invalidateGoalRecommendationData`                                                         |
-| 다른 화면 영향 없는 설정                             | `invalidateSettingsData` (옵트인 토글 기본값)                                                                                |
+| 상황                                                              | 함수                                                                                                                         |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 계좌 sync                                                         | `invalidateSyncData`                                                                                                         |
+| 계좌 CUD                                                          | `invalidateAccountData`                                                                                                      |
+| 브로커 연동 해제                                                  | `invalidateBrokerCredentialData`                                                                                             |
+| 거래내역 CUD                                                      | `invalidateTransactionData`                                                                                                  |
+| 수기 매매 기록 CUD                                                | `invalidateTradeData` (해외 SELL이 양도세 실현손익이 되므로 세금·지금 할 일 포함)                                            |
+| 포트폴리오/리밸런싱 CUD                                           | `invalidatePortfolioData`                                                                                                    |
+| 전술 설정 / 제안 비중 적용 / 전술 끄기(서버가 TACTICAL 알림 해제) | `invalidateTacticalData` / `{ portfolioChanged: true }` / `{ alertsReset: true }`(끌 때 항상)                                |
+| DCA·배당 목표 변경                                                | `invalidateDcaData` (목표 금액·연도 변경은 `{ goalRecommendation: true }`, 배당 목표는 + `invalidateGoalRecommendationData`) |
+| 소득 구간 변경                                                    | `invalidateIncomeBracketData`                                                                                                |
+| 챌린지 CUD                                                        | `invalidateChallengeData`                                                                                                    |
+| 환율 / 주가 / 리밸런싱 알림 CUD                                   | `invalidateAlertData` / `invalidateStockPriceAlertData` / `invalidateRebalancingAlertData(qc, portfolioId)`                  |
+| 주문 실행 / 미체결 취소                                           | `invalidateRebalancingHistoryData`                                                                                           |
+| 대기 플랜 취소/승인                                               | `invalidateRebalancingPlanData(qc, { executed })` — 응답 `EXECUTED`면 `executed: true`                                       |
+| 복합신호 설정 / 추천 후보 변경                                    | `invalidateCompositeSignalData` / `invalidateGoalRecommendationData`                                                         |
+| 다른 화면 영향 없는 설정                                          | `invalidateSettingsData` (옵트인 토글 기본값)                                                                                |
 
 - 당겨서 새로고침처럼 자기 쿼리 하나만 다시 받을 땐 그 `useQuery`의 `refetch`.
 - 목표 비중 저장 후 열린 분석 화면은 `portfolioItemsSignature` 변경으로 자동 재분석된다 — **`Portfolio.updated_at`은 비중만 바뀐 저장에선 갱신되지 않으니 신선도 판단에 쓰지 말 것.**
@@ -236,7 +236,7 @@ _기타_
 
 **포맷 (`utils/format.ts`)** — 로컬 재정의 금지.
 
-- `fmtKrw`(억/만/원) · `fmtKrwPreview`(입력 중 "5,000,000원 (500만원)") · `fmtKrwShort`(차트 레이블) · `fmtKrwPrice` · `fmtMonth` · `fmtPct`(null → "—") · `fmtDateTime` · `relativeTime` · `convertUsdToKrw`/`formatUsdAsKrw`
+- `fmtKrw`(억/만/원) · `fmtKrwPreview`(입력 중 "5,000,000원 (500만원)") · `fmtKrwShort`(차트 레이블) · `fmtKrwPrice` · `fmtUsd`/`fmtUsdPrice` · `fmtNativePrice`(주문가 — 국내 원·해외 $, 주가에 `fmtKrw` 쓰면 만원 축약됨) · `fmtMonth` · `fmtPct`(null → "—") · `fmtDateTime` · `relativeTime` · `convertUsdToKrw`/`formatUsdAsKrw`
 - `pctOf(part, total)` — 인라인 `total > 0 ? v / total * 100 : 0` 대신. `clampPct(pct)` — 진행률 바 width에 그대로 넣지 말 것
 - **날짜**: `localToday()`/`localMonth()` 사용 — `new Date().toISOString().slice(...)`는 UTC라 KST 09시 전엔 전날/전월. 모듈 최상위 상수로 고정하지 말고 폼을 열 때 호출. `parseYmd`/`daysUntilYmd`
 - 차트 X축은 `"YY.M"` — 직접 문자열 파싱(타임존 이슈 방지)
