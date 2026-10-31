@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Literal, cast
+from typing import Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,10 +27,10 @@ from app.services.alerts.calculator import (
     should_fire_today,
 )
 from app.services.rebalancing._alert_queries import alert_with_recipient_stmt
-from app.services.rebalancing.alert_scope import resolve_effective_account_ids
+from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
 from app.services.rebalancing.diagnosis_service import fetch_composite_signal
 from app.services.rebalancing.order_builder import (
-    build_rebalancing_orders,
+    build_alert_order_preview,
     is_alert_blocked_by_market_gate,
 )
 from app.services.rebalancing.service import filter_drifting_items
@@ -119,14 +119,7 @@ async def _process_rebalancing_alert(
     from app.services.notifications.email_service import send_rebalancing_alert
 
     # 실제 매수/매도 수량 미리보기 — drift가 있을 때만 계산(실행/저장은 하지 않음, 표시 전용).
-    order_preview_items: list = []
-    if drifting:
-        strategy = alert.strategy
-        order_type = cast(Literal["MARKET", "LIMIT"], alert.order_type)
-        buy_account_id = str(alert.account_id) if alert.account_id else ""
-        order_preview_items = build_rebalancing_orders(
-            drifting, ticker_account_map or {}, strategy, order_type, buy_account_id, alert_id=str(alert.id)
-        )
+    order_preview_items = build_alert_order_preview(alert, drifting, ticker_account_map)
 
     # AUTO 모드 실행은 rebalancing_auto_execution 인트라데이 잡이 전담한다.
     # 10분 간격 job(check_rebalancing_alerts)은 각 알림의 notify_time 창에서만 이메일/FCM 리포트를 발송한다.
@@ -233,19 +226,14 @@ def _should_skip_by_schedule(alert: RebalancingAlert, trigger_condition: str, is
 
 async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db: AsyncSession, cache: Any = None):
     """알림 대상 포트폴리오의 현재 배분을 조회·분석한다. 실패 시 None(호출부에서 skip)."""
-    from app.services.portfolio.portfolio_service import build_portfolio_overview
-    from app.services.rebalancing.service import analyze_rebalancing
-
-    effective_account_ids = resolve_effective_account_ids(alert, portfolio)
-
     try:
-        overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, cache=cache)
+        overview = await load_alert_overview(alert, portfolio, db, cache)
     except Exception as exc:
         report_handled_failure("rebalancing_alert_overview_failed", exc, alert_id=str(alert.id))
         return None
 
     try:
-        return analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+        return analyze_alert_overview(portfolio, overview)
     except Exception as exc:
         report_handled_failure("rebalancing_alert_analysis_failed", exc, alert_id=str(alert.id))
         return None

@@ -324,14 +324,10 @@ async def _drifting_items_for_alert(
 
     반환: (analysis, overview, drifting) — drifting은 analysis.items(그룹 members 포함)와 같은 객체를 가리킨다.
     """
-    from app.services.portfolio.portfolio_service import build_portfolio_overview
-    from app.services.rebalancing.alert_scope import resolve_effective_account_ids
-    from app.services.rebalancing.service import analyze_rebalancing
+    from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
 
-    effective_account_ids = resolve_effective_account_ids(alert, portfolio)
-
-    overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, cache=cache)
-    analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+    overview = await load_alert_overview(alert, portfolio, db, cache)
+    analysis = analyze_alert_overview(portfolio, overview)
 
     # SCHEDULE_ONLY("스케줄일에 무조건")는 임계값과 무관하게 목표 비중 대비 차이가 있는 종목을 전부
     # 대상으로 한다 — 정기 적립식 자동매수가 스케줄일에 쌓인 예수금을 목표 비중대로 매수하는 동작.

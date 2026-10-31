@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +12,7 @@ from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.services.rebalancing._alert_queries import get_alert_by_portfolio, list_alerts_by_portfolio_accounts
 
-__all__ = ["resolve_effective_account_ids", "switch_alert_scope"]
+__all__ = ["analyze_alert_overview", "load_alert_overview", "resolve_effective_account_ids", "switch_alert_scope"]
 
 
 def resolve_effective_account_ids(alert: RebalancingAlert, portfolio: Portfolio) -> list[uuid.UUID] | None:
@@ -24,6 +25,22 @@ def resolve_effective_account_ids(alert: RebalancingAlert, portfolio: Portfolio)
         return [alert.account_id]
     saved_ids = getattr(portfolio, "account_ids", None)
     return [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
+
+
+async def load_alert_overview(alert: RebalancingAlert, portfolio: Portfolio, db: AsyncSession, cache: Any) -> Any:
+    """알림의 계좌 범위로 포트폴리오 overview를 조회한다(알림 확인·테스트 발송·AUTO 플랜 생성 공용)."""
+    # 테스트가 build_portfolio_overview를 원래 모듈 경로로 patch하므로 호출 시점에 import한다
+    from app.services.portfolio.portfolio_service import build_portfolio_overview
+
+    account_ids = resolve_effective_account_ids(alert, portfolio)
+    return await build_portfolio_overview(alert.user_id, db, account_ids=account_ids, cache=cache)
+
+
+def analyze_alert_overview(portfolio: Portfolio, overview: Any) -> Any:
+    """알림용 리밸런싱 분석 — 목표에 없는 예수금도 현금 행으로 포함한다."""
+    from app.services.rebalancing.service import analyze_rebalancing
+
+    return analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
 
 
 async def switch_alert_scope(db: AsyncSession, portfolio: Portfolio, target_scope: str) -> None:
