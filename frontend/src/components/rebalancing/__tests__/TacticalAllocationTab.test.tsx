@@ -517,4 +517,20 @@ describe("TacticalAllocationTab", () => {
       expect(toast).toHaveBeenCalledWith(expect.stringContaining("일반 모드로 바뀌었어요"), "info"),
     );
   });
+
+  it("연동 안내가 안 뜨는 경우에도 끄면 알림 캐시를 비운다", async () => {
+    // 적립식 중 하나만 TACTICAL이면 linked=false지만 서버는 그 TACTICAL 알림을 DISABLED로 바꾼다 (plans/101 A1)
+    vi.mocked(alertsApi.fetchRebalancingAlerts).mockResolvedValue([
+      dcaAlert("TACTICAL"),
+      { ...dcaAlert("DISABLED"), id: "a2", account_id: "acc2" },
+    ]);
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
+    vi.mocked(tacticalApi.deleteTacticalStrategy).mockResolvedValue(undefined as never);
+    renderTab();
+    fireEvent.click(await screen.findByText("전술 배분 끄기"));
+    const { invalidateTacticalData } = await import("@/utils/queryInvalidation");
+    await waitFor(() =>
+      expect(invalidateTacticalData).toHaveBeenCalledWith(expect.anything(), { alertsReset: true }),
+    );
+  });
 });

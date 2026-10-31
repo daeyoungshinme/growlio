@@ -143,16 +143,16 @@ export function invalidatePortfolioData(qc: QueryClient) {
  * 제안 비중 적용 시엔 포트폴리오 목표가 바뀌므로 `invalidatePortfolioData`도 함께(포트폴리오 목록·드리프트·리밸런싱 전략). */
 export function invalidateTacticalData(
   qc: QueryClient,
-  opts: { portfolioChanged?: boolean; dcaLinked?: boolean } = {},
+  opts: { portfolioChanged?: boolean; alertsReset?: boolean } = {},
 ) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.tacticalStatusBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.tacticalBacktestBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
     ...(opts.portfolioChanged ? [invalidatePortfolioData(qc)] : []),
-    // 전술 연동 자동매수를 끄면 서버가 그 알림을 일반 모드로 되돌린다 — 포트폴리오·계좌별 알림 캐시까지 비워야
-    // 모달이 옛 TACTICAL 값을 다시 저장하지 않는다 (plans/99 B2). 환전 계획 기본 포트폴리오도 이 알림을 따른다
-    ...(opts.dcaLinked
+    // 전술을 끄면 서버가 그 포트폴리오의 TACTICAL 알림을 모두 일반 모드로 되돌린다 — 포트폴리오·계좌별 알림 캐시까지
+    // 비워야 모달이 옛 TACTICAL 값을 다시 저장하지 않는다 (plans/99 B2). 환전 계획 기본 포트폴리오도 이 알림을 따른다
+    ...(opts.alertsReset
       ? [
           qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlertBase }),
