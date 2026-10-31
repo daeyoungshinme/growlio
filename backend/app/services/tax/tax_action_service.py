@@ -30,7 +30,7 @@ from app.services.tax.isa_service import (
 )
 from app.services.tax.overseas_realized_service import get_overseas_realized_summary
 from app.services.tax.pension_contribution_service import PensionContributionStatus, calc_pension_contribution_status
-from app.services.tax.tax_service import get_overseas_positions_detail, get_tax_summary, pick_year_rule
+from app.services.tax.tax_service import get_tax_summary, load_tax_stock_rows, pick_year_rule
 from app.utils.kst import today_kst
 
 ActionCategory = Literal[
@@ -480,11 +480,11 @@ async def get_tax_action_plan_with_summary(
         isa_contrib = await calc_isa_contribution_status(user_id, year, db)
         actions.extend(build_isa_contribution_actions(isa_contrib, today))
 
-    # 해외 포지션은 한 번만 읽어 실현손익·세금 요약에 넘긴다(스냅샷+포지션 로드 3회 → 1회)
-    positions = await get_overseas_positions_detail(user_id, db)
+    # 스냅샷은 한 번만 읽어 실현손익(포지션)·세금 요약(행)에 넘긴다
+    rows, positions = await load_tax_stock_rows(user_id, db)
     realized = await get_overseas_realized_summary(user_id, year, db, overseas_positions=positions)
     tax_summary = await get_tax_summary(
-        user_id, year, db, overseas_realized_krw=realized["realized_gain_krw"], overseas_positions=positions
+        user_id, year, db, overseas_realized_krw=realized["realized_gain_krw"], stock_rows=rows
     )
     gain_action = build_overseas_gain_harvest_action(
         positions,

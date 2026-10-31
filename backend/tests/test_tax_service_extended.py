@@ -334,3 +334,61 @@ class TestEstimateOverseasTransferTax:
         result_future = estimate_overseas_transfer_tax(12_500_000.0, year=2030)
         result_2026 = estimate_overseas_transfer_tax(12_500_000.0, year=2026)
         assert result_future == result_2026
+
+
+class TestMarketClassificationPinned:
+    """세금 요약 미실현과 실현손익의 OTHER 판정이 갈리는 현재 동작 고정(세무 판단 보류 — docs/plans/105 D2)."""
+
+    def test_other_market_excluded_from_unrealized_buckets(self):
+        from app.services.tax.tax_service import _stock_unrealized_from_rows
+
+        pos = _make_position(ticker="XYZ", market="OTHER", avg_price=100_000.0, current_price=150_000.0, qty=10)
+        assert _stock_unrealized_from_rows([_make_snap_acc([pos])]) == (0.0, 0.0, 0.0, 0.0)
+
+    def test_other_market_is_overseas_for_realized(self):
+        from app.services.tax.overseas_realized_service import _is_overseas
+
+        assert _is_overseas("OTHER") is True
+        assert _is_overseas("KOSPI") is False
+
+
+class TestTaxSummarySnapshotReadOnce:
+    """get_tax_summary가 스냅샷을 한 번만 읽고, 넘겨받은 행이 있으면 다시 읽지 않는다(docs/plans/105 E)."""
+
+    @staticmethod
+    def _patches(rows_mock):
+        from unittest.mock import patch
+
+        base = "app.services.tax.tax_service"
+        return (
+            patch(f"{base}._latest_stock_rows", new=rows_mock),
+            patch(f"{base}._calc_dividend_income", new=AsyncMock(return_value=0.0)),
+            patch(f"{base}._calc_interest_income", new=AsyncMock(return_value=0.0)),
+            patch(f"{base}._calc_total_fees", new=AsyncMock(return_value=0.0)),
+        )
+
+    @pytest.mark.asyncio
+    async def test_reads_once_when_rows_not_given(self, mock_db, override_settings):
+        from app.services.tax.tax_service import get_tax_summary
+
+        pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=90_000.0, qty=10)
+        rows_mock = AsyncMock(return_value=[_make_snap_acc([pos])])
+        p1, p2, p3, p4 = self._patches(rows_mock)
+        with p1, p2, p3, p4:
+            result = await get_tax_summary(uuid.uuid4(), 2025, mock_db)
+
+        rows_mock.assert_awaited_once()
+        assert result["overseas_unrealized_gain_krw"] == -100_000
+
+    @pytest.mark.asyncio
+    async def test_uses_given_rows_without_reading(self, mock_db, override_settings):
+        from app.services.tax.tax_service import get_tax_summary
+
+        rows_mock = AsyncMock(return_value=[])
+        pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=90_000.0, qty=10)
+        p1, p2, p3, p4 = self._patches(rows_mock)
+        with p1, p2, p3, p4:
+            result = await get_tax_summary(uuid.uuid4(), 2025, mock_db, stock_rows=[_make_snap_acc([pos])])
+
+        rows_mock.assert_not_awaited()
+        assert result["overseas_unrealized_gain_krw"] == -100_000

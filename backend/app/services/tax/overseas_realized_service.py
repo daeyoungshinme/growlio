@@ -137,6 +137,7 @@ async def _fetch_kis_realized(acc: AssetAccount, start: date, end: date, db: Asy
 
 
 def _is_overseas(market: str) -> bool:
+    """국내 시장이 아니면 해외 — OTHER도 해외다. 세금 요약 미실현은 OTHER를 빼므로 기준이 갈린다(세무 판단 보류)."""
     return market.upper() not in DOMESTIC_MARKETS
 
 

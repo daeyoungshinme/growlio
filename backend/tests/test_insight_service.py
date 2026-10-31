@@ -183,7 +183,7 @@ class TestCheckTaxLossHarvest:
     async def test_no_positions_returns_empty(self, mock_db, override_settings):
         from app.services.insight_service import _check_tax_loss_harvest
 
-        with patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=[])):
+        with patch("app.services.insight_service.load_tax_stock_rows", new=AsyncMock(return_value=([], []))):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
 
         assert result == []
@@ -195,7 +195,7 @@ class TestCheckTaxLossHarvest:
         positions = [
             {"ticker": "AAPL", "unrealized_pnl_krw": 500_000, "qty": 5},
         ]
-        with patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=positions)):
+        with patch("app.services.insight_service.load_tax_stock_rows", new=AsyncMock(return_value=([], positions))):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
 
         assert result == []
@@ -210,8 +210,9 @@ class TestCheckTaxLossHarvest:
         ]
         summary = {"harvesting_recommendations": [{"ticker": "TSLA", "tax_saved_krw": 330_000}]}
         tax_summary = AsyncMock(return_value=summary)
+        rows: list = []
         with (
-            patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=positions)),
+            patch("app.services.insight_service.load_tax_stock_rows", new=AsyncMock(return_value=(rows, positions))),
             patch("app.services.insight_service.get_tax_summary", new=tax_summary),
         ):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
@@ -219,8 +220,8 @@ class TestCheckTaxLossHarvest:
         assert len(result) == 1
         assert result[0].type == "TAX_LOSS_HARVEST"
         assert result[0].metric_value == 330_000
-        # 같은 포지션을 넘겨 세금 요약이 포지션을 다시 읽지 않게 한다
-        assert tax_summary.call_args.kwargs["overseas_positions"] is positions
+        # 같은 스냅샷 행을 넘겨 세금 요약이 스냅샷을 다시 읽지 않게 한다
+        assert tax_summary.call_args.kwargs["stock_rows"] is rows
 
     @pytest.mark.asyncio
     async def test_small_tax_saving_returns_empty(self, mock_db, override_settings):
@@ -230,7 +231,7 @@ class TestCheckTaxLossHarvest:
         positions = [{"ticker": "TSLA", "unrealized_pnl_krw": -100_000, "qty": 1}]
         summary = {"harvesting_recommendations": [{"ticker": "TSLA", "tax_saved_krw": 22_000}]}
         with (
-            patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=positions)),
+            patch("app.services.insight_service.load_tax_stock_rows", new=AsyncMock(return_value=([], positions))),
             patch("app.services.insight_service.get_tax_summary", new=AsyncMock(return_value=summary)),
         ):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
