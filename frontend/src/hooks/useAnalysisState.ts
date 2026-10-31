@@ -219,9 +219,8 @@ export function useAnalysisState({
       return;
     }
     void triggerRebalancingAnalysis(autoAnalyzeId);
-    // selectedIds(Set)는 참조 비교가 불안정하므로 직렬화된 문자열로 의존성 추적
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoAnalyzeId, selectedIdStr, accountsReady]);
+    // selectedIds(Set)는 참조 비교가 불안정하므로 직렬화된 문자열로 의존성 추적. triggerRebalancingAnalysis는 deps가 []라 안정적
+  }, [autoAnalyzeId, selectedIdStr, accountsReady, triggerRebalancingAnalysis]);
 
   // 이미 분석 결과를 보여주고 있는 포트폴리오의 목표 비중이 저장으로 바뀌면 자동 재분석
   useEffect(() => {

@@ -56,14 +56,12 @@ export function useGoalWizardFeasibility(
   });
 
   useEffect(() => {
-    if (feasibility?.required_return_pct != null && !form.goal_annual_return_pct) {
-      const suggested = feasibility.required_return_pct;
-      setForm((f) =>
-        f.goal_annual_return_pct ? f : { ...f, goal_annual_return_pct: String(suggested) },
-      );
-    }
-    // form.goal_annual_return_pct는 의도적으로 제외 — 최초 1회만 prefill하고 이후 사용자 입력을 덮어쓰지 않음
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (feasibility?.required_return_pct == null) return;
+    const suggested = feasibility.required_return_pct;
+    // 이미 값이 있으면 updater가 그대로 둔다 — 사용자 입력을 덮어쓰지 않고, form을 deps에 넣지 않아도 된다
+    setForm((f) =>
+      f.goal_annual_return_pct ? f : { ...f, goal_annual_return_pct: String(suggested) },
+    );
   }, [feasibility, setForm]);
 
   return {

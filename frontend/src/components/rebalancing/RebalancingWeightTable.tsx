@@ -66,7 +66,7 @@ function TradeExecutionDetail({ item }: { item: RebalancingItem }) {
   const tradeKrw = calcTradeKrw(item);
   return (
     <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
-      {Math.abs(Math.round(item.shares_to_trade!))}주 × {fmtKrwPrice(item.current_price_krw!)} ·
+      {Math.abs(Math.round(item.shares_to_trade))}주 × {fmtKrwPrice(item.current_price_krw)} ·
       수수료 {fmtKrw(tradeKrw * TRADING_FEE_RATE)}
     </div>
   );

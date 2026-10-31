@@ -110,6 +110,7 @@ function DiagnosticGauge({ value }: { value: number }) {
 
 function InsightRow({ insight }: { insight: Insight }) {
   const navigate = useNavigate();
+  const actionUrl = insight.action_url;
   const severityDot: Record<string, string> = {
     ALERT: "bg-red-500",
     WARNING: "bg-amber-400",
@@ -127,9 +128,9 @@ function InsightRow({ insight }: { insight: Insight }) {
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
           {insight.detail}
         </p>
-        {insight.action_label && insight.action_url && (
+        {insight.action_label && actionUrl && (
           <button
-            onClick={() => navigate(insight.action_url!)}
+            onClick={() => navigate(actionUrl)}
             className={`${TOUCH_TARGET_ROW} text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline active:opacity-70`}
           >
             {insight.action_label} →
