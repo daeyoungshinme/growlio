@@ -35,14 +35,12 @@ from app.schemas.settings import (
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.accounts.credential_service import encrypt
 from app.services.goal.goal_age_recommendation_service import age_group_from_birth_year
-from app.utils.cache_keys import (
-    challenge_progress_key,
-    dashboard_summary_key,
-    dca_analysis_key,
+from app.utils.cache_invalidation import (
     invalidate_goal_recommendation_caches,
     invalidate_rebalancing_analysis_cache_all,
     invalidate_user_caches,
 )
+from app.utils.cache_keys import challenge_progress_key, dashboard_summary_key, dca_analysis_key
 from app.utils.numbers import opt_float
 
 router = APIRouter(prefix="/settings", tags=["settings"])

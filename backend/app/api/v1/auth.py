@@ -19,7 +19,7 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.services.auth_service import delete_supabase_user, supabase_user_exists, verify_password
-from app.utils.cache_keys import invalidate_all_user_caches, invalidate_user_caches
+from app.utils.cache_invalidation import invalidate_all_user_caches, invalidate_user_caches
 from app.utils.masking import mask_email
 
 logger = structlog.get_logger()

@@ -32,12 +32,12 @@ from app.schemas.challenge import (
 )
 from app.services._settings_queries import get_or_create_settings
 from app.services.portfolio.composition_calculator import build_asset_totals, exclude_real_estate
+from app.utils.cache_invalidation import invalidate_user_caches
 from app.utils.cache_keys import (
     TTL_CHALLENGE_PROGRESS,
     CacheStoreType,
     challenge_progress_key,
     get_cached_json,
-    invalidate_user_caches,
     set_cached_json,
 )
 from app.utils.kst import month_key as _month_key

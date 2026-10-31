@@ -224,6 +224,7 @@ providers/
   _overseas_name_enrichment.py  해외 이름·시장 보강(7일 캐시). 시장 미확정 시 NASDAQ 폴백 → 키움 주문 stex_tp 오라우팅 위험이라 경고 로그 + 1h만 캐시
 utils/
   cache_keys.py       캐시 키 + TTL (휘발성)
+  cache_invalidation.py  invalidate_* — SCAN 패턴이 cache_keys 빌더 포맷과 맞아야 함(드리프트 테스트가 검사)
   durable_state.py    Postgres AppState KV — 재시작에도 유지할 상태. 다중 프로세스 선점은 claim_durable()(get→set은 경합에 안전하지 않음)
   circuit_breaker.py  KIS/키움/토스 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s (재시작 시 초기화)
   kst.py              today_kst()/now_kst()/kst_day_start() — "오늘 보냈나" 비교는 kst_day_start

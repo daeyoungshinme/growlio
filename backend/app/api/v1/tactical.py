@@ -22,12 +22,8 @@ from app.models.user import User
 from app.schemas.portfolio import IndexGroupSuggestion
 from app.schemas.tactical import TacticalApplyRequest, TacticalStrategyUpsert
 from app.services.tactical import tactical_allocation_service as tactical
-from app.utils.cache_keys import (
-    insights_key,
-    invalidate_rebalancing_analysis_cache,
-    invalidate_user_caches,
-    portfolio_list_key,
-)
+from app.utils.cache_invalidation import invalidate_rebalancing_analysis_cache, invalidate_user_caches
+from app.utils.cache_keys import insights_key, portfolio_list_key
 from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/tactical", tags=["tactical"])

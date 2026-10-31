@@ -69,9 +69,7 @@ from app.services.external_queries import (
 )
 from app.services.goal.goal_return_solver import build_feasibility_preview
 from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_monthly_trend
-from app.utils.cache_keys import (
-    invalidate_asset_account_caches,
-)
+from app.utils.cache_invalidation import invalidate_asset_account_caches
 from app.utils.currency import fetch_usd_krw
 from app.utils.kst import KST
 from app.utils.numbers import opt_float
