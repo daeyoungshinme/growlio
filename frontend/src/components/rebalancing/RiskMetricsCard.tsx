@@ -9,8 +9,8 @@ import {
   summarizeRiskLevel,
   type MetricConfig,
 } from "@/utils/riskLevel";
-
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+
 function RiskMetricRow({
   metric,
   isExpanded,

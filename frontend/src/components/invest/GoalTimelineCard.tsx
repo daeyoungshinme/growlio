@@ -7,8 +7,8 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { goalRecommendationOverallQuery } from "@/api/queryOptions";
-
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+
 interface Props {
   timeline: GoalTimeline;
   goalAmount: number | null;

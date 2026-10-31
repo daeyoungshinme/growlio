@@ -8,7 +8,7 @@ import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
 import RebalancingStrategyCard from "@/components/rebalancing/RebalancingStrategyCard";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
-import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { useAnalysisState } from "@/hooks/useAnalysisState";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";

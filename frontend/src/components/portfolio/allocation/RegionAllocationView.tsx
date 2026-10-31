@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import InfoTip from "@/components/common/InfoTip";
 import { fmtKrw, fmtKrwShort, pctOf } from "@/utils/format";
-import SegmentedControl from "./SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 
 export type RegionBasis = "exposure" | "listing";
 

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrwShort } from "@/utils/format";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import SegmentedControl from "./allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 
 const TreemapChart = lazy(() => import("./TreemapChart"));
 const MonthlyDividendChart = lazy(() => import("./MonthlyDividendChart"));

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+
 interface Props {
   isOpen: boolean;
   onToggle: () => void;

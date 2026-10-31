@@ -5,12 +5,12 @@ import { Link } from "react-router-dom";
 import { fmtKrw } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { useTaxSimulation, type OverseasTaxRule } from "@/hooks/useTaxSimulation";
-import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import { TaxPositionTable } from "./TaxPositionTable";
 import { TaxSimulationCard } from "./TaxSimulationCard";
 import { TaxRecommendationList } from "./TaxRecommendationList";
-
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+
 interface Props {
   positions: OverseasPositionDetail[];
   /** 올해 실현손익 자동 집계(E6, 증권사 체결 + 직접 기록한 매도) — 없거나 집계 계좌가 없으면 수기 입력만 */

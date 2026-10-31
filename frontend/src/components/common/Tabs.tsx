@@ -1,6 +1,29 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 type Variant = "underline" | "pill";
+
+const END_FADE_STYLE = {
+  maskImage: "linear-gradient(to right, black calc(100% - 24px), transparent)",
+  WebkitMaskImage: "linear-gradient(to right, black calc(100% - 24px), transparent)",
+};
+
+/** 가로 스크롤 탭 오른쪽에 더 있는데 끝까지 안 밀었으면 true — 모바일에서 뒤쪽 탭이 있다는 힌트 */
+function useHasMoreToRight() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const update = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setHasMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+  useEffect(() => {
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [update]);
+  return { ref, hasMore, update };
+}
 
 interface Props<T extends string> {
   tabs: readonly T[];
@@ -20,6 +43,8 @@ export default function Tabs<T extends string>({
   className,
   fullWidth,
 }: Props<T>) {
+  const { ref: scrollRef, hasMore, update: updateFade } = useHasMoreToRight();
+
   if (variant === "pill") {
     return (
       <div
@@ -51,6 +76,9 @@ export default function Tabs<T extends string>({
 
   return (
     <div
+      ref={scrollRef}
+      onScroll={updateFade}
+      style={hasMore ? END_FADE_STYLE : undefined}
       role="tablist"
       className={`flex gap-1 border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-none ${className ?? ""}`}
     >

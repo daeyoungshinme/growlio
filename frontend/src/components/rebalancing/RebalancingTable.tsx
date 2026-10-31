@@ -14,8 +14,8 @@ import RebalancingSummaryCards from "./RebalancingSummaryCards";
 import RebalancingWeightTable from "./RebalancingWeightTable";
 import RebalancingDetailMetrics from "./RebalancingDetailMetrics";
 import { calcTradeSummary, TRADING_FEE_RATE } from "./rebalancingTradeMath";
-
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+
 interface Props {
   analysis: RebalancingAnalysis;
   portfolioId: string;

@@ -3,7 +3,7 @@ import { History } from "lucide-react";
 import type { TacticalBacktestResult } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { useTacticalBacktest } from "@/hooks/useTacticalAllocation";
 import { extractErrorMessage } from "@/utils/error";

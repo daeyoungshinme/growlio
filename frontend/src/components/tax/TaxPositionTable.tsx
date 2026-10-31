@@ -3,8 +3,8 @@ import { fmtKrw, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { marketLabel } from "@/constants/markets";
 import { posKey } from "@/hooks/useTaxSimulation";
-
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+
 interface Props {
   kind: "profit" | "loss";
   positions: OverseasPositionDetail[];

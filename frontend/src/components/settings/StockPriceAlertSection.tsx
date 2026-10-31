@@ -120,8 +120,8 @@ export function StockPriceAlertSection() {
             </div>
           )}
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <div className="flex-1 min-w-[120px]">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="col-span-2 sm:col-span-1">
             <label className={LABEL_MD}>목표가 (원)</label>
             <input
               type="number"
@@ -133,7 +133,7 @@ export function StockPriceAlertSection() {
               min="0"
             />
           </div>
-          <div className="flex-1 min-w-[100px]">
+          <div>
             <label className={LABEL_MD}>조건</label>
             <select
               className={FORM_INPUT_SM}
@@ -146,7 +146,7 @@ export function StockPriceAlertSection() {
               <option value="ABOVE">이상 (↑)</option>
             </select>
           </div>
-          <div className="flex-1 min-w-[80px]">
+          <div>
             <label className={LABEL_MD}>알림 횟수</label>
             <input
               type="number"

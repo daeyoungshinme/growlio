@@ -4,8 +4,8 @@ import type { AssetAccount } from "@/api/assets";
 import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { isSyncableAccount } from "@/utils/accounts";
 import { STOCK_TYPE_LABELS } from "@/constants";
-
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+
 interface Props {
   accounts: AssetAccount[];
   onReanalyze: () => void;

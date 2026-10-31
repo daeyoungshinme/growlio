@@ -17,8 +17,8 @@ import CollapsibleCard from "@/components/common/CollapsibleCard";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { goalRecommendationOverallQuery, settingsQuery } from "@/api/queryOptions";
-
 import { TOUCH_HEIGHT_MIN, TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+
 interface Props {
   onOpenSettings: () => void;
 }
@@ -263,7 +263,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                 지금 설정하기
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">예상 연배당</p>
                 <p className="text-base sm:text-xl font-bold text-gray-900 dark:text-gray-50">

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
 import type { AssetAccount } from "@/api/assets";

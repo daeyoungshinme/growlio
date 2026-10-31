@@ -3,8 +3,8 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { PortfolioMetrics } from "@/api/backtest";
 import { pnlColor, LOSS_COLOR, PIE_COLORS } from "@/utils/colors";
 import InfoTip from "@/components/common/InfoTip";
-
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+
 interface Props {
   metrics: PortfolioMetrics[];
 }

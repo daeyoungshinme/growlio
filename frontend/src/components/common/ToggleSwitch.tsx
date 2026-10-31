@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+
 interface ToggleSwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;

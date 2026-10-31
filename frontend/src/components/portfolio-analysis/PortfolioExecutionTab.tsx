@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AnalysisPanel } from "./AnalysisPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import EmptyState from "@/components/common/EmptyState";
+import SkeletonCard from "@/components/common/SkeletonCard";
 import { mergeAlertsByPortfolio } from "@/utils/portfolio";
 import { accountsQuery, portfoliosQuery, rebalancingAlertsQuery } from "@/api/queryOptions";
 
@@ -65,7 +66,7 @@ export default function PortfolioExecutionTab({ portfolioId, scrollToResult }: P
     );
 
   if (portfoliosLoading) {
-    return <div className="h-32 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />;
+    return <SkeletonCard rows={3} />;
   }
 
   if (portfoliosError) {

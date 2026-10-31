@@ -838,6 +838,31 @@ describe("RebalancingStatusCard", () => {
       ).toBeInTheDocument();
     });
   });
+
+  it("포트폴리오 행은 Space로 페이지를 스크롤하지 않고, 안쪽 버튼의 키 입력은 행이 가로채지 않는다", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
+    vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
+      {
+        portfolio_id: "p1",
+        portfolio_name: "테스트",
+        max_drift_pct: 1,
+        threshold_pct: 5,
+        needs_rebalancing: false,
+        has_alert_configured: false,
+      },
+    ] as never);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard />
+      </MemoryRouter>,
+    );
+    const inner = await screen.findByRole("button", { name: "테스트 자동화 설정하기" });
+    const row = inner.closest('[role="button"][tabindex="0"]') as HTMLElement;
+
+    // fireEvent는 preventDefault되면 false를 돌려준다
+    expect(fireEvent.keyDown(row, { key: " " })).toBe(false);
+    expect(fireEvent.keyDown(inner, { key: " " })).toBe(true);
+  });
 });
 
 // =========================================

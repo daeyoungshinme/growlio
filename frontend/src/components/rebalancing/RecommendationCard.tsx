@@ -23,7 +23,7 @@ import { extractErrorMessage } from "@/utils/error";
 import { toPortfolioItemsPreservingGroups } from "@/utils/recommendationDrift";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
-import SegmentedControl from "@/components/portfolio/allocation/SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { useAutoExecutionNotice } from "@/hooks/useAutoExecutionNotice";

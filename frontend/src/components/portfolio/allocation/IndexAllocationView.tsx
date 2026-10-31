@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { fmtKrw } from "@/utils/format";
 import type { IndexExposure, IndexExposureGroup } from "@/types";
-import SegmentedControl from "./SegmentedControl";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import WeightBarRow, { ListingBadge } from "./WeightBarRow";
 
 type Basis = "stock" | "etf";

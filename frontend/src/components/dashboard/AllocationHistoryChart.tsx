@@ -18,7 +18,11 @@ import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 import { useAllocationHistory } from "@/hooks/useAllocationHistory";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
-import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import {
+  TOUCH_HEIGHT_MIN,
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+  TOUCH_TARGET_ROW,
+} from "@/constants/uiSizes";
 
 const TYPE_COLORS: Record<string, string> = {
   STOCK_DOMESTIC: "#2563EB",
@@ -211,14 +215,26 @@ function AllocationHistoryChart({
                         ? ((row.total_krw - prev.total_krw) / prev.total_krw) * 100
                         : null;
                     const isExpanded = expandedMonth === row.month;
+                    const toggle = () => setExpandedMonth(isExpanded ? null : row.month);
                     return (
                       <React.Fragment key={row.month}>
+                        {/* 행 전체 클릭은 마우스 편의, 키보드·스크린리더는 월 셀의 버튼으로 */}
                         <tr
-                          onClick={() => setExpandedMonth(isExpanded ? null : row.month)}
+                          onClick={toggle}
                           className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                         >
-                          <td className="py-2 px-1 sm:px-2 text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">
-                            {fmtMonth(row.month)}
+                          <td className="px-1 sm:px-2 text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">
+                            <button
+                              type="button"
+                              aria-expanded={isExpanded}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggle();
+                              }}
+                              className={`${TOUCH_TARGET_ROW} w-full text-left`}
+                            >
+                              {fmtMonth(row.month)}
+                            </button>
                           </td>
                           <td className="py-2 px-1 sm:px-2 text-xs text-right font-medium text-gray-900 dark:text-gray-50 whitespace-nowrap">
                             {fmtKrw(row.total_krw)}

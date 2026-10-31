@@ -14,8 +14,8 @@ import { fmtKrw } from "@/utils/format";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { SELECT_SM } from "@/constants/inputStyles";
-
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+
 interface TaxOptimizationCardProps {
   /** 특정 계좌만 필터링해 조회 (미지정 시 전체 계좌 통합) */
   accountId?: string | null;

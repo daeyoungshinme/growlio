@@ -4,8 +4,8 @@ import { RebalancingAnalysis } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { CASH_TICKER } from "@/constants/assets";
 import { DividendDiffCell } from "./RebalancingCells";
-
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+
 interface Props {
   analysis: RebalancingAnalysis;
 }

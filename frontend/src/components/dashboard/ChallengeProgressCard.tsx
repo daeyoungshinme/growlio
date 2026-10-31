@@ -2,8 +2,8 @@ import { Link } from "react-router-dom";
 import { Flame, ChevronRight } from "lucide-react";
 import type { Challenge } from "@/api/challenges";
 import { clampPct, fmtPct } from "@/utils/format";
-
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+
 interface Props {
   challenges: Challenge[];
 }

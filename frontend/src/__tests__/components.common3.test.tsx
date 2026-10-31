@@ -231,6 +231,21 @@ describe("Tabs", () => {
     fireEvent.click(screen.getByText("탭3"));
     expect(onChange).toHaveBeenCalledWith("탭3");
   });
+
+  it("underline 탭이 가로로 넘치면 끝까지 밀 때까지만 오른쪽 페이드를 건다", () => {
+    renderWithProviders(<Tabs tabs={tabs} activeTab="탭1" onChange={vi.fn()} />);
+    const list = screen.getByRole("tablist");
+    expect(list.style.maskImage).toBe("");
+
+    Object.defineProperty(list, "scrollWidth", { configurable: true, value: 500 });
+    Object.defineProperty(list, "clientWidth", { configurable: true, value: 300 });
+    fireEvent.scroll(list);
+    expect(list.style.maskImage).toContain("linear-gradient");
+
+    Object.defineProperty(list, "scrollLeft", { configurable: true, value: 200 });
+    fireEvent.scroll(list);
+    expect(list.style.maskImage).toBe("");
+  });
 });
 
 // ------- TreemapCell -------
