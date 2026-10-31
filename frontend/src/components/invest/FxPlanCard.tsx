@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchFxPlan, type FxPlanData, type FxZone } from "@/api/invest";
-import { createExchangeRateAlert, fetchExchangeRateAlerts } from "@/api/alerts";
+import { createExchangeRateAlert } from "@/api/alerts";
+import { exchangeRateAlertsQuery } from "@/api/queryOptions";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { SELECT_SM } from "@/constants/inputStyles";
@@ -111,10 +112,7 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
     // 월 탭·포트폴리오를 바꿀 때 카드 전체가 스켈레톤으로 바뀌며 탭 포커스가 사라지지 않게 (plans/99 B1)
     placeholderData: keepPreviousData,
   });
-  const { data: alerts } = useQuery({
-    queryKey: QUERY_KEYS.exchangeRateAlerts,
-    queryFn: fetchExchangeRateAlerts,
-  });
+  const { data: alerts } = useQuery(exchangeRateAlertsQuery);
 
   const registered = new Set(
     (alerts ?? [])

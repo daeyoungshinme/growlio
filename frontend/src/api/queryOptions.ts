@@ -1,8 +1,8 @@
 import { queryOptions } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { fetchAccounts } from "@/api/assets";
-import { fetchRebalancingAlerts } from "@/api/alerts";
+import { fetchAccounts, fetchExchangeRate } from "@/api/assets";
+import { fetchExchangeRateAlerts, fetchRebalancingAlerts } from "@/api/alerts";
 import { fetchPortfolioOverviewLite, fetchPortfolios } from "@/api/portfolios";
 import { fetchSettings } from "@/api/settings";
 import { fetchMarketSignal } from "@/api/marketSignals";
@@ -25,6 +25,19 @@ export const portfoliosQuery = queryOptions({
   queryKey: QUERY_KEYS.portfolios,
   queryFn: () => fetchPortfolios(),
   staleTime: STALE_TIME.MEDIUM,
+});
+
+/** USD/KRW 환율 — ExchangeRateProvider와 대시보드 프리페치가 같은 staleTime을 쓰도록 (plans/101 C3) */
+export const exchangeRateQuery = queryOptions({
+  queryKey: QUERY_KEYS.exchangeRate,
+  queryFn: () => fetchExchangeRate(),
+  staleTime: STALE_TIME.EXCHANGE_RATE,
+});
+
+/** 환율 알림 목록 — 설정 화면과 환전 계획 카드(등록 여부 표시)가 함께 쓴다 */
+export const exchangeRateAlertsQuery = queryOptions({
+  queryKey: QUERY_KEYS.exchangeRateAlerts,
+  queryFn: () => fetchExchangeRateAlerts(),
 });
 
 export const settingsQuery = queryOptions({

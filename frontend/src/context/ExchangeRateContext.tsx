@@ -1,8 +1,6 @@
 import { createContext, useContext, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchExchangeRate } from "@/api/assets";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import { exchangeRateQuery } from "@/api/queryOptions";
 import { toast } from "@/utils/toast";
 
 export interface ExchangeRateContextValue {
@@ -18,11 +16,7 @@ const ExchangeRateContext = createContext<ExchangeRateContextValue>({
 });
 
 export function ExchangeRateProvider({ children }: { children: React.ReactNode }) {
-  const { data, isLoading, error } = useQuery({
-    queryKey: QUERY_KEYS.exchangeRate,
-    queryFn: fetchExchangeRate,
-    staleTime: STALE_TIME.EXCHANGE_RATE,
-  });
+  const { data, isLoading, error } = useQuery(exchangeRateQuery);
 
   const rate = data?.usd_krw ?? null;
 
