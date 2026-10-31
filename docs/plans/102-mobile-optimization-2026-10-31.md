@@ -123,6 +123,31 @@
 - `StockAccountCard.tsx:219` 예수금 연필 제거(⚙과 같은 `onEdit`, 67 결정 완결)
 - `Tabs` underline 변형 가로 스크롤에 끝 페이드 힌트 추가(`Tabs.tsx:55`)
 
+**Phase C 결과 (2026-10-31, 완료)**
+- C1: 인라인 `min-h-[44px]`는 실제로 46건이었다.
+  - 대부분 전폭 버튼·링크·입력처럼 높이만 필요한 곳이었다. 기존 `TOUCH_TARGET_*`는 `min-w`와 flex 정렬까지 붙여서, 그대로 치환하면 레이아웃이 바뀐다.
+  - 그래서 `TOUCH_HEIGHT_MIN`/`TOUCH_HEIGHT_MIN_MOBILE_ONLY`를 신설했다. 46건과 `inputStyles` 2건을 치환했다.
+  - 40px이던 계좌 동기화 버튼 3개와 세금 수량 입력은 44px로 올렸다.
+  - `GoalCandidateManagerModal` select는 이미 36px(`min-h-9`)이라 유지했다. 컴팩트 상수를 쓰면 select에 flex가 붙는다.
+- C2
+  - 백테스트: 칩·전체 선택은 36px, 체크박스 행·날짜 입력은 모바일 44px로 키웠다. 차트 보기는 `SegmentedControl`로 바꿨다.
+  - 실행 모달: 시장가/지정가, 주문 방식, 취소, 매수 종목 추가 select, 재조회, 지정가·수량 입력을 44px로 키웠다.
+  - "다시 시도" 3곳도 44px로 키웠다.
+  - 시장가/지정가는 `SegmentedControl`(36px 칩)로 바꾸면 오히려 작아진다. 그래서 기존 버튼에 44px와 `aria-pressed`만 붙였다.
+  - 호가단위 안내는 이미 모바일에도 보이고 있었다.
+- C3
+  - 시장신호 알림 2개와 챌린지 알림을 `ToggleRow`로 바꿨다.
+  - 설정의 생체 인증·푸시 행은 유지했다. 이미 행 전체가 44px 버튼이고 `aria-pressed`가 있으며, 아이콘 메뉴 목록의 일부다.
+- C4
+  - `SegmentedControl`을 `common/`으로 옮겼다(11곳).
+  - 월별 자산 표 행에 키보드로 펼칠 수 있는 월 버튼을 넣었다.
+  - 진단 포트폴리오 행: Space로 페이지가 스크롤되던 것과, 안쪽 버튼의 키 입력이 행까지 전파되던 것을 고쳤다.
+  - 알림 폼을 2열 그리드로 바꿨다. underline `Tabs`에는 끝 페이드를 넣었다.
+  - `SkeletonCard` 2곳, `text-[11px]` 1곳을 고쳤다.
+  - **유지**
+    - `PortfolioListSection` 중첩 버튼: 이미 target 확인과 preventDefault가 되어 있었다.
+    - 고정 3열 6곳: `fmtKrw`가 축약형(최대 "9,999만원"·"12.34억원")이라 390px 3열에 들어간다. `DcaOutlook`은 데스크톱 전용이다.
+
 ## Phase D — 구조 개선 (중위험, 별도 커밋)
 **D1. 리밸런싱 › 포트폴리오: 포트폴리오 목록 → "선택 1장 + 변경(바텀시트)"** (67 보류분)
 - 모바일(`!useIsSmUp`)에서만 적용한다. 바텀시트는 기존 `Modal`(모바일 바텀시트 동작)을 재사용하고 새 컴포넌트는 만들지 않는다.
@@ -142,6 +167,18 @@
 
 **D5.** `RebalancingAccountSyncSection`을 분석 "상세" disclosure 안으로 옮긴다(`AnalysisPanel.tsx:202`).
 
+**Phase D 결과 (2026-10-31, 완료)**
+- D1
+  - 모바일에서 포트폴리오가 2개 이상이면 선택 카드 1장과 "다른 포트폴리오 보기 (N개)"만 보인다. 누르면 `Modal` 시트에 기존 목록(드래그 포함)이 열린다.
+  - 시트에서 고르기·수정·자동화 설정을 누르면 시트가 닫힌다. 삭제는 확인창이 위에 뜨므로 시트를 유지한다.
+  - 선택 카드에는 순서 핸들을 그리지 않는다. 생성 버튼은 헤더에 그대로 두었다.
+- D2: 기간 `SegmentedControl`은 유지했다. CollapsibleCard 헤더 전체가 토글 버튼이라 안에 넣으면 버튼이 중첩된다. 차트 칩은 C2에서 이미 흡수했다.
+- D3: 모바일 차트 높이를 240으로, x축 라벨을 약 5개로 줄였다. 범례는 Recharts 기본 줄바꿈을 그대로 쓴다.
+- D4
+  - `AchievementTable` 데스크톱의 `max-h` 내부 스크롤을 없앴다. 대신 최근 12행과 "더 보기"를 두고, 모바일과 상태를 공유한다.
+  - `WeightsCompare`·전술 백테스트 표·월별 자산 표는 유지했다. 3~4열에 값이 짧고, 넘칠 수 있는 곳에는 이미 `overflow-x-auto`가 있다.
+- D5: 계좌 데이터 갱신을 `RebalancingTable`의 "상세 정보" 안으로 옮겼다. 접힌 상태에서도 부제에 "계좌 갱신"이 보인다.
+
 ## Phase E — 네이티브 셸 (실기기 확인 필요)
 - **E1. 인증 페이지 safe-area**
   - 대상: `LoginPage:39`, `RegisterPage:89`, `ResetPasswordPage:60,117`, `FindAccountPage:31`, `ForgotPasswordPage:30`, `AuthCallbackPage:97`, `RebalancingPlanConfirmPage:112`
@@ -153,6 +190,17 @@
   - `AndroidManifest.xml`에 `android:windowSoftInputMode="adjustResize"`를 명시한다.
   - 전역 `focusin` 처리: 입력이 `visualViewport` 아래에 있으면 `scrollIntoView({block:"center"})`. `AppLayout`에 한 번만 등록한다.
   - `@capacitor/keyboard` 의존성은 추가하지 않는다.
+
+**Phase E 결과 (2026-10-31, 코드 완료 — 실기기 미확인)**
+- E1: `layout/AuthLayout`을 신설했다(safe-area 상하 + `min-h-dvh`). 인증 페이지 6개(재설정은 2분기)와 계획 확인 페이지에 적용했다. 모두 AppLayout 밖이라 패딩이 두 번 들어가지 않는다.
+- E2: `useModalBehavior`에 `hasOpenModal()`을 추가했다. 뒤로가기(`AppLayout`)와 스와이프(`useSwipeNavigation`) 판정을 이것으로 바꿨다.
+- E3: 매니페스트에 `adjustResize`를 넣었다. `hooks/useRevealFocusedInput`을 AppLayout에 한 번 등록했다. 포커스 후 `SCROLL_INTO_VIEW_DELAY`가 지나서도 입력이 `visualViewport` 아래에 있으면 `block:center`로 올린다.
+- 검증
+  - 프론트 1928 tests(+12), lint·typecheck 클린
+  - 규칙 grep 0건: `min-h-[44px]`(uiSizes 제외), `text-[10/11px]`, 옛 SegmentedControl 경로, overflow 판정, Tooltip import
+- 확인하지 못한 것
+  - 390px 실브라우저: Playwright 미설치이고 로그인 seed가 없다.
+  - Android 실기기: 상태바 겹침, 키보드가 입력을 가리는지, 모달 위 뒤로가기.
 
 ---
 
