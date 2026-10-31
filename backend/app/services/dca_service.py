@@ -22,6 +22,7 @@ from app.utils.cache_keys import (
     get_cached_json,
     set_cached_json,
 )
+from app.utils.kst import month_key as _month_key
 from app.utils.kst import today_kst
 
 _DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50년)
@@ -370,7 +371,3 @@ def _calc_acceleration_scenarios(
 def _elapsed_months(start: date, end: date) -> int:
     delta = relativedelta(end, start)
     return delta.years * 12 + delta.months
-
-
-def _month_key(d: date) -> str:
-    return d.strftime("%Y-%m")

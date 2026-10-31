@@ -9,8 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user, get_db
-from app.api.v1._account_deps import get_owned_or_404
+from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.constants import ORDER_EXECUTABLE_ASSET_TYPES
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter

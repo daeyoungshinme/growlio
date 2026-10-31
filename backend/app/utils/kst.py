@@ -31,3 +31,14 @@ def kst_day_start(d: date) -> datetime:
     이력(전날 23:30 UTC)을 같은 날로 보지 못한다(plans/61 A2).
     """
     return datetime(d.year, d.month, d.day, tzinfo=KST)
+
+
+def month_key(d: date) -> str:
+    """`YYYY-MM`."""
+    return d.strftime("%Y-%m")
+
+
+def month_label(month_str: str) -> str:
+    """`YYYY-MM` → `YYYY년 M월`."""
+    y, m = month_str.split("-")
+    return f"{y}년 {int(m)}월"

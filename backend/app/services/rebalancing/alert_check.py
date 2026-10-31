@@ -32,7 +32,6 @@ from app.services.rebalancing.diagnosis_service import fetch_composite_signal
 from app.services.rebalancing.order_builder import (
     build_rebalancing_orders,
     is_alert_blocked_by_market_gate,
-    refresh_live_prices,
 )
 from app.services.rebalancing.service import filter_drifting_items
 from app.utils.cache_keys import TTL_COMPOSITE_ALERT_SENT, composite_alert_sent_key
@@ -41,11 +40,7 @@ from app.utils.kst import today_kst
 from app.utils.market_hours import is_alert_execution_time
 from app.utils.metrics import alert_trigger_count
 
-__all__ = [
-    "build_rebalancing_orders",
-    "check_rebalancing_alerts",
-    "refresh_live_prices",
-]
+__all__ = ["check_rebalancing_alerts"]
 
 logger = structlog.get_logger()
 

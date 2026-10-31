@@ -12,8 +12,6 @@ import structlog
 
 logger = structlog.get_logger()
 
-_DEFAULT_SEMAPHORE_LIMIT = 5
-
 _LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 _ssl_client: httpx.AsyncClient | None = None
 _nossl_client: httpx.AsyncClient | None = None

@@ -97,6 +97,10 @@ TTL_TECHNICAL_SIGNAL_DEGRADED = 600  # 일부 종목 종가 조회 실패 결과
 # 키 빌더 함수의 f-string 포맷은 그대로 유지할 것 — 무단으로 포맷을 바꾸면 캐시 미스가 폭증한다.**
 _ALLOC_HISTORY_VERSION = "v3"  # v3: 증권계좌 예수금(스냅샷−포지션 차액)을 CASH_STOCK으로 보존
 _ETF_PROFILE_VERSION = "v1"  # v1: 첫 버전 태깅 — EtfProfile TypedDict 필드가 바뀌면 올릴 것
+_TECHNICAL_SIGNAL_VERSION = "v4"  # 버전 이력은 technical_signal_key docstring
+_TACTICAL_BACKTEST_VERSION = "v4"  # 버전 이력은 tactical_backtest_key docstring
+_USD_KRW_HISTORY_VERSION = "v1"
+_TACTICAL_TILT_VERSION = "v1"
 _MARKET_SIGNAL_VERSION = "v7"
 """v4: exchange_rate.value 산출 소스를 FRED 지연값 → 실시간 캐시(get_usd_krw_rate)로 변경
 (필드 구성은 동일하나 값 자체가 달라지므로, 기존 v3 캐시가 최대 1시간 TTL 동안
@@ -200,24 +204,24 @@ def overseas_stock_meta_key(ticker: str) -> str:
 def technical_signal_key(tickers: tuple[str, ...]) -> str:
     """차트 기술적 지표 스냅샷(일봉) 캐시 키 — 유저 무관 전역 공유. v2: 추세 히스테리시스 밴드 도입.
     v3: 20/60/120일선·웅덩이 단계 추가(스냅샷 모양 변경). v4: 추세 밴드 1%→2%(같은 모양, 추세 값이 달라짐)."""
-    return f"{_env_prefix()}technical_signal:v4:{','.join(sorted(tickers))}"
+    return f"{_env_prefix()}technical_signal:{_TECHNICAL_SIGNAL_VERSION}:{','.join(sorted(tickers))}"
 
 
 def usd_krw_history_key() -> str:
     """USD/KRW 1년 일봉 종가 캐시 키 — 유저 무관 전역 공유(환전 계획 위치·변동성 계산용)."""
-    return f"{_env_prefix()}usd_krw_history:v1"
+    return f"{_env_prefix()}usd_krw_history:{_USD_KRW_HISTORY_VERSION}"
 
 
 def tactical_tilt_key() -> str:
     """QQQ/SPY 틸트 입력(실질금리·상대강도) 캐시 키 — 유저 무관 전역 공유."""
-    return f"{_env_prefix()}tactical_tilt:v1"
+    return f"{_env_prefix()}tactical_tilt:{_TACTICAL_TILT_VERSION}"
 
 
 def tactical_backtest_key(settings_hash: str, years: int) -> str:
     """전술 배분 백테스트 결과 캐시 키 — 비중표+틸트·웅덩이 이동폭 해시가 같으면 유저 간 공유.
     v2: 공격 국면 유지·틸트. v3: 웅덩이 투입·레버리지 자산. v4: 현금 이자·거래비용·평균 비중 고정(plans/69),
     추세 밴드 2%·매크로 반영 옵션(plans/70)."""
-    return f"{_env_prefix()}tactical_backtest:v4:{settings_hash}:{years}"
+    return f"{_env_prefix()}tactical_backtest:{_TACTICAL_BACKTEST_VERSION}:{settings_hash}:{years}"
 
 
 def kis_amex_master_key() -> str:

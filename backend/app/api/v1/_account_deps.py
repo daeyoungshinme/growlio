@@ -4,10 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_owned_or_404
 from app.models.asset import AssetAccount
-
-__all__ = ["get_owned_or_404", "get_owned_account"]
 
 
 async def get_owned_account(account_id: UUID, user_id: UUID, db: AsyncSession) -> AssetAccount:
