@@ -16,11 +16,10 @@ from app.providers._error_mapping import map_http_status_error, map_network_erro
 from app.providers._overseas_cache import fetch_overseas_cached
 from app.providers._overseas_name_enrichment import enrich_overseas_positions
 from app.providers._retry import with_token_refresh
-from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
+from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, combine_domestic_overseas
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.accounts.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
-from app.utils.kst import today_kst
 from app.utils.masking import mask_account_no
 
 if TYPE_CHECKING:
@@ -126,34 +125,7 @@ class KISProvider(BrokerProvider):
         # 해외 시세(HHDFS00000300)의 output.rate는 등락률(%)이지 환율이 아니다 — 키움·토스와 같은 공용 환율을 쓴다
         usd_krw_rate = await get_usd_krw_rate(cache)
 
-        overseas_value_krw = overseas["total_value_usd"] * usd_krw_rate
-        overseas_deposit_krw = overseas["deposit_usd"] * usd_krw_rate
-        overseas_invested_krw = sum(
-            float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate for p in overseas["positions"]
-        )
-
         overseas_positions = await enrich_overseas_positions(overseas["positions"], cache)
-        all_raw = domestic["positions"] + [
-            {**p, "value_krw": p["value_usd"] * usd_krw_rate} for p in overseas_positions
-        ]
-
-        positions = [raw_to_position(p, usd_krw_rate) for p in all_raw]
-
-        stock_value_krw = domestic["total_value_krw"] + overseas_value_krw
-        total_value_krw = stock_value_krw + domestic["deposit_krw"] + overseas_deposit_krw
-        total_invested = domestic["invested_krw"] + overseas_invested_krw
-
-        logger.info("kis_sync_done", account_id=str(account.id), total_krw=total_value_krw)
-
-        return BalanceResult(
-            positions=positions,
-            total_value_krw=total_value_krw,
-            deposit_krw=domestic["deposit_krw"],
-            # 해외 조회 실패(ok=False) 시 None → asset_service가 기존 deposit_usd 유지
-            deposit_foreign=(None if overseas.get("ok") is False else overseas["deposit_usd"]),
-            overseas_known=overseas.get("ok") is not False,
-            invested_krw=total_invested,
-            pnl_krw=stock_value_krw - total_invested,
-            usd_krw_rate=usd_krw_rate,
-            extra={"source": "KIS_API", "snapshot_date": today_kst()},
-        )
+        result = combine_domestic_overseas(domestic, overseas, overseas_positions, usd_krw_rate, "KIS_API")
+        logger.info("kis_sync_done", account_id=str(account.id), total_krw=result.total_value_krw)
+        return result

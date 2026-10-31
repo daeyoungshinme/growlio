@@ -53,8 +53,21 @@ async def get_plan_leg_by_token(
     return leg
 
 
-def _as_aware(dt: datetime) -> datetime:
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+def is_leg_past_deadline(leg: RebalancingPlanLeg) -> bool:
+    """deadline_at(naive면 UTC로 간주)이 지났는지."""
+    deadline = leg.deadline_at if leg.deadline_at.tzinfo else leg.deadline_at.replace(tzinfo=UTC)
+    return datetime.now(tz=UTC) >= deadline
+
+
+async def _lock_leg(leg_id: uuid.UUID, db: AsyncSession) -> RebalancingPlanLeg | None:
+    return await db.scalar(select(RebalancingPlanLeg).where(RebalancingPlanLeg.id == leg_id).with_for_update())
+
+
+def _decide_leg(leg: RebalancingPlanLeg, status: str, decided_by: str, at: datetime | None = None) -> None:
+    """leg를 종료 상태로 바꾼다(결정 시각·주체 기록). commit은 호출자가 한다."""
+    leg.status = status
+    leg.decided_at = at or datetime.now(tz=UTC)
+    leg.decided_by = decided_by
 
 
 async def _lock_and_claim(leg_id: uuid.UUID, db: AsyncSession) -> RebalancingPlanLeg:
@@ -63,7 +76,7 @@ async def _lock_and_claim(leg_id: uuid.UUID, db: AsyncSession) -> RebalancingPla
     상태(status)는 아직 바꾸지 않고 token_consumed_at만 먼저 커밋해, 이후 실제 실행(수 초 소요될
     수 있는 브로커 API 호출) 도중 들어오는 중복 요청도 이 시점 이후로는 확실히 차단한다.
     """
-    locked = await db.scalar(select(RebalancingPlanLeg).where(RebalancingPlanLeg.id == leg_id).with_for_update())
+    locked = await _lock_leg(leg_id, db)
     if locked is None:
         raise NotFoundError(detail="계획을 찾을 수 없습니다")
     if locked.status != "PENDING" or locked.token_consumed_at is not None:
@@ -78,9 +91,7 @@ async def _decline_leg(
     leg: RebalancingPlanLeg, db: AsyncSession, decided_by: str, new_status: str, history_message: str
 ) -> None:
     locked = await _lock_and_claim(leg.id, db)
-    locked.status = new_status
-    locked.decided_at = datetime.now(tz=UTC)
-    locked.decided_by = decided_by
+    _decide_leg(locked, new_status, decided_by)
     plan = await db.get(RebalancingPlan, locked.plan_id)
     if plan:
         await save_alert_history(db, plan.user_id, "REBALANCING", history_message)
@@ -174,10 +185,8 @@ async def _execute_leg(
         await db.rollback()
         await db.refresh(locked)
         await db.refresh(plan)
-        locked.status = "FAILED"
+        _decide_leg(locked, "FAILED", decided_by)
         locked.error_message = reason
-        locked.decided_at = datetime.now(tz=UTC)
-        locked.decided_by = decided_by
         await save_alert_history(
             db, plan.user_id, "REBALANCING", f"리밸런싱 자동화 {'매수' if locked.side == 'BUY' else '매도'} 실행 실패"
         )
@@ -190,10 +199,8 @@ async def _execute_leg(
         # 실제 체결과 어긋나므로 EXECUTED로 기록하되 확인 안내를 남긴다(plans/62 A7)
         await db.refresh(locked)
         locked.error_message = HISTORY_MISSING_MESSAGE
-    locked.status = "EXECUTED"
+    _decide_leg(locked, "EXECUTED", decided_by)
     locked.execution_id = execution_id
-    locked.decided_at = datetime.now(tz=UTC)
-    locked.decided_by = decided_by
     await db.commit()
     return execution_id
 
@@ -212,10 +219,8 @@ async def _approve_leg_now(
 
     # 매도 deadline_at은 당일 장마감 승인 기한이다 — 만료 job(15분 주기)이 돌기 전에 들어온 승인도
     # 기한이 지났으면 실행하지 않고 만료로 마감한다(plans/62 A4). 매수 deadline_at은 실행 예정 시각이라 해당 없음.
-    if locked.side == "SELL" and _as_aware(locked.deadline_at) <= datetime.now(tz=UTC):
-        locked.status = "EXPIRED"
-        locked.decided_at = datetime.now(tz=UTC)
-        locked.decided_by = "SYSTEM_EXPIRY"
+    if locked.side == "SELL" and is_leg_past_deadline(locked):
+        _decide_leg(locked, "EXPIRED", "SYSTEM_EXPIRY")
         await save_alert_history(db, plan.user_id, "REBALANCING", "리밸런싱 자동화 매도 승인 만료 (장마감 미응답)")
         await db.commit()
         raise ConflictError(detail="승인 기한(장마감)이 지나 만료된 계획입니다")
@@ -277,19 +282,17 @@ async def _run_due_buy_leg(
 ) -> bool:
     """대기시간이 지난 BUY leg 1건을 만료·보류·실행한다. 처리(만료 또는 실행)했으면 True."""
     from app.models.alert import RebalancingAlert
-    from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode, tactical_regime_for_gate
+    from app.services.rebalancing.order_builder import is_alert_blocked_by_market_gate
     from app.utils.market_hours import is_korean_market_open, is_us_market_open
 
-    locked = await db.scalar(select(RebalancingPlanLeg).where(RebalancingPlanLeg.id == leg_id).with_for_update())
+    locked = await _lock_leg(leg_id, db)
     if locked is None or locked.status != "PENDING" or locked.token_consumed_at is not None:
         return False
 
     market_open = is_korean_market_open() if locked.market == "KR" else is_us_market_open()
     if not market_open:
-        locked.status = "EXPIRED"
+        _decide_leg(locked, "EXPIRED", "SYSTEM_AUTO", at=now)
         locked.error_message = "market_closed_before_execution"
-        locked.decided_at = now
-        locked.decided_by = "SYSTEM_AUTO"
         await db.commit()
         return True
 
@@ -299,9 +302,7 @@ async def _run_due_buy_leg(
 
     plan_alert_id = getattr(plan, "alert_id", None)
     alert = await db.get(RebalancingAlert, plan_alert_id) if plan_alert_id else None
-    market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-    tactical_regime = await tactical_regime_for_gate(alert, db)
-    if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness, tactical_regime):
+    if await is_alert_blocked_by_market_gate(alert, db, composite_level, data_freshness):
         logger.info(
             "rebalancing_plan_buy_execution_skipped_market_signal",
             leg_id=str(locked.id),
@@ -343,16 +344,12 @@ async def fail_stuck_consumed_legs(db: AsyncSession) -> int:
     processed = 0
     for leg_id in [row[0] for row in result.all()]:
         try:
-            locked = await db.scalar(
-                select(RebalancingPlanLeg).where(RebalancingPlanLeg.id == leg_id).with_for_update()
-            )
+            locked = await _lock_leg(leg_id, db)
             if locked is None or locked.status != "PENDING":
                 continue
             side = locked.side
-            locked.status = "FAILED"
+            _decide_leg(locked, "FAILED", "SYSTEM_EXPIRY")
             locked.error_message = STUCK_LEG_MESSAGE
-            locked.decided_at = datetime.now(tz=UTC)
-            locked.decided_by = "SYSTEM_EXPIRY"
             plan = await db.get(RebalancingPlan, locked.plan_id)
             if plan:
                 await save_alert_history(db, plan.user_id, "REBALANCING", "리밸런싱 자동화 실행 결과 확인 필요")
@@ -386,14 +383,10 @@ async def expire_due_sell_legs(db: AsyncSession) -> int:
     processed = 0
     for leg_id in due_leg_ids:
         try:
-            locked = await db.scalar(
-                select(RebalancingPlanLeg).where(RebalancingPlanLeg.id == leg_id).with_for_update()
-            )
+            locked = await _lock_leg(leg_id, db)
             if locked is None or locked.status != "PENDING" or locked.token_consumed_at is not None:
                 continue
-            locked.status = "EXPIRED"
-            locked.decided_at = now
-            locked.decided_by = "SYSTEM_EXPIRY"
+            _decide_leg(locked, "EXPIRED", "SYSTEM_EXPIRY", at=now)
             plan = await db.get(RebalancingPlan, locked.plan_id)
             if plan:
                 await save_alert_history(

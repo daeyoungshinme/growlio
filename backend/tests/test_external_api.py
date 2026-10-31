@@ -212,7 +212,7 @@ class TestCreateExternalTransaction:
                 "app.api.v1.external.get_latest_snapshot_with_positions",
                 AsyncMock(return_value=(snapshot, positions or [])),
             ),
-            patch("app.api.v1.external._upsert_snapshot", AsyncMock()),
+            patch("app.services.accounts.snapshot_service._upsert_snapshot", AsyncMock()),
             patch("app.api.v1.external.invalidate_asset_account_caches", AsyncMock()),
         )
 
@@ -267,6 +267,47 @@ class TestCreateExternalTransaction:
         assert account.deposit_krw == 150_000.0
         upsert_mock.assert_awaited_once()
         assert db.add.call_count == 1  # Transaction row만 add (계좌는 기존 ORM 객체 수정)
+
+    def test_manual_account_deposit_copies_positions_into_new_snapshot(self, override_settings):
+        """보유종목이 있는 수동 계좌에 입금하면 오늘 스냅샷에도 포지션이 복사돼야 한다(계좌 수정 경로와 동일).
+
+        예전엔 이 경로만 복사를 빠뜨려 오늘 스냅샷의 포지션 행이 비었다.
+        """
+        user = _make_user()
+        account = _make_account(user.id, data_source="MANUAL", deposit_krw=100_000.0, deposit_usd=None)
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        position = SimpleNamespace(ticker="005930", market="KOSPI", qty=10, avg_price=10_000.0, current_price=15_000.0)
+        new_snap = SimpleNamespace(id=uuid.uuid4())
+
+        patches = self._patches(account, positions=[position])
+        with (
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
+            patch(
+                "app.services.accounts.snapshot_service._upsert_snapshot", AsyncMock(return_value=new_snap)
+            ) as upsert_mock,
+            patch("app.services.accounts.snapshot_service.sync_snapshot_positions", AsyncMock()) as sync_mock,
+            patches[5],
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/external/transactions",
+                json={
+                    "account_id": str(account.id),
+                    "transaction_type": "DEPOSIT",
+                    "amount": 50_000,
+                    "transaction_date": "2026-08-01",
+                },
+            )
+
+        assert resp.status_code == 201
+        assert upsert_mock.call_args.kwargs["amount_krw"] == 150_000.0 + 150_000.0
+        sync_mock.assert_awaited_once()
+        assert sync_mock.call_args.kwargs["snapshot_id"] == new_snap.id
+        assert sync_mock.call_args.kwargs["positions"] == [position]
 
     def test_manual_account_withdrawal_subtracts_deposit_krw(self, override_settings):
         user = _make_user()

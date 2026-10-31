@@ -19,17 +19,13 @@ from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.notifications.email_service import send_challenge_reminder_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
+from app.utils.kst import month_label as _month_label
 from app.utils.kst import now_kst
 
 logger = structlog.get_logger()
 
 _CONCURRENCY = 3
 _DEDUP_TTL = 45 * 24 * 3600  # 45일 — 다음 달 발송 전까지만 유지되면 충분
-
-
-def _month_label(month_str: str) -> str:
-    y, m = month_str.split("-")
-    return f"{y}년 {int(m)}월"
 
 
 def _reminder_dedup_key(challenge_id, month: str) -> str:

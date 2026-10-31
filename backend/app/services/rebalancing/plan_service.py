@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +33,7 @@ from app.services.rebalancing.plan_execution import (
     expire_due_sell_legs,
     fail_stuck_consumed_legs,
     get_plan_leg_by_token,
+    is_leg_past_deadline,
     reject_sell_leg,
 )
 from app.services.rebalancing.plan_generation import (
@@ -84,11 +84,6 @@ __all__ = [
 
 # 실행되지 않고 종료된 leg 상태 — 형제 leg가 체결됐다면 "반쪽 실행"이다(PENDING은 아직 진행 중이라 제외)
 _TERMINAL_UNEXECUTED_STATUSES = {"FAILED", "EXPIRED", "REJECTED", "CANCELED"}
-
-
-def is_leg_past_deadline(leg: RebalancingPlanLeg) -> bool:
-    deadline = leg.deadline_at if leg.deadline_at.tzinfo else leg.deadline_at.replace(tzinfo=UTC)
-    return datetime.now(tz=UTC) >= deadline
 
 
 def build_leg_summary(

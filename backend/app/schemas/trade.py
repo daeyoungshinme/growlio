@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from app.enums import TradeSide
-from app.schemas._validators import validate_non_negative_amount, validate_positive_amount
+from app.schemas._validators import NonNegativeAmount, PositiveAmount
 from app.utils.kst import today_kst
 
 
@@ -24,20 +24,10 @@ class TradeCreate(BaseModel):
     market: str = Field(min_length=1, max_length=20)
     name: str = Field(default="", max_length=200)
     qty: float = Field(gt=0, le=1_000_000_000)
-    price_krw: float
-    fee: float | None = None
+    price_krw: PositiveAmount
+    fee: NonNegativeAmount | None = None
     trade_date: date
     notes: str | None = Field(default=None, max_length=500)
-
-    @field_validator("price_krw")
-    @classmethod
-    def price_positive(cls, v: float) -> float:
-        return validate_positive_amount(v)
-
-    @field_validator("fee")
-    @classmethod
-    def fee_non_negative(cls, v: float | None) -> float | None:
-        return validate_non_negative_amount(v)
 
     @field_validator("trade_date")
     @classmethod
@@ -53,20 +43,10 @@ TRADE_CLEARABLE_FIELDS = frozenset({"fee", "notes"})
 class TradeUpdate(BaseModel):
     side: TradeSide | None = None
     qty: float | None = Field(default=None, gt=0, le=1_000_000_000)
-    price_krw: float | None = None
-    fee: float | None = None
+    price_krw: PositiveAmount | None = None
+    fee: NonNegativeAmount | None = None
     trade_date: date | None = None
     notes: str | None = Field(default=None, max_length=500)
-
-    @field_validator("price_krw")
-    @classmethod
-    def price_positive(cls, v: float | None) -> float | None:
-        return validate_positive_amount(v)
-
-    @field_validator("fee")
-    @classmethod
-    def fee_non_negative(cls, v: float | None) -> float | None:
-        return validate_non_negative_amount(v)
 
     @field_validator("trade_date")
     @classmethod

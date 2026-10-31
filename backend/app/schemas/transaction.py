@@ -1,49 +1,29 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from app.enums import TransactionType
-from app.schemas._validators import validate_non_negative_amount, validate_positive_amount
+from app.schemas._validators import NonNegativeAmount, PositiveAmount
 
 
 class TransactionCreate(BaseModel):
     account_id: UUID | None = None
     transaction_type: TransactionType
-    amount: float
+    amount: PositiveAmount
     transaction_date: date
     ticker: str | None = Field(default=None, max_length=50)
     notes: str | None = Field(default=None, max_length=2000)
-    fee: float | None = None
-
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float) -> float:
-        return validate_positive_amount(v)
-
-    @field_validator("fee")
-    @classmethod
-    def fee_non_negative(cls, v: float | None) -> float | None:
-        return validate_non_negative_amount(v)
+    fee: NonNegativeAmount | None = None
 
 
 class TransactionUpdate(BaseModel):
     transaction_type: TransactionType | None = None
-    amount: float | None = None
+    amount: PositiveAmount | None = None
     transaction_date: date | None = None
     ticker: str | None = Field(default=None, max_length=50)
     notes: str | None = Field(default=None, max_length=2000)
-    fee: float | None = None
-
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float | None) -> float | None:
-        return validate_positive_amount(v)
-
-    @field_validator("fee")
-    @classmethod
-    def fee_non_negative(cls, v: float | None) -> float | None:
-        return validate_non_negative_amount(v)
+    fee: NonNegativeAmount | None = None
 
 
 class TransactionResponse(BaseModel):

@@ -14,8 +14,7 @@ from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
-from app.api.v1._account_deps import get_owned_or_404
+from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.limiter import limiter
 from app.models.user import User
 

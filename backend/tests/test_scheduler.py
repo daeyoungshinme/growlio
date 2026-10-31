@@ -73,7 +73,10 @@ def test_job_event_listener_logs_missed_and_error():
 
     from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_MISSED, JobExecutionEvent
 
-    with patch.object(scheduler_module, "logger") as mock_logger:
+    with (
+        patch.object(scheduler_module, "logger") as mock_logger,
+        patch.object(scheduler_module.sentry_sdk, "capture_message") as mock_capture,
+    ):
         scheduler_module._on_job_event(
             JobExecutionEvent(EVENT_JOB_MISSED, "job-a", "default", datetime(2026, 9, 25, 9, 0))
         )
@@ -87,6 +90,8 @@ def test_job_event_listener_logs_missed_and_error():
     assert mock_logger.warning.call_args.args[0] == "scheduler_job_missed"
     mock_logger.error.assert_called_once()
     assert mock_logger.error.call_args.kwargs["job_id"] == "job-b"
+    # 예외를 삼키지 않는 잡의 실패도 Sentry로 간다(스택 없이) — missed는 보내지 않는다
+    mock_capture.assert_called_once_with("scheduler_job_error job-b: ValueError", level="error")
 
 
 def test_report_job_failure_logs_and_captures_to_sentry():

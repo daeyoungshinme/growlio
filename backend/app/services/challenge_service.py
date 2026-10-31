@@ -40,13 +40,10 @@ from app.utils.cache_keys import (
     invalidate_user_caches,
     set_cached_json,
 )
+from app.utils.kst import month_key as _month_key
 from app.utils.kst import today_kst
 
 _NUDGE_DAY_OF_MONTH = 20  # 이 날짜 이후부터 "이번 달 아직 적립 안 함"을 네비 배지로 노출
-
-
-def _month_key(d: date) -> str:
-    return d.strftime("%Y-%m")
 
 
 def _add_months(month_str: str, delta: int) -> str:

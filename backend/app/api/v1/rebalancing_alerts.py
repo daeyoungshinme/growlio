@@ -9,8 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user, get_db
-from app.api.v1._account_deps import get_owned_or_404
+from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.constants import ORDER_EXECUTABLE_ASSET_TYPES
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
@@ -90,23 +89,37 @@ async def _validate_tactical_gate(db: AsyncSession, body: RebalancingAlertCreate
         )
 
 
+_ALERT_BODY_FIELDS = (
+    "threshold_pct",
+    "schedule_type",
+    "schedule_day_of_week",
+    "schedule_day_of_month",
+    "trigger_condition",
+    "mode",
+    "strategy",
+    "order_type",
+    "market_condition_mode",
+    "auto_execution_time",
+    "notify_time",
+    "buy_wait_minutes",
+    "tax_impact_gate_mode",
+    "max_tax_impact_krw",
+)
+"""요청 본문에서 그대로 옮기는 알림 설정 필드 — account_id/alert_scope는 호출부 책임."""
+
+
 def _apply_alert_fields(alert: RebalancingAlert, body: RebalancingAlertCreate) -> None:
-    """AGGREGATE/PER_ACCOUNT 양쪽 upsert가 공유하는 필드 할당 — account_id/alert_scope는 호출부 책임."""
-    alert.threshold_pct = body.threshold_pct
-    alert.schedule_type = body.schedule_type
-    alert.schedule_day_of_week = body.schedule_day_of_week
-    alert.schedule_day_of_month = body.schedule_day_of_month
-    alert.trigger_condition = body.trigger_condition
-    alert.mode = body.mode
-    alert.strategy = body.strategy
-    alert.order_type = body.order_type
-    alert.market_condition_mode = body.market_condition_mode
-    alert.auto_execution_time = body.auto_execution_time
-    alert.notify_time = body.notify_time
-    alert.buy_wait_minutes = body.buy_wait_minutes
-    alert.tax_impact_gate_mode = body.tax_impact_gate_mode
-    alert.max_tax_impact_krw = body.max_tax_impact_krw
+    """AGGREGATE/PER_ACCOUNT 양쪽 upsert가 공유하는 필드 할당."""
+    for field in _ALERT_BODY_FIELDS:
+        setattr(alert, field, getattr(body, field))
     alert.is_active = True
+
+
+def _test_alert_response(result: dict) -> TestAlertResponse:
+    email_sent, push_sent = result["email_sent"], result["push_sent"]
+    return TestAlertResponse(
+        email_sent=email_sent, push_sent=push_sent, message=_format_test_alert_message(email_sent, push_sent)
+    )
 
 
 def _format_test_alert_message(email_sent: bool, push_sent: bool) -> str:
@@ -120,30 +133,7 @@ def _format_test_alert_message(email_sent: bool, push_sent: bool) -> str:
 
 
 def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
-    max_tax_impact_krw = alert.max_tax_impact_krw
-    return RebalancingAlertResponse(
-        id=alert.id,
-        portfolio_id=alert.portfolio_id,
-        is_active=alert.is_active,
-        threshold_pct=float(alert.threshold_pct),
-        schedule_type=alert.schedule_type,
-        schedule_day_of_week=alert.schedule_day_of_week,
-        schedule_day_of_month=alert.schedule_day_of_month,
-        trigger_condition=alert.trigger_condition,
-        mode=alert.mode,
-        strategy=alert.strategy,
-        account_id=alert.account_id,
-        order_type=alert.order_type,
-        market_condition_mode=alert.market_condition_mode,
-        auto_execution_time=alert.auto_execution_time,
-        notify_time=alert.notify_time,
-        buy_wait_minutes=alert.buy_wait_minutes,
-        tax_impact_gate_mode=alert.tax_impact_gate_mode,
-        max_tax_impact_krw=(float(max_tax_impact_krw) if max_tax_impact_krw is not None else None),
-        last_triggered_at=alert.last_triggered_at,
-        created_at=alert.created_at,
-        updated_at=alert.updated_at,
-    )
+    return RebalancingAlertResponse.model_validate(alert, from_attributes=True)
 
 
 @router.get("/rebalancing", response_model=list[RebalancingAlertResponse])
@@ -244,12 +234,7 @@ async def trigger_rebalancing_alert_test(
         db=db,
         cache=cache,
     )
-
-    email_sent = result["email_sent"]
-    push_sent = result["push_sent"]
-    message = _format_test_alert_message(email_sent, push_sent)
-
-    return TestAlertResponse(email_sent=email_sent, push_sent=push_sent, message=message)
+    return _test_alert_response(result)
 
 
 @router.delete("/rebalancing/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -389,9 +374,4 @@ async def trigger_account_rebalancing_alert_test(
         account_id=account_id,
         cache=cache,
     )
-
-    email_sent = result["email_sent"]
-    push_sent = result["push_sent"]
-    message = _format_test_alert_message(email_sent, push_sent)
-
-    return TestAlertResponse(email_sent=email_sent, push_sent=push_sent, message=message)
+    return _test_alert_response(result)

@@ -75,8 +75,7 @@ async def _send_templated(
     to_email: str,
     build_template: Callable[[], tuple[str, str]],
     *,
-    ok_event: str,
-    fail_event: str,
+    event: str,
     not_configured_event: str = "email_not_configured_skip_email",
     **log_fields: Any,
 ) -> bool:
@@ -84,7 +83,8 @@ async def _send_templated(
 
     이메일 미설정 시 `False`(발송 안 함), 발송 성공 시 `True`, 발송 실패 시 예외를
     삼키고 `False`. `build_template`은 미설정이 아닐 때만 호출된다(불필요한 템플릿
-    렌더 방지). `log_fields`는 성공 로그에 추가로 실리는 구조화 키.
+    렌더 방지). 로그 이벤트는 `{event}_email_sent` / `{event}_email_failed`.
+    `log_fields`는 성공 로그에 추가로 실리는 구조화 키.
     """
     if not _email_configured():
         logger.warning(not_configured_event, to=to_email)
@@ -92,10 +92,10 @@ async def _send_templated(
     subject, html = build_template()
     try:
         await _send_html_email(to_email, subject, html)
-        logger.info(ok_event, to=to_email, **log_fields)
+        logger.info(f"{event}_email_sent", to=to_email, **log_fields)
         return True
     except Exception as e:
-        report_handled_failure(fail_event, e, to=to_email)
+        report_handled_failure(f"{event}_email_failed", e, to=to_email)
         return False
 
 
@@ -114,8 +114,7 @@ async def send_exchange_rate_alert(
     return await _send_templated(
         to_email,
         lambda: exchange_rate_alert_template(target_rate, direction, current_rate),
-        ok_event="exchange_rate_alert_email_sent",
-        fail_event="exchange_rate_alert_email_failed",
+        event="exchange_rate_alert",
         target_rate=target_rate,
         current_rate=current_rate,
     )
@@ -158,8 +157,7 @@ async def send_rebalancing_alert(
             app_link=app_link,
             automation_note=automation_note,
         ),
-        ok_event="rebalancing_alert_email_sent",
-        fail_event="rebalancing_alert_email_failed",
+        event="rebalancing_alert",
         portfolio=portfolio_name,
         items=len(items_to_show),
         drifting=drifting_count,
@@ -182,8 +180,7 @@ async def send_rebalancing_execution_email(
         lambda: rebalancing_execution_template(
             portfolio_name, executed_at, result_items, total_success, total_fail, total_skipped
         ),
-        ok_event="rebalancing_execution_email_sent",
-        fail_event="rebalancing_execution_email_failed",
+        event="rebalancing_execution",
         portfolio=portfolio_name,
         success=total_success,
         fail=total_fail,
@@ -197,8 +194,7 @@ async def send_rebalancing_plan_execution_failed_email(
     return await _send_templated(
         to_email,
         lambda: rebalancing_plan_execution_failed_template(portfolio_name, side, error_message),
-        ok_event="rebalancing_plan_execution_failed_email_sent",
-        fail_event="rebalancing_plan_execution_failed_email_failed",
+        event="rebalancing_plan_execution_failed",
         portfolio=portfolio_name,
         side=side,
     )
@@ -211,8 +207,7 @@ async def send_tax_impact_gate_blocked_email(
     return await _send_templated(
         to_email,
         lambda: tax_impact_gate_blocked_template(portfolio_name, estimated_tax_krw, max_tax_impact_krw),
-        ok_event="tax_impact_gate_blocked_email_sent",
-        fail_event="tax_impact_gate_blocked_email_failed",
+        event="tax_impact_gate_blocked",
         portfolio=portfolio_name,
     )
 
@@ -224,8 +219,7 @@ async def send_market_signal_gate_blocked_email(
     return await _send_templated(
         to_email,
         lambda: market_signal_gate_blocked_template(portfolio_name, composite_level, market_condition_mode),
-        ok_event="market_signal_gate_blocked_email_sent",
-        fail_event="market_signal_gate_blocked_email_failed",
+        event="market_signal_gate_blocked",
         portfolio=portfolio_name,
     )
 
@@ -237,8 +231,7 @@ async def send_daily_value_cap_gate_blocked_email(
     return await _send_templated(
         to_email,
         lambda: daily_value_cap_gate_blocked_template(portfolio_name, today_total_krw, attempted_value_krw, cap_krw),
-        ok_event="daily_value_cap_gate_blocked_email_sent",
-        fail_event="daily_value_cap_gate_blocked_email_failed",
+        event="daily_value_cap_gate_blocked",
         portfolio=portfolio_name,
     )
 
@@ -274,8 +267,7 @@ async def send_rebalancing_plan_pending_email(
             [_to_section(leg) for leg in buy_legs],
             [_to_section(leg) for leg in sell_legs],
         ),
-        ok_event="rebalancing_plan_pending_email_sent",
-        fail_event="rebalancing_plan_pending_email_failed",
+        event="rebalancing_plan_pending",
         portfolio=portfolio_name,
         buy_items=sum(len(leg.items) for leg in buy_legs),
         sell_items=sum(len(leg.items) for leg in sell_legs),
@@ -294,8 +286,7 @@ async def send_stock_price_alert(
     return await _send_templated(
         to_email,
         lambda: stock_price_alert_template(ticker, name, target_price, current_price, direction),
-        ok_event="stock_price_alert_email_sent",
-        fail_event="stock_price_alert_email_failed",
+        event="stock_price_alert",
         ticker=ticker,
         current_price=current_price,
     )
@@ -333,8 +324,7 @@ async def send_monthly_report_email(
             annual_dividends_received,
             asset_allocation,
         ),
-        ok_event="monthly_report_email_sent",
-        fail_event="monthly_report_email_failed",
+        event="monthly_report",
         month=report_month,
     )
 
@@ -353,8 +343,7 @@ async def send_goal_achievement_email(
     return await _send_templated(
         to_email,
         lambda: goal_achievement_template(goal_type, goal_amount, current_amount, achievement_pct),
-        ok_event="goal_achievement_email_sent",
-        fail_event="goal_achievement_email_failed",
+        event="goal_achievement",
         goal_type=goal_type,
         pct=achievement_pct,
     )
@@ -369,14 +358,7 @@ async def send_test_email(to_email: str) -> bool:
     """
     if not _email_configured():
         raise RuntimeError("email_not_configured")
-    subject, html = test_email_template()
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("test_email_sent", to=to_email)
-        return True
-    except Exception as e:
-        logger.error("test_email_failed", to=to_email, error=str(e))
-        return False
+    return await _send_templated(to_email, test_email_template, event="test")
 
 
 async def send_account_deletion_email(to_email: str) -> bool:
@@ -384,8 +366,7 @@ async def send_account_deletion_email(to_email: str) -> bool:
     return await _send_templated(
         to_email,
         account_deletion_template,
-        ok_event="account_deletion_email_sent",
-        fail_event="account_deletion_email_failed",
+        event="account_deletion",
         not_configured_event="email_not_configured_skip_account_deletion_email",
     )
 
@@ -400,8 +381,7 @@ async def send_market_signal_change_alert(
     return await _send_templated(
         to_email,
         lambda: market_signal_change_template(old_level, new_level, reason),
-        ok_event="market_signal_change_email_sent",
-        fail_event="market_signal_change_email_failed",
+        event="market_signal_change",
         old_level=old_level,
         new_level=new_level,
     )
@@ -412,8 +392,7 @@ async def send_year_end_tax_reminder_email(to_email: str, content: Mapping[str, 
     return await _send_templated(
         to_email,
         lambda: year_end_tax_reminder_template(content),
-        ok_event="year_end_tax_reminder_email_sent",
-        fail_event="year_end_tax_reminder_email_failed",
+        event="year_end_tax_reminder",
     )
 
 
@@ -422,8 +401,7 @@ async def send_market_signal_daily_digest_alert(to_email: str, level: str, reaso
     return await _send_templated(
         to_email,
         lambda: market_signal_daily_digest_template(level, reason),
-        ok_event="market_signal_daily_digest_email_sent",
-        fail_event="market_signal_daily_digest_email_failed",
+        event="market_signal_daily_digest",
         level=level,
     )
 
@@ -434,8 +412,7 @@ async def send_recommendation_drift_alert_email(to_email: str, portfolio_names: 
     return await _send_templated(
         to_email,
         lambda: recommendation_drift_alert_template(portfolio_names, app_link),
-        ok_event="recommendation_drift_alert_email_sent",
-        fail_event="recommendation_drift_alert_email_failed",
+        event="recommendation_drift_alert",
         portfolio_count=len(portfolio_names),
     )
 
@@ -455,8 +432,7 @@ async def send_tactical_regime_change_email(
     return await _send_templated(
         to_email,
         lambda: tactical_regime_change_template(portfolio_name, old_label, new_label, weights_text, reasons, app_link),
-        ok_event="tactical_regime_change_email_sent",
-        fail_event="tactical_regime_change_email_failed",
+        event="tactical_regime_change",
         new_regime=new_label,
     )
 
@@ -476,8 +452,7 @@ async def send_tactical_dip_email(
     return await _send_templated(
         to_email,
         lambda: tactical_dip_template(portfolio_name, stage_label, deploy_pct, weights_text, reasons, app_link),
-        ok_event="tactical_dip_email_sent",
-        fail_event="tactical_dip_email_failed",
+        event="tactical_dip",
         stage=stage_label,
     )
 
@@ -494,8 +469,7 @@ async def send_challenge_reminder_email(
     return await _send_templated(
         to_email,
         lambda: challenge_reminder_template(title, month_label, this_month_net_krw, target_amount, current_streak),
-        ok_event="challenge_reminder_email_sent",
-        fail_event="challenge_reminder_email_failed",
+        event="challenge_reminder",
         title=title,
     )
 
@@ -517,8 +491,7 @@ async def send_challenge_wrap_email(
         lambda: challenge_wrap_template(
             title, month_label, prev_month_net_krw, target_met, current_streak, longest_streak, milestone, completed
         ),
-        ok_event="challenge_wrap_email_sent",
-        fail_event="challenge_wrap_email_failed",
+        event="challenge_wrap",
         title=title,
     )
 
@@ -538,7 +511,6 @@ async def send_dca_cash_shortfall_email(
         lambda: dca_cash_shortfall_template(
             portfolio_name, account_name, run_date_label, cash_krw, expected_krw, synced_label
         ),
-        ok_event="dca_cash_shortfall_email_sent",
-        fail_event="dca_cash_shortfall_email_failed",
+        event="dca_cash_shortfall",
         portfolio_name=portfolio_name,
     )

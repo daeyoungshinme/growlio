@@ -188,17 +188,23 @@ def _normalize_received_map_by_ticker(
     return normalized
 
 
-async def _fetch_estimated_dividend_map(
+async def _gather_position_dividends(
     positions: dict[tuple[str, str], dict],
     cache,
     kis_creds,
     dart_key,
-    usd_krw_rate: float,
-) -> dict[tuple[str, str], dict]:
-    """보유 포지션별 예상 배당금을 동시 조회해 (ticker, market) → 집계 dict로 병합한다."""
+    *,
+    failure_event: str,
+    usd_krw_rate: float = 0.0,
+    with_ex_dividend_date: bool = False,
+) -> list[dict]:
+    """보유 포지션별 배당 정보를 동시 조회해 `calculate_position_dividend` 결과 목록을 반환한다.
 
-    async def _fetch_estimated(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
-        yield_decimal, dps, months, _ = await fetch_ticker_dividend_info(
+    종목 하나의 조회 실패는 `failure_event`로 경고만 남기고 건너뛴다(나머지 종목은 그대로).
+    """
+
+    async def _one(ticker: str, market: str, info: dict) -> dict:
+        yield_decimal, dps, months, ex_dividend_date = await fetch_ticker_dividend_info(
             ticker, market, cache, _DIVIDEND_FETCH_SEM, kis_creds, dart_key
         )
         return calculate_position_dividend(
@@ -207,25 +213,39 @@ async def _fetch_estimated_dividend_map(
             yield_decimal=yield_decimal,
             dps=dps,
             months=months,
-            value_krw=value_krw,
-            invested_krw=invested_krw,
-            qty=qty,
+            value_krw=info["value_krw"],
+            invested_krw=info["invested_krw"],
+            qty=info.get("qty", 0.0),
             usd_krw_rate=usd_krw_rate,
+            ex_dividend_date=ex_dividend_date if with_ex_dividend_date else None,
         )
 
-    tasks = [
-        _fetch_estimated(ticker, market, info["value_krw"], info["invested_krw"], info.get("qty", 0.0))
-        for (ticker, market), info in positions.items()
-    ]
-    estimated_results = await asyncio.gather(*tasks, return_exceptions=True)
+    raw = await asyncio.gather(
+        *(_one(ticker, market, info) for (ticker, market), info in positions.items()), return_exceptions=True
+    )
+    results: list[dict] = []
+    for item in raw:
+        if isinstance(item, Exception):
+            logger.warning(failure_event, error=str(item))
+        elif isinstance(item, dict):
+            results.append(item)
+    return results
+
+
+async def _fetch_estimated_dividend_map(
+    positions: dict[tuple[str, str], dict],
+    cache,
+    kis_creds,
+    dart_key,
+    usd_krw_rate: float,
+) -> dict[tuple[str, str], dict]:
+    """보유 포지션별 예상 배당금을 동시 조회해 (ticker, market) → 집계 dict로 병합한다."""
+    estimated_results = await _gather_position_dividends(
+        positions, cache, kis_creds, dart_key, failure_event="dividend_estimate_fetch_failed", usd_krw_rate=usd_krw_rate
+    )
 
     estimated_map: dict[tuple[str, str], dict] = {}
     for item in estimated_results:
-        if isinstance(item, Exception):
-            logger.warning("dividend_estimate_fetch_failed", error=str(item))
-            continue
-        if not isinstance(item, dict):
-            continue
         em_key: tuple[str, str] = (item["ticker"], item.get("market", ""))
         if em_key not in estimated_map:
             estimated_map[em_key] = item
@@ -338,33 +358,7 @@ async def get_position_dividend_yields(
 
     cache = await get_cache_store()
 
-    async def fetch_one(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
-        yield_decimal, dps, months, ex_dividend_date = await fetch_ticker_dividend_info(
-            ticker, market, cache, _DIVIDEND_FETCH_SEM, kis_creds, dart_key
-        )
-        return calculate_position_dividend(
-            ticker=ticker,
-            market=market,
-            yield_decimal=yield_decimal,
-            dps=dps,
-            months=months,
-            value_krw=value_krw,
-            invested_krw=invested_krw,
-            qty=qty,
-            ex_dividend_date=ex_dividend_date,
-        )
-
-    tasks = [
-        fetch_one(ticker, market, info["value_krw"], info["invested_krw"], info.get("qty", 0.0))
-        for (ticker, market), info in positions.items()
-    ]
-    raw = await asyncio.gather(*tasks, return_exceptions=True)
-    results: list[dict] = []
-    for item in raw:
-        if isinstance(item, Exception):
-            logger.warning("position_yield_fetch_failed", error=str(item))
-            continue
-        if not isinstance(item, dict):
-            continue
-        results.append(item)
-    return results
+    # 환율을 넘기지 않으므로 estimated_monthly_usd는 None — 이 응답은 원화 기준만 쓴다
+    return await _gather_position_dividends(
+        positions, cache, kis_creds, dart_key, failure_event="position_yield_fetch_failed", with_ex_dividend_date=True
+    )

@@ -17,12 +17,32 @@ from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan
+from app.models.user import User, UserSettings
 from app.services.alerts._dispatch import send_push_safely
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.plan_generation import DailyValueCapBlocked, MarketSignalGateBlocked, TaxGateBlocked
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
+
+
+async def _plan_recipient(plan: RebalancingPlan, db: AsyncSession) -> tuple[str, str | None, str | None] | None:
+    """(포트폴리오 이름(없으면 "포트폴리오"), 수신 이메일, fcm_token). 유저가 없으면 None.
+
+    수신 이메일은 알림 전용 이메일이 있으면 그것, 없으면 가입 이메일.
+    """
+    row = await db.execute(
+        select(Portfolio.name, User.email, UserSettings.notification_email, UserSettings.fcm_token)
+        .select_from(User)
+        .outerjoin(Portfolio, Portfolio.id == plan.portfolio_id)
+        .outerjoin(UserSettings, UserSettings.user_id == User.id)
+        .where(User.id == plan.user_id)
+    )
+    info = row.first()
+    if info is None:
+        return None
+    portfolio_name, user_email, notification_email, fcm_token = info
+    return portfolio_name or "포트폴리오", notification_email or user_email, fcm_token
 
 
 async def notify_plan_generated(
@@ -285,7 +305,6 @@ async def notify_daily_value_cap_blocked(
 async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UUID, db: AsyncSession) -> None:
     """leg 실행 완료 후 결과 이메일/푸시 발송 (기존 실행완료 템플릿 재사용)."""
     from app.models.asset import RebalancingExecution
-    from app.models.user import User, UserSettings
     from app.services.notifications.email_service import send_rebalancing_execution_email
 
     exec_result = await db.scalar(
@@ -296,19 +315,10 @@ async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UU
     if exec_result is None:
         return
 
-    row = await db.execute(
-        select(Portfolio.name, User.email, UserSettings.notification_email, UserSettings.fcm_token)
-        .select_from(User)
-        .outerjoin(Portfolio, Portfolio.id == plan.portfolio_id)
-        .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .where(User.id == plan.user_id)
-    )
-    info = row.first()
-    if info is None:
+    recipient = await _plan_recipient(plan, db)
+    if recipient is None:
         return
-    portfolio_name, user_email, notification_email, fcm_token = info
-    portfolio_name = portfolio_name or "포트폴리오"
-    email = notification_email or user_email
+    portfolio_name, email, fcm_token = recipient
 
     if email:
         try:
@@ -345,22 +355,12 @@ async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_m
     leg 실행 자체가 예외를 던진 경우(자격증명 오류, 브로커 토큰 발급 실패 등)는 실행 리포트가
     아예 생성되지 않아 사용자가 이력 탭을 직접 열어보지 않으면 알 방법이 없었다 — 그 공백을 메운다.
     """
-    from app.models.user import User, UserSettings
     from app.services.notifications.email_service import send_rebalancing_plan_execution_failed_email
 
-    row = await db.execute(
-        select(Portfolio.name, User.email, UserSettings.notification_email, UserSettings.fcm_token)
-        .select_from(User)
-        .outerjoin(Portfolio, Portfolio.id == plan.portfolio_id)
-        .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .where(User.id == plan.user_id)
-    )
-    info = row.first()
-    if info is None:
+    recipient = await _plan_recipient(plan, db)
+    if recipient is None:
         return
-    portfolio_name, user_email, notification_email, fcm_token = info
-    portfolio_name = portfolio_name or "포트폴리오"
-    email = notification_email or user_email
+    portfolio_name, email, fcm_token = recipient
 
     if email:
         try:

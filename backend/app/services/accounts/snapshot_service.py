@@ -8,8 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import AssetSnapshot, Position
+from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services.accounts._snapshot_queries import latest_snapshot_subquery
+from app.utils.kst import today_kst
+from app.utils.pnl import eval_value
 
 
 async def _upsert_snapshot(
@@ -131,3 +133,34 @@ async def sync_snapshot_positions(
                 usd_rate=p.usd_rate,
             )
         )
+
+
+async def write_manual_deposit_snapshot(
+    db: AsyncSession,
+    account: AssetAccount,
+    *,
+    latest_snap: AssetSnapshot | None,
+    positions: list[Position],
+    usd_rate: float,
+) -> tuple[AssetSnapshot, float]:
+    """예수금이 바뀐 수동 계좌의 오늘 스냅샷을 다시 쓰고 (스냅샷, 총액)을 반환한다.
+
+    총액 = 보유종목 평가액 + 원화 예수금 + 달러 예수금×환율. 투자원금·평가손익은 직전 스냅샷 값을 잇는다.
+    positions(직전 스냅샷 포지션, 없으면 수동 포지션)를 새 스냅샷에 복사한다 — 빠뜨리면 오늘 스냅샷에
+    포지션 행이 비어 스냅샷 기준 종목 집계에서 보유종목이 사라진다.
+    `latest_snap`/`positions`는 이번 요청에서 스냅샷을 쓰기 **전에** 조회한 값이어야 한다. commit은 호출자가 한다.
+    """
+    total = eval_value(positions) + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate
+    snap = await _upsert_snapshot(
+        db,
+        account_id=account.id,
+        user_id=account.user_id,
+        snapshot_date=today_kst(),
+        amount_krw=total,
+        invested_amount=latest_snap.invested_amount if latest_snap else None,
+        unrealized_pnl=latest_snap.unrealized_pnl if latest_snap else None,
+        source="MANUAL",
+    )
+    if positions:
+        await sync_snapshot_positions(db, snapshot_id=snap.id, account_id=account.id, positions=positions)
+    return snap, total

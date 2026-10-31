@@ -8,7 +8,11 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.enums import AccountTaxType, AssetType, DataSource, InvestmentHorizon, IsaType
 from app.models.asset import VALID_MARKETS
-from app.schemas._validators import MAX_AMOUNT_KRW, validate_non_negative_amount, validate_positive_amount
+from app.schemas._validators import (
+    MAX_AMOUNT_KRW,
+    NonNegativeAmount,
+    PositiveAmount,
+)
 
 # 증권사 자격증명 필드(평문, 저장 시 암호화)의 길이 상한.
 # AES-GCM hex 저장값((12 nonce + n + 16 tag) * 2)이 String(512)에 들어가야 한다
@@ -157,10 +161,10 @@ class AssetAccountCreate(BaseModel):
         default=None, max_length=MAX_CREDENTIAL_LENGTH
     )  # 토스 Client Secret (평문, 저장 시 암호화)
     is_mock_mode: bool = True
-    manual_amount: float | None = None
+    manual_amount: PositiveAmount | None = None
     manual_currency: str = "KRW"
-    deposit_krw: float | None = None
-    deposit_usd: float | None = None
+    deposit_krw: NonNegativeAmount | None = None
+    deposit_usd: NonNegativeAmount | None = None
     notes: str | None = Field(default=None, max_length=2000)
     sort_order: int = Field(default=0, ge=0, le=10_000)
     real_estate_details: RealEstateDetails | None = None
@@ -169,16 +173,6 @@ class AssetAccountCreate(BaseModel):
     investment_horizon: InvestmentHorizon | None = None
     isa_open_date: date | None = None
     isa_type: IsaType | None = None
-
-    @field_validator("deposit_krw", "deposit_usd")
-    @classmethod
-    def deposit_non_negative(cls, v: float | None) -> float | None:
-        return validate_non_negative_amount(v)
-
-    @field_validator("manual_amount")
-    @classmethod
-    def manual_amount_positive(cls, v: float | None) -> float | None:
-        return validate_positive_amount(v)
 
     @model_validator(mode="after")
     def kis_credentials_required(self) -> "AssetAccountCreate":
@@ -226,9 +220,9 @@ class AssetAccountUpdate(BaseModel):
     toss_client_secret: str | None = Field(
         default=None, max_length=MAX_CREDENTIAL_LENGTH
     )  # 토스 Client Secret (평문, 저장 시 암호화)
-    manual_amount: float | None = None
-    deposit_krw: float | None = None
-    deposit_usd: float | None = None
+    manual_amount: PositiveAmount | None = None
+    deposit_krw: NonNegativeAmount | None = None
+    deposit_usd: NonNegativeAmount | None = None
     notes: str | None = Field(default=None, max_length=2000)
     is_active: bool | None = None
     sort_order: int | None = Field(default=None, ge=0, le=10_000)
@@ -238,16 +232,6 @@ class AssetAccountUpdate(BaseModel):
     investment_horizon: InvestmentHorizon | None = None
     isa_open_date: date | None = None
     isa_type: IsaType | None = None
-
-    @field_validator("manual_amount")
-    @classmethod
-    def manual_amount_positive(cls, v: float | None) -> float | None:
-        return validate_positive_amount(v)
-
-    @field_validator("deposit_krw", "deposit_usd")
-    @classmethod
-    def deposit_non_negative(cls, v: float | None) -> float | None:
-        return validate_non_negative_amount(v)
 
 
 class AssetAccountResponse(BaseModel):

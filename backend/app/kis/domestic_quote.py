@@ -50,7 +50,7 @@ async def get_domestic_dividend_info(
     """국내 주식 배당 정보 조회.
 
     inquire-price(FHKST01010100) → stck_divi_rate, per_divi_amt 파싱.
-    ETF 분배금은 pykrx(_sync_pykrx_etf_dividend_info)가 담당.
+    ETF 분배금은 KIS ETF 시세·FDR 폴백(`dividend/fetcher.py`)이 담당.
     Returns: {"dps": float, "dividend_yield": float} — yield는 decimal (예: 0.0215)
     """
     headers = {

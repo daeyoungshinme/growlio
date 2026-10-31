@@ -32,3 +32,28 @@ def _email_div(heading: str, heading_color: str, body: str, footer: str = "") ->
 
 _SIGNAL_LEVEL_LABEL: dict[str, str] = {"GREEN": "안정", "YELLOW": "주의", "RED": "위험"}
 _SIGNAL_LEVEL_COLOR: dict[str, str] = {"GREEN": "#16a34a", "YELLOW": "#d97706", "RED": "#dc2626"}
+
+
+def _name_ticker_cell(td_style: str, name: str, ticker: str) -> str:
+    """종목명 아래 회색 작은 글씨로 티커를 붙인 표 셀."""
+    return f"<td style='{td_style}'>{name}<br><span style='color:#6b7280;font-size:11px;'>{ticker}</span></td>"
+
+
+def _data_table(headers: list[tuple[str, str]], rows_html: str, *, margin_top: int) -> str:
+    """회색 헤더 행 + 본문 행의 표. headers는 (제목, text-align) 목록."""
+    ths = "".join(
+        f"<th style='padding:8px;text-align:{align};font-size:13px;'>{label}</th>" for label, align in headers
+    )
+    return (
+        f"<table style='width:100%;border-collapse:collapse;margin-top:{margin_top}px;'>"
+        f"<thead><tr style='background:#f1f5f9;'>{ths}</tr></thead>"
+        f"<tbody>{rows_html}</tbody></table>"
+    )
+
+
+def _notice_banner(text: str) -> str:
+    """노란 안내 배너(테스트 발송·자동 실행 보류 안내 등)."""
+    return (
+        "<div style='background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;"
+        f"padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e;'>{text}</div>"
+    )

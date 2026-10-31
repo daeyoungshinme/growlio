@@ -9,14 +9,13 @@ Yahoo Finance가 클라우드 호스팅(Render 등) IP를 차단해 401을 반�
 
 from __future__ import annotations
 
-import threading
 from typing import TYPE_CHECKING
 
 import structlog
-from tenacity import retry
 
 from app.utils.kst import today_kst
-from app.utils.naver_retry import NAVER_MOBILE_UA, NAVER_RETRY
+from app.utils.naver_retry import NAVER_FAILURES, log_naver_failure, naver_get_json
+from app.utils.pykrx_util import quiet_pykrx
 
 if TYPE_CHECKING:
     from datetime import date
@@ -24,12 +23,6 @@ if TYPE_CHECKING:
     import pandas as pd
 
 logger = structlog.get_logger()
-
-_pykrx_lock = threading.Lock()
-"""pykrx는 동시(멀티스레드) 호출에 안전하지 않아 프로세스 크래시가 관측됐다 — 여러 조합/종목이
-run_in_executor로 동시에 pykrx를 호출할 수 있는 모든 경로(목표 역산 기간별 추천 등)에서 이 락으로
-호출을 완전히 직렬화한다. threading.Lock을 쓰는 이유: 이 함수들은 실행기 워커 스레드에서 도는
-동기 함수이므로 asyncio.Lock/Semaphore가 아니라 스레드 락이 맞다."""
 
 
 def yf_symbol_to_krx_ticker(symbol: str) -> str | None:
@@ -62,49 +55,23 @@ def sync_fdr_kosdaq_tickers() -> frozenset[str] | None:
 
 def sync_naver_price(ticker: str) -> float | None:
     """Naver Finance 모바일 API(basic)로 국내 종목 현재가(종가) 조회. 국내 종목 전용."""
-    import requests as _req
-    import requests.exceptions as _req_exc
-
-    @retry(**NAVER_RETRY)
-    def _fetch() -> _req.Response:
-        url = f"https://m.stock.naver.com/api/stock/{ticker}/basic"
-        r = _req.get(url, headers={"User-Agent": NAVER_MOBILE_UA}, timeout=10)
-        r.raise_for_status()
-        return r
-
     try:
-        resp = _fetch()
-        raw_price = resp.json().get("closePrice")
+        raw_price = naver_get_json(ticker, "basic").get("closePrice")
         if not raw_price:
             return None
         price = float(str(raw_price).replace(",", ""))
         return price if price > 0 else None
-    except _req_exc.HTTPError as exc:
-        logger.warning(
-            "naver_price_http_error",
-            ticker=ticker,
-            status=exc.response.status_code if exc.response else None,
-        )
-        return None
-    except _req_exc.RequestException as exc:
-        logger.warning("naver_price_network_error", ticker=ticker, error=str(exc))
-        return None
-    except (ValueError, KeyError, TypeError) as exc:
-        logger.warning("naver_price_parse_error", ticker=ticker, error=str(exc))
+    except NAVER_FAILURES as exc:
+        log_naver_failure("naver_price", ticker, exc)
         return None
 
 
 def sync_pykrx_price(ticker: str) -> float | None:
     """pykrx로 국내 종목 최근 종가 조회. KRX 로그인 불필요."""
-    import contextlib
-    import io
     from datetime import timedelta
 
     try:
-        with _pykrx_lock:
-            with contextlib.redirect_stdout(io.StringIO()):
-                from pykrx import stock
-
+        with quiet_pykrx() as stock:
             today = today_kst()
             end = today.strftime("%Y%m%d")
             start = (today - timedelta(days=10)).strftime("%Y%m%d")
@@ -125,14 +92,8 @@ def sync_pykrx_price(ticker: str) -> float | None:
 
 def sync_pykrx_close_series(ticker: str, start: date, end: date) -> pd.Series | None:
     """pykrx로 국내 종목의 기간별 종가 Series 조회 (백테스트/팩터/리스크 폴백용)."""
-    import contextlib
-    import io
-
     try:
-        with _pykrx_lock:
-            with contextlib.redirect_stdout(io.StringIO()):
-                from pykrx import stock
-
+        with quiet_pykrx() as stock:
             df = stock.get_market_ohlcv_by_date(start.strftime("%Y%m%d"), end.strftime("%Y%m%d"), ticker)
         if df is None or df.empty:
             return None

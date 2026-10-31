@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from app.utils.circuit_breaker import CircuitOpenError, fred_circuit
+from app.utils.circuit_breaker import fred_circuit
 
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
@@ -29,15 +29,8 @@ logger = structlog.get_logger()
 
 async def fetch_vix_signal() -> dict[str, Any] | None:
     """FRED VIXCLS 시리즈에서 VIX 최신값을 가져와 위험 레벨을 판단한다."""
-    if not fred_circuit.is_available():
-        logger.warning("fred_circuit_open", signal="vix")
-        return None
-    from app.services.market_signal.economic_indicator_service import fred_get_observations
-
-    try:
-        obs = await fred_circuit.call(fred_get_observations, "VIXCLS", limit=5)
-    except (CircuitOpenError, Exception) as exc:
-        logger.warning("vix_fetch_failed", error=str(exc))
+    obs = await _fred_obs("VIXCLS", 5, signal="vix")
+    if obs is None:
         return None
     value = _latest_value(obs)
     if value is None:
@@ -66,15 +59,8 @@ async def fetch_vix_signal() -> dict[str, Any] | None:
 
 async def fetch_yield_curve_signal() -> dict[str, Any] | None:
     """FRED T10Y2Y 시리즈에서 10Y-2Y 스프레드 최신값을 가져와 커브 상태를 판단한다."""
-    if not fred_circuit.is_available():
-        logger.warning("fred_circuit_open", signal="yield_curve")
-        return None
-    from app.services.market_signal.economic_indicator_service import fred_get_observations
-
-    try:
-        obs = await fred_circuit.call(fred_get_observations, "T10Y2Y", limit=5)
-    except (CircuitOpenError, Exception) as exc:
-        logger.warning("yield_curve_fetch_failed", error=str(exc))
+    obs = await _fred_obs("T10Y2Y", 5, signal="yield_curve")
+    if obs is None:
         return None
     value = _latest_value(obs)
     if value is None:
@@ -103,15 +89,8 @@ async def fetch_yield_curve_signal() -> dict[str, Any] | None:
 
 async def fetch_high_yield_spread_signal() -> dict[str, Any] | None:
     """FRED BAMLH0A0HYM2(하이일드 채권 스프레드) 최신값으로 신용 경색 위험도를 판단한다."""
-    if not fred_circuit.is_available():
-        logger.warning("fred_circuit_open", signal="high_yield_spread")
-        return None
-    from app.services.market_signal.economic_indicator_service import fred_get_observations
-
-    try:
-        obs = await fred_circuit.call(fred_get_observations, "BAMLH0A0HYM2", limit=5)
-    except (CircuitOpenError, Exception) as exc:
-        logger.warning("high_yield_spread_fetch_failed", error=str(exc))
+    obs = await _fred_obs("BAMLH0A0HYM2", 5, signal="high_yield_spread")
+    if obs is None:
         return None
     value = _latest_value(obs)
     if value is None:
@@ -143,26 +122,14 @@ async def fetch_dollar_index_signal() -> dict[str, Any] | None:
 
     달러 급등(20일선 상향 이탈)은 신흥국·원자재 자산에서 자금이 이탈하는 신호로 해석한다.
     """
-    if not fred_circuit.is_available():
-        logger.warning("fred_circuit_open", signal="dollar_index")
-        return None
-    from app.services.market_signal.economic_indicator_service import fred_get_observations, parse_fred_obs
-
-    try:
-        obs = await fred_circuit.call(fred_get_observations, "DTWEXBGS", limit=30)
-    except (CircuitOpenError, Exception) as exc:
-        logger.warning("dollar_index_fetch_failed", error=str(exc))
+    obs = await _fred_obs("DTWEXBGS", 30, signal="dollar_index")
+    if obs is None:
         return None
 
-    points = parse_fred_obs(obs)
-    if len(points) < 20:
+    ma = _ma20(_parse_fred_obs(obs))
+    if ma is None:
         return None
-
-    recent = points[-20:]
-    ma20 = sum(p["value"] for p in recent) / len(recent)
-    latest = points[-1]
-    if ma20 == 0:
-        return None
+    latest, ma20 = ma
     deviation_pct = (latest["value"] - ma20) / ma20 * 100
 
     if deviation_pct <= 1:
@@ -194,20 +161,13 @@ async def fetch_rate_cut_expectation_signal() -> dict[str, Any] | None:
     CME FedWatch(금리선물 기반 실제 인하 확률)는 공식 무료 API가 없어 채택한 대체 지표 —
     스프레드가 깊이 마이너스일수록 인하 기대(또는 경기침체 우려)가 크다는 방향성만 참고한다.
     """
-    if not fred_circuit.is_available():
-        logger.warning("fred_circuit_open", signal="rate_cut_expectation")
-        return None
     import asyncio
 
-    from app.services.market_signal.economic_indicator_service import fred_get_observations
-
-    try:
-        dgs2_obs, fedfunds_obs = await asyncio.gather(
-            fred_circuit.call(fred_get_observations, "DGS2", limit=5),
-            fred_circuit.call(fred_get_observations, "FEDFUNDS", limit=5),
-        )
-    except (CircuitOpenError, Exception) as exc:
-        logger.warning("rate_cut_expectation_fetch_failed", error=str(exc))
+    dgs2_obs, fedfunds_obs = await asyncio.gather(
+        _fred_obs("DGS2", 5, signal="rate_cut_expectation"),
+        _fred_obs("FEDFUNDS", 5, signal="rate_cut_expectation"),
+    )
+    if dgs2_obs is None or fedfunds_obs is None:
         return None
 
     dgs2 = _latest_value(dgs2_obs)
@@ -283,29 +243,18 @@ async def fetch_exchange_rate_signal(cache: CacheStore | None = None) -> dict[st
     단, 실시간 캐시가 비어 있으면 설정 fallback(1300원) 대신 FRED 최신 관측치를 쓴다 —
     고정 fallback으로 이격도를 내면 항상 NORMAL로 오판한다(plans/97 A3).
     """
-    if not fred_circuit.is_available():
-        logger.warning("fred_circuit_open", signal="exchange_rate")
-        return None
-    from app.services.market_signal.economic_indicator_service import fred_get_observations, parse_fred_obs
-
-    try:
-        obs = await fred_circuit.call(fred_get_observations, "DEXKOUS", limit=30)
-    except (CircuitOpenError, Exception) as exc:
-        logger.warning("exchange_rate_fetch_failed", error=str(exc))
+    obs = await _fred_obs("DEXKOUS", 30, signal="exchange_rate")
+    if obs is None:
         return None
 
-    points = parse_fred_obs(obs)
-    if len(points) < 20:
+    ma = _ma20(_parse_fred_obs(obs))
+    if ma is None:
         return None
-
-    recent = points[-20:]
-    ma20 = sum(p["value"] for p in recent) / len(recent)
-    if ma20 == 0:
-        return None
+    latest, ma20 = ma
 
     from app.utils.currency import fetch_usd_krw
 
-    live_rate = await fetch_usd_krw(cache, allow_fallback=False) or recent[-1]["value"]
+    live_rate = await fetch_usd_krw(cache, allow_fallback=False) or latest["value"]
     deviation_pct = (live_rate - ma20) / ma20 * 100
 
     if deviation_pct <= 1:
@@ -326,7 +275,7 @@ async def fetch_exchange_rate_signal(cache: CacheStore | None = None) -> dict[st
         "ma20": round(ma20, 2),
         "deviation_pct": round(deviation_pct, 2),
         "level": level,
-        "date": recent[-1]["date"],  # ma20 산출 기준 FRED 최신 관측일 (value의 기준일 아님)
+        "date": latest["date"],  # ma20 산출 기준 FRED 최신 관측일 (value의 기준일 아님)
         "sub_score": sub_score,
     }
 
@@ -338,26 +287,14 @@ async def fetch_oil_price_signal() -> dict[str, Any] | None:
     유가 급등(인플레이션·지정학 리스크)과 급락(수요 위축·경기침체 우려) 모두 위험자산에
     부정적 신호로 해석하기 때문이다.
     """
-    if not fred_circuit.is_available():
-        logger.warning("fred_circuit_open", signal="oil_price")
-        return None
-    from app.services.market_signal.economic_indicator_service import fred_get_observations, parse_fred_obs
-
-    try:
-        obs = await fred_circuit.call(fred_get_observations, "DCOILWTICO", limit=30)
-    except (CircuitOpenError, Exception) as exc:
-        logger.warning("oil_price_fetch_failed", error=str(exc))
+    obs = await _fred_obs("DCOILWTICO", 30, signal="oil_price")
+    if obs is None:
         return None
 
-    points = parse_fred_obs(obs)
-    if len(points) < 20:
+    ma = _ma20(_parse_fred_obs(obs))
+    if ma is None:
         return None
-
-    recent = points[-20:]
-    ma20 = sum(p["value"] for p in recent) / len(recent)
-    latest = points[-1]
-    if ma20 == 0:
-        return None
+    latest, ma20 = ma
     deviation_pct = (latest["value"] - ma20) / ma20 * 100
     abs_deviation_pct = abs(deviation_pct)
 
@@ -406,21 +343,7 @@ async def fetch_cpi_inflation_signal() -> dict[str, Any] | None:
     `economic_indicator_service.fetch_indicator_history`를 재사용해 `fetch_inflation_summary`와
     동일한 13개월 윈도우 YoY 산식을 그대로 적용한다(중복 구현 방지).
     """
-    from app.services.market_signal.economic_indicator_service import fetch_indicator_history
-
-    points = await fetch_indicator_history("CPI_US", months=13)
-    if len(points) < 13:
-        return None
-
-    yoy_pct = (points[-1]["value"] - points[-13]["value"]) / points[-13]["value"] * 100
-    level, sub_score = _inflation_bucket(yoy_pct)
-
-    return {
-        "yoy_change_pct": round(yoy_pct, 2),
-        "level": level,
-        "date": points[-1]["date"],
-        "sub_score": sub_score,
-    }
+    return await _yoy_inflation_signal("CPI_US")
 
 
 async def fetch_pce_inflation_signal() -> dict[str, Any] | None:
@@ -428,21 +351,7 @@ async def fetch_pce_inflation_signal() -> dict[str, Any] | None:
 
     CPI 신호와 동일한 산식·버킷을 사용 — `fetch_inflation_signal()`이 둘을 worst-case로 병합한다.
     """
-    from app.services.market_signal.economic_indicator_service import fetch_indicator_history
-
-    points = await fetch_indicator_history("PCE_US", months=13)
-    if len(points) < 13:
-        return None
-
-    yoy_pct = (points[-1]["value"] - points[-13]["value"]) / points[-13]["value"] * 100
-    level, sub_score = _inflation_bucket(yoy_pct)
-
-    return {
-        "yoy_change_pct": round(yoy_pct, 2),
-        "level": level,
-        "date": points[-1]["date"],
-        "sub_score": sub_score,
-    }
+    return await _yoy_inflation_signal("PCE_US")
 
 
 async def fetch_inflation_signal() -> dict[str, Any] | None:
@@ -481,18 +390,11 @@ async def fetch_employment_signal() -> dict[str, Any] | None:
     같은 Tier A(상한 4)로 분류한다. 여기서는 3개월 평균 대신 최신 관측치를 그대로 사용하는
     단순화 버전을 적용한다(월간 지표라 3개월 평균과의 차이가 크지 않음).
     """
-    if not fred_circuit.is_available():
-        logger.warning("fred_circuit_open", signal="employment")
-        return None
-    from app.services.market_signal.economic_indicator_service import fred_get_observations, parse_fred_obs
-
-    try:
-        obs = await fred_circuit.call(fred_get_observations, "UNRATE", limit=13)
-    except (CircuitOpenError, Exception) as exc:
-        logger.warning("employment_fetch_failed", error=str(exc))
+    obs = await _fred_obs("UNRATE", 13, signal="employment")
+    if obs is None:
         return None
 
-    points = parse_fred_obs(obs)
+    points = _parse_fred_obs(obs)
     if len(points) < 13:
         return None
 
@@ -526,6 +428,59 @@ async def fetch_employment_signal() -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 # 내부 헬퍼
 # ---------------------------------------------------------------------------
+
+
+async def _fred_obs(series: str, limit: int, *, signal: str) -> list[dict[str, Any]] | None:
+    """서킷브레이커를 거친 FRED 관측치 조회. 서킷 OPEN·조회 실패면 경고 로그 후 None.
+
+    `fred_get_observations`는 호출 시점에 모듈에서 읽는다 — 테스트가 그 모듈 전역을 patch한다.
+    """
+    if not fred_circuit.is_available():
+        logger.warning("fred_circuit_open", signal=signal)
+        return None
+    from app.services.market_signal.economic_indicator_service import fred_get_observations
+
+    try:
+        return await fred_circuit.call(fred_get_observations, series, limit=limit)
+    except Exception as exc:
+        logger.warning(f"{signal}_fetch_failed", error=str(exc))
+        return None
+
+
+def _parse_fred_obs(obs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    from app.services.market_signal.economic_indicator_service import parse_fred_obs
+
+    return parse_fred_obs(obs)
+
+
+def _ma20(points: list[dict[str, Any]]) -> tuple[dict[str, Any], float] | None:
+    """(최신 관측치, 최근 20개 이동평균). 관측치가 20개 미만이거나 평균이 0이면 None."""
+    if len(points) < 20:
+        return None
+    recent = points[-20:]
+    ma20 = sum(p["value"] for p in recent) / len(recent)
+    if ma20 == 0:
+        return None
+    return points[-1], ma20
+
+
+async def _yoy_inflation_signal(indicator: str) -> dict[str, Any] | None:
+    """13개월 윈도우 YoY % → `_inflation_bucket`. `fetch_inflation_summary`와 같은 산식을 재사용한다."""
+    from app.services.market_signal.economic_indicator_service import fetch_indicator_history
+
+    points = await fetch_indicator_history(indicator, months=13)
+    if len(points) < 13:
+        return None
+
+    yoy_pct = (points[-1]["value"] - points[-13]["value"]) / points[-13]["value"] * 100
+    level, sub_score = _inflation_bucket(yoy_pct)
+
+    return {
+        "yoy_change_pct": round(yoy_pct, 2),
+        "level": level,
+        "date": points[-1]["date"],
+        "sub_score": sub_score,
+    }
 
 
 def _latest_value(obs: list[dict[str, Any]]) -> float | None:

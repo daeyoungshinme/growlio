@@ -185,20 +185,6 @@ class TestSyncYahooDividendInfoOutlierExclusion:
         assert _exclude_capital_gain_outlier(_BadTicker()) is None
 
 
-# ── sync_pykrx_etf_dividend_info ─────────────────────────────
-
-
-class TestSyncPykrxEtfDividendInfo:
-    def test_api_error_returns_zeros(self, override_settings):
-        """pykrx API 오류 시 0 반환 (AttributeError → except Exception)."""
-        from app.services.dividend.sync_sources import sync_pykrx_etf_dividend_info
-
-        # pykrx.stock.get_market_dividend_by_date doesn't exist → AttributeError → 0 returned
-        result = sync_pykrx_etf_dividend_info("INVALID_TICKER_XYZ")
-        assert result["dps"] == 0.0
-        assert result["dividend_yield"] == 0.0
-
-
 # ── sync_fdr_etf_dividend_info ────────────────────────────────
 
 
@@ -229,6 +215,32 @@ class TestSyncFdrEtfDividendInfo:
             result = dp_mod.sync_fdr_etf_dividend_info("069500")
 
         assert result["dps"] == 0.0
+
+    def test_pykrx_call_holds_process_lock(self, override_settings):
+        """배당 수집도 pykrx 호출 중 프로세스 락을 잡아야 한다 — 가격/수익률 경로와 동시 실행 시 크래시 방지."""
+        import pandas as pd
+
+        from app.utils.pykrx_util import _pykrx_lock
+
+        mock_fdr = MagicMock()
+        mock_fdr.StockListing.return_value = pd.DataFrame({"Symbol": ["069500"], "Price": [10_000.0]})
+        held: list[bool] = []
+
+        def _fundamental(*_a, **_k):
+            held.append(_pykrx_lock.locked())
+            return pd.DataFrame({"DPS": [300.0], "DIV": [3.0]}, index=["069500"])
+
+        with (
+            patch.dict("sys.modules", {"FinanceDataReader": mock_fdr}),
+            patch("pykrx.stock.get_market_fundamental_by_ticker", side_effect=_fundamental),
+        ):
+            from app.services.dividend.sync_sources import sync_fdr_etf_dividend_info
+
+            result = sync_fdr_etf_dividend_info("069500")
+
+        assert result == {"dps": 300.0, "dividend_yield": pytest.approx(0.03)}
+        assert held == [True]
+        assert not _pykrx_lock.locked()
 
 
 # ── sync_naver_etf_dividend_info ─────────────────────────────

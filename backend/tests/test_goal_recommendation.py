@@ -4671,3 +4671,41 @@ class TestRefreshSubRecommendationsInBackground:
             await svc.refresh_horizon_recommendations_in_background(uuid.uuid4(), CacheStore())
 
         mock_compute.assert_not_called()
+
+
+class TestDividendYieldBaseExcludesRealEstate:
+    """기간별·나이별 필요 배당수익률도 전체 경로처럼 부동산을 뺀 투자자산 기준이어야 한다.
+
+    예전엔 두 경로만 부동산 포함 총자산으로 나눠, 부동산 비중만큼 필요 배당률이 낮게 나왔다.
+    """
+
+    _OVERVIEW = {
+        "total_assets_krw": 10_000_000.0,
+        "asset_type_allocation": [
+            {"type": "REAL_ESTATE", "amount_krw": 5_000_000.0},
+            {"type": "STOCK_KIS", "amount_krw": 5_000_000.0},
+        ],
+    }
+
+    async def test_horizon_uses_investable_base(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+
+        from app.services.goal import goal_horizon_recommendation_service as hor
+
+        settings_row = SimpleNamespace(annual_dividend_goal=150_000.0)
+        with patch.object(hor, "build_portfolio_overview", AsyncMock(return_value=self._OVERVIEW)):
+            pct = await hor._horizon_required_dividend_yield_pct(None, None, None, settings_row)
+        assert pct == 3.0
+
+    async def test_age_uses_investable_base(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+
+        from app.services.goal import goal_age_recommendation_service as age
+
+        settings_row = SimpleNamespace(annual_dividend_goal=150_000.0)
+        with patch.object(age, "build_portfolio_overview", AsyncMock(return_value=self._OVERVIEW)):
+            pct, note = await age._resolve_age_dividend_target(None, None, None, settings_row, "50대", 0.0)
+        assert pct == 3.0
+        assert note is None

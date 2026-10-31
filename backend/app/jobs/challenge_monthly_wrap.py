@@ -27,6 +27,7 @@ from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.notifications.email_service import send_challenge_wrap_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
+from app.utils.kst import month_label as _month_label
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -40,11 +41,6 @@ def _prev_month_str() -> str:
     today = today_kst()
     prev_last = today.replace(day=1) - timedelta(days=1)
     return prev_last.strftime("%Y-%m")
-
-
-def _month_label(month_str: str) -> str:
-    y, m = month_str.split("-")
-    return f"{y}년 {int(m)}월"
 
 
 def _wrap_dedup_key(challenge_id, month: str) -> str:

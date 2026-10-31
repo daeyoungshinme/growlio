@@ -517,8 +517,6 @@ def compute_weighted_expected_metrics(
     """
     import numpy as np
 
-    from app.services.estimation import shrink_covariance
-
     valid = [
         (sym, w)
         for sym, w in zip(symbols, weights_pct, strict=False)
@@ -543,10 +541,7 @@ def compute_weighted_expected_metrics(
     expected_return = round(float(weights @ cagrs), 2)
     expected_dividend = round(float(weights @ dividends), 2)
 
-    min_len = min(len(returns_map[s]) for s in syms)
-    rets = np.array([returns_map[s][:min_len] for s in syms])
-    cov_annual = np.cov(rets) * 252 if len(syms) > 1 else np.array([[float(np.var(rets[0])) * 252]])
-    cov_annual = shrink_covariance(rets, cov_annual)
+    cov_annual = _annualized_covariance(tuple(syms), returns_map)
     expected_volatility = round(float(np.sqrt(weights @ cov_annual @ weights)) * 100, 2)
 
     return expected_return, expected_dividend, expected_volatility

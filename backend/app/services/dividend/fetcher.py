@@ -25,7 +25,6 @@ from app.services.dividend.sync_sources import (
     sync_fetch_dividend_months,
     sync_naver_etf_dividend_info,
     sync_naver_stock_dividend_info,
-    sync_pykrx_etf_dividend_info,
     sync_yahoo_dividend_info,
 )
 from app.services.market_data.yahoo_price import to_yf_symbol as _to_yahoo_symbol
@@ -168,16 +167,12 @@ async def _fetch_korean_fallbacks(
     kis_creds: dict | None,
     dart_key: str,
 ) -> tuple[float, float]:
-    """국내 종목 fallback 체인: KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적."""
+    """국내 종목 fallback 체인: KIS ETF → FDR(+pykrx 펀더멘털) → KIS 일반 → DART → 정적."""
     if is_etf and (dps == 0.0 or yield_decimal == 0.0) and kis_creds:
         prev_dps = dps
         dps, yield_decimal = _merge_source(await _try_kis_etf(ticker, kis_creds), dps, yield_decimal)
         if dps != prev_dps:
             logger.info("kis_etf_dividend_fallback_used", ticker=ticker)
-
-    if dps == 0.0 or yield_decimal == 0.0:
-        pykrx = await loop.run_in_executor(None, partial(sync_pykrx_etf_dividend_info, ticker))
-        dps, yield_decimal = _merge_source(pykrx, dps, yield_decimal)
 
     if is_etf and (dps == 0.0 or yield_decimal == 0.0):
         dps, yield_decimal = _merge_source(await _try_fdr(ticker, loop), dps, yield_decimal)

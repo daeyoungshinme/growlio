@@ -102,16 +102,10 @@ def _build_failed_group_result(
         error_type=type(error).__name__,
     )
     fail_orders = [
-        OrderResult(
-            ticker=o.ticker,
-            name=o.name,
-            market=o.market,
-            side=o.side,
-            quantity=o.quantity,
-            status="FAILED",
+        OrderResult.for_order(
+            o,
+            "FAILED",
             error_msg=detail,
-            order_type=o.order_type,
-            price=o.limit_price or o.reference_price,
         )
         for o in group_orders
     ]
@@ -286,16 +280,10 @@ def _split_tax_deferred_overseas_buys(
     for o in group_orders:
         if o.side == "BUY" and o.market in OVERSEAS_MARKETS:
             skipped.append(
-                OrderResult(
-                    ticker=o.ticker,
-                    name=o.name,
-                    market=o.market,
-                    side=o.side,
-                    quantity=o.quantity,
-                    status="SKIPPED",
+                OrderResult.for_order(
+                    o,
+                    "SKIPPED",
                     error_msg=TAX_DEFERRED_OVERSEAS_MSG,
-                    order_type=o.order_type,
-                    price=o.limit_price or o.reference_price,
                 )
             )
         else:

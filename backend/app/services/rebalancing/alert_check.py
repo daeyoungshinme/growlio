@@ -14,27 +14,24 @@ from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
 import structlog
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
-from app.models.user import User, UserSettings
+from app.models.user import UserSettings
 from app.services.alerts._dispatch import send_push_safely
 from app.services.alerts.alert_service import save_alert_history
 from app.services.alerts.calculator import (
     already_fired_today,
     should_fire_today,
 )
+from app.services.rebalancing._alert_queries import alert_with_recipient_stmt
 from app.services.rebalancing.alert_scope import resolve_effective_account_ids
 from app.services.rebalancing.diagnosis_service import fetch_composite_signal
 from app.services.rebalancing.order_builder import (
     build_rebalancing_orders,
-    is_market_signal_blocking_auto_mode,
-    refresh_live_prices,
-    tactical_regime_for_gate,
+    is_alert_blocked_by_market_gate,
 )
 from app.services.rebalancing.service import filter_drifting_items
 from app.utils.cache_keys import TTL_COMPOSITE_ALERT_SENT, composite_alert_sent_key
@@ -43,11 +40,7 @@ from app.utils.kst import today_kst
 from app.utils.market_hours import is_alert_execution_time
 from app.utils.metrics import alert_trigger_count
 
-__all__ = [
-    "build_rebalancing_orders",
-    "check_rebalancing_alerts",
-    "refresh_live_prices",
-]
+__all__ = ["check_rebalancing_alerts"]
 
 logger = structlog.get_logger()
 
@@ -207,17 +200,14 @@ async def _process_rebalancing_alert(
 async def _get_composite_level(cache, db: AsyncSession) -> tuple[str, str]:
     """전체 알림 루프에서 공용으로 쓸 시장 신호 등급(confirmed, hysteresis 적용)을 1회 조회한다.
 
-    조회 자체가 실패하면 (composite_level="GREEN", data_freshness="STALE")로 폴백한다 —
+    조회 자체가 실패하면 `get_confirmed_composite_level`이 (composite_level="GREEN", data_freshness="STALE")로
+    폴백한다 —
     composite_level만 보면 "안전"으로 오인되므로, data_freshness="STALE"을 함께 반환해
     `is_market_signal_blocking_auto_mode`가 AUTO를 보수적으로 차단할 수 있게 한다.
     """
     from app.services.market_signal.market_signal_service import get_confirmed_composite_level
 
-    try:
-        return await get_confirmed_composite_level(cache, db)
-    except Exception as exc:
-        logger.warning("market_signal_fetch_failed_in_alert_check", error=str(exc))
-        return "GREEN", "STALE"
+    return await get_confirmed_composite_level(cache, db)
 
 
 def _should_skip_by_schedule(alert: RebalancingAlert, trigger_condition: str, is_schedule_day: bool) -> bool:
@@ -297,20 +287,8 @@ async def _evaluate_composite_trigger(
 
 
 async def _load_active_alert_rows(db: AsyncSession, alert_ids: list[uuid.UUID] | None = None) -> list:
-    stmt = (
-        select(
-            RebalancingAlert,
-            Portfolio,
-            User.email,
-            UserSettings.notification_email,
-            UserSettings.fcm_token,
-            UserSettings.composite_signal_alerts_enabled,
-        )
-        .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
-        .join(User, User.id == RebalancingAlert.user_id)
-        .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
-        .where(RebalancingAlert.is_active == True)
+    stmt = alert_with_recipient_stmt(UserSettings.composite_signal_alerts_enabled).where(
+        RebalancingAlert.is_active == True
     )
     if alert_ids is not None:
         stmt = stmt.where(RebalancingAlert.id.in_(alert_ids))
@@ -354,15 +332,14 @@ async def _check_one_rebalancing_alert(row, composite_level, market_data_freshne
     items_to_show, is_scheduled_report, is_composite_triggered = selected
 
     automation_note = None
-    if alert.mode == "AUTO":
-        market_mode = alert.market_condition_mode
-        tactical_regime = await tactical_regime_for_gate(alert, db)
-        if is_market_signal_blocking_auto_mode(market_mode, composite_level, market_data_freshness, tactical_regime):
-            automation_note = (
-                "전술 배분이 방어 국면이라 이번엔 자동 매수 대신 알림만 발송됐습니다."
-                if market_mode == "TACTICAL"
-                else f"시장 위험 신호({composite_level})로 이번엔 자동 실행 대신 알림만 발송됐습니다."
-            )
+    if alert.mode == "AUTO" and await is_alert_blocked_by_market_gate(
+        alert, db, composite_level, market_data_freshness
+    ):
+        automation_note = (
+            "전술 배분이 방어 국면이라 이번엔 자동 매수 대신 알림만 발송됐습니다."
+            if alert.market_condition_mode == "TACTICAL"
+            else f"시장 위험 신호({composite_level})로 이번엔 자동 실행 대신 알림만 발송됐습니다."
+        )
 
     email = notification_email or user_email
     triggered = await _process_rebalancing_alert(

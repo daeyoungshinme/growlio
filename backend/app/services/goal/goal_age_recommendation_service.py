@@ -37,16 +37,11 @@ from app.services.market_data.price_service import get_historical_returns
 from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import (
-    TTL_GOAL_RECOMMENDATION,
-    TTL_GOAL_RECOMMENDATION_STALE,
     CacheStoreType,
-    get_cached_json,
     get_goal_recommendation_generation,
     goal_recommendation_age_key,
     goal_recommendation_age_stale_key,
-    set_cached_json,
 )
-from app.utils.inproc_lock import single_flight_fetch
 from app.utils.kst import today_kst
 
 _AGE_GROUP_PROFILE: dict[str, tuple[str, str, float | None, float | None, float]] = {
@@ -115,45 +110,28 @@ async def get_age_based_recommendation(
     """
     if gen is None:
         gen = await get_goal_recommendation_generation(cache, user_id)
-    cache_key = goal_recommendation_age_key(user_id, gen)
-    stale_key = goal_recommendation_age_stale_key(user_id, gen)
-
-    async def _read_cache() -> GoalRecommendation | None:
-        cached = await get_cached_json(cache, cache_key)
-        return GoalRecommendation(**cached) if cached is not None else None
-
-    cached = await _read_cache()
-    if cache is not None and cached is not None:
-        return cached
-
-    async def _fetch_and_cache() -> GoalRecommendation:
-        result = await _compute_age_based_recommendation(cache, db, user_id, settings_row)
-        if result.recommended_items:
-            payload = result.model_dump(mode="json")
-            await set_cached_json(cache, cache_key, payload, TTL_GOAL_RECOMMENDATION)
-            await set_cached_json(cache, stale_key, payload, TTL_GOAL_RECOMMENDATION_STALE)
-        return result
-
-    if cache is None:
-        return await _fetch_and_cache()
-
-    return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
+    return await _grc.cached_recommendation(
+        cache,
+        goal_recommendation_age_key(user_id, gen),
+        goal_recommendation_age_stale_key(user_id, gen),
+        GoalRecommendation,
+        lambda: _compute_age_based_recommendation(cache, db, user_id, settings_row),
+        lambda result: bool(result.recommended_items),
+    )
 
 
 async def get_cached_age_based_recommendation(
     cache: CacheStoreType, user_id: uuid.UUID, gen: str
 ) -> GoalRecommendation | None:
     """1시간 키만 조회한다 — 엔드포인트가 설정 조회·stale 판단 전에 먼저 확인한다."""
-    cached = await get_cached_json(cache, goal_recommendation_age_key(user_id, gen))
-    return GoalRecommendation(**cached) if cached is not None else None
+    return await _grc.read_cached_model(cache, goal_recommendation_age_key(user_id, gen), GoalRecommendation)
 
 
 async def get_stale_age_based_recommendation(
     cache: CacheStoreType, user_id: uuid.UUID, gen: str
 ) -> GoalRecommendation | None:
     """1시간 키가 만료된 뒤에도 남는 마지막 정상 결과(1일) — 전체 추천 SWR과 같은 규칙(plans/66·90 C6)."""
-    cached = await get_cached_json(cache, goal_recommendation_age_stale_key(user_id, gen))
-    return GoalRecommendation(**cached) if cached is not None else None
+    return await _grc.read_cached_model(cache, goal_recommendation_age_stale_key(user_id, gen), GoalRecommendation)
 
 
 async def refresh_age_based_recommendation_in_background(user_id: uuid.UUID, cache: CacheStoreType) -> None:
@@ -307,7 +285,7 @@ async def _resolve_age_dividend_target(
     if annual_dividend_goal:
         overall_overview = await build_portfolio_overview(user_id, db, account_ids=None, cache=cache)
         required_dividend_yield_pct = _grc._required_dividend_yield_pct(
-            annual_dividend_goal, float(overall_overview.get("total_assets_krw", 0))
+            annual_dividend_goal, _grc.investable_assets_krw(overall_overview)
         )
     if required_dividend_yield_pct is None and default_dividend_floor_pct > 0:
         return default_dividend_floor_pct, (

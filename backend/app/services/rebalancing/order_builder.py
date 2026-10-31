@@ -215,6 +215,19 @@ async def tactical_regime_for_gate(alert: Any, db: AsyncSession) -> str | None:
     )
 
 
+async def is_alert_blocked_by_market_gate(
+    alert: Any, db: AsyncSession, composite_level: str, data_freshness: str
+) -> bool:
+    """알림의 `market_condition_mode` 게이트 판정(TACTICAL이면 그 포트폴리오 확정 국면을 조회해서).
+
+    AUTO 경로 4곳(드리프트 알림·플랜 생성 job·원클릭 실행·매수 leg 실행 직전)이 공유한다.
+    `alert`가 None이면 DISABLED로 본다. 로깅·차단 시 문구는 호출부 책임.
+    """
+    market_mode = getattr(alert, "market_condition_mode", "DISABLED")
+    tactical_regime = await tactical_regime_for_gate(alert, db)
+    return is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness, tactical_regime)
+
+
 def is_tax_impact_blocking_auto_mode(
     gate_mode: str, estimated_tax_krw: float, max_tax_impact_krw: float | None
 ) -> bool:

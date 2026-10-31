@@ -1,8 +1,10 @@
+import sentry_sdk
 import structlog
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_MISSED, JobExecutionEvent
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from app.core.logging import redact_secrets
 from app.utils.kst import now_kst
 
 logger = structlog.get_logger()
@@ -22,13 +24,22 @@ scheduler = AsyncIOScheduler(
 def _on_job_event(event: JobExecutionEvent) -> None:
     """잡이 예외를 밖으로 던졌거나(EVENT_JOB_ERROR) 유예시간을 넘겨 버려졌을 때(EVENT_JOB_MISSED) 기록.
 
-    대부분의 잡은 내부에서 예외를 삼키지만, 삼키지 않는 잡의 실패와 misfire는 이 리스너 없이는
-    APScheduler 기본 stdlib 로그에만 남아 구조화 로그에서 보이지 않는다.
+    대부분의 잡은 내부에서 예외를 삼키지만, 삼키지 않는 잡(동기화·청소·플랜 실행 등)의 실패와 misfire는
+    이 리스너 없이는 APScheduler 기본 stdlib 로그에만 남아 구조화 로그·Sentry에서 보이지 않는다.
+    Sentry는 스택 없는 메시지로 보낸다 — 주문 실행 잡은 자격증명을 지역변수로 다룬다
+    (`report_handled_failure`와 같은 이유).
     """
     if event.code == EVENT_JOB_MISSED:
         logger.warning("scheduler_job_missed", job_id=event.job_id, scheduled_run_time=str(event.scheduled_run_time))
     elif event.exception is not None:
-        logger.error("scheduler_job_error", job_id=event.job_id, error=str(event.exception))
+        exc = event.exception
+        logger.error(
+            "scheduler_job_error",
+            job_id=event.job_id,
+            error=redact_secrets(str(exc)),
+            error_type=type(exc).__name__,
+        )
+        sentry_sdk.capture_message(f"scheduler_job_error {event.job_id}: {type(exc).__name__}", level="error")
 
 
 def init_scheduler() -> None:

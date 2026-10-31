@@ -623,3 +623,59 @@ class TestCacheLock:
             assert acquired is True
 
         cache.delete.assert_not_called()
+
+
+class TestInvalidationPatternsMatchBuilders:
+    """무효화 함수의 SCAN 패턴이 키 빌더의 포맷과 어긋나지 않는지 — 빌더가 만든 키를 실제 CacheStore에 넣고
+    무효화 후 사라졌는지 본다. 패턴은 f-string으로 따로 쓰여 있어, 빌더만 바꾸면 무효화가 조용히 빗나간다."""
+
+    async def test_asset_account_invalidation_removes_every_user_scoped_key(self, override_settings):
+        from app.core.cache_store import CacheStore
+        from app.utils import cache_keys as ck
+
+        uid, pid = uuid.uuid4(), uuid.uuid4()
+        keys = [
+            ck.alloc_history_key(uid, 12, "acct1"),
+            ck.dividend_summary_key(uid, "acct1"),
+            ck.dividend_ticker_summary_key(uid, 2026, "acct1"),
+            ck.dividends_positions_key(uid, "acct1"),
+            ck.portfolio_overview_key(uid, "acct1"),
+            ck.portfolio_overview_lite_key(uid, "acct1"),
+            ck.rebalancing_strategy_key(uid, pid, "acct1"),
+            ck.rebalancing_analysis_key(uid, pid, "acct1", None),
+            ck.tax_overseas_key(uid, "acct1"),
+            ck.tax_overseas_realized_key(uid, 2026, "acct1"),
+            ck.factor_analysis_key(uid, "acct1"),
+            ck.efficient_frontier_key(uid, str(pid), "acct1"),
+            ck.monthly_trend_key(uid),
+            ck.dashboard_summary_key(uid),
+            ck.insights_key(uid),
+        ]
+        store = CacheStore()
+        for k in keys:
+            await store.setex(k, 3600, "1")
+
+        await ck.invalidate_asset_account_caches(store, uid, 2026)
+
+        assert [k for k in keys if await store.get(k) is not None] == []
+
+    async def test_portfolio_analysis_invalidation_is_scoped_to_that_portfolio(self, override_settings):
+        from app.core.cache_store import CacheStore
+        from app.utils import cache_keys as ck
+
+        uid, pid, other = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        target = [
+            ck.rebalancing_analysis_key(uid, pid, "acct1", None),
+            ck.rebalancing_strategy_key(uid, pid, "acct1"),
+            ck.factor_analysis_portfolio_key(pid),
+            ck.efficient_frontier_key(uid, str(pid), "acct1"),
+        ]
+        kept = ck.rebalancing_analysis_key(uid, other, "acct1", 50000.0)
+        store = CacheStore()
+        for k in [*target, kept]:
+            await store.setex(k, 3600, "1")
+
+        await ck.invalidate_rebalancing_analysis_cache(store, uid, pid)
+
+        assert [k for k in target if await store.get(k) is not None] == []
+        assert await store.get(kept) == "1"

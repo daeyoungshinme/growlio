@@ -33,7 +33,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,14 +44,14 @@ from app.enums import AssetType, DataSource, TransactionType
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
-from app.schemas._validators import validate_positive_amount
+from app.schemas._validators import PositiveAmount
 from app.schemas.invest import GoalFeasibilityPreview
 from app.services._settings_queries import get_settings_row
 from app.services.accounts.asset_service import list_accounts as _list_accounts
 from app.services.accounts.snapshot_service import (
-    _upsert_snapshot,
     get_latest_snapshot_with_positions,
     get_latest_snapshots_by_account,
+    write_manual_deposit_snapshot,
 )
 from app.services.external_queries import (
     account_scoped_performance,
@@ -64,7 +64,7 @@ from app.utils.cache_keys import (
     invalidate_asset_account_caches,
 )
 from app.utils.currency import fetch_usd_krw
-from app.utils.kst import KST, today_kst
+from app.utils.kst import KST
 
 router = APIRouter(prefix="/external", tags=["external"])
 logger = structlog.get_logger()
@@ -254,17 +254,13 @@ async def get_investment_goal(
 class ExternalTransactionCreate(BaseModel):
     account_id: UUID
     transaction_type: TransactionType
-    amount: float
+    amount: PositiveAmount
     transaction_date: date
     notes: str | None = Field(default=None, max_length=1000)
     # 멱등 키 — 같은 사용자가 같은 키로 다시 보내면 새로 기록하지 않는다(nestlio: "nestlio:{거래id}:{동작}").
     external_ref: str | None = Field(default=None, min_length=1, max_length=100)
 
     # 내부 TransactionCreate와 같은 규칙 — 음수 DEPOSIT이 MANUAL 계좌 예수금을 깎거나 Numeric 오버플로로 500이 나지 않게
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float) -> float:
-        return validate_positive_amount(v)
 
 
 class ExternalTransactionResult(BaseModel):
@@ -345,22 +341,7 @@ async def create_external_transaction(
         cache = await get_cache_store()
         usd_rate = await fetch_usd_krw(cache)
         latest_snap, pos_list = await get_latest_snapshot_with_positions(db, account.id)
-        pos_value = sum(
-            (float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0)
-            for p in pos_list
-        )
-        usd_as_krw = float(account.deposit_usd or 0) * usd_rate
-        total = pos_value + float(account.deposit_krw or 0) + usd_as_krw
-        await _upsert_snapshot(
-            db,
-            account_id=account.id,
-            user_id=account.user_id,
-            snapshot_date=today_kst(),
-            amount_krw=total,
-            invested_amount=latest_snap.invested_amount if latest_snap else None,
-            unrealized_pnl=latest_snap.unrealized_pnl if latest_snap else None,
-            source="MANUAL",
-        )
+        await write_manual_deposit_snapshot(db, account, latest_snap=latest_snap, positions=pos_list, usd_rate=usd_rate)
 
     try:
         await db.commit()
