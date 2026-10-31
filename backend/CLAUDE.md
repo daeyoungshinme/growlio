@@ -166,7 +166,8 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `index_exposure_service.py` — 지수별 비중 + 리밸런싱 지수 그룹 제안
 
 **전술 배분 (`tactical/`, QQQ/SPY)**
-- `tactical_allocation_service.py` — 국면 판정(매크로 확정등급 × 추세, 서로 다른 KST 날짜 2회 확정 — 백테스트도 같은 함수), 제안 비중(비중표 → 틸트 → 웅덩이), 목표 교체. **QQQ·SPY·DIA는 지수 그룹 비중** — 적용 시 기존 그룹은 보존하고 비중만. QLD·SSO 0%면 짝 그룹의 레버리지 멤버로(전량 매도 방지). `ASSET_LABELS`는 프론트 `tacticalLabels.ASSET_LABEL`과 같게. 알림 판정은 `last_regime != notified_regime`
+- `tactical_allocation_service.py` — 시장 관측·전략 저장·상태·목표 교체(DB). `tactical_regime`·`tactical_apply` 심볼을 재노출 — 서브모듈 내부 호출을 가로채는 patch는 서브모듈 경로로
+- `tactical_regime.py` — 국면 판정(매크로 확정등급 × 추세, 서로 다른 KST 날짜 2회 확정 — 백테스트도 같은 함수), 제안 비중(비중표 → 틸트 → 웅덩이). `tactical_apply.py` — 적용 계획(그룹 재구성·분할 보간·할 일 판정). **QQQ·SPY·DIA는 지수 그룹 비중** — 적용 시 기존 그룹은 보존하고 비중만. QLD·SSO 0%면 짝 그룹의 레버리지 멤버로(전량 매도 방지). `ASSET_LABELS`는 프론트 `tacticalLabels.ASSET_LABEL`과 같게. 알림 판정은 `last_regime != notified_regime`
 - `tactical_tilt.py`(QQQ↔SPY 월 1회, 기본 끔) · `tactical_dip.py`(웅덩이 투입, 공격 국면만, 기본 끔) · `tactical_hints.py`(다음 전환 조건)
 - `tactical_backtest.py` — 실시간과 같은 판정 함수 사용. 매크로는 VIX로만 근사(`macro_note` 고지). **계산 방식 변경 시 `tactical_backtest_key` 버전을 올려 캐시 무효화**
 
