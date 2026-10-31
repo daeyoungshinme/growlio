@@ -6,7 +6,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.utils.pnl import calc_net_asset_amount, calc_position_pnl, eval_value, invested_value, pnl_pct
+from app.utils.pnl import (
+    calc_net_asset_amount,
+    calc_position_pnl,
+    eval_value,
+    invested_value,
+    pnl_pct,
+    reprice_positions_krw,
+)
 
 
 def _pos(avg_price=1000.0, qty=10.0, current_price=None):
@@ -123,3 +130,34 @@ class TestCalcNetAssetAmount:
 
     def test_none_real_estate_details_no_deduction(self):
         assert calc_net_asset_amount(300_000_000.0, "REAL_ESTATE", None) == pytest.approx(300_000_000.0)
+
+
+class TestRepricePositionsKrw:
+    @staticmethod
+    def _p(ticker, market, current_price=None, avg_price=100.0, qty=2.0):
+        return SimpleNamespace(
+            ticker=ticker, market=market, current_price=current_price, avg_price=avg_price, qty=qty, value_krw=None
+        )
+
+    def test_overseas_converted_with_usd_rate(self):
+        p = self._p("AAPL", "NASDAQ")
+        reprice_positions_krw([p], {"AAPL": 200.0}, 1400.0)
+        assert p.current_price == pytest.approx(280_000.0)
+        assert p.value_krw == pytest.approx(560_000.0)
+
+    def test_domestic_uses_raw_price(self):
+        p = self._p("005930", "KRX")
+        reprice_positions_krw([p], {"005930": 70_000.0}, None)
+        assert p.current_price == pytest.approx(70_000.0)
+
+    def test_overseas_without_usd_rate_keeps_existing_price(self):
+        # 환율이 없으면 USD 시세를 원화로 쓰지 않고 기존 현재가를 유지한다
+        p = self._p("AAPL", "NASDAQ", current_price=280_000.0)
+        reprice_positions_krw([p], {"AAPL": 200.0}, None)
+        assert p.current_price == pytest.approx(280_000.0)
+        assert p.value_krw == pytest.approx(560_000.0)
+
+    def test_missing_price_falls_back_to_avg_price(self):
+        p = self._p("AAPL", "NASDAQ", current_price=None, avg_price=250_000.0)
+        reprice_positions_krw([p], {}, 1400.0)
+        assert p.current_price == pytest.approx(250_000.0)
