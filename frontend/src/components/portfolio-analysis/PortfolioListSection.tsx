@@ -12,6 +12,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   TriangleAlert,
   Anchor,
+  ArrowLeftRight,
   CircleAlert,
   CircleCheck,
   Pen,
@@ -28,7 +29,10 @@ import type { PortfolioDriftSummary } from "@/api/rebalancing";
 import { DRIFT_STATUS_LABEL, getDriftStatus, getPortfolioTargetState } from "@/utils/portfolio";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import Modal, { ModalBody } from "@/components/common/Modal";
+import { useIsSmUp } from "@/hooks/useMediaQuery";
 import {
+  TOUCH_HEIGHT_MIN,
   TOUCH_TARGET_COMPACT_MOBILE_ONLY,
   TOUCH_TARGET_MIN_MOBILE_ONLY,
 } from "@/constants/uiSizes";
@@ -70,7 +74,8 @@ interface PortfolioCardProps {
   alertMode?: "NOTIFY" | "AUTO";
   hasAlert: boolean;
   isTargetPending: boolean;
-  dragHandleListeners: React.HTMLAttributes<HTMLElement>;
+  /** 없으면 순서 변경 핸들을 그리지 않는다(모바일 선택 카드 — 순서는 시트 목록에서) */
+  dragHandleListeners?: React.HTMLAttributes<HTMLElement>;
   onToggleSelect: (id: string) => void;
   onOpenEditor: (portfolio: Portfolio) => void;
   onOpenAlertModal: (id: string) => void;
@@ -133,14 +138,16 @@ const PortfolioCard = memo(function PortfolioCard({
     >
       {/* 행1: 드래그 핸들 + 이름/부제/미니바 + 수정/삭제 */}
       <div className="flex items-start gap-2">
-        <button
-          {...dragHandleListeners}
-          onClick={(e) => e.stopPropagation()}
-          aria-label="포트폴리오 순서 변경"
-          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none`}
-        >
-          <GripVertical size={14} />
-        </button>
+        {dragHandleListeners && (
+          <button
+            {...dragHandleListeners}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="포트폴리오 순서 변경"
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none`}
+          >
+            <GripVertical size={14} />
+          </button>
+        )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 line-clamp-2 leading-snug">
             {p.name}
@@ -288,6 +295,9 @@ export default function PortfolioListSection({
     conflicts: { accountName: string; fromPortfolioName: string }[];
   } | null>(null);
 
+  const isSmUp = useIsSmUp();
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   const unassignedAccounts = stockAccounts.filter((a) => !a.target_portfolio_id);
 
   function getAccountLabel(p: Portfolio): string {
@@ -334,6 +344,58 @@ export default function PortfolioListSection({
       relevant.map((a) => a.id),
     );
   }
+
+  // 시트 안에서 고르거나 편집·자동화로 넘어가면 시트는 닫는다(삭제는 확인창이 위에 뜨므로 유지)
+  const inSheet = <A extends unknown[]>(fn: (...args: A) => void) =>
+    sheetOpen
+      ? (...args: A) => {
+          setSheetOpen(false);
+          fn(...args);
+        }
+      : fn;
+
+  function renderCard(p: Portfolio, dragHandleListeners?: React.HTMLAttributes<HTMLElement>) {
+    return (
+      <PortfolioCard
+        portfolio={p}
+        selected={selectedIds.has(p.id)}
+        targetState={getPortfolioTargetState(p, stockAccounts)}
+        accountLabel={getAccountLabel(p)}
+        showAccountLabel={stockAccounts.length > 1}
+        drift={driftByPortfolioId?.[p.id]}
+        alertMode={alertByPortfolioId[p.id]?.mode}
+        hasAlert={alertPortfolioIds.has(p.id)}
+        isTargetPending={isTargetPending}
+        dragHandleListeners={dragHandleListeners}
+        onToggleSelect={inSheet(onToggleSelect)}
+        onOpenEditor={inSheet(onOpenEditor)}
+        onOpenAlertModal={inSheet(onOpenAlertModal)}
+        onConfirmDelete={onConfirmDelete}
+        onToggleTarget={handleToggleTarget}
+      />
+    );
+  }
+
+  function renderList() {
+    return (
+      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+        <SortableContext items={portfolios.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+          {portfolios.map((p) => (
+            <SortablePortfolioItem key={p.id} id={p.id}>
+              {({ dragHandleListeners }) => renderCard(p, dragHandleListeners)}
+            </SortablePortfolioItem>
+          ))}
+        </SortableContext>
+      </DndContext>
+    );
+  }
+
+  // 모바일은 목록 전체 대신 선택 1장 + 시트(plans/102 D1, 67 보류분) — 카드가 쌓여 분석 결과가 한참 아래로 밀렸다.
+  // null(matchMedia 없음·SSR)은 데스크톱처럼 목록을 그린다.
+  const compactSelected =
+    isSmUp === false && portfolios.length > 1
+      ? portfolios.find((p) => selectedIds.has(p.id))
+      : undefined;
 
   return (
     <div className="w-full space-y-3">
@@ -422,37 +484,24 @@ export default function PortfolioListSection({
             첫 번째 포트폴리오 만들기
           </button>
         </div>
-      ) : (
-        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          <SortableContext
-            items={portfolios.map((p) => p.id)}
-            strategy={verticalListSortingStrategy}
+      ) : compactSelected ? (
+        <>
+          {renderCard(compactSelected)}
+          <button
+            type="button"
+            onClick={() => setSheetOpen(true)}
+            className={`${TOUCH_HEIGHT_MIN} w-full flex items-center justify-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
           >
-            {portfolios.map((p) => (
-              <SortablePortfolioItem key={p.id} id={p.id}>
-                {({ dragHandleListeners }) => (
-                  <PortfolioCard
-                    portfolio={p}
-                    selected={selectedIds.has(p.id)}
-                    targetState={getPortfolioTargetState(p, stockAccounts)}
-                    accountLabel={getAccountLabel(p)}
-                    showAccountLabel={stockAccounts.length > 1}
-                    drift={driftByPortfolioId?.[p.id]}
-                    alertMode={alertByPortfolioId[p.id]?.mode}
-                    hasAlert={alertPortfolioIds.has(p.id)}
-                    isTargetPending={isTargetPending}
-                    dragHandleListeners={dragHandleListeners}
-                    onToggleSelect={onToggleSelect}
-                    onOpenEditor={onOpenEditor}
-                    onOpenAlertModal={onOpenAlertModal}
-                    onConfirmDelete={onConfirmDelete}
-                    onToggleTarget={handleToggleTarget}
-                  />
-                )}
-              </SortablePortfolioItem>
-            ))}
-          </SortableContext>
-        </DndContext>
+            <ArrowLeftRight size={14} /> 다른 포트폴리오 보기 ({portfolios.length}개)
+          </button>
+        </>
+      ) : (
+        renderList()
+      )}
+      {sheetOpen && (
+        <Modal title="포트폴리오 선택" onClose={() => setSheetOpen(false)} closeOnBackdrop>
+          <ModalBody className="space-y-3">{renderList()}</ModalBody>
+        </Modal>
       )}
       {pendingReassign && (
         <ConfirmModal

@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { SeriesData } from "@/api/backtest";
 import { useThemeStore } from "@/stores/themeStore";
+import { useIsSmUp } from "@/hooks/useMediaQuery";
 import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { PIE_COLORS } from "@/utils/colors";
 import SegmentedControl from "@/components/common/SegmentedControl";
@@ -114,6 +115,7 @@ function computeAnnualReturns(dates: string[], series: SeriesData[]): AnnualRow[
 
 function BacktestResultChart({ dates, series }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
+  const isSmUp = useIsSmUp();
   const [view, setView] = useState<ChartView>("cumulative");
 
   // 차트 데이터는 입력이 바뀔 때만 다시 만든다. 낙폭은 시리즈마다 한 번만 계산 — 예전엔 날짜마다 시리즈
@@ -145,7 +147,10 @@ function BacktestResultChart({ dates, series }: Props) {
     tickLine: false as const,
   };
   const gridProps = { strokeDasharray: "3 3", stroke: isDark ? "#374151" : "#F3F4F6" };
-  const tickInterval = Math.max(1, Math.floor(dates.length / 12));
+  // 390px에선 라벨 12개가 겹친다 — 모바일은 약 5개, 높이도 줄여 아래 지표가 덜 밀리게 (plans/102 D3)
+  const isMobile = isSmUp === false;
+  const tickInterval = Math.max(1, Math.floor(dates.length / (isMobile ? 5 : 12)));
+  const chartHeight = isMobile ? 240 : 280;
   const legendStyle = {
     wrapperStyle: { fontSize: 12, paddingTop: 12, color: isDark ? "#d1d5db" : undefined },
   };
@@ -167,7 +172,7 @@ function BacktestResultChart({ dates, series }: Props) {
       </div>
 
       {view === "cumulative" && (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <LineChart data={cumulativeData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid {...gridProps} />
             <XAxis dataKey="date" {...axisProps} interval={tickInterval} />
@@ -200,7 +205,7 @@ function BacktestResultChart({ dates, series }: Props) {
       )}
 
       {view === "annual" && (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart data={annualData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid {...gridProps} />
             <XAxis dataKey="year" {...axisProps} />
@@ -232,7 +237,7 @@ function BacktestResultChart({ dates, series }: Props) {
       )}
 
       {view === "drawdown" && (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <AreaChart data={drawdownData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid {...gridProps} />
             <XAxis dataKey="date" {...axisProps} interval={tickInterval} />

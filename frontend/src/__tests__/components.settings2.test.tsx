@@ -2,7 +2,7 @@
  * Tests for settings components, RebalancingTable, ResetPasswordPage, and other uncovered components.
  */
 import { describe, it, expect, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
 
@@ -478,5 +478,24 @@ describe("RebalancingTable", () => {
       </MemoryRouter>,
     );
     expect(document.body).toBeDefined();
+  });
+
+  it("계좌 데이터 갱신은 기본 접힌 '상세 정보' 안에 있다 (plans/102 D5)", () => {
+    localStorage.clear();
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingTable
+          analysis={mockAnalysis}
+          portfolioId="p1"
+          accounts={[mockAccount]}
+          onReanalyze={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("계좌 데이터 갱신")).toBeNull();
+    const details = screen.getByRole("button", { name: /상세 정보/ });
+    expect(details.textContent).toContain("계좌 갱신");
+    fireEvent.click(details);
+    expect(screen.getByText("계좌 데이터 갱신")).toBeDefined();
   });
 });

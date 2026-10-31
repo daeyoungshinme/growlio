@@ -5,7 +5,8 @@ import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { AssetAccount } from "@/api/assets";
-import { isOrderExecutableAccount } from "@/utils/accounts";
+import { isOrderExecutableAccount, isSyncableAccount } from "@/utils/accounts";
+import { RebalancingAccountSyncSection } from "./RebalancingAccountSyncSection";
 import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import RebalancingDividendSection from "./RebalancingDividendSection";
@@ -39,6 +40,7 @@ export default function RebalancingTable({
   cashIsLive = false,
 }: Props) {
   const tradableAccounts = accounts.filter((a) => isOrderExecutableAccount(a.asset_type));
+  const hasSyncable = accounts.some((a) => isSyncableAccount(a.data_source));
   const [executionOpen, setExecutionOpen] = useState(false);
   const [detailsOpen, toggleDetailsOpen] = useCollapsible(
     false,
@@ -178,7 +180,9 @@ export default function RebalancingTable({
           <span>
             상세 정보
             <span className="ml-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">
-              {["집중도·CAGR", hasDividendData && "배당"].filter(Boolean).join(" · ")}
+              {["집중도·CAGR", hasDividendData && "배당", hasSyncable && onReanalyze && "계좌 갱신"]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           </span>
           <ChevronDown
@@ -194,6 +198,11 @@ export default function RebalancingTable({
 
           {/* 배당 분석 섹션 */}
           {hasDividendData && <RebalancingDividendSection analysis={analysis} />}
+
+          {/* 계좌 갱신은 분석 직후 매번 쓰는 동작이 아니라 상세 안으로 (plans/102 D5) */}
+          {onReanalyze && (
+            <RebalancingAccountSyncSection accounts={accounts} onReanalyze={onReanalyze} />
+          )}
 
           <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
             분석 시점:{" "}

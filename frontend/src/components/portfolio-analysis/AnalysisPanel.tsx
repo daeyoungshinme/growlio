@@ -5,7 +5,6 @@ import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
 
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
-import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
 import RebalancingStrategyCard from "@/components/rebalancing/RebalancingStrategyCard";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 import SegmentedControl from "@/components/common/SegmentedControl";
@@ -202,10 +201,6 @@ export function AnalysisPanel({
                   })()}
                   autoOpenExecution={autoOpenExecution}
                   cashIsLive={cashIsLive}
-                  onReanalyze={() => triggerRebalancingAnalysis(analysis.portfolio_id)}
-                />
-                <RebalancingAccountSyncSection
-                  accounts={analysisAccounts}
                   onReanalyze={() => triggerRebalancingAnalysis(analysis.portfolio_id)}
                 />
               </>

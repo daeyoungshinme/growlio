@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, fireEvent, within } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
@@ -236,5 +236,92 @@ describe("PortfolioListSection - 기준 지정 재지정", () => {
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(onBatchSetTarget).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+// ------- PortfolioListSection: 모바일 선택 1장 + 시트 (plans/102 D1) -------
+describe("PortfolioListSection - 모바일 바텀시트", () => {
+  const mk = (id: string, name: string, sort_order: number): Portfolio => ({
+    id,
+    name,
+    items: [],
+    base_type: "STOCK_ONLY",
+    account_ids: null,
+    sort_order,
+    created_at: "2024-01-01",
+    updated_at: "2024-01-01",
+  });
+  const portfolios = [mk("pA", "포트폴리오 A", 0), mk("pB", "포트폴리오 B", 1)];
+
+  const mockViewport = (desktop: boolean) =>
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) =>
+        ({
+          matches: desktop,
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    });
+
+  afterEach(() => {
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
+  function renderSection(onToggleSelect = vi.fn(), onOpenEditor = vi.fn()) {
+    renderWithProviders(
+      <PortfolioListSection
+        portfolios={portfolios}
+        isLoading={false}
+        selectedIds={new Set(["pA"])}
+        stockAccounts={[]}
+        alertPortfolioIds={new Set()}
+        autoAlertCount={0}
+        alertByPortfolioId={{}}
+        isTargetPending={false}
+        onDragEnd={vi.fn()}
+        onToggleSelect={onToggleSelect}
+        onOpenEditor={onOpenEditor}
+        onOpenAlertModal={vi.fn()}
+        onConfirmDelete={vi.fn()}
+        onBatchSetTarget={vi.fn()}
+      />,
+    );
+    return { onToggleSelect, onOpenEditor };
+  }
+
+  it("모바일에서는 선택된 카드만 보이고, 시트에서 고르면 선택을 넘기고 시트를 닫는다", () => {
+    mockViewport(false);
+    const { onToggleSelect } = renderSection();
+
+    expect(screen.getByRole("button", { name: "포트폴리오 A 선택" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "포트폴리오 B 선택" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "포트폴리오 순서 변경" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /다른 포트폴리오 보기 \(2개\)/ }));
+    const sheet = screen.getByRole("dialog", { name: "포트폴리오 선택" });
+    fireEvent.click(within(sheet).getByRole("button", { name: "포트폴리오 B 선택" }));
+
+    expect(onToggleSelect).toHaveBeenCalledWith("pB");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("시트에서 수정을 누르면 시트를 닫고 편집기로 넘긴다", () => {
+    mockViewport(false);
+    const { onOpenEditor } = renderSection();
+    fireEvent.click(screen.getByRole("button", { name: /다른 포트폴리오 보기/ }));
+    const sheet = screen.getByRole("dialog", { name: "포트폴리오 선택" });
+    fireEvent.click(within(sheet).getAllByRole("button", { name: "포트폴리오 수정" })[1]!);
+    expect(onOpenEditor).toHaveBeenCalledWith(portfolios[1]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("데스크톱에서는 기존처럼 목록 전체를 보여준다", () => {
+    mockViewport(true);
+    renderSection();
+    expect(screen.getByRole("button", { name: "포트폴리오 B 선택" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: /다른 포트폴리오 보기/ })).toBeNull();
   });
 });

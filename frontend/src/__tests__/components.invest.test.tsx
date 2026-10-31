@@ -758,3 +758,35 @@ describe("TaxPlannerSection", () => {
     expect(screen.getAllByText(/250만원 공제/).length).toBeGreaterThan(0);
   });
 });
+
+// ------- AchievementTable: 데스크톱도 중첩 스크롤 대신 "더 보기" (plans/102 D4) -------
+describe("AchievementTable scrollable", () => {
+  const rows = Array.from({ length: 15 }, (_, i) => ({
+    key: `m${i}`,
+    label: `${i + 1}월`,
+    projected: 1_000_000,
+    actual: 900_000,
+    achievementPct: 90,
+  }));
+
+  it("데스크톱 표는 최근 12행만 그리고 '더 보기'로 나머지를 펼친다", async () => {
+    const { default: AchievementTable } = await import("@/components/invest/AchievementTable");
+    const { container } = renderWithProviders(
+      <AchievementTable
+        title="월별 달성"
+        subtitle="부제"
+        emptyTitle="없음"
+        projectedLabel="계획"
+        actualLabel="실제"
+        rows={rows}
+        scrollable
+      />,
+    );
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(12);
+    expect(container.innerHTML).not.toContain("max-h-[440px]");
+
+    fireEvent.click(screen.getByRole("button", { name: "3개월 더 보기" }));
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(15);
+    expect(screen.getAllByRole("button", { name: "접기" })).toHaveLength(2);
+  });
+});
