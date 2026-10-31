@@ -173,10 +173,10 @@ async def apply_tactical_weights(
     분할 적용 규칙 등 검증은 `tactical.check_apply_allowed`가 한다.
     """
     portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
-    strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
     fraction = body.fraction if body else 1.0
-    regime = tactical.check_apply_allowed(portfolio, strategy, fraction)
-    assert strategy is not None  # check_apply_allowed가 None이면 400을 던진다
+    strategy, regime = tactical.check_apply_allowed(
+        portfolio, await tactical.get_strategy(portfolio_id, current_user.id, db), fraction
+    )
 
     cache = await get_cache_store()
     suggestions = (

@@ -434,8 +434,10 @@ async def disable_strategy(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: Asyn
     await db.commit()
 
 
-def check_apply_allowed(portfolio: Portfolio, strategy: TacticalStrategy | None, fraction: float) -> Regime:
-    """제안 비중 적용 전 검증 — 적용할 확정 국면을 돌려준다.
+def check_apply_allowed(
+    portfolio: Portfolio, strategy: TacticalStrategy | None, fraction: float
+) -> tuple[TacticalStrategy, Regime]:
+    """제안 비중 적용 전 검증 — None이 아님이 확인된 전략과 적용할 확정 국면을 돌려준다.
 
     `fraction<1`(분할 적용)은 전술 자산만으로 구성된 포트폴리오에서만, 같은 국면에서 한 번만 허용한다 — 다른 종목을
     절반만 줄이는 건 전술 배분이 관리하는 범위가 아니고, 두 번째부터는 나머지 적용(fraction=1)이다.
@@ -452,7 +454,7 @@ def check_apply_allowed(portfolio: Portfolio, strategy: TacticalStrategy | None,
     if fraction < 1 and strategy.partial_regime == regime:
         # 현재 목표에서 다시 절반을 보간하면 75%가 된다 — 두 번째는 나머지(전체) 적용만 허용
         raise BadRequestError(detail="이미 절반을 적용했어요. 나머지를 적용해주세요.")
-    return regime
+    return strategy, regime
 
 
 def tactical_asset_of(item: Any) -> str | None:
