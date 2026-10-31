@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.constants import BROKER_API_ASSET_TYPES, is_non_tradable
 from app.core.cache_store import get_cache_store
 from app.core.logging import public_error_message
@@ -295,13 +295,14 @@ async def get_portfolio_expected_metrics_endpoint(
     """포트폴리오의 현재 목표 비중에 대한 기대수익률/배당수익률/변동성 — "추천 비중 적용 전
     비교 미리보기"에서 추천 비중의 같은 지표와 나란히 보여주기 위한 온디맨드 조회(캐싱 없음,
     확인 모달을 열 때만 호출)."""
-    portfolio = await db.scalar(
-        select(Portfolio)
-        .options(selectinload(Portfolio.items))
-        .where(Portfolio.id == portfolio_id, Portfolio.user_id == current_user.id)
+    portfolio = await get_owned_or_404(
+        db,
+        Portfolio,
+        portfolio_id,
+        current_user.id,
+        "포트폴리오를 찾을 수 없습니다",
+        options=(selectinload(Portfolio.items),),
     )
-    if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     items = [
         (

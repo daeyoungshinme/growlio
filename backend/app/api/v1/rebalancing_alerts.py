@@ -34,14 +34,14 @@ router = APIRouter()
 
 
 async def _get_portfolio_with_accounts(db: AsyncSession, portfolio_id: uuid.UUID, user_id: uuid.UUID) -> Portfolio:
-    portfolio = await db.scalar(
-        select(Portfolio)
-        .options(selectinload(Portfolio.linked_accounts))
-        .where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
+    return await get_owned_or_404(
+        db,
+        Portfolio,
+        portfolio_id,
+        user_id,
+        "포트폴리오를 찾을 수 없습니다",
+        options=(selectinload(Portfolio.linked_accounts),),
     )
-    if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
-    return portfolio
 
 
 def _reject_if_per_account_scope(portfolio: Portfolio) -> None:

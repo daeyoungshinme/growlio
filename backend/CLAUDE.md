@@ -121,7 +121,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 **포트폴리오·자산 집계 (`portfolio/`)**
 - `asset_aggregator.py` — 대시보드 집계, XIRR·연환산·벤치마크, 월별 추이(`get_monthly_trend`)
 - `portfolio_service.py` — overview 집계. 부분집합 총자산 반복 계산은 `prefetch_accounts_snapshot_positions()`/`compute_total_assets_krw()`로 1회 조회 재사용
-- `portfolio_history_service.py` · `position_aggregator.py` · `returns_calculator.py`
+- `portfolio_crud_service.py`(포트폴리오 CRUD·연동 계좌 target_portfolio_id 동기화, 캐시 무효화는 라우터) · `portfolio_history_service.py` · `position_aggregator.py` · `returns_calculator.py`
 - `composition_calculator.py` — 자산 구성. `exclude_real_estate()`는 목표 진행률·필요수익률 등 "투자자산" 계산 전용(대시보드 총자산 표시엔 미적용)
 - `period_purchase_service.py` — 기간별 매수 수익률. 스냅샷 수량·평단 변화로 추정, 수기 BUY 기록 있으면 기록 우선. **해외는 `avg_price_usd`로 역산 후 그 스냅샷 `usd_rate`로 환산**(원화 평단은 매일 재환산돼 역산 불가). 기록 market과 브로커 포지션 market이 달라 `_position_key_aligner`로 정렬
 - 쿼리 헬퍼: `_position_queries.py`, `_portfolio_queries.py`
