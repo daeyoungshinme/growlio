@@ -3,7 +3,7 @@ import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { pnlColor, PIE_COLORS } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN_MOBILE_ONLY, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { DashboardData } from "@/api/dashboard";
 import MiniDonut from "@/components/common/MiniDonut";
 
@@ -115,7 +115,7 @@ export default memo(function HeroSummaryCard({
             title={
               amountVisible ? `${Math.floor(data.total_assets_krw).toLocaleString()}원` : undefined
             }
-            className="self-start min-h-[44px] sm:min-h-0 flex items-center gap-2 text-left rounded-lg text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className={`self-start ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} flex items-center gap-2 text-left rounded-lg text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
           >
             <span>{amountVisible ? fmtKrw(Math.floor(data.total_assets_krw)) : "••••••"}</span>
             {amountVisible ? (

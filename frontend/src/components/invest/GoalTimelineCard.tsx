@@ -8,6 +8,7 @@ import CollapsibleSection from "@/components/common/CollapsibleSection";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { goalRecommendationOverallQuery } from "@/api/queryOptions";
 
+import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 interface Props {
   timeline: GoalTimeline;
   goalAmount: number | null;
@@ -151,7 +152,7 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
             onToggle={toggleFaster}
             label="더 빨리 달성하려면?"
             collapsedHint="적립액·수익률을 얼마나 늘리면 몇 년 앞당길 수 있는지"
-            buttonClassName="w-full flex items-center justify-between min-h-[44px] text-sm font-semibold text-gray-900 dark:text-gray-50"
+            buttonClassName={`w-full flex items-center justify-between ${TOUCH_HEIGHT_MIN} text-sm font-semibold text-gray-900 dark:text-gray-50`}
           >
             {recommendation?.is_configured && (
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-3 p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950">
@@ -247,7 +248,7 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
 
             <Link
               to={rebalancingUrl({ tab: "목표 조정", mode: "추천" })}
-              className="flex items-center gap-1.5 min-h-[44px] text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline mt-1"
+              className={`flex items-center gap-1.5 ${TOUCH_HEIGHT_MIN} text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline mt-1`}
             >
               수익률을 높이는 포트폴리오 추천 보기 <ArrowRight size={12} />
             </Link>

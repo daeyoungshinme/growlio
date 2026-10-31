@@ -10,6 +10,7 @@ import {
   type MetricConfig,
 } from "@/utils/riskLevel";
 
+import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 function RiskMetricRow({
   metric,
   isExpanded,
@@ -87,7 +88,7 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={toggleOpen}
-          className="flex items-center gap-2 min-h-[44px] -my-2"
+          className={`flex items-center gap-2 ${TOUCH_HEIGHT_MIN} -my-2`}
           aria-expanded={isOpen}
         >
           <div className="p-1.5 bg-orange-50 dark:bg-orange-950 rounded-lg">

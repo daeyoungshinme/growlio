@@ -5,6 +5,7 @@ import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { isSyncableAccount } from "@/utils/accounts";
 import { STOCK_TYPE_LABELS } from "@/constants";
 
+import { TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 interface Props {
   accounts: AssetAccount[];
   onReanalyze: () => void;
@@ -95,7 +96,7 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
             </span>
             <button
               onClick={() => void handleSync()}
-              className="flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] sm:min-h-0 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className={`flex items-center gap-1.5 px-3 py-1.5 ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors`}
             >
               <RefreshCw size={12} />
               다시 동기화
@@ -110,7 +111,7 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
             </span>
             <button
               onClick={() => void handleSync()}
-              className="px-3 py-1.5 min-h-[40px] sm:min-h-0 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className={`px-3 py-1.5 ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors`}
             >
               재시도
             </button>
@@ -120,7 +121,7 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
           <button
             onClick={() => void handleSync()}
             disabled={isSyncing || selectedIds.size === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] sm:min-h-0 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors"
+            className={`flex items-center gap-1.5 px-3 py-1.5 ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors`}
           >
             {isSyncing ? (
               <>

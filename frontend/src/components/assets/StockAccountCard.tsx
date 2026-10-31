@@ -20,7 +20,7 @@ import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { isSyncableAccount } from "@/utils/accounts";
 import { toast } from "@/utils/toast";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import EditableNameField from "@/components/common/EditableNameField";
 import AccountActionsMenu from "@/components/common/AccountActionsMenu";
 
@@ -258,7 +258,7 @@ export default function StockAccountCard({
             type="button"
             onClick={() => setShowMoreStats((v) => !v)}
             aria-expanded={showMoreStats}
-            className="col-span-3 flex items-center justify-center gap-1 min-h-[44px] text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+            className={`col-span-3 flex items-center justify-center gap-1 ${TOUCH_HEIGHT_MIN} text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300`}
           >
             {showMoreStats ? "접기" : "누적 입금·배당 보기"}
             <ChevronDown

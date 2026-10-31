@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { INPUT_SM } from "@/constants/inputStyles";
-import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export default function FindAccountPage() {
   const [displayName, setDisplayName] = useState("");
@@ -78,11 +78,14 @@ export default function FindAccountPage() {
         <div className="mt-6 flex justify-between text-xs text-gray-500 dark:text-gray-400">
           <Link
             to="/forgot-password"
-            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-blue-600 dark:text-blue-400 hover:underline`}
           >
             비밀번호 찾기
           </Link>
-          <Link to="/login" className="inline-flex items-center min-h-[44px] hover:underline">
+          <Link
+            to="/login"
+            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} hover:underline`}
+          >
             로그인으로 돌아가기
           </Link>
         </div>

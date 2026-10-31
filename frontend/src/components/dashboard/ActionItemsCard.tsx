@@ -11,7 +11,7 @@ import SkeletonCard from "@/components/common/SkeletonCard";
 import { ACTION_PRIORITY_STYLE, deadlineLabel } from "@/utils/actionPriority";
 import { MARKET_SIGNAL_BADGE_CLASS, MARKET_SIGNAL_LABEL } from "@/utils/marketSignalBadge";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
-import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { driftSummaryQuery } from "@/api/queryOptions";
 
 const VISIBLE_LIMIT = 3;
@@ -56,7 +56,7 @@ function RebalanceGroupRow({
       <button
         onClick={toggleExpanded}
         aria-expanded={expanded}
-        className="flex items-start gap-3 w-full min-h-[44px] py-3 text-left active:opacity-70"
+        className={`flex items-start gap-3 w-full ${TOUCH_HEIGHT_MIN} py-3 text-left active:opacity-70`}
       >
         <span
           className={`mt-0.5 shrink-0 text-xs font-semibold rounded-full px-2 py-0.5 ${priority.className}`}
@@ -97,7 +97,7 @@ function RebalanceGroupRow({
               <li key={s.portfolio_id}>
                 <Link
                   to={rebalancingUrl({ tab: "포트폴리오", portfolioId: s.portfolio_id })}
-                  className="flex items-center gap-2 min-h-[44px] py-1.5 active:opacity-70"
+                  className={`flex items-center gap-2 ${TOUCH_HEIGHT_MIN} py-1.5 active:opacity-70`}
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
@@ -127,7 +127,7 @@ function ActionRow({ item, marketSignal }: { item: ActionItem; marketSignal: Mar
     <li>
       <Link
         to={item.link}
-        className="flex items-start gap-3 min-h-[44px] py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 active:opacity-70"
+        className={`flex items-start gap-3 ${TOUCH_HEIGHT_MIN} py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 active:opacity-70`}
       >
         <span
           className={`mt-0.5 shrink-0 text-xs font-semibold rounded-full px-2 py-0.5 ${priority.className}`}

@@ -7,7 +7,7 @@ import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { REDIRECT_DELAY_MS } from "@/constants/timers";
 import { toast } from "@/utils/toast";
-import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -205,7 +205,10 @@ export default function ResetPasswordPage() {
 
         {!success && (
           <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-6">
-            <Link to="/login" className="inline-flex items-center min-h-[44px] hover:underline">
+            <Link
+              to="/login"
+              className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} hover:underline`}
+            >
               로그인으로 돌아가기
             </Link>
           </p>

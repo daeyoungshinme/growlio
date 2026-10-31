@@ -36,7 +36,7 @@ import ConfirmModal from "@/components/common/ConfirmModal";
 import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
-import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { accountsQuery, compositeSignalStatusQuery, settingsQuery } from "@/api/queryOptions";
@@ -262,7 +262,7 @@ export default function SettingsPage() {
           <button
             onClick={saveDart}
             disabled={saving === "dart"}
-            className="min-h-[44px] bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className={`${TOUCH_HEIGHT_MIN} bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
           >
             {saving === "dart" ? "저장 중..." : "저장"}
           </button>
@@ -270,7 +270,7 @@ export default function SettingsPage() {
             <button
               onClick={() => setConfirmingDartDelete(true)}
               disabled={saving === "dart-delete"}
-              className="min-h-[44px] px-5 py-2 text-sm border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
+              className={`${TOUCH_HEIGHT_MIN} px-5 py-2 text-sm border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors`}
             >
               {saving === "dart-delete" ? "삭제 중..." : "삭제"}
             </button>

@@ -3,7 +3,7 @@ import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
 import { fmtKrw, fmtMonth } from "@/utils/format";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import type { DCAAnalysisData } from "@/api/invest";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 type GoalTimeline = DCAAnalysisData["goal_timeline"] | undefined;
 
@@ -73,7 +73,7 @@ export function MobileDcaOutlook({
             isOpen={detailOpen}
             onToggle={onToggleDetail}
             label="달성 예상일 · 진행 상세"
-            buttonClassName="mt-1 w-full flex items-center justify-between min-h-[44px] text-xs text-gray-500 dark:text-gray-400 font-medium"
+            buttonClassName={`mt-1 w-full flex items-center justify-between ${TOUCH_HEIGHT_MIN} text-xs text-gray-500 dark:text-gray-400 font-medium`}
           >
             <div className="flex items-end justify-between">
               <p className="text-xs text-gray-400 dark:text-gray-500">실제 달성 예상</p>

@@ -15,6 +15,7 @@ import RebalancingWeightTable from "./RebalancingWeightTable";
 import RebalancingDetailMetrics from "./RebalancingDetailMetrics";
 import { calcTradeSummary, TRADING_FEE_RATE } from "./rebalancingTradeMath";
 
+import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 interface Props {
   analysis: RebalancingAnalysis;
   portfolioId: string;
@@ -172,7 +173,7 @@ export default function RebalancingTable({
           type="button"
           onClick={toggleDetailsOpen}
           aria-expanded={detailsOpen}
-          className="w-full flex items-center justify-between min-h-[44px] text-sm font-medium text-gray-700 dark:text-gray-300"
+          className={`w-full flex items-center justify-between ${TOUCH_HEIGHT_MIN} text-sm font-medium text-gray-700 dark:text-gray-300`}
         >
           <span>
             상세 정보

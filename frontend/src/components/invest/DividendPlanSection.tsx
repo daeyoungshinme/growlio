@@ -18,6 +18,7 @@ import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationC
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { goalRecommendationOverallQuery, settingsQuery } from "@/api/queryOptions";
 
+import { TOUCH_HEIGHT_MIN, TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 interface Props {
   onOpenSettings: () => void;
 }
@@ -99,7 +100,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
           </h3>
           <button
             onClick={onOpenSettings}
-            className="shrink-0 flex items-center gap-2 px-4 py-2 min-h-[44px] sm:min-h-0 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className={`shrink-0 flex items-center gap-2 px-4 py-2 ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
           >
             <Settings2 size={15} />
             설정 편집
@@ -108,7 +109,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
         <div className="text-right mb-4">
           <Link
             to="/assets?tab=투자현황&portfolioTab=배당"
-            className="inline-flex items-center min-h-[44px] text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
           >
             종목별 배당 내역 보기
           </Link>
@@ -331,7 +332,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
 
           <Link
             to={rebalancingUrl({ tab: "목표 조정", mode: "추천" })}
-            className="flex items-center gap-1.5 min-h-[44px] text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline"
+            className={`flex items-center gap-1.5 ${TOUCH_HEIGHT_MIN} text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline`}
           >
             추천 포트폴리오 자세히 보기 <ArrowRight size={12} />
           </Link>

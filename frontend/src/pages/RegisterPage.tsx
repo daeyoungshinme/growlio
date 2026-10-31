@@ -6,7 +6,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { toast } from "@/utils/toast";
 import { INPUT_SM } from "@/constants/inputStyles";
-import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -203,7 +203,7 @@ export default function RegisterPage() {
           이미 계정이 있으신가요?{" "}
           <Link
             to="/login"
-            className="inline-flex items-center min-h-[44px] text-blue-600 dark:text-blue-400 hover:underline"
+            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-blue-600 dark:text-blue-400 hover:underline`}
           >
             로그인
           </Link>

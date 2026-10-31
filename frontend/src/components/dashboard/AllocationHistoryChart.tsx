@@ -18,7 +18,7 @@ import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 import { useAllocationHistory } from "@/hooks/useAllocationHistory";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
-import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
 const TYPE_COLORS: Record<string, string> = {
   STOCK_DOMESTIC: "#2563EB",
@@ -167,7 +167,7 @@ function AllocationHistoryChart({
         <button
           onClick={() => setShowDetail((v) => !v)}
           aria-expanded={showDetail}
-          className="mt-4 w-full flex items-center justify-between min-h-[44px] px-3 text-xs text-gray-500 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          className={`mt-4 w-full flex items-center justify-between ${TOUCH_HEIGHT_MIN} px-3 text-xs text-gray-500 dark:text-gray-400 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors`}
         >
           <span>월별 상세</span>
           <ChevronDown

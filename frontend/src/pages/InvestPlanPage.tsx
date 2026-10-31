@@ -13,7 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import { useDividendPlanSettings } from "@/hooks/useDividendPlanSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
@@ -145,7 +145,7 @@ export default function InvestPlanPage() {
         <span>데이터를 불러오지 못했습니다.</span>
         <button
           onClick={() => invalidateDcaData(queryClient)}
-          className="underline font-medium ml-2 min-h-[44px]"
+          className={`underline font-medium ml-2 ${TOUCH_HEIGHT_MIN}`}
         >
           다시 시도
         </button>
@@ -268,7 +268,7 @@ export default function InvestPlanPage() {
                 <button
                   type="button"
                   onClick={() => setShowAllStats((v) => !v)}
-                  className="sm:hidden mt-3 min-h-[44px] flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400"
+                  className={`sm:hidden mt-3 ${TOUCH_HEIGHT_MIN} flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400`}
                 >
                   {showAllStats ? (
                     <>
@@ -284,7 +284,10 @@ export default function InvestPlanPage() {
                   <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
                     월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
                     있습니다.{" "}
-                    <button onClick={openWizard} className="underline font-medium min-h-[44px]">
+                    <button
+                      onClick={openWizard}
+                      className={`underline font-medium ${TOUCH_HEIGHT_MIN}`}
+                    >
                       지금 설정하기
                     </button>
                   </div>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 interface ToggleSwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -38,7 +39,7 @@ interface ToggleRowProps extends Omit<ToggleSwitchProps, "ariaLabel"> {
 export function ToggleRow({ title, description, checked, onChange, disabled }: ToggleRowProps) {
   return (
     <label
-      className={`flex items-start justify-between gap-3 min-h-[44px] py-1 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+      className={`flex items-start justify-between gap-3 ${TOUCH_HEIGHT_MIN} py-1 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
     >
       <span className="flex-1 min-w-0">
         <span className="block text-sm text-gray-700 dark:text-gray-300">{title}</span>

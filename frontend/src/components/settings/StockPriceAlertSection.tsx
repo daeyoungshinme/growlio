@@ -11,6 +11,7 @@ import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
 import {
+  TOUCH_HEIGHT_MIN,
   TOUCH_TARGET_COMPACT_MOBILE_ONLY,
   TOUCH_TARGET_MIN,
   TOUCH_TARGET_MIN_MOBILE_ONLY,
@@ -103,7 +104,7 @@ export function StockPriceAlertSection() {
               {suggestions.map((s) => (
                 <button
                   key={`${s.ticker}-${s.market}`}
-                  className="w-full text-left px-3 min-h-[44px] text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className={`w-full text-left px-3 ${TOUCH_HEIGHT_MIN} text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}
                   onClick={() => {
                     setSelectedStock(s);
                     setForm((f) => ({ ...f, query: `${s.name} (${s.ticker})` }));

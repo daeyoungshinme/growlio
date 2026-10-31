@@ -15,6 +15,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { SELECT_SM } from "@/constants/inputStyles";
 
+import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 interface TaxOptimizationCardProps {
   /** 특정 계좌만 필터링해 조회 (미지정 시 전체 계좌 통합) */
   accountId?: string | null;
@@ -146,7 +147,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
           <button
             onClick={() => setPlannerOpenOverride(!plannerOpen)}
             aria-expanded={plannerOpen}
-            className="w-full flex items-center justify-between min-h-[44px] text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-t border-gray-100 dark:border-gray-700 pt-3 transition-colors"
+            className={`w-full flex items-center justify-between ${TOUCH_HEIGHT_MIN} text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-t border-gray-100 dark:border-gray-700 pt-3 transition-colors`}
           >
             <span className="flex items-center gap-1.5">
               <span className="text-left break-keep">절세 플래너 — 해외 종목 매도 시뮬레이션</span>

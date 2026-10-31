@@ -10,6 +10,7 @@ import { TaxPositionTable } from "./TaxPositionTable";
 import { TaxSimulationCard } from "./TaxSimulationCard";
 import { TaxRecommendationList } from "./TaxRecommendationList";
 
+import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 interface Props {
   positions: OverseasPositionDetail[];
   /** 올해 실현손익 자동 집계(E6, 증권사 체결 + 직접 기록한 매도) — 없거나 집계 계좌가 없으면 수기 입력만 */
@@ -166,7 +167,7 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
             value={realizedAbsInput}
             onChange={(e) => applyRealized(e.target.value.replace(/-/g, ""), realizedSign)}
             placeholder={autoRealized !== null ? String(Math.round(autoRealized)) : "0"}
-            className="flex-1 sm:flex-none sm:w-36 min-w-0 min-h-[44px] border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`flex-1 sm:flex-none sm:w-36 min-w-0 ${TOUCH_HEIGHT_MIN} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
           />
           {isManualRealized && alreadyRealized !== 0 && (
             <span className={`text-xs font-medium ${pnlColor(alreadyRealized)}`}>

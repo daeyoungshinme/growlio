@@ -4,6 +4,7 @@ import { PortfolioMetrics } from "@/api/backtest";
 import { pnlColor, LOSS_COLOR, PIE_COLORS } from "@/utils/colors";
 import InfoTip from "@/components/common/InfoTip";
 
+import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 interface Props {
   metrics: PortfolioMetrics[];
 }
@@ -209,7 +210,7 @@ export default function BacktestMetricsTable({ metrics }: Props) {
       <button
         onClick={() => setShowAdvanced((v) => !v)}
         aria-expanded={showAdvanced}
-        className="mt-1 flex items-center gap-1 min-h-[44px] text-xs text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        className={`mt-1 flex items-center gap-1 ${TOUCH_HEIGHT_MIN} text-xs text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors`}
       >
         {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         {showAdvanced ? "기본 지표만 보기" : "상세 지표 보기 (Sharpe · 변동성 · Sortino)"}
