@@ -1,4 +1,4 @@
-"""KIS·키움 공용 주문 흐름 — 매도 보유수량 clamp, FULL 전략 매수 예산 clamp.
+"""KIS·키움 공용 주문 흐름 — 매도→매수 순서, 매도 보유수량 clamp, FULL 전략 매수 예산 clamp.
 
 브로커마다 다른 것은 잔고·예산 조회 API, 단건 주문 함수, 해외 보유수량 키뿐이라 `BrokerOrderOps`로 주입한다.
 각 실행기는 호출마다 ops를 만들고, 그 콜러블은 실행기 모듈의 이름을 **호출 시점에** 조회한다
@@ -111,4 +111,17 @@ async def execute_buys_with_cash_check(ops: BrokerOrderOps, buys: list[Execution
     results: list[OrderResult] = list(skipped)
     for order in adjusted:
         results.append(await ops.place(order))
+    return results
+
+
+async def execute_sell_then_buy(
+    orders: list[ExecutionOrderItem],
+    execute_sells: Callable[[list[ExecutionOrderItem]], Awaitable[list[OrderResult]]],
+    execute_buys: Callable[[list[ExecutionOrderItem]], Awaitable[list[OrderResult]]],
+) -> list[OrderResult]:
+    """매도 → 매수 순으로 실행한다(매도 대금이 매수 예산 재조회에 반영되도록). 브로커별 실행기는 호출부가 주입한다."""
+    sells = [o for o in orders if o.side == "SELL"]
+    buys = [o for o in orders if o.side == "BUY"]
+    results = list(await execute_sells(sells))
+    results.extend(await execute_buys(buys))
     return results

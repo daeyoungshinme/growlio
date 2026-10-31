@@ -18,6 +18,7 @@ from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExec
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
 from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.accounts.credential_service import decrypt_kis_credentials, decrypt_kiwoom_credentials
+from app.services.rebalancing._broker_order_flow import execute_sell_then_buy
 from app.services.rebalancing._kis_order_executor import (
     _execute_buys_with_cash_check,
     _execute_sells_with_clamp,
@@ -316,24 +317,11 @@ async def _execute_kiwoom_account_orders(
         account_id=str(acc_uuid),
     )
 
-    sells = [o for o in group_orders if o.side == "SELL"]
-    buys = [o for o in group_orders if o.side == "BUY"]
-
-    account_results: list[OrderResult] = await _execute_kiwoom_sells_with_clamp(
-        sells,
-        access_token,
-        account_no,
-        is_mock,
+    return await execute_sell_then_buy(
+        group_orders,
+        lambda sells: _execute_kiwoom_sells_with_clamp(sells, access_token, account_no, is_mock),
+        lambda buys: _execute_kiwoom_buys_with_cash_check(buys, access_token, account_no, is_mock),
     )
-    account_results.extend(
-        await _execute_kiwoom_buys_with_cash_check(
-            buys,
-            access_token,
-            account_no,
-            is_mock,
-        )
-    )
-    return account_results
 
 
 async def _normalize_kis_overseas_markets(orders: list[ExecutionOrderItem], cache) -> list[ExecutionOrderItem]:
@@ -390,28 +378,11 @@ async def _execute_kis_account_orders(
             is_mock,
         )
 
-    sells = [o for o in group_orders if o.side == "SELL"]
-    buys = [o for o in group_orders if o.side == "BUY"]
-
-    account_results = await _execute_sells_with_clamp(
-        sells,
-        app_key,
-        app_secret,
-        access_token,
-        account_no,
-        is_mock,
+    return await execute_sell_then_buy(
+        group_orders,
+        lambda sells: _execute_sells_with_clamp(sells, app_key, app_secret, access_token, account_no, is_mock),
+        lambda buys: _execute_buys_with_cash_check(buys, app_key, app_secret, access_token, account_no, is_mock),
     )
-    account_results.extend(
-        await _execute_buys_with_cash_check(
-            buys,
-            app_key,
-            app_secret,
-            access_token,
-            account_no,
-            is_mock,
-        )
-    )
-    return account_results
 
 
 async def _execute_account_group(
