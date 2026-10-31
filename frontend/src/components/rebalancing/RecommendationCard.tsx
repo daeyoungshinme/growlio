@@ -21,7 +21,10 @@ import { isBankAccount, isStockAccount } from "@/utils/accounts";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { toPortfolioItemsPreservingGroups } from "@/utils/recommendationDrift";
-import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import {
+  TOUCH_HEIGHT_MIN_MOBILE_ONLY,
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+} from "@/constants/uiSizes";
 import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
 import SegmentedControl from "@/components/common/SegmentedControl";
 import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
@@ -344,7 +347,7 @@ export default function RecommendationCard({
               <button
                 type="button"
                 onClick={() => refetchOverall()}
-                className="underline font-medium text-teal-700 dark:text-teal-400 shrink-0"
+                className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} underline font-medium text-teal-700 dark:text-teal-400 shrink-0`}
               >
                 다시 시도
               </button>

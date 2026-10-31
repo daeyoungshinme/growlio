@@ -14,7 +14,7 @@ import RebalancingSummaryCards from "./RebalancingSummaryCards";
 import RebalancingWeightTable from "./RebalancingWeightTable";
 import RebalancingDetailMetrics from "./RebalancingDetailMetrics";
 import { calcTradeSummary, TRADING_FEE_RATE } from "./rebalancingTradeMath";
-import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   analysis: RebalancingAnalysis;
@@ -114,7 +114,7 @@ export default function RebalancingTable({
             <button
               onClick={() => void syncAndReanalyze()}
               disabled={syncState === "syncing"}
-              className="inline-flex items-center justify-center gap-1.5 self-end sm:self-auto px-3 py-1.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors"
+              className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} inline-flex items-center justify-center gap-1.5 self-end sm:self-auto px-3 py-1.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors`}
             >
               {syncState === "syncing" ? (
                 <Loader2 size={12} className="animate-spin" />

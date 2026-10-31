@@ -9,7 +9,7 @@ import {
   useRebalancingExecution,
 } from "@/hooks/useRebalancingExecution";
 import Modal from "@/components/common/Modal";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   portfolioId: string;
@@ -50,7 +50,8 @@ export function RebalancingExecutionModal({
                 <button
                   key={type}
                   onClick={() => dispatch({ type: "SET_ORDER_TYPE", orderType: type })}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  aria-pressed={orderType === type}
+                  className={`${TOUCH_HEIGHT_MIN} px-4 py-2 text-sm font-medium transition-colors ${
                     orderType === type
                       ? "bg-indigo-600 text-white"
                       : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -131,7 +132,7 @@ export function RebalancingExecutionModal({
             <>
               <button
                 onClick={onClose}
-                className="shrink-0 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className={`${TOUCH_HEIGHT_MIN} shrink-0 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
               >
                 취소
               </button>

@@ -18,8 +18,15 @@ import { SeriesData } from "@/api/backtest";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { PIE_COLORS } from "@/utils/colors";
+import SegmentedControl from "@/components/common/SegmentedControl";
 
 type ChartView = "cumulative" | "annual" | "drawdown";
+
+const VIEW_OPTIONS = [
+  { value: "cumulative", label: "누적" },
+  { value: "annual", label: "연도별" },
+  { value: "drawdown", label: "드로다운" },
+] as const satisfies readonly { value: ChartView; label: string }[];
 
 interface Props {
   dates: string[];
@@ -143,10 +150,6 @@ function BacktestResultChart({ dates, series }: Props) {
     wrapperStyle: { fontSize: 12, paddingTop: 12, color: isDark ? "#d1d5db" : undefined },
   };
 
-  const btnBase = "px-2.5 py-1 text-xs rounded-lg font-medium transition-colors";
-  const btnActive = `${btnBase} bg-blue-600 text-white`;
-  const btnInactive = `${btnBase} bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700`;
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -155,26 +158,12 @@ function BacktestResultChart({ dates, series }: Props) {
           {view === "annual" && "연도별 수익률"}
           {view === "drawdown" && "드로다운 (최고점 대비 하락률)"}
         </p>
-        <div className="flex gap-1">
-          <button
-            className={view === "cumulative" ? btnActive : btnInactive}
-            onClick={() => setView("cumulative")}
-          >
-            누적
-          </button>
-          <button
-            className={view === "annual" ? btnActive : btnInactive}
-            onClick={() => setView("annual")}
-          >
-            연도별
-          </button>
-          <button
-            className={view === "drawdown" ? btnActive : btnInactive}
-            onClick={() => setView("drawdown")}
-          >
-            드로다운
-          </button>
-        </div>
+        <SegmentedControl
+          options={VIEW_OPTIONS}
+          value={view}
+          onChange={setView}
+          ariaLabel="차트 보기"
+        />
       </div>
 
       {view === "cumulative" && (
