@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.exceptions import NotFoundError
 from app.services.rebalancing.strategy_service import (
     _build_summary,
     _build_trade_recommendations,
@@ -413,9 +414,9 @@ class TestGetRebalancingStrategyOwnership:
         mock_db.scalar.return_value = None
         portfolio_id = str(uuid.uuid4())
 
-        result = await get_rebalancing_strategy(make_user_id, portfolio_id, mock_db)
+        with pytest.raises(NotFoundError, match="포트폴리오를 찾을 수 없습니다"):
+            await get_rebalancing_strategy(make_user_id, portfolio_id, mock_db)
 
-        assert result == {"error": "포트폴리오를 찾을 수 없습니다"}
         stmt = mock_db.scalar.call_args.args[0]
         compiled = stmt.compile()
         assert "portfolios.user_id" in str(compiled)

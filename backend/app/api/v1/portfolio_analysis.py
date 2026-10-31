@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
@@ -105,7 +105,4 @@ async def portfolio_rebalancing_strategy(
     """팩터·프론티어 분석 기반 리밸런싱 전략 제시."""
     cache = await get_cache_store()
     # str 그대로 UUID 컬럼과 비교하면 형식이 틀린 값이 DB 오류 500이 됐다 — 422로 거부한 뒤 문자열로 넘긴다
-    result = await get_rebalancing_strategy(current_user.id, str(portfolio_id), db, cache)
-    if "error" in result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result["error"])
-    return result
+    return await get_rebalancing_strategy(current_user.id, str(portfolio_id), db, cache)
