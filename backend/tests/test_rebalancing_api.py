@@ -145,32 +145,32 @@ class TestRebalancingAnalyze:
                     return_value=AsyncMock(get=AsyncMock(return_value=None)),
                 ),
                 patch(
-                    "app.api.v1.rebalancing.build_portfolio_overview",
+                    "app.services.rebalancing.portfolio_analysis_service.build_portfolio_overview",
                     new_callable=AsyncMock,
                     return_value=overview,
                 ),
                 patch(
-                    "app.api.v1.rebalancing.get_ticker_dividend_summary",
+                    "app.services.rebalancing.portfolio_analysis_service.get_ticker_dividend_summary",
                     new_callable=AsyncMock,
                     return_value=[],
                 ) as mock_dividend_summary,
                 patch(
-                    "app.api.v1.rebalancing.collect_dividend_map",
+                    "app.services.rebalancing.portfolio_analysis_service.collect_dividend_map",
                     new_callable=AsyncMock,
                     return_value={},
                 ),
                 patch(
-                    "app.api.v1.rebalancing.get_historical_returns",
+                    "app.services.rebalancing.portfolio_analysis_service.get_historical_returns",
                     new_callable=AsyncMock,
                     return_value={},
                 ),
                 patch(
-                    "app.api.v1.rebalancing.enrich_overview_with_prices",
+                    "app.services.rebalancing.portfolio_analysis_service.enrich_overview_with_prices",
                     new_callable=AsyncMock,
                     return_value=overview,
                 ),
                 patch(
-                    "app.api.v1.rebalancing.get_settings_row",
+                    "app.services.rebalancing.portfolio_analysis_service.get_settings_row",
                     new_callable=AsyncMock,
                     return_value=None,
                 ),

@@ -121,7 +121,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 **포트폴리오·자산 집계 (`portfolio/`)**
 - `asset_aggregator.py` — 대시보드 집계, XIRR·연환산·벤치마크, 월별 추이(`get_monthly_trend`)
 - `portfolio_service.py` — overview 집계. 부분집합 총자산 반복 계산은 `prefetch_accounts_snapshot_positions()`/`compute_total_assets_krw()`로 1회 조회 재사용
-- `portfolio_history_service.py` · `position_aggregator.py` · `returns_calculator.py`
+- `portfolio_crud_service.py`(포트폴리오 CRUD·연동 계좌 target_portfolio_id 동기화, 캐시 무효화는 라우터) · `portfolio_history_service.py` · `position_aggregator.py` · `returns_calculator.py`
 - `composition_calculator.py` — 자산 구성. `exclude_real_estate()`는 목표 진행률·필요수익률 등 "투자자산" 계산 전용(대시보드 총자산 표시엔 미적용)
 - `period_purchase_service.py` — 기간별 매수 수익률. 스냅샷 수량·평단 변화로 추정, 수기 BUY 기록 있으면 기록 우선. **해외는 `avg_price_usd`로 역산 후 그 스냅샷 `usd_rate`로 환산**(원화 평단은 매일 재환산돼 역산 불가). 기록 market과 브로커 포지션 market이 달라 `_position_key_aligner`로 정렬
 - 쿼리 헬퍼: `_position_queries.py`, `_portfolio_queries.py`
@@ -145,8 +145,9 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `order_cancel_service.py` — 실행 주문의 미체결분 취소(체결 조회 없이 요청, 증권사 거부=CANCEL_FAILED). **KIS 국내 취소는 주문 응답의 `KRX_FWDG_ORD_ORGNO`(`order_org_no`) 저장이 필수** — 없으면 취소 불가. 증권사 거부는 `BrokerOrderRejectedError`가 아니라 클라이언트의 `KisApiError`/`KiwoomApiError`로 먼저 온다. 취소 가능 판정(`cancel_block_reason`·활성 계좌 유형)은 `order_cancel_rules.py` — 실행 직후 결과·이력 상세·취소 요청이 같은 규칙을 쓴다. **토큰 발급은 DB commit을 하므로 주문 행 `FOR UPDATE` 전에** 받고 잠근 뒤 재확인
 - `krx_tick.py` — 국내 지정가 호가단위 보정(ETF·ETN 5원, 매수 내림·매도 올림)
 - `alert_check.py` — 드리프트 알림(10분 job). 복합신호 on/off는 **유저 단위**
+- `portfolio_analysis_service.py` — analyze 파이프라인(overview→배당·수익률→현재가 보강→분석→진단, 계좌범위·예수금별 캐시). 라우터는 소유 확인만
 - `drift_summary_service.py` — 이탈 요약(drift-summary·action-items 공유, 같은 세션이라 순차)
-- `strategy_service.py` · `alert_scope.py` · `alert_test.py` · `diagnosis_service.py`(설명 전용, alert 아님) · `overview_enrichment.py` · `_alert_queries.py`
+- `strategy_service.py` · `alert_scope.py`(계좌 범위 + 알림용 overview·분석 `load_alert_overview`·`analyze_alert_overview`) · `alert_test.py` · `diagnosis_service.py`(설명 전용, alert 아님) · `overview_enrichment.py` · `_alert_queries.py`
 - `broker_balance_service.py` — 3사 실시간 잔고. **주문 실행은 KIS/키움만**(토스 주문 API 미구현)
 
 **목표 역산 추천 (`goal/`)**
@@ -228,7 +229,7 @@ utils/
   kst.py              today_kst()/now_kst()/kst_day_start() — "오늘 보냈나" 비교는 kst_day_start
   pykrx_util.py       **pykrx 호출은 반드시 `with quiet_pykrx() as stock:` 안에서** — 동시 호출 시 프로세스 크래시(락 직렬화)
   naver_retry.py      Naver 모바일 API는 `naver_get_json` + `except NAVER_FAILURES` → `log_naver_failure`
-  currency.py · masking.py · inproc_lock.py(단일 프로세스 전제) · market_hours.py · metrics.py · pnl.py
+  currency.py · masking.py · inproc_lock.py(단일 프로세스 전제) · market_hours.py · metrics.py · pnl.py · numbers.py(opt_float — Numeric→float|None)
 limiter.py      slowapi. 키는 rate_limit_key(JWT sub / X-Forwarded-For 첫 hop — Vercel→Render 프록시라 client.host는 공용).
                 **인증 없이 상태를 바꾸거나 토큰을 받는 라우트는 ip_rate_limit_key + peer_rate_limit_key 두 데코레이터를 겹친다**(tests/test_rate_limit_key.py가 검사)
 enums.py        도메인 StrEnum — 매직 스트링 대신

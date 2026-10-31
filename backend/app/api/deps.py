@@ -1,11 +1,13 @@
 import uuid
-from typing import Annotated, Any
+from collections.abc import Sequence
+from typing import Annotated, Any, Protocol
 
 import structlog
 from fastapi import Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.interfaces import ORMOption
 
 from app.core.database import get_db
 from app.models.user import User
@@ -64,16 +66,24 @@ class PaginationParams(BaseModel):
 PaginationDep = Annotated[PaginationParams, Depends(PaginationParams)]
 
 
-async def get_owned_or_404[T](
+class _UserOwned(Protocol):
+    """id·user_id 컬럼을 가진 ORM 모델."""
+
+    id: Any
+    user_id: Any
+
+
+async def get_owned_or_404[T: _UserOwned](
     db: AsyncSession,
     model: type[T],
     resource_id: Any,
     user_id: uuid.UUID,
     detail: str = "찾을 수 없습니다",
+    options: Sequence[ORMOption] = (),
 ) -> T:
-    """user_id 소유 리소스를 조회하고 없으면 404를 raise한다."""
+    """user_id 소유 리소스를 조회하고 없으면 404를 raise한다. options로 관계 로드를 지정한다."""
     row: T | None = await db.scalar(
-        select(model).where(model.id == resource_id, model.user_id == user_id)  # type: ignore[attr-defined, arg-type]
+        select(model).where(model.id == resource_id, model.user_id == user_id).options(*options)
     )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)

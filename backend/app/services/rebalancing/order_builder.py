@@ -284,6 +284,20 @@ def _flatten_account_tax_types(ticker_account_map: dict[str, list]) -> dict[str,
     return result
 
 
+def build_alert_order_preview(alert: Any, drifting: list, ticker_account_map: dict[str, list] | None) -> list[Any]:
+    """알림 이메일의 매수/매도 수량 미리보기 — 알림 설정(전략·주문유형·매수 계좌)으로 주문을 만든다. 실행·저장 안 함."""
+    if not drifting:
+        return []
+    return build_rebalancing_orders(
+        drifting,
+        ticker_account_map or {},
+        getattr(alert, "strategy", "BUY_ONLY"),
+        getattr(alert, "order_type", "MARKET"),
+        str(alert.account_id) if alert.account_id else "",
+        alert_id=str(alert.id),
+    )
+
+
 def build_rebalancing_orders(
     drifting: list,
     ticker_account_map: dict[str, list],

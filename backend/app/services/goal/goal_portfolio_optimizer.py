@@ -7,7 +7,10 @@
 
 from __future__ import annotations
 
-_MAX_WEIGHT = 0.4  # 종목당 최대 비중 상한 (과도한 집중 방지) — 기본값, UserSettings.goal_max_weight_pct로 조정 가능
+from app.constants import DEFAULT_GOAL_MAX_WEIGHT_PCT
+
+# 종목당 최대 비중 상한 (과도한 집중 방지) — UserSettings.goal_max_weight_pct로 조정 가능
+_MAX_WEIGHT = DEFAULT_GOAL_MAX_WEIGHT_PCT / 100
 _MIN_RETURN_DAYS = 30
 _MIN_CANDIDATES = 2
 _RISK_TOLERANCE_FRONTIER_FRACTION = {"CONSERVATIVE": 0.0, "BALANCED": 0.4, "AGGRESSIVE": 0.8}

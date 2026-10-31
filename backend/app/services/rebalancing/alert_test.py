@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal, cast
+from typing import Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import RebalancingAlert
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing._alert_queries import alert_scope_filter, alert_with_recipient_stmt
-from app.services.rebalancing.alert_scope import resolve_effective_account_ids
-from app.services.rebalancing.order_builder import build_rebalancing_orders
+from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
+from app.services.rebalancing.order_builder import build_alert_order_preview
 from app.services.rebalancing.service import filter_drifting_items
 
 __all__ = ["send_test_rebalancing_alert"]
@@ -36,8 +36,6 @@ async def send_test_rebalancing_alert(
     """
     from app.services.alerts._dispatch import send_push_safely
     from app.services.notifications.email_service import send_rebalancing_alert
-    from app.services.portfolio.portfolio_service import build_portfolio_overview
-    from app.services.rebalancing.service import analyze_rebalancing
 
     result = await db.execute(
         alert_with_recipient_stmt().where(
@@ -54,28 +52,19 @@ async def send_test_rebalancing_alert(
     email = notification_email or user_email
     threshold = float(alert.threshold_pct)
 
-    effective_account_ids = resolve_effective_account_ids(alert, portfolio)
-
     items_to_show: list = []
     drifting: list = []
     ticker_account_map: dict[str, list] = {}
     try:
-        overview = await build_portfolio_overview(user_id, db, account_ids=effective_account_ids, cache=cache)
-        analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+        overview = await load_alert_overview(alert, portfolio, db, cache)
+        analysis = analyze_alert_overview(portfolio, overview)
         drifting = filter_drifting_items(analysis.items, threshold)
         items_to_show = analysis.items
         ticker_account_map = analysis.ticker_account_map
     except Exception as exc:
         logger.error("test_rebalancing_alert_analysis_failed", portfolio_id=str(portfolio_id), error=str(exc))
 
-    order_preview_items: list = []
-    if drifting:
-        strategy = getattr(alert, "strategy", "BUY_ONLY")
-        order_type = cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
-        buy_account_id = str(alert.account_id) if alert.account_id else ""
-        order_preview_items = build_rebalancing_orders(
-            drifting, ticker_account_map, strategy, order_type, buy_account_id, alert_id=str(alert.id)
-        )
+    order_preview_items = build_alert_order_preview(alert, drifting, ticker_account_map)
 
     email_sent = False
     try:

@@ -31,6 +31,7 @@ from app.constants import (
     CASH_EQUIVALENT_MARKET,
     CASH_EQUIVALENT_NAME,
     CASH_EQUIVALENT_TICKER,
+    DEFAULT_GOAL_CAGR_LOOKBACK_YEARS,
     DOMESTIC_MARKETS,
 )
 from app.schemas.rebalancing import (
@@ -65,7 +66,7 @@ from app.utils.inproc_lock import single_flight_fetch
 logger = structlog.get_logger()
 
 _DIVIDEND_FETCH_CONCURRENCY = 8
-_DEFAULT_CAGR_LOOKBACK_YEARS = 10
+_DEFAULT_CAGR_LOOKBACK_YEARS = DEFAULT_GOAL_CAGR_LOOKBACK_YEARS
 
 _NON_BINDING_RETURN_FLOOR = -50.0
 """기간별/연령대별 추천은 목표 역산이 아니므로 required_return_pct 하한 제약을 사실상 무효화한다

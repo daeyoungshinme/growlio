@@ -11,14 +11,13 @@ import json
 import uuid
 
 import structlog
-from sqlalchemy import bindparam, select, text
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
+from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.core.cache_store import get_cache_store
 from app.core.config import settings
-from app.models.asset import AssetAccount, AssetSnapshot
-from app.services.accounts._snapshot_queries import latest_snapshot_subquery
+from app.services.accounts._snapshot_queries import latest_snapshot_rows
 from app.services.accounts.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key
 from app.services.dividend.calculator import calculate_position_dividend
@@ -46,22 +45,9 @@ async def _collect_positions(
 
     account_ids 지정 시 해당 계좌들만 집계(미지정 시 전체 계좌 통합).
     """
-    subq = latest_snapshot_subquery(user_id=user_id)
-    snap_date_match = (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date)
-    conditions = [
-        AssetAccount.is_active == True,
-        AssetAccount.asset_type.like("STOCK%"),
-    ]
-    if account_ids:
-        conditions.append(AssetAccount.id.in_(account_ids))
-    result = await db.execute(
-        select(AssetSnapshot, AssetAccount)
-        .options(selectinload(AssetSnapshot.position_items))
-        .join(subq, snap_date_match)
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(*conditions)
+    rows = await latest_snapshot_rows(
+        db, user_id, account_ids=account_ids, asset_types=POSITION_STOCK_ASSET_TYPES, with_positions=True
     )
-    rows = result.all()
 
     positions_map: dict[tuple[str, str], dict] = {}
     for snap, _acc in rows:
