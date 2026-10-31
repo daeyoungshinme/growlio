@@ -22,6 +22,17 @@ describe("ConfirmModal", () => {
     expect(screen.getByText("취소")).toBeInTheDocument();
   });
 
+  it("긴 children이 있어도 버튼은 스크롤 본문 밖에 고정된다", () => {
+    renderWithProviders(
+      <ConfirmModal message="메시지" onConfirm={vi.fn()} onCancel={vi.fn()}>
+        <p>긴 비교표</p>
+      </ConfirmModal>,
+    );
+    const scrollBody = screen.getByText("긴 비교표").closest(".overflow-y-auto");
+    expect(scrollBody).not.toBeNull();
+    expect(scrollBody).not.toContainElement(screen.getByText("확인"));
+  });
+
   it("confirmLabel/cancelLabel을 커스터마이즈할 수 있다", () => {
     renderWithProviders(
       <ConfirmModal

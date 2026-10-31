@@ -158,189 +158,194 @@ export default function TransactionModal({
         </button>
       </div>
 
-      {/* 추가 폼 */}
-      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 space-y-3 shrink-0">
-        {/* 유형 */}
-        <div className="flex gap-2">
-          {TX_TYPES.map((t) => (
-            <button
-              key={t}
-              onClick={() => handleTxTypeChange(t)}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 text-sm font-medium rounded-lg border transition-colors ${
-                form.transaction_type === t
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-300"
-              }`}
-            >
-              {TX_LABELS[t]}
-            </button>
-          ))}
-        </div>
+      {/* 폼과 목록을 한 스크롤 영역에 둔다 — 폼을 고정하면 키보드가 올라온 짧은 화면에서 폼 하단·추가 버튼에 닿지 못한다 (plans/102 A1) */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        {/* 추가 폼 */}
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 space-y-3">
+          {/* 유형 */}
+          <div className="flex gap-2">
+            {TX_TYPES.map((t) => (
+              <button
+                key={t}
+                onClick={() => handleTxTypeChange(t)}
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 text-sm font-medium rounded-lg border transition-colors ${
+                  form.transaction_type === t
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-300"
+                }`}
+              >
+                {TX_LABELS[t]}
+              </button>
+            ))}
+          </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {/* 금액 */}
-          <div>
-            {/* 모바일 통화 토글(36px)이 h-5에 갇혀 아래 입력칸을 덮지 않게 최소 높이만 둔다 (plans/99 C) */}
-            <div className="flex items-center justify-between min-h-5">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">금액 *</label>
-              {form.transaction_type === "DIVIDEND" && (
-                <div className="flex gap-0.5 text-xs">
-                  {CURRENCY_TYPES.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => handleCurrencySwitch(c)}
-                      aria-pressed={currency === c}
-                      className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-1.5 rounded transition-colors ${
-                        currency === c
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  ))}
+          <div className="grid grid-cols-2 gap-3">
+            {/* 금액 */}
+            <div>
+              {/* 모바일 통화 토글(36px)이 h-5에 갇혀 아래 입력칸을 덮지 않게 최소 높이만 둔다 (plans/99 C) */}
+              <div className="flex items-center justify-between min-h-5">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  금액 *
+                </label>
+                {form.transaction_type === "DIVIDEND" && (
+                  <div className="flex gap-0.5 text-xs">
+                    {CURRENCY_TYPES.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => handleCurrencySwitch(c)}
+                        aria-pressed={currency === c}
+                        className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-1.5 rounded transition-colors ${
+                          currency === c
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {currency === "USD" && form.transaction_type === "DIVIDEND" ? (
+                <div>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-sm text-gray-400 shrink-0">$</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      className={`w-full ${INPUT_SM}`}
+                      value={amountUsd || ""}
+                      onChange={(e) => handleUsdAmountChange(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      step="0.01"
+                      min={0}
+                    />
+                  </div>
+                  {formatUsdAsKrw(amountUsd, usdRate) && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
+                      {formatUsdAsKrw(amountUsd, usdRate)}
+                    </p>
+                  )}
                 </div>
-              )}
-            </div>
-            {currency === "USD" && form.transaction_type === "DIVIDEND" ? (
-              <div>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className="text-sm text-gray-400 shrink-0">$</span>
+              ) : (
+                <div>
                   <input
                     type="number"
                     inputMode="decimal"
-                    className={`w-full ${INPUT_SM}`}
-                    value={amountUsd || ""}
-                    onChange={(e) => handleUsdAmountChange(parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    step="0.01"
+                    className={`mt-1 w-full ${INPUT_SM}`}
+                    value={form.amount || ""}
+                    onChange={(e) => set("amount", Number(e.target.value))}
+                    placeholder="예: 500000"
                     min={0}
                   />
+                  {form.amount > 0 && (
+                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                      {fmtKrwPreview(form.amount)}
+                    </p>
+                  )}
                 </div>
-                {formatUsdAsKrw(amountUsd, usdRate) && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                    {formatUsdAsKrw(amountUsd, usdRate)}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  className={`mt-1 w-full ${INPUT_SM}`}
-                  value={form.amount || ""}
-                  onChange={(e) => set("amount", Number(e.target.value))}
-                  placeholder="예: 500000"
-                  min={0}
-                />
-                {form.amount > 0 && (
-                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
-                    {fmtKrwPreview(form.amount)}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-          {/* 날짜 */}
-          <div className="min-w-0">
-            <div className="flex items-center h-5">
-              <label
-                htmlFor="tx-date"
-                className="text-xs font-medium text-gray-600 dark:text-gray-400"
-              >
-                날짜 *
-              </label>
+              )}
             </div>
+            {/* 날짜 */}
+            <div className="min-w-0">
+              <div className="flex items-center h-5">
+                <label
+                  htmlFor="tx-date"
+                  className="text-xs font-medium text-gray-600 dark:text-gray-400"
+                >
+                  날짜 *
+                </label>
+              </div>
+              <input
+                id="tx-date"
+                type="date"
+                className={`mt-1 w-full ${INPUT_SM}`}
+                value={form.transaction_date}
+                onChange={(e) => set("transaction_date", e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* 종목 (배당 전용) */}
+          {form.transaction_type === "DIVIDEND" && (
+            <TransactionTickerField
+              set={set}
+              ticker={form.ticker ?? ""}
+              accountPositions={accountPositions}
+              tickerDirect={tickerDirect}
+              setTickerDirect={setTickerDirect}
+              tickerQuery={tickerQuery}
+              tickerSuggestions={tickerSuggestions}
+              tickerSearchLoading={tickerSearchLoading}
+              showTickerSuggestions={showTickerSuggestions}
+              setShowTickerSuggestions={setShowTickerSuggestions}
+              clearTickerSuggestions={clearTickerSuggestions}
+              onTickerQueryChange={handleTickerQueryChange}
+            />
+          )}
+
+          {/* 메모 */}
+          <div>
+            <label
+              htmlFor="tx-notes"
+              className="text-xs font-medium text-gray-600 dark:text-gray-400"
+            >
+              메모 (선택)
+            </label>
             <input
-              id="tx-date"
-              type="date"
+              id="tx-notes"
               className={`mt-1 w-full ${INPUT_SM}`}
-              value={form.transaction_date}
-              onChange={(e) => set("transaction_date", e.target.value)}
+              value={form.notes || ""}
+              onChange={(e) => set("notes", e.target.value)}
+              placeholder="메모 입력"
             />
           </div>
-        </div>
 
-        {/* 종목 (배당 전용) */}
-        {form.transaction_type === "DIVIDEND" && (
-          <TransactionTickerField
-            set={set}
-            ticker={form.ticker ?? ""}
-            accountPositions={accountPositions}
-            tickerDirect={tickerDirect}
-            setTickerDirect={setTickerDirect}
-            tickerQuery={tickerQuery}
-            tickerSuggestions={tickerSuggestions}
-            tickerSearchLoading={tickerSearchLoading}
-            showTickerSuggestions={showTickerSuggestions}
-            setShowTickerSuggestions={setShowTickerSuggestions}
-            clearTickerSuggestions={clearTickerSuggestions}
-            onTickerQueryChange={handleTickerQueryChange}
-          />
-        )}
-
-        {/* 메모 */}
-        <div>
-          <label
-            htmlFor="tx-notes"
-            className="text-xs font-medium text-gray-600 dark:text-gray-400"
+          {formError && (
+            <p role="alert" className="text-xs text-red-500 dark:text-red-400">
+              {formError}
+            </p>
+          )}
+          <button
+            onClick={handleSubmit}
+            disabled={editingTx ? updateMut.isPending : createMut.isPending}
+            aria-busy={editingTx ? updateMut.isPending : createMut.isPending}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} w-full py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
           >
-            메모 (선택)
-          </label>
-          <input
-            id="tx-notes"
-            className={`mt-1 w-full ${INPUT_SM}`}
-            value={form.notes || ""}
-            onChange={(e) => set("notes", e.target.value)}
-            placeholder="메모 입력"
-          />
+            {(editingTx ? updateMut.isPending : createMut.isPending)
+              ? "저장 중..."
+              : editingTx
+                ? "수정"
+                : "내역 추가"}
+          </button>
         </div>
 
-        {formError && (
-          <p role="alert" className="text-xs text-red-500 dark:text-red-400">
-            {formError}
-          </p>
+        {/* 예수금 반영 확인 팝업 */}
+        {depositPrompt && onDepositUpdate && (
+          <DepositReflectPrompt
+            depositKrw={depositKrw}
+            amount={depositPrompt.amount}
+            txType={depositPrompt.txType}
+            onApply={(next) => {
+              onDepositUpdate(next);
+              setDepositPrompt(null);
+            }}
+            onSkip={() => setDepositPrompt(null)}
+          />
         )}
-        <button
-          onClick={handleSubmit}
-          disabled={editingTx ? updateMut.isPending : createMut.isPending}
-          aria-busy={editingTx ? updateMut.isPending : createMut.isPending}
-          className="w-full py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          {(editingTx ? updateMut.isPending : createMut.isPending)
-            ? "저장 중..."
-            : editingTx
-              ? "수정"
-              : "내역 추가"}
-        </button>
-      </div>
 
-      {/* 예수금 반영 확인 팝업 */}
-      {depositPrompt && onDepositUpdate && (
-        <DepositReflectPrompt
-          depositKrw={depositKrw}
-          amount={depositPrompt.amount}
-          txType={depositPrompt.txType}
-          onApply={(next) => {
-            onDepositUpdate(next);
-            setDepositPrompt(null);
-          }}
-          onSkip={() => setDepositPrompt(null)}
-        />
-      )}
-
-      {/* 내역 목록 */}
-      <div className="overflow-y-auto flex-1">
-        <TransactionList
-          txList={txList}
-          isLoading={isLoading}
-          activeType={form.transaction_type}
-          isDeleting={deleteMut.isPending}
-          onEdit={startEdit}
-          onDelete={(id) => deleteMut.mutate(id)}
-        />
+        {/* 내역 목록 */}
+        <div>
+          <TransactionList
+            txList={txList}
+            isLoading={isLoading}
+            activeType={form.transaction_type}
+            isDeleting={deleteMut.isPending}
+            onEdit={startEdit}
+            onDelete={(id) => deleteMut.mutate(id)}
+          />
+        </div>
       </div>
     </Modal>
   );

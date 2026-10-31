@@ -10,7 +10,8 @@ import { RISK_TOLERANCE_OPTIONS } from "@/constants/goalRiskTolerance";
 import { invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalFooter } from "@/components/common/Modal";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { settingsQuery } from "@/api/queryOptions";
 
 const CAGR_LOOKBACK_OPTIONS = [3, 5, 10];
@@ -296,44 +297,43 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
             "연령대" 탭에서 해당 연령대에 맞는 투자성향과 주식비중으로 추천을 받을 수 있습니다.
           </p>
         </div>
-
-        <div className="flex justify-end gap-2 pt-1">
+      </div>
+      <ModalFooter>
+        <button
+          type="button"
+          onClick={onClose}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 sm:flex-none px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+        >
+          닫기
+        </button>
+        {isDirty && (
           <button
             type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            disabled={
+              saveMutation.isPending ||
+              !maxWeightValid ||
+              !shortTermFloorValid ||
+              !bondCeilingValid ||
+              !cashCeilingValid
+            }
+            onClick={() =>
+              saveMutation.mutate({
+                risk_tolerance: currentRiskTolerance,
+                max_weight_pct: currentMaxWeightPct,
+                cagr_lookback_years: currentCagrLookbackYears,
+                short_term_equity_floor_pct: currentShortTermEquityFloorPct,
+                age_group: currentAgeGroup,
+                bond_ceiling_pct: currentBondCeilingPct,
+                cash_ceiling_pct: currentCashCeilingPct,
+              })
+            }
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 sm:flex-none gap-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg transition-colors`}
           >
-            닫기
+            {saveMutation.isPending && <Loader2 size={12} className="animate-spin" />}
+            저장
           </button>
-          {isDirty && (
-            <button
-              type="button"
-              disabled={
-                saveMutation.isPending ||
-                !maxWeightValid ||
-                !shortTermFloorValid ||
-                !bondCeilingValid ||
-                !cashCeilingValid
-              }
-              onClick={() =>
-                saveMutation.mutate({
-                  risk_tolerance: currentRiskTolerance,
-                  max_weight_pct: currentMaxWeightPct,
-                  cagr_lookback_years: currentCagrLookbackYears,
-                  short_term_equity_floor_pct: currentShortTermEquityFloorPct,
-                  age_group: currentAgeGroup,
-                  bond_ceiling_pct: currentBondCeilingPct,
-                  cash_ceiling_pct: currentCashCeilingPct,
-                })
-              }
-              className="flex items-center gap-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              {saveMutation.isPending && <Loader2 size={12} className="animate-spin" />}
-              저장
-            </button>
-          )}
-        </div>
-      </div>
+        )}
+      </ModalFooter>
     </Modal>
   );
 }

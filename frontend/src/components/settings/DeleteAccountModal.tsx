@@ -8,7 +8,8 @@ import { PERSIST_CACHE_KEY } from "@/constants/queryConfig";
 import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { storageRemove } from "@/utils/safeStorage";
 
 interface Props {
@@ -41,7 +42,7 @@ export default function DeleteAccountModal({ onClose }: Props) {
 
   return (
     <Modal onClose={onClose} title="회원 탈퇴" size="sm">
-      <div className="p-4 space-y-4">
+      <ModalBody className="space-y-4">
         <div className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
           <TriangleAlert size={18} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
           <p>
@@ -64,26 +65,25 @@ export default function DeleteAccountModal({ onClose }: Props) {
             placeholder="비밀번호를 입력하세요"
           />
         </div>
-
-        <div className="flex justify-end gap-3 pt-1">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            disabled={password.length === 0 || deleteMutation.isPending}
-            onClick={() => deleteMutation.mutate()}
-            className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors"
-          >
-            {deleteMutation.isPending && <Loader2 size={14} className="animate-spin" />}
-            탈퇴하기
-          </button>
-        </div>
-      </div>
+      </ModalBody>
+      <ModalFooter>
+        <button
+          type="button"
+          onClick={onClose}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+        >
+          취소
+        </button>
+        <button
+          type="button"
+          disabled={password.length === 0 || deleteMutation.isPending}
+          onClick={() => deleteMutation.mutate()}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 gap-1 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors`}
+        >
+          {deleteMutation.isPending && <Loader2 size={14} className="animate-spin" />}
+          탈퇴하기
+        </button>
+      </ModalFooter>
     </Modal>
   );
 }

@@ -84,8 +84,8 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
         </span>
       </div>
 
-      {/* 팩터 변화 + 프론티어 변화 나란히 */}
-      <div className={`grid gap-4 ${hasFrontier ? "grid-cols-2" : "grid-cols-1"}`}>
+      {/* 팩터 변화 + 프론티어 변화 — 모바일은 세로로(한 행 고정폭 합 ~185px라 2열이면 넘친다), sm+ 나란히 */}
+      <div className={`grid gap-4 grid-cols-1 ${hasFrontier ? "sm:grid-cols-2" : ""}`}>
         {/* 팩터 변화 */}
         <div className="space-y-2">
           <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">팩터 변화</p>

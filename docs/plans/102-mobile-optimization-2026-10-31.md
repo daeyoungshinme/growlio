@@ -35,6 +35,21 @@
 **A3. 효율 분석 가로 넘침**
 - `rebalancing/RebalancingStrategyCard.tsx:88`: `grid-cols-2` → `grid-cols-1 sm:grid-cols-2`. 고정폭 합이 약 185px인데 칸은 약 150px뿐이다.
 
+**Phase A 결과 (2026-10-31, 완료)**
+- `ModalBody`를 신설했다.
+- `ModalBody`+`ModalFooter`로 전환: TradeFormModal(스크롤 불가 해소, `form=` 연결), BankAccount, RealEstate 2종, ChangePassword, DeleteAccount
+- 버튼만 `ModalFooter`로 이동(28→44px): GoalRecommendationOptions, GoalCandidateManager
+- 그 외 모달
+  - StockAccountModal: 자체 footer를 `ModalFooter`로 교체
+  - StockPositionsModal: 세로 배치를 유지하고 safe-area 패딩과 44px만 적용
+  - TransactionModal: 폼이 `shrink-0`이라 잘리던 문제 → 폼과 목록을 한 스크롤 영역으로 합침. 추가 버튼은 목록 위에 두는 게 자연스러워 footer로 옮기지 않음
+- **변경하지 않음**
+  - RebalancingAlertModal: 이미 `sticky bottom-0` 저장 바가 있다.
+  - 기존 `ModalFooter` 사용처 4곳의 본문 래퍼: 패딩(`pt-2 pb-6`)이 달라 `ModalBody`로 통일하면 시각이 바뀐다. 동작 문제가 없어 보류했다.
+- A2 ConfirmModal: 본문만 스크롤하고 버튼은 고정했다.
+- A3 효율 분석: 모바일 1열로 바꿨다.
+- 검증: 프론트 1915 tests(+2), lint·format·typecheck 클린. 390px 실브라우저는 미확인.
+
 ## Phase B — 터치에서 안 보이는 정보
 **B1. `common/InfoTip` 신설**
 - 탭하면 팝오버가 열리고, 바깥 탭이나 Esc로 닫힌다. 뷰포트 경계 안으로 클램프한다.

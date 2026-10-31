@@ -1,6 +1,7 @@
 import { Lock } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalFooter } from "@/components/common/Modal";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
@@ -410,21 +411,21 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+        <ModalFooter>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 sm:flex-none sm:ml-auto px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
           >
             취소
           </button>
           <button
             onClick={handleSubmit}
             disabled={isEdit ? editDisabled : createDisabled}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 sm:flex-none px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
           >
             {isLoading ? "저장 중..." : isEdit ? "저장" : "등록"}
           </button>
-        </div>
+        </ModalFooter>
       </Modal>
     </ErrorBoundary>
   );
