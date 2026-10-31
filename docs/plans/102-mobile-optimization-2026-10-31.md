@@ -35,6 +35,21 @@
 **A3. 효율 분석 가로 넘침**
 - `rebalancing/RebalancingStrategyCard.tsx:88`: `grid-cols-2` → `grid-cols-1 sm:grid-cols-2`. 고정폭 합이 약 185px인데 칸은 약 150px뿐이다.
 
+**Phase A 결과 (2026-10-31, 완료)**
+- `ModalBody`를 신설했다.
+- `ModalBody`+`ModalFooter`로 전환: TradeFormModal(스크롤 불가 해소, `form=` 연결), BankAccount, RealEstate 2종, ChangePassword, DeleteAccount
+- 버튼만 `ModalFooter`로 이동(28→44px): GoalRecommendationOptions, GoalCandidateManager
+- 그 외 모달
+  - StockAccountModal: 자체 footer를 `ModalFooter`로 교체
+  - StockPositionsModal: 세로 배치를 유지하고 safe-area 패딩과 44px만 적용
+  - TransactionModal: 폼이 `shrink-0`이라 잘리던 문제 → 폼과 목록을 한 스크롤 영역으로 합침. 추가 버튼은 목록 위에 두는 게 자연스러워 footer로 옮기지 않음
+- **변경하지 않음**
+  - RebalancingAlertModal: 이미 `sticky bottom-0` 저장 바가 있다.
+  - 기존 `ModalFooter` 사용처 4곳의 본문 래퍼: 패딩(`pt-2 pb-6`)이 달라 `ModalBody`로 통일하면 시각이 바뀐다. 동작 문제가 없어 보류했다.
+- A2 ConfirmModal: 본문만 스크롤하고 버튼은 고정했다.
+- A3 효율 분석: 모바일 1열로 바꿨다.
+- 검증: 프론트 1915 tests(+2), lint·format·typecheck 클린. 390px 실브라우저는 미확인.
+
 ## Phase B — 터치에서 안 보이는 정보
 **B1. `common/InfoTip` 신설**
 - 탭하면 팝오버가 열리고, 바깥 탭이나 Esc로 닫힌다. 뷰포트 경계 안으로 클램프한다.
@@ -49,6 +64,26 @@
 - 미니바: `PortfolioListSection.tsx:154,163` → InfoTip 또는 범례 텍스트
 - 버튼 설명: `UnifiedPortfolioEditor.tsx:295,308`, `PortfolioPage.tsx:269`, `AutomationStatusBar.tsx:41`, `AnalysisPanel.tsx:144`, `PortfolioListSection.tsx:217`(기준 지정 의미)
 - `TaxPositionTable.tsx:83`: 원시 `pos.market` → `marketLabel()`
+
+**Phase B 결과 (2026-10-31, 완료)**
+- B1 `common/InfoTip`을 신설했다. 탭으로 열리고, 바깥 탭·Esc·스크롤로 닫힌다. 뷰포트에 맞춰 위치를 조정하고, Esc는 캡처 단계에서 처리해 모달보다 먼저 닫힌다.
+  - `Tooltip.tsx` 사용처 3곳을 대체하고 Tooltip은 삭제했다.
+  - Sharpe(효율 분석·전술 백테스트)에 붙였다.
+  - 백테스트 모바일 카드에는 CAGR·MDD 한 줄 설명을 화면에 표시했다.
+- B2 처리 내역
+  - StockAccountCard: 모바일 2열 + 예수금 전폭으로 바꾸고, `fmtKrw` 전체 값을 표시해 truncate·title을 없앴다. 예수금 연필은 제거했다(C4 선반영).
+  - InvestmentSnapshotCard: `fmtKrw`로 바꿨다. DividendTab: truncate → break-keep.
+  - 비활성 사유
+    - 리밸런싱 실행(데스크톱): 기존 안내문에 합쳤다.
+    - 알림 "지금 계획 생성": 이미 화면 문구가 있어 title만 제거했다.
+    - 투자현황 수동 계좌 "갱신": `aria-disabled` + 누르면 토스트.
+  - 포트폴리오 카드: 미니바 구성을 상위 3개 글로 표시했다. 기준 지정 버튼은 상태별 aria-label로 바꿨다. 수정/삭제는 44px로 키웠다(C2 선반영).
+  - 분석 패널 실시간 재분석 아이콘에 "실시간" 라벨을 붙였다.
+  - TaxPositionTable: `marketLabel()`을 적용했다.
+- **유지**
+  - HeroSummaryCard 원 단위 title: 같은 값의 이중 표기라 U1 결정대로 둔다.
+  - UnifiedPortfolioEditor 버튼 2개의 title: 라벨만으로 의미가 전달되어 보조 설명으로 남긴다.
+- 검증: 프론트 1916 tests(Tooltip 테스트 5건 제거·InfoTip 6건 추가), lint·format·typecheck 클린.
 
 ## Phase C — 터치 타겟·규칙 스윕 (기계적)
 **C1. 인라인 `min-h-[44px]` 44건 → `constants/uiSizes.ts` 상수**

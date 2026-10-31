@@ -467,7 +467,7 @@ describe("PortfolioPage", () => {
     expect(toast).toHaveBeenCalledWith("동기화 완료", "success");
   });
 
-  it("수동(비연동) 계좌를 선택하면 갱신 버튼이 비활성화된다", async () => {
+  it("수동(비연동) 계좌를 선택하면 갱신 버튼은 비활성 표시되고, 누르면 사유를 토스트로 알린다", async () => {
     vi.mocked(fetchAccounts).mockResolvedValueOnce([
       { id: "acc-3", asset_type: "STOCK_OTHER", name: "타증권사 계좌", data_source: "MANUAL" },
     ] as never);
@@ -478,9 +478,10 @@ describe("PortfolioPage", () => {
     });
     renderPortfolio("?account=acc-3");
     const syncBtn = await screen.findByRole("button", { name: /선택 계좌 갱신/ });
-    expect(syncBtn).toBeDisabled();
+    expect(syncBtn).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(syncBtn);
     expect(syncAccount).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining("수동 계좌"), "info");
   });
 
   it("동기화 시작 요청이 실패하면 에러 토스트를 표시한다", async () => {

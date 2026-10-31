@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, fireEvent, getAllByRole } from "@testing-library/react";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 
 afterEach(() => {
   document.body.style.overflow = "";
@@ -15,6 +15,24 @@ describe("Modal", () => {
     );
     expect(getByText("테스트 모달")).toBeTruthy();
     expect(getByText("내용입니다")).toBeTruthy();
+  });
+
+  it("ModalBody는 스크롤 영역이고 ModalFooter는 그 밖에 고정된다", () => {
+    const { getByText } = render(
+      <Modal onClose={vi.fn()} title="폼">
+        <ModalBody className="space-y-4">
+          <p>본문</p>
+        </ModalBody>
+        <ModalFooter>
+          <button>저장</button>
+        </ModalFooter>
+      </Modal>,
+    );
+    const body = getByText("본문").parentElement!;
+    expect(body.className).toContain("overflow-y-auto");
+    expect(body.className).toContain("min-h-0");
+    expect(body.className).toContain("space-y-4");
+    expect(body).not.toContainElement(getByText("저장"));
   });
 
   it("Tab 키로 포커스가 마지막 요소에서 첫 번째로 순환한다", () => {

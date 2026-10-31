@@ -180,7 +180,7 @@ export default function DividendTab({
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-tight break-keep">
               예상 연간 배당금
             </p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600 truncate">
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600 break-keep">
               {totalEstimated > 0 ? `${fmtKrwShort(totalEstimated)}원` : "—"}
             </p>
             {totalEstimated > 0 && overallDividendYield != null ? (
@@ -197,7 +197,7 @@ export default function DividendTab({
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-tight break-keep">
               올해 수령 배당금
             </p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50 truncate">
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50 break-keep">
               {received > 0 ? `${fmtKrwShort(received)}원` : "—"}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -208,7 +208,7 @@ export default function DividendTab({
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-tight break-keep">
               월평균 예상 배당금
             </p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600 truncate">
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600 break-keep">
               {estimatedMonthly > 0 ? `${fmtKrwShort(estimatedMonthly)}원` : "—"}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">연간 예상 배당금 ÷ 12</p>

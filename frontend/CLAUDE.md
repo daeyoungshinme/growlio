@@ -69,7 +69,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 
 디렉토리: assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings, tax. 최상위 `ErrorBoundary.tsx`, `Toaster.tsx`(`growlio:toast` 이벤트 구독).
 
-**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 오버플로우 메뉴 — 아이콘+라벨 함께 렌더, 모바일 `title` 미동작 우회), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalFooter` — **입력 폼 모달의 저장 버튼은 여기에**, 본문 끝이면 모바일 키보드에 가려짐), `OfflineBanner`, `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(의존성 없는 SVG 도넛 — 홈이 recharts 청크 없이 그림), `Tabs`, `ToggleSwitch`(+`ToggleRow` — 행 전체가 label, 설정 목록은 이것), `Tooltip`, `TopLoadingBar`, `TreemapCell`
+**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 오버플로우 메뉴 — 아이콘+라벨 함께 렌더, 모바일 `title` 미동작 우회), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalBody`·`ModalFooter` — `Modal`은 스크롤을 두지 않아 **긴 본문은 `ModalBody`로 감싸야** 하단에 닿고, **입력 폼 모달의 저장 버튼은 `ModalFooter`에**(본문 끝이면 모바일 키보드에 가려짐, `<form id>` + 버튼 `form=`)), `OfflineBanner`, `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(의존성 없는 SVG 도넛 — 홈이 recharts 청크 없이 그림), `Tabs`, `ToggleSwitch`(+`ToggleRow` — 행 전체가 label, 설정 목록은 이것), `InfoTip`(탭으로 여는 설명 팝오버 — hover 전용 툴팁은 없앴다), `TopLoadingBar`, `TreemapCell`
 
 - `BiometricGuard` — Android 생체 인증 게이트. **UI 게이트일 뿐 보안 경계 아님**(캐시된 JWT로 API 호출은 막히지 않음).
 - `OfflineBanner` — PWA Workbox `StaleWhileRevalidate`(dashboard/portfolio-overview/accounts)와 함께 오프라인 안내.
@@ -279,7 +279,7 @@ _기타_
 - 이미 44px로 정착된 삭제 아이콘 버튼(`StockAccountCard`·`BankAccountCard`·`PortfolioItemRow`)은 개별 화면에서 축소 금지.
 - 금융 기록 삭제·실주문/실계획 생성 등 되돌릴 수 없는 동작은 `ConfirmModal`(무엇이 일어나는지 문구 포함)을 거친다.
 - 하단 고정 요소는 `index.css`의 `--bottom-nav-h` 변수 사용(`bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))]`) — rem 하드코딩 금지.
-- `title` 속성은 터치에서 안 보인다 — 사용자가 알아야 할 정보는 화면 표시 또는 탭→토스트.
+- `title` 속성은 터치에서 안 보인다 — 사용자가 알아야 할 정보는 화면 표시, 용어 설명은 `InfoTip`, 비활성 사유는 탭→토스트.
 - 페이지 스크롤 안 `max-h-* overflow-y-auto` 중첩 스크롤 금지 → "N개 더 보기".
 - 음수 가능한 숫자 입력은 모바일 키패드에 마이너스가 없으므로 이익/손실 `SegmentedControl` + 절댓값 입력(`TaxPlannerSection` 참고).
 

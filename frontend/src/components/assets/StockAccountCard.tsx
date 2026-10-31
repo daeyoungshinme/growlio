@@ -3,7 +3,6 @@ import {
   ChartNoAxesColumn,
   ChevronDown,
   Loader2,
-  Pencil,
   Receipt,
   RefreshCw,
   Settings,
@@ -16,7 +15,7 @@ import {
 } from "@/api/assets";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useHaptic } from "@/hooks/useHaptic";
-import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime, fmtKrwShort, fmtUsd } from "@/utils/format";
+import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime, fmtUsd } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { isSyncableAccount } from "@/utils/accounts";
@@ -193,39 +192,25 @@ export default function StockAccountCard({
         </div>
       </div>
       {hasStats && (
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-3 gap-x-4 gap-y-2">
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
-            <p
-              className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5 truncate"
-              title={fmtKrw(stats.amount_krw)}
-            >
-              {fmtKrwShort(stats.amount_krw)}원
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5 break-keep">
+              {fmtKrw(stats.amount_krw)}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">평가손익</p>
-            <p
-              className={`text-sm font-semibold mt-0.5 truncate ${pnlColor(pnl)}`}
-              title={fmtKrw(pnl)}
-            >
+            <p className={`text-sm font-semibold mt-0.5 break-keep ${pnlColor(pnl)}`}>
               {pnl >= 0 ? "+" : ""}
-              {fmtKrwShort(pnl)}원
+              {fmtKrw(pnl)}
             </p>
             <p className={`text-xs font-medium ${pnlColor(pnl)}`}>({fmtPct(ret)})</p>
           </div>
-          <div>
-            {/* 연필을 값 칸이 아니라 라벨 옆에 둔다 — 44px 버튼이 약 100px 칸에서 금액을 잘라먹었다 (docs/plans/67) */}
-            <div className="flex items-center gap-0.5">
-              <p className="text-xs text-gray-500 dark:text-gray-400">예수금</p>
-              <button
-                onClick={() => onEdit(account)}
-                aria-label="예수금 수정"
-                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-3 -mr-2 p-1 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0`}
-              >
-                <Pencil size={12} />
-              </button>
-            </div>
+          {/* 모바일은 2열 + 예수금 전폭 — 3열(약 100px 칸)에서 금액이 잘려 전체 값이 title에만 있었다 (plans/102 B2).
+              예수금 수정은 헤더 ⚙(같은 onEdit)로 — 칸 안 연필은 중복이라 제거 */}
+          <div className="col-span-2 sm:col-span-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400">예수금</p>
             <div className="mt-0.5">
               <div className="min-w-0">
                 {(() => {
@@ -236,11 +221,8 @@ export default function StockAccountCard({
                   const total = krw + usdAsKrw;
                   return (
                     <>
-                      <p
-                        className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate"
-                        title={fmtKrw(hasUsd && usdRate ? total : krw)}
-                      >
-                        {fmtKrwShort(hasUsd && usdRate ? total : krw)}원
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 break-keep">
+                        {fmtKrw(hasUsd && usdRate ? total : krw)}
                       </p>
                       {hasUsd && (
                         <p className="text-xs text-gray-400 dark:text-gray-500">

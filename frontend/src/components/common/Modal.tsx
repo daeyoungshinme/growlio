@@ -73,6 +73,22 @@ export default function Modal({
   );
 }
 
+/** 모달 스크롤 본문 — `Modal`은 스크롤을 직접 두지 않으므로 내용이 긴 모달은 반드시 이걸로 감싼다.
+ * 감싸지 않으면 `max-h-[85dvh]`에 잘려 하단(저장 버튼)에 닿을 수 없다 (docs/plans/102 A1). */
+export function ModalBody({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 /** 모달 하단 고정 버튼 영역 — 스크롤 본문(`flex-1 overflow-y-auto`) 다음 형제로 둔다. 버튼이 본문 끝에 있으면
  * 모바일 키보드가 올라올 때 화면 밖으로 밀려 "저장"을 찾으려 스크롤해야 했다 (docs/plans/67 P2-4). */
 export function ModalFooter({ children }: { children: ReactNode }) {

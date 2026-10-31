@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { PortfolioMetrics } from "@/api/backtest";
 import { pnlColor, LOSS_COLOR, PIE_COLORS } from "@/utils/colors";
-import Tooltip from "@/components/common/Tooltip";
+import InfoTip from "@/components/common/InfoTip";
 
 interface Props {
   metrics: PortfolioMetrics[];
@@ -24,9 +24,9 @@ const HIGHLIGHT = "bg-blue-50 dark:bg-blue-950/40 rounded";
 
 function TooltipLabel({ label, tip }: { label: string; tip: string }) {
   return (
-    <Tooltip content={tip} position="top">
-      <span className="cursor-help underline decoration-dotted decoration-gray-400">{label}</span>
-    </Tooltip>
+    <InfoTip label={`${label} 설명`} content={tip}>
+      {label}
+    </InfoTip>
   );
 }
 
@@ -196,6 +196,9 @@ export default function BacktestMetricsTable({ metrics }: Props) {
       </div>
 
       {/* 용어 설명 — title 툴팁은 터치에서 안 보여 펼쳤을 때 화면에 적는다 (docs/plans/67) */}
+      <p className="sm:hidden mt-2 text-xs text-gray-500 dark:text-gray-400">
+        CAGR: 복리 기준 연평균 수익률 · MDD: 고점 대비 최대 하락폭
+      </p>
       {showAdvanced && (
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           Sharpe: 변동성 대비 초과 수익 · Sortino: 하락 변동성 대비 수익 (둘 다 높을수록 좋아요)

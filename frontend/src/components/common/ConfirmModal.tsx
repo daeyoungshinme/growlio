@@ -39,10 +39,11 @@ export default function ConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={msgId}
-        className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm max-h-[85dvh] overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6"
+        className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm max-h-[85dvh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start gap-3 mb-5">
+        {/* 본문만 스크롤하고 버튼은 고정 — 비교표 같은 긴 children이 확인 버튼을 화면 밖으로 밀지 않게 (plans/102 A2) */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex items-start gap-3 px-6 pt-6 pb-5">
           {danger && (
             <TriangleAlert size={20} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
           )}
@@ -53,7 +54,7 @@ export default function ConfirmModal({
             {children}
           </div>
         </div>
-        <div className="flex gap-4 justify-end">
+        <div className="shrink-0 flex gap-4 justify-end px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6">
           <button
             onClick={onCancel}
             className={`${TOUCH_TARGET_MIN} px-4 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}

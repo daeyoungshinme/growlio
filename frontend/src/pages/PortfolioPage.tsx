@@ -223,9 +223,12 @@ export default function PortfolioPage() {
   // 모바일은 좁은 헤더에 맞춰 짧은 라벨을 보이고, 접근 이름(aria-label)은 전체 문구를 유지한다.
   const syncAction = selectedAccount
     ? {
-        onClick: handleSyncSelected,
-        disabled: isSyncingSelected || !canSyncSelected,
-        title: canSyncSelected ? undefined : "수동 계좌는 갱신할 수 없습니다",
+        // 수동 계좌는 비활성 사유가 title로만 있어 터치에서 안 보였다 — 누르면 사유를 토스트로 (plans/102 B2)
+        onClick: canSyncSelected
+          ? handleSyncSelected
+          : () => toast("수동 계좌는 갱신할 수 없어요. 계좌관리에서 직접 수정해 주세요", "info"),
+        disabled: isSyncingSelected,
+        unavailable: !canSyncSelected,
         spinning: isSyncingSelected,
         label: isSyncingSelected ? "갱신 중..." : "선택 계좌 갱신",
         shortLabel: isSyncingSelected ? "갱신 중" : "갱신",
@@ -233,7 +236,7 @@ export default function PortfolioPage() {
     : {
         onClick: handleSyncAll,
         disabled: isSyncingAll,
-        title: undefined,
+        unavailable: false,
         spinning: isSyncingAll,
         label: isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신",
         shortLabel: isSyncingAll ? `${syncDone}/${syncTotal}` : "갱신",
@@ -266,9 +269,9 @@ export default function PortfolioPage() {
             <button
               onClick={syncAction.onClick}
               disabled={syncAction.disabled}
-              title={syncAction.title}
               aria-label={syncAction.label}
-              className={`${SYNC_BUTTON_CLASS} shrink-0`}
+              aria-disabled={syncAction.unavailable || undefined}
+              className={`${SYNC_BUTTON_CLASS} shrink-0 ${syncAction.unavailable ? "opacity-50" : ""}`}
             >
               <RefreshCw size={14} className={syncAction.spinning ? "animate-spin" : ""} />
               <span className="sm:hidden">{syncAction.shortLabel}</span>

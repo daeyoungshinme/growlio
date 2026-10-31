@@ -1,6 +1,8 @@
+import { useId } from "react";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
 import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS } from "@/api/assets";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export default function BankAccountModal({ initialAccount, onClose, onSubmit, isLoading }: Props) {
+  const formId = useId();
   const isEdit = !!initialAccount;
 
   const { form, set } = useForm<AssetAccountCreate>({
@@ -65,8 +68,8 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
       size="md"
       closeOnBackdrop
     >
-      <div className="overflow-y-auto flex-1 px-6 py-5">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <ModalBody>
+        <form id={formId} onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
               htmlFor="bank-name"
@@ -254,24 +257,25 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
               전체 자산 합계에 포함
             </label>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading || usdPending}
-              className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {isLoading ? "저장 중..." : isEdit ? "저장" : "추가"}
-            </button>
-          </div>
         </form>
-      </div>
+      </ModalBody>
+      <ModalFooter>
+        <button
+          type="button"
+          onClick={onClose}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          form={formId}
+          disabled={isLoading || usdPending}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+        >
+          {isLoading ? "저장 중..." : isEdit ? "저장" : "추가"}
+        </button>
+      </ModalFooter>
     </Modal>
   );
 }

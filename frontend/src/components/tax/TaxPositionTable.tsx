@@ -1,6 +1,7 @@
 import type { OverseasPositionDetail } from "@/api/tax";
 import { fmtKrw, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
+import { marketLabel } from "@/constants/markets";
 import { posKey } from "@/hooks/useTaxSimulation";
 
 interface Props {
@@ -74,7 +75,9 @@ export function TaxPositionTable({
                   <span className="font-medium text-sm text-gray-800 dark:text-gray-200">
                     {pos.ticker}
                   </span>
-                  <span className="text-gray-400 dark:text-gray-500 text-xs">{pos.market}</span>
+                  <span className="text-gray-400 dark:text-gray-500 text-xs">
+                    {marketLabel(pos.market)}
+                  </span>
                   {isWithinBudget && (
                     <span className="px-1 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded text-xs font-medium">
                       무세 실현 가능
@@ -156,7 +159,9 @@ export function TaxPositionTable({
                       <span className="font-medium text-gray-800 dark:text-gray-200">
                         {pos.ticker}
                       </span>
-                      <span className="text-gray-400 dark:text-gray-500 text-xs">{pos.market}</span>
+                      <span className="text-gray-400 dark:text-gray-500 text-xs">
+                        {marketLabel(pos.market)}
+                      </span>
                       {isWithinBudget && (
                         <span className="ml-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded text-xs font-medium">
                           무세 실현 가능

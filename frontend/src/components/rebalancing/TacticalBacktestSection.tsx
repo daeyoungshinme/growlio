@@ -17,6 +17,7 @@ import {
   toChartSeries,
 } from "./tacticalLabels";
 import { pnlColor } from "@/utils/colors";
+import InfoTip from "@/components/common/InfoTip";
 
 // recharts 청크는 카드를 펼쳐 결과가 왔을 때만 받는다
 const BacktestResultChart = lazy(() => import("@/components/backtest/BacktestResultChart"));
@@ -116,7 +117,14 @@ export default function TacticalBacktestSection({ portfolioId }: Props) {
                     <th className="py-1 font-medium">구분</th>
                     <th className="py-1 font-medium text-right">연평균</th>
                     <th className="py-1 font-medium text-right">최대낙폭</th>
-                    <th className="py-1 font-medium text-right">샤프</th>
+                    <th className="py-1 font-medium text-right">
+                      <InfoTip
+                        label="샤프 설명"
+                        content="변동성 1단위당 초과 수익률이에요. 높을수록 같은 위험으로 더 많이 벌었다는 뜻이에요."
+                      >
+                        샤프
+                      </InfoTip>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

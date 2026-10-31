@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { AssetAccount, AssetAccountCreate, RealEstateDetails } from "@/api/assets";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
@@ -17,6 +18,7 @@ interface EditModalProps {
 }
 
 export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: EditModalProps) {
+  const formId = useId();
   const re = account.real_estate_details;
   const [form, setForm] = useState({
     name: account.name,
@@ -53,8 +55,8 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
 
   return (
     <Modal onClose={onClose} title="부동산 수정" size="md" closeOnBackdrop>
-      <div className="overflow-y-auto flex-1 px-6 py-5">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <ModalBody>
+        <form id={formId} onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="re-edit-name" className={FORM_LABEL}>
               부동산 이름 *
@@ -204,24 +206,25 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
               </div>
             </div>
           )}
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {isLoading ? "저장 중..." : "수정"}
-            </button>
-          </div>
         </form>
-      </div>
+      </ModalBody>
+      <ModalFooter>
+        <button
+          type="button"
+          onClick={onClose}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          form={formId}
+          disabled={isLoading}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+        >
+          {isLoading ? "저장 중..." : "수정"}
+        </button>
+      </ModalFooter>
     </Modal>
   );
 }

@@ -19,7 +19,6 @@ import OfflineBanner from "@/components/common/OfflineBanner";
 import PageLoader from "@/components/common/PageLoader";
 import Tabs from "@/components/common/Tabs";
 import TreemapCell from "@/components/common/TreemapCell";
-import Tooltip from "@/components/common/Tooltip";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -309,29 +308,6 @@ describe("TreemapCell", () => {
     const textNodes = container.querySelectorAll("text");
     const hasName = Array.from(textNodes).some((t) => t.textContent?.includes("이름이매우길"));
     expect(hasName).toBe(true);
-  });
-});
-
-// ------- Tooltip -------
-describe("Tooltip", () => {
-  it("renders children and tooltip content", () => {
-    render(
-      <Tooltip content="도움말">
-        <button>hover me</button>
-      </Tooltip>,
-    );
-    expect(screen.getByText("hover me")).toBeDefined();
-    expect(screen.getByRole("tooltip")).toBeDefined();
-    expect(screen.getByText("도움말")).toBeDefined();
-  });
-
-  it("renders with position bottom", () => {
-    const { container } = render(
-      <Tooltip content="아래" position="bottom">
-        <span>target</span>
-      </Tooltip>,
-    );
-    expect(container.querySelector('[role="tooltip"]')).toBeDefined();
   });
 });
 

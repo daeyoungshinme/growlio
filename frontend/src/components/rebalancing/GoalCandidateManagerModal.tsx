@@ -17,7 +17,7 @@ import { formatTerPct, itemKey, overlapWarningFor } from "@/utils/etfOverlap";
 import { invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalFooter } from "@/components/common/Modal";
 import { useTimeout } from "@/hooks/useTimeout";
 import { settingsQuery } from "@/api/queryOptions";
 
@@ -251,28 +251,27 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
             </ul>
           )}
         </div>
-
-        <div className="flex justify-end gap-2">
+      </div>
+      <ModalFooter>
+        <button
+          type="button"
+          onClick={onClose}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 sm:flex-none px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+        >
+          닫기
+        </button>
+        {pendingCandidates !== null && (
           <button
             type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            disabled={saveMutation.isPending}
+            onClick={() => saveMutation.mutate(candidates)}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 sm:flex-none gap-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg transition-colors`}
           >
-            닫기
+            {saveMutation.isPending && <Loader2 size={12} className="animate-spin" />}
+            저장
           </button>
-          {pendingCandidates !== null && (
-            <button
-              type="button"
-              disabled={saveMutation.isPending}
-              onClick={() => saveMutation.mutate(candidates)}
-              className="flex items-center gap-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              {saveMutation.isPending && <Loader2 size={12} className="animate-spin" />}
-              저장
-            </button>
-          )}
-        </div>
-      </div>
+        )}
+      </ModalFooter>
     </Modal>
   );
 }
