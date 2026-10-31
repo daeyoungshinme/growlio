@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Prerequisites
 
-Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.13+, Node 22+, [uv](https://docs.astral.sh/uv/) 필수.
+Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.13+, Node 24(CI·이미지 기준 LTS, 22+에서도 동작), [uv](https://docs.astral.sh/uv/) 필수.
 
 > Android 빌드 시 추가 필요: JDK 21+, Android Studio (SDK 포함).
 
