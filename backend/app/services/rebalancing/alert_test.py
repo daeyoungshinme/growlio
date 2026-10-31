@@ -6,14 +6,11 @@ import uuid
 from typing import Any, Literal, cast
 
 import structlog
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.alert import RebalancingAlert
-from app.models.portfolio import Portfolio
-from app.models.user import User, UserSettings
 from app.services.alerts.alert_service import save_alert_history
+from app.services.rebalancing._alert_queries import alert_scope_filter, alert_with_recipient_stmt
 from app.services.rebalancing.alert_scope import resolve_effective_account_ids
 from app.services.rebalancing.order_builder import build_rebalancing_orders
 from app.services.rebalancing.service import filter_drifting_items
@@ -42,21 +39,11 @@ async def send_test_rebalancing_alert(
     from app.services.portfolio.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.service import analyze_rebalancing
 
-    account_filter = (
-        (RebalancingAlert.alert_scope == "PER_ACCOUNT") & (RebalancingAlert.account_id == account_id)
-        if account_id is not None
-        else RebalancingAlert.alert_scope == "AGGREGATE"
-    )
     result = await db.execute(
-        select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email, UserSettings.fcm_token)
-        .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
-        .join(User, User.id == RebalancingAlert.user_id)
-        .outerjoin(UserSettings, UserSettings.user_id == RebalancingAlert.user_id)
-        .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
-        .where(
+        alert_with_recipient_stmt().where(
             RebalancingAlert.portfolio_id == portfolio_id,
             RebalancingAlert.user_id == user_id,
-            account_filter,
+            alert_scope_filter(account_id),
         )
     )
     row = result.first()

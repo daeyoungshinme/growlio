@@ -9,17 +9,14 @@ from __future__ import annotations
 import uuid
 
 import structlog
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
 from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
-from app.models.portfolio import Portfolio
-from app.models.user import User, UserSettings
 from app.services.alerts.calculator import already_fired_today, is_auto_schedule_day
+from app.services.rebalancing._alert_queries import alert_with_recipient_stmt
 from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode, tactical_regime_for_gate
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
@@ -67,16 +64,9 @@ async def run_rebalancing_auto_execution() -> None:
 
 
 async def _load_auto_alert_rows(db: AsyncSession, alert_ids: list[uuid.UUID] | None = None) -> list:
-    stmt = (
-        select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email, UserSettings.fcm_token)
-        .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
-        .join(User, User.id == RebalancingAlert.user_id)
-        .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
-        .where(
-            RebalancingAlert.is_active == True,
-            RebalancingAlert.mode == "AUTO",
-        )
+    stmt = alert_with_recipient_stmt().where(
+        RebalancingAlert.is_active == True,
+        RebalancingAlert.mode == "AUTO",
     )
     if alert_ids is not None:
         stmt = stmt.where(RebalancingAlert.id.in_(alert_ids))

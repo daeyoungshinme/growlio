@@ -22,7 +22,8 @@ from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.schemas.rebalancing import ExecutionPlanOverride
-from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode, tactical_regime_for_gate
+from app.services.rebalancing._alert_queries import alert_scope_filter
+from app.services.rebalancing.order_builder import is_alert_blocked_by_market_gate
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
     PlanGenerationInProgress,
@@ -89,17 +90,12 @@ async def _load_alert_row(
             detail="계좌별 독립 설정 포트폴리오는 account_id를 지정해야 합니다",
         )
 
-    account_filter = (
-        (RebalancingAlert.alert_scope == "PER_ACCOUNT") & (RebalancingAlert.account_id == account_id)
-        if is_per_account
-        else RebalancingAlert.alert_scope == "AGGREGATE"
-    )
     alert_row = await db.scalar(
         select(RebalancingAlert).where(
             RebalancingAlert.portfolio_id == portfolio_id,
             RebalancingAlert.user_id == user_id,
             RebalancingAlert.is_active == True,
-            account_filter,
+            alert_scope_filter(account_id if is_per_account else None),
         )
     )
     if not alert_row or not alert_row.account_id:
@@ -146,20 +142,13 @@ async def quick_execute_plan(
     if await has_pending_plan_for_alert(alert_row.id, db):
         return QuickExecuteOutcome(QuickExecuteStatus.ALREADY_PENDING)
 
-    try:
-        composite_level, data_freshness = await get_confirmed_composite_level(cache, db)
-    except Exception as exc:
-        logger.warning("market_signal_fetch_failed_in_quick_execute", error=str(exc))
-        composite_level = "GREEN"
-        data_freshness = "STALE"
-
-    market_mode = getattr(alert_row, "market_condition_mode", "DISABLED")
-    tactical_regime = await tactical_regime_for_gate(alert_row, db)
-    if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness, tactical_regime):
+    # 조회 실패는 get_confirmed_composite_level이 (GREEN, STALE)로 흡수한다 — 게이트가 보수적으로 차단
+    composite_level, data_freshness = await get_confirmed_composite_level(cache, db)
+    if await is_alert_blocked_by_market_gate(alert_row, db, composite_level, data_freshness):
         return QuickExecuteOutcome(
             QuickExecuteStatus.MARKET_BLOCKED,
             composite_level=composite_level,
-            tactical_blocked=market_mode == "TACTICAL",
+            tactical_blocked=alert_row.market_condition_mode == "TACTICAL",
         )
 
     generated = await build_pending_plan_for_alert(
