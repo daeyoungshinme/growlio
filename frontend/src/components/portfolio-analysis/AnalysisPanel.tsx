@@ -141,10 +141,11 @@ export function AnalysisPanel({
             onClick={handleLiveAnalysis}
             disabled={analyzing}
             aria-label="실시간 잔고로 다시 분석"
-            title="실시간 잔고로 다시 분석"
-            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} flex-none justify-center px-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-40`}
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} flex-none justify-center gap-1 px-2 text-xs rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-40`}
           >
             {analyzing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {/* 아이콘만이면 터치에서 의미를 알 수 없다(title 미표시) — 짧은 라벨을 함께 (plans/102 B2) */}
+            <span aria-hidden="true">실시간</span>
           </button>
         )}
       </div>

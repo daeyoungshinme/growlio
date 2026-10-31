@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
-import { Info } from "lucide-react";
-import Tooltip from "@/components/common/Tooltip";
-import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import InfoTip from "@/components/common/InfoTip";
 import { fmtKrw, fmtKrwShort, pctOf } from "@/utils/format";
 import SegmentedControl from "./SegmentedControl";
 
@@ -76,14 +74,7 @@ export default function RegionAllocationView({ basis, onBasisChange, amounts, fa
       {/* 예시가 붙은 긴 설명은 툴팁으로 — 모바일에서 두 줄을 차지했다 */}
       <p className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
         {BASIS_HINT[basis].short}
-        <Tooltip content={BASIS_HINT[basis].detail} maxWidth="w-56">
-          <span
-            aria-label="기준 설명"
-            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} -my-2 text-gray-400 dark:text-gray-500 rounded`}
-          >
-            <Info size={14} aria-hidden="true" />
-          </span>
-        </Tooltip>
+        <InfoTip label="기준 설명" content={BASIS_HINT[basis].detail} />
       </p>
 
       <div className="mt-3">

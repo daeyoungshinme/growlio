@@ -138,18 +138,13 @@ export default function RebalancingTable({
         <div className="flex items-center gap-2 ml-auto">
           {tradableAccounts.length === 0 && (
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              KIS·키움 증권계좌 연동 시 자동 주문 가능
+              자산 › 계좌관리에서 KIS·키움 증권계좌를 연동하면 주문할 수 있어요
             </span>
           )}
           <button
             onClick={() => setExecutionOpen(true)}
             disabled={tradableAccounts.length === 0}
             className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
-            title={
-              tradableAccounts.length === 0
-                ? "자산 › 계좌관리에서 KIS·키움 증권계좌를 연동하세요"
-                : ""
-            }
           >
             <Zap size={14} /> 리밸런싱 실행
           </button>

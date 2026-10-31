@@ -65,6 +65,26 @@
 - 버튼 설명: `UnifiedPortfolioEditor.tsx:295,308`, `PortfolioPage.tsx:269`, `AutomationStatusBar.tsx:41`, `AnalysisPanel.tsx:144`, `PortfolioListSection.tsx:217`(기준 지정 의미)
 - `TaxPositionTable.tsx:83`: 원시 `pos.market` → `marketLabel()`
 
+**Phase B 결과 (2026-10-31, 완료)**
+- B1 `common/InfoTip`을 신설했다. 탭으로 열리고, 바깥 탭·Esc·스크롤로 닫힌다. 뷰포트에 맞춰 위치를 조정하고, Esc는 캡처 단계에서 처리해 모달보다 먼저 닫힌다.
+  - `Tooltip.tsx` 사용처 3곳을 대체하고 Tooltip은 삭제했다.
+  - Sharpe(효율 분석·전술 백테스트)에 붙였다.
+  - 백테스트 모바일 카드에는 CAGR·MDD 한 줄 설명을 화면에 표시했다.
+- B2 처리 내역
+  - StockAccountCard: 모바일 2열 + 예수금 전폭으로 바꾸고, `fmtKrw` 전체 값을 표시해 truncate·title을 없앴다. 예수금 연필은 제거했다(C4 선반영).
+  - InvestmentSnapshotCard: `fmtKrw`로 바꿨다. DividendTab: truncate → break-keep.
+  - 비활성 사유
+    - 리밸런싱 실행(데스크톱): 기존 안내문에 합쳤다.
+    - 알림 "지금 계획 생성": 이미 화면 문구가 있어 title만 제거했다.
+    - 투자현황 수동 계좌 "갱신": `aria-disabled` + 누르면 토스트.
+  - 포트폴리오 카드: 미니바 구성을 상위 3개 글로 표시했다. 기준 지정 버튼은 상태별 aria-label로 바꿨다. 수정/삭제는 44px로 키웠다(C2 선반영).
+  - 분석 패널 실시간 재분석 아이콘에 "실시간" 라벨을 붙였다.
+  - TaxPositionTable: `marketLabel()`을 적용했다.
+- **유지**
+  - HeroSummaryCard 원 단위 title: 같은 값의 이중 표기라 U1 결정대로 둔다.
+  - UnifiedPortfolioEditor 버튼 2개의 title: 라벨만으로 의미가 전달되어 보조 설명으로 남긴다.
+- 검증: 프론트 1916 tests(Tooltip 테스트 5건 제거·InfoTip 6건 추가), lint·format·typecheck 클린.
+
 ## Phase C — 터치 타겟·규칙 스윕 (기계적)
 **C1. 인라인 `min-h-[44px]` 44건 → `constants/uiSizes.ts` 상수**
 - 대표 파일: `ActionItemsCard`, 인증 페이지 링크, `SettingsPage:265,273`, `InvestPlanPage`, `DividendPlanSection`, `RebalancingDividendSection`, `CollapsibleSection`, `ToggleSwitch`

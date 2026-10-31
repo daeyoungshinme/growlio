@@ -28,7 +28,10 @@ import type { PortfolioDriftSummary } from "@/api/rebalancing";
 import { DRIFT_STATUS_LABEL, getDriftStatus, getPortfolioTargetState } from "@/utils/portfolio";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import {
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+  TOUCH_TARGET_MIN_MOBILE_ONLY,
+} from "@/constants/uiSizes";
 import { PIE_COLORS } from "@/utils/colors";
 
 function SortablePortfolioItem({
@@ -151,20 +154,24 @@ const PortfolioCard = memo(function PortfolioCard({
               {top.map((item, ci) => (
                 <div
                   key={item.ticker}
-                  title={`${item.name ?? item.ticker}: ${item.weight.toFixed(1)}%`}
                   style={{
                     width: `${item.weight}%`,
                     backgroundColor: PIE_COLORS[ci],
                   }}
                 />
               ))}
-              {rest > 0 && (
-                <div
-                  title={`기타: ${rest.toFixed(1)}%`}
-                  style={{ width: `${rest}%`, backgroundColor: "#9CA3AF" }}
-                />
-              )}
+              {rest > 0 && <div style={{ width: `${rest}%`, backgroundColor: "#9CA3AF" }} />}
             </div>
+          )}
+          {/* 미니바 구성은 title로만 있어 터치에서 안 보였다 — 상위 3개를 글로 (plans/102 B2) */}
+          {top.length > 0 && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 truncate">
+              {top
+                .slice(0, 3)
+                .map((item) => `${item.name ?? item.ticker} ${item.weight.toFixed(0)}%`)
+                .join(" · ")}
+              {sorted.length > 3 && ` 외 ${sorted.length - 3}개`}
+            </p>
           )}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-0.5 flex-shrink-0 mt-0.5">
@@ -174,7 +181,7 @@ const PortfolioCard = memo(function PortfolioCard({
               onOpenEditor(p);
             }}
             aria-label="포트폴리오 수정"
-            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
           >
             <Pen size={14} />
           </button>
@@ -184,7 +191,7 @@ const PortfolioCard = memo(function PortfolioCard({
               onConfirmDelete(p.id);
             }}
             aria-label="포트폴리오 삭제"
-            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
           >
             <Trash2 size={14} />
           </button>
@@ -213,8 +220,7 @@ const PortfolioCard = memo(function PortfolioCard({
         <button
           onClick={(e) => onToggleTarget(e, p)}
           disabled={isTargetPending}
-          aria-label="기준 포트폴리오 지정"
-          title={tState !== "none" ? "기준 포트폴리오 해제" : "이 포트폴리오를 기준으로 지정"}
+          aria-label={tState !== "none" ? "기준 포트폴리오 해제" : "이 포트폴리오를 기준으로 지정"}
           className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
             tState === "full"
               ? "bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900"

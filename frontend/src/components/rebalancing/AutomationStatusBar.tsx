@@ -38,7 +38,6 @@ export default function AutomationStatusBar({ existingAlert, onOpenAlertModal, c
           e.stopPropagation();
           onOpenAlertModal();
         }}
-        title={isDcaAutoBuy ? "정기 적립식 자동매수 설정" : "리밸런싱 자동화 설정"}
         aria-label={isDcaAutoBuy ? "정기 적립식 자동매수 설정" : "리밸런싱 자동화 설정"}
         className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
           isDcaAutoBuy

@@ -3,6 +3,7 @@ import { TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { fetchRebalancingStrategy } from "@/api/risk";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import InfoTip from "@/components/common/InfoTip";
 
 const FACTOR_LABELS: Record<string, string> = {
   value: "가치",
@@ -165,7 +166,14 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
               </div>
               {frontier_changes.sharpe_improvement != null && (
                 <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-2.5 text-xs">
-                  <p className="text-gray-400 dark:text-gray-500 mb-0.5">Sharpe 비율</p>
+                  <p className="text-gray-400 dark:text-gray-500 mb-0.5">
+                    <InfoTip
+                      label="Sharpe 비율 설명"
+                      content="변동성 1단위당 초과 수익률이에요. 높을수록 같은 위험으로 더 많이 벌었다는 뜻이에요."
+                    >
+                      Sharpe 비율
+                    </InfoTip>
+                  </p>
                   <p
                     className={`font-semibold ${frontier_changes.sharpe_improvement ? "text-red-500" : "text-blue-500"}`}
                   >

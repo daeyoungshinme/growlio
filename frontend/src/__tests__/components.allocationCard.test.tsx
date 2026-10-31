@@ -143,6 +143,9 @@ describe("AllocationCard", () => {
       expect(await screen.findAllByText("70.0%")).toHaveLength(2); // 해외 7/10
       expect(screen.getAllByText("20.0%")).toHaveLength(2); // 국내
       expect(screen.getByText("판별 불가")).toBeInTheDocument();
+      // 기준 상세 설명은 ⓘ를 탭해야 보인다(InfoTip)
+      expect(screen.queryByText(/국내상장 미국 ETF/)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "기준 설명" }));
       expect(screen.getByText(/국내상장 미국 ETF/)).toBeInTheDocument();
     });
 

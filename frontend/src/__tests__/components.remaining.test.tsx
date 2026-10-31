@@ -231,13 +231,8 @@ describe("BacktestMetricsTable", () => {
 
   it("expands details on click", () => {
     renderWithProviders(<BacktestMetricsTable metrics={mockMetrics} />);
-    const expandBtn = screen.queryByRole("button");
-    if (expandBtn) {
-      fireEvent.click(expandBtn);
-      expect(document.body).toBeDefined();
-    } else {
-      expect(document.body).toBeDefined();
-    }
+    fireEvent.click(screen.getByRole("button", { name: /상세 지표 보기/ }));
+    expect(screen.getByRole("button", { name: "기본 지표만 보기" })).toBeInTheDocument();
   });
 
   it("renders with single metric", () => {

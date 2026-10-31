@@ -96,7 +96,6 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
         <button
           onClick={() => setConfirmingQuickExecute(true)}
           disabled={quickExecuteMut.isPending || form.isDirty}
-          title={form.isDirty ? "변경한 설정을 먼저 저장해 주세요" : undefined}
           className="w-full flex items-center justify-center gap-2 py-2 text-sm border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-950 disabled:opacity-50 transition-colors"
         >
           {quickExecuteMut.isPending ? (

@@ -1,9 +1,8 @@
-import { Info } from "lucide-react";
 import type { AssetAccountCreate } from "@/api/assets";
 import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS, ISA_TYPE_LABELS } from "@/api/assets";
 import { INPUT_SM } from "@/constants/inputStyles";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
-import Tooltip from "@/components/common/Tooltip";
+import InfoTip from "@/components/common/InfoTip";
 import type { useForm } from "@/hooks/useForm";
 
 const LABEL_CLASS = "text-sm font-medium text-gray-700 dark:text-gray-300";
@@ -47,9 +46,10 @@ export default function StockAccountTaxFields({ form, set, isOpen, onToggle }: P
           <div>
             <label htmlFor="stock-horizon" className={`flex items-center gap-1 ${LABEL_CLASS}`}>
               투자 기간
-              <Tooltip content="세제 유형과 함께 리밸런싱 탭의 기간별 목표 역산 추천이 어느 포트폴리오에 적용될지 매칭하는 데 사용됩니다.">
-                <Info size={12} className="text-gray-400 cursor-help" />
-              </Tooltip>
+              <InfoTip
+                label="투자 기간 설명"
+                content="세제 유형과 함께 리밸런싱 탭의 기간별 목표 역산 추천이 어느 포트폴리오에 적용될지 매칭하는 데 사용됩니다."
+              />
             </label>
             <select
               id="stock-horizon"

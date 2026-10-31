@@ -121,7 +121,7 @@ describe("StockAccountCard", () => {
     expect(screen.getByText("평가금액")).toBeInTheDocument();
   });
 
-  it("예수금 수정 버튼 클릭 시 onEdit을 계좌 정보와 함께 호출한다 (계좌 수정 모달로 위임)", () => {
+  it("예수금 칸엔 별도 수정 버튼이 없고 금액을 잘림 없이 표시한다 (수정은 ⚙ 계좌 수정)", () => {
     const stats = {
       amount_krw: 5000000,
       invested_krw: 4000000,
@@ -130,7 +130,9 @@ describe("StockAccountCard", () => {
       dividend_total: 100000,
     };
     renderWithProviders(<StockAccountCard {...defaultProps} stats={stats} />);
-    fireEvent.click(screen.getByRole("button", { name: "예수금 수정" }));
+    expect(screen.queryByRole("button", { name: "예수금 수정" })).toBeNull();
+    expect(screen.getByText("500만원")).not.toHaveClass("truncate");
+    fireEvent.click(screen.getByRole("button", { name: "계좌 수정" }));
     expect(defaultProps.onEdit).toHaveBeenCalledWith(mockAccount);
   });
 

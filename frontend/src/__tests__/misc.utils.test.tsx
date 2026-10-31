@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import Tooltip from "@/components/common/Tooltip";
 import { SideBadge, StatusBadge } from "@/components/rebalancing/RebalancingBadges";
 import { isNativePlatform, getApiBaseUrl } from "@/utils/platform";
 import { toast } from "@/utils/toast";
@@ -9,38 +8,6 @@ import { toast } from "@/utils/toast";
 vi.mock("@/hooks/useHaptic", () => ({
   triggerHaptic: vi.fn().mockResolvedValue(undefined),
 }));
-
-describe("Tooltip", () => {
-  it("콘텐츠와 children을 렌더링한다", () => {
-    renderWithProviders(
-      <Tooltip content="도움말 텍스트">
-        <button>버튼</button>
-      </Tooltip>,
-    );
-    expect(screen.getByText("버튼")).toBeInTheDocument();
-    expect(screen.getByRole("tooltip")).toBeInTheDocument();
-    expect(screen.getByText("도움말 텍스트")).toBeInTheDocument();
-  });
-
-  it("기본 position이 top이다", () => {
-    renderWithProviders(
-      <Tooltip content="툴팁">
-        <span>요소</span>
-      </Tooltip>,
-    );
-    const tooltip = screen.getByRole("tooltip");
-    expect(tooltip.className).toContain("bottom-full");
-  });
-
-  it("position=bottom이면 아래 위치 클래스가 적용된다", () => {
-    renderWithProviders(
-      <Tooltip content="툴팁" position="bottom">
-        <span>요소</span>
-      </Tooltip>,
-    );
-    expect(screen.getByRole("tooltip").className).toContain("top-full");
-  });
-});
 
 describe("RebalancingBadges", () => {
   it("SideBadge isBuy=true이면 '매수'를 표시한다", () => {

@@ -204,7 +204,9 @@ describe("PortfolioListSection - 기준 지정 재지정", () => {
   }
 
   function clickAssignButton(index: number) {
-    const buttons = screen.getAllByRole("button", { name: "기준 포트폴리오 지정" });
+    const buttons = screen.getAllByRole("button", {
+      name: /^(기준 포트폴리오 해제|이 포트폴리오를 기준으로 지정)$/,
+    });
     fireEvent.click(buttons[index]!);
   }
 
