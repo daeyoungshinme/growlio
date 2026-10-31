@@ -74,6 +74,23 @@ describe("authStore — login", () => {
     expect(state.userId).toBe("user-1");
   });
 
+  it("로그인 직후 /auth/me의 needs_password_reset을 store에 반영한다 (plans/101 A5)", async () => {
+    vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
+      data: {
+        user: { id: "user-3", email: "migrated@example.com" },
+        session: { access_token: "token" },
+      },
+      error: null,
+    } as never);
+    vi.mocked(api.post).mockResolvedValue({ data: {} });
+    vi.mocked(api.get).mockResolvedValue({ data: { needs_password_reset: true } });
+
+    const store = await getStore();
+    await store.login("migrated@example.com", "password123");
+
+    await vi.waitFor(() => expect(useAuthStore.getState().needsPasswordReset).toBe(true));
+  });
+
   it("로그인 실패 시 에러를 던진다", async () => {
     vi.mocked(mockSupabaseAuth.signInWithPassword).mockResolvedValue({
       data: { user: null, session: null },
