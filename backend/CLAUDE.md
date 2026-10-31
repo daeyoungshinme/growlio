@@ -115,7 +115,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `asset_service.py` — 계좌별 sync + `sync_account_now`(assets `/sync` 전용)
 - `asset_credential_service.py` — 브로커 자격증명 검증·삭제
 - `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). `sync_accounts`(세마포어 3)는 `jobs/asset_sync`도 재사용. 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 브로커 응답 대기 중 커넥션 점유로 풀 고갈 방지. 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
-- `snapshot_service.py` — 스냅샷 upsert·포지션 sync 헬퍼
+- `snapshot_service.py` — 스냅샷 upsert·포지션 sync 헬퍼. 수동 계좌 예수금 변경 → 오늘 스냅샷 재작성은 `write_manual_deposit_snapshot`(포지션 복사 포함 — 빠뜨리면 오늘 스냅샷에서 보유종목이 사라진다)
 - 쿼리 헬퍼: `_snapshot_queries.py`(최신 스냅샷 서브쿼리), `_account_queries.py`(활성 계좌 — `active_accounts_stmt()`/`active_broker_accounts_stmt()`)
 
 **포트폴리오·자산 집계 (`portfolio/`)**
@@ -194,7 +194,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
 - `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유. 해외 매수 시장 판정 `buy_market`은 fx_plan도 사용) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
 - `fx_plan_service.py` — 환율 1년 위치(백분위·이평 이격·1개월 ±1σ)와 해외 적립 필요 달러의 분할 환전 구간. **예측 아님**. 현재값은 실시간 캐시(없으면 1년 일봉 마지막 종가, `rate_is_live`), Yahoo `USDKRW=X` 1년 일봉은 통계용(6h 캐시). 구간 알림 등록은 프론트가 기존 환율 알림 API로
-- `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → pykrx → FDR → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_dividend_data`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
+- `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → FDR(+pykrx 펀더멘털) → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_dividend_data`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
 - `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR) · `_settings_queries.py`
 
@@ -226,13 +226,15 @@ utils/
   durable_state.py    Postgres AppState KV — 재시작에도 유지할 상태. 다중 프로세스 선점은 claim_durable()(get→set은 경합에 안전하지 않음)
   circuit_breaker.py  KIS/키움/토스 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s (재시작 시 초기화)
   kst.py              today_kst()/now_kst()/kst_day_start() — "오늘 보냈나" 비교는 kst_day_start
-  currency.py · masking.py · inproc_lock.py(단일 프로세스 전제) · market_hours.py · naver_retry.py · metrics.py · pnl.py
+  pykrx_util.py       **pykrx 호출은 반드시 `with quiet_pykrx() as stock:` 안에서** — 동시 호출 시 프로세스 크래시(락 직렬화)
+  naver_retry.py      Naver 모바일 API는 `naver_get_json` + `except NAVER_FAILURES` → `log_naver_failure`
+  currency.py · masking.py · inproc_lock.py(단일 프로세스 전제) · market_hours.py · metrics.py · pnl.py
 limiter.py      slowapi. 키는 rate_limit_key(JWT sub / X-Forwarded-For 첫 hop — Vercel→Render 프록시라 client.host는 공용).
                 **인증 없이 상태를 바꾸거나 토큰을 받는 라우트는 ip_rate_limit_key + peer_rate_limit_key 두 데코레이터를 겹친다**(tests/test_rate_limit_key.py가 검사)
 enums.py        도메인 StrEnum — 매직 스트링 대신
 constants.py    DOMESTIC/OVERSEAS_MARKETS, POSITION_STOCK_ASSET_TYPES, BROKER_API_ASSET_TYPES·BROKER_API_DATA_SOURCES(잔고 조회), ORDER_EXECUTABLE_ASSET_TYPES(주문·취소, 토스 제외), is_non_tradable(). **새 브로커는 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 7곳 누락)
 exceptions.py   AppError 계열(전역 핸들러가 변환) + SyncError 계열
-scheduler.py    init_scheduler()의 jobs 스펙 리스트
+scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 던진 잡은 리스너가 스택 없이 Sentry로 보낸다
 ```
 
 ### Jobs (`jobs/`, APScheduler)
