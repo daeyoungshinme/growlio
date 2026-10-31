@@ -32,16 +32,17 @@ from app.schemas.challenge import (
 )
 from app.services._settings_queries import get_or_create_settings
 from app.services.portfolio.composition_calculator import build_asset_totals, exclude_real_estate
+from app.utils.cache_invalidation import invalidate_user_caches
 from app.utils.cache_keys import (
     TTL_CHALLENGE_PROGRESS,
     CacheStoreType,
     challenge_progress_key,
     get_cached_json,
-    invalidate_user_caches,
     set_cached_json,
 )
 from app.utils.kst import month_key as _month_key
 from app.utils.kst import today_kst
+from app.utils.numbers import opt_float
 
 _NUDGE_DAY_OF_MONTH = 20  # 이 날짜 이후부터 "이번 달 아직 적립 안 함"을 네비 배지로 노출
 
@@ -145,7 +146,7 @@ def _current_return_pct(summary: dict[str, Any]) -> float | None:
         return float(xirr)
     if annual is not None:
         return float(annual)
-    return float(cumulative) if cumulative is not None else None
+    return opt_float(cumulative)
 
 
 async def compute_progress(
@@ -180,7 +181,7 @@ async def compute_progress(
 
         summary = await get_dashboard_summary(user_id, db, cache)
         cur = _current_return_pct(summary)
-        target_pct = float(challenge.target_pct) if challenge.target_pct is not None else None
+        target_pct = opt_float(challenge.target_pct)
         progress_pct = None
         if target_pct and target_pct > 0 and cur is not None:
             progress_pct = round(cur / target_pct * 100, 1)
@@ -201,8 +202,8 @@ def _serialize(challenge: InvestmentChallenge, progress: ChallengeProgress) -> C
         id=challenge.id,
         title=challenge.title,
         challenge_type=challenge.challenge_type,
-        target_amount=float(challenge.target_amount) if challenge.target_amount is not None else None,
-        target_pct=float(challenge.target_pct) if challenge.target_pct is not None else None,
+        target_amount=opt_float(challenge.target_amount),
+        target_pct=opt_float(challenge.target_pct),
         target_months=challenge.target_months,
         account_id=challenge.account_id,
         start_month=challenge.start_month,

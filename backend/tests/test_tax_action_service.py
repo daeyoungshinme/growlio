@@ -334,8 +334,8 @@ class TestGetTaxActionPlan:
                 new=AsyncMock(return_value=_TAX_SUMMARY),
             ),
             patch(
-                "app.services.tax.tax_action_service.get_overseas_positions_detail",
-                new=AsyncMock(return_value=[{"unrealized_pnl_krw": 1_000_000}]),
+                "app.services.tax.tax_action_service.load_tax_stock_rows",
+                new=AsyncMock(return_value=([], [{"unrealized_pnl_krw": 1_000_000}])),
             ),
         ):
             plan = await get_tax_action_plan(uuid.uuid4(), 2026, mock_db)
@@ -355,8 +355,8 @@ class TestGetTaxActionPlan:
             patch("app.services.tax.tax_action_service.today_kst", return_value=TODAY),
             patch("app.services.tax.tax_action_service.get_tax_summary", new=summary_mock),
             patch(
-                "app.services.tax.tax_action_service.get_overseas_positions_detail",
-                new=AsyncMock(return_value=[{"unrealized_pnl_krw": 1_000_000}]),
+                "app.services.tax.tax_action_service.load_tax_stock_rows",
+                new=AsyncMock(return_value=([], [{"unrealized_pnl_krw": 1_000_000}])),
             ),
         ):
             plan = await get_tax_action_plan(uuid.uuid4(), 2026, mock_db)
@@ -366,21 +366,22 @@ class TestGetTaxActionPlan:
 
     @pytest.mark.asyncio
     async def test_overseas_positions_loaded_once_and_shared(self, mock_db, realized_mock):
-        """해외 포지션은 한 번만 읽어 실현손익·세금 요약에 그대로 넘긴다 (docs/plans/39 N1)."""
+        """스냅샷은 한 번만 읽어 실현손익(포지션)·세금 요약(행)에 그대로 넘긴다 (docs/plans/39 N1·105 E)."""
         mock_db.execute = AsyncMock(side_effect=[_result(scalar=None), _result(rows=[("GENERAL",)])])
         positions = [{"unrealized_pnl_krw": 1_000_000}]
-        positions_mock = AsyncMock(return_value=positions)
+        rows: list = []
+        positions_mock = AsyncMock(return_value=(rows, positions))
         summary_mock = AsyncMock(return_value=_TAX_SUMMARY)
         with (
             patch("app.services.tax.tax_action_service.today_kst", return_value=TODAY),
             patch("app.services.tax.tax_action_service.get_tax_summary", new=summary_mock),
-            patch("app.services.tax.tax_action_service.get_overseas_positions_detail", new=positions_mock),
+            patch("app.services.tax.tax_action_service.load_tax_stock_rows", new=positions_mock),
         ):
             await get_tax_action_plan(uuid.uuid4(), 2026, mock_db)
 
         positions_mock.assert_awaited_once()
         assert realized_mock.call_args.kwargs["overseas_positions"] is positions
-        assert summary_mock.call_args.kwargs["overseas_positions"] is positions
+        assert summary_mock.call_args.kwargs["stock_rows"] is rows
 
     @pytest.mark.asyncio
     async def test_empty_when_nothing_actionable(self, mock_db):
@@ -390,10 +391,7 @@ class TestGetTaxActionPlan:
                 "app.services.tax.tax_action_service.get_tax_summary",
                 new=AsyncMock(return_value=_TAX_SUMMARY),
             ),
-            patch(
-                "app.services.tax.tax_action_service.get_overseas_positions_detail",
-                new=AsyncMock(return_value=[]),
-            ),
+            patch("app.services.tax.tax_action_service.load_tax_stock_rows", new=AsyncMock(return_value=([], []))),
         ):
             plan = await get_tax_action_plan(uuid.uuid4(), 2026, mock_db)
 

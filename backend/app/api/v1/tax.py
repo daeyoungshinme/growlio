@@ -13,7 +13,7 @@ from app.services.tax.isa_service import get_isa_status_summary
 from app.services.tax.overseas_realized_service import get_overseas_realized_summary
 from app.services.tax.pension_contribution_service import calc_pension_contribution_status
 from app.services.tax.tax_action_service import get_tax_action_plan
-from app.services.tax.tax_service import get_overseas_positions_detail, get_tax_summary
+from app.services.tax.tax_service import get_overseas_positions_detail, get_tax_summary, load_tax_stock_rows
 from app.utils.cache_keys import TTL_TAX_OVERSEAS, get_cached_json, set_cached_json, tax_overseas_key
 from app.utils.kst import today_kst
 
@@ -57,7 +57,7 @@ async def tax_summary(
     target_year = year if year is not None else current_year
     if target_year < 2000 or target_year > current_year + 1:
         raise HTTPException(status_code=400, detail="유효하지 않은 연도입니다.")
-    positions = await get_overseas_positions_detail(current_user.id, db, account_id)
+    rows, positions = await load_tax_stock_rows(current_user.id, db, account_id)
     realized_krw: float | None = None
     if target_year <= current_year:
         realized = await get_overseas_realized_summary(
@@ -65,7 +65,7 @@ async def tax_summary(
         )
         realized_krw = realized["realized_gain_krw"]
     return await get_tax_summary(
-        current_user.id, target_year, db, account_id, overseas_realized_krw=realized_krw, overseas_positions=positions
+        current_user.id, target_year, db, account_id, overseas_realized_krw=realized_krw, stock_rows=rows
     )
 
 

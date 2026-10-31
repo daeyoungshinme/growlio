@@ -7,6 +7,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.utils.cache_invalidation import (
+    invalidate_asset_account_caches,
+    invalidate_rebalancing_strategy_cache,
+    invalidate_user_caches,
+)
 from app.utils.cache_keys import (
     alloc_history_key,
     backtest_key,
@@ -20,9 +25,6 @@ from app.utils.cache_keys import (
     dividend_ticker_summary_key,
     economic_indicator_calendar_key,
     has_overseas_key,
-    invalidate_asset_account_caches,
-    invalidate_rebalancing_strategy_cache,
-    invalidate_user_caches,
     monthly_trend_key,
     portfolio_list_key,
     portfolio_overview_key,
@@ -158,7 +160,7 @@ class TestInvalidateRebalancingStrategyCache:
     async def test_analysis_invalidation_also_clears_strategy(self, override_settings):
         """plans/77 B3 — 포트폴리오 수정·전술 적용(분석 캐시 무효화 경로)이 전략 비교 캐시도 지운다."""
         from app.core.cache_store import CacheStore
-        from app.utils.cache_keys import invalidate_rebalancing_analysis_cache
+        from app.utils.cache_invalidation import invalidate_rebalancing_analysis_cache
 
         uid = uuid.uuid4()
         cache = CacheStore()
@@ -176,11 +178,8 @@ class TestInvalidateRebalancingStrategyCache:
     async def test_analysis_invalidation_clears_target_factor_and_frontier(self, override_settings):
         """plans/95 A1 — 전략 재계산이 읽는 목표 팩터·프론티어 캐시가 남으면 옛 비중이 다시 조립된다."""
         from app.core.cache_store import CacheStore
-        from app.utils.cache_keys import (
-            efficient_frontier_key,
-            factor_analysis_portfolio_key,
-            invalidate_rebalancing_analysis_cache,
-        )
+        from app.utils.cache_invalidation import invalidate_rebalancing_analysis_cache
+        from app.utils.cache_keys import efficient_frontier_key, factor_analysis_portfolio_key
 
         uid = uuid.uuid4()
         cache = CacheStore()
@@ -204,7 +203,7 @@ class TestInvalidateDividendCaches:
 
     @pytest.mark.asyncio
     async def test_full_invalidation_by_default(self, override_settings):
-        from app.utils.cache_keys import invalidate_dividend_caches
+        from app.utils.cache_invalidation import invalidate_dividend_caches
 
         cache = AsyncMock()
         cache.scan = AsyncMock(return_value=(0, []))
@@ -216,7 +215,7 @@ class TestInvalidateDividendCaches:
 
     @pytest.mark.asyncio
     async def test_positions_unchanged_skips_by_ticker_cache(self, override_settings):
-        from app.utils.cache_keys import invalidate_dividend_caches
+        from app.utils.cache_invalidation import invalidate_dividend_caches
 
         cache = AsyncMock()
         cache.scan = AsyncMock(return_value=(0, []))
@@ -240,11 +239,11 @@ class TestInvalidateAssetAccountCachesGoalRecommendation:
     @pytest.mark.asyncio
     async def test_positions_changed_invalidates_goal_recommendation(self, override_settings):
         from app.core.cache_store import CacheStore
+        from app.utils.cache_invalidation import invalidate_asset_account_caches
         from app.utils.cache_keys import (
             get_goal_recommendation_generation,
             goal_recommendation_key,
             goal_recommendation_stale_key,
-            invalidate_asset_account_caches,
         )
 
         cache = CacheStore()
@@ -263,11 +262,8 @@ class TestInvalidateAssetAccountCachesGoalRecommendation:
     @pytest.mark.asyncio
     async def test_positions_unchanged_keeps_goal_recommendation(self, override_settings):
         from app.core.cache_store import CacheStore
-        from app.utils.cache_keys import (
-            get_goal_recommendation_generation,
-            goal_recommendation_key,
-            invalidate_asset_account_caches,
-        )
+        from app.utils.cache_invalidation import invalidate_asset_account_caches
+        from app.utils.cache_keys import get_goal_recommendation_generation, goal_recommendation_key
 
         cache = CacheStore()
         uid = uuid.uuid4()
@@ -307,6 +303,7 @@ class TestInvalidateGoalRecommendationCaches:
     async def test_settings_change_invalidates_stale_result_too(self, override_settings):
         """목표·후보·옵션 변경 후 stale 결과를 돌려주면 바뀌기 전 설정의 답이 보인다 — 함께 지운다."""
         from app.core.cache_store import CacheStore
+        from app.utils.cache_invalidation import invalidate_goal_recommendation_caches
         from app.utils.cache_keys import (
             get_goal_recommendation_generation,
             goal_recommendation_age_key,
@@ -315,7 +312,6 @@ class TestInvalidateGoalRecommendationCaches:
             goal_recommendation_horizon_stale_key,
             goal_recommendation_key,
             goal_recommendation_stale_key,
-            invalidate_goal_recommendation_caches,
         )
 
         cache = CacheStore()
@@ -340,11 +336,8 @@ class TestInvalidateGoalRecommendationCaches:
     async def test_invalidation_rotates_generation(self, override_settings):
         """계산 도중 무효화되면 끝난 옛 계산은 옛 세대 키에 쓴다 — 새 세대 조회에는 보이지 않아야 한다(plans/88)."""
         from app.core.cache_store import CacheStore
-        from app.utils.cache_keys import (
-            get_goal_recommendation_generation,
-            goal_recommendation_key,
-            invalidate_goal_recommendation_caches,
-        )
+        from app.utils.cache_invalidation import invalidate_goal_recommendation_caches
+        from app.utils.cache_keys import get_goal_recommendation_generation, goal_recommendation_key
 
         cache = CacheStore()
         uid = uuid.uuid4()
@@ -631,6 +624,7 @@ class TestInvalidationPatternsMatchBuilders:
 
     async def test_asset_account_invalidation_removes_every_user_scoped_key(self, override_settings):
         from app.core.cache_store import CacheStore
+        from app.utils import cache_invalidation as ci
         from app.utils import cache_keys as ck
 
         uid, pid = uuid.uuid4(), uuid.uuid4()
@@ -655,12 +649,13 @@ class TestInvalidationPatternsMatchBuilders:
         for k in keys:
             await store.setex(k, 3600, "1")
 
-        await ck.invalidate_asset_account_caches(store, uid, 2026)
+        await ci.invalidate_asset_account_caches(store, uid, 2026)
 
         assert [k for k in keys if await store.get(k) is not None] == []
 
     async def test_portfolio_analysis_invalidation_is_scoped_to_that_portfolio(self, override_settings):
         from app.core.cache_store import CacheStore
+        from app.utils import cache_invalidation as ci
         from app.utils import cache_keys as ck
 
         uid, pid, other = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
@@ -675,7 +670,7 @@ class TestInvalidationPatternsMatchBuilders:
         for k in [*target, kept]:
             await store.setex(k, 3600, "1")
 
-        await ck.invalidate_rebalancing_analysis_cache(store, uid, pid)
+        await ci.invalidate_rebalancing_analysis_cache(store, uid, pid)
 
         assert [k for k in target if await store.get(k) is not None] == []
         assert await store.get(kept) == "1"

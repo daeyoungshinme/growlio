@@ -19,15 +19,8 @@ from app.schemas.portfolio import (
 )
 from app.services.etf.index_exposure_service import get_index_group_suggestions
 from app.services.portfolio import portfolio_crud_service as crud
-from app.utils.cache_keys import (
-    TTL_PORTFOLIO_LIST,
-    get_cached_json,
-    insights_key,
-    invalidate_rebalancing_analysis_cache,
-    invalidate_user_caches,
-    portfolio_list_key,
-    set_cached_json,
-)
+from app.utils.cache_invalidation import invalidate_rebalancing_analysis_cache, invalidate_user_caches
+from app.utils.cache_keys import TTL_PORTFOLIO_LIST, get_cached_json, insights_key, portfolio_list_key, set_cached_json
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 

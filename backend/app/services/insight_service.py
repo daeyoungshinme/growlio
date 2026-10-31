@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.job_runner import report_handled_failure
 from app.services.portfolio.asset_aggregator import get_dashboard_summary
-from app.services.tax.tax_service import get_overseas_positions_detail, get_tax_summary
+from app.services.tax.tax_service import get_tax_summary, load_tax_stock_rows
 from app.utils.cache_keys import (
     TTL_INSIGHTS,
     TTL_MARKET_SIGNAL_DEGRADED,
@@ -268,11 +268,11 @@ async def _check_tax_loss_harvest(
 
     손실 수확 후보·절세액은 절세 탭·지금 할 일과 같은 `get_tax_summary`의 `harvesting_recommendations`를
     쓴다 — 따로 계산하면 기본공제·손익통산 기준이 달라 화면마다 절세액이 어긋났다(plans/90 C4)."""
-    positions = await get_overseas_positions_detail(user_id, db)
+    rows, positions = await load_tax_stock_rows(user_id, db)
     if not any(p["unrealized_pnl_krw"] < 0 for p in positions):
         return []
 
-    summary = await get_tax_summary(user_id, today_kst().year, db, overseas_positions=positions)
+    summary = await get_tax_summary(user_id, today_kst().year, db, stock_rows=rows)
     loss_positions = summary.get("harvesting_recommendations", [])
     tax_saved = sum(float(p["tax_saved_krw"]) for p in loss_positions)
 

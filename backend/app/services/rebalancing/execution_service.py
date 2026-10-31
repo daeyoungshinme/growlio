@@ -29,7 +29,7 @@ from app.services.rebalancing._kiwoom_order_executor import (
     _execute_kiwoom_sells_with_clamp,
 )
 from app.services.rebalancing.order_cancel_rules import active_account_asset_types, cancel_block_reason
-from app.utils.cache_keys import invalidate_rebalancing_analysis_cache
+from app.utils.cache_invalidation import invalidate_rebalancing_analysis_cache
 from app.utils.metrics import rebalancing_execution_count
 
 logger = structlog.get_logger()

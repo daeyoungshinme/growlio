@@ -20,6 +20,7 @@ from app.schemas.rebalancing import (
 from app.schemas.service_dtypes import DividendMapEntry, PositionMapEntry, ReturnsMapEntry
 from app.services.rebalancing._order_quantity_guard import floor_shares
 from app.services.rebalancing.group_expansion import ROLE_PRIMARY, allocate_group_trades
+from app.utils.numbers import opt_float
 
 logger = structlog.get_logger()
 
@@ -96,7 +97,7 @@ def _build_group_item(
                 target_value_krw=round(value, 0),
                 diff_krw=0.0,
                 shares_to_trade=0.0,
-                current_price_krw=float(effective_price) if effective_price is not None else None,
+                current_price_krw=opt_float(effective_price),
                 current_qty=qty,
                 target_qty=qty,
                 dividend_yield=div_yield,
@@ -331,7 +332,7 @@ def _build_target_items(
                 target_value_krw=round(target_value, 0),
                 diff_krw=round(diff_krw, 0),
                 shares_to_trade=shares,
-                current_price_krw=float(current_price) if current_price is not None else None,
+                current_price_krw=opt_float(current_price),
                 current_qty=current_qty,
                 target_qty=target_qty,
                 dividend_yield=div_yield,
@@ -383,7 +384,7 @@ def _build_untracked_items(
                 target_value_krw=0.0,
                 diff_krw=round(diff_u, 0),
                 shares_to_trade=shares_u,
-                current_price_krw=float(current_price_u) if current_price_u is not None else None,
+                current_price_krw=opt_float(current_price_u),
                 current_qty=current_qty_u,
                 target_qty=0.0,
                 dividend_yield=div_yield_u,

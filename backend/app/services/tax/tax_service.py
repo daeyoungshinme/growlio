@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import (
     COMPREHENSIVE_TAX_THRESHOLD_KRW,
+    DOMESTIC_MARKETS,
     OVERSEAS_MARKETS,
     POSITION_STOCK_ASSET_TYPES,
     TAX_DEFERRED_TAX_TYPES,
@@ -15,8 +16,6 @@ from app.constants import (
 from app.models.asset import AssetAccount, Transaction
 from app.services.accounts._snapshot_queries import latest_snapshot_rows
 from app.utils.kst import today_kst
-
-_DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}
 
 _DOMESTIC_LARGE_HOLDER_THRESHOLD = 1_000_000_000
 _GEUMT_EXCESS_THRESHOLD = 300_000_000  # 금투세 누진 구간 기준 3억
@@ -207,7 +206,7 @@ async def get_tax_summary(
     account_id: uuid.UUID | None = None,
     *,
     overseas_realized_krw: float | None = None,
-    overseas_positions: list[dict] | None = None,
+    stock_rows: list[Any] | None = None,
 ) -> dict[str, Any]:
     """연도별 세금 추정 요약. account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합).
 
@@ -215,8 +214,8 @@ async def get_tax_summary(
     - 해외 양도세: 올해 실현손익(`overseas_realized_krw`, 증권사 체결 기준 — 모르면 0) + 미실현 손익을
       연내 전부 실현한다고 가정한 추정치 (250만원 공제 후 22%). 실현손익은 브로커 API 호출이 필요해
       이 함수가 직접 조회하지 않고 호출부(api/v1/tax.py, tax_action_service)가 넘긴다.
-    - `overseas_positions`: 호출부가 이미 조회한 `get_overseas_positions_detail` 결과(같은 account_id 기준).
-      실현손익·절세 액션과 한 요청에서 스냅샷·포지션을 여러 번 읽지 않도록 넘겨받는다 — None이면 직접 조회.
+    - `stock_rows`: 호출부가 `load_tax_stock_rows`로 이미 읽은 최신 스냅샷 행(같은 account_id 기준).
+      실현손익·절세 액션과 한 요청에서 스냅샷·포지션을 여러 번 읽지 않도록 넘겨받는다 — None이면 직접 1회 조회.
     - 국내 양도세: 대주주 요건(10억) 초과 시 경고
     - 금융소득 종합과세 경계(2000만원) 경고 — 이자·배당 기준. 해외주식 양도차익은 양도소득(분류과세)이라
       금융소득에 합산하지 않는다(이전 구현은 해외 미실현 이익을 더해 경고를 과대 발생시켰음)
@@ -231,8 +230,9 @@ async def get_tax_summary(
     dividend_tax = dividend_income * rates["dividend"]
     interest_tax = interest_income * rates["interest"]
 
-    overseas_unrealized, domestic_stock_krw, domestic_unrealized, tax_deferred_value_krw = await _calc_stock_unrealized(
-        user_id, db, account_id
+    rows = stock_rows if stock_rows is not None else await _latest_stock_rows(user_id, db, account_id)
+    overseas_unrealized, domestic_stock_krw, domestic_unrealized, tax_deferred_value_krw = _stock_unrealized_from_rows(
+        rows
     )
     realized = overseas_realized_krw or 0.0
     overseas_gain_taxable = max(0.0, realized + overseas_unrealized - rates["overseas_deduction"])
@@ -252,11 +252,7 @@ async def get_tax_summary(
     comprehensive_tax_warning = total_financial_income >= COMPREHENSIVE_TAX_THRESHOLD_KRW
     comprehensive_tax_remaining_krw = max(0.0, COMPREHENSIVE_TAX_THRESHOLD_KRW - total_financial_income)
 
-    positions = (
-        overseas_positions
-        if overseas_positions is not None
-        else await get_overseas_positions_detail(user_id, db, account_id)
-    )
+    positions = _overseas_positions_from_rows(rows)
     harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable, rates)
     geumt_simulation = _simulate_geumt_tax(overseas_unrealized, domestic_unrealized, rates)
     health_insurance_estimate = _calc_health_insurance_estimate(total_financial_income)
@@ -317,8 +313,19 @@ async def get_overseas_positions_detail(
 
     최신 스냅샷 기준. 수익·손실 종목 모두 포함. account_id 지정 시 해당 계좌만 집계.
     """
-    rows = await _latest_stock_rows(user_id, db, account_id)
+    return _overseas_positions_from_rows(await _latest_stock_rows(user_id, db, account_id))
 
+
+async def load_tax_stock_rows(
+    user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None = None
+) -> tuple[list[Any], list[dict]]:
+    """최신 스냅샷 행과 그 행에서 만든 해외 포지션 목록 — 세금 요약(`stock_rows=`)과 실현손익
+    (`overseas_positions=`)에 함께 넘겨 한 요청에서 스냅샷을 한 번만 읽는다."""
+    rows = await _latest_stock_rows(user_id, db, account_id)
+    return rows, _overseas_positions_from_rows(rows)
+
+
+def _overseas_positions_from_rows(rows: list[Any]) -> list[dict]:
     positions: list[dict] = []
     for snap, acc in rows:
         if acc.tax_type in TAX_DEFERRED_TAX_TYPES:
@@ -447,11 +454,14 @@ async def _calc_stock_unrealized(
 
     ISA/연금저축/IRP(과세이연) 계좌 보유분은 국내/해외 미실현손익 합산에서 제외하고
     tax_deferred_value_krw로 별도 집계한다. account_id 지정 시 해당 계좌만 집계.
+    OTHER 시장은 국내·해외 어디에도 넣지 않는다(실현손익 `overseas_realized_service`는 해외로 본다 — 세무 판단 보류).
 
     Returns: (overseas_unrealized_krw, domestic_stock_value_krw, domestic_unrealized_krw, tax_deferred_value_krw)
     """
-    rows = await _latest_stock_rows(user_id, db, account_id)
+    return _stock_unrealized_from_rows(await _latest_stock_rows(user_id, db, account_id))
 
+
+def _stock_unrealized_from_rows(rows: list[Any]) -> tuple[float, float, float, float]:
     overseas_value = 0.0
     overseas_invested = 0.0
     domestic_value = 0.0
@@ -473,7 +483,7 @@ async def _calc_stock_unrealized(
             if market in OVERSEAS_MARKETS:
                 overseas_value += cur * qty
                 overseas_invested += avg * qty
-            elif market in _DOMESTIC_MARKETS:
+            elif market in DOMESTIC_MARKETS:
                 domestic_value += cur * qty
                 domestic_invested += avg * qty
 

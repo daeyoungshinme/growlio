@@ -15,13 +15,8 @@ from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionTotal, TransactionUpdate
-from app.utils.cache_keys import (
-    challenge_progress_key,
-    dashboard_summary_key,
-    invalidate_dividend_caches,
-    invalidate_user_caches,
-    monthly_trend_key,
-)
+from app.utils.cache_invalidation import invalidate_dividend_caches, invalidate_user_caches
+from app.utils.cache_keys import challenge_progress_key, dashboard_summary_key, monthly_trend_key
 from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])

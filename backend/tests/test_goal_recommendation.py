@@ -4508,7 +4508,7 @@ class TestGoalRecommendationSettingsSavedMidCompute:
             get_cached_goal_recommendation,
             get_goal_recommendation,
         )
-        from app.utils.cache_keys import invalidate_goal_recommendation_caches
+        from app.utils.cache_invalidation import invalidate_goal_recommendation_caches
 
         cache = CacheStore()
         settings_row = SimpleNamespace(user_id=uuid.uuid4())

@@ -1,69 +1,70 @@
-"""나스닥100/S&P500 전술 배분 — 매크로 복합신호 + 차트 추세로 국면을 판정해 목표 비중을 제안한다.
+"""전술 배분 서비스 — 시장 관측(`evaluate_market`), 전략 조회·저장·해제, 상태 응답, 제안 비중 적용(DB 쓰기).
 
-비중 자산은 QQQ·SPY·DIA(다우)·QLD·SSO(나스닥·S&P 2배)·현금. QQQ·SPY·DIA는 각각 나스닥100·S&P500·다우 **지수 그룹**의
-비중이다(plans/76) — 판정 지표·백테스트는 QQQ·SPY·DIA 가격으로 지수를 재현하고, 포트폴리오에는 지수 그룹 항목
-(plans/74, 대표 종목+멤버)으로 적용해 같은 지수를 여러 종목으로 들고 있어도 전량 매도가 나지 않는다.
-DIA·QLD·SSO는 비중표에만 쓰이는 선택 자산이고(기본 0%) 국면 판정에는 넣지 않는다 — DIA는 SPY와 상관이 0.95를 넘어
-새 정보가 거의 없고, 레버리지 ETF는 기초지수(QQQ·SPY) 신호와 같으며,
-판정 규칙은 백테스트로 검증된 QQQ/SPY 기준을 유지한다.
-
-제안 비중 = 국면 비중표 → 나스닥/S&P 틸트(`tactical_tilt`, 월 1회) → 눌림목 현금 투입(`tactical_dip`, 공격 국면만).
-
-판정 규칙(순서대로):
-1. SPY·QQQ 추세가 모두 UNKNOWN(시세 조회 실패)이면 판정 불가 → 기존 확정 국면 유지
-2. 매크로 RED 이거나 SPY 추세 DOWN → RISK_OFF
-3. SPY·QQQ 추세가 모두 UP 이고 매크로 GREEN(STALE 아님) → RISK_ON
-   (직전 확정 국면이 RISK_ON이면 매크로 YELLOW여도 RISK_ON 유지 — 아래 히스테리시스)
-4. 그 외 → NEUTRAL
-
-공격 국면 히스테리시스: 진입은 매크로 GREEN이 필요하지만, 이미 공격 국면이면 YELLOW까지는 유지한다(RED·SPY 하락은
-즉시 이탈 대상). 경계값 근처에서 GREEN↔YELLOW가 오갈 때마다 공격↔중립이 뒤집히던 왕복이 백테스트 전환 횟수의
-절반 이상을 차지해 도입했다(10년 88→39회, CAGR·샤프 동반 개선 — 비대칭 확정일수·최소 유지기간은 회복 구간
-재진입을 늦춰 오히려 성과가 나빠 채택하지 않음).
-
-매크로 반영 끄기(`use_macro=False`, 전략별 옵션 — plans/70): 매크로를 항상 GREEN으로 보고 차트 추세만으로 판정한다
-(SPY 하락 → 방어, SPY·QQQ 상승 → 공격). 백테스트(VIX 근사)에선 20년 CAGR +1~1.7%p였지만 최근 10년 MDD는 나빠졌고
-실시간 매크로는 8개 지표 복합이라 단정할 수 없어 기본은 켬이다.
-
-국면 확정(`step_confirmation`): 같은 새 국면이 서로 다른 KST 날짜에 2번 관측돼야 바뀐다. 매크로 등급 자체에도
-2연속 확인 히스테리시스가 있으므로 이중 완충이다. 자동 주문은 하지 않는다 — 제안 비중을 포트폴리오 목표에
-적용(`apply_regime_to_portfolio`)한 뒤 기존 리밸런싱 실행 화면에서 사용자가 직접 확인·실행한다.
+국면 판정·제안 비중 규칙은 `tactical_regime`, 적용 계획(그룹 재구성·분할 보간·할 일 판정)은 `tactical_apply`에 있다.
+이 파일은 두 모듈의 심볼을 재노출한다 — `from ...tactical_allocation_service import X`·`patch.object(tactical, ...)`
+호출부는 그대로 유효하다. 단 서브모듈 안의 함수 간 호출을 가로채려면 그 서브모듈 경로를 patch해야 한다.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any
 
-import structlog
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import BadRequestError, ConflictError
 from app.models.alert import RebalancingAlert
-from app.models.portfolio import (
-    GROUP_ROLE_DOMESTIC_ALT,
-    GROUP_ROLE_MEMBER,
-    Portfolio,
-    PortfolioItem,
-    PortfolioItemMember,
-)
+from app.models.portfolio import Portfolio, PortfolioItem
 from app.models.tactical import TacticalStrategy
-from app.services.market_signal.technical_indicators import TechnicalSnapshot, TrendState
+from app.services.market_signal.technical_indicators import TechnicalSnapshot
 from app.services.market_signal.technical_signal_service import get_technical_signals
-from app.services.tactical.tactical_dip import ACTIVE_REGIMES as DIP_ACTIVE_REGIMES
-from app.services.tactical.tactical_dip import DEFAULT_DIP_SHIFT_PCT, advance_dip_level, apply_dip, dip_reasons
-from app.services.tactical.tactical_hints import transition_hints
-from app.services.tactical.tactical_tilt import (
-    DEFAULT_TILT_SHIFT_PCT,
-    apply_tilt,
-    classify_tilt,
-    get_tilt_inputs,
-    is_new_month,
-    tilt_reasons,
+from app.services.tactical.tactical_apply import (
+    _current_weights,
+    _GroupSpec,
+    _MemberSpec,
+    _new_item,
+    _plan_groups,
+    _weights_to_apply,
+    check_apply_allowed,
+    current_groups,
+    interpolate_weights,
+    is_tactical_managed,
+    needs_group_suggestions,
+    pending_action,
+    tactical_asset_of,
 )
+from app.services.tactical.tactical_dip import dip_reasons
+from app.services.tactical.tactical_hints import transition_hints
+from app.services.tactical.tactical_regime import (
+    ASSET_GROUP_KEYS,
+    ASSET_LABELS,
+    DEFAULT_REGIME_WEIGHTS,
+    LEVERAGED_ASSETS,
+    OPTIONAL_ASSETS,
+    REGIME_LABELS,
+    REGIMES,
+    TACTICAL_ASSETS,
+    ConfirmState,
+    Regime,
+    advance_dip,
+    advance_regime,
+    advance_tilt,
+    classify_regime,
+    dip_deployed_for,
+    dip_shift_of,
+    effective_dip_level,
+    effective_tilt,
+    format_weights,
+    observed_for,
+    proposed_weights_for,
+    resolve_weights,
+    step_confirmation,
+    tilt_shift_of,
+    uses_macro,
+    validate_regime_weights,
+)
+from app.services.tactical.tactical_tilt import classify_tilt, get_tilt_inputs, tilt_reasons
 from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
@@ -71,239 +72,55 @@ if TYPE_CHECKING:
     from app.schemas.portfolio import IndexGroupSuggestion
     from app.schemas.tactical import TacticalStrategyUpsert
 
-logger = structlog.get_logger()
-
-Regime = Literal["RISK_ON", "NEUTRAL", "RISK_OFF"]
-REGIMES: tuple[Regime, ...] = ("RISK_ON", "NEUTRAL", "RISK_OFF")
-REGIME_LABELS: dict[str, str] = {"RISK_ON": "공격", "NEUTRAL": "중립", "RISK_OFF": "방어"}
-
-TACTICAL_ASSETS: tuple[str, ...] = ("QQQ", "SPY", "DIA", "QLD", "SSO", "CASH")
-# 0%면 비중 문구에서 생략하는 선택 자산(기본 비중표에 없음)
-OPTIONAL_ASSETS = frozenset({"DIA", "QLD", "SSO"})
-LEVERAGED_ASSETS = frozenset({"QLD", "SSO"})
-# 포트폴리오 항목 저장 형식 — 프론트 종목검색 저장값과 동일(NYSE Arca 상장 ETF는 Yahoo PCX→"NYSE";
-# KIS 주문 시 kis/exchange_master가 AMS 종목마스터로 AMEX 보정)
-_ASSET_META: dict[str, tuple[str, str]] = {
-    "QQQ": ("Invesco QQQ Trust", "NASDAQ"),
-    "SPY": ("SPDR S&P 500 ETF Trust", "NYSE"),
-    "DIA": ("SPDR Dow Jones Industrial Average ETF Trust", "NYSE"),
-    "QLD": ("ProShares Ultra QQQ", "NYSE"),
-    "SSO": ("ProShares Ultra S&P500", "NYSE"),
-    "CASH": ("현금", "KRW"),
-}
-
-# 화면·알림 문구용 이름 — 프론트 tacticalLabels.ASSET_LABEL과 같은 뜻
-ASSET_LABELS: dict[str, str] = {
-    "QQQ": "나스닥100",
-    "SPY": "S&P500",
-    "DIA": "다우존스",
-    "QLD": "나스닥100 2배",
-    "SSO": "S&P500 2배",
-    "CASH": "현금",
-}
-# 지수 그룹으로 적용하는 자산 → 그룹 키(etf_index_classifier.INDEX_LABELS 키, plans/76)
-ASSET_GROUP_KEYS: dict[str, str] = {"QQQ": "US_NASDAQ100", "SPY": "US_SP500", "DIA": "US_DJIA"}
-_GROUP_KEY_ASSET: dict[str, str] = {v: k for k, v in ASSET_GROUP_KEYS.items()}
-# 레버리지 자산 → (같은 지수 그룹 자산, 배수). 비중표에서 0%면 짝 그룹의 레버리지 멤버(노출 합산)로 둔다
-_LEVERAGED_PAIR: dict[str, tuple[str, float]] = {"QLD": ("QQQ", 2.0), "SSO": ("SPY", 2.0)}
-
-DEFAULT_REGIME_WEIGHTS: dict[str, dict[str, float]] = {
-    "RISK_ON": {"QQQ": 50.0, "SPY": 40.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 10.0},
-    "NEUTRAL": {"QQQ": 30.0, "SPY": 40.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 30.0},
-    "RISK_OFF": {"QQQ": 10.0, "SPY": 30.0, "DIA": 0.0, "QLD": 0.0, "SSO": 0.0, "CASH": 60.0},
-}
-
-_TREND_LABELS: dict[TrendState, str] = {"UP": "상승", "NEUTRAL": "혼조", "DOWN": "하락", "UNKNOWN": "확인 불가"}
-_MACRO_LABELS = {"GREEN": "안정", "YELLOW": "주의", "RED": "위험"}
-
-
-def classify_regime(
-    macro_level: str,
-    macro_freshness: str,
-    trends: dict[str, TrendState],
-    prev: str | None = None,
-    *,
-    use_macro: bool = True,
-) -> tuple[Regime | None, list[str]]:
-    """(국면 또는 판정불가 None, 판정 근거 문장 목록). `prev`는 직전 확정 국면(공격 국면 유지 판정용).
-
-    `use_macro=False`면 매크로를 GREEN·LIVE로 취급한다(차트 추세만으로 판정).
-    """
-    spy = trends.get("SPY", "UNKNOWN")
-    qqq = trends.get("QQQ", "UNKNOWN")
-    if use_macro:
-        macro_stale = macro_freshness == "STALE"
-        macro_line = f"매크로 신호: {_MACRO_LABELS.get(macro_level, macro_level)}" + (
-            " (데이터 지연)" if macro_stale else ""
-        )
-    else:
-        macro_level, macro_stale = "GREEN", False
-        macro_line = "매크로 신호: 반영 안 함(차트 추세만)"
-    reasons = [macro_line, f"SPY 추세: {_TREND_LABELS[spy]} · QQQ 추세: {_TREND_LABELS[qqq]}"]
-    if spy == "UNKNOWN" and qqq == "UNKNOWN":
-        reasons.append("시세를 받지 못해 국면을 판정하지 않았습니다.")
-        return None, reasons
-    if (macro_level == "RED" and not macro_stale) or spy == "DOWN":
-        return "RISK_OFF", reasons
-    if spy == "UP" and qqq == "UP":
-        if macro_level == "GREEN" and not macro_stale:
-            return "RISK_ON", reasons
-        if prev == "RISK_ON" and macro_level in ("GREEN", "YELLOW"):
-            reasons.append("공격 국면 진입 이후 추세가 유지돼 공격 국면을 이어가요(매크로 위험 시 전환).")
-            return "RISK_ON", reasons
-    return "NEUTRAL", reasons
-
-
-class ConfirmState(NamedTuple):
-    """확정 상태 — 국면·틸트가 같은 규칙(`step_confirmation`)을 쓴다."""
-
-    current: str | None
-    pending: str | None
-    pending_since: date | None
-
-
-def step_confirmation(state: ConfirmState, observed: str | None, today: date) -> tuple[ConfirmState, bool]:
-    """같은 새 값이 서로 다른 날짜에 2번 관측되면 확정한다. (새 상태, 확정값 변경 여부 — 최초 확정 포함).
-
-    실시간은 KST 날짜, 백테스트는 거래일 날짜로 호출한다. 같은 날 반복 조회는 확정을 앞당기지 않는다.
-    """
-    if observed is None:
-        return state, False
-    if state.current is None:
-        return ConfirmState(observed, None, None), True
-    if observed == state.current:
-        return ConfirmState(state.current, None, None), False
-    if observed == state.pending and state.pending_since is not None and today > state.pending_since:
-        return ConfirmState(observed, None, None), True
-    if observed != state.pending:
-        return ConfirmState(state.current, observed, today), False
-    return state, False
-
-
-def advance_regime(strategy: TacticalStrategy, market: dict[str, Any], today: date) -> bool:
-    """시장 관측(`evaluate_market`)으로 확정 상태를 갱신한다. 확정 국면이 바뀌었으면 True(최초 확정 포함)."""
-    observed, _ = observed_for(market, strategy.last_regime, uses_macro(strategy))
-    state = ConfirmState(strategy.last_regime, strategy.pending_regime, strategy.pending_first_seen)
-    new, changed = step_confirmation(state, observed, today)
-    strategy.pending_regime = new.pending
-    strategy.pending_first_seen = new.pending_since
-    if changed:
-        strategy.last_regime = new.current
-        strategy.last_regime_changed_at = datetime.now(UTC)
-        # 이전 국면의 분할 적용은 새 국면 제안과 무관 — 새 국면은 처음부터 다시 적용한다
-        strategy.partial_regime = None
-        strategy.partial_applied_on = None
-    return changed
-
-
-def advance_tilt(strategy: TacticalStrategy, market: dict[str, Any], today: date) -> bool:
-    """그 달 첫 점검일에만 틸트를 갱신한다(입력 일부 결측이면 이번 점검은 건너뛰고 다음 점검에서 재시도).
-
-    상태가 바뀌었으면(판정일 기록 포함) True — 호출부 커밋 판단용.
-    """
-    if not market.get("tilt_inputs_complete") or not is_new_month(strategy.tilt_evaluated_on, today):
-        return False
-    strategy.last_tilt = market["observed_tilt"]
-    strategy.tilt_evaluated_on = today
-    return True
-
-
-def advance_dip(strategy: TacticalStrategy, market: dict[str, Any]) -> bool:
-    """확정 국면 갱신 뒤 호출 — 눌림목 투입 단계를 갱신한다. 바뀌었으면 True(호출부 커밋 판단용).
-
-    투입을 끈 전략(이동폭 0)도 단계는 추적한다 — 나중에 켰을 때 진행 중인 웅덩이를 바로 반영하도록.
-    """
-    prev = strategy.dip_level or 0
-    new = advance_dip_level(prev, market.get("qqq_pullback_stage"), strategy.last_regime)
-    if new == prev:
-        return False
-    strategy.dip_level = new
-    return True
-
-
-def uses_macro(strategy: TacticalStrategy | None) -> bool:
-    # 새로 만든 객체는 flush 전까지 server_default가 채워지지 않아 None일 수 있다
-    return strategy is None or strategy.use_macro is None or bool(strategy.use_macro)
-
-
-def dip_shift_of(strategy: TacticalStrategy | None) -> float:
-    if strategy is None or strategy.dip_shift_pct is None:
-        return DEFAULT_DIP_SHIFT_PCT
-    return float(strategy.dip_shift_pct)
-
-
-def effective_dip_level(strategy: TacticalStrategy | None, regime: str | None) -> int:
-    """제안 비중에 쓸 투입 단계 — 전략이 없으면(미리보기)·공격 국면이 아니면 투입하지 않는다."""
-    if strategy is None or regime not in DIP_ACTIVE_REGIMES:
-        return 0
-    return strategy.dip_level or 0
-
-
-def tilt_shift_of(strategy: TacticalStrategy | None) -> float:
-    # 새로 만든 객체는 flush 전까지 server_default가 채워지지 않아 None일 수 있다
-    if strategy is None or strategy.tilt_shift_pct is None:
-        return DEFAULT_TILT_SHIFT_PCT
-    return float(strategy.tilt_shift_pct)
-
-
-def effective_tilt(strategy: TacticalStrategy | None, market: dict[str, Any]) -> str:
-    """제안 비중에 쓸 틸트 — 전략이 있으면 월 1회 확정값(아직 없으면 균형), 없으면 오늘 판정(미리보기)."""
-    if strategy is None:
-        return market.get("observed_tilt", "BALANCED")
-    return strategy.last_tilt or "BALANCED"
-
-
-def _tilted_weights(strategy: TacticalStrategy | None, regime: str, market: dict[str, Any]) -> dict[str, float]:
-    return apply_tilt(resolve_weights(strategy)[regime], effective_tilt(strategy, market), tilt_shift_of(strategy))
-
-
-def proposed_weights_for(strategy: TacticalStrategy | None, regime: str, market: dict[str, Any]) -> dict[str, float]:
-    tilted = _tilted_weights(strategy, regime, market)
-    return apply_dip(tilted, effective_dip_level(strategy, regime), dip_shift_of(strategy))
-
-
-def dip_deployed_for(strategy: TacticalStrategy | None, regime: str | None, market: dict[str, Any]) -> float:
-    """제안 비중에 실제로 들어간 웅덩이 투입량(%p) — 명목 투입량(`dip_amount`)이 현금 비중을 넘으면 현금까지만."""
-    if regime is None:
-        return 0.0
-    tilted = _tilted_weights(strategy, regime, market)
-    proposed = apply_dip(tilted, effective_dip_level(strategy, regime), dip_shift_of(strategy))
-    return round(tilted.get("CASH", 0.0) - proposed.get("CASH", 0.0), 1)
-
-
-def validate_regime_weights(raw: dict[str, Any]) -> dict[str, dict[str, float]]:
-    """국면별 비중표 검증 — 3개 국면 모두, 자산은 TACTICAL_ASSETS(누락은 0), 각 0~100, 합계 100."""
-    if set(raw) != set(REGIMES):
-        raise ValueError("공격·중립·방어 3개 국면의 비중을 모두 입력해야 합니다.")
-    result: dict[str, dict[str, float]] = {}
-    for regime in REGIMES:
-        weights = raw[regime]
-        if not isinstance(weights, dict) or not weights or not set(weights) <= set(TACTICAL_ASSETS):
-            raise ValueError("비중 자산은 QQQ·SPY·DIA·QLD·SSO·CASH만 사용할 수 있습니다.")
-        cleaned = {k: float(v) for k, v in weights.items()}
-        if any(v < 0 or v > 100 for v in cleaned.values()):
-            raise ValueError("각 비중은 0~100 사이여야 합니다.")
-        if abs(sum(cleaned.values()) - 100.0) > 0.01:
-            raise ValueError(f"{REGIME_LABELS[regime]} 국면 비중 합계가 100이어야 합니다.")
-        result[regime] = {a: cleaned.get(a, 0.0) for a in TACTICAL_ASSETS}
-    return result
-
-
-def resolve_weights(strategy: TacticalStrategy | None) -> dict[str, dict[str, float]]:
-    if strategy is not None and strategy.regime_weights:
-        try:
-            return validate_regime_weights(strategy.regime_weights)
-        except (ValueError, TypeError):
-            logger.warning("tactical_invalid_stored_weights", strategy_id=str(strategy.id))
-    return DEFAULT_REGIME_WEIGHTS
-
-
-def format_weights(weights: dict[str, float]) -> str:
-    return " · ".join(
-        f"{ASSET_LABELS[a]} {weights.get(a, 0):g}%"
-        for a in TACTICAL_ASSETS
-        if a not in OPTIONAL_ASSETS or weights.get(a, 0) > 0
-    )
+__all__ = [
+    "ASSET_GROUP_KEYS",
+    "ASSET_LABELS",
+    "DEFAULT_REGIME_WEIGHTS",
+    "LEVERAGED_ASSETS",
+    "OPTIONAL_ASSETS",
+    "REGIMES",
+    "REGIME_LABELS",
+    "TACTICAL_ASSETS",
+    "ConfirmState",
+    "Regime",
+    "_GroupSpec",
+    "_MemberSpec",
+    "_current_weights",
+    "_new_item",
+    "_plan_groups",
+    "_weights_to_apply",
+    "advance_dip",
+    "advance_regime",
+    "advance_tilt",
+    "apply_regime_to_portfolio",
+    "build_status",
+    "check_apply_allowed",
+    "classify_regime",
+    "current_groups",
+    "dip_deployed_for",
+    "dip_shift_of",
+    "disable_strategy",
+    "effective_dip_level",
+    "effective_tilt",
+    "evaluate_market",
+    "format_weights",
+    "get_owned_portfolio",
+    "get_strategy",
+    "interpolate_weights",
+    "is_tactical_managed",
+    "list_strategies",
+    "needs_group_suggestions",
+    "observed_for",
+    "pending_action",
+    "proposed_weights_for",
+    "resolve_weights",
+    "save_strategy",
+    "step_confirmation",
+    "tactical_asset_of",
+    "tilt_shift_of",
+    "uses_macro",
+    "validate_regime_weights",
+]
 
 
 async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[str, Any]:
@@ -339,15 +156,6 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
         "tilt_reasons": tilt_reasons(tilt_inputs, observed_tilt),
         "qqq_pullback_stage": qqq_stage,
     }
-
-
-def observed_for(market: dict[str, Any], prev: str | None, use_macro: bool = True) -> tuple[Regime | None, list[str]]:
-    """직전 확정 국면·매크로 반영 여부를 반영한 관측 국면과 근거."""
-    if not use_macro and "observed_no_macro" in market:
-        return market["observed_no_macro"], market["reasons_no_macro"]
-    if prev == "RISK_ON" and "observed_if_risk_on" in market:
-        return market["observed_if_risk_on"], market["reasons_if_risk_on"]
-    return market["observed_regime"], market["reasons"]
 
 
 async def get_owned_portfolio(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> Portfolio | None:
@@ -434,90 +242,6 @@ async def disable_strategy(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: Asyn
     await db.commit()
 
 
-def check_apply_allowed(
-    portfolio: Portfolio, strategy: TacticalStrategy | None, fraction: float
-) -> tuple[TacticalStrategy, Regime]:
-    """제안 비중 적용 전 검증 — None이 아님이 확인된 전략과 적용할 확정 국면을 돌려준다.
-
-    `fraction<1`(분할 적용)은 전술 자산만으로 구성된 포트폴리오에서만, 같은 국면에서 한 번만 허용한다 — 다른 종목을
-    절반만 줄이는 건 전술 배분이 관리하는 범위가 아니고, 두 번째부터는 나머지 적용(fraction=1)이다.
-    """
-    if strategy is None:
-        raise BadRequestError(detail="전술 배분을 먼저 켜주세요.")
-    regime = strategy.last_regime
-    if regime not in REGIMES:
-        raise ConflictError(detail="아직 국면이 확정되지 않았습니다. 잠시 후 다시 시도해주세요.")
-    if fraction < 1 and not is_tactical_managed(portfolio):
-        raise BadRequestError(
-            detail="전술 자산 외 종목이 있는 포트폴리오는 나눠서 적용할 수 없습니다. 한 번에 적용해주세요."
-        )
-    if fraction < 1 and strategy.partial_regime == regime:
-        # 현재 목표에서 다시 절반을 보간하면 75%가 된다 — 두 번째는 나머지(전체) 적용만 허용
-        raise BadRequestError(detail="이미 절반을 적용했어요. 나머지를 적용해주세요.")
-    return strategy, regime
-
-
-def tactical_asset_of(item: Any) -> str | None:
-    """포트폴리오 항목이 어느 전술 자산인지 — 나스닥100·S&P500·다우 지수 그룹은 대표 종목과 무관하게 QQQ·SPY·DIA,
-    그룹이 아닌 단독 항목은 ticker가 전술 자산일 때만. 그 외(다른 지수 그룹·개별 종목)는 None."""
-    group_key = getattr(item, "group_key", None)
-    if group_key:
-        return _GROUP_KEY_ASSET.get(group_key)
-    return item.ticker if item.ticker in TACTICAL_ASSETS else None
-
-
-def _current_weights(portfolio: Portfolio) -> dict[str, float]:
-    """현재 목표 비중 — 전술 자산은 자산 키(그룹은 QQQ·SPY·DIA)로, 나머지는 ticker 키로."""
-    out: dict[str, float] = {}
-    for item in portfolio.items:
-        key = tactical_asset_of(item) or item.ticker
-        out[key] = round(out.get(key, 0.0) + float(item.weight), 2)
-    return out
-
-
-def current_groups(portfolio: Portfolio) -> dict[str, dict[str, Any]]:
-    """전술 자산별 지수 그룹 구성 요약(화면 보조 문구용) — 그룹이 아닌 자산은 넣지 않는다."""
-    out: dict[str, dict[str, Any]] = {}
-    for item in portfolio.items:
-        asset = tactical_asset_of(item)
-        if asset and getattr(item, "group_key", None):
-            members = getattr(item, "members", None) or []
-            out[asset] = {
-                "label": item.group_label or "",
-                "primary": item.ticker,
-                "member_count": sum(1 for m in members if m.role == GROUP_ROLE_MEMBER),
-                "domestic_alt": next((m.ticker for m in members if m.role == GROUP_ROLE_DOMESTIC_ALT), None),
-            }
-    return out
-
-
-def is_tactical_managed(portfolio: Portfolio) -> bool:
-    """포트폴리오가 전술 자산(나스닥100·S&P500·다우 지수 그룹 포함)만으로 구성됐는지 — 아니면 적용 시 다른 종목이
-    지워진다는 경고 대상."""
-    return all(tactical_asset_of(item) is not None for item in portfolio.items)
-
-
-def pending_action(strategy: TacticalStrategy, portfolio: Portfolio) -> Literal["APPLY", "PARTIAL"] | None:
-    """확정 국면의 제안 비중을 아직 적용하지 않았으면 "APPLY", 절반만 적용했으면 "PARTIAL" — 홈 "지금 할 일"용.
-
-    프론트 `tacticalNextAction`의 action 톤과 같은 판정(적립 연동 모드는 호출부가 거른다). 전환 확인 중이면
-    다음 거래일 재확인 후 적용하라는 안내뿐이라 할 일로 보지 않는다. 제안 비중은 저장된 틸트·웅덩이 단계로
-    계산하므로(`apply_regime_to_portfolio`와 같은 `market={}`) 시세를 조회하지 않는다.
-    """
-    regime = strategy.last_regime
-    if regime is None or strategy.pending_regime:
-        return None
-    if strategy.partial_regime == regime:
-        return "PARTIAL"
-    if strategy.applied_regime != regime:
-        return "APPLY"
-    proposed = proposed_weights_for(strategy, regime, {})
-    current = _current_weights(portfolio)
-    if any(round(current.get(a, 0.0), 1) != round(proposed.get(a, 0.0), 1) for a in TACTICAL_ASSETS):
-        return "APPLY"
-    return None
-
-
 async def build_status(
     portfolio: Portfolio,
     strategy: TacticalStrategy | None,
@@ -576,149 +300,6 @@ async def build_status(
         "current_groups": current_groups(portfolio),
         "portfolio_compatible": is_tactical_managed(portfolio),
     }
-
-
-def interpolate_weights(current: dict[str, float], target: dict[str, float], fraction: float) -> dict[str, float]:
-    """현재 목표에서 제안 비중 쪽으로 `fraction`만큼 이동(0.1%p 단위). 반올림 오차는 현금이 흡수한다."""
-    out = {a: round(current.get(a, 0.0) + (target.get(a, 0.0) - current.get(a, 0.0)) * fraction, 1) for a in target}
-    out["CASH"] = round(100.0 - sum(v for a, v in out.items() if a != "CASH"), 1)
-    return out
-
-
-class _MemberSpec(NamedTuple):
-    ticker: str
-    market: str
-    name: str
-    role: str
-    leverage: float = 1.0
-
-
-class _GroupSpec(NamedTuple):
-    """다시 만들 지수 그룹 항목 — 대표 종목(ticker/market/name) + 라벨 + 멤버."""
-
-    ticker: str
-    market: str
-    name: str
-    label: str
-    members: list[_MemberSpec]
-
-
-def _weights_to_apply(
-    portfolio: Portfolio, strategy: TacticalStrategy, regime: str, fraction: float
-) -> dict[str, float]:
-    weights = proposed_weights_for(strategy, regime, {})
-    if fraction < 1:
-        weights = interpolate_weights(_current_weights(portfolio), weights, fraction)
-    return weights
-
-
-def _existing_groups(portfolio: Portfolio) -> dict[str, Any]:
-    return {
-        asset: item
-        for item in portfolio.items
-        if getattr(item, "group_key", None) and (asset := tactical_asset_of(item)) is not None
-    }
-
-
-def needs_group_suggestions(
-    portfolio: Portfolio, strategy: TacticalStrategy, regime: str, fraction: float = 1.0
-) -> bool:
-    """적용 시 새로 만들 지수 그룹이 있는지 — 있을 때만 호출부가 보유 종목 기반 그룹 제안을 조회한다."""
-    weights = _weights_to_apply(portfolio, strategy, regime, fraction)
-    existing = _existing_groups(portfolio)
-    return any(weights.get(a, 0) > 0 and a not in existing for a in ASSET_GROUP_KEYS)
-
-
-def _group_from_item(item: Any) -> _GroupSpec:
-    return _GroupSpec(
-        ticker=item.ticker,
-        market=item.market,
-        name=item.name,
-        label=item.group_label or "",
-        members=[_MemberSpec(m.ticker, m.market, m.name, m.role, float(m.leverage or 1)) for m in (item.members or [])],
-    )
-
-
-def _group_from_suggestion(asset: str, suggestion: IndexGroupSuggestion | None) -> _GroupSpec:
-    """새 그룹 — 대표 종목은 전술 자산(판정·백테스트 기준 ETF), 멤버·국내 대체는 보유 종목 기반 제안에서."""
-    from app.services.etf.etf_index_classifier import index_label
-
-    name, market = _ASSET_META[asset]
-    label = suggestion.label if suggestion else index_label(ASSET_GROUP_KEYS[asset])
-    members: list[_MemberSpec] = []
-    if suggestion is not None:
-        alt = suggestion.domestic_alt
-        skip = {asset} | ({alt.ticker} if alt else set())
-        members = [
-            _MemberSpec(m.ticker, m.market, m.name, GROUP_ROLE_MEMBER, m.leverage)
-            for m in suggestion.members
-            if m.ticker not in skip
-        ]
-        if alt is not None:
-            members.append(_MemberSpec(alt.ticker, alt.market, alt.name, GROUP_ROLE_DOMESTIC_ALT))
-    return _GroupSpec(ticker=asset, market=market, name=name, label=label, members=members)
-
-
-def _plan_groups(
-    portfolio: Portfolio,
-    weights: dict[str, float],
-    suggestions: dict[str, IndexGroupSuggestion] | None,
-) -> dict[str, _GroupSpec]:
-    """비중>0인 QQQ·SPY·DIA의 그룹 구성 — 기존 그룹은 그대로, 없으면 제안으로 새로. 레버리지 규칙 반영.
-
-    QLD·SSO 비중>0이면 단독 항목으로 관리하므로 짝 그룹 멤버에서 뺀다(한 종목은 한 항목에만). 0%면 예전 단독
-    항목이었던 경우 짝 그룹의 레버리지 멤버로 옮긴다 — 목표에 없는 종목으로 전량 매도되지 않고 그룹이 비중을
-    넘을 때 먼저 팔린다(group_expansion).
-    """
-    existing = _existing_groups(portfolio)
-    groups: dict[str, _GroupSpec] = {}
-    for asset, group_key in ASSET_GROUP_KEYS.items():
-        if weights.get(asset, 0) <= 0:
-            continue
-        if asset in existing:
-            groups[asset] = _group_from_item(existing[asset])
-        else:
-            groups[asset] = _group_from_suggestion(asset, (suggestions or {}).get(group_key))
-
-    standalone = {item.ticker for item in portfolio.items if not getattr(item, "group_key", None)}
-    for lev, (pair, multiple) in _LEVERAGED_PAIR.items():
-        spec = groups.get(pair)
-        if spec is None:
-            continue
-        members = [m for m in spec.members if m.ticker != lev]
-        if weights.get(lev, 0) <= 0:
-            held = next((m for m in spec.members if m.ticker == lev), None)
-            if held is not None:
-                members.append(held)
-            elif lev in standalone:
-                name, market = _ASSET_META[lev]
-                members.append(_MemberSpec(lev, market, name, GROUP_ROLE_MEMBER, multiple))
-        groups[pair] = spec._replace(members=members)
-    return groups
-
-
-def _new_item(portfolio: Portfolio, asset: str, weight: float, idx: int, spec: _GroupSpec | None) -> PortfolioItem:
-    if spec is None:
-        name, market = _ASSET_META[asset]
-        return PortfolioItem(
-            portfolio_id=portfolio.id, ticker=asset, name=name, market=market, weight=weight, sort_order=idx
-        )
-    return PortfolioItem(
-        portfolio_id=portfolio.id,
-        ticker=spec.ticker,
-        name=spec.name,
-        market=spec.market,
-        weight=weight,
-        sort_order=idx,
-        group_key=ASSET_GROUP_KEYS[asset],
-        group_label=spec.label or None,
-        members=[
-            PortfolioItemMember(
-                ticker=m.ticker, market=m.market, name=m.name, role=m.role, leverage=m.leverage, sort_order=i
-            )
-            for i, m in enumerate(spec.members)
-        ],
-    )
 
 
 async def apply_regime_to_portfolio(

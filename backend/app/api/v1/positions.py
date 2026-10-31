@@ -20,7 +20,8 @@ from app.schemas.asset import ManualPosition, PositionListResponse
 from app.services.accounts.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.services.market_data.price_service import fetch_prices_batch
 from app.services.portfolio._position_queries import fetch_manual_positions
-from app.utils.cache_keys import invalidate_asset_account_caches, sync_lock_key
+from app.utils.cache_invalidation import invalidate_asset_account_caches
+from app.utils.cache_keys import sync_lock_key
 from app.utils.currency import fetch_usd_krw
 from app.utils.inproc_lock import inproc_lock
 from app.utils.kst import today_kst

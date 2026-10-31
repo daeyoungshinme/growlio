@@ -30,7 +30,7 @@ from app.services.rebalancing.execution_service import (
     load_kiwoom_credentials,
 )
 from app.services.rebalancing.order_cancel_rules import CANCEL_FAILED, CANCELED, cancel_block_reason
-from app.utils.cache_keys import invalidate_rebalancing_analysis_cache
+from app.utils.cache_invalidation import invalidate_rebalancing_analysis_cache
 
 logger = structlog.get_logger()
 

@@ -23,6 +23,7 @@ from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, Re
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.order_builder import market_group
 from app.services.rebalancing.plan_notifications import _notify_leg_execution_failed, _send_leg_execution_email
+from app.utils.numbers import opt_float
 
 logger = structlog.get_logger()
 
@@ -131,7 +132,7 @@ async def _rebuild_orders_from_items(
 
     orders: list[ExecutionOrderItem] = []
     for item in items:
-        limit_price = float(item.limit_price) if item.limit_price is not None else None
+        limit_price = opt_float(item.limit_price)
         if item.order_type == "LIMIT":
             fresh = price_map.get(item.ticker or "")
             if fresh and fresh > 0:
@@ -150,7 +151,7 @@ async def _rebuild_orders_from_items(
                 account_id=item.account_id,
                 order_type=item.order_type,
                 limit_price=limit_price,
-                reference_price=float(item.reference_price) if item.reference_price is not None else None,
+                reference_price=opt_float(item.reference_price),
             )
         )
     return orders

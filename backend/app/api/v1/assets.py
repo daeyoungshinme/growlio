@@ -57,10 +57,8 @@ from app.services.accounts.snapshot_service import (
 )
 from app.services.accounts.sync_all_service import get_sync_all_status, is_sync_all_running, run_sync_all
 from app.services.tax.isa_service import calc_account_auto_pnl
-from app.utils.cache_keys import (
-    invalidate_asset_account_caches,
-    sync_lock_key,
-)
+from app.utils.cache_invalidation import invalidate_asset_account_caches
+from app.utils.cache_keys import sync_lock_key
 from app.utils.currency import fetch_usd_krw
 from app.utils.inproc_lock import inproc_lock
 from app.utils.kst import today_kst

@@ -15,13 +15,8 @@ from app.limiter import limiter
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User
 from app.schemas.alert import ExchangeRateAlertCreate, ExchangeRateAlertResponse
-from app.utils.cache_keys import (
-    TTL_EXCHANGE_RATE_ALERTS,
-    exchange_rate_alerts_key,
-    get_cached_json,
-    invalidate_exchange_rate_alert_caches,
-    set_cached_json,
-)
+from app.utils.cache_invalidation import invalidate_exchange_rate_alert_caches
+from app.utils.cache_keys import TTL_EXCHANGE_RATE_ALERTS, exchange_rate_alerts_key, get_cached_json, set_cached_json
 
 router = APIRouter()
 
