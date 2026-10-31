@@ -6,18 +6,17 @@
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import CacheStore, get_cache_store
+from app.core.job_runner import report_handled_failure
 from app.limiter import limiter
-from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio, PortfolioAccount
 from app.models.tactical import TacticalStrategy
 from app.models.user import User
@@ -125,26 +124,7 @@ async def upsert_tactical_strategy(
 ) -> dict[str, Any]:
     """전략 사용 시작/설정 변경. 최초 생성 시 현재 관측 국면을 바로 확정 국면으로 삼는다(알림 없음)."""
     portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
-    strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
-    if strategy is None:
-        strategy = TacticalStrategy(user_id=current_user.id, portfolio_id=portfolio_id)
-        db.add(strategy)
-    strategy.notify_enabled = body.notify_enabled
-    strategy.regime_weights = body.regime_weights
-    strategy.tilt_shift_pct = Decimal(str(body.tilt_shift_pct))
-    strategy.dip_shift_pct = Decimal(str(body.dip_shift_pct))
-    strategy.use_macro = body.use_macro
-
-    cache = await get_cache_store()
-    market = await tactical.evaluate_market(cache, db)
-    today = today_kst()
-    tactical.advance_regime(strategy, market, today)
-    tactical.advance_tilt(strategy, market, today)
-    tactical.advance_dip(strategy, market)
-    if strategy.notified_regime is None:
-        strategy.notified_regime = strategy.last_regime  # 사용 시작 시점 국면은 알릴 필요 없음
-        strategy.notified_dip_level = strategy.dip_level or 0  # 진행 중인 웅덩이도 마찬가지
-    await db.commit()
+    strategy, market = await tactical.save_strategy(portfolio_id, current_user.id, body, await get_cache_store(), db)
     return await tactical.build_status(portfolio, strategy, market)
 
 
@@ -156,24 +136,8 @@ async def delete_tactical_strategy(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """전략 사용 중지(포트폴리오 목표 비중은 그대로 둔다).
-
-    이 포트폴리오의 자동매수가 전술 연동(`market_condition_mode="TACTICAL"`)이면 일반 모드(DISABLED)로 되돌린다 —
-    국면이 없으면 게이트가 늘 통과라 연동 표시만 남아 오해를 부른다.
-    """
-    strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
-    if strategy is not None:
-        await db.execute(
-            update(RebalancingAlert)
-            .where(
-                RebalancingAlert.portfolio_id == portfolio_id,
-                RebalancingAlert.user_id == current_user.id,
-                RebalancingAlert.market_condition_mode == "TACTICAL",
-            )
-            .values(market_condition_mode="DISABLED")
-        )
-        await db.delete(strategy)
-        await db.commit()
+    """전략 사용 중지(포트폴리오 목표 비중은 그대로 둔다). 전술 연동 자동매수는 일반 모드로 되돌린다."""
+    await tactical.disable_strategy(portfolio_id, current_user.id, db)
 
 
 async def _group_suggestions(
@@ -192,7 +156,7 @@ async def _group_suggestions(
         account_ids = list(rows.scalars().all()) or None
         result = await get_index_group_suggestions(cache, db, user.id, account_ids)
     except Exception as exc:
-        logger.warning("tactical_group_suggestions_failed", portfolio_id=str(portfolio.id), error=str(exc))
+        report_handled_failure("tactical_group_suggestions_failed", exc, portfolio_id=str(portfolio.id))
         return None
     return {g.key: g for g in result.groups}
 
@@ -208,31 +172,13 @@ async def apply_tactical_weights(
 ) -> dict[str, Any]:
     """확정 국면의 제안 비중을 포트폴리오 목표 비중으로 저장한다 — 주문은 내지 않는다.
 
-    `fraction<1`(분할 적용)은 전술 자산만으로 구성된 포트폴리오에서만, 같은 국면에서 한 번만 허용한다 — 다른 종목을
-    절반만 줄이는 건 전술 배분이 관리하는 범위가 아니고, 두 번째부터는 나머지 적용(fraction=1)이다.
+    분할 적용 규칙 등 검증은 `tactical.check_apply_allowed`가 한다.
     """
     portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
-    if strategy is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="전술 배분을 먼저 켜주세요.")
-    regime = strategy.last_regime
-    if regime not in tactical.REGIMES:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="아직 국면이 확정되지 않았습니다. 잠시 후 다시 시도해주세요."
-        )
-
     fraction = body.fraction if body else 1.0
-    if fraction < 1 and not tactical.is_tactical_managed(portfolio):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="전술 자산 외 종목이 있는 포트폴리오는 나눠서 적용할 수 없습니다. 한 번에 적용해주세요.",
-        )
-    if fraction < 1 and strategy.partial_regime == regime:
-        # 현재 목표에서 다시 절반을 보간하면 75%가 된다 — 두 번째는 나머지(전체) 적용만 허용
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이미 절반을 적용했어요. 나머지를 적용해주세요.",
-        )
+    regime = tactical.check_apply_allowed(portfolio, strategy, fraction)
+    assert strategy is not None  # check_apply_allowed가 None이면 400을 던진다
 
     cache = await get_cache_store()
     suggestions = (
