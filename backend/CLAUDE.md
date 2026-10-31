@@ -228,7 +228,7 @@ utils/
   kst.py              today_kst()/now_kst()/kst_day_start() — "오늘 보냈나" 비교는 kst_day_start
   pykrx_util.py       **pykrx 호출은 반드시 `with quiet_pykrx() as stock:` 안에서** — 동시 호출 시 프로세스 크래시(락 직렬화)
   naver_retry.py      Naver 모바일 API는 `naver_get_json` + `except NAVER_FAILURES` → `log_naver_failure`
-  currency.py · masking.py · inproc_lock.py(단일 프로세스 전제) · market_hours.py · metrics.py · pnl.py
+  currency.py · masking.py · inproc_lock.py(단일 프로세스 전제) · market_hours.py · metrics.py · pnl.py · numbers.py(opt_float — Numeric→float|None)
 limiter.py      slowapi. 키는 rate_limit_key(JWT sub / X-Forwarded-For 첫 hop — Vercel→Render 프록시라 client.host는 공용).
                 **인증 없이 상태를 바꾸거나 토큰을 받는 라우트는 ip_rate_limit_key + peer_rate_limit_key 두 데코레이터를 겹친다**(tests/test_rate_limit_key.py가 검사)
 enums.py        도메인 StrEnum — 매직 스트링 대신

@@ -28,12 +28,11 @@ GET /goal은 사용자가 growlio 설정에서 입력한 투자목표(목표금�
 엔드포인트는 목표 "설정값"만 내려주고 진행률/달성 시점 같은 계산값은 포함하지 않는다.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,7 +43,17 @@ from app.enums import AssetType, DataSource, TransactionType
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
-from app.schemas._validators import PositiveAmount
+from app.schemas.external import (
+    ExternalAccountBalance,
+    ExternalAccountPerformance,
+    ExternalGoalSettings,
+    ExternalNetDeposit,
+    ExternalNetWorthPoint,
+    ExternalPerformance,
+    ExternalRealEstateItem,
+    ExternalTransactionCreate,
+    ExternalTransactionResult,
+)
 from app.schemas.invest import GoalFeasibilityPreview
 from app.services._settings_queries import get_settings_row
 from app.services.accounts.asset_service import list_accounts as _list_accounts
@@ -65,20 +74,10 @@ from app.utils.cache_keys import (
 )
 from app.utils.currency import fetch_usd_krw
 from app.utils.kst import KST
+from app.utils.numbers import opt_float
 
 router = APIRouter(prefix="/external", tags=["external"])
 logger = structlog.get_logger()
-
-
-class ExternalAccountBalance(BaseModel):
-    id: str
-    name: str
-    asset_type: AssetType
-    current_value_krw: float
-    as_of: date | None = None
-    # 최신 스냅샷의 투자 원금/평가손익 — 스냅샷이 없거나 원금을 추적하지 않는 계좌(예금 등)는 None.
-    invested_amount_krw: float | None = None
-    unrealized_pnl_krw: float | None = None
 
 
 @router.get("/accounts", response_model=list[ExternalAccountBalance])
@@ -116,22 +115,11 @@ async def list_account_balances(
                 asset_type=account.asset_type,
                 current_value_krw=value,
                 as_of=as_of,
-                invested_amount_krw=float(invested) if invested is not None else None,
-                unrealized_pnl_krw=float(pnl) if pnl is not None else None,
+                invested_amount_krw=opt_float(invested),
+                unrealized_pnl_krw=opt_float(pnl),
             )
         )
     return result
-
-
-class ExternalPerformance(BaseModel):
-    xirr_pct: float | None = None
-    annual_return_pct: float | None = None
-    cumulative_return_pct: float | None = None
-    goal_annual_return_pct: float | None = None
-    return_goal_gap_pct: float | None = None
-    annual_deposit_goal: float | None = None
-    annual_deposit_current: float | None = None
-    deposit_achievement_pct: float | None = None
 
 
 @router.get("/performance", response_model=ExternalPerformance)
@@ -163,19 +151,6 @@ async def get_external_goal_feasibility(
     (build_feasibility_preview), 현재 자산과 기간을 growlio 총자산·목표 연말 대신 호출자가 넘긴 값으로 쓴다.
     아무것도 저장하지 않는다."""
     return build_feasibility_preview(current_amount, goal_amount, n_months, monthly_deposit_amount)
-
-
-class ExternalRealEstateItem(BaseModel):
-    id: str
-    name: str
-    address: str | None = None
-    property_type: str | None = None
-    market_value_krw: float
-    mortgage_balance_krw: float
-    net_equity_krw: float
-    purchase_price_krw: float | None = None
-    purchase_date: str | None = None
-    as_of: date | None = None
 
 
 @router.get("/real-estate", response_model=list[ExternalRealEstateItem])
@@ -215,16 +190,6 @@ async def list_real_estate_items(
     return result
 
 
-class ExternalGoalSettings(BaseModel):
-    is_configured: bool
-    goal_amount: float | None = None
-    goal_annual_return_pct: float | None = None
-    goal_start_date: datetime | None = None
-    goal_initial_amount: float | None = None
-    annual_deposit_goal: float | None = None
-    annual_dividend_goal: float | None = None
-
-
 @router.get("/goal", response_model=ExternalGoalSettings)
 @limiter.limit("20/minute")
 async def get_investment_goal(
@@ -243,32 +208,12 @@ async def get_investment_goal(
     return ExternalGoalSettings(
         is_configured=True,
         goal_amount=float(row.goal_amount),
-        goal_annual_return_pct=float(row.goal_annual_return_pct) if row.goal_annual_return_pct is not None else None,
+        goal_annual_return_pct=opt_float(row.goal_annual_return_pct),
         goal_start_date=row.goal_start_date,
-        goal_initial_amount=float(row.goal_initial_amount) if row.goal_initial_amount is not None else None,
-        annual_deposit_goal=float(row.annual_deposit_goal) if row.annual_deposit_goal is not None else None,
-        annual_dividend_goal=float(row.annual_dividend_goal) if row.annual_dividend_goal is not None else None,
+        goal_initial_amount=opt_float(row.goal_initial_amount),
+        annual_deposit_goal=opt_float(row.annual_deposit_goal),
+        annual_dividend_goal=opt_float(row.annual_dividend_goal),
     )
-
-
-class ExternalTransactionCreate(BaseModel):
-    account_id: UUID
-    transaction_type: TransactionType
-    amount: PositiveAmount
-    transaction_date: date
-    notes: str | None = Field(default=None, max_length=1000)
-    # 멱등 키 — 같은 사용자가 같은 키로 다시 보내면 새로 기록하지 않는다(nestlio: "nestlio:{거래id}:{동작}").
-    external_ref: str | None = Field(default=None, min_length=1, max_length=100)
-
-    # 내부 TransactionCreate와 같은 규칙 — 음수 DEPOSIT이 MANUAL 계좌 예수금을 깎거나 Numeric 오버플로로 500이 나지 않게
-
-
-class ExternalTransactionResult(BaseModel):
-    transaction_id: str
-    deposit_krw_adjusted: bool
-    deposit_krw: float | None = None
-    # True면 같은 external_ref로 이미 기록돼 있어 아무것도 바꾸지 않았다.
-    duplicate: bool = False
 
 
 def _duplicate_result(tx: Transaction, req: ExternalTransactionCreate) -> ExternalTransactionResult:
@@ -366,12 +311,6 @@ async def create_external_transaction(
     )
 
 
-class ExternalNetDeposit(BaseModel):
-    account_id: str
-    month: str
-    net_deposit_krw: float
-
-
 @router.get("/net-deposits", response_model=list[ExternalNetDeposit])
 @limiter.limit("20/minute")
 async def list_net_deposits(
@@ -390,11 +329,6 @@ async def list_net_deposits(
     )
 
 
-class ExternalNetWorthPoint(BaseModel):
-    month: str
-    total_krw: float
-
-
 @router.get("/net-worth-history", response_model=list[ExternalNetWorthPoint])
 @limiter.limit("20/minute")
 async def get_net_worth_history(
@@ -407,13 +341,6 @@ async def get_net_worth_history(
     cache = await get_cache_store()
     trend = await get_monthly_trend(current_user.id, db, cache)
     return [ExternalNetWorthPoint(month=row["month"][:7], total_krw=row["total_krw"]) for row in trend]
-
-
-class ExternalAccountPerformance(BaseModel):
-    xirr_pct: float | None = None
-    current_value_krw: float
-    net_invested_krw: float
-    account_count: int
 
 
 @router.get("/account-performance", response_model=ExternalAccountPerformance)

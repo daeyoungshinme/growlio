@@ -32,6 +32,16 @@ MAX_GOAL_CANDIDATE_TICKERS = 20
 """사용자가 등록 가능한 목표 역산 추천 후보 종목 최대 개수 — 설정 저장 검증(`GoalCandidateTickersUpdate`)·
 중복 점검 요청 검증(`CandidateOverlapRequest`)·추천 서비스의 잔여 슬롯 계산이 공유한다."""
 
+DEFAULT_GOAL_MAX_WEIGHT_PCT = 40.0
+"""목표 추천 종목당 최대 비중(%) 기본값 — `UserSettings.goal_max_weight_pct`가 NULL일 때.
+설정 응답·옵션 기본값·최적화 상한이 공유한다."""
+
+DEFAULT_GOAL_CAGR_LOOKBACK_YEARS = 10
+"""목표 추천 기대수익률(CAGR) 산출 기간(년) 기본값 — `UserSettings.goal_cagr_lookback_years`가 NULL일 때."""
+
+DEFAULT_GOAL_SHORT_TERM_EQUITY_FLOOR_PCT = 80.0
+"""단기 목표 추천의 최소 주식 비중(%) 기본값 — `UserSettings.goal_short_term_equity_floor_pct`가 NULL일 때."""
+
 PENSION_TAX_TYPES: frozenset[str] = frozenset({"PENSION_SAVINGS", "IRP"})
 """연금저축·IRP — 세법/퇴직급여법상 매수 가능 상품이 제한되고 납입액이 세액공제 대상인 계좌 tax_type."""
 

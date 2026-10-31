@@ -27,7 +27,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import DOMESTIC_MARKETS, MAX_GOAL_CANDIDATE_TICKERS
+from app.constants import DEFAULT_GOAL_SHORT_TERM_EQUITY_FLOOR_PCT, DOMESTIC_MARKETS, MAX_GOAL_CANDIDATE_TICKERS
 from app.enums import AccountTaxType, InvestmentHorizon
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
@@ -79,7 +79,7 @@ _HORIZON_ELIGIBLE_ASSET_CLASSES: dict[str, set[str]] = {
     "LONG_TERM": {"EQUITY"},
 }
 
-_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT = 80.0
+_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT = DEFAULT_GOAL_SHORT_TERM_EQUITY_FLOOR_PCT
 """단기(최대 3년) 목표는 안전자산 위주가 아니라 주식을 최소 이 비율까지 담아 다소 공격적으로
 구성한다 — 사용자가 UserSettings.goal_short_term_equity_floor_pct로 조정 가능, NULL이면 이 기본값
 사용. 등록된 주식 후보가 하나도 없으면 이 제약은 적용하지 않고 기존(안전자산만으로 최소분산)
