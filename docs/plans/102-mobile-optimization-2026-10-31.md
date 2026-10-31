@@ -1,4 +1,4 @@
-# 모바일 최적화 재감사·수정 계획 (docs/plans/101)
+# 모바일 최적화 재감사·수정 계획 (docs/plans/102)
 
 ## Context
 모바일 라운드(53·58·67·72·79)를 여러 번 거쳐 기본기는 갖춰졌다. viewport `interactive-widget`, `h-dvh`, safe-area, `--bottom-nav-h`, Android 뒤로가기, lazy 청크, 가상 스크롤, `inputMode` 63/63이 모두 들어가 있다. 그래서 이번 감사(셸·공통 / 홈·자산·계획·설정 / 리밸런싱 3영역, 코드 리딩 390px 기준)에서 남은 것은 아래 다섯 축이다.
@@ -11,8 +11,8 @@
 목표는 이 다섯 축을 정리해 "실주문·입력·숫자 읽기" 동선에서 막히는 곳을 없애는 것이다.
 
 ## 0. 계획서 저장
-- 이 내용을 `docs/plans/101-mobile-optimization-2026-10-31.md`로 저장한다.
-- `docs/plans/README.md` 인덱스에 행을 추가하고, 67 행에 "잔여 → 101"을 적는다.
+- 이 내용을 `docs/plans/102-mobile-optimization-2026-10-31.md`로 저장한다.
+- `docs/plans/README.md` 인덱스에 행을 추가하고, 67 행에 "잔여 → 102"을 적는다.
 - 브랜치: `chore/mobile-optimization-2026-10-31`.
 
 ---
