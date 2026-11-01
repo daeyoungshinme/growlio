@@ -8,8 +8,15 @@ import {
   RebalancingExecutionContext,
   useRebalancingExecution,
 } from "@/hooks/useRebalancingExecution";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalBody } from "@/components/common/Modal";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import SegmentedControl from "@/components/common/SegmentedControl";
+import type { OrderType } from "@/hooks/rebalancingExecution/types";
+
+const ORDER_TYPE_OPTIONS: readonly { value: OrderType; label: string }[] = [
+  { value: "MARKET", label: "시장가" },
+  { value: "LIMIT", label: "지정가" },
+];
 
 interface Props {
   portfolioId: string;
@@ -45,22 +52,12 @@ export function RebalancingExecutionModal({
         {phase === "confirm" && (
           <div className="shrink-0 px-4 sm:px-6 py-2.5 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center gap-3">
             <span className="text-xs text-gray-500 dark:text-gray-400">주문 유형</span>
-            <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              {(["MARKET", "LIMIT"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => dispatch({ type: "SET_ORDER_TYPE", orderType: type })}
-                  aria-pressed={orderType === type}
-                  className={`${TOUCH_HEIGHT_MIN} px-4 py-2 text-sm font-medium transition-colors ${
-                    orderType === type
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                  }`}
-                >
-                  {type === "MARKET" ? "시장가" : "지정가"}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              options={ORDER_TYPE_OPTIONS}
+              value={orderType}
+              onChange={(next) => dispatch({ type: "SET_ORDER_TYPE", orderType: next })}
+              ariaLabel="주문 유형"
+            />
             {priceState === "loading" && (
               <div className="w-full sm:w-48 space-y-1">
                 <div className="flex justify-between text-xs text-gray-500 dark:text-gray-500">
@@ -99,7 +96,7 @@ export function RebalancingExecutionModal({
           </div>
         )}
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+        <ModalBody padding="px-4 sm:px-6 py-4" className="space-y-4">
           {phase === "confirm" && <RebalancingConfirmStep ordersCount={orders.length} />}
 
           {phase === "executing" && (
@@ -115,7 +112,7 @@ export function RebalancingExecutionModal({
           )}
 
           {phase === "result" && <RebalancingResultSection results={results} onSynced={onSynced} />}
-        </div>
+        </ModalBody>
 
         {/* 시세를 불러오는 중엔 모든 종목이 '비어 있음'으로 잡힌다 — 위 로딩 배너로 충분하고 버튼은 계속 막혀 있다 */}
         {phase === "confirm" && priceState !== "loading" && missingLimitPriceTickers.length > 0 && (

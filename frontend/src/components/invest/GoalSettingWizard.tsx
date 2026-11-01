@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import Modal, { ModalFooter } from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { GoalForm } from "@/hooks/useGoalSettings";
 import {
@@ -60,7 +60,7 @@ export default function GoalSettingWizard({
 
   return (
     <Modal title={`목표 설정 가이드 (${step}/${TOTAL_STEPS})`} onClose={onClose} size="md">
-      <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-2 space-y-4 flex-1">
+      <ModalBody padding="px-6 pb-6 pt-2" className="space-y-4">
         <div className="flex items-center gap-1.5">
           {STEP_TITLES.map((title, i) => (
             <div
@@ -93,7 +93,7 @@ export default function GoalSettingWizard({
             목표 금액과 목표 시점을 입력하면 다음으로 넘어갈 수 있어요.
           </p>
         )}
-      </div>
+      </ModalBody>
       <ModalFooter>
         {step > 1 && (
           <button

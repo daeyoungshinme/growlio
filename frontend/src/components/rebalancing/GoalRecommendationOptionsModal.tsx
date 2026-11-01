@@ -10,7 +10,7 @@ import { RISK_TOLERANCE_OPTIONS } from "@/constants/goalRiskTolerance";
 import { invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import Modal, { ModalFooter } from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { settingsQuery } from "@/api/queryOptions";
 
@@ -126,7 +126,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
 
   return (
     <Modal onClose={onClose} title="추천 설정" size="sm">
-      <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
+      <ModalBody padding="p-4" className="space-y-4">
         <p className="text-xs text-gray-500 dark:text-gray-400">
           목표 달성 추천 비중을 계산하는 방식을 조정합니다. 저장하지 않으면 기존 설정이 유지됩니다.
         </p>
@@ -297,7 +297,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
             "연령대" 탭에서 해당 연령대에 맞는 투자성향과 주식비중으로 추천을 받을 수 있습니다.
           </p>
         </div>
-      </div>
+      </ModalBody>
       <ModalFooter>
         <button
           type="button"

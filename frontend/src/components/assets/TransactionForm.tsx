@@ -13,13 +13,14 @@ import { useUsdAmountInput } from "@/hooks/useUsdAmountInput";
 import { formatUsdAsKrw, fmtKrwPreview, localToday } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
-import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
+import { TX_LABELS, TX_TYPES, CURRENCY_OPTIONS } from "@/constants/transaction";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import FormInput from "@/components/common/FormInput";
 import { TickerSearchField } from "./TickerSearchField";
 import { extractErrorMessage } from "@/utils/error";
 import { transactionSchema, type TransactionFormData } from "@/schemas/transaction";
+import SegmentedControl from "@/components/common/SegmentedControl";
 
 // 모듈 로드 시점에 고정하면 자정을 넘긴 세션에서 어제 날짜가 남는다 — 폼을 열 때마다 계산
 const makeEmptyForm = (): TransactionCreate => ({
@@ -195,19 +196,12 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
             <div className="flex items-center justify-between">
               <label className={labelCls}>금액 *</label>
               {form.transaction_type === "DIVIDEND" && (
-                <div className="flex gap-0.5 text-xs">
-                  {CURRENCY_TYPES.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => switchCurrency(c)}
-                      aria-pressed={currency === c}
-                      className={`px-2.5 py-2 rounded transition-colors ${currency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"}`}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  options={CURRENCY_OPTIONS}
+                  value={currency}
+                  onChange={switchCurrency}
+                  ariaLabel="통화"
+                />
               )}
             </div>
             {currency === "USD" && form.transaction_type === "DIVIDEND" ? (

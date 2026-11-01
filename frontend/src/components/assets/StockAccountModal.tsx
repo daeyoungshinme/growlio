@@ -1,6 +1,6 @@
 import { Lock } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import Modal, { ModalFooter } from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
@@ -189,7 +189,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
         size="md"
         closeOnBackdrop
       >
-        <div className="overflow-y-auto flex-1 px-6 py-4">
+        <ModalBody>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
             {isEdit
               ? "계좌 정보를 수정합니다. 계좌번호·유형·데이터 소스는 변경할 수 없습니다."
@@ -410,7 +410,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
               </label>
             </div>
           </div>
-        </div>
+        </ModalBody>
         <ModalFooter>
           <button
             onClick={onClose}

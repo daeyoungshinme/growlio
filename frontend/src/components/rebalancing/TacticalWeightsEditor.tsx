@@ -7,7 +7,7 @@ import type {
   TacticalStrategyPayload,
 } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
-import { ToggleSwitch } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleSwitch";
 import SegmentedControl from "@/components/common/SegmentedControl";
 import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
@@ -286,16 +286,12 @@ export default function TacticalWeightsEditor({
           </p>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold">매크로 신호 반영</span>
-            <ToggleSwitch checked={macro} onChange={setMacro} ariaLabel="매크로 신호 반영" />
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            끄면 SPY·QQQ 200일선 추세만으로 국면을 판단해요. 과거 백테스트에선 수익률이 더 높았지만
-            최근 10년 최대낙폭은 커졌어요.
-          </p>
-        </div>
+        <ToggleRow
+          title="매크로 신호 반영"
+          description="끄면 SPY·QQQ 200일선 추세만으로 국면을 판단해요. 과거 백테스트에선 수익률이 더 높았지만 최근 10년 최대낙폭은 커졌어요."
+          checked={macro}
+          onChange={setMacro}
+        />
 
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">웅덩이 매수 투입폭</span>

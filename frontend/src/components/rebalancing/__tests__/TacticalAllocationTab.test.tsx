@@ -295,7 +295,7 @@ describe("TacticalAllocationTab", () => {
     vi.mocked(tacticalApi.upsertTacticalStrategy).mockResolvedValue(makeStatus());
     renderTab();
 
-    fireEvent.click(await screen.findByLabelText("국면 전환 알림"));
+    fireEvent.click(await screen.findByLabelText("국면 전환 알림 (이메일·푸시)"));
     await waitFor(() =>
       expect(tacticalApi.upsertTacticalStrategy).toHaveBeenCalledWith("p1", {
         notify_enabled: false,

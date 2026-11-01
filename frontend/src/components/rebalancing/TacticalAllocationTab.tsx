@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { TacticalStatus } from "@/api/tactical";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { ToggleSwitch } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleSwitch";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
@@ -104,23 +104,20 @@ function TacticalStatusView({
           </button>
         ) : (
           <>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm">국면 전환 알림 (이메일·푸시)</span>
-              <ToggleSwitch
-                checked={status.notify_enabled}
-                disabled={upsert.isPending}
-                onChange={(checked) =>
-                  upsert.mutate({
-                    notify_enabled: checked,
-                    regime_weights: status.is_default_weights ? null : status.regime_weights,
-                    tilt_shift_pct: status.tilt_shift_pct,
-                    dip_shift_pct: status.dip_shift_pct,
-                    use_macro: status.use_macro,
-                  })
-                }
-                ariaLabel="국면 전환 알림"
-              />
-            </div>
+            <ToggleRow
+              title="국면 전환 알림 (이메일·푸시)"
+              checked={status.notify_enabled}
+              disabled={upsert.isPending}
+              onChange={(checked) =>
+                upsert.mutate({
+                  notify_enabled: checked,
+                  regime_weights: status.is_default_weights ? null : status.regime_weights,
+                  tilt_shift_pct: status.tilt_shift_pct,
+                  dip_shift_pct: status.dip_shift_pct,
+                  use_macro: status.use_macro,
+                })
+              }
+            />
             {!fullyApplied && (
               <button
                 type="button"
