@@ -18,7 +18,7 @@
     "generate:icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.3",
+    "@capacitor/android": "^8.6.0",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/haptics": "^8.0.2",
