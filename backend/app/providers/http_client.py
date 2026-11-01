@@ -82,6 +82,8 @@ def _is_rate_limit_body(response: httpx.Response) -> bool:
         data = response.json()
     except Exception:
         return False
+    if not isinstance(data, dict):  # 배열·null·문자열 본문 — 원래 HTTP 오류를 AttributeError로 덮지 않는다
+        return False
     err = data.get("error")
     return (
         data.get("msg_cd") == "EGW00201"
