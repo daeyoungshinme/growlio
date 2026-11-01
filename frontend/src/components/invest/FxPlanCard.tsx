@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchFxPlan, type FxPlanData, type FxZone } from "@/api/invest";
 import { createExchangeRateAlert } from "@/api/alerts";
@@ -7,6 +8,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { SELECT_SM } from "@/constants/inputStyles";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { ALERT_TABS } from "@/constants/tabs";
 import Tabs from "@/components/common/Tabs";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { fmtKrw, fmtPct, clampPct, fmtUsd } from "@/utils/format";
@@ -285,17 +287,28 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
                 환전은 증권사 앱에서 직접 진행합니다.
               </p>
               {targets.length > 0 && (
-                <button
-                  onClick={() => registerMutation.mutate()}
-                  disabled={pendingTargets.length === 0 || registerMutation.isPending}
-                  className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
-                >
-                  {pendingTargets.length === 0
-                    ? "목표 환율 알림 등록됨"
-                    : registerMutation.isPending
-                      ? "등록 중…"
-                      : "목표 환율 알림 등록"}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <button
+                    onClick={() => registerMutation.mutate()}
+                    disabled={pendingTargets.length === 0 || registerMutation.isPending}
+                    className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                  >
+                    {pendingTargets.length === 0
+                      ? "목표 환율 알림 등록됨"
+                      : registerMutation.isPending
+                        ? "등록 중…"
+                        : "목표 환율 알림 등록"}
+                  </button>
+                  {/* 등록한 알림의 수정·삭제는 설정 › 알림 설정 › 환율 알림에서 (계획 106 C2) */}
+                  {targets.some((r) => registered.has(r)) && (
+                    <Link
+                      to={`/settings/notifications?atab=${ALERT_TABS[0]}`}
+                      className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline`}
+                    >
+                      환율 알림 관리 →
+                    </Link>
+                  )}
+                </div>
               )}
             </>
           )}

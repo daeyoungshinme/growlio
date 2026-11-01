@@ -47,6 +47,7 @@ describe("AutoDailyCapEditor", () => {
   it("금액을 입력해 저장하면 숫자로 PUT 한다", async () => {
     renderWithSettings(null);
     const input = await screen.findByLabelText("하루 합산 최대 거래대금 (원)");
+    expect(screen.getByText(/모든 포트폴리오 공통/)).toBeInTheDocument();
     fireEvent.change(input, { target: { value: "3000000" } });
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() =>

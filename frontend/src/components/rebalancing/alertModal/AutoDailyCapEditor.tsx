@@ -43,6 +43,10 @@ function DailyCapForm({ dailyCapKrw, maxOrderValueKrw, onSave, isSaving }: FormP
         <label htmlFor="auto-daily-cap" className={LABEL_MD}>
           하루 합산 최대 거래대금 (원)
         </label>
+        {/* 포트폴리오별 모달 안에 있지만 유저 단위 설정 — 범위를 명시한다(계획 106 C3) */}
+        <p className="text-xs text-amber-700 dark:text-amber-400 mb-1">
+          모든 포트폴리오 공통 — 여기서 바꾸면 다른 포트폴리오의 자동 실행에도 적용돼요.
+        </p>
         <input
           id="auto-daily-cap"
           type="number"
