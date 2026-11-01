@@ -1,17 +1,13 @@
 import { useState } from "react";
 import { TriangleAlert, ChevronDown, ChevronUp, Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  fetchOverseasPositionsTax,
-  fetchOverseasRealized,
-  fetchTaxSummary,
-  type TaxSummary,
-} from "@/api/tax";
+import { fetchOverseasPositionsTax, fetchOverseasRealized, type TaxSummary } from "@/api/tax";
 import TaxPlannerSection from "@/components/tax/TaxPlannerSection";
 import { GeumtSimulationSection } from "@/components/tax/GeumtSimulationSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { fmtKrw } from "@/utils/format";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { taxSummaryQuery } from "@/api/queryOptions";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { SELECT_SM } from "@/constants/inputStyles";
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
@@ -34,11 +30,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
   const [plannerOpenOverride, setPlannerOpenOverride] = useState<boolean | null>(null);
   const [geumtOpen, setGeumtOpen] = useState(false);
 
-  const { data: taxData, isLoading: taxLoading } = useQuery({
-    queryKey: QUERY_KEYS.taxSummary(taxYear, accountId),
-    queryFn: () => fetchTaxSummary(taxYear, accountId),
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data: taxData, isLoading: taxLoading } = useQuery(taxSummaryQuery(taxYear, accountId));
 
   const hasLossHarvestCandidates = (taxData?.overseas_unrealized_gain_krw ?? 0) < 0;
   const plannerOpen = plannerOpenOverride ?? false;

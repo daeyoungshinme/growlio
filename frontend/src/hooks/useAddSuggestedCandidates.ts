@@ -7,7 +7,7 @@ import { toast } from "@/utils/toast";
 
 /** 제안된 배당 후보(`suggested_candidates`)를 현재 등록된 후보 목록에 병합해 저장한다 —
  * 승인 전에는 비중 계산에 반영되지 않으므로 사용자가 "후보에 추가" 버튼을 눌러야만 호출된다.
- * `RecommendationCard.tsx`(리밸런싱 탭)와 `DividendPlanSection.tsx`(배당 계획 탭)가 공용한다. */
+ * 리밸런싱 › 목표 조정 › 추천(`RecommendationCard.tsx`)이 쓴다 — 배당 계획 탭은 이름 요약과 링크만 둔다(plans/106 C1). */
 export function useAddSuggestedCandidates(currentCandidates: GoalCandidateTicker[]) {
   const queryClient = useQueryClient();
   return useMutation({

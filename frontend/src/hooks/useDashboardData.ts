@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchDashboard } from "@/api/dashboard";
 import { useExchangeRate } from "./useExchangeRate";
 import { useChallenges } from "./useChallenges";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
+import { REFETCH_INTERVAL } from "@/constants/queryConfig";
 import { isNativePlatform } from "@/utils/platform";
 import {
   accountsQuery,
+  dashboardQuery,
   dcaAnalysisQuery,
   marketSignalQuery,
   portfolioOverviewLiteQuery,
@@ -18,9 +17,7 @@ const DASHBOARD_POLL = isNativePlatform() ? false : REFETCH_INTERVAL.DASHBOARD;
 
 export function useDashboardData() {
   const { data, isLoading, error, dataUpdatedAt, refetch } = useQuery({
-    queryKey: QUERY_KEYS.dashboard,
-    queryFn: fetchDashboard,
-    staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 백엔드 캐시 TTL(5분)과 동기화
+    ...dashboardQuery,
     refetchInterval: DASHBOARD_POLL,
     refetchOnWindowFocus: false,
   });

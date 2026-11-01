@@ -1,7 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchTaxSummary } from "@/api/tax";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import { taxSummaryQuery } from "@/api/queryOptions";
 import { clampPct, fmtKrw } from "@/utils/format";
 
 function riskColor(pct: number): string {
@@ -21,14 +19,10 @@ function riskBarColor(pct: number): string {
 /** 배당소득 기준 건강보험 피부양자 자격상실 위험을 상시 노출한다(ISA/연금 계좌 유무와 무관 —
  * 배당소득은 계좌 태그가 아니라 전체 배당 수령액 기준). ISA/연금 계좌가 하나도 없어도 이 카드는
  * 항상 보여야 "세금탭에 아무것도 안 보인다"는 사각지대가 생기지 않는다.
- * `TaxOptimizationCard`와 동일 queryKey를 써서 React Query 캐시를 공유한다. */
+ * `TaxOptimizationCard`와 같은 `taxSummaryQuery`라 React Query 캐시를 공유한다. */
 export default function HealthInsuranceRiskCard() {
   const currentYear = new Date().getFullYear();
-  const { data } = useQuery({
-    queryKey: QUERY_KEYS.taxSummary(currentYear, undefined),
-    queryFn: () => fetchTaxSummary(currentYear, undefined),
-    staleTime: STALE_TIME.LONG,
-  });
+  const { data } = useQuery(taxSummaryQuery(currentYear));
 
   if (!data) return null;
 
