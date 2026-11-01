@@ -9,7 +9,7 @@ import { useDividendData } from "@/hooks/useDividendData";
 import StockHoldingsTable, {
   type HoldingsSortRequest,
 } from "@/components/assets/StockHoldingsTable";
-import HorizonSummaryCard from "@/components/dashboard/HorizonSummaryCard";
+import HorizonSummaryCard from "@/components/portfolio/HorizonSummaryCard";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { fmtKrw } from "@/utils/format";
 import { invalidateSyncData } from "@/utils/queryInvalidation";

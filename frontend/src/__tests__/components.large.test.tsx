@@ -213,7 +213,7 @@ import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { AnalysisPanel } from "@/components/portfolio-analysis/AnalysisPanel";
 import { clearAnalysisCache } from "@/hooks/useAnalysisState";
-import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
+import RebalancingStatusCard from "@/components/rebalancing/RebalancingStatusCard";
 import { fetchPortfolios } from "@/api/portfolios";
 import { analyzePortfolio, fetchDriftSummary } from "@/api/rebalancing";
 import AssetsPage from "@/pages/AssetsPage";

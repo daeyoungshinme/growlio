@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import IsaMaturityCard from "@/components/dashboard/IsaMaturityCard";
-import PensionContributionCard from "@/components/dashboard/PensionContributionCard";
-import HealthInsuranceRiskCard from "@/components/dashboard/HealthInsuranceRiskCard";
+import IsaMaturityCard from "@/components/tax/IsaMaturityCard";
+import PensionContributionCard from "@/components/tax/PensionContributionCard";
+import HealthInsuranceRiskCard from "@/components/tax/HealthInsuranceRiskCard";
 import TaxActionPlanCard from "@/components/tax/TaxActionPlanCard";
 import { isaStatusQuery, portfolioOverviewLiteQuery } from "@/api/queryOptions";
 
