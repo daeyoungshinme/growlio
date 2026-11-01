@@ -14,6 +14,7 @@ import {
   type OverallTargetSelection,
   type RecommendationTabActions,
 } from "@/components/rebalancing/recommendationCardModel";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 interface Props {
   data: GoalRecommendation;
@@ -30,7 +31,7 @@ export default function RecommendationOverallTab({ data, selection, actions }: P
         fallback="목표금액·목표연도를 설정하면 추천을 받을 수 있습니다"
         action={
           <Link
-            to="/invest-plan?tab=적립 계획&from=recommendation"
+            to={investPlanUrl("적립 계획", { from: "recommendation" })}
             className={SETUP_CTA_ACTION_CLASS}
           >
             목표 설정하러 가기 <ArrowRight size={12} />

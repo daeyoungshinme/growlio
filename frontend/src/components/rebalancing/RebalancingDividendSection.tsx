@@ -5,6 +5,7 @@ import { fmtKrw } from "@/utils/format";
 import { CASH_TICKER } from "@/constants/assets";
 import { DividendDiffCell } from "./RebalancingCells";
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 interface Props {
   analysis: RebalancingAnalysis;
@@ -29,7 +30,7 @@ export default function RebalancingDividendSection({ analysis }: Props) {
         <div className="text-sm font-medium text-gray-800 dark:text-gray-200">배당 분석</div>
         <div className="flex items-center gap-3 shrink-0">
           <Link
-            to="/invest-plan?tab=배당 계획"
+            to={investPlanUrl("배당 계획")}
             className={`inline-flex items-center ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
           >
             배당 목표 확인

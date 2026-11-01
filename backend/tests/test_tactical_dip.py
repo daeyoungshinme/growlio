@@ -281,7 +281,7 @@ def _items(**weights):
 @pytest.fixture(autouse=True)
 def _no_group_suggestions():
     # 적용 시 새 지수 그룹의 보유 종목 제안 조회(plans/76) — 여기선 대표 종목만으로 생성
-    with patch("app.api.v1.tactical._group_suggestions", AsyncMock(return_value=None)):
+    with patch.object(tactical, "group_suggestions_for", AsyncMock(return_value=None)):
         yield
 
 

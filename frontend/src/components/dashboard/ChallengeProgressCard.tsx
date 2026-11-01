@@ -3,6 +3,7 @@ import { Flame, ChevronRight } from "lucide-react";
 import type { Challenge } from "@/api/challenges";
 import { clampPct, fmtPct } from "@/utils/format";
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 interface Props {
   challenges: Challenge[];
@@ -22,7 +23,7 @@ export default function ChallengeProgressCard({ challenges }: Props) {
   // 한 줄 행 — 미입금 경고는 "지금 할 일"·하단 네비 배지가 이미 띄우므로 여기선 습관 지표만 (docs/plans/67 P1-4)
   return (
     <Link
-      to="/invest-plan?tab=챌린지"
+      to={investPlanUrl("챌린지")}
       className={`card flex items-center gap-3 ${TOUCH_HEIGHT_MIN} active:opacity-70 hover:border-blue-300 dark:hover:border-blue-700 transition-colors`}
     >
       <div className="p-1.5 rounded-lg shrink-0 bg-orange-100/60 dark:bg-orange-900/30">

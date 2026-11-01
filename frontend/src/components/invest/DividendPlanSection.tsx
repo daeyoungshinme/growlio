@@ -16,6 +16,7 @@ import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationC
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { goalRecommendationOverallQuery } from "@/api/queryOptions";
 import { TOUCH_HEIGHT_MIN, TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { portfolioUrl } from "@/utils/tabUrl";
 
 interface Props {
   onOpenSettings: () => void;
@@ -102,7 +103,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
         </div>
         <div className="text-right mb-4">
           <Link
-            to="/assets?tab=투자현황&portfolioTab=배당"
+            to={portfolioUrl("배당")}
             className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
           >
             종목별 배당 내역 보기

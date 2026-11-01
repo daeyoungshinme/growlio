@@ -78,12 +78,15 @@ export default function Modal({
 export function ModalBody({
   children,
   className = "",
+  padding = "px-6 py-4",
 }: {
   children: ReactNode;
   className?: string;
+  /** 기본 여백을 바꿀 때 — `className`에 px/py를 넣으면 기본값과 충돌해 CSS 순서로 승자가 갈린다 */
+  padding?: string;
 }) {
   return (
-    <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4 ${className}`}>
+    <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${padding} ${className}`}>
       {children}
     </div>
   );

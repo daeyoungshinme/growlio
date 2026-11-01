@@ -16,6 +16,7 @@ import {
   CASH_EQUIVALENT_TICKER,
 } from "@/constants/assets";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
+import { ModalBody } from "@/components/common/Modal";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { CASH_TICKER } from "@/constants/assets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -193,7 +194,7 @@ export default function UnifiedPortfolioEditor({
             </button>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-6 space-y-5">
+          <ModalBody padding="px-4 py-4 sm:px-6" className="space-y-5">
             {/* 이름 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -413,7 +414,7 @@ export default function UnifiedPortfolioEditor({
                 onSelectAll={() => setUserOverrideIds(null)}
               />
             )}
-          </div>
+          </ModalBody>
 
           {/* 하단 버튼 */}
           <div className="flex gap-3 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4 border-t border-gray-100 dark:border-gray-700 shrink-0">

@@ -54,10 +54,8 @@ async def _check_one(db, strategy_id, market: dict) -> None:
     strategy = await db.get(TacticalStrategy, strategy_id)
     if strategy is None:
         return
-    today = today_kst()
-    tactical.advance_regime(strategy, market, today)
-    tactical.advance_tilt(strategy, market, today)  # 틸트 단독 변경은 알림 없음(월 1회·소폭 조정이라 소음만 늘린다)
-    tactical.advance_dip(strategy, market)
+    # 틸트 단독 변경은 알림 없음(월 1회·소폭 조정이라 소음만 늘린다)
+    tactical.advance_strategy(strategy, market, today_kst())
     regime_sent = await _notify_regime(db, strategy, market)
     await _notify_dip(db, strategy, market, regime_sent=regime_sent)
     await db.commit()

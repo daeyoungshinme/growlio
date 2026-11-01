@@ -17,7 +17,7 @@ import { formatTerPct, itemKey, overlapWarningFor } from "@/utils/etfOverlap";
 import { invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import Modal, { ModalFooter } from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import { useTimeout } from "@/hooks/useTimeout";
 import { settingsQuery } from "@/api/queryOptions";
 
@@ -135,7 +135,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
 
   return (
     <Modal onClose={onClose} title="후보 ETF 관리" size="sm">
-      <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3">
+      <ModalBody padding="p-4" className="space-y-3">
         <p className="text-xs text-gray-500 dark:text-gray-400">
           목표 달성 추천 비중 계산에 함께 고려할 ETF 후보를 등록합니다. ISA·연금저축·IRP 계좌는
           해외지수 추종 ETF를, 일반 계좌는 국내지수 추종 종목·ETF를 기간별 추천에서 우선 반영합니다
@@ -251,7 +251,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
             </ul>
           )}
         </div>
-      </div>
+      </ModalBody>
       <ModalFooter>
         <button
           type="button"

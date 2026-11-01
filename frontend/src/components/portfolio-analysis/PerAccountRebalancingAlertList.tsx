@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, Loader2 } from "lucide-react";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalBody } from "@/components/common/Modal";
 import RebalancingAlertModal from "@/components/rebalancing/RebalancingAlertModal";
 import {
   fetchAccountRebalancingAlerts,
@@ -84,7 +84,7 @@ export default function PerAccountRebalancingAlertList({
         size="md"
         closeOnBackdrop
       >
-        <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3">
+        <ModalBody padding="p-4" className="space-y-3">
           <p className="text-xs text-gray-500 dark:text-gray-400">
             이 포트폴리오에 연결된 계좌마다 알림/자동매매를 독립적으로 설정합니다.
           </p>
@@ -146,7 +146,7 @@ export default function PerAccountRebalancingAlertList({
               })}
             </ul>
           )}
-        </div>
+        </ModalBody>
         <div className="sticky bottom-0 bg-white dark:bg-gray-900 px-4 py-3 border-t border-gray-100 dark:border-gray-700">
           <button
             onClick={handleSwitchBackClick}

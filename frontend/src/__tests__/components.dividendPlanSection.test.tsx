@@ -4,11 +4,9 @@ import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders as renderWithProvidersBase } from "@/test/renderWithProviders";
 import type { DividendPlanData } from "@/api/invest";
 import type { GoalRecommendation } from "@/api/rebalancing";
-import type { SettingsData } from "@/api/settings";
 
 const fetchDividendPlan = vi.fn();
 const fetchOverallGoalRecommendation = vi.fn();
-const fetchSettings = vi.fn();
 const toastMock = vi.fn();
 
 vi.mock("@/api/invest", () => ({
@@ -16,9 +14,6 @@ vi.mock("@/api/invest", () => ({
 }));
 vi.mock("@/api/rebalancing", () => ({
   fetchOverallGoalRecommendation: (...args: unknown[]) => fetchOverallGoalRecommendation(...args),
-}));
-vi.mock("@/api/settings", () => ({
-  fetchSettings: (...args: unknown[]) => fetchSettings(...args),
 }));
 vi.mock("@/utils/toast", () => ({ toast: (...args: unknown[]) => toastMock(...args) }));
 vi.mock("@/stores/themeStore", () => ({
@@ -80,49 +75,10 @@ function makeRecommendation(overrides: Partial<GoalRecommendation> = {}): GoalRe
   };
 }
 
-function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
-  return {
-    has_kis: false,
-    has_dart: false,
-    goal_amount: null,
-    goal_annual_return_pct: null,
-    annual_deposit_goal: null,
-    monthly_deposit_amount: null,
-    retirement_target_year: null,
-    user_email: "test@example.com",
-    notification_email: null,
-    annual_dividend_goal: 3_000_000,
-    fcm_token_stored: false,
-    composite_signal_alerts_enabled: true,
-    market_signal_daily_digest_enabled: false,
-    year_end_tax_reminder_enabled: false,
-    goal_achievement_alerts_enabled: true,
-    monthly_report_enabled: true,
-    recommendation_drift_alert_enabled: false,
-    challenge_reminders_enabled: false,
-    goal_candidate_tickers: [
-      { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", asset_class: "EQUITY" },
-    ],
-    goal_risk_tolerance: "CONSERVATIVE",
-    goal_max_weight_pct: 40.0,
-    goal_cagr_lookback_years: 10,
-    goal_short_term_equity_floor_pct: 80.0,
-    goal_bond_ceiling_pct: null,
-    goal_cash_ceiling_pct: null,
-    age_group: null,
-    birth_year: null,
-    income_bracket: null,
-    auto_rebalancing_max_order_value_krw: 50_000_000.0,
-    auto_rebalancing_daily_value_cap_krw: null,
-    ...overrides,
-  };
-}
-
 describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    fetchSettings.mockResolvedValue(makeSettingsData());
   });
 
   it("배당목표 + 추천이 설정된 경우 목표/기대 배당수익률 비교와 제안 후보를 보여준다", async () => {

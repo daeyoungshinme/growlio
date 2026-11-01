@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { Challenge, ChallengeCreatePayload, ChallengeType } from "@/api/challenges";
 import type { AssetAccount } from "@/api/assets";
 import type { SettingsData } from "@/api/settings";
-import Modal, { ModalFooter } from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import FormInput from "@/components/common/FormInput";
 import { ToggleRow } from "@/components/common/ToggleSwitch";
@@ -152,7 +152,7 @@ export default function ChallengeFormModal({
   return (
     <>
       <Modal title={isEdit ? "챌린지 편집" : "새 챌린지"} onClose={requestClose} size="md">
-        <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-2 space-y-4 flex-1">
+        <ModalBody padding="px-6 pb-6 pt-2" className="space-y-4">
           {!isEdit && (
             <div>
               <span className={`block mb-1 ${LABEL_SM}`}>유형</span>
@@ -303,7 +303,7 @@ export default function ChallengeFormModal({
             checked={form.reminder_enabled}
             onChange={(v) => set("reminder_enabled", v)}
           />
-        </div>
+        </ModalBody>
         <ModalFooter>
           <button
             type="button"

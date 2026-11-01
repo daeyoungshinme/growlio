@@ -28,6 +28,7 @@ import { invalidateTradeData } from "@/utils/queryInvalidation";
 import { convertUsdToKrw, fmtKrwPrice, localToday } from "@/utils/format";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
+import SegmentedControl from "@/components/common/SegmentedControl";
 
 export interface TradePrefill {
   account_id: string;
@@ -197,23 +198,13 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
             </select>
           </div>
 
-          <div className="flex gap-2" role="group" aria-label="매매 구분">
-            {SIDE_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                aria-pressed={side === o.value}
-                onClick={() => setSide(o.value)}
-                className={`${TOUCH_TARGET_MIN} flex-1 rounded-lg text-sm font-medium transition-colors ${
-                  side === o.value
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
-                }`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            options={SIDE_OPTIONS}
+            value={side}
+            onChange={setSide}
+            ariaLabel="매매 구분"
+            stretch
+          />
 
           <div>
             <label htmlFor="trade-stock" className={FORM_LABEL}>

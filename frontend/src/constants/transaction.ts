@@ -4,6 +4,8 @@ export const TX_TYPES = ["DEPOSIT", "WITHDRAWAL", "DIVIDEND", "INTEREST"] as con
 export type TxType = (typeof TX_TYPES)[number];
 
 export const CURRENCY_TYPES = ["KRW", "USD"] as const;
+/** 통화 택일 `SegmentedControl` 옵션 */
+export const CURRENCY_OPTIONS = CURRENCY_TYPES.map((c) => ({ value: c, label: c }));
 export type CurrencyType = (typeof CURRENCY_TYPES)[number];
 
 export const TX_LABELS: Record<string, string> = {

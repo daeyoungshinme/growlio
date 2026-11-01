@@ -15,6 +15,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { portfoliosQuery } from "@/api/queryOptions";
+import { assetManagementUrl } from "@/utils/tabUrl";
 
 const ActionItemsCard = lazy(() => import("../components/dashboard/ActionItemsCard"));
 
@@ -47,7 +48,7 @@ function OnboardingChecklist() {
               </p>
             </div>
             <Link
-              to="/assets?tab=계좌관리&atab=증권계좌"
+              to={assetManagementUrl("증권계좌")}
               className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
             >
               등록하기 →

@@ -44,7 +44,7 @@ make build-android-debug / build-android-release
 - `/dashboard` — 홈
 - `/assets` — 단일 라우트, `?tab=` 투자현황/계좌관리 (`ASSETS_TOP_TABS`). 계좌관리 `?atab=` 기본은 증권계좌(`ASSET_MANAGEMENT_TABS[0]`)
 - `/invest-plan` — `?tab=` 적립 계획/배당 계획/절세/챌린지
-- `/settings`, `/settings/notifications` — 각 기능의 편집 UI는 해당 페이지에 있고 설정 탭엔 요약 + 딥링크만. 알림 설정 `?atab=`은 URL 동기화, 단 `atab=시장 신호 알림`은 탭이 아니라 시장 모니터링 카드를 펼치는 값(발송된 링크 호환)
+- `/settings`, `/settings/notifications` — 각 기능의 편집 UI는 해당 페이지에 있고 설정 탭엔 요약 + 딥링크만. 알림 설정 `?atab=`은 URL 동기화, 단 `atab=시장 신호 알림`(`MARKET_ALERT_SECTION`)은 탭이 아니라 시장 모니터링 카드를 펼치는 값(발송된 링크 호환)
 - **탭 계층**: 페이지 1단 = pill, 2단 = underline, 3단 = segmented. 4단 이상 금지 — 더 필요하면 select나 접기로
 - `/rebalancing` — `?rtab=` 진단/포트폴리오/목표 조정/이력, 목표 조정 안 `?gmode=` 추천/전술. **링크는 반드시 `utils/rebalancingUrl.ts`의 `rebalancingUrl()`로**, 페이지 내부 URL 상태는 `hooks/useRebalancingUrlState.ts`
 - `*` → `/dashboard`. `/market`·`/portfolio`·`/asset-management`·`/trend`는 없음(제거됨). `BottomNav`(`constants/nav.ts`)는 5탭
@@ -70,7 +70,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 
 디렉토리: assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings, tax. 최상위 `ErrorBoundary.tsx`, `Toaster.tsx`(`growlio:toast` 이벤트 구독).
 
-**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 오버플로우 메뉴 — 아이콘+라벨 함께 렌더, 모바일 `title` 미동작 우회), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalBody`·`ModalFooter` — `Modal`은 스크롤을 두지 않아 **긴 본문은 `ModalBody`로 감싸야** 하단에 닿고, **입력 폼 모달의 저장 버튼은 `ModalFooter`에**(본문 끝이면 모바일 키보드에 가려짐, `<form id>` + 버튼 `form=`)), `OfflineBanner`, `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(의존성 없는 SVG 도넛 — 홈이 recharts 청크 없이 그림), `Tabs`, `ToggleSwitch`(+`ToggleRow` — 행 전체가 label, 설정 목록은 이것), `SegmentedControl`(2~4개 보기 전환·시장가/지정가 같은 택일 — 칩 버튼 직접 만들지 말 것), `InfoTip`(탭으로 여는 설명 팝오버 — hover 전용 툴팁은 없앴다), `TopLoadingBar`, `TreemapCell`
+**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 오버플로우 메뉴 — 아이콘+라벨 함께 렌더, 모바일 `title` 미동작 우회), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalBody`·`ModalFooter` — `Modal`은 스크롤을 두지 않아 **긴 본문은 `ModalBody`로 감싸야** 하단에 닿고(여백을 바꿀 땐 `className` 대신 `padding`), **입력 폼 모달의 저장 버튼은 `ModalFooter`에**(본문 끝이면 모바일 키보드에 가려짐, `<form id>` + 버튼 `form=`)), `OfflineBanner`, `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(의존성 없는 SVG 도넛 — 홈이 recharts 청크 없이 그림), `Tabs`, `ToggleSwitch`(+`ToggleRow` — 행 전체가 label, 설정 목록은 이것), `SegmentedControl`(2~4개 보기 전환·시장가/지정가 같은 택일 — 칩 버튼 직접 만들지 말 것), `InfoTip`(탭으로 여는 설명 팝오버 — hover 전용 툴팁은 없앴다), `TopLoadingBar`, `TreemapCell`
 
 **`layout/`**: `AppLayout`(로그인 후 셸 — 모달 열림 판정은 `hasOpenModal()`(`useModalBehavior`), body overflow로 추정 금지), `AuthLayout`(AppLayout 밖 전체 화면 — 인증·딥링크 확인 페이지는 이걸로 감싸야 safe-area·dvh가 잡힘), `Sidebar`, `BottomNav`
 
@@ -207,7 +207,7 @@ _기타_
 
 - 문자열 하드코딩 금지 — `QUERY_KEYS`에서 import. 새 키 추가 시 이 표도 갱신.
 - 계좌·연도별로 분기되는 키는 무효화 전용 `xxxBase` 프리픽스 키(`portfolioOverviewBase`, `transactionsBase`, `taxSummaryBase` 등)가 따로 있다 — **무효화는 항상 Base 키로**(특정 accountId 키만 지우면 다른 조합이 stale).
-- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status·exchange-rate·exchange-rate-alerts)는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
+- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status·exchange-rate·exchange-rate-alerts·dashboard·tax-summary(`taxSummaryQuery(year, accountId)`))는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
 
 **캐시 무효화 (`src/utils/queryInvalidation.ts`)** — 컴포넌트·훅에서 `queryClient.invalidateQueries()` 직접 호출 금지. 새 함수는 `invalidate<Domain>Data(queryClient)` 형태로 여기에 추가. 각 함수의 정확한 대상은 소스 확인.
 
@@ -257,6 +257,7 @@ _기타_
 - `portfolio.ts` — `groupPositionsByTicker`, `getPortfolioTargetState`, `getPortfolioHorizon(TaxType)`, `inferHorizonTaxTypeFromAccounts`, `mergeAlertsByPortfolio`
 - `portfolioGroups.ts` — 지수 그룹 편집 순수 함수. 레버리지 멤버는 대표·국내 대체 후보에서 제외(백엔드 검증과 같은 규칙)
 - `components/rebalancing/rebalancingTradeMath.ts` — **분석 결과 그룹 행은 `shares_to_trade`가 null** — 주문·거래 요약은 `flattenTradeItems()`로 펼친 목록 사용
+- `tabUrl.ts` — 자산·계획·알림 설정 딥링크 빌더(`portfolioUrl`·`assetManagementUrl`·`investPlanUrl`·`notificationSettingsUrl`). 탭 인자는 `constants/tabs.ts` 유니온 — **`to="/invest-plan?tab=..."` 직접 조립 금지**. 값은 인코딩하지 않는다(백엔드·이메일 링크와 같은 모양)
 - `rebalancingUrl.ts` — `REBALANCING_TABS`·`GOAL_MODES`가 탭 이름 단일 정의(**백엔드 `email_service`·`insight_service`·`action_items_service`의 탭 문자열과 같아야 함**), `parseRebalancingTab`(옛 `rtab=추천/전술` 호환), `rebalancingUrl()`
 - `recommendationDrift.ts` — `RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3%p) — 백엔드 `compute_recommendation_drift`와 동일 로직. `foldIntoPortfolioGroups`는 백엔드 `fold_into_portfolio_groups`와 같은 규칙
 - `marketSignalRows.ts` — 매크로 8지표 행 변환(Tier 분류는 백엔드 `market_signal_service` 재사용)

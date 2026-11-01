@@ -1,6 +1,6 @@
 """QQQ/SPY 전술 배분 규칙 백테스트(비중표에 DIA가 있으면 DIA도 보유·비교).
 
-실시간 판정(`tactical_allocation_service.classify_regime`)과 같은 규칙을 과거 일봉에 적용한다. 단 매크로
+실시간 판정(`tactical_regime.classify_regime`)과 같은 규칙을 과거 일봉에 적용한다. 단 매크로
 입력은 단순화한다 — 실시간 복합신호 8종 중 ICE 하이일드 스프레드 등은 FRED에 과거 이력이 짧아(약 3년)
 장기 재현이 불가능하므로 VIX만으로 등급을 근사한다(GREEN <20, YELLOW 20~30, RED ≥30). 결과 화면에 이
 차이를 명시한다. (VIX 경계에 히스테리시스를 두는 방식도 실측했으나 위험 신호 반영이 늦어져 성과가 나빠 채택하지 않음.)
@@ -40,14 +40,14 @@ import structlog
 from app.services.backtest.backtest_metrics import compute_metrics
 from app.services.market_signal.technical_indicators import pullback_series, trend_series
 from app.services.market_signal.technical_signal_service import fetch_close_history
-from app.services.tactical.tactical_allocation_service import (
+from app.services.tactical.tactical_dip import DIP_EXIT_STAGES, advance_dip_level, apply_dip
+from app.services.tactical.tactical_regime import (
     LEVERAGED_ASSETS,
     TACTICAL_ASSETS,
     ConfirmState,
     classify_regime,
     step_confirmation,
 )
-from app.services.tactical.tactical_dip import DIP_EXIT_STAGES, advance_dip_level, apply_dip
 from app.services.tactical.tactical_tilt import REAL_YIELD_LOOKBACK, RS_SMA, apply_tilt, classify_tilt
 from app.utils.cache_keys import TTL_TACTICAL_BACKTEST, get_cached_json, set_cached_json, tactical_backtest_key
 

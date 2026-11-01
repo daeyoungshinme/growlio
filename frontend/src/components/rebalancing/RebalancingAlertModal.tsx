@@ -1,7 +1,7 @@
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalBody } from "@/components/common/Modal";
 import { updateAlertScope } from "@/api/alerts";
 import {
   useRebalancingAlertQueries,
@@ -66,7 +66,7 @@ export default function RebalancingAlertModal({
   // 입력 섹션이 많아 백드롭 오탭으로 작성 중 설정이 사라지지 않도록 닫기는 X/ESC로만 허용한다.
   return (
     <Modal title={title} onClose={onClose} size="md">
-      <div className="flex-1 overflow-y-auto overscroll-contain">
+      <ModalBody padding="">
         {isLoading ? (
           <div className="flex justify-center py-4">
             <Loader2 size={20} className="animate-spin text-gray-400" />
@@ -88,7 +88,7 @@ export default function RebalancingAlertModal({
             marketSignal={marketSignal}
           />
         )}
-      </div>
+      </ModalBody>
     </Modal>
   );
 }

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import Modal from "@/components/common/Modal";
+import Modal, { ModalBody } from "@/components/common/Modal";
 import { useAccountPositions } from "@/hooks/useAccountPositions";
 import {
   createTransaction,
@@ -12,7 +12,7 @@ import {
 import { fmtKrwPreview, formatUsdAsKrw } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
-import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
+import { TX_LABELS, TX_TYPES, CURRENCY_OPTIONS } from "@/constants/transaction";
 import { TransactionList } from "./TransactionList";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { transactionSchema } from "@/schemas/transaction";
@@ -20,10 +20,8 @@ import { useTransactionFormState } from "@/hooks/useTransactionFormState";
 import TransactionTickerField from "./TransactionTickerField";
 import DepositReflectPrompt from "./DepositReflectPrompt";
 import { INPUT_SM } from "@/constants/inputStyles";
-import {
-  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
-  TOUCH_TARGET_MIN_MOBILE_ONLY,
-} from "@/constants/uiSizes";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import SegmentedControl from "@/components/common/SegmentedControl";
 
 interface Props {
   accountId: string;
@@ -159,7 +157,7 @@ export default function TransactionModal({
       </div>
 
       {/* 폼과 목록을 한 스크롤 영역에 둔다 — 폼을 고정하면 키보드가 올라온 짧은 화면에서 폼 하단·추가 버튼에 닿지 못한다 (plans/102 A1) */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+      <ModalBody padding="">
         {/* 추가 폼 */}
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 space-y-3">
           {/* 유형 */}
@@ -188,23 +186,12 @@ export default function TransactionModal({
                   금액 *
                 </label>
                 {form.transaction_type === "DIVIDEND" && (
-                  <div className="flex gap-0.5 text-xs">
-                    {CURRENCY_TYPES.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => handleCurrencySwitch(c)}
-                        aria-pressed={currency === c}
-                        className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-1.5 rounded transition-colors ${
-                          currency === c
-                            ? "bg-blue-600 text-white"
-                            : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        }`}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
+                  <SegmentedControl
+                    options={CURRENCY_OPTIONS}
+                    value={currency}
+                    onChange={handleCurrencySwitch}
+                    ariaLabel="통화"
+                  />
                 )}
               </div>
               {currency === "USD" && form.transaction_type === "DIVIDEND" ? (
@@ -346,7 +333,7 @@ export default function TransactionModal({
             onDelete={(id) => deleteMut.mutate(id)}
           />
         </div>
-      </div>
+      </ModalBody>
     </Modal>
   );
 }

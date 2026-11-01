@@ -15,6 +15,7 @@ import { fmtKrw, fmtPct, clampPct, fmtUsd } from "@/utils/format";
 import { invalidateAlertData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
+import { notificationSettingsUrl } from "@/utils/tabUrl";
 
 const MONTH_OPTIONS = ["1개월", "3개월", "6개월"] as const;
 type MonthOption = (typeof MONTH_OPTIONS)[number];
@@ -302,7 +303,7 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
                   {/* 등록한 알림의 수정·삭제는 설정 › 알림 설정 › 환율 알림에서 (계획 106 C2) */}
                   {targets.some((r) => registered.has(r)) && (
                     <Link
-                      to={`/settings/notifications?atab=${ALERT_TABS[0]}`}
+                      to={notificationSettingsUrl(ALERT_TABS[0])}
                       className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline`}
                     >
                       환율 알림 관리 →

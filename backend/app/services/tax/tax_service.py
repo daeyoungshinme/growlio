@@ -447,21 +447,15 @@ async def _calc_taxable_income_by_type(
     return float(total) if total else 0.0
 
 
-async def _calc_stock_unrealized(
-    user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None = None
-) -> tuple[float, float, float, float]:
+def _stock_unrealized_from_rows(rows: list[Any]) -> tuple[float, float, float, float]:
     """최신 스냅샷 기준 해외/국내 미실현 손익과 국내 평가액 반환.
 
     ISA/연금저축/IRP(과세이연) 계좌 보유분은 국내/해외 미실현손익 합산에서 제외하고
-    tax_deferred_value_krw로 별도 집계한다. account_id 지정 시 해당 계좌만 집계.
+    tax_deferred_value_krw로 별도 집계한다. `rows`는 `_latest_stock_rows()`의 (스냅샷, 계좌) 행.
     OTHER 시장은 국내·해외 어디에도 넣지 않는다(실현손익 `overseas_realized_service`는 해외로 본다 — 세무 판단 보류).
 
     Returns: (overseas_unrealized_krw, domestic_stock_value_krw, domestic_unrealized_krw, tax_deferred_value_krw)
     """
-    return _stock_unrealized_from_rows(await _latest_stock_rows(user_id, db, account_id))
-
-
-def _stock_unrealized_from_rows(rows: list[Any]) -> tuple[float, float, float, float]:
     overseas_value = 0.0
     overseas_invested = 0.0
     domestic_value = 0.0

@@ -7,7 +7,8 @@ import { fetchPortfolioOverviewLite, fetchPortfolios } from "@/api/portfolios";
 import { fetchSettings } from "@/api/settings";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchDCAAnalysis } from "@/api/invest";
-import { fetchIsaStatus } from "@/api/tax";
+import { fetchIsaStatus, fetchTaxSummary } from "@/api/tax";
+import { fetchDashboard } from "@/api/dashboard";
 import {
   fetchCompositeSignalStatus,
   fetchDriftSummary,
@@ -20,6 +21,21 @@ import {
  * queryFn은 화살표로 감싼다 — 모듈 로드 시점에 fetch 함수를 읽지 않아, 일부 export만 목킹한 테스트에서도 import가 깨지지 않는다.
  * 사용: `useQuery(portfoliosQuery)`, 조건부면 `useQuery({ ...portfoliosQuery, enabled })`, 프리페치도 그대로 넘긴다.
  */
+
+/** 홈 대시보드 — 화면과 부팅·로그인 프리페치가 같은 staleTime을 쓰도록(프리페치만 기본값이면 홈 진입 즉시 재조회) */
+export const dashboardQuery = queryOptions({
+  queryKey: QUERY_KEYS.dashboard,
+  queryFn: () => fetchDashboard(),
+  staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 백엔드 캐시 TTL(5분)과 동기화
+});
+
+/** 세금 요약 — 절세 카드(연도·계좌 선택)와 건강보험 위험 카드(올해·전체)가 캐시를 공유한다 */
+export const taxSummaryQuery = (year: number, accountId?: string | null) =>
+  queryOptions({
+    queryKey: QUERY_KEYS.taxSummary(year, accountId),
+    queryFn: () => fetchTaxSummary(year, accountId),
+    staleTime: STALE_TIME.LONG,
+  });
 
 export const portfoliosQuery = queryOptions({
   queryKey: QUERY_KEYS.portfolios,

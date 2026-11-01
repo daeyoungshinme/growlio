@@ -195,6 +195,17 @@ def advance_dip(strategy: TacticalStrategy, market: dict[str, Any]) -> bool:
     return True
 
 
+def advance_strategy(strategy: TacticalStrategy, market: dict[str, Any], today: date) -> bool:
+    """국면 → 틸트 → 웅덩이 순으로 상태를 갱신한다(웅덩이는 갱신된 확정 국면을 본다). 하나라도 바뀌면 True.
+
+    조회(`GET /tactical/{id}`)·설정 저장·일일 점검 job이 같은 순서로 부른다 — 세 단계는 단락 없이 모두 실행한다.
+    """
+    regime_changed = advance_regime(strategy, market, today)
+    tilt_changed = advance_tilt(strategy, market, today)
+    dip_changed = advance_dip(strategy, market)
+    return regime_changed or tilt_changed or dip_changed
+
+
 def uses_macro(strategy: TacticalStrategy | None) -> bool:
     # 새로 만든 객체는 flush 전까지 server_default가 채워지지 않아 None일 수 있다
     return strategy is None or strategy.use_macro is None or bool(strategy.use_macro)

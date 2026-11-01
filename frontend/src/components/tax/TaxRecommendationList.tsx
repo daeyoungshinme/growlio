@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { OverseasPositionDetail } from "@/api/tax";
 import { fmtKrw } from "@/utils/format";
 import { posKey } from "@/hooks/useTaxSimulation";
+import { assetManagementUrl } from "@/utils/tabUrl";
 
 interface Recommendation {
   pos: OverseasPositionDetail;
@@ -34,7 +35,7 @@ export function TaxRecommendationList({ recommendations }: Props) {
               <span className="text-gray-500 dark:text-gray-400">{label}</span>
               {" → "}수익 {fmtKrw(pos.unrealized_pnl_krw)} 실현
               <Link
-                to="/assets?tab=계좌관리&atab=증권계좌"
+                to={assetManagementUrl("증권계좌")}
                 className="ml-1.5 text-blue-600 dark:text-blue-400 hover:underline"
               >
                 {pos.account_name}에서 매도 →

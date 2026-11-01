@@ -19,7 +19,7 @@ export default function AccountHistoryTab({ accounts }: { accounts: AssetAccount
   const raw = searchParams.get("history");
   const segment: HistorySegment = (HISTORY_SEGMENTS as readonly string[]).includes(raw ?? "")
     ? (raw as HistorySegment)
-    : "현금 흐름";
+    : HISTORY_SEGMENTS[0];
   const setSegment = useCallback(
     (next: HistorySegment) =>
       setSearchParams(

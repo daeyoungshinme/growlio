@@ -1,8 +1,9 @@
 """전술 배분 서비스 — 시장 관측(`evaluate_market`), 전략 조회·저장·해제, 상태 응답, 제안 비중 적용(DB 쓰기).
 
 국면 판정·제안 비중 규칙은 `tactical_regime`, 적용 계획(그룹 재구성·분할 보간·할 일 판정)은 `tactical_apply`에 있다.
-이 파일은 두 모듈의 심볼을 재노출한다 — `from ...tactical_allocation_service import X`·`patch.object(tactical, ...)`
-호출부는 그대로 유효하다. 단 서브모듈 안의 함수 간 호출을 가로채려면 그 서브모듈 경로를 patch해야 한다.
+이 파일은 두 모듈 중 외부 호출부(라우터·잡·테스트)가 쓰는 심볼만 재노출한다 — `from ...tactical_allocation_service
+import X`·`patch.object(tactical, ...)` 호출부는 그대로 유효하다. 새 외부 호출부는 원 모듈에서 직접 import한다.
+단 서브모듈 안의 함수 간 호출을 가로채려면 그 서브모듈 경로를 patch해야 한다.
 """
 
 from __future__ import annotations
@@ -14,15 +15,15 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.job_runner import report_handled_failure
+from app.exceptions import NotFoundError
 from app.models.alert import RebalancingAlert
-from app.models.portfolio import Portfolio, PortfolioItem
+from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.tactical import TacticalStrategy
 from app.services.market_signal.technical_indicators import TechnicalSnapshot
 from app.services.market_signal.technical_signal_service import get_technical_signals
 from app.services.tactical.tactical_apply import (
     _current_weights,
-    _GroupSpec,
-    _MemberSpec,
     _new_item,
     _plan_groups,
     _weights_to_apply,
@@ -32,16 +33,12 @@ from app.services.tactical.tactical_apply import (
     is_tactical_managed,
     needs_group_suggestions,
     pending_action,
-    tactical_asset_of,
 )
 from app.services.tactical.tactical_dip import dip_reasons
 from app.services.tactical.tactical_hints import transition_hints
 from app.services.tactical.tactical_regime import (
-    ASSET_GROUP_KEYS,
-    ASSET_LABELS,
     DEFAULT_REGIME_WEIGHTS,
     LEVERAGED_ASSETS,
-    OPTIONAL_ASSETS,
     REGIME_LABELS,
     REGIMES,
     TACTICAL_ASSETS,
@@ -49,6 +46,7 @@ from app.services.tactical.tactical_regime import (
     Regime,
     advance_dip,
     advance_regime,
+    advance_strategy,
     advance_tilt,
     classify_regime,
     dip_deployed_for,
@@ -73,24 +71,17 @@ if TYPE_CHECKING:
     from app.schemas.tactical import TacticalStrategyUpsert
 
 __all__ = [
-    "ASSET_GROUP_KEYS",
-    "ASSET_LABELS",
     "DEFAULT_REGIME_WEIGHTS",
     "LEVERAGED_ASSETS",
-    "OPTIONAL_ASSETS",
     "REGIMES",
     "REGIME_LABELS",
     "TACTICAL_ASSETS",
     "ConfirmState",
     "Regime",
-    "_GroupSpec",
-    "_MemberSpec",
     "_current_weights",
-    "_new_item",
-    "_plan_groups",
-    "_weights_to_apply",
     "advance_dip",
     "advance_regime",
+    "advance_strategy",
     "advance_tilt",
     "apply_regime_to_portfolio",
     "build_status",
@@ -105,6 +96,7 @@ __all__ = [
     "evaluate_market",
     "format_weights",
     "get_owned_portfolio",
+    "group_suggestions_for",
     "get_strategy",
     "interpolate_weights",
     "is_tactical_managed",
@@ -116,7 +108,6 @@ __all__ = [
     "resolve_weights",
     "save_strategy",
     "step_confirmation",
-    "tactical_asset_of",
     "tilt_shift_of",
     "uses_macro",
     "validate_regime_weights",
@@ -158,15 +149,20 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
     }
 
 
-async def get_owned_portfolio(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> Portfolio | None:
+async def get_owned_portfolio(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> Portfolio:
+    """항목까지 로드한 소유 포트폴리오. 없거나 남의 것이면 `NotFoundError`(404)."""
     from sqlalchemy.orm import selectinload
 
-    result = await db.execute(
+    from app.services.portfolio.portfolio_crud_service import PORTFOLIO_NOT_FOUND
+
+    portfolio = await db.scalar(
         select(Portfolio)
         .options(selectinload(Portfolio.items))
         .where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
     )
-    return result.scalar_one_or_none()
+    if portfolio is None:
+        raise NotFoundError(PORTFOLIO_NOT_FOUND)
+    return portfolio
 
 
 async def get_strategy(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> TacticalStrategy | None:
@@ -208,10 +204,7 @@ async def save_strategy(
     strategy.use_macro = body.use_macro
 
     market = await evaluate_market(cache, db)
-    today = today_kst()
-    advance_regime(strategy, market, today)
-    advance_tilt(strategy, market, today)
-    advance_dip(strategy, market)
+    advance_strategy(strategy, market, today_kst())
     if strategy.notified_regime is None:
         strategy.notified_regime = strategy.last_regime  # 사용 시작 시점 국면은 알릴 필요 없음
         strategy.notified_dip_level = strategy.dip_level or 0  # 진행 중인 웅덩이도 마찬가지
@@ -334,3 +327,24 @@ async def apply_regime_to_portfolio(
         strategy.partial_regime = regime
         strategy.partial_applied_on = today_kst()
     return weights
+
+
+async def group_suggestions_for(
+    portfolio: Portfolio, user_id: uuid.UUID, db: AsyncSession, cache: CacheStore
+) -> dict[str, IndexGroupSuggestion] | None:
+    """새로 만들 지수 그룹의 멤버·국내 대체 종목 — 포트폴리오 연결 계좌의 보유 종목 기준 제안(plans/76).
+
+    실패해도 적용은 막지 않는다(대표 종목만으로 그룹 생성).
+    """
+    from app.services.etf.index_exposure_service import get_index_group_suggestions
+
+    try:
+        rows = await db.execute(
+            select(PortfolioAccount.account_id).where(PortfolioAccount.portfolio_id == portfolio.id)
+        )
+        account_ids = list(rows.scalars().all()) or None
+        result = await get_index_group_suggestions(cache, db, user_id, account_ids)
+    except Exception as exc:
+        report_handled_failure("tactical_group_suggestions_failed", exc, portfolio_id=str(portfolio.id))
+        return None
+    return {g.key: g for g in result.groups}

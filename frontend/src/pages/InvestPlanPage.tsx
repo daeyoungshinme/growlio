@@ -31,7 +31,7 @@ import { fmtKrw, fmtKrwPreview, localMonth } from "@/utils/format";
 import { invalidateDcaData } from "@/utils/queryInvalidation";
 import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import Modal, { ModalFooter } from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -53,7 +53,7 @@ export default function InvestPlanPage() {
   const rawTab = searchParams.get("tab");
   const activeTab: Tab = (TABS as readonly string[]).includes(rawTab ?? "")
     ? (rawTab as Tab)
-    : "적립 계획";
+    : TABS[0];
   const setActiveTab = (tab: Tab) =>
     setSearchParams(
       (prev) => {
@@ -416,7 +416,7 @@ export default function InvestPlanPage() {
       {/* 적립 계획 설정 편집 모달 (플랫 폼, 재설정용) */}
       {editing && !wizardMode && (
         <Modal title="적립 계획 설정 편집" onClose={handleCloseModal} size="md">
-          <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-2 space-y-4 flex-1">
+          <ModalBody padding="px-6 pb-6 pt-2" className="space-y-4">
             {[
               {
                 label: "월 적립액 (원)",
@@ -484,7 +484,7 @@ export default function InvestPlanPage() {
                 />
               );
             })}
-          </div>
+          </ModalBody>
           <ModalFooter>
             <button
               onClick={handleCloseModal}
@@ -520,7 +520,7 @@ export default function InvestPlanPage() {
       {/* 배당 계획 설정 편집 모달 */}
       {dividendEditing && (
         <Modal title="배당 계획 설정" onClose={handleDividendCloseModal} size="md">
-          <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-2 space-y-4 flex-1">
+          <ModalBody padding="px-6 pb-6 pt-2" className="space-y-4">
             <FormInput
               label="목표 연간 배당금 (원)"
               type="number"
@@ -537,7 +537,7 @@ export default function InvestPlanPage() {
               }
               hint="예상 연배당이 이 금액을 넘으면 목표 달성"
             />
-          </div>
+          </ModalBody>
           <ModalFooter>
             <button
               onClick={handleDividendCloseModal}

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { fmtKrwShort } from "@/utils/format";
 import type { DashboardData } from "@/api/dashboard";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 export interface GoalChip {
   key: string;
@@ -180,7 +181,7 @@ export function buildGoalChips({ data, expectedGoalYear }: GoalChipsInput): Goal
       label: "배당 목표",
       shortLabel: "배당",
       isSet: hasDividendGoal,
-      setupHref: "/invest-plan?tab=배당 계획",
+      setupHref: investPlanUrl("배당 계획"),
       content: (
         <>
           <span

@@ -1,5 +1,5 @@
 import type { TacticalStatus } from "@/api/tactical";
-import Modal, { ModalFooter } from "@/components/common/Modal";
+import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { formatTacticalWeights, REGIME_LABEL, TACTICAL_ASSET_LIST_TEXT } from "./tacticalLabels";
 
@@ -21,7 +21,7 @@ export default function TacticalApplyConfirmModal({
 }) {
   return (
     <Modal title={partialActive ? "나머지 적용" : "제안 비중 적용"} size="sm" onClose={onClose}>
-      <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-200">
+      <ModalBody className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-200">
         <p>
           &ldquo;{status.portfolio_name}&rdquo; 목표 비중을{" "}
           {REGIME_LABEL[status.confirmed_regime ?? "NEUTRAL"]} 국면 비중(
@@ -41,7 +41,7 @@ export default function TacticalApplyConfirmModal({
             타이밍을 나눌 수 있어요.
           </p>
         )}
-      </div>
+      </ModalBody>
       <ModalFooter>
         {status.portfolio_compatible && !partialActive && (
           <button

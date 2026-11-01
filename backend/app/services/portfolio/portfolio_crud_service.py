@@ -186,6 +186,15 @@ async def update_portfolio(
     return await load_portfolio_with_relations(db, portfolio_id)
 
 
+async def delete_portfolio(db: AsyncSession, user_id: uuid.UUID, portfolio_id: uuid.UUID) -> None:
+    """포트폴리오를 삭제하고 커밋한다. 소유하지 않았으면 404. 캐시 무효화는 호출부."""
+    portfolio = await db.scalar(select(Portfolio).where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id))
+    if portfolio is None:
+        raise NotFoundError(PORTFOLIO_NOT_FOUND)
+    await db.delete(portfolio)
+    await db.commit()
+
+
 async def reorder_portfolios(db: AsyncSession, user_id: uuid.UUID, items: Sequence[PortfolioReorderItem]) -> None:
     """포트폴리오 순서를 일괄 갱신하고 커밋한다. user_id 소유 행만 바뀐다."""
     sort_case = case(

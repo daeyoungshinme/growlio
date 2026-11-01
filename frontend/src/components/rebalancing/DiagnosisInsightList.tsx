@@ -4,6 +4,7 @@ import { ChevronDown, Receipt, ShieldAlert, TrendingUp } from "lucide-react";
 import type { DiagnosisContext } from "@/api/rebalancing";
 import { buildDiagnosisNotes, type DiagnosisNoteIcon } from "@/utils/diagnosisInsights";
 import { fmtKrw } from "@/utils/format";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 const NOTE_ICONS: Record<DiagnosisNoteIcon, React.ReactNode> = {
   market: <TrendingUp size={13} className="text-blue-600 dark:text-blue-400 shrink-0" />,
@@ -37,7 +38,7 @@ export default function DiagnosisInsightList({ context }: Props) {
             {note.text}
             {note.isTaxLossOpportunity && (
               <Link
-                to="/invest-plan?tab=절세"
+                to={investPlanUrl("절세")}
                 className="ml-1.5 inline-block text-blue-600 dark:text-blue-400 hover:underline font-medium"
               >
                 절세 탭에서 확인 →
