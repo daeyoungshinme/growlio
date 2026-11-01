@@ -9,17 +9,14 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
-from app.core.cache_store import CacheStore, get_cache_store
-from app.core.job_runner import report_handled_failure
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
-from app.models.portfolio import Portfolio, PortfolioAccount
+from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.models.user import User
-from app.schemas.portfolio import IndexGroupSuggestion
 from app.schemas.tactical import TacticalApplyRequest, TacticalStrategyUpsert
 from app.services.tactical import tactical_allocation_service as tactical
 from app.utils.cache_invalidation import invalidate_rebalancing_analysis_cache, invalidate_user_caches
@@ -29,25 +26,12 @@ from app.utils.kst import today_kst
 router = APIRouter(prefix="/tactical", tags=["tactical"])
 
 
-async def _portfolio_or_404(portfolio_id: uuid.UUID, user: User, db: AsyncSession) -> Portfolio:
-    portfolio = await tactical.get_owned_portfolio(portfolio_id, user.id, db)
-    if portfolio is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
-    return portfolio
-
-
 async def _status(
     portfolio: Portfolio, strategy: TacticalStrategy | None, db: AsyncSession, *, advance: bool
 ) -> dict[str, Any]:
-    cache = await get_cache_store()
-    market = await tactical.evaluate_market(cache, db)
-    if advance and strategy is not None:
-        today = today_kst()
-        regime_changed = tactical.advance_regime(strategy, market, today)
-        tilt_changed = tactical.advance_tilt(strategy, market, today)
-        dip_changed = tactical.advance_dip(strategy, market)
-        if regime_changed or tilt_changed or dip_changed:
-            await db.commit()
+    market = await tactical.evaluate_market(await get_cache_store(), db)
+    if advance and strategy is not None and tactical.advance_strategy(strategy, market, today_kst()):
+        await db.commit()
     return await tactical.build_status(portfolio, strategy, market)
 
 
@@ -99,7 +83,7 @@ async def get_tactical_status(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """현재 국면(관측·확정), 매크로 등급, QQQ/SPY/DIA 차트 지표(웅덩이 단계 포함), 제안 비중·현재 목표 비중."""
-    portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
+    portfolio = await tactical.get_owned_portfolio(portfolio_id, current_user.id, db)
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
     # 서버가 잠들어 일일 점검 job이 못 돈 날도 앱을 열면 국면 확정이 진행되도록 조회 시에도 갱신한다.
     # 07:40 job과 겹쳐도 안전하다 — 확정 규칙(step_confirmation)이 같은 날·같은 관측에 같은 상태를 내고 알림은
@@ -117,7 +101,7 @@ async def upsert_tactical_strategy(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """전략 사용 시작/설정 변경. 최초 생성 시 현재 관측 국면을 바로 확정 국면으로 삼는다(알림 없음)."""
-    portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
+    portfolio = await tactical.get_owned_portfolio(portfolio_id, current_user.id, db)
     strategy, market = await tactical.save_strategy(portfolio_id, current_user.id, body, await get_cache_store(), db)
     return await tactical.build_status(portfolio, strategy, market)
 
@@ -134,27 +118,6 @@ async def delete_tactical_strategy(
     await tactical.disable_strategy(portfolio_id, current_user.id, db)
 
 
-async def _group_suggestions(
-    portfolio: Portfolio, user: User, db: AsyncSession, cache: CacheStore
-) -> dict[str, IndexGroupSuggestion] | None:
-    """새로 만들 지수 그룹의 멤버·국내 대체 종목 — 포트폴리오 연결 계좌의 보유 종목 기준 제안(plans/76).
-
-    실패해도 적용은 막지 않는다(대표 종목만으로 그룹 생성).
-    """
-    from app.services.etf.index_exposure_service import get_index_group_suggestions
-
-    try:
-        rows = await db.execute(
-            select(PortfolioAccount.account_id).where(PortfolioAccount.portfolio_id == portfolio.id)
-        )
-        account_ids = list(rows.scalars().all()) or None
-        result = await get_index_group_suggestions(cache, db, user.id, account_ids)
-    except Exception as exc:
-        report_handled_failure("tactical_group_suggestions_failed", exc, portfolio_id=str(portfolio.id))
-        return None
-    return {g.key: g for g in result.groups}
-
-
 @router.post("/{portfolio_id}/apply")
 @limiter.limit("10/minute")
 async def apply_tactical_weights(
@@ -168,7 +131,7 @@ async def apply_tactical_weights(
 
     분할 적용 규칙 등 검증은 `tactical.check_apply_allowed`가 한다.
     """
-    portfolio = await _portfolio_or_404(portfolio_id, current_user, db)
+    portfolio = await tactical.get_owned_portfolio(portfolio_id, current_user.id, db)
     fraction = body.fraction if body else 1.0
     strategy, regime = tactical.check_apply_allowed(
         portfolio, await tactical.get_strategy(portfolio_id, current_user.id, db), fraction
@@ -176,7 +139,7 @@ async def apply_tactical_weights(
 
     cache = await get_cache_store()
     suggestions = (
-        await _group_suggestions(portfolio, current_user, db, cache)
+        await tactical.group_suggestions_for(portfolio, current_user.id, db, cache)
         if tactical.needs_group_suggestions(portfolio, strategy, regime, fraction)
         else None
     )
@@ -191,7 +154,7 @@ async def apply_tactical_weights(
     await invalidate_rebalancing_analysis_cache(cache, current_user.id, portfolio_id)
 
     db.expire(portfolio)
-    refreshed = await _portfolio_or_404(portfolio_id, current_user, db)
+    refreshed = await tactical.get_owned_portfolio(portfolio_id, current_user.id, db)
     return await _status(refreshed, strategy, db, advance=False)
 
 
@@ -207,7 +170,7 @@ async def backtest_tactical_rules(
     """이 포트폴리오의 국면별 비중표·틸트·웅덩이 투입폭으로 과거 규칙을 재현한 백테스트(SPY·QQQ·DIA 단순보유와 비교)."""
     from app.services.tactical.tactical_backtest import run_tactical_backtest
 
-    await _portfolio_or_404(portfolio_id, current_user, db)
+    await tactical.get_owned_portfolio(portfolio_id, current_user.id, db)
     strategy = await tactical.get_strategy(portfolio_id, current_user.id, db)
     try:
         return await run_tactical_backtest(

@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
+from app.exceptions import NotFoundError
 from app.models.tactical import TacticalStrategy
 from app.services.market_signal import technical_indicators as ti
 from app.services.tactical import tactical_allocation_service as tactical
@@ -720,7 +721,7 @@ class TestTacticalApi:
     def test_status_404_for_foreign_portfolio(self, api_db):
         app = _setup(_user(), api_db)
         with (
-            patch.object(tactical, "get_owned_portfolio", AsyncMock(return_value=None)),
+            patch.object(tactical, "get_owned_portfolio", AsyncMock(side_effect=NotFoundError())),
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             assert client.get(f"/api/v1/tactical/{uuid.uuid4()}").status_code == 404
@@ -800,7 +801,7 @@ class TestTacticalApi:
             patch.object(tactical, "get_owned_portfolio", AsyncMock(return_value=portfolio)),
             patch.object(tactical, "get_strategy", AsyncMock(return_value=strategy)),
             patch.object(tactical, "evaluate_market", AsyncMock(return_value=_MARKET)),
-            patch("app.api.v1.tactical._group_suggestions", AsyncMock(return_value=None)) as suggest,
+            patch.object(tactical, "group_suggestions_for", AsyncMock(return_value=None)) as suggest,
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.post(f"/api/v1/tactical/{portfolio.id}/apply")
@@ -1062,3 +1063,37 @@ class TestDisableStrategy:
             await tactical.disable_strategy(uuid.uuid4(), uuid.uuid4(), db)
         db.execute.assert_not_awaited()
         db.commit.assert_not_awaited()
+
+
+class TestGroupSuggestionsFor:
+    """plans/107 B6 — 라우터에서 옮긴 지수 그룹 제안: 연결 계좌 범위로 조회하고, 실패해도 적용을 막지 않는다."""
+
+    async def test_scopes_to_linked_accounts(self):
+        account_id = uuid.uuid4()
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=MagicMock(scalars=lambda: MagicMock(all=lambda: [account_id])))
+        group = SimpleNamespace(key="QQQ")
+        fetch = AsyncMock(return_value=SimpleNamespace(groups=[group]))
+        user_id = uuid.uuid4()
+        with patch("app.services.etf.index_exposure_service.get_index_group_suggestions", fetch):
+            result = await tactical.group_suggestions_for(SimpleNamespace(id=uuid.uuid4()), user_id, db, MagicMock())
+
+        assert result == {"QQQ": group}
+        assert fetch.await_args.args[2:] == (user_id, [account_id])
+
+    async def test_failure_returns_none(self):
+        db = MagicMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db"))
+        with patch.object(tactical, "report_handled_failure") as report:
+            assert (
+                await tactical.group_suggestions_for(SimpleNamespace(id=uuid.uuid4()), uuid.uuid4(), db, None) is None
+            )
+        report.assert_called_once()
+
+
+class TestGetOwnedPortfolio:
+    async def test_missing_raises_not_found(self):
+        db = MagicMock()
+        db.scalar = AsyncMock(return_value=None)
+        with pytest.raises(NotFoundError):
+            await tactical.get_owned_portfolio(uuid.uuid4(), uuid.uuid4(), db)

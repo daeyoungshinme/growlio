@@ -5,10 +5,9 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db, get_owned_or_404
+from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
-from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.portfolio import (
     IndexGroupSuggestionResponse,
@@ -103,10 +102,7 @@ async def delete_portfolio(
     db: AsyncSession = Depends(get_db),
 ):
     """포트폴리오 삭제."""
-    portfolio = await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, crud.PORTFOLIO_NOT_FOUND)
-
-    await db.delete(portfolio)
-    await db.commit()
+    await crud.delete_portfolio(db, current_user.id, portfolio_id)
 
     cache = await get_cache_store()
     await invalidate_user_caches(cache, portfolio_list_key(current_user.id), insights_key(current_user.id))
