@@ -27,6 +27,7 @@ import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { settingsQuery } from "@/api/queryOptions";
+import { ALERT_TABS, type AlertTab } from "@/constants/tabs";
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -125,8 +126,6 @@ function AlertHistorySection() {
   );
 }
 
-const ALERT_TABS = ["환율 알림", "주가 알림", "발송 이력"] as const;
-type AlertTab = (typeof ALERT_TABS)[number];
 /** 시장 모니터링 카드를 펼친 채 여는 `?atab=` 값 — `MarketSignalBanner`의 "설정 →" 링크가 쓴다 */
 const MARKET_SECTION_PARAM = "시장 신호 알림";
 

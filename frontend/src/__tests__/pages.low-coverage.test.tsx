@@ -297,14 +297,19 @@ describe("AssetManagementPage", () => {
     expect(screen.getByText("은행계좌")).toBeInTheDocument();
   });
 
-  it("은행계좌 탭에 '계좌 추가' 버튼이 있다", () => {
+  it("atab 없이 진입하면 증권계좌 탭이 기본으로 열린다", () => {
+    renderPage(<AssetManagementPage />);
+    expect(screen.getByRole("tab", { name: "증권계좌" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("기본 탭(증권계좌)에 '계좌 추가' 버튼이 있다", () => {
     renderPage(<AssetManagementPage />);
     expect(screen.getByText("계좌 추가")).toBeInTheDocument();
   });
 
   it("계좌가 없을 때 빈 상태 메시지를 표시한다", () => {
     renderPage(<AssetManagementPage />);
-    expect(screen.getByText("등록된 은행계좌가 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("등록된 증권계좌가 없습니다.")).toBeInTheDocument();
   });
 
   it("계좌관리에는 홈 Hero와 중복되는 전체 자산 구성 카드를 두지 않는다", () => {

@@ -59,7 +59,7 @@ export default function AssetManagementPage() {
     ? "내역"
     : TABS.includes(rawTab as Tab)
       ? (rawTab as Tab)
-      : "은행계좌";
+      : TABS[0];
   const setTab = useCallback(
     (next: Tab) => {
       setSearchParams(

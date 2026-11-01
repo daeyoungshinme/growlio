@@ -163,6 +163,8 @@ describe("tabs constants", () => {
     expect(ASSET_MANAGEMENT_TABS).toContain("증권계좌");
     expect(ASSET_MANAGEMENT_TABS).toContain("부동산");
     expect(ASSET_MANAGEMENT_TABS).toContain("내역");
+    // 첫 항목이 계좌관리 기본 탭(계획 106 B1)
+    expect(ASSET_MANAGEMENT_TABS[0]).toBe("증권계좌");
   });
 
   it("PORTFOLIO_TABS는 2개 탭을 포함한다 (세금은 계획 › 절세로 이동)", () => {

@@ -4,11 +4,12 @@ import SegmentedControl from "@/components/common/SegmentedControl";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
 import type { AssetAccount } from "@/api/assets";
+import { ACCOUNT_HISTORY_SEGMENTS, type AccountHistorySegment } from "@/constants/tabs";
 
 const PeriodPurchasesTab = lazy(() => import("@/components/assets/PeriodPurchasesTab"));
 
-const HISTORY_SEGMENTS = ["현금 흐름", "매수 내역"] as const;
-type HistorySegment = (typeof HISTORY_SEGMENTS)[number];
+const HISTORY_SEGMENTS = ACCOUNT_HISTORY_SEGMENTS;
+type HistorySegment = AccountHistorySegment;
 
 /** 자산 › 계좌관리 › 내역 — 입출금·배당(현금 흐름)과 기간별 매수(매수 내역)를 한 탭의 세그먼트로 묶는다
  * (plans/50 M2). 둘 다 계좌 CRUD가 아닌 "기록" 화면이라 하위탭 2개를 차지할 이유가 없었고, 360px에서
