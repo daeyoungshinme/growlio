@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+_EMPTY_NAVER = {"dps": 0, "dividend_yield": 0, "dividend_months": []}
+
 
 @pytest.fixture
 def mock_cache():
@@ -104,7 +106,10 @@ class TestFetchTickerDividendInfo:
 
         loop_mock.run_in_executor = fake_executor
 
+        # 첫 known 종목은 국내(005930)라 Naver가 먼저 호출됨 — 패치 누락 시 실네트워크로 CI가 timeout
         with (
+            patch("app.services.dividend.fetcher.sync_naver_stock_dividend_info", return_value=dict(_EMPTY_NAVER)),
+            patch("app.services.dividend.fetcher.sync_naver_etf_dividend_info", return_value=dict(_EMPTY_NAVER)),
             patch("app.services.dividend.fetcher.sync_yahoo_dividend_info", return_value=yahoo_result),
             patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[]),
             patch("asyncio.get_running_loop", return_value=loop_mock),
