@@ -10,6 +10,7 @@ import { TaxPositionTable } from "./TaxPositionTable";
 import { TaxSimulationCard } from "./TaxSimulationCard";
 import { TaxRecommendationList } from "./TaxRecommendationList";
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+import { assetManagementUrl } from "@/utils/tabUrl";
 
 interface Props {
   positions: OverseasPositionDetail[];
@@ -20,7 +21,7 @@ interface Props {
 }
 
 /** 키움·토스·수기 계좌는 계좌관리 › 내역 › 매수 내역에서 해외 매도를 기록하면 실현손익에 반영된다 */
-const TRADE_RECORD_LINK = "/assets?tab=계좌관리&atab=내역&history=매수 내역";
+const TRADE_RECORD_LINK = assetManagementUrl("내역", "매수 내역");
 
 export default function TaxPlannerSection({ positions, realized, taxRule }: Props) {
   const autoRealized = realized?.realized_gain_krw ?? null;

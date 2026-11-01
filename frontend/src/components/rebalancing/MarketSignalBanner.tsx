@@ -11,6 +11,8 @@ import SignalRow from "./SignalRow";
 import InflationIndicatorList from "./InflationIndicatorList";
 import ChartTrendList from "./ChartTrendList";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { notificationSettingsUrl } from "@/utils/tabUrl";
+import { MARKET_ALERT_SECTION } from "@/constants/tabs";
 
 interface Props {
   signal: MarketSignalResponse;
@@ -184,7 +186,7 @@ export default function MarketSignalBanner({
               {compositeStatus.enabled ? "받는 중" : "꺼짐"}
             </span>
             <Link
-              to="/settings/notifications?atab=시장 신호 알림"
+              to={notificationSettingsUrl(MARKET_ALERT_SECTION)}
               aria-label="시장 위험 신호 알림 설정"
               className={`${TOUCH_TARGET_ROW} !justify-end ml-auto text-xs text-blue-600 dark:text-blue-400`}
             >

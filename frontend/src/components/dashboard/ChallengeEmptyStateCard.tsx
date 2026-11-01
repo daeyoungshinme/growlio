@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Flame, X } from "lucide-react";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 /** 홈 대시보드 — 적립 챌린지가 하나도 없을 때 만들기를 유도하는 카드. X로 닫으면 다시 안 뜸. */
 export default function ChallengeEmptyStateCard() {
@@ -21,7 +22,7 @@ export default function ChallengeEmptyStateCard() {
         적립 습관을 챌린지로 만들어보세요
       </p>
       <Link
-        to="/invest-plan?tab=챌린지"
+        to={investPlanUrl("챌린지")}
         className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
       >
         만들기 →

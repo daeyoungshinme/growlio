@@ -42,6 +42,7 @@ import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { fmtKrwShort } from "@/utils/format";
 import { accountsQuery, compositeSignalStatusQuery, settingsQuery } from "@/api/queryOptions";
+import { assetManagementUrl, investPlanUrl } from "@/utils/tabUrl";
 
 const RISK_TOLERANCE_LABELS: Record<string, string> = {
   CONSERVATIVE: "보수적",
@@ -206,7 +207,7 @@ export default function SettingsPage() {
       {/* 다른 설정 — 계좌 연동/목표/추천 옵션은 각 기능 페이지에서 편집, 여기서는 상태 요약 + 딥링크만 제공 */}
       <SectionCard title="다른 설정">
         <SettingsLinkRow
-          to="/assets?tab=계좌관리"
+          to={assetManagementUrl()}
           icon={<Landmark size={18} className="text-gray-400 dark:text-gray-500" />}
           label="계좌 연동 (KIS·키움 / 토스 조회 전용)"
           status={accountLinkSummary}
@@ -217,13 +218,13 @@ export default function SettingsPage() {
           }
         />
         <SettingsLinkRow
-          to="/invest-plan?tab=적립 계획"
+          to={investPlanUrl("적립 계획")}
           icon={<Target size={18} className="text-gray-400 dark:text-gray-500" />}
           label="투자·입금 목표"
           status={goalSummary}
         />
         <SettingsLinkRow
-          to="/invest-plan?tab=배당 계획"
+          to={investPlanUrl("배당 계획")}
           icon={<Coins size={18} className="text-gray-400 dark:text-gray-500" />}
           label="배당 목표"
           status={dividendGoalSummary}

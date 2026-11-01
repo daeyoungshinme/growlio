@@ -16,6 +16,7 @@ import RebalancingWeightTable from "./RebalancingWeightTable";
 import RebalancingDetailMetrics from "./RebalancingDetailMetrics";
 import { calcTradeSummary, TRADING_FEE_RATE } from "./rebalancingTradeMath";
 import { TOUCH_HEIGHT_MIN, TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { assetManagementUrl } from "@/utils/tabUrl";
 
 interface Props {
   analysis: RebalancingAnalysis;
@@ -221,7 +222,7 @@ export default function RebalancingTable({
       >
         {tradableAccounts.length === 0 ? (
           <Link
-            to="/assets?tab=계좌관리&atab=증권계좌"
+            to={assetManagementUrl("증권계좌")}
             className="w-full flex items-center justify-center gap-1.5 bg-white dark:bg-gray-900 border border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 py-3 rounded-xl text-sm font-semibold shadow-lg"
           >
             증권계좌 연동하면 바로 주문할 수 있어요 →

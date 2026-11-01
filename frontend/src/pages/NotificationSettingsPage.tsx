@@ -27,7 +27,7 @@ import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { settingsQuery } from "@/api/queryOptions";
-import { ALERT_TABS, type AlertTab } from "@/constants/tabs";
+import { ALERT_TABS, MARKET_ALERT_SECTION, type AlertTab } from "@/constants/tabs";
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -126,9 +126,6 @@ function AlertHistorySection() {
   );
 }
 
-/** 시장 모니터링 카드를 펼친 채 여는 `?atab=` 값 — `MarketSignalBanner`의 "설정 →" 링크가 쓴다 */
-const MARKET_SECTION_PARAM = "시장 신호 알림";
-
 /** 설정탭 "알림 설정" 딥링크 진입점 — 카테고리별 그룹(정기 리포트·요약/즉시 알림/시장 모니터링) +
  * 환율/주가/발송이력 탭을 별도 라우트로 분리해 `SettingsPage.tsx`의 3중 중첩(SectionCard›
  * CollapsibleCard×3›내부 pill탭)을 완화한다(2026-07-26). */
@@ -139,7 +136,7 @@ export default function NotificationSettingsPage() {
   const rawAlertTab = searchParams.get("atab");
   const alertTab: AlertTab = (ALERT_TABS as readonly string[]).includes(rawAlertTab ?? "")
     ? (rawAlertTab as AlertTab)
-    : "환율 알림";
+    : ALERT_TABS[0];
   const setAlertTab = useCallback(
     (next: AlertTab) => {
       setSearchParams(
@@ -193,7 +190,7 @@ export default function NotificationSettingsPage() {
   );
   useEffect(() => {
     // 딥링크 값이 바뀔 때만 펼친다(setMarketAlertsOpen은 참조 고정)
-    if (rawAlertTab === MARKET_SECTION_PARAM) setMarketAlertsOpen(true);
+    if (rawAlertTab === MARKET_ALERT_SECTION) setMarketAlertsOpen(true);
   }, [rawAlertTab, setMarketAlertsOpen]);
 
   const reportAlertsEnabledCount = countEnabled([

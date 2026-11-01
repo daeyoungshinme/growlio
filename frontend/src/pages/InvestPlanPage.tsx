@@ -53,7 +53,7 @@ export default function InvestPlanPage() {
   const rawTab = searchParams.get("tab");
   const activeTab: Tab = (TABS as readonly string[]).includes(rawTab ?? "")
     ? (rawTab as Tab)
-    : "적립 계획";
+    : TABS[0];
   const setActiveTab = (tab: Tab) =>
     setSearchParams(
       (prev) => {

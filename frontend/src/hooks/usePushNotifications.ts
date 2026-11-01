@@ -14,6 +14,7 @@ import { registerPushToken } from "@/api/settings";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { useLatestRef } from "@/hooks/useLatestRef";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 /** 설정탭 "다시 시도" 버튼 등에서 등록을 재시도할 때 사용 — 실제 토큰 수신은 usePushNotifications()가
  * 마운트해둔 "registration" 리스너가 처리하므로, 여기서는 권한 재요청 + register() 호출만 한다. */
@@ -76,17 +77,17 @@ export function resolvePushDeepLink(
       return rebalancingUrl({ tab: "진단" });
     case "GOAL_ASSET":
     case "GOAL_DEPOSIT":
-      return `/invest-plan?tab=${encodeURIComponent("적립 계획")}`;
+      return investPlanUrl("적립 계획");
     case "GOAL_DIVIDEND":
-      return `/invest-plan?tab=${encodeURIComponent("배당 계획")}`;
+      return investPlanUrl("배당 계획");
     case "DCA_CASH_SHORTFALL":
-      return `/invest-plan?tab=${encodeURIComponent("적립 계획")}`;
+      return investPlanUrl("적립 계획");
     // 예전엔 매핑이 없어 눌러도 첫 화면에 머물렀다(plans/90 B5)
     case "CHALLENGE_REMINDER":
     case "CHALLENGE_WRAPUP":
-      return `/invest-plan?tab=${encodeURIComponent("챌린지")}`;
+      return investPlanUrl("챌린지");
     case "YEAR_END_TAX_REMINDER":
-      return `/invest-plan?tab=${encodeURIComponent("절세")}`;
+      return investPlanUrl("절세");
     case "RECOMMENDATION_DRIFT":
       return rebalancingUrl({ tab: "목표 조정", mode: "추천" });
     // 전술 국면 변경 — 백엔드 push_type이 소문자(tactical_regime_check.py)라 그대로 매핑

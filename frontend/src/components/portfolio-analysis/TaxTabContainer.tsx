@@ -20,7 +20,7 @@ export default function TaxTabContainer() {
   const rawTaxTab = searchParams.get("taxTab");
   const taxTab: TaxTab = (TAX_TABS as readonly string[]).includes(rawTaxTab ?? "")
     ? (rawTaxTab as TaxTab)
-    : "한도 현황";
+    : TAX_TABS[0];
   const accountId = searchParams.get("taxAccount") || null;
 
   const setParam = useCallback(

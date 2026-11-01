@@ -57,7 +57,7 @@ export default function PortfolioPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("portfolioTab");
 
-  const tab: Tab = TABS.includes(rawTab as Tab) ? (rawTab as Tab) : "종목 현황";
+  const tab: Tab = TABS.includes(rawTab as Tab) ? (rawTab as Tab) : TABS[0];
 
   const handleTabChange = useCallback(
     (next: Tab) => {

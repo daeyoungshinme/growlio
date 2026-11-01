@@ -6,6 +6,7 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import type { PortfolioOverview } from "@/types";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { portfolioUrl } from "@/utils/tabUrl";
 
 interface Props {
   overview: PortfolioOverview | undefined;
@@ -31,7 +32,7 @@ export default function InvestmentSnapshotCard({ overview }: Props) {
       title="주식 투자 현황"
       headerRight={
         <Link
-          to="/assets?tab=투자현황"
+          to={portfolioUrl()}
           className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
         >
           자세히 보기

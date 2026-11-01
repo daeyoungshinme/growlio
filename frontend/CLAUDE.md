@@ -44,7 +44,7 @@ make build-android-debug / build-android-release
 - `/dashboard` — 홈
 - `/assets` — 단일 라우트, `?tab=` 투자현황/계좌관리 (`ASSETS_TOP_TABS`). 계좌관리 `?atab=` 기본은 증권계좌(`ASSET_MANAGEMENT_TABS[0]`)
 - `/invest-plan` — `?tab=` 적립 계획/배당 계획/절세/챌린지
-- `/settings`, `/settings/notifications` — 각 기능의 편집 UI는 해당 페이지에 있고 설정 탭엔 요약 + 딥링크만. 알림 설정 `?atab=`은 URL 동기화, 단 `atab=시장 신호 알림`은 탭이 아니라 시장 모니터링 카드를 펼치는 값(발송된 링크 호환)
+- `/settings`, `/settings/notifications` — 각 기능의 편집 UI는 해당 페이지에 있고 설정 탭엔 요약 + 딥링크만. 알림 설정 `?atab=`은 URL 동기화, 단 `atab=시장 신호 알림`(`MARKET_ALERT_SECTION`)은 탭이 아니라 시장 모니터링 카드를 펼치는 값(발송된 링크 호환)
 - **탭 계층**: 페이지 1단 = pill, 2단 = underline, 3단 = segmented. 4단 이상 금지 — 더 필요하면 select나 접기로
 - `/rebalancing` — `?rtab=` 진단/포트폴리오/목표 조정/이력, 목표 조정 안 `?gmode=` 추천/전술. **링크는 반드시 `utils/rebalancingUrl.ts`의 `rebalancingUrl()`로**, 페이지 내부 URL 상태는 `hooks/useRebalancingUrlState.ts`
 - `*` → `/dashboard`. `/market`·`/portfolio`·`/asset-management`·`/trend`는 없음(제거됨). `BottomNav`(`constants/nav.ts`)는 5탭
@@ -257,6 +257,7 @@ _기타_
 - `portfolio.ts` — `groupPositionsByTicker`, `getPortfolioTargetState`, `getPortfolioHorizon(TaxType)`, `inferHorizonTaxTypeFromAccounts`, `mergeAlertsByPortfolio`
 - `portfolioGroups.ts` — 지수 그룹 편집 순수 함수. 레버리지 멤버는 대표·국내 대체 후보에서 제외(백엔드 검증과 같은 규칙)
 - `components/rebalancing/rebalancingTradeMath.ts` — **분석 결과 그룹 행은 `shares_to_trade`가 null** — 주문·거래 요약은 `flattenTradeItems()`로 펼친 목록 사용
+- `tabUrl.ts` — 자산·계획·알림 설정 딥링크 빌더(`portfolioUrl`·`assetManagementUrl`·`investPlanUrl`·`notificationSettingsUrl`). 탭 인자는 `constants/tabs.ts` 유니온 — **`to="/invest-plan?tab=..."` 직접 조립 금지**. 값은 인코딩하지 않는다(백엔드·이메일 링크와 같은 모양)
 - `rebalancingUrl.ts` — `REBALANCING_TABS`·`GOAL_MODES`가 탭 이름 단일 정의(**백엔드 `email_service`·`insight_service`·`action_items_service`의 탭 문자열과 같아야 함**), `parseRebalancingTab`(옛 `rtab=추천/전술` 호환), `rebalancingUrl()`
 - `recommendationDrift.ts` — `RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3%p) — 백엔드 `compute_recommendation_drift`와 동일 로직. `foldIntoPortfolioGroups`는 백엔드 `fold_into_portfolio_groups`와 같은 규칙
 - `marketSignalRows.ts` — 매크로 8지표 행 변환(Tier 분류는 백엔드 `market_signal_service` 재사용)

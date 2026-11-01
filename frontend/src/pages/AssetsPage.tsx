@@ -14,7 +14,7 @@ export default function AssetsPage() {
   const rawTab = searchParams.get("tab");
   const activeTab: AssetsTopTab = (ASSETS_TOP_TABS as readonly string[]).includes(rawTab ?? "")
     ? (rawTab as AssetsTopTab)
-    : "투자현황";
+    : ASSETS_TOP_TABS[0];
 
   const handleTabChange = (tab: AssetsTopTab) => {
     setSearchParams(

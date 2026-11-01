@@ -38,9 +38,7 @@ describe("resolvePushDeepLink", () => {
   });
 
   it("routes DCA_CASH_SHORTFALL to the savings plan tab", () => {
-    expect(resolvePushDeepLink({ type: "DCA_CASH_SHORTFALL" })).toBe(
-      `/invest-plan?tab=${encodeURIComponent("적립 계획")}`,
-    );
+    expect(resolvePushDeepLink({ type: "DCA_CASH_SHORTFALL" })).toBe("/invest-plan?tab=적립 계획");
   });
 
   it("routes RECOMMENDATION_DRIFT to the recommendation tab", () => {
