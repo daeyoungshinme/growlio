@@ -22,7 +22,7 @@ import {
   settingsQuery,
 } from "@/api/queryOptions";
 
-const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
+const RebalancingStatusCard = lazy(() => import("../components/rebalancing/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
 const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSignalBanner"));
 const InflationIndicatorList = lazy(

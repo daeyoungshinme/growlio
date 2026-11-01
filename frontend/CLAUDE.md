@@ -42,9 +42,10 @@ make build-android-debug / build-android-release
 - 인증: `/login`, `/register`, `/find-account`, `/forgot-password`, `/reset-password`, `/auth/callback`(이메일 인증 랜딩, 인증 불필요)
 - `/rebalancing/plan-confirm?token=` — 이메일 링크 전용 매수 취소/매도 승인(인증 불필요)
 - `/dashboard` — 홈
-- `/assets` — 단일 라우트, `?tab=` 투자현황/계좌관리 (`ASSETS_TOP_TABS`)
-- `/invest-plan` — 적립 계획/배당 계획/절세/챌린지
-- `/settings`, `/settings/notifications` — 각 기능의 편집 UI는 해당 페이지에 있고 설정 탭엔 요약 + 딥링크만
+- `/assets` — 단일 라우트, `?tab=` 투자현황/계좌관리 (`ASSETS_TOP_TABS`). 계좌관리 `?atab=` 기본은 증권계좌(`ASSET_MANAGEMENT_TABS[0]`)
+- `/invest-plan` — `?tab=` 적립 계획/배당 계획/절세/챌린지
+- `/settings`, `/settings/notifications` — 각 기능의 편집 UI는 해당 페이지에 있고 설정 탭엔 요약 + 딥링크만. 알림 설정 `?atab=`은 URL 동기화, 단 `atab=시장 신호 알림`은 탭이 아니라 시장 모니터링 카드를 펼치는 값(발송된 링크 호환)
+- **탭 계층**: 페이지 1단 = pill, 2단 = underline, 3단 = segmented. 4단 이상 금지 — 더 필요하면 select나 접기로
 - `/rebalancing` — `?rtab=` 진단/포트폴리오/목표 조정/이력, 목표 조정 안 `?gmode=` 추천/전술. **링크는 반드시 `utils/rebalancingUrl.ts`의 `rebalancingUrl()`로**, 페이지 내부 URL 상태는 `hooks/useRebalancingUrlState.ts`
 - `*` → `/dashboard`. `/market`·`/portfolio`·`/asset-management`·`/trend`는 없음(제거됨). `BottomNav`(`constants/nav.ts`)는 5탭
 - 새 페이지는 `App.tsx`에 `<Route>` 등록 필수
@@ -79,7 +80,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 **주요 화면 컴포넌트 — 진입 지점과 함정만**
 
 - `dashboard/ActionItemsCard` — 홈 "지금 할 일"(`GET /dashboard/action-items`). **홈에서 리밸런싱을 다루는 유일한 카드**(REBALANCE 행 + 시장 신호 배지). 배지 상수 `utils/marketSignalBadge.ts`, 우선순위·마감 라벨 `utils/actionPriority.ts`(둘 다 공용).
-- `dashboard/{IsaMaturityCard,PensionContributionCard,HealthInsuranceRiskCard}` — 계획탭 › 절세의 `TaxLimitsSection`이 렌더(건보 카드는 항상).
+- `tax/{IsaMaturityCard,PensionContributionCard,HealthInsuranceRiskCard}` — 계획탭 › 절세의 `TaxLimitsSection`이 렌더(건보 카드는 항상). ISA 카드 앵커 `#isa-status`는 백엔드 절세 CTA 링크와 같아야 함.
 - `portfolio-analysis/TaxTabContainer` — 계획탭 "절세"(`?taxTab=`, `?taxAccount=`). 옛 `/assets?portfolioTab=세금` 링크는 `utils/legacyTabRedirect.ts`가 옮김.
 - `portfolio/AllocationCard` — 자산탭 비중 분석(국내/해외·종목·지수). 하위 뷰 `portfolio/allocation/`. "종목" 보기는 상위 5 + 기타만.
 - `assets/AccountHistoryTab` — 계좌관리 "내역"(`?history=` 현금 흐름/매수 내역).
@@ -149,7 +150,7 @@ _기타_
 
 - `queryKeys.ts` — **모든 queryKey는 `QUERY_KEYS`에서 import**
 - `queryConfig.ts` — `STALE_TIME`/`REFETCH_INTERVAL` + persist(24h localStorage) 설정. **persist 대상 응답 형태를 호환되지 않게 바꾸면 `PERSIST_CACHE_BUSTER`를 날짜로 올린다**
-- `tabs.ts` — `ASSETS_TOP_TABS`, `ASSET_MANAGEMENT_TABS`, `PORTFOLIO_TABS`
+- `tabs.ts` — URL에 실리는 탭 이름 단일 정의(`ASSETS_TOP_TABS`·`ASSET_MANAGEMENT_TABS`·`ACCOUNT_HISTORY_SEGMENTS`·`PORTFOLIO_TABS`·`INVEST_PLAN_TABS`·`TAX_TABS`·`ALERT_TABS`). **백엔드 링크 문자열(`action_items_service`·`tax_action_service`·이메일)과 같아야 함**
 - `rebalancingConfig.ts` — 알림 폼 옵션 상수 + `PLAN_LEG_STATUS_LABEL`
 - `uiSizes.ts` — 터치 타겟 상수 (아래 모바일 규칙)
 - `markets.ts` · `inputStyles.ts` — 아래 Absolute Rules
@@ -298,7 +299,7 @@ _기타_
 - 헤드라인 카드(`HeroSummaryCard`, `InvestmentGoalCard`)는 접기 불가. 단 `HeroSummaryCard`의 총액·범례 금액은 **기본 숨김**(탭하면 표시, 저장 안 함).
 - 보조/상세 최상위 카드는 `useCollapsible`로 접기 가능, 첫 방문은 **열림**, 접은 상태는 localStorage 유지. 이미 펼친 카드 안의 2차 토글은 대상 아님.
 - **기본 접힘 예외**(보조 도구·상세): 진단 `RiskMetricsCard`, `MarketSignalBanner` 상세("자세히"), 전술 백테스트·판정 근거·비중표 편집, 절약 복리 시뮬레이터, `RebalancingDiagnosisCard`, 분석 "상세 정보", "더 빨리 달성하려면?", 절세 플래너, `AllocationCard`(모바일만). localStorage 키는 `growlio:<영역>:<이름>` 형식.
-- 홈에는 `RebalancingStatusCard`가 없다(진단탭 전용, 항상 펼침) — 홈 리밸런싱은 `ActionItemsCard`만.
+- 홈에는 `RebalancingStatusCard`가 없다(`rebalancing/`, 진단탭 전용, 항상 펼침) — 홈 리밸런싱은 `ActionItemsCard`만.
 
 ---
 

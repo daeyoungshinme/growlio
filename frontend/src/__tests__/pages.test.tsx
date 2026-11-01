@@ -370,7 +370,7 @@ describe("AssetManagementPage", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      // Initial tab is 은행계좌
+      // Initial tab is 증권계좌
       expect(document.body).toBeDefined();
     });
   });

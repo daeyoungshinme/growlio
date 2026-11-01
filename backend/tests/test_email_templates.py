@@ -127,7 +127,7 @@ class TestRebalancingAlertTemplate:
             composite_reason="시장 위험 신호가 RED 단계입니다",
         )
         assert "하루 1회" in html
-        assert "시장 신호 알림" in html
+        assert "알림 설정 &gt; 시장 모니터링" in html
 
     def test_scheduled_footer_unchanged_for_non_composite(self):
         _, html = rebalancing_alert_template(
@@ -168,7 +168,7 @@ class TestMarketSignalChangeTemplate:
         _, html = market_signal_change_template("GREEN", "RED", "시장 위험 신호가 높은 국면입니다")
         assert "등급이 바뀔 때마다" in html
         assert "1시간 간격" in html
-        assert "시장 신호 알림" in html
+        assert "알림 설정 &gt; 시장 모니터링" in html
 
 
 class TestStockPriceAlertTemplate:

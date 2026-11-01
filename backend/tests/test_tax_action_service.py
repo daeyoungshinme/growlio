@@ -68,6 +68,7 @@ class TestBuildPensionAction:
         assert action["amount_krw"] == 3_000_000
         assert action["benefit_krw"] == 495_000  # 300만 × 16.5%
         assert action["deadline"] == "2026-12-31"
+        assert action["cta"]["link"] == "/assets?tab=계좌관리&atab=내역&history=현금 흐름"
         assert "매월 약 1,000,000원" in action["detail"]  # 10~12월 3개월 분할
         assert "소득 구간을 입력하면" not in action["detail"]
 
@@ -107,6 +108,7 @@ class TestBuildIsaTransferActions:
         assert action["amount_krw"] == 30_000_000
         assert action["deadline"] == "2027-01-13"  # 만기 + 60일
         assert action["category"] == "ISA_PENSION_TRANSFER"
+        assert action["cta"]["link"] == "/invest-plan?tab=절세&taxTab=한도 현황#isa-status"
 
 
 class TestBuildIsaContributionActions:
@@ -118,6 +120,7 @@ class TestBuildIsaContributionActions:
         actions = build_isa_contribution_actions(contrib, TODAY)
         assert len(actions) == 1
         assert actions[0]["amount_krw"] == 25_000_000
+        assert actions[0]["cta"]["link"] == "/assets?tab=계좌관리&atab=내역&history=현금 흐름"
         assert actions[0]["benefit_krw"] is None
         assert "이월 포함" in actions[0]["detail"]
         # 한도 문구는 isa_service 상수에서 파생 — 한도 개정 시 문구만 stale해지지 않게

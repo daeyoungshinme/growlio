@@ -39,10 +39,11 @@ import GoalSettingWizard from "@/components/invest/GoalSettingWizard";
 import Tabs from "@/components/common/Tabs";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { settingsQuery } from "@/api/queryOptions";
+import { INVEST_PLAN_TABS, type InvestPlanTab } from "@/constants/tabs";
 
 // 절세는 자산 › 투자현황 › 세금에서 이동(plans/50 M1) — 목표·배당·절세 "계획"을 한 탭에 모은다
-const TABS = ["적립 계획", "배당 계획", "절세", "챌린지"] as const;
-type Tab = (typeof TABS)[number];
+const TABS = INVEST_PLAN_TABS;
+type Tab = InvestPlanTab;
 
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();

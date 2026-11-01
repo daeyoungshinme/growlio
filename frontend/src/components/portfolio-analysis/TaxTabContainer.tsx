@@ -7,9 +7,7 @@ import Tabs from "@/components/common/Tabs";
 import TaxLimitsSection from "@/components/portfolio-analysis/TaxLimitsSection";
 import TaxOptimizationCard from "@/components/portfolio-analysis/TaxOptimizationCard";
 import { accountsQuery } from "@/api/queryOptions";
-
-const TAX_TABS = ["한도 현황", "세금 추정"] as const;
-type TaxTab = (typeof TAX_TABS)[number];
+import { TAX_TABS, type TaxTab } from "@/constants/tabs";
 
 /** 계획 › 절세 탭 — "한도 현황"(절세 액션 플랜·ISA 만기·연금 공제한도)과 "세금 추정"(배당세·해외 양도세 +
  * 절세 플래너/금투세 시뮬레이션)을 탭으로 묶는다. 2026-10-08(plans/50 M1) 자산 › 투자현황 › 세금에서 이동 —

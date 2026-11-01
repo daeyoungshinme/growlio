@@ -10,7 +10,7 @@ vi.mock("@/api/tax", () => ({
   fetchPensionContribution: (...args: unknown[]) => fetchPensionContribution(...args),
 }));
 
-import PensionContributionCard from "@/components/dashboard/PensionContributionCard";
+import PensionContributionCard from "@/components/tax/PensionContributionCard";
 
 function makeOverview(taxTypes: string[]): PortfolioOverview {
   return {

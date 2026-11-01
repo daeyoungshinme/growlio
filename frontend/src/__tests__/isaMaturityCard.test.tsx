@@ -17,7 +17,7 @@ vi.mock("@/api/assets", () => ({
 
 vi.mock("@/utils/toast", () => ({ toast: (...args: unknown[]) => toastMock(...args) }));
 
-import IsaMaturityCard from "@/components/dashboard/IsaMaturityCard";
+import IsaMaturityCard from "@/components/tax/IsaMaturityCard";
 
 function makeStatus(overrides: Partial<IsaAccountStatus> = {}): IsaAccountStatus {
   return {

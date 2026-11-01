@@ -151,7 +151,9 @@ describe("AllocationCard", () => {
 
     it("상장시장 기준으로 바꾸면 overview 금액을 쓴다", async () => {
       renderCard();
-      fireEvent.click(screen.getByRole("button", { name: "상장시장" }));
+      fireEvent.change(screen.getByRole("combobox", { name: "국내/해외 기준" }), {
+        target: { value: "listing" },
+      });
       expect(screen.getAllByText("60.0%")).toHaveLength(2);
       expect(screen.getAllByText("40.0%")).toHaveLength(2);
       expect(screen.queryByText("판별 불가")).not.toBeInTheDocument();

@@ -34,7 +34,7 @@ vi.mock("@/api/assets", async (importOriginal) => ({
   fetchAccounts: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
+vi.mock("@/components/rebalancing/RebalancingStatusCard", () => ({
   default: () => React.createElement("div", { "data-testid": "rebalancing-status-card" }),
 }));
 

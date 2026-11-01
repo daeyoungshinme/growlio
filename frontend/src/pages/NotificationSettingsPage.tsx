@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ArrowLeft, Bell, Mail, Activity } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,6 +27,7 @@ import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { settingsQuery } from "@/api/queryOptions";
+import { ALERT_TABS, type AlertTab } from "@/constants/tabs";
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -125,19 +126,31 @@ function AlertHistorySection() {
   );
 }
 
-const ALERT_TABS = ["환율 알림", "주가 알림", "발송 이력"] as const;
-type AlertTab = (typeof ALERT_TABS)[number];
+/** 시장 모니터링 카드를 펼친 채 여는 `?atab=` 값 — `MarketSignalBanner`의 "설정 →" 링크가 쓴다 */
+const MARKET_SECTION_PARAM = "시장 신호 알림";
 
 /** 설정탭 "알림 설정" 딥링크 진입점 — 카테고리별 그룹(정기 리포트·요약/즉시 알림/시장 모니터링) +
  * 환율/주가/발송이력 탭을 별도 라우트로 분리해 `SettingsPage.tsx`의 3중 중첩(SectionCard›
  * CollapsibleCard×3›내부 pill탭)을 완화한다(2026-07-26). */
 export default function NotificationSettingsPage() {
-  const [searchParams] = useSearchParams();
-  const initialAlertTab = searchParams.get("atab");
-  const [alertTab, setAlertTab] = useState<AlertTab>(
-    (ALERT_TABS as readonly string[]).includes(initialAlertTab ?? "")
-      ? (initialAlertTab as AlertTab)
-      : "환율 알림",
+  // 하위 탭은 URL(`?atab=`)과 동기화 — 새로고침·뒤로가기에도 보던 탭이 유지된다(AssetsPage 패턴과 동일).
+  // `atab=시장 신호 알림`은 탭이 아니라 "시장 모니터링" 카드를 펼치는 특수값(이미 발송된 링크 호환으로 유지).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawAlertTab = searchParams.get("atab");
+  const alertTab: AlertTab = (ALERT_TABS as readonly string[]).includes(rawAlertTab ?? "")
+    ? (rawAlertTab as AlertTab)
+    : "환율 알림";
+  const setAlertTab = useCallback(
+    (next: AlertTab) => {
+      setSearchParams(
+        (prev) => {
+          prev.set("atab", next);
+          return prev;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
   );
 
   const alertTabContentRef = useRef<HTMLDivElement>(null);
@@ -179,9 +192,9 @@ export default function NotificationSettingsPage() {
     "growlio:settings:market-alerts-open",
   );
   useEffect(() => {
-    // 딥링크 탭이 바뀔 때만 펼친다(setMarketAlertsOpen은 참조 고정)
-    if (initialAlertTab === "시장 신호 알림") setMarketAlertsOpen(true);
-  }, [initialAlertTab, setMarketAlertsOpen]);
+    // 딥링크 값이 바뀔 때만 펼친다(setMarketAlertsOpen은 참조 고정)
+    if (rawAlertTab === MARKET_SECTION_PARAM) setMarketAlertsOpen(true);
+  }, [rawAlertTab, setMarketAlertsOpen]);
 
   const reportAlertsEnabledCount = countEnabled([
     monthlyReportEnabled,

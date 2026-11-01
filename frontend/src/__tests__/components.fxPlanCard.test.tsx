@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor, fireEvent } from "@testing-library/react";
-import { renderWithProviders } from "@/test/renderWithProviders";
+import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
+import { renderWithProviders as renderBase } from "@/test/renderWithProviders";
+
+// "환율 알림 관리" 링크가 있어 라우터 안에서 렌더한다
+const renderWithProviders = (ui: ReactNode) => renderBase(<MemoryRouter>{ui}</MemoryRouter>);
 import type { FxPlanData } from "@/api/invest";
 import type { ExchangeRateAlert } from "@/api/alerts";
 
@@ -109,6 +114,18 @@ describe("FxPlanCard", () => {
     vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([alert(1380), alert(1360)]);
     renderWithProviders(<FxPlanCard flat />);
     expect(await screen.findByRole("button", { name: "목표 환율 알림 등록됨" })).toBeDisabled();
+    // 등록한 알림은 설정 › 알림 설정 › 환율 알림에서 관리
+    const link = screen.getByRole("link", { name: "환율 알림 관리 →" });
+    expect(decodeURIComponent(link.getAttribute("href") ?? "")).toBe(
+      "/settings/notifications?atab=환율 알림",
+    );
+  });
+
+  it("등록한 목표 환율 알림이 없으면 관리 링크를 보이지 않는다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    renderWithProviders(<FxPlanCard flat />);
+    expect(await screen.findByRole("button", { name: "목표 환율 알림 등록" })).toBeEnabled();
+    expect(screen.queryByRole("link", { name: "환율 알림 관리 →" })).toBeNull();
   });
 
   it("월 적립액 미설정이면 설정 버튼을 보여준다", async () => {

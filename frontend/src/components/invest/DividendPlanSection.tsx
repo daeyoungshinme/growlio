@@ -8,15 +8,13 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
-import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
 import { MONTH_LABELS } from "@/utils/dividendUtils";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
-import { goalRecommendationOverallQuery, settingsQuery } from "@/api/queryOptions";
+import { goalRecommendationOverallQuery } from "@/api/queryOptions";
 import { TOUCH_HEIGHT_MIN, TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
@@ -35,10 +33,6 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
 
   // GoalTimelineCard(적립 계획 탭)와 동일한 queryKey를 써서 캐시를 공유한다 — 중복 호출 없음.
   const { data: recommendation } = useQuery(goalRecommendationOverallQuery);
-  const { data: settingsData } = useQuery(settingsQuery);
-  const addSuggestedMutation = useAddSuggestedCandidates(
-    settingsData?.goal_candidate_tickers ?? [],
-  );
   // 월별 균등화 추천은 실적(자산 › 배당)이 아니라 계획 행동이라 여기 둔다. 접힌 동안엔 조회하지 않는다.
   const [optimizationOpen, toggleOptimization] = useCollapsible(
     false,
@@ -324,17 +318,21 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
             </p>
           )}
 
-          <SuggestedCandidatesBlock
-            candidates={recommendation.suggested_candidates}
-            onAdd={() => addSuggestedMutation.mutate(recommendation.suggested_candidates)}
-            isPending={addSuggestedMutation.isPending}
-          />
+          {/* 후보 추가 같은 편집은 목표 조정 › 추천 한 곳에서 — 여기는 요약만(계획 106 C1) */}
+          {recommendation.suggested_candidates.length > 0 && (
+            <p className="text-xs text-gray-600 dark:text-gray-300">
+              제안 고배당 후보 {recommendation.suggested_candidates.map((c) => c.name).join(", ")}
+            </p>
+          )}
 
           <Link
             to={rebalancingUrl({ tab: "목표 조정", mode: "추천" })}
             className={`flex items-center gap-1.5 ${TOUCH_HEIGHT_MIN} text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline`}
           >
-            추천 포트폴리오 자세히 보기 <ArrowRight size={12} />
+            {recommendation.suggested_candidates.length > 0
+              ? "목표 조정에서 후보 추가·추천 비중 보기"
+              : "추천 포트폴리오 자세히 보기"}{" "}
+            <ArrowRight size={12} />
           </Link>
         </CollapsibleCard>
       )}

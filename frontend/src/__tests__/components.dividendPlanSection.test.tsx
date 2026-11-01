@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders as renderWithProvidersBase } from "@/test/renderWithProviders";
 import type { DividendPlanData } from "@/api/invest";
@@ -9,7 +9,6 @@ import type { SettingsData } from "@/api/settings";
 const fetchDividendPlan = vi.fn();
 const fetchOverallGoalRecommendation = vi.fn();
 const fetchSettings = vi.fn();
-const updateGoalCandidateTickers = vi.fn();
 const toastMock = vi.fn();
 
 vi.mock("@/api/invest", () => ({
@@ -20,7 +19,6 @@ vi.mock("@/api/rebalancing", () => ({
 }));
 vi.mock("@/api/settings", () => ({
   fetchSettings: (...args: unknown[]) => fetchSettings(...args),
-  updateGoalCandidateTickers: (...args: unknown[]) => updateGoalCandidateTickers(...args),
 }));
 vi.mock("@/utils/toast", () => ({ toast: (...args: unknown[]) => toastMock(...args) }));
 vi.mock("@/stores/themeStore", () => ({
@@ -138,7 +136,12 @@ describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
     expect(screen.getByText("+3.00%")).toBeDefined(); // 목표 배당수익률
     expect(screen.getByText("+1.80%")).toBeDefined(); // 기대 배당수익률
     expect(screen.getByText(/Nasdaq Equity Premium/)).toBeDefined();
-    expect(screen.getByText("후보에 추가")).toBeDefined();
+    // 후보 추가는 목표 조정 › 추천에서만(계획 106 C1) — 여기는 요약 + 링크
+    expect(screen.queryByText("후보에 추가")).toBeNull();
+    const link = screen.getByText("목표 조정에서 후보 추가·추천 비중 보기").closest("a");
+    expect(decodeURIComponent(link?.getAttribute("href") ?? "")).toBe(
+      "/rebalancing?rtab=목표 조정&gmode=추천",
+    );
   });
 
   it("배당목표를 설정하지 않았으면 추천 섹션을 숨긴다", async () => {
@@ -161,27 +164,5 @@ describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
 
     await screen.findByText("배당 목표 달성 현황");
     expect(screen.queryByText("배당 목표를 더 빨리 달성하려면?")).toBeNull();
-  });
-
-  it("'후보에 추가' 클릭 시 등록 후보와 병합해 저장한다", async () => {
-    fetchDividendPlan.mockResolvedValue(makeDividendPlan());
-    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
-    updateGoalCandidateTickers.mockResolvedValue(undefined);
-
-    renderWithProviders(<DividendPlanSection onOpenSettings={vi.fn()} />);
-
-    fireEvent.click(await screen.findByText("배당 목표를 더 빨리 달성하려면?"));
-    fireEvent.click(await screen.findByText("후보에 추가"));
-
-    await waitFor(() => expect(updateGoalCandidateTickers).toHaveBeenCalled());
-    expect(updateGoalCandidateTickers.mock.calls[0]![0]).toEqual([
-      { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", asset_class: "EQUITY" },
-      {
-        ticker: "JEPQ",
-        name: "JPMorgan Nasdaq Equity Premium Income ETF",
-        market: "NASDAQ",
-        asset_class: "EQUITY",
-      },
-    ]);
   });
 });

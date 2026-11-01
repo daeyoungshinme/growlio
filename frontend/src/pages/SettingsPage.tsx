@@ -12,6 +12,7 @@ import {
   Sparkles,
   ChevronRight,
   KeyRound,
+  Coins,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
@@ -39,6 +40,7 @@ import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { fmtKrwShort } from "@/utils/format";
 import { accountsQuery, compositeSignalStatusQuery, settingsQuery } from "@/api/queryOptions";
 
 const RISK_TOLERANCE_LABELS: Record<string, string> = {
@@ -123,19 +125,25 @@ export default function SettingsPage() {
     }
   };
 
+  // 투자·입금 목표는 적립 계획, 배당 목표는 배당 계획에서 편집하므로 행을 나눈다
   const goalFieldsSetCount = current
     ? [
         current.goal_amount,
         current.annual_deposit_goal,
         current.monthly_deposit_amount,
         current.retirement_target_year,
-        current.annual_dividend_goal,
       ].filter((v) => v !== null && v !== undefined).length
     : 0;
   const goalSummary = !current
     ? "불러오는 중..."
     : goalFieldsSetCount > 0
       ? `목표 ${goalFieldsSetCount}개 설정됨`
+      : "설정된 목표 없음";
+  const dividendGoal = current?.annual_dividend_goal;
+  const dividendGoalSummary = !current
+    ? "불러오는 중..."
+    : dividendGoal != null && dividendGoal > 0
+      ? `연 ${fmtKrwShort(dividendGoal)}원`
       : "설정된 목표 없음";
 
   // 키움·토스 API 키는 계좌 단위로 저장돼 has_kis(전역 KIS 키)만 보면 연결된 사용자도 "미연결"로 보였음
@@ -211,8 +219,14 @@ export default function SettingsPage() {
         <SettingsLinkRow
           to="/invest-plan?tab=적립 계획"
           icon={<Target size={18} className="text-gray-400 dark:text-gray-500" />}
-          label="투자·입금·배당 목표"
+          label="투자·입금 목표"
           status={goalSummary}
+        />
+        <SettingsLinkRow
+          to="/invest-plan?tab=배당 계획"
+          icon={<Coins size={18} className="text-gray-400 dark:text-gray-500" />}
+          label="배당 목표"
+          status={dividendGoalSummary}
         />
         <SettingsLinkRow
           to={rebalancingUrl({ tab: "목표 조정", mode: "추천", openRecOptions: true })}
