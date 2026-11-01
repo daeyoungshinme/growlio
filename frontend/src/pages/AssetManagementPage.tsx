@@ -30,7 +30,7 @@ import { useAccountMutations } from "@/hooks/useAccountMutations";
 import { isSyncableAccount } from "@/utils/accounts";
 import { useStockAccountStats } from "@/hooks/useStockAccountStats";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
-import { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
+import { ASSET_MANAGEMENT_TABS, type AssetManagementTab } from "@/constants/tabs";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import Tabs from "@/components/common/Tabs";
 
@@ -48,7 +48,7 @@ export default function AssetManagementPage() {
     if (!legacySegment) return;
     setSearchParams(
       (prev) => {
-        prev.set("atab", "내역");
+        prev.set("atab", "내역" satisfies AssetManagementTab);
         prev.set("history", legacySegment);
         return prev;
       },

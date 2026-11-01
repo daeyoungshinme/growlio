@@ -19,6 +19,9 @@
 *.html  text eol=lf
 *.css   text eol=lf
 
+# Windows 배치는 CRLF 그대로 둔다 — Gradle wrapper(Dependabot bump)가 CRLF로 생성해 정규화하면 줄바꿈만 바뀐 전체 diff가 생긴다
+*.bat   -text
+
 # Binary files
 *.png   binary
 *.jpg   binary
