@@ -12,7 +12,7 @@
 0(끔)~20%p로 조절한다. 현금 이자·거래비용 반영 후(plans/70)에도 20년 MDD 24.7→27.7 악화·회전율의 약 1/3을 차지해
 **기본값은 끔(0)**이다(기존 전략에 저장된 값은 유지).
 
-순수 함수 + 입력 조회(캐시). 국면 상태 갱신은 tactical_allocation_service.
+순수 함수 + 입력 조회(캐시). 국면 상태 갱신은 tactical_regime.
 """
 
 from __future__ import annotations

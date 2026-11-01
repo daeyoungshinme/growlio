@@ -1,8 +1,9 @@
 """전술 배분 서비스 — 시장 관측(`evaluate_market`), 전략 조회·저장·해제, 상태 응답, 제안 비중 적용(DB 쓰기).
 
 국면 판정·제안 비중 규칙은 `tactical_regime`, 적용 계획(그룹 재구성·분할 보간·할 일 판정)은 `tactical_apply`에 있다.
-이 파일은 두 모듈의 심볼을 재노출한다 — `from ...tactical_allocation_service import X`·`patch.object(tactical, ...)`
-호출부는 그대로 유효하다. 단 서브모듈 안의 함수 간 호출을 가로채려면 그 서브모듈 경로를 patch해야 한다.
+이 파일은 두 모듈 중 외부 호출부(라우터·잡·테스트)가 쓰는 심볼만 재노출한다 — `from ...tactical_allocation_service
+import X`·`patch.object(tactical, ...)` 호출부는 그대로 유효하다. 새 외부 호출부는 원 모듈에서 직접 import한다.
+단 서브모듈 안의 함수 간 호출을 가로채려면 그 서브모듈 경로를 patch해야 한다.
 """
 
 from __future__ import annotations
@@ -21,8 +22,6 @@ from app.services.market_signal.technical_indicators import TechnicalSnapshot
 from app.services.market_signal.technical_signal_service import get_technical_signals
 from app.services.tactical.tactical_apply import (
     _current_weights,
-    _GroupSpec,
-    _MemberSpec,
     _new_item,
     _plan_groups,
     _weights_to_apply,
@@ -32,16 +31,12 @@ from app.services.tactical.tactical_apply import (
     is_tactical_managed,
     needs_group_suggestions,
     pending_action,
-    tactical_asset_of,
 )
 from app.services.tactical.tactical_dip import dip_reasons
 from app.services.tactical.tactical_hints import transition_hints
 from app.services.tactical.tactical_regime import (
-    ASSET_GROUP_KEYS,
-    ASSET_LABELS,
     DEFAULT_REGIME_WEIGHTS,
     LEVERAGED_ASSETS,
-    OPTIONAL_ASSETS,
     REGIME_LABELS,
     REGIMES,
     TACTICAL_ASSETS,
@@ -73,22 +68,14 @@ if TYPE_CHECKING:
     from app.schemas.tactical import TacticalStrategyUpsert
 
 __all__ = [
-    "ASSET_GROUP_KEYS",
-    "ASSET_LABELS",
     "DEFAULT_REGIME_WEIGHTS",
     "LEVERAGED_ASSETS",
-    "OPTIONAL_ASSETS",
     "REGIMES",
     "REGIME_LABELS",
     "TACTICAL_ASSETS",
     "ConfirmState",
     "Regime",
-    "_GroupSpec",
-    "_MemberSpec",
     "_current_weights",
-    "_new_item",
-    "_plan_groups",
-    "_weights_to_apply",
     "advance_dip",
     "advance_regime",
     "advance_tilt",
@@ -116,7 +103,6 @@ __all__ = [
     "resolve_weights",
     "save_strategy",
     "step_confirmation",
-    "tactical_asset_of",
     "tilt_shift_of",
     "uses_macro",
     "validate_regime_weights",

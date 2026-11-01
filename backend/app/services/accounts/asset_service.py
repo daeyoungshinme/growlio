@@ -58,7 +58,7 @@ _CIRCUITS: dict[str, CircuitBreaker] = {
 class SyncAccountResult:
     """sync_account()의 반환값 — 스냅샷과 함께 보유 종목 구성 변경 여부를 전달한다.
 
-    positions_changed는 배당 캐시 무효화 범위를 좁히는 데 쓰인다(cache_keys.invalidate_dividend_caches
+    positions_changed는 배당 캐시 무효화 범위를 좁히는 데 쓰인다(cache_invalidation.invalidate_dividend_caches
     참고) — 단순 가격/잔고 갱신 동기화마다 종목별 배당 추정(외부 API 폴백 체인)을 재계산하지
     않기 위함.
     """
@@ -130,8 +130,7 @@ async def _revalue_preserved_overseas(preserved: list[Position], usd_krw_rate: f
 async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStoreType) -> SyncAccountResult:
     """모든 데이터 소스를 통합 처리하는 계좌 동기화 진입점.
 
-    SyncError 계층 예외 및 CircuitOpenError를 그대로 전파한다.
-    API 레이어에서 HTTPException으로 변환.
+    SyncError 계층 예외 및 CircuitOpenError를 그대로 전파한다 — HTTP 응답 변환은 main.py 전역 핸들러가 한다.
     """
     _sync_start = time.monotonic()
     provider = get_provider(account)

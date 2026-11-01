@@ -11,7 +11,7 @@
 - 웅덩이 종료: `DIP_EXIT_STAGES`(종가가 이평선 위로 회복)면 0으로 돌아가 투입분을 현금으로 되돌린다.
 
 투입량 = `dip_shift_pct × 단계/3`(%p), 현금을 넘지 않으며 주식 자산들에 기존 비율대로 나눈다. 순수 함수만 둔다 —
-상태 갱신은 tactical_allocation_service, 과거 재현은 tactical_backtest.
+상태 갱신은 tactical_regime, 과거 재현은 tactical_backtest.
 """
 
 from __future__ import annotations
