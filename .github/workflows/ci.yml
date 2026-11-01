@@ -29,7 +29,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine  # docker-compose.yml db와 같은 major 유지 — Dependabot은 워크플로 서비스 이미지를 추적하지 않는다
         env:
           POSTGRES_DB: growlio_test
           POSTGRES_USER: postgres

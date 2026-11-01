@@ -138,7 +138,7 @@ updates:
         update-types:
           - "version-update:semver-major"
 
-  # docker-compose의 모니터링 이미지(prometheus·grafana) 핀 — 위 docker 항목은 Dockerfile만 본다
+  # docker-compose의 이미지 핀(로컬 db postgres + 모니터링 prometheus·grafana) — 위 docker 항목은 Dockerfile만 본다
   - package-ecosystem: "docker-compose"
     directory: "/"
     schedule:
@@ -147,6 +147,26 @@ updates:
     labels:
       - "dependencies"
       - "docker"
+    ignore:
+      # postgres major는 볼륨 경로(18부터 /var/lib/postgresql)와 데이터 마이그레이션이 따라오고,
+      # ci.yml 서비스 이미지는 Dependabot이 못 봐 로컬·CI가 갈라진다(#205, plans/107 A). 운영 Supabase 버전에 맞춰 사람이 올린다
+      - dependency-name: "postgres"
+        update-types:
+          - "version-update:semver-major"
+
+  # Android(Capacitor) Gradle 의존성 — AGP·androidx 버전은 Capacitor major가 정하므로 major는 cap 업그레이드 때 함께 올린다
+  - package-ecosystem: "gradle"
+    directory: "/frontend/android"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    labels:
+      - "dependencies"
+      - "android"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"
