@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import InfoTip from "@/components/common/InfoTip";
 import { fmtKrw, fmtKrwShort, pctOf } from "@/utils/format";
-import SegmentedControl from "@/components/common/SegmentedControl";
+import { SELECT_SM } from "@/constants/inputStyles";
 
 export type RegionBasis = "exposure" | "listing";
 
@@ -37,7 +37,8 @@ interface Props {
   fallback?: ReactNode;
 }
 
-/** 국내/해외 비중 — 스택 바 + 범례. 실제 투자지역/상장시장 기준을 토글한다. */
+/** 국내/해외 비중 — 스택 바 + 범례. 실제 투자지역/상장시장 기준을 고른다.
+ * 기준 선택은 select — 이미 자산(pill) › 종목 현황(underline) › 비중 보기(segmented) 3단 안이라 4단 탭을 만들지 않는다(계획 106 B4). */
 export default function RegionAllocationView({ basis, onBasisChange, amounts, fallback }: Props) {
   const segments: Segment[] = amounts
     ? [
@@ -65,17 +66,25 @@ export default function RegionAllocationView({ basis, onBasisChange, amounts, fa
 
   return (
     <div>
-      <SegmentedControl
-        options={BASIS_OPTIONS}
-        value={basis}
-        onChange={onBasisChange}
-        ariaLabel="국내/해외 기준"
-      />
-      {/* 예시가 붙은 긴 설명은 툴팁으로 — 모바일에서 두 줄을 차지했다 */}
-      <p className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-        {BASIS_HINT[basis].short}
-        <InfoTip label="기준 설명" content={BASIS_HINT[basis].detail} />
-      </p>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <select
+          value={basis}
+          onChange={(e) => onBasisChange(e.target.value as RegionBasis)}
+          className={`${SELECT_SM} w-auto`}
+          aria-label="국내/해외 기준"
+        >
+          {BASIS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label} 기준
+            </option>
+          ))}
+        </select>
+        {/* 예시가 붙은 긴 설명은 툴팁으로 — 모바일에서 두 줄을 차지했다 */}
+        <p className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+          {BASIS_HINT[basis].short}
+          <InfoTip label="기준 설명" content={BASIS_HINT[basis].detail} />
+        </p>
+      </div>
 
       <div className="mt-3">
         {!amounts ? (
