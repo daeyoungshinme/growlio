@@ -43,6 +43,12 @@ class TestIsRateLimitBody:
         resp.json.side_effect = Exception("parse error")
         assert _is_rate_limit_body(resp) is False
 
+    @pytest.mark.parametrize("body", [[], None, "text", 5])
+    def test_returns_false_for_non_object_json(self, body):
+        resp = MagicMock()
+        resp.json.return_value = body
+        assert _is_rate_limit_body(resp) is False
+
     def test_returns_false_for_empty_body(self):
         resp = MagicMock()
         resp.json.return_value = {}

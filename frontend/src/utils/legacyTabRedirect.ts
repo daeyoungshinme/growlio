@@ -6,9 +6,12 @@
  * - `/assets?tab=계좌관리&atab=입출금·배당` → `atab=내역&history=현금 흐름`
  * - `/assets?tab=계좌관리&atab=기간별 매수` → `atab=내역&history=매수 내역`
  */
+import type { AccountHistorySegment, InvestPlanTab } from "@/constants/tabs";
+
+// 옛 링크의 taxTab·account는 사용자 URL 값이라 인코딩해야 해서 비인코딩 빌더(tabUrl.ts)를 쓰지 않는다
 export function legacyAssetsTaxRedirect(searchParams: URLSearchParams): string | null {
   if (searchParams.get("portfolioTab") !== "세금") return null;
-  const next = new URLSearchParams({ tab: "절세" });
+  const next = new URLSearchParams({ tab: "절세" satisfies InvestPlanTab });
   const taxTab = searchParams.get("taxTab");
   if (taxTab) next.set("taxTab", taxTab);
   const account = searchParams.get("account");
@@ -16,12 +19,12 @@ export function legacyAssetsTaxRedirect(searchParams: URLSearchParams): string |
   return `/invest-plan?${next.toString()}`;
 }
 
-const LEGACY_HISTORY_ATABS: Record<string, string> = {
+const LEGACY_HISTORY_ATABS: Record<string, AccountHistorySegment> = {
   "입출금·배당": "현금 흐름",
   "기간별 매수": "매수 내역",
 };
 
 /** 옛 계좌관리 하위탭(atab)이면 새 "내역" 탭의 세그먼트 이름을, 아니면 null을 돌려준다. */
-export function legacyHistorySegment(atab: string | null): string | null {
+export function legacyHistorySegment(atab: string | null): AccountHistorySegment | null {
   return atab ? (LEGACY_HISTORY_ATABS[atab] ?? null) : null;
 }
