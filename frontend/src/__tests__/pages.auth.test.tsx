@@ -79,7 +79,7 @@ describe("LoginPage", () => {
   });
 
   it("로그인 실패 시 에러 메시지를 표시한다", async () => {
-    mockLogin.mockRejectedValue(new Error("Invalid credentials"));
+    mockLogin.mockRejectedValue(new Error("Invalid login credentials"));
     renderWithRouter(<LoginPage />);
     fireEvent.change(screen.getByLabelText("이메일"), { target: { value: "test@example.com" } });
     fireEvent.change(screen.getByLabelText("비밀번호"), { target: { value: "wrong" } });
@@ -87,6 +87,19 @@ describe("LoginPage", () => {
     await waitFor(() =>
       expect(screen.getByText("이메일 또는 비밀번호가 올바르지 않습니다")).toBeInTheDocument(),
     );
+  });
+
+  it.each([
+    ["Failed to fetch", /네트워크 상태를 확인/],
+    ["Email not confirmed", /이메일 인증이 완료되지 않았습니다/],
+  ])("로그인 실패 원인 %s는 비밀번호 오류로 안내하지 않는다", async (message, expected) => {
+    mockLogin.mockRejectedValue(new Error(message));
+    renderWithRouter(<LoginPage />);
+    fireEvent.change(screen.getByLabelText("이메일"), { target: { value: "test@example.com" } });
+    fireEvent.change(screen.getByLabelText("비밀번호"), { target: { value: "pw" } });
+    fireEvent.submit(screen.getByRole("button", { name: "로그인" }));
+    await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument());
+    expect(screen.queryByText("이메일 또는 비밀번호가 올바르지 않습니다")).toBeNull();
   });
 
   it("Caps Lock이 켜진 상태로 비밀번호 필드에 입력하면 경고 문구를 표시한다", () => {

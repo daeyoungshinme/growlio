@@ -252,6 +252,7 @@ _기타_
 - `utils/cacheOwner.ts` — 사용자 전환 시 persist 캐시 폐기(쿼리키에 user id가 없음)
 
 **도메인 유틸 (`utils/`)** — 인라인 재구현 금지, 백엔드 공식 포팅본은 **양쪽을 함께 수정**
+- `depositDelta.ts` — 거래 수정 후 예수금 반영 제안액(차액만). 전액을 제안하면 이중 반영된다
 
 - `accounts.ts` — `isPortfolioAccount`/`isStockAccount`/`isBankAccount`(**`account.asset_type` 문자열을 전달**, 인라인 비교 금지), `isSyncableAccount`, `isBrokerBalanceAccount`(3사), `isOrderExecutableAccount`(KIS·키움만 — 백엔드 `ORDER_EXECUTABLE_ASSET_TYPES`와 같은 집합), `horizonTaggedAccounts`(기간별 합산은 `invested_krw + unrealized_pnl` — `amount_krw`는 예수금 포함이라 주식 총액보다 커짐)
 - `portfolio.ts` — `groupPositionsByTicker`, `getPortfolioTargetState`, `getPortfolioHorizon(TaxType)`, `inferHorizonTaxTypeFromAccounts`, `mergeAlertsByPortfolio`

@@ -47,6 +47,8 @@ export interface ExecutionState {
   phase: Phase;
   results: ExecutionResult[];
   errorMsg: string | null;
+  /** 주문 접수 여부를 모르는 실패(타임아웃·네트워크·5xx·중복) — 이력을 확인하기 전엔 다시 실행하지 못한다 */
+  executionUncertain: boolean;
   confirmed: boolean;
 }
 
@@ -103,7 +105,7 @@ export type ExecutionAction =
   | { type: "REMOVE_BUY_ACCOUNT"; ticker: string; accountId: string; rowTicker?: string }
   | { type: "EXECUTE_START" }
   | { type: "EXECUTE_SUCCESS"; results: ExecutionResult[] }
-  | { type: "EXECUTE_ERROR"; msg: string }
+  | { type: "EXECUTE_ERROR"; msg: string; uncertain?: boolean }
   | { type: "CONFIRM_CLICK" }
   | { type: "UNCONFIRM" }
   | { type: "BULK_SET_QTY"; entries: Array<{ key: string; qty: number }> };

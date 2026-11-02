@@ -1,5 +1,5 @@
 import { lazy, LazyExoticComponent, Suspense, useCallback, useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -39,8 +39,9 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function LazyRoute({ Component }: { Component: LazyExoticComponent<() => React.JSX.Element> }) {
+  const { pathname } = useLocation();
   return (
-    <ErrorBoundary>
+    <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<PageLoader />}>
         <Component />
       </Suspense>

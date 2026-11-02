@@ -9,6 +9,14 @@ import { prefetchDashboardData } from "@/api/prefetch";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 import AuthLayout from "@/components/layout/AuthLayout";
+function loginErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (/invalid login credentials/i.test(message)) return "이메일 또는 비밀번호가 올바르지 않습니다";
+  if (/email not confirmed/i.test(message))
+    return "이메일 인증이 완료되지 않았습니다. 메일함을 확인해주세요";
+  return "로그인 중 문제가 발생했습니다. 네트워크 상태를 확인하고 다시 시도해주세요";
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,8 +37,8 @@ export default function LoginPage() {
       // await 없이 실행하므로 navigate와 병렬 진행 — 청크 로드 완료 시점에 캐시가 채워짐.
       prefetchDashboardData(queryClient);
       void navigate("/dashboard");
-    } catch {
-      setError("이메일 또는 비밀번호가 올바르지 않습니다");
+    } catch (e) {
+      setError(loginErrorMessage(e));
     } finally {
       setLoading(false);
     }

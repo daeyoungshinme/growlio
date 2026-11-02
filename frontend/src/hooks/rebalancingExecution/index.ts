@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useMemo, useReducer } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
-import { extractErrorMessage } from "@/utils/error";
+import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { invalidateRebalancingHistoryData, invalidateSyncData } from "@/utils/queryInvalidation";
 import { isOrderExecutableAccount } from "@/utils/accounts";
+import { toast } from "@/utils/toast";
 import { triggerHaptic } from "../useHaptic";
 import {
   type ExecutionOrderItem,
@@ -125,6 +126,9 @@ interface UseRebalancingExecutionParams {
  * 지정가인데 가격이 없는 주문의 종목 — 백엔드가 LIMIT+가격 없음을 422로 거부해 배치 전체가 실패하므로
  * 실행 전에 막는다(입력을 비웠거나 해외 시세 1개만 못 받아도 생긴다).
  */
+const EXECUTION_UNCERTAIN_MESSAGE =
+  "주문 접수 여부를 확인하지 못했습니다. 실행 이력과 증권사 앱에서 체결 내역을 확인한 뒤, 필요하면 이 창을 닫고 다시 진행해주세요.";
+
 export function findMissingLimitPriceTickers(orders: ExecutionOrderItem[]): string[] {
   return orders
     .filter((o) => o.order_type === "LIMIT" && !(o.limit_price != null && o.limit_price > 0))
@@ -170,6 +174,7 @@ export function useRebalancingExecution({
         phase: "confirm" as Phase,
         results: [],
         errorMsg: null,
+        executionUncertain: false,
         confirmed: false,
       };
     },
@@ -398,6 +403,10 @@ export function useRebalancingExecution({
   function autoAdjustForCash() {
     if (!globalCashSummary.balancesLoaded || !globalCashSummary.isInsufficient) return;
     if (globalCashSummary.totalBuyCost === null || globalCashSummary.totalBuyCost <= 0) return;
+    if (globalCashSummary.totalAvailable !== null && globalCashSummary.totalAvailable <= 0) {
+      toast("사용 가능한 금액이 없어 자동 조정할 수 없습니다.", "error");
+      return;
+    }
     if (globalCashSummary.totalAvailable === null || globalCashSummary.totalAvailable <= 0) return;
 
     const ratio = globalCashSummary.totalAvailable / globalCashSummary.totalBuyCost;
@@ -441,14 +450,20 @@ export function useRebalancingExecution({
 
   const missingLimitPriceTickers = findMissingLimitPriceTickers(orders);
 
+  // 확인 화면(모달)을 다시 열기 전까지 같은 키를 쓴다 — 서버가 처리했는데 응답만 못 받았어도 재주문되지 않는다
+  const idempotencyKeyRef = useRef(crypto.randomUUID());
+
   async function handleExecute() {
-    if (orders.length === 0 || missingLimitPriceTickers.length > 0) return;
+    if (orders.length === 0 || missingLimitPriceTickers.length > 0 || state.executionUncertain) {
+      return;
+    }
     dispatch({ type: "EXECUTE_START" });
     try {
       const res = await executeRebalancing(portfolioId, {
         account_id: null,
         orders,
         strategy: state.strategy,
+        idempotency_key: idempotencyKeyRef.current,
       });
       dispatch({ type: "EXECUTE_SUCCESS", results: res });
       void triggerHaptic("success");
@@ -459,10 +474,25 @@ export function useRebalancingExecution({
       onExecuted?.(res);
     } catch (e: unknown) {
       void triggerHaptic("error");
-      dispatch({
-        type: "EXECUTE_ERROR",
-        msg: extractErrorMessage(e, "주문 실행 중 오류가 발생했습니다."),
-      });
+      const status = getHttpStatus(e);
+      if (status === 409) {
+        // 같은 키가 이미 처리됨 — 서버 문구가 이력 확인을 안내한다
+        dispatch({
+          type: "EXECUTE_ERROR",
+          msg: extractErrorMessage(e, EXECUTION_UNCERTAIN_MESSAGE),
+          uncertain: true,
+        });
+      } else if (status !== undefined && status >= 400 && status < 500) {
+        // 검증·한도 거절은 주문이 나가지 않았다 — 고쳐서 다시 낼 수 있게 새 키를 쓴다
+        idempotencyKeyRef.current = crypto.randomUUID();
+        dispatch({
+          type: "EXECUTE_ERROR",
+          msg: extractErrorMessage(e, "주문 실행 중 오류가 발생했습니다."),
+        });
+      } else {
+        dispatch({ type: "EXECUTE_ERROR", msg: EXECUTION_UNCERTAIN_MESSAGE, uncertain: true });
+        void invalidateRebalancingHistoryData(queryClient);
+      }
     }
   }
 

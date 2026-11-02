@@ -48,6 +48,8 @@ export default function RebalancingAlertModal({
   const {
     alert,
     isLoading,
+    loadFailed,
+    retryLoad,
     autoExecutionAccounts,
     targetAccountIsAutoEligible,
     targetAccountTaxType,
@@ -71,6 +73,13 @@ export default function RebalancingAlertModal({
           <div className="flex justify-center py-4">
             <Loader2 size={20} className="animate-spin text-gray-400" />
           </div>
+        ) : loadFailed ? (
+          <EmptyState
+            title="알림 설정을 불러오지 못했습니다."
+            description="기존 설정을 덮어쓰지 않도록 다시 불러온 뒤 수정할 수 있습니다."
+            action={{ label: "다시 시도", onClick: () => void retryLoad() }}
+            compact
+          />
         ) : (
           <AlertFormBody
             key={alert?.id ?? "new"}
@@ -96,6 +105,7 @@ export default function RebalancingAlertModal({
 import type { RebalancingAlert } from "@/api/alerts";
 import type { AccountTaxType, AssetAccount, InvestmentHorizon } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
+import EmptyState from "@/components/common/EmptyState";
 
 function AlertFormBody({
   alert,

@@ -160,6 +160,7 @@ const baseState: ExecutionState = {
   phase: "confirm",
   results: [],
   errorMsg: null,
+  executionUncertain: false,
   confirmed: false,
 };
 
@@ -843,6 +844,69 @@ describe("useRebalancingExecution", () => {
     expect(executeRebalancing).toHaveBeenCalledTimes(1);
     expect(invalidateSyncData).toHaveBeenCalledTimes(1);
     expect(invalidateRebalancingHistoryData).toHaveBeenCalledTimes(1);
+  });
+
+  describe("handleExecute 실패 분류 (plans/109 A3)", () => {
+    async function runFailure(error: unknown) {
+      const { fetchAllBrokerBalances, executeRebalancing } = await import("@/api/rebalancing");
+      vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
+      vi.mocked(executeRebalancing).mockReset();
+      vi.mocked(executeRebalancing).mockRejectedValueOnce(error);
+      vi.mocked(executeRebalancing).mockResolvedValue([]);
+      const { result } = renderHook(
+        () =>
+          useRebalancingExecution({
+            portfolioId: "p1",
+            analysis: mockAnalysis,
+            accounts: mockKisAccounts,
+          }),
+        { wrapper: createWrapper() },
+      );
+      await act(async () => {
+        await result.current.handleExecute();
+      });
+      return { result, executeRebalancing: vi.mocked(executeRebalancing) };
+    }
+    const keyOf = (call: unknown[]) => (call[1] as { idempotency_key: string }).idempotency_key;
+
+    it("타임아웃(응답 없음)이면 재실행을 막아 두 번째 주문이 나가지 않는다", async () => {
+      const { result, executeRebalancing } = await runFailure(new Error("timeout"));
+      expect(result.current.state.executionUncertain).toBe(true);
+      expect(result.current.state.errorMsg).toContain("확인하지 못했습니다");
+
+      await act(async () => {
+        await result.current.handleExecute();
+      });
+      expect(executeRebalancing).toHaveBeenCalledTimes(1);
+    });
+
+    it("5xx도 접수 여부를 모르므로 재실행을 막는다", async () => {
+      const { result } = await runFailure({ response: { status: 502 } });
+      expect(result.current.state.executionUncertain).toBe(true);
+    });
+
+    it("409(이미 접수)는 서버 문구를 보여주고 재실행을 막는다", async () => {
+      const { result } = await runFailure({
+        response: { status: 409, data: { detail: "이미 접수된 주문입니다." } },
+      });
+      expect(result.current.state.executionUncertain).toBe(true);
+      expect(result.current.state.errorMsg).toBe("이미 접수된 주문입니다.");
+    });
+
+    it("검증 거절(4xx)은 새 키로 다시 실행할 수 있다", async () => {
+      const { result, executeRebalancing } = await runFailure({
+        response: { status: 422, data: { detail: "수량 오류" } },
+      });
+      expect(result.current.state.executionUncertain).toBe(false);
+
+      await act(async () => {
+        await result.current.handleExecute();
+      });
+      expect(executeRebalancing).toHaveBeenCalledTimes(2);
+      const [first, second] = executeRebalancing.mock.calls;
+      expect(keyOf(first!)).toBeTruthy();
+      expect(keyOf(first!)).not.toBe(keyOf(second!));
+    });
   });
 
   it("시장가 주문에도 조회한 현재가를 reference_price로 실어 결과·이력 가격이 비지 않는다 (plans/90 B7)", async () => {

@@ -735,6 +735,7 @@ const baseReducerState: ExecutionState = {
   phase: "confirm",
   results: [],
   errorMsg: null,
+  executionUncertain: false,
   confirmed: false,
 };
 

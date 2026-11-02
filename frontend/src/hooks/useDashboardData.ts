@@ -30,7 +30,11 @@ export function useDashboardData() {
 
   const { data: dcaData, isLoading: dcaLoading } = useQuery(dcaAnalysisQuery);
 
-  const { data: accounts = [], isLoading: accountsLoading } = useQuery(accountsQuery);
+  const {
+    data: accounts = [],
+    isLoading: accountsLoading,
+    isError: accountsFailed,
+  } = useQuery(accountsQuery);
 
   const { data: challenges = [] } = useChallenges();
 
@@ -52,6 +56,7 @@ export function useDashboardData() {
     dcaLoading,
     accounts,
     accountsLoading,
+    accountsFailed,
     exchangeRate,
     marketSignal,
     challenges,

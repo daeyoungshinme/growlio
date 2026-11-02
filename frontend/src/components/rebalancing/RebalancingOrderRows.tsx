@@ -120,6 +120,7 @@ export function QtyInput({
   return (
     <div className="flex items-center justify-end gap-1">
       <input
+        aria-label="주문 수량"
         type="number"
         inputMode="numeric"
         min={0}

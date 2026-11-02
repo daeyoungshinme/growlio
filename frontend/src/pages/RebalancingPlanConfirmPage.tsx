@@ -14,10 +14,11 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PLAN_LEG_STATUS_LABEL } from "@/constants/rebalancingConfig";
 import { fmtDateTime, fmtKrwPrice } from "@/utils/format";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
-import { extractErrorMessage } from "@/utils/error";
+import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { STALE_TIME } from "@/constants/queryConfig";
 
 import AuthLayout from "@/components/layout/AuthLayout";
+import EmptyState from "@/components/common/EmptyState";
 const REASON_LABEL: Record<string, string> = {
   NOT_FOUND: "존재하지 않는 링크입니다.",
   ALREADY_DECIDED: "이미 처리된 계획입니다.",
@@ -75,9 +76,11 @@ export default function RebalancingPlanConfirmPage() {
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   // 매도 승인은 즉시 실주문 — 한 번 탭으로 체결되지 않게 확인 단계를 둔다
   const [confirmingApprove, setConfirmingApprove] = useState(false);
+  // 실패를 결과 문구로 쓰면 그 자리에 있던 승인·취소 버튼이 사라져 기한 안에 다시 시도할 수 없다
+  const [actionError, setActionError] = useState<string | null>(null);
   const qc = useQueryClient();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: QUERY_KEYS.rebalancingPlanPreview(token),
     queryFn: () => fetchPlanPreview(token),
     enabled: !!token,
@@ -93,7 +96,10 @@ export default function RebalancingPlanConfirmPage() {
       // 같은 앱 세션에서 열린 경우 대기 플랜 목록/실행 이력도 갱신
       void invalidateRebalancingPlanData(qc);
     },
-    onError: (e) => setResultMessage(extractErrorMessage(e, "처리 중 오류가 발생했습니다")),
+    onError: (e) => {
+      setActionError(extractErrorMessage(e, "처리 중 오류가 발생했습니다"));
+      void refetch();
+    },
   });
 
   const decideMut = useMutation({
@@ -103,7 +109,10 @@ export default function RebalancingPlanConfirmPage() {
       void refetch();
       void invalidateRebalancingPlanData(qc, { executed: res.status === "EXECUTED" });
     },
-    onError: (e) => setResultMessage(extractErrorMessage(e, "처리 중 오류가 발생했습니다")),
+    onError: (e) => {
+      setActionError(extractErrorMessage(e, "처리 중 오류가 발생했습니다"));
+      void refetch();
+    },
   });
 
   const leg = data?.leg;
@@ -123,6 +132,13 @@ export default function RebalancingPlanConfirmPage() {
           <div className="flex justify-center py-8">
             <Loader2 size={24} className="animate-spin text-gray-400" />
           </div>
+        ) : isError && getHttpStatus(error) !== 404 ? (
+          <EmptyState
+            title="계획을 불러오지 못했습니다."
+            description="네트워크 상태를 확인한 뒤 다시 시도해주세요. 링크가 잘못된 것은 아닙니다."
+            action={{ label: "다시 시도", onClick: () => void refetch() }}
+            compact
+          />
         ) : !data?.valid || !leg ? (
           <p className="text-sm text-center text-gray-500">
             {REASON_LABEL[data?.reason ?? "NOT_FOUND"]}
@@ -140,6 +156,12 @@ export default function RebalancingPlanConfirmPage() {
             )}
 
             <ItemsTable items={leg.items} />
+
+            {actionError && !resultMessage && (
+              <p role="alert" className="text-sm text-center text-red-600 dark:text-red-400">
+                {actionError}
+              </p>
+            )}
 
             {resultMessage ? (
               <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">

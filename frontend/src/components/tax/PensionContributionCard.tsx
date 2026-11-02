@@ -4,6 +4,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import type { PortfolioOverview } from "@/types";
 import { clampPct, fmtKrw } from "@/utils/format";
+import EmptyState from "@/components/common/EmptyState";
 
 function achievementColor(pct: number): string {
   if (pct >= 100) return "text-green-600 dark:text-green-400";
@@ -25,13 +26,22 @@ export default function PensionContributionCard({ overview }: Props) {
   );
 
   const currentYear = new Date().getFullYear();
-  const { data } = useQuery({
+  const { data, isError, refetch } = useQuery({
     queryKey: QUERY_KEYS.pensionContribution(currentYear),
     queryFn: () => fetchPensionContribution(currentYear),
     staleTime: STALE_TIME.MEDIUM,
     enabled: hasPensionAccount,
   });
 
+  if (hasPensionAccount && isError && !data) {
+    return (
+      <EmptyState
+        title="연금 납입 현황을 불러오지 못했습니다."
+        action={{ label: "다시 시도", onClick: () => void refetch() }}
+        compact
+      />
+    );
+  }
   if (!hasPensionAccount || !data) return null;
 
   const chips = [

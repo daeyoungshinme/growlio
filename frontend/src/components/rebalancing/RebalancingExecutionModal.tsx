@@ -43,12 +43,16 @@ export function RebalancingExecutionModal({
     onExecuted,
   });
   const { state, orders, missingLimitPriceTickers, dispatch, loadAllPrices } = exec;
-  const blocked = orders.length === 0 || missingLimitPriceTickers.length > 0;
   const { phase, results, confirmed, orderType, priceState, priceLoadProgress } = state;
+  const blocked =
+    orders.length === 0 || missingLimitPriceTickers.length > 0 || state.executionUncertain;
+  // 주문 중에 닫으면 결과를 잃고 같은 주문을 다시 낼 수 있다 — X·ESC·뒤로가기를 막고, 모바일 하단 네비까지 덮는다
+  const executing = phase === "executing";
+  const handleClose = executing ? () => {} : onClose;
 
   return (
     <RebalancingExecutionContext.Provider value={exec}>
-      <Modal onClose={onClose} title="리밸런싱 실행" size="xl" avoidBottomNav>
+      <Modal onClose={handleClose} title="리밸런싱 실행" size="xl" avoidBottomNav={!executing}>
         {phase === "confirm" && (
           <div className="shrink-0 px-4 sm:px-6 py-2.5 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center gap-3">
             <span className="text-xs text-gray-500 dark:text-gray-400">주문 유형</span>

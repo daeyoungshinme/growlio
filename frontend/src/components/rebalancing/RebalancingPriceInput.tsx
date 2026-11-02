@@ -36,6 +36,7 @@ export function RebalancingPriceInput({
     <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-end gap-1">
         <input
+          aria-label={overseas ? "지정가 (USD)" : "지정가 (원)"}
           type="number"
           inputMode="decimal"
           min={0}

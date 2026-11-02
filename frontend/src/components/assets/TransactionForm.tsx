@@ -7,6 +7,7 @@ import {
   updateTransaction,
   type Transaction,
   type TransactionCreate,
+  type TransactionUpdate,
 } from "@/api/transactions";
 import { useForm } from "@/hooks/useForm";
 import { useUsdAmountInput } from "@/hooks/useUsdAmountInput";
@@ -21,6 +22,7 @@ import { TickerSearchField } from "./TickerSearchField";
 import { extractErrorMessage } from "@/utils/error";
 import { transactionSchema, type TransactionFormData } from "@/schemas/transaction";
 import SegmentedControl from "@/components/common/SegmentedControl";
+import { depositDeltaAfterEdit } from "@/utils/depositDelta";
 
 // 모듈 로드 시점에 고정하면 자정을 넘긴 세션에서 어제 날짜가 남는다 — 폼을 열 때마다 계산
 const makeEmptyForm = (): TransactionCreate => ({
@@ -77,16 +79,18 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<TransactionCreate> }) =>
+    mutationFn: ({ id, data }: { id: string; data: TransactionUpdate }) =>
       updateTransaction(id, data),
     onSuccess: (_, vars) => {
       void invalidateTransactionData(qc);
       toast("수정되었습니다", "success");
-      onSuccess(
-        vars.data?.account_id ?? "",
-        vars.data?.amount ?? 0,
-        vars.data?.transaction_type ?? "",
+      // 메모만 고쳐도 전액을 다시 제안하면 예수금에 이중 반영된다 — 달라진 금액만 제안한다
+      const delta = depositDeltaAfterEdit(
+        editingTx,
+        vars.data.amount ?? 0,
+        vars.data.transaction_type ?? form.transaction_type,
       );
+      onSuccess(editingTx?.account_id ?? "", delta.amount, delta.txType);
     },
     onError: (e) => toast(extractErrorMessage(e, "내역 수정에 실패했습니다"), "error"),
   });
@@ -122,7 +126,17 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
       notes: form.notes || undefined,
     };
     if (editingTx) {
-      updateMut.mutate({ id: editingTx.id, data: payload });
+      // 계좌는 수정할 수 없다(입력도 잠겨 있다). 지운 칸은 null로 보내야 서버가 지운다.
+      updateMut.mutate({
+        id: editingTx.id,
+        data: {
+          ...payload,
+          account_id: undefined,
+          fee: form.fee ?? null,
+          ticker: payload.ticker ?? null,
+          notes: payload.notes ?? null,
+        },
+      });
     } else {
       createMut.mutate(payload);
     }
@@ -143,6 +157,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
             <button
               key={t}
               type="button"
+              aria-pressed={form.transaction_type === t}
               onClick={() => {
                 setField("transaction_type", t);
                 setField("ticker", "");
@@ -166,6 +181,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
             <select
               id="txform-account"
               value={form.account_id}
+              disabled={editingTx !== null}
               onChange={(e) => {
                 setField("account_id", e.target.value);
                 setField("ticker", "");
@@ -211,6 +227,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                   <input
                     type="number"
                     inputMode="decimal"
+                    aria-label="금액 (USD)"
                     value={amountUsd || ""}
                     onChange={(e) => changeUsd(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"

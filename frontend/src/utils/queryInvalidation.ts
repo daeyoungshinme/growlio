@@ -88,6 +88,7 @@ export function invalidateTransactionData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummaryBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTickerBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
   ]);
 }

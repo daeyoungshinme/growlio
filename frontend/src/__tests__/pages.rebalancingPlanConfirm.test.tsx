@@ -84,6 +84,29 @@ describe("RebalancingPlanConfirmPage", () => {
     expect(fetchPlanPreview).not.toHaveBeenCalled();
   });
 
+  it("네트워크 실패는 잘못된 링크로 안내하지 않고 재시도를 제공한다", async () => {
+    vi.mocked(fetchPlanPreview).mockRejectedValueOnce(new Error("Network Error"));
+    vi.mocked(fetchPlanPreview).mockResolvedValueOnce(makePreview({ side: "SELL" }));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByText("삼성전자")).toBeInTheDocument();
+  });
+
+  it("승인이 실패해도 기한 안에 다시 시도할 수 있게 버튼을 유지한다", async () => {
+    vi.mocked(fetchPlanPreview).mockResolvedValue(makePreview({ side: "SELL" }));
+    vi.mocked(decideSellPlanByToken).mockRejectedValue({
+      response: { status: 500, data: { detail: "일시적 오류" } },
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /거부/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("일시적 오류");
+    expect(screen.getByRole("button", { name: /거부/ })).toBeInTheDocument();
+  });
+
   it("만료된 토큰은 사유를 보여준다", async () => {
     vi.mocked(fetchPlanPreview).mockResolvedValue({
       valid: false,

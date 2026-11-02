@@ -13,6 +13,7 @@ import { sessionSet, storageGet, storageRemove, storageSet } from "@/utils/safeS
 import { CACHE_OWNER_CHANGED_EVENT, claimCacheOwner } from "@/utils/cacheOwner";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { registerPushToken } from "@/api/settings";
+import { useSyncStore } from "@/stores/syncStore";
 
 /** 로그아웃이 푸시 토큰 삭제 응답을 기다리는 최대 시간 — api 기본 타임아웃(60s)만큼 막히지 않게 한다. */
 const LOGOUT_PUSH_CLEAR_TIMEOUT_MS = 3000;
@@ -194,6 +195,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
       }
       set({ isAuthenticated: false, userId: null, email: null, needsPasswordReset: false });
       storageRemove(AUTH_ME_CACHE_KEY);
+      // 앱을 새로 열지 않고 계정을 바꾸면 이전 계정의 실패 계좌명이 남는다
+      useSyncStore.getState().reset();
       const supabase = await getSupabase();
       await supabase.auth.signOut();
     },

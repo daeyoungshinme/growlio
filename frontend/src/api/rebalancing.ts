@@ -128,6 +128,8 @@ export interface ExecutionRequest {
   account_id?: string | null;
   orders: ExecutionOrderItem[];
   strategy?: "FULL" | "BUY_ONLY" | "TWO_PHASE";
+  /** 확인 화면 1회당 하나 — 응답을 못 받았을 때 주문이 두 번 나가지 않게 서버가 선점한다 */
+  idempotency_key?: string;
 }
 
 export interface OrderResult {
@@ -224,7 +226,8 @@ export interface ExecutionPlanResult {
     | "MARKET_BLOCKED"
     | "TAX_BLOCKED"
     | "DAILY_CAP_BLOCKED"
-    | "GENERATION_IN_PROGRESS";
+    | "GENERATION_IN_PROGRESS"
+    | "USD_RATE_UNAVAILABLE";
   message: string;
   email_sent: boolean;
   plan_id: string | null;

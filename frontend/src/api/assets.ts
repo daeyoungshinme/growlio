@@ -75,7 +75,7 @@ export interface AssetAccountCreate {
   name: string;
   asset_type: string;
   data_source?: string;
-  institution?: string;
+  institution?: string | null;
   tax_type?: AccountTaxType;
   investment_horizon?: InvestmentHorizon | null;
   isa_open_date?: string | null;
@@ -93,7 +93,7 @@ export interface AssetAccountCreate {
   manual_amount?: number;
   deposit_krw?: number;
   deposit_usd?: number;
-  notes?: string;
+  notes?: string | null;
   sort_order?: number;
   real_estate_details?: RealEstateDetails;
   include_in_total?: boolean;

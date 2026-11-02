@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { taxSummaryQuery } from "@/api/queryOptions";
 import { clampPct, fmtKrw } from "@/utils/format";
+import EmptyState from "@/components/common/EmptyState";
 
 function riskColor(pct: number): string {
   if (pct >= 100) return "text-red-600 dark:text-red-400";
@@ -22,8 +23,17 @@ function riskBarColor(pct: number): string {
  * `TaxOptimizationCard`와 같은 `taxSummaryQuery`라 React Query 캐시를 공유한다. */
 export default function HealthInsuranceRiskCard() {
   const currentYear = new Date().getFullYear();
-  const { data } = useQuery(taxSummaryQuery(currentYear));
+  const { data, isError, refetch } = useQuery(taxSummaryQuery(currentYear));
 
+  if (isError && !data) {
+    return (
+      <EmptyState
+        title="건강보험 위험 판정을 불러오지 못했습니다."
+        action={{ label: "다시 시도", onClick: () => void refetch() }}
+        compact
+      />
+    );
+  }
   if (!data) return null;
 
   const est = data.health_insurance_estimate;
