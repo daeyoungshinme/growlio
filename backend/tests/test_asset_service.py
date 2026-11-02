@@ -202,6 +202,11 @@ class TestKISProvider:
         }
 
         with (
+            patch(
+                "app.services.market_data.stock_search_service._search_yahoo",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
             patch("app.providers.kis_provider.decrypt", return_value="plain_value"),
             patch("app.providers.kis_provider.get_access_token", new_callable=AsyncMock, return_value="token"),
             patch(

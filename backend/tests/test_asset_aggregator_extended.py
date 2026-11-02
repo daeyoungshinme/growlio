@@ -13,6 +13,12 @@ import pytest
 from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.utils.kst import today_kst
 
+
+def _one_year_before(day: date) -> date:
+    """2월 29일에도 터지지 않는 1년 전 날짜(운영의 yahoo_price와 같은 처리)."""
+    return day.replace(year=day.year - 1, day=28 if (day.month, day.day) == (2, 29) else day.day)
+
+
 # ── _calc_returns (순수 함수) ─────────────────────────────────
 
 
@@ -49,7 +55,7 @@ class TestCalcReturns:
     def test_positive_return(self, override_settings):
         from app.services.portfolio.returns_calculator import calc_returns as _calc_returns
 
-        one_year_ago = today_kst().replace(year=today_kst().year - 1)
+        one_year_ago = _one_year_before(today_kst())
         ann, cum = _calc_returns(1_100_000, 1_000_000, one_year_ago)
         assert ann is not None
         assert cum is not None
@@ -58,7 +64,7 @@ class TestCalcReturns:
     def test_negative_return(self, override_settings):
         from app.services.portfolio.returns_calculator import calc_returns as _calc_returns
 
-        one_year_ago = today_kst().replace(year=today_kst().year - 1)
+        one_year_ago = _one_year_before(today_kst())
         ann, cum = _calc_returns(900_000, 1_000_000, one_year_ago)
         assert ann is not None
         assert cum is not None
@@ -72,7 +78,7 @@ class TestCalcReturns:
         """
         from app.services.portfolio.returns_calculator import calc_returns as _calc_returns
 
-        one_year_ago = today_kst().replace(year=today_kst().year - 1)
+        one_year_ago = _one_year_before(today_kst())
 
         _, cum_correct = _calc_returns(12_000_000, 10_000_000, one_year_ago, net_flows=0)
         assert cum_correct == pytest.approx(20.0, abs=0.01)
@@ -89,7 +95,7 @@ class TestCalcReturns:
         """
         from app.services.portfolio.returns_calculator import calc_returns as _calc_returns
 
-        one_year_ago = today_kst().replace(year=today_kst().year - 1)
+        one_year_ago = _one_year_before(today_kst())
 
         _, cum_correct = _calc_returns(18_000_000, 16_000_000, one_year_ago, net_flows=2_000_000)
         assert cum_correct == pytest.approx(0.0, abs=0.01)

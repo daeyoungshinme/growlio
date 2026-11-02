@@ -9,6 +9,12 @@ import pytest
 
 from app.utils.kst import today_kst
 
+
+def _one_year_before(day: date) -> date:
+    """2월 29일에도 터지지 않는 1년 전 날짜(운영의 yahoo_price와 같은 처리)."""
+    return day.replace(year=day.year - 1, day=28 if (day.month, day.day) == (2, 29) else day.day)
+
+
 # ── _xirr 테스트 ────────────────────────────────────────────
 
 
@@ -20,7 +26,7 @@ class TestXirr:
         from app.services.portfolio.returns_calculator import xirr as _xirr
 
         today = today_kst()
-        start = today.replace(year=today.year - 1)
+        start = _one_year_before(today)
         cashflows = [(start, -1_000_000.0), (today, 1_100_000.0)]
         result = _xirr(cashflows)
         assert result is not None
@@ -93,7 +99,7 @@ class TestCalcXirr:
 
         # 두 번째 execute: 스냅샷 조회 → 1년 전 데이터
         snap_row = SimpleNamespace(
-            snapshot_date=today_kst().replace(year=today_kst().year - 1),
+            snapshot_date=_one_year_before(today_kst()),
             total=10_000_000.0,
         )
         snap_result = MagicMock()
@@ -133,7 +139,7 @@ class TestCalcXirr:
 
         user_id = uuid.uuid4()
         current_total = 11_000_000.0
-        one_year_ago = today_kst().replace(year=today_kst().year - 1)
+        one_year_ago = _one_year_before(today_kst())
 
         tx_row = SimpleNamespace(
             transaction_date=one_year_ago,
@@ -161,7 +167,7 @@ class TestCalcXirr:
         tx_result = MagicMock()
         tx_result.all.return_value = [
             SimpleNamespace(
-                transaction_date=today_kst().replace(year=today_kst().year - 1),
+                transaction_date=_one_year_before(today_kst()),
                 transaction_type="DEPOSIT",
                 amount=10_000_000.0,
             )

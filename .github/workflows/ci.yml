@@ -85,6 +85,10 @@ jobs:
       - name: Migrate (alembic upgrade head)
         run: .venv/bin/alembic upgrade head
 
+      # 모델과 마이그레이션이 어긋나면 다음 autogenerate가 인덱스를 지운다(plans/55 C6)
+      - name: Model drift check (alembic check)
+        run: .venv/bin/alembic check
+
       - name: Rollback check (alembic downgrade -1)
         run: .venv/bin/alembic downgrade -1
 
