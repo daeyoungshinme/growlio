@@ -50,3 +50,20 @@ def test_namedtuple_value_does_not_raise():
 
     assert "abc123secret" not in str(out["pair"])
     assert out["pair"][1] == 1
+
+
+def test_traceback_passes_through_redaction_before_rendering():
+    """plans/109 C3 — exc_info를 렌더러가 직접 출력하면 예외 메시지의 시크릿이 그대로 남는다."""
+    from app.core.logging import _with_redaction
+
+    processors = _with_redaction([lambda _l, _m, event: event])
+    try:
+        raise ValueError("password=hunter2")
+    except ValueError as exc:
+        event = {"event": "unhandled_exception", "exc_info": exc}
+        for processor in processors[:-1]:
+            event = processor(None, "error", event)
+
+    assert "exc_info" not in event
+    assert "hunter2" not in event["exception"]
+    assert "ValueError" in event["exception"]

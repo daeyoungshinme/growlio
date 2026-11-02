@@ -352,3 +352,35 @@ class TestKiwoomBalancePaginationGuards:
             pytest.raises(RuntimeError, match="연속조회"),
         ):
             await get_overseas_balance("token", "1234567890", is_mock=True)
+
+
+class TestRequiredNumbers:
+    """plans/109 B4 — 수량·금액을 0으로 뭉개면 보유종목이 지워진다."""
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("000000005", 5.0),
+            ("+61300", 61300.0),
+            ("--23722054", -23722054.0),
+            ("20,190", 20190.0),
+            ("", 0.0),
+            (None, 0.0),
+        ],
+    )
+    def test_valid_and_blank_values_parse(self, raw, expected):
+        from app.kiwoom.balance import _parse_required_num
+
+        assert _parse_required_num(raw) == expected
+
+    def test_garbage_raises_instead_of_zero(self):
+        from app.exceptions import BalanceResponseError
+        from app.kiwoom.balance import _parse_required_num
+
+        with pytest.raises(BalanceResponseError):
+            _parse_required_num("N/A")
+
+    def test_optional_field_parser_stays_lenient(self):
+        from app.kiwoom.balance import _parse_num
+
+        assert _parse_num("N/A") == 0.0

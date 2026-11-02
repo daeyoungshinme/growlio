@@ -35,6 +35,8 @@ from app.services.rebalancing.quick_execute_service import (
     QuickExecuteStatus,
     quick_execute_plan,
 )
+from app.utils.cache_keys import TTL_REBALANCING_EXECUTE_CLAIM, rebalancing_execute_claim_key
+from app.utils.durable_state import claim_durable
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
 logger = structlog.get_logger()
@@ -85,6 +87,9 @@ _QUICK_EXECUTE_MESSAGES: dict[QuickExecuteStatus, Callable[[QuickExecuteOutcome]
     QuickExecuteStatus.TAX_BLOCKED: _tax_blocked_message,
     QuickExecuteStatus.DAILY_CAP_BLOCKED: _daily_cap_blocked_message,
     QuickExecuteStatus.GENERATION_IN_PROGRESS: lambda _o: "다른 요청이 이미 처리 중입니다. 잠시 후 다시 시도해주세요.",
+    QuickExecuteStatus.USD_RATE_UNAVAILABLE: lambda _o: (
+        "환율을 불러오지 못해 해외 주문 수량을 계산할 수 없습니다. 잠시 후 다시 시도해주세요."
+    ),
     QuickExecuteStatus.NO_DRIFT: lambda _o: "포트폴리오가 이미 균형을 이루고 있거나 실행할 주문이 없습니다.",
     QuickExecuteStatus.PLAN_GENERATED: _plan_generated_message,
 }
@@ -104,6 +109,14 @@ async def execute_portfolio_rebalancing(
     await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
     if body.account_id:
         await get_owned_account(body.account_id, current_user.id, db)
+
+    if body.idempotency_key and not await claim_durable(
+        db, rebalancing_execute_claim_key(current_user.id, body.idempotency_key), TTL_REBALANCING_EXECUTE_CLAIM
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 접수된 주문입니다. 실행 이력에서 결과를 확인해주세요.",
+        )
 
     results, _execution_id = await execute_rebalancing(
         user_id=current_user.id,

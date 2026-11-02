@@ -50,6 +50,7 @@ TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
 TTL_INSIGHTS = 3600  # 스마트 인사이트 & 포트폴리오 진단 1시간
 TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 TTL_JOB_LOCK_REBALANCING_AUTO = 3600  # 리밸런싱 자동 실행 분산 락 (중복 실행 방지)
+TTL_REBALANCING_EXECUTE_CLAIM = 86400  # 수동 실행 멱등 키 — 확인 화면을 다시 열면 새 키라 하루면 충분
 TTL_REBALANCING_AUTO_CLAIM = 2 * 86400  # AUTO 플랜 생성 claim — 일자 키라 하루만 지나면 다시 읽히지 않음(sweep이 정리)
 TTL_JOB_LOCK_REBALANCING_PLAN_BUY = 300  # 리밸런싱 매수 대기 플랜 실행 분산 락 (1분 간격 job, 중복 실행 방지)
 TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
@@ -384,6 +385,11 @@ def composite_alert_sent_key(user_id: uuid.UUID, day: str) -> str:
     포트폴리오 알림을 갖고 있어도 하루 1건만 발송하도록 제한한다.
     """
     return f"{_env_prefix()}rebalancing:composite_sent:{user_id}:{day}"
+
+
+def rebalancing_execute_claim_key(user_id: uuid.UUID, idempotency_key: str) -> str:
+    """수동 실행 요청을 선점했음을 기록하는 durable 키 — 사용자별로 분리한다."""
+    return f"rebalancing_execute_claim:{user_id}:{idempotency_key}"
 
 
 def rebalancing_auto_claim_key(alert_id: uuid.UUID, day: str) -> str:

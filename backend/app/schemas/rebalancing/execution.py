@@ -30,6 +30,8 @@ class ExecutionRequest(BaseModel):
     account_id: uuid.UUID | None = None  # 기본 KIS 계좌 (order에 account_id 없을 때 폴백)
     orders: list[ExecutionOrderItem] = Field(max_length=200)
     strategy: Literal["FULL", "BUY_ONLY", "TWO_PHASE"] = "FULL"
+    # 확인 화면 1회당 하나 — 응답을 못 받고 다시 눌러도 주문이 두 번 나가지 않게 한다(구버전 APK는 안 보내므로 선택)
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
 
     @field_validator("orders")
     @classmethod
@@ -65,6 +67,7 @@ class ExecutionPlanResult(BaseModel):
         "TAX_BLOCKED",
         "DAILY_CAP_BLOCKED",
         "GENERATION_IN_PROGRESS",
+        "USD_RATE_UNAVAILABLE",
     ]
     message: str
     email_sent: bool = False

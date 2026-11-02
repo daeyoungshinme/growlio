@@ -87,3 +87,17 @@ async def test_cached_zero_skips_fetch():
     )
     fetch_fn.assert_not_awaited()
     assert result == {"positions": [], "total_value_usd": 0.0, "deposit_usd": 0.0}
+
+
+@pytest.mark.asyncio
+async def test_unknown_deposit_is_not_cached_as_no_overseas():
+    """예수금 미확인(None)을 "해외 없음"으로 캐싱하면 다음 동기화의 확정 0이 달러 예수금을 지운다(plans/109 B2)."""
+    cache = _cache()
+    await fetch_overseas_cached(
+        AsyncMock(return_value={"positions": [], "total_value_usd": 0.0, "deposit_usd": None}),
+        uuid.uuid4(),
+        cache,
+        token_expired_exc=_TokenExpired,
+        broker_name="KIS",
+    )
+    assert cache.setex.await_args.args[2] == "1"

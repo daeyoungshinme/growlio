@@ -870,6 +870,7 @@ class TestExecuteDueBuyLegs:
         due_result.all.return_value = [(leg_id,)]
         locked_leg = SimpleNamespace(
             id=leg_id,
+            plan_id=uuid.uuid4(),
             side="BUY",
             market="KR",
             status="PENDING",
@@ -882,6 +883,7 @@ class TestExecuteDueBuyLegs:
 
         mock_db.execute = AsyncMock(return_value=due_result)
         mock_db.scalar = AsyncMock(return_value=locked_leg)
+        mock_db.get = AsyncMock(return_value=None)
 
         with patch("app.utils.market_hours.is_korean_market_open", return_value=False):
             count = await svc.execute_due_buy_legs(mock_db, MagicMock())
@@ -1110,6 +1112,7 @@ class TestExecuteDueBuyLegs:
         due_result.all.return_value = [(leg_id,)]
         locked_leg = SimpleNamespace(
             id=leg_id,
+            plan_id=uuid.uuid4(),
             side="BUY",
             market="US",
             status="PENDING",
@@ -1122,6 +1125,7 @@ class TestExecuteDueBuyLegs:
 
         mock_db.execute = AsyncMock(return_value=due_result)
         mock_db.scalar = AsyncMock(return_value=locked_leg)
+        mock_db.get = AsyncMock(return_value=None)
 
         with (
             patch("app.utils.market_hours.is_korean_market_open", return_value=True),
@@ -1344,6 +1348,7 @@ class TestPlanLegFailureIsolation:
         due_result.all.return_value = [(bad_id,), (good_id,)]
         good_leg = SimpleNamespace(
             id=good_id,
+            plan_id=uuid.uuid4(),
             side="BUY",
             market="KR",
             status="PENDING",
@@ -1354,6 +1359,7 @@ class TestPlanLegFailureIsolation:
         )
         mock_db.execute = AsyncMock(return_value=due_result)
         mock_db.scalar = AsyncMock(side_effect=[RuntimeError("db connection lost"), good_leg])
+        mock_db.get = AsyncMock(return_value=None)
 
         with (
             patch("app.utils.market_hours.is_korean_market_open", return_value=False),

@@ -202,6 +202,9 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     invested_krw = balance.invested_krw
     pnl_krw = balance.pnl_krw
     snapshot_positions: list[Any] = list(balance.positions)
+    if balance.overseas_known and balance.deposit_foreign is None and account.deposit_usd:
+        # 해외 조회는 됐지만 달러 예수금만 미확인 — 유지한 예수금을 합계에도 넣어야 그날 스냅샷이 그만큼 빠지지 않는다
+        amount_krw += float(account.deposit_usd) * balance.usd_krw_rate
     if replace_positions and not balance.overseas_known:
         # 해외 조회 실패 — balance 합계엔 해외 종목·외화예수금이 빠져 있다. 보존된 해외 포지션과 기존
         # deposit_usd를 더하지 않으면 그날 스냅샷(월별 대표값 후보)이 해외분만큼 급락한다.
@@ -226,8 +229,8 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         source=source,
     )
 
-    if snapshot_positions:
-        await sync_snapshot_positions(db, snapshot_id=snapshot.id, account_id=account.id, positions=snapshot_positions)
+    # 빈 목록도 호출한다 — 당일 재동기화에서 전량 매도가 확인되면 오늘 스냅샷의 포지션 행을 지워야 유령 보유가 안 남는다
+    await sync_snapshot_positions(db, snapshot_id=snapshot.id, account_id=account.id, positions=snapshot_positions)
 
     account.last_synced_at = datetime.now(UTC)
     account.last_sync_error = None

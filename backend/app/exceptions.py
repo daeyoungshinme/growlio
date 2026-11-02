@@ -88,3 +88,7 @@ class BrokerOrderRejectedError(RuntimeError):
 
 class BalancePaginationError(RuntimeError):
     """잔고 연속조회가 페이지 상한을 넘거나 같은 연속키를 반복 — 부분 목록으로 동기화하지 않는다."""
+
+
+class BalanceResponseError(BalancePaginationError):
+    """잔고 응답을 신뢰할 수 없음(합계 누락·숫자 해석 불가) — 0으로 저장하면 보유종목이 지워져 동기화를 실패시킨다."""

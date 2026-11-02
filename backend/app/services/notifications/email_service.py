@@ -46,6 +46,7 @@ from app.services.notifications.email_templates import (
     test_email_template,
     year_end_tax_reminder_template,
 )
+from app.utils.masking import mask_email
 
 logger = structlog.get_logger()
 
@@ -87,15 +88,15 @@ async def _send_templated(
     `log_fields`는 성공 로그에 추가로 실리는 구조화 키.
     """
     if not _email_configured():
-        logger.warning(not_configured_event, to=to_email)
+        logger.warning(not_configured_event, to=mask_email(to_email))
         return False
     subject, html = build_template()
     try:
         await _send_html_email(to_email, subject, html)
-        logger.info(f"{event}_email_sent", to=to_email, **log_fields)
+        logger.info(f"{event}_email_sent", to=mask_email(to_email), **log_fields)
         return True
     except Exception as e:
-        report_handled_failure(f"{event}_email_failed", e, to=to_email)
+        report_handled_failure(f"{event}_email_failed", e, to=mask_email(to_email))
         return False
 
 

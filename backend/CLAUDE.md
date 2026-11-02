@@ -38,6 +38,7 @@ cd backend && uv run mypy app/
 - 운영 이미지(`backend/Dockerfile`)는 의존성만 설치하고 프로젝트는 설치하지 않는다(`--no-install-project`). `scripts/*`의 `import app`은 `ENV PYTHONPATH=/app`에 의존하므로 이 줄을 지우면 preDeploy가 `ModuleNotFoundError`로 실패한다. CI `docker-build` 잡이 scripts/ 작업 경로 import로 이를 확인한다.
 
 ### Tests 주의
+- `conftest.py`가 외부 DNS 조회를 막고 시도한 테스트를 실패시킨다 → 해당 호출을 mock. `settings.fred_api_key`도 비운다. `curl_cffi`(yfinance)는 안 걸리니 직접 mock.
 
 - 실제 DB 없이 mocked `AsyncSession`(`tests/conftest.py`). 환경변수(`KIS_CRED_ENCRYPTION_KEY` 등)도 conftest가 override — `.env` 없이 실행 가능.
 - 주요 fixtures: `mock_db`, `mock_cache`(in-memory get/set/setex), `make_account`, `make_snapshot`, `make_user_settings`.
@@ -102,7 +103,7 @@ tactical.py              전술 배분 — GET /tactical(켠 목록), GET /tacti
 positions.py             포지션 CRUD + 현재가 sync (/assets/{id}/positions)
 external.py              자매 앱 nestlio 전용(같은 Supabase JWT, growlio 프론트 미사용). 조회 로직은 services/external_queries.py. POST /external/transactions의 external_ref는 멱등 키(같은 키 재전송 → duplicate=True로 기존 행)
 _account_deps.py         계좌 소유권 검증(get_owned_account) + get_owned_or_404 재노출
-_alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토리
+_alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토리, `count_user_alerts`(생성 상한)
 ```
 
 ### Services (`services/`)
@@ -138,7 +139,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `order_builder.py` — 주문 생성 공용(AUTO·원클릭·플랜). 시장 게이트 단일 판정 `is_market_signal_blocking_auto_mode`(CAUTIOUS=RED, STRICT=YELLOW·RED, TACTICAL=같은 포트폴리오 확정 국면 RISK_OFF면 매수 보류 — 호출부 5곳이 `tactical_regime_for_gate()` 결과를 함께 넘김). `clamp_orders_to_max_value()` 1건당 상한. 방법론 `docs/plans/21-market-signal-methodology.md`
 - `plan_service.py` — AUTO 2단계 플랜 진입점, 하위 3모듈 심볼 재노출. **테스트 patch는 `plan_service.X`가 아니라 실제 호출부 서브모듈 경로로**
   - `plan_generation.py` — 플랜 생성. 게이트 차단 시 `TaxGateBlocked`/`MarketSignalGateBlocked`/`DailyValueCapBlocked` sentinel(플랜 미생성)
-  - `plan_execution.py` — leg 실행/취소/만료. 매수는 대기 후 자동(실행 직전 시장 게이트 재확인), 매도는 이메일 승인. 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 방지. `token_consumed_at`만 찍힌 채 30분 넘은 PENDING은 `fail_stuck_consumed_legs()`가 FAILED 마감(재실행 안 함)
+  - `plan_execution.py` — leg 실행/취소/만료. 매수는 대기 후 자동(실행 직전 시장 게이트 재확인), 매도는 이메일 승인. 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 방지. `token_consumed_at`만 찍힌 채 30분 넘은 PENDING은 `fail_stuck_consumed_legs()`가 FAILED 마감(재실행 안 함) **세션에 이미 읽은 행을 `FOR UPDATE`로 다시 읽을 땐 `populate_existing=True` 필수** — 없으면 락을 기다린 뒤에도 옛 값으로 판정해 주문이 두 번 나간다.
   - `plan_notifications.py` — 플랜 알림 (차단 안내는 하루 1회 durable dedup)
 - `quick_execute_service.py` — "지금 계획 생성". 상태 enum만 반환, 문구는 라우터가 조립. 계좌 소유권 검증은 콜백 주입(**서비스→API 계층 import 금지**)
 - `execution_service.py` — 주문 조율. 실제 주문은 `_kis_order_executor.py`/`_kiwoom_order_executor.py`(FULL 매수는 실행 직전 가용현금으로 예산 clamp), 공용 `_order_executor_common.py`(국내 지정가 호가 보정 `snap_domestic_limit_price` 포함), `_order_quantity_guard.py`(매도→보유수량, 매수→예산), `_broker_order_flow.py`(매도 clamp·FULL 예산 clamp 흐름 — 브로커 차이는 `BrokerOrderOps`로 주입)
@@ -214,7 +215,7 @@ core/
   logging.py    structlog 시크릿 redact + yfinance 404 소음 필터. 계좌번호·이메일은 utils/masking.py.
                 **응답·DB·알림에 예외 사유는 str(e) 대신 public_error_message(e)** (SQL 파라미터·URL의 계좌번호 유출 방지)
   cache_store.py in-memory TTL 캐시(LRU 20,000). **프로세스 로컬** — 워커/인스턴스 2개↑면 적중률 급락·무효화 미전파(render.yaml은 단일 전제)
-kis/            KIS 클라이언트. **해외 거래소 코드 체계가 둘**: 주문/잔고 NASD/NYSE/AMEX vs 시세 NAS/NYS/AMS.
+kis/            KIS 클라이언트. **해외 거래소 코드 체계가 둘**: 주문/잔고 NASD/NYSE/AMEX vs 시세 NAS/NYS/AMS. **잔고의 NASD는 실전=미국 전체, 모의=나스닥** — 합치면 이중 집계라 ticker로 중복 제거한다.
                 KIS는 NYSE Arca ETF(SPY·VOO 등)를 AMEX로 분류 → exchange_master.resolve_kis_overseas_market()로 주문·시세 직전 보정(키움은 무보정)
 kiwoom/         키움 클라이언트 (rate limit 4/s, return_code=5 = rate limit)
 toss/           토스 Open API. **Open API → IP 관리에 서버 IP 등록 필수**(미등록 403 edge-blocked). 샌드박스 없음, rate 1/s

@@ -549,3 +549,51 @@ class TestSyncAccountNow:
             "snapshot_date": "2026-09-12",
             "amount_krw": 1_000_000.0,
         }
+
+
+class TestSyncSnapshotConsistency:
+    """plans/109 B2·B3 — 오늘 스냅샷이 현재 잔고와 어긋나지 않게 한다."""
+
+    @staticmethod
+    async def _sync(account, balance, mock_db):
+        from app.services.accounts.asset_service import sync_account
+
+        provider = AsyncMock()
+        provider.sync = AsyncMock(return_value=balance)
+        upsert = AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4()))
+        sync_positions = AsyncMock()
+        with (
+            patch("app.services.accounts.asset_service.get_provider", return_value=provider),
+            patch("app.services.accounts.asset_service._upsert_snapshot", new=upsert),
+            patch("app.services.accounts.asset_service.sync_snapshot_positions", new=sync_positions),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
+        ):
+            await sync_account(account, mock_db, cache=MagicMock())
+        return upsert, sync_positions
+
+    @pytest.mark.asyncio
+    async def test_full_sell_clears_todays_snapshot_positions(self, mock_db, override_settings, make_account):
+        from app.providers.base import BalanceResult
+
+        account = make_account(data_source="KIS_API")
+        _upsert, sync_positions = await self._sync(account, BalanceResult(total_value_krw=0.0, positions=[]), mock_db)
+
+        sync_positions.assert_awaited_once()
+        assert sync_positions.await_args.kwargs["positions"] == []
+
+    @pytest.mark.asyncio
+    async def test_unknown_usd_deposit_is_kept_and_stays_in_snapshot_total(
+        self, mock_db, override_settings, make_account
+    ):
+        from app.providers.base import BalanceResult
+
+        account = make_account(data_source="KIS_API")
+        account.deposit_usd = 100.0
+        balance = BalanceResult(
+            total_value_krw=1_000_000.0, positions=[], deposit_foreign=None, overseas_known=True, usd_krw_rate=1400.0
+        )
+        upsert, _sync_positions = await self._sync(account, balance, mock_db)
+
+        assert account.deposit_usd == 100.0
+        assert upsert.await_args.kwargs["amount_krw"] == 1_140_000.0

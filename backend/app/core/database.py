@@ -48,8 +48,7 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, executem
         logger.warning(
             "slow_query",
             duration_ms=round(elapsed_ms),
-            sql=statement,
-            params=str(parameters)[:200] if parameters else None,
+            sql=statement,  # 바인드값은 남기지 않는다 — 이메일·금액·암호문이 그대로 로그에 실린다
         )
 
 

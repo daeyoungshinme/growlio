@@ -1806,11 +1806,15 @@ class TestSwitchAlertScope:
         from app.services.rebalancing.alert_scope import switch_alert_scope
 
         portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
-        existing_alert = SimpleNamespace(account_id=None)
+        existing_alert = SimpleNamespace(id=uuid.uuid4(), account_id=None)
         mock_db.scalar = AsyncMock(return_value=existing_alert)
+        cancel = AsyncMock()
 
-        await switch_alert_scope(mock_db, portfolio, "PER_ACCOUNT")
+        with patch("app.services.rebalancing.plan_execution.cancel_pending_buy_legs", new=cancel):
+            await switch_alert_scope(mock_db, portfolio, "PER_ACCOUNT")
 
+        # 지우기 전에 대기 매수를 멈춘다 — FK SET NULL 뒤엔 게이트 없이 실행된다(plans/109 A4)
+        cancel.assert_awaited_once_with(mock_db, alert_id=existing_alert.id)
         mock_db.delete.assert_awaited_once_with(existing_alert)
         assert portfolio.alert_scope == "PER_ACCOUNT"
 

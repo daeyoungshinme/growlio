@@ -3,6 +3,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
@@ -12,6 +13,7 @@ from app.core.cache_store import get_cache_store
 from app.kis.auth import promote_user_token_to_account
 from app.kiwoom.client import KiwoomTokenIssueError
 from app.limiter import limiter
+from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount, Transaction
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -242,6 +244,10 @@ async def update_account(
     update_fields = req.model_dump(exclude_none=True, exclude=CREDENTIAL_FIELDS)
     for field, value in update_fields.items():
         setattr(account, field, value)
+    # 지울 수 있는 항목만 null을 반영한다 — 금액·이름 등은 null이어도 기존 값 유지
+    for field in _CLEARABLE_ACCOUNT_FIELDS & req.model_fields_set:
+        if getattr(req, field) is None:
+            setattr(account, field, None)
 
     # 키가 전송된 브로커만 키·시크릿 쌍을 함께 교체 (시크릿만 단독 전송은 무시 — 기존 동작 유지)
     for spec in BROKER_CREDENTIAL_SPECS.values():
@@ -342,6 +348,24 @@ async def delete_account_toss_credentials(
     await _delete_own_credentials(account_id, current_user, db, "TOSS_API")
 
 
+_CLEARABLE_ACCOUNT_FIELDS = {"notes", "institution", "investment_horizon"}
+
+
+async def _stop_automation_for_account(account_id: UUID, db: AsyncSession) -> None:
+    """이 계좌로 주문하는 알림을 끄고 대기 매수를 취소한다. commit은 호출자가 한다."""
+    from app.services.rebalancing.plan_execution import cancel_pending_buy_legs
+
+    alerts = await db.scalars(
+        select(RebalancingAlert).where(
+            RebalancingAlert.account_id == account_id,
+            or_(RebalancingAlert.mode == "AUTO", RebalancingAlert.alert_scope == "PER_ACCOUNT"),
+        )
+    )
+    for alert in alerts.all():
+        alert.is_active = False
+        await cancel_pending_buy_legs(db, alert_id=alert.id)
+
+
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(
     account_id: UUID,
@@ -350,8 +374,15 @@ async def delete_account(
 ):
     account = await _get_owned_account(account_id, current_user.id, db)
     account.is_active = False
-    await db.commit()
-    await invalidate_asset_account_caches(await get_cache_store(), current_user.id)
+    await _stop_automation_for_account(account.id, db)
+    cache = await get_cache_store()
+    # 삭제 계좌는 복구 경로가 없다 — 쓸 일 없는 App Key·토큰을 남겨두지 않는다(commit 포함)
+    spec = BROKER_CREDENTIAL_SPECS.get(account.data_source)
+    if spec is not None:
+        await delete_credentials(account, db, cache, spec)
+    else:
+        await db.commit()
+    await invalidate_asset_account_caches(cache, current_user.id)
 
 
 @router.post("/{account_id}/sync")

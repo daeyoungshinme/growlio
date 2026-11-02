@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
-from app.api.v1._alert_crud import register_alert_reactivate_delete
+from app.api.v1._alert_crud import count_user_alerts, register_alert_reactivate_delete
+from app.constants import MAX_EXCHANGE_RATE_ALERTS_PER_USER
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.alert import ExchangeRateAlert
@@ -62,6 +63,11 @@ async def create_exchange_rate_alert(
     db: AsyncSession = Depends(get_db),
 ):
     """목표환율 알림 생성."""
+    if await count_user_alerts(db, ExchangeRateAlert, current_user.id) >= MAX_EXCHANGE_RATE_ALERTS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"환율 알림은 {MAX_EXCHANGE_RATE_ALERTS_PER_USER}개까지 만들 수 있습니다. 안 쓰는 알림은 지워주세요",
+        )
     alert = ExchangeRateAlert(
         user_id=current_user.id,
         target_rate=req.target_rate,

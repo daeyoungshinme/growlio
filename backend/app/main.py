@@ -49,6 +49,8 @@ if settings.sentry_dsn:
         release=settings.sentry_release or None,
         traces_sample_rate=0.1,
         send_default_pii=False,
+        # 스택 지역변수에 복호화된 브로커 자격증명이 있을 수 있다 — report_handled_failure와 같은 이유
+        include_local_variables=False,
     )
     logger.info(
         "sentry_initialized",

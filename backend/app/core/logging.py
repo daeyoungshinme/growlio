@@ -122,6 +122,19 @@ def _quiet_yfinance_noise() -> None:
         yf_logger.addFilter(_DropBenignYFinance404())
 
 
+def _with_redaction(processors: list) -> list:
+    """렌더러 바로 앞에 트레이스백 문자열화 + redact를 끼운다.
+
+    `exc_info`를 렌더러가 직접 출력하면 redact를 거치지 않아 예외 메시지의 시크릿이 그대로 남는다 —
+    먼저 문자열(`exception` 키)로 만들어 redact 대상에 넣는다.
+    """
+    processors = [*processors[:-1], structlog.processors.format_exc_info, _redact_processor, processors[-1]]
+    console_renderer = processors[-1]
+    if isinstance(console_renderer, structlog.dev.ConsoleRenderer):
+        console_renderer.exception_formatter = structlog.dev.plain_traceback
+    return processors
+
+
 def configure_logging() -> None:
     """앱 로거를 최초로 사용하기 전에 호출.
 
@@ -132,9 +145,4 @@ def configure_logging() -> None:
     _quiet_yfinance_noise()
     if structlog.is_configured():
         return
-    processors = list(structlog.get_config()["processors"])
-    processors.insert(-1, _redact_processor)
-    console_renderer = processors[-1]
-    if isinstance(console_renderer, structlog.dev.ConsoleRenderer):
-        console_renderer.exception_formatter = structlog.dev.plain_traceback
-    structlog.configure(processors=processors)
+    structlog.configure(processors=_with_redaction(list(structlog.get_config()["processors"])))

@@ -101,6 +101,7 @@ class TestExchangeRateAlerts:
         with (
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.api.v1.exchange_rate_alerts.ExchangeRateAlert") as MockAlert,
+            patch("app.api.v1.exchange_rate_alerts.count_user_alerts", AsyncMock(return_value=0)),
         ):
             instance = MagicMock()
             instance.id = alert_orm.id
@@ -668,6 +669,7 @@ class TestStockPriceAlertExtended:
         with (
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.api.v1.stock_price_alerts.StockPriceAlert") as MockAlert,
+            patch("app.api.v1.stock_price_alerts.count_user_alerts", AsyncMock(return_value=0)),
         ):
             MockAlert.return_value = alert_orm
             resp = client.post("/api/v1/alerts/stock-price", json=payload)
@@ -737,3 +739,59 @@ class TestStockPriceAlertExtended:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/alerts/stock-price/{alert_orm.id}")
         assert resp.status_code == 204
+
+
+class TestAlertPerUserLimit:
+    """plans/109 E5 — 10분 잡의 조회 대상을 무한정 늘리지 못하게 한다."""
+
+    def test_stock_price_alert_over_limit_returns_409(self, override_settings):
+        from unittest.mock import patch
+
+        from app.constants import MAX_STOCK_PRICE_ALERTS_PER_USER
+
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        payload = {
+            "ticker": "005930",
+            "market": "KOSPI",
+            "name": "삼성전자",
+            "target_price": 75000.0,
+            "direction": "ABOVE",
+        }
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch(
+                "app.api.v1.stock_price_alerts.count_user_alerts",
+                AsyncMock(return_value=MAX_STOCK_PRICE_ALERTS_PER_USER),
+            ),
+        ):
+            resp = client.post("/api/v1/alerts/stock-price", json=payload)
+
+        assert resp.status_code == 409
+        db.commit.assert_not_awaited()
+        app.dependency_overrides.clear()
+
+    def test_exchange_rate_alert_over_limit_returns_409(self, override_settings):
+        from unittest.mock import patch
+
+        from app.constants import MAX_EXCHANGE_RATE_ALERTS_PER_USER
+
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch(
+                "app.api.v1.exchange_rate_alerts.count_user_alerts",
+                AsyncMock(return_value=MAX_EXCHANGE_RATE_ALERTS_PER_USER),
+            ),
+        ):
+            resp = client.post(
+                "/api/v1/alerts/exchange-rate",
+                json={"target_rate": 1300.0, "direction": "BELOW", "max_trigger_count": 1},
+            )
+
+        assert resp.status_code == 409
+        db.commit.assert_not_awaited()
+        app.dependency_overrides.clear()

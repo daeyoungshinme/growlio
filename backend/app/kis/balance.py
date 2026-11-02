@@ -2,7 +2,7 @@ from typing import Any
 
 import structlog
 
-from app.exceptions import BalancePaginationError
+from app.exceptions import BalancePaginationError, BalanceResponseError
 from app.kis.client import KisTokenExpiredError, auth_headers, kis_request, split_account_no
 from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
@@ -19,6 +19,10 @@ logger = structlog.get_logger()
 # 잔고 연속조회 상한 — KIS 실전 국내잔고는 페이지당 약 50행이라 20페이지면 1,000종목
 _MAX_PAGES = 20
 _TR_CONT_MORE = {"F", "M"}  # 응답 헤더 tr_cont: F/M=다음 페이지 있음, D/E=마지막
+
+
+# 개별 거래소 먼저 — 실계좌 NASD는 미국 전체라 마지막에 둬야 NYSE·AMEX 종목의 시장이 맞게 잡힌다
+_OVERSEAS_BALANCE_QUERY_ORDER = ("NYSE", "AMEX", "NASDAQ")
 
 
 async def _fetch_balance_pages(
@@ -55,7 +59,8 @@ async def _fetch_balance_pages(
         fk = str(data.get(fk_param.lower()) or "")
         nk = str(data.get(nk_param.lower()) or "")
         if not nk.strip():
-            break
+            # 다음 페이지가 있다는데 키가 없다 — 여기서 멈추면 나머지 보유종목이 "매도됨"으로 지워진다
+            raise BalancePaginationError(f"KIS 잔고 연속조회 키가 없습니다({path})")
         if (fk, nk) == prev:
             # 같은 키를 반복하면 같은 페이지가 쌓여 수량이 부풀려진다
             raise BalancePaginationError(f"KIS 잔고 연속조회 키가 반복됩니다({path})")
@@ -118,7 +123,10 @@ async def get_domestic_balance(
             }
         )
 
-    summary = data.get("output2", [{}])[0] if data.get("output2") else {}
+    if not data.get("output2"):
+        # 합계가 없으면 총액·예수금이 0으로 저장돼 스냅샷이 급락한다(포지션만 남음)
+        raise BalanceResponseError("KIS 국내 잔고 응답에 계좌 합계가 없습니다")
+    summary = data["output2"][0]
     # 예수금은 D+2 정산 후 예수금(prvs_rcdl_excc_amt = 가수도정산금액)을 쓴다 — dnca_tot_amt는
     # 당일 결제기준(D+0)이라 매도대금(T+2 결제)이 빠져 매매 직후 총자산이 덜 찬 것처럼 보인다.
     # 키움 d2_entra와 동일 의미. 필드 부재/모의계좌 대비로 dnca_tot_amt 폴백.
@@ -187,12 +195,15 @@ async def get_overseas_balance(
     headers = auth_headers(app_key, app_secret, access_token, tr_id)
 
     all_positions: list[dict] = []
-    deposit_usd = 0.0
+    # None = 응답에 필드 없음(미확인). 0.0으로 두면 asset_service가 "확정값"으로 보고 기존 달러 예수금을 지운다.
+    deposit_usd: float | None = None
     failed_exchanges: list[str] = []
+    seen_tickers: set[str] = set()
 
-    # KIS 해외잔고 API는 거래소별로 각각 호출해야 한다.
-    # "NASD"만 조회하면 NYSE·AMEX 보유 종목이 누락됨.
-    for market_name, exchange_code in OVERSEAS_MARKET_CODES.items():
+    # 거래소별로 호출한다. 공식 문서상 OVRS_EXCG_CD=NASD가 [모의]는 나스닥, [실전]은 "미국전체"라 실계좌는 NYSE·AMEX
+    # 종목이 NASD 응답에도 나온다 — 합치면 평가액이 2배가 되므로 개별 거래소를 먼저 조회하고 ticker로 중복을 거른다.
+    for market_name in _OVERSEAS_BALANCE_QUERY_ORDER:
+        exchange_code = OVERSEAS_MARKET_CODES[market_name]
         try:
             pages = await _fetch_balance_pages(
                 "/uapi/overseas-stock/v1/trading/inquire-balance",
@@ -218,11 +229,13 @@ async def get_overseas_balance(
         data = pages[0]
         for item in (row for page_data in pages for row in page_data.get("output1", [])):
             qty = int(item.get("ovrs_cblc_qty", 0))
-            if qty <= 0:
+            ticker = item.get("ovrs_pdno")
+            if qty <= 0 or ticker in seen_tickers:
                 continue
+            seen_tickers.add(ticker)
             all_positions.append(
                 {
-                    "ticker": item.get("ovrs_pdno"),
+                    "ticker": ticker,
                     "name": item.get("ovrs_item_name"),
                     "market": market_name,
                     "qty": qty,
@@ -236,9 +249,11 @@ async def get_overseas_balance(
             )
 
         # 외화예수금은 거래소별 응답에 동일하게 포함되므로 첫 번째 값만 사용
-        if deposit_usd == 0.0:
+        if not deposit_usd:
             summary = data.get("output2", {}) or {}
-            deposit_usd = float(summary.get("frcr_dncl_amt_2", 0))
+            raw_deposit = summary.get("frcr_dncl_amt_2")
+            if raw_deposit not in (None, ""):
+                deposit_usd = float(raw_deposit)
 
     if failed_exchanges:
         # 나머지 거래소 조회는 끝까지 시도(로그 확보)하되, 결과는 불완전하므로 실패로 전파 →

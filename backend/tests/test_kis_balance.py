@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -217,3 +217,98 @@ class TestKisBalancePaginationGuards:
             pytest.raises(RuntimeError, match="연속조회"),
         ):
             await get_domestic_balance("k", "s", "t", "12345678", is_mock=False)
+
+
+class TestKisOverseasRealAccountSemantics:
+    """plans/109 B1·B2 — 실계좌 NASD는 "미국전체"라 NYSE 종목이 두 응답에 모두 나온다."""
+
+    @staticmethod
+    def _response(tickers, output2=None):
+        return {
+            "output1": [
+                {
+                    "ovrs_pdno": ticker,
+                    "ovrs_item_name": ticker,
+                    "ovrs_cblc_qty": "10",
+                    "pchs_avg_pric": "100",
+                    "now_pric2": "110",
+                    "ovrs_stck_evlu_amt": "1100",
+                    "frcr_evlu_pfls_amt": "100",
+                    "evlu_pfls_rt": "10",
+                }
+                for ticker in tickers
+            ],
+            "output2": output2 or {},
+        }
+
+    async def _balance(self, by_exchange):
+        from app.kis.balance import get_overseas_balance
+
+        async def _fake(*args, **kwargs):
+            return by_exchange[kwargs["params"]["OVRS_EXCG_CD"]]
+
+        with patch("app.kis.balance.kis_request", new=AsyncMock(side_effect=_fake)):
+            return await get_overseas_balance("k", "s", "t", "12345678-01", is_mock=False)
+
+    @pytest.mark.asyncio
+    async def test_same_ticker_in_nasd_and_nyse_counts_once_with_specific_market(self):
+        result = await self._balance(
+            {
+                "NYSE": self._response(["KO"]),
+                "AMEX": self._response(["SPY"]),
+                "NASD": self._response(["KO", "SPY", "AAPL"]),
+            }
+        )
+
+        assert {p["ticker"]: p["market"] for p in result["positions"]} == {
+            "KO": "NYSE",
+            "SPY": "AMEX",
+            "AAPL": "NASDAQ",
+        }
+        assert result["total_value_usd"] == 3300
+
+    @pytest.mark.asyncio
+    async def test_missing_deposit_field_is_unknown_not_zero(self):
+        empty = self._response([])
+        result = await self._balance({"NYSE": empty, "AMEX": empty, "NASD": empty})
+
+        assert result["deposit_usd"] is None
+
+    @pytest.mark.asyncio
+    async def test_deposit_field_when_present_is_used(self):
+        empty = self._response([])
+        with_deposit = self._response([], {"frcr_dncl_amt_2": "50"})
+        result = await self._balance({"NYSE": empty, "AMEX": with_deposit, "NASD": empty})
+
+        assert result["deposit_usd"] == 50.0
+
+
+class TestKisBalanceUntrustworthyResponse:
+    @pytest.mark.asyncio
+    async def test_more_pages_without_key_raises_instead_of_partial_list(self):
+        from app.exceptions import BalancePaginationError
+        from app.kis.balance import get_domestic_balance
+
+        async def _fake(*args, **kwargs):
+            kwargs["response_headers"]["tr_cont"] = "M"
+            return {"output1": [], "output2": [{}], "ctx_area_fk100": "", "ctx_area_nk100": ""}
+
+        with (
+            patch("app.kis.balance.kis_request", new=AsyncMock(side_effect=_fake)),
+            pytest.raises(BalancePaginationError),
+        ):
+            await get_domestic_balance("k", "s", "t", "12345678-01", is_mock=False)
+
+    @pytest.mark.asyncio
+    async def test_missing_summary_raises_instead_of_zero_total(self):
+        from app.exceptions import BalanceResponseError
+        from app.kis.balance import get_domestic_balance
+
+        async def _fake(*args, **kwargs):
+            return {"output1": [], "output2": []}
+
+        with (
+            patch("app.kis.balance.kis_request", new=AsyncMock(side_effect=_fake)),
+            pytest.raises(BalanceResponseError),
+        ):
+            await get_domestic_balance("k", "s", "t", "12345678-01", is_mock=False)

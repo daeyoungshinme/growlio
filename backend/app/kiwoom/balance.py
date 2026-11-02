@@ -14,7 +14,7 @@ from typing import Any
 
 import structlog
 
-from app.exceptions import BalancePaginationError
+from app.exceptions import BalancePaginationError, BalanceResponseError
 from app.kiwoom.client import auth_headers, kiwoom_request
 from app.kiwoom.constants import (
     API_ID_DOMESTIC_BALANCE,
@@ -67,8 +67,11 @@ async def _fetch_list_pages(
         rows.extend(data.get(list_key) or [])
         prev_key = next_key
         next_key = resp_headers.get("next-key", "")
-        if resp_headers.get("cont-yn") != "Y" or not next_key.strip():
+        if resp_headers.get("cont-yn") != "Y":
             break
+        if not next_key.strip():
+            # 다음 페이지가 있다는데 키가 없다 — 여기서 멈추면 나머지 보유종목이 "매도됨"으로 지워진다
+            raise BalancePaginationError(f"키움 잔고 연속조회 키가 없습니다({path})")
         if next_key == prev_key:
             # 같은 키를 반복하면 같은 페이지가 쌓여 수량이 부풀려진다
             raise BalancePaginationError(f"키움 잔고 연속조회 키가 반복됩니다({path})")
@@ -98,6 +101,20 @@ def _parse_num(raw: Any) -> float:
         return 0.0
 
 
+def _parse_required_num(raw: Any) -> float:
+    """수량·평가금액·예수금처럼 0으로 뭉개면 안 되는 필드 — 값이 있는데 숫자가 아니면 동기화를 실패시킨다.
+
+    빈 값은 0이다(보유 없음·해당 없음). 해석 불가를 0으로 두면 그 종목이 삭제되거나 스냅샷이 급락한다.
+    """
+    text = str(raw).strip().replace(",", "").lstrip("+-") if raw is not None else ""
+    if text:
+        try:
+            float(text)
+        except ValueError as e:
+            raise BalanceResponseError("키움 잔고 응답의 숫자를 해석할 수 없습니다") from e
+    return _parse_num(raw)
+
+
 def _parse_price(raw: Any) -> float:
     """가격류 필드는 전일 대비 등락 부호가 값 자체에 붙어 올 수 있어 절대값을 취한다."""
     return abs(_parse_num(raw))
@@ -122,9 +139,9 @@ def _pick_deposit_krw(data: dict[str, Any]) -> tuple[float, str]:
     폴백"은 하지 않는다: 더 큰 entr로 되돌아가 과대표시되고, d2가 실제 0이면 entr도 사실상 0이다.
     """
     if data.get("d2_entra") is not None:
-        return _parse_num(data["d2_entra"]), "d2_entra"
+        return _parse_required_num(data["d2_entra"]), "d2_entra"
     if data.get("entr") is not None:
-        return _parse_num(data["entr"]), "entr"
+        return _parse_required_num(data["entr"]), "entr"
     return 0.0, "none"
 
 
@@ -195,7 +212,7 @@ async def get_domestic_balance(
 
     positions = []
     for item in rows:
-        qty = int(_parse_num(item.get("rmnd_qty")))
+        qty = int(_parse_required_num(item.get("rmnd_qty")))
         if qty <= 0:
             continue
         positions.append(
@@ -206,7 +223,7 @@ async def get_domestic_balance(
                 "qty": qty,
                 "avg_price": _parse_price(item.get("pur_pric")),
                 "current_price": _parse_price(item.get("cur_prc")),
-                "value_krw": _parse_num(item.get("evlt_amt")),
+                "value_krw": _parse_required_num(item.get("evlt_amt")),
                 "pnl": _parse_num(item.get("evltv_prft")),
                 "pnl_pct": _parse_num(item.get("prft_rt")),
                 "currency": "KRW",
@@ -215,7 +232,7 @@ async def get_domestic_balance(
 
     return {
         "positions": positions,
-        "total_value_krw": _parse_num(data.get("tot_evlt_amt")),
+        "total_value_krw": _parse_required_num(data.get("tot_evlt_amt")),
         "deposit_krw": deposit_info["deposit_krw"],
         "orderable_krw": deposit_info["orderable_krw"],
         "invested_krw": _parse_num(data.get("tot_pur_amt")),
@@ -263,7 +280,7 @@ async def get_overseas_balance(
         ),
     )
 
-    held_items = [item for item in items if int(_parse_num(item.get("poss_qty"))) > 0]
+    held_items = [item for item in items if int(_parse_required_num(item.get("poss_qty"))) > 0]
 
     positions = []
     for item in held_items:
@@ -276,7 +293,7 @@ async def get_overseas_balance(
                 "qty": int(_parse_num(item.get("poss_qty"))),
                 "avg_price": _parse_price(item.get("frgn_stk_book_uv")),
                 "current_price": _parse_price(item.get("now_pric")),
-                "value_usd": _parse_num(item.get("evlt_amt")),
+                "value_usd": _parse_required_num(item.get("evlt_amt")),
                 "pnl_usd": _parse_num(item.get("pl_amt")),
                 "pnl_pct": _parse_num(item.get("pl_rt")),
                 "currency": crnc_code,
@@ -286,7 +303,7 @@ async def get_overseas_balance(
     deposit_usd = 0.0
     for row in deposit_data.get("result_list", []):
         if row.get("crnc_code") == "USD":
-            deposit_usd = _parse_num(row.get("fc_entra"))
+            deposit_usd = _parse_required_num(row.get("fc_entra"))
             break
 
     return {

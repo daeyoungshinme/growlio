@@ -12,6 +12,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
@@ -19,6 +20,11 @@ from app.limiter import limiter
 from app.models.user import User
 
 InvalidateCache = Callable[[uuid.UUID], Awaitable[None]]
+
+
+async def count_user_alerts(db: AsyncSession, model: Any, user_id: uuid.UUID) -> int:
+    """사용자당 알림 개수 — 생성 상한 판정용."""
+    return await db.scalar(select(func.count()).select_from(model).where(model.user_id == user_id)) or 0
 
 
 def register_alert_reactivate_delete(

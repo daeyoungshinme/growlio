@@ -3,6 +3,8 @@
 import logging
 from unittest.mock import patch
 
+import structlog
+
 from app.core.logging import (
     _DropBenignYFinance404,
     _redact_processor,
@@ -55,7 +57,9 @@ class TestConfigureLogging:
             patch("app.core.logging.structlog.configure") as mock_configure,
         ):
             configure_logging()
-        mock_configure.assert_called_once_with(processors=["a", "b", _redact_processor, "renderer"])
+        mock_configure.assert_called_once_with(
+            processors=["a", "b", structlog.processors.format_exc_info, _redact_processor, "renderer"]
+        )
 
     def test_attaches_yfinance_noise_filter_once(self):
         yf_logger = logging.getLogger("yfinance")

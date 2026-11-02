@@ -32,6 +32,7 @@ from app.services.rebalancing.order_builder import (
     split_orders_by_market,
 )
 from app.services.rebalancing.service import filter_drifting_items
+from app.utils.currency import get_live_or_cached_usd_krw
 from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
@@ -64,6 +65,11 @@ class DailyValueCapBlocked:
     today_total_krw: float
     attempted_value_krw: float
     cap_krw: float
+
+
+@dataclass(frozen=True)
+class UsdRateUnavailable:
+    """해외 종목이 있는데 실환율이 없어 주문 수량을 계산하지 않았다 — 드리프트 없음이 아니라 다음에 다시 평가할 대상."""
 
 
 @dataclass(frozen=True)
@@ -401,6 +407,15 @@ async def _check_daily_value_cap(
     )
 
 
+def _portfolio_has_overseas(portfolio: Portfolio) -> bool:
+    """포트폴리오 항목(지수 그룹 멤버 포함)에 해외 시장이 있는지."""
+    return any(
+        market_group(market) == "US"
+        for item in portfolio.items
+        for market in (item.market, *(member.market for member in item.members))
+    )
+
+
 async def build_pending_plan_for_alert(
     alert: RebalancingAlert,
     portfolio: Portfolio,
@@ -416,6 +431,7 @@ async def build_pending_plan_for_alert(
     | TaxGateBlocked
     | DailyValueCapBlocked
     | PlanGenerationInProgress
+    | UsdRateUnavailable
 ):
     """알림 설정 기준으로 드리프트 분석 후 대기 플랜을 생성한다.
 
@@ -425,6 +441,12 @@ async def build_pending_plan_for_alert(
     | DailyValueCapBlocked(하루 합산 거래한도 게이트 차단) | PlanGenerationInProgress(동시 요청 락 획득 실패).
     buy_tokens/sell_tokens는 [(market, raw_token), ...] — KR/US leg가 각각 있으면 최대 2개.
     """
+    # 드리프트 수량은 환율로 계산된다 — 캐시가 비면(재시작 직후) 고정 fallback이 실환율처럼 쓰여 해외 매수 수량이
+    # 틀어지므로, 분석 전에 실환율을 채워 두고 그래도 없으면 생성하지 않는다(다음 tick·사용자 재시도)
+    if _portfolio_has_overseas(portfolio) and not (await get_live_or_cached_usd_krw(cache))[1]:
+        logger.warning("rebalancing_plan_generation_usd_rate_unavailable", alert_id=str(alert.id))
+        return UsdRateUnavailable()
+
     buy_account_id = account_id_override or alert.account_id
     prepared = await _drifting_items_for_alert(alert, portfolio, db, buy_account_id, cache)
     if prepared is None:
@@ -444,6 +466,11 @@ async def build_pending_plan_for_alert(
     async with inproc_lock(lock_cache, f"rebalancing_plan_gen:{alert.user_id}", ttl=60) as acquired:
         if not acquired:
             logger.info("rebalancing_plan_generation_lock_busy", alert_id=str(alert.id))
+            return PlanGenerationInProgress()
+
+        # 호출자의 pending 확인은 락 밖이다 — 앞선 요청이 방금 커밋한 플랜을 여기서 걸러야 매수가 두 번 나가지 않는다
+        if await has_pending_plan_for_alert(alert.id, db):
+            logger.info("rebalancing_plan_generation_already_pending", alert_id=str(alert.id))
             return PlanGenerationInProgress()
 
         strategy = strategy_override or alert.strategy
