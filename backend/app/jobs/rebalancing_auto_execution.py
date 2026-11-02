@@ -17,12 +17,17 @@ from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.services.alerts.calculator import already_fired_today, is_auto_schedule_day
 from app.services.rebalancing._alert_queries import alert_with_recipient_stmt
-from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode, tactical_regime_for_gate
+from app.services.rebalancing.order_builder import (
+    is_market_signal_blocking_auto_mode,
+    market_group,
+    tactical_regime_for_gate,
+)
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
     MarketSignalGateBlocked,
     PlanGenerationInProgress,
     TaxGateBlocked,
+    UsdRateUnavailable,
     build_pending_plan_for_alert,
     get_alert_ids_with_pending_plan,
     notify_daily_value_cap_blocked,
@@ -109,6 +114,15 @@ async def _run_auto_execution() -> None:
             logger.info("rebalancing_auto_plan_generated", count=triggered_count)
 
 
+def _any_portfolio_market_open(portfolio) -> bool:
+    """포트폴리오 항목(지수 그룹 멤버 포함)의 시장 중 지금 열린 시장이 있는지."""
+    markets = {item.market for item in portfolio.items} | {
+        member.market for item in portfolio.items for member in item.members
+    }
+    groups = {market_group(market) for market in markets}
+    return ("KR" in groups and is_korean_market_open()) or ("US" in groups and is_us_market_open())
+
+
 async def _process_one_alert(
     row,
     db: AsyncSession,
@@ -127,6 +141,10 @@ async def _process_one_alert(
     # 실행 시각이 없는 알림은 장중 매 tick이 대상이라, 플랜 없이 끝난 평가도 그날 한 번으로 친다 —
     # 드리프트 없음·게이트 차단이면 claim을 남겨 같은 날 전체 분석을 5분마다 반복하지 않는다(plans/78 D1).
     once_per_day = auto_execution_time is None
+    # 시각 미지정 알림은 그날 첫 tick에 평가된다 — 다른 시장 시간(00:00 KST 미국장)에 국내 플랜을 만들면 leg가 만료되고
+    # 당일 재생성도 막혀 적립이 통째로 빠진다. 이 포트폴리오의 시장이 열릴 때까지 평가를 미룬다(claim도 남기지 않음).
+    if once_per_day and not _any_portfolio_market_open(portfolio):
+        return False
     claim_key = rebalancing_auto_claim_key(alert.id, today_kst().isoformat())
     if once_per_day and await get_durable(db, claim_key) is not None:
         return False
@@ -184,7 +202,7 @@ async def _process_one_alert(
     if not isinstance(generated, tuple):
         # 게이트 차단·생성할 주문 없음 — 지정 시각 알림은 다음 tick(±4분 창)에 다시 평가하고, 시각 없는 알림은
         # 그날 평가를 마친 것으로 claim을 유지한다. 수동 실행과의 락 경합은 평가가 아니므로 항상 푼다.
-        if not once_per_day or isinstance(generated, PlanGenerationInProgress):
+        if not once_per_day or isinstance(generated, PlanGenerationInProgress | UsdRateUnavailable):
             await delete_durable(db, claim_key)
         if isinstance(generated, TaxGateBlocked):
             await notify_tax_gate_blocked(alert, portfolio, generated, email, fcm_token, db)

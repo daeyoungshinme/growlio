@@ -161,7 +161,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
             {selectedYear}년 입금 합계
           </p>
           <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
-            {fmtKrw(yearDeposit)}
+            {isLoading || isError ? "—" : fmtKrw(yearDeposit)}
           </p>
         </div>
         <div className="card">
@@ -169,7 +169,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
             {selectedYear}년 배당 합계
           </p>
           <p className="text-xl font-bold text-green-600 dark:text-green-400">
-            {fmtKrw(yearDividend)}
+            {isLoading || isError ? "—" : fmtKrw(yearDividend)}
           </p>
           {yearInterest > 0 && (
             <p className="mt-0.5 text-xs text-teal-600 dark:text-teal-400">

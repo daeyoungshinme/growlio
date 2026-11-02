@@ -48,13 +48,13 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
     e.preventDefault();
     onSubmit({
       name: form.name,
-      institution: form.institution || undefined,
+      institution: form.institution || (initialAccount ? null : undefined),
       asset_type: form.asset_type,
       data_source: "MANUAL",
       deposit_krw: depositKrw ?? 0,
       deposit_usd: depositUsd ?? 0,
       manual_amount: totalKrw > 0 ? totalKrw : undefined,
-      notes: form.notes || undefined,
+      notes: form.notes || (initialAccount ? null : undefined),
       include_in_total: form.include_in_total,
       tax_type: form.tax_type,
       investment_horizon: form.investment_horizon ?? null,
@@ -97,7 +97,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
             <input
               id="bank-institution"
               type="text"
-              value={form.institution}
+              value={form.institution ?? ""}
               onChange={(e) => set("institution", e.target.value)}
               placeholder="예: 국민은행"
               className={`w-full ${INPUT_SM}`}
@@ -235,7 +235,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
             </label>
             <textarea
               id="bank-notes"
-              value={form.notes}
+              value={form.notes ?? ""}
               onChange={(e) => set("notes", e.target.value)}
               placeholder="선택 입력"
               rows={2}

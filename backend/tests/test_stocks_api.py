@@ -201,7 +201,11 @@ class TestStockSearch:
         """q 길이 1이하면 빈 배열 반환."""
         from app.main import app
 
-        with TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch("app.api.v1.stocks._search_naver", new_callable=AsyncMock, return_value=[]),
+            patch("app.api.v1.stocks._search_yahoo", new_callable=AsyncMock, return_value=[]),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/stocks/search?q=a")
         assert resp.status_code in (200, 422, 400)
         if resp.status_code == 200:

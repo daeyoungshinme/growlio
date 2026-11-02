@@ -68,8 +68,15 @@ def _make_alert(**kwargs) -> SimpleNamespace:
     return SimpleNamespace(**defaults)
 
 
+@pytest.fixture(autouse=True)
+def _portfolio_market_open():
+    """시각 미지정 알림의 시장 개장 판정은 test_rebalancing_order_safety.py에서 따로 검증한다."""
+    with patch("app.jobs.rebalancing_auto_execution._any_portfolio_market_open", return_value=True):
+        yield
+
+
 def _make_portfolio(**kwargs) -> SimpleNamespace:
-    defaults = {"id": uuid4(), "name": "Test Portfolio", "account_ids": None, "linked_accounts": []}
+    defaults = {"id": uuid4(), "name": "Test Portfolio", "account_ids": None, "linked_accounts": [], "items": []}
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
 
@@ -771,7 +778,13 @@ class TestBuildPendingPlanForAlert:
         def _fake(_alert, drifting, *_args):
             return [SimpleNamespace(quantity=1, reference_price=abs(getattr(i, "diff_krw", 0.0))) for i in drifting]
 
-        with patch("app.services.rebalancing.plan_generation._build_plan_orders", side_effect=_fake) as mock_build:
+        with (
+            patch("app.services.rebalancing.plan_generation._build_plan_orders", side_effect=_fake) as mock_build,
+            patch(
+                "app.services.rebalancing.plan_generation.has_pending_plan_for_alert",
+                new=AsyncMock(return_value=False),
+            ),
+        ):
             yield mock_build
 
     @pytest.mark.asyncio

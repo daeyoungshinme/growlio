@@ -28,6 +28,7 @@ from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
     PlanGenerationInProgress,
     TaxGateBlocked,
+    UsdRateUnavailable,
     build_pending_plan_for_alert,
     has_pending_plan_for_alert,
     notify_plan_generated,
@@ -42,6 +43,7 @@ class QuickExecuteStatus(StrEnum):
     TAX_BLOCKED = "TAX_BLOCKED"
     DAILY_CAP_BLOCKED = "DAILY_CAP_BLOCKED"
     GENERATION_IN_PROGRESS = "GENERATION_IN_PROGRESS"
+    USD_RATE_UNAVAILABLE = "USD_RATE_UNAVAILABLE"
     NO_DRIFT = "NO_DRIFT"
     PLAN_GENERATED = "PLAN_GENERATED"
 
@@ -167,6 +169,8 @@ async def quick_execute_plan(
         return QuickExecuteOutcome(QuickExecuteStatus.DAILY_CAP_BLOCKED, daily_cap=generated)
     if isinstance(generated, PlanGenerationInProgress):
         return QuickExecuteOutcome(QuickExecuteStatus.GENERATION_IN_PROGRESS)
+    if isinstance(generated, UsdRateUnavailable):
+        return QuickExecuteOutcome(QuickExecuteStatus.USD_RATE_UNAVAILABLE)
     if generated is None:
         return QuickExecuteOutcome(QuickExecuteStatus.NO_DRIFT)
     plan, buy_tokens, sell_tokens = generated

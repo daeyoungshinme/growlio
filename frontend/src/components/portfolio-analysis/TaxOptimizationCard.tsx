@@ -11,6 +11,7 @@ import { taxSummaryQuery } from "@/api/queryOptions";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { SELECT_SM } from "@/constants/inputStyles";
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+import EmptyState from "@/components/common/EmptyState";
 
 interface TaxOptimizationCardProps {
   /** 특정 계좌만 필터링해 조회 (미지정 시 전체 계좌 통합) */
@@ -30,7 +31,12 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
   const [plannerOpenOverride, setPlannerOpenOverride] = useState<boolean | null>(null);
   const [geumtOpen, setGeumtOpen] = useState(false);
 
-  const { data: taxData, isLoading: taxLoading } = useQuery(taxSummaryQuery(taxYear, accountId));
+  const {
+    data: taxData,
+    isLoading: taxLoading,
+    isError: taxFailed,
+    refetch: refetchTax,
+  } = useQuery(taxSummaryQuery(taxYear, accountId));
 
   const hasLossHarvestCandidates = (taxData?.overseas_unrealized_gain_krw ?? 0) < 0;
   const plannerOpen = plannerOpenOverride ?? false;
@@ -78,6 +84,14 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
       </div>
 
       {taxLoading && <p className="text-sm text-gray-400 dark:text-gray-500">계산 중...</p>}
+
+      {taxFailed && !taxData && (
+        <EmptyState
+          title="세금 추정을 불러오지 못했습니다."
+          action={{ label: "다시 시도", onClick: () => void refetchTax() }}
+          compact
+        />
+      )}
 
       {taxData && !taxLoading && (
         <div className="space-y-3">

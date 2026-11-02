@@ -15,6 +15,8 @@ const MOBILE_PAGE_SIZE = 50;
 interface TransactionListProps {
   txList: Transaction[] | undefined;
   isLoading: boolean;
+  loadFailed?: boolean;
+  onRetry?: () => void;
   activeType: TransactionCreate["transaction_type"];
   isDeleting: boolean;
   onEdit: (tx: Transaction) => void;
@@ -24,6 +26,8 @@ interface TransactionListProps {
 export function TransactionList({
   txList,
   isLoading,
+  loadFailed,
+  onRetry,
   activeType,
   isDeleting,
   onEdit,
@@ -54,6 +58,21 @@ export function TransactionList({
   if (isLoading) {
     return (
       <div className="py-8 text-center text-gray-300 dark:text-gray-600 text-sm">로딩 중...</div>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+        내역을 불러오지 못했습니다.{" "}
+        <button
+          type="button"
+          onClick={onRetry}
+          className="text-blue-600 dark:text-blue-400 underline"
+        >
+          다시 시도
+        </button>
+      </div>
     );
   }
 

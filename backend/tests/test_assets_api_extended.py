@@ -425,10 +425,37 @@ class TestDeleteAccount:
         account = _make_account(user.id)
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=account)
+        db.scalars = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
         app = _setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/assets/{account.id}")
         assert resp.status_code == 204
+
+    def test_delete_broker_account_removes_credentials_and_stops_automation(self, override_settings):
+        """plans/109 C5 — 복구 경로가 없으니 자격증명을 남기지 않고, 이 계좌로 주문하던 알림·대기 매수도 멈춘다."""
+        user = _make_user()
+        account = _make_account(user.id)
+        account.data_source = "KIS_API"
+        alert = SimpleNamespace(id=uuid.uuid4(), is_active=True)
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.scalars = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[alert])))
+        app = _setup_app(user, db)
+        delete_credentials = AsyncMock()
+        cancel = AsyncMock()
+
+        with (
+            patch("app.api.v1.assets.delete_credentials", new=delete_credentials),
+            patch("app.services.rebalancing.plan_execution.cancel_pending_buy_legs", new=cancel),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.delete(f"/api/v1/assets/{account.id}")
+
+        assert resp.status_code == 204
+        assert account.is_active is False
+        assert alert.is_active is False
+        cancel.assert_awaited_once_with(db, alert_id=alert.id)
+        delete_credentials.assert_awaited_once()
 
 
 class TestBatchSetTargetPortfolio:

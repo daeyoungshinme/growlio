@@ -57,6 +57,8 @@ async def switch_alert_scope(db: AsyncSession, portfolio: Portfolio, target_scop
     if target_scope not in ("AGGREGATE", "PER_ACCOUNT"):
         raise UnprocessableError(detail="알 수 없는 alert_scope입니다")
 
+    from app.services.rebalancing.plan_execution import cancel_pending_buy_legs
+
     current_scope = getattr(portfolio, "alert_scope", "AGGREGATE")
     if current_scope == target_scope:
         return
@@ -72,10 +74,12 @@ async def switch_alert_scope(db: AsyncSession, portfolio: Portfolio, target_scop
         if aggregate_alert and aggregate_alert.account_id in linked_account_ids:
             aggregate_alert.alert_scope = "PER_ACCOUNT"  # 연결 계좌 소속 실행계좌 — 그 계좌 전용 행으로 승계
         elif aggregate_alert:
+            await cancel_pending_buy_legs(db, alert_id=aggregate_alert.id)
             await db.delete(aggregate_alert)
     else:
         per_account_alerts = await list_alerts_by_portfolio_accounts(db, portfolio.id, portfolio.user_id)
         for alert in per_account_alerts:
+            await cancel_pending_buy_legs(db, alert_id=alert.id)
             await db.delete(alert)
 
     portfolio.alert_scope = target_scope

@@ -141,8 +141,9 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     const data: AssetAccountCreate = {
       name: form.name,
       asset_type: initialAccount.asset_type,
-      institution: form.institution || undefined,
-      notes: form.notes || undefined,
+      // 수정 때 지운 칸은 null로 보내야 서버가 지운다
+      institution: form.institution || (initialAccount ? null : undefined),
+      notes: form.notes || (initialAccount ? null : undefined),
       include_in_total: form.include_in_total,
       deposit_krw: depositKrw ?? 0,
       deposit_usd: depositUsd ?? 0,

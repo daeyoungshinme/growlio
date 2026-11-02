@@ -105,6 +105,11 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
       }
     }
 
+    // 전체 교체 저장이라 저장된 목록을 모른 채 추가하면 기존 후보가 지워진다
+    if (settingsData === undefined) {
+      toast("저장된 후보를 아직 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", "error");
+      return;
+    }
     setPendingCandidates((prev) => {
       const base = prev ?? savedCandidates;
       if (base.some((c) => c.ticker === s.ticker && c.market === s.market)) return prev;
@@ -263,7 +268,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
         {pendingCandidates !== null && (
           <button
             type="button"
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || settingsData === undefined}
             onClick={() => saveMutation.mutate(candidates)}
             className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 sm:flex-none gap-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg transition-colors`}
           >

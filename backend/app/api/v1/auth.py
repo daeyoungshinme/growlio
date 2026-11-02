@@ -166,16 +166,28 @@ async def delete_account(
     user_email = current_user.email
     account_ids = (await db.execute(select(AssetAccount.id).where(AssetAccount.user_id == user_id))).scalars().all()
 
+    # 로컬 삭제를 먼저 flush해 실패할 수 있는 건 Supabase 삭제 전에 드러나게 한다 — 반대 순서면 로컬 실패 시
+    # 로그인은 못 하는데 자격증명과 잡 대상 데이터만 남는다. 트랜잭션은 Supabase 삭제가 끝난 뒤 확정한다.
+    try:
+        await db.delete(current_user)
+        await db.flush()
+    except Exception as e:
+        await db.rollback()
+        report_handled_failure("account_delete_local_failed", e, user_id=str(user_id), email=mask_email(user_email))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요"
+        ) from e
+
     try:
         await delete_supabase_user(str(user_id))
     except httpx.HTTPError as e:
+        await db.rollback()
         report_handled_failure("account_delete_supabase_failed", e, user_id=str(user_id))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요"
         ) from e
 
     try:
-        await db.delete(current_user)
         await db.commit()
     except Exception as e:
         # Supabase 유저는 이미 삭제됐다 — 로컬 데이터가 고아로 남으므로 Sentry로 알린다
@@ -188,7 +200,13 @@ async def delete_account(
 
     cache = await get_cache_store()
     for account_id in account_ids:
-        await invalidate_user_caches(cache, f"kis_token:account:{account_id}", f"kiwoom_token:account:{account_id}")
+        await invalidate_user_caches(
+            cache,
+            f"kis_token:account:{account_id}",
+            f"kiwoom_token:account:{account_id}",
+            f"toss_token:account:{account_id}",
+        )
+    await invalidate_user_caches(cache, f"kis_token:{user_id}:real", f"kis_token:{user_id}:mock")
     await invalidate_all_user_caches(cache, user_id)
 
     from app.services.notifications.email_service import send_account_deletion_email

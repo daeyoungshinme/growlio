@@ -6,6 +6,8 @@ interface Props {
   children: ReactNode;
   /** "page" (default): full-height error view; "section": compact inline error */
   variant?: "page" | "section";
+  /** 값이 바뀌면 오류 화면을 해제한다(라우트 이동 등) */
+  resetKey?: string;
 }
 
 interface State {
@@ -23,6 +25,13 @@ function isChunkLoadError(error: Error | null): boolean {
 
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
+
+  componentDidUpdate(prevProps: Props) {
+    // 같은 위치의 경계가 라우트 간에 재사용되므로, 탭을 옮기면 오류 화면을 풀어야 한다
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
@@ -43,7 +52,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <p className="text-gray-500 dark:text-gray-400 text-sm">
               이 섹션을 불러올 수 없습니다.
             </p>
-            {this.state.error && (
+            {isDev && this.state.error && (
               <p className="text-xs text-red-400 bg-red-50 dark:bg-red-950 rounded p-2 max-w-xs text-center break-all">
                 {this.state.error.message}
               </p>

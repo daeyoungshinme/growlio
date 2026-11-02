@@ -262,6 +262,9 @@ async def create_external_transaction(
         if existing is not None:
             return _duplicate_result(existing, req)
     account = await _get_owned_account(req.account_id, current_user.id, db)
+    if account.data_source == DataSource.MANUAL:
+        # 예수금을 읽고 더해 쓰므로 동시 입금이 겹치면 한쪽 금액이 사라진다 — 계좌 행을 잠그고 최신 값을 읽는다
+        await db.refresh(account, with_for_update=True)
 
     tx = Transaction(
         user_id=current_user.id,

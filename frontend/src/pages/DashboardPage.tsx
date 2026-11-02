@@ -124,6 +124,7 @@ export default function DashboardPage() {
     dcaLoading,
     accounts,
     accountsLoading,
+    accountsFailed,
     exchangeRate,
     marketSignal,
     challenges,
@@ -150,7 +151,8 @@ export default function DashboardPage() {
       </div>
     );
 
-  if (!accountsLoading && accounts.length === 0) return <OnboardingChecklist />;
+  // 조회 실패는 "계좌 없음"이 아니다 — 기존 사용자에게 시작 안내가 뜨지 않게 한다
+  if (!accountsLoading && !accountsFailed && accounts.length === 0) return <OnboardingChecklist />;
 
   return (
     <>

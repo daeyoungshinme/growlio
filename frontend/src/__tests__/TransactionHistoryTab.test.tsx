@@ -207,7 +207,18 @@ describe("TransactionHistoryTab", () => {
     expect(screen.getByText(`${currentYear}년 배당 합계`)).toBeInTheDocument();
   });
 
+  it("조회에 실패하면 합계를 0원으로 보이지 않는다", async () => {
+    const { fetchAllTransactions } = await import("../api/transactions");
+    vi.mocked(fetchAllTransactions).mockRejectedValueOnce(new Error("down"));
+    renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
+    expect(await screen.findByText("거래 내역을 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("0원")).toBeNull();
+  });
+
   it("거래 데이터가 없으면 합계가 0원이다", async () => {
+    const { fetchAllTransactions } = await import("../api/transactions");
+    vi.mocked(fetchAllTransactions).mockResolvedValue([]);
     renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
     await waitFor(() => {
       const zeros = screen.getAllByText("0원");

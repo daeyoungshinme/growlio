@@ -290,6 +290,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                     {unassignedBuyItems.length > 0 && (
                       <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700/20">
                         <select
+                          aria-label="이 계좌로 매수할 종목 추가"
                           value=""
                           onChange={(e) => {
                             if (e.target.value) addBuyAccount(e.target.value, acc.id);

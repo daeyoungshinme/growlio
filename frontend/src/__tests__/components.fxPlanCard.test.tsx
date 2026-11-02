@@ -109,6 +109,16 @@ describe("FxPlanCard", () => {
     );
   });
 
+  it("알림을 불러오지 못하면 전부 미등록으로 보고 중복 등록하지 않는다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    vi.mocked(fetchExchangeRateAlerts).mockRejectedValue(new Error("down"));
+    renderWithProviders(<FxPlanCard flat />);
+
+    await waitFor(() => expect(fetchExchangeRateAlerts).toHaveBeenCalled());
+    // "등록됨"으로 보이면 등록하지 않은 알림을 등록한 줄 안다
+    expect(await screen.findByRole("button", { name: "알림 목록 확인 중" })).toBeDisabled();
+  });
+
   it("모든 목표가 등록돼 있으면 버튼이 비활성화된다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
     vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([alert(1380), alert(1360)]);

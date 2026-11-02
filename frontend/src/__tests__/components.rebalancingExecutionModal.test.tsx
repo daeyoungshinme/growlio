@@ -37,12 +37,15 @@ function setExec(over: {
   priceState?: string;
   orderType?: "MARKET" | "LIMIT";
   hasRealAccount?: boolean;
+  phase?: string;
+  executionUncertain?: boolean;
 }) {
   const dispatch = vi.fn();
   const handleExecute = vi.fn();
   execMock.current = {
     state: {
-      phase: "confirm",
+      phase: over.phase ?? "confirm",
+      executionUncertain: over.executionUncertain ?? false,
       results: [],
       confirmed: over.confirmed ?? false,
       orderType: over.orderType ?? "LIMIT",
@@ -63,16 +66,47 @@ function setExec(over: {
   return { dispatch, handleExecute };
 }
 
-function renderModal() {
+function renderModal(onClose = vi.fn()) {
   renderWithProviders(
     <RebalancingExecutionModal
       portfolioId="p1"
       analysis={{} as RebalancingAnalysis}
       accounts={[]}
-      onClose={vi.fn()}
+      onClose={onClose}
     />,
   );
 }
+
+describe("RebalancingExecutionModal 주문 중 보호 (plans/109 A3)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("주문 실행 중에는 ESC(Android 뒤로가기 포함)로 닫히지 않는다", () => {
+    setExec({ phase: "executing" });
+    const onClose = vi.fn();
+    renderModal(onClose);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("실행 중이 아니면 ESC로 닫힌다", () => {
+    setExec({});
+    const onClose = vi.fn();
+    renderModal(onClose);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("접수 여부를 모르면 주문 확인 버튼을 막는다", () => {
+    setExec({ executionUncertain: true });
+    renderModal();
+
+    expect(screen.getByRole("button", { name: /주문 확인/ })).toBeDisabled();
+  });
+});
 
 describe("RebalancingExecutionModal 실행 게이트", () => {
   beforeEach(() => vi.clearAllMocks());

@@ -172,7 +172,8 @@ export function AlertAutoModeSection({
         <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
           지정 시각에 자동 실행됩니다 — 종목별 소속 시장(국내 KRX 09:00~15:30 KST / 해외 NYSE
           09:30~16:00 ET)에 맞춰 실행 여부가 자동 판단되므로, 해외 종목 위주라면 저녁~새벽 시간도
-          지정할 수 있습니다.
+          지정할 수 있습니다. 국내·해외가 섞인 포트폴리오는 이 시각에 열려 있는 시장의 종목만
+          체결되고, 닫힌 시장의 매수는 만료되어 알림으로 안내합니다.
         </p>
       </div>
 

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
+from app.api.v1._account_deps import get_owned_account
 from app.constants import ORDER_EXECUTABLE_ASSET_TYPES
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
@@ -29,6 +30,7 @@ from app.services.rebalancing._alert_queries import (
     get_alert_by_portfolio_and_account,
     list_alerts_by_portfolio_accounts,
 )
+from app.services.rebalancing.plan_execution import cancel_pending_buy_legs
 
 router = APIRouter()
 
@@ -106,6 +108,14 @@ _ALERT_BODY_FIELDS = (
     "max_tax_impact_krw",
 )
 """요청 본문에서 그대로 옮기는 알림 설정 필드 — account_id/alert_scope는 호출부 책임."""
+
+
+async def _cancel_pending_buys_if_auto_turned_off(
+    db: AsyncSession, alert: RebalancingAlert, body: RebalancingAlertCreate
+) -> None:
+    """AUTO에서 다른 모드로 바꾸면 이미 대기 중인 매수도 함께 멈춘다 — commit은 호출자의 저장과 같이 한다."""
+    if alert.mode == "AUTO" and body.mode != "AUTO":
+        await cancel_pending_buy_legs(db, alert_id=alert.id)
 
 
 def _apply_alert_fields(alert: RebalancingAlert, body: RebalancingAlertCreate) -> None:
@@ -191,6 +201,9 @@ async def upsert_rebalancing_alert(
                 detail="자동 실행 모드에는 KIS/키움 연동 계좌를 선택해야 합니다",
             )
         await _validate_auto_execution_account(db, body.account_id, current_user.id)
+    elif body.account_id is not None:
+        # NOTIFY도 원클릭 실행 때 이 계좌를 쓰고 계좌명이 응답에 실린다 — 남의 계좌 UUID를 받지 않는다
+        await get_owned_account(body.account_id, current_user.id, db)
     _validate_tax_gate_fields(body)
     await _validate_tactical_gate(db, body, portfolio_id)
 
@@ -198,6 +211,8 @@ async def upsert_rebalancing_alert(
     if not alert:
         alert = RebalancingAlert(user_id=current_user.id, portfolio_id=portfolio_id, alert_scope="AGGREGATE")
         db.add(alert)
+    else:
+        await _cancel_pending_buys_if_auto_turned_off(db, alert, body)
     _apply_alert_fields(alert, body)
     alert.account_id = body.account_id
 
@@ -252,6 +267,7 @@ async def delete_rebalancing_alert(
     alert = await get_alert_by_portfolio(db, portfolio_id, current_user.id)
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
+    await cancel_pending_buy_legs(db, alert_id=alert.id)
     await db.delete(alert)
     await db.commit()
 
@@ -322,6 +338,8 @@ async def upsert_account_rebalancing_alert(
     if not alert:
         alert = RebalancingAlert(user_id=current_user.id, portfolio_id=portfolio_id, alert_scope="PER_ACCOUNT")
         db.add(alert)
+    else:
+        await _cancel_pending_buys_if_auto_turned_off(db, alert, body)
     _apply_alert_fields(alert, body)
     # account_id는 PER_ACCOUNT 행에서 "분석 스코프 + AUTO 실행 계좌" 역할 — 항상 path의 계좌로 고정한다.
     alert.account_id = account_id
@@ -346,6 +364,7 @@ async def delete_account_rebalancing_alert(
     alert = await get_alert_by_portfolio_and_account(db, portfolio_id, account_id, current_user.id)
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
+    await cancel_pending_buy_legs(db, alert_id=alert.id)
     await db.delete(alert)
     await db.commit()
 

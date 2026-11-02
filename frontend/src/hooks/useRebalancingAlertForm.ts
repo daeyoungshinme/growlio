@@ -37,7 +37,12 @@ export function useRebalancingAlertQueries({
   accountIds,
   targetAccountId,
 }: UseRebalancingAlertFormOpts) {
-  const { data: alert, isLoading } = useQuery({
+  const {
+    data: alert,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: targetAccountId
       ? QUERY_KEYS.rebalancingAlertByAccount(portfolioId, targetAccountId)
       : QUERY_KEYS.rebalancingAlert(portfolioId),
@@ -73,6 +78,9 @@ export function useRebalancingAlertQueries({
   return {
     alert: alert ?? null,
     isLoading: isLoading || (targetAccountId ? accountsLoading : false),
+    // 404(알림 없음)는 null로 온다 — 이건 진짜 조회 실패다. 기본 폼을 보여주면 저장 시 기존 AUTO 설정을 덮어쓴다.
+    loadFailed: isError && alert === undefined,
+    retryLoad: refetch,
     autoExecutionAccounts,
     targetAccountIsAutoEligible,
     targetAccountTaxType: targetAccount?.tax_type,

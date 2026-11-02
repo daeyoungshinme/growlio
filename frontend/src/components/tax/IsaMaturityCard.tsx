@@ -11,6 +11,7 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import SegmentedControl from "@/components/common/SegmentedControl";
+import EmptyState from "@/components/common/EmptyState";
 
 /** 백엔드 date("YYYY-MM-DD") → "M/D". `new Date()`는 UTC 자정으로 해석해 UTC보다 늦은 타임존에서 전날이 된다. */
 function fmtMonthDay(ymd: string): string {
@@ -187,8 +188,17 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
 /** ISA 계좌의 의무가입(3년) 진행 상황과 비과세 한도 대비 예상 세금을 보여준다. ISA 계좌가 없으면 표시하지 않는다.
  * `TaxLimitsSection`(`TaxTabContainer`의 "한도 현황" 탭)이 렌더하므로 이 컴포넌트는 헤더/보더 없이 본문만 그린다. */
 export default function IsaMaturityCard() {
-  const { data } = useQuery(isaStatusQuery);
+  const { data, isError, refetch } = useQuery(isaStatusQuery);
 
+  if (isError && !data) {
+    return (
+      <EmptyState
+        title="ISA 현황을 불러오지 못했습니다."
+        action={{ label: "다시 시도", onClick: () => void refetch() }}
+        compact
+      />
+    );
+  }
   if (!data || data.accounts.length === 0) return null;
 
   return (

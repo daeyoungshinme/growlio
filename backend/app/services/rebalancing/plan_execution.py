@@ -22,11 +22,17 @@ from app.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.order_builder import market_group
-from app.services.rebalancing.plan_notifications import _notify_leg_execution_failed, _send_leg_execution_email
+from app.services.rebalancing.plan_notifications import (
+    _notify_buy_leg_expired,
+    _notify_leg_execution_failed,
+    _send_leg_execution_email,
+)
 from app.utils.numbers import opt_float
 
 logger = structlog.get_logger()
 
+AUTOMATION_OFF_DECIDED_BY = "USER_AUTOMATION_OFF"
+NO_ORDER_SUCCEEDED_MESSAGE = "체결된 주문이 없습니다."
 HISTORY_MISSING_MESSAGE = "주문은 실행됐지만 실행 기록 저장에 실패했습니다. 증권사 앱에서 체결 내역을 확인하세요."
 
 
@@ -61,7 +67,14 @@ def is_leg_past_deadline(leg: RebalancingPlanLeg) -> bool:
 
 
 async def _lock_leg(leg_id: uuid.UUID, db: AsyncSession) -> RebalancingPlanLeg | None:
-    return await db.scalar(select(RebalancingPlanLeg).where(RebalancingPlanLeg.id == leg_id).with_for_update())
+    # 호출자가 같은 세션에서 leg를 먼저 읽었을 수 있다 — populate_existing 없이는 락을 기다린 뒤에도 세션에 남은
+    # 옛 값(token_consumed_at=None)으로 판정해 동시 승인이 둘 다 통과하고 주문이 두 번 나간다
+    return await db.scalar(
+        select(RebalancingPlanLeg)
+        .where(RebalancingPlanLeg.id == leg_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
 
 
 def _decide_leg(leg: RebalancingPlanLeg, status: str, decided_by: str, at: datetime | None = None) -> None:
@@ -105,6 +118,42 @@ async def cancel_buy_leg(leg: RebalancingPlanLeg, db: AsyncSession, decided_by: 
 
 async def reject_sell_leg(leg: RebalancingPlanLeg, db: AsyncSession, decided_by: str) -> None:
     await _decline_leg(leg, db, decided_by, "REJECTED", "리밸런싱 자동화 매도 계획 거부")
+
+
+async def cancel_pending_buy_legs(
+    db: AsyncSession,
+    *,
+    alert_id: uuid.UUID | None = None,
+    portfolio_id: uuid.UUID | None = None,
+) -> int:
+    """자동화를 끈(알림 삭제·AUTO 해제·포트폴리오 삭제) 쪽의 대기 매수 leg를 취소한다. commit은 호출자가 한다.
+
+    매수 leg는 승인 없이 대기시간 뒤 실행되고, 알림이 지워지면 FK가 SET NULL이 되어 시장 게이트까지 DISABLED로
+    풀린 채 주문이 나간다 — 그래서 알림을 지우기 전에 같은 트랜잭션에서 취소한다. 실행이 시작된(토큰 소비) leg는
+    이미 주문이 나갔을 수 있어 건드리지 않고, 매도 leg는 어차피 사용자 승인이 있어야 실행되므로 그대로 둔다.
+    """
+    condition = (
+        RebalancingPlan.alert_id == alert_id if alert_id is not None else RebalancingPlan.portfolio_id == portfolio_id
+    )
+    result = await db.execute(
+        select(RebalancingPlanLeg.id, RebalancingPlan.user_id)
+        .join(RebalancingPlan, RebalancingPlan.id == RebalancingPlanLeg.plan_id)
+        .where(
+            condition,
+            RebalancingPlanLeg.side == "BUY",
+            RebalancingPlanLeg.status == "PENDING",
+            RebalancingPlanLeg.token_consumed_at.is_(None),
+        )
+    )
+    canceled = 0
+    for leg_id, user_id in result.all():
+        locked = await _lock_leg(leg_id, db)
+        if locked is None or locked.status != "PENDING" or locked.token_consumed_at is not None:
+            continue
+        _decide_leg(locked, "CANCELED", AUTOMATION_OFF_DECIDED_BY)
+        await save_alert_history(db, user_id, "REBALANCING", "리밸런싱 자동화 해제로 대기 중이던 매수 취소")
+        canceled += 1
+    return canceled
 
 
 async def _rebuild_orders_from_items(
@@ -157,6 +206,37 @@ async def _rebuild_orders_from_items(
     return orders
 
 
+def _no_order_succeeded(results: list) -> bool:
+    """주문을 시도했지만 한 건도 접수되지 않았는지 — 부분 체결은 자금이 움직였으므로 해당 없음."""
+    orders = [order for result in results for order in result.orders]
+    return bool(orders) and not any(order.status == "SUCCESS" for order in orders)
+
+
+async def _fail_leg_without_fills(
+    locked: RebalancingPlanLeg,
+    plan: RebalancingPlan,
+    results: list,
+    execution_id: uuid.UUID | None,
+    db: AsyncSession,
+    decided_by: str,
+) -> None:
+    """전 주문 실패 leg를 FAILED로 마감한다 — EXECUTED로 두면 일일 거래한도에 합산돼 이후 플랜까지 막힌다."""
+    if execution_id is None:
+        await db.refresh(plan)
+    reason = next(
+        (order.error_msg for result in results for order in result.orders if order.error_msg),
+        NO_ORDER_SUCCEEDED_MESSAGE,
+    )
+    _decide_leg(locked, "FAILED", decided_by)
+    locked.execution_id = execution_id
+    locked.error_message = reason
+    await save_alert_history(
+        db, plan.user_id, "REBALANCING", f"리밸런싱 자동화 {'매수' if locked.side == 'BUY' else '매도'} 실행 실패"
+    )
+    await db.commit()
+    await _notify_leg_execution_failed(plan, locked.side, reason, db)
+
+
 async def _execute_leg(
     locked: RebalancingPlanLeg, plan: RebalancingPlan, db: AsyncSession, cache, decided_by: str
 ) -> uuid.UUID | None:
@@ -167,7 +247,7 @@ async def _execute_leg(
 
     try:
         orders = await _rebuild_orders_from_items(locked.items, locked.side, plan.user_id, db, cache)
-        _results, execution_id = await execute_rebalancing(
+        results, execution_id = await execute_rebalancing(
             user_id=plan.user_id,
             account_id=plan.account_id,
             orders=orders,
@@ -200,6 +280,9 @@ async def _execute_leg(
         # 실제 체결과 어긋나므로 EXECUTED로 기록하되 확인 안내를 남긴다(plans/62 A7)
         await db.refresh(locked)
         locked.error_message = HISTORY_MISSING_MESSAGE
+    if _no_order_succeeded(results):
+        await _fail_leg_without_fills(locked, plan, results, execution_id, db, decided_by)
+        return None
     _decide_leg(locked, "EXECUTED", decided_by)
     locked.execution_id = execution_id
     await db.commit()
@@ -294,7 +377,15 @@ async def _run_due_buy_leg(
     if not market_open:
         _decide_leg(locked, "EXPIRED", "SYSTEM_AUTO", at=now)
         locked.error_message = "market_closed_before_execution"
+        expired_plan = await db.get(RebalancingPlan, locked.plan_id)
+        if expired_plan is not None:
+            await save_alert_history(
+                db, expired_plan.user_id, "REBALANCING", "리밸런싱 자동화 매수 만료 (실행 시점에 장이 닫혀 있음)"
+            )
         await db.commit()
+        # 조용히 사라지면 "매월 적립"이 빠진 줄도 모른다 — 만료를 알린다(이월은 하지 않는다)
+        if expired_plan is not None:
+            await _notify_buy_leg_expired(expired_plan, locked.market, db)
         return True
 
     plan = await db.get(RebalancingPlan, locked.plan_id)

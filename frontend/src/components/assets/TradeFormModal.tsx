@@ -221,7 +221,11 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
                 {!prefill && (
                   <button
                     type="button"
-                    onClick={() => setStock(null)}
+                    onClick={() => {
+                      // 수정 중 종목을 바꾸면 옛 기록을 덮어쓰게 된다 — 수정 모드를 끝내고 새 기록으로 입력
+                      cancelEdit();
+                      setStock(null);
+                    }}
                     className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400`}
                   >
                     변경

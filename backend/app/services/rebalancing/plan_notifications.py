@@ -378,3 +378,21 @@ async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_m
         failure_event="rebalancing_plan_execution_failed_push_failed",
         plan_id=str(plan.id),
     )
+
+
+async def _notify_buy_leg_expired(plan: RebalancingPlan, market: str | None, db: AsyncSession) -> None:
+    """실행 시점에 장이 닫혀 매수 leg가 만료됐음을 푸시로 알린다."""
+    recipient = await _plan_recipient(plan, db)
+    if recipient is None:
+        return
+    portfolio_name, _email, fcm_token = recipient
+    market_label = "국내" if market == "KR" else "해외"
+    await send_push_safely(
+        plan.user_id,
+        title=f"리밸런싱 자동화 매수 미실행 — {portfolio_name}",
+        body=f"실행 시점에 {market_label} 장이 닫혀 있어 이번 매수는 진행되지 않았습니다.",
+        fcm_token=fcm_token,
+        data={"type": "REBALANCING_PLAN_EXPIRED", "portfolio_id": str(plan.portfolio_id or "")},
+        failure_event="rebalancing_plan_buy_expired_push_failed",
+        plan_id=str(plan.id),
+    )

@@ -120,12 +120,10 @@ async def update_transaction(
         tx.amount = req.amount
     if req.transaction_date is not None:
         tx.transaction_date = req.transaction_date
-    if req.ticker is not None:
-        tx.ticker = req.ticker
-    if req.notes is not None:
-        tx.notes = req.notes
-    if req.fee is not None:
-        tx.fee = req.fee
+    # 선택 항목은 보낸 값 그대로 반영한다 — null은 "지움"이고, 안 보낸 항목(구버전 APK 포함)만 유지한다
+    for field in ("ticker", "notes", "fee"):
+        if field in req.model_fields_set:
+            setattr(tx, field, getattr(req, field))
     await db.commit()
     await db.refresh(tx)
     await _invalidate_tx_caches(current_user.id)

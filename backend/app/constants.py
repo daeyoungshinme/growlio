@@ -28,6 +28,9 @@ ORDER_EXECUTABLE_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIS", "STOCK_KI
 """주문 실행·취소 게이트 — 토스는 주문 API 미구현이라 제외. 읽기 경로(BROKER_API_ASSET_TYPES)와 의도적으로 다르다."""
 
 MAX_GOAL_CANDIDATE_TICKERS = 20
+# 주가 알림은 10분 잡의 조회 종목 수를 늘린다 — 평범한 사용을 넉넉히 넘는 값으로 비용 상한만 건다
+MAX_STOCK_PRICE_ALERTS_PER_USER = 100
+MAX_EXCHANGE_RATE_ALERTS_PER_USER = 50
 """사용자가 등록 가능한 목표 역산 추천 후보 종목 최대 개수 — 설정 저장 검증(`GoalCandidateTickersUpdate`)·
 중복 점검 요청 검증(`CandidateOverlapRequest`)·추천 서비스의 잔여 슬롯 계산이 공유한다."""
 

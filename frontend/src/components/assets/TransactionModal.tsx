@@ -22,6 +22,7 @@ import DepositReflectPrompt from "./DepositReflectPrompt";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import SegmentedControl from "@/components/common/SegmentedControl";
+import { depositDeltaAfterEdit } from "@/utils/depositDelta";
 
 interface Props {
   accountId: string;
@@ -69,7 +70,12 @@ export default function TransactionModal({
     handleTickerQueryChange,
   } = useTransactionFormState(accountId);
 
-  const { data: txList, isLoading } = useQuery<Transaction[]>({
+  const {
+    data: txList,
+    isLoading,
+    isError: txListFailed,
+    refetch: refetchTxList,
+  } = useQuery<Transaction[]>({
     queryKey: QUERY_KEYS.transactions(accountId),
     queryFn: () => fetchAllTransactions({ account_id: accountId }),
   });
@@ -93,9 +99,14 @@ export default function TransactionModal({
       updateTransaction(id, data),
     onSuccess: (_, vars) => {
       invalidate();
+      const delta = depositDeltaAfterEdit(
+        editingTx,
+        vars.data.amount ?? 0,
+        vars.data.transaction_type ?? form.transaction_type,
+      );
       setEditingTx(null);
       resetForm();
-      triggerDepositPrompt(vars.data?.amount ?? 0, vars.data?.transaction_type ?? "");
+      triggerDepositPrompt(delta.amount, delta.txType);
     },
     onError: () => toast("내역 수정에 실패했습니다"),
   });
@@ -132,7 +143,13 @@ export default function TransactionModal({
     if (editingTx) {
       updateMut.mutate({
         id: editingTx.id,
-        data: payload as Parameters<typeof updateTransaction>[1],
+        // 지운 칸은 null로 보내야 서버가 지운다(undefined는 전송되지 않아 옛 값이 남는다)
+        data: {
+          ...payload,
+          fee: form.fee ?? null,
+          ticker: payload.ticker ?? null,
+          notes: payload.notes ?? null,
+        },
       });
     } else {
       createMut.mutate(payload);
@@ -165,6 +182,8 @@ export default function TransactionModal({
             {TX_TYPES.map((t) => (
               <button
                 key={t}
+                type="button"
+                aria-pressed={form.transaction_type === t}
                 onClick={() => handleTxTypeChange(t)}
                 className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 text-sm font-medium rounded-lg border transition-colors ${
                   form.transaction_type === t
@@ -202,6 +221,7 @@ export default function TransactionModal({
                       type="number"
                       inputMode="decimal"
                       className={`w-full ${INPUT_SM}`}
+                      aria-label="금액 (USD)"
                       value={amountUsd || ""}
                       onChange={(e) => handleUsdAmountChange(parseFloat(e.target.value) || 0)}
                       placeholder="0.00"
@@ -327,6 +347,8 @@ export default function TransactionModal({
           <TransactionList
             txList={txList}
             isLoading={isLoading}
+            loadFailed={txListFailed}
+            onRetry={() => void refetchTxList()}
             activeType={form.transaction_type}
             isDeleting={deleteMut.isPending}
             onEdit={startEdit}

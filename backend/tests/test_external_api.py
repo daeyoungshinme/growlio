@@ -267,6 +267,8 @@ class TestCreateExternalTransaction:
         assert account.deposit_krw == 150_000.0
         upsert_mock.assert_awaited_once()
         assert db.add.call_count == 1  # Transaction row만 add (계좌는 기존 ORM 객체 수정)
+        # 동시 입금이 겹쳐도 금액이 사라지지 않게 계좌 행을 잠그고 최신 값을 읽는다(plans/109 B6)
+        db.refresh.assert_any_await(account, with_for_update=True)
 
     def test_manual_account_deposit_copies_positions_into_new_snapshot(self, override_settings):
         """보유종목이 있는 수동 계좌에 입금하면 오늘 스냅샷에도 포지션이 복사돼야 한다(계좌 수정 경로와 동일).

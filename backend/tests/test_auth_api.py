@@ -456,7 +456,8 @@ class TestDeleteAccount:
             )
 
         assert resp.status_code == 502
-        db.delete.assert_not_called()
+        # 로컬 삭제는 flush만 된 상태라 되돌리면 데이터가 그대로다
+        db.rollback.assert_awaited()
         db.commit.assert_not_called()
         app.dependency_overrides.clear()
 
@@ -518,4 +519,62 @@ class TestDeleteAccount:
         # 고아 데이터는 Sentry로 보고하고, 이메일은 마스킹해서 남긴다
         assert report.call_args.args[0] == "account_delete_local_cleanup_failed"
         assert report.call_args.kwargs["email"] != user.email
+        app.dependency_overrides.clear()
+
+
+class TestAccountDeleteOrder:
+    """plans/109 C6 — 로컬 삭제가 실패할 수 있으면 Supabase를 지우기 전에 드러나야 한다."""
+
+    def test_local_failure_keeps_supabase_user(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        db.delete = AsyncMock()
+        db.flush = AsyncMock(side_effect=RuntimeError("fk violation"))
+        db.rollback = AsyncMock()
+        _configure_empty_execute(db)
+        app = _setup_app(user, db)
+        delete_remote = AsyncMock(return_value=None)
+
+        with (
+            patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
+            patch("app.api.v1.auth.delete_supabase_user", delete_remote),
+            patch("app.api.v1.auth.report_handled_failure"),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/auth/account/delete",
+                json={"password": "correct"},
+                headers={"Authorization": "Bearer faketoken"},
+            )
+
+        assert resp.status_code == 502
+        delete_remote.assert_not_awaited()
+        db.commit.assert_not_awaited()
+        app.dependency_overrides.clear()
+
+    def test_supabase_failure_rolls_back_local_delete(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        db.delete = AsyncMock()
+        db.flush = AsyncMock()
+        db.rollback = AsyncMock()
+        _configure_empty_execute(db)
+        app = _setup_app(user, db)
+        error = httpx.ConnectError("down")
+
+        with (
+            patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
+            patch("app.api.v1.auth.delete_supabase_user", AsyncMock(side_effect=error)),
+            patch("app.api.v1.auth.report_handled_failure"),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/auth/account/delete",
+                json={"password": "correct"},
+                headers={"Authorization": "Bearer faketoken"},
+            )
+
+        assert resp.status_code == 502
+        db.rollback.assert_awaited()
+        db.commit.assert_not_awaited()
         app.dependency_overrides.clear()

@@ -149,7 +149,7 @@ def combine_domestic_overseas(
     asset_service가 기존 deposit_usd를 유지한다. `extra_fields`는 BalanceResult에 그대로 넘긴다(키움 orderable_krw 등).
     """
     overseas_value_krw = overseas["total_value_usd"] * usd_krw_rate
-    overseas_deposit_krw = overseas["deposit_usd"] * usd_krw_rate
+    overseas_deposit_krw = (overseas["deposit_usd"] or 0.0) * usd_krw_rate
     overseas_invested_krw = sum(
         float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate for p in overseas["positions"]
     )

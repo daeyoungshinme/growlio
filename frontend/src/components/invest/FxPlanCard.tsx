@@ -125,7 +125,8 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
   const targets = (data?.tranches ?? [])
     .map((t) => t.target_rate)
     .filter((r): r is number => r !== null);
-  const pendingTargets = targets.filter((r) => !registered.has(r));
+  // 알림을 불러오기 전엔 전부 미등록으로 보여 중복 등록된다 — 로드 후에만 등록 대상을 계산한다
+  const pendingTargets = alerts ? targets.filter((r) => !registered.has(r)) : [];
 
   // 고른 포트폴리오가 삭제되면 404가 계속 남는다 — 자동 선택으로 되돌린다 (plans/97 B3).
   // 일시적인 5xx·네트워크 오류에는 사용자의 선택을 지우지 않는다 (plans/99 B1)
@@ -294,11 +295,13 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
                     disabled={pendingTargets.length === 0 || registerMutation.isPending}
                     className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                   >
-                    {pendingTargets.length === 0
-                      ? "목표 환율 알림 등록됨"
-                      : registerMutation.isPending
-                        ? "등록 중…"
-                        : "목표 환율 알림 등록"}
+                    {!alerts
+                      ? "알림 목록 확인 중"
+                      : pendingTargets.length === 0
+                        ? "목표 환율 알림 등록됨"
+                        : registerMutation.isPending
+                          ? "등록 중…"
+                          : "목표 환율 알림 등록"}
                   </button>
                   {/* 등록한 알림의 수정·삭제는 설정 › 알림 설정 › 환율 알림에서 (계획 106 C2) */}
                   {targets.some((r) => registered.has(r)) && (

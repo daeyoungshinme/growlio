@@ -25,6 +25,7 @@ import { toast } from "@/utils/toast";
 import { fmtDateTime } from "@/utils/format";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { notificationSettingsUrl } from "@/utils/tabUrl";
+import EmptyState from "@/components/common/EmptyState";
 
 const TRIGGER_LABEL: Record<string, string> = {
   MANUAL: "수동",
@@ -322,13 +323,22 @@ export default function RebalancingHistoryTab() {
   const qc = useQueryClient();
   const [showAllLegs, setShowAllLegs] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(HISTORY_PAGE);
-  const { data: history = [], isLoading } = useQuery({
+  const {
+    data: history = [],
+    isLoading,
+    isError: historyFailed,
+    refetch: refetchHistory,
+  } = useQuery({
     queryKey: QUERY_KEYS.rebalancingHistory,
     queryFn: () => fetchRebalancingHistory(50),
     staleTime: STALE_TIME.SHORT,
   });
 
-  const { data: planLegs = [] } = useQuery({
+  const {
+    data: planLegs = [],
+    isError: legsFailed,
+    refetch: refetchLegs,
+  } = useQuery({
     queryKey: QUERY_KEYS.rebalancingPlans,
     queryFn: () => fetchRecentPlanLegs(30),
     staleTime: STALE_TIME.VERY_SHORT,
@@ -378,7 +388,31 @@ export default function RebalancingHistoryTab() {
     return <SkeletonCard rows={4} />;
   }
 
+  // 실패를 "이력 없음"으로 보이면 대기 매수가 없는 줄 알고 취소 기회를 놓친다
+  const loadFailedNotice = (historyFailed || legsFailed) && (
+    <EmptyState
+      title="실행 이력을 일부 불러오지 못했습니다."
+      description="대기 중인 매수가 있어도 여기에 보이지 않을 수 있습니다."
+      action={{
+        label: "다시 시도",
+        onClick: () => {
+          void refetchHistory();
+          void refetchLegs();
+        },
+      }}
+      compact
+    />
+  );
+
   if (history.length === 0 && planLegs.length === 0) {
+    if (loadFailedNotice) {
+      return (
+        <div className="space-y-4">
+          {alertHistoryLink}
+          {loadFailedNotice}
+        </div>
+      );
+    }
     return (
       <div className="space-y-4">
         {alertHistoryLink}
@@ -394,6 +428,7 @@ export default function RebalancingHistoryTab() {
   return (
     <div className="space-y-4">
       {alertHistoryLink}
+      {loadFailedNotice}
       {planLegs.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400">

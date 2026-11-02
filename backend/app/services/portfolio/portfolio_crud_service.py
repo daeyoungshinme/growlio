@@ -191,6 +191,10 @@ async def delete_portfolio(db: AsyncSession, user_id: uuid.UUID, portfolio_id: u
     portfolio = await db.scalar(select(Portfolio).where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id))
     if portfolio is None:
         raise NotFoundError(PORTFOLIO_NOT_FOUND)
+    from app.services.rebalancing.plan_execution import cancel_pending_buy_legs
+
+    # 삭제되면 알림은 CASCADE, 플랜 FK는 SET NULL이라 대기 매수만 게이트 없이 살아남는다
+    await cancel_pending_buy_legs(db, portfolio_id=portfolio_id)
     await db.delete(portfolio)
     await db.commit()
 

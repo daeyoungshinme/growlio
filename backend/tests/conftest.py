@@ -1,5 +1,6 @@
 """공통 테스트 픽스처."""
 
+import socket
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
@@ -9,6 +10,7 @@ import structlog
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import engine
 from app.utils.kst import today_kst
 
@@ -31,6 +33,36 @@ def _fail_on_real_db_connect():
     if _real_db_connect_attempts:
         _real_db_connect_attempts.clear()
         pytest.fail("테스트가 실제 DB에 접속을 시도함 — 해당 모듈의 AsyncSessionLocal을 patch하세요")
+
+
+# 외부 네트워크 차단 가드 — DB 가드와 같은 방식. DNS 조회 단계에서 막으므로 asyncio(ProactorEventLoop의 ConnectEx)
+# 경로까지 걸린다. pytest-socket은 소켓 생성을 막아 Windows에서 asyncio 이벤트 루프 자체가 뜨지 않아 쓰지 않는다.
+# curl_cffi(yfinance)는 C 레벨 DNS라 여기 안 걸린다 — 그쪽은 mock으로 막아야 한다.
+_LOCAL_HOSTS = {None, "", "localhost", "127.0.0.1", "::1", "testserver", "test"}
+_real_getaddrinfo = socket.getaddrinfo
+_real_network_attempts: list[str] = []
+
+
+def _guarded_getaddrinfo(host, *args, **kwargs):
+    if host in _LOCAL_HOSTS:
+        return _real_getaddrinfo(host, *args, **kwargs)
+    _real_network_attempts.append(str(host))
+    raise OSError(f"테스트가 외부 네트워크에 접속하려 함: {host} — 해당 호출을 mock해야 한다")
+
+
+socket.getaddrinfo = _guarded_getaddrinfo
+
+
+@pytest.fixture(autouse=True)
+def _fail_on_real_network(monkeypatch):
+    # 로컬 .env의 실제 FRED 키로 호출하지 않는다 — 키 없는 CI와 같은 동작(시장 신호 STALE)으로 맞춘다
+    monkeypatch.setattr(settings, "fred_api_key", "")
+    _real_network_attempts.clear()
+    yield
+    if _real_network_attempts:
+        hosts = sorted(set(_real_network_attempts))
+        _real_network_attempts.clear()
+        pytest.fail(f"테스트가 외부 네트워크 접속을 시도함: {hosts} — 해당 호출을 mock해야 한다")
 
 
 # GitHub Actions는 TTY가 감지되어 structlog가 Rich 렌더러를 기본 활성화함.

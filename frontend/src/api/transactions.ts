@@ -52,7 +52,14 @@ export const fetchTransactionSummary = (params?: { account_id?: string; year?: n
 export const createTransaction = (data: TransactionCreate) =>
   apiPost<Transaction>("/transactions", data);
 
-export const updateTransaction = (id: string, data: Partial<TransactionCreate>) =>
+/** 수정 — null은 "지움"이다(undefined는 전송되지 않아 기존 값 유지) */
+export type TransactionUpdate = Partial<Omit<TransactionCreate, "fee" | "ticker" | "notes">> & {
+  fee?: number | null;
+  ticker?: string | null;
+  notes?: string | null;
+};
+
+export const updateTransaction = (id: string, data: TransactionUpdate) =>
   apiPut<Transaction>(`/transactions/${id}`, data);
 
 export const deleteTransaction = (id: string) => apiDelete(`/transactions/${id}`);
