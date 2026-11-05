@@ -4,20 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_mock_db():
@@ -33,22 +24,6 @@ def _make_mock_db():
     db.flush = AsyncMock()
     db.refresh = AsyncMock()
     return db
-
-
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
 
 
 _MOCK_BACKTEST_PORTFOLIO = {
@@ -68,9 +43,9 @@ def _make_backtest_result():
 
 class TestRunBacktest:
     def test_run_backtest_returns_200(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "portfolio_ids": [str(uuid.uuid4())],
             "start_date": "2020-01-01",

@@ -8,15 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_mock_db():
@@ -34,29 +26,13 @@ def _make_mock_db():
     return db
 
 
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 class TestDividendsPositionsCacheHit:
     """dividends.py line 63: skip=0 + cached 결과 반환."""
 
     def test_returns_cached_list_when_skip_is_zero(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         cached_data = [{"ticker": "005930", "dividend_yield": 1.5}]
 
@@ -73,9 +49,9 @@ class TestExchangeRateAlertsCacheHit:
     """exchange_rate_alerts.py line 78: skip=0, limit=50 + cached 결과 반환."""
 
     def test_returns_cached_list_for_default_params(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         cached_data = [
             {
@@ -103,9 +79,9 @@ class TestTaxOverseasPositionsCacheHit:
     """tax.py line 29: overseas-positions 캐시 히트 반환."""
 
     def test_returns_cached_overseas_positions(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         cached_data = [{"ticker": "AAPL", "unrealized_gain_krw": 500000}]
 
@@ -122,9 +98,9 @@ class TestRebalancingAlertAutoModeAccountValidation:
     """rebalancing_alerts.py lines 169-176: AUTO 모드 + account_id 설정 시 계좌 유효성 검증."""
 
     def test_auto_mode_with_non_kis_account_returns_422(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         portfolio_id = uuid.uuid4()
         account_id = uuid.uuid4()
@@ -152,9 +128,9 @@ class TestRebalancingAlertGetSuccess:
     def test_returns_200_when_alert_found(self, override_settings):
         from datetime import UTC, datetime
 
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         portfolio_id = uuid.uuid4()
         alert = SimpleNamespace(

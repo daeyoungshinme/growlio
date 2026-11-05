@@ -9,15 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user
 
 
 def _make_mock_db():
@@ -91,7 +83,7 @@ def _make_leg(*, side="BUY", status="PENDING", plan_id=None):
 
 class TestListPlans:
     def test_returns_leg_summaries(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         leg = _make_leg()
         plan = SimpleNamespace(id=leg.plan_id, portfolio_id=uuid.uuid4(), account_id=None)
@@ -115,7 +107,7 @@ class TestListPlans:
 
     def test_marks_partially_executed_when_sibling_leg_executed(self):
         """매도는 체결(EXECUTED, 목록에서 제외)됐는데 매수가 FAILED면 반쪽 실행으로 표시. PENDING은 진행 중이라 제외."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         half_plan = SimpleNamespace(id=uuid.uuid4(), portfolio_id=uuid.uuid4(), account_id=None)
         pending_plan = SimpleNamespace(id=uuid.uuid4(), portfolio_id=uuid.uuid4(), account_id=None)
@@ -146,7 +138,7 @@ class TestListPlans:
 
 class TestCancelPlanLeg:
     def test_returns_404_when_not_owned(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
 
@@ -160,7 +152,7 @@ class TestCancelPlanLeg:
         assert resp.status_code == 404
 
     def test_cancels_buy_leg(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         leg = _make_leg(side="BUY")
         db.scalar = AsyncMock(return_value=leg)
@@ -178,7 +170,7 @@ class TestCancelPlanLeg:
         mock_cancel.assert_called_once()
 
     def test_rejects_sell_leg(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         leg = _make_leg(side="SELL")
         db.scalar = AsyncMock(return_value=leg)
@@ -199,7 +191,7 @@ class TestCancelPlanLeg:
 class TestApprovePlanLeg:
     def test_approves_buy_leg(self):
         """앱에서 매수 대기시간을 건너뛰고 즉시 실행 — approve_buy_leg 경로."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         leg = _make_leg(side="BUY")
         db.scalar = AsyncMock(return_value=leg)
@@ -221,7 +213,7 @@ class TestApprovePlanLeg:
         mock_approve.assert_called_once()
 
     def test_approves_sell_leg(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         leg = _make_leg(side="SELL")
         db.scalar = AsyncMock(return_value=leg)
@@ -241,7 +233,7 @@ class TestApprovePlanLeg:
         mock_approve.assert_called_once()
 
     def test_reports_failure_when_execution_id_none(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         leg = _make_leg(side="SELL")
         db.scalar = AsyncMock(return_value=leg)
@@ -259,7 +251,7 @@ class TestApprovePlanLeg:
 
     def test_reports_executed_when_only_history_save_failed(self):
         """plans/62 A7 — 실행 기록만 저장 실패(execution_id 없음)해도 leg가 EXECUTED면 실행됨으로 응답."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         leg = _make_leg(side="SELL")
         db.scalar = AsyncMock(return_value=leg)

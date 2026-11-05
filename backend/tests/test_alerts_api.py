@@ -9,48 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
-
-
-def _make_mock_db():
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    db = AsyncMock(spec=AsyncSession)
-    db.scalar = AsyncMock(return_value=None)
-    result = MagicMock()
-    result.scalars.return_value.all.return_value = []
-    result.all.return_value = []
-    db.execute = AsyncMock(return_value=result)
-    db.commit = AsyncMock()
-    db.add = MagicMock()
-    db.flush = AsyncMock()
-    db.refresh = AsyncMock()
-    db.delete = AsyncMock()
-    return db
-
-
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
+from tests.api_helpers import make_mock_db, make_user, setup_app
 
 
 def _make_alert_orm(user_id):
@@ -78,22 +37,22 @@ class TestExchangeRateAlerts:
         assert resp.status_code == 401
 
     def test_list_returns_200(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/alerts/exchange-rate")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
     def test_create_exchange_rate_alert(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
 
         alert_orm = _make_alert_orm(user.id)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {"target_rate": 1300.0, "direction": "BELOW", "max_trigger_count": 1}
 
         from unittest.mock import patch
@@ -118,19 +77,19 @@ class TestExchangeRateAlerts:
         assert resp.status_code in (200, 201)
 
     def test_create_validates_target_rate(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         payload = {"target_rate": -100.0, "direction": "BELOW"}
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.post("/api/v1/alerts/exchange-rate", json=payload)
         assert resp.status_code == 422
 
     def test_delete_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/alerts/exchange-rate/{uuid.uuid4()}")
         assert resp.status_code == 404
@@ -138,19 +97,19 @@ class TestExchangeRateAlerts:
 
 class TestStockPriceAlerts:
     def test_list_stock_price_alerts(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/alerts/stock-price")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
     def test_delete_stock_price_alert_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/alerts/stock-price/{uuid.uuid4()}")
         assert resp.status_code == 404
@@ -158,9 +117,9 @@ class TestStockPriceAlerts:
 
 class TestAlertHistory:
     def test_list_alert_history_returns_200(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/alerts/history")
         assert resp.status_code == 200
@@ -169,18 +128,18 @@ class TestAlertHistory:
 
 class TestRebalancingAlerts:
     def test_list_rebalancing_alerts(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/alerts/rebalancing")
         assert resp.status_code == 200
 
     def test_get_rebalancing_alert_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         portfolio_id = uuid.uuid4()
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(f"/api/v1/alerts/rebalancing/{portfolio_id}")
@@ -189,17 +148,17 @@ class TestRebalancingAlerts:
 
 class TestExchangeRateAlertExtended:
     def test_reactivate_exchange_rate_alert_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(f"/api/v1/alerts/exchange-rate/{uuid.uuid4()}/reactivate")
         assert resp.status_code == 404
 
     def test_reactivate_exchange_rate_alert_success(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         alert_orm = SimpleNamespace(
             id=uuid.uuid4(),
             user_id=user.id,
@@ -213,7 +172,7 @@ class TestExchangeRateAlertExtended:
         )
         db.scalar = AsyncMock(return_value=alert_orm)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(f"/api/v1/alerts/exchange-rate/{alert_orm.id}/reactivate")
         assert resp.status_code == 200
@@ -221,8 +180,8 @@ class TestExchangeRateAlertExtended:
         assert alert_orm.trigger_count == 0
 
     def test_delete_exchange_rate_alert_success(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         alert_orm = SimpleNamespace(
             id=uuid.uuid4(),
             user_id=user.id,
@@ -235,7 +194,7 @@ class TestExchangeRateAlertExtended:
             created_at=datetime.now(UTC),
         )
         db.scalar = AsyncMock(return_value=alert_orm)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/alerts/exchange-rate/{alert_orm.id}")
         assert resp.status_code == 204
@@ -276,10 +235,10 @@ class TestRebalancingAlertExtended:
         )
 
     def test_upsert_rebalancing_alert_portfolio_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         portfolio_id = uuid.uuid4()
         payload = {"portfolio_id": str(portfolio_id), "threshold_pct": 5.0}
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -287,8 +246,8 @@ class TestRebalancingAlertExtended:
         assert resp.status_code == 404
 
     def test_upsert_rebalancing_alert_create_new(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         now = datetime.now(UTC)
@@ -305,7 +264,7 @@ class TestRebalancingAlertExtended:
             obj.updated_at = now
 
         db.refresh = AsyncMock(side_effect=_refresh)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {"portfolio_id": str(portfolio_id), "threshold_pct": 5.0}
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
@@ -317,8 +276,8 @@ class TestRebalancingAlertExtended:
         저장되어야 한다. account_id(실행계좌)는 AUTO 모드면 NOT NULL이 되므로, 과거에는 이
         NOT NULL 여부로 스코프를 판별해 저장 직후 재조회(GET)가 항상 404를 내는 버그가 있었다.
         """
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         exec_account_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
@@ -343,7 +302,7 @@ class TestRebalancingAlertExtended:
             obj.updated_at = now
 
         db.refresh = AsyncMock(side_effect=_refresh)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "portfolio_id": str(portfolio_id),
             "threshold_pct": 5.0,
@@ -358,8 +317,8 @@ class TestRebalancingAlertExtended:
 
     def test_upsert_rebalancing_alert_auto_mode_accepts_kiwoom_account(self, override_settings):
         """키움 연동 계좌도 AUTO 실행 계좌로 지정할 수 있어야 한다."""
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         exec_account_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
@@ -383,7 +342,7 @@ class TestRebalancingAlertExtended:
             obj.updated_at = now
 
         db.refresh = AsyncMock(side_effect=_refresh)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "portfolio_id": str(portfolio_id),
             "threshold_pct": 5.0,
@@ -402,8 +361,8 @@ class TestRebalancingAlertExtended:
         200으로 정상 조회되어야 한다 (스코프 드리프트로 알림이 사라진 것처럼 보이는 회귀 방지 —
         as1의 잘못된 백필로 발견된 좀비 알림 버그와 같은 계열).
         """
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
@@ -415,7 +374,7 @@ class TestRebalancingAlertExtended:
         # GET: 3rd scalar portfolio, 4th get_alert_by_portfolio(방금 수정된 알림)
         db.scalar = AsyncMock(side_effect=[portfolio_orm, alert_orm, portfolio_orm, alert_orm])
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {"portfolio_id": str(portfolio_id), "threshold_pct": 5.0, "mode": "NOTIFY"}
         with TestClient(app, raise_server_exceptions=False) as client:
             put_resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
@@ -429,15 +388,15 @@ class TestRebalancingAlertExtended:
         assert get_resp.json()["mode"] == "NOTIFY"
 
     def test_upsert_rebalancing_alert_update_existing(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
         # First scalar returns portfolio, second returns existing alert
         db.scalar = AsyncMock(side_effect=[portfolio_orm, alert_orm])
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {"portfolio_id": str(portfolio_id), "threshold_pct": 10.0}
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
@@ -445,44 +404,44 @@ class TestRebalancingAlertExtended:
         assert alert_orm.threshold_pct == 10.0
 
     def test_delete_rebalancing_alert_success(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
         db.scalar = AsyncMock(return_value=alert_orm)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/alerts/rebalancing/{portfolio_id}")
         assert resp.status_code == 204
 
     def test_delete_rebalancing_alert_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/alerts/rebalancing/{uuid.uuid4()}")
         assert resp.status_code == 404
 
     def test_rebalancing_alert_validator_invalid_threshold(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         db.scalar = AsyncMock(return_value=portfolio_orm)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {"portfolio_id": str(portfolio_id), "threshold_pct": 99.0}
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
         assert resp.status_code == 422
 
     def test_rebalancing_alert_validator_invalid_dow(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         db.scalar = AsyncMock(return_value=portfolio_orm)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "portfolio_id": str(portfolio_id),
             "threshold_pct": 5.0,
@@ -495,12 +454,12 @@ class TestRebalancingAlertExtended:
 
     def test_rebalancing_alert_tax_gate_enabled_without_max_rejected(self, override_settings):
         """세금영향 게이트를 켜면서 상한 금액을 비워두면 422 — '켜져 있는데 상한 없음'은 항상 설정 실수."""
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         db.scalar = AsyncMock(return_value=portfolio_orm)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "portfolio_id": str(portfolio_id),
             "threshold_pct": 5.0,
@@ -512,8 +471,8 @@ class TestRebalancingAlertExtended:
         assert "상한" in resp.json()["detail"]
 
     def test_rebalancing_alert_tax_gate_enabled_with_max_saved(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트", alert_scope="AGGREGATE")
         now = datetime.now(UTC)
@@ -528,7 +487,7 @@ class TestRebalancingAlertExtended:
             obj.updated_at = now
 
         db.refresh = AsyncMock(side_effect=_refresh)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "portfolio_id": str(portfolio_id),
             "threshold_pct": 5.0,
@@ -544,10 +503,10 @@ class TestRebalancingAlertExtended:
 
     def test_test_rebalancing_alert_not_found(self, override_settings):
         """알림 미설정 시 404 반환."""
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.post(f"/api/v1/alerts/rebalancing/{uuid.uuid4()}/test")
         assert resp.status_code == 404
@@ -557,12 +516,12 @@ class TestRebalancingAlertExtended:
         from unittest.mock import AsyncMock as AM
         from unittest.mock import patch
 
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
         db.scalar = AsyncMock(return_value=alert_orm)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch(
@@ -584,12 +543,12 @@ class TestRebalancingAlertExtended:
         from unittest.mock import AsyncMock as AM
         from unittest.mock import patch
 
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
         db.scalar = AsyncMock(return_value=alert_orm)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch(
@@ -611,12 +570,12 @@ class TestRebalancingAlertExtended:
         from unittest.mock import AsyncMock as AM
         from unittest.mock import patch
 
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         portfolio_id = uuid.uuid4()
         alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
         db.scalar = AsyncMock(return_value=alert_orm)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch(
@@ -652,11 +611,11 @@ class TestStockPriceAlertExtended:
         )
 
     def test_create_stock_price_alert_success(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         alert_orm = self._make_stock_alert_orm(user.id)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "ticker": "005930",
             "market": "KOSPI",
@@ -676,9 +635,9 @@ class TestStockPriceAlertExtended:
         assert resp.status_code in (200, 201)
 
     def test_create_stock_price_alert_invalid_price(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         payload = {
             "ticker": "005930",
             "market": "KOSPI",
@@ -691,9 +650,9 @@ class TestStockPriceAlertExtended:
         assert resp.status_code == 422
 
     def test_create_stock_price_alert_invalid_count(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         payload = {
             "ticker": "005930",
             "market": "KOSPI",
@@ -707,23 +666,23 @@ class TestStockPriceAlertExtended:
         assert resp.status_code == 422
 
     def test_reactivate_stock_price_alert_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(f"/api/v1/alerts/stock-price/{uuid.uuid4()}/reactivate")
         assert resp.status_code == 404
 
     def test_reactivate_stock_price_alert_success(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         alert_orm = self._make_stock_alert_orm(user.id)
         alert_orm.is_active = False
         alert_orm.trigger_count = 3
         db.scalar = AsyncMock(return_value=alert_orm)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(f"/api/v1/alerts/stock-price/{alert_orm.id}/reactivate")
         assert resp.status_code == 200
@@ -731,11 +690,11 @@ class TestStockPriceAlertExtended:
         assert alert_orm.trigger_count == 0
 
     def test_delete_stock_price_alert_success(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         alert_orm = self._make_stock_alert_orm(user.id)
         db.scalar = AsyncMock(return_value=alert_orm)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/alerts/stock-price/{alert_orm.id}")
         assert resp.status_code == 204
@@ -749,9 +708,9 @@ class TestAlertPerUserLimit:
 
         from app.constants import MAX_STOCK_PRICE_ALERTS_PER_USER
 
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         payload = {
             "ticker": "005930",
             "market": "KOSPI",
@@ -777,9 +736,9 @@ class TestAlertPerUserLimit:
 
         from app.constants import MAX_EXCHANGE_RATE_ALERTS_PER_USER
 
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         with (
             TestClient(app, raise_server_exceptions=False) as client,
             patch(

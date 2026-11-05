@@ -9,15 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_account(user_id, asset_type="STOCK_KIS"):
@@ -34,28 +26,12 @@ def _make_mock_db(accounts):
     return db
 
 
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 class TestSyncAllAccounts:
     def test_starts_background_sync_and_returns_total(self):
-        user = _make_user()
+        user = make_user()
         accounts = [_make_account(user.id), _make_account(user.id)]
         db = _make_mock_db(accounts)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.assets.is_sync_all_running", AsyncMock(return_value=False)),
@@ -71,9 +47,9 @@ class TestSyncAllAccounts:
         assert len(mock_run.call_args.args[1]) == 2
 
     def test_conflict_when_already_running(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db([])
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.assets.is_sync_all_running", AsyncMock(return_value=True)),
@@ -88,9 +64,9 @@ class TestSyncAllAccounts:
 
 class TestGetSyncAllStatus:
     def test_returns_status_from_service(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db([])
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         stored = {
             "status": "running",
             "total": 3,
@@ -109,9 +85,9 @@ class TestGetSyncAllStatus:
         assert resp.json() == stored
 
     def test_returns_failed_accounts_when_partial_failure(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db([])
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         stored = {
             "status": "done",
             "total": 2,
@@ -132,9 +108,9 @@ class TestGetSyncAllStatus:
         assert resp.json() == stored
 
     def test_returns_idle_when_nothing_running(self):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db([])
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.assets.get_sync_all_status", AsyncMock(return_value={"status": "idle"})),

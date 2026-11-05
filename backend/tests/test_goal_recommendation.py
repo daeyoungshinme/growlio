@@ -548,31 +548,6 @@ class TestOptimizeGoalPortfolio:
         assert note is not None
         assert "상한" in note
 
-    def test_equity_ceiling_one_disables_constraint(self):
-        """equity_ceiling=1.0이면 상한이 사실상 없는 것과 같아(안전자산 하한 0%) 일반 최소분산
-        결과와 동일해야 한다 — equity_floor=0의 대칭 케이스."""
-        random.seed(6)
-        returns_map = {
-            "SAFE1": [random.gauss(0.0001, 0.0005) for _ in range(252)],
-            "SAFE2": [random.gauss(0.00012, 0.0006) for _ in range(252)],
-            "STOCK": [random.gauss(0.0004, 0.01) for _ in range(252)],
-        }
-        tickers = [("SAFE1", "안전자산1", "KOSPI"), ("SAFE2", "안전자산2", "KOSPI"), ("STOCK", "주식", "KOSPI")]
-
-        items, _, _, note = _optimize_goal_portfolio(
-            symbols=["SAFE1", "SAFE2", "STOCK"],
-            tickers=tickers,
-            cagr_pct=[3.0, 3.0, 8.0],
-            returns_map=returns_map,
-            required_return_pct=-50.0,
-            asset_classes=["OTHER", "OTHER", "EQUITY"],
-            class_bounds={"EQUITY": (0.0, 1.0)},
-        )
-
-        assert note is None
-        stock_weight = next(i["weight"] for i in items if i["ticker"] == "STOCK")
-        assert stock_weight < 40.0  # 고변동 STOCK 쪽 비중이 억제되어야 함 (상한 제약 없음)
-
     def test_equity_ceiling_with_single_non_equity_candidate_raises_per_ticker_cap(self):
         """안전자산 하한(1-equity_ceiling)이 기본 종목당 최대 비중(40%)보다 크면, 안전자산 후보가
         1개뿐이어도 그 하한을 채울 수 있도록 종목당 상한이 동적으로 완화된다 — equity_floor의
@@ -599,8 +574,8 @@ class TestOptimizeGoalPortfolio:
         safe_weight = next(i["weight"] for i in items if i["ticker"] == "SAFE")
         assert safe_weight == pytest.approx(50.0, abs=1.0)
 
-    def test_equity_floor_zero_disables_constraint(self):
-        """equity_floor=0이면 하한 제약이 적용되지 않고 일반 최소분산 결과와 동일해야 한다.
+    def test_equity_bounds_zero_to_one_disable_constraint(self):
+        """equity_floor=0·equity_ceiling=1이면 제약이 적용되지 않고 일반 최소분산 결과와 동일해야 한다.
 
         후보가 2개뿐이면 기본 max_weight(40%) 상한이 1/n=50%로 완화되어 두 후보 모두 정확히
         50%로 강제되므로(변동성과 무관한 코너 해), 이 테스트는 후보를 3개로 구성해 옵티마이저가
@@ -626,7 +601,7 @@ class TestOptimizeGoalPortfolio:
 
         assert note is None
         stock_weight = next(i["weight"] for i in items if i["ticker"] == "STOCK")
-        assert stock_weight < 40.0  # 고변동 STOCK 쪽 비중이 억제되어야 함 (하한 제약 없음)
+        assert stock_weight < 40.0  # 고변동 STOCK 쪽 비중이 억제되어야 함 (제약 없음)
 
 
 class TestResolveIndexRegion:

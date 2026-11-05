@@ -8,6 +8,8 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.api_helpers import setup_app
+
 # ── 공통 헬퍼 ────────────────────────────────────────────────
 
 
@@ -388,22 +390,6 @@ def test_user_settings_relationship_uses_passive_deletes():
     assert mapper.relationships["asset_accounts"].passive_deletes is True
 
 
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 def _configure_empty_execute(db) -> None:
     """db.execute(select(AssetAccount.id)...).scalars().all() → [] 로 체이닝 설정."""
     execute_result = MagicMock()
@@ -418,7 +404,7 @@ class TestDeleteAccount:
         user = _make_user()
         db = _make_mock_db()
         db.delete = AsyncMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.auth.verify_password", AsyncMock(return_value=False)),
@@ -439,7 +425,7 @@ class TestDeleteAccount:
         db = _make_mock_db()
         db.delete = AsyncMock()
         _configure_empty_execute(db)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
@@ -466,7 +452,7 @@ class TestDeleteAccount:
         db = _make_mock_db()
         db.delete = AsyncMock()
         _configure_empty_execute(db)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         cache_mock = AsyncMock()
         cache_mock.scan = AsyncMock(return_value=(0, []))
@@ -500,7 +486,7 @@ class TestDeleteAccount:
         db.delete = AsyncMock()
         db.commit = AsyncMock(side_effect=RuntimeError("connection lost"))
         _configure_empty_execute(db)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
@@ -532,7 +518,7 @@ class TestAccountDeleteOrder:
         db.flush = AsyncMock(side_effect=RuntimeError("fk violation"))
         db.rollback = AsyncMock()
         _configure_empty_execute(db)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         delete_remote = AsyncMock(return_value=None)
 
         with (
@@ -559,7 +545,7 @@ class TestAccountDeleteOrder:
         db.flush = AsyncMock()
         db.rollback = AsyncMock()
         _configure_empty_execute(db)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         error = httpx.ConnectError("down")
 
         with (

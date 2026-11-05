@@ -2,21 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_mock_db():
@@ -30,22 +20,6 @@ def _make_mock_db():
     db.commit = AsyncMock()
     db.add = MagicMock()
     return db
-
-
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
 
 
 _MOCK_SUMMARY = {"total_dividend_krw": 0.0, "estimated_annual_krw": 0.0}
@@ -62,9 +36,9 @@ class TestDividendSummary:
         assert resp.status_code == 401
 
     def test_returns_200_with_mocked_service(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.dividends.get_dividend_summary",
@@ -78,9 +52,9 @@ class TestDividendSummary:
 
 class TestDividendPositions:
     def test_returns_200_with_empty_list(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.dividends.get_position_dividend_yields",
@@ -95,9 +69,9 @@ class TestDividendPositions:
 
 class TestDividendByTicker:
     def test_returns_200_with_mocked_service(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.dividends.get_ticker_dividend_summary",
@@ -111,9 +85,9 @@ class TestDividendByTicker:
 
 class TestDividendMonthlyOptimization:
     def test_monthly_optimization_returns_200(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.dividends.get_ticker_dividend_summary",

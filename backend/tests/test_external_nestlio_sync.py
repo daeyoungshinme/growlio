@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.services.external_queries import build_account_cashflows
 from app.services.portfolio.returns_calculator import xirr
+from tests.api_helpers import setup_app
 
 
 def _make_user():
@@ -29,22 +30,6 @@ def _make_mock_db():
     db.refresh = AsyncMock()
     db.rollback = AsyncMock()
     return db
-
-
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
 
 
 def _auto_account(user_id):
@@ -73,7 +58,7 @@ class TestExternalTransactionIdempotency:
         user = _make_user()
         account = _auto_account(user.id)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         existing = SimpleNamespace(id=uuid.uuid4())
 
         with ExitStack() as stack:
@@ -99,7 +84,7 @@ class TestExternalTransactionIdempotency:
         user = _make_user()
         account = _auto_account(user.id)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with ExitStack() as stack:
             _common_tx_patches(stack, account)
@@ -117,7 +102,7 @@ class TestExternalTransactionIdempotency:
         account = _auto_account(user.id)
         db = _make_mock_db()
         db.commit = AsyncMock(side_effect=IntegrityError("insert", {}, Exception("unique")))
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         first = SimpleNamespace(id=uuid.uuid4())
 
         with ExitStack() as stack:
@@ -138,7 +123,7 @@ class TestExternalTransactionIdempotency:
         user = _make_user()
         account = _auto_account(user.id)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         existing = SimpleNamespace(id=uuid.uuid4())
 
         with ExitStack() as stack:
@@ -160,7 +145,7 @@ class TestExternalTransactionIdempotency:
         user = _make_user()
         account = _auto_account(user.id)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         existing = SimpleNamespace(
             id=uuid.uuid4(),
             account_id=account.id,
@@ -189,7 +174,7 @@ class TestExternalTransactionIdempotency:
         user = _make_user()
         account = _auto_account(user.id)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         existing = SimpleNamespace(
             id=uuid.uuid4(),
             account_id=account.id,
@@ -210,7 +195,7 @@ class TestExternalTransactionIdempotency:
 
     def test_rejects_overlong_external_ref(self, override_settings):
         user = _make_user()
-        app = _setup_app(user, _make_mock_db())
+        app = setup_app(user, _make_mock_db())
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.post("/api/v1/external/transactions", json=_tx_body(uuid.uuid4(), external_ref="x" * 101))
         assert resp.status_code == 422
@@ -220,7 +205,7 @@ class TestNetDeposits:
     def test_excludes_nestlio_pushed_rows_by_default(self, override_settings):
         user = _make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         account_id = uuid.uuid4()
         rows = [{"account_id": str(account_id), "month": "2026-09", "net_deposit_krw": 500_000.0}]
 
@@ -239,7 +224,7 @@ class TestNetDeposits:
     def test_empty_prefix_disables_filter(self, override_settings):
         user = _make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         account_id = uuid.uuid4()
 
         with (
@@ -254,7 +239,7 @@ class TestNetDeposits:
         assert query.await_args.args[-1] is None
 
     def test_validates_start_month(self, override_settings):
-        app = _setup_app(_make_user(), _make_mock_db())
+        app = setup_app(_make_user(), _make_mock_db())
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(
                 "/api/v1/external/net-deposits", params={"account_ids": [str(uuid.uuid4())], "start_month": "2026-13"}
@@ -264,7 +249,7 @@ class TestNetDeposits:
 
 class TestNetWorthHistory:
     def test_returns_monthly_totals_as_year_month(self, override_settings):
-        app = _setup_app(_make_user(), _make_mock_db())
+        app = setup_app(_make_user(), _make_mock_db())
         trend = [{"month": "2026-09-01", "total_krw": 1_000_000.0}, {"month": "2026-10-01", "total_krw": 1_200_000.0}]
 
         with (
@@ -285,7 +270,7 @@ class TestAccountPerformance:
     def test_returns_scoped_performance(self, override_settings):
         user = _make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         account_id = uuid.uuid4()
         result = {
             "xirr_pct": 7.5,
@@ -305,7 +290,7 @@ class TestAccountPerformance:
         perf.assert_awaited_once_with(db, user.id, [account_id])
 
     def test_requires_account_ids(self, override_settings):
-        app = _setup_app(_make_user(), _make_mock_db())
+        app = setup_app(_make_user(), _make_mock_db())
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/external/account-performance")
         assert resp.status_code == 422

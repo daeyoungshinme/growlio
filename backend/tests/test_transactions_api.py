@@ -7,15 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_mock_db():
@@ -52,22 +44,6 @@ def _make_tx(user_id=None, tx_id=None):
     )
 
 
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 def _cleanup_app():
     from app.api.deps import get_current_user
     from app.core.database import get_db
@@ -83,13 +59,13 @@ class TestSummarizeTransactions:
     def test_returns_grouped_totals_scoped_to_user(self, override_settings):
         from decimal import Decimal
 
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         acc = uuid.uuid4()
         result = MagicMock()
         result.all.return_value = [(acc, "DEPOSIT", Decimal("1500000.00"), 3), (acc, "DIVIDEND", Decimal("12.5"), 1)]
         db.execute = AsyncMock(return_value=result)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get(
@@ -110,12 +86,12 @@ class TestSummarizeTransactions:
             _cleanup_app()
 
     def test_not_shadowed_by_tx_id_routes(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         result = MagicMock()
         result.all.return_value = []
         db.execute = AsyncMock(return_value=result)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get("/api/v1/transactions/summary", headers={"Authorization": "Bearer fake"})
@@ -136,9 +112,9 @@ class TestListTransactions:
         assert resp.status_code == 401
 
     def test_returns_200_empty_list(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get(
@@ -151,9 +127,9 @@ class TestListTransactions:
             _cleanup_app()
 
     def test_filters_by_year(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get(
@@ -165,9 +141,9 @@ class TestListTransactions:
             _cleanup_app()
 
     def test_filters_by_transaction_type(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get(
@@ -181,12 +157,12 @@ class TestListTransactions:
 
 class TestCreateTransaction:
     def test_returns_201_on_create(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         _make_tx(user_id=user.id)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -213,11 +189,11 @@ class TestCreateTransaction:
 
     def test_rejects_account_not_owned(self, override_settings):
         """다른 사용자(또는 없는) 계좌 ID로는 거래를 만들 수 없다 — 404, 저장 안 함."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)  # 소유 계좌 조회 실패
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.post(
@@ -237,7 +213,7 @@ class TestCreateTransaction:
             _cleanup_app()
 
     def test_creates_with_owned_account(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account_id = uuid.uuid4()
         db.scalar = AsyncMock(return_value=SimpleNamespace(id=account_id, user_id=user.id, is_active=True))
@@ -248,7 +224,7 @@ class TestCreateTransaction:
 
         db.refresh = AsyncMock(side_effect=_fill)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -278,9 +254,9 @@ class TestCreateTransaction:
             _cleanup_app()
 
     def test_rejects_invalid_transaction_type(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.post(
@@ -297,9 +273,9 @@ class TestCreateTransaction:
             _cleanup_app()
 
     def test_rejects_missing_required_fields(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.post(
@@ -314,10 +290,10 @@ class TestCreateTransaction:
 
 class TestUpdateTransaction:
     def test_returns_404_for_nonexistent(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -330,12 +306,12 @@ class TestUpdateTransaction:
             _cleanup_app()
 
     def test_update_returns_200_when_found(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         tx = _make_tx(user_id=user.id)
         db.scalar = AsyncMock(return_value=tx)
         db.refresh = AsyncMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -357,12 +333,12 @@ class TestUpdateTransaction:
             _cleanup_app()
 
     def test_update_all_fields(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         tx = _make_tx(user_id=user.id)
         db.scalar = AsyncMock(return_value=tx)
         db.refresh = AsyncMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -391,9 +367,9 @@ class TestUpdateTransaction:
             _cleanup_app()
 
     def test_filters_by_account_id(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         account_id = uuid.uuid4()
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
@@ -408,10 +384,10 @@ class TestUpdateTransaction:
 
 class TestDeleteTransaction:
     def test_returns_404_for_nonexistent(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.delete(
@@ -423,12 +399,12 @@ class TestDeleteTransaction:
             _cleanup_app()
 
     def test_returns_204_on_success(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         tx = _make_tx(user_id=user.id)
         db.scalar = AsyncMock(return_value=tx)
         db.delete = AsyncMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(

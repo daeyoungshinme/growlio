@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+
+from tests.api_helpers import make_user
 
 
 @pytest.fixture(autouse=True)
@@ -18,16 +18,6 @@ def _restore_db_override():
     from app.main import app
 
     app.dependency_overrides.pop(get_db, None)
-
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
 
 
 def _setup_app(user):
@@ -54,7 +44,7 @@ _MOCK_SIGNAL = {
 
 class TestGetMarketSignalEndpoint:
     def test_returns_200_with_mocked_service(self, override_settings):
-        user = _make_user()
+        user = make_user()
         app = _setup_app(user)
         with (
             patch("app.api.v1.market_signals.get_market_signal", new=AsyncMock(return_value=_MOCK_SIGNAL)),
@@ -66,7 +56,7 @@ class TestGetMarketSignalEndpoint:
 
     def test_includes_confirmed_level_without_mutating_cached_signal(self, override_settings):
         """AUTO 게이트 기준 등급을 함께 내려 준다 — 공유 캐시 dict는 건드리지 않는다(plans/63 P1-5)."""
-        user = _make_user()
+        user = make_user()
         app = _setup_app(user)
         cached = {**_MOCK_SIGNAL, "composite_level": "RED"}
         with (
