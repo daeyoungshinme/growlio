@@ -324,34 +324,29 @@ async def _delete_own_credentials(account_id: UUID, user: User, db: AsyncSession
     await delete_credentials(account, db, await get_cache_store(), BROKER_CREDENTIAL_SPECS[data_source])
 
 
-@router.delete("/{account_id}/kis-credentials", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_account_kis_credentials(
-    account_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+def _credential_delete_route(data_source: str):
+    async def delete_account_credentials(
+        account_id: UUID,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> None:
+        await _delete_own_credentials(account_id, current_user, db, data_source)
+
+    return delete_account_credentials
+
+
+for _slug, _data_source, _label in (
+    ("kis", "KIS_API", "KIS API"),
+    ("kiwoom", "KIWOOM_API", "키움 API"),
+    ("toss", "TOSS_API", "토스 Open API"),
 ):
-    """계좌별 KIS API 자격증명과 발급 토큰을 삭제한다."""
-    await _delete_own_credentials(account_id, current_user, db, "KIS_API")
-
-
-@router.delete("/{account_id}/kiwoom-credentials", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_account_kiwoom_credentials(
-    account_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """계좌별 키움 API 자격증명을 삭제한다."""
-    await _delete_own_credentials(account_id, current_user, db, "KIWOOM_API")
-
-
-@router.delete("/{account_id}/toss-credentials", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_account_toss_credentials(
-    account_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """계좌별 토스 Open API 자격증명을 삭제한다."""
-    await _delete_own_credentials(account_id, current_user, db, "TOSS_API")
+    router.add_api_route(
+        f"/{{account_id}}/{_slug}-credentials",
+        _credential_delete_route(_data_source),
+        methods=["DELETE"],
+        status_code=status.HTTP_204_NO_CONTENT,
+        summary=f"계좌별 {_label} 자격증명 삭제",
+    )
 
 
 _CLEARABLE_ACCOUNT_FIELDS = {"notes", "institution", "investment_horizon"}

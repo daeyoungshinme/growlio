@@ -196,7 +196,6 @@ describe("api/tax", () => {
       overseas_unrealized_gain_krw: 5000000,
       overseas_gain_deduction_krw: 2500000,
       overseas_tax_estimated_krw: 462000,
-      domestic_stock_value_krw: 0,
       domestic_large_holder_warning: false,
       comprehensive_tax_warning: false,
       total_estimated_tax_krw: 616000,

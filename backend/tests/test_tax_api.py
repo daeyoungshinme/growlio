@@ -51,11 +51,14 @@ def _setup_app(user, db):
 _MOCK_TAX_SUMMARY = {
     "year": 2024,
     "overseas_realized_gain_krw": 0.0,
-    "dividend_total_krw": 0.0,
+    "dividend_income_krw": 0.0,
     "dividend_tax_krw": 0.0,
-    "overseas_tax_krw": 0.0,
-    "total_tax_krw": 0.0,
-    "comprehensive_income_warning": False,
+    "overseas_tax_estimated_krw": 0.0,
+    "total_estimated_tax_krw": 0.0,
+    "comprehensive_tax_warning": False,
+    "financial_income_krw": 0.0,
+    "total_fees_krw": 0.0,
+    "harvesting_recommendations": [{"ticker": "AAPL"}],
 }
 
 _MOCK_OVERSEAS_POSITIONS: list = []
@@ -84,6 +87,23 @@ class TestTaxSummary:
         ):
             resp = client.get("/api/v1/tax/summary")
         assert resp.status_code == 200
+
+    def test_response_omits_fields_used_only_internally(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with (
+            patch(
+                "app.api.v1.tax.get_tax_summary",
+                AsyncMock(return_value=_MOCK_TAX_SUMMARY),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            body = client.get("/api/v1/tax/summary").json()
+        assert body["total_estimated_tax_krw"] == 0.0
+        assert "harvesting_recommendations" not in body
+        assert "financial_income_krw" not in body
+        assert "total_fees_krw" not in body
 
     def test_returns_200_with_year_param(self, override_settings):
         user = _make_user()

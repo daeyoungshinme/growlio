@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.job_runner import report_handled_failure
 from app.models.alert import AlertHistory
+from app.utils.kst import kst_day_start, today_kst
 from app.utils.metrics import alert_trigger_count
 
 logger = structlog.get_logger()
@@ -30,6 +31,20 @@ async def save_alert_history(
     message: str,
 ) -> None:
     db.add(AlertHistory(user_id=user_id, alert_type=alert_type, message=message))
+
+
+async def already_sent_alert_today(db: AsyncSession, user_id: uuid.UUID, alert_type: str) -> bool:
+    """KST 오늘 이미 같은 유형을 발송했으면 True — 스케줄러 재시작/misfire로 인한 중복 발송 방지."""
+    result = await db.execute(
+        select(AlertHistory.id)
+        .where(
+            AlertHistory.user_id == user_id,
+            AlertHistory.alert_type == alert_type,
+            AlertHistory.created_at >= kst_day_start(today_kst()),
+        )
+        .limit(1)
+    )
+    return result.scalar() is not None
 
 
 async def apply_alert_trigger(
