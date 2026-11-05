@@ -32,7 +32,7 @@ from app.utils.cache_keys import (
 from app.utils.cache_keys import (
     USD_KRW_RATE as _USD_KRW_KEY,
 )
-from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
+from app.utils.currency import refresh_usd_krw
 
 logger = structlog.get_logger()
 
@@ -92,17 +92,12 @@ async def get_index_region(
 @limiter.limit("10/minute")
 async def get_exchange_rate(request: Request, cache: CacheStore = Depends(get_cache_store)):
     """현재 USD/KRW 환율 조회 (캐시 → yfinance, ~15분 지연)."""
-    from app.services.market_data.yahoo_price import fetch_usdkrw
-
     cached = await cache.get(_USD_KRW_KEY)
     if cached:
-        return {"usd_krw": float(cached)}
-    rate = await fetch_usdkrw()
-    if rate > 0:
-        await cache_usd_krw_rate(cache, rate)
-    else:
-        rate = await get_usd_krw_rate(cache)
-    return {"usd_krw": rate}
+        return {"usd_krw": float(cached), "is_fallback": False}
+    rate, is_live = await refresh_usd_krw(cache)
+    # is_fallback이면 프론트는 환율 없음과 같게 다룬다 — 구버전 앱을 위해 usd_krw는 계속 내려준다
+    return {"usd_krw": rate, "is_fallback": not is_live}
 
 
 async def _kis_price_fallback(
@@ -141,7 +136,7 @@ async def get_stock_price(
     그래도 없고 `account_id`(KIS 연동 보유 계좌)가 주어진 경우 최후로 KIS API를 시도한다.
     해외 종목은 USD → KRW 변환 후 반환. 캐시 TTL 900s.
     """
-    from app.services.market_data.yahoo_price import fetch_usdkrw, fetch_yahoo_price
+    from app.services.market_data.yahoo_price import fetch_yahoo_price
 
     cache_key = current_price_display_key(ticker, market)
     cached = await get_cached_json(cache, cache_key)
@@ -162,9 +157,7 @@ async def get_stock_price(
         return {"price_krw": None, "price_usd": None, "usd_rate": None}
 
     if market in OVERSEAS_MARKETS:
-        usd_rate = await fetch_usdkrw()
-        if not usd_rate:
-            usd_rate = await get_usd_krw_rate(cache)
+        usd_rate, _is_live = await refresh_usd_krw(cache)
         result = {
             "price_krw": round(price * usd_rate) if usd_rate else None,
             "price_usd": round(price, 2),
@@ -274,14 +267,9 @@ async def get_stock_prices_batch(
     # 해외 종목이 있으면 환율 1회 조회
     overseas_tickers = {t for t, m in to_fetch if m in OVERSEAS_MARKETS}
     usd_rate: float = 0.0
+    usd_rate_is_live = True
     if overseas_tickers:
-        from app.services.market_data.yahoo_price import fetch_usdkrw
-
-        usd_rate = await fetch_usdkrw()
-        if not usd_rate:
-            usd_rate = await get_usd_krw_rate(cache)
-        if usd_rate:
-            await cache_usd_krw_rate(cache, usd_rate)
+        usd_rate, usd_rate_is_live = await refresh_usd_krw(cache)
 
     for ticker, market in to_fetch:
         price = price_map.get(ticker)
@@ -299,7 +287,8 @@ async def get_stock_prices_batch(
             entry = {"price_krw": price, "price_usd": None, "usd_rate": None}
 
         result[ticker] = entry
-        if entry["price_krw"] is not None:
+        # fallback 환율로 환산한 값은 응답에만 쓴다 — 캐시하면 환율이 돌아와도 TTL 동안 옛 금액이 남는다
+        if entry["price_krw"] is not None and (usd_rate_is_live or market not in OVERSEAS_MARKETS):
             await set_cached_json(cache, current_price_display_key(ticker, market), entry, TTL_PRICE_CURRENT)
 
     return result

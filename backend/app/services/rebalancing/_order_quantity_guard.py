@@ -20,6 +20,8 @@ logger = structlog.get_logger()
 
 # 금액/가격 나눗셈의 부동소수 오차(예: 300000/100000.00000001 → 2.9999999)로 1주가 빠지지 않게 하는 허용치
 _SHARES_EPSILON = 1e-9
+# 시장가 매수의 예산 계산용 여유 — 체결가는 참고 시세보다 오를 수 있다
+MARKET_BUY_PRICE_BUFFER = 1.02
 
 
 def floor_shares(value: float) -> int:
@@ -80,15 +82,24 @@ def budget_skipped_result(order: ExecutionOrderItem) -> OrderResult:
     )
 
 
+def budget_unit_price(order: ExecutionOrderItem) -> float | None:
+    """예산 계산에 쓸 1주 가격 — 지정가, 시장가면 참고 시세+여유. 둘 다 없으면 None."""
+    if order.limit_price and order.limit_price > 0:
+        return order.limit_price
+    if order.reference_price and order.reference_price > 0:
+        return order.reference_price * MARKET_BUY_PRICE_BUFFER
+    return None
+
+
 def fit_buy_to_budget(order: ExecutionOrderItem, budget: float) -> tuple[ExecutionOrderItem | None, int]:
     """매수 주문 하나를 budget 안에 맞춘다 — (낼 주문 또는 None, 못 산 수량).
 
-    지정가는 `int(budget // 지정가)`주까지만 낸다. 1주도 못 사면 None과 전체 수량을 돌려준다.
-    시장가는 체결가를 미리 알 수 없어 그대로 통과시킨다(못 산 수량 0).
+    `int(budget // 예산 단가)`주까지만 낸다. 1주도 못 사면 None과 전체 수량을 돌려준다.
+    시장가도 참고 시세로 맞춘다. 참고 시세조차 없는 주문만 그대로 통과시키고(못 산 수량 0) 브로커 거부에 맡긴다.
     FULL 전략의 `clamp_buy_orders_to_budget`와 TWO_PHASE의 `_execute_buys_within_budget`가 같이 쓴다.
     """
-    price = order.limit_price
-    if not price or price <= 0:
+    price = budget_unit_price(order)
+    if price is None:
         return order, 0
     affordable_qty = int(budget // price) if budget > 0 else 0
     if affordable_qty <= 0:
@@ -107,9 +118,9 @@ def clamp_buy_orders_to_budget(
 
     포트폴리오 합산 계획 수량을 그대로 실행하면, 같은 실행 묶음의 매도 leg가 예상보다
     적게 체결됐거나(AUTO 2단계 플랜처럼 매도·매수가 분리 실행되는 경우 포함) 아예
-    실패·만료됐을 때 매수가 실제 가용 현금을 초과할 수 있다. 지정가 주문은 예산 초과분만큼
-    수량을 줄이고 예산이 아예 없으면 SKIPPED 처리한다. 시장가 주문은 실행 시점 체결가를
-    미리 알 수 없어 clamp 대상에서 제외한다 — 최종 안전장치는 브로커의 주문 거부에 있다.
+    실패·만료됐을 때 매수가 실제 가용 현금을 초과할 수 있다. 예산 초과분만큼 수량을 줄이고
+    예산이 아예 없으면 SKIPPED 처리한다. 시장가는 참고 시세+여유로 계산하며, 참고 시세가 없는 주문만
+    clamp에서 빠진다 — 최종 안전장치는 브로커의 주문 거부에 있다.
     예산은 계획 금액으로 바로 차감한다(체결 여부와 무관).
 
     Returns: (실행 가능한 조정된 주문 목록, SKIPPED 처리된 결과 목록)
@@ -132,7 +143,7 @@ def clamp_buy_orders_to_budget(
                 clamped_qty=fitted.quantity,
             )
         adjusted.append(fitted)
-        if fitted.limit_price and fitted.limit_price > 0:
-            remaining_budget -= fitted.quantity * fitted.limit_price
+        if (price := budget_unit_price(fitted)) is not None:
+            remaining_budget -= fitted.quantity * price
 
     return adjusted, skipped

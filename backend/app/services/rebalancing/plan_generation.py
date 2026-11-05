@@ -13,12 +13,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import BROKER_API_DATA_SOURCES
 from app.core.config import settings
 from app.models.alert import RebalancingAlert
-from app.models.portfolio import Portfolio
+from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
+from app.models.portfolio import Portfolio, PortfolioAccount
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.services.rebalancing.group_expansion import expand_group_items
 from app.services.rebalancing.order_builder import (
@@ -70,6 +72,24 @@ class DailyValueCapBlocked:
 @dataclass(frozen=True)
 class UsdRateUnavailable:
     """해외 종목이 있는데 실환율이 없어 주문 수량을 계산하지 않았다 — 드리프트 없음이 아니라 다음에 다시 평가할 대상."""
+
+
+@dataclass(frozen=True)
+class SyncRequiredAfterExecution:
+    """접수된 주문이 아직 스냅샷에 반영되지 않았다 — 지금 만들면 체결 전 수량으로 같은 주문이 다시 나간다.
+
+    다음 동기화로 풀리므로 알림 없이 다음 평가로 넘긴다.
+    """
+
+    account_name: str
+
+
+@dataclass(frozen=True)
+class SnapshotTooStale:
+    """동기화가 오래 끊겨 보유 수량을 믿을 수 없다 — 무인 AUTO는 생성하지 않고 사용자에게 알린다."""
+
+    account_name: str
+    days_since_sync: int
 
 
 @dataclass(frozen=True)
@@ -407,6 +427,74 @@ async def _check_daily_value_cap(
     )
 
 
+# 연휴에도 일일 동기화는 돈다. 이만큼 끊겼다면 장애로 보고 무인 실행을 멈춘다
+_AUTO_SNAPSHOT_MAX_AGE = timedelta(days=5)
+
+
+async def _check_snapshot_freshness(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    buy_account_id: uuid.UUID | None,
+    db: AsyncSession,
+    *,
+    enforce_max_age: bool,
+) -> SyncRequiredAfterExecution | SnapshotTooStale | None:
+    """플랜의 수량 근거인 스냅샷이 믿을 만한지 — 대상은 실행 계좌와 포트폴리오 연결 계좌 중 브로커 계좌.
+
+    플랜은 스냅샷 보유 수량으로 계산되는데 체결 뒤 자동 동기화는 없다. 그래서 마지막 접수 주문이 마지막 동기화보다
+    뒤면 같은 주문이 다시 만들어진다(plans/110 A2).
+    """
+    accounts = (
+        await db.execute(
+            select(AssetAccount.id, AssetAccount.name, AssetAccount.last_synced_at).where(
+                AssetAccount.user_id == alert.user_id,
+                AssetAccount.is_active == True,
+                AssetAccount.data_source.in_(BROKER_API_DATA_SOURCES),
+                or_(
+                    AssetAccount.id == buy_account_id,
+                    AssetAccount.id.in_(
+                        select(PortfolioAccount.account_id).where(PortfolioAccount.portfolio_id == portfolio.id)
+                    ),
+                ),
+            )
+        )
+    ).all()
+    if not accounts:
+        return None
+
+    if enforce_max_age:
+        now = datetime.now(UTC)
+        for _account_id, name, last_synced_at in accounts:
+            if last_synced_at is not None and now - last_synced_at > _AUTO_SNAPSHOT_MAX_AGE:
+                return SnapshotTooStale(account_name=name, days_since_sync=(now - last_synced_at).days)
+
+    last_executed_at = dict(
+        (
+            await db.execute(
+                select(RebalancingExecutionResult.account_id, func.max(RebalancingExecution.executed_at))
+                .join(RebalancingExecution, RebalancingExecution.id == RebalancingExecutionResult.execution_id)
+                .where(
+                    RebalancingExecution.user_id == alert.user_id,
+                    RebalancingExecutionResult.account_id.in_([str(row[0]) for row in accounts]),
+                    RebalancingExecutionResult.status == "SUCCESS",
+                    or_(
+                        RebalancingExecutionResult.cancel_status.is_(None),
+                        RebalancingExecutionResult.cancel_status != "CANCELED",
+                    ),
+                )
+                .group_by(RebalancingExecutionResult.account_id)
+            )
+        )
+        .tuples()
+        .all()
+    )
+    for account_id, name, last_synced_at in accounts:
+        executed_at = last_executed_at.get(str(account_id))
+        if executed_at is not None and (last_synced_at is None or executed_at > last_synced_at):
+            return SyncRequiredAfterExecution(account_name=name)
+    return None
+
+
 def _portfolio_has_overseas(portfolio: Portfolio) -> bool:
     """포트폴리오 항목(지수 그룹 멤버 포함)에 해외 시장이 있는지."""
     return any(
@@ -425,6 +513,7 @@ async def build_pending_plan_for_alert(
     order_type_override: Literal["MARKET", "LIMIT"] | None = None,
     account_id_override: uuid.UUID | None = None,
     cache: Any = None,
+    enforce_snapshot_max_age: bool = False,
 ) -> (
     tuple[RebalancingPlan, list[tuple[str, str]], list[tuple[str, str]]]
     | None
@@ -432,13 +521,17 @@ async def build_pending_plan_for_alert(
     | DailyValueCapBlocked
     | PlanGenerationInProgress
     | UsdRateUnavailable
+    | SyncRequiredAfterExecution
+    | SnapshotTooStale
 ):
     """알림 설정 기준으로 드리프트 분석 후 대기 플랜을 생성한다.
 
     AUTO 스케줄러 job과 수동 "지금 테스트 실행" 모두 이 함수로 플랜을 생성해 두 경로가
     동일한 계획 생성 로직(및 이메일 발송 파이프라인)을 공유하도록 한다.
     반환: (plan, buy_tokens, sell_tokens) | None(드리프트 없음) | TaxGateBlocked(세금영향 게이트 차단)
-    | DailyValueCapBlocked(하루 합산 거래한도 게이트 차단) | PlanGenerationInProgress(동시 요청 락 획득 실패).
+    | DailyValueCapBlocked(하루 합산 거래한도 게이트 차단) | PlanGenerationInProgress(동시 요청 락 획득 실패)
+    | SyncRequiredAfterExecution(접수 주문이 스냅샷에 미반영)
+    | SnapshotTooStale(`enforce_snapshot_max_age`일 때만, 무인 실행용).
     buy_tokens/sell_tokens는 [(market, raw_token), ...] — KR/US leg가 각각 있으면 최대 2개.
     """
     # 드리프트 수량은 환율로 계산된다 — 캐시가 비면(재시작 직후) 고정 fallback이 실환율처럼 쓰여 해외 매수 수량이
@@ -448,6 +541,12 @@ async def build_pending_plan_for_alert(
         return UsdRateUnavailable()
 
     buy_account_id = account_id_override or alert.account_id
+    if stale := await _check_snapshot_freshness(
+        alert, portfolio, buy_account_id, db, enforce_max_age=enforce_snapshot_max_age
+    ):
+        logger.info("rebalancing_plan_blocked_snapshot", alert_id=str(alert.id), reason=type(stale).__name__)
+        return stale
+
     prepared = await _drifting_items_for_alert(alert, portfolio, db, buy_account_id, cache)
     if prepared is None:
         return None

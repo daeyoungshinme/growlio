@@ -26,6 +26,8 @@ from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
     MarketSignalGateBlocked,
     PlanGenerationInProgress,
+    SnapshotTooStale,
+    SyncRequiredAfterExecution,
     TaxGateBlocked,
     UsdRateUnavailable,
     build_pending_plan_for_alert,
@@ -33,6 +35,7 @@ from app.services.rebalancing.plan_service import (
     notify_daily_value_cap_blocked,
     notify_market_signal_gate_blocked,
     notify_plan_generated,
+    notify_stale_snapshot_blocked,
     notify_tax_gate_blocked,
 )
 from app.utils.cache_keys import (
@@ -123,6 +126,16 @@ def _any_portfolio_market_open(portfolio) -> bool:
     return ("KR" in groups and is_korean_market_open()) or ("US" in groups and is_us_market_open())
 
 
+async def _notify_generation_blocked(generated, alert, portfolio, email, fcm_token, db: AsyncSession) -> None:
+    """게이트 차단을 사용자에게 알린다. 드리프트 없음·락 경합(수동 실행과 겹친 드문 경우)·미동기화는 조용히 넘어간다."""
+    if isinstance(generated, TaxGateBlocked):
+        await notify_tax_gate_blocked(alert, portfolio, generated, email, fcm_token, db)
+    elif isinstance(generated, DailyValueCapBlocked):
+        await notify_daily_value_cap_blocked(alert, portfolio, generated, email, fcm_token, db)
+    elif isinstance(generated, SnapshotTooStale):
+        await notify_stale_snapshot_blocked(alert, portfolio, generated, email, fcm_token, db)
+
+
 async def _process_one_alert(
     row,
     db: AsyncSession,
@@ -191,7 +204,9 @@ async def _process_one_alert(
         return False
 
     try:
-        generated = await build_pending_plan_for_alert(alert, portfolio, db, composite_level, cache=cache)
+        generated = await build_pending_plan_for_alert(
+            alert, portfolio, db, composite_level, cache=cache, enforce_snapshot_max_age=True
+        )
     except Exception:
         # 생성 중 실패 — 다음 tick에 재시도할 수 있게 claim을 푼다. 플랜이 commit된 뒤의 실패라면
         # last_triggered_at이 같은 트랜잭션으로 저장돼 already_fired_today가 막는다.
@@ -202,13 +217,12 @@ async def _process_one_alert(
     if not isinstance(generated, tuple):
         # 게이트 차단·생성할 주문 없음 — 지정 시각 알림은 다음 tick(±4분 창)에 다시 평가하고, 시각 없는 알림은
         # 그날 평가를 마친 것으로 claim을 유지한다. 수동 실행과의 락 경합은 평가가 아니므로 항상 푼다.
-        if not once_per_day or isinstance(generated, PlanGenerationInProgress | UsdRateUnavailable):
+        # 미동기화도 평가를 마친 게 아니다 — 동기화 후 같은 날 다시 평가할 수 있게 claim을 남기지 않는다(plans/110 A2)
+        if not once_per_day or isinstance(
+            generated, PlanGenerationInProgress | UsdRateUnavailable | SyncRequiredAfterExecution
+        ):
             await delete_durable(db, claim_key)
-        if isinstance(generated, TaxGateBlocked):
-            await notify_tax_gate_blocked(alert, portfolio, generated, email, fcm_token, db)
-        elif isinstance(generated, DailyValueCapBlocked):
-            await notify_daily_value_cap_blocked(alert, portfolio, generated, email, fcm_token, db)
-        # PlanGenerationInProgress: 수동 "지금 실행"과 거의 동시에 겹친 드문 경합 — 조용히 스킵
+        await _notify_generation_blocked(generated, alert, portfolio, email, fcm_token, db)
         return False
 
     plan_obj, buy_tokens, sell_tokens = generated

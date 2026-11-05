@@ -28,6 +28,7 @@ from app.services.notifications.email_templates.rebalancing import (
     rebalancing_execution_template,
     rebalancing_plan_execution_failed_template,
     rebalancing_plan_pending_template,
+    stale_snapshot_blocked_template,
     tax_impact_gate_blocked_template,
 )
 from app.services.notifications.email_templates.reports import (
@@ -51,6 +52,7 @@ __all__ = [
     "market_signal_change_template",
     "market_signal_daily_digest_template",
     "market_signal_gate_blocked_template",
+    "stale_snapshot_blocked_template",
     "monthly_report_template",
     "rebalancing_alert_template",
     "rebalancing_execution_template",

@@ -736,7 +736,7 @@ class TestRunAutoExecution:
 
         call_count = 0
 
-        async def _gen_side_effect(alert, portfolio, db, composite_level, cache=None):
+        async def _gen_side_effect(alert, portfolio, db, composite_level, cache=None, **_kwargs):
             nonlocal call_count
             result = None if call_count == 0 else (_make_plan(), [("KR", "buy-token")], [])
             call_count += 1

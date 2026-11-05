@@ -170,7 +170,7 @@ class TestUpdateAccountCashTransaction:
 
         with (
             patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
-            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch("app.api.v1.assets.require_live_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",
                 AsyncMock(return_value=(latest_snap, [])),
@@ -201,7 +201,7 @@ class TestUpdateAccountCashTransaction:
 
         with (
             patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
-            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch("app.api.v1.assets.require_live_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",
                 AsyncMock(return_value=(latest_snap, [])),
@@ -231,7 +231,7 @@ class TestUpdateAccountCashTransaction:
 
         with (
             patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
-            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch("app.api.v1.assets.require_live_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",
                 AsyncMock(return_value=(latest_snap, [])),
@@ -258,7 +258,7 @@ class TestUpdateAccountCashTransaction:
 
         with (
             patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
-            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch("app.api.v1.assets.require_live_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",
                 AsyncMock(return_value=(None, [])),
@@ -288,7 +288,7 @@ class TestUpdateAccountCashTransaction:
 
         with (
             patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
-            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch("app.api.v1.assets.require_live_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",
                 AsyncMock(return_value=(latest_snap, [])),
@@ -353,7 +353,7 @@ class TestUpdateAccountManualStockSnapshotConsistency:
 
         with (
             patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
-            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch("app.api.v1.assets.require_live_usd_krw", AsyncMock(return_value=1_300.0)),
             patch("app.api.v1.assets.get_latest_snapshot_with_positions", AsyncMock(side_effect=fake_get_latest)),
             patch(
                 "app.services.accounts.snapshot_service._upsert_snapshot",

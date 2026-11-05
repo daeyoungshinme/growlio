@@ -11,7 +11,7 @@ from app.exceptions import BadRequestError
 from app.models.asset import Position as DBPosition
 from app.providers.base import BalanceResult, BrokerProvider
 from app.providers.base import Position as ProviderPosition
-from app.utils.currency import fetch_usd_krw
+from app.utils.currency import fetch_usd_krw, sync_usd_krw_rate
 from app.utils.kst import today_kst
 from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount
 from app.utils.pnl import reprice_positions_krw
@@ -48,7 +48,8 @@ class ManualProvider(BrokerProvider):
             has_overseas = any(p.market in OVERSEAS_MARKETS for p in db_positions)
             usd_rate: float | None = None
             if has_overseas:
-                usd_rate = await fetch_usd_krw(cache, force_refresh=True) or None
+                # 환율이 없으면 해외 종목은 기존 현재가를 유지한다(reprice_positions_krw)
+                usd_rate = await fetch_usd_krw(cache, force_refresh=True, allow_fallback=False) or None
 
             reprice_positions_krw(db_positions, price_map, usd_rate)
 
@@ -60,7 +61,7 @@ class ManualProvider(BrokerProvider):
         pnl = value - invested if positions else 0.0
 
         if positions:
-            usd_rate_val = await fetch_usd_krw(cache)
+            usd_rate_val = await sync_usd_krw_rate(cache, needs_usd=bool(account.deposit_usd))
             deposit = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate_val
             amount_krw = (value if value else invested) + deposit
             account.manual_amount = amount_krw
@@ -69,7 +70,7 @@ class ManualProvider(BrokerProvider):
                 raise BadRequestError("부동산 시세(manual_amount)가 설정되지 않았습니다")
             amount_krw = _calc_net_asset_amount(account.manual_amount, account.asset_type, account.real_estate_details)
         elif account.deposit_krw is not None or account.deposit_usd is not None:
-            usd_rate2 = await fetch_usd_krw(cache)
+            usd_rate2 = await sync_usd_krw_rate(cache, needs_usd=bool(account.deposit_usd))
             amount_krw = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate2
         else:
             amount_krw = float(account.manual_amount or 0)

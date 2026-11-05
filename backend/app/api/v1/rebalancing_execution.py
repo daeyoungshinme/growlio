@@ -90,6 +90,10 @@ _QUICK_EXECUTE_MESSAGES: dict[QuickExecuteStatus, Callable[[QuickExecuteOutcome]
     QuickExecuteStatus.USD_RATE_UNAVAILABLE: lambda _o: (
         "환율을 불러오지 못해 해외 주문 수량을 계산할 수 없습니다. 잠시 후 다시 시도해주세요."
     ),
+    QuickExecuteStatus.SYNC_REQUIRED: lambda o: (
+        f"{o.sync_account_name} 계좌의 최근 주문이 아직 잔고에 반영되지 않았습니다. "
+        "계좌를 동기화한 뒤 다시 실행해주세요. 같은 주문이 두 번 나가는 것을 막기 위한 확인입니다."
+    ),
     QuickExecuteStatus.NO_DRIFT: lambda _o: "포트폴리오가 이미 균형을 이루고 있거나 실행할 주문이 없습니다.",
     QuickExecuteStatus.PLAN_GENERATED: _plan_generated_message,
 }

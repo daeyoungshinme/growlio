@@ -27,6 +27,8 @@ from app.services.rebalancing.order_builder import is_alert_blocked_by_market_ga
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
     PlanGenerationInProgress,
+    SnapshotTooStale,
+    SyncRequiredAfterExecution,
     TaxGateBlocked,
     UsdRateUnavailable,
     build_pending_plan_for_alert,
@@ -44,6 +46,7 @@ class QuickExecuteStatus(StrEnum):
     DAILY_CAP_BLOCKED = "DAILY_CAP_BLOCKED"
     GENERATION_IN_PROGRESS = "GENERATION_IN_PROGRESS"
     USD_RATE_UNAVAILABLE = "USD_RATE_UNAVAILABLE"
+    SYNC_REQUIRED = "SYNC_REQUIRED"
     NO_DRIFT = "NO_DRIFT"
     PLAN_GENERATED = "PLAN_GENERATED"
 
@@ -58,6 +61,7 @@ class QuickExecuteOutcome:
     email_sent: bool = False
     has_email: bool = False
     plan_id: uuid.UUID | None = None
+    sync_account_name: str | None = None
     buy_count: int = 0
     sell_count: int = 0
 
@@ -171,6 +175,8 @@ async def quick_execute_plan(
         return QuickExecuteOutcome(QuickExecuteStatus.GENERATION_IN_PROGRESS)
     if isinstance(generated, UsdRateUnavailable):
         return QuickExecuteOutcome(QuickExecuteStatus.USD_RATE_UNAVAILABLE)
+    if isinstance(generated, SyncRequiredAfterExecution | SnapshotTooStale):
+        return QuickExecuteOutcome(QuickExecuteStatus.SYNC_REQUIRED, sync_account_name=generated.account_name)
     if generated is None:
         return QuickExecuteOutcome(QuickExecuteStatus.NO_DRIFT)
     plan, buy_tokens, sell_tokens = generated

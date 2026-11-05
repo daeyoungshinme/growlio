@@ -11,16 +11,16 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 
     app_env: str = "development"
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/growlio"
+    database_url: str = Field("postgresql+asyncpg://postgres:postgres@localhost:5432/growlio", repr=False)
 
-    kis_cred_encryption_key: str  # 32-byte hex (64자), AES-256 암호화 키
+    kis_cred_encryption_key: str = Field(repr=False)  # 32-byte hex (64자), AES-256 암호화 키
 
     allowed_origins: str = "http://localhost:5173"
 
     # Supabase
     supabase_project_url: str = ""
-    supabase_anon_key: str = ""
-    supabase_service_role_key: str = ""
+    supabase_anon_key: str = Field("", repr=False)
+    supabase_service_role_key: str = Field("", repr=False)
 
     # 외부 API 동시 호출 제한 및 캐시 설정
     api_semaphore_limit: int = 5
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     # 축소한다(0으로 줄어들면 해당 주문은 건너뜀). 계산 버그로 인한 과다 주문을 막는 안전장치.
     auto_rebalancing_max_order_value_krw: float = 50_000_000.0
 
-    migration_database_url: str = ""  # Alembic 전용 Direct connection (비워두면 DATABASE_URL 사용)
+    migration_database_url: str = Field("", repr=False)  # Alembic 전용 Direct connection (비워두면 DATABASE_URL 사용)
 
     # DB 커넥션 풀 설정 — 과거 PgBouncer session mode(포트 5432, 프로젝트 전체 15 상한) 기준으로
     # 총합 7(pool_size+max_overflow)로 여유를 뒀던 값. 현재 운영은 transaction pooler(6543)를
@@ -58,28 +58,28 @@ class Settings(BaseSettings):
     database_pool_timeout: int = 30
     slow_query_ms: int = 200  # 이 임계값(ms) 초과 쿼리는 경고 로그 출력
 
-    dart_api_key: str = ""  # .env의 DART_API_KEY로 설정 (opendart.fss.or.kr)
+    dart_api_key: str = Field("", repr=False)  # .env의 DART_API_KEY로 설정 (opendart.fss.or.kr)
 
-    fred_api_key: str = ""  # fred.stlouisfed.org — 미국 경제지표 (무료 API 키)
+    fred_api_key: str = Field("", repr=False)  # fred.stlouisfed.org — 미국 경제지표 (무료 API 키)
 
     # 이메일 알림 (Resend HTTP API)
-    resend_api_key: str = ""
+    resend_api_key: str = Field("", repr=False)
     email_from: str = "growlio@example.com"
     email_timeout: int = 10  # 이메일 API 요청 타임아웃(초)
 
     frontend_url: str = "http://localhost:5173"
 
     # Sentry 에러 추적 (비어 있으면 비활성화)
-    sentry_dsn: str = ""
+    sentry_dsn: str = Field("", repr=False)
     # release 태그 — CI/CD에서 git SHA 등으로 주입. 비어 있으면 미설정.
     # Render는 SENTRY_RELEASE를 채우지 않으므로 Render가 자동 주입하는 RENDER_GIT_COMMIT으로 폴백한다(plans/95 D)
     sentry_release: str = Field(default="", validation_alias=AliasChoices("SENTRY_RELEASE", "RENDER_GIT_COMMIT"))
 
     # Prometheus /metrics 엔드포인트 보호 토큰 (비어 있으면 인증 없음)
-    metrics_token: str = ""
+    metrics_token: str = Field("", repr=False)
 
     # FCM 푸시 알림 — 서비스 계정 JSON 전체 문자열 (비어 있으면 푸시 비활성화)
-    firebase_credentials_json: str = ""
+    firebase_credentials_json: str = Field("", repr=False)
 
     @property
     def allowed_origins_list(self) -> list[str]:

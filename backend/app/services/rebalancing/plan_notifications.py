@@ -20,7 +20,12 @@ from app.models.rebalancing_plan import RebalancingPlan
 from app.models.user import User, UserSettings
 from app.services.alerts._dispatch import send_push_safely
 from app.services.alerts.alert_service import save_alert_history
-from app.services.rebalancing.plan_generation import DailyValueCapBlocked, MarketSignalGateBlocked, TaxGateBlocked
+from app.services.rebalancing.plan_generation import (
+    DailyValueCapBlocked,
+    MarketSignalGateBlocked,
+    SnapshotTooStale,
+    TaxGateBlocked,
+)
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -251,6 +256,46 @@ async def notify_market_signal_gate_blocked(
             f"적립 매수 보류(전술 방어 국면): {portfolio.name}"
             if tactical
             else f"리밸런싱 자동화 보류(시장신호 게이트): {portfolio.name} — 현재 신호 {blocked.composite_level}"
+        ),
+        fcm_token=fcm_token,
+    )
+
+
+async def notify_stale_snapshot_blocked(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    blocked: SnapshotTooStale,
+    email: str | None,
+    fcm_token: str | None,
+    db: AsyncSession,
+) -> None:
+    """동기화가 오래 끊겨 AUTO 계획을 만들지 않았음을 알린다 — 같은 알림에 대해 하루 1회만 발송."""
+    from app.services.notifications.email_service import send_stale_snapshot_blocked_email
+    from app.utils.cache_keys import TTL_STALE_SNAPSHOT_ALERT_SENT, stale_snapshot_alert_sent_key
+
+    await _notify_gate_blocked(
+        alert,
+        portfolio,
+        db,
+        dedup_key=stale_snapshot_alert_sent_key(alert.id, today_kst().isoformat()),
+        ttl=TTL_STALE_SNAPSHOT_ALERT_SENT,
+        event_prefix="stale_snapshot_blocked",
+        send_email=(
+            (
+                lambda: send_stale_snapshot_blocked_email(
+                    email, portfolio.name, blocked.account_name, blocked.days_since_sync
+                )
+            )
+            if email
+            else _no_email
+        ),
+        push_body=(
+            f"{blocked.account_name} 계좌가 {blocked.days_since_sync}일째 동기화되지 않아 이번 계획을 만들지 않았어요."
+        ),
+        push_type="REBALANCING_STALE_SNAPSHOT_BLOCKED",
+        history_message=(
+            f"리밸런싱 자동화 보류(동기화 끊김): {portfolio.name} — "
+            f"{blocked.account_name} 계좌 {blocked.days_since_sync}일째 미동기화"
         ),
         fcm_token=fcm_token,
     )

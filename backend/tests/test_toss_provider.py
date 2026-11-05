@@ -60,7 +60,7 @@ class TestTossProviderSync:
             patch("app.providers.toss_provider.decrypt", side_effect=["id", "secret"]),
             patch("app.toss.auth.get_access_token", new=AsyncMock(return_value="tok-1")),
             patch("app.toss.balance.get_balance", new=AsyncMock(return_value=_balance())),
-            patch("app.providers.toss_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.toss_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -98,7 +98,7 @@ class TestTossProviderSync:
             patch("app.providers.toss_provider.decrypt", side_effect=["id", "secret"]),
             patch("app.toss.auth.get_access_token", side_effect=_fake_get_token),
             patch("app.toss.balance.get_balance", side_effect=_fake_get_balance),
-            patch("app.providers.toss_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.toss_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -140,7 +140,7 @@ class TestTossProviderSync:
             patch("app.providers.toss_provider.decrypt", side_effect=["id", "secret"]),
             patch("app.toss.auth.get_access_token", new=AsyncMock(return_value="tok-1")),
             patch("app.toss.balance.get_balance", new=AsyncMock(return_value=bal)),
-            patch("app.providers.toss_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.toss_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
             patch(
                 "app.providers._overseas_name_enrichment.resolve_ticker_meta",
                 new=AsyncMock(return_value=("Apple Inc.", "NASDAQ")),
@@ -172,7 +172,7 @@ class TestTossProviderSync:
                 "app.toss.balance.get_balance",
                 new=AsyncMock(side_effect=TossApiError("edge-blocked", "blocked", status_code=403)),
             ),
-            patch("app.providers.toss_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.toss_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
             pytest.raises(ProviderApiError) as exc,
         ):
             await provider.sync(account, db=AsyncMock(), cache=mock_cache)

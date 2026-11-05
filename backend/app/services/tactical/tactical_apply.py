@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 
 def check_apply_allowed(
-    portfolio: Portfolio, strategy: TacticalStrategy | None, fraction: float
+    portfolio: Portfolio, strategy: TacticalStrategy | None, fraction: float, expected_regime: str | None = None
 ) -> tuple[TacticalStrategy, Regime]:
     """제안 비중 적용 전 검증 — None이 아님이 확인된 전략과 적용할 확정 국면을 돌려준다.
 
@@ -45,6 +45,8 @@ def check_apply_allowed(
     regime = strategy.last_regime
     if regime not in REGIMES:
         raise ConflictError(detail="아직 국면이 확정되지 않았습니다. 잠시 후 다시 시도해주세요.")
+    if expected_regime is not None and expected_regime != regime:
+        raise ConflictError(detail="그 사이 국면이 바뀌었어요. 새 제안 비중을 확인한 뒤 다시 적용해주세요.")
     if fraction < 1 and not is_tactical_managed(portfolio):
         raise BadRequestError(
             detail="전술 자산 외 종목이 있는 포트폴리오는 나눠서 적용할 수 없습니다. 한 번에 적용해주세요."
@@ -117,9 +119,17 @@ def pending_action(strategy: TacticalStrategy, portfolio: Portfolio) -> Literal[
 
 
 def interpolate_weights(current: dict[str, float], target: dict[str, float], fraction: float) -> dict[str, float]:
-    """현재 목표에서 제안 비중 쪽으로 `fraction`만큼 이동(0.1%p 단위). 반올림 오차는 현금이 흡수한다."""
+    """현재 목표에서 제안 비중 쪽으로 `fraction`만큼 이동(0.1%p 단위). 반올림 오차는 현금이 흡수한다.
+
+    현금이 없어 음수가 되면 0으로 두고 가장 큰 항목에서 뺀다 — 음수 현금은 저장 때 버려져 합계가 100.1이 된다.
+    """
     out = {a: round(current.get(a, 0.0) + (target.get(a, 0.0) - current.get(a, 0.0)) * fraction, 1) for a in target}
-    out["CASH"] = round(100.0 - sum(v for a, v in out.items() if a != "CASH"), 1)
+    cash = round(100.0 - sum(v for a, v in out.items() if a != "CASH"), 1)
+    if cash < 0:
+        largest = max((a for a in out if a != "CASH"), key=lambda a: out[a])
+        out[largest] = round(out[largest] + cash, 1)
+        cash = 0.0
+    out["CASH"] = cash
     return out
 
 
@@ -165,6 +175,18 @@ def needs_group_suggestions(
     weights = _weights_to_apply(portfolio, strategy, regime, fraction)
     existing = _existing_groups(portfolio)
     return any(weights.get(a, 0) > 0 and a not in existing for a in ASSET_GROUP_KEYS)
+
+
+def groups_removed_on_apply(portfolio: Portfolio, weights: dict[str, float] | None) -> list[str]:
+    """적용하면 사라지는 지수 그룹 이름 — 제안 비중이 0%인 자산의 기존 그룹. 비중이 돌아와도 대표·멤버 구성은 복원되지
+    않으므로 적용 전에 알린다(plans/110 A6)."""
+    if weights is None:
+        return []
+    return [
+        item.group_label or item.name
+        for asset, item in _existing_groups(portfolio).items()
+        if weights.get(asset, 0) <= 0
+    ]
 
 
 def _group_from_item(item: Any) -> _GroupSpec:

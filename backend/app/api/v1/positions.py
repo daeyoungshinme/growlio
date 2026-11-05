@@ -22,7 +22,7 @@ from app.services.market_data.price_service import fetch_prices_batch
 from app.services.portfolio._position_queries import fetch_manual_positions
 from app.utils.cache_invalidation import invalidate_asset_account_caches
 from app.utils.cache_keys import sync_lock_key
-from app.utils.currency import fetch_usd_krw
+from app.utils.currency import fetch_usd_krw, require_live_usd_krw
 from app.utils.inproc_lock import inproc_lock
 from app.utils.kst import today_kst
 from app.utils.pnl import calc_position_pnl, reprice_positions_krw
@@ -131,7 +131,7 @@ async def save_positions(
 
         usd_rate = 1.0
         if account.deposit_usd:
-            usd_rate = await fetch_usd_krw(cache)
+            usd_rate = await require_live_usd_krw(cache)
 
         snap = await _upsert_snapshot(
             db,
@@ -184,8 +184,12 @@ async def sync_position_prices(
 
         has_overseas = any(p.market in OVERSEAS_MARKETS for p in pos_objs)
         usd_rate: float | None = None
-        if has_overseas or account.deposit_usd:
-            usd_rate = await fetch_usd_krw(cache, force_refresh=True) or None
+        if account.deposit_usd:
+            # 달러 예수금은 스냅샷 합계에 들어가므로 환율 없이는 저장하지 않는다(`or 1`로 $1=1원이 되는 경로 차단)
+            usd_rate = await require_live_usd_krw(cache, force_refresh=True)
+        elif has_overseas:
+            # 환율이 없으면 해외 종목은 기존 현재가를 유지한다(reprice_positions_krw)
+            usd_rate = await fetch_usd_krw(cache, force_refresh=True, allow_fallback=False) or None
 
         reprice_positions_krw(pos_objs, price_map, usd_rate)
         updated_dicts = [p.to_dict() for p in pos_objs]

@@ -39,6 +39,7 @@ from app.services.notifications.email_templates import (
     rebalancing_plan_execution_failed_template,
     rebalancing_plan_pending_template,
     recommendation_drift_alert_template,
+    stale_snapshot_blocked_template,
     stock_price_alert_template,
     tactical_dip_template,
     tactical_regime_change_template,
@@ -221,6 +222,18 @@ async def send_market_signal_gate_blocked_email(
         to_email,
         lambda: market_signal_gate_blocked_template(portfolio_name, composite_level, market_condition_mode),
         event="market_signal_gate_blocked",
+        portfolio=portfolio_name,
+    )
+
+
+async def send_stale_snapshot_blocked_email(
+    to_email: str, portfolio_name: str, account_name: str, days_since_sync: int
+) -> bool:
+    """동기화 끊김으로 AUTO 계획 생성이 보류됐을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
+    return await _send_templated(
+        to_email,
+        lambda: stale_snapshot_blocked_template(portfolio_name, account_name, days_since_sync),
+        event="stale_snapshot_blocked",
         portfolio=portfolio_name,
     )
 

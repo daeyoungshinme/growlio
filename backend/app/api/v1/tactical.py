@@ -133,15 +133,22 @@ async def apply_tactical_weights(
     """
     portfolio = await tactical.get_owned_portfolio(portfolio_id, current_user.id, db)
     fraction = body.fraction if body else 1.0
+    expected_regime = body.expected_regime if body else None
     strategy, regime = tactical.check_apply_allowed(
-        portfolio, await tactical.get_strategy(portfolio_id, current_user.id, db), fraction
+        portfolio, await tactical.get_strategy(portfolio_id, current_user.id, db), fraction, expected_regime
     )
 
+    # 그룹 제안은 오래 걸릴 수 있어 락 밖에서 구하고, 항목을 교체하기 직전에 잠그고 다시 읽어 판정한다 —
+    # 그 사이 저장된 편집을 옛 값으로 덮어쓰거나 동시 적용이 겹쳐 비중 합이 200%가 되지 않게(plans/110 A4)
     cache = await get_cache_store()
     suggestions = (
         await tactical.group_suggestions_for(portfolio, current_user.id, db, cache)
         if tactical.needs_group_suggestions(portfolio, strategy, regime, fraction)
         else None
+    )
+    portfolio = await tactical.get_owned_portfolio(portfolio_id, current_user.id, db, lock=True)
+    strategy, regime = tactical.check_apply_allowed(
+        portfolio, await tactical.get_strategy(portfolio_id, current_user.id, db, lock=True), fraction, expected_regime
     )
     await tactical.apply_regime_to_portfolio(
         portfolio, strategy, regime, db, fraction=fraction, group_suggestions=suggestions

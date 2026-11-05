@@ -70,7 +70,7 @@ from app.services.external_queries import (
 from app.services.goal.goal_return_solver import build_feasibility_preview
 from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_monthly_trend
 from app.utils.cache_invalidation import invalidate_asset_account_caches
-from app.utils.currency import fetch_usd_krw
+from app.utils.currency import require_live_usd_krw
 from app.utils.kst import KST
 from app.utils.numbers import opt_float
 
@@ -285,7 +285,7 @@ async def create_external_transaction(
         account.manual_updated_at = datetime.now(UTC)
 
         cache = await get_cache_store()
-        usd_rate = await fetch_usd_krw(cache)
+        usd_rate = await require_live_usd_krw(cache) if account.deposit_usd else 1.0
         latest_snap, pos_list = await get_latest_snapshot_with_positions(db, account.id)
         await write_manual_deposit_snapshot(db, account, latest_snap=latest_snap, positions=pos_list, usd_rate=usd_rate)
 

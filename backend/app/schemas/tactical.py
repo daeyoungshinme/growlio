@@ -30,3 +30,5 @@ class TacticalStrategyUpsert(BaseModel):
 class TacticalApplyRequest(BaseModel):
     # 1이면 제안 비중 그대로, 0.5면 현재 목표에서 제안 쪽으로 절반만(분할 적용)
     fraction: float = Field(1.0, gt=0, le=1)
+    # 화면에서 본 확정 국면 — 그 사이 국면이 바뀌었으면 다른 비중을 저장하지 않고 409(구버전 앱은 안 보내므로 선택)
+    expected_regime: str | None = None

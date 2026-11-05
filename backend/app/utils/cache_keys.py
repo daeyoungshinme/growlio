@@ -60,6 +60,7 @@ TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감�
 TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저당 1일 1회 제한 플래그
 TTL_TAX_IMPACT_GATE_ALERT_SENT = 86400  # 세금영향 게이트로 AUTO 계획 생성이 보류됐다는 알림, 알림당 1일 1회 제한 플래그
 TTL_MARKET_SIGNAL_GATE_ALERT_SENT = 86400  # 시장신호 게이트로 AUTO 계획 생성 보류 알림, 알림당 1일 1회 제한 플래그
+TTL_STALE_SNAPSHOT_ALERT_SENT = 86400  # 동기화 끊김으로 AUTO 계획 생성 보류 알림, 알림당 1일 1회 제한 플래그
 TTL_DAILY_VALUE_CAP_ALERT_SENT = 86400  # 하루 합산 거래한도 게이트로 AUTO 계획 생성 보류 알림, 유저당 1일 1회
 TTL_MONTHLY_REPORT_SENT = 45 * 24 * 3600  # 월간 리포트 유저+대상월 1회 발송 플래그 (다음 달 실행 전까지 유지)
 TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
@@ -416,6 +417,11 @@ def market_signal_gate_alert_sent_key(alert_id: uuid.UUID, day: str) -> str:
     `tax_impact_gate_alert_sent_key`와 동일한 이유(5분 간격 job의 매 tick 재차단) — 알림당 하루 1건만 발송한다.
     """
     return f"{_env_prefix()}rebalancing:market_gate_sent:{alert_id}:{day}"
+
+
+def stale_snapshot_alert_sent_key(alert_id: uuid.UUID, day: str) -> str:
+    """동기화 끊김으로 AUTO 계획 생성이 보류됐다는 알림이 발송된 알림+일자를 기록하는 키(중복 발송 억제)."""
+    return f"{_env_prefix()}rebalancing:stale_snapshot_sent:{alert_id}:{day}"
 
 
 def daily_value_cap_gate_alert_sent_key(user_id: uuid.UUID, day: str) -> str:

@@ -113,7 +113,7 @@ class TestKISProviderSync:
                 "app.providers.kis_provider.get_overseas_balance",
                 new=AsyncMock(return_value=_empty_overseas()),
             ),
-            patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kis_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -139,7 +139,7 @@ class TestKISProviderSync:
                 "app.providers.kis_provider.get_overseas_balance",
                 new=AsyncMock(return_value=_overseas_balance()),
             ),
-            patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kis_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
             patch(
                 "app.kis.overseas_quote.kis_request",
                 new=AsyncMock(return_value={"output": {"last": "200", "rate": "1.25"}}),
@@ -173,7 +173,7 @@ class TestKISProviderSync:
                 "app.providers.kis_provider.get_overseas_balance",
                 new=AsyncMock(side_effect=RuntimeError("KIS 해외잔고 조회 실패 거래소: AMEX")),
             ),
-            patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kis_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -213,7 +213,7 @@ class TestKISProviderSync:
                 "app.providers.kis_provider.get_overseas_balance",
                 new=AsyncMock(return_value=_empty_overseas()),
             ),
-            patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kis_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -248,7 +248,7 @@ class TestKISProviderSync:
                 "app.providers.kis_provider.get_overseas_balance",
                 new=AsyncMock(return_value=_overseas_balance()),
             ),
-            patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kis_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
             patch(
                 "app.providers._overseas_name_enrichment.resolve_ticker_meta",
                 new=AsyncMock(return_value=("Apple Inc.", "NASDAQ")),
