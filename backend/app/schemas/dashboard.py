@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 class DashboardResponse(BaseModel):
     total_assets_krw: float
+    investable_assets_krw: float | None = None  # 부동산 제외 — goal_achievement_pct의 분자
     asset_allocation: list[dict]
     goal_amount: float | None
     goal_achievement_pct: float | None

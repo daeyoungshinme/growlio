@@ -17,7 +17,6 @@ interface Props {
 
 export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) {
   const {
-    months_to_goal,
     expected_goal_date,
     actual_expected_goal_date,
     current_progress_pct,
@@ -108,15 +107,10 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
           )}
         </div>
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">목표 달성 예상</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">계획 기준 달성 예상</p>
           <p className="text-xl font-bold text-gray-900 dark:text-gray-50">
-            {expected_goal_date ?? "—"}
+            {expected_goal_date ? fmtMonth(expected_goal_date) : "—"}
           </p>
-          {months_to_goal && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              약 {months_to_goal}개월 후
-            </p>
-          )}
         </div>
         <div className="col-span-2 sm:col-span-1">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">계획 대비</p>

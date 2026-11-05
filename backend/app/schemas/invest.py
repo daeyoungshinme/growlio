@@ -35,7 +35,7 @@ class GoalTimeline(BaseModel):
     months_to_goal: int | None
     expected_goal_date: str | None  # "2039-01" — 최초 계획 기준 달성 예정일
     actual_expected_goal_date: str | None = None  # "2037-04" — 현재 실적 기준 달성 예상일
-    current_progress_pct: float | None  # 대시보드 goal_achievement_pct와 동일 소스(총자산÷목표금액)
+    current_progress_pct: float | None  # 대시보드 goal_achievement_pct와 동일 소스(부동산 제외 투자자산÷목표금액)
     on_track: bool | None
     lead_lag_months: int | None  # 양수=앞서는 개월, 음수=뒤처지는 개월
     # 현재 페이스보다 N년 더 빨리 달성하려면 월 적립액을 얼마로 늘려야 하는지 역산 — 목표 미달성 시에만 채워짐

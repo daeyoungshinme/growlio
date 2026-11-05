@@ -150,6 +150,13 @@ describe("GoalTimelineCard", () => {
     expect(screen.getByText("65.5%")).toBeDefined();
   });
 
+  it("시작일부터의 총 기간을 남은 기간처럼 표시하지 않고, 계획 기준 예상일을 연월로 보여 준다", async () => {
+    renderCard(mockTimeline, 100000000);
+    expect(await screen.findByText("계획 기준 달성 예상")).toBeDefined();
+    expect(screen.getByText("2026년 1월")).toBeDefined();
+    expect(screen.queryByText(/개월 후/)).toBeNull();
+  });
+
   it("renders 앞서고 있음 when lead > 0", async () => {
     renderCard(mockTimeline, 100000000);
     expect(await screen.findByText(/개월 앞서고 있음/)).toBeDefined();

@@ -19,6 +19,8 @@ export interface DividendMonthlyBreakdown {
 
 export interface DashboardData {
   total_assets_krw: number;
+  /** 부동산 제외 — 목표 진행률의 분자. 옛 persist 캐시에는 없을 수 있다 */
+  investable_assets_krw?: number | null;
   asset_allocation: DashboardAllocationItem[];
   goal_amount: number | null;
   goal_achievement_pct: number | null;

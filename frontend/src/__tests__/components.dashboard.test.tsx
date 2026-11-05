@@ -73,6 +73,7 @@ function renderGoalCard(ui: React.ReactElement) {
 
 const baseDashboard: DashboardData = {
   total_assets_krw: 150_000_000,
+  investable_assets_krw: 150_000_000,
   cumulative_return_pct: 12.5,
   asset_allocation: [],
   deposit_achievement_pct: 75.0,
@@ -169,6 +170,25 @@ describe("InvestmentGoalCard", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
     expect(screen.getAllByText("15.0%")[0]).toBeInTheDocument();
     expect(screen.getAllByText(/목표까지 8\.50억원 남음/)[0]).toBeInTheDocument();
+  });
+
+  it("남은 금액은 진행률과 같은 투자자산 기준이다 — 부동산으로 총자산이 목표를 넘어도 달성이 아니다", () => {
+    const data = {
+      ...baseDashboard,
+      total_assets_krw: 1_500_000_000,
+      investable_assets_krw: 600_000_000,
+      goal_achievement_pct: 60,
+    };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
+    expect(screen.getAllByText(/목표까지 4\.00억원 남음/)[0]).toBeInTheDocument();
+    expect(screen.queryByText(/달성$/)).not.toBeInTheDocument();
+  });
+
+  it("투자자산 값이 없는 옛 캐시 응답이면 남은 금액·달성 문구를 표시하지 않는다", () => {
+    const data = { ...baseDashboard, investable_assets_krw: undefined };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
+    expect(screen.queryByText(/목표까지/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/달성$/)).not.toBeInTheDocument();
   });
 
   it("연간 입금 항목에 현재/목표 금액 텍스트를 표시한다", () => {
@@ -277,12 +297,12 @@ describe("InvestmentGoalCard", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} dcaData={makeDcaData("2045-03")} />);
     // 헤드라인(진행률)은 접힘 상태에도 모바일+데스크탑 양쪽에 항상 보인다
     expect(screen.getAllByText("15.0%").length).toBeGreaterThanOrEqual(2);
-    // 접힘 상태: "실제 달성 예상"은 데스크탑 블록에만 존재(1개) — 모바일 상세는 아직 숨김
-    expect(screen.getAllByText("실제 달성 예상")).toHaveLength(1);
+    // 접힘 상태: "실제 기준 달성 예상"은 데스크탑 블록에만 존재(1개) — 모바일 상세는 아직 숨김
+    expect(screen.getAllByText("실제 기준 달성 예상")).toHaveLength(1);
 
     fireEvent.click(screen.getByText("달성 예상일 · 진행 상세"));
     // 펼침 후에는 모바일 상세 블록도 렌더되어 2곳에 존재
-    expect(screen.getAllByText("실제 달성 예상")).toHaveLength(2);
+    expect(screen.getAllByText("실제 기준 달성 예상")).toHaveLength(2);
   });
 });
 

@@ -36,9 +36,9 @@ function ProgressHeadline({
       >
         {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
       </p>
-      {goalAmountDisplay != null && hasData && (
+      {goalAmountDisplay != null && hasData && goalGapAmount != null && (
         <p className={`text-xs mt-0.5 text-gray-500 dark:text-gray-400`}>
-          {goalGapAmount != null && goalGapAmount > 0
+          {goalGapAmount > 0
             ? `목표까지 ${fmtKrw(goalGapAmount)} 남음`
             : `목표 ${fmtKrw(goalAmountDisplay)} 달성`}
         </p>
@@ -51,6 +51,11 @@ function expectedDateLabel(timeline: GoalTimeline): string {
   if (timeline?.actual_expected_goal_date) return fmtMonth(timeline.actual_expected_goal_date);
   if (timeline?.expected_goal_date) return fmtMonth(timeline.expected_goal_date);
   return "—";
+}
+
+/** 실적 기준 예상일이 없으면 계획 기준 날짜를 보여 주므로 라벨도 그에 맞춘다 */
+function expectedDateCaption(timeline: GoalTimeline): string {
+  return timeline?.actual_expected_goal_date ? "실제 기준 달성 예상" : "계획 기준 달성 예상";
 }
 
 function hasOutlook({ timeline, currentProgressPct }: OutlookProps): boolean {
@@ -76,7 +81,9 @@ export function MobileDcaOutlook({
             buttonClassName={`mt-1 w-full flex items-center justify-between ${TOUCH_HEIGHT_MIN} text-xs text-gray-500 dark:text-gray-400 font-medium`}
           >
             <div className="flex items-end justify-between">
-              <p className="text-xs text-gray-400 dark:text-gray-500">실제 달성 예상</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                {expectedDateCaption(timeline)}
+              </p>
               <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                 {expectedDateLabel(timeline)}
               </p>
@@ -154,16 +161,11 @@ export function DesktopDcaOutlook(props: OutlookProps) {
         <ProgressHeadline size="lg" {...props} />
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-0.5">
-            실제 달성 예상
+            {expectedDateCaption(timeline)}
           </p>
           <p className="text-base font-semibold text-blue-600 dark:text-blue-400">
             {expectedDateLabel(timeline)}
           </p>
-          {timeline?.months_to_goal != null && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              약 {timeline.months_to_goal}개월 후
-            </p>
-          )}
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-0.5">계획 대비</p>

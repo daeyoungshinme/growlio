@@ -269,7 +269,10 @@ def _build_yearly_achievements(projection_months: list[dict]) -> list[dict[str, 
 
 
 def _calc_months_to_goal(initial_value: float, pmt: float, r: float, goal_amount: float) -> int | None:
-    """현재 계획 기준 목표 달성까지 남은 개월 수. 이미 달성했으면 0."""
+    """initial_value에서 출발해 목표에 닿기까지 걸리는 개월 수. 이미 달성했으면 0.
+
+    초기 투자금을 넘기면 시작일부터의 총 기간이고, 현재 자산을 넘겨야 오늘부터 남은 기간이다.
+    """
     if initial_value >= goal_amount:
         return 0
     for n in range(1, _DCA_MAX_MONTHS + 1):
