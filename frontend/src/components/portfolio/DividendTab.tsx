@@ -7,6 +7,7 @@ import SegmentedControl from "@/components/common/SegmentedControl";
 
 const TreemapChart = lazy(() => import("./TreemapChart"));
 const MonthlyDividendChart = lazy(() => import("./MonthlyDividendChart"));
+const YearlyDividendChart = lazy(() => import("./YearlyDividendChart"));
 import MonthlyTickerDetail from "./MonthlyTickerDetail";
 import type { DividendByTicker, DividendYield } from "@/types";
 import {
@@ -399,12 +400,6 @@ export default function DividendTab({
                 </tbody>
               </table>
             </div>
-            <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">합계</span>
-              <span className="text-sm font-semibold text-gray-900 dark:text-gray-50">
-                {fmtKrwShort(totalEstimated)}원
-              </span>
-            </div>
           </div>
         </div>
       )}
@@ -431,6 +426,9 @@ export default function DividendTab({
             monthlyEstimate={monthlyEstimateByMonth[selectedMonth - 1] ?? 0}
             monthTickerActualMap={monthTickerActualMap}
           />
+          <Suspense fallback={<SkeletonCard rows={3} />}>
+            <YearlyDividendChart />
+          </Suspense>
           <Link
             to={investPlanUrl("배당 계획")}
             className={`flex items-center ${TOUCH_HEIGHT_MIN} text-sm text-blue-600 dark:text-blue-400 hover:underline`}

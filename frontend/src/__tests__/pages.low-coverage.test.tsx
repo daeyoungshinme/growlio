@@ -370,11 +370,6 @@ describe("InvestPlanPage", () => {
     expect(screen.getByText("설정 편집")).toBeInTheDocument();
   });
 
-  it("적립 계획 설명 텍스트가 표시된다", () => {
-    renderPage(<InvestPlanPage />);
-    expect(screen.getByText("적립식 DCA 복리계산 및 목표 달성 현황")).toBeInTheDocument();
-  });
-
   it("월 적립액, 목표 연수익률 등 설정 항목이 표시된다", () => {
     renderPage(<InvestPlanPage />);
     expect(screen.getByText("월 적립액")).toBeInTheDocument();

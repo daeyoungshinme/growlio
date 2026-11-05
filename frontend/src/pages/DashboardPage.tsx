@@ -19,8 +19,6 @@ import { assetManagementUrl } from "@/utils/tabUrl";
 
 const ActionItemsCard = lazy(() => import("../components/dashboard/ActionItemsCard"));
 
-const InvestmentSnapshotCard = lazy(() => import("../components/dashboard/InvestmentSnapshotCard"));
-
 const AllocationHistoryCard = lazy(() => import("../components/dashboard/AllocationHistoryCard"));
 
 function OnboardingChecklist() {
@@ -177,6 +175,7 @@ export default function DashboardPage() {
         {/* Hero: 자산 현황 */}
         <ErrorBoundary variant="section">
           <HeroSummaryCard
+            overview={overview}
             data={data}
             exchangeRate={exchangeRate}
             dataUpdatedAt={dataUpdatedAt}
@@ -206,13 +205,6 @@ export default function DashboardPage() {
           ) : (
             <ChallengeEmptyStateCard />
           )}
-        </ErrorBoundary>
-
-        {/* 주식 투자 현황 (평가액·원금·손익) */}
-        <ErrorBoundary variant="section">
-          <Suspense fallback={<SkeletonCard />}>
-            <InvestmentSnapshotCard overview={overview} />
-          </Suspense>
         </ErrorBoundary>
 
         {/* 자산 추이 — 과거지향 정보라 최하단 유지. 목표·포트폴리오 모두 없는 완전 신규 유저는 추이 데이터가

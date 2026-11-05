@@ -1,16 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from "recharts";
 import { ArrowRight, CalendarRange, Settings2, TrendingUp } from "lucide-react";
 import { fetchDividendPlan } from "@/api/invest";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
-import { useThemeStore } from "@/stores/themeStore";
-import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
+import { fmtKrw, fmtPct } from "@/utils/format";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { MONTH_LABELS } from "@/utils/dividendUtils";
-import { summarizeAmounts } from "@/utils/chartSummary";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
@@ -24,9 +20,6 @@ interface Props {
 }
 
 export default function DividendPlanSection({ onOpenSettings }: Props) {
-  const { isDark } = useThemeStore();
-  const tooltipStyle = chartTooltipStyle(isDark);
-
   const { data, isLoading, isError } = useQuery({
     queryKey: QUERY_KEYS.dividendPlan,
     queryFn: fetchDividendPlan,
@@ -63,26 +56,16 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
     required_dividend_yield_pct,
     current_dividend_yield_pct,
     monthly_projected,
-    monthly_received,
-    yearly_received,
   } = data;
-
-  // 월별 실수령 맵 (YYYY-MM → amount)
-  const receivedByMonth: Record<number, number> = {};
-  for (const r of monthly_received) {
-    const monthNum = parseInt(r.month.split("-")[1] ?? "", 10);
-    receivedByMonth[monthNum] = (receivedByMonth[monthNum] ?? 0) + r.amount;
-  }
-
-  // 바차트 데이터: 예상 + 실수령 병합
-  const monthlyChartData = monthly_projected.map((p) => ({
-    name: MONTH_LABELS[p.month - 1],
-    예상: p.amount_krw,
-    실수령: receivedByMonth[p.month] ?? 0,
-  }));
 
   // 평균 예상 배당금 (약한 달 판정용)
   const avgProjected = monthly_projected.reduce((s, p) => s + p.amount_krw, 0) / 12;
+  const weakMonths =
+    avgProjected > 0
+      ? monthly_projected
+          .filter((p) => p.amount_krw < avgProjected * 0.5)
+          .map((p) => MONTH_LABELS[p.month - 1])
+      : [];
 
   const progressPct = goal_achievement_pct !== null ? Math.min(goal_achievement_pct, 100) : null;
 
@@ -339,148 +322,24 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
         </CollapsibleCard>
       )}
 
-      {/* 월별 배당 분포 */}
-      <div className="card">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">
-          월별 배당 분포
-        </h3>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
-          예상 배당금 기준. 약한 달(평균 50% 미만)은 연한 색으로 표시.
-        </p>
-        <div
-          className="h-[180px] sm:h-[220px]"
-          role="img"
-          aria-label={summarizeAmounts(
-            "월별 예상 배당 차트",
-            monthlyChartData.map((m) => ({ name: m.name ?? "", amount: m.예상 })),
-          )}
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyChartData} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
-              <XAxis
-                dataKey="name"
-                tick={chartTickStyle(isDark)}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tickFormatter={(v: number) => fmtKrwShort(v)}
-                tick={chartTickStyle(isDark)}
-                axisLine={false}
-                tickLine={false}
-                width={50}
-              />
-              <Tooltip
-                formatter={(v: number, name: string) => [fmtKrw(v), name]}
-                contentStyle={tooltipStyle.contentStyle}
-                labelStyle={tooltipStyle.labelStyle}
-                itemStyle={tooltipStyle.itemStyle}
-              />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="예상" name="예상" radius={[3, 3, 0, 0]}>
-                {monthlyChartData.map((_entry, i) => {
-                  const projected = monthly_projected[i]?.amount_krw ?? 0;
-                  const isWeak = avgProjected > 0 && projected < avgProjected * 0.5;
-                  return (
-                    <Cell
-                      key={`proj-${i}`}
-                      fill={
-                        isWeak ? (isDark ? "#93c5fd" : "#bfdbfe") : isDark ? "#3b82f6" : "#2563eb"
-                      }
-                    />
-                  );
-                })}
-              </Bar>
-              <Bar
-                dataKey="실수령"
-                name="실수령"
-                fill={isDark ? "#6ee7b7" : "#10b981"}
-                radius={[3, 3, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* 연도별 배당 추이 */}
-      {yearly_received.length > 0 && (
+      {/* 월별·연도별 차트는 실적 화면(자산 › 배당 › 월별 배당)에 있다 */}
+      {avgProjected > 0 && (
         <div className="card">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">
-            연도별 실수령 배당 추이
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">
+            배당이 약한 달
           </h3>
-          <div
-            className="h-[130px] sm:h-[160px]"
-            role="img"
-            aria-label={summarizeAmounts(
-              "연도별 실수령 배당 차트",
-              yearly_received.map((y) => ({ name: `${y.year}년`, amount: y.amount_krw })),
-            )}
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            {weakMonths.length > 0 ? weakMonths.join(", ") : "평균의 절반에 못 미치는 달이 없어요"}
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            예상 배당금이 월평균의 50% 미만인 달
+          </p>
+          <Link
+            to={portfolioUrl("배당", "월별 배당")}
+            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={yearly_received.map((y, i) => {
-                  const prev = i > 0 ? yearly_received[i - 1] : undefined;
-                  return {
-                    name: `${y.year}년`,
-                    배당: y.amount_krw,
-                    growth:
-                      prev && prev.amount_krw > 0
-                        ? ((y.amount_krw - prev.amount_krw) / prev.amount_krw) * 100
-                        : null,
-                  };
-                })}
-                margin={{ top: 0, right: 4, left: 0, bottom: 0 }}
-              >
-                <XAxis
-                  dataKey="name"
-                  tick={chartTickStyle(isDark)}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tickFormatter={(v: number) => fmtKrwShort(v)}
-                  tick={chartTickStyle(isDark)}
-                  axisLine={false}
-                  tickLine={false}
-                  width={50}
-                />
-                <Tooltip
-                  formatter={(v: number) => [fmtKrw(v), "실수령 배당"]}
-                  contentStyle={tooltipStyle.contentStyle}
-                  labelStyle={tooltipStyle.labelStyle}
-                  itemStyle={tooltipStyle.itemStyle}
-                />
-                <Bar dataKey="배당" fill={isDark ? "#34d399" : "#059669"} radius={[3, 3, 0, 0]}>
-                  {yearly_received.map((_y, i) => (
-                    <Cell key={`yr-${i}`} fill={isDark ? "#34d399" : "#059669"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-3">
-            {yearly_received.map((y, i) => {
-              const prev = yearly_received[i - 1];
-              const growth =
-                prev && prev.amount_krw > 0
-                  ? ((y.amount_krw - prev.amount_krw) / prev.amount_krw) * 100
-                  : null;
-              return (
-                <div key={y.year} className="text-xs">
-                  <span className="text-gray-500 dark:text-gray-400">{y.year}년 </span>
-                  <span className="font-medium text-gray-900 dark:text-gray-50">
-                    {fmtKrw(y.amount_krw)}
-                  </span>
-                  {growth !== null && (
-                    <span className={`ml-1 ${growth >= 0 ? "text-red-500" : "text-blue-500"}`}>
-                      {growth >= 0 ? "+" : ""}
-                      {growth.toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+            월별·연도별 차트 보기
+          </Link>
         </div>
       )}
 

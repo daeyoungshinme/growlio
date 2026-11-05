@@ -6,7 +6,7 @@ import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import GoalChipGrid from "./investmentGoal/GoalChipGrid";
-import { DesktopDcaOutlook, MobileDcaOutlook } from "./investmentGoal/DcaOutlook";
+import { DcaOutlook } from "./investmentGoal/DcaOutlook";
 import { buildGoalChips } from "./investmentGoal/goalChips";
 
 interface Props {
@@ -96,14 +96,8 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           showAll={showAllGoals}
           onToggleShowAll={toggleShowAllGoals}
         />
-        <MobileDcaOutlook
-          {...outlook}
-          detailOpen={dcaDetailOpen}
-          onToggleDetail={toggleDcaDetail}
-        />
+        <DcaOutlook {...outlook} detailOpen={dcaDetailOpen} onToggleDetail={toggleDcaDetail} />
       </div>
-
-      <DesktopDcaOutlook {...outlook} />
     </div>
   );
 }
