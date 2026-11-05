@@ -70,6 +70,7 @@ TTL_ETF_PROFILE_MISSING = 86400  # ETF 아님/데이터 없음 확정 1일 — �
 # Yahoo가 quoteType으로 "ETF 아님"(개별주 등)을 명시한 해외 종목은 바뀔 일이 없어
 # 프로필과 같은 7일(TTL_ETF_PROFILE)을 쓴다
 TTL_CANDIDATE_OVERLAP = 86400  # 후보·보유 ETF 중복 분석 1일 — 입력 목록 해시가 키라 목록이 바뀌면 자동으로 새 키
+TTL_GOAL_RECOMMENDATION_INCOMPLETE = 600  # 일부 후보 시세를 못 가져온 추천 — 복구되면 곧 다시 계산
 TTL_GOAL_RECOMMENDATION = 3600  # 목표 역산 추천(전체/기간별) 1시간 — 프론트 staleTime과 정합, 설정 변경 시 무효화됨
 TTL_GOAL_RECOMMENDATION_STALE = (
     86400  # 추천(전체/기간별/연령대) 마지막 정상 결과 1일 — 1시간 키 만료 시 즉시 응답+백그라운드 재계산

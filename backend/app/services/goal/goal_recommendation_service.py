@@ -270,6 +270,7 @@ async def get_goal_recommendation(
         GoalRecommendation,
         lambda: _compute_goal_recommendation(cache, base_krw, existing_items, settings_row, db),
         lambda result: bool(result.recommended_items),
+        lambda result: result.data_incomplete,
     )
 
 
@@ -288,7 +289,8 @@ def _resolve_required_return(
     required_return_pct, early_result = _resolve_asset_goal_return_pct(settings_row, pv, required_dividend_yield_pct)
     if early_result is not None:
         return None, _grc._NON_BINDING_RETURN_FLOOR, early_result
-    assert required_return_pct is not None  # nosec B101 - early_result is None이면 항상 값이 있음
+    if required_return_pct is None:  # 자산 목표는 달성했고 배당 목표가 남은 경우
+        return None, _grc._NON_BINDING_RETURN_FLOOR, None
     return required_return_pct, required_return_pct, None
 
 
@@ -312,8 +314,13 @@ def _resolve_asset_goal_return_pct(
     n_months = months_until_year_end(target_year)
 
     if n_months <= 0:
-        return None, _grc._no_recommendation("목표 연도가 이미 지났습니다 — 목표연도를 다시 설정해주세요")
+        return None, _grc._no_recommendation(
+            "목표 연도가 이미 지났습니다 — 목표연도를 다시 설정해주세요",
+            required_dividend_yield_pct=required_dividend_yield_pct,
+        )
     if pv >= goal_amount:
+        if required_dividend_yield_pct is not None:
+            return None, None  # 배당 목표는 아직 남았다 — 수익률 제약 없이 배당 기준으로 계속 계산한다
         return None, _grc._no_recommendation(
             "이미 목표 금액을 달성했습니다", required_dividend_yield_pct=required_dividend_yield_pct
         )
@@ -496,6 +503,7 @@ async def _compute_goal_recommendation(
         fetch_yf_daily_returns, filtered, include_cash_equivalent=False, cache=cache
     )
     _mark("daily_returns")
+    missing_count = _grc._missing_candidate_count(len(computed_candidates), filtered, returns_map)
     items, expected_return_pct, expected_volatility_pct, opt_note = await _grc._run_goal_optimizer(
         filtered,
         returns_map,
@@ -511,6 +519,7 @@ async def _compute_goal_recommendation(
 
     result = GoalRecommendation(
         generated_at=datetime.now(UTC).isoformat(),
+        data_incomplete=missing_count > 0,
         is_configured=True,
         required_return_pct=required_return_pct,
         required_dividend_yield_pct=required_dividend_yield_pct,
@@ -518,7 +527,7 @@ async def _compute_goal_recommendation(
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=expected_dividend_yield_pct,
         expected_volatility_pct=expected_volatility_pct,
-        note=_grc._join_notes(preference_fallback_note, opt_note),
+        note=_grc._join_notes(preference_fallback_note, _grc._missing_candidates_note(missing_count), opt_note),
         cagr_lookback_years=cagr_lookback_years,
         risk_tolerance=risk_tolerance,
         max_weight_pct=round(max_weight * 100, 2),
@@ -536,6 +545,7 @@ async def compute_portfolio_expected_metrics(
     cache: CacheStoreType,
     items: list[tuple[str, str, str, float]],  # (ticker, market, name, weight 0~100)
     cagr_lookback_years: int = _grc._DEFAULT_CAGR_LOOKBACK_YEARS,
+    non_tradable_weight_pct: float = 0.0,
 ) -> PortfolioExpectedMetrics:
     """포트폴리오의 현재 목표 비중(`Portfolio.items`, CASH/부동산 등 시세 없는 항목은 호출측이 미리
     제외)에 대해 추천 비중과 동일한 지표(기대수익률/배당수익률/변동성)를 계산한다 — "적용 전 비교
@@ -565,6 +575,16 @@ async def compute_portfolio_expected_metrics(
     expected_return_pct, expected_dividend_yield_pct, expected_volatility_pct = compute_weighted_expected_metrics(
         symbols, weights_pct, cagr_by_symbol, dividend_by_symbol, returns_map
     )
+    # 현금·부동산을 빼고 재정규화한 값이라 전액 투자처럼 보인다 — 추천의 합성 현금성과 같은 수익률·변동성 0으로 되돌린다
+    invested = sum(weights_pct)
+    total = invested + non_tradable_weight_pct
+    share = invested / total if total > 0 else 1.0
+    if share < 1.0 and expected_return_pct is not None:
+        expected_return_pct = round(expected_return_pct * share + _grc._CASH_EQUIVALENT_CAGR_PCT * (1 - share), 2)
+        if expected_dividend_yield_pct is not None:
+            expected_dividend_yield_pct = round(expected_dividend_yield_pct * share, 2)
+        if expected_volatility_pct is not None:
+            expected_volatility_pct = round(expected_volatility_pct * share, 2)
     return PortfolioExpectedMetrics(
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=expected_dividend_yield_pct or None,

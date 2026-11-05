@@ -269,10 +269,20 @@ async def _build_horizon_result(
         return HorizonGoalRecommendation(
             **common, note=_combine_note("추천에 필요한 수익률 데이터를 가져오지 못했습니다")
         )
+    real_count = sum(1 for c in filtered if c.symbol != _grc._CASH_EQUIVALENT_TICKER)
+    if real_count <= 1 and real_count < len(eligible_candidates):
+        # 시세 장애로 후보가 하나(또는 합성 현금만) 남았다 — 전액 배분을 정상 추천처럼 내면 안 된다
+        return HorizonGoalRecommendation(
+            **common, note=_combine_note("추천에 필요한 수익률 데이터를 가져오지 못했습니다")
+        )
     if len(filtered) == 1:
         return _single_candidate_horizon_result(filtered[0], common, _combine_note)
 
     returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent, cache)
+    # CAGR은 있어도 일별수익률이 모자란 채권은 옵티마이저에서 빠진다 — 그러면 IRP 안전자산 제약이 조용히 사라진다
+    if is_irp and not include_cash_equivalent and _grc._ensure_safe_asset(filtered, returns_map):
+        include_cash_equivalent = True
+    missing_count = _grc._missing_candidate_count(len(eligible_candidates), filtered, returns_map)
     equity_floor, equity_ceiling = _horizon_equity_bounds(
         is_irp, include_cash_equivalent, filtered, short_term_equity_floor
     )
@@ -293,12 +303,13 @@ async def _build_horizon_result(
 
     return HorizonGoalRecommendation(
         **common,
+        data_incomplete=missing_count > 0,
         recommended_items=_grc._attach_dividend_yield(items, dividend_map),
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=_grc._weighted_dividend_yield(items, dividend_map),
         expected_volatility_pct=expected_volatility_pct,
         includes_cash_equivalent=_grc._includes_cash_equivalent(items),
-        note=_combine_note(opt_note),
+        note=_combine_note(_grc._join_notes(_grc._missing_candidates_note(missing_count), opt_note)),
     )
 
 
@@ -334,6 +345,7 @@ async def get_horizon_recommendations(
         HorizonRecommendationResponse,
         lambda: _compute_horizon_recommendations(cache, db, user_id, settings_row),
         lambda result: all(rec.recommended_items for rec in result.recommendations),
+        lambda result: any(rec.data_incomplete for rec in result.recommendations),
     )
 
 

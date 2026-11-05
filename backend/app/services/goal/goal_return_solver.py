@@ -22,14 +22,25 @@ DEPOSIT_GUIDE_PRESET_RETURNS_PCT: tuple[float, ...] = (4.0, 7.0, 10.0)
 
 
 def months_until_year_end(target_year: int) -> int:
-    """오늘부터 `target_year`년 12월 31일까지 남은 개월 수."""
+    """오늘부터 `target_year`년 12월 31일까지 남은 개월 수. 올해가 목표면 12월에도 최소 1개월이다 — 0이면 "목표 연도가
+    지났다"로 처리돼 12월 내내 추천이 나오지 않았다."""
     today = today_kst()
     delta = relativedelta(date(target_year, 12, 31), today)
-    return delta.years * 12 + delta.months
+    months = delta.years * 12 + delta.months
+    return max(months, 1) if target_year == today.year else months
+
+
+def monthly_rate(annual_r: float) -> float:
+    """연 수익률(소수) → 월 복리 수익률. 12개월 복리가 정확히 연 수익률이 되는 값이다.
+
+    `annual_r / 12`(명목)로 풀면 CAGR과 비교할 수 없다 — 연 6.95%로 표시된 필요 수익률을 CAGR 6.95%로 달성해도 목표에
+    못 미친다(plans/110 C5). 프론트 `utils/savingsProjection.ts`의 `monthlyRate`와 같은 식이다.
+    """
+    return (1 + annual_r) ** (1 / 12) - 1
 
 
 def _future_value(pv: float, pmt: float, annual_r: float, n_months: int) -> float:
-    r_m = annual_r / 12
+    r_m = monthly_rate(annual_r)
     if abs(r_m) < 1e-12:
         return pv + pmt * n_months
     try:
@@ -63,7 +74,10 @@ def solve_required_annual_return_pct(
     if f_hi < 0:
         return None
 
-    return round(brentq(f, _LO_ANNUAL_RETURN, _HI_ANNUAL_RETURN) * 100, 2)
+    try:
+        return round(brentq(f, _LO_ANNUAL_RETURN, _HI_ANNUAL_RETURN) * 100, 2)
+    except ValueError:  # 매우 먼 미래 + 무한대 값으로 구간 부호를 판정할 수 없다 — 해 없음으로 본다
+        return None
 
 
 def solve_required_monthly_deposit(
@@ -78,7 +92,7 @@ def solve_required_monthly_deposit(
     미지수로 풀이하므로 대수적으로 바로 풀린다(root-finding 불필요). pv만으로 이미 목표를
     초과 달성하면 0을 반환한다(월 적립 불필요).
     """
-    r_m = annual_return_pct / 100 / 12
+    r_m = monthly_rate(annual_return_pct / 100)
     if abs(r_m) < 1e-12:
         pmt = (goal_amount - pv) / n_months
     else:

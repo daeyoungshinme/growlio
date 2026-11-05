@@ -16,7 +16,7 @@ describe("projectedValueAtMonth", () => {
     const pmt = 500_000;
     const annualReturnPct = 7;
     const n = 12;
-    const r = annualReturnPct / 100 / 12;
+    const r = Math.pow(1 + annualReturnPct / 100, 1 / 12) - 1;
     const expected = initial * Math.pow(1 + r, n) + pmt * ((Math.pow(1 + r, n) - 1) / r);
     expect(projectedValueAtMonth(initial, pmt, annualReturnPct, n)).toBeCloseTo(expected, 6);
   });

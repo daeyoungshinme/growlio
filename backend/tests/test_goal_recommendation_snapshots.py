@@ -381,6 +381,8 @@ _AGE_SCENARIOS: dict[str, dict[str, Any]] = {
         "lookback": 3,
     },
     "age_insufficient_data": {"age_group": "THIRTIES", "candidates": [KODEX200, UNKNOWN_A]},
+    # 주식 상한 구간에 안전자산 후보가 없으면 현금성을 넣어 상한을 지킨다(plans/110 C2)
+    "age_sixties_equity_only_keeps_ceiling": {"age_group": "SIXTIES_PLUS", "candidates": [KODEX200, SPY]},
     "age_no_candidates": {"age_group": "FORTIES", "candidates": []},
     "age_not_configured": {"age_group": None, "candidates": [KODEX200]},
 }

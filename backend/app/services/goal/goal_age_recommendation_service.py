@@ -117,6 +117,7 @@ async def get_age_based_recommendation(
         GoalRecommendation,
         lambda: _compute_age_based_recommendation(cache, db, user_id, settings_row),
         lambda result: bool(result.recommended_items),
+        lambda result: result.data_incomplete,
     )
 
 
@@ -218,11 +219,15 @@ async def _compute_age_based_recommendation(
         _grc._fetch_dividend_yields(cache, tickers_only),
     )
     filtered = _grc._candidates_with_cagr(candidate_dicts, cagr_map, dividend_map, equity_vs_other=True)
-    include_cash_equivalent = equity_floor is not None and not _grc._has_real_safe_asset(filtered)
+    # 주식 상한 구간(50대·60대+)도 안전자산이 없으면 상한을 지킬 수 없다 — 하한 구간과 똑같이 현금성을 넣는다
+    has_equity_bound = equity_floor is not None or equity_ceiling is not None
+    include_cash_equivalent = has_equity_bound and not _grc._has_real_safe_asset(filtered)
     if include_cash_equivalent:
         filtered.append(_grc._cash_equivalent_candidate())
 
-    if len(filtered) < _MIN_CANDIDATES:
+    # 시세 장애로 실제 후보가 하나 이하만 남으면 합성 현금과 짝지어 정상 추천처럼 내지 않는다(기간별 추천과 같은 규칙)
+    real_count = sum(1 for c in filtered if c.symbol != _grc._CASH_EQUIVALENT_TICKER)
+    if len(filtered) < _MIN_CANDIDATES or (real_count <= 1 and real_count < len(candidate_dicts)):
         no_data_result = _grc._no_recommendation(
             "추천에 필요한 수익률 데이터를 가져오지 못했습니다",
             required_dividend_yield_pct=required_dividend_yield_pct,
@@ -231,6 +236,9 @@ async def _compute_age_based_recommendation(
         return await _with_bracket(no_data_result, None)
 
     returns_map = await _grc._fetch_candidate_returns(fetch_yf_daily_returns, filtered, include_cash_equivalent, cache)
+    if has_equity_bound and not include_cash_equivalent:
+        _grc._ensure_safe_asset(filtered, returns_map)
+    missing_count = _grc._missing_candidate_count(len(candidate_dicts), filtered, returns_map)
     items, expected_return_pct, expected_volatility_pct, opt_note = await _grc._run_goal_optimizer(
         filtered,
         returns_map,
@@ -247,6 +255,7 @@ async def _compute_age_based_recommendation(
     return await _with_bracket(
         GoalRecommendation(
             generated_at=datetime.now(UTC).isoformat(),
+            data_incomplete=missing_count > 0,
             is_configured=True,
             required_dividend_yield_pct=required_dividend_yield_pct,
             recommended_items=_grc._attach_dividend_yield(items, dividend_map),
@@ -255,7 +264,9 @@ async def _compute_age_based_recommendation(
             expected_volatility_pct=expected_volatility_pct,
             # age_default_dividend_note(명시적 목표가 아닌 연령대 기본값을 적용한 경우에만 존재)는
             # opt_note(옵티마이저의 배당 목표 달성 불가 fail-soft 안내)보다 앞에 붙인다.
-            note=_grc._join_notes(duplicate_index_note, age_default_dividend_note, opt_note),
+            note=_grc._join_notes(
+                duplicate_index_note, _grc._missing_candidates_note(missing_count), age_default_dividend_note, opt_note
+            ),
             cagr_lookback_years=cagr_lookback_years,
             risk_tolerance=risk_tolerance,
             max_weight_pct=round(max_weight * 100, 2),

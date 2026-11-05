@@ -35,7 +35,12 @@ def _portfolio(markets=("KOSPI",)):
 
 def _account(deposit_krw=300_000.0, deposit_usd=None):
     return SimpleNamespace(
-        name="키움 연금", deposit_krw=deposit_krw, deposit_usd=deposit_usd, last_synced_at=None, is_active=True
+        id=uuid.uuid4(),
+        name="키움 연금",
+        deposit_krw=deposit_krw,
+        deposit_usd=deposit_usd,
+        last_synced_at=None,
+        is_active=True,
     )
 
 
