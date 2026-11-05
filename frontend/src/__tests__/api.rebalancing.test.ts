@@ -106,13 +106,17 @@ describe("api/rebalancing", () => {
   it("fetchRebalancingHistory calls GET /rebalancing/history with default limit", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });
     await fetchRebalancingHistory();
-    expect(api.get).toHaveBeenCalledWith("/rebalancing/history", { params: { limit: 20 } });
+    expect(api.get).toHaveBeenCalledWith("/rebalancing/history", {
+      params: { limit: 20, skip: 0 },
+    });
   });
 
   it("fetchRebalancingHistory calls GET /rebalancing/history with custom limit", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });
     await fetchRebalancingHistory(10);
-    expect(api.get).toHaveBeenCalledWith("/rebalancing/history", { params: { limit: 10 } });
+    expect(api.get).toHaveBeenCalledWith("/rebalancing/history", {
+      params: { limit: 10, skip: 0 },
+    });
   });
 
   it("fetchRebalancingExecutionDetail calls GET /rebalancing/history/:id", async () => {

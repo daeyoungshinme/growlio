@@ -5,6 +5,7 @@ import type { GoalFeasibilityBand } from "@/utils/goalFeasibility";
 import GoalWizardLoading from "./GoalWizardLoading";
 import type { StepFormProps } from "./GoalWizardInputSteps";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import EmptyState from "@/components/common/EmptyState";
 
 // 백엔드 DEPOSIT_GUIDE_PRESET_RETURNS_PCT(4/7/10%)와 배열 순서로 매칭되는 표시용 레이블
 const DEPOSIT_GUIDE_PRESET_LABELS = ["보수적", "중립", "공격적"];
@@ -12,14 +13,28 @@ const DEPOSIT_GUIDE_PRESET_LABELS = ["보수적", "중립", "공격적"];
 interface FeasibilityProps {
   feasibility: GoalFeasibilityPreview | undefined;
   feasibilityLoading: boolean;
+  feasibilityFailed?: boolean;
+  onRetryFeasibility?: () => void;
 }
 
 /** 3단계 — 월 적립액·연간 입금 목표. 가정 수익률별 필요 적립액 가이드로 바로 채울 수 있다. */
+function FeasibilityError({ onRetry }: { onRetry?: () => void }) {
+  return (
+    <EmptyState
+      title="계산 결과를 불러오지 못했습니다."
+      action={onRetry ? { label: "다시 시도", onClick: onRetry } : undefined}
+      compact
+    />
+  );
+}
+
 export function MonthlyDepositStep({
   form,
   setForm,
   feasibility,
   feasibilityLoading,
+  feasibilityFailed,
+  onRetryFeasibility,
 }: StepFormProps & FeasibilityProps) {
   return (
     <div className="space-y-3">
@@ -65,6 +80,7 @@ export function MonthlyDepositStep({
           얼마를 적립해야 할지 감이 안 온다면, 가정 수익률별 필요 적립액을 참고해 바로 채워보세요.
         </p>
         {feasibilityLoading && <GoalWizardLoading text="계산하고 있어요..." />}
+        {feasibilityFailed && !feasibility && <FeasibilityError onRetry={onRetryFeasibility} />}
         {feasibility?.deposit_guide.map((item, i) => (
           <div
             key={item.annual_return_pct}
@@ -107,11 +123,14 @@ export function RequiredReturnStep({
   setForm,
   feasibility,
   feasibilityLoading,
+  feasibilityFailed,
+  onRetryFeasibility,
   band,
 }: StepFormProps & FeasibilityProps & { band: GoalFeasibilityBand | null }) {
   return (
     <div className="space-y-3">
       {feasibilityLoading && <GoalWizardLoading text="필요 수익률을 계산하고 있어요..." />}
+      {feasibilityFailed && !feasibility && <FeasibilityError onRetry={onRetryFeasibility} />}
       {feasibility && (
         <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 space-y-2">
           <p className="text-xs text-gray-500 dark:text-gray-400">

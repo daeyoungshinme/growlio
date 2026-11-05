@@ -37,7 +37,12 @@ export function useGoalWizardFeasibility(
     targetYearNum > 0 &&
     (hasCustomInitial || currentAssets != null);
 
-  const { data: feasibility, isLoading: feasibilityLoading } = useQuery({
+  const {
+    data: feasibility,
+    isLoading: feasibilityLoading,
+    isError: feasibilityFailed,
+    refetch: refetchFeasibility,
+  } = useQuery({
     queryKey: QUERY_KEYS.goalFeasibility(
       goalAmountNum,
       targetYearNum,
@@ -68,6 +73,8 @@ export function useGoalWizardFeasibility(
     currentAssets,
     feasibility,
     feasibilityLoading,
+    feasibilityFailed,
+    refetchFeasibility,
     band: feasibility ? classifyGoalFeasibility(feasibility.required_return_pct) : null,
     // 2단계(목표 금액·시점)는 두 값이 모두 있어야 다음으로 넘어갈 수 있다
     canProceed: step !== 2 || (goalAmountNum > 0 && targetYearNum > 0),

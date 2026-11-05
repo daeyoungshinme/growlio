@@ -141,3 +141,18 @@ describe("AutoInvestStatusBanner", () => {
     expect(screen.queryByText(/부족/)).not.toBeInTheDocument();
   });
 });
+
+describe("AutoInvestStatusBanner 조회 실패 (plans/110 D3)", () => {
+  it("알림 조회가 실패하면 '설정해보세요'로 보이지 않는다", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValue([portfolio]);
+    vi.mocked(fetchRebalancingAlerts).mockRejectedValue(new Error("500"));
+    renderWithProviders(
+      <MemoryRouter>
+        <AutoInvestStatusBanner />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("자동매수 상태를 불러오지 못했습니다.", undefined, { timeout: 6000 });
+    expect(screen.queryByText("정기 적립식 자동매수를 설정해보세요")).toBeNull();
+  }, 10000);
+});

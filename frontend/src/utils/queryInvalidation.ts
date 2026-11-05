@@ -28,6 +28,11 @@ export function invalidateSyncData(qc: QueryClient) {
     // 환전 계획의 보유 달러는 계좌 deposit_usd 합 (plans/97 B2)
     qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+    // 자산 합계 기준 카드 — 백엔드 sync도 같은 캐시를 지운다 (plans/110 D4)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
   ]);
 }
 
@@ -60,6 +65,9 @@ export function invalidateAccountData(qc: QueryClient) {
     // 환전 계획의 보유 달러는 계좌 deposit_usd 합 (plans/97 B2)
     qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
   ]);
 }
 
@@ -112,6 +120,8 @@ export function invalidateChallengeData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+    // 첫 챌린지를 만들면 백엔드가 리마인더 설정을 켠다 — 토글이 꺼진 채로 남지 않게
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
   ]);
 }
 

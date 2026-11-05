@@ -273,3 +273,40 @@ describe("실제 QueryClient 프리픽스 매칭", () => {
     expect(invalidated(qc, QUERY_KEYS.portfolioRisk)).toBe(true);
   });
 });
+
+describe("자산 합계 기준 카드 무효화 (plans/110 D4)", () => {
+  const keysOf = (spy: { mock: { calls: unknown[][] } }) =>
+    spy.mock.calls.map((call) => JSON.stringify((call[0] as { queryKey: unknown }).queryKey));
+
+  it("sync는 적립 분석·챌린지·ISA·배당 계획도 지운다", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries").mockResolvedValue();
+    await invalidateSyncData(qc);
+    const keys = keysOf(spy);
+    for (const key of [
+      QUERY_KEYS.dcaAnalysis,
+      QUERY_KEYS.challenges,
+      QUERY_KEYS.isaStatus,
+      QUERY_KEYS.dividendPlan,
+    ]) {
+      expect(keys).toContain(JSON.stringify(key));
+    }
+  });
+
+  it("계좌 수정도 같은 카드를 지운다", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries").mockResolvedValue();
+    await invalidateAccountData(qc);
+    const keys = keysOf(spy);
+    for (const key of [QUERY_KEYS.dcaAnalysis, QUERY_KEYS.challenges, QUERY_KEYS.dividendPlan]) {
+      expect(keys).toContain(JSON.stringify(key));
+    }
+  });
+
+  it("챌린지 변경은 설정도 지운다 — 백엔드가 리마인더를 켤 수 있다", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries").mockResolvedValue();
+    await invalidateChallengeData(qc);
+    expect(keysOf(spy)).toContain(JSON.stringify(QUERY_KEYS.settings));
+  });
+});

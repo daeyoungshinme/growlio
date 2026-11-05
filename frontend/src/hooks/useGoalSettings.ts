@@ -153,6 +153,7 @@ export function useGoalSettings() {
    * 성공 여부를 돌려준다 — 마법사 6단계가 실패 시 이전 설정 기준 추천을 보여주지 않도록. */
   const saveSettings = async (): Promise<boolean> => {
     setSaving(true);
+    let goalSaved = false;
     try {
       // 비운 필드는 null(백엔드가 지움), 처음부터 비어 있던 필드는 생략(기존 값 유지)
       const init = initialForm ?? undefined;
@@ -189,6 +190,7 @@ export function useGoalSettings() {
         ),
         birth_year: numberFieldPayload(form.birth_year, init?.birth_year),
       });
+      goalSaved = true;
       if (wizardMode) {
         // 리스크 성향은 전체교체 엔드포인트라 다른 필드(종목당 최대비중 등)를 덮어쓰지 않도록
         // 저장 직전 최신값을 조회해 리스크 성향만 갈아끼워 되돌려 보낸다.
@@ -211,7 +213,13 @@ export function useGoalSettings() {
       await dcaInvalidation;
       return true;
     } catch {
-      toast("저장에 실패했습니다", "error");
+      if (goalSaved) {
+        // 목표는 이미 저장됐다 — "실패"만 띄우면 화면이 옛 값으로 남고 사용자는 전부 실패한 줄 안다
+        toast("목표는 저장했지만 투자 성향을 저장하지 못했어요. 다시 시도해 주세요", "error");
+        await invalidateDcaData(queryClient, { goalRecommendation: true });
+      } else {
+        toast("저장에 실패했습니다", "error");
+      }
       return false;
     } finally {
       setSaving(false);
