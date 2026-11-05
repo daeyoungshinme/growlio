@@ -24,11 +24,17 @@ from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.market_signal.market_signal_service import (
     get_confirmed_composite_level,
-    get_last_composite_level,
     get_market_signal,
 )
 from app.services.rebalancing.diagnosis_service import _MARKET_NOTES
-from app.utils.cache_keys import CacheStoreType
+from app.utils.cache_keys import (
+    TTL_MARKET_SIGNAL_CHANGE_SENT,
+    CacheStoreType,
+    market_signal_change_attempts_key,
+    market_signal_change_sent_key,
+    market_signal_last_notified_level_key,
+)
+from app.utils.durable_state import delete_durable, get_durable, set_durable
 from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
@@ -50,18 +56,37 @@ async def _get_composite_subscribers(db: AsyncSession) -> list[tuple[User, UserS
     return [(user, user_settings) for user, user_settings in result.all()]
 
 
-async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreType) -> None:
-    """confirmed(hysteresis 적용) 등급이 이전 confirmed 값과 달라졌으면 구독 유저 전체에게 즉시 알림한다.
+_MAX_LEVEL_NOTICE_ATTEMPTS = 3  # 시간당 잡 기준 3시간 — 수신 채널이 없는 사용자 때문에 끝없이 돌지 않게
 
-    raw 레벨이 아닌 confirmed 레벨(연속 CONFIRM_STREAK_REQUIRED회 관측 후에만 반영)을 기준으로
-    비교해, 경계값 근처에서 등급이 잦게 오갈 때 발생하는 알림 flapping을 억제한다. 최초 실행
-    (이전 관측값 없음)은 저장만 하고 발송하지 않는다 — 배포 직후 스팸 방지.
+
+async def _finish_level_notice(db: AsyncSession, new_level: str, failed_count: int) -> None:
+    """전원 처리했으면 통지 등급을 갱신한다. 실패가 남으면 다음 실행에 재시도하되 정해진 횟수까지만."""
+    attempts = 0
+    raw_attempts = await get_durable(db, market_signal_change_attempts_key())
+    if raw_attempts:
+        level, _, count = raw_attempts.partition(":")
+        attempts = int(count) if level == new_level and count.isdigit() else 0
+    attempts += 1
+    if failed_count and attempts < _MAX_LEVEL_NOTICE_ATTEMPTS:
+        await set_durable(db, market_signal_change_attempts_key(), f"{new_level}:{attempts}")
+        return
+    if failed_count:
+        logger.warning("market_signal_change_gave_up", new_level=new_level, failed=failed_count, attempts=attempts)
+    await set_durable(db, market_signal_last_notified_level_key(), new_level)
+    await delete_durable(db, market_signal_change_attempts_key())
+
+
+async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreType) -> None:
+    """confirmed(hysteresis 적용) 등급이 마지막으로 알린 등급과 달라졌으면 구독 유저 전체에게 알린다.
+
+    raw 레벨이 아닌 confirmed 레벨(연속 CONFIRM_STREAK_REQUIRED회 관측 후에만 반영)을 기준으로 비교해, 경계값 근처에서
+    등급이 잦게 오갈 때의 알림 flapping을 억제한다. 비교 대상은 확정 등급의 이전 값이 아니라 "마지막으로 알린 등급"이다.
+    확정은 5~10분 주기 잡들이 먼저 하므로, 이전 값과 비교하면 이 시간당 잡은 변화를 거의 보지 못해 알림이 유실됐다.
+    최초 실행(알린 등급 없음)은 저장만 하고 발송하지 않는다 — 배포 직후 스팸 방지.
     """
     from app.services.alerts._dispatch import dispatch_dual_channel_alert
     from app.services.notifications.email_service import send_market_signal_change_alert
     from app.services.rebalancing.alert_check import _mark_composite_alert_sent_today
-
-    old_level = await get_last_composite_level(db)
 
     try:
         new_level, _ = await get_confirmed_composite_level(cache, db)
@@ -69,22 +94,35 @@ async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreTy
         logger.warning("market_signal_level_check_fetch_failed", error=str(exc))
         return
 
+    old_level = await get_durable(db, market_signal_last_notified_level_key())
     if old_level is None:
-        return  # get_confirmed_composite_level가 최초 부트스트랩 저장을 이미 처리함
+        await set_durable(db, market_signal_last_notified_level_key(), new_level)
+        return
 
     if old_level == new_level:
         return
 
     reason = _MARKET_NOTES.get(new_level)
     subscribers = await _get_composite_subscribers(db)
+    await db.commit()  # 발송 내내 커넥션을 잡고 있지 않는다 — 유저마다 새 세션을 연다
 
     # 유저마다 새 세션 — 공유 세션이면 한 유저의 DB 오류가 뒤 유저 발송을 전부 막는다(docs/plans/39 N3).
     sent_count = 0
+    failed_count = 0
     for user, user_settings in subscribers:
         to_email = getattr(user_settings, "notification_email", None) or user.email
         fcm_token = getattr(user_settings, "fcm_token", None)
+        sent_key = market_signal_change_sent_key(user.id, old_level, new_level)
         try:
             async with AsyncSessionLocal() as user_db:
+                if await get_durable(user_db, sent_key) is not None:
+                    continue
+
+                async def _after_sent(session: AsyncSession = user_db, key: str = sent_key, uid=user.id) -> None:
+                    # 같은 날 rebalancing/alert_check의 복합신호 알림과 중복 발송되지 않도록 dedup을 공유한다.
+                    await _mark_composite_alert_sent_today(session, uid)
+                    await set_durable(session, key, "1", ttl=TTL_MARKET_SIGNAL_CHANGE_SENT)
+
                 sent = await dispatch_dual_channel_alert(
                     user_db,
                     user.id,
@@ -96,14 +134,18 @@ async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreTy
                     push_body=f"시장 위험 신호가 {old_level} → {new_level}로 변경되었습니다.",
                     push_type="MARKET_SIGNAL",
                     fcm_token=fcm_token,
-                    # 같은 날 rebalancing/alert_check의 복합신호 알림과 중복 발송되지 않도록 dedup을 공유한다.
-                    after_sent=partial(_mark_composite_alert_sent_today, user_db, user.id),
+                    after_sent=_after_sent,
                 )
         except Exception as exc:
             report_job_failure("market_signal_change_user_failed", exc, user_id=str(user.id))
+            failed_count += 1
             continue
         if sent:
             sent_count += 1
+        else:
+            failed_count += 1
+
+    await _finish_level_notice(db, new_level, failed_count)
 
     if sent_count:
         logger.info(
@@ -189,5 +231,6 @@ async def send_market_signal_daily_digest(db: AsyncSession, cache: CacheStoreTyp
         partial(_send_digest_to_user, level=level, reason=reason),
         concurrency=_DIGEST_CONCURRENCY,
         failure_event="market_signal_daily_digest_user_failed",
+        release_session=db,
     )
     logger.info("market_signal_daily_digest_completed", level=level, subscriber_count=len(subscribers))

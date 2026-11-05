@@ -689,6 +689,15 @@ describe("TaxPlannerSection", () => {
     );
   });
 
+  it("실현손익 API 자체가 실패해도 경고한다", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxPlannerSection positions={[realizedPos]} realizedFailed />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("realized-lookup-failed")).toBeDefined();
+  });
+
   it("조회가 성공하면 실패 경고를 띄우지 않는다", () => {
     renderWithProviders(
       <MemoryRouter>

@@ -188,5 +188,6 @@ async def send_recommendation_drift_alerts(db: AsyncSession) -> None:
         _send_alert_to_user,
         concurrency=_ALERT_CONCURRENCY,
         failure_event="recommendation_drift_alert_user_failed",
+        release_session=db,
     )
     logger.info("recommendation_drift_alert_completed", subscriber_count=len(subscribers))

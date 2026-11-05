@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import sentry_sdk
 import structlog
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_MISSED, JobExecutionEvent
@@ -56,6 +58,7 @@ def init_scheduler() -> None:
     from app.jobs.market_signal_alert import run_market_signal_alert_check
     from app.jobs.market_signal_daily_digest import run_market_signal_daily_digest
     from app.jobs.monthly_report import run_monthly_report
+    from app.jobs.periodic_catchup import run_periodic_catchup
     from app.jobs.rebalancing_alert import run_rebalancing_alert_check
     from app.jobs.rebalancing_auto_execution import run_rebalancing_auto_execution
     from app.jobs.rebalancing_plan_buy_execution import run_rebalancing_plan_buy_execution
@@ -101,6 +104,7 @@ def init_scheduler() -> None:
         (run_cache_sweep, IntervalTrigger(minutes=15), "cache_sweep"),
         (run_app_state_sweep, kst(hour=4, minute=10), "app_state_sweep"),
         (refresh_kosdaq_tickers, kst(hour=7, minute=0), "kosdaq_tickers_refresh"),
+        (run_periodic_catchup, kst(hour="10-21", minute=25), "periodic_catchup"),
     ]
     for func, trigger, job_id in jobs:
         scheduler.add_job(func, trigger, id=job_id, replace_existing=True)
@@ -108,6 +112,9 @@ def init_scheduler() -> None:
     scheduler.modify_job("kosdaq_tickers_refresh", next_run_time=now_kst())
     # 기동 직후 1회 — 환율·시장 신호·기술적 신호·JWKS 예열(콜드 스타트 첫 요청의 외부 API 대기 제거)
     scheduler.add_job(run_startup_warmup, id="startup_warmup", next_run_time=now_kst(), replace_existing=True)
+
+    # 슬립에서 깨어난 직후에도 보충한다 — 예열이 끝날 시간을 두고
+    scheduler.modify_job("periodic_catchup", next_run_time=now_kst() + timedelta(minutes=2))
 
     scheduler.add_listener(_on_job_event, EVENT_JOB_ERROR | EVENT_JOB_MISSED)
     scheduler.start()

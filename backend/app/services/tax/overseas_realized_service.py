@@ -22,7 +22,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Literal, TypedDict
+from typing import Literal, NamedTuple, TypedDict
 
 import structlog
 from sqlalchemy import select
@@ -42,6 +42,7 @@ from app.services.portfolio.period_purchase_service import Lot
 from app.services.tax.tax_service import get_overseas_positions_detail, is_paper_account
 from app.utils.cache_keys import (
     TTL_TAX_OVERSEAS_REALIZED,
+    TTL_TAX_OVERSEAS_REALIZED_FAILED,
     get_cached_json,
     set_cached_json,
     tax_overseas_realized_key,
@@ -106,7 +107,14 @@ def _unsupported_reason(acc: AssetAccount) -> str:
     return "수기 계좌라 자동 집계할 수 없어요"
 
 
-async def _fetch_kis_realized(acc: AssetAccount, start: date, end: date, db: AsyncSession, cache: CacheStore) -> float:
+class KisRealized(NamedTuple):
+    total_krw: float
+    truncated: bool  # 연속조회 상한에 걸려 합계가 실제보다 작을 수 있다
+
+
+async def _fetch_kis_realized(
+    acc: AssetAccount, start: date, end: date, db: AsyncSession, cache: CacheStore
+) -> KisRealized:
     creds = decrypt_kis_credentials(acc)
     if creds is None or not acc.kis_account_no:
         raise ValueError("KIS 자격증명 없음")
@@ -125,7 +133,7 @@ async def _fetch_kis_realized(acc: AssetAccount, start: date, end: date, db: Asy
             force_refresh=force_refresh,
         )
 
-    async def _fetch(token: str) -> float:
+    async def _fetch(token: str) -> KisRealized:
         # 타임아웃은 순수 HTTP 조회에만 건다 — 토큰 발급(`store_token`)은 공유 세션에서 commit하므로
         # wait_for 취소가 commit 도중에 떨어지면 세션이 깨진 채 다음 계좌 루프로 넘어간다.
         # 토큰 발급 HTTP는 공용 httpx 클라이언트 타임아웃(30초)으로 이미 상한이 있다.
@@ -133,7 +141,7 @@ async def _fetch_kis_realized(acc: AssetAccount, start: date, end: date, db: Asy
             get_overseas_realized_pnl(app_key, app_secret, token, account_no, start, end),
             timeout=_FETCH_TIMEOUT_SECONDS,
         )
-        return result["total_krw"]
+        return KisRealized(result["total_krw"], bool(result.get("truncated")))
 
     return await with_token_refresh(_fetch, _get_token, KisTokenExpiredError)
 
@@ -381,11 +389,15 @@ async def get_overseas_realized_summary(
                 had_failure = True
                 uncovered.append({"account_id": acc_id, "account_name": acc.name, "reason": "조회 실패"})
                 continue
+            if realized.truncated:
+                uncovered.append(
+                    {"account_id": acc_id, "account_name": acc.name, "reason": "체결이 많아 일부만 집계했어요"}
+                )
             covered.append(
                 {
                     "account_id": acc_id,
                     "account_name": acc.name,
-                    "realized_krw": round(realized, 0),
+                    "realized_krw": round(realized.total_krw, 0),
                     "method": "BROKER",
                     "estimated": False,
                 }
@@ -416,6 +428,7 @@ async def get_overseas_realized_summary(
         "as_of": today.isoformat(),
         "lookup_failed": had_failure,
     }
-    if not had_failure:  # 일시 실패 결과를 1시간 고정하지 않도록 성공 시에만 캐시
-        await set_cached_json(cache, cache_key, summary, TTL_TAX_OVERSEAS_REALIZED)
+    # 일시 실패 결과는 1시간 고정하지 않고 잠깐만 둔다 — 장애 중 홈을 열 때마다 계좌별로 다시 기다리지 않게
+    ttl = TTL_TAX_OVERSEAS_REALIZED_FAILED if had_failure else TTL_TAX_OVERSEAS_REALIZED
+    await set_cached_json(cache, cache_key, summary, ttl)
     return summary

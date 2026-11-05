@@ -59,6 +59,8 @@ export const QUERY_KEYS = {
   rebalancingAlertByAccount: (portfolioId: string, accountId: string) =>
     ["rebalancing-alert", portfolioId, "accounts", accountId] as const,
   rebalancingHistory: ["rebalancing-history"] as const,
+  /** 실행 이력 무한 목록 — 값 형태가 달라 키를 분리하고, `rebalancingHistory` 프리픽스로 함께 무효화된다 */
+  rebalancingHistoryPages: ["rebalancing-history", "pages"] as const,
   /** 실행 1건 상세 — `rebalancingHistory` 프리픽스로 함께 무효화된다 */
   rebalancingExecutionDetail: (executionId: string) =>
     ["rebalancing-history", executionId] as const,

@@ -263,8 +263,11 @@ export interface RebalancingExecutionDetail extends RebalancingExecutionSummary 
   results: ExecutionResult[] | null;
 }
 
-export const fetchRebalancingHistory = (limit = 20): Promise<RebalancingExecutionSummary[]> =>
-  apiGet<RebalancingExecutionSummary[]>(`/rebalancing/history`, { params: { limit } });
+export const fetchRebalancingHistory = (
+  limit = 20,
+  skip = 0,
+): Promise<RebalancingExecutionSummary[]> =>
+  apiGet<RebalancingExecutionSummary[]>(`/rebalancing/history`, { params: { limit, skip } });
 
 export const fetchRebalancingExecutionDetail = (id: string): Promise<RebalancingExecutionDetail> =>
   apiGet<RebalancingExecutionDetail>(`/rebalancing/history/${id}`);

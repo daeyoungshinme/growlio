@@ -29,6 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
@@ -277,8 +278,35 @@ _SOURCES: list[tuple[str, _Source]] = [
 ]
 
 
+_SOURCE_LABELS = {
+    "tactical": "전술 배분",
+    "rebalance": "리밸런싱",
+    "dca": "적립",
+    "tax": "세금",
+    "challenge": "챌린지",
+}
+
+
+def _partial_failure_item(failed: list[str]) -> ActionItem:
+    """일부 소스를 못 읽었다는 안내 — 빈 목록이 "할 일 없음"으로 보이지 않게 한다.
+
+    응답 형태를 바꾸면 구버전 앱이 깨지므로 일반 항목으로 끼워 넣는다.
+    """
+    labels = "·".join(_SOURCE_LABELS.get(name, name) for name in failed)
+    return ActionItem(
+        id="partial-failure",
+        kind="PARTIAL_FAILURE",
+        priority="LOW",
+        title="일부 할 일을 불러오지 못했어요",
+        detail=f"{labels} 정보를 확인하지 못해 빠진 항목이 있을 수 있어요. 잠시 후 다시 확인해 주세요",
+        cta_label="다시 보기",
+        link="/dashboard",
+    )
+
+
 async def get_action_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> list[ActionItem]:
     collected: list[ActionItem] = []
+    failed: list[str] = []
     tactical_portfolio_ids: set[uuid.UUID] = set()
     sources: list[tuple[str, _Source]] = [
         ("tactical", partial(_tactical_items, found_portfolio_ids=tactical_portfolio_ids)),
@@ -289,7 +317,8 @@ async def get_action_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
         try:
             collected.extend(await source(user_id, db, cache))
         except Exception as e:
-            logger.warning("action_items_source_failed", source=name, error=str(e), exc_type=type(e).__name__)
+            report_handled_failure("action_items_source_failed", e, source=name)
+            failed.append(name)
             # DB 오류로 트랜잭션이 aborted 상태면 뒤 소스 쿼리까지 전부 실패하므로 되돌려 둔다
             # (읽기 전용 요청이라 잃을 쓰기가 없고, 뒤 소스는 ORM 객체를 새로 읽는다)
             try:
@@ -298,4 +327,7 @@ async def get_action_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
                 logger.warning("action_items_rollback_failed", source=name)
     # 안정 정렬 — 같은 우선순위·마감이면 소스 순서(전술 → 리밸런싱 → 적립 → 세금 → 챌린지)를 유지한다
     collected.sort(key=lambda it: (_PRIORITY_ORDER[it.priority], it.deadline or "9999-12-31"))
+    if failed:
+        # 낮은 우선순위라도 상한에 밀려 사라지면 안 된다 — 한 자리를 비워 둔다
+        return [*collected[: MAX_ACTION_ITEMS - 1], _partial_failure_item(failed)]
     return collected[:MAX_ACTION_ITEMS]

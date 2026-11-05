@@ -44,7 +44,13 @@ export interface DashboardData {
 export const fetchDashboard = () => apiGet<DashboardData>("/dashboard");
 
 export type ActionItemKind =
-  "TACTICAL" | "REBALANCE" | "DCA_SHORTFALL" | "TAX_WARNING" | "TAX_ACTION" | "CHALLENGE";
+  | "TACTICAL"
+  | "REBALANCE"
+  | "DCA_SHORTFALL"
+  | "TAX_WARNING"
+  | "TAX_ACTION"
+  | "CHALLENGE"
+  | "PARTIAL_FAILURE";
 
 /** 홈 "지금 할 일" 1행 — 백엔드 `action_items_service`가 우선순위·마감 순으로 최대 5건 반환 */
 export interface ActionItem {

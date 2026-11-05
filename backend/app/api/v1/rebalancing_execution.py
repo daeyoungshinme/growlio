@@ -182,14 +182,16 @@ async def create_rebalancing_execution_plan(
 async def get_rebalancing_history(
     request: Request,
     limit: int = Query(default=20, ge=1, le=100),
+    skip: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """리밸런싱 실행 이력 목록을 반환한다 (최신순)."""
+    """리밸런싱 실행 이력 목록을 반환한다 (최신순). `skip`으로 다음 페이지를 이어 받는다."""
     result = await db.execute(
         select(RebalancingExecution)
         .where(RebalancingExecution.user_id == current_user.id)
         .order_by(desc(RebalancingExecution.executed_at))
+        .offset(skip)
         .limit(limit)
     )
     return result.scalars().all()

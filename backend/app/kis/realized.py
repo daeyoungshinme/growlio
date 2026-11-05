@@ -34,6 +34,7 @@ class RealizedTrade(TypedDict):
 class OverseasRealizedPnl(TypedDict):
     total_krw: float
     trades: list[RealizedTrade]
+    truncated: bool  # 연속조회 상한에 걸렸고 합계도 없어 실제보다 작을 수 있다
 
 
 def _to_float(value: Any) -> float:
@@ -70,6 +71,7 @@ async def get_overseas_realized_pnl(
     trades: list[RealizedTrade] = []
     summary_total: float | None = None
     fk200 = nk200 = ""
+    page_limit_hit = False
     for page in range(_MAX_PAGES):
         page_headers = {**headers, "tr_cont": "N"} if page > 0 else headers
         data = await kis_request(
@@ -113,6 +115,8 @@ async def get_overseas_realized_pnl(
         fk200, nk200 = next_fk, next_nk
     else:
         logger.warning("kis_period_profit_page_limit", pages=_MAX_PAGES, trades=len(trades))
+        page_limit_hit = True
 
     total = summary_total if summary_total is not None else sum(t["realized_krw"] for t in trades)
-    return {"total_krw": total, "trades": trades}
+    # 합계(output2)가 있으면 페이지와 무관하게 믿을 수 있고, 없을 때만 잘린 체결의 합이라 실제보다 작을 수 있다
+    return {"total_krw": total, "trades": trades, "truncated": page_limit_hit and summary_total is None}

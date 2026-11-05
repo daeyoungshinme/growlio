@@ -52,6 +52,7 @@ async def _run_challenge_deposit_reminder(db: AsyncSession, cache: CacheStoreTyp
         lambda user, settings_row, to_email: _check_user(user, settings_row, to_email, cache),
         concurrency=_CONCURRENCY,
         failure_event="challenge_deposit_reminder_failed",
+        release_session=db,
     )
 
 

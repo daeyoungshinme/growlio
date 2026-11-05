@@ -100,4 +100,4 @@ async def test_unknown_deposit_is_not_cached_as_no_overseas():
         token_expired_exc=_TokenExpired,
         broker_name="KIS",
     )
-    assert cache.setex.await_args.args[2] == "1"
+    assert cache.setex.await_args.args[2] == "u"  # "0"이면 다음 동기화가 달러 예수금을 지운다

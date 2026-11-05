@@ -39,7 +39,12 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
   const hasLossHarvestCandidates = (taxData?.overseas_unrealized_gain_krw ?? 0) < 0;
   const plannerOpen = plannerOpenOverride ?? false;
 
-  const { data: positionsData, isLoading: posLoading } = useQuery({
+  const {
+    data: positionsData,
+    isLoading: posLoading,
+    isError: positionsFailed,
+    refetch: refetchPositions,
+  } = useQuery({
     queryKey: QUERY_KEYS.overseasPositionsTax(accountId),
     queryFn: () => fetchOverseasPositionsTax(accountId),
     staleTime: STALE_TIME.MEDIUM,
@@ -47,7 +52,11 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
   });
 
   // 플래너는 올해 기준 — 증권사 체결 기준 올해 실현손익(KIS 실전 계좌 자동 집계)을 기본값으로 쓴다
-  const { data: realizedData, isLoading: realizedLoading } = useQuery({
+  const {
+    data: realizedData,
+    isLoading: realizedLoading,
+    isError: realizedFailed,
+  } = useQuery({
     queryKey: QUERY_KEYS.overseasRealized(currentYear, accountId),
     queryFn: () => fetchOverseasRealized(currentYear, accountId),
     staleTime: STALE_TIME.MEDIUM,
@@ -173,12 +182,19 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 <TaxPlannerSection
                   positions={positionsData}
                   realized={realizedData}
+                  realizedFailed={realizedFailed}
                   taxRule={{
                     deduction: taxData.overseas_gain_deduction_krw,
                     rate: taxData.rates.overseas_tax_rate_pct / 100,
                   }}
                 />
               </ErrorBoundary>
+            ) : positionsFailed ? (
+              <EmptyState
+                title="해외 종목을 불러오지 못했습니다."
+                action={{ label: "다시 시도", onClick: () => void refetchPositions() }}
+                compact
+              />
             ) : null)}
         </div>
       )}

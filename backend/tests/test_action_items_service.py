@@ -211,7 +211,7 @@ async def test_one_source_failure_keeps_others_and_rolls_back():
         drift=AsyncMock(side_effect=RuntimeError("db down")),
         challenge=challenge,
     )
-    assert [i.kind for i in items] == ["CHALLENGE"]
+    assert [i.kind for i in items] == ["CHALLENGE", "PARTIAL_FAILURE"]
     db.rollback.assert_awaited_once()
 
 
@@ -287,5 +287,5 @@ async def test_tactical_failure_keeps_rebalance_rows():
     items, db = await _run(
         tactical=AsyncMock(side_effect=RuntimeError("db down")), drift=AsyncMock(return_value=[drift])
     )
-    assert [i.kind for i in items] == ["REBALANCE"]
+    assert [i.kind for i in items] == ["REBALANCE", "PARTIAL_FAILURE"]
     db.rollback.assert_awaited_once()

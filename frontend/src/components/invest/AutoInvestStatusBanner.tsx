@@ -18,19 +18,35 @@ import {
   rebalancingAlertsQuery,
   settingsQuery,
 } from "@/api/queryOptions";
+import EmptyState from "@/components/common/EmptyState";
 
 /** "정기 적립식 자동매수"(리밸런싱 AUTO의 SCHEDULE_ONLY+BUY_ONLY 프리셋) 설정 여부를 한 줄로
  * 보여주고, /rebalancing 실행 화면으로 딥링크한다. 적립 계획 탭에서 이 기능의 존재를 알리는
  * 진입점 — 실제 설정 UI는 RebalancingAlertModal의 "빠른 설정"에 있다. */
 export default function AutoInvestStatusBanner() {
   const { data: portfolios } = useQuery(portfoliosQuery);
-  const { data: alerts } = useQuery(rebalancingAlertsQuery);
+  const {
+    data: alerts,
+    isError: alertsFailed,
+    refetch: refetchAlerts,
+  } = useQuery(rebalancingAlertsQuery);
 
   const { data: accounts } = useQuery(accountsQuery);
   const { data: settings } = useQuery(settingsQuery);
   const usdRate = useExchangeRate();
 
   if (!portfolios || portfolios.length === 0) return null;
+
+  // 조회 실패를 "자동매수 없음"으로 보이면 켜 둔 사용자가 "설정해보세요"를 보고 부족 경고도 놓친다
+  if (alertsFailed && !alerts) {
+    return (
+      <EmptyState
+        title="자동매수 상태를 불러오지 못했습니다."
+        action={{ label: "다시 시도", onClick: () => void refetchAlerts() }}
+        compact
+      />
+    );
+  }
 
   // 꺼진 정기 적립식은 "자동매수 중"으로 보이면 안 된다(plans/63 P1-4)
   const alertByPortfolioId = activeAlertsOnly(mergeAlertsByPortfolio(alerts ?? []));

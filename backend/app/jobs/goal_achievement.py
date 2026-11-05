@@ -61,6 +61,7 @@ async def _run_goal_achievement_check(db: AsyncSession, cache: CacheStoreType) -
         lambda user, settings_row, to_email: _check_user_goals(user, settings_row, to_email, cache),
         concurrency=_GOAL_CHECK_CONCURRENCY,
         failure_event="goal_achievement_check_failed",
+        release_session=db,
     )
 
 

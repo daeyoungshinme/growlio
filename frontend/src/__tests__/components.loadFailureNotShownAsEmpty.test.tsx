@@ -133,3 +133,36 @@ describe("ErrorBoundary resetKey", () => {
     spy.mockRestore();
   });
 });
+
+describe("실행 이력 페이지네이션 (plans/110 D7)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const rows = (from: number, count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `exec-${from + i}`,
+      triggered_by: "MANUAL",
+      strategy: "FULL",
+      total_success: 1,
+      total_fail: 0,
+      total_skipped: 0,
+      executed_at: "2026-11-01T00:00:00Z",
+    }));
+
+  it("받아 둔 50건을 다 보여주면 다음 묶음을 skip으로 받는다", async () => {
+    vi.mocked(fetchRecentPlanLegs).mockResolvedValue([]);
+    vi.mocked(fetchRebalancingHistory).mockImplementation((_limit, skip = 0) =>
+      Promise.resolve((skip === 0 ? rows(0, 50) : rows(50, 3)) as never),
+    );
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
+
+    const more = await screen.findByText("실행 이력 더 보기");
+    expect(fetchRebalancingHistory).toHaveBeenCalledTimes(1);
+    for (let i = 0; i < 4; i++) act(() => more.click());
+
+    await waitFor(() => expect(fetchRebalancingHistory).toHaveBeenCalledWith(50, 50));
+  });
+});

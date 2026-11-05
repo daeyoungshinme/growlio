@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import {
   fetchRebalancingExecutionDetail,
@@ -318,21 +318,29 @@ function PendingPlanRow({
  * 대기(PENDING) 플랜은 행동이 필요하므로 개수와 무관하게 항상 전부 보인다. */
 const CLOSED_LEGS_VISIBLE = 5;
 const HISTORY_PAGE = 10;
+const HISTORY_FETCH_SIZE = 50;
 
 export default function RebalancingHistoryTab() {
   const qc = useQueryClient();
   const [showAllLegs, setShowAllLegs] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(HISTORY_PAGE);
   const {
-    data: history = [],
+    data: historyPages,
     isLoading,
     isError: historyFailed,
     refetch: refetchHistory,
-  } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingHistory,
-    queryFn: () => fetchRebalancingHistory(50),
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: QUERY_KEYS.rebalancingHistoryPages,
+    queryFn: ({ pageParam }) => fetchRebalancingHistory(HISTORY_FETCH_SIZE, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) =>
+      lastPage.length < HISTORY_FETCH_SIZE ? undefined : pages.length * HISTORY_FETCH_SIZE,
     staleTime: STALE_TIME.SHORT,
   });
+  const history = useMemo(() => historyPages?.pages.flat() ?? [], [historyPages]);
 
   const {
     data: planLegs = [],
@@ -459,13 +467,22 @@ export default function RebalancingHistoryTab() {
           {history.slice(0, historyVisible).map((item) => (
             <ExecutionRow key={item.id} item={item} />
           ))}
-          {history.length > historyVisible && (
+          {(history.length > historyVisible || hasNextPage) && (
             <button
               type="button"
-              onClick={() => setHistoryVisible((n) => n + HISTORY_PAGE)}
-              className={`${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400`}
+              disabled={isFetchingNextPage}
+              onClick={() => {
+                setHistoryVisible((n) => n + HISTORY_PAGE);
+                // 받아 둔 만큼 다 보여줬으면 다음 묶음을 받는다
+                if (history.length <= historyVisible + HISTORY_PAGE && hasNextPage) {
+                  void fetchNextPage();
+                }
+              }}
+              className={`${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400 disabled:opacity-50`}
             >
-              실행 이력 더 보기 ({history.length - historyVisible}개 남음)
+              {hasNextPage
+                ? "실행 이력 더 보기"
+                : `실행 이력 더 보기 (${history.length - historyVisible}개 남음)`}
             </button>
           )}
         </div>

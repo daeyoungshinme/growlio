@@ -9,7 +9,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.kis.realized import get_overseas_realized_pnl
-from app.services.tax.overseas_realized_service import get_overseas_realized_summary, resolve_source
+from app.services.tax.overseas_realized_service import KisRealized, get_overseas_realized_summary, resolve_source
+from app.utils.cache_keys import TTL_TAX_OVERSEAS_REALIZED_FAILED
 
 TODAY = date(2026, 9, 26)
 
@@ -72,7 +73,7 @@ class TestGetOverseasRealizedPnl:
     async def test_empty_response(self):
         with patch("app.kis.realized.kis_request", new=AsyncMock(return_value={"output1": [], "output2": {}})):
             result = await get_overseas_realized_pnl("k", "s", "t", "1234567801", date(2026, 1, 1), TODAY)
-        assert result == {"total_krw": 0, "trades": []}
+        assert result == {"total_krw": 0, "trades": [], "truncated": False}
 
 
 def _acc(make_account, name: str, **kw):
@@ -113,7 +114,7 @@ class TestGetOverseasRealizedSummary:
         db = _db_with_accounts([kis, kis_mock, kiwoom, toss_no_overseas, isa])
         positions = [{"account_id": str(kis_mock.id)}, {"account_id": str(kiwoom.id)}]
 
-        fetch = AsyncMock(return_value=1_300_000.0)
+        fetch = AsyncMock(return_value=KisRealized(1_300_000.0, False))
         with (
             patch("app.services.tax.overseas_realized_service._fetch_kis_realized", new=fetch),
             patch(
@@ -140,7 +141,7 @@ class TestGetOverseasRealizedSummary:
         ok = _acc(make_account, "A 계좌")
         broken = _acc(make_account, "B 계좌")
         db = _db_with_accounts([ok, broken])
-        fetch = AsyncMock(side_effect=[500_000.0, RuntimeError("boom")])
+        fetch = AsyncMock(side_effect=[KisRealized(500_000.0, False), RuntimeError("boom")])
         with (
             patch("app.services.tax.overseas_realized_service._fetch_kis_realized", new=fetch),
             patch(
@@ -154,8 +155,29 @@ class TestGetOverseasRealizedSummary:
         assert summary["uncovered_accounts"] == [
             {"account_id": str(broken.id), "account_name": "B 계좌", "reason": "조회 실패"}
         ]
-        mock_cache.setex.assert_not_awaited()
-        mock_cache.set.assert_not_awaited()
+        assert summary["lookup_failed"] is True
+        # 1시간 고정하지 않고 잠깐만 둔다 — 장애 중 홈을 열 때마다 계좌별 20초씩 기다리지 않게
+        assert mock_cache.setex.await_args.args[1] == TTL_TAX_OVERSEAS_REALIZED_FAILED
+
+    @pytest.mark.asyncio
+    async def test_truncated_lookup_is_reported_as_partial(self, make_account, mock_cache):
+        kis = _acc(make_account, "KIS")
+        with (
+            patch(
+                "app.services.tax.overseas_realized_service._fetch_kis_realized",
+                new=AsyncMock(return_value=KisRealized(1_000.0, True)),
+            ),
+            patch(
+                "app.services.tax.overseas_realized_service.get_overseas_positions_detail",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            summary = await get_overseas_realized_summary(
+                uuid.uuid4(), 2026, _db_with_accounts([kis]), cache=mock_cache
+            )
+
+        assert summary["source"] == "PARTIAL"
+        assert "일부만" in summary["uncovered_accounts"][0]["reason"]
 
     @pytest.mark.asyncio
     async def test_no_supported_accounts_returns_none(self, make_account, mock_cache):
@@ -195,7 +217,7 @@ class TestGetOverseasRealizedSummary:
         ):
             total = await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, MagicMock(), mock_cache)
 
-        assert total == 42.0
+        assert total.total_krw == 42.0
         assert token.call_args_list[1].kwargs["force_refresh"] is True
         assert pnl.call_args_list[1].args[2] == "new"
 
@@ -223,7 +245,9 @@ class TestGetOverseasRealizedSummary:
         ):
             fast_pnl = AsyncMock(return_value={"total_krw": 7.0, "trades": []})
             with patch("app.services.tax.overseas_realized_service.get_overseas_realized_pnl", new=fast_pnl):
-                assert await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, MagicMock(), mock_cache) == 7.0
+                assert (
+                    await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, MagicMock(), mock_cache)
+                ).total_krw == 7.0
             with (
                 patch("app.services.tax.overseas_realized_service.get_overseas_realized_pnl", new=slow_pnl),
                 pytest.raises(TimeoutError),
@@ -393,7 +417,8 @@ class TestSummaryWithTradeRecords:
             patch("app.services.tax.overseas_realized_service.today_kst", return_value=TODAY),
             patch("app.services.tax.overseas_realized_service.load_trade_record_realized", new=load),
             patch(
-                "app.services.tax.overseas_realized_service._fetch_kis_realized", new=AsyncMock(return_value=500_000.0)
+                "app.services.tax.overseas_realized_service._fetch_kis_realized",
+                new=AsyncMock(return_value=KisRealized(500_000.0, False)),
             ),
             patch(
                 "app.services.tax.overseas_realized_service.get_overseas_positions_detail",

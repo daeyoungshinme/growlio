@@ -16,6 +16,8 @@ interface Props {
   positions: OverseasPositionDetail[];
   /** 올해 실현손익 자동 집계(E6, 증권사 체결 + 직접 기록한 매도) — 없거나 집계 계좌가 없으면 수기 입력만 */
   realized?: OverseasRealizedSummary | null;
+  /** 실현손익 API 자체가 실패 — 0으로 계산 중임을 알린다 */
+  realizedFailed?: boolean;
   /** 세금 요약 응답의 해외 양도세 공제·세율 — 없으면 훅의 폴백 상수 */
   taxRule?: OverseasTaxRule;
 }
@@ -23,7 +25,7 @@ interface Props {
 /** 키움·토스·수기 계좌는 계좌관리 › 내역 › 매수 내역에서 해외 매도를 기록하면 실현손익에 반영된다 */
 const TRADE_RECORD_LINK = assetManagementUrl("내역", "매수 내역");
 
-export default function TaxPlannerSection({ positions, realized, taxRule }: Props) {
+export default function TaxPlannerSection({ positions, realized, realizedFailed, taxRule }: Props) {
   const autoRealized = realized?.realized_gain_krw ?? null;
   const fromRecords = realized?.covered_accounts.some((a) => a.method === "TRADE_RECORD") ?? false;
   const estimated = realized?.covered_accounts.some((a) => a.estimated) ?? false;
@@ -91,7 +93,7 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
           </p>
         </div>
 
-        {realized?.lookup_failed && (
+        {(realized?.lookup_failed || realizedFailed) && (
           <div className="flex items-start gap-2" data-testid="realized-lookup-failed" role="alert">
             <TriangleAlert size={13} className="text-red-500 mt-0.5 shrink-0" />
             <p className="text-xs text-red-700 dark:text-red-400">

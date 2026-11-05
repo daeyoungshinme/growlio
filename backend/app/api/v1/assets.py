@@ -10,6 +10,7 @@ from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
 from app.core.cache_store import get_cache_store
+from app.exceptions import BadRequestError
 from app.kis.auth import promote_user_token_to_account
 from app.kiwoom.client import KiwoomTokenIssueError
 from app.limiter import limiter
@@ -241,7 +242,11 @@ async def update_account(
 ):
     account = await _get_owned_account(account_id, current_user.id, db)
 
-    update_fields = req.model_dump(exclude_none=True, exclude=CREDENTIAL_FIELDS)
+    # 비활성화는 DELETE만 — 수정 경로로 꺼면 자동화 중단·자격증명 삭제 정리를 건너뛴다(plans/110 D10)
+    if req.is_active is False:
+        raise BadRequestError("계좌를 비활성화하려면 삭제 기능을 사용해주세요")
+
+    update_fields = req.model_dump(exclude_none=True, exclude=CREDENTIAL_FIELDS | {"is_active"})
     for field, value in update_fields.items():
         setattr(account, field, value)
     # 지울 수 있는 항목만 null을 반영한다 — 금액·이름 등은 null이어도 기존 값 유지

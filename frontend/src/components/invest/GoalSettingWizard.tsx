@@ -52,11 +52,23 @@ export default function GoalSettingWizard({
   onSave,
   onClose,
 }: Props) {
-  const { currentAssets, feasibility, feasibilityLoading, band, canProceed } =
-    useGoalWizardFeasibility(form, setForm, step);
+  const {
+    currentAssets,
+    feasibility,
+    feasibilityLoading,
+    feasibilityFailed,
+    refetchFeasibility,
+    band,
+    canProceed,
+  } = useGoalWizardFeasibility(form, setForm, step);
   const autosave = useRecommendationStepAutosave(step, onSave);
   const formProps = { form, setForm };
-  const feasibilityProps = { feasibility, feasibilityLoading };
+  const feasibilityProps = {
+    feasibility,
+    feasibilityLoading,
+    feasibilityFailed,
+    onRetryFeasibility: () => void refetchFeasibility(),
+  };
 
   return (
     <Modal title={`목표 설정 가이드 (${step}/${TOTAL_STEPS})`} onClose={onClose} size="md">
