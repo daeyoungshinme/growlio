@@ -72,6 +72,8 @@ from app.utils.inproc_lock import single_flight_fetch
 logger = structlog.get_logger()
 
 _DIVIDEND_FETCH_CONCURRENCY = 8
+_dividend_fetch_sem = asyncio.Semaphore(_DIVIDEND_FETCH_CONCURRENCY)
+"""프로세스 공용 — 호출마다 만들면 horizon 15개 조합이 동시에 돌 때 8×15건이 된다."""
 _DEFAULT_CAGR_LOOKBACK_YEARS = DEFAULT_GOAL_CAGR_LOOKBACK_YEARS
 
 _NON_BINDING_RETURN_FLOOR = -50.0
@@ -169,7 +171,6 @@ async def _fetch_dividend_yields(
     무배당 종목을 다시 스크래핑하는 낭비를 없앤다(원본 필터링 동작은 `result` 포함 여부로 유지).
     """
     loop = asyncio.get_running_loop()
-    sem = asyncio.Semaphore(_DIVIDEND_FETCH_CONCURRENCY)
     result: dict[tuple[str, str], float] = {}
 
     async def _fetch_one(ticker: str, market: str) -> None:
@@ -180,7 +181,7 @@ async def _fetch_dividend_yields(
                 result[(ticker, market)] = cached["yield_pct"]
             return
         try:
-            async with sem:
+            async with _dividend_fetch_sem:
                 if market.upper() in DOMESTIC_MARKETS:
                     fn = (
                         sync_naver_etf_dividend_info
@@ -189,7 +190,7 @@ async def _fetch_dividend_yields(
                     )
                     info = await loop.run_in_executor(None, fn, ticker)
                 else:
-                    info = await loop.run_in_executor(None, sync_yahoo_dividend_info, to_yf_symbol(ticker, market))
+                    info = await run_yf_bounded(sync_yahoo_dividend_info, to_yf_symbol(ticker, market))
             if info.get("fetch_failed"):
                 # 조회 실패를 "배당 0%"로 전역 캐시하면 복구 뒤에도 하루 동안 모든 유저의 배당 목표가 틀어진다
                 return

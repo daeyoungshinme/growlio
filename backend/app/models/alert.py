@@ -68,7 +68,7 @@ class RebalancingAlert(_AlertMixin, Base):
     trigger_condition: Mapped[str] = mapped_column(String(20), nullable=False, default="DRIFT_ONLY")
     # 실행 모드: NOTIFY(이메일 알림만) | AUTO(자동 주문 실행)
     mode: Mapped[str] = mapped_column(String(10), nullable=False, default="NOTIFY")
-    # 자동 실행 전략: BUY_ONLY | FULL
+    # 자동 실행 전략: BUY_ONLY | FULL | TWO_PHASE
     strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="BUY_ONLY")
     # 이 알림 행 자체의 스코프. portfolio.alert_scope와 동기화되지만 별도 컬럼으로 저장한다 —
     # account_id는 AGGREGATE 스코프에서도 AUTO 모드면 NOT NULL이 되므로(아래 참고),

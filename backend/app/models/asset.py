@@ -243,7 +243,7 @@ class RebalancingExecution(Base):
     )
     # MANUAL | AUTO
     triggered_by: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
-    # FULL | BUY_ONLY
+    # FULL | BUY_ONLY | TWO_PHASE
     strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="FULL")
     total_success: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_fail: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

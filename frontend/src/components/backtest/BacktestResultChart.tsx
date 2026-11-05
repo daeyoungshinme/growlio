@@ -19,6 +19,11 @@ import { useThemeStore } from "@/stores/themeStore";
 import { useIsSmUp } from "@/hooks/useMediaQuery";
 import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { PIE_COLORS } from "@/utils/colors";
+import {
+  summarizeBacktestAnnual,
+  summarizeBacktestCumulative,
+  summarizeBacktestDrawdown,
+} from "@/utils/chartSummary";
 import SegmentedControl from "@/components/common/SegmentedControl";
 
 type ChartView = "cumulative" | "annual" | "drawdown";
@@ -120,7 +125,7 @@ function BacktestResultChart({ dates, series }: Props) {
 
   // 차트 데이터는 입력이 바뀔 때만 다시 만든다. 낙폭은 시리즈마다 한 번만 계산 — 예전엔 날짜마다 시리즈
   // 전체 낙폭을 다시 계산해(O(날짜²)) 일별 수천 포인트 백테스트에서 렌더마다 수백만 번 연산했다
-  const { cumulativeData, drawdownData, annualData } = useMemo(() => {
+  const { cumulativeData, drawdownData, annualData, viewLabels } = useMemo(() => {
     const drawdowns = series.map((s) => computeDrawdown(s.values));
     const toRows = (pick: (seriesIdx: number, i: number) => number | null | undefined) =>
       dates.map((d, i) => {
@@ -131,10 +136,19 @@ function BacktestResultChart({ dates, series }: Props) {
         });
         return row;
       });
+    const annual = computeAnnualReturns(dates, series);
+    const labels: Record<ChartView, string> = {
+      cumulative: summarizeBacktestCumulative(series),
+      annual: summarizeBacktestAnnual(series, annual),
+      drawdown: summarizeBacktestDrawdown(
+        series.map((s, si) => ({ name: s.name, values: drawdowns[si] ?? [] })),
+      ),
+    };
     return {
       cumulativeData: toRows((si, i) => series[si]?.values[i]),
       drawdownData: toRows((si, i) => drawdowns[si]?.[i]),
-      annualData: computeAnnualReturns(dates, series),
+      annualData: annual,
+      viewLabels: labels,
     };
   }, [dates, series]);
 
@@ -171,101 +185,103 @@ function BacktestResultChart({ dates, series }: Props) {
         />
       </div>
 
-      {view === "cumulative" && (
-        <ResponsiveContainer width="100%" height={chartHeight}>
-          <LineChart data={cumulativeData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid {...gridProps} />
-            <XAxis dataKey="date" {...axisProps} interval={tickInterval} />
-            <YAxis {...axisProps} tickFormatter={(v) => `${v.toFixed(0)}`} width={40} />
-            <Tooltip
-              {...tooltipStyle}
-              formatter={(value: unknown, name: string) => {
-                if (value == null || typeof value !== "number") return ["-", name];
-                return [
-                  `${value >= 100 ? "+" : ""}${(value - 100).toFixed(2)}% (${value.toFixed(1)})`,
-                  name,
-                ];
-              }}
-            />
-            <Legend {...legendStyle} iconType="plainline" />
-            {series.map((s, i) => (
-              <Line
-                key={s.name}
-                type="monotone"
-                dataKey={s.name}
-                stroke={PIE_COLORS[i % PIE_COLORS.length]}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
-                connectNulls={false}
+      <div role="img" aria-label={viewLabels[view]}>
+        {view === "cumulative" && (
+          <ResponsiveContainer width="100%" height={chartHeight}>
+            <LineChart data={cumulativeData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="date" {...axisProps} interval={tickInterval} />
+              <YAxis {...axisProps} tickFormatter={(v) => `${v.toFixed(0)}`} width={40} />
+              <Tooltip
+                {...tooltipStyle}
+                formatter={(value: unknown, name: string) => {
+                  if (value == null || typeof value !== "number") return ["-", name];
+                  return [
+                    `${value >= 100 ? "+" : ""}${(value - 100).toFixed(2)}% (${value.toFixed(1)})`,
+                    name,
+                  ];
+                }}
               />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
-      )}
+              <Legend {...legendStyle} iconType="plainline" />
+              {series.map((s, i) => (
+                <Line
+                  key={s.name}
+                  type="monotone"
+                  dataKey={s.name}
+                  stroke={PIE_COLORS[i % PIE_COLORS.length]}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                  connectNulls={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
 
-      {view === "annual" && (
-        <ResponsiveContainer width="100%" height={chartHeight}>
-          <BarChart data={annualData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid {...gridProps} />
-            <XAxis dataKey="year" {...axisProps} />
-            <YAxis
-              {...axisProps}
-              tickFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`}
-              width={50}
-            />
-            <ReferenceLine y={0} stroke={isDark ? "#6B7280" : "#D1D5DB"} />
-            <Tooltip
-              {...tooltipStyle}
-              formatter={(value: unknown, name: string) => {
-                if (value == null || typeof value !== "number") return ["-", name];
-                return [`${value >= 0 ? "+" : ""}${value.toFixed(2)}%`, name];
-              }}
-            />
-            <Legend {...legendStyle} />
-            {series.map((s, i) => (
-              <Bar
-                key={s.name}
-                dataKey={s.name}
-                fill={PIE_COLORS[i % PIE_COLORS.length]}
-                radius={[2, 2, 0, 0]}
-                maxBarSize={28}
+        {view === "annual" && (
+          <ResponsiveContainer width="100%" height={chartHeight}>
+            <BarChart data={annualData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="year" {...axisProps} />
+              <YAxis
+                {...axisProps}
+                tickFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`}
+                width={50}
               />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      )}
+              <ReferenceLine y={0} stroke={isDark ? "#6B7280" : "#D1D5DB"} />
+              <Tooltip
+                {...tooltipStyle}
+                formatter={(value: unknown, name: string) => {
+                  if (value == null || typeof value !== "number") return ["-", name];
+                  return [`${value >= 0 ? "+" : ""}${value.toFixed(2)}%`, name];
+                }}
+              />
+              <Legend {...legendStyle} />
+              {series.map((s, i) => (
+                <Bar
+                  key={s.name}
+                  dataKey={s.name}
+                  fill={PIE_COLORS[i % PIE_COLORS.length]}
+                  radius={[2, 2, 0, 0]}
+                  maxBarSize={28}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        )}
 
-      {view === "drawdown" && (
-        <ResponsiveContainer width="100%" height={chartHeight}>
-          <AreaChart data={drawdownData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid {...gridProps} />
-            <XAxis dataKey="date" {...axisProps} interval={tickInterval} />
-            <YAxis {...axisProps} tickFormatter={(v) => `${v.toFixed(0)}%`} width={45} />
-            <ReferenceLine y={0} stroke={isDark ? "#6B7280" : "#D1D5DB"} />
-            <Tooltip
-              {...tooltipStyle}
-              formatter={(value: unknown, name: string) => {
-                if (value == null || typeof value !== "number") return ["-", name];
-                return [`${value.toFixed(2)}%`, name];
-              }}
-            />
-            <Legend {...legendStyle} iconType="plainline" />
-            {series.map((s, i) => (
-              <Area
-                key={s.name}
-                type="monotone"
-                dataKey={s.name}
-                stroke={PIE_COLORS[i % PIE_COLORS.length]}
-                fill={`${PIE_COLORS[i % PIE_COLORS.length]}33`}
-                strokeWidth={1.5}
-                dot={false}
-                connectNulls={false}
+        {view === "drawdown" && (
+          <ResponsiveContainer width="100%" height={chartHeight}>
+            <AreaChart data={drawdownData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="date" {...axisProps} interval={tickInterval} />
+              <YAxis {...axisProps} tickFormatter={(v) => `${v.toFixed(0)}%`} width={45} />
+              <ReferenceLine y={0} stroke={isDark ? "#6B7280" : "#D1D5DB"} />
+              <Tooltip
+                {...tooltipStyle}
+                formatter={(value: unknown, name: string) => {
+                  if (value == null || typeof value !== "number") return ["-", name];
+                  return [`${value.toFixed(2)}%`, name];
+                }}
               />
-            ))}
-          </AreaChart>
-        </ResponsiveContainer>
-      )}
+              <Legend {...legendStyle} iconType="plainline" />
+              {series.map((s, i) => (
+                <Area
+                  key={s.name}
+                  type="monotone"
+                  dataKey={s.name}
+                  stroke={PIE_COLORS[i % PIE_COLORS.length]}
+                  fill={`${PIE_COLORS[i % PIE_COLORS.length]}33`}
+                  strokeWidth={1.5}
+                  dot={false}
+                  connectNulls={false}
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </div>
   );
 }

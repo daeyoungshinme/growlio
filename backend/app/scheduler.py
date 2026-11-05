@@ -14,7 +14,8 @@ logger = structlog.get_logger()
 # misfire_grace_time: APScheduler 기본값(1초)이면 이벤트 루프가 동기 연산(pandas/MVO 등)으로 잠깐만 밀려도
 # 잡이 "missed"로 조용히 버려진다. coalesce=True라 늦게 실행돼도 1회로 합쳐지므로 넉넉히 잡는다.
 # 주의: jobstore가 메모리라 프로세스 재시작(재배포/Render 무료 플랜 슬립) 사이에 놓친 잡은 이 값과 무관하게
-# 복구되지 않는다 — 슬립은 .github/workflows/keep-alive.yml로 완화 (backend/CLAUDE.md "jobs" 참고).
+# 복구되지 않는다 — 슬립을 막으려면 외부 핑이나 유료 플랜이 필요하다. keep-alive.yml은 GitHub 스로틀로
+# 사실상 효과가 없다 (backend/CLAUDE.md "스케줄러 실행 제약").
 MISFIRE_GRACE_SECONDS = 900
 
 scheduler = AsyncIOScheduler(

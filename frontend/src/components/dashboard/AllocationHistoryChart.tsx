@@ -14,6 +14,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { CHART_TICK_FONT_SIZE, chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
+import { summarizeAllocationHistory } from "@/utils/chartSummary";
 import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 import { useAllocationHistory } from "@/hooks/useAllocationHistory";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -119,7 +120,11 @@ function AllocationHistoryChart({
       }
     >
       <>
-        <div className="h-[180px] sm:h-[220px]">
+        <div
+          className="h-[180px] sm:h-[220px]"
+          role="img"
+          aria-label={summarizeAllocationHistory(reversedMonthly)}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid

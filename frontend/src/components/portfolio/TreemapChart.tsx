@@ -2,6 +2,7 @@ import { memo } from "react";
 import { ResponsiveContainer, Treemap, Tooltip } from "recharts";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrwShort } from "@/utils/format";
+import { summarizeWeights } from "@/utils/chartSummary";
 import { chartTooltipStyle } from "@/utils/chart";
 import TreemapCell from "@/components/common/TreemapCell";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -34,19 +35,21 @@ function TreemapChart({ data, title, height = 220, bare = false, isLoading }: Pr
       데이터 없음
     </div>
   ) : (
-    <ResponsiveContainer width="100%" height={height}>
-      <Treemap data={data} dataKey="value" content={<TreemapCell />}>
-        <Tooltip
-          formatter={(value: number, _name: string, props) => [
-            `${fmtKrwShort(value)}원 (${(props.payload?.pct ?? 0).toFixed(1)}%)`,
-            props.payload?.ticker
-              ? `${props.payload.name} (${props.payload.ticker})`
-              : props.payload?.name,
-          ]}
-          {...chartTooltipStyle(isDark)}
-        />
-      </Treemap>
-    </ResponsiveContainer>
+    <div role="img" aria-label={summarizeWeights(title ?? "자산 비중 트리맵", data)}>
+      <ResponsiveContainer width="100%" height={height}>
+        <Treemap data={data} dataKey="value" content={<TreemapCell />}>
+          <Tooltip
+            formatter={(value: number, _name: string, props) => [
+              `${fmtKrwShort(value)}원 (${(props.payload?.pct ?? 0).toFixed(1)}%)`,
+              props.payload?.ticker
+                ? `${props.payload.name} (${props.payload.ticker})`
+                : props.payload?.name,
+            ]}
+            {...chartTooltipStyle(isDark)}
+          />
+        </Treemap>
+      </ResponsiveContainer>
+    </div>
   );
 
   if (bare) {

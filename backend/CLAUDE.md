@@ -72,13 +72,13 @@ cd backend && uv run mypy app/
 - `InvestmentChallenge` — DEPOSIT/RETURN_PCT/TARGET_VALUE. `account_id`는 DEPOSIT만. 진행률·스트릭은 저장 안 하고 매 조회 재계산
 - `UserSettings` — 브로커 자격증명(AES-256), 투자·입금 목표, 추천 옵션, 알림 옵트인. `PUT /settings/goal`은 **보낸 키만** 바꾼다(`model_fields_set` — 명시적 null은 비우고 생략은 유지). `challenge_reminders_enabled`는 챌린지별 알림 ON으로 첫 챌린지 생성 시 자동 True(이중 게이트 방지)
 
-### API 라우터 (`api/v1/`, 전부 `router.py`에서 등록)
+### API 라우터 (`api/v1/`, `router.py`에서 등록 — `positions`는 `assets.py`, 알림 하위 라우터는 `alerts.py`를 거친다)
 
 > 라우터 추가/prefix 변경 시 이 목록도 갱신.
 
 ```
 assets.py                계좌 CRUD + 동기화 트리거, 브로커 자격증명 검증·삭제, ISA 누적손익 수동입력
-auth.py                  /me, /sync-profile, /find-account, /account/delete. 로그인·가입·refresh는 프론트가 Supabase에 직접 — 백엔드엔 없음
+auth.py                  /me, /sync-profile, /password-reset-complete, /find-account, /account/delete. 로그인·가입·refresh는 프론트가 Supabase에 직접 — 백엔드엔 없음
 alerts.py                알림 목록·읽음 (+ 하위 /alerts/*: exchange_rate_alerts.py / stock_price_alerts.py / rebalancing_alerts.py)
 backtest.py              백테스트
 dashboard.py             대시보드 집계(구현은 asset_aggregator) + GET /dashboard/action-items
@@ -87,12 +87,12 @@ invest.py                DCA 분석 + GET /invest/goal-feasibility(저장 없음
 challenges.py            적립 챌린지 CRUD + 진행률 (/challenges/summary는 네비 배지용 경량)
 portfolios.py            포트폴리오 CRUD — 항목은 단독 종목 또는 지수 그룹(group). index-group-suggestions는 **항상 전체 계좌 기준**, 범위 밖 종목은 in_scope=False
 portfolio_analysis.py    /portfolio/{overview,allocation-history,risk,rebalancing-strategy,index-exposure}
-rebalancing.py           리밸런싱 추천 + 목표 역산 추천(goal-recommendation/{by-horizon,by-age}) + expected-metrics
+rebalancing.py           리밸런싱 분석(portfolios/{id}/analyze) + 목표 역산 추천(goal-recommendation/{by-horizon,by-age}) + expected-metrics + candidates/overlap + broker-balance(/{id}, -all) + drift-summary + composite-signal
 rebalancing_execution.py 주문 실행·이력 + 미체결 취소(POST /history/results/{id}/cancel)
 rebalancing_plan.py      대기 플랜 조회/취소/승인 (인증 필요)
 rebalancing_plan_public.py 이메일 링크 토큰 액션 — **인증 없음, Depends(get_current_user) 사용 금지**
 settings.py              DART 키 + 목표/알림 설정 (브로커 자격증명은 assets.py 소관)
-stocks.py                종목 검색 + GET /stocks/index-region
+stocks.py                종목 검색 + /stocks/{index-region,exchange-rate,price,prices-batch}
 tax.py                   /tax/{summary,overseas-positions,overseas-realized,isa-status,pension-contribution,action-plan}
 transactions.py          입출금/배당 CRUD
 trades.py                수기 매매 CRUD + GET /trades/period-summary (기본 KST 이번 달, 미래 기간 400)
@@ -209,7 +209,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 ### 그 외 패키지
 
 ```
-schemas/        Pydantic(라우터 인라인 스키마 금지 — 알림은 schemas/alert.py). rebalancing/ 패키지는 __init__.py 재노출(from app.schemas.rebalancing import X 유지). service_dtypes.py는 서비스 내부 TypedDict
+schemas/        Pydantic(라우터 인라인 스키마 금지 — 알림은 schemas/alert.py). rebalancing/ 패키지는 __init__.py 재노출(from app.schemas.rebalancing import X 유지). service_dtypes.py는 서비스 내부 TypedDict, _validators.py는 공용 금액 검증(NaN·Infinity 거부)
 core/
   config.py     Settings(pydantic-settings)
   database.py   async engine/session, Base
@@ -219,6 +219,7 @@ core/
   cache_store.py in-memory TTL 캐시(LRU 20,000). **프로세스 로컬** — 워커/인스턴스 2개↑면 적중률 급락·무효화 미전파(render.yaml은 단일 전제)
 kis/            KIS 클라이언트. **해외 거래소 코드 체계가 둘**: 주문/잔고 NASD/NYSE/AMEX vs 시세 NAS/NYS/AMS. **잔고의 NASD는 실전=미국 전체, 모의=나스닥** — 합치면 이중 집계라 ticker로 중복 제거한다.
                 KIS는 NYSE Arca ETF(SPY·VOO 등)를 AMEX로 분류 → exchange_master.resolve_kis_overseas_market()로 주문·시세 직전 보정(키움은 무보정)
+                현재가 조회: domestic_quote.py / overseas_quote.py
 kiwoom/         키움 클라이언트 (rate limit 4/s, return_code=5 = rate limit)
 toss/           토스 Open API. **Open API → IP 관리에 서버 IP 등록 필수**(미등록 403 edge-blocked). 샌드박스 없음, rate 1/s
 providers/
@@ -265,6 +266,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 | `startup_warmup.py` | 기동 직후 1회 | 환율·시장신호·JWKS 예열 |
 | `periodic_catchup.py` | 기동 2분 뒤 + 10~21시 매시 25분 | 놓친 월간 잡 보충(1~3일: 리포트·챌린지 결산, 25~28일: 독려). 월 단위 dedup이 있는 잡만 넣을 것 |
 | `cache_sweep.py` / `app_state_sweep.py` | 15분 / 04:10 | 만료 캐시 / durable row 청소 |
+| `kosdaq_tickers_refresh` (`market_data/yahoo_price.py`, jobs 파일 없음) | 기동 직후 + 07:00 | KOSDAQ 종목 목록(`.KQ` 교정용) |
 | `_job_helpers.py` | — | job 공통 헬퍼(`run_alert_job`·`peak_rss_mb`). 유저별 루프 `run_per_user`·`report_job_failure`는 `core/job_runner.py`(알림 서비스도 쓰므로 core) |
 
 - **새 job**: 파일 생성 → `scheduler.py` `init_scheduler()` jobs 리스트에 `(함수, 트리거, id)` 추가(cron은 `kst(...)` 헬퍼) → `tests/test_scheduler.py` `EXPECTED_JOB_IDS` 갱신.
