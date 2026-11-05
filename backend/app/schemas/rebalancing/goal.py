@@ -43,6 +43,8 @@ class GoalRecommendation(BaseModel):
     """목표 역산 추천 — 로드맵 A 3단계. 자동 반영되지 않으며 사용자가 확인 후 수동 적용한다."""
 
     generated_at: str  # ISO timestamp
+    # 일부 후보 시세를 못 가져와 빼고 계산함 — 캐시 시간을 정할 때만 쓰고 응답에는 싣지 않는다
+    data_incomplete: bool = Field(default=False, exclude=True)
     is_configured: bool  # 목표금액/목표연도 미설정 시 False
     required_return_pct: float | None = None  # 목표 달성에 필요한 연평균 수익률(%)
     required_dividend_yield_pct: float | None = None  # 목표 배당 달성에 필요한 배당수익률(%, 현재 자산 기준)
@@ -76,6 +78,8 @@ class HorizonGoalRecommendation(BaseModel):
     태그된 계좌가 없는 (기간, 세제유형) 조합은 응답 목록에서 아예 생략된다(카드 자체에서 숨김 처리).
     """
 
+    # 일부 후보 시세를 못 가져와 빼고 계산함 — 캐시 시간을 정할 때만 쓰고 응답에는 싣지 않는다
+    data_incomplete: bool = Field(default=False, exclude=True)
     investment_horizon: str  # SHORT_TERM | MID_TERM | LONG_TERM
     tax_type: str  # GENERAL | ISA | PENSION_SAVINGS | IRP | OVERSEAS_DEDICATED
     base_krw: float  # 해당 (기간, 세제유형) 조합에 태그된 계좌들의 자산총액

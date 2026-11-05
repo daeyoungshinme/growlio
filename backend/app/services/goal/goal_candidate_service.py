@@ -18,6 +18,7 @@ from app.constants import (
     DOMESTIC_MARKETS,
     MAX_GOAL_CANDIDATE_TICKERS,
     PENSION_TAX_TYPES,
+    POSITION_STOCK_ASSET_TYPES,
     is_non_tradable,
 )
 from app.models.asset import AssetAccount
@@ -401,6 +402,8 @@ async def _active_account_tax_types(db: AsyncSession, user_id: uuid.UUID) -> lis
                 select(AssetAccount.tax_type).where(
                     AssetAccount.user_id == user_id,
                     AssetAccount.is_active == True,
+                    # 은행·부동산 계좌도 기본값 GENERAL이라 넣으면 IRP 전용 사용자가 "혼합"으로 판정된다
+                    AssetAccount.asset_type.in_(POSITION_STOCK_ASSET_TYPES),
                 )
             )
         )

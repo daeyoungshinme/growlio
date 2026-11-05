@@ -46,7 +46,12 @@ from app.services.dividend.sync_sources import (
     sync_naver_stock_dividend_info,
     sync_yahoo_dividend_info,
 )
-from app.services.goal.goal_portfolio_optimizer import _MAX_WEIGHT, _dividend_floor_constraint, _optimize_goal_portfolio
+from app.services.goal.goal_portfolio_optimizer import (
+    _MAX_WEIGHT,
+    _MIN_RETURN_DAYS,
+    _dividend_floor_constraint,
+    _optimize_goal_portfolio,
+)
 from app.services.goal.recommendation_universe import RECOMMENDATION_UNIVERSE
 from app.services.market_data.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.services.market_signal.market_signal_service import get_market_signal
@@ -54,6 +59,7 @@ from app.utils.cache_keys import (
     TTL_DAILY_RETURNS,
     TTL_GOAL_CANDIDATE_DIVIDEND_YIELD,
     TTL_GOAL_RECOMMENDATION,
+    TTL_GOAL_RECOMMENDATION_INCOMPLETE,
     TTL_GOAL_RECOMMENDATION_STALE,
     CacheStoreType,
     daily_returns_key,
@@ -184,6 +190,9 @@ async def _fetch_dividend_yields(
                     info = await loop.run_in_executor(None, fn, ticker)
                 else:
                     info = await loop.run_in_executor(None, sync_yahoo_dividend_info, to_yf_symbol(ticker, market))
+            if info.get("fetch_failed"):
+                # 조회 실패를 "배당 0%"로 전역 캐시하면 복구 뒤에도 하루 동안 모든 유저의 배당 목표가 틀어진다
+                return
             yield_pct = info["dividend_yield"] * 100
             await set_cached_json(cache, cache_key, {"yield_pct": yield_pct}, TTL_GOAL_CANDIDATE_DIVIDEND_YIELD)
             if yield_pct > 0:
@@ -377,11 +386,14 @@ async def cached_recommendation[M: BaseModel](
     model: type[M],
     compute: Callable[[], Awaitable[M]],
     cacheable: Callable[[M], bool],
+    incomplete: Callable[[M], bool] | None = None,
 ) -> M:
     """추천 3종(전체·기간별·나이별) 공용 캐시 골격: 1시간 키 히트면 반환, 아니면 single-flight로 1건만 계산.
 
     `cacheable(result)`가 참일 때만 1시간 키와 stale(1일) 키에 저장한다 — 빈 추천(일시적 외부 API 장애 등)을
     캐싱하면 복구 뒤에도 TTL 동안 같은 실패를 돌려준다. cache가 None이면 매번 계산한다.
+    `incomplete(result)`가 참이면(일부 후보의 시세를 못 가져옴) 짧게만 저장하고 stale 키에는 넣지 않는다 — 장애 중
+    결과가 하루 동안 남지 않게. 아예 안 저장하면 시세가 계속 없는 후보(상장 직후 ETF)를 가진 유저가 매번 전부 계산한다.
     """
 
     async def _read_cache() -> M | None:
@@ -395,6 +407,9 @@ async def cached_recommendation[M: BaseModel](
         result = await compute()
         if cacheable(result):
             payload = result.model_dump(mode="json")
+            if incomplete is not None and incomplete(result):
+                await set_cached_json(cache, cache_key, payload, TTL_GOAL_RECOMMENDATION_INCOMPLETE)
+                return result
             await set_cached_json(cache, cache_key, payload, TTL_GOAL_RECOMMENDATION)
             await set_cached_json(cache, stale_key, payload, TTL_GOAL_RECOMMENDATION_STALE)
         return result
@@ -455,6 +470,41 @@ def _candidates_with_cagr(
 
 def _has_real_safe_asset(candidates: list[_GoalCandidate]) -> bool:
     return any(c.asset_class != "EQUITY" for c in candidates)
+
+
+def _has_usable_safe_asset(candidates: list[_GoalCandidate], returns_map: dict[str, list[float]]) -> bool:
+    """옵티마이저까지 살아남는 실제 안전자산 후보가 있는지 — CAGR이 있어도 일별수익률이 모자라면 옵티마이저가 뺀다."""
+    return any(
+        c.asset_class != "EQUITY" and len(returns_map.get(c.symbol) or []) >= _MIN_RETURN_DAYS for c in candidates
+    )
+
+
+def _ensure_safe_asset(candidates: list[_GoalCandidate], returns_map: dict[str, list[float]]) -> bool:
+    """안전자산 제약이 걸린 추천에서 쓸 수 있는 안전자산이 없으면 합성 현금성 후보를 넣는다. 넣었으면 True."""
+    if _has_usable_safe_asset(candidates, returns_map):
+        return False
+    if not any(c.symbol == _CASH_EQUIVALENT_TICKER for c in candidates):
+        candidates.append(_cash_equivalent_candidate())
+    returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
+    return True
+
+
+def _missing_candidate_count(
+    eligible_count: int, candidates: list[_GoalCandidate], returns_map: dict[str, list[float]]
+) -> int:
+    """등록 후보 중 시세·수익률 데이터가 없어 계산에서 빠진 수(합성 현금성 후보는 세지 않는다)."""
+    usable = sum(
+        1
+        for c in candidates
+        if c.symbol != _CASH_EQUIVALENT_TICKER and len(returns_map.get(c.symbol) or []) >= _MIN_RETURN_DAYS
+    )
+    return max(0, eligible_count - usable)
+
+
+def _missing_candidates_note(missing: int) -> str | None:
+    if missing <= 0:
+        return None
+    return f"시세를 가져오지 못한 후보 {missing}개를 빼고 계산했어요 — 잠시 후 다시 확인해 주세요"
 
 
 def _cash_equivalent_candidate() -> _GoalCandidate:

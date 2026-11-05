@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any
 
@@ -25,7 +25,7 @@ from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
 from app.models.portfolio import GROUP_ROLE_DOMESTIC_ALT, Portfolio
 from app.models.user import User, UserSettings
-from app.services.alerts.calculator import next_auto_schedule_date
+from app.services.alerts.calculator import already_fired_today, is_auto_schedule_day, next_auto_schedule_date
 from app.utils.cache_keys import CacheStoreType
 from app.utils.currency import fetch_usd_krw
 from app.utils.kst import today_kst
@@ -65,18 +65,35 @@ def buy_market(item: Any, tax_type: str | None) -> str:
     return item.market
 
 
+def _buys_overseas(account: AssetAccount, portfolio: Portfolio) -> bool:
+    tax_type = getattr(account, "tax_type", None)
+    return any(
+        (market or "").upper() not in DOMESTIC_MARKETS and market != CASH_EQUIVALENT_MARKET
+        for market in (buy_market(item, tax_type) for item in portfolio.items)
+    )
+
+
 def account_cash_krw(account: AssetAccount, portfolio: Portfolio, usd_krw: float | None) -> float:
     """실행 계좌 예수금(원). 포트폴리오에 해외 종목이 있을 때만 달러 예수금을 환산해 더한다 —
     국내 종목만 사는 적립식이면 달러는 매수에 쓰이지 않아 부족 판정을 가리기만 한다."""
     cash = float(account.deposit_krw or 0)
-    tax_type = getattr(account, "tax_type", None)
-    has_overseas = any(
-        (market or "").upper() not in DOMESTIC_MARKETS and market != CASH_EQUIVALENT_MARKET
-        for market in (buy_market(item, tax_type) for item in portfolio.items)
-    )
-    if has_overseas and account.deposit_usd and usd_krw:
+    if account.deposit_usd and usd_krw and _buys_overseas(account, portfolio):
         cash += float(account.deposit_usd) * usd_krw
     return cash
+
+
+def _cash_is_unknown(account: AssetAccount, portfolio: Portfolio, usd_krw: float | None) -> bool:
+    """예수금을 모르는 경우 — 동기화 전이거나 달러로 사야 하는데 실환율이 없다. 모르는 것을 부족으로 단정하지 않는다."""
+    if account.deposit_krw is None and not account.deposit_usd:
+        return True
+    return bool(account.deposit_usd) and not usd_krw and _buys_overseas(account, portfolio)
+
+
+def _upcoming_run_date(alert: RebalancingAlert, today: date) -> date | None:
+    """다음 실행일 — 오늘이 실행일이고 아직 안 돌았으면 오늘. 예전에는 당일 아침에도 다음 달 날짜를 보여줬다."""
+    if is_auto_schedule_day(alert, today) and not already_fired_today(alert):
+        return today
+    return next_auto_schedule_date(alert, today)
 
 
 @dataclass(frozen=True)
@@ -128,26 +145,69 @@ async def find_dca_cash_shortfalls(
 
     today = today_kst()
     usd_krw: float | None = None
-    shortfalls: list[DcaShortfall] = []
+    usd_checked = False
+    by_user: dict[uuid.UUID, list[DcaShortfall]] = {}
     for alert, portfolio, account, user, settings_row in rows:
         try:
-            run_date = next_auto_schedule_date(alert, today)
+            run_date = _upcoming_run_date(alert, today)
             if run_date is None:
                 continue
-            days_until = (run_date - today).days
-            if notice_window is not None and not (notice_window[0] <= days_until <= notice_window[1]):
+            if account.deposit_usd and not usd_checked:
+                # 판정에 쓰는 값이라 고정 fallback을 쓰지 않는다 — 1300이면 달러 예수금이 적게 잡혀 거짓 알림이 간다
+                usd_krw = await fetch_usd_krw(cache, allow_fallback=False)
+                usd_checked = True
+            if _cash_is_unknown(account, portfolio, usd_krw):
                 continue
-            if usd_krw is None and account.deposit_usd:
-                usd_krw = await fetch_usd_krw(cache)
-            cash_krw = account_cash_krw(account, portfolio, usd_krw)
             expected_raw = settings_row.monthly_deposit_amount if settings_row else None
-            expected_krw = float(expected_raw) if expected_raw else None
-            if is_cash_short(cash_krw, expected_krw):
-                shortfalls.append(
-                    DcaShortfall(
-                        alert, portfolio, account, user, settings_row, run_date, days_until, cash_krw, expected_krw
-                    )
+            by_user.setdefault(user.id, []).append(
+                DcaShortfall(
+                    alert,
+                    portfolio,
+                    account,
+                    user,
+                    settings_row,
+                    run_date,
+                    (run_date - today).days,
+                    account_cash_krw(account, portfolio, usd_krw),
+                    float(expected_raw) if expected_raw else None,
                 )
+            )
         except Exception as e:
             report_handled_failure("dca_cash_shortfall_evaluate_failed", e, alert_id=str(alert.id))
+
+    shortfalls: list[DcaShortfall] = []
+    for evaluated in by_user.values():
+        shortfalls.extend(_shortfalls_for_user(evaluated, notice_window))
     return shortfalls
+
+
+def _shortfalls_for_user(evaluated: list[DcaShortfall], notice_window: tuple[int, int] | None) -> list[DcaShortfall]:
+    """한 사용자의 자동매수 전체로 판정한다. 월 적립액은 사용자 단위 값이라 알림마다 비교하면 틀린다 — 두 계좌로
+    나눠 사면 둘 다 부족으로 나오고, 한 계좌를 두 포트폴리오가 쓰면 같은 예수금을 두 번 세어 부족을 놓친다.
+
+    합계는 알림 창 밖 계좌까지 포함해 계산하고(창 안 계좌만 보면 거짓 부족), 알림은 창 안의 가장 이른 건에만 낸다.
+    """
+
+    def in_window(sf: DcaShortfall) -> bool:
+        return notice_window is None or notice_window[0] <= sf.days_until <= notice_window[1]
+
+    cash_by_account = {str(sf.account.id): sf.cash_krw for sf in evaluated}
+    expected = evaluated[0].expected_krw
+    if expected:
+        total_cash = sum(cash_by_account.values())
+        candidates = [sf for sf in evaluated if in_window(sf)]
+        if not candidates or not is_cash_short(total_cash, expected):
+            return []
+        return [replace(min(candidates, key=lambda sf: sf.days_until), cash_krw=total_cash)]
+
+    # 월 적립액을 모르면 계좌마다 최소 예수금으로 본다 — 계좌당 한 건
+    earliest: dict[str, DcaShortfall] = {}
+    for sf in evaluated:
+        key = str(sf.account.id)
+        if (
+            in_window(sf)
+            and is_cash_short(sf.cash_krw, None)
+            and (key not in earliest or sf.days_until < earliest[key].days_until)
+        ):
+            earliest[key] = sf
+    return list(earliest.values())

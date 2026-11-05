@@ -24,6 +24,11 @@ def _zero_div() -> dict:
     return {"dps": 0.0, "dividend_yield": 0.0}
 
 
+def _failed_div() -> dict:
+    """조회 실패 — 값은 0이지만 "배당 없음"과 구분한다(`fetch_failed`). 결과를 캐시하는 호출부가 확인한다."""
+    return {**_zero_div(), "fetch_failed": True}
+
+
 def _zero_div_with_months() -> dict:
     return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
 
@@ -70,7 +75,7 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
     import yfinance as yf
 
     if not yahoo_circuit.is_available():
-        return {"ex_dividend_date": None, **_zero_div()}
+        return {"ex_dividend_date": None, **_failed_div()}
 
     try:
         ticker = yf.Ticker(yahoo_symbol)
@@ -115,7 +120,7 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
     except Exception as e:
         logger.warning("yahoo_dividend_info_failed", symbol=yahoo_symbol, error=str(e))
         yahoo_circuit.record_failure()
-        return {"ex_dividend_date": None, **_zero_div()}
+        return {"ex_dividend_date": None, **_failed_div()}
 
 
 def sync_fdr_etf_dividend_info(ticker: str) -> dict:
@@ -184,7 +189,7 @@ def sync_naver_etf_dividend_info(ticker: str) -> dict:
         }
     except NAVER_FAILURES as exc:
         log_naver_failure("naver_etf_dividend", ticker, exc)
-        return _zero_div_with_months()
+        return {**_failed_div(), "dividend_months": []}
 
 
 def sync_naver_etf_index_region(ticker: str) -> str | None:
@@ -223,7 +228,7 @@ def sync_naver_stock_dividend_info(ticker: str) -> dict:
         return {"dps": 0.0, "dividend_yield": yield_pct / 100.0, "dividend_months": []}
     except NAVER_FAILURES as exc:
         log_naver_failure("naver_stock_dividend", ticker, exc)
-        return _zero_div_with_months()
+        return {**_failed_div(), "dividend_months": []}
 
 
 def sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:

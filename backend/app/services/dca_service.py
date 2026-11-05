@@ -13,7 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import UserSettings
-from app.services.goal.goal_return_solver import solve_required_annual_return_pct, solve_required_monthly_deposit
+from app.services.goal.goal_return_solver import (
+    monthly_rate,
+    solve_required_annual_return_pct,
+    solve_required_monthly_deposit,
+)
 from app.services.portfolio.composition_calculator import build_asset_totals, exclude_real_estate
 from app.utils.cache_keys import (
     TTL_DCA_ANALYSIS,
@@ -39,17 +43,17 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
 
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
 
-    pmt = float(settings_row.monthly_deposit_amount) if settings_row and settings_row.monthly_deposit_amount else None
-    annual_return_pct = (
-        float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
-    )
-    goal_amount = float(settings_row.goal_amount) if settings_row and settings_row.goal_amount else None
-    start_dt = settings_row.goal_start_date if settings_row else None
-    manual_initial = (
-        float(settings_row.goal_initial_amount) if settings_row and settings_row.goal_initial_amount else None
-    )
+    # 0은 유효한 값이다(수익률 0%, 거치식 적립 0원, 시작 금액 0원) — 비운 값은 None으로 저장된다
+    def _number(value: Any) -> float | None:
+        return float(value) if value is not None else None
 
-    is_configured = bool(pmt and annual_return_pct and goal_amount and start_dt)
+    pmt = _number(settings_row.monthly_deposit_amount) if settings_row else None
+    annual_return_pct = _number(settings_row.goal_annual_return_pct) if settings_row else None
+    goal_amount = _number(settings_row.goal_amount) if settings_row else None
+    start_dt = settings_row.goal_start_date if settings_row else None
+    manual_initial = _number(settings_row.goal_initial_amount) if settings_row else None
+
+    is_configured = pmt is not None and annual_return_pct is not None and bool(goal_amount) and bool(start_dt)
 
     dca_settings = {
         "monthly_deposit_amount": pmt,
@@ -87,7 +91,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
     else:
         start_date = start_dt
     today = today_kst()
-    r = annual_return_pct / 12 / 100
+    r = monthly_rate(annual_return_pct / 100)
 
     if manual_initial is not None:
         initial_value = manual_initial
@@ -265,7 +269,9 @@ def _build_yearly_achievements(projection_months: list[dict]) -> list[dict[str, 
 
 
 def _calc_months_to_goal(initial_value: float, pmt: float, r: float, goal_amount: float) -> int | None:
-    """현재 계획 기준 목표 달성까지 남은 개월 수."""
+    """현재 계획 기준 목표 달성까지 남은 개월 수. 이미 달성했으면 0."""
+    if initial_value >= goal_amount:
+        return 0
     for n in range(1, _DCA_MAX_MONTHS + 1):
         if r == 0:
             fv = initial_value + pmt * n
@@ -296,11 +302,13 @@ def _calc_goal_timeline(
     else:
         projected_now = initial_value * ((1 + r) ** n) + pmt * (((1 + r) ** n - 1) / r)
 
-    on_track = (current_actual >= projected_now) if (current_actual and projected_now > 0) else None
+    not_started = start_date > today
+    # 시작 전에는 비교 대상이 없다 — 예전에는 경과 개월이 음수라 이론값이 초기금액보다 낮아져 "순항"으로 나왔다
+    on_track = (current_actual >= projected_now) if (current_actual and projected_now > 0 and not not_started) else None
     current_progress_pct = round((current_actual / goal_amount) * 100, 1) if goal_amount > 0 else None
 
     expected_goal_date: str | None = None
-    if months_to_goal:
+    if months_to_goal is not None:
         expected = start_date + relativedelta(months=months_to_goal)
         expected_goal_date = expected.strftime("%Y-%m")
 
@@ -308,9 +316,9 @@ def _calc_goal_timeline(
     lead_lag_months: int | None = None
     actual_expected_goal_date: str | None = None
     acceleration_scenarios: list[dict[str, Any]] = []
-    if months_to_goal and current_actual and projected_now > 0:
+    if months_to_goal is not None and current_actual and projected_now > 0 and not not_started:
         actual_months_to_goal = _calc_months_to_goal(current_actual, pmt, r, goal_amount)
-        if actual_months_to_goal:
+        if actual_months_to_goal is not None:
             remaining_planned = months_to_goal - elapsed
             remaining_actual = actual_months_to_goal
             lead_lag_months = remaining_planned - remaining_actual  # 양수=앞서는 개월
@@ -369,5 +377,6 @@ def _calc_acceleration_scenarios(
 
 
 def _elapsed_months(start: date, end: date) -> int:
+    """경과 개월 수. 시작일이 미래면 0."""
     delta = relativedelta(end, start)
-    return delta.years * 12 + delta.months
+    return max(delta.years * 12 + delta.months, 0)

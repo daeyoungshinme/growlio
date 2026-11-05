@@ -99,7 +99,7 @@ class TestSolveRequiredAnnualReturnPct:
     def test_known_case_matches_fv_formula(self):
         pv, pmt, n = 10_000_000.0, 500_000.0, 120
         annual_r = 0.06
-        r_m = annual_r / 12
+        r_m = (1 + annual_r) ** (1 / 12) - 1
         fv = pv * (1 + r_m) ** n + pmt * (((1 + r_m) ** n - 1) / r_m)
 
         solved = solve_required_annual_return_pct(pv, pmt, n, fv)
@@ -115,7 +115,7 @@ class TestSolveRequiredAnnualReturnPct:
 class TestSolveRequiredMonthlyDeposit:
     def test_known_case_matches_fv_formula(self):
         pv, annual_return_pct, n = 10_000_000.0, 6.0, 120
-        r_m = annual_return_pct / 100 / 12
+        r_m = (1 + annual_return_pct / 100) ** (1 / 12) - 1
         pmt = 500_000.0
         goal_amount = pv * (1 + r_m) ** n + pmt * (((1 + r_m) ** n - 1) / r_m)
 
@@ -525,8 +525,8 @@ class TestOptimizeGoalPortfolio:
         equity_weight = sum(i["weight"] for i in items if i["ticker"] in {"STOCK1", "STOCK2"})
         assert equity_weight == pytest.approx(70.0, abs=1.0)
 
-    def test_equity_ceiling_ignored_when_all_candidates_are_equity(self):
-        """후보가 전부 주식이면 비교 대상이 없어 제약이 무의미하므로 무시되고 일반 최소분산으로 계산된다."""
+    def test_equity_ceiling_refused_when_all_candidates_are_equity(self):
+        """후보가 전부 주식이면 상한을 지킬 수 없다 — 조용히 버리지 않고 추천하지 않는다(plans/110 C2)."""
         random.seed(31)
         returns_map = {
             "A": [random.gauss(0.0002, 0.002) for _ in range(252)],
@@ -544,8 +544,9 @@ class TestOptimizeGoalPortfolio:
             class_bounds={"EQUITY": (0.0, 0.7)},
         )
 
-        assert note is None
-        assert sum(i["weight"] for i in items) == pytest.approx(100.0, abs=0.1)
+        assert items == []
+        assert note is not None
+        assert "상한" in note
 
     def test_equity_ceiling_one_disables_constraint(self):
         """equity_ceiling=1.0이면 상한이 사실상 없는 것과 같아(안전자산 하한 0%) 일반 최소분산

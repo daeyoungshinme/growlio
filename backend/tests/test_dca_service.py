@@ -79,14 +79,14 @@ class TestCalcMonthsToGoal:
         assert result is None
 
     def test_already_at_goal_returns_early(self, override_settings):
-        """이미 목표 달성 시 1 반환."""
+        """이미 목표 달성 시 0 반환."""
         result = _calc_months_to_goal(
             initial_value=100_000_000.0,
             pmt=1_000_000.0,
             r=0.0,
             goal_amount=100_000_000.0,
         )
-        assert result == 1
+        assert result == 0
 
 
 # ── _build_projection_curve ──────────────────────────────────
@@ -487,9 +487,10 @@ class TestGetDcaAnalysisConfigured:
 
         result = await get_dca_analysis(uuid.uuid4(), mock_db)
 
-        # goal_annual_return_pct=0.0 is falsy → is_configured=False (no projection)
-        assert result["is_configured"] is False
-        assert result["projection_months"] == []
+        # 수익률 0%는 유효한 설정이다 — 원금 단순 합산으로 분석한다(plans/110 C7)
+        assert result["is_configured"] is True
+        assert result["projection_months"]
+        assert result["goal_timeline"]["months_to_goal"] == 12
 
     @pytest.mark.asyncio
     async def test_current_progress_pct_uses_unified_asset_total(self, mock_db, override_settings):

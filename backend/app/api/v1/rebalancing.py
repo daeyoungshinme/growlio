@@ -262,7 +262,13 @@ async def get_portfolio_expected_metrics_endpoint(
     settings_row = await get_settings_row(db, current_user.id)
     cagr_lookback_years = _cagr_lookback_years_from_settings(settings_row)
 
-    return await compute_portfolio_expected_metrics(cache, items, cagr_lookback_years=cagr_lookback_years)
+    total_weight = sum(float(_item_attr(i, "weight")) for i in portfolio.items)
+    return await compute_portfolio_expected_metrics(
+        cache,
+        items,
+        cagr_lookback_years=cagr_lookback_years,
+        non_tradable_weight_pct=max(0.0, total_weight - sum(w for *_, w in items)),
+    )
 
 
 @router.get("/broker-balance/{account_id}", response_model=KisBalanceResponse)

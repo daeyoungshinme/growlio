@@ -288,6 +288,16 @@ def _optimize_goal_portfolio(
     cagrs_raw = np.array(cagrs_list, dtype=float)
     n = len(syms)
 
+    # 상한이 걸린 자산군만 남으면 지킬 수 없다 — 제약을 조용히 버리면 "안전자산 30%" 안내와 100% 주식이 함께 나온다
+    for cls, (_lower, upper) in (class_bounds or {}).items():
+        if upper < 1.0 and all(c == cls for c in classes):
+            return (
+                [],
+                None,
+                None,
+                "자산군 비중 상한을 지킬 수 없습니다 — 다른 자산군(채권/현금성 등) 후보를 추가해주세요",
+            )
+
     if float(cagrs_raw.max()) < required_return_pct:
         return [], None, None, f"큐레이션 종목만으로는 목표 수익률(연 {required_return_pct:.1f}%)을 달성하기 어렵습니다"
 
@@ -303,6 +313,7 @@ def _optimize_goal_portfolio(
     bounds, group_budget, active_classes = _resolve_class_bounds(classes, class_bounds, n, max_weight_used)
     x0 = np.full(n, 1.0 / n)
 
+    class_constraints = _class_range_constraints(classes, class_bounds, active_classes)
     effective_frontier_frac, note = _signal_adjusted_frontier_fraction(risk_tolerance, market_signal_level)
     constraints, note = _return_constraints(
         cagrs,
@@ -314,12 +325,13 @@ def _optimize_goal_portfolio(
         required_return_pct,
         effective_frontier_frac,
         note,
+        class_constraints,
     )
     # 명시적으로 범위가 지정된 자산군만 실제 SLSQP 부등식 제약으로 추가한다 — 묵시적으로
     # 유도되는 범위는 `_resolve_class_bounds`가 이미 bounds(종목당 상한) 완화에 반영했으므로
     # 여기서 별도 제약으로 다시 추가하면 총합=1 제약과 선형종속돼 야코비안이 특이해질 위험이
     # 있다(no_spread 케이스와 동일한 이유).
-    constraints = [*constraints, *_class_range_constraints(classes, class_bounds, active_classes)]
+    constraints = [*constraints, *class_constraints]
 
     # 자산군 범위가 걸려 있으면 배당 달성가능성 검증도 동일한 group_budget으로 제한한다(위
     # max_achievable_return 계산과 동일한 이유) — 그렇지 않으면 실제로는 자산군 하한 제약이
@@ -354,7 +366,16 @@ def _optimize_goal_portfolio(
     weights = res.x
     expected_return = round(float(weights @ cagrs), 2)
     expected_volatility = round(float(np.sqrt(weights @ cov_annual @ weights)) * 100, 2)
-    return _weights_to_items(tks, weights), expected_return, expected_volatility, note
+    active_bounds = {c: (class_bounds or {}).get(c, (0.0, 1.0)) for c in active_classes}
+    items = _weights_to_items(tks, weights, classes, active_bounds, [b[1] for b in bounds])
+    if _class_bounds_violated(items, active_bounds):
+        return [], None, None, "제약 조건을 만족하는 포트폴리오를 찾지 못했습니다"
+    return (
+        [{k: v for k, v in item.items() if k != "_class"} for item in items],
+        expected_return,
+        expected_volatility,
+        note,
+    )
 
 
 def _valid_optimizer_inputs(
@@ -378,13 +399,18 @@ def _valid_optimizer_inputs(
 
 
 def _annualized_covariance(syms: tuple[str, ...], returns_map: dict[str, list[float]]):
-    """가장 짧은 시계열 길이에 맞춘 일별수익률의 연환산 공분산(Ledoit-Wolf 축소 적용)."""
+    """가장 짧은 시계열 길이에 맞춘 일별수익률의 연환산 공분산(Ledoit-Wolf 축소 적용).
+
+    시계열은 오래된 날짜부터 정렬돼 있으므로 **최근 구간**(`[-min_len:]`)으로 맞춘다. 앞에서 자르면 오래된 ETF의 옛
+    구간과 신규 ETF의 최근 구간을 짝지어 상관이 사라지고, 가짜 분산 효과로 신규 ETF에 비중이 쏠린다(plans/110 C1).
+    시계열에 날짜가 없어 시장 간 거래일 차이는 남는다.
+    """
     import numpy as np
 
     from app.services.estimation import shrink_covariance
 
     min_len = min(len(returns_map[s]) for s in syms)
-    rets = np.array([returns_map[s][:min_len] for s in syms])
+    rets = np.array([returns_map[s][-min_len:] for s in syms])
     cov_annual = np.cov(rets) * 252 if len(syms) > 1 else np.array([[float(np.var(rets[0])) * 252]])
     return shrink_covariance(rets, cov_annual)
 
@@ -442,11 +468,14 @@ def _return_constraints(
     required_return_pct: float,
     effective_frontier_frac: float,
     note: str | None,
+    class_constraints: list[dict] | None = None,
 ) -> tuple[list[dict], str | None]:
     """총합=1 + 수익률 제약을 만든다(자산군·배당 제약은 호출측이 뒤에 덧붙인다).
 
     CONSERVATIVE(보간 비율 0)는 "필요수익률 이상" 부등식, BALANCED/AGGRESSIVE는 제약 없는 최소분산
     포트폴리오의 자연 수익률과 달성 가능 최대 수익률 사이 보간 지점을 등식으로 고정한다.
+    자산군 제약이 있으면 목표를 그 제약 안에서 낼 수 있는 최소 수익률 이상으로 올린다 — 시장 신호 감쇠로 목표가 낮아지면
+    자산군 하한을 지키면서는 도달할 수 없어 최적화가 실패하고 빈 추천이 나왔다. 정상 범위의 목표는 바꾸지 않는다.
     """
     import numpy as np
     from scipy.optimize import minimize
@@ -469,6 +498,17 @@ def _return_constraints(
     frontier_low = max(natural_return, required_return_pct)
     frontier_high = _max_achievable_return(cagrs, bounds, classes, group_budget)
     target = frontier_low + effective_frontier_frac * max(frontier_high - frontier_low, 0.0)
+    if class_constraints:
+        constrained_res = minimize(
+            lambda w: float(w @ cov_annual @ w),
+            x0=x0,
+            method="SLSQP",
+            bounds=bounds,
+            constraints=[{"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0}, *class_constraints],
+            options={"ftol": 1e-9, "maxiter": 500},
+        )
+        if constrained_res.success:
+            target = max(target, float(constrained_res.x @ cagrs))
     target = min(max(target, required_return_pct), frontier_high)
 
     no_spread = frontier_high - frontier_low < 1e-6
@@ -490,17 +530,105 @@ def _return_constraints(
     return [sum_to_one, return_constraint], note
 
 
-def _weights_to_items(tks: tuple[tuple[str, str, str], ...], weights) -> list[dict]:
-    """0.5% 미만 비중은 버리고 % 단위(소수 1자리)로 반올림한 뒤, 반올림 오차를 첫 종목에 몰아 합계 100을 맞춘다."""
-    items: list[dict] = [
-        {"ticker": tk[0], "name": tk[1], "market": tk[2], "weight": round(float(w) * 100, 1)}
-        for tk, w in zip(tks, weights, strict=False)
-        if w >= 0.005
-    ]
-    total = sum(i["weight"] for i in items)
-    if items and abs(total - 100) > 0.01:
-        items[0]["weight"] = round(items[0]["weight"] + (100 - total), 1)
+class _RoundedWeights:
+    """반올림한 비중(0.1%p 단위)을 종목당 상한·자산군 범위 안에서 옮기는 도구."""
+
+    def __init__(self, items: list[dict], caps: list[float], bounds: dict[str, tuple[float, float]]) -> None:
+        self.items = items
+        self.caps = caps
+        self.bounds = bounds
+        # 큰 항목부터 — 작은 항목에 오차를 몰면 상대 왜곡이 커진다
+        self.by_weight = sorted(range(len(items)), key=lambda k: -items[k]["weight"])
+
+    def class_sum(self, cls: str) -> float:
+        return sum(i["weight"] for i in self.items if i["_class"] == cls)
+
+    def _fits(self, idx: int, delta: float, check_class: bool) -> bool:
+        item = self.items[idx]
+        if item["weight"] + delta > self.caps[idx] + 1e-9 or item["weight"] + delta < 0:
+            return False
+        if not check_class:
+            return True
+        lower, upper = self.bounds.get(item["_class"], (0.0, 1.0))
+        return lower * 100 - 1e-9 <= self.class_sum(item["_class"]) + delta <= upper * 100 + 1e-9
+
+    def shift(self, amount: float, candidates: list[int], *, check_class: bool = True) -> float:
+        """amount를 후보들에 0.1 단위로 나눠 싣고 못 실은 나머지를 돌려준다."""
+        step = 0.1 if amount > 0 else -0.1
+        remaining = round(amount, 1)
+        for idx in candidates:
+            while abs(remaining) >= 0.05 and self._fits(idx, step, check_class):
+                self.items[idx]["weight"] = round(self.items[idx]["weight"] + step, 1)
+                remaining = round(remaining - step, 1)
+        return remaining
+
+    def repair_class_bounds(self) -> None:
+        """자산군 범위를 벗어난 만큼 다른 자산군과 주고받는다."""
+        for cls, (lower, upper) in self.bounds.items():
+            members = [k for k in self.by_weight if self.items[k]["_class"] == cls]
+            others = [k for k in self.by_weight if self.items[k]["_class"] != cls]
+            if not others:
+                continue
+            over = round(self.class_sum(cls) - upper * 100, 1)
+            under = round(lower * 100 - self.class_sum(cls), 1)
+            if over > 0:
+                moved = round(over + self.shift(-over, members, check_class=False), 1)
+                self.shift(moved, others, check_class=False)
+            elif under > 0:
+                moved = round(under + self.shift(-under, others, check_class=False), 1)
+                self.shift(moved, members, check_class=False)
+
+    def complete_to_100(self) -> None:
+        """합계 100을 맞춘다. 범위 안에서 못 맞추면 합계를 우선한다 — 자산군 범위는 호출부가 최종 검증한다."""
+        diff = round(100 - sum(i["weight"] for i in self.items), 1)
+        if abs(diff) >= 0.05:
+            diff = self.shift(diff, self.by_weight)
+        if abs(diff) >= 0.05:
+            first = self.items[self.by_weight[0]]
+            first["weight"] = round(first["weight"] + diff, 1)
+
+
+def _weights_to_items(
+    tks: tuple[tuple[str, str, str], ...],
+    weights,
+    classes: tuple[str, ...] | None = None,
+    class_bounds: dict[str, tuple[float, float]] | None = None,
+    upper_bounds: list[float] | None = None,
+) -> list[dict]:
+    """0.5% 미만 비중은 버리고 % 단위(소수 1자리)로 반올림한 뒤 합계 100과 자산군 범위를 맞춘다.
+
+    반올림·버린 비중은 최적화 뒤에 생기는 오차라 그대로 두면 자산군 상한(IRP 주식 70% 등)을 넘는다. 오차는 종목당 상한과
+    자산군 범위에 여유가 있는 항목으로 보낸다. 항목에는 자산군(`_class`)을 남겨 호출부가 최종 검증한 뒤 지운다.
+    """
+    items: list[dict] = []
+    caps: list[float] = []
+    for idx, (tk, w) in enumerate(zip(tks, weights, strict=False)):
+        if w < 0.005:
+            continue
+        items.append(
+            {
+                "ticker": tk[0],
+                "name": tk[1],
+                "market": tk[2],
+                "weight": round(float(w) * 100, 1),
+                "_class": classes[idx] if classes else None,
+            }
+        )
+        caps.append(upper_bounds[idx] * 100 if upper_bounds else 100.0)
+    if items:
+        rounded = _RoundedWeights(items, caps, class_bounds or {})
+        rounded.repair_class_bounds()
+        rounded.complete_to_100()
     return items
+
+
+def _class_bounds_violated(items: list[dict], class_bounds: dict[str, tuple[float, float]]) -> bool:
+    """반올림 보정 뒤에도 자산군 범위를 벗어났는지. 0.05%p 미만은 반올림 단위 안이라 허용한다."""
+    for cls, (lower, upper) in class_bounds.items():
+        total = sum(i["weight"] for i in items if i.get("_class") == cls)
+        if total > upper * 100 + 0.05 or total < lower * 100 - 0.05:
+            return True
+    return False
 
 
 def compute_weighted_expected_metrics(
@@ -515,7 +643,7 @@ def compute_weighted_expected_metrics(
     과정 없이 바로 적용한 버전. "적용 전 비교 미리보기"에서 포트폴리오의 현재 목표 비중에 대해
     추천 비중과 같은 지표를 나란히 보여주기 위해 쓰인다.
 
-    시세 데이터가 없는 종목(`returns_map`에 없거나 데이터 부족)은 계산에서 제외하고 나머지
+    시세·CAGR 데이터가 없는 종목은 수익률 0으로 치지 않고 계산에서 제외한 뒤 나머지
     비중으로 재정규화한다. 유효 종목이 하나도 없으면 (None, None, None)을 반환한다.
     """
     import numpy as np
@@ -523,7 +651,7 @@ def compute_weighted_expected_metrics(
     valid = [
         (sym, w)
         for sym, w in zip(symbols, weights_pct, strict=False)
-        if sym in returns_map and len(returns_map[sym]) >= _MIN_RETURN_DAYS and w > 0
+        if sym in returns_map and len(returns_map[sym]) >= _MIN_RETURN_DAYS and sym in cagr_by_symbol and w > 0
     ]
     if not valid:
         return None, None, None
@@ -538,7 +666,7 @@ def compute_weighted_expected_metrics(
     # 기대수익률은 "이미 정해진" 비중에 대한 실제 가중평균이므로(최적화 대상이 아님) 축소추정을
     # 적용하지 않는다 — 축소추정(CAGR)은 `_optimize_goal_portfolio`가 최적화 입력을 만들 때만
     # 쓰인다. 변동성(공분산)은 최적화 쪽 결과와 같은 척도로 비교되도록 동일하게 축소추정을 적용.
-    cagrs = np.array([cagr_by_symbol.get(s, 0.0) for s in syms], dtype=float)
+    cagrs = np.array([cagr_by_symbol[s] for s in syms], dtype=float)
     dividends = np.array([dividend_by_symbol.get(s, 0.0) for s in syms], dtype=float)
 
     expected_return = round(float(weights @ cagrs), 2)
