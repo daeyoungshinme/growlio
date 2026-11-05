@@ -173,6 +173,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `tactical_backtest.py` — 실시간과 같은 판정 함수 사용. 매크로는 VIX로만 근사(`macro_note` 고지). **계산 방식 변경 시 `tactical_backtest_key` 버전을 올려 캐시 무효화**
 
 **세금 (`tax/`)**
+- **세금 집계 함정**: 삭제 계좌도 포함한다(실제 소득·납입). 모의 계좌 판정은 `is_paper_account` — `is_mock_mode` 컬럼 기본값이 True라 토스·수기 계좌를 그 값만으로 빼면 안 된다. 취득가는 현재 환율 환산이라 환차익이 빠진 추정이다(`OVERSEAS_FX_BASIS_NOTE`).
 - `tax_service.py` — 연도별 세금 추정·종합과세·건보 피부양자. 해외 실현손익은 직접 조회하지 않고 `overseas_realized_krw` 인자로 받음
 - `overseas_realized_service.py` — 해외 실현손익. KIS 실전은 브로커(TTTS3039R), 그 외는 해외 SELL `TradeRecord`(KIS 실전 계좌 기록은 이중 집계 방지로 무시). 성공 시만 1h 캐시
 - `tax_action_service.py` — 절세 액션 플랜(조합만). 세법 수치는 `_DEDUCTION_RULES` 연도별 테이블
