@@ -136,6 +136,14 @@ export function fmtPct(n: number | null, digits = 2): string {
 }
 
 /**
+ * 0 이상이면 "+"를 붙여 포맷 (금액 등 fmtPct가 아닌 값)
+ * 예: fmtSigned(10000, fmtKrw) → "+1만원"
+ */
+export function fmtSigned(n: number, format: (v: number) => string): string {
+  return `${n >= 0 ? "+" : ""}${format(n)}`;
+}
+
+/**
  * 진행률(%) 값을 프로그레스 바 렌더링용으로 0~100 범위에 클램프
  * 예: clampPct(120) → 100, clampPct(-5) → 0
  */

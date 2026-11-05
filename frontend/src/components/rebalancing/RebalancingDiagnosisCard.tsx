@@ -8,7 +8,7 @@ import { DRIFT_STATUS_LABEL, getDriftStatus, type DriftStatus } from "@/utils/po
 
 const DEFAULT_THRESHOLD = 5.0;
 
-// 카드 전체를 상태색으로 채우는 대신, 대시보드 RebalancingStatusCard와 동일하게
+// 카드 전체를 상태색으로 채우는 대신 RebalancingStatusCard와 동일하게
 // 중립 `.card` 배경 위에 상태별 테두리/링만 얹어 앱 전역의 "진단 카드 강조" 시각 언어를 통일한다.
 const STATUS_CONFIG = {
   critical: {

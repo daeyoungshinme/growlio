@@ -40,5 +40,3 @@ export const challengeFormSchema = z
       });
     }
   });
-
-export type ChallengeFormData = z.infer<typeof challengeFormSchema>;

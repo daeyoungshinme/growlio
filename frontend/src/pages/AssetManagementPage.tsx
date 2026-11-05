@@ -33,6 +33,7 @@ import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { ASSET_MANAGEMENT_TABS, type AssetManagementTab } from "@/constants/tabs";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import Tabs from "@/components/common/Tabs";
+import PageLoadError from "@/components/common/PageLoadError";
 
 const TABS = ASSET_MANAGEMENT_TABS;
 type Tab = (typeof TABS)[number];
@@ -148,15 +149,10 @@ export default function AssetManagementPage() {
 
   if (error)
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <p className="text-sm text-red-500">계좌 정보를 불러오지 못했습니다</p>
-        <button
-          onClick={() => void refetchAccounts()}
-          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
-        >
-          다시 시도
-        </button>
-      </div>
+      <PageLoadError
+        message="계좌 정보를 불러오지 못했습니다"
+        onRetry={() => void refetchAccounts()}
+      />
     );
 
   return (

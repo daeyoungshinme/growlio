@@ -39,6 +39,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { fetchPortfolioOverview } from "@/api/portfolios";
 import { accountsQuery } from "@/api/queryOptions";
+import PageLoadError from "@/components/common/PageLoadError";
 
 const AllocationCard = lazy(() => import("../components/portfolio/AllocationCard"));
 
@@ -202,17 +203,7 @@ export default function PortfolioPage() {
       </div>
     );
   if (error || !data)
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
-        <button
-          onClick={() => void refetch()}
-          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
-        >
-          다시 시도
-        </button>
-      </div>
-    );
+    return <PageLoadError message="데이터를 불러오지 못했습니다" onRetry={() => void refetch()} />;
 
   const hasHorizonTags = horizonTaggedAccounts(data.accounts).length > 0;
   const pnlSign = data.unrealized_pnl_krw >= 0 ? "+" : "";

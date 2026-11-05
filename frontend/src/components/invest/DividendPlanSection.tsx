@@ -19,6 +19,26 @@ interface Props {
   onOpenSettings: () => void;
 }
 
+function AchievementValue({ pct, sizeClass }: { pct: number | null; sizeClass: string }) {
+  const achieved = (pct ?? 0) >= 100;
+  return (
+    <>
+      <p
+        className={`${sizeClass} font-bold ${
+          achieved ? "text-emerald-600 dark:text-emerald-400" : "text-blue-500"
+        }`}
+      >
+        {pct !== null ? `${pct.toFixed(1)}%` : "—"}
+      </p>
+      {achieved && (
+        <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+          <TrendingUp size={12} /> 목표 달성
+        </span>
+      )}
+    </>
+  );
+}
+
 export default function DividendPlanSection({ onOpenSettings }: Props) {
   const { data, isLoading, isError } = useQuery({
     queryKey: QUERY_KEYS.dividendPlan,
@@ -101,20 +121,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               <div className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl mb-3">
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">배당 달성률</p>
-                  <p
-                    className={`text-3xl font-bold ${
-                      (goal_achievement_pct ?? 0) >= 100
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-blue-500"
-                    }`}
-                  >
-                    {goal_achievement_pct !== null ? `${goal_achievement_pct.toFixed(1)}%` : "—"}
-                  </p>
-                  {(goal_achievement_pct ?? 0) >= 100 && (
-                    <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
-                      <TrendingUp size={12} /> 목표 달성
-                    </span>
-                  )}
+                  <AchievementValue pct={goal_achievement_pct} sizeClass="text-3xl" />
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">목표</p>
@@ -178,20 +185,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               </div>
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">달성률</p>
-                <p
-                  className={`text-xl font-bold ${
-                    (goal_achievement_pct ?? 0) >= 100
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-blue-500"
-                  }`}
-                >
-                  {goal_achievement_pct !== null ? `${goal_achievement_pct.toFixed(1)}%` : "—"}
-                </p>
-                {(goal_achievement_pct ?? 0) >= 100 && (
-                  <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
-                    <TrendingUp size={12} /> 목표 달성
-                  </span>
-                )}
+                <AchievementValue pct={goal_achievement_pct} sizeClass="text-xl" />
               </div>
             </div>
 

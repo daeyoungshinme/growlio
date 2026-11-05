@@ -1,5 +1,5 @@
 import { RebalancingAnalysis } from "@/api/rebalancing";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtSigned } from "@/utils/format";
 import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 
 interface Props {
@@ -72,8 +72,7 @@ export default function RebalancingSummaryCards({
         <div className="bg-white dark:bg-gray-800/60 rounded-lg p-2">
           <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">리밸런싱 후 예수금</div>
           <div className={`text-sm font-semibold ${cashAfterCls}`}>
-            {cashAfter >= 0 ? "+" : ""}
-            {fmtKrw(cashAfter)}
+            {fmtSigned(cashAfter, fmtKrw)}
           </div>
         </div>
       </div>

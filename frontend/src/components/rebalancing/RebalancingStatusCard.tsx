@@ -147,13 +147,12 @@ function InsightRow({ insight }: { insight: Insight }) {
 }
 
 /** 리밸런싱 › 진단 탭 상단 카드 — 포트폴리오별 이탈 현황 + 전체 자산 진단. 시장 신호 표시는 탭의
- * MarketSignalBanner가 맡고, 여기서는 이탈과 결합한 안내 문구에만 쓴다(홈 인스턴스는 plans/50에서 제거). */
+ * MarketSignalBanner가 맡고, 여기서는 이탈과 결합한 안내 문구에만 쓴다. */
 interface Props {
   marketSignal?: MarketSignalResponse | null;
   onPortfolioSelect?: (id: string, openAlert?: boolean) => void;
-  /** 지정 시, 포트폴리오가 하나도 없을 때 `null` 대신 "포트폴리오 만들기" CTA 카드를 렌더한다.
-   * 리밸런싱 진단 탭 전용(대시보드 인스턴스는 미지정 → 종전대로 아무것도 렌더하지 않음). */
-  emptyStateCta?: () => void;
+  /** 포트폴리오가 하나도 없을 때 보여 주는 "포트폴리오 만들기" CTA */
+  emptyStateCta: () => void;
 }
 
 // 리밸런싱 기회는 이 카드의 포트폴리오 이탈 행(drift-summary)이 따로 보여 주므로 뺀다
@@ -209,7 +208,6 @@ export default function RebalancingStatusCard({
   }
 
   if (portfoliosError) {
-    if (!emptyStateCta) return null;
     return (
       <div className="card">
         <div className="flex items-center justify-between gap-2 text-xs text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-3 py-2">
@@ -226,7 +224,6 @@ export default function RebalancingStatusCard({
   }
 
   if (portfolioCount === 0) {
-    if (!emptyStateCta) return null;
     return (
       <div className="card">
         <div className="flex items-center gap-2 mb-3">

@@ -12,14 +12,36 @@ import ChallengeEmptyStateCard from "@/components/dashboard/ChallengeEmptyStateC
 import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfolioBanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { portfoliosQuery } from "@/api/queryOptions";
 import { assetManagementUrl } from "@/utils/tabUrl";
+import PageLoadError from "@/components/common/PageLoadError";
 
 const ActionItemsCard = lazy(() => import("../components/dashboard/ActionItemsCard"));
 
 const AllocationHistoryCard = lazy(() => import("../components/dashboard/AllocationHistoryCard"));
+
+const ONBOARDING_STEPS = [
+  {
+    title: "1단계: 계좌 등록",
+    description: "은행·증권 계좌를 연결하세요.",
+    to: assetManagementUrl("증권계좌"),
+    cta: "등록하기 →",
+  },
+  {
+    title: "2단계: 포트폴리오 구성",
+    description: "목표 비중을 설정해 리밸런싱을 관리하세요.",
+    to: rebalancingUrl({ tab: "포트폴리오" }),
+    cta: "둘러보기 →",
+  },
+  {
+    title: "3단계: 투자 목표 설정",
+    description: "자산·배당·입금 목표를 입력하세요.",
+    to: "/invest-plan",
+    cta: "설정하기 →",
+  },
+];
 
 function OnboardingChecklist() {
   return (
@@ -34,60 +56,22 @@ function OnboardingChecklist() {
         </p>
 
         <ol className="space-y-4">
-          {/* Step 1: 계좌 등록 — 이 화면은 계좌가 없을 때만 표시되므로 미완료 */}
-          <li className="flex items-start gap-3">
-            <Circle size={20} className="mt-0.5 shrink-0 text-gray-300 dark:text-gray-600" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                1단계: 계좌 등록
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                은행·증권 계좌를 연결하세요.
-              </p>
-            </div>
-            <Link
-              to={assetManagementUrl("증권계좌")}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
-            >
-              등록하기 →
-            </Link>
-          </li>
-
-          <li className="flex items-start gap-3">
-            <Circle size={20} className="mt-0.5 shrink-0 text-gray-300 dark:text-gray-600" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                2단계: 포트폴리오 구성
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                목표 비중을 설정해 리밸런싱을 관리하세요.
-              </p>
-            </div>
-            <Link
-              to={rebalancingUrl({ tab: "포트폴리오" })}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
-            >
-              둘러보기 →
-            </Link>
-          </li>
-
-          <li className="flex items-start gap-3">
-            <Circle size={20} className="mt-0.5 shrink-0 text-gray-300 dark:text-gray-600" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                3단계: 투자 목표 설정
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                자산·배당·입금 목표를 입력하세요.
-              </p>
-            </div>
-            <Link
-              to="/invest-plan"
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
-            >
-              설정하기 →
-            </Link>
-          </li>
+          {/* 계좌가 없을 때만 표시되는 화면이라 전부 미완료 */}
+          {ONBOARDING_STEPS.map((step) => (
+            <li key={step.title} className="flex items-start gap-3">
+              <Circle size={20} className="mt-0.5 shrink-0 text-gray-300 dark:text-gray-600" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{step.title}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{step.description}</p>
+              </div>
+              <Link
+                to={step.to}
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} -my-2 shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
+              >
+                {step.cta}
+              </Link>
+            </li>
+          ))}
         </ol>
       </div>
     </div>
@@ -137,17 +121,7 @@ export default function DashboardPage() {
     portfolios?.length === 0;
 
   if (!isLoading && !data)
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
-        <button
-          onClick={() => void refetch()}
-          className={`px-4 ${TOUCH_HEIGHT_MIN} text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
-        >
-          다시 시도
-        </button>
-      </div>
-    );
+    return <PageLoadError message="데이터를 불러오지 못했습니다" onRetry={() => void refetch()} />;
 
   // 조회 실패는 "계좌 없음"이 아니다 — 기존 사용자에게 시작 안내가 뜨지 않게 한다
   if (!accountsLoading && !accountsFailed && accounts.length === 0) return <OnboardingChecklist />;

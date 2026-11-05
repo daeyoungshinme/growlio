@@ -4,6 +4,7 @@ import { fetchRebalancingStrategy } from "@/api/risk";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import InfoTip from "@/components/common/InfoTip";
+import { fmtPct } from "@/utils/format";
 
 const FACTOR_LABELS: Record<string, string> = {
   value: "가치",
@@ -149,9 +150,7 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
               <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-2.5 text-xs">
                 <p className="text-gray-400 dark:text-gray-500 mb-0.5">기대수익</p>
                 <p className="font-semibold text-gray-700 dark:text-gray-300">
-                  {frontier.current_return >= 0 ? "+" : ""}
-                  {frontier.current_return.toFixed(2)}% → {frontier.target_return >= 0 ? "+" : ""}
-                  {frontier.target_return.toFixed(2)}%
+                  {fmtPct(frontier.current_return, 2)} → {fmtPct(frontier.target_return, 2)}
                 </p>
                 {frontier_changes.return_change != null && (
                   <p

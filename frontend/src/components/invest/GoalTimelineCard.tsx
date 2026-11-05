@@ -11,10 +11,9 @@ import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 
 interface Props {
   timeline: GoalTimeline;
-  flat?: boolean;
 }
 
-export default function GoalTimelineCard({ timeline, flat }: Props) {
+export default function GoalTimelineCard({ timeline }: Props) {
   const {
     expected_goal_date,
     actual_expected_goal_date,
@@ -86,7 +85,7 @@ export default function GoalTimelineCard({ timeline, flat }: Props) {
   };
 
   return (
-    <div className={flat ? undefined : "card"}>
+    <div>
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">
         목표 달성 전망
       </h3>

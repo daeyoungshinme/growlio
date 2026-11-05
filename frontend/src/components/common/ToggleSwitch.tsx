@@ -1,35 +1,13 @@
 import type { ReactNode } from "react";
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 
-interface ToggleSwitchProps {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  disabled?: boolean;
-  ariaLabel?: string;
-}
-
 const SWITCH_TRACK_CLASS =
   "w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full";
 
-export function ToggleSwitch({ checked, onChange, disabled, ariaLabel }: ToggleSwitchProps) {
-  return (
-    <label
-      className={`relative inline-flex items-center shrink-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-        className="sr-only peer"
-        aria-label={ariaLabel}
-      />
-      <div className={SWITCH_TRACK_CLASS} />
-    </label>
-  );
-}
-
-interface ToggleRowProps extends Omit<ToggleSwitchProps, "ariaLabel"> {
+interface ToggleRowProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
   title: string;
   description?: ReactNode;
 }

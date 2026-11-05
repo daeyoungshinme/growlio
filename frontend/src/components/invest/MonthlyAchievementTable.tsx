@@ -4,10 +4,9 @@ import AchievementTable from "./AchievementTable";
 
 interface Props {
   data: DCAProjectionPoint[];
-  flat?: boolean;
 }
 
-export default function MonthlyAchievementTable({ data, flat }: Props) {
+export default function MonthlyAchievementTable({ data }: Props) {
   const today = localMonth();
   const rows = data
     .filter((d) => d.month <= today && d.has_data)
@@ -28,7 +27,6 @@ export default function MonthlyAchievementTable({ data, flat }: Props) {
       projectedLabel="이론값"
       actualLabel="실제값"
       rows={rows}
-      flat={flat}
       scrollable
       showRecalcNote={false}
     />

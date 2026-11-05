@@ -1,4 +1,4 @@
-import { fmtKrwShort } from "@/utils/format";
+import { fmtKrwShort, fmtSigned, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { POSITION_MARKETS } from "@/constants/markets";
 import type { StockSuggestion } from "@/api/assets";
@@ -8,14 +8,8 @@ export function PnlCell({ val, pct }: { val: number; pct: number }) {
   const color = pnlColor(val);
   return (
     <div className="text-right text-xs">
-      <div className={`font-bold ${color}`}>
-        {pct >= 0 ? "+" : ""}
-        {pct.toFixed(2)}%
-      </div>
-      <div className={color}>
-        {val >= 0 ? "+" : ""}
-        {fmtKrwShort(val)}원
-      </div>
+      <div className={`font-bold ${color}`}>{fmtPct(pct, 2)}</div>
+      <div className={color}>{fmtSigned(val, fmtKrwShort)}원</div>
     </div>
   );
 }

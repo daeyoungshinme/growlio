@@ -7,7 +7,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { summarizeAmounts } from "@/utils/chartSummary";
 import { pnlColor } from "@/utils/colors";
-import { fmtKrw, fmtKrwShort } from "@/utils/format";
+import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 
 /** 연도별 실수령 배당 — 계좌 필터와 무관한 전체 계좌 합계라 화면에 기준을 표시한다 */
 export default function YearlyDividendChart() {
@@ -72,10 +72,7 @@ export default function YearlyDividendChart() {
                 {fmtKrw(y.amount_krw)}
               </span>
               {growth !== null && (
-                <span className={`ml-1 ${pnlColor(growth)}`}>
-                  {growth >= 0 ? "+" : ""}
-                  {growth.toFixed(1)}%
-                </span>
+                <span className={`ml-1 ${pnlColor(growth)}`}>{fmtPct(growth, 1)}</span>
               )}
             </div>
           );

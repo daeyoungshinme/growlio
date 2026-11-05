@@ -78,7 +78,7 @@ describe("FxPlanCard", () => {
 
   it("위치·필요 달러·구간을 보여준다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/1년 중 중간/)).toBeInTheDocument();
     expect(screen.getByText(/환율 예측이 아닙니다/)).toBeInTheDocument();
     expect(screen.getByText(/\$1,700 필요/)).toBeInTheDocument();
@@ -88,7 +88,7 @@ describe("FxPlanCard", () => {
 
   it("기간을 바꾸면 그 기간으로 다시 조회한다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     fireEvent.click(await screen.findByRole("tab", { name: "6개월" }));
     await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(6, null));
   });
@@ -99,7 +99,7 @@ describe("FxPlanCard", () => {
       alert(1380),
       alert(1360, { is_active: false }),
     ]);
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText("알림 등록됨")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "목표 환율 알림 등록" }));
     await waitFor(() => expect(createExchangeRateAlert).toHaveBeenCalledTimes(1));
@@ -112,7 +112,7 @@ describe("FxPlanCard", () => {
   it("알림을 불러오지 못하면 전부 미등록으로 보고 중복 등록하지 않는다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
     vi.mocked(fetchExchangeRateAlerts).mockRejectedValue(new Error("down"));
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
 
     await waitFor(() => expect(fetchExchangeRateAlerts).toHaveBeenCalled());
     // "등록됨"으로 보이면 등록하지 않은 알림을 등록한 줄 안다
@@ -122,7 +122,7 @@ describe("FxPlanCard", () => {
   it("모든 목표가 등록돼 있으면 버튼이 비활성화된다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
     vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([alert(1380), alert(1360)]);
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     expect(await screen.findByRole("button", { name: "목표 환율 알림 등록됨" })).toBeDisabled();
     // 등록한 알림은 설정 › 알림 설정 › 환율 알림에서 관리
     const link = screen.getByRole("link", { name: "환율 알림 관리 →" });
@@ -133,7 +133,7 @@ describe("FxPlanCard", () => {
 
   it("등록한 목표 환율 알림이 없으면 관리 링크를 보이지 않는다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     expect(await screen.findByRole("button", { name: "목표 환율 알림 등록" })).toBeEnabled();
     expect(screen.queryByRole("link", { name: "환율 알림 관리 →" })).toBeNull();
   });
@@ -141,7 +141,7 @@ describe("FxPlanCard", () => {
   it("월 적립액 미설정이면 설정 버튼을 보여준다", async () => {
     const onEditGoal = vi.fn();
     vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, status: "NO_DEPOSIT_GOAL", tranches: [] });
-    renderWithProviders(<FxPlanCard flat onEditGoal={onEditGoal} />);
+    renderWithProviders(<FxPlanCard onEditGoal={onEditGoal} />);
     fireEvent.click(await screen.findByRole("button", { name: "월 적립액 설정" }));
     expect(onEditGoal).toHaveBeenCalled();
   });
@@ -153,7 +153,7 @@ describe("FxPlanCard", () => {
       portfolio_options: [],
       tranches: [],
     });
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/해외 종목이 들어 있는 포트폴리오가 없어/)).toBeInTheDocument();
   });
 
@@ -164,14 +164,14 @@ describe("FxPlanCard", () => {
       need_usd: 0,
       tranches: [],
     });
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/이미 보유한 달러로 3개월치/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /알림 등록/ })).not.toBeInTheDocument();
   });
 
   it("시세 없이도 계획을 보여주고, 조회 실패 시 안내한다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValueOnce({ ...plan, position: null });
-    const { unmount } = renderWithProviders(<FxPlanCard flat />);
+    const { unmount } = renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/위치 판단 없이/)).toBeInTheDocument();
     unmount();
     vi.mocked(fetchFxPlan).mockRejectedValueOnce(new Error("x"));
@@ -187,14 +187,14 @@ describe("FxPlanCard", () => {
         { id: "p2", name: "연금" },
       ],
     });
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     fireEvent.change(await screen.findByLabelText("포트폴리오 선택"), { target: { value: "p2" } });
     await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(3, "p2"));
   });
 
   it("실시간 환율이 없으면 최근 종가 기준임을 알린다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, rate_is_live: false });
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/최근 종가 기준/)).toBeInTheDocument();
   });
 
@@ -208,7 +208,7 @@ describe("FxPlanCard", () => {
         ? Promise.reject({ response: { status: 404 } })
         : Promise.resolve({ ...plan, portfolio_options: options }),
     );
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     fireEvent.change(await screen.findByLabelText("포트폴리오 선택"), { target: { value: "p2" } });
     await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(3, "p2"));
     expect(await screen.findByLabelText("포트폴리오 선택")).toHaveValue("p1");
@@ -225,7 +225,7 @@ describe("FxPlanCard", () => {
         ? Promise.reject({ response: { status: 503 } })
         : Promise.resolve({ ...plan, portfolio_options: options }),
     );
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     fireEvent.change(await screen.findByLabelText("포트폴리오 선택"), { target: { value: "p2" } });
     expect(await screen.findByText(/환전 계획을 불러오지 못했습니다/)).toBeInTheDocument();
     expect(vi.mocked(fetchFxPlan).mock.calls.filter(([, pid]) => pid === null)).toHaveLength(1);
@@ -239,7 +239,7 @@ describe("FxPlanCard", () => {
       portfolio_name: "연금",
       tranches: [],
     });
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/선택한 포트폴리오에 해외 종목이 없습니다/)).toBeInTheDocument();
     const picker = screen.getByLabelText("포트폴리오 선택");
     expect(picker).toHaveValue("p2");
@@ -255,7 +255,7 @@ describe("FxPlanCard", () => {
       status: "NO_RATE",
       tranches: [],
     });
-    renderWithProviders(<FxPlanCard flat />);
+    renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/환율을 불러오지 못해 필요한 달러를/)).toBeInTheDocument();
     expect(screen.queryByText(/필요$/)).not.toBeInTheDocument();
   });

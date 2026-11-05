@@ -734,22 +734,11 @@ describe("AnalysisPanel", () => {
 // RebalancingStatusCard
 // =========================================
 describe("RebalancingStatusCard", () => {
-  it("포트폴리오 없을 때 아무것도 렌더링하지 않음", async () => {
-    const { container } = renderWithProviders(
-      <MemoryRouter>
-        <RebalancingStatusCard />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(container.firstChild).toBeNull();
-    });
-  });
-
   it("포트폴리오 있을 때 카드 렌더링", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     renderWithProviders(
       <MemoryRouter>
-        <RebalancingStatusCard />
+        <RebalancingStatusCard emptyStateCta={vi.fn()} />
       </MemoryRouter>,
     );
     await waitFor(() => {
@@ -763,7 +752,7 @@ describe("RebalancingStatusCard", () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     const { container } = renderWithProviders(
       <MemoryRouter>
-        <RebalancingStatusCard />
+        <RebalancingStatusCard emptyStateCta={vi.fn()} />
       </MemoryRouter>,
     );
     await waitFor(() => {
@@ -798,18 +787,6 @@ describe("RebalancingStatusCard", () => {
     });
   });
 
-  it("포트폴리오 쿼리 에러 시 emptyStateCta 없으면 아무것도 렌더링하지 않는다", async () => {
-    vi.mocked(fetchPortfolios).mockRejectedValueOnce(new Error("network error"));
-    const { container } = renderWithProviders(
-      <MemoryRouter>
-        <RebalancingStatusCard />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(container.firstChild).toBeNull();
-    });
-  });
-
   it("emptyStateCta 지정 시 포트폴리오가 없으면 '포트폴리오 만들기' CTA를 렌더한다 (진단 탭)", async () => {
     const onCreate = vi.fn();
     renderWithProviders(
@@ -829,7 +806,10 @@ describe("RebalancingStatusCard", () => {
     ] as never);
     renderWithProviders(
       <MemoryRouter>
-        <RebalancingStatusCard marketSignal={{ composite_level: "RED" } as never} />
+        <RebalancingStatusCard
+          emptyStateCta={vi.fn()}
+          marketSignal={{ composite_level: "RED" } as never}
+        />
       </MemoryRouter>,
     );
     await waitFor(() => {
@@ -853,7 +833,7 @@ describe("RebalancingStatusCard", () => {
     ] as never);
     renderWithProviders(
       <MemoryRouter>
-        <RebalancingStatusCard />
+        <RebalancingStatusCard emptyStateCta={vi.fn()} />
       </MemoryRouter>,
     );
     const inner = await screen.findByRole("button", { name: "테스트 자동화 설정하기" });

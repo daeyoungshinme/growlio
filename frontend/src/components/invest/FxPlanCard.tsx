@@ -41,7 +41,6 @@ const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
 
 interface Props {
   /** 접힘 카드 안에 임베드될 때 — 외곽 card 스타일 생략 */
-  flat?: boolean;
   /** 월 적립액 미설정 시 "설정 편집" 열기 */
   onEditGoal?: () => void;
 }
@@ -102,7 +101,7 @@ function PositionBlock({ position }: { position: NonNullable<FxPlanData["positio
   );
 }
 
-export default function FxPlanCard({ flat, onEditGoal }: Props) {
+export default function FxPlanCard({ onEditGoal }: Props) {
   const qc = useQueryClient();
   const [monthOption, setMonthOption] = useState<MonthOption>("3개월");
   const [portfolioId, setPortfolioId] = useState<string | null>(null);
@@ -146,12 +145,7 @@ export default function FxPlanCard({ flat, onEditGoal }: Props) {
     },
   });
 
-  const wrap = (children: ReactNode) =>
-    flat ? (
-      <div className="space-y-5">{children}</div>
-    ) : (
-      <div className="card space-y-5">{children}</div>
-    );
+  const wrap = (children: ReactNode) => <div className="space-y-5">{children}</div>;
 
   if (isLoading) return <SkeletonCard rows={4} height="h-5" />;
   if (isError || !data) {

@@ -10,7 +10,7 @@ import {
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { usePositionsEditor } from "@/hooks/usePositionsEditor";
 import { extractErrorMessage } from "@/utils/error";
-import { fmtKrwShort } from "@/utils/format";
+import { fmtKrwShort, fmtSigned, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
@@ -189,12 +189,10 @@ export default function StockPositionsModal({
         <div>
           <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">손익/수익률</p>
           <p className={`font-bold text-sm ${pnlColor(displaySummary.total_pnl)}`}>
-            {displaySummary.total_pnl >= 0 ? "+" : ""}
-            {fmtKrwShort(displaySummary.total_pnl)}원
+            {fmtSigned(displaySummary.total_pnl, fmtKrwShort)}원
           </p>
           <p className={`text-xs ${pnlColor(displaySummary.total_pnl_pct)}`}>
-            {displaySummary.total_pnl_pct >= 0 ? "+" : ""}
-            {displaySummary.total_pnl_pct.toFixed(2)}%
+            {fmtPct(displaySummary.total_pnl_pct, 2)}
           </p>
         </div>
       </div>

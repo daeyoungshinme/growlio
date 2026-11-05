@@ -1,20 +1,12 @@
 import { WifiOff } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-
-function formatLastOnline(date: Date | null): string {
-  if (!date) return "";
-  const mins = Math.floor((Date.now() - date.getTime()) / 60_000);
-  if (mins < 1) return "방금 전";
-  if (mins < 60) return `${mins}분 전`;
-  const hrs = Math.floor(mins / 60);
-  return `${hrs}시간 전`;
-}
+import { relativeTime } from "@/utils/format";
 
 export default function OfflineBanner() {
   const { online, lastOnlineAt } = useOnlineStatus();
   if (online) return null;
 
-  const lastUpdated = formatLastOnline(lastOnlineAt);
+  const lastUpdated = lastOnlineAt ? relativeTime(lastOnlineAt.toISOString()) : "";
 
   return (
     <div

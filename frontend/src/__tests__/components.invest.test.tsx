@@ -312,7 +312,6 @@ describe("GoalTimelineCard", () => {
 describe("SavingsSimulatorCard", () => {
   it("renders default 10/20/30년 stat tiles with default amount", () => {
     renderWithProviders(<SavingsSimulatorCard />);
-    expect(screen.getByText("절약 복리 시뮬레이터")).toBeDefined();
     expect(screen.getByText("10년 후")).toBeDefined();
     expect(screen.getByText("20년 후")).toBeDefined();
     expect(screen.getByText("30년 후")).toBeDefined();

@@ -19,14 +19,8 @@ import {
 import EmptyState from "@/components/common/EmptyState";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { marketLabel } from "@/constants/markets";
+import type { DividendSummary } from "@/api/dividends";
 import { investPlanUrl } from "@/utils/tabUrl";
-
-interface DividendSummary {
-  annual_received: number;
-  estimated_annual: number;
-  monthly_breakdown: { month: string; amount: number }[];
-  monthly_ticker_breakdown: { month: string; ticker: string | null; amount: number }[];
-}
 
 interface Props {
   dividendData: DividendYield[];
@@ -38,6 +32,43 @@ interface Props {
 
 const DIV_SUBTABS = ["종목별 배당", "월별 배당"] as const;
 type DivSubTab = (typeof DIV_SUBTABS)[number];
+
+function WeightBar({ pct, className }: { pct: number; className: string }) {
+  return (
+    <div className={`flex items-center gap-1.5 ${className}`}>
+      <div className="w-14 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+        <div
+          className={`${weightBarColor(pct)} h-full rounded-full`}
+          style={{ width: `${Math.min(pct, 100)}%` }}
+        />
+      </div>
+      <span className="text-xs text-gray-500 dark:text-gray-400 w-9 text-right">
+        {pct.toFixed(1)}%
+      </span>
+    </div>
+  );
+}
+
+function FreqBadges({ months, className = "" }: { months: number[]; className?: string }) {
+  const freqInfo = dividendFreqInfo(months);
+  return (
+    <div className={`flex items-center gap-1 flex-wrap ${className}`}>
+      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${freqInfo.cls}`}>
+        {freqInfo.label}
+      </span>
+      {months.length > 0 &&
+        months.length < 12 &&
+        months.map((m) => (
+          <span
+            key={m}
+            className="text-xs px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-100"
+          >
+            {m}월
+          </span>
+        ))}
+    </div>
+  );
+}
 
 export default function DividendTab({
   dividendData,
@@ -114,6 +145,22 @@ export default function DividendTab({
         .filter((d) => d.estimated_annual_krw > 0)
         .sort((a, b) => b.estimated_annual_krw - a.estimated_annual_krw),
     [dividendByTicker],
+  );
+
+  const tickerRows = useMemo(
+    () =>
+      sortedByTicker.map((d) => {
+        const rowKey = `${d.ticker}-${d.market}`;
+        const posDiv = positionsDivMap[rowKey] ?? tickerOnlyDivMap[d.ticker ?? ""];
+        const posYield = posDiv?.investment_yield ?? 0;
+        return {
+          d,
+          rowKey,
+          pct: totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0,
+          investmentYield: posYield > 0 ? posYield : (d.investment_yield ?? 0),
+        };
+      }),
+    [sortedByTicker, positionsDivMap, tickerOnlyDivMap, totalEstimated],
   );
 
   const monthlyEstimateByMonth = useMemo(
@@ -245,15 +292,7 @@ export default function DividendTab({
             </div>
             {/* 모바일 카드 뷰 */}
             <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
-              {sortedByTicker.map((d) => {
-                const pct =
-                  totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0;
-                const rowKey = `${d.ticker}-${d.market}`;
-                const posDiv = positionsDivMap[rowKey] ?? tickerOnlyDivMap[d.ticker ?? ""];
-                const posYield = posDiv?.investment_yield ?? 0;
-                const investmentYield = posYield > 0 ? posYield : (d.investment_yield ?? 0);
-                const barColor = weightBarColor(pct);
-                const freqInfo = dividendFreqInfo(d.dividend_months);
+              {tickerRows.map(({ d, pct, rowKey, investmentYield }) => {
                 return (
                   <div key={rowKey} className="px-4 py-3">
                     {/* Row 1: 종목명 + 연간 배당액 */}
@@ -279,36 +318,10 @@ export default function DividendTab({
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <div className="w-14 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className={`${barColor} h-full rounded-full`}
-                            style={{ width: `${Math.min(pct, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 w-9 text-right">
-                          {pct.toFixed(1)}%
-                        </span>
-                      </div>
+                      <WeightBar pct={pct} className="shrink-0" />
                     </div>
                     {/* Row 3: 빈도 배지 + 월 배지들 */}
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span
-                        className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${freqInfo.cls}`}
-                      >
-                        {freqInfo.label}
-                      </span>
-                      {d.dividend_months.length > 0 &&
-                        d.dividend_months.length < 12 &&
-                        d.dividend_months.map((m) => (
-                          <span
-                            key={m}
-                            className="text-xs px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-100"
-                          >
-                            {m}월
-                          </span>
-                        ))}
-                    </div>
+                    <FreqBadges months={d.dividend_months} />
                   </div>
                 );
               })}
@@ -336,15 +349,7 @@ export default function DividendTab({
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedByTicker.map((d) => {
-                    const pct =
-                      totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0;
-                    const rowKey = `${d.ticker}-${d.market}`;
-                    const posDiv = positionsDivMap[rowKey] ?? tickerOnlyDivMap[d.ticker ?? ""];
-                    const posYield = posDiv?.investment_yield ?? 0;
-                    const investmentYield = posYield > 0 ? posYield : (d.investment_yield ?? 0);
-                    const barColor = weightBarColor(pct);
-                    const freqInfo = dividendFreqInfo(d.dividend_months);
+                  {tickerRows.map(({ d, pct, rowKey, investmentYield }) => {
                     return (
                       <tr
                         key={rowKey}
@@ -363,36 +368,10 @@ export default function DividendTab({
                           {fmtKrwShort(d.estimated_annual_krw)}원
                         </td>
                         <td className="py-2 px-3">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <div className="w-14 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                              <div
-                                className={`${barColor} h-full rounded-full`}
-                                style={{ width: `${Math.min(pct, 100)}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400 w-9 text-right">
-                              {pct.toFixed(1)}%
-                            </span>
-                          </div>
+                          <WeightBar pct={pct} className="justify-end" />
                         </td>
                         <td className="py-2 px-5 text-right">
-                          <div className="flex items-center justify-end gap-1 flex-wrap">
-                            <span
-                              className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${freqInfo.cls}`}
-                            >
-                              {freqInfo.label}
-                            </span>
-                            {d.dividend_months.length > 0 &&
-                              d.dividend_months.length < 12 &&
-                              d.dividend_months.map((m) => (
-                                <span
-                                  key={m}
-                                  className="text-xs px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-100"
-                                >
-                                  {m}월
-                                </span>
-                              ))}
-                          </div>
+                          <FreqBadges months={d.dividend_months} className="justify-end" />
                         </td>
                       </tr>
                     );

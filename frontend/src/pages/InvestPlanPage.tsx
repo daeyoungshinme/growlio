@@ -307,10 +307,10 @@ export default function InvestPlanPage() {
                     </Suspense>
                     <div className="card divide-y divide-gray-100 dark:divide-gray-700">
                       <div className="pb-4">
-                        <GoalTimelineCard flat timeline={data.goal_timeline} />
+                        <GoalTimelineCard timeline={data.goal_timeline} />
                       </div>
                       <div className="py-4">
-                        <YearlyAchievementTable flat data={data.yearly_achievements} />
+                        <YearlyAchievementTable data={data.yearly_achievements} />
                       </div>
                       <div className="pt-4">
                         <CollapsibleSection
@@ -323,7 +323,7 @@ export default function InvestPlanPage() {
                               : undefined
                           }
                         >
-                          <MonthlyAchievementTable flat data={data.projection_months} />
+                          <MonthlyAchievementTable data={data.projection_months} />
                         </CollapsibleSection>
                       </div>
                     </div>
@@ -343,7 +343,7 @@ export default function InvestPlanPage() {
             >
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-                  <FxPlanCard flat onEditGoal={openEdit} />
+                  <FxPlanCard onEditGoal={openEdit} />
                 </Suspense>
               </ErrorBoundary>
             </CollapsibleCard>
@@ -359,7 +359,7 @@ export default function InvestPlanPage() {
             >
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-                  <SavingsSimulatorCard flat goalReturnPct={s?.goal_annual_return_pct ?? null} />
+                  <SavingsSimulatorCard goalReturnPct={s?.goal_annual_return_pct ?? null} />
                 </Suspense>
               </ErrorBoundary>
             </CollapsibleCard>
