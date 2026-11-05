@@ -1,3 +1,4 @@
+import { fmtPct } from "@/utils/format";
 import type {
   MarketSignalResponse,
   VixLevel,
@@ -257,7 +258,7 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
     content: signals.dollar_index
       ? {
           dotColor: dotColorForSubScore(signals.dollar_index.sub_score),
-          valueText: `${signals.dollar_index.deviation_pct >= 0 ? "+" : ""}${signals.dollar_index.deviation_pct.toFixed(1)}% · ${DOLLAR_LABEL[signals.dollar_index.level]}`,
+          valueText: `${fmtPct(signals.dollar_index.deviation_pct, 1)} · ${DOLLAR_LABEL[signals.dollar_index.level]}`,
           hintText: DOLLAR_HINT[signals.dollar_index.level],
           subScore: signals.dollar_index.sub_score,
         }
@@ -271,7 +272,7 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
     content: signals.exchange_rate
       ? {
           dotColor: dotColorForSubScore(signals.exchange_rate.sub_score),
-          valueText: `₩${signals.exchange_rate.value.toFixed(0)} · ${signals.exchange_rate.deviation_pct >= 0 ? "+" : ""}${signals.exchange_rate.deviation_pct.toFixed(1)}% · ${EXCHANGE_LABEL[signals.exchange_rate.level]}`,
+          valueText: `₩${signals.exchange_rate.value.toFixed(0)} · ${fmtPct(signals.exchange_rate.deviation_pct, 1)} · ${EXCHANGE_LABEL[signals.exchange_rate.level]}`,
           hintText: EXCHANGE_HINT[signals.exchange_rate.level],
           subScore: signals.exchange_rate.sub_score,
         }
@@ -285,7 +286,7 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
     content: signals.oil_price
       ? {
           dotColor: dotColorForSubScore(signals.oil_price.sub_score),
-          valueText: `$${signals.oil_price.value.toFixed(1)} · ${signals.oil_price.deviation_pct >= 0 ? "+" : ""}${signals.oil_price.deviation_pct.toFixed(1)}% · ${OIL_LABEL[signals.oil_price.level]}`,
+          valueText: `$${signals.oil_price.value.toFixed(1)} · ${fmtPct(signals.oil_price.deviation_pct, 1)} · ${OIL_LABEL[signals.oil_price.level]}`,
           hintText: OIL_HINT[signals.oil_price.level],
           subScore: signals.oil_price.sub_score,
         }
@@ -305,11 +306,9 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
           const cpiHint = s.cpi_level ? INFLATION_HINT[s.cpi_level] : "";
           const pceHint = s.pce_level ? INFLATION_HINT[s.pce_level] : "";
           const parts: string[] = [];
-          if (s.cpi_yoy_pct != null)
-            parts.push(`CPI ${s.cpi_yoy_pct >= 0 ? "+" : ""}${s.cpi_yoy_pct.toFixed(1)}%`);
+          if (s.cpi_yoy_pct != null) parts.push(`CPI ${fmtPct(s.cpi_yoy_pct, 1)}`);
           if (s.cpi_level) parts.push(INFLATION_LABEL[s.cpi_level]);
-          if (s.pce_yoy_pct != null)
-            parts.push(`PCE ${s.pce_yoy_pct >= 0 ? "+" : ""}${s.pce_yoy_pct.toFixed(1)}%`);
+          if (s.pce_yoy_pct != null) parts.push(`PCE ${fmtPct(s.pce_yoy_pct, 1)}`);
           if (s.pce_level) parts.push(INFLATION_LABEL[s.pce_level]);
           return {
             dotColor: dotColorForSubScore(s.sub_score),

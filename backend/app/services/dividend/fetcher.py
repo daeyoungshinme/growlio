@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -68,17 +69,17 @@ async def _try_naver(ticker: str, is_etf: bool, loop: asyncio.AbstractEventLoop)
     )
 
 
-async def _try_kis_etf(ticker: str, kis_creds: dict) -> dict:
-    """KIS ETF 전용 배당 조회. 실패 시 빈 결과 반환."""
+async def _try_kis(fetch: Callable[..., Awaitable[dict]], ticker: str, kis_creds: dict, failure_event: str) -> dict:
+    """KIS 배당 조회. 실패 시 빈 결과 반환."""
     return await _try_source(
-        get_domestic_etf_dividend_info(
+        fetch(
             app_key=kis_creds["app_key"],
             app_secret=kis_creds["app_secret"],
             access_token=kis_creds["access_token"],
             ticker=ticker,
             is_mock=kis_creds["is_mock"],
         ),
-        "kis_etf_dividend_fallback_failed",
+        failure_event,
         ticker,
     )
 
@@ -88,21 +89,6 @@ async def _try_fdr(ticker: str, loop: asyncio.AbstractEventLoop) -> dict:
     return await _try_source(
         fdr_circuit.call(loop.run_in_executor, None, partial(sync_fdr_etf_dividend_info, ticker)),
         "fdr_dividend_circuit_skipped",
-        ticker,
-    )
-
-
-async def _try_kis_general(ticker: str, kis_creds: dict) -> dict:
-    """KIS 일반주식 배당 조회. 실패 시 빈 결과 반환."""
-    return await _try_source(
-        get_domestic_dividend_info(
-            app_key=kis_creds["app_key"],
-            app_secret=kis_creds["app_secret"],
-            access_token=kis_creds["access_token"],
-            ticker=ticker,
-            is_mock=kis_creds["is_mock"],
-        ),
-        "kis_dividend_fallback_failed",
         ticker,
     )
 
@@ -170,7 +156,11 @@ async def _fetch_korean_fallbacks(
     """국내 종목 fallback 체인: KIS ETF → FDR(+pykrx 펀더멘털) → KIS 일반 → DART → 정적."""
     if is_etf and (dps == 0.0 or yield_decimal == 0.0) and kis_creds:
         prev_dps = dps
-        dps, yield_decimal = _merge_source(await _try_kis_etf(ticker, kis_creds), dps, yield_decimal)
+        dps, yield_decimal = _merge_source(
+            await _try_kis(get_domestic_etf_dividend_info, ticker, kis_creds, "kis_etf_dividend_fallback_failed"),
+            dps,
+            yield_decimal,
+        )
         if dps != prev_dps:
             logger.info("kis_etf_dividend_fallback_used", ticker=ticker)
 
@@ -179,7 +169,11 @@ async def _fetch_korean_fallbacks(
 
     if (dps == 0.0 or yield_decimal == 0.0) and kis_creds:
         prev_dps = dps
-        dps, yield_decimal = _merge_source(await _try_kis_general(ticker, kis_creds), dps, yield_decimal)
+        dps, yield_decimal = _merge_source(
+            await _try_kis(get_domestic_dividend_info, ticker, kis_creds, "kis_dividend_fallback_failed"),
+            dps,
+            yield_decimal,
+        )
         if dps != prev_dps:
             logger.info("kis_dividend_fallback_used", ticker=ticker)
 

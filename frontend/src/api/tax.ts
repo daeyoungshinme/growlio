@@ -24,15 +24,6 @@ export const fetchOverseasPositionsTax = (accountId?: string | null) =>
     params: { account_id: accountId || undefined },
   });
 
-export interface HarvestingRecommendation {
-  ticker: string;
-  name: string;
-  market: string;
-  unrealized_loss_krw: number;
-  tax_saved_krw: number;
-  qty: number;
-}
-
 export interface HealthInsuranceEstimate {
   financial_income_for_health_insurance_krw: number;
   threshold_krw: number;
@@ -49,28 +40,18 @@ export interface TaxSummary {
   /** 과세계좌 이자소득(사용자가 기록한 INTEREST 내역 기준) */
   interest_income_krw: number;
   interest_tax_krw: number;
-  /** 금융소득 = 배당 + 이자 (종합과세 2,000만원 판정 기준) */
-  financial_income_krw: number;
   overseas_unrealized_gain_krw: number;
   /** 증권사 체결 기준 올해 해외 실현손익 — 자동 집계 가능한 계좌가 없으면 null */
   overseas_realized_gain_krw: number | null;
-  /** 세금 없이 연내 추가 실현 가능한 해외 이익(250만 공제 − 실현손익) — 실현손익 미확인이면 null */
-  overseas_tax_free_room_krw: number | null;
-  overseas_realized_tax_krw: number | null;
   overseas_gain_deduction_krw: number;
   overseas_tax_estimated_krw: number;
-  domestic_stock_value_krw: number;
-  domestic_unrealized_gain_krw: number;
   domestic_large_holder_warning: boolean;
-  domestic_large_holder_excess_krw: number;
   /** 대주주 기준 이상인 종목명(없거나 구버전 서버면 비어 있음) */
   domestic_large_holder_name?: string | null;
   domestic_large_holder_threshold_krw?: number;
   comprehensive_tax_warning: boolean;
   comprehensive_tax_remaining_krw: number;
   total_estimated_tax_krw: number;
-  total_fees_krw: number;
-  harvesting_recommendations: HarvestingRecommendation[];
   health_insurance_estimate: HealthInsuranceEstimate;
   note: string;
   rates: {

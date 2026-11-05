@@ -34,7 +34,7 @@ async def test_day_start_is_kst_midnight(module_path: str, func_name: str):
     db = MagicMock()
     db.execute = AsyncMock(return_value=result)
 
-    with patch(f"{module_path}.today_kst", return_value=_TODAY):
+    with patch("app.services.alerts.alert_service.today_kst", return_value=_TODAY):
         await getattr(module, func_name)(db, uuid.uuid4())
 
     stmt = db.execute.call_args[0][0]

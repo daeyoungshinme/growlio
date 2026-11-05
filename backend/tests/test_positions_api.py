@@ -10,16 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.utils.kst import today_kst
-
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_account(user_id, account_id=None):
@@ -56,39 +47,23 @@ def _make_mock_db():
     return db
 
 
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 class TestSavePositions:
     def test_save_positions_returns_404_for_nonexistent_account(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = [{"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "qty": 10.0, "avg_price": 70000.0}]
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(f"/api/v1/assets/{uuid.uuid4()}/positions", json=payload)
         assert resp.status_code == 404
 
     def test_save_positions_returns_200_with_empty_list(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         mock_snap = SimpleNamespace(
             id=uuid.uuid4(),
@@ -134,16 +109,16 @@ class TestGetPositions:
         assert resp.status_code == 401
 
     def test_returns_404_for_nonexistent_account(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)  # account not found
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(f"/api/v1/assets/{uuid.uuid4()}/positions")
         assert resp.status_code == 404
 
     def test_returns_positions_for_valid_account(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
@@ -172,7 +147,7 @@ class TestGetPositions:
         result.scalars.return_value.all.return_value = [mock_pos]
         db.execute = AsyncMock(return_value=result)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(f"/api/v1/assets/{account.id}/positions")
         assert resp.status_code == 200
@@ -192,11 +167,11 @@ class TestSavePositionsExtended:
 
     def test_save_positions_with_actual_positions(self, override_settings):
         """비어 있지 않은 포지션 리스트 저장 (lines 108-109, 121, 139)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id, user_id=user.id)
 
@@ -232,12 +207,12 @@ class TestSavePositionsExtended:
 
     def test_save_positions_with_deposit_usd_fetches_rate(self, override_settings):
         """deposit_usd 있을 때 환율 조회 경로 (line 125)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         account.deposit_usd = 1000.0
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id, user_id=user.id)
 
@@ -271,11 +246,11 @@ class TestSavePositionsExtended:
 
     def test_save_positions_lock_conflict_returns_409(self, override_settings):
         """Cache 락 획득 실패 시 409 (line 97)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with patch("app.api.v1.positions.get_cache_store") as mock_gr:
             mock_cache = AsyncMock()
@@ -303,11 +278,11 @@ class TestSyncPositionPrices:
 
     def test_sync_no_positions_returns_400(self, override_settings):
         """저장된 포지션 없을 때 400 (lines 155-173)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with patch("app.api.v1.positions.get_cache_store") as mock_gr:
             mock_cache = AsyncMock()
@@ -322,11 +297,11 @@ class TestSyncPositionPrices:
 
     def test_sync_prices_lock_conflict_returns_409(self, override_settings):
         """sync-prices 락 획득 실패 시 409 (line 161)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with patch("app.api.v1.positions.get_cache_store") as mock_gr:
             mock_cache = AsyncMock()
@@ -341,7 +316,7 @@ class TestSyncPositionPrices:
 
     def test_sync_prices_success(self, override_settings):
         """현재가 동기화 성공 경로 (lines 175-215)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
@@ -369,7 +344,7 @@ class TestSyncPositionPrices:
         db.execute = AsyncMock(return_value=pos_result)
 
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with patch("app.api.v1.positions.get_cache_store") as mock_gr:
             mock_cache = AsyncMock()
@@ -392,7 +367,7 @@ class TestSyncPositionPrices:
 
     def test_sync_prices_overseas_applies_usd_rate(self, override_settings):
         """해외 종목 환율 적용 경로 (lines 181, 187)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
@@ -420,7 +395,7 @@ class TestSyncPositionPrices:
         db.execute = AsyncMock(return_value=pos_result)
 
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with patch("app.api.v1.positions.get_cache_store") as mock_gr:
             mock_cache = AsyncMock()
@@ -442,7 +417,7 @@ class TestSyncPositionPrices:
 
     def test_sync_prices_no_price_in_map_uses_fallback(self, override_settings):
         """가격 미조회 시 기존 current_price 사용 (line 191)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
@@ -470,7 +445,7 @@ class TestSyncPositionPrices:
         db.execute = AsyncMock(return_value=pos_result)
 
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with patch("app.api.v1.positions.get_cache_store") as mock_gr:
             mock_cache = AsyncMock()

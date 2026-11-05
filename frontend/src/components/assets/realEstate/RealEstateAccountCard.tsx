@@ -1,6 +1,6 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtSigned } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
@@ -88,8 +88,7 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">매입차익</p>
             <p className={`text-xs font-semibold mt-0.5 ${pnlColor(appreciation)}`}>
-              {appreciation >= 0 ? "+" : ""}
-              {fmtKrw(appreciation)}
+              {fmtSigned(appreciation, fmtKrw)}
             </p>
           </div>
         )}

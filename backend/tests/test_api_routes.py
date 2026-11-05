@@ -132,15 +132,6 @@ class TestAuthRoutes:
 class TestAssetsRoutes:
     """GET /api/v1/assets — 계좌 목록 조회."""
 
-    def test_returns_401_without_auth(self, override_settings):
-        from app.api.deps import get_current_user
-        from app.main import app
-
-        app.dependency_overrides.pop(get_current_user, None)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get("/api/v1/assets")
-        assert resp.status_code == 401
-
     def test_returns_200_with_empty_accounts(self, override_settings):
         from app.api.deps import get_current_user
 
@@ -251,15 +242,6 @@ class TestPortfolioIndexExposureRoutes:
 class TestDividendsRoutes:
     """GET /api/v1/dividends/summary — 배당금 요약."""
 
-    def test_returns_401_without_auth(self, override_settings):
-        from app.api.deps import get_current_user
-        from app.main import app
-
-        app.dependency_overrides.pop(get_current_user, None)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get("/api/v1/dividends/summary")
-        assert resp.status_code == 401
-
     def test_returns_200_with_mocked_service(self, override_settings):
         from app.api.deps import get_current_user
 
@@ -290,15 +272,6 @@ class TestDividendsRoutes:
 
 class TestTaxRoutes:
     """GET /api/v1/tax — 세금 추정."""
-
-    def test_returns_401_without_auth(self, override_settings):
-        from app.api.deps import get_current_user
-        from app.main import app
-
-        app.dependency_overrides.pop(get_current_user, None)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get("/api/v1/tax/summary")
-        assert resp.status_code == 401
 
     def test_returns_200_with_mocked_service(self, override_settings):
         from app.api.deps import get_current_user
@@ -332,15 +305,6 @@ class TestTaxRoutes:
 
 class TestAlertsRoutes:
     """GET /api/v1/alerts/exchange-rate — 환율 알림 목록."""
-
-    def test_returns_401_without_auth(self, override_settings):
-        from app.api.deps import get_current_user
-        from app.main import app
-
-        app.dependency_overrides.pop(get_current_user, None)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get("/api/v1/alerts/exchange-rate")
-        assert resp.status_code == 401
 
     def test_exchange_rate_alerts_returns_200_with_empty_list(self, override_settings):
         from app.api.deps import get_current_user

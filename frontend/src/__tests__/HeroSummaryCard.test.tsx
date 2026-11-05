@@ -128,7 +128,7 @@ describe("HeroSummaryCard", () => {
     renderWithProviders(
       <HeroSummaryCard data={baseDashboard} exchangeRate={1350} dataUpdatedAt={Date.now()} />,
     );
-    expect(screen.getByText("방금 업데이트")).toBeInTheDocument();
+    expect(screen.getByText("방금 전 업데이트")).toBeInTheDocument();
     expect(screen.getByText(/주식 67%/)).toBeInTheDocument();
   });
 

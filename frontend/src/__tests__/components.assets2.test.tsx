@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
 import { render } from "@testing-library/react";
 
-vi.mock("@/utils/format", () => ({
+vi.mock("@/utils/format", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/format")>()),
   fmtKrwShort: vi.fn((n: number) => `${n}만`),
   fmtKrw: vi.fn((n: number) => `${n}원`),
 }));

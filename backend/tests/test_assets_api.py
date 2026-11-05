@@ -10,15 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_mock_db, make_user, setup_app
 
 
 def _make_account_orm(user_id, account_id=None):
@@ -55,39 +47,6 @@ def _make_account_orm(user_id, account_id=None):
     )
 
 
-def _make_mock_db():
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    db = AsyncMock(spec=AsyncSession)
-    db.scalar = AsyncMock(return_value=None)
-    result = MagicMock()
-    result.scalars.return_value.all.return_value = []
-    result.all.return_value = []
-    db.execute = AsyncMock(return_value=result)
-    db.commit = AsyncMock()
-    db.add = MagicMock()
-    db.flush = AsyncMock()
-    db.refresh = AsyncMock()
-    db.delete = AsyncMock()
-    return db
-
-
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 class TestListAccounts:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
@@ -99,22 +58,22 @@ class TestListAccounts:
         assert resp.status_code == 401
 
     def test_returns_empty_list(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/assets")
         assert resp.status_code == 200
         assert resp.json() == []
 
     def test_returns_accounts(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         account = _make_account_orm(user.id)
         result = MagicMock()
         result.scalars.return_value.all.return_value = [account]
         db.execute = AsyncMock(return_value=result)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/assets")
         assert resp.status_code == 200
@@ -123,8 +82,8 @@ class TestListAccounts:
 
 class TestCreateAccount:
     def test_create_manual_account(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         account = _make_account_orm(user.id)
 
         async def mock_refresh(obj):
@@ -134,7 +93,7 @@ class TestCreateAccount:
                         setattr(obj, k, v)
 
         db.refresh = AsyncMock(side_effect=mock_refresh)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "name": "테스트 수동 계좌",
             "asset_type": "STOCK_OTHER",
@@ -147,8 +106,8 @@ class TestCreateAccount:
 
     def test_create_account_invalidates_asset_caches(self, override_settings, monkeypatch):
         """계좌 생성 후 대시보드·추이 캐시가 남으면 새 계좌가 TTL 동안 안 보인다."""
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         account = _make_account_orm(user.id)
 
         async def mock_refresh(obj):
@@ -160,7 +119,7 @@ class TestCreateAccount:
         db.refresh = AsyncMock(side_effect=mock_refresh)
         invalidate = AsyncMock()
         monkeypatch.setattr("app.api.v1.assets.invalidate_asset_account_caches", invalidate)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "name": "테스트 수동 계좌",
             "asset_type": "STOCK_OTHER",
@@ -176,8 +135,8 @@ class TestCreateAccount:
     def test_create_manual_account_ignores_stray_kis_account_no(self, override_settings):
         """브라우저 자동완성 등으로 kis_account_no에 형식이 안 맞는 값이 남아있어도
         data_source가 MANUAL이면 무시되고 정상 생성되어야 한다."""
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         account = _make_account_orm(user.id)
 
         async def mock_refresh(obj):
@@ -187,7 +146,7 @@ class TestCreateAccount:
                         setattr(obj, k, v)
 
         db.refresh = AsyncMock(side_effect=mock_refresh)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "name": "테스트 수동 계좌",
             "asset_type": "STOCK_OTHER",
@@ -203,8 +162,8 @@ class TestCreateAccount:
         """자격증명 확인(verify-kis-credentials) 단계에서 발급된 유저 레벨 토큰이 있으면
         계좌 생성 시 그 계좌로 승격되어야 한다 — 등록 직후 프론트가 자동 호출하는 첫
         동기화가 KIS 토큰을 또 발급받으려다 발급 속도 제한에 걸리는 것을 방지하기 위함."""
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         account = _make_account_orm(user.id)
 
         async def mock_refresh(obj):
@@ -220,7 +179,7 @@ class TestCreateAccount:
         )
         db.scalar = AsyncMock(return_value=verified_token)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "name": "KIS 계좌",
             "asset_type": "STOCK_KIS",
@@ -240,8 +199,8 @@ class TestCreateAccount:
     def test_create_kis_account_without_verified_token_skips_promotion(self, override_settings):
         """유저 레벨 토큰이 없으면(자격증명 확인을 건너뛴 경우 등) 조용히 넘어가고
         계좌 생성은 정상 완료되어야 한다."""
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         account = _make_account_orm(user.id)
 
         async def mock_refresh(obj):
@@ -253,7 +212,7 @@ class TestCreateAccount:
         db.refresh = AsyncMock(side_effect=mock_refresh)
         db.scalar = AsyncMock(return_value=None)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "name": "KIS 계좌",
             "asset_type": "STOCK_KIS",
@@ -269,9 +228,9 @@ class TestCreateAccount:
 
     def test_create_kiwoom_account_requires_account_no(self, override_settings):
         """키움은 스키마 validator가 없어 라우터가 스펙 테이블로 필수값을 검증한다."""
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         payload = {
             "name": "키움 계좌",
             "asset_type": "STOCK_OTHER",
@@ -286,10 +245,10 @@ class TestCreateAccount:
         db.add.assert_not_called()
 
     def test_create_kiwoom_account_encrypts_and_forces_asset_type(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.add = MagicMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {
             "name": "키움 계좌",
             "asset_type": "STOCK_OTHER",
@@ -313,10 +272,10 @@ class TestCreateAccount:
 
 class TestDeleteAccount:
     def test_delete_returns_404_for_nonexistent(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/assets/{uuid.uuid4()}")
         assert resp.status_code == 404

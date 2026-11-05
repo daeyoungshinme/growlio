@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
 from app.core.job_runner import report_job_failure
+from app.models.user import User, UserSettings
 
 
 def peak_rss_mb() -> float | None:
@@ -39,3 +43,16 @@ async def run_alert_job(
                 await service_func(db)
         except Exception as e:
             report_job_failure(f"{job_name}_failed", e)
+
+
+async def challenge_reminder_recipients(db: AsyncSession) -> list[tuple[User, UserSettings]]:
+    """챌린지 알림을 켠 활성 사용자 — 챌린지 독려·결산 잡 공용."""
+    result = await db.execute(
+        select(User, UserSettings)
+        .join(UserSettings, User.id == UserSettings.user_id)
+        .where(
+            User.is_active == True,
+            UserSettings.challenge_reminders_enabled == True,
+        )
+    )
+    return [(user, settings_row) for user, settings_row in result.all()]

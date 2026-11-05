@@ -27,12 +27,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.core.database import AsyncSessionLocal
 from app.core.job_runner import run_per_user
-from app.models.alert import AlertHistory
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services._settings_queries import get_settings_row
 from app.services.accounts._account_queries import active_accounts_stmt
+from app.services.alerts.alert_service import already_sent_alert_today
 from app.services.goal.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal.goal_recommendation_service import (
     _RECOMMENDATION_DRIFT_THRESHOLD_PCT,
@@ -43,7 +43,6 @@ from app.services.goal.goal_recommendation_service import (
 )
 from app.services.portfolio._portfolio_queries import get_linked_portfolios
 from app.utils.cache_keys import CacheStoreType, get_goal_recommendation_generation
-from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
 
@@ -65,19 +64,7 @@ async def _get_subscribers(db: AsyncSession) -> list[tuple[User, UserSettings]]:
 
 
 async def _already_sent_this_week(db: AsyncSession, user_id: uuid.UUID) -> bool:
-    """오늘(=이번 주, 주 1회 실행) 이미 발송했으면 True — 스케줄러 재시작/misfire로 인한 중복 발송 방지."""
-    today = today_kst()
-    day_start = kst_day_start(today)
-    result = await db.execute(
-        select(AlertHistory.id)
-        .where(
-            AlertHistory.user_id == user_id,
-            AlertHistory.alert_type == "RECOMMENDATION_DRIFT",
-            AlertHistory.created_at >= day_start,
-        )
-        .limit(1)
-    )
-    return result.scalar() is not None
+    return await already_sent_alert_today(db, user_id, "RECOMMENDATION_DRIFT")
 
 
 def _is_full_target(portfolio: Portfolio, stock_accounts: list[AssetAccount]) -> bool:

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import { clampPct, fmtKrwShort, fmtPct } from "@/utils/format";
+import { clampPct, fmtKrwShort, fmtPct, fmtSigned } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { weightBarColor } from "@/utils/dividendUtils";
 import type { DividendYield } from "@/types";
@@ -73,8 +73,7 @@ export default function StockHoldingMobileCard({
           </p>
           <span className="shrink-0 flex items-center gap-1">
             <span className={`font-medium tabular-nums ${pnlColor(agg.total_pnl)}`}>
-              {agg.total_pnl >= 0 ? "+" : ""}
-              {fmtKrwShort(agg.total_pnl)}원 · {fmtPct(agg.pnl_pct)}
+              {fmtSigned(agg.total_pnl, fmtKrwShort)}원 · {fmtPct(agg.pnl_pct)}
             </span>
             <ChevronDown
               size={14}

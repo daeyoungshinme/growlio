@@ -8,15 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_mock_db():
@@ -53,22 +45,6 @@ def _make_portfolio(user_id=None, portfolio_id=None):
     )
 
 
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 def _make_full_portfolio(user_id, portfolio_id=None):
     from datetime import datetime
 
@@ -89,12 +65,12 @@ def _make_full_portfolio(user_id, portfolio_id=None):
 
 class TestUpdatePortfolio:
     def test_update_returns_404_when_not_found(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         result_mock = MagicMock()
         result_mock.scalar_one_or_none.return_value = None
         db.execute = AsyncMock(return_value=result_mock)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(f"/api/v1/portfolios/{uuid.uuid4()}", json={"name": "새 이름"})
@@ -107,7 +83,7 @@ class TestUpdatePortfolio:
             app.dependency_overrides.pop(get_db, None)
 
     def test_update_portfolio_name_returns_200(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         portfolio = _make_full_portfolio(user_id=user.id)
 
@@ -118,7 +94,7 @@ class TestUpdatePortfolio:
             return r
 
         db.execute = AsyncMock(side_effect=multi_execute)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -154,9 +130,9 @@ class TestListPortfolios:
         assert resp.status_code == 401
 
     def test_returns_200_empty_list(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -179,7 +155,7 @@ class TestListPortfolios:
 
 class TestCreatePortfolio:
     def test_returns_201_on_create(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         portfolio = _make_portfolio(user_id=user.id)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
@@ -189,7 +165,7 @@ class TestCreatePortfolio:
 
         db.scalar = AsyncMock(side_effect=mock_scalar)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -213,9 +189,9 @@ class TestCreatePortfolio:
             app.dependency_overrides.pop(get_db, None)
 
     def test_create_rejects_empty_name(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.post(
@@ -234,11 +210,11 @@ class TestCreatePortfolio:
 
 class TestDeletePortfolio:
     def test_returns_404_for_nonexistent(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -261,13 +237,13 @@ class TestDeletePortfolio:
             app.dependency_overrides.pop(get_db, None)
 
     def test_returns_204_when_portfolio_found(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         portfolio = _make_portfolio(user_id=user.id)
         db.scalar = AsyncMock(return_value=portfolio)
         db.delete = AsyncMock()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -294,12 +270,12 @@ class TestDeletePortfolio:
 
 class TestReorderPortfolios:
     def test_returns_204_on_reorder(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         pid1 = uuid.uuid4()
         pid2 = uuid.uuid4()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -328,10 +304,10 @@ class TestReorderPortfolios:
             app.dependency_overrides.pop(get_db, None)
 
     def test_empty_items_returns_204(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.patch(
@@ -360,7 +336,7 @@ class TestCreatePortfolioExtended:
     """create_portfolio 핵심 경로 커버 (lines 105-144, 37-48)."""
 
     def test_create_with_valid_items_success(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         portfolio = _make_full_portfolio(user_id=user.id)
 
@@ -368,7 +344,7 @@ class TestCreatePortfolioExtended:
         result.scalar_one.return_value = portfolio
         db.execute = AsyncMock(return_value=result)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -394,7 +370,7 @@ class TestCreatePortfolioExtended:
 
     def test_create_with_account_ids_links_accounts(self, override_settings):
         """_validate_account_ids 통과 + 계좌 연동 로직 (lines 37-48, 124-134)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         portfolio = _make_full_portfolio(user_id=user.id)
         account_id = uuid.uuid4()
@@ -404,7 +380,7 @@ class TestCreatePortfolioExtended:
         result.all.return_value = [(account_id,)]
         db.execute = AsyncMock(return_value=result)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -431,14 +407,14 @@ class TestCreatePortfolioExtended:
 
     def test_create_with_invalid_account_ids_returns_400(self, override_settings):
         """_validate_account_ids에서 소유하지 않은 계좌 감지 시 400 (lines 44-48)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
         result = MagicMock()
         result.all.return_value = []
         db.execute = AsyncMock(return_value=result)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.post(
@@ -459,7 +435,7 @@ class TestCreatePortfolioExtended:
 class TestListPortfoliosExtended:
     def test_returns_cached_data_on_cache_hit(self, override_settings):
         """Cache 캐시 히트 시 DB 조회 없이 반환 (lines 74-76)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
         cached = json.dumps(
@@ -476,7 +452,7 @@ class TestListPortfoliosExtended:
                 }
             ]
         )
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -506,12 +482,12 @@ class TestUpdatePortfolioExtended:
 
     def test_update_portfolio_items(self, override_settings):
         """body.items 업데이트 경로 (lines 179-181)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         portfolio = _make_full_portfolio(user_id=user.id)
         db.execute = AsyncMock(return_value=self._make_result(portfolio))
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -533,12 +509,12 @@ class TestUpdatePortfolioExtended:
 
     def test_update_portfolio_base_type(self, override_settings):
         """body.base_type 업데이트 경로 (line 176)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         portfolio = _make_full_portfolio(user_id=user.id)
         db.execute = AsyncMock(return_value=self._make_result(portfolio))
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -560,7 +536,7 @@ class TestUpdatePortfolioExtended:
 
     def test_update_portfolio_account_ids_change(self, override_settings):
         """account_ids 변경 시 추가/제거 로직 (lines 172, 191-212)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         old_account_id = uuid.uuid4()
         new_account_id = uuid.uuid4()
@@ -570,7 +546,7 @@ class TestUpdatePortfolioExtended:
         result = self._make_result(portfolio, account_id=new_account_id)
         db.execute = AsyncMock(return_value=result)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(

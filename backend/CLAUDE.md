@@ -42,6 +42,7 @@ cd backend && uv run mypy app/
 
 - 실제 DB 없이 mocked `AsyncSession`(`tests/conftest.py`). 환경변수(`KIS_CRED_ENCRYPTION_KEY` 등)도 conftest가 override — `.env` 없이 실행 가능.
 - 주요 fixtures: `mock_db`, `mock_cache`(in-memory get/set/setex), `make_account`, `make_snapshot`, `make_user_settings`.
+- API 라우트 테스트 공용 헬퍼: `tests/api_helpers.py`(`make_user`·`make_mock_db`·`setup_app`). 구성이 다르면 로컬 헬퍼를 둔다.
 - **Windows**: 전체 실행이 `N passed` 후 exit `-1073741819`(0xC0000005)로 끝나는 건 네이티브 확장 teardown 이슈 — 테스트 실패 아님. 판정은 `N passed` 출력과 CI 기준.
 - 테스트 목록: `uv run pytest --collect-only -q`.
 

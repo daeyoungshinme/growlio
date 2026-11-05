@@ -25,6 +25,7 @@ import {
   summarizeBacktestDrawdown,
 } from "@/utils/chartSummary";
 import SegmentedControl from "@/components/common/SegmentedControl";
+import { fmtPct } from "@/utils/format";
 
 type ChartView = "cumulative" | "annual" | "drawdown";
 
@@ -234,7 +235,7 @@ function BacktestResultChart({ dates, series }: Props) {
                 {...tooltipStyle}
                 formatter={(value: unknown, name: string) => {
                   if (value == null || typeof value !== "number") return ["-", name];
-                  return [`${value >= 0 ? "+" : ""}${value.toFixed(2)}%`, name];
+                  return [`${fmtPct(value, 2)}`, name];
                 }}
               />
               <Legend {...legendStyle} />

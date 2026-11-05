@@ -37,12 +37,11 @@ type SavingsMode = (typeof SAVINGS_MODES)[number];
 
 interface Props {
   /** 접힘 카드 안에 임베드될 때 — 외곽 card 스타일과 제목을 생략(제목은 감싸는 카드 헤더가 담당) */
-  flat?: boolean;
   /** 사용자가 설정한 실제 목표 연수익률(UserSettings.goal_annual_return_pct) — 있으면 초기 가정 수익률로 사용 */
   goalReturnPct?: number | null;
 }
 
-export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
+export default function SavingsSimulatorCard({ goalReturnPct }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const [mode, setMode] = useState<SavingsMode>("적립식");
   const [monthlyAmountInput, setMonthlyAmountInput] = useState(
@@ -75,21 +74,7 @@ export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
   const compoundEffect = valueAt30 - totalPrincipalAt30;
 
   return (
-    <div className={flat ? undefined : "card"}>
-      {!flat && (
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">
-          절약 복리 시뮬레이터
-        </h3>
-      )}
-      {/* 접힘 카드(flat) 안에선 카드 힌트가 같은 설명을 이미 보여준다 — 반복 제거 (docs/plans/67 P1-12) */}
-      {!flat && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          {isLumpSum
-            ? "받은 보너스나 목돈을 한 번에 투자하면 복리로 얼마나 커지는지 미리 확인해보세요."
-            : "매달 아낀 돈을 투자하면 복리로 얼마나 커지는지 미리 확인해보세요."}
-        </p>
-      )}
-
+    <div>
       <div className="mb-3">
         <Tabs tabs={SAVINGS_MODES} activeTab={mode} onChange={setMode} variant="pill" fullWidth />
       </div>

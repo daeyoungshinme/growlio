@@ -19,10 +19,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
 from app.core.job_runner import run_per_user
-from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
+from app.services.alerts.alert_service import already_sent_alert_today
 from app.services.tax.tax_action_service import TaxAction, get_tax_action_plan
-from app.utils.kst import kst_day_start, today_kst
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -61,19 +61,7 @@ async def _get_reminder_subscribers(db: AsyncSession) -> list[tuple[User, UserSe
 
 
 async def _already_sent_reminder_today(db: AsyncSession, user_id: uuid.UUID) -> bool:
-    """오늘 이미 리마인더를 발송했으면 True — 스케줄러 재시작/misfire로 인한 중복 발송 방지."""
-    today = today_kst()
-    day_start = kst_day_start(today)
-    result = await db.execute(
-        select(AlertHistory.id)
-        .where(
-            AlertHistory.user_id == user_id,
-            AlertHistory.alert_type == "YEAR_END_TAX_REMINDER",
-            AlertHistory.created_at >= day_start,
-        )
-        .limit(1)
-    )
-    return result.scalar() is not None
+    return await already_sent_alert_today(db, user_id, "YEAR_END_TAX_REMINDER")
 
 
 async def _send_reminder_to_user(user: User, user_settings: UserSettings, to_email: str) -> None:

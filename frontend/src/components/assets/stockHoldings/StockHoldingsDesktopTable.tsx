@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { clampPct, fmtKrwShort, fmtPct } from "@/utils/format";
+import { clampPct, fmtKrwShort, fmtPct, fmtSigned } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import type { DividendYield } from "@/types";
 import { marketLabel } from "@/constants/markets";
@@ -216,8 +216,7 @@ export default function StockHoldingsDesktopTable({
                   <td
                     className={`py-3 px-4 text-right text-xs font-medium ${pnlColor(agg.total_pnl)}`}
                   >
-                    {agg.total_pnl >= 0 ? "+" : ""}
-                    {fmtKrwShort(agg.total_pnl)}원
+                    {fmtSigned(agg.total_pnl, fmtKrwShort)}원
                     <span className="font-bold">({fmtPct(agg.pnl_pct)})</span>
                   </td>
                   <td className="py-3 px-4 text-right">
@@ -269,10 +268,7 @@ export default function StockHoldingsDesktopTable({
                         {fmtKrwShort(sub.value_krw)}원
                       </td>
                       <td className={`py-2 px-4 text-right text-xs ${pnlColor(sub.pnl)}`}>
-                        <div>
-                          {sub.pnl >= 0 ? "+" : ""}
-                          {fmtKrwShort(sub.pnl)}원
-                        </div>
+                        <div>{fmtSigned(sub.pnl, fmtKrwShort)}원</div>
                         <div className="font-medium">{fmtPct(sub.pnl_pct)}</div>
                       </td>
                       <td className="py-2 px-4" />

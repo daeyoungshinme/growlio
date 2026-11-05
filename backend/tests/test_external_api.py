@@ -10,6 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.api_helpers import setup_app
+
 
 def _make_user():
     return SimpleNamespace(id=uuid.uuid4(), email="test@example.com", display_name="테스트", is_active=True)
@@ -41,22 +43,6 @@ def _make_mock_db():
     return db
 
 
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 class TestListAccountBalances:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
@@ -71,7 +57,7 @@ class TestListAccountBalances:
         user = _make_user()
         account = _make_account(user.id)
         db = AsyncMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         snapshot = SimpleNamespace(
             amount_krw=1_234_000.0, snapshot_date=date(2026, 8, 1), invested_amount=None, unrealized_pnl=None
         )
@@ -97,7 +83,7 @@ class TestListAccountBalances:
         user = _make_user()
         account = _make_account(user.id, manual_amount=500_000.0)
         db = AsyncMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[account])),
@@ -140,7 +126,7 @@ class TestListRealEstateItems:
             },
         )
         db = AsyncMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[bank, real_estate])),
@@ -170,7 +156,7 @@ class TestListRealEstateItems:
             real_estate_details=None,
         )
         db = AsyncMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[real_estate])),
@@ -188,7 +174,7 @@ class TestListRealEstateItems:
         user = _make_user()
         bank = _make_account(user.id, asset_type="BANK_ACCOUNT")
         db = AsyncMock()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[bank])),
@@ -237,7 +223,7 @@ class TestCreateExternalTransaction:
         user = _make_user()
         account = _make_account(user.id, data_source="MANUAL", deposit_krw=100_000.0, deposit_usd=None)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         patches = self._patches(account)
         with (
@@ -278,7 +264,7 @@ class TestCreateExternalTransaction:
         user = _make_user()
         account = _make_account(user.id, data_source="MANUAL", deposit_krw=100_000.0, deposit_usd=None)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         position = SimpleNamespace(ticker="005930", market="KOSPI", qty=10, avg_price=10_000.0, current_price=15_000.0)
         new_snap = SimpleNamespace(id=uuid.uuid4())
 
@@ -315,7 +301,7 @@ class TestCreateExternalTransaction:
         user = _make_user()
         account = _make_account(user.id, data_source="MANUAL", deposit_krw=100_000.0, deposit_usd=None)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         patches = self._patches(account)
         with (
@@ -346,7 +332,7 @@ class TestCreateExternalTransaction:
             user.id, data_source="KIS_API", asset_type="STOCK_KIS", deposit_krw=500_000.0, deposit_usd=None
         )
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         patches = self._patches(account)
         with (
@@ -379,7 +365,7 @@ class TestCreateExternalTransaction:
         user = _make_user()
         account = _make_account(user.id, data_source="MANUAL", deposit_krw=0.0)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         patches = self._patches(account)
         with (
@@ -409,7 +395,7 @@ class TestCreateExternalTransaction:
         user = _make_user()
         account = _make_account(user.id, data_source="MANUAL", deposit_krw=1_000_000.0)
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         patches = self._patches(account)
         with (
@@ -438,7 +424,7 @@ class TestCreateExternalTransaction:
 
         user = _make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch(
@@ -464,7 +450,7 @@ class TestAccountInvestedAmount:
     def test_exposes_invested_amount_and_pnl_from_latest_snapshot(self, override_settings):
         user = _make_user()
         account = _make_account(user.id, asset_type="STOCK_KIS")
-        app = _setup_app(user, AsyncMock())
+        app = setup_app(user, AsyncMock())
         snapshot = SimpleNamespace(
             amount_krw=1_200_000.0,
             snapshot_date=date(2026, 9, 1),
@@ -488,7 +474,7 @@ class TestAccountInvestedAmount:
     def test_invested_amount_is_null_without_snapshot(self, override_settings):
         user = _make_user()
         account = _make_account(user.id)
-        app = _setup_app(user, AsyncMock())
+        app = setup_app(user, AsyncMock())
 
         with (
             patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[account])),
@@ -504,7 +490,7 @@ class TestAccountInvestedAmount:
 class TestPerformance:
     def test_returns_return_kpis_from_dashboard_summary(self, override_settings):
         user = _make_user()
-        app = _setup_app(user, AsyncMock())
+        app = setup_app(user, AsyncMock())
         summary = {
             "xirr_pct": 8.5,
             "annual_return_pct": 7.2,
@@ -533,7 +519,7 @@ class TestPerformance:
 
 class TestExternalGoalFeasibility:
     def test_returns_required_return_and_deposit_guide(self, override_settings):
-        app = _setup_app(_make_user(), AsyncMock())
+        app = setup_app(_make_user(), AsyncMock())
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(
                 "/api/v1/external/goal-feasibility",
@@ -553,7 +539,7 @@ class TestExternalGoalFeasibility:
         assert [g["annual_return_pct"] for g in body["deposit_guide"]] == [4.0, 7.0, 10.0]
 
     def test_already_achieved_and_expired(self, override_settings):
-        app = _setup_app(_make_user(), AsyncMock())
+        app = setup_app(_make_user(), AsyncMock())
         with TestClient(app, raise_server_exceptions=False) as client:
             done = client.get(
                 "/api/v1/external/goal-feasibility",

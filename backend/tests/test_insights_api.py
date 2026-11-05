@@ -2,21 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_mock_db():
@@ -29,22 +19,6 @@ def _make_mock_db():
     db.execute = AsyncMock(return_value=result)
     db.commit = AsyncMock()
     return db
-
-
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
 
 
 _MOCK_INSIGHTS = [
@@ -63,9 +37,9 @@ class TestInsights:
         assert resp.status_code == 401
 
     def test_list_insights_returns_200(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.insights.generate_insights",

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { RebalancingAnalysis } from "@/api/rebalancing";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtSigned } from "@/utils/format";
 import { CASH_TICKER } from "@/constants/assets";
 import { DividendDiffCell } from "./RebalancingCells";
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -79,8 +79,7 @@ export default function RebalancingDividendSection({ analysis }: Props) {
           <div
             className={`text-sm font-semibold ${divDiff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
           >
-            {divDiff >= 0 ? "+" : ""}
-            {fmtKrw(divDiff)}
+            {fmtSigned(divDiff, fmtKrw)}
           </div>
           {currentDiv > 0 && (
             <div

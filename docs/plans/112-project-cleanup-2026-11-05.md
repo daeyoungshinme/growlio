@@ -210,13 +210,18 @@ Windows의 `N passed` 후 종료 코드 `-1073741819`는 실패가 아니다.
 | 1 문서 | 완료 | #225 | README 138KB → 27KB, CLAUDE.md 3종 91KB → 77KB(60KB 목표 미달 — 남은 내용은 대부분 함정 설명) |
 | 2 인프라 | keep-alive 제외 완료 | #226 | nginx·monitoring·preDeployCommand 제거 |
 | 3 화면 | 완료 | #227 | 홈 카드 통합, 데스크톱 전망 접기, 계획 탭 차트 정리 |
-| 5 백엔드 | 삭제·`/dashboard`·drift 축소만 완료 | 이 PR | 프로덕션·테스트 288줄 감소 |
+| 5 백엔드 | 완료 | #228, 후속 PR | 삭제·`/dashboard`·drift 축소, `/tax/summary` 응답 축소, 저위험 중복 통합 |
+| 4 프론트 코드 | 완료 | 후속 PR | 미사용 코드·`flat` prop 삭제, 부동산 모달 통합, 배당 행 중복 제거, `fmtSigned`, `PageLoadError` |
+| 6 테스트 | 완료 | 후속 PR | 동일 헬퍼 42개를 `tests/api_helpers.py`로, 중복 테스트 5개 제거, 세금 API 목 응답 수정 |
 
 **조사와 달랐던 점:** `tactical_allocation_service.__all__` 5개는 소비자가 없는 재노출이 아니었다. `svc.check_apply_allowed`처럼 모듈 속성으로 쓰여 그대로 둔다.
 
+**조사 수치와 달랐던 점**
+- `DividendSummary`(`api/dividends.ts`)는 쓰이고 있어 `DividendTab`의 중복 정의를 지웠다.
+- "다시 시도" 54건은 대부분 `EmptyState` 등으로 이미 처리돼 있었고, 똑같은 전체 페이지 블록은 3곳뿐이었다.
+- `_make_mock_db`는 29개 파일에 21가지 변형이라 같은 4곳만 옮겼다. 다른 구성은 로컬에 둔다.
+- `dependency_overrides` 정리 코드 207줄은 파일마다 호출 위치가 달라 손대지 않았다.
+
 **남은 일**
 - keep-alive 제거: 외부 핑 등록 후
-- 배치 4 전체
-- 배치 5: `/tax/summary` 응답 축소, 저위험 중복 통합
-- 배치 6 전체
-- 배치 0·3 브라우저 확인(Vercel Preview)
+- 브라우저 확인(Vercel Preview): 배치 0·3·4

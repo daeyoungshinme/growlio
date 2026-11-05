@@ -1,21 +1,12 @@
 """설정 API 테스트 (GET/PUT /api/v1/settings)."""
 
-import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_mock_db():
@@ -32,22 +23,6 @@ def _make_mock_db():
     return db
 
 
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 class TestGetSettings:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
@@ -60,11 +35,11 @@ class TestGetSettings:
 
     def test_returns_200_no_settings_row(self, override_settings):
         """UserSettings 행 없을 때 기본값 반환."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get("/api/v1/settings", headers={"Authorization": "Bearer fake"})
@@ -83,7 +58,7 @@ class TestGetSettings:
 
     def test_returns_200_with_settings_row(self, override_settings):
         """UserSettings 행 있을 때 실제 값 반환."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(
             dart_api_key="encrypted_key",
@@ -116,7 +91,7 @@ class TestGetSettings:
         )
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get("/api/v1/settings", headers={"Authorization": "Bearer fake"})
@@ -151,7 +126,7 @@ class TestGetSettings:
 class TestUpdateGoal:
     def test_put_goal_returns_200(self, override_settings):
         """목표 금액 업데이트."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(
             goal_amount=None,
@@ -165,7 +140,7 @@ class TestUpdateGoal:
         )
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -183,7 +158,7 @@ class TestUpdateGoal:
 
     def test_put_goal_with_all_fields(self, override_settings):
         """모든 목표 필드 동시 업데이트."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(
             goal_amount=None,
@@ -197,7 +172,7 @@ class TestUpdateGoal:
         )
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -224,7 +199,7 @@ class TestUpdateGoal:
 
     def test_put_goal_with_birth_year_derives_age_group(self, override_settings):
         """birth_year를 보내면 age_group이 자동 파생되어 함께 저장된다(온보딩 전용)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(
             goal_amount=None,
@@ -240,7 +215,7 @@ class TestUpdateGoal:
         )
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -260,7 +235,7 @@ class TestUpdateGoal:
 
     def test_put_goal_null_clears_and_omitted_keeps(self, override_settings):
         """명시적 null은 값을 비우고, 생략한 필드는 그대로 둔다(입력을 지워도 이전 목표가 남던 버그)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(
             goal_amount=300_000_000,
@@ -276,7 +251,7 @@ class TestUpdateGoal:
         )
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -302,10 +277,10 @@ class TestUpdateGoal:
 
     def test_put_goal_rejects_invalid_birth_year(self, override_settings):
         """미래 출생연도는 422 반환."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -323,10 +298,10 @@ class TestUpdateGoal:
 
     def test_put_goal_rejects_negative_amount(self, override_settings):
         """음수 목표 금액은 422 반환."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -346,12 +321,12 @@ class TestUpdateGoal:
 class TestUpdateCompositeSignalAlerts:
     def test_put_composite_signal_alerts_returns_200_and_sets_flag(self, override_settings):
         """복합신호(시장/리스크) 알림 수신 여부를 유저 단위로 저장한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(composite_signal_alerts_enabled=True)
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -370,13 +345,13 @@ class TestUpdateCompositeSignalAlerts:
 
     def test_put_composite_signal_alerts_invalidates_analysis_cache(self, override_settings, monkeypatch):
         """진단 캐시의 diagnosis_context가 이 설정으로 계산되므로 토글 즉시 비워야 한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=SimpleNamespace(composite_signal_alerts_enabled=True))
         invalidate = AsyncMock()
         monkeypatch.setattr("app.api.v1.settings.invalidate_rebalancing_analysis_cache_all", invalidate)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -407,12 +382,12 @@ class TestUpdateCompositeSignalAlerts:
 class TestUpdateMarketSignalDigest:
     def test_put_market_signal_digest_returns_200_and_sets_flag(self, override_settings):
         """시장신호 매일 요약(08:30 KST) 수신 여부를 유저 단위로 저장한다 — 기본값 OFF의 옵트인 설정."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(market_signal_daily_digest_enabled=False)
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -442,12 +417,12 @@ class TestUpdateMarketSignalDigest:
 class TestUpdateAutoRebalancingDailyCap:
     def test_put_daily_cap_returns_200_and_sets_value(self, override_settings):
         """AUTO 리밸런싱 유저 단위 하루 합산 거래대금 상한을 저장한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(auto_rebalancing_daily_value_cap_krw=None)
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -466,12 +441,12 @@ class TestUpdateAutoRebalancingDailyCap:
 
     def test_put_daily_cap_accepts_null_to_clear(self, override_settings):
         """None(미지정)으로 다시 보내면 무제한(기본값)으로 되돌아간다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(auto_rebalancing_daily_value_cap_krw=80_000_000.0)
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -489,10 +464,10 @@ class TestUpdateAutoRebalancingDailyCap:
             app.dependency_overrides.pop(get_db, None)
 
     def test_put_daily_cap_rejects_zero_or_negative(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -521,12 +496,12 @@ class TestUpdateAutoRebalancingDailyCap:
 class TestUpdateIncomeBracket:
     def test_put_income_bracket_sets_and_clears(self, override_settings):
         """절세 액션 플랜의 연금 공제율 분기용 소득 구간 — 설정 후 null로 해제할 수 있다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(income_bracket=None)
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -551,11 +526,11 @@ class TestUpdateIncomeBracket:
             app.dependency_overrides.pop(get_db, None)
 
     def test_put_income_bracket_rejects_unknown_value(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=SimpleNamespace(income_bracket=None))
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -575,12 +550,12 @@ class TestUpdateIncomeBracket:
 class TestUpdateGoalAchievementAlerts:
     def test_put_goal_achievement_alerts_returns_200_and_sets_flag(self, override_settings):
         """자산/입금/배당 목표 달성 알림 수신 여부를 유저 단위로 저장한다 — 기본값 ON에서 끌 수 있어야 한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(goal_achievement_alerts_enabled=True)
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -610,12 +585,12 @@ class TestUpdateGoalAchievementAlerts:
 class TestUpdateMonthlyReportAlerts:
     def test_put_monthly_report_alerts_returns_200_and_sets_flag(self, override_settings):
         """월간 리포트 수신 여부를 유저 단위로 저장한다 — 기본값 ON에서 끌 수 있어야 한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(monthly_report_enabled=True)
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -645,12 +620,12 @@ class TestUpdateMonthlyReportAlerts:
 class TestUpdateGoalCandidateTickers:
     def test_put_goal_candidate_tickers_returns_200_and_saves_list(self, override_settings):
         """목표 역산 추천용 사용자 등록 후보 ETF 목록을 저장한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(goal_candidate_tickers=None)
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -679,10 +654,10 @@ class TestUpdateGoalCandidateTickers:
 
     def test_put_goal_candidate_tickers_rejects_over_twenty(self, override_settings):
         """후보 ETF가 20개를 초과하면 422를 반환한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -710,7 +685,7 @@ class TestUpdateGoalCandidateTickers:
 
 class TestUpdateGoalRecommendationOptions:
     def test_put_goal_recommendation_options_returns_200_and_saves_fields(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(
             goal_risk_tolerance=None,
@@ -723,7 +698,7 @@ class TestUpdateGoalRecommendationOptions:
         )
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -755,10 +730,10 @@ class TestUpdateGoalRecommendationOptions:
             app.dependency_overrides.pop(get_db, None)
 
     def test_put_goal_recommendation_options_rejects_bond_ceiling_out_of_range(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -780,10 +755,10 @@ class TestUpdateGoalRecommendationOptions:
             app.dependency_overrides.pop(get_db, None)
 
     def test_put_goal_recommendation_options_rejects_short_term_equity_floor_out_of_range(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -805,10 +780,10 @@ class TestUpdateGoalRecommendationOptions:
             app.dependency_overrides.pop(get_db, None)
 
     def test_put_goal_recommendation_options_rejects_invalid_age_group(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -831,10 +806,10 @@ class TestUpdateGoalRecommendationOptions:
             app.dependency_overrides.pop(get_db, None)
 
     def test_put_goal_recommendation_options_rejects_max_weight_out_of_range(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -851,10 +826,10 @@ class TestUpdateGoalRecommendationOptions:
             app.dependency_overrides.pop(get_db, None)
 
     def test_put_goal_recommendation_options_rejects_invalid_lookback_years(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -888,12 +863,12 @@ class TestUpdateDartKey:
         """DART API 키 저장 성공."""
         from unittest.mock import patch as _patch
 
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings_row = SimpleNamespace(dart_api_key=None)
         db.scalar = AsyncMock(return_value=settings_row)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 _patch("app.api.v1.settings.encrypt", return_value="enc_key"),
@@ -916,12 +891,12 @@ class TestUpdateDartKey:
 class TestUpdateChallengeReminders:
     def test_put_challenge_reminders_returns_200_and_sets_flag(self, override_settings):
         """적립 챌린지 알림 수신 여부를 유저 단위로 저장한다 — 옵트인(기본 OFF)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings = SimpleNamespace(challenge_reminders_enabled=False)
         db.scalar = AsyncMock(return_value=settings)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -954,10 +929,10 @@ class TestPushToken:
     def _put(self, payload):
         from unittest.mock import patch
 
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         row = SimpleNamespace(fcm_token="old")
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch("app.api.v1.settings.get_or_create_settings", AsyncMock(return_value=row)),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -997,14 +972,14 @@ _TOGGLE_CASES = [
 @pytest.mark.parametrize(("path", "column", "invalidates_analysis"), _TOGGLE_CASES)
 @pytest.mark.parametrize("enabled", [True, False])
 def test_toggle_put_sets_only_its_column(override_settings, monkeypatch, path, column, invalidates_analysis, enabled):
-    user = _make_user()
+    user = make_user()
     db = _make_mock_db()
     row = SimpleNamespace(**{c: None for _, c, _ in _TOGGLE_CASES})
     db.scalar = AsyncMock(return_value=row)
     invalidate = AsyncMock()
     monkeypatch.setattr("app.api.v1.settings.invalidate_rebalancing_analysis_cache_all", invalidate)
 
-    app = _setup_app(user, db)
+    app = setup_app(user, db)
     try:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(

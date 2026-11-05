@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown, Receipt, ShieldAlert, TrendingUp } from "lucide-react";
 import type { DiagnosisContext } from "@/api/rebalancing";
 import { buildDiagnosisNotes, type DiagnosisNoteIcon } from "@/utils/diagnosisInsights";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtSigned } from "@/utils/format";
 import { investPlanUrl } from "@/utils/tabUrl";
 
 const NOTE_ICONS: Record<DiagnosisNoteIcon, React.ReactNode> = {
@@ -79,10 +79,7 @@ export default function DiagnosisInsightList({ context }: Props) {
                   </span>
                   <span>
                     {item.excluded_reason ?? (
-                      <>
-                        {item.estimated_realized_gain_krw >= 0 ? "+" : ""}
-                        {fmtKrw(item.estimated_realized_gain_krw)}
-                      </>
+                      <>{fmtSigned(item.estimated_realized_gain_krw, fmtKrw)}</>
                     )}
                   </span>
                 </li>

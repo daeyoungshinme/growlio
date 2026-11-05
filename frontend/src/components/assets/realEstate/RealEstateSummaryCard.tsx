@@ -1,5 +1,5 @@
 import type { AssetAccount } from "@/api/assets";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtSigned } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 
 interface SummaryProps {
@@ -47,8 +47,7 @@ export function RealEstateSummaryCard({ accounts }: SummaryProps) {
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">매입차익 합계</p>
             <p className={`text-sm font-semibold mt-0.5 ${pnlColor(totalAppreciation)}`}>
-              {totalAppreciation >= 0 ? "+" : ""}
-              {fmtKrw(totalAppreciation)}
+              {fmtSigned(totalAppreciation, fmtKrw)}
             </p>
           </div>
         )}

@@ -3,10 +3,9 @@ import AchievementTable from "./AchievementTable";
 
 interface Props {
   data: YearlyAchievement[];
-  flat?: boolean;
 }
 
-export default function YearlyAchievementTable({ data, flat }: Props) {
+export default function YearlyAchievementTable({ data }: Props) {
   const rows = data
     .filter((d) => d.has_data)
     .map((d) => ({
@@ -25,7 +24,6 @@ export default function YearlyAchievementTable({ data, flat }: Props) {
       projectedLabel="이론 연말값"
       actualLabel="실제 연말값"
       rows={rows}
-      flat={flat}
     />
   );
 }

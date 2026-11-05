@@ -39,6 +39,69 @@ async def get_domestic_price(
     return float(output.get("stck_prpr", 0))
 
 
+def _parse_amount(raw: object, ticker: str, field: str, event_prefix: str) -> float:
+    try:
+        return float(raw or 0)  # type: ignore[arg-type]
+    except (ValueError, TypeError):
+        logger.warning(f"{event_prefix}_parse_error", ticker=ticker, field=field, value=raw)
+        return 0.0
+
+
+async def _fetch_dividend_fields(
+    app_key: str,
+    app_secret: str,
+    access_token: str,
+    ticker: str,
+    *,
+    is_mock: bool,
+    tr_id: str,
+    market_div: str,
+    event_prefix: str,
+    rate_fields: tuple[str, ...],
+    amount_fields: tuple[str, ...],
+) -> tuple[float, float]:
+    """inquire-price 응답에서 (배당률 %, 주당 배당금)을 읽는다. 조회 불가·오류 응답은 (0, 0).
+
+    필드명이 API 버전에 따라 다를 수 있어 앞쪽 필드부터 값이 있는 것을 쓴다.
+    """
+    headers = {
+        "authorization": f"Bearer {access_token}",
+        "appkey": app_key,
+        "appsecret": app_secret,
+        "tr_id": tr_id,
+        "custtype": "P",
+    }
+    logger.debug(f"{event_prefix}_request", ticker=ticker, is_mock=is_mock)
+
+    try:
+        data = await kis_request(
+            "GET",
+            "/uapi/domestic-stock/v1/quotations/inquire-price",
+            is_mock=is_mock,
+            headers=headers,
+            params={"FID_COND_MRKT_DIV_CODE": market_div, "FID_INPUT_ISCD": ticker},
+        )
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in (400, 404):
+            logger.debug(f"{event_prefix}_http_error", ticker=ticker, status=e.response.status_code)
+            return 0.0, 0.0
+        raise
+
+    rt_cd = data.get("rt_cd")
+    if rt_cd != "0":
+        logger.debug(f"{event_prefix}_api_error", ticker=ticker, rt_cd=rt_cd, msg=data.get("msg1"))
+        return 0.0, 0.0
+
+    output = data.get("output", {})
+    raw_rate = next((output[f] for f in rate_fields if output.get(f)), None)
+    raw_amount = next((output[f] for f in amount_fields if output.get(f)), None)
+    logger.info(f"{event_prefix}_raw_output", ticker=ticker, is_mock=is_mock, rate=raw_rate, amount=raw_amount)
+    return (
+        _parse_amount(raw_rate, ticker, rate_fields[0], event_prefix),
+        _parse_amount(raw_amount, ticker, amount_fields[0], event_prefix),
+    )
+
+
 async def get_domestic_dividend_info(
     app_key: str,
     app_secret: str,
@@ -47,70 +110,26 @@ async def get_domestic_dividend_info(
     *,
     is_mock: bool,
 ) -> dict:
-    """국내 주식 배당 정보 조회.
+    """국내 주식 배당 정보 조회 (FHKST01010100).
 
-    inquire-price(FHKST01010100) → stck_divi_rate, per_divi_amt 파싱.
     ETF 분배금은 KIS ETF 시세·FDR 폴백(`dividend/fetcher.py`)이 담당.
     Returns: {"dps": float, "dividend_yield": float} — yield는 decimal (예: 0.0215)
     """
-    headers = {
-        "authorization": f"Bearer {access_token}",
-        "appkey": app_key,
-        "appsecret": app_secret,
-        "tr_id": TR_DOMESTIC_PRICE,  # FHKST01010100
-        "custtype": "P",
-    }
-
-    logger.debug("kis_dividend_request", ticker=ticker, is_mock=is_mock)
-
-    try:
-        data = await kis_request(
-            "GET",
-            "/uapi/domestic-stock/v1/quotations/inquire-price",
-            is_mock=is_mock,
-            headers=headers,
-            params={"FID_COND_MRKT_DIV_CODE": DOMESTIC_MARKET_DIV, "FID_INPUT_ISCD": ticker},
-        )
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code in (400, 404):
-            logger.debug("kis_dividend_stock_http_error", ticker=ticker, status=e.response.status_code)
-            return {"dps": 0.0, "dividend_yield": 0.0}
-        raise
-
-    rt_cd = data.get("rt_cd")
-    output = data.get("output", {})
-
-    if rt_cd != "0":
-        logger.debug("kis_dividend_stock_api_error", ticker=ticker, rt_cd=rt_cd, msg=data.get("msg1"))
-        return {"dps": 0.0, "dividend_yield": 0.0}
-
-    raw_divi_rate = output.get("stck_divi_rate")
-    raw_divi_amt = output.get("per_divi_amt")
-
-    logger.info(
-        "kis_dividend_raw_output",
-        ticker=ticker,
+    rate_pct, dps = await _fetch_dividend_fields(
+        app_key,
+        app_secret,
+        access_token,
+        ticker,
         is_mock=is_mock,
-        stck_divi_rate=raw_divi_rate,
-        per_divi_amt=raw_divi_amt,
+        tr_id=TR_DOMESTIC_PRICE,
+        market_div=DOMESTIC_MARKET_DIV,
+        event_prefix="kis_dividend",
+        rate_fields=("stck_divi_rate",),
+        amount_fields=("per_divi_amt",),
     )
-
-    try:
-        stck_divi_rate_pct = float(raw_divi_rate or 0)
-    except (ValueError, TypeError):
-        logger.warning("kis_dividend_parse_error", ticker=ticker, field="stck_divi_rate", value=raw_divi_rate)
-        stck_divi_rate_pct = 0.0
-
-    try:
-        per_divi_amt = float(raw_divi_amt or 0)
-    except (ValueError, TypeError):
-        logger.warning("kis_dividend_parse_error", ticker=ticker, field="per_divi_amt", value=raw_divi_amt)
-        per_divi_amt = 0.0
-
-    yield_decimal = stck_divi_rate_pct / 100 if stck_divi_rate_pct > 0 else 0.0
-
-    logger.info("kis_dividend_parsed", ticker=ticker, is_mock=is_mock, dps=per_divi_amt, dividend_yield=yield_decimal)
-    return {"dps": per_divi_amt, "dividend_yield": yield_decimal}
+    yield_decimal = rate_pct / 100 if rate_pct > 0 else 0.0
+    logger.info("kis_dividend_parsed", ticker=ticker, is_mock=is_mock, dps=dps, dividend_yield=yield_decimal)
+    return {"dps": dps, "dividend_yield": yield_decimal}
 
 
 async def get_domestic_etf_dividend_info(
@@ -125,63 +144,18 @@ async def get_domestic_etf_dividend_info(
 
     Returns: {"dps": float, "dividend_yield": float} — yield는 decimal (예: 0.0215)
     """
-    headers = {
-        "authorization": f"Bearer {access_token}",
-        "appkey": app_key,
-        "appsecret": app_secret,
-        "tr_id": TR_DOMESTIC_ETF_PRICE,
-        "custtype": "P",
-    }
-
-    logger.debug("kis_etf_dividend_request", ticker=ticker, is_mock=is_mock)
-
-    try:
-        data = await kis_request(
-            "GET",
-            "/uapi/domestic-stock/v1/quotations/inquire-price",
-            is_mock=is_mock,
-            headers=headers,
-            params={"FID_COND_MRKT_DIV_CODE": DOMESTIC_MARKET_DIV_ETF, "FID_INPUT_ISCD": ticker},
-        )
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code in (400, 404):
-            logger.debug("kis_etf_dividend_http_error", ticker=ticker, status=e.response.status_code)
-            return {"dps": 0.0, "dividend_yield": 0.0}
-        raise
-
-    rt_cd = data.get("rt_cd")
-    output = data.get("output", {})
-
-    if rt_cd != "0":
-        logger.debug("kis_etf_dividend_api_error", ticker=ticker, rt_cd=rt_cd, msg=data.get("msg1"))
-        return {"dps": 0.0, "dividend_yield": 0.0}
-
-    # FHPET01010000 응답 필드: etf_divi_rt(분배율%), etf_divi_amt(분배금)
-    # 필드명이 API 버전에 따라 다를 수 있어 stck_divi_rate/per_divi_amt로도 fallback
-    raw_divi_rt = output.get("etf_divi_rt") or output.get("stck_divi_rate")
-    raw_divi_amt = output.get("etf_divi_amt") or output.get("per_divi_amt")
-
-    logger.info(
-        "kis_etf_dividend_raw_output",
-        ticker=ticker,
+    rate_pct, dps = await _fetch_dividend_fields(
+        app_key,
+        app_secret,
+        access_token,
+        ticker,
         is_mock=is_mock,
-        etf_divi_rt=raw_divi_rt,
-        etf_divi_amt=raw_divi_amt,
+        tr_id=TR_DOMESTIC_ETF_PRICE,
+        market_div=DOMESTIC_MARKET_DIV_ETF,
+        event_prefix="kis_etf_dividend",
+        rate_fields=("etf_divi_rt", "stck_divi_rate"),
+        amount_fields=("etf_divi_amt", "per_divi_amt"),
     )
-
-    try:
-        divi_rt_pct = float(raw_divi_rt or 0)
-    except (ValueError, TypeError):
-        logger.warning("kis_etf_dividend_parse_error", ticker=ticker, field="etf_divi_rt", value=raw_divi_rt)
-        divi_rt_pct = 0.0
-
-    try:
-        divi_amt = float(raw_divi_amt or 0)
-    except (ValueError, TypeError):
-        logger.warning("kis_etf_dividend_parse_error", ticker=ticker, field="etf_divi_amt", value=raw_divi_amt)
-        divi_amt = 0.0
-
-    yield_decimal = round(divi_rt_pct / 100, 6) if divi_rt_pct > 0 else 0.0
-
-    logger.info("kis_etf_dividend_parsed", ticker=ticker, is_mock=is_mock, dps=divi_amt, dividend_yield=yield_decimal)
-    return {"dps": divi_amt, "dividend_yield": yield_decimal}
+    yield_decimal = round(rate_pct / 100, 6) if rate_pct > 0 else 0.0
+    logger.info("kis_etf_dividend_parsed", ticker=ticker, is_mock=is_mock, dps=dps, dividend_yield=yield_decimal)
+    return {"dps": dps, "dividend_yield": yield_decimal}

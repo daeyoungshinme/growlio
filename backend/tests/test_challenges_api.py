@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
+from tests.api_helpers import setup_app
+
 
 def _make_user():
     return SimpleNamespace(
@@ -26,22 +28,6 @@ def _make_mock_db():
     return db
 
 
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 class TestListChallenges:
     def test_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
@@ -53,7 +39,7 @@ class TestListChallenges:
 
     def test_returns_list(self, override_settings):
         user = _make_user()
-        app = _setup_app(user, _make_mock_db())
+        app = setup_app(user, _make_mock_db())
         with (
             patch(
                 "app.services.challenge_service.list_challenges_with_progress",
@@ -67,7 +53,7 @@ class TestListChallenges:
 
     def test_summary_endpoint(self, override_settings):
         user = _make_user()
-        app = _setup_app(user, _make_mock_db())
+        app = setup_app(user, _make_mock_db())
         with (
             patch(
                 "app.services.challenge_service.get_challenge_summary",
@@ -83,7 +69,7 @@ class TestListChallenges:
 class TestCreateChallenge:
     def test_rejects_return_pct_with_account_id(self, override_settings):
         user = _make_user()
-        app = _setup_app(user, _make_mock_db())
+        app = setup_app(user, _make_mock_db())
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.post(
                 "/api/v1/challenges",
@@ -99,7 +85,7 @@ class TestCreateChallenge:
 
     def test_rejects_bad_month_format(self, override_settings):
         user = _make_user()
-        app = _setup_app(user, _make_mock_db())
+        app = setup_app(user, _make_mock_db())
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.post(
                 "/api/v1/challenges",
@@ -109,7 +95,7 @@ class TestCreateChallenge:
 
     def test_creates_deposit_challenge(self, override_settings):
         user = _make_user()
-        app = _setup_app(user, _make_mock_db())
+        app = setup_app(user, _make_mock_db())
         fake = SimpleNamespace(id=uuid.uuid4())
         resp_model = {
             "id": str(fake.id),
@@ -154,7 +140,7 @@ class TestGetUpdateDelete:
         user = _make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/challenges/{uuid.uuid4()}")
         assert resp.status_code == 404
@@ -164,7 +150,7 @@ class TestGetUpdateDelete:
         db = _make_mock_db()
         challenge = SimpleNamespace(id=uuid.uuid4(), user_id=user.id, challenge_type="DEPOSIT")
         db.scalar = AsyncMock(return_value=challenge)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch("app.services.challenge_service.delete_challenge", AsyncMock()),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -199,7 +185,7 @@ class TestUpdateValidation:
         challenge.user_id = user.id
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=challenge)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         update = AsyncMock(return_value=challenge)
         with (
             patch("app.services.challenge_service.update_challenge", update),

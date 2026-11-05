@@ -72,7 +72,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 
 디렉토리: assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings, tax. 최상위 `ErrorBoundary.tsx`, `Toaster.tsx`(`growlio:toast` 이벤트 구독).
 
-**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 오버플로우 메뉴 — 아이콘+라벨 함께 렌더, 모바일 `title` 미동작 우회), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalBody`·`ModalFooter` — `Modal`은 스크롤을 두지 않아 **긴 본문은 `ModalBody`로 감싸야** 하단에 닿고(여백을 바꿀 땐 `className` 대신 `padding`), **입력 폼 모달의 저장 버튼은 `ModalFooter`에**(본문 끝이면 모바일 키보드에 가려짐, `<form id>` + 버튼 `form=`)), `OfflineBanner`, `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(의존성 없는 SVG 도넛 — 홈이 recharts 청크 없이 그림), `Tabs`, `ToggleSwitch`(+`ToggleRow` — 행 전체가 label, 설정 목록은 이것), `SegmentedControl`(2~4개 보기 전환·시장가/지정가 같은 택일 — 칩 버튼 직접 만들지 말 것), `InfoTip`(탭으로 여는 설명 팝오버 — hover 전용 툴팁 금지), `TopLoadingBar`, `TreemapCell`
+**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 오버플로우 메뉴 — 아이콘+라벨 함께 렌더, 모바일 `title` 미동작 우회), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalBody`·`ModalFooter` — `Modal`은 스크롤을 두지 않아 **긴 본문은 `ModalBody`로 감싸야** 하단에 닿고(여백을 바꿀 땐 `className` 대신 `padding`), **입력 폼 모달의 저장 버튼은 `ModalFooter`에**(본문 끝이면 모바일 키보드에 가려짐, `<form id>` + 버튼 `form=`)), `OfflineBanner`, `PageLoadError`(페이지 전체 조회 실패 + 다시 시도), `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(의존성 없는 SVG 도넛 — 홈이 recharts 청크 없이 그림), `Tabs`, `ToggleSwitch.tsx`의 `ToggleRow`(행 전체가 label, 설정 목록은 이것), `SegmentedControl`(2~4개 보기 전환·시장가/지정가 같은 택일 — 칩 버튼 직접 만들지 말 것), `InfoTip`(탭으로 여는 설명 팝오버 — hover 전용 툴팁 금지), `TopLoadingBar`, `TreemapCell`
 
 **`layout/`**: `RefreshContext`, `AppLayout`(로그인 후 셸 — 모달 열림 판정은 `hasOpenModal()`(`useModalBehavior`), body overflow로 추정 금지), `AuthLayout`(AppLayout 밖 전체 화면 — 인증·딥링크 확인 페이지는 이걸로 감싸야 safe-area·dvh가 잡힘), `Sidebar`, `BottomNav`
 
@@ -210,7 +210,7 @@ _기타_
 
 **포맷 (`utils/format.ts`)** — 로컬 재정의 금지.
 
-- `fmtKrw`(억/만/원) · `fmtKrwPreview`(입력 중 "5,000,000원 (500만원)") · `fmtKrwShort`(차트 레이블) · `fmtKrwPrice` · `fmtUsd`/`fmtUsdPrice` · `fmtNativePrice`(주문가 — 국내 원·해외 $, 주가에 `fmtKrw` 쓰면 만원 축약됨) · `fmtMonth` · `fmtPct`(null → "—") · `fmtDateTime` · `relativeTime` · `convertUsdToKrw`/`formatUsdAsKrw`
+- `fmtKrw`(억/만/원) · `fmtKrwPreview`(입력 중 "5,000,000원 (500만원)") · `fmtKrwShort`(차트 레이블) · `fmtKrwPrice` · `fmtUsd`/`fmtUsdPrice` · `fmtNativePrice`(주문가 — 국내 원·해외 $, 주가에 `fmtKrw` 쓰면 만원 축약됨) · `fmtMonth` · `fmtPct`(null → "—") · `fmtDateTime` · `relativeTime` · `fmtSigned(n, format)`(금액에 부호, 퍼센트는 `fmtPct`) · `convertUsdToKrw`/`formatUsdAsKrw`
 - `pctOf(part, total)` — 인라인 `total > 0 ? v / total * 100 : 0` 대신. `clampPct(pct)` — 진행률 바 width에 그대로 넣지 말 것
 - **날짜**: `localToday()`/`localMonth()` 사용 — `new Date().toISOString().slice(...)`는 UTC라 KST 09시 전엔 전날/전월. 모듈 최상위 상수로 고정하지 말고 폼을 열 때 호출. `parseYmd`/`daysUntilYmd`
 - 차트 X축은 `"YY.M"` — 직접 문자열 파싱(타임존 이슈 방지)

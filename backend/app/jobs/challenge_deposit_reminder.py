@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
 from app.core.job_runner import report_job_failure, run_per_user
-from app.jobs._job_helpers import run_alert_job
+from app.jobs._job_helpers import challenge_reminder_recipients, run_alert_job
 from app.models.challenge import CHALLENGE_ACTIVE, CHALLENGE_DEPOSIT, InvestmentChallenge
 from app.models.user import User, UserSettings
 from app.services import challenge_service
@@ -38,15 +38,7 @@ async def run_challenge_deposit_reminder() -> None:
 
 
 async def _run_challenge_deposit_reminder(db: AsyncSession, cache: CacheStoreType) -> None:
-    result = await db.execute(
-        select(User, UserSettings)
-        .join(UserSettings, User.id == UserSettings.user_id)
-        .where(
-            User.is_active == True,
-            UserSettings.challenge_reminders_enabled == True,
-        )
-    )
-    users = result.all()
+    users = await challenge_reminder_recipients(db)
     await run_per_user(
         users,
         lambda user, settings_row, to_email: _check_user(user, settings_row, to_email, cache),

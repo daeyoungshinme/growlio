@@ -2,22 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_mock_db():
@@ -29,22 +19,6 @@ def _make_mock_db():
     result.scalars.return_value.all.return_value = []
     db.execute = AsyncMock(return_value=result)
     return db
-
-
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
 
 
 _MOCK_DCA = {
@@ -80,9 +54,9 @@ class TestDcaAnalysis:
         assert resp.status_code == 401
 
     def test_returns_200_with_mocked_service(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.invest.dca_service.get_dca_analysis",
@@ -94,9 +68,9 @@ class TestDcaAnalysis:
         assert resp.status_code == 200
 
     def test_returns_dca_data_structure(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.invest.dca_service.get_dca_analysis",
@@ -123,9 +97,9 @@ class TestGoalFeasibility:
         assert resp.status_code == 401
 
     def test_computes_required_return_with_explicit_initial_amount(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(
                 "/api/v1/invest/goal-feasibility",
@@ -148,9 +122,9 @@ class TestGoalFeasibility:
             assert item["required_annual_deposit"] == pytest.approx(item["required_monthly_deposit"] * 12)
 
     def test_falls_back_to_current_asset_total_when_initial_amount_omitted(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.invest.build_asset_totals",
@@ -168,9 +142,9 @@ class TestGoalFeasibility:
 
     def test_fallback_excludes_real_estate_from_asset_total(self, override_settings):
         """initial_amount 미지정 시 폴백으로 쓰는 총자산에서 부동산 순자산은 제외해야 한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.invest.build_asset_totals",
@@ -187,9 +161,9 @@ class TestGoalFeasibility:
         assert data["pv"] == 120_000_000
 
     def test_already_achieved_returns_none_with_note(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(
                 "/api/v1/invest/goal-feasibility",
@@ -202,9 +176,9 @@ class TestGoalFeasibility:
         assert data["deposit_guide"] == []
 
     def test_past_target_year_returns_none_with_note(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(
                 "/api/v1/invest/goal-feasibility",
@@ -216,9 +190,9 @@ class TestGoalFeasibility:
         assert "목표 연도가 이미 지났습니다" in data["note"]
 
     def test_infeasible_goal_returns_none_with_note(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(
                 "/api/v1/invest/goal-feasibility",
@@ -249,9 +223,9 @@ _MOCK_DIVIDEND_PLAN = {
 
 class TestDividendPlan:
     def test_returns_200_with_mocked_service(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with (
             patch(
                 "app.api.v1.invest.dividend_plan_service.get_dividend_plan",

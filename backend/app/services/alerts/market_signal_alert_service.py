@@ -20,8 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
 from app.core.job_runner import report_job_failure, run_per_user
-from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
+from app.services.alerts.alert_service import already_sent_alert_today
 from app.services.market_signal.market_signal_service import (
     get_confirmed_composite_level,
     get_market_signal,
@@ -35,7 +35,6 @@ from app.utils.cache_keys import (
     market_signal_last_notified_level_key,
 )
 from app.utils.durable_state import delete_durable, get_durable, set_durable
-from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
 
@@ -170,19 +169,7 @@ async def _get_daily_digest_subscribers(db: AsyncSession) -> list[tuple[User, Us
 
 
 async def _already_sent_digest_today(db: AsyncSession, user_id) -> bool:
-    """오늘 이미 다이제스트를 발송했으면 True — 스케줄러 재시작/misfire로 인한 중복 발송 방지."""
-    today = today_kst()
-    day_start = kst_day_start(today)
-    result = await db.execute(
-        select(AlertHistory.id)
-        .where(
-            AlertHistory.user_id == user_id,
-            AlertHistory.alert_type == "MARKET_SIGNAL_DIGEST",
-            AlertHistory.created_at >= day_start,
-        )
-        .limit(1)
-    )
-    return result.scalar() is not None
+    return await already_sent_alert_today(db, user_id, "MARKET_SIGNAL_DIGEST")
 
 
 async def _send_digest_to_user(

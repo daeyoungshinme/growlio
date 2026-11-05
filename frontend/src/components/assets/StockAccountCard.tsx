@@ -15,7 +15,7 @@ import {
 } from "@/api/assets";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useHaptic } from "@/hooks/useHaptic";
-import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime, fmtUsd } from "@/utils/format";
+import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime, fmtUsd, fmtSigned } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { isSyncableAccount } from "@/utils/accounts";
@@ -202,8 +202,7 @@ export default function StockAccountCard({
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">평가손익</p>
             <p className={`text-sm font-semibold mt-0.5 break-keep ${pnlColor(pnl)}`}>
-              {pnl >= 0 ? "+" : ""}
-              {fmtKrw(pnl)}
+              {fmtSigned(pnl, fmtKrw)}
             </p>
             <p className={`text-xs font-medium ${pnlColor(pnl)}`}>({fmtPct(ret)})</p>
           </div>

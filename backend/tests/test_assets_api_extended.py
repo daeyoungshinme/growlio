@@ -12,6 +12,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from app.utils.kst import today_kst
+from tests.api_helpers import make_mock_db, make_user, setup_app
 
 
 def _make_cache_mock() -> AsyncMock:
@@ -21,16 +22,6 @@ def _make_cache_mock() -> AsyncMock:
     cache.scan = AsyncMock(return_value=(0, []))
     cache.unlink = AsyncMock()
     return cache
-
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
 
 
 def _make_account(user_id, account_id=None):
@@ -83,44 +74,11 @@ def _make_snapshot(user_id, account_id):
     )
 
 
-def _make_mock_db():
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    db = AsyncMock(spec=AsyncSession)
-    db.scalar = AsyncMock(return_value=None)
-    result = MagicMock()
-    result.scalars.return_value.all.return_value = []
-    result.all.return_value = []
-    db.execute = AsyncMock(return_value=result)
-    db.commit = AsyncMock()
-    db.add = MagicMock()
-    db.flush = AsyncMock()
-    db.refresh = AsyncMock()
-    db.delete = AsyncMock()
-    return db
-
-
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
-
-
 class TestUpdateAccount:
     def test_update_account_name(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
 
         async def mock_refresh(obj):
@@ -128,17 +86,17 @@ class TestUpdateAccount:
 
         db.refresh = AsyncMock(side_effect=mock_refresh)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         payload = {"name": "새 계좌 이름"}
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(f"/api/v1/assets/{account.id}", json=payload)
         assert resp.status_code == 200
 
     def test_update_account_returns_404_for_nonexistent(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(f"/api/v1/assets/{uuid.uuid4()}", json={"name": "test"})
         assert resp.status_code == 404
@@ -159,12 +117,12 @@ class TestUpdateAccountCashTransaction:
         return acc
 
     def test_balance_increase_creates_deposit_transaction(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = self._make_cash_account(user.id, deposit_krw=1_000_000.0)
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         latest_snap = SimpleNamespace(amount_krw=1_000_000.0, invested_amount=None, unrealized_pnl=None)
 
         with (
@@ -190,12 +148,12 @@ class TestUpdateAccountCashTransaction:
         assert tx.account_id == account.id
 
     def test_balance_decrease_creates_withdrawal_transaction(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = self._make_cash_account(user.id, deposit_krw=5_000_000.0)
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         latest_snap = SimpleNamespace(amount_krw=5_000_000.0, invested_amount=None, unrealized_pnl=None)
 
         with (
@@ -220,12 +178,12 @@ class TestUpdateAccountCashTransaction:
         assert tx.amount == 4_000_000.0
 
     def test_no_change_creates_no_transaction(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = self._make_cash_account(user.id, deposit_krw=1_000_000.0)
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         latest_snap = SimpleNamespace(amount_krw=1_000_000.0, invested_amount=None, unrealized_pnl=None)
 
         with (
@@ -248,12 +206,12 @@ class TestUpdateAccountCashTransaction:
 
     def test_first_snapshot_creates_no_transaction(self, override_settings):
         """계좌의 최초 스냅샷(latest_snap is None)은 base 값이므로 거래로 잡지 않는다."""
-        user = _make_user()
+        user = make_user()
         account = self._make_cash_account(user.id, deposit_krw=3_000_000.0)
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         with (
             patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
@@ -275,14 +233,14 @@ class TestUpdateAccountCashTransaction:
 
     def test_non_cash_account_creates_no_transaction(self, override_settings):
         """STOCK_OTHER 등 비현금성 계좌는 잔액 변화가 시세 변동일 수 있으므로 거래를 만들지 않는다."""
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.asset_type = "STOCK_OTHER"
         account.deposit_krw = 1_000_000.0
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         latest_snap = SimpleNamespace(amount_krw=1_000_000.0, invested_amount=None, unrealized_pnl=None)
 
         with (
@@ -310,15 +268,15 @@ class TestUpdateAccountManualStockSnapshotConsistency:
     보유 종목 평가액이 누락되던 상호작용 버그의 회귀 테스트."""
 
     def test_position_value_preserved_when_manual_amount_and_deposit_sent_together(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.deposit_krw = 1_000_000.0
         account.deposit_usd = 0.0
         account.manual_amount = 1_000_000.0
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         position = SimpleNamespace(
             ticker="005930",
@@ -376,16 +334,16 @@ class TestUpdateAccountManualStockSnapshotConsistency:
 
     def test_real_estate_snapshot_still_written_without_deposit_fields(self, override_settings):
         """REAL_ESTATE 편집(deposit_krw/usd 미전송)은 블록 1(모기지 차감 경로)이 그대로 실행돼야 한다."""
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.asset_type = "REAL_ESTATE"
         account.data_source = "MANUAL"
         account.manual_amount = 500_000_000.0
         account.real_estate_details = {"mortgage_balance_krw": 100_000_000.0}
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         upsert_calls: list[dict] = []
 
@@ -420,26 +378,26 @@ class TestUpdateAccountManualStockSnapshotConsistency:
 
 class TestDeleteAccount:
     def test_delete_account_success(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.scalars = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/assets/{account.id}")
         assert resp.status_code == 204
 
     def test_delete_broker_account_removes_credentials_and_stops_automation(self, override_settings):
         """plans/109 C5 — 복구 경로가 없으니 자격증명을 남기지 않고, 이 계좌로 주문하던 알림·대기 매수도 멈춘다."""
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.data_source = "KIS_API"
         alert = SimpleNamespace(id=uuid.uuid4(), is_active=True)
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.scalars = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[alert])))
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         delete_credentials = AsyncMock()
         cancel = AsyncMock()
 
@@ -459,9 +417,9 @@ class TestDeleteAccount:
 
 class TestBatchSetTargetPortfolio:
     def test_batch_set_empty_ids_returns_empty(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
+        user = make_user()
+        db = make_mock_db()
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 "/api/v1/assets/batch-target-portfolio",
@@ -471,13 +429,13 @@ class TestBatchSetTargetPortfolio:
         assert resp.json() == []
 
     def test_batch_set_forbidden_accounts(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
-        db = _make_mock_db()
+        db = make_mock_db()
         result = MagicMock()
         result.scalars.return_value.all.return_value = [account]  # Only 1 of 2 requested
         db.execute = AsyncMock(return_value=result)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 "/api/v1/assets/batch-target-portfolio",
@@ -486,17 +444,17 @@ class TestBatchSetTargetPortfolio:
         assert resp.status_code == 403
 
     def test_batch_set_success(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account1 = _make_account(user.id)
         account2 = _make_account(user.id)
-        db = _make_mock_db()
+        db = make_mock_db()
         result = MagicMock()
         result.scalars.return_value.all.return_value = [account1, account2]
         db.execute = AsyncMock(return_value=result)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
         portfolio_id = uuid.uuid4()
         db.scalar = AsyncMock(return_value=MagicMock(id=portfolio_id, user_id=user.id))  # 소유 포트폴리오
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 "/api/v1/assets/batch-target-portfolio",
@@ -508,11 +466,11 @@ class TestBatchSetTargetPortfolio:
 
     def test_batch_set_rejects_portfolio_not_owned(self, override_settings):
         """다른 사용자의 포트폴리오 id는 지정할 수 없다 — 계좌 소유만 보고 포트폴리오 소유는 안 보던 허점."""
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)  # 본인 소유 포트폴리오 아님
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 "/api/v1/assets/batch-target-portfolio",
@@ -524,22 +482,22 @@ class TestBatchSetTargetPortfolio:
 
 class TestDeleteCredentials:
     def test_delete_kis_credentials_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/assets/{uuid.uuid4()}/kis-credentials")
         assert resp.status_code == 404
 
     def test_delete_kis_credentials_success(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.kis_app_key = "encrypted_key"
         account.kis_app_secret = "encrypted_secret"
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/assets/{account.id}/kis-credentials")
         assert resp.status_code == 204
@@ -547,26 +505,26 @@ class TestDeleteCredentials:
         assert account.kis_app_secret is None
 
     def test_delete_kiwoom_credentials_success(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.kiwoom_app_key = "encrypted_key"
         account.kiwoom_app_secret = "encrypted_secret"
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/assets/{account.id}/kiwoom-credentials")
         assert resp.status_code == 204
         assert account.kiwoom_app_key is None
 
     def test_delete_toss_credentials_success(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.toss_client_id = "encrypted_id"
         account.toss_client_secret = "encrypted_secret"
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/assets/{account.id}/toss-credentials")
         assert resp.status_code == 204
@@ -583,8 +541,8 @@ class TestVerifyKiwoomCredentials:
     _SERVICE = "app.api.v1.assets._verify_kiwoom_credentials_service"
 
     def _post(self, side_effect=None):
-        user = _make_user()
-        app = _setup_app(user, _make_mock_db())
+        user = make_user()
+        app = setup_app(user, make_mock_db())
         with (
             patch(self._SERVICE, new=AsyncMock(side_effect=side_effect)) as svc,
             TestClient(app, raise_server_exceptions=False) as client,
@@ -625,10 +583,10 @@ class TestVerifyKiwoomCredentials:
 
 class TestUpdateIsaPnlOverride:
     def test_not_found(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
+        user = make_user()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 f"/api/v1/assets/{uuid.uuid4()}/isa-pnl-override",
@@ -637,13 +595,13 @@ class TestUpdateIsaPnlOverride:
         assert resp.status_code == 404
 
     def test_rejects_non_isa_account(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.tax_type = "GENERAL"
         account.isa_manual_cumulative_pnl_krw = None
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 f"/api/v1/assets/{account.id}/isa-pnl-override",
@@ -652,14 +610,14 @@ class TestUpdateIsaPnlOverride:
         assert resp.status_code == 400
 
     def test_sets_override_on_isa_account(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.tax_type = "ISA"
         account.isa_manual_cumulative_pnl_krw = None
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 f"/api/v1/assets/{account.id}/isa-pnl-override",
@@ -669,16 +627,16 @@ class TestUpdateIsaPnlOverride:
         assert account.isa_manual_cumulative_pnl_krw == 2_500_000
 
     def test_sets_override_captures_baseline_auto_pnl(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.tax_type = "ISA"
         account.isa_manual_cumulative_pnl_krw = None
         account.isa_baseline_auto_pnl_krw = None
         account.isa_baseline_captured_at = None
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 f"/api/v1/assets/{account.id}/isa-pnl-override",
@@ -690,16 +648,16 @@ class TestUpdateIsaPnlOverride:
         assert account.isa_baseline_captured_at == today_kst()
 
     def test_clears_override_with_null(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
         account.tax_type = "ISA"
         account.isa_manual_cumulative_pnl_krw = 2_500_000.0
         account.isa_baseline_auto_pnl_krw = 100_000.0
         account.isa_baseline_captured_at = today_kst()
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.patch(
                 f"/api/v1/assets/{account.id}/isa-pnl-override",
@@ -717,11 +675,11 @@ class TestSyncAccountEndpoint:
     (QueuePool 고갈 수정 회귀 테스트)."""
 
     def test_commits_request_session_before_broker_sync(self, override_settings):
-        user = _make_user()
+        user = make_user()
         account = _make_account(user.id)
-        db = _make_mock_db()
+        db = make_mock_db()
         db.scalar = AsyncMock(return_value=account)
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
 
         @asynccontextmanager
         async def fake_lock(cache, key, ttl=120):

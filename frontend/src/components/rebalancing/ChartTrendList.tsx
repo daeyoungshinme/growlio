@@ -1,5 +1,6 @@
 import type { TacticalMarket, TechnicalSnapshot } from "@/api/tactical";
 import { PULLBACK_BADGE_CLASS, PULLBACK_LABEL, TREND_LABEL } from "./tacticalLabels";
+import { fmtPct } from "@/utils/format";
 
 /** QQQ·SPY(·DIA) 차트 지표 행 — 진단 탭 "시장 상황" 카드의 차트 추세 영역(예전 전술 탭 판정 근거에서 이동, plans/82) */
 
@@ -11,7 +12,7 @@ function fmtNum(n: number | null | undefined, digits = 2): string {
 function fmtGap(close: number | null | undefined, ma: number | null | undefined): string {
   if (close == null || ma == null || ma <= 0) return "—";
   const pct = (close / ma - 1) * 100;
-  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+  return `${fmtPct(pct, 1)}`;
 }
 
 function IndicatorRow({

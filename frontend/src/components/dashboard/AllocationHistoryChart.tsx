@@ -12,7 +12,7 @@ import {
 import { ChevronDown, ChevronRight, ChartNoAxesColumn } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
 import { CHART_TICK_FONT_SIZE, chartTickStyle, chartTooltipStyle } from "@/utils/chart";
-import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
+import { fmtKrw, fmtKrwShort, fmtMonth, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { summarizeAllocationHistory } from "@/utils/chartSummary";
 import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
@@ -247,8 +247,7 @@ function AllocationHistoryChart({
                           <td className="py-2 px-1 sm:px-2 text-xs text-right whitespace-nowrap">
                             {change != null ? (
                               <span className={`${pnlColor(change)} font-medium`}>
-                                {change >= 0 ? "+" : ""}
-                                {change.toFixed(2)}%
+                                {fmtPct(change, 2)}
                               </span>
                             ) : (
                               <span className="text-gray-300 dark:text-gray-600">—</span>

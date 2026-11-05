@@ -1,7 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
-import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
+import { fmtKrw, fmtKrwShort, fmtPct, fmtSigned, relativeTime } from "@/utils/format";
 import { pnlColor, PIE_COLORS } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -32,13 +32,9 @@ export default memo(function HeroSummaryCard({
 }: Props) {
   // 금액은 기본 숨김, 탭하면 표시 — 남이 화면을 볼 수 있는 상황 대비. 저장하지 않아 홈에 올 때마다 다시 숨김
   const [amountVisible, setAmountVisible] = useState(false);
-  const updatedLabel = useMemo(() => {
-    if (!dataUpdatedAt) return null;
-    const mins = Math.floor((Date.now() - dataUpdatedAt) / 60_000);
-    if (mins < 1) return "방금 업데이트";
-    if (mins < 60) return `${mins}분 전 업데이트`;
-    return `${Math.floor(mins / 60)}시간 전 업데이트`;
-  }, [dataUpdatedAt]);
+  const updatedLabel = dataUpdatedAt
+    ? `${relativeTime(new Date(dataUpdatedAt).toISOString())} 업데이트`
+    : null;
 
   const allocationChartData = useMemo(() => {
     if (!data) return [];
@@ -164,11 +160,8 @@ export default memo(function HeroSummaryCard({
                     : pnlColor(overview.unrealized_pnl_krw)
                 }`}
               >
-                {amountVisible
-                  ? `${overview.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrw(overview.unrealized_pnl_krw)}`
-                  : "••••••"}{" "}
-                ({overview.stock_return_pct >= 0 ? "+" : ""}
-                {overview.stock_return_pct.toFixed(1)}%)
+                {amountVisible ? `${fmtSigned(overview.unrealized_pnl_krw, fmtKrw)}` : "••••••"} (
+                {fmtPct(overview.stock_return_pct, 1)})
               </span>
             </Link>
           )}

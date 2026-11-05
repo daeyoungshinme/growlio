@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtSigned } from "@/utils/format";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import EmptyState from "@/components/common/EmptyState";
 
@@ -28,7 +28,6 @@ interface Props {
   projectedLabel: string;
   actualLabel: string;
   rows: AchievementRow[];
-  flat?: boolean;
   /** true면 행이 많은 표 — 최근 행만(모바일 6·데스크톱 12) 보여주고 "더 보기" */
   scrollable?: boolean;
   /** "목표를 바꾸면 과거 수치도 다시 계산" 안내 — 같은 카드에 표가 둘이면 한쪽만 (docs/plans/67 P1-15) */
@@ -42,14 +41,13 @@ export default function AchievementTable({
   projectedLabel,
   actualLabel,
   rows,
-  flat,
   scrollable,
   showRecalcNote = true,
 }: Props) {
   const [showAll, setShowAll] = useState(false);
   if (rows.length === 0) {
     return (
-      <div className={flat ? undefined : "card"}>
+      <div>
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">{title}</h3>
         <EmptyState title={emptyTitle} compact />
       </div>
@@ -73,7 +71,7 @@ export default function AchievementTable({
     );
 
   return (
-    <div className={flat ? undefined : "card"}>
+    <div>
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">{title}</h3>
       <p className={`text-xs text-gray-500 dark:text-gray-400 ${showRecalcNote ? "" : "mb-3"}`}>
         {subtitle}
@@ -109,8 +107,7 @@ export default function AchievementTable({
                 </span>
                 {diff !== null && (
                   <span className={diff >= 0 ? "text-red-500" : "text-blue-500"}>
-                    {diff >= 0 ? "+" : ""}
-                    {fmtKrw(diff)}
+                    {fmtSigned(diff, fmtKrw)}
                   </span>
                 )}
               </div>
@@ -168,7 +165,7 @@ export default function AchievementTable({
                           : "text-blue-500"
                     }`}
                   >
-                    {diff !== null ? `${diff >= 0 ? "+" : ""}${fmtKrw(diff)}` : "—"}
+                    {diff !== null ? `${fmtSigned(diff, fmtKrw)}` : "—"}
                   </td>
                 </tr>
               );

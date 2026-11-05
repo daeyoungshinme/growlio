@@ -7,15 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-
-def _make_user():
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        email="test@example.com",
-        display_name="테스트",
-        is_active=True,
-        needs_password_reset=False,
-    )
+from tests.api_helpers import make_user, setup_app
 
 
 def _make_mock_db():
@@ -33,22 +25,6 @@ def _make_mock_db():
     db.flush = AsyncMock()
     db.refresh = AsyncMock()
     return db
-
-
-def _setup_app(user, db):
-    from app.api.deps import get_current_user
-    from app.core.database import get_db
-    from app.main import app
-
-    async def override_auth():
-        return user
-
-    async def override_db():
-        yield db
-
-    app.dependency_overrides[get_current_user] = override_auth
-    app.dependency_overrides[get_db] = override_db
-    return app
 
 
 _MOCK_ANALYSIS = {
@@ -73,11 +49,11 @@ class TestRebalancingAnalyze:
         assert resp.status_code == 401
 
     def test_returns_404_for_nonexistent_portfolio(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -107,7 +83,7 @@ class TestRebalancingAnalyze:
         포트폴리오에 연결되지 않은 계좌에도 동일 종목(특히 해외 주식)을 보유한 경우 배당 총액과
         평가금액의 계좌 범위가 어긋나 "리밸런싱 후 배당" 금액이 왜곡됐다.
         """
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
 
         scoped_account_id = uuid.uuid4()
@@ -136,7 +112,7 @@ class TestRebalancingAnalyze:
             ],
         }
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -204,11 +180,11 @@ class TestRebalancingHistory:
         assert resp.status_code == 401
 
     def test_returns_200_empty_history(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.execute.return_value.scalars.return_value.all.return_value = []
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get(
@@ -229,7 +205,7 @@ class TestGoalRecommendationEndpoint:
     def test_base_krw_excludes_real_estate(self, override_settings):
         """부동산은 목표 역산 추천 MVO 엔진의 후보가 아니고 성장도 모델링되지 않으므로,
         필요 수익률 역산 원금(base_krw)에서 제외되어야 한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings_row = SimpleNamespace(goal_amount=100_000_000.0)
         db.scalar = AsyncMock(return_value=settings_row)
@@ -242,7 +218,7 @@ class TestGoalRecommendationEndpoint:
             ],
         }
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -295,11 +271,11 @@ class TestGoalRecommendationEndpoint:
         """캐시된 추천이 있으면 계산 입력(overview·포지션) 조회 없이 바로 반환한다."""
         from app.schemas.rebalancing import GoalRecommendation
 
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         cached = {"generated_at": "2024-01-01T00:00:00Z", "is_configured": True, "required_return_pct": 5.0}
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -338,11 +314,11 @@ class TestGoalRecommendationEndpoint:
         """1시간 키가 만료됐어도 마지막 정상 결과가 있으면 계산 없이 반환하고 백그라운드 갱신을 예약한다."""
         from app.schemas.rebalancing import GoalRecommendation
 
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         stale = {"generated_at": "2024-01-01T00:00:00Z", "is_configured": True, "required_return_pct": 7.0}
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -407,9 +383,9 @@ class TestSubRecommendationStaleWhileRevalidate:
         compute_name = (
             "get_horizon_recommendations" if kind == "horizon_recommendations" else ("get_age_based_recommendation")
         )
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(f"app.api.v1.rebalancing.get_cached_{kind}", new_callable=AsyncMock, return_value=None),
@@ -436,7 +412,7 @@ class TestDriftSummary:
     def test_composite_signal_alerts_disabled_forces_has_composite_signal_false(self, override_settings):
         """유저가 composite_signal_alerts_enabled=False로 꺼두면, 실제 신호 상태와 무관하게
         모든 포트폴리오 summary의 has_composite_signal이 False로 강제된다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         portfolio = SimpleNamespace(
             id=uuid.uuid4(), name="테스트 포트폴리오", account_ids=None, base_type="STOCK", items=[]
@@ -444,7 +420,7 @@ class TestDriftSummary:
         settings_row = SimpleNamespace(composite_signal_alerts_enabled=False)
         db.scalar = AsyncMock(return_value=settings_row)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -497,12 +473,12 @@ class TestCompositeSignalStatus:
 
     def test_disabled_returns_enabled_false_and_skips_signal_fetch(self, override_settings):
         """UserSettings 행이 없으면 enabled 기본값 True. 명시적으로 꺼둔 경우엔 신호 조회를 스킵한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         settings_row = SimpleNamespace(composite_signal_alerts_enabled=False)
         db.scalar = AsyncMock(return_value=settings_row)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -534,11 +510,11 @@ class TestCompositeSignalStatus:
 
     def test_no_settings_row_defaults_enabled_true_and_reports_trigger(self, override_settings):
         """UserSettings 행이 없으면(신규 유저) enabled 기본값 True로 신호를 평가한다."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -581,11 +557,11 @@ class TestBrokerBalance:
         assert resp.status_code == 401
 
     def test_returns_404_for_nonexistent_account(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -613,7 +589,7 @@ class TestBrokerBalance:
 
         from app.exceptions import ProviderApiError
 
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = SimpleNamespace(
             id=uuid.uuid4(),
@@ -627,7 +603,7 @@ class TestBrokerBalance:
         )
         db.scalar = AsyncMock(return_value=account)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -657,7 +633,7 @@ class TestBrokerBalance:
 
     def test_returns_400_when_kiwoom_account_no_missing(self, override_settings):
         """kiwoom_account_no가 없으면 400을 반환한다 (nullable 계좌번호 가드)."""
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         account = SimpleNamespace(
             id=uuid.uuid4(),
@@ -671,7 +647,7 @@ class TestBrokerBalance:
         )
         db.scalar = AsyncMock(return_value=account)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -777,11 +753,11 @@ class TestPortfolioExpectedMetricsEndpoint:
     """GET /rebalancing/portfolios/{portfolio_id}/expected-metrics — 적용 전 비교 미리보기용."""
 
     def test_returns_404_when_portfolio_not_found(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.get(
@@ -797,7 +773,7 @@ class TestPortfolioExpectedMetricsEndpoint:
             app.dependency_overrides.pop(get_db, None)
 
     def test_excludes_cash_and_real_estate_items_and_returns_metrics(self, override_settings):
-        user = _make_user()
+        user = make_user()
         db = _make_mock_db()
         portfolio = SimpleNamespace(
             id=uuid.uuid4(),
@@ -815,7 +791,7 @@ class TestPortfolioExpectedMetricsEndpoint:
             expected_return_pct=8.0, expected_dividend_yield_pct=1.5, expected_volatility_pct=12.0
         )
 
-        app = _setup_app(user, db)
+        app = setup_app(user, db)
         try:
             with (
                 patch(
@@ -884,7 +860,7 @@ class TestCandidateOverlap:
         return resp, mock_analyze
 
     def test_uses_draft_candidates_when_given(self, override_settings):
-        app = _setup_app(_make_user(), _make_mock_db())
+        app = setup_app(make_user(), _make_mock_db())
         try:
             pos_map = {"a": {"ticker": "360200", "name": "ACE 미국S&P500", "market": "KOSPI"}}
             resp, mock_analyze = self._post(
@@ -906,7 +882,7 @@ class TestCandidateOverlap:
             app.dependency_overrides.pop(get_db, None)
 
     def test_falls_back_to_saved_candidates(self, override_settings):
-        app = _setup_app(_make_user(), _make_mock_db())
+        app = setup_app(make_user(), _make_mock_db())
         saved = [{"ticker": "SPY", "name": "SPDR S&P 500", "market": "NYSE", "asset_class": "EQUITY"}]
         try:
             resp, mock_analyze = self._post(app, {}, settings_row=SimpleNamespace(goal_candidate_tickers=saved))
@@ -920,7 +896,7 @@ class TestCandidateOverlap:
             app.dependency_overrides.pop(get_db, None)
 
     def test_rejects_more_than_max_candidates(self, override_settings):
-        app = _setup_app(_make_user(), _make_mock_db())
+        app = setup_app(make_user(), _make_mock_db())
         try:
             too_many = [{"ticker": f"T{i}", "name": "x", "market": "NYSE"} for i in range(21)]
             resp, mock_analyze = self._post(app, {"candidates": too_many})
