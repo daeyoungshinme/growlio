@@ -34,6 +34,8 @@ TTL_DIVIDEND_FALLBACK_FX = 300  # 환율 fallback으로 계산된 배당 요약 
 TTL_DART = 3600  # DART 공시 1시간
 TTL_DIVIDEND_MONTHS = 604800  # 배당 월별 데이터 7일
 TTL_HAS_OVERSEAS_TRUE = 21600  # 해외 보유 중 6시간
+TTL_MARKET_SIGNAL_CHANGE_SENT = 6 * 3600  # 등급 변경 알림 재시도 구간(3회, 시간당 1회)보다 길게
+TTL_TAX_OVERSEAS_REALIZED_FAILED = 120  # 조회 실패 결과 — 장애 중 홈을 열 때마다 계좌별 20초씩 재시도하지 않게
 TTL_HAS_OVERSEAS_FALSE = 900  # 해외 없음 15분 (신규 매수 시 빠른 반영)
 TTL_DIVIDEND_SUMMARY = 3600  # 배당 집계 1시간
 TTL_PORTFOLIO_OVERVIEW = 1800  # 포트폴리오 overview 30분
@@ -348,6 +350,22 @@ def market_signal_last_level_key() -> str:
     (`market_signal_service.get_confirmed_composite_level`)가 공유 — 연속 확인 없이는
     이 값이 바뀌지 않아 두 소비처 모두 flapping을 피한다."""
     return f"{_env_prefix()}market:signal:last_level"
+
+
+def market_signal_last_notified_level_key() -> str:
+    """사용자에게 마지막으로 알린 등급. 확정 등급(`market_signal_last_level_key`)은 5~10분 주기 잡이 먼저 갱신하므로
+    그 값과 비교하면 시간당 알림 잡이 변화를 보지 못한다(plans/110 D1)."""
+    return f"{_env_prefix()}market:signal:last_notified_level"
+
+
+def market_signal_change_attempts_key() -> str:
+    """등급 변경 알림 재시도 횟수 — "등급:횟수". 수신 채널이 없는 사용자 때문에 끝없이 재시도하지 않게 한다."""
+    return f"{_env_prefix()}market:signal:change_attempts"
+
+
+def market_signal_change_sent_key(user_id: uuid.UUID, old_level: str, new_level: str) -> str:
+    """이 등급 변경을 이미 받은 사용자 — 일부만 실패해 재시도할 때 받은 사람에게 다시 보내지 않는다."""
+    return f"{_env_prefix()}market:signal:change_sent:{user_id}:{old_level}:{new_level}"
 
 
 def market_signal_pending_confirmation_key() -> str:

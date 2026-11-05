@@ -67,6 +67,7 @@ async def _run_challenge_monthly_wrap(db: AsyncSession, cache: CacheStoreType) -
         lambda user, settings_row, to_email: _wrap_user(user, settings_row, to_email, cache),
         concurrency=_CONCURRENCY,
         failure_event="challenge_monthly_wrap_failed",
+        release_session=db,
     )
 
 

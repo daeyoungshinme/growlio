@@ -115,5 +115,6 @@ async def send_year_end_tax_reminder(db: AsyncSession) -> None:
         _send_reminder_to_user,
         concurrency=_REMINDER_CONCURRENCY,
         failure_event="year_end_tax_reminder_user_failed",
+        release_session=db,
     )
     logger.info("year_end_tax_reminder_completed", subscriber_count=len(subscribers))

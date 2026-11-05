@@ -66,6 +66,7 @@ async def _run_monthly_report(db: AsyncSession, cache: CacheStoreType) -> None:
         ),
         concurrency=_MONTHLY_REPORT_CONCURRENCY,
         failure_event="monthly_report_failed",
+        release_session=db,
     )
 
 

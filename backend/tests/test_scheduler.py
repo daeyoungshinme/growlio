@@ -30,6 +30,7 @@ EXPECTED_JOB_IDS = {
     "cache_sweep",
     "app_state_sweep",
     "kosdaq_tickers_refresh",
+    "periodic_catchup",
     "startup_warmup",
 }
 

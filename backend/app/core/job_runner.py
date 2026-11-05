@@ -15,6 +15,8 @@ import structlog
 from app.core.logging import redact_secrets
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from app.models.user import User, UserSettings
 
 logger = structlog.get_logger()
@@ -51,12 +53,17 @@ async def run_per_user(
     *,
     concurrency: int,
     failure_event: str,
+    release_session: AsyncSession | None = None,
 ) -> None:
     """유저별 알림 잡 공통 골격: 동시성 제한 → 수신 이메일 결정 → 핸들러 → 실패는 유저 단위로 Sentry 보고.
 
     한 유저의 예외가 다른 유저 처리를 막지 않는다. DB 세션은 핸들러가 연다(유저마다 세션 수·시점이 다르다).
+    `release_session`은 대상을 읽어 온 바깥 세션 — 트랜잭션을 끝내 커넥션을 돌려준다. 잡히지 않으면 풀(7개) 하나를
+    전체 발송 동안 차지해 핸들러 세션과 API 요청이 기다린다. `expire_on_commit=False`라 읽어 둔 행은 그대로 쓸 수 있다.
     `handle_user(user, settings_row, to_email)`의 `to_email`은 알림 수신 이메일(없으면 가입 이메일)이다.
     """
+    if release_session is not None:
+        await release_session.commit()
     sem = asyncio.Semaphore(concurrency)
 
     async def _one(user: User, settings_row: UserSettings) -> None:
