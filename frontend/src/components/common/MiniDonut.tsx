@@ -16,11 +16,11 @@ interface Props {
   hideValues?: boolean;
 }
 
-// 반지름 25, 두께 15 → 안쪽 17.5 / 바깥 32.5 (viewBox 100 기준) — 예전 recharts 도넛(35%/65%)과 같은 비율
-const RADIUS = 25;
-const STROKE = 15;
+// 반지름 30, 두께 18 → 안쪽 21 / 바깥 39 (viewBox 100 기준) — 구멍 비율 약 54%. 눌렀을 때 +2 두께도 viewBox 안에 들어간다
+const RADIUS = 30;
+const STROKE = 18;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-const GAP = 1.6; // 조각 사이 간격(원주 길이 단위, 약 3도)
+const GAP = 1.9; // 조각 사이 간격(원주 길이 단위, 약 3.6도)
 
 /**
  * 의존성 없는 SVG 도넛. 홈 첫 카드에서 이 작은 도넛 하나 때문에 recharts 청크(약 435KB)를 받아
