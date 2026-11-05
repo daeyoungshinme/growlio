@@ -31,6 +31,26 @@ describe("ExchangeRateProvider", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("서버가 고정 fallback을 주면 환율 없음으로 다루고 한 번 알린다", async () => {
+    const { fetchExchangeRate } = await import("@/api/assets");
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(fetchExchangeRate).mockResolvedValueOnce({ usd_krw: 1300, is_fallback: true });
+
+    const { result } = renderHook(() => useExchangeRateContext(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(toast).toHaveBeenCalledTimes(1));
+    expect(result.current.rate).toBeNull();
+  });
+
+  it("is_fallback이 없는 응답(구버전 서버)은 실환율로 쓴다", async () => {
+    const { fetchExchangeRate } = await import("@/api/assets");
+    vi.mocked(fetchExchangeRate).mockResolvedValueOnce({ usd_krw: 1412 });
+
+    const { result } = renderHook(() => useExchangeRateContext(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.rate).toBe(1412));
+  });
+
   it("로딩 중 isLoading이 true다", async () => {
     const { fetchExchangeRate } = await import("@/api/assets");
     vi.mocked(fetchExchangeRate).mockReturnValue(new Promise(() => {}));

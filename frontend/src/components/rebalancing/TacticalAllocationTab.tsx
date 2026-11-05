@@ -52,7 +52,10 @@ function TacticalStatusView({
   status: TacticalStatus;
   onGoToExecution: (portfolioId: string) => void;
 }) {
-  const { upsert, disable, apply } = useTacticalMutations(status.portfolio_id);
+  const { upsert, disable, apply } = useTacticalMutations(
+    status.portfolio_id,
+    status.confirmed_regime,
+  );
   const [confirmApply, setConfirmApply] = useState(false);
   // 이번 화면에서 방금 적용한 비율(1=전체, 0.5=절반) — 서버 재조회 전에도 다음 단계 버튼을 보여주려고
   const [justApplied, setJustApplied] = useState<number | null>(null);

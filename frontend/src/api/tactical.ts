@@ -73,6 +73,8 @@ export interface TacticalStatus {
   current_groups: Partial<Record<TacticalAsset, TacticalGroupSummary>>;
   /** 포트폴리오가 전술 자산(나스닥100·S&P500·다우 그룹, QLD/SSO, 현금)으로만 구성됐는지 — false면 적용 시 다른 종목이 목표에서 빠진다 */
   portfolio_compatible: boolean;
+  /** 적용하면 사라지는 지수 그룹 이름(제안 비중 0%) — 비중이 돌아와도 대표·멤버 구성은 복원되지 않는다 */
+  groups_removed_on_apply?: string[];
   /** 틸트 이동폭(%p, 0이면 끔). proposed_weights에는 이미 반영돼 있다 */
   tilt_shift_pct: number;
   observed_tilt: TacticalTilt; // 오늘 판정
@@ -170,8 +172,15 @@ export const deleteTacticalStrategy = (portfolioId: string) =>
   apiDelete(`/tactical/${portfolioId}`);
 
 /** fraction<1이면 현재 목표에서 제안 쪽으로 그만큼만 옮긴다(분할 적용 — 전술 자산만 있는 포트폴리오만) */
-export const applyTacticalWeights = (portfolioId: string, fraction = 1) =>
-  apiPost<TacticalStatus>(`/tactical/${portfolioId}/apply`, { fraction });
+export const applyTacticalWeights = (
+  portfolioId: string,
+  fraction = 1,
+  expectedRegime?: TacticalRegime | null,
+) =>
+  apiPost<TacticalStatus>(`/tactical/${portfolioId}/apply`, {
+    fraction,
+    expected_regime: expectedRegime ?? undefined,
+  });
 
 export const fetchTacticalBacktest = (portfolioId: string, years: number) =>
   apiGet<TacticalBacktestResult>(`/tactical/${portfolioId}/backtest`, { params: { years } });

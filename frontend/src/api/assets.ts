@@ -194,8 +194,8 @@ export const fetchIndexRegion = (
 ): Promise<{ index_region: IndexRegion }> =>
   apiGet<{ index_region: IndexRegion }>("/stocks/index-region", { params: { ticker, market } });
 
-export const fetchExchangeRate = (): Promise<{ usd_krw: number }> =>
-  apiGet<{ usd_krw: number }>("/stocks/exchange-rate");
+export const fetchExchangeRate = (): Promise<{ usd_krw: number; is_fallback?: boolean }> =>
+  apiGet<{ usd_krw: number; is_fallback?: boolean }>("/stocks/exchange-rate");
 
 export interface StockPrice {
   price_krw: number | null;

@@ -4,6 +4,7 @@ import {
   deleteTacticalStrategy,
   fetchTacticalBacktest,
   fetchTacticalStatus,
+  type TacticalRegime,
   type TacticalStrategyPayload,
   upsertTacticalStrategy,
 } from "@/api/tactical";
@@ -39,7 +40,7 @@ export function useTacticalBacktest(
 }
 
 /** 전략 켜기/설정 변경·끄기·제안 비중 적용 뮤테이션 묶음. */
-export function useTacticalMutations(portfolioId: string) {
+export function useTacticalMutations(portfolioId: string, confirmedRegime?: TacticalRegime | null) {
   const queryClient = useQueryClient();
 
   const upsert = useMutation({
@@ -68,7 +69,8 @@ export function useTacticalMutations(portfolioId: string) {
 
   /** 인자 fraction(기본 1) — 0.5면 절반만 적용(분할 적용) */
   const apply = useMutation({
-    mutationFn: (fraction?: number) => applyTacticalWeights(portfolioId, fraction ?? 1),
+    mutationFn: (fraction?: number) =>
+      applyTacticalWeights(portfolioId, fraction ?? 1, confirmedRegime),
     onSuccess: async (_data, fraction) => {
       toast(
         (fraction ?? 1) < 1
