@@ -55,7 +55,7 @@ typecheck:
 	cd ../frontend && npm run typecheck
 
 clean:
-	rm -rf frontend/dist backend/.pytest_cache backend/.ruff_cache
+	rm -rf frontend/dist frontend/coverage .mypy_cache backend/.pytest_cache backend/.ruff_cache backend/.mypy_cache frontend/.mypy_cache frontend/.pytest_cache frontend/.ruff_cache
 
 format: format-backend
 	cd frontend && npm run format

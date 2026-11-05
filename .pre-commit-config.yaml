@@ -17,7 +17,7 @@ repos:
         name: mypy (backend)
         language: system
         entry: >-
-          bash -c 'if [ -x backend/.venv/Scripts/mypy.exe ] || [ -x backend/.venv/bin/mypy ]; then cd backend && uv run mypy app/; else echo "SKIP: backend/.venv 없음 — uv venv && uv pip install -e .[dev] 실행 필요" && exit 0; fi'
+          bash -c 'if [ -x backend/.venv/Scripts/mypy.exe ] || [ -x backend/.venv/bin/mypy ]; then cd backend && uv run mypy app/; else echo "SKIP: backend/.venv 없음 — make install-backend 실행 필요" && exit 0; fi'
         files: ^backend/app/
         pass_filenames: false
 

@@ -10,18 +10,15 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
-backend/.env
-frontend/.env
-frontend/.env.local
 
 # ── Python ─────────────────────────────────────────
 backend/.venv/
 **/__pycache__/
 **/*.pyc
 **/*.pyo
-backend/.pytest_cache/
-backend/.ruff_cache/
-backend/.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 *.egg-info/
 .coverage
 .coverage.*
@@ -30,7 +27,6 @@ backend/coverage.xml
 
 # ── Node.js ────────────────────────────────────────
 node_modules/
-frontend/node_modules/
 frontend/dist/
 frontend/coverage/
 frontend/tsc_output.txt
@@ -45,3 +41,6 @@ frontend/tsc_output.txt
 *.p12
 *.jks
 *.keystore
+
+# ── Firebase 설정 (로컬 FCM 빌드 전용) ─────────────
+google-services.json
