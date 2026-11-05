@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import (
+    BROKER_API_DATA_SOURCES,
     COMPREHENSIVE_TAX_THRESHOLD_KRW,
     DOMESTIC_MARKETS,
     OVERSEAS_MARKETS,
@@ -17,18 +18,16 @@ from app.models.asset import AssetAccount, Transaction
 from app.services.accounts._snapshot_queries import latest_snapshot_rows
 from app.utils.kst import today_kst
 
-_DOMESTIC_LARGE_HOLDER_THRESHOLD = 1_000_000_000
-_GEUMT_EXCESS_THRESHOLD = 300_000_000  # 금투세 누진 구간 기준 3억
+_DOMESTIC_LARGE_HOLDER_THRESHOLD = 5_000_000_000  # 대주주 시가총액 기준 — 종목당 50억원(2025년 말 기준 판정부터)
 
 _HEALTH_INSURANCE_DEPENDENT_THRESHOLD_KRW = 20_000_000  # 건강보험 피부양자 자격유지 금융소득 기준
 _HEALTH_INSURANCE_REGIONAL_DEDUCTION_KRW = 3_360_000  # 지역가입자 전환 시 소득 기본공제
-_HEALTH_INSURANCE_RATE = 0.0709  # 건강보험료율 (2025년 기준 — 매년 변경되므로 갱신 필요)
-_LONG_TERM_CARE_RATE_OF_PREMIUM = 0.1295  # 장기요양보험료율 (건강보험료 대비 비율)
-
-
-class _GeuMTRates(TypedDict):
-    standard_pct: float
-    excess_above_300m_pct: float
+# 연도별 (건강보험료율, 장기요양보험료율[건강보험료 대비]) — 매년 갱신. 2026년 값은 2차 출처 기준(공단 고시 원문 미확인)
+_HEALTH_INSURANCE_RATES: dict[int, tuple[float, float]] = {
+    2025: (0.0709, 0.1295),
+    2026: (0.0719, 0.1314),
+}
+_MOCK_CAPABLE_ASSET_TYPES = frozenset({"STOCK_KIS", "STOCK_KIWOOM"})
 
 
 class _TaxRates(TypedDict):
@@ -36,9 +35,6 @@ class _TaxRates(TypedDict):
     interest: float  # 이자소득세율(원천징수, 지방세 포함)
     overseas_gain: float  # 해외 양도세율
     overseas_deduction: int  # 해외 양도소득 공제 (원)
-    geumt_domestic_deduction: int  # 금투세 국내 공제 (원)
-    geumt_standard: float  # 금투세 기본세율
-    geumt_excess: float  # 금투세 3억 초과 세율
 
 
 _TAX_RATES: dict[int, _TaxRates] = {
@@ -47,18 +43,12 @@ _TAX_RATES: dict[int, _TaxRates] = {
         interest=0.154,
         overseas_gain=0.22,
         overseas_deduction=2_500_000,
-        geumt_domestic_deduction=50_000_000,
-        geumt_standard=0.20,
-        geumt_excess=0.25,
     ),
     2026: _TaxRates(
         dividend=0.154,
         interest=0.154,
         overseas_gain=0.22,
         overseas_deduction=2_500_000,
-        geumt_domestic_deduction=50_000_000,
-        geumt_standard=0.20,
-        geumt_excess=0.25,
     ),
 }
 
@@ -73,6 +63,19 @@ def pick_year_rule[T](table: dict[int, T], year: int) -> T:
 def _get_rates(year: int) -> _TaxRates:
     """연도별 세율 반환. 해당 연도가 없으면 가장 가까운 연도 사용."""
     return pick_year_rule(_TAX_RATES, year)
+
+
+# 취득가에 매수일이 아닌 현재 환율을 쓴다 — 세법은 취득일 환율 기준이라 달러가 오른 만큼 실제 과세 이익이 더 크다
+OVERSEAS_FX_BASIS_NOTE = "매수 시점 환율을 반영하지 않은 추정이라 환차익만큼 실제 과세 이익과 다를 수 있어요."
+
+
+def is_paper_account(acc: Any) -> bool:
+    """KIS·키움 모의투자 계좌인지. 수기·토스 계좌도 컬럼 기본값이 True라 브로커 연동 계좌로 한정한다."""
+    return (
+        getattr(acc, "is_mock_mode", False) is True
+        and acc.asset_type in _MOCK_CAPABLE_ASSET_TYPES
+        and acc.data_source in BROKER_API_DATA_SOURCES
+    )
 
 
 class OverseasTransferTaxEstimate(TypedDict):
@@ -100,69 +103,6 @@ def estimate_overseas_transfer_tax(realized_gain_krw: float, year: int | None = 
     }
 
 
-class GeuMTSimulationResult(TypedDict):
-    overseas_gain_krw: float
-    overseas_deduction_krw: int
-    overseas_taxable_krw: float
-    overseas_tax_krw: float
-    domestic_gain_krw: float
-    domestic_deduction_krw: int
-    domestic_taxable_krw: float
-    domestic_tax_krw: float
-    total_tax_krw: float
-    current_overseas_tax_krw: float
-    tax_difference_krw: float
-    note: str
-    rates: _GeuMTRates
-
-
-def _calc_geumt_tax(taxable_gain: float, rates: _TaxRates) -> float:
-    """금투세 누진 세율 계산. 3억 이하 기본세율, 초과분 높은세율."""
-    if taxable_gain <= 0:
-        return 0.0
-    if taxable_gain <= _GEUMT_EXCESS_THRESHOLD:
-        return taxable_gain * rates["geumt_standard"]
-    return (
-        _GEUMT_EXCESS_THRESHOLD * rates["geumt_standard"]
-        + (taxable_gain - _GEUMT_EXCESS_THRESHOLD) * rates["geumt_excess"]
-    )
-
-
-def _simulate_geumt_tax(overseas_gain: float, domestic_gain: float, rates: _TaxRates) -> GeuMTSimulationResult:
-    """금융투자소득세 시뮬레이션 (2025년 이후 유예 중).
-
-    미실현 손익 기준 추정치. 실제 과세는 실현 손익 기준.
-    """
-    overseas_taxable = max(0.0, overseas_gain - rates["overseas_deduction"])
-    domestic_taxable = max(0.0, domestic_gain - rates["geumt_domestic_deduction"])
-
-    overseas_tax = _calc_geumt_tax(overseas_taxable, rates)
-    domestic_tax = _calc_geumt_tax(domestic_taxable, rates)
-    total_tax = overseas_tax + domestic_tax
-
-    current_overseas_tax = max(0.0, overseas_gain - rates["overseas_deduction"]) * rates["overseas_gain"]
-    tax_difference = total_tax - current_overseas_tax
-
-    return {
-        "overseas_gain_krw": round(overseas_gain, 0),
-        "overseas_deduction_krw": rates["overseas_deduction"],
-        "overseas_taxable_krw": round(overseas_taxable, 0),
-        "overseas_tax_krw": round(overseas_tax, 0),
-        "domestic_gain_krw": round(domestic_gain, 0),
-        "domestic_deduction_krw": rates["geumt_domestic_deduction"],
-        "domestic_taxable_krw": round(domestic_taxable, 0),
-        "domestic_tax_krw": round(domestic_tax, 0),
-        "total_tax_krw": round(total_tax, 0),
-        "current_overseas_tax_krw": round(current_overseas_tax, 0),
-        "tax_difference_krw": round(tax_difference, 0),
-        "note": "금투세는 2025년 이후 유예 중입니다. 현재 미실현 손익 기준 추정치입니다.",
-        "rates": {
-            "standard_pct": rates["geumt_standard"] * 100,
-            "excess_above_300m_pct": rates["geumt_excess"] * 100,
-        },
-    }
-
-
 class HealthInsuranceEstimate(TypedDict):
     financial_income_for_health_insurance_krw: float
     threshold_krw: float
@@ -172,18 +112,22 @@ class HealthInsuranceEstimate(TypedDict):
     note: str
 
 
-def _calc_health_insurance_estimate(financial_income: float) -> HealthInsuranceEstimate:
+def _calc_health_insurance_estimate(financial_income: float, year: int | None = None) -> HealthInsuranceEstimate:
     """건강보험 피부양자 자격상실 위험 추정 (금융소득 = 과세계좌 배당 + 기록된 이자 기준 근사치).
 
     실제 부과액에 필요한 근로/사업/기타소득·재산은 반영하지 않는다 — 참고용 추정치.
     """
-    warning = financial_income >= _HEALTH_INSURANCE_DEPENDENT_THRESHOLD_KRW
+    # 기준은 "초과" — 정확히 2,000만원이면 아직 해당하지 않는다
+    warning = financial_income > _HEALTH_INSURANCE_DEPENDENT_THRESHOLD_KRW
+    premium_rate, long_term_care_rate = pick_year_rule(
+        _HEALTH_INSURANCE_RATES, year if year is not None else today_kst().year
+    )
     remaining = max(0.0, _HEALTH_INSURANCE_DEPENDENT_THRESHOLD_KRW - financial_income)
 
     estimated_monthly_premium: float | None = None
     if warning:
         taxable_income = max(0.0, financial_income - _HEALTH_INSURANCE_REGIONAL_DEDUCTION_KRW)
-        monthly_premium = (taxable_income / 12) * _HEALTH_INSURANCE_RATE * (1 + _LONG_TERM_CARE_RATE_OF_PREMIUM)
+        monthly_premium = (taxable_income / 12) * premium_rate * (1 + long_term_care_rate)
         estimated_monthly_premium = round(monthly_premium, 0)
 
     return {
@@ -216,7 +160,7 @@ async def get_tax_summary(
       이 함수가 직접 조회하지 않고 호출부(api/v1/tax.py, tax_action_service)가 넘긴다.
     - `stock_rows`: 호출부가 `load_tax_stock_rows`로 이미 읽은 최신 스냅샷 행(같은 account_id 기준).
       실현손익·절세 액션과 한 요청에서 스냅샷·포지션을 여러 번 읽지 않도록 넘겨받는다 — None이면 직접 1회 조회.
-    - 국내 양도세: 대주주 요건(10억) 초과 시 경고
+    - 국내 양도세: 한 종목 보유액이 대주주 기준(50억) 이상이면 경고. 판정은 종목별이라 계좌를 합쳐 종목 단위로 본다
     - 금융소득 종합과세 경계(2000만원) 경고 — 이자·배당 기준. 해외주식 양도차익은 양도소득(분류과세)이라
       금융소득에 합산하지 않는다(이전 구현은 해외 미실현 이익을 더해 경고를 과대 발생시켰음)
     - 건강보험 피부양자 자격상실 위험(이자+배당 금융소득 2000만원 기준) + 예상 월 보험료 참고 추정치
@@ -244,18 +188,19 @@ async def get_tax_summary(
     else:
         overseas_tax_free_room = overseas_realized_tax = None
 
-    domestic_large_holder_warning = domestic_stock_krw >= _DOMESTIC_LARGE_HOLDER_THRESHOLD
-    domestic_large_holder_excess_krw = max(0.0, domestic_stock_krw - _DOMESTIC_LARGE_HOLDER_THRESHOLD)
+    largest_domestic_name, largest_domestic_krw = _largest_domestic_holding(rows)
+    domestic_large_holder_warning = largest_domestic_krw >= _DOMESTIC_LARGE_HOLDER_THRESHOLD
+    domestic_large_holder_excess_krw = max(0.0, largest_domestic_krw - _DOMESTIC_LARGE_HOLDER_THRESHOLD)
 
     # 이자소득은 사용자가 기록한 INTEREST 내역 기준(예금·CMA 등) — 기록이 없으면 배당만으로 근사된다
     total_financial_income = dividend_income + interest_income
-    comprehensive_tax_warning = total_financial_income >= COMPREHENSIVE_TAX_THRESHOLD_KRW
+    # 기준은 "초과" — 정확히 2,000만원이면 종합과세 대상이 아니다
+    comprehensive_tax_warning = total_financial_income > COMPREHENSIVE_TAX_THRESHOLD_KRW
     comprehensive_tax_remaining_krw = max(0.0, COMPREHENSIVE_TAX_THRESHOLD_KRW - total_financial_income)
 
     positions = _overseas_positions_from_rows(rows)
     harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable, rates)
-    geumt_simulation = _simulate_geumt_tax(overseas_unrealized, domestic_unrealized, rates)
-    health_insurance_estimate = _calc_health_insurance_estimate(total_financial_income)
+    health_insurance_estimate = _calc_health_insurance_estimate(total_financial_income, year)
 
     return {
         "year": year,
@@ -274,17 +219,19 @@ async def get_tax_summary(
         "domestic_unrealized_gain_krw": round(domestic_unrealized, 0),
         "domestic_large_holder_warning": domestic_large_holder_warning,
         "domestic_large_holder_excess_krw": round(domestic_large_holder_excess_krw, 0),
+        "domestic_large_holder_name": largest_domestic_name if domestic_large_holder_warning else None,
+        "domestic_large_holder_threshold_krw": _DOMESTIC_LARGE_HOLDER_THRESHOLD,
         "comprehensive_tax_warning": comprehensive_tax_warning,
         "comprehensive_tax_remaining_krw": round(comprehensive_tax_remaining_krw, 0),
         "total_estimated_tax_krw": round(dividend_tax + interest_tax + overseas_tax_estimated, 0),
         "total_fees_krw": round(total_fees, 0),
         "tax_deferred_value_krw": round(tax_deferred_value_krw, 0),
         "harvesting_recommendations": harvesting,
-        "financial_investment_tax_simulation": geumt_simulation,
         "health_insurance_estimate": health_insurance_estimate,
         "note": (
             "해외 주식 양도세는 올해 실현손익(증권사 조회 가능분)과 미실현 손익을 연내 모두 실현한다고 가정한 "
             "추정치입니다. 실제 납부액은 실현 손익 기준으로 계산됩니다. "
+            f"{OVERSEAS_FX_BASIS_NOTE} "
             "ISA/연금저축/IRP 계좌 보유분은 과세이연되어 위 추정에서 제외되었습니다."
         ),
         "rates": {
@@ -297,13 +244,15 @@ async def get_tax_summary(
 
 async def _latest_stock_rows(user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None) -> list[Any]:
     """활성 주식 계좌의 최신 스냅샷 행(포지션 포함). account_id 지정 시 그 계좌만."""
-    return await latest_snapshot_rows(
+    rows = await latest_snapshot_rows(
         db,
         user_id,
         account_ids=[account_id] if account_id is not None else None,
         asset_types=POSITION_STOCK_ASSET_TYPES,
         with_positions=True,
     )
+    # 모의투자 손익은 실제 소득이 아니다
+    return [row for row in rows if not is_paper_account(row[1])]
 
 
 async def get_overseas_positions_detail(
@@ -367,6 +316,8 @@ def _build_harvesting_recommendations(
     """손실 수확(Tax-Loss Harvesting) 추천 목록.
 
     현재 과세 대상 이익이 있을 때, 손실 종목 전량 매도로 절세 가능한 금액을 계산.
+    `current_taxable_gain`은 미실현 이익까지 연내 전부 실현한다는 가정의 값이다 — 올해 실제로 줄어드는 세금은
+    실현 이익 기준으로 `tax_action_service.build_loss_harvest_actions`가 다시 계산한다.
     """
     if current_taxable_gain <= 0:
         return []
@@ -385,6 +336,7 @@ def _build_harvesting_recommendations(
                 "ticker": pos["ticker"],
                 "name": pos["name"],
                 "market": pos["market"],
+                "account_id": pos.get("account_id"),
                 "unrealized_loss_krw": round(pos["unrealized_pnl_krw"], 0),
                 "tax_saved_krw": tax_saved,
                 "qty": pos["qty"],
@@ -445,6 +397,26 @@ async def _calc_taxable_income_by_type(
     )
     total = result.scalar()
     return float(total) if total else 0.0
+
+
+def _largest_domestic_holding(rows: list[Any]) -> tuple[str | None, float]:
+    """국내 종목별(계좌 합산) 평가액 중 가장 큰 종목 — 대주주 판정은 종목 단위다.
+
+    ISA·연금 계좌 보유분도 지분이라 합산한다.
+    """
+    by_ticker: dict[str, float] = {}
+    names: dict[str, str] = {}
+    for snap, _acc in rows:
+        for pos in snap.position_items:
+            if pos.market not in DOMESTIC_MARKETS:
+                continue
+            value = float(pos.current_price or pos.avg_price or 0) * float(pos.qty or 0)
+            by_ticker[pos.ticker] = by_ticker.get(pos.ticker, 0.0) + value
+            names[pos.ticker] = pos.name or pos.ticker
+    if not by_ticker:
+        return None, 0.0
+    ticker = max(by_ticker, key=lambda t: by_ticker[t])
+    return names[ticker], by_ticker[ticker]
 
 
 def _stock_unrealized_from_rows(rows: list[Any]) -> tuple[float, float, float, float]:

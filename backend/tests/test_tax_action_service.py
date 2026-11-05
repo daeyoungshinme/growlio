@@ -103,7 +103,10 @@ class TestBuildIsaTransferActions:
         assert len(actions) == expected
 
     def test_benefit_and_deadline(self):
-        (action,) = build_isa_transfer_actions([_isa_account("2026-11-14")], RULES, 0.165, "UNDER_55M", TODAY)
+        account = _isa_account("2026-11-14")
+        (action,) = build_isa_transfer_actions(
+            [account], RULES, 0.165, "UNDER_55M", TODAY, {account["account_id"]: 50_000_000.0}
+        )
         assert action["benefit_krw"] == 495_000  # 300만 × 16.5%
         assert action["amount_krw"] == 30_000_000
         assert action["deadline"] == "2027-01-13"  # 만기 + 60일
@@ -206,7 +209,7 @@ class TestBuildLossHarvestActions:
         actions = build_loss_harvest_actions(harvesting, TODAY)
         assert [a["id"] for a in actions] == ["loss-harvest-A", "loss-harvest-B", "loss-harvest-C"]
         assert actions[0]["amount_krw"] == 1_000_000
-        assert actions[0]["benefit_krw"] == 220_000
+        assert actions[0]["benefit_krw"] is None  # 실현 이익을 모르면 절감액을 내지 않는다(plans/110 B5)
 
 
 class TestBuildFinancialIncomeAction:
@@ -345,8 +348,9 @@ class TestGetTaxActionPlan:
 
         isa_mock.assert_not_called()
         assert plan["income_bracket"] == "UNDER_55M"
-        assert [a["category"] for a in plan["actions"]] == ["PENSION_DEDUCTION", "OVERSEAS_GAIN_HARVEST"]
-        assert plan["actions"][0]["benefit_krw"] == 330_000  # 200만 × 16.5%
+        # 해외 매도 마감(12/28)이 연금 납입 마감(12/31)보다 빠르다
+        assert [a["category"] for a in plan["actions"]] == ["OVERSEAS_GAIN_HARVEST", "PENSION_DEDUCTION"]
+        assert plan["actions"][1]["benefit_krw"] == 330_000  # 200만 × 16.5%
 
     @pytest.mark.asyncio
     async def test_passes_broker_realized_gain_to_summary_and_a4(self, mock_db, realized_mock):

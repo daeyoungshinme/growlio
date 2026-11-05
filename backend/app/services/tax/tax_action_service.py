@@ -30,7 +30,7 @@ from app.services.tax.isa_service import (
 )
 from app.services.tax.overseas_realized_service import get_overseas_realized_summary
 from app.services.tax.pension_contribution_service import PensionContributionStatus, calc_pension_contribution_status
-from app.services.tax.tax_service import get_tax_summary, load_tax_stock_rows, pick_year_rule
+from app.services.tax.tax_service import OVERSEAS_FX_BASIS_NOTE, get_tax_summary, load_tax_stock_rows, pick_year_rule
 from app.utils.kst import today_kst
 
 ActionCategory = Literal[
@@ -175,6 +175,12 @@ def _fmt_limit(amount: int) -> str:
     return f"{amount // 10_000:,}만원"
 
 
+def overseas_sell_deadline(year: int) -> date:
+    """올해 귀속 해외주식 매도의 보수적 마감일(12월 마지막 주 월요일). 결제일 기준이라 12/31에 팔면 내년 귀속이다."""
+    last_day = date(year, 12, 31)
+    return last_day - timedelta(days=last_day.weekday())
+
+
 def build_pension_action(
     pension: PensionContributionStatus,
     has_pension_savings: bool,
@@ -227,9 +233,18 @@ def build_pension_action(
 
 
 def build_isa_transfer_actions(
-    isa_accounts: list[IsaAccountStatus], rules: _DeductionRules, rate: float, income_bracket: str | None, today: date
+    isa_accounts: list[IsaAccountStatus],
+    rules: _DeductionRules,
+    rate: float,
+    income_bracket: str | None,
+    today: date,
+    balances: dict[str, float] | None = None,
 ) -> list[TaxAction]:
-    """A2 — ISA 만기 D-90 ~ 만기 후 60일: 만기자금 연금계좌 이전 시 추가 세액공제."""
+    """A2 — ISA 만기 D-90 ~ 만기 후 60일: 만기자금 연금계좌 이전 시 추가 세액공제.
+
+    혜택은 옮길 수 있는 금액의 10%(상한 300만원)이므로 계좌 평가액(`balances`, 계좌 id → 원)으로 계산한다.
+    평가액을 모르면 금액·절세액을 내지 않는다 — 잔액과 무관한 최대치를 보여주면 정렬과 리마인더 합계까지 부풀려진다.
+    """
     actions: list[TaxAction] = []
     max_transfer = rules["isa_transfer_cap_krw"] / rules["isa_transfer_rate"]
     for acc in isa_accounts:
@@ -244,7 +259,17 @@ def build_isa_transfer_actions(
             if today >= maturity
             else f"만기일({maturity.isoformat()}) 이후 {rules['isa_transfer_window_days']}일 이내에"
         )
-        benefit = rules["isa_transfer_cap_krw"] * rate
+        balance = (balances or {}).get(acc["account_id"])
+        amount: float | None = None
+        benefit: float | None = None
+        size_note = f"{_fmt_won(max_transfer)} 이상 이전 시 최대 공제"
+        if balance is not None and balance > 0:
+            transferable = min(balance, max_transfer)
+            extra_limit = transferable * rules["isa_transfer_rate"]
+            amount = transferable
+            benefit = extra_limit * rate
+            if balance < max_transfer:
+                size_note = f"현재 평가액 {_fmt_won(balance)} 전액을 옮기면 공제한도 {_fmt_won(extra_limit)} 추가"
         actions.append(
             _make_action(
                 action_id=f"isa-transfer-{acc['account_id']}",
@@ -253,10 +278,10 @@ def build_isa_transfer_actions(
                 detail=(
                     f"{timing} 연금저축/IRP로 옮기면 이전액의 {rules['isa_transfer_rate'] * 100:.0f}%"
                     f"(최대 {_fmt_won(rules['isa_transfer_cap_krw'])})가 올해 연금 공제한도에 더해져요. "
-                    f"{_fmt_won(max_transfer)} 이상 이전 시 최대 공제 — 공제율 {rate * 100:.1f}% 기준"
+                    f"{size_note} — 공제율 {rate * 100:.1f}% 기준"
                     f"{'' if income_bracket else '(낮은 구간)'}."
                 ),
-                amount=max_transfer,
+                amount=amount,
                 benefit=benefit,
                 deadline=window_end,
                 today=today,
@@ -325,57 +350,111 @@ def build_overseas_gain_harvest_action(
     realized_partial: bool = False,
     realized_from_records: bool = False,
     realized_estimated: bool = False,
+    realized_lookup_failed: bool = False,
 ) -> TaxAction | None:
     """A4 — 해외주식 250만원 기본공제 범위 내 이익실현(취득가 상향).
 
     `realized_krw`(증권사 체결 + 미지원 계좌는 수기 SELL 기록 기준 올해 실현손익, E6)가 있으면
     공제 여유 = 공제 − 실현손익(손실이면 여유 증가), 없으면 올해 실현손익 0으로 가정한다.
+    증권사 조회가 실패했으면(`realized_lookup_failed`) 0 가정이 위험하다 — 이미 공제를 다 쓴 사용자에게 "더 실현해도
+    된다"고 안내하게 되므로 금액 없이 조회 실패만 알린다. 마감일이 지나면 올해 귀속이 안 되므로 내지 않는다.
     """
     gains = sum(p["unrealized_pnl_krw"] for p in positions if p["unrealized_pnl_krw"] > 0)
+    deadline = overseas_sell_deadline(today.year)
+    if gains <= 0 or today > deadline:
+        return None
+    if realized_lookup_failed:
+        return _make_action(
+            action_id="overseas-gain-harvest",
+            category="OVERSEAS_GAIN_HARVEST",
+            title="올해 해외 실현손익을 확인하지 못했어요",
+            detail=(
+                "증권사 조회에 실패해 양도세 공제가 얼마나 남았는지 계산하지 않았어요. 이미 공제를 다 썼을 수 있으니 "
+                "잠시 후 다시 확인한 뒤 이익 실현을 판단하세요."
+            ),
+            amount=None,
+            benefit=None,
+            deadline=deadline,
+            today=today,
+            cta_label="해외 종목 보기",
+            cta_link=_LINK_TAX_ESTIMATE,
+        )
     room = max(0.0, deduction_krw - (realized_krw or 0.0))
-    if gains <= 0 or room <= 0:
+    if room <= 0:
         return None
     amount = min(gains, room)
     return _make_action(
         action_id="overseas-gain-harvest",
         category="OVERSEAS_GAIN_HARVEST",
-        title=f"해외주식 이익 {_fmt_won(amount)}까지 연내 실현 시 양도세 0원",
+        title=f"해외주식 이익 {_fmt_won(amount)}까지 연내 실현 검토 (기본공제 범위)",
         detail=(
             f"해외주식 양도차익은 연 {_fmt_won(deduction_krw)}까지 공제돼요. 공제 범위만큼 이익을 실현하고 "
             "다시 사면 취득가가 올라가 나중에 낼 양도세가 줄어요(아래 절감액은 향후 매도 시 기준). "
             f"{_realized_note(realized_krw, realized_partial, realized_from_records, realized_estimated)}"
-            "결제일 기준이라 12월 마지막 주 "
+            f"{OVERSEAS_FX_BASIS_NOTE} 결제일 기준이라 12월 마지막 주 "
             "초까지 매도해야 올해 귀속돼요. 정보 제공 목적이며 매매 권유가 아닙니다."
         ),
         amount=amount,
         benefit=amount * gain_tax_rate,
-        deadline=date(today.year, 12, 31),
+        deadline=deadline,
         today=today,
         cta_label="해외 종목 보기",
         cta_link=_LINK_TAX_ESTIMATE,
     )
 
 
-def build_loss_harvest_actions(harvesting: list[dict], today: date) -> list[TaxAction]:
-    """A5 — 기존 손실수확 추천(tax_service._build_harvesting_recommendations) 상위 N개를 액션화."""
-    return [
-        _make_action(
-            action_id=f"loss-harvest-{item['ticker']}",
-            category="TAX_LOSS_HARVEST",
-            title=f"{item['name']} 손실 {_fmt_won(abs(item['unrealized_loss_krw']))} 실현 검토",
-            detail=(
-                "해외주식 과세 이익과 손익을 통산하면 올해 양도세를 줄일 수 있어요. 결제일 기준이라 12월 마지막 주 "
-                "초까지 매도해야 올해 귀속돼요. 정보 제공 목적이며 매매 권유가 아닙니다."
-            ),
-            amount=abs(float(item["unrealized_loss_krw"])),
-            benefit=float(item["tax_saved_krw"]),
-            deadline=date(today.year, 12, 31),
-            today=today,
-            cta_label="손실수확 보기",
-            cta_link=_LINK_TAX_ESTIMATE,
+def build_loss_harvest_actions(
+    harvesting: list[dict],
+    today: date,
+    realized_krw: float | None = None,
+    deduction_krw: float = 0.0,
+    gain_tax_rate: float = 0.0,
+) -> list[TaxAction]:
+    """A5 — 기존 손실수확 추천(tax_service._build_harvesting_recommendations) 상위 N개를 액션화.
+
+    추천 목록의 `tax_saved_krw`는 미실현 이익까지 전부 판다는 가정의 값이다. 손실만 팔면 올해 줄어드는 세금은
+    이미 실현한 과세 이익만큼뿐이므로 절감액은 그 기준으로 다시 계산하고, 없으면 금액을 내지 않는다.
+    """
+    deadline = overseas_sell_deadline(today.year)
+    if today > deadline:
+        return []
+    remaining_gain = max(0.0, (realized_krw or 0.0) - deduction_krw)
+    actions: list[TaxAction] = []
+    for item in harvesting[:_HARVESTING_TOP_N]:
+        loss = abs(float(item["unrealized_loss_krw"]))
+        offset = min(loss, remaining_gain)
+        remaining_gain -= offset
+        if offset > 0:
+            reason = "올해 이미 실현한 해외주식 이익과 손익을 통산하면 양도세를 줄일 수 있어요."
+        elif realized_krw is None:
+            reason = "올해 실현손익을 확인하지 못해 절감액을 계산하지 않았어요."
+        else:
+            reason = (
+                "올해 실현한 이익이 공제 범위 안이라 지금 손실만 팔아도 올해 세금은 줄지 않아요. "
+                "연내 이익을 실현할 계획이 있을 때 손익을 통산할 수 있어요."
+            )
+        account_id = item.get("account_id")
+        actions.append(
+            _make_action(
+                # 같은 종목을 두 계좌에 보유하면 항목이 둘이다
+                action_id=f"loss-harvest-{account_id}-{item['ticker']}"
+                if account_id
+                else f"loss-harvest-{item['ticker']}",
+                category="TAX_LOSS_HARVEST",
+                title=f"{item['name']} 손실 {_fmt_won(loss)} 실현 검토",
+                detail=(
+                    f"{reason} {OVERSEAS_FX_BASIS_NOTE} 결제일 기준이라 12월 마지막 주 "
+                    "초까지 매도해야 올해 귀속돼요. 정보 제공 목적이며 매매 권유가 아닙니다."
+                ),
+                amount=loss,
+                benefit=offset * gain_tax_rate if offset > 0 else None,
+                deadline=deadline,
+                today=today,
+                cta_label="손실수확 보기",
+                cta_link=_LINK_TAX_ESTIMATE,
+            )
         )
-        for item in harvesting[:_HARVESTING_TOP_N]
-    ]
+    return actions
 
 
 def build_financial_income_action(tax_summary: dict, today: date) -> TaxAction | None:
@@ -392,7 +471,7 @@ def build_financial_income_action(tax_summary: dict, today: date) -> TaxAction |
         else f"배당 {_fmt_won(dividend)}, 기록된 이자 없음"
     )
     interest_hint = "" if interest > 0 else " 예금·CMA 이자가 있다면 이자 내역을 기록해야 정확해져요."
-    if remaining > 0:
+    if financial <= COMPREHENSIVE_TAX_THRESHOLD_KRW:  # 기준은 "초과" — 정확히 2,000만원은 아직 대상이 아니다
         title = f"금융소득 종합과세까지 {_fmt_won(remaining)} 남음"
         detail = (
             f"올해 과세계좌 금융소득이 {_fmt_won(financial)}({breakdown})이에요. "
@@ -468,6 +547,9 @@ async def get_tax_action_plan_with_summary(
 
     actions: list[TaxAction] = []
 
+    # 스냅샷은 한 번만 읽어 ISA 평가액·실현손익(포지션)·세금 요약(행)에 넘긴다
+    rows, positions = await load_tax_stock_rows(user_id, db)
+
     has_ps = "PENSION_SAVINGS" in tax_types
     has_irp = "IRP" in tax_types
     if has_ps or has_irp:
@@ -478,30 +560,42 @@ async def get_tax_action_plan_with_summary(
 
     if "ISA" in tax_types:
         isa = await get_isa_status_summary(user_id, db)
-        actions.extend(build_isa_transfer_actions(isa["accounts"], rules, rate, income_bracket, today))
+        balances = {str(acc.id): float(snap.amount_krw or 0) for snap, acc in rows}
+        actions.extend(build_isa_transfer_actions(isa["accounts"], rules, rate, income_bracket, today, balances))
         isa_contrib = await calc_isa_contribution_status(user_id, year, db)
         actions.extend(build_isa_contribution_actions(isa_contrib, today))
 
-    # 스냅샷은 한 번만 읽어 실현손익(포지션)·세금 요약(행)에 넘긴다
-    rows, positions = await load_tax_stock_rows(user_id, db)
     realized = await get_overseas_realized_summary(user_id, year, db, overseas_positions=positions)
     tax_summary = await get_tax_summary(
         user_id, year, db, overseas_realized_krw=realized["realized_gain_krw"], stock_rows=rows
     )
+    deduction_krw = float(tax_summary["overseas_gain_deduction_krw"])
+    gain_tax_rate = float(tax_summary["rates"]["overseas_tax_rate_pct"]) / 100
+    # 캐시된 예전 응답에는 lookup_failed가 없다(실패 결과는 캐시하지 않으므로 없으면 성공)
+    lookup_failed = bool(realized.get("lookup_failed", False))
     gain_action = build_overseas_gain_harvest_action(
         positions,
-        float(tax_summary["overseas_gain_deduction_krw"]),
-        float(tax_summary["rates"]["overseas_tax_rate_pct"]) / 100,
+        deduction_krw,
+        gain_tax_rate,
         today,
         realized_krw=realized["realized_gain_krw"],
         realized_partial=realized["source"] == "PARTIAL",
         # 캐시된 예전 응답에는 method/estimated가 없다
         realized_from_records=any(a.get("method") == "TRADE_RECORD" for a in realized["covered_accounts"]),
         realized_estimated=any(a.get("estimated", False) for a in realized["covered_accounts"]),
+        realized_lookup_failed=lookup_failed,
     )
     if gain_action:
         actions.append(gain_action)
-    actions.extend(build_loss_harvest_actions(tax_summary.get("harvesting_recommendations", []), today))
+    actions.extend(
+        build_loss_harvest_actions(
+            tax_summary.get("harvesting_recommendations", []),
+            today,
+            realized_krw=None if lookup_failed else realized["realized_gain_krw"],
+            deduction_krw=deduction_krw,
+            gain_tax_rate=gain_tax_rate,
+        )
+    )
     financial_action = build_financial_income_action(tax_summary, today)
     if financial_action:
         actions.append(financial_action)

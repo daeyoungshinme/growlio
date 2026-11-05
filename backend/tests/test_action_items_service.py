@@ -73,6 +73,7 @@ def _tax_summary(**warnings):
         "comprehensive_tax_warning": warnings.get("comprehensive", False),
         "domestic_large_holder_warning": warnings.get("large_holder", False),
         "domestic_large_holder_excess_krw": warnings.get("excess", 0.0),
+        "domestic_large_holder_name": warnings.get("large_holder_name"),
     }
 
 
@@ -156,9 +157,9 @@ async def test_tax_warning_priority_order_matches_frontend():
     items, _ = await _run(tax=tax)
     assert items[0].title == "건강보험 피부양자 자격 상실 위험"
 
-    tax = AsyncMock(return_value=({"actions": []}, _tax_summary(large_holder=True, excess=12_000_000.0)))
+    tax = AsyncMock(return_value=({"actions": []}, _tax_summary(large_holder=True, large_holder_name="삼성전자")))
     items, _ = await _run(tax=tax)
-    assert items[0].title == "국내주식 대주주요건 주의 (12,000,000원 초과)"
+    assert items[0].title == "국내주식 대주주요건 주의 (삼성전자)"
 
 
 @pytest.mark.asyncio

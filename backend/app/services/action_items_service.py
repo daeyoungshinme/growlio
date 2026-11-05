@@ -209,8 +209,8 @@ def _tax_warning_text(summary: dict[str, Any]) -> str | None:
     if summary.get("comprehensive_tax_warning"):
         return "금융소득 종합과세 대상 가능"
     if summary.get("domestic_large_holder_warning"):
-        excess = float(summary.get("domestic_large_holder_excess_krw") or 0)
-        return f"국내주식 대주주요건 주의 ({excess:,.0f}원 초과)" if excess > 0 else "국내주식 대주주요건 주의"
+        name = summary.get("domestic_large_holder_name")
+        return f"국내주식 대주주요건 주의 ({name})" if name else "국내주식 대주주요건 주의"
     return None
 
 

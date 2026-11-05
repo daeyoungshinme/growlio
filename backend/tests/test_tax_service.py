@@ -198,7 +198,6 @@ class TestGetTaxSummary:
             "total_fees_krw",
             "tax_deferred_value_krw",
             "harvesting_recommendations",
-            "financial_investment_tax_simulation",
             "health_insurance_estimate",
             "note",
             "rates",
@@ -271,40 +270,42 @@ class TestGetTaxSummary:
 
     @pytest.mark.asyncio
     async def test_domestic_large_holder_warning(self, mock_db, override_settings):
-        """국내주식 보유액 10억 이상이면 대주주 경고."""
-        user_id = uuid.uuid4()
-
+        """한 종목 보유액이 50억 이상이면 대주주 경고."""
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(0.0, 1_000_000_000.0, 0.0, 0.0),
+                "app.services.tax.tax_service._largest_domestic_holding",
+                return_value=("삼성전자", 5_000_000_000.0),
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):
-            result = await get_tax_summary(user_id, 2025, mock_db)
+            result = await get_tax_summary(uuid.uuid4(), 2025, mock_db, stock_rows=[])
 
         assert result["domestic_large_holder_warning"] is True
+        assert result["domestic_large_holder_name"] == "삼성전자"
         assert result["domestic_large_holder_excess_krw"] == 0.0
 
     @pytest.mark.asyncio
-    async def test_domestic_large_holder_excess_krw_reflects_amount_over_threshold(self, mock_db, override_settings):
-        """국내주식 보유액이 10억원을 초과한 만큼을 domestic_large_holder_excess_krw로 반환한다."""
-        user_id = uuid.uuid4()
-
+    async def test_domestic_total_over_threshold_without_large_ticker_has_no_warning(self, mock_db, override_settings):
+        """합계가 커도 종목당 기준 미만이면 경고하지 않는다 — 예전에는 합계를 10억과 비교했다."""
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(0.0, 1_300_000_000.0, 0.0, 0.0),
+                return_value=(0.0, 6_000_000_000.0, 0.0, 0.0),
+            ),
+            patch(
+                "app.services.tax.tax_service._largest_domestic_holding",
+                return_value=("삼성전자", 1_200_000_000.0),
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):
-            result = await get_tax_summary(user_id, 2025, mock_db)
+            result = await get_tax_summary(uuid.uuid4(), 2025, mock_db, stock_rows=[])
 
-        assert result["domestic_large_holder_excess_krw"] == 300_000_000.0
+        assert result["domestic_large_holder_warning"] is False
+        assert result["domestic_large_holder_name"] is None
 
     @pytest.mark.asyncio
     async def test_comprehensive_tax_warning_when_over_20m(self, mock_db, override_settings):
@@ -427,8 +428,8 @@ class TestCalcHealthInsuranceEstimate:
         assert result["threshold_krw"] == 20_000_000.0
 
     def test_at_threshold_triggers_warning(self, override_settings):
-        """배당소득이 2000만원 이상이면 경고와 예상 월 보험료를 반환한다."""
-        result = _calc_health_insurance_estimate(20_000_000.0)
+        """배당소득이 2000만원을 넘으면 경고와 예상 월 보험료를 반환한다."""
+        result = _calc_health_insurance_estimate(20_000_001.0)
 
         assert result["dependent_risk_warning"] is True
         assert result["income_remaining_until_risk_krw"] == 0.0
@@ -436,9 +437,9 @@ class TestCalcHealthInsuranceEstimate:
         assert result["estimated_monthly_premium_krw"] > 0
 
     def test_estimated_monthly_premium_formula(self, override_settings):
-        """월 보험료 = (배당소득 - 336만원) / 12 × 7.09% × (1 + 12.95%)."""
+        """월 보험료 = (배당소득 - 336만원) / 12 × 7.09% × (1 + 12.95%) — 2025년 요율."""
         dividend_income = 30_000_000.0
-        result = _calc_health_insurance_estimate(dividend_income)
+        result = _calc_health_insurance_estimate(dividend_income, 2025)
 
         taxable = dividend_income - 3_360_000.0
         expected = round((taxable / 12) * 0.0709 * 1.1295, 0)
