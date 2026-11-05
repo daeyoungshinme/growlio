@@ -57,6 +57,8 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
   └── api/{도메인}.ts → React Query useQuery/useMutation → Page
 ```
 
+- `api/fetchAllPages.ts` — skip/limit 목록을 끝까지 받는다. **목록 전체를 걸러 쓰거나 합계를 내는 화면은 이걸로** — 기본 limit(100)만 받으면 합계가 조용히 줄어든다.
+
 - **인증**: 로그인·가입·갱신은 전부 Supabase Auth. 백엔드는 JWKS 검증만 — 별도 "백엔드 JWT" 없음.
 - `lib/supabase.ts` — `await getSupabase()`로 지연 로드(supabase-js ~200KB가 부팅 경로를 막던 문제). **동기 `supabase` export 없음.** 토큰 첨부·갱신은 `api/client.ts` 소관. 세션은 localStorage 평문 — 쿠키 전환 보류 결정은 `docs/plans/28-localstorage-token-decision.md`.
 - `lib/storedSession.ts` — 저장된 `sb-*-auth-token`을 SDK 없이 동기로 읽어 부팅 시 토큰 시드.
@@ -246,6 +248,7 @@ _기타_
 
 **에러·토스트·스토리지**
 
+- `utils/chartSummary.ts` — 차트 대체 텍스트 문장. recharts 차트는 `role="img"` 래퍼의 `aria-label`로 쓴다
 - `utils/error.ts` `extractErrorMessage(e, fallback?)` — API 에러 수동 파싱 금지
 - `utils/toast.ts` `toast(message, type?)` — 훅 아님, 어디서든 호출
 - `utils/safeStorage.ts` — **`localStorage`/`sessionStorage` 직접 접근 금지**(차단 환경에선 접근만으로 throw해 부팅 실패)

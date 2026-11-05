@@ -10,6 +10,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { MONTH_LABELS } from "@/utils/dividendUtils";
+import { summarizeAmounts } from "@/utils/chartSummary";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
@@ -346,7 +347,14 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
         <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
           예상 배당금 기준. 약한 달(평균 50% 미만)은 연한 색으로 표시.
         </p>
-        <div className="h-[180px] sm:h-[220px]">
+        <div
+          className="h-[180px] sm:h-[220px]"
+          role="img"
+          aria-label={summarizeAmounts(
+            "월별 예상 배당 차트",
+            monthlyChartData.map((m) => ({ name: m.name ?? "", amount: m.예상 })),
+          )}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthlyChartData} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
               <XAxis
@@ -400,7 +408,14 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">
             연도별 실수령 배당 추이
           </h3>
-          <div className="h-[130px] sm:h-[160px]">
+          <div
+            className="h-[130px] sm:h-[160px]"
+            role="img"
+            aria-label={summarizeAmounts(
+              "연도별 실수령 배당 차트",
+              yearly_received.map((y) => ({ name: `${y.year}년`, amount: y.amount_krw })),
+            )}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={yearly_received.map((y, i) => {

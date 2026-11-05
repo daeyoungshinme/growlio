@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { summarizeSavings } from "@/utils/chartSummary";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrw, fmtKrwPreview, fmtKrwShort } from "@/utils/format";
 import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
@@ -242,36 +243,44 @@ export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
         </div>
       )}
 
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f0f0f0"} />
-          <XAxis
-            dataKey="year"
-            tick={chartTickStyle(isDark)}
-            tickFormatter={(v: number) => `${v}년`}
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            tick={chartTickStyle(isDark)}
-            tickFormatter={(v: number) => fmtKrwShort(v)}
-            width={48}
-          />
-          <Tooltip
-            formatter={(value: number, name: string) => [
-              fmtKrw(value),
-              name === "value"
-                ? "투자 후 금액"
-                : isLumpSum
-                  ? "원금(추가 납입 없음)"
-                  : "단순 납입 누계",
-            ]}
-            labelFormatter={(label: number) => `${label}년 후`}
-            {...chartTooltipStyle(isDark)}
-          />
-          <Line type="monotone" dataKey="principal" stroke="#9ca3af" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="value" stroke="#4f46e5" strokeWidth={2} dot={false} />
-        </LineChart>
-      </ResponsiveContainer>
+      <div role="img" aria-label={summarizeSavings(30, valueAt30, totalPrincipalAt30)}>
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f0f0f0"} />
+            <XAxis
+              dataKey="year"
+              tick={chartTickStyle(isDark)}
+              tickFormatter={(v: number) => `${v}년`}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tick={chartTickStyle(isDark)}
+              tickFormatter={(v: number) => fmtKrwShort(v)}
+              width={48}
+            />
+            <Tooltip
+              formatter={(value: number, name: string) => [
+                fmtKrw(value),
+                name === "value"
+                  ? "투자 후 금액"
+                  : isLumpSum
+                    ? "원금(추가 납입 없음)"
+                    : "단순 납입 누계",
+              ]}
+              labelFormatter={(label: number) => `${label}년 후`}
+              {...chartTooltipStyle(isDark)}
+            />
+            <Line
+              type="monotone"
+              dataKey="principal"
+              stroke="#9ca3af"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line type="monotone" dataKey="value" stroke="#4f46e5" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
       <div className="flex items-center gap-4 flex-wrap mt-2 text-xs text-gray-500 dark:text-gray-400">
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-5 border-t-2 border-gray-400" />

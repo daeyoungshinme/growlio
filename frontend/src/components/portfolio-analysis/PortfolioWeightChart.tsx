@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { PortfolioItem } from "@/api/portfolios";
 import { PIE_COLORS } from "@/utils/colors";
+import { summarizeWeights } from "@/utils/chartSummary";
 
 interface Props {
   items: PortfolioItem[];
@@ -26,7 +27,14 @@ function PortfolioWeightChart({ items }: Props) {
           단일 종목 비중 {maxWeight.toFixed(1)}% — 집중 투자 위험이 있습니다
         </div>
       )}
-      <div className="w-full max-w-[180px]">
+      <div
+        className="w-full max-w-[180px]"
+        role="img"
+        aria-label={summarizeWeights(
+          "포트폴리오 비중 차트",
+          pieData.map((d) => ({ name: d.name, pct: d.value })),
+        )}
+      >
         <ResponsiveContainer width="100%" aspect={1}>
           <PieChart>
             <Pie

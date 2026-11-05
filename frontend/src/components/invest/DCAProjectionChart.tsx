@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { summarizeProjection } from "@/utils/chartSummary";
 import type { DCAProjectionPoint } from "@/api/invest";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrw, fmtKrwShort, localMonth } from "@/utils/format";
@@ -148,81 +149,83 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
         )}
       </div>
       {/* 모바일은 240px — 적립 계획 탭 세로 길이 축소 (docs/plans/67 Phase 3) */}
-      <ResponsiveContainer width="100%" height={isMobile ? 240 : 320}>
-        <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f0f0f0"} />
-          <XAxis
-            dataKey="month"
-            tick={chartTickStyle(isDark)}
-            tickFormatter={(v: string) => v.slice(2)}
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            tick={chartTickStyle(isDark)}
-            tickFormatter={(v: number) => fmtKrwShort(v)}
-            width={56}
-            domain={yDomain}
-          />
-          <Tooltip
-            formatter={(value: number, name: string) => {
-              const label =
-                name === "conservative_krw"
-                  ? `보수적 가정(연 ${CONSERVATIVE_RETURN_PCT}%)`
-                  : name === "aggressive_krw"
-                    ? `공격적 가정(연 ${AGGRESSIVE_RETURN_PCT}%)`
-                    : name === "projected_krw" || name === "projected_future_krw"
-                      ? "이론값"
-                      : "실제값";
-              return [fmtKrw(value), label];
-            }}
-            labelFormatter={(label: string) => `${label}`}
-            {...chartTooltipStyle(isDark)}
-          />
-          <Line
-            type="monotone"
-            dataKey="projected_krw"
-            stroke="#3b82f6"
-            strokeWidth={2}
-            dot={false}
-          />
-          <Line
-            type="monotone"
-            dataKey="projected_future_krw"
-            stroke="#3b82f6"
-            strokeWidth={2}
-            dot={false}
-            strokeDasharray="5 3"
-          />
-          <Line
-            type="monotone"
-            dataKey="actual_krw"
-            stroke="#ef4444"
-            strokeWidth={2}
-            dot={{ r: 3, fill: "#ef4444", strokeWidth: 0 }}
-            connectNulls={true}
-          />
-          {showScenarios && canShowScenarios && (
-            <>
-              <Line
-                type="monotone"
-                dataKey="conservative_krw"
-                stroke="#9ca3af"
-                strokeWidth={1.5}
-                dot={false}
-                strokeDasharray="4 3"
-              />
-              <Line
-                type="monotone"
-                dataKey="aggressive_krw"
-                stroke="#8b5cf6"
-                strokeWidth={1.5}
-                dot={false}
-                strokeDasharray="4 3"
-              />
-            </>
-          )}
-        </LineChart>
-      </ResponsiveContainer>
+      <div role="img" aria-label={summarizeProjection([...recentPast, ...visibleFuture])}>
+        <ResponsiveContainer width="100%" height={isMobile ? 240 : 320}>
+          <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f0f0f0"} />
+            <XAxis
+              dataKey="month"
+              tick={chartTickStyle(isDark)}
+              tickFormatter={(v: string) => v.slice(2)}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tick={chartTickStyle(isDark)}
+              tickFormatter={(v: number) => fmtKrwShort(v)}
+              width={56}
+              domain={yDomain}
+            />
+            <Tooltip
+              formatter={(value: number, name: string) => {
+                const label =
+                  name === "conservative_krw"
+                    ? `보수적 가정(연 ${CONSERVATIVE_RETURN_PCT}%)`
+                    : name === "aggressive_krw"
+                      ? `공격적 가정(연 ${AGGRESSIVE_RETURN_PCT}%)`
+                      : name === "projected_krw" || name === "projected_future_krw"
+                        ? "이론값"
+                        : "실제값";
+                return [fmtKrw(value), label];
+              }}
+              labelFormatter={(label: string) => `${label}`}
+              {...chartTooltipStyle(isDark)}
+            />
+            <Line
+              type="monotone"
+              dataKey="projected_krw"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="projected_future_krw"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              dot={false}
+              strokeDasharray="5 3"
+            />
+            <Line
+              type="monotone"
+              dataKey="actual_krw"
+              stroke="#ef4444"
+              strokeWidth={2}
+              dot={{ r: 3, fill: "#ef4444", strokeWidth: 0 }}
+              connectNulls={true}
+            />
+            {showScenarios && canShowScenarios && (
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="conservative_krw"
+                  stroke="#9ca3af"
+                  strokeWidth={1.5}
+                  dot={false}
+                  strokeDasharray="4 3"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="aggressive_krw"
+                  stroke="#8b5cf6"
+                  strokeWidth={1.5}
+                  dot={false}
+                  strokeDasharray="4 3"
+                />
+              </>
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
       {!hasActualData && (
         <p className="text-xs text-yellow-500 mt-2">
           실제 자산 데이터가 없습니다. 계좌를 동기화하면 표시됩니다.
