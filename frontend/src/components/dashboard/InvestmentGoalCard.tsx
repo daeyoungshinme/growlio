@@ -48,8 +48,12 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
   const timeline = dcaData?.goal_timeline;
   const currentProgressPct = timeline?.current_progress_pct ?? data?.goal_achievement_pct;
   const goalAmountDisplay = dcaData?.settings.goal_amount ?? data?.goal_amount;
+  // 진행률과 같은 기준(부동산 제외) — 총자산으로 빼면 진행률 60%인데 "달성"으로 보일 수 있다
+  const investableAssets = data?.investable_assets_krw;
   const goalGapAmount =
-    goalAmountDisplay != null && data != null ? goalAmountDisplay - data.total_assets_krw : null;
+    goalAmountDisplay != null && investableAssets != null
+      ? goalAmountDisplay - investableAssets
+      : null;
   const expectedGoalDateStr =
     timeline?.actual_expected_goal_date ?? timeline?.expected_goal_date ?? null;
   const expectedGoalYear = expectedGoalDateStr ? Number(expectedGoalDateStr.slice(0, 4)) : null;

@@ -556,6 +556,7 @@ class TestGetDashboardSummary:
 
         # 총자산 90M 중 부동산 40M을 뺀 투자자산 50M 기준 → 50%
         assert result["goal_achievement_pct"] == pytest.approx(50.0)
+        assert result["investable_assets_krw"] == pytest.approx(50_000_000.0)
         # 총자산 카드 자체는 부동산을 포함한 90M 그대로
         assert result["total_assets_krw"] == pytest.approx(90_000_000.0)
 

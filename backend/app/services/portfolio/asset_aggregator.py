@@ -258,6 +258,7 @@ async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache
 
     result: dict[str, Any] = {
         "total_assets_krw": total_assets_krw,
+        "investable_assets_krw": investable_assets_krw,
         "asset_allocation": [
             {"type": k, "amount_krw": v, "pct": v / total_assets_krw * 100 if total_assets_krw else 0}
             for k, v in by_type.items()
