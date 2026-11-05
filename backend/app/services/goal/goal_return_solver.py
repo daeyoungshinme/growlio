@@ -13,7 +13,6 @@ from dateutil.relativedelta import relativedelta
 from app.schemas.invest import DepositGuideItem, GoalFeasibilityPreview
 from app.utils.kst import today_kst
 
-_LO_ANNUAL_RETURN = -0.9
 _HI_ANNUAL_RETURN = 5.0  # 연 500% — 이 이상 필요하면 사실상 달성 불가능한 목표로 간주
 
 # 월 적립액 가이드에 사용하는 가정 수익률 프리셋 — GoalRecommendationOptionsModal의
@@ -61,21 +60,21 @@ def solve_required_annual_return_pct(
 
     호출 전 `pv < goal_amount`이고 `n_months > 0`임을 보장해야 한다(이미 달성했거나
     목표연도가 지난 경우는 호출측에서 별도 분기 처리).
-    반환값이 None이면 탐색 범위(연 -90%~500%) 내에서 해가 없는 것 — 사실상 달성 불가능한 목표.
+    적립만으로 달성되면 0.0이다 — 음수로 풀면 "연 -90% 필요"처럼 읽힌다. 호출측은 0.0을 "수익 없이도 달성"으로 해석한다.
+    반환값이 None이면 연 500%로도 닿지 않는 것 — 사실상 달성 불가능한 목표.
     """
     from scipy.optimize import brentq
 
     def f(annual_r: float) -> float:
         return _future_value(pv, pmt, annual_r, n_months) - goal_amount
 
-    f_lo, f_hi = f(_LO_ANNUAL_RETURN), f(_HI_ANNUAL_RETURN)
-    if f_lo > 0:
-        return round(_LO_ANNUAL_RETURN * 100, 2)
-    if f_hi < 0:
+    if f(0.0) >= 0:
+        return 0.0
+    if f(_HI_ANNUAL_RETURN) < 0:
         return None
 
     try:
-        return round(brentq(f, _LO_ANNUAL_RETURN, _HI_ANNUAL_RETURN) * 100, 2)
+        return round(brentq(f, 0.0, _HI_ANNUAL_RETURN) * 100, 2)
     except ValueError:  # 매우 먼 미래 + 무한대 값으로 구간 부호를 판정할 수 없다 — 해 없음으로 본다
         return None
 
@@ -124,7 +123,12 @@ def build_feasibility_preview(
         )
 
     required_return_pct = solve_required_annual_return_pct(pv, monthly_deposit_amount, n_months, goal_amount)
-    note = None if required_return_pct is not None else "현재 조건(적립액·기간)으로는 달성이 매우 어려운 목표입니다"
+    if required_return_pct is None:
+        note = "현재 조건(적립액·기간)으로는 달성이 매우 어려운 목표입니다"
+    elif required_return_pct == 0:
+        note = "현재 적립액만으로도 목표 금액에 도달합니다"
+    else:
+        note = None
     deposit_guide = []
     for preset_pct in DEPOSIT_GUIDE_PRESET_RETURNS_PCT:
         monthly = solve_required_monthly_deposit(pv, preset_pct, n_months, goal_amount)

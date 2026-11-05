@@ -12,9 +12,10 @@ DIA·QLD·SSO는 비중표에만 쓰이는 선택 자산이고(기본 0%) 국면
 판정 규칙(순서대로):
 1. SPY·QQQ 추세가 모두 UNKNOWN(시세 조회 실패)이면 판정 불가 → 기존 확정 국면 유지
 2. 매크로 RED 이거나 SPY 추세 DOWN → RISK_OFF
-3. SPY·QQQ 추세가 모두 UP 이고 매크로 GREEN(STALE 아님) → RISK_ON
+3. SPY·QQQ 중 한쪽만 UNKNOWN이면 판정 불가 → 기존 확정 국면 유지(NEUTRAL로 세면 2일 확정에 쓰여 공격 국면이 풀린다)
+4. SPY·QQQ 추세가 모두 UP 이고 매크로 GREEN(STALE 아님) → RISK_ON
    (직전 확정 국면이 RISK_ON이면 매크로 YELLOW여도 RISK_ON 유지 — 아래 히스테리시스)
-4. 그 외 → NEUTRAL
+5. 그 외 → NEUTRAL
 
 공격 국면 히스테리시스: 진입은 매크로 GREEN이 필요하지만, 이미 공격 국면이면 YELLOW까지는 유지한다(RED·SPY 하락은
 즉시 이탈 대상). 경계값 근처에서 GREEN↔YELLOW가 오갈 때마다 공격↔중립이 뒤집히던 왕복이 백테스트 전환 횟수의
@@ -119,6 +120,9 @@ def classify_regime(
         return None, reasons
     if (macro_level == "RED" and not macro_stale) or spy == "DOWN":
         return "RISK_OFF", reasons
+    if "UNKNOWN" in (spy, qqq):
+        reasons.append("한쪽 시세를 받지 못해 국면을 판정하지 않았습니다.")
+        return None, reasons
     if spy == "UP" and qqq == "UP":
         if macro_level == "GREEN" and not macro_stale:
             return "RISK_ON", reasons
@@ -256,8 +260,22 @@ def dip_deployed_for(strategy: TacticalStrategy | None, regime: str | None, mark
     return round(tilted.get("CASH", 0.0) - proposed.get("CASH", 0.0), 1)
 
 
+def _normalize_weights(weights: dict[str, float]) -> dict[str, float]:
+    """소수 둘째 자리로 맞추고 반올림 차이는 가장 큰 자산에 얹는다 — `PortfolioItem.weight`가 Numeric(6,2)라 그대로
+    저장하면 33.333×3이 99.99가 된다."""
+    out = {a: round(w, 2) for a, w in weights.items()}
+    gap = round(100.0 - sum(out.values()), 2)
+    if gap:
+        largest = max(out, key=lambda a: out[a])
+        out[largest] = round(out[largest] + gap, 2)
+    return out
+
+
 def validate_regime_weights(raw: dict[str, Any]) -> dict[str, dict[str, float]]:
-    """국면별 비중표 검증 — 3개 국면 모두, 자산은 TACTICAL_ASSETS(누락은 0), 각 0~100, 합계 100."""
+    """국면별 비중표 검증 — 3개 국면 모두, 자산은 TACTICAL_ASSETS(누락은 0), 각 0~100, 합계 100.
+
+    소수 자릿수는 거부하지 않고 정규화한다 — 저장값도 이 함수를 거치므로(`resolve_weights`) 거부하면 이미 저장된 표가
+    조용히 기본 비중으로 바뀐다."""
     if set(raw) != set(REGIMES):
         raise ValueError("공격·중립·방어 3개 국면의 비중을 모두 입력해야 합니다.")
     result: dict[str, dict[str, float]] = {}
@@ -270,7 +288,7 @@ def validate_regime_weights(raw: dict[str, Any]) -> dict[str, dict[str, float]]:
             raise ValueError("각 비중은 0~100 사이여야 합니다.")
         if abs(sum(cleaned.values()) - 100.0) > 0.01:
             raise ValueError(f"{REGIME_LABELS[regime]} 국면 비중 합계가 100이어야 합니다.")
-        result[regime] = {a: cleaned.get(a, 0.0) for a in TACTICAL_ASSETS}
+        result[regime] = _normalize_weights({a: cleaned.get(a, 0.0) for a in TACTICAL_ASSETS})
     return result
 
 

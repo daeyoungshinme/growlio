@@ -291,7 +291,9 @@ def _resolve_required_return(
         return None, _grc._NON_BINDING_RETURN_FLOOR, early_result
     if required_return_pct is None:  # 자산 목표는 달성했고 배당 목표가 남은 경우
         return None, _grc._NON_BINDING_RETURN_FLOOR, None
-    return required_return_pct, required_return_pct, None
+    # 적립만으로 달성되면(0%) 수익률 제약을 걸지 않는다 — 0%를 하한으로 넘기면 후보 CAGR이 전부 음수일 때 빈 추천이 된다
+    optimizer_floor = required_return_pct if required_return_pct > 0 else _grc._NON_BINDING_RETURN_FLOOR
+    return required_return_pct, optimizer_floor, None
 
 
 def _resolve_asset_goal_return_pct(
@@ -338,18 +340,18 @@ async def _apply_tax_type_preference_for_overall(
     db: AsyncSession,
     candidate_dicts: list[dict[str, str]],
     user_id: uuid.UUID | None,
-) -> tuple[list[dict[str, str]], str | None, str | None]:
+) -> tuple[list[dict[str, str]], str | None, str | None, int]:
     """활성 계좌가 전부 단일 세제유형일 때만 추종지수 지역 선호 필터를 적용한다(전체 자산 기준 경로 전용).
 
-    반환값: (필터링된 후보, fallback 안내 note, 단일 세제유형 값(있으면, `overall_market_filter`용)).
+    반환값: (필터링된 후보, fallback 안내 note, 단일 세제유형 값(있으면, `overall_market_filter`용), 보강한 후보 수).
     `_compute_goal_recommendation()`의 분기 복잡도를 낮추기 위해 분리했다.
     """
     if user_id is None:
-        return candidate_dicts, None, None
+        return candidate_dicts, None, None, 0
     tax_type_rows = await _active_account_tax_types(db, user_id)
     distinct_tax_types = {t or AccountTaxType.GENERAL.value for t in tax_type_rows}
     if len(distinct_tax_types) != 1:
-        return candidate_dicts, None, None
+        return candidate_dicts, None, None, 0
     single_tax_type = next(iter(distinct_tax_types))
     # 전 계좌가 연금저축(또는 IRP)뿐이면 매수 불가 상품(레버리지·인버스·ETN·개별종목)을 먼저 제외(계획 37 E1)
     pension_excluded = [c for c in candidate_dicts if pension_ineligibility_reason(c, single_tax_type)]
@@ -361,7 +363,7 @@ async def _apply_tax_type_preference_for_overall(
     if added:
         await _persist_added_candidates(db, user_id, added)
     notes = [pension_exclusion_note(pension_excluded, single_tax_type), preference_fallback_note]
-    return computed_candidates, " ".join(n for n in notes if n) or None, single_tax_type
+    return computed_candidates, " ".join(n for n in notes if n) or None, single_tax_type, len(added)
 
 
 async def _fetch_overall_candidate_data(
@@ -456,9 +458,12 @@ async def _compute_goal_recommendation(
         )
 
     user_id = getattr(settings_row, "user_id", None)
-    computed_candidates, preference_fallback_note, single_tax_type = await _apply_tax_type_preference_for_overall(
-        db, candidate_dicts, user_id
-    )
+    (
+        computed_candidates,
+        preference_fallback_note,
+        single_tax_type,
+        added_count,
+    ) = await _apply_tax_type_preference_for_overall(db, candidate_dicts, user_id)
     preference_fallback_note = _grc._join_notes(
         preference_fallback_note, detect_duplicate_tracking_index_note(computed_candidates, existing_items)
     )
@@ -466,7 +471,8 @@ async def _compute_goal_recommendation(
     risk_tolerance = getattr(settings_row, "goal_risk_tolerance", None) or "CONSERVATIVE"
     max_weight = _grc._max_weight_from_settings(settings_row)
     cagr_lookback_years = _grc._cagr_lookback_years_from_settings(settings_row)
-    dividend_capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
+    # 방금 보강한 후보도 등록 슬롯을 차지한다 — 빼지 않으면 "후보에 추가"가 상한을 넘는다
+    dividend_capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts) - added_count
 
     async def _suggest_dividend_candidates(
         expected_dividend_yield_pct: float | None,

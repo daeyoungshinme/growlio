@@ -373,7 +373,7 @@ class TestAccelerationScenarios:
         assert result["acceleration_scenarios"] == []
 
     def test_required_return_pct_none_when_unreachable(self, override_settings):
-        """적립액 고정 시 탐색범위(연 -90%~500%) 안에서 해가 없으면 None(이 방법으론 달성 어려움)."""
+        """적립액 고정 시 연 500%로도 닿지 않으면 None(이 방법으론 달성 어려움)."""
         scenarios = _calc_acceleration_scenarios(
             pv=0.0,
             pmt=1.0,
