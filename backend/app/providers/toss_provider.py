@@ -21,7 +21,7 @@ from app.providers._retry import with_token_refresh
 from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, raw_to_position
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.accounts.credential_service import decrypt
-from app.utils.currency import get_usd_krw_rate
+from app.utils.currency import sync_usd_krw_rate
 from app.utils.kst import today_kst
 
 if TYPE_CHECKING:
@@ -113,10 +113,12 @@ class TossProvider(BrokerProvider):
 
         bal = await _run_fetch(_do, account_id=str(account.id))
 
-        usd_krw_rate = await get_usd_krw_rate(cache)
-
         raw_positions = bal["positions"]
         usd_positions = [p for p in raw_positions if p.get("currency") == "USD"]
+        usd_krw_rate = await sync_usd_krw_rate(
+            cache, needs_usd=bool(usd_positions or bal.get("deposit_usd") or account.deposit_usd)
+        )
+
         if usd_positions:
             enriched = {p["ticker"]: p for p in await enrich_overseas_positions(usd_positions, cache)}
             raw_positions = [enriched.get(p["ticker"], p) if p.get("currency") == "USD" else p for p in raw_positions]

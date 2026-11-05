@@ -18,7 +18,9 @@ const ExchangeRateContext = createContext<ExchangeRateContextValue>({
 export function ExchangeRateProvider({ children }: { children: React.ReactNode }) {
   const { data, isLoading, error } = useQuery(exchangeRateQuery);
 
-  const rate = data?.usd_krw ?? null;
+  // 고정 fallback은 실환율이 아니다 — 환율 없음과 같게 둬서 달러 입력 저장·환산 표시가 막히게 한다(plans/110 A7)
+  const isFallback = data?.is_fallback === true;
+  const rate = isFallback ? null : (data?.usd_krw ?? null);
 
   // 실패 토스트는 여기서 한 번만 — 소비 훅마다 띄우면 마운트된 화면 수(최대 13곳)만큼 같은 토스트가 쌓였다(plans/95 G)
   useEffect(() => {
@@ -26,6 +28,11 @@ export function ExchangeRateProvider({ children }: { children: React.ReactNode }
       toast("환율 데이터를 불러오지 못했습니다. 해외 주식 금액이 부정확할 수 있습니다.", "error");
     }
   }, [error]);
+  useEffect(() => {
+    if (isFallback) {
+      toast("환율을 확인할 수 없어요. 해외 주식 금액이 부정확할 수 있습니다.", "error");
+    }
+  }, [isFallback]);
   // 매 렌더 새 객체를 넘기면 AppLayout이 리렌더될 때마다(당겨서 새로고침 제스처 중 매 프레임 등) 환율을 쓰는
   // 컴포넌트 전부가 다시 렌더됐다
   const value = useMemo(

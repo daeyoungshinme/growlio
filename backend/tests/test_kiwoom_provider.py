@@ -74,7 +74,7 @@ class TestKiwoomProviderSync:
             patch("app.kiwoom.auth.get_access_token", new=AsyncMock(return_value="token-1")),
             patch("app.kiwoom.balance.get_domestic_balance", new=AsyncMock(return_value=_domestic_balance())),
             patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock(return_value=_empty_overseas())),
-            patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kiwoom_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -116,7 +116,7 @@ class TestKiwoomProviderSync:
             patch("app.kiwoom.auth.get_access_token", side_effect=_fake_get_access_token),
             patch("app.kiwoom.balance.get_domestic_balance", side_effect=_fake_get_domestic_balance),
             patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock(return_value=_empty_overseas())),
-            patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kiwoom_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -151,7 +151,7 @@ class TestKiwoomProviderSync:
                 "app.kiwoom.balance.get_overseas_balance",
                 new=AsyncMock(return_value=_overseas_balance(total_value_usd=1_000.0, deposit_usd=100.0)),
             ),
-            patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kiwoom_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
             patch(
                 "app.providers._overseas_name_enrichment.resolve_ticker_meta",
                 new=AsyncMock(return_value=(None, None)),
@@ -192,7 +192,7 @@ class TestKiwoomProviderSync:
                 "app.kiwoom.balance.get_overseas_balance",
                 new=AsyncMock(side_effect=RuntimeError("mock 모드 해외 미지원")),
             ),
-            patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kiwoom_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -249,7 +249,7 @@ class TestKiwoomProviderSync:
             patch("app.kiwoom.auth.get_access_token", new=AsyncMock(return_value="token-1")),
             patch("app.kiwoom.balance.get_domestic_balance", new=AsyncMock(return_value=_domestic_balance())),
             patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock(return_value=_empty_overseas())),
-            patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kiwoom_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -272,7 +272,7 @@ class TestKiwoomProviderSync:
             patch("app.kiwoom.auth.get_access_token", new=AsyncMock(return_value="token-1")),
             patch("app.kiwoom.balance.get_domestic_balance", new=AsyncMock(return_value=_domestic_balance())),
             patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock()) as overseas_fn,
-            patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kiwoom_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
             result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
@@ -299,7 +299,7 @@ class TestKiwoomProviderSync:
             patch("app.kiwoom.auth.get_access_token", new=AsyncMock(return_value="token-1")),
             patch("app.kiwoom.balance.get_domestic_balance", new=AsyncMock(return_value=_domestic_balance())),
             patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock(return_value=overseas)),
-            patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+            patch("app.providers.kiwoom_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
             patch(
                 "app.providers._overseas_name_enrichment.resolve_ticker_meta",
                 new=AsyncMock(return_value=("Apple Inc.", "NASDAQ")),

@@ -35,6 +35,12 @@ export default function TacticalApplyConfirmModal({
           {!status.portfolio_compatible &&
             ` ${TACTICAL_ASSET_LIST_TEXT} 외 종목은 목표에서 빠집니다.`}
         </p>
+        {(status.groups_removed_on_apply ?? []).length > 0 && (
+          <p className="text-amber-700 dark:text-amber-400">
+            {status.groups_removed_on_apply?.join(", ")} 그룹은 제안 비중이 0%라 목표에서 빠져요.
+            나중에 비중이 돌아오면 대표 종목·멤버를 다시 구성해야 해요.
+          </p>
+        )}
         {status.portfolio_compatible && !partialActive && (
           <p className="text-gray-500 dark:text-gray-400">
             국면이 막 바뀐 직후라면 절반만 먼저 적용하고 다음 거래일에 나머지를 적용해 매수·매도

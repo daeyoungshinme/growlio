@@ -238,6 +238,30 @@ describe("TacticalAllocationTab", () => {
     );
   });
 
+  it("화면에서 본 국면을 함께 보내 그 사이 국면이 바뀌면 서버가 거부할 수 있게 한다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
+    vi.mocked(tacticalApi.applyTacticalWeights).mockResolvedValue(makeStatus());
+    renderTab();
+
+    fireEvent.click(await screen.findByText("제안 비중을 목표 비중으로 적용"));
+    fireEvent.click(screen.getByText("한 번에 적용"));
+
+    await waitFor(() =>
+      expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 1, "RISK_ON"),
+    );
+  });
+
+  it("제안 비중 0%로 사라지는 지수 그룹은 적용 전에 알린다", async () => {
+    vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(
+      makeStatus({ groups_removed_on_apply: ["다우 지수"] }),
+    );
+    renderTab();
+
+    fireEvent.click(await screen.findByText("제안 비중을 목표 비중으로 적용"));
+
+    expect(screen.getByText(/다우 지수 그룹은 제안 비중이 0%라 목표에서 빠져요/)).toBeDefined();
+  });
+
   it("적용은 확인 모달을 거치고, 성공하면 실행 화면 이동 버튼이 나온다", async () => {
     vi.mocked(tacticalApi.fetchTacticalStatus).mockResolvedValue(makeStatus());
     vi.mocked(tacticalApi.applyTacticalWeights).mockResolvedValue(makeStatus());
@@ -250,7 +274,9 @@ describe("TacticalAllocationTab", () => {
     // 다른 종목이 섞인 포트폴리오는 분할 적용 버튼이 없다
     expect(screen.queryByText("절반 먼저 적용")).toBeNull();
     fireEvent.click(screen.getByText("한 번에 적용"));
-    await waitFor(() => expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 1));
+    await waitFor(() =>
+      expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 1, expect.anything()),
+    );
 
     fireEvent.click(await screen.findByText("리밸런싱 분석·실행으로 이동"));
     expect(onGoToExecution).toHaveBeenCalledWith("p1");
@@ -350,7 +376,9 @@ describe("TacticalAllocationTab", () => {
     expect(screen.queryByText("절반 먼저 적용")).toBeNull();
     const buttons = screen.getAllByRole("button", { name: "나머지 적용" });
     fireEvent.click(buttons[buttons.length - 1]!);
-    await waitFor(() => expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 1));
+    await waitFor(() =>
+      expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 1, expect.anything()),
+    );
   });
 
   it("다음 전환 조건과 확정 안내를 최대 2줄 보여준다", async () => {
@@ -403,7 +431,9 @@ describe("TacticalAllocationTab", () => {
 
     fireEvent.click(await screen.findByText("제안 비중을 목표 비중으로 적용"));
     fireEvent.click(screen.getByText("절반 먼저 적용"));
-    await waitFor(() => expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 0.5));
+    await waitFor(() =>
+      expect(tacticalApi.applyTacticalWeights).toHaveBeenCalledWith("p1", 0.5, expect.anything()),
+    );
     expect(await screen.findByText("리밸런싱 분석·실행으로 이동")).toBeDefined();
   });
 

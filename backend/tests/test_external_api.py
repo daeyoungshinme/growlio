@@ -207,7 +207,7 @@ class TestCreateExternalTransaction:
         return (
             patch("app.api.v1.external._get_owned_account", AsyncMock(return_value=account)),
             patch("app.api.v1.external.get_cache_store", AsyncMock(return_value=None)),
-            patch("app.api.v1.external.fetch_usd_krw", AsyncMock(return_value=1300.0)),
+            patch("app.api.v1.external.require_live_usd_krw", AsyncMock(return_value=1300.0)),
             patch(
                 "app.api.v1.external.get_latest_snapshot_with_positions",
                 AsyncMock(return_value=(snapshot, positions or [])),

@@ -39,6 +39,11 @@ class ExternalAPIError(AppError):
     detail = "외부 API 오류가 발생했습니다"
 
 
+class ServiceUnavailableError(AppError):
+    status_code = 503
+    detail = "일시적으로 처리할 수 없습니다. 잠시 후 다시 시도해주세요."
+
+
 class KisAuthError(ExternalAPIError):
     status_code = 401
     detail = "KIS 인증에 실패했습니다. 자격증명을 확인하세요"

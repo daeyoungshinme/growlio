@@ -151,6 +151,9 @@ async def update_portfolio(
         select(Portfolio)
         .where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
         .options(*PORTFOLIO_RELATIONS)
+        # 항목을 지우고 다시 넣는다. 동시 저장이 겹치면 서로의 새 행을 못 봐 비중 합이 200%가 된다(plans/110 A4)
+        .with_for_update(of=Portfolio)
+        .execution_options(populate_existing=True)
     )
     portfolio = result.scalar_one_or_none()
     if not portfolio:

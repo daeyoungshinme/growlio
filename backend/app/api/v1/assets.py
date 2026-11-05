@@ -61,7 +61,7 @@ from app.services.accounts.sync_all_service import get_sync_all_status, is_sync_
 from app.services.tax.isa_service import calc_account_auto_pnl
 from app.utils.cache_invalidation import invalidate_asset_account_caches
 from app.utils.cache_keys import sync_lock_key
-from app.utils.currency import fetch_usd_krw
+from app.utils.currency import require_live_usd_krw
 from app.utils.inproc_lock import inproc_lock
 from app.utils.kst import today_kst
 from app.utils.pnl import calc_net_asset_amount
@@ -286,7 +286,8 @@ async def update_account(
         await db.commit()
     if deposit_trigger:
         cache = await get_cache_store()
-        usd_rate = await fetch_usd_krw(cache)
+        # 현금 계좌는 아래에서 차액이 영구 입출금 행이 된다 — 달러 잔액을 fallback 환율로 환산해 기록하면 되돌릴 수 없다
+        usd_rate = await require_live_usd_krw(cache) if account.deposit_usd else 1.0
         _, total = await write_manual_deposit_snapshot(
             db, account, latest_snap=latest_snap, positions=pos_list, usd_rate=usd_rate
         )

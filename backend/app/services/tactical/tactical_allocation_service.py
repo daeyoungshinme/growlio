@@ -29,6 +29,7 @@ from app.services.tactical.tactical_apply import (
     _weights_to_apply,
     check_apply_allowed,
     current_groups,
+    groups_removed_on_apply,
     interpolate_weights,
     is_tactical_managed,
     needs_group_suggestions,
@@ -98,6 +99,7 @@ __all__ = [
     "get_owned_portfolio",
     "group_suggestions_for",
     "get_strategy",
+    "groups_removed_on_apply",
     "interpolate_weights",
     "is_tactical_managed",
     "list_strategies",
@@ -149,28 +151,39 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
     }
 
 
-async def get_owned_portfolio(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> Portfolio:
-    """항목까지 로드한 소유 포트폴리오. 없거나 남의 것이면 `NotFoundError`(404)."""
+async def get_owned_portfolio(
+    portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, *, lock: bool = False
+) -> Portfolio:
+    """항목까지 로드한 소유 포트폴리오. 없거나 남의 것이면 `NotFoundError`(404).
+
+    `lock`이면 행을 잠그고 세션에 남은 옛 값 대신 DB 값으로 다시 읽는다 — 목표 비중 교체 직전용(plans/110 A4).
+    """
     from sqlalchemy.orm import selectinload
 
     from app.services.portfolio.portfolio_crud_service import PORTFOLIO_NOT_FOUND
 
-    portfolio = await db.scalar(
+    stmt = (
         select(Portfolio)
         .options(selectinload(Portfolio.items))
         .where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
     )
+    if lock:
+        stmt = stmt.with_for_update(of=Portfolio).execution_options(populate_existing=True)
+    portfolio = await db.scalar(stmt)
     if portfolio is None:
         raise NotFoundError(PORTFOLIO_NOT_FOUND)
     return portfolio
 
 
-async def get_strategy(portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> TacticalStrategy | None:
-    result = await db.execute(
-        select(TacticalStrategy).where(
-            TacticalStrategy.portfolio_id == portfolio_id, TacticalStrategy.user_id == user_id
-        )
+async def get_strategy(
+    portfolio_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, *, lock: bool = False
+) -> TacticalStrategy | None:
+    stmt = select(TacticalStrategy).where(
+        TacticalStrategy.portfolio_id == portfolio_id, TacticalStrategy.user_id == user_id
     )
+    if lock:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
 
@@ -292,6 +305,9 @@ async def build_status(
         "current_weights": _current_weights(portfolio),
         "current_groups": current_groups(portfolio),
         "portfolio_compatible": is_tactical_managed(portfolio),
+        "groups_removed_on_apply": groups_removed_on_apply(
+            portfolio, proposed_weights_for(strategy, confirmed, {}) if strategy and confirmed else None
+        ),
     }
 
 

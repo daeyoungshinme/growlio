@@ -367,7 +367,7 @@ class TestPlanGenerationRechecksPendingInsideLock:
 class TestPlanGenerationRequiresRealUsdRate:
     @staticmethod
     def _portfolio(*markets: str) -> SimpleNamespace:
-        return SimpleNamespace(items=[SimpleNamespace(market=m, members=[]) for m in markets])
+        return SimpleNamespace(id=uuid.uuid4(), items=[SimpleNamespace(market=m, members=[]) for m in markets])
 
     @pytest.mark.asyncio
     async def test_overseas_portfolio_without_real_rate_skips_analysis(self, mock_db):
@@ -395,7 +395,10 @@ class TestPlanGenerationRequiresRealUsdRate:
             patch.object(gen, "_drifting_items_for_alert", new=AsyncMock(return_value=None)),
         ):
             result = await gen.build_pending_plan_for_alert(
-                SimpleNamespace(id=uuid.uuid4(), account_id=None), self._portfolio("KOSPI"), mock_db, "GREEN"
+                SimpleNamespace(id=uuid.uuid4(), user_id=uuid.uuid4(), account_id=None),
+                self._portfolio("KOSPI"),
+                mock_db,
+                "GREEN",
             )
 
         assert result is None

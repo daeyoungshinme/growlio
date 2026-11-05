@@ -13,7 +13,11 @@ from app.services.rebalancing._broker_order_flow import (
     execute_sells_with_clamp,
 )
 from app.services.rebalancing._order_executor_common import execute_single_order, snap_domestic_limit_price
-from app.services.rebalancing._order_quantity_guard import budget_skipped_result, fit_buy_to_budget
+from app.services.rebalancing._order_quantity_guard import (
+    budget_skipped_result,
+    budget_unit_price,
+    fit_buy_to_budget,
+)
 from app.utils.masking import mask_account_no
 
 logger = structlog.get_logger()
@@ -140,8 +144,9 @@ async def _execute_two_phase_orders(
 
     logger.info("two_phase_phase1_start", orderable_cash=orderable_cash, buy_count=len(buys))
 
+    # 가격을 모르는 시장가는 1단계에서 내지 않는다 — 매도 대금이 필요하면 거부되고 3단계 재시도에서도 빠진다
     phase1_results, remaining_buys, _ = await _execute_buys_within_budget(
-        buys, orderable_cash, app_key, app_secret, access_token, account_no, is_mock
+        buys, orderable_cash, app_key, app_secret, access_token, account_no, is_mock, defer_unpriced=True
     )
 
     # Phase 2: 매도 전체 실행 (실행 계좌의 실제 보유수량으로 clamp)
@@ -182,11 +187,13 @@ async def _execute_buys_within_budget(
     access_token: str,
     account_no: str,
     is_mock: bool,
+    *,
+    defer_unpriced: bool = False,
 ) -> tuple[list[OrderResult], list[ExecutionOrderItem], float]:
     """예산(budget) 범위 내에서 매수 주문을 실행한다.
 
-    지정가(limit_price)가 있는 경우 예산 초과분은 수량 조정하고 나머지를 remaining에 추가한다.
-    시장가 주문은 가격 추정이 불가하므로 전량 시도 후 remaining 없음.
+    예산 단가(지정가, 시장가는 참고 시세+여유)로 초과분은 수량을 줄이고 나머지를 remaining에 추가한다.
+    단가를 모르는 주문은 `defer_unpriced`면 remaining으로 넘기고, 아니면 그대로 시도한다(브로커 거부가 최종 안전장치).
     Returns: (실행 결과 목록, 예산 부족으로 남은 주문 목록, 사용된 예산)
     """
     results: list[OrderResult] = []
@@ -194,6 +201,9 @@ async def _execute_buys_within_budget(
     remaining_budget = budget
 
     for order in buy_orders:
+        if defer_unpriced and budget_unit_price(order) is None:
+            remaining.append(order)
+            continue
         fitted, leftover_qty = fit_buy_to_budget(order, remaining_budget)
         if fitted is None:
             remaining.append(order)
@@ -205,7 +215,7 @@ async def _execute_buys_within_budget(
         results.append(result)
 
         # FULL과 달리 체결에 성공한 금액만 뺀다 — 실패분 예산은 다음 주문이 쓴다
-        if result.status == "SUCCESS" and fitted.limit_price and fitted.limit_price > 0:
-            remaining_budget -= fitted.quantity * fitted.limit_price
+        if result.status == "SUCCESS" and (price := budget_unit_price(fitted)) is not None:
+            remaining_budget -= fitted.quantity * price
 
     return results, remaining, budget - remaining_budget

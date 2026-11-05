@@ -16,7 +16,7 @@ from app.providers._retry import with_token_refresh
 from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, combine_domestic_overseas
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.accounts.credential_service import decrypt
-from app.utils.currency import get_usd_krw_rate
+from app.utils.currency import sync_usd_krw_rate
 from app.utils.masking import mask_account_no
 
 if TYPE_CHECKING:
@@ -106,7 +106,9 @@ class KiwoomProvider(BrokerProvider):
         except RuntimeError as e:
             raise ProviderApiError(str(e), http_status=502) from e
 
-        usd_krw_rate = await get_usd_krw_rate(cache)
+        usd_krw_rate = await sync_usd_krw_rate(
+            cache, needs_usd=bool(overseas["positions"] or overseas.get("deposit_usd") or account.deposit_usd)
+        )
 
         overseas_positions = await enrich_overseas_positions(overseas["positions"], cache)
         result = combine_domestic_overseas(

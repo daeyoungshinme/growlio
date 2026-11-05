@@ -395,6 +395,27 @@ def tax_impact_gate_blocked_template(
     return subject, html
 
 
+def stale_snapshot_blocked_template(portfolio_name: str, account_name: str, days_since_sync: int) -> tuple[str, str]:
+    """계좌 동기화가 오래 끊겨 이번 자동 실행 계획 생성이 보류됐을 때 발송."""
+    subject = f"[Growlio] 리밸런싱 자동화 보류 — 계좌 동기화 끊김 ({portfolio_name})"
+    table = _kv_table(
+        [
+            ("포트폴리오", portfolio_name),
+            ("계좌", account_name),
+            ("마지막 동기화", f"{days_since_sync}일 전"),
+        ]
+    )
+    html = _email_div(
+        "리밸런싱 자동화 보류 — 계좌 동기화 끊김",
+        "#D97706",
+        table,
+        "보유 수량을 믿을 수 없어 이번 자동 실행 계획을 만들지 않았습니다. 앱에서 계좌를 동기화하면 다음 실행 때 다시 "
+        "확인합니다. 동기화가 계속 실패하면 증권사 API 키를 확인해주세요. "
+        "이 알림은 같은 알림에 대해 하루 1회만 발송됩니다.",
+    )
+    return subject, html
+
+
 def market_signal_gate_blocked_template(
     portfolio_name: str, composite_level: str, market_condition_mode: str
 ) -> tuple[str, str]:

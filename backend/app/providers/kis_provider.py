@@ -19,7 +19,7 @@ from app.providers._retry import with_token_refresh
 from app.providers.base import SYNC_TIMEOUT_SECONDS, BalanceResult, BrokerProvider, combine_domestic_overseas
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.accounts.credential_service import decrypt
-from app.utils.currency import get_usd_krw_rate
+from app.utils.currency import sync_usd_krw_rate
 from app.utils.masking import mask_account_no
 
 if TYPE_CHECKING:
@@ -123,7 +123,9 @@ class KISProvider(BrokerProvider):
         if last_token is None:
             raise RuntimeError("last_token이 설정되지 않음: _get_token이 호출되지 않았습니다.")
         # 해외 시세(HHDFS00000300)의 output.rate는 등락률(%)이지 환율이 아니다 — 키움·토스와 같은 공용 환율을 쓴다
-        usd_krw_rate = await get_usd_krw_rate(cache)
+        usd_krw_rate = await sync_usd_krw_rate(
+            cache, needs_usd=bool(overseas["positions"] or overseas.get("deposit_usd") or account.deposit_usd)
+        )
 
         overseas_positions = await enrich_overseas_positions(overseas["positions"], cache)
         result = combine_domestic_overseas(domestic, overseas, overseas_positions, usd_krw_rate, "KIS_API")

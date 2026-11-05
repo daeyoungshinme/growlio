@@ -40,6 +40,8 @@ from app.services.rebalancing.plan_generation import (
     DailyValueCapBlocked,
     MarketSignalGateBlocked,
     PlanGenerationInProgress,
+    SnapshotTooStale,
+    SyncRequiredAfterExecution,
     TaxGateBlocked,
     UsdRateUnavailable,
     build_pending_plan_for_alert,
@@ -52,6 +54,7 @@ from app.services.rebalancing.plan_notifications import (
     notify_daily_value_cap_blocked,
     notify_market_signal_gate_blocked,
     notify_plan_generated,
+    notify_stale_snapshot_blocked,
     notify_tax_gate_blocked,
 )
 
@@ -59,6 +62,8 @@ __all__ = [
     "DailyValueCapBlocked",
     "MarketSignalGateBlocked",
     "PlanGenerationInProgress",
+    "SnapshotTooStale",
+    "SyncRequiredAfterExecution",
     "UsdRateUnavailable",
     "TaxGateBlocked",
     "approve_buy_leg",
@@ -77,6 +82,7 @@ __all__ = [
     "executed_plan_ids",
     "list_recent_plan_legs",
     "notify_daily_value_cap_blocked",
+    "notify_stale_snapshot_blocked",
     "notify_market_signal_gate_blocked",
     "notify_plan_generated",
     "notify_tax_gate_blocked",

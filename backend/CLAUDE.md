@@ -276,6 +276,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 
 - **현재가**: Yahoo(yfinance) → KIS. yfinance는 `run_in_executor`.
 - **USD/KRW**: `utils/currency.get_usd_krw_rate(cache)` → 캐시 없으면 `settings.usd_krw_fallback_rate`. KIS 성공 시 `cache_usd_krw_rate()`. 테스트 patch 경로 `app.utils.currency.cache_usd_krw_rate`.
+  - **함정**: 새로 조회한 값만 캐시한다(`refresh_usd_krw`) — fallback을 `cache_usd_krw_rate`에 넣으면 모든 경로가 실환율로 믿는다. 스냅샷·거래 행 같은 영구 기록은 `require_live_usd_krw`(없으면 503), 브로커 동기화는 `sync_usd_krw_rate`(달러 자산이 있으면 실패 처리).
   - **함정**: fallback(1300)은 평가액 환산용. 환율로 알림 발동·위치 판정을 하면 `fetch_usd_krw(..., allow_fallback=False)`(없으면 0.0) 또는 `get_live_or_cached_usd_krw`의 실값 여부로 거를 것 — 고정값이 실환율로 쓰이면 BELOW 알림 거짓 발동.
 - **월별 추이 SQL(`get_monthly_trend`)**: `asset_accounts` JOIN + `is_active = TRUE` 필수(누락 시 비활성 계좌 합산으로 수배 부풀림). 월말 스냅샷 없음 — 해당 월 마지막 sync일 값이 대표값.
 - **브로커 예수금**: `deposit_krw`는 **D+2 정산 후 예수금**(키움 `d2_entra`, KIS `prvs_rcdl_excc_amt`) — D+0을 쓰면 매도대금이 빠져 며칠간 총자산이 어긋남. 부재 시 D+0 폴백 + 경고 로그. FULL 매수 예산은 별도(키움 `orderable_krw`, KIS `get_orderable_cash()`). `deposit_usd`는 해외 조회 실패 시 `None`으로 기존 값 유지, 확정 `0.0`일 때만 갱신.

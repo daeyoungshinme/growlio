@@ -1,0 +1,159 @@
+# 계획 110: 기술부채 — 세금·목표 계산 정확성, 환율 캐시, 재주문 (2026-11-05)
+
+> **진행 상태**: 배치 A 완료(결과는 문서 끝). 배치 B~E 미착수.
+
+## Context
+
+"남은 기술부채 확인 후 수정 계획" 요청. main은 깨끗하고 CI도 통과한다. `alembic check`·pip-audit·프로덕션 npm audit 모두 0건이다(109의 미검증 항목 하나 해소). TODO·`any` 같은 고전적 부채는 이번에도 없다.
+
+109가 미감사로 남긴 영역(세금·적립·전술 적용·목표)을 처음 감사하고 이관 항목을 재검증했다. 그 결과 **돈과 세금 판단이 틀어지는 실버그**가 나왔다. 지금이 11월이라 세금 항목은 연말 전에 고쳐야 의미가 있다.
+
+**근거 수준**
+- 아래 ✔는 내가 소스에서 직접 확인했다.
+- ○는 조사 보고만 있고 착수 시 재확인이 필요하다.
+- 락 경합·자정 재주문·알림 유실은 코드로만 확인했고 재현하지 않았다.
+- 세법은 2차 출처 기준이다. 상수를 바꾸기 전에 국가법령정보센터·공단 고시로 확인한다.
+
+**세션 운영**: 배치별 브랜치·PR(A→B→C→D→E). 각 배치는 독립 실행 가능하다. 실행 시 이 문서를 `docs/plans/110-technical-debt-2026-11-05.md`로 옮기고 README 인덱스를 갱신한다.
+
+---
+
+## 배치 A — 주문·자금 (최우선)
+
+| # | 문제 | 수정 | 근거 | 크기 |
+|---|---|---|---|---|
+| A1 | **환율 캐시 오염.** `api/v1/stocks.py:280-285`: Yahoo 실패 시 `get_usd_krw_rate`가 준 fallback 1300을 `cache_usd_krw_rate`로 전역 캐시에 저장한다. 1300은 타당성 범위(500~3000)를 통과한다. 이후 `get_live_or_cached_usd_krw`는 실값으로 판정하고 `allow_fallback=False`도 1300을 돌려줘, 109 B5 게이트와 97 거짓 알림 방지가 함께 무력화된다. 실패가 이어지면 옛 캐시의 TTL도 계속 연장된다 | 새로 조회한 값만 캐시한다 | ✔ | S |
+| A2 | **체결 후 옛 스냅샷으로 같은 주문 재생성.** 플랜은 스냅샷 수량을 쓰고 체결 후 sync가 없으며 신선도 게이트도 없다. 수동 경로(`quick_execute_service.py:144`는 pending만 확인)와 시각 미지정 AUTO의 미국장 자정 경계(날짜 claim 리셋, `rebalancing_auto_execution.py`) 모두 해당한다 | `plan_generation`에 공용 게이트 추가: 대상 계좌의 **마지막 접수 실행 시각 > `last_synced_at`**이면 생성하지 않는다. AUTO는 claim 없이 다음 tick으로, 수동은 "동기화 후 다시" 응답으로 처리한다. 스냅샷이 N일 넘게 오래된 AUTO도 차단하고 알린다 | ✔(코드) | M |
+| A3 | **TWO_PHASE 시장가 현금 초과.** `fit_buy_to_budget`이 시장가를 그대로 통과시켜(`_order_quantity_guard.py:90-92`), 매도 대금이 필요한 매수까지 1단계에서 나가 거부되고 3단계 재시도에서도 빠진다 | `limit_price`가 없으면 `reference_price`+버퍼로 예산을 계산한다. 예산 차감도 같은 가격으로 한다. `reference_price`가 없으면 `remaining`으로 넘긴다 | ✔ | S |
+| A4 | **동시 저장 시 목표 비중 200%.** `tactical_allocation_service.py:318`과 `portfolio_crud_service.py:173`이 락 없이 DELETE+INSERT 한다. 적용은 잠금 없이 읽은 뒤 오래 대기할 수 있어(`tactical.py:134-145`) 사이에 저장된 편집도 덮어쓴다 | 두 경로 모두 `Portfolio` 행을 `with_for_update, populate_existing=True`로 잠근다. 전술 적용은 그룹 제안 계산을 락 전에 하고, 락 안에서 다시 읽어 판정·계획한다 | ✔ | S~M |
+| A5 | **분할 적용 합계 100.1.** `interpolate_weights`에서 CASH가 -0.1이 되면 저장 시 버려진다. 검증을 거치지 않아 이후 PUT이 실패한다 | 음수 CASH는 0으로 하고 오차는 최대 비중 항목이 흡수한다. 합계 100 불변 테스트 추가 | ✔ | S |
+| A6 | **전술 적용이 사용자 그룹을 지운다.** 0% 자산의 기존 그룹은 경고 없이 삭제되고(`tactical_apply.py:214-215`), 비중이 돌아오면 대표 종목·멤버 없이 재생성된다. 단독 QLD 0%는 갈 곳이 없으면 목표에서 사라진다 | 0% 그룹의 구성은 `TacticalStrategy`에 보존 또는 적용 전 미리보기로 삭제를 고지한다. 착수 시 코드를 보고 작은 쪽을 고른다. `expected_regime`(선택 필드)을 받아 불일치 시 409(보고 #14) | ✔/○ | M |
+| A7 | **fallback 환율이 영구 값으로 저장.** 현금 계좌 수정이 1300 기준 DEPOSIT/WITHDRAWAL 행을 만들 수 있다(`assets.py:289-307`). 동기화 스냅샷도 1300으로 계산되고 `usd_rate=1300`이 실값처럼 저장된다(`providers/base.py`) | 영구 기록 경로는 `get_live_or_cached_usd_krw`로 바꾸고 실값이 없으면 거부한다. 해외 보유·달러 예수금 계좌의 동기화는 실패로 처리해 기존 데이터를 보존한다(109 B4와 같은 원칙). 국내 전용은 그대로 진행. `/stocks/exchange-rate`에 `is_fallback` 추가, 프론트는 USD 입력 저장을 막고 "추정 환율"을 표시 | ○ | M |
+
+## 배치 B — 세금 (연말 전 필수)
+
+| # | 문제 | 수정 | 근거 | 크기 |
+|---|---|---|---|---|
+| B1 | **연금저축 초과 납입이 IRP 한도를 깎는다.** 연금저축 800만·IRP 0이면 잔여 100만으로 나오지만 실제는 300만이다(`pension_contribution_service.py:60,72`) | 공제 합계를 `min(연금저축, 600만)+IRP`로 계산. `total_achievement_pct`도 같이 | ✔ | S |
+| B2 | **KIS 조회 실패가 "실현손익 0".** `realized_krw or 0.0`(`tax_action_service.py:335`)로 공제 여유 250만, 제목 "양도세 0원"이 나온다. 프론트도 `autoRealized ?? 0`이고 실패 사유는 성공 분기에서만 보인다(`TaxPlannerSection.tsx:93`) | 요약에 `realized_lookup_failed` 추가. 실패 시 A4 액션은 금액·"0원" 문구를 내지 않고 조회 실패를 안내한다. 프론트에 실패 경고. 전량 매도한 키움·토스 계좌도 미집계로 표시(`:375`) | ✔ | S~M |
+| B3 | **삭제 계좌가 연간 세금에서 빠진다.** 계획 60·95가 "세금 집계는 실제 소득이라 그대로"로 정했는데 연금 납입(`:51`)과 해외 실현손익(`:312`)만 `is_active`로 거른다 | 연금은 필터 제거. 실현손익은 삭제 계좌의 수기 기록을 포함하고, 자격증명이 삭제된 KIS 계좌는 조회 불가를 안내 | ✔ | S |
+| B4 | **ISA 이전 혜택이 잔액 무시.** 1,000만 ISA에도 3,000만 이전·39.6만 혜택으로 표시된다(`:247,259`). 정렬과 리마인더 합계도 오염된다 | 평가액을 넘겨 `min(한도, 잔액×10%)×공제율`로 계산, 이전 금액도 잔액 상한 | ✔ | S |
+| B5 | **손실수확 절감액이 미실행 매도를 가정.** 실현 0·미실현 이익 1,000만·손실 300만이면 "올해 줄일 수 있어요 66만"이 나온다(`tax_service.py:238,256`) | 절감액은 올해 **실현** 과세이익 기준. 실현 이익이 공제 이하면 benefit 없이 "이익 실현 계획이 있을 때" 문구로 낮춘다 | ✔ | S |
+| B6 | **마감일 12/31.** 본문은 결제일 기준이라며 마지막 주 초를 말하는데 마감일과 우선순위는 12/31까지 유지된다(`:352,372`) | 문구와 맞춘 보수적 마감일 헬퍼로 교체 | ✔ | S |
+| B7 | **대주주 경고가 잘못된 기준.** 국내 **전체 평가액 합계**를 10억과 비교한다(`tax_service.py:247`). 종목별 판정이어야 한다 | 종목별 합산으로 변경. 기준액은 공식 확인 후 교체(2차 출처상 50억). "초과액" 문구 제거, 전년말 기준 안내 | ✔ | S |
+| B8 | **금투세 시뮬레이션이 폐지된 세금 기준.** "유예 중"으로 안내하고 지방세 포함 22%와 미포함 20%를 비교한다 | **삭제 권장**: `_simulate_geumt_tax`, `GeumtSimulationSection`, `TaxOptimizationCard` 연결, 테스트, `geumt_*` 세율. 프론트를 먼저 optional로 보고 구버전 앱이 안전한지 확인 | ✔ | S |
+| B9 | **해외 양도차익에 환차익 없음.** 취득가에 오늘 환율을 곱한다(`providers/base.py`). "양도세 0원"이 틀릴 수 있다 | 이번에는 **문구로 정직하게**: 요약·A4·손실수확에 "매수 시 환율 미반영 추정" 명시, "양도세 0원" 단정 제거. 실제 원화 취득가는 이관 | ✔ | S |
+| B10 | **모의투자 계좌가 세금에 포함** | `_latest_stock_rows`·실현손익에서 `is_mock_mode` 제외. `default=True`이므로 비브로커 계좌 값을 먼저 확인하고 브로커 계좌로만 한정 | ✔(필드)/○ | S |
+| B11 | 소규모: 2,000만 정확히 일치를 초과로 판정(`>=`→`>`), 같은 티커 2계좌의 액션 ID 중복, 건보료율 상수가 2025년 값(2026 고시 확인 후 연도별로 갱신) | | ○ | S |
+
+## 배치 C — 적립·목표 추천
+
+| # | 문제 | 수정 | 근거 | 크기 |
+|---|---|---|---|---|
+| C1 | **공분산이 다른 날짜끼리 짝짓는다.** `returns_map[s][:min_len]`(`goal_portfolio_optimizer.py:387`)이 오래된 ETF의 옛 구간과 신규 ETF를 비교해 가짜 분산 효과로 비중이 쏠린다 | 시계열 순서를 확인한 뒤 최근 구간 `[-min_len:]`으로. 날짜 키 정렬은 이관(거래일 차이는 남음) | ✔(코드)/○(순서) | S |
+| C2 | **연령·IRP 비중 제약이 조용히 사라진다.** 전 후보가 주식이면 상한이 있는 50대·60대에 현금이 추가되지 않아 100% 주식이 된다(`goal_age_recommendation_service.py:221`, 옵티마이저 `:173`). IRP도 수익률 부족 채권이 빠지면 "30% 이상" 노트가 붙은 채 100% 주식이 된다 | 하한뿐 아니라 상한이 있을 때도 현금성 후보를 넣는다. 안전자산 판정을 일별수익률 필터 **후**로 옮긴다. 최종 결과를 제약에 대해 검증해 어긋나면 추천 없음과 사유를 반환 | ✔ | M |
+| C3 | **반올림이 제약을 깬다.** 오차를 첫 종목에 몰아 40% 상한을 40.4 등으로 넘긴다(`:502`) | 오차를 상한 여유가 있는 항목에 배정. C2의 최종 검증으로 고정 | ✔ | S |
+| C4 | **데이터 장애가 정상 추천으로 캐시.** 배당 조회 실패가 0%로 전역 1일 캐시되고(`_goal_recommendation_common.py:187`, `sync_sources._zero_div`), 후보 하나 남은 결과가 100%로 1시간 캐시된다(`goal_horizon_recommendation_service.py:272,336`) | 실패와 진짜 0%를 구분해 실패는 캐시하지 않는다. 후보가 빠진 결과는 캐시하지 않거나 짧게 두고 노트 표시. 단일 후보 100%는 상한 초과이므로 추천 없음 | ✔/○ | M |
+| C5 | **필요 수익률이 명목·CAGR 혼용.** `annual_r/12`(`goal_return_solver.py:32`)로 푼 값을 CAGR과 비교한다. 1천만→2천만 10년: 6.95% 표시, 실제 7.18% | 솔버와 `dca_service`(같은 공식)를 `(1+r)^(1/12)-1`로 통일. **표시 수치가 조금 오른다** | ✔ | S |
+| C6 | **12월 내내 "목표 연도 지남".** `months_until_year_end`가 12월에 0을 반환(`:28`) | 올해면 최소 1개월 | ✔ | S |
+| C7 | **DCA 0값·경계.** 수익률·적립액·초기금액 0이 미설정 취급(`dca_service.py:42-52`). 이미 달성해도 다음 달 표시(`:269`). 미래 시작일이면 경과 음수로 거짓 on_track(`:290`) | `is not None` 판정, 달성 시 0개월, 경과 0 클램프+시작 전 상태. **`r==0` 분기 테스트 추가** | ✔ | S |
+| C8 | **예수금 부족 판정.** 알림마다 사용자 전체 월 적립액과 비교(`dca_cash_shortfall_service.py:143`)해 분할 시 오탐, 같은 계좌 공유 시 누락. fallback 환율(`:141`), 미동기화 예수금 0 간주(`:71`), 실행일 당일 무시 | 사용자 단위로 묶어 고유 계좌 예수금 합과 적립액을 비교. `allow_fallback=False`, 환율·예수금 미확인이면 "부족" 단정 금지. 실행일 당일은 오늘로 표시 | ✔/○ | M |
+| C9 | 보고 건(착수 시 재확인): 적용 미리보기 수치 3종(#10), RED/YELLOW 빈 추천(#15), 자산 목표 달성 시 배당 목표 포기(#17), 은행 계좌로 세제 필터 무력화(#19), 먼 `target_year` 500(#24) | 각각 작은 수정 | ○ | S 각 |
+
+## 배치 D — 실패 가시성·알림·운영
+
+| # | 문제 | 수정 | 근거 | 크기 |
+|---|---|---|---|---|
+| D1 | **시장 신호 등급 변경 알림이 대부분 유실.** 5~10분 주기 잡들이 먼저 확정하면 시간당 알림 잡은 `old==new`로 끝난다(`market_signal_alert_service.py:64-76`, 호출부 6곳). 발송 중단 시 재시도도 없다 | `notified_regime`처럼 "마지막 통지 등급" 키를 분리하고, 사용자별 dedup 뒤 전원 처리 시에만 갱신. 배포 첫 실행은 저장만 | ✔(코드) | S~M |
+| D2 | **홈 "지금 할 일" 전 소스 실패 시 `200 []`**(`action_items_service.py:291`) | `report_handled_failure`로 승격. 응답 형태는 구버전 앱 호환을 위해 유지하고 "일부를 불러오지 못했어요" 항목을 추가. KIS 장애 시 짧은 실패 캐시와 `_tax_items` 타임아웃 | ✔ | S~M |
+| D3 | 프론트 실패가 없음·0으로 보임: `TaxOptimizationCard`, `TaxLimitsSection`, `AutoInvestStatusBanner`(자동매수 활성인데 "설정해보세요"), 목표 위저드 3~4단계 | `isError` 분기와 재시도 | ○ | S 각 |
+| D4 | 무효화 누락: `invalidateSyncData`·`invalidateAccountData`의 `dcaAnalysis`·`challenges`·`isaStatus`·`dividendPlan`, 챌린지 리마인더 토글. 위저드 부분 저장 후 실패 메시지 | `queryInvalidation.ts` 보강, 부분 저장 구분 | ○ | S |
+| D5 | 월간 잡 유실(Render 슬립·메모리 잡스토어) | 월 단위 dedup이 있는 잡을 시작 시+1~3일·25~28일 매시간 재실행. 주간 잡은 주 단위 키 신설 후 | ○ | S~M |
+| D6 | `run_alert_job` 바깥 세션이 커넥션을 계속 점유(풀 7개) | 분기 전 트랜잭션 종료 | ○ | S |
+| D7 | 실행 이력 50건 뒤 접근 불가 | `PaginationDep`+무한 쿼리(`alertHistoryPages` 패턴) | ○ | S |
+| D8 | KIS 실현손익 10페이지 잘림을 호출부가 모름(`kis/realized.py:24,115`) | `truncated` 전달 → `estimated=True`와 경고 | ○ | S |
+| D9 | 국내 전용 KIS 계좌가 동기화마다 해외 3회 호출 | "보유 없음·예수금 미확인" 캐시. `deposit_usd=None` 유지(0 금지) | ○ | S |
+| D10 | `PUT /assets/{id}` `is_active=false`가 `delete_account` 정리를 우회 | 스키마에서 거부 | ○ | S |
+
+## 배치 E — 정리
+
+- FK 인덱스 3개: `rebalancing_plans.portfolio_id`, `rebalancing_executions.portfolio_id`, `rebalancing_plan_legs.execution_id`. **공유 Supabase 마이그레이션**이므로 적용 전 확인받는다.
+- 차트 11곳에 `role="img"`+요약(`MiniDonut`·`FxPlanCard` 패턴).
+- 문서: `backend/CLAUDE.md` 누락 파일·잡·라우터, `scheduler.py:15` keep-alive 설명 모순, 키움 주문 가능 현금 주석, TWO_PHASE 주석. `frontend/CLAUDE.md`에 `api/fetchAllPages.ts`.
+- 낮은 순위 묶음: 음수 필요 수익률, 추가 후보 20개 초과, 배당 조회 세마포어 호출별 생성, 국면 UNKNOWN 관측, 비중표 99.99.
+
+---
+
+## 이번 범위에서 제외 (이관)
+
+- **스키마 판단 필요**: ISA 계약 기간(5년 계약 만기 오판), 연금 입금 유형(ISA 이전·퇴직금이 납입으로 집계), 배당 세전·세후 구분, 실제 원화 취득가(B9 본수정).
+- **선행 조건**: KIS present-balance TR(실계좌 확인 후), 공분산 날짜 키 정렬.
+- **큰 작업**: 데이터 보존 잡(실제 테이블 크기 확인 먼저, nestlio와 DB 공유), 암호화 키 회전(다중 키 복호화+재암호화 스크립트).
+- **그대로**: 프론트 메이저(React 19·recharts 3·tailwind 4·TS 7), IDOR 재점검 결과 누락 없음.
+
+## 사용자 확인 필요
+
+1. **Render `preDeployCommand`, KIS 실계좌 조회**(109 이관, 여전히 미확인).
+2. **APK CI**: 마지막 실행이 2026-05-25 실패. Variables 설정 또는 워크플로우 정리 판단.
+3. **PR #218**(Dependabot 백엔드 2건): CI 통과, 머지 대기.
+4. **세법 개정 확인**: 2026 세제개편안의 ISA 이월·5년 제한·한도 변경의 입법 여부. 확정되면 `isa_service.py` 상수 갱신.
+
+## 검증
+
+- 배치마다 `make lint`, `make typecheck`, `make test-backend-cov`(89% 게이트), `make test-frontend`, `npm run build`. Windows에 make가 없으면 같은 명령을 직접 실행한다. 종료 코드 `-1073741819`는 실패가 아니다.
+- **회귀 테스트는 수정 전 코드에서 실패함을 먼저 확인**한다. 필수 시나리오:
+  - A1 콜드 캐시+Yahoo 실패 후 캐시가 비어 있음
+  - A2 실행 후 미동기화면 재생성 안 됨, 동기화 후 생성됨
+  - A3 시장가 예산 초과분이 `remaining`으로 감
+  - A5 합계 100 불변
+  - B1 800만/0 → 잔여 300만
+  - B2 조회 실패 시 "0원" 미표시
+  - C1 신규 ETF와의 상관이 실제 구간 기준
+  - C2 60대 전 후보 주식 → 주식 ≤35%
+  - C5 FV 왕복 일치
+  - C6 12월 1일
+  - D1 다른 잡이 먼저 확정해도 알림 발송
+- 실DB 락(A4)은 테스트가 DB를 막으므로 쿼리 옵션으로 고정하고, 미검증으로 명시한다.
+- 배치 C는 추천 결과가 바뀌므로 수정 전후 샘플 결과를 PR에 첨부한다. 실주문은 하지 않는다.
+- 파일 추가·삭제 시 CLAUDE.md 목록 갱신. 완료 시 `docs/plans/110`에 결과·미검증·이관을 기록한다.
+
+## 핵심 파일
+
+- 백엔드: `api/v1/stocks.py`, `services/rebalancing/{plan_generation,quick_execute_service,_order_quantity_guard}.py`, `services/tactical/{tactical_allocation_service,tactical_apply}.py`, `services/portfolio/portfolio_crud_service.py`, `services/tax/{pension_contribution_service,tax_action_service,tax_service,overseas_realized_service}.py`, `services/goal/{goal_portfolio_optimizer,goal_return_solver,goal_age_recommendation_service,goal_horizon_recommendation_service,_goal_recommendation_common}.py`, `services/{dca_service,dca_cash_shortfall_service,action_items_service}.py`, `services/alerts/market_signal_alert_service.py`
+- 프론트: `components/tax/TaxPlannerSection.tsx`, `hooks/useTaxSimulation.ts`, `components/portfolio-analysis/TaxOptimizationCard.tsx`, `utils/queryInvalidation.ts`, `context/ExchangeRateContext.tsx`
+- 재사용: `get_live_or_cached_usd_krw`·`fetch_usd_krw(allow_fallback=False)`(`utils/currency.py`), `report_handled_failure`, `populate_existing` 패턴(`order_cancel_service`), `BalanceResponseError`, `PaginationDep`, `notified_regime` 패턴
+
+---
+
+## 배치 A 결과 (2026-11-05)
+
+A1~A7 구현. 수정 전 코드에서 재현 확인: 환율 조회 실패 뒤 캐시에 1300 저장, 예산 0인데 시장가 발주, 분할 적용 저장 합계 100.1.
+
+### 계획과 달라진 것
+
+- **A6**: 그룹 구성 보존은 스키마 변경이 필요해 작은 쪽을 택했다. `groups_removed_on_apply`로 확인 모달에서 미리 알린다. 비중이 돌아왔을 때 복원은 하지 않는다.
+- **A7**: `/stocks/exchange-rate`의 `is_fallback`이면 프론트는 환율 없음(`null`)으로 다룬다. 소비처가 이미 `null`을 처리하므로 입력 차단이 따로 필요 없었다. 구버전 앱을 위해 `usd_krw`는 계속 내려준다.
+- **A7**: 수동 계좌 재평가의 `fetch_usd_krw(...) or None`은 fallback 때문에 죽은 코드였다. `allow_fallback=False`로 원래 의도(환율 없으면 해외 종목은 기존 현재가 유지)를 살렸다. 그러면 `deposit_usd * (usd_rate or 1)`이 $1=1원이 되므로 달러 예수금이 있으면 503으로 거부한다.
+- **추가 — 설정 비밀값 repr 노출**: 작업 중 assert 실패 출력에 `Settings` 전체가 찍혀 로컬 `.env`의 DB 비밀번호가 평문으로 나왔다. 비밀 필드 11개(`database_url` 등)를 `repr=False`로 막았다. 계획에 없던 항목이다.
+
+### 동작이 바뀌는 것
+
+- **달러 자산 계좌의 동기화**: 실환율이 없으면 이제 실패한다(`last_sync_error`, 기존 데이터 유지). Yahoo가 캐시 TTL(1시간)보다 오래 죽으면 그동안 해외 계좌 동기화가 멈춘다. 1300 스냅샷보다 낫다고 판단했다.
+- **FULL 전략 시장가**: `fit_buy_to_budget`을 공유하므로 FULL의 국내 시장가 매수도 참고 시세+2%로 수량이 줄 수 있다. 예전에는 브로커 거부에 맡겼다.
+- **AUTO 무인 실행**: 5일 넘게 동기화가 끊긴 계좌가 있으면 계획을 만들지 않고 하루 1회 알린다. 주문 접수 뒤 동기화 전이면 조용히 다음 평가로 넘긴다.
+- **수동 실행**: 주문 접수 뒤 동기화 전이면 "동기화 후 다시 실행" 안내.
+
+### 검증
+
+- 백엔드: 3,460 tests 통과. ruff·mypy clean. 프론트: typecheck·eslint 통과, 전체 vitest 통과.
+
+### 검증하지 못한 것
+
+- **실DB 락 경합(A4)**: 테스트가 DB를 막아 쿼리 옵션만 고정했다.
+- **실주문·실계좌**: 안 했다. 자정 경계 재주문은 코드 경로로만 확인했다.
+- **게이트 오탐**: 미체결로 끝나 스냅샷이 안 변한 주문도 다음 동기화 전까지 재생성을 막는다. 취소한 주문은 제외했다.
+
+### 이번에 안 막은 경로
+
+- `/execute` 직접 실행(모달에서 확인 후 발주)에는 신선도 게이트를 넣지 않았다. 사람이 수량을 보고 누르고 `idempotency_key`가 있어 범위 밖으로 뒀다. 다만 체결 직후 재분석하면 같은 수량이 다시 보일 수 있다.
+- 표시·계산 전용 경로의 fallback(`composition_calculator` 등)은 그대로다. 저장되지 않는 값이라 범위 밖으로 뒀다.
