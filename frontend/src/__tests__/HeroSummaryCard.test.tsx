@@ -3,6 +3,9 @@ import { fireEvent, screen } from "@testing-library/react";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { DashboardData } from "@/api/dashboard";
+import { MemoryRouter } from "react-router-dom";
+import type { PortfolioOverview } from "@/types";
+import { portfolioUrl } from "@/utils/tabUrl";
 
 const baseDashboard: DashboardData = {
   total_assets_krw: 150_000_000,
@@ -39,6 +42,43 @@ describe("HeroSummaryCard", () => {
     expect(toggle).not.toHaveAttribute("title");
     expect(screen.queryByText("1.50억원")).toBeNull();
     expect(screen.queryByText(/· 1.0억/)).toBeNull();
+  });
+
+  describe("주식 평가손익", () => {
+    const overview = {
+      total_stock_krw: 80_000_000,
+      unrealized_pnl_krw: 10_000_000,
+      stock_return_pct: 14.3,
+    } as PortfolioOverview;
+
+    function renderHero(value: PortfolioOverview) {
+      renderWithProviders(
+        <MemoryRouter>
+          <HeroSummaryCard data={baseDashboard} overview={value} exchangeRate={1350} />
+        </MemoryRouter>,
+      );
+    }
+
+    it("금액은 전체 자산과 함께 기본 숨김이고 수익률만 보인다", () => {
+      renderHero(overview);
+      expect(screen.getByText(/••••••.*\+14\.3%/)).toBeInTheDocument();
+      expect(screen.queryByText(/\+1,000만/)).toBeNull();
+    });
+
+    it("금액을 펼치면 손익 금액도 표시하고 자산 탭으로 연결된다", () => {
+      renderHero(overview);
+      fireEvent.click(screen.getByRole("button", { name: "전체 자산 금액 보기" }));
+      expect(screen.getByText(/\+1,000만.*\+14\.3%/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /주식 평가손익/ })).toHaveAttribute(
+        "href",
+        portfolioUrl(),
+      );
+    });
+
+    it("보유 주식이 없으면 표시하지 않는다", () => {
+      renderHero({ ...overview, total_stock_krw: 0 });
+      expect(screen.queryByText(/주식 평가손익/)).toBeNull();
+    });
   });
 
   it("누르면 전체 자산이 억원 단위로 표시되고 다시 누르면 숨긴다", () => {

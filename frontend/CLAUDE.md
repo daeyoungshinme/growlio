@@ -270,7 +270,7 @@ _기타_
 
 **콜랩스 기본값**
 
-- 헤드라인 카드(`HeroSummaryCard`, `InvestmentGoalCard`)는 접기 불가. 단 `HeroSummaryCard`의 총액·범례 금액은 **기본 숨김**(탭하면 표시, 저장 안 함).
+- 헤드라인 카드(`HeroSummaryCard`, `InvestmentGoalCard`)는 접기 불가. 단 `HeroSummaryCard`의 총액·범례·주식 평가손익 금액은 **기본 숨김**(탭하면 표시, 저장 안 함).
 - 보조/상세 최상위 카드는 `useCollapsible`로 접기 가능, 첫 방문은 **열림**, 접은 상태는 localStorage 유지. 이미 펼친 카드 안의 2차 토글은 대상 아님.
 - **기본 접힘 예외**(보조 도구·상세): 진단 `RiskMetricsCard`, `MarketSignalBanner` 상세("자세히"), 전술 백테스트·판정 근거·비중표 편집, 절약 복리 시뮬레이터, `RebalancingDiagnosisCard`, 분석 "상세 정보", "더 빨리 달성하려면?", 절세 플래너, `AllocationCard`(모바일만). localStorage 키는 `growlio:<영역>:<이름>` 형식.
 - 홈에는 `RebalancingStatusCard`가 없다(`rebalancing/`, 진단탭 전용, 접기 상태는 저장 안 함) — 홈 리밸런싱은 `ActionItemsCard`만.

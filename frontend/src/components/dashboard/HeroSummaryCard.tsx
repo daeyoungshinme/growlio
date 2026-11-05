@@ -1,15 +1,19 @@
 import { memo, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { pnlColor, PIE_COLORS } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { DashboardData } from "@/api/dashboard";
+import type { PortfolioOverview } from "@/types";
+import { portfolioUrl } from "@/utils/tabUrl";
 import MiniDonut from "@/components/common/MiniDonut";
 
 const CASH_TYPES = new Set(["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"]);
 interface Props {
   data: DashboardData | undefined;
+  overview?: PortfolioOverview | undefined;
   exchangeRate: number | null;
   dataUpdatedAt?: number;
   isLoading?: boolean;
@@ -19,6 +23,7 @@ interface Props {
 
 export default memo(function HeroSummaryCard({
   data,
+  overview,
   exchangeRate,
   dataUpdatedAt,
   isLoading,
@@ -147,6 +152,26 @@ export default memo(function HeroSummaryCard({
               </p>
             </div>
           </div>
+          {overview && overview.total_stock_krw > 0 && (
+            <Link to={portfolioUrl()} className={`block ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} pt-1.5`}>
+              <span className="block text-xs text-gray-500 dark:text-gray-400 font-medium">
+                주식 평가손익 <span className="font-normal">(매입원가 대비)</span>
+              </span>
+              <span
+                className={`block text-sm font-semibold tabular-nums ${
+                  overview.unrealized_pnl_krw === 0
+                    ? "text-gray-400 dark:text-gray-500"
+                    : pnlColor(overview.unrealized_pnl_krw)
+                }`}
+              >
+                {amountVisible
+                  ? `${overview.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrw(overview.unrealized_pnl_krw)}`
+                  : "••••••"}{" "}
+                ({overview.stock_return_pct >= 0 ? "+" : ""}
+                {overview.stock_return_pct.toFixed(1)}%)
+              </span>
+            </Link>
+          )}
         </div>
 
         {/* 우: 도넛 */}

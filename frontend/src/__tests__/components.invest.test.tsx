@@ -131,10 +131,10 @@ describe("GoalTimelineCard", () => {
     suggested_candidates: [],
   };
 
-  function renderCard(timeline: GoalTimeline, goalAmount: number | null) {
+  function renderCard(timeline: GoalTimeline) {
     return renderWithProviders(
       <MemoryRouter>
-        <GoalTimelineCard timeline={timeline} goalAmount={goalAmount} />
+        <GoalTimelineCard timeline={timeline} />
       </MemoryRouter>,
     );
   }
@@ -145,50 +145,50 @@ describe("GoalTimelineCard", () => {
   });
 
   it("renders with timeline data", async () => {
-    renderCard(mockTimeline, 100000000);
+    renderCard(mockTimeline);
     expect(await screen.findByText("목표 달성 전망")).toBeDefined();
     expect(screen.getByText("65.5%")).toBeDefined();
   });
 
   it("시작일부터의 총 기간을 남은 기간처럼 표시하지 않고, 계획 기준 예상일을 연월로 보여 준다", async () => {
-    renderCard(mockTimeline, 100000000);
+    renderCard(mockTimeline);
     expect(await screen.findByText("계획 기준 달성 예상")).toBeDefined();
     expect(screen.getByText("2026년 1월")).toBeDefined();
     expect(screen.queryByText(/개월 후/)).toBeNull();
   });
 
   it("renders 앞서고 있음 when lead > 0", async () => {
-    renderCard(mockTimeline, 100000000);
+    renderCard(mockTimeline);
     expect(await screen.findByText(/개월 앞서고 있음/)).toBeDefined();
   });
 
   it("renders 뒤처지고 있음 when lead < 0", async () => {
     const laggingTimeline = { ...mockTimeline, lead_lag_months: -3, on_track: false };
-    renderCard(laggingTimeline, 100000000);
+    renderCard(laggingTimeline);
     expect(await screen.findByText(/개월 뒤처지고 있음/)).toBeDefined();
   });
 
   it("renders 계획과 정확히 일치 when lead = 0", async () => {
     const exactTimeline = { ...mockTimeline, lead_lag_months: 0 };
-    renderCard(exactTimeline, 100000000);
+    renderCard(exactTimeline);
     expect(await screen.findByText("계획과 정확히 일치")).toBeDefined();
   });
 
   it("renders with null progress", async () => {
     const nullTimeline = { ...mockTimeline, current_progress_pct: null, on_track: null };
-    renderCard(nullTimeline, null);
+    renderCard(nullTimeline);
     expect(await screen.findByText("목표 달성 전망")).toBeDefined();
   });
 
   it("shows on_track badge when on_track = false and lead/lag is unknown", async () => {
     // 계획 대비·상태 두 칸을 합쳐(docs/plans/67 P1-15) 개월 차이가 없을 때만 달성/미달 판정을 보여준다
     const offTrack = { ...mockTimeline, on_track: false, lead_lag_months: null };
-    renderCard(offTrack, null);
+    renderCard(offTrack);
     expect(await screen.findByText(/계획 미달/)).toBeDefined();
   });
 
   it("hides acceleration section when no scenarios and no recommendation", async () => {
-    renderCard(mockTimeline, 100000000);
+    renderCard(mockTimeline);
     await screen.findByText("목표 달성 전망");
     expect(screen.queryByText("더 빨리 달성하려면?")).toBeNull();
   });
@@ -217,7 +217,7 @@ describe("GoalTimelineCard", () => {
         },
       ],
     };
-    renderCard(withScenarios, 100000000);
+    renderCard(withScenarios);
     // 기본 접힘(docs/plans/67 P1-14)
     fireEvent.click(await screen.findByText("더 빨리 달성하려면?"));
     expect(screen.getByText("1년 앞당기기")).toBeDefined();
@@ -247,7 +247,7 @@ describe("GoalTimelineCard", () => {
         },
       ],
     });
-    renderCard(mockTimeline, 100000000);
+    renderCard(mockTimeline);
     fireEvent.click(await screen.findByText("더 빨리 달성하려면?"));
     expect(await screen.findByText("목표 달성 필요 수익률")).toBeDefined();
     expect(screen.getByText("+7.20%")).toBeDefined();
@@ -276,7 +276,7 @@ describe("GoalTimelineCard", () => {
         },
       ],
     };
-    renderCard(withScenarios, 100000000);
+    renderCard(withScenarios);
     fireEvent.click(await screen.findByText("더 빨리 달성하려면?"));
     expect(await screen.findByText("추천 포트폴리오로 달성 가능")).toBeDefined();
   });
@@ -302,7 +302,7 @@ describe("GoalTimelineCard", () => {
         },
       ],
     };
-    renderCard(withScenarios, 100000000);
+    renderCard(withScenarios);
     fireEvent.click(await screen.findByText("더 빨리 달성하려면?"));
     expect(await screen.findByText("추천 포트폴리오로는 1.5%p 부족")).toBeDefined();
   });

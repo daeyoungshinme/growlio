@@ -13,9 +13,10 @@ const RecommendationCard = lazy(loadRecommendationCard);
 const TacticalAllocationTab = lazy(loadTacticalAllocationTab);
 
 const MODE_INTRO: Record<GoalMode, string> = {
-  추천: "목표 수익률·연령대·투자 기간에 맞춘 추천 비중을 포트폴리오 목표로 적용해요. 실제 주문은 포트폴리오 탭에서 해요.",
-  전술: "시장 국면(진단 탭 시장 상황의 매크로·차트 추세)에 따라 나스닥·S&P500 목표 비중을 조정하자고 제안해요. 실제 주문은 포트폴리오 탭에서 해요.",
+  추천: "목표 수익률·연령대·투자 기간에 맞춘 추천 비중을 포트폴리오 목표로 적용해요.",
+  전술: "시장 국면(진단 탭 시장 상황의 매크로·차트 추세)에 따라 나스닥·S&P500 목표 비중을 조정하자고 제안해요.",
 };
+const ORDER_NOTICE = "실제 주문은 포트폴리오 탭에서 해요.";
 
 interface Props {
   mode: GoalMode;
@@ -62,7 +63,9 @@ export default function GoalAdjustTab({
   return (
     <div className="flex flex-col gap-4">
       <Tabs tabs={GOAL_MODES} activeTab={mode} onChange={onModeChange} variant="underline" />
-      <p className="text-xs text-gray-500 dark:text-gray-400 px-1">{MODE_INTRO[mode]}</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
+        {MODE_INTRO[mode]} {ORDER_NOTICE}
+      </p>
 
       {isTactical && portfolios.length > 0 && (
         <label className="flex flex-col gap-1 px-1">
@@ -78,9 +81,6 @@ export default function GoalAdjustTab({
               </option>
             ))}
           </select>
-          <span className="text-xs text-gray-400 dark:text-gray-500">
-            시장 국면은 모든 포트폴리오에 같아요. 비중표 설정과 적용은 고른 포트폴리오에만 해당돼요.
-          </span>
         </label>
       )}
 

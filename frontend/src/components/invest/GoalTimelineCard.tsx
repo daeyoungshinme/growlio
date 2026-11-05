@@ -11,11 +11,10 @@ import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 
 interface Props {
   timeline: GoalTimeline;
-  goalAmount: number | null;
   flat?: boolean;
 }
 
-export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) {
+export default function GoalTimelineCard({ timeline, flat }: Props) {
   const {
     expected_goal_date,
     actual_expected_goal_date,
@@ -100,11 +99,6 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
           <p className="text-xl font-bold text-gray-900 dark:text-gray-50">
             {current_progress_pct !== null ? `${current_progress_pct.toFixed(1)}%` : "—"}
           </p>
-          {goalAmount && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              목표 {fmtKrw(goalAmount)}
-            </p>
-          )}
         </div>
         <div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">계획 기준 달성 예상</p>

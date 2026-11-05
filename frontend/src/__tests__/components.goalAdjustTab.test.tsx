@@ -101,7 +101,6 @@ describe("GoalAdjustTab", () => {
     expect(selection.lastOptions).toEqual({ preferTactical: true });
     expect(screen.getByRole("option", { name: "미국 전술 (전술 켜짐)" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "국내 배당" })).toBeInTheDocument();
-    expect(screen.getByText(/시장 국면은 모든 포트폴리오에 같아요/)).toBeInTheDocument();
   });
 
   it("추천 모드는 상단 대상 포트폴리오 선택기를 그리지 않는다(적용 영역에서 고름)", async () => {

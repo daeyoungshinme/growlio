@@ -24,8 +24,8 @@ function withQuery(path: string, params: Record<string, string | undefined>): st
 }
 
 /** 자산 › 투자현황(`portfolioTab` 하위 탭) */
-export function portfolioUrl(portfolioTab?: PortfolioTab): string {
-  return withQuery("/assets", { tab: "투자현황", portfolioTab });
+export function portfolioUrl(portfolioTab?: PortfolioTab, divTab?: "월별 배당"): string {
+  return withQuery("/assets", { tab: "투자현황", portfolioTab, divTab });
 }
 
 /** 자산 › 계좌관리(`atab`), 내역 탭이면 `history` 세그먼트까지 */

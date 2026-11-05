@@ -18,7 +18,7 @@ export default function GoalChipGrid({ chips, laggingKey, showAll, onToggleShowA
   return (
     <>
       <div
-        className={`order-2 sm:order-1 grid gap-px bg-gray-100 dark:bg-gray-700 ${
+        className={`order-2 grid gap-px bg-gray-100 dark:bg-gray-700 ${
           showAll ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2"
         }`}
       >

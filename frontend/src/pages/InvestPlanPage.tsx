@@ -184,9 +184,6 @@ export default function InvestPlanPage() {
                     <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">
                       적립 계획 설정
                     </h2>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                      적립식 DCA 복리계산 및 목표 달성 현황
-                    </p>
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
                     <button
@@ -310,11 +307,7 @@ export default function InvestPlanPage() {
                     </Suspense>
                     <div className="card divide-y divide-gray-100 dark:divide-gray-700">
                       <div className="pb-4">
-                        <GoalTimelineCard
-                          flat
-                          timeline={data.goal_timeline}
-                          goalAmount={s?.goal_amount ?? null}
-                        />
+                        <GoalTimelineCard flat timeline={data.goal_timeline} />
                       </div>
                       <div className="py-4">
                         <YearlyAchievementTable flat data={data.yearly_achievements} />
@@ -429,7 +422,6 @@ export default function InvestPlanPage() {
                 label: "목표 연수익률 (%)",
                 key: "goal_annual_return_pct",
                 placeholder: "8",
-                hint: "홈 탭 투자 목표 카드에 표시",
                 inputMode: "decimal",
               },
               {
@@ -457,7 +449,6 @@ export default function InvestPlanPage() {
                 label: "연간 입금 목표 (원)",
                 key: "annual_deposit_goal",
                 placeholder: "24000000",
-                hint: "홈 탭 입금 달성률에 표시",
                 inputMode: "numeric",
                 isAmount: true,
               },
@@ -465,7 +456,6 @@ export default function InvestPlanPage() {
                 label: "은퇴 목표시점 (연도)",
                 key: "retirement_target_year",
                 placeholder: "2045",
-                hint: "홈 탭 투자 목표 카드에 표시",
                 inputMode: "numeric",
               },
             ].map(({ label, key, placeholder, type, hint, inputMode, isAmount }) => {
