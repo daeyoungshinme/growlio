@@ -402,8 +402,8 @@ async def _execute_account_group(
     if not group_orders:
         account_results: list[OrderResult] = []
     elif account.asset_type == "STOCK_KIWOOM":
-        # 키움은 주문가능금액 조회 API가 없어 TWO_PHASE(예수금 매수→매도→잔여 매수)를 지원하지 않는다 —
-        # 매도→매수(예수금 근사 예산 clamp)로 실행한다. 결과(매도 후 가능한 만큼 매수)는 같은 방향이다.
+        # 키움 경로엔 TWO_PHASE(예수금 매수→매도→잔여 매수) 실행기가 없다 — 매도→매수(주문가능금액 `orderable_krw`로
+        # clamp, `_kiwoom_ops`)로 실행한다. 결과(매도 후 가능한 만큼 매수)는 같은 방향이다.
         if strategy == "TWO_PHASE":
             logger.info("kiwoom_two_phase_runs_as_sell_then_buy", account_id=acc_id_str)
         account_results = await _execute_kiwoom_account_orders(
