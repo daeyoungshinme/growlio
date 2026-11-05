@@ -667,6 +667,47 @@ describe("TaxPlannerSection", () => {
     expect(screen.getByLabelText("직접 입력 (자동값 대신)")).toBeDefined();
   });
 
+  it("증권사 조회가 실패하면 공제 잔여를 믿지 말라고 알린다", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxPlannerSection
+          positions={[realizedPos]}
+          realized={{
+            year: 2026,
+            realized_gain_krw: null,
+            source: "NONE",
+            covered_accounts: [],
+            uncovered_accounts: [{ account_id: "k1", account_name: "KIS", reason: "조회 실패" }],
+            as_of: "2026-09-26",
+            lookup_failed: true,
+          }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("realized-lookup-failed").textContent).toContain(
+      "증권사 조회에 실패",
+    );
+  });
+
+  it("조회가 성공하면 실패 경고를 띄우지 않는다", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxPlannerSection
+          positions={[realizedPos]}
+          realized={{
+            year: 2026,
+            realized_gain_krw: 0,
+            source: "BROKER",
+            covered_accounts: [{ account_id: "k1", account_name: "KIS", realized_krw: 0 }],
+            uncovered_accounts: [],
+            as_of: "2026-09-26",
+          }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("realized-lookup-failed")).toBeNull();
+  });
+
   it("자동 집계가 없으면 수기 입력 안내를 보여준다", () => {
     renderWithProviders(
       <MemoryRouter>

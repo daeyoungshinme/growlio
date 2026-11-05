@@ -33,25 +33,6 @@ export interface HarvestingRecommendation {
   qty: number;
 }
 
-export interface GeumtSimulation {
-  overseas_gain_krw: number;
-  overseas_deduction_krw: number;
-  overseas_taxable_krw: number;
-  overseas_tax_krw: number;
-  domestic_gain_krw: number;
-  domestic_deduction_krw: number;
-  domestic_taxable_krw: number;
-  domestic_tax_krw: number;
-  total_tax_krw: number;
-  current_overseas_tax_krw: number;
-  tax_difference_krw: number;
-  note: string;
-  rates: {
-    standard_pct: number;
-    excess_above_300m_pct: number;
-  };
-}
-
 export interface HealthInsuranceEstimate {
   financial_income_for_health_insurance_krw: number;
   threshold_krw: number;
@@ -82,12 +63,14 @@ export interface TaxSummary {
   domestic_unrealized_gain_krw: number;
   domestic_large_holder_warning: boolean;
   domestic_large_holder_excess_krw: number;
+  /** 대주주 기준 이상인 종목명(없거나 구버전 서버면 비어 있음) */
+  domestic_large_holder_name?: string | null;
+  domestic_large_holder_threshold_krw?: number;
   comprehensive_tax_warning: boolean;
   comprehensive_tax_remaining_krw: number;
   total_estimated_tax_krw: number;
   total_fees_krw: number;
   harvesting_recommendations: HarvestingRecommendation[];
-  financial_investment_tax_simulation: GeumtSimulation;
   health_insurance_estimate: HealthInsuranceEstimate;
   note: string;
   rates: {
@@ -113,6 +96,8 @@ export interface OverseasRealizedSummary {
   }[];
   uncovered_accounts: { account_id: string; account_name: string; reason: string }[];
   as_of: string;
+  /** 증권사 조회가 실패한 계좌가 있음 — 합계와 공제 여유를 믿으면 안 된다 */
+  lookup_failed?: boolean;
 }
 
 export const fetchOverseasRealized = (year?: number, accountId?: string | null) =>
@@ -157,6 +142,8 @@ export interface PensionContributionStatus {
   pension_savings_deposit_krw: number;
   irp_deposit_krw: number;
   total_deposit_krw: number;
+  /** 공제 대상 납입액(연금저축은 600만원까지) — 구버전 서버 응답엔 없음 */
+  total_credited_krw?: number;
   pension_savings_limit_krw: number;
   total_limit_krw: number;
   pension_savings_achievement_pct: number;

@@ -86,9 +86,20 @@ export default function TaxPlannerSection({ positions, realized, taxRule }: Prop
           {/* 4문장 상시 안내를 핵심 한 줄로 (docs/plans/67 P1-12) */}
           <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
             해외 주식 <span className="font-medium">매매 차익</span>만 계산해요. 배당금은 공제
-            대상이 아니에요(15.4% 별도 원천징수).
+            대상이 아니에요(15.4% 별도 원천징수). 매수 시점 환율을 반영하지 않은 추정이라 환차익만큼
+            실제 과세 이익과 다를 수 있어요.
           </p>
         </div>
+
+        {realized?.lookup_failed && (
+          <div className="flex items-start gap-2" data-testid="realized-lookup-failed" role="alert">
+            <TriangleAlert size={13} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-red-700 dark:text-red-400">
+              증권사 조회에 실패해 일부 계좌의 올해 실현 손익이 빠져 있어요. 아래 공제 잔여는
+              실제보다 크게 보일 수 있으니, 다시 확인하거나 합계를 직접 입력하세요.
+            </p>
+          </div>
+        )}
 
         {autoRealized !== null && realized ? (
           <div className="space-y-1.5" data-testid="auto-realized">
