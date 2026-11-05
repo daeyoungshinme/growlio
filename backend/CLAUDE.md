@@ -263,6 +263,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 | `recommendation_drift_alert.py` | 매주 월 09:15 | 옵트인 |
 | `token_refresh.py` | 06:00 | 실패는 스택 없는 capture_message(자격증명 지역변수 전송 방지) |
 | `startup_warmup.py` | 기동 직후 1회 | 환율·시장신호·JWKS 예열 |
+| `periodic_catchup.py` | 기동 2분 뒤 + 10~21시 매시 25분 | 놓친 월간 잡 보충(1~3일: 리포트·챌린지 결산, 25~28일: 독려). 월 단위 dedup이 있는 잡만 넣을 것 |
 | `cache_sweep.py` / `app_state_sweep.py` | 15분 / 04:10 | 만료 캐시 / durable row 청소 |
 | `_job_helpers.py` | — | job 공통 헬퍼(`run_alert_job`·`peak_rss_mb`). 유저별 루프 `run_per_user`·`report_job_failure`는 `core/job_runner.py`(알림 서비스도 쓰므로 core) |
 
