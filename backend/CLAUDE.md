@@ -47,16 +47,13 @@ cd backend && uv run mypy app/
 
 ### Environment (`backend/.env`, `.env.example` 참고)
 
-- `APP_ENV=development` — `/docs` 활성화
-- `DATABASE_URL` — asyncpg URL. Supabase면 **Transaction Pooler(6543)** 권장 — Session Pooler(5432)는 프로젝트 전체 동시 연결 15개를 공유해 좀비 `uvicorn --reload` 하나로도 `EMAXCONNSESSION`
+키 목록은 `.env.example`, 튜닝값은 `app/core/config.py` `Settings`. 함정만:
+
+- `APP_ENV=development`여야 `/docs`가 열린다.
+- `DATABASE_URL` — Supabase면 **Transaction Pooler(6543)** 권장. Session Pooler(5432)는 프로젝트 전체 동시 연결 15개를 공유해 좀비 `uvicorn --reload` 하나로도 `EMAXCONNSESSION`
 - `MIGRATION_DATABASE_URL` — Supabase 마이그레이션용 (로컬 Docker는 `DATABASE_URL`과 동일)
 - `KIS_CRED_ENCRYPTION_KEY` — 64자 hex. KIS/키움/토스 자격증명 AES-256 키
-- `ALLOWED_ORIGINS`(CORS, 쉼표 구분) · `FRONTEND_URL`(이메일 링크) · `API_SEMAPHORE_LIMIT` · `CACHE_TTL_SECONDS`
-- Supabase: `SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- 외부 API: `DART_API_KEY`, `FRED_API_KEY`
-- 이메일(Resend HTTP API — 클라우드 SMTP 포트 차단 회피): `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_TIMEOUT`
-- FCM: `FIREBASE_CREDENTIALS_JSON`(한 줄 JSON) · 모니터링: `METRICS_TOKEN`, `SENTRY_DSN`, `SENTRY_RELEASE`
-- 그 외 튜닝값(rate limit·circuit breaker·DB pool·환율 fallback 등)은 `app/core/config.py` `Settings` — 전부 기본값 있음
+- 이메일은 Resend HTTP API(클라우드 SMTP 포트 차단 회피). `FIREBASE_CREDENTIALS_JSON`은 한 줄 JSON
 
 ---
 
@@ -115,7 +112,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `credential_service.py` — AES-256 암복호화
 - `asset_service.py` — 계좌별 sync + `sync_account_now`(assets `/sync` 전용)
 - `asset_credential_service.py` — 브로커 자격증명 검증·삭제
-- `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). `sync_accounts`(세마포어 3)는 `jobs/asset_sync`도 재사용. 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 브로커 응답 대기 중 커넥션 점유로 풀 고갈 방지. 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
+- `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). `sync_accounts`(세마포어 3)는 `jobs/asset_sync`도 재사용. 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 풀 고갈 방지. 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
 - `snapshot_service.py` — 스냅샷 upsert·포지션 sync 헬퍼. 수동 계좌 예수금 변경 → 오늘 스냅샷 재작성은 `write_manual_deposit_snapshot`(포지션 복사 포함 — 빠뜨리면 오늘 스냅샷에서 보유종목이 사라진다)
 - 쿼리 헬퍼: `_snapshot_queries.py`(최신 스냅샷 서브쿼리), `_account_queries.py`(활성 계좌 — `active_accounts_stmt()`/`active_broker_accounts_stmt()`)
 
@@ -136,7 +133,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 **리밸런싱 (`rebalancing/`)**
 - `service.py` — 리밸런싱 추천. 지수 그룹은 그룹 행 하나(`shares_to_trade=None`, 종목별은 `members`)
 - `group_expansion.py` — 그룹 행 → 종목 단위 매매 전개. 그룹 차이는 **노출 단위**(멤버 `leverage` 배수). **그룹 행은 수량이 없으므로 수량 기반 소비처를 새로 만들면 반드시 `expand_group_items`/`iter_trade_items`로 펼칠 것**
-- `order_builder.py` — 주문 생성 공용(AUTO·원클릭·플랜). 시장 게이트 단일 판정 `is_market_signal_blocking_auto_mode`(CAUTIOUS=RED, STRICT=YELLOW·RED, TACTICAL=같은 포트폴리오 확정 국면 RISK_OFF면 매수 보류 — 호출부 5곳이 `tactical_regime_for_gate()` 결과를 함께 넘김). `clamp_orders_to_max_value()` 1건당 상한. 방법론 `docs/plans/21-market-signal-methodology.md`
+- `order_builder.py` — 주문 생성 공용(AUTO·원클릭·플랜). 시장 게이트 단일 판정 `is_market_signal_blocking_auto_mode`(CAUTIOUS=RED, STRICT=YELLOW·RED, TACTICAL=같은 포트폴리오 확정 국면 RISK_OFF면 매수 보류 — 호출부는 `tactical_regime_for_gate()` 결과를 함께 넘긴다). `clamp_orders_to_max_value()` 1건당 상한. 방법론 `docs/plans/21-market-signal-methodology.md`
 - `plan_service.py` — AUTO 2단계 플랜 진입점, 하위 3모듈 심볼 재노출. **테스트 patch는 `plan_service.X`가 아니라 실제 호출부 서브모듈 경로로**
   - `plan_generation.py` — 플랜 생성. 게이트 차단 시 `TaxGateBlocked`/`MarketSignalGateBlocked`/`DailyValueCapBlocked` sentinel(플랜 미생성)
   - `plan_execution.py` — leg 실행/취소/만료. 매수는 대기 후 자동(실행 직전 시장 게이트 재확인), 매도는 이메일 승인. 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 방지. `token_consumed_at`만 찍힌 채 30분 넘은 PENDING은 `fail_stuck_consumed_legs()`가 FAILED 마감(재실행 안 함) **세션에 이미 읽은 행을 `FOR UPDATE`로 다시 읽을 땐 `populate_existing=True` 필수** — 없으면 락을 기다린 뒤에도 옛 값으로 판정해 주문이 두 번 나간다.
@@ -152,7 +149,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `broker_balance_service.py` — 3사 실시간 잔고. **주문 실행은 KIS/키움만**(토스 주문 API 미구현)
 
 **목표 역산 추천 (`goal/`)**
-- `goal_recommendation_service.py` — 전체 자산 기준 진입점. 필요수익률 역산 → MVO. 추천은 자동 반영 안 됨(수동 적용). 결과 1h 캐시 + stale 키(1d) — 미스여도 stale 즉시 반환 후 `BackgroundTasks`로 재계산(기간별·연령대도 같은 SWR, 갱신은 `refresh_recommendation_in_background` 공용). 무효화 함수는 stale 키도 함께 지운다. **추천 캐시 키(전체·기간별·연령대 각 1h/stale)는 사용자별 세대를 포함 — 무효화는 `invalidate_goal_recommendation_caches`(세대 교체)로만, 세대는 설정을 읽기 *전에* `get_goal_recommendation_generation`으로 잡아 넘긴다**(계산 중 저장된 설정을 옛 결과가 덮던 경합). sync 무효화는 `positions_changed=True`일 때만 추천 캐시 삭제. `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 **동일 로직 — 임계값 함께 맞출 것**
+- `goal_recommendation_service.py` — 전체 자산 기준 진입점. 필요수익률 역산 → MVO. 추천은 자동 반영 안 됨(수동 적용). 결과 1h 캐시 + stale 키(1d) — 미스여도 stale 즉시 반환 후 `BackgroundTasks`로 재계산(기간별·연령대도 같은 SWR, 갱신은 `refresh_recommendation_in_background` 공용). 무효화 함수는 stale 키도 함께 지운다. **추천 캐시 키(전체·기간별·연령대 각 1h/stale)는 사용자별 세대를 포함 — 무효화는 `invalidate_goal_recommendation_caches`(세대 교체)로만, 세대는 설정을 읽기 *전에* `get_goal_recommendation_generation`으로 잡아 넘긴다**. sync 무효화는 `positions_changed=True`일 때만 추천 캐시 삭제. `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 **동일 로직 — 임계값 함께 맞출 것**
 - `_goal_recommendation_common.py` — 세 진입점 공용 헬퍼·계산 골격(`import ... as _grc`, patch 경로도 여기 하나). **단 외부 조회(`get_historical_returns`/`fetch_yf_daily_returns`/`build_portfolio_overview`)는 테스트가 진입점 모듈 경로로 patch하므로 진입점에 남기고 인자로 넘긴다**(옮기면 patch 수백 곳 무효화). 추천 출력은 `tests/test_goal_recommendation_snapshots.py`가 고정 — 리팩터링 후 반드시 통과, 의도적 변경 시만 `UPDATE_GOAL_SNAPSHOTS=1`
 - `goal_age_recommendation_service.py`(연령대) · `goal_horizon_recommendation_service.py`(투자기간 × 세제유형, 최대 15조합, IRP 안전자산 30% 하한)
 - `goal_portfolio_optimizer.py` — MVO(SLSQP). **배당 목표 사전검증은 `class_bounds` 그룹 예산도 반영 필수** — 종목 상한만 보면 SLSQP 전체 실패(빈 추천)
@@ -197,9 +194,9 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `estimation.py` — Ledoit-Wolf 공분산·James-Stein 기대수익률 축소(고정 노이즈분산 사용 — 표본분산 재사용 시 축소 상쇄 버그). `goal/goal_portfolio_optimizer`·`portfolio_optimizer` 공용이라 평면
 - `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
-- `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유. 해외 매수 시장 판정 `buy_market`은 fx_plan도 사용) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
+- `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
 - `fx_plan_service.py` — 환율 1년 위치(백분위·이평 이격·1개월 ±1σ)와 해외 적립 필요 달러의 분할 환전 구간. **예측 아님**. 현재값은 실시간 캐시(없으면 1년 일봉 마지막 종가, `rate_is_live`), Yahoo `USDKRW=X` 1년 일봉은 통계용(6h 캐시). 구간 알림 등록은 프론트가 기존 환율 알림 API로
-- `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → FDR(+pykrx 펀더멘털) → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_dividend_data`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
+- `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → FDR(+pykrx 펀더멘털) → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_ticker_dividend_summary`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
 - `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR) · `_settings_queries.py`
 
@@ -219,13 +216,13 @@ core/
   cache_store.py in-memory TTL 캐시(LRU 20,000). **프로세스 로컬** — 워커/인스턴스 2개↑면 적중률 급락·무효화 미전파(render.yaml은 단일 전제)
 kis/            KIS 클라이언트. **해외 거래소 코드 체계가 둘**: 주문/잔고 NASD/NYSE/AMEX vs 시세 NAS/NYS/AMS. **잔고의 NASD는 실전=미국 전체, 모의=나스닥** — 합치면 이중 집계라 ticker로 중복 제거한다.
                 KIS는 NYSE Arca ETF(SPY·VOO 등)를 AMEX로 분류 → exchange_master.resolve_kis_overseas_market()로 주문·시세 직전 보정(키움은 무보정)
-                현재가 조회: domestic_quote.py / overseas_quote.py
-kiwoom/         키움 클라이언트 (rate limit 4/s, return_code=5 = rate limit)
+                현재가 조회: domestic_quote.py / overseas_quote.py · 주문: order.py
+kiwoom/         키움 클라이언트, 주문 order.py (rate limit 4/s, return_code=5 = rate limit)
 toss/           토스 Open API. **Open API → IP 관리에 서버 IP 등록 필수**(미등록 403 edge-blocked). 샌드박스 없음, rate 1/s
 providers/
-  http_client.py broker_request(retry_on_request_error=False)는 주문 접수 4곳 전용 — 응답 유실 시 중복 주문 방지(5xx도 재시도 안 함).
+  http_client.py broker_request(retry_on_request_error=False)는 `kis/order.py`·`kiwoom/order.py` 주문·취소 접수 전용 — 응답 유실 시 중복 주문 방지(5xx도 재시도 안 함).
                 잔고 연속조회는 상한 20페이지, **상한 도달·연속키 반복 시 부분 목록 대신 raise**(부분 결과는 나머지 보유를 "매도됨"으로 만듦)
-  kis_/kiwoom_/toss_/manual_provider.py, _token_cache.py, _retry.py, _overseas_cache.py, _error_mapping.py
+  base.py(공통 인터페이스), kis_/kiwoom_/toss_/manual_provider.py, _token_cache.py, _retry.py, _overseas_cache.py, _error_mapping.py
   _overseas_name_enrichment.py  해외 이름·시장 보강(7일 캐시). 시장 미확정 시 NASDAQ 폴백 → 키움 주문 stex_tp 오라우팅 위험이라 경고 로그 + 1h만 캐시
 utils/
   cache_keys.py       캐시 키 + TTL (휘발성)
@@ -239,7 +236,7 @@ utils/
 limiter.py      slowapi. 키는 rate_limit_key(JWT sub / X-Forwarded-For 첫 hop — Vercel→Render 프록시라 client.host는 공용).
                 **인증 없이 상태를 바꾸거나 토큰을 받는 라우트는 ip_rate_limit_key + peer_rate_limit_key 두 데코레이터를 겹친다**(tests/test_rate_limit_key.py가 검사)
 enums.py        도메인 StrEnum — 매직 스트링 대신
-constants.py    DOMESTIC/OVERSEAS_MARKETS, POSITION_STOCK_ASSET_TYPES, BROKER_API_ASSET_TYPES·BROKER_API_DATA_SOURCES(잔고 조회), ORDER_EXECUTABLE_ASSET_TYPES(주문·취소, 토스 제외), is_non_tradable(). **새 브로커는 여기에만 추가**(서비스별 로컬 집합 금지 — 토스 연동 때 7곳 누락)
+constants.py    DOMESTIC/OVERSEAS_MARKETS, POSITION_STOCK_ASSET_TYPES, BROKER_API_ASSET_TYPES·BROKER_API_DATA_SOURCES(잔고 조회), ORDER_EXECUTABLE_ASSET_TYPES(주문·취소, 토스 제외), is_non_tradable(). **새 브로커는 여기에만 추가**(서비스별 로컬 집합 금지)
 exceptions.py   AppError 계열(전역 핸들러가 변환) + SyncError 계열
 scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 던진 잡은 리스너가 스택 없이 Sentry로 보낸다
 ```
@@ -283,7 +280,6 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 - **USD/KRW**: `utils/currency.get_usd_krw_rate(cache)` → 캐시 없으면 `settings.usd_krw_fallback_rate`. KIS 성공 시 `cache_usd_krw_rate()`. 테스트 patch 경로 `app.utils.currency.cache_usd_krw_rate`.
   - **함정**: 새로 조회한 값만 캐시한다(`refresh_usd_krw`) — fallback을 `cache_usd_krw_rate`에 넣으면 모든 경로가 실환율로 믿는다. 스냅샷·거래 행 같은 영구 기록은 `require_live_usd_krw`(없으면 503), 브로커 동기화는 `sync_usd_krw_rate`(달러 자산이 있으면 실패 처리).
   - **함정**: fallback(1300)은 평가액 환산용. 환율로 알림 발동·위치 판정을 하면 `fetch_usd_krw(..., allow_fallback=False)`(없으면 0.0) 또는 `get_live_or_cached_usd_krw`의 실값 여부로 거를 것 — 고정값이 실환율로 쓰이면 BELOW 알림 거짓 발동.
-- **월별 추이 SQL(`get_monthly_trend`)**: `asset_accounts` JOIN + `is_active = TRUE` 필수(누락 시 비활성 계좌 합산으로 수배 부풀림). 월말 스냅샷 없음 — 해당 월 마지막 sync일 값이 대표값.
 - **브로커 예수금**: `deposit_krw`는 **D+2 정산 후 예수금**(키움 `d2_entra`, KIS `prvs_rcdl_excc_amt`) — D+0을 쓰면 매도대금이 빠져 며칠간 총자산이 어긋남. 부재 시 D+0 폴백 + 경고 로그. FULL 매수 예산은 별도(키움 `orderable_krw`, KIS `get_orderable_cash()`). `deposit_usd`는 해외 조회 실패 시 `None`으로 기존 값 유지, 확정 `0.0`일 때만 갱신.
 - **인증**: 백엔드는 토큰을 발급하지 않는다. `api/deps.py` `get_current_user`가 Supabase JWKS로 검증만. nestlio도 같은 JWT로 `/external/*`.
 - **미들웨어(`main.py`)**: slowapi, CORS, GZip, Request ID, 보안 헤더, 요청 로깅. `RequestValidationError`는 NaN/Infinity를 None으로 바꿔 422(기본 핸들러는 500). 그 외 예외는 `redact_secrets()` 후 500. 백엔드 CSP는 API 응답용 — 실제 프론트 CSP는 `frontend/vercel.json`.
@@ -294,7 +290,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 
 **자격증명**: KIS/키움 App Key·Secret, 토스 Client ID·Secret은 `credential_service.encrypt()` 후 저장, 읽을 때 `decrypt()`. 평문 저장·로그 출력 금지.
 
-**금액**: `Numeric(18, 2)` / `Mapped[float | None]`. 해외 `avg_price` 포함 **모든 금액은 KRW 저장**(프론트가 USD × 환율 변환 후 전송).
+**금액**: `Numeric(18, 2)` / `Mapped[float | None]`. 전부 KRW 저장(루트 Key Constraints).
 
 **SQLAlchemy async**
 ```python
