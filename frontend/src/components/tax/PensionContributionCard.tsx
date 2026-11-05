@@ -56,7 +56,8 @@ export default function PensionContributionCard({ overview }: Props) {
     {
       key: "total",
       label: "합산 한도 (연금저축+IRP)",
-      current: data.total_deposit_krw,
+      // 연금저축 600만원 초과분은 공제 대상이 아니라 합산 한도를 쓰지 않는다
+      current: data.total_credited_krw ?? data.total_deposit_krw,
       limit: data.total_limit_krw,
       pct: data.total_achievement_pct,
       barColorClass: "bg-emerald-500",

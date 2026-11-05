@@ -3,7 +3,6 @@ import { TriangleAlert, ChevronDown, ChevronUp, Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchOverseasPositionsTax, fetchOverseasRealized, type TaxSummary } from "@/api/tax";
 import TaxPlannerSection from "@/components/tax/TaxPlannerSection";
-import { GeumtSimulationSection } from "@/components/tax/GeumtSimulationSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { fmtKrw } from "@/utils/format";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -29,7 +28,6 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
   // 플래너는 기본 접힘 — 손실수확 후보가 있으면 토글 옆 "손실수확 가능" 배지로 알린다. 예전처럼 자동으로
   // 펼치면 절세 탭이 표·입력폼까지 한 번에 길어졌다 (docs/plans/67 Phase 3)
   const [plannerOpenOverride, setPlannerOpenOverride] = useState<boolean | null>(null);
-  const [geumtOpen, setGeumtOpen] = useState(false);
 
   const {
     data: taxData,
@@ -99,9 +97,10 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
             <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
               <TriangleAlert size={14} className="text-orange-500 mt-0.5 shrink-0" />
               <p className="text-xs text-orange-700 dark:text-orange-400">
-                국내 주식 보유액이 10억원을 {fmtKrw(taxData.domestic_large_holder_excess_krw)}{" "}
-                초과했습니다. 대주주 요건 해당 시 양도소득세(22%)가 부과될 수 있습니다 — 초과분
-                이상을 매도하면 기준 아래로 내려갑니다.
+                {taxData.domestic_large_holder_name ?? "보유 종목"} 보유액이 대주주 기준(
+                {fmtKrw(taxData.domestic_large_holder_threshold_krw ?? 5_000_000_000)}) 이상이에요.
+                판정은 종목별·직전 연도 말 기준이고 지분율 요건도 함께 봐요. 대주주에 해당하면
+                양도소득세가 부과될 수 있으니 세무 전문가와 확인해 보세요.
               </p>
             </div>
           )}
@@ -181,23 +180,6 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 />
               </ErrorBoundary>
             ) : null)}
-
-          <button
-            onClick={() => setGeumtOpen((v) => !v)}
-            className="w-full flex items-center justify-between py-2 text-xs font-medium text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 border-t border-gray-100 dark:border-gray-700 pt-3 transition-colors"
-          >
-            <span>금투세 시뮬레이션 — 유예 중 세제 미리 보기</span>
-            {geumtOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-
-          {geumtOpen && taxData.financial_investment_tax_simulation && (
-            <ErrorBoundary variant="section">
-              <GeumtSimulationSection
-                sim={taxData.financial_investment_tax_simulation}
-                currentOverseasTax={taxData.overseas_tax_estimated_krw}
-              />
-            </ErrorBoundary>
-          )}
         </div>
       )}
     </div>

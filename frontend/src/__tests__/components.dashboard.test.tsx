@@ -50,7 +50,6 @@ const emptyTaxSummary: TaxSummary = {
   total_estimated_tax_krw: 0,
   total_fees_krw: 0,
   harvesting_recommendations: [],
-  financial_investment_tax_simulation: {} as TaxSummary["financial_investment_tax_simulation"],
   health_insurance_estimate: {
     financial_income_for_health_insurance_krw: 0,
     threshold_krw: 20_000_000,

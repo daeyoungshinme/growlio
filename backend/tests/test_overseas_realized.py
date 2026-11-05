@@ -129,8 +129,9 @@ class TestGetOverseasRealizedSummary:
         assert summary["source"] == "PARTIAL"
         assert [a["account_name"] for a in summary["covered_accounts"]] == ["KIS 일반"]
         uncovered = {a["account_name"]: a["reason"] for a in summary["uncovered_accounts"]}
-        assert set(uncovered) == {"KIS 모의", "키움"}  # 해외 미보유 토스·과세이연 ISA는 제외
-        assert "모의투자" in uncovered["KIS 모의"]
+        # 모의투자는 소득이 아니라 대상에서 빠진다(plans/110 B10). 해외 미보유 토스·과세이연 ISA도 제외
+        assert set(uncovered) == {"키움"}
+        assert summary["lookup_failed"] is False
         assert "키움" in uncovered["키움"]
         mock_cache.setex.assert_awaited()
 
@@ -417,3 +418,77 @@ class TestSummaryWithTradeRecords:
             }
         ]
         assert summary["source"] == "PARTIAL"
+
+
+class TestRealizedCoverageGaps:
+    """plans/110 B2·B3 — 조회 실패·전량 매도·삭제 계좌가 "실현손익 없음"으로 보이지 않아야 한다."""
+
+    @pytest.fixture(autouse=True)
+    def _today(self):
+        with (
+            patch("app.services.tax.overseas_realized_service.today_kst", return_value=TODAY),
+            patch(
+                "app.services.tax.overseas_realized_service.load_trade_record_realized",
+                new=AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.tax.overseas_realized_service.get_overseas_positions_detail",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            yield
+
+    def _db(self, accounts: list, history: list[tuple]) -> MagicMock:
+        accounts_result = MagicMock()
+        accounts_result.scalars.return_value.all.return_value = accounts
+        history_result = MagicMock()
+        history_result.all.return_value = history
+        db = MagicMock()
+        db.execute = AsyncMock(side_effect=[accounts_result, history_result])
+        return db
+
+    @pytest.mark.asyncio
+    async def test_lookup_failure_is_flagged(self, make_account, mock_cache):
+        kis = _acc(make_account, "KIS")
+        with patch(
+            "app.services.tax.overseas_realized_service._fetch_kis_realized",
+            new=AsyncMock(side_effect=RuntimeError("timeout")),
+        ):
+            summary = await get_overseas_realized_summary(
+                uuid.uuid4(), 2026, _db_with_accounts([kis]), cache=mock_cache
+            )
+
+        assert summary["lookup_failed"] is True
+        assert summary["realized_gain_krw"] is None
+
+    @pytest.mark.asyncio
+    async def test_account_that_sold_everything_is_uncovered(self, make_account, mock_cache):
+        """올해 해외 종목이 있었던 계좌는 지금 보유가 없어도 실현손익이 있을 수 있다."""
+        kiwoom = _acc(make_account, "키움", asset_type="STOCK_KIWOOM")
+        db = self._db([kiwoom], [(kiwoom.id, "NASDAQ")])
+
+        summary = await get_overseas_realized_summary(uuid.uuid4(), 2026, db, cache=mock_cache)
+
+        assert [a["account_name"] for a in summary["uncovered_accounts"]] == ["키움"]
+
+    @pytest.mark.asyncio
+    async def test_domestic_only_account_stays_out(self, make_account, mock_cache):
+        kiwoom = _acc(make_account, "키움", asset_type="STOCK_KIWOOM")
+        db = self._db([kiwoom], [(kiwoom.id, "KOSPI")])
+
+        summary = await get_overseas_realized_summary(uuid.uuid4(), 2026, db, cache=mock_cache)
+
+        assert summary["uncovered_accounts"] == []
+
+    @pytest.mark.asyncio
+    async def test_deleted_kis_account_is_not_queried_but_reported(self, make_account, mock_cache):
+        """삭제 계좌는 증권사에 조회하지 않고, 올해 해외 이력이 있으면 빠졌다고 알린다."""
+        deleted = _acc(make_account, "옛 KIS", is_active=False)
+        db = self._db([deleted], [(deleted.id, "NASDAQ")])
+        fetch = AsyncMock()
+
+        with patch("app.services.tax.overseas_realized_service._fetch_kis_realized", new=fetch):
+            summary = await get_overseas_realized_summary(uuid.uuid4(), 2026, db, cache=mock_cache)
+
+        fetch.assert_not_awaited()
+        assert "삭제" in summary["uncovered_accounts"][0]["reason"]

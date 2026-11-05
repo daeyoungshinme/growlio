@@ -26,6 +26,7 @@ class PensionContributionStatus(TypedDict):
     pension_savings_deposit_krw: float
     irp_deposit_krw: float
     total_deposit_krw: float
+    total_credited_krw: float  # 공제 대상 납입액 — 연금저축은 600만원까지만 친다
     pension_savings_limit_krw: int
     total_limit_krw: int
     pension_savings_achievement_pct: float
@@ -41,6 +42,8 @@ async def calc_pension_contribution_status(
     """연금저축/IRP 계좌군의 연간 DEPOSIT 합산 대비 세액공제 한도(600만원/900만원) 진행률.
 
     Transaction(DEPOSIT) 수기 입력에 의존 — KIS/키움 자동 동기화로는 생성되지 않는다.
+    삭제한 계좌의 올해 납입도 실제 납입이므로 포함한다(세금 집계는 삭제 계좌를 빼지 않는다, plans/60·95).
+    연금저축 600만원 초과분은 공제 대상이 아니라 합산 한도(900만원)를 쓰지 않는다 — 800만원을 넣어도 IRP 여유는 300만원.
     """
     result = await db.execute(
         select(AssetAccount.tax_type, func.sum(Transaction.amount))
@@ -48,7 +51,6 @@ async def calc_pension_contribution_status(
         .where(
             AssetAccount.user_id == user_id,
             AssetAccount.tax_type.in_(PENSION_TAX_TYPES),
-            AssetAccount.is_active == True,
             Transaction.transaction_type == "DEPOSIT",
             func.extract("year", Transaction.transaction_date) == year,
         )
@@ -58,17 +60,19 @@ async def calc_pension_contribution_status(
     pension_savings = sums.get("PENSION_SAVINGS", 0.0)
     irp = sums.get("IRP", 0.0)
     total = pension_savings + irp
+    credited = min(pension_savings, _PENSION_SAVINGS_LIMIT_KRW) + irp
 
     return {
         "year": year,
         "pension_savings_deposit_krw": round(pension_savings, 0),
         "irp_deposit_krw": round(irp, 0),
         "total_deposit_krw": round(total, 0),
+        "total_credited_krw": round(credited, 0),
         "pension_savings_limit_krw": _PENSION_SAVINGS_LIMIT_KRW,
         "total_limit_krw": _PENSION_TOTAL_LIMIT_KRW,
         "pension_savings_achievement_pct": round(min(pension_savings / _PENSION_SAVINGS_LIMIT_KRW * 100, 999), 1),
-        "total_achievement_pct": round(min(total / _PENSION_TOTAL_LIMIT_KRW * 100, 999), 1),
+        "total_achievement_pct": round(min(credited / _PENSION_TOTAL_LIMIT_KRW * 100, 999), 1),
         "pension_savings_remaining_krw": round(max(0.0, _PENSION_SAVINGS_LIMIT_KRW - pension_savings), 0),
-        "total_remaining_krw": round(max(0.0, _PENSION_TOTAL_LIMIT_KRW - total), 0),
+        "total_remaining_krw": round(max(0.0, _PENSION_TOTAL_LIMIT_KRW - credited), 0),
         "note": _PENSION_CONTRIBUTION_NOTE,
     }

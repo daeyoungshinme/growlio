@@ -39,7 +39,7 @@ from app.models.trade import TradeRecord
 from app.providers._retry import with_token_refresh
 from app.services.accounts.credential_service import decrypt_kis_credentials
 from app.services.portfolio.period_purchase_service import Lot
-from app.services.tax.tax_service import get_overseas_positions_detail
+from app.services.tax.tax_service import get_overseas_positions_detail, is_paper_account
 from app.utils.cache_keys import (
     TTL_TAX_OVERSEAS_REALIZED,
     get_cached_json,
@@ -80,11 +80,13 @@ class OverseasRealizedSummary(TypedDict):
     covered_accounts: list[RealizedAccount]
     uncovered_accounts: list[UncoveredAccount]
     as_of: str
+    lookup_failed: bool  # 증권사 조회가 실패한 계좌가 있다 — 합계를 믿고 공제 여유를 계산하면 안 된다
 
 
 def _is_kis_auto(acc: AssetAccount) -> bool:
     return bool(
         acc.asset_type == "STOCK_KIS"
+        and acc.is_active is not False
         and not acc.is_mock_mode
         and acc.kis_app_key
         and acc.kis_app_secret
@@ -93,8 +95,8 @@ def _is_kis_auto(acc: AssetAccount) -> bool:
 
 
 def _unsupported_reason(acc: AssetAccount) -> str:
-    if acc.asset_type == "STOCK_KIS" and acc.is_mock_mode:
-        return "모의투자 계좌는 실현손익 조회를 지원하지 않아요"
+    if acc.is_active is False:
+        return "삭제한 계좌라 자동으로 집계할 수 없어요"
     if acc.asset_type == "STOCK_KIS":
         return "KIS API 자격증명이 없어요"
     if acc.asset_type == "STOCK_KIWOOM":
@@ -282,6 +284,25 @@ async def load_trade_record_realized(
     }
 
 
+async def _accounts_with_overseas_history(
+    account_ids: list[uuid.UUID], start: date, end: date, db: AsyncSession
+) -> set[str]:
+    """기간 중 스냅샷에 해외 종목이 있었던 계좌 — 전량 매도해 지금은 보유가 없어도 실현손익이 있을 수 있다."""
+    if not account_ids:
+        return set()
+    rows = await db.execute(
+        select(AssetSnapshot.account_id, Position.market)
+        .join(Position, Position.snapshot_id == AssetSnapshot.id)
+        .where(
+            AssetSnapshot.account_id.in_(account_ids),
+            AssetSnapshot.snapshot_date >= start,
+            AssetSnapshot.snapshot_date <= end,
+        )
+        .distinct()
+    )
+    return {str(account_id) for account_id, market in rows.all() if _is_overseas(market)}
+
+
 def resolve_source(covered: list[RealizedAccount], uncovered: list[UncoveredAccount]) -> RealizedSource:
     if not covered:
         return "NONE"
@@ -307,9 +328,9 @@ async def get_overseas_realized_summary(
     if cached is not None:
         return cached
 
+    # 삭제한 계좌의 올해 매도도 실제 소득이라 활성 여부로 거르지 않는다(세금 집계 기준, plans/60·95)
     conditions = [
         AssetAccount.user_id == user_id,
-        AssetAccount.is_active == True,
         AssetAccount.asset_type.in_(POSITION_STOCK_ASSET_TYPES),
     ]
     if account_id is not None:
@@ -317,7 +338,7 @@ async def get_overseas_realized_summary(
     accounts = [
         acc
         for acc in (await db.execute(select(AssetAccount).where(*conditions))).scalars().all()
-        if acc.tax_type not in TAX_DEFERRED_TAX_TYPES
+        if acc.tax_type not in TAX_DEFERRED_TAX_TYPES and not is_paper_account(acc)
     ]
     positions = (
         overseas_positions
@@ -333,6 +354,17 @@ async def get_overseas_realized_summary(
     # KIS 자동 집계 계좌의 수기 기록은 쓰지 않는다 — 브로커 체결 기준이 정답이고 합치면 이중 집계된다
     by_records = await load_trade_record_realized(
         user_id, [acc for acc in accounts if not _is_kis_auto(acc)], start, end, db
+    )
+
+    traded_overseas = await _accounts_with_overseas_history(
+        [
+            acc.id
+            for acc in accounts
+            if not _is_kis_auto(acc) and str(acc.id) not in by_records and str(acc.id) not in holding_account_ids
+        ],
+        start,
+        end,
+        db,
     )
 
     covered: list[RealizedAccount] = []
@@ -372,7 +404,7 @@ async def get_overseas_realized_summary(
             uncovered.append(
                 {"account_id": acc_id, "account_name": acc.name, "reason": "매도 기록의 취득가를 알 수 없어요"}
             )
-        elif acc_id in holding_account_ids:
+        elif acc_id in holding_account_ids or acc_id in traded_overseas:
             uncovered.append({"account_id": acc_id, "account_name": acc.name, "reason": _unsupported_reason(acc)})
 
     summary: OverseasRealizedSummary = {
@@ -382,6 +414,7 @@ async def get_overseas_realized_summary(
         "covered_accounts": covered,
         "uncovered_accounts": uncovered,
         "as_of": today.isoformat(),
+        "lookup_failed": had_failure,
     }
     if not had_failure:  # 일시 실패 결과를 1시간 고정하지 않도록 성공 시에만 캐시
         await set_cached_json(cache, cache_key, summary, TTL_TAX_OVERSEAS_REALIZED)
