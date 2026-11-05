@@ -45,21 +45,10 @@ async def _upsert_snapshot(
     return result.scalar_one()
 
 
-async def get_latest_snapshot(db: AsyncSession, account_id: uuid.UUID) -> AssetSnapshot | None:
-    """계좌의 최신 스냅샷만 반환한다 (포지션 불필요한 호출부 전용 — `get_latest_snapshot_with_positions`은
-    스냅샷이 없을 때 수동 포지션까지 별도 쿼리로 로드하므로, 포지션을 쓰지 않는 호출부에 쓰면 안 함)."""
-    return await db.scalar(
-        select(AssetSnapshot)
-        .where(AssetSnapshot.account_id == account_id)
-        .order_by(AssetSnapshot.snapshot_date.desc())
-        .limit(1)
-    )
-
-
 async def get_latest_snapshots_by_account(
     db: AsyncSession, account_ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, AssetSnapshot]:
-    """계좌별 최신 스냅샷을 한 번에 조회한다 — 계좌마다 `get_latest_snapshot`을 부르는 N+1 대신.
+    """계좌별 최신 스냅샷을 한 번에 조회한다 — 계좌별 개별 조회의 N+1 대신.
 
     (account_id, snapshot_date)가 유일(uq_snapshot_account_date)이라 max(date) 조인은 계좌당 1행이다.
     """

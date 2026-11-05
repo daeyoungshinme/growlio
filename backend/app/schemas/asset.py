@@ -1,7 +1,6 @@
 import math
 import re
 from datetime import date, datetime
-from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -247,7 +246,6 @@ class AssetAccountResponse(BaseModel):
     manual_amount: float | None
     manual_currency: str
     manual_updated_at: datetime | None
-    manual_positions: list[Any] | None = None
     deposit_krw: float | None = None
     deposit_usd: float | None = None
     real_estate_details: dict | None = None

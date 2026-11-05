@@ -48,7 +48,6 @@ def _make_analysis(items: list[RebalancingItem]) -> RebalancingAnalysis:
         base_type="STOCK_ONLY",
         base_value_krw=10_000_000.0,
         items=items,
-        untracked_holdings=[],
         analyzed_at="2026-07-03T00:00:00+00:00",
     )
 

@@ -202,34 +202,11 @@ class TestUntrackedHoldings:
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
-        assert result.untracked_holdings == []
         tsla = next(i for i in result.items if i.ticker == "TSLA")
         assert tsla.target_weight_pct == 0.0
         assert tsla.target_value_krw == 0.0
         assert tsla.diff_krw == -400_000  # 전량 매도
         assert tsla.shares_to_trade == -4  # qty=4 전량 매도 → -4
-
-    def test_all_tracked_empty_untracked(self):
-        """모든 보유 종목이 목표 포트폴리오에 있으면 untracked_holdings 비어 있음."""
-        portfolio = _make_portfolio(
-            [
-                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-            ]
-        )
-        overview = _make_overview(
-            total_stock_krw=1_000_000,
-            all_positions=[
-                {
-                    "ticker": "AAPL",
-                    "market": "NASDAQ",
-                    "name": "Apple",
-                    "value_krw": 1_000_000,
-                    "current_price": 200_000,
-                },
-            ],
-        )
-        result = analyze_rebalancing(portfolio, overview)
-        assert result.untracked_holdings == []
 
 
 class TestShareCalculationEdgeCases:

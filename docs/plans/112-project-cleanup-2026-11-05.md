@@ -199,3 +199,24 @@ Windows의 `N passed` 후 종료 코드 `-1073741819`는 실패가 아니다.
   - 머지 후 CI 그린, Render 배포 `/health`
 - **배치 5:** `alembic check`로 모델 드리프트를 확인한다. 응답 필드 삭제 전에 `backend/`·`frontend/src`·nestlio를 grep한다.
 - **완료 시:** 줄어든 양을 계획서에 기록하고, 파일 목록이 바뀐 CLAUDE.md 항목을 갱신한다.
+
+---
+
+## 결과 (2026-11-05)
+
+| 배치 | 상태 | PR | 결과 |
+|---|---|---|---|
+| 0 표시 오류 | 완료 | #224 | 남은 금액 기준·"약 N개월 후" 수정 |
+| 1 문서 | 완료 | #225 | README 138KB → 27KB, CLAUDE.md 3종 91KB → 77KB(60KB 목표 미달 — 남은 내용은 대부분 함정 설명) |
+| 2 인프라 | keep-alive 제외 완료 | #226 | nginx·monitoring·preDeployCommand 제거 |
+| 3 화면 | 완료 | #227 | 홈 카드 통합, 데스크톱 전망 접기, 계획 탭 차트 정리 |
+| 5 백엔드 | 삭제·`/dashboard`·drift 축소만 완료 | 이 PR | 프로덕션·테스트 288줄 감소 |
+
+**조사와 달랐던 점:** `tactical_allocation_service.__all__` 5개는 소비자가 없는 재노출이 아니었다. `svc.check_apply_allowed`처럼 모듈 속성으로 쓰여 그대로 둔다.
+
+**남은 일**
+- keep-alive 제거: 외부 핑 등록 후
+- 배치 4 전체
+- 배치 5: `/tax/summary` 응답 축소, 저위험 중복 통합
+- 배치 6 전체
+- 배치 0·3 브라우저 확인(Vercel Preview)

@@ -274,12 +274,6 @@ export const fetchRebalancingExecutionDetail = (id: string): Promise<Rebalancing
 
 // ── 드리프트 요약 (대시보드용 경량 조회) ────────────────────────
 
-export interface DriftedItem {
-  ticker: string;
-  name: string;
-  weight_diff_pct: number;
-}
-
 export interface PortfolioDriftSummary {
   portfolio_id: string;
   portfolio_name: string;
@@ -287,7 +281,6 @@ export interface PortfolioDriftSummary {
   threshold_pct: number;
   max_drift_pct: number;
   drifted_items_count: number;
-  top_drifted_items: DriftedItem[];
   has_composite_signal?: boolean;
   composite_reason?: string | null;
   has_alert_configured?: boolean;

@@ -158,13 +158,6 @@ def test_usd_counted_only_when_portfolio_has_overseas_items():
     assert svc.account_cash_krw(account, _portfolio(("KOSPI", "NASDAQ")), 1400.0) == 240_000
 
 
-def test_is_dca_auto_buy_matches_frontend_preset():
-    assert svc.is_dca_auto_buy(_alert())
-    notify = _alert()
-    notify.mode = "NOTIFY"
-    assert not svc.is_dca_auto_buy(notify)
-
-
 def test_email_template_shows_shortfall_and_run_date():
     from app.services.notifications.email_templates import dca_cash_shortfall_template
 

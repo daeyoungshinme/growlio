@@ -27,51 +27,6 @@ class TestToYahooSymbol:
         assert _to_yahoo_symbol(ticker, market) == expected
 
 
-# ── fetch_current_price 우선순위 체인 테스트 ────────────────
-
-
-class TestFetchCurrentPrice:
-    """Yahoo 실패 → KIS → LS 순서로 fallback 되는지 검증."""
-
-    @pytest.mark.asyncio
-    async def test_returns_yahoo_price_when_available(self, mock_db, mock_cache, override_settings):
-        """Yahoo Finance 가격 조회 성공 시 바로 반환."""
-        import uuid
-        from unittest.mock import AsyncMock, patch
-
-        user_id = uuid.uuid4()
-
-        with (
-            patch("app.services.market_data.price_service.domestic_price_fallback", new=AsyncMock(return_value=None)),
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=75000.0),
-        ):
-            from app.services.market_data.price_service import fetch_current_price
-
-            # DB 조회 없이 Yahoo가 성공하면 DB 없어도 됨
-            # (실제 내부 구현상 DB 조회 후 KIS/LS 체인이므로 mock 필요)
-            mock_db.scalar.return_value = None  # UserSettings 없음 → KIS/LS skip
-
-            price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_cache)
-            # Yahoo가 성공했으므로 75000 반환
-            assert price == 75000.0
-
-    @pytest.mark.asyncio
-    async def test_returns_none_when_all_providers_fail(self, mock_db, mock_cache, override_settings):
-        """모든 provider 실패 시 None 반환 (예외 없음)."""
-        import uuid
-        from unittest.mock import patch
-
-        user_id = uuid.uuid4()
-        mock_db.scalar.return_value = None  # UserSettings 없음
-
-        # Yahoo 조회 함수 자체를 막는다 — 막지 않으면 실제 yfinance 네트워크 호출이 나간다
-        with patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None):
-            from app.services.market_data.price_service import fetch_current_price
-
-            price = await fetch_current_price(user_id, "UNKNOWN", "NYSE", mock_db, mock_cache)
-            assert price is None
-
-
 # ── 배치 조회 테스트 ────────────────────────────────────────
 
 
@@ -378,26 +333,6 @@ class TestGetHistoricalReturns:
         assert ("005930", "KOSPI") in result
 
 
-# ── fetch_current_price cache hit ─────────────────────────────
-
-
-class TestFetchCurrentPriceCacheHit:
-    @pytest.mark.asyncio
-    async def test_returns_cached_price(self, mock_db, override_settings):
-        import uuid
-        from unittest.mock import AsyncMock
-
-        user_id = uuid.uuid4()
-        cache = AsyncMock()
-        cache.get = AsyncMock(return_value=b"75000.0")
-
-        from app.services.market_data.price_service import fetch_current_price
-
-        price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, cache)
-
-        assert price == 75000.0
-
-
 # ── domestic_price_fallback: 국내 종목 Naver→pykrx 폴백 ────────
 
 
@@ -450,46 +385,3 @@ class TestDomesticPriceFallback:
             price = await domestic_price_fallback("005930", loop)
 
         assert price is None
-
-
-class TestFetchCurrentPriceDomesticPriority:
-    """국내 종목은 Naver/pykrx가 성공하면 Yahoo를 호출하지 않아야 한다."""
-
-    @pytest.mark.asyncio
-    async def test_domestic_naver_success_skips_yahoo(self, mock_db, mock_cache, override_settings):
-        import uuid
-        from unittest.mock import patch
-
-        user_id = uuid.uuid4()
-        mock_db.scalar.return_value = None
-
-        with (
-            patch("app.services.market_data.price_service.sync_naver_price", return_value=286000.0),
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price") as mock_yahoo,
-        ):
-            from app.services.market_data.price_service import fetch_current_price
-
-            price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_cache)
-
-        assert price == 286000.0
-        mock_yahoo.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_overseas_ticker_skips_domestic_fallback(self, mock_db, mock_cache, override_settings):
-        """해외 종목은 국내 폴백(Naver/pykrx)을 거치지 않고 바로 Yahoo로 간다."""
-        import uuid
-        from unittest.mock import patch
-
-        user_id = uuid.uuid4()
-        mock_db.scalar.return_value = None
-
-        with (
-            patch("app.services.market_data.price_service.domestic_price_fallback") as mock_domestic,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=180.0),
-        ):
-            from app.services.market_data.price_service import fetch_current_price
-
-            price = await fetch_current_price(user_id, "AAPL", "NASDAQ", mock_db, mock_cache)
-
-        assert price == 180.0
-        mock_domestic.assert_not_called()

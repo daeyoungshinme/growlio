@@ -27,7 +27,6 @@ from app.services.market_data.price_sync_sources import sync_naver_price, sync_p
 from app.services.market_data.yahoo_price import (
     _sync_pykrx_returns_batch,
     fetch_yahoo_batch,
-    fetch_yahoo_price,
     fetch_yahoo_returns_batch,
     run_yf_bounded,
 )
@@ -57,45 +56,6 @@ async def domestic_price_fallback(ticker: str, loop: asyncio.AbstractEventLoop) 
         return price
 
     return await loop.run_in_executor(None, partial(sync_pykrx_price, ticker))
-
-
-async def fetch_current_price(
-    user_id: uuid.UUID,
-    ticker: str,
-    market: str,
-    db: AsyncSession,
-    cache: CacheStoreType = None,
-) -> float | None:
-    """단일 종목 현재가 조회.
-    캐시(15분) → (국내: Naver/pykrx →) Yahoo Finance → KIS 순으로 시도한다.
-    """
-    cache_key = current_price_key(ticker, market)
-    if cache:
-        cached = await cache.get(cache_key)
-        if cached:
-            return float(cached)
-
-    loop = asyncio.get_running_loop()
-
-    price: float | None = None
-    if market.upper() in DOMESTIC_MARKETS:
-        price = await domestic_price_fallback(ticker, loop)
-
-    if not price:
-        price = await fetch_yahoo_price(ticker, market)
-
-    if not price:
-        account = await _get_any_kis_account(user_id, db)
-        if account:
-            try:
-                price = await _price_via_kis(account, ticker, market, db, cache)
-            except Exception as e:
-                logger.warning("kis_price_failed", ticker=ticker, error=str(e), exc_type=type(e).__name__)
-
-    if price and cache:
-        await cache.set(cache_key, str(price), ex=TTL_PRICE_CURRENT)
-
-    return price
 
 
 async def _read_cached_prices(cache: CacheStoreType, tickers: list[tuple[str, str]]) -> dict[str, float]:

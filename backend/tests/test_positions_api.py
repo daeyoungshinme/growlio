@@ -33,7 +33,6 @@ def _make_account(user_id, account_id=None):
         is_active=True,
         is_mock_mode=False,
         manual_amount=0.0,
-        manual_positions=None,
         manual_currency="KRW",
         deposit_krw=None,
         deposit_usd=None,

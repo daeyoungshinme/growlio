@@ -47,7 +47,6 @@ def _make_account(user_id, account_id=None):
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
         manual_amount=None,
-        manual_positions=None,
         manual_currency="KRW",
         kis_account_no=None,
         kis_app_key=None,

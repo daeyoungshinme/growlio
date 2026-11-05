@@ -43,11 +43,7 @@ DCA_AUTO_BUY_PRESET: dict[str, str] = {
     "strategy": "BUY_ONLY",
 }
 """정기 적립식 자동매수 프리셋 — 프론트 `utils/dcaAutoBuy.ts::isDcaAutoBuyPreset`과 같은 판정.
-`find_dca_cash_shortfalls` 쿼리와 `is_dca_auto_buy`가 이 한 곳을 공유한다."""
-
-
-def is_dca_auto_buy(alert: RebalancingAlert) -> bool:
-    return all(getattr(alert, field) == value for field, value in DCA_AUTO_BUY_PRESET.items())
+`find_dca_cash_shortfalls` 쿼리가 쓴다."""
 
 
 def is_cash_short(cash_krw: float, expected_krw: float | None) -> bool:

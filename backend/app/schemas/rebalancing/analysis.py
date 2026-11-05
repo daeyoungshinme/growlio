@@ -46,16 +46,6 @@ class RebalancingItem(BaseModel):
     members: list["RebalancingItem"] = []
 
 
-class CurrentHolding(BaseModel):
-    """목표 포트폴리오에 없는 보유 종목."""
-
-    ticker: str
-    name: str
-    market: str
-    current_value_krw: float
-    current_weight_pct: float
-
-
 class TaxImpactItem(BaseModel):
     """세금 영향 미리보기 — 매도 대상 종목별 추정치(근사치, 참고용)."""
 
@@ -113,7 +103,6 @@ class RebalancingAnalysis(BaseModel):
     base_value_krw: float
     items: list[RebalancingItem]
     # 항상 비어 있음 — 구버전 프론트(PWA 캐시 번들)가 `.forEach`로 읽어 남겨둔다. 다음 정리 때 제거(plans/78 A2).
-    untracked_holdings: list[CurrentHolding] = []
     analyzed_at: str  # ISO timestamp
     current_portfolio_annual_dividend: float = 0.0  # 목표 포트폴리오 항목 기준 현재 연간 배당
     target_portfolio_annual_dividend: float = 0.0  # 목표 포트폴리오 연간 배당 합계
