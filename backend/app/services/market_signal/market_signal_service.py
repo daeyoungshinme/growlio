@@ -39,7 +39,7 @@ from app.services.market_signal.market_signal_indicators import (
     fetch_vix_signal,
     fetch_yield_curve_signal,
 )
-from app.services.market_signal.market_signal_scoring import COMPOSITE_SCORE_MAX, compute_composite_signal
+from app.services.market_signal.market_signal_scoring import compute_composite_signal
 from app.utils.cache_keys import (
     TTL_MARKET_SIGNAL,
     TTL_MARKET_SIGNAL_DEGRADED,
@@ -59,7 +59,6 @@ if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
 
 __all__ = [
-    "COMPOSITE_SCORE_MAX",
     "compute_composite_signal",
     "fetch_cpi_inflation_signal",
     "fetch_dollar_index_signal",

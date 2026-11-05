@@ -24,7 +24,6 @@ from app.schemas.rebalancing import RebalancingItem
 from app.services.rebalancing._order_quantity_guard import floor_shares
 
 ROLE_PRIMARY = "PRIMARY"
-ROLE_MEMBER = "MEMBER"
 ROLE_DOMESTIC_ALT = "DOMESTIC_ALT"
 
 

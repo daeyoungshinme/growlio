@@ -11,7 +11,6 @@ import structlog
 from app.constants import CASH_EQUIVALENT_ACCOUNT_TYPES, CASH_EQUIVALENT_TICKER, is_non_tradable
 from app.models.portfolio import Portfolio
 from app.schemas.rebalancing import (
-    DriftedItem,
     PortfolioDriftSummary,
     RebalancingAnalysis,
     RebalancingItem,
@@ -602,7 +601,6 @@ def analyze_rebalancing(
 
 
 _DEFAULT_DRIFT_THRESHOLD = 5.0
-_TOP_DRIFTED_LIMIT = 3
 
 
 def filter_drifting_items(items: list[Any], threshold_pct: float) -> list[Any]:
@@ -636,16 +634,10 @@ def compute_portfolio_drift_summary(
             threshold_pct=threshold_pct,
             max_drift_pct=0.0,
             drifted_items_count=0,
-            top_drifted_items=[],
         )
 
     drifting = filter_drifting_items(items, threshold_pct)
-    sorted_by_drift = sorted(items, key=lambda i: abs(i.weight_diff_pct), reverse=True)
-    max_drift = abs(sorted_by_drift[0].weight_diff_pct)
-    top_items = [
-        DriftedItem(ticker=i.ticker, name=i.name, weight_diff_pct=round(i.weight_diff_pct, 2))
-        for i in sorted_by_drift[:_TOP_DRIFTED_LIMIT]
-    ]
+    max_drift = max(abs(i.weight_diff_pct) for i in items)
 
     return PortfolioDriftSummary(
         portfolio_id=uuid.UUID(str(portfolio.id)),
@@ -654,5 +646,4 @@ def compute_portfolio_drift_summary(
         threshold_pct=threshold_pct,
         max_drift_pct=round(max_drift, 2),
         drifted_items_count=len(drifting),
-        top_drifted_items=top_items,
     )

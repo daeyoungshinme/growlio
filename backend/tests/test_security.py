@@ -87,7 +87,6 @@ class TestCrossUserAccess:
             kiwoom_account_no=None,
             deposit_krw=None,
             manual_amount=None,
-            manual_positions=None,
             manual_currency="KRW",
             manual_updated_at=None,
             real_estate_details=None,

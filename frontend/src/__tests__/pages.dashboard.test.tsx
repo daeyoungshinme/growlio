@@ -55,7 +55,6 @@ const mockDashboardData = {
   annual_deposit_goal: 24_000_000,
   ytd_deposit_amount: 12_000_000,
   estimated_annual_dividends: 2_400_000,
-  annual_dividends_received: 1_000_000,
 };
 
 const mockOverview = {

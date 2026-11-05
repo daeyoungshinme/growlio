@@ -38,7 +38,6 @@ vi.mock("@/api/dashboard", () => ({
     total_bank_krw: 2000000,
     total_real_estate_krw: 0,
     estimated_annual_dividends: 300000,
-    annual_dividends_received: 150000,
     deposit_achievement_pct: 60,
     deposit_achievement_monthly: [{ month: "2024-01", deposit: 500000, goal: 500000 }],
     retirement_years_left: 20,

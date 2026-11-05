@@ -98,10 +98,6 @@ class KisBalanceResponse(BaseModel):
     error: str | None = None  # 일괄 조회 시 계좌별 오류 메시지
 
 
-# 키움 잔고 응답 — KIS와 동일한 구조
-KiwoomBalanceResponse = KisBalanceResponse
-
-
 class OrderResult(BaseModel):
     ticker: str
     name: str

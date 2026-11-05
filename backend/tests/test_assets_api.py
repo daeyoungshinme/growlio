@@ -34,7 +34,6 @@ def _make_account_orm(user_id, account_id=None):
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
         manual_amount=None,
-        manual_positions=None,
         manual_currency="KRW",
         kis_account_no="12345678-01",
         kis_app_key=None,

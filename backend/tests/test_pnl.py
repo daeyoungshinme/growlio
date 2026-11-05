@@ -11,7 +11,6 @@ from app.utils.pnl import (
     calc_position_pnl,
     eval_value,
     invested_value,
-    pnl_pct,
     reprice_positions_krw,
 )
 
@@ -70,20 +69,6 @@ class TestInvestedValue:
     def test_none_avg_price_treated_as_zero(self):
         pos = SimpleNamespace(avg_price=None, qty=5.0, current_price=None)
         assert invested_value([pos]) == pytest.approx(0.0)
-
-
-class TestPnlPct:
-    def test_profit(self):
-        assert pnl_pct(11000.0, 10000.0) == pytest.approx(10.0)
-
-    def test_loss(self):
-        assert pnl_pct(9000.0, 10000.0) == pytest.approx(-10.0)
-
-    def test_zero_invested_returns_zero(self):
-        assert pnl_pct(5000.0, 0.0) == pytest.approx(0.0)
-
-    def test_breakeven(self):
-        assert pnl_pct(10000.0, 10000.0) == pytest.approx(0.0)
 
 
 class TestCalcPositionPnl:

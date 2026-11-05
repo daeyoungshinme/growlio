@@ -7,16 +7,6 @@ export interface DashboardAllocationItem {
   pct: number;
 }
 
-export interface MonthlyTrend {
-  month: string;
-  total_krw: number;
-}
-
-export interface DividendMonthlyBreakdown {
-  month: string;
-  amount: number;
-}
-
 export interface DashboardData {
   total_assets_krw: number;
   /** 부동산 제외 — 목표 진행률의 분자. 옛 persist 캐시에는 없을 수 있다 */
@@ -26,16 +16,12 @@ export interface DashboardData {
   goal_achievement_pct: number | null;
   stock_return_pct: number;
   annual_return_pct: number | null;
-  monthly_trend: MonthlyTrend[];
   annual_deposit_goal: number | null;
   annual_deposit_current: number;
   deposit_achievement_pct: number | null;
-  annual_dividends_received: number | null;
   estimated_annual_dividends: number | null;
-  dividend_monthly_breakdown: DividendMonthlyBreakdown[];
   cumulative_return_pct: number | null;
   xirr_pct: number | null;
-  xirr_is_estimated: boolean;
   goal_annual_return_pct: number | null;
   return_goal_gap_pct: number | null;
   retirement_target_year: number | null;

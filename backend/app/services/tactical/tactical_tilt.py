@@ -38,7 +38,6 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 Tilt = Literal["FAVOR_QQQ", "BALANCED", "FAVOR_SPY"]
-TILTS: tuple[Tilt, ...] = ("FAVOR_QQQ", "BALANCED", "FAVOR_SPY")
 TILT_LABELS: dict[str, str] = {"FAVOR_QQQ": "나스닥 우위", "BALANCED": "균형", "FAVOR_SPY": "S&P500 우위"}
 
 DEFAULT_TILT_SHIFT_PCT = 0.0
