@@ -1,9 +1,14 @@
 /** 절약 복리 시뮬레이터 계산 유틸 — 월 절약액을 투자했을 때의 미래가치 계산 */
 
+/** 연 수익률(%) → 월 복리 수익률. 12개월 복리가 정확히 연 수익률이 된다 — 백엔드 `monthly_rate`와 같은 식. */
+export function monthlyRate(annualReturnPct: number): number {
+  return Math.pow(1 + annualReturnPct / 100, 1 / 12) - 1;
+}
+
 /**
  * 매달 절약해 투자하는 금액의 N년 후 미래가치 (월복리 연금 공식)
  * FV = pmt * (((1+r)^n - 1) / r), r = 월수익률, n = 총 개월수
- * 예: futureValueOfMonthlySavings(100_000, 7, 10) → 약 1,730만원
+ * 예: futureValueOfMonthlySavings(100_000, 7, 10) → 약 1,711만원
  */
 export function futureValueOfMonthlySavings(
   monthlyAmount: number,
@@ -12,7 +17,7 @@ export function futureValueOfMonthlySavings(
 ): number {
   const n = years * 12;
   if (n <= 0) return 0;
-  const r = annualReturnPct / 100 / 12;
+  const r = monthlyRate(annualReturnPct);
   if (r === 0) return monthlyAmount * n;
   return monthlyAmount * ((Math.pow(1 + r, n) - 1) / r);
 }
@@ -28,7 +33,7 @@ export function futureValueOfLumpSum(
 ): number {
   const n = years * 12;
   if (n <= 0) return 0;
-  const r = annualReturnPct / 100 / 12;
+  const r = monthlyRate(annualReturnPct);
   return principal * Math.pow(1 + r, n);
 }
 

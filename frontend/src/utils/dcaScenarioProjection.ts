@@ -1,3 +1,5 @@
+import { monthlyRate } from "@/utils/savingsProjection";
+
 /**
  * DCA 프로젝션 시나리오 비교 계산 유틸.
  * backend/app/services/dca_service.py의 _build_projection_curve()와 동일한 공식을 그대로 포팅 —
@@ -15,7 +17,7 @@ export function projectedValueAtMonth(
   annualReturnPct: number,
   n: number,
 ): number {
-  const r = annualReturnPct / 100 / 12;
+  const r = monthlyRate(annualReturnPct);
   if (r === 0) return initial + monthlyDepositAmount * n;
   return initial * Math.pow(1 + r, n) + monthlyDepositAmount * ((Math.pow(1 + r, n) - 1) / r);
 }
