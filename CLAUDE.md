@@ -44,30 +44,13 @@ bash dev.sh         # (또는 make dev)
 
 ## Makefile 단축 명령
 
-```bash
-make up               # docker compose up -d db
-make down             # docker compose down
-make migrate          # cd backend && uv run alembic upgrade head
-make migrate-down     # cd backend && uv run alembic downgrade -1 (1단계 롤백)
-make install-backend  # cd backend && uv sync --extra dev (uv.lock 기준) + pre-commit install
-make install-frontend # cd frontend && npm install
-make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh) — Windows Git Bash 전용
-make dev-keep-port    # 위와 동일하되, 8000 포트가 이미 사용 중이면 강제 종료 대신 다음 빈 포트로 백엔드 구동
-make dev-backend      # 백엔드만 (localhost:8000)
-make dev-frontend     # 프론트엔드만 (localhost:5173)
-make test-backend     # cd backend && uv run pytest (커버리지 없이 빠르게)
-make test-backend-cov # cd backend && uv run pytest --cov=app (pyproject fail_under=89 — CI와 동일한 게이트)
-make test-frontend    # cd frontend && npm run test
-make lint             # ruff check + format --check (backend) + eslint --max-warnings 0 + prettier --check (frontend) — CI와 같은 기준
-make typecheck        # mypy (backend) + npm run typecheck (frontend 앱+테스트 tsconfig — CI와 동일)
-make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
-make format           # ruff format + ruff --fix (backend) + prettier --write (frontend)
-make format-backend   # ruff format + ruff --fix (backend만)
-make db-reset         # docker compose down -v + up + migrate (**데이터 전체 삭제** — 개발 환경 전용)
-make build-android-debug    # npm build + cap sync + gradlew assembleDebug (gradlew.bat 호출 — Windows 전용)
-make build-android-release  # npm build + cap sync + gradlew assembleRelease (Windows 전용)
-# Android 빌드 전제: JDK 21+, Android Studio (SDK 설치 포함) 필요
-```
+전체 목록은 `Makefile`(`make up`/`down`/`migrate`/`install-*`/`dev`/`test-*`/`lint`/`typecheck`/`format`/`clean`). 주의점만:
+
+- `make migrate-down` — 1단계 롤백
+- `make db-reset` — **데이터 전체 삭제**(개발 환경 전용)
+- `make dev`·`make build-android-*` — Windows 전용(`bash dev.sh`, `gradlew.bat`). macOS/Linux는 `make dev-backend` + `make dev-frontend`
+- `make test-backend`는 커버리지 없이 빠르게, `make test-backend-cov`가 CI와 같은 89% 게이트
+- `make lint`·`make typecheck`는 CI와 같은 기준
 
 ---
 
@@ -101,7 +84,7 @@ growlio/
 - `nginx/` + `docker-compose.yml` — 위 Render/Vercel 조합을 쓰지 않고 자체 서버에 통째로 호스팅할 때를 위한 대안 구성(포트 80 리버스 프록시, `/api/*` → backend:8000, 그 외 → frontend 정적파일). 현재 운영에서는 사용하지 않음. 이 경로를 실제로 쓰게 되면 `nginx/nginx.conf`의 `location` 블록도 새 API prefix에 맞춰 수정 필요.
 - `monitoring/` — Prometheus 설정(`prometheus.yml`) + Grafana 대시보드. `docker compose --profile monitoring up -d` 로 실행 (Prometheus `:9090`, Grafana `:3000`).
 - `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build + 이미지 빌드 스모크 `docker-build` + 보안 스캔(TruffleHog·bandit·pip-audit·npm audit), push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (10분마다 운영 백엔드 `/health` 호출).
-- **Render 무료 플랜 슬립 주의**: 15분 무요청 시 백엔드가 잠들면 같은 프로세스의 스케줄러(AUTO 리밸런싱·알림·일일 동기화)도 멈춘다. `keep-alive.yml`은 GitHub 스로틀로 실제 2~9시간 간격이라 사실상 효과 없음 — 외부 핑 서비스 필요 — 상세는 `backend/CLAUDE.md`의 "스케줄러 실행 제약".
+- **Render 무료 플랜은 15분 무요청 시 잠들고 스케줄러도 함께 멈춘다** — `backend/CLAUDE.md` "스케줄러 실행 제약".
 
 ---
 
@@ -114,7 +97,7 @@ growlio/
 ## Key Constraints (공통)
 
 - `avg_price` 및 모든 금액 컬럼은 **항상 KRW** — 해외 종목은 프론트에서 USD × 환율 변환 후 전송
-- **월별 추이 쿼리**: `is_active = TRUE` 필터 필수 — 누락 시 비활성 계좌 스냅샷이 합산되어 금액 수배 부풀림
+- **월별 추이 쿼리(`get_monthly_trend`)**: `asset_accounts` JOIN + `is_active = TRUE` 필수 — 누락 시 비활성 계좌 스냅샷이 합산되어 금액 수배 부풀림
 - **스냅샷 기준**: 월말 스냅샷 개념 없음 — 해당 월 마지막 sync일 값이 월별 대표값으로 사용됨
 
 ---
@@ -130,8 +113,8 @@ make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-c
 make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.config.ts
 ```
 
-- Windows에서 전체 pytest가 `N passed` 후 종료 코드 `-1073741819`로 끝나는 건 테스트 실패가 아님 (`backend/CLAUDE.md` Tests 참고).
-- 파일 추가·삭제·이동 시 `backend/CLAUDE.md`·`frontend/CLAUDE.md`의 해당 목록(라우터·서비스·훅·유틸·queryKey 표 등)도 함께 갱신 — 각 목록이 "추가/삭제 시 갱신"을 전제로 유지됨.
+- Windows pytest 종료 코드 `-1073741819`는 실패가 아님 (`backend/CLAUDE.md` Tests).
+- 파일 추가·삭제·이동 시 `backend/CLAUDE.md`·`frontend/CLAUDE.md`의 해당 목록(라우터·서비스·훅·유틸 등)도 함께 갱신 — 각 목록이 "추가/삭제 시 갱신"을 전제로 유지됨.
 - CLAUDE.md 항목은 **한 줄 요약 + 코드만 봐선 모르는 함정**까지만. 구현 세부·설계 경위·`plans/NN` 이력은 계획서와 커밋 메시지에 남기고 여기엔 쓰지 않는다(하위 CLAUDE.md는 해당 디렉토리 작업 때마다 통째로 컨텍스트에 로드됨).
 
 ---
@@ -139,10 +122,9 @@ make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.co
 ## 자주 막히는 문제
 
 - `make up` 후 DB 연결 실패: PostgreSQL 준비 대기 필요 — `docker compose logs db` 로 상태 확인 후 재시도
-- `EMAXCONNSESSION`/`max clients reached` 오류: `backend/.env`의 `DATABASE_URL`이 로컬 Docker Postgres가 아니라 Supabase 풀러를 직접 가리키는 구성일 수 있음(개발자별로 다를 수 있으니 먼저 `.env` 확인) — 이 경우 Session Pooler(5432) 대신 Transaction Pooler(6543) 사용 권장, 상세는 `backend/CLAUDE.md` Environment 섹션 참고
-- `make migrate`가 Supabase(nestlio와 `public` 스키마 공유) DB에서 버전 충돌/실패: growlio는 alembic 버전 포인터를 기본 `alembic_version`이 아닌 `growlio_alembic_version`에 저장함(`backend/alembic/env.py`의 `VERSION_TABLE`). 전환 이전부터 있던 기존 DB라면 `alembic upgrade head` 전에 `python backend/scripts/bootstrap_alembic.py` 1회 실행 필요(멱등, 신규 DB는 무동작) — `render.yaml`의 `preDeployCommand`도 이 순서. 상세는 `backend/CLAUDE.md` 참고
+- `EMAXCONNSESSION`/`max clients reached` 오류: `backend/.env`의 `DATABASE_URL`이 Supabase Session Pooler를 가리키는지 확인 — `backend/CLAUDE.md` Environment
+- `make migrate`가 Supabase(nestlio와 `public` 스키마 공유) DB에서 버전 충돌/실패: `backend/CLAUDE.md` "Alembic 주의"의 `growlio_alembic_version`
 - `dev.sh`는 기본적으로 8000/5173 포트를 점유한 이전(좀비) 프로세스를 강제 종료 후 재기동함. 다른 세션에서 의도적으로 띄워둔 백엔드까지 종료되는 게 문제라면 `bash dev.sh --keep-port`(또는 `make dev-keep-port`) 사용 — 8000이 사용 중이면 종료하지 않고 다음 빈 포트로 대신 구동, 프론트엔드 Vite 프록시도 자동으로 그 포트를 따라감
 - 백엔드(8000)만 뜨고 `localhost:5173` 연결 불가: dev.sh를 `Git\usr\bin\bash.exe`로 직접 실행하면 `/usr/bin`이 PATH에 없어 npm이 실패함 — dev.sh가 PATH를 자동 보정하므로, 재발 시 dev.sh 상단의 PATH 보정 블록을 먼저 확인
-- 새 모델은 `backend/app/models/__init__.py`에 import 추가 — `alembic/env.py`는 `import app.models`로 패키지만 읽음 (누락 시 autogenerate가 모델 인식 못함)
 - pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인
 - **동시 세션 작업**: 이 저장소는 여러 창/세션에서 병행 작업되는 경우가 잦음 — 계획 수립·구현 도중 `git status`가 대화 시작 시점과 달라져 있다면 다른 세션의 진행 중 작업일 가능성이 높음. 무시하거나 되돌리지 말고 먼저 `git diff`로 변경 내용을 확인할 것
