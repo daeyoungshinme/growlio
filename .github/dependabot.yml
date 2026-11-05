@@ -122,9 +122,7 @@ updates:
 
   # Dockerfile 베이스 이미지(python·node) — 없으면 아무도 추적하지 않았다. Render가 backend/Dockerfile로 배포한다
   - package-ecosystem: "docker"
-    directories:
-      - "/backend"
-      - "/frontend"
+    directory: "/backend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 3
@@ -132,11 +130,6 @@ updates:
       - "dependencies"
       - "docker"
     ignore:
-      # Node 홀수 버전(25·27…)은 LTS가 아니라 6개월 만에 EOL이다 — node:25가 그대로 운영 빌드에 남았다(plans/99 D1).
-      # CI·Android 빌드와 같은 LTS 짝수 major는 사람이 올린다
-      - dependency-name: "node"
-        update-types:
-          - "version-update:semver-major"
       # python minor(3.13→3.15)는 런타임 교체 — CI(setup-python)·pyproject·uv.lock이 3.13 기준이고,
       # 새 버전 wheel이 없는 패키지(pandas 2.3.3)는 slim 이미지에서 컴파일러 없이 소스 빌드하다 깨진다(#209). 사람이 함께 올린다
       - dependency-name: "python"
@@ -144,7 +137,7 @@ updates:
           - "version-update:semver-major"
           - "version-update:semver-minor"
 
-  # docker-compose의 이미지 핀(로컬 db postgres + 모니터링 prometheus·grafana) — 위 docker 항목은 Dockerfile만 본다
+  # docker-compose의 이미지 핀(로컬 db postgres) — 위 docker 항목은 Dockerfile만 본다
   - package-ecosystem: "docker-compose"
     directory: "/"
     schedule:

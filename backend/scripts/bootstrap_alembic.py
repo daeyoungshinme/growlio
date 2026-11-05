@@ -11,7 +11,7 @@
 * 없고 `asset_accounts` 가 있으면 (= 기존 growlio DB) → 테이블 생성 + `_BASELINE_REVISION` seed
 * 없고 `asset_accounts` 도 없으면 (= 완전 신규 DB)   → 아무것도 안 함 (alembic 이 001부터 생성)
 
-`alembic upgrade head` 직전에 실행한다 (`render.yaml` preDeployCommand, 로컬 최초 1회).
+`alembic upgrade head` 직전에 실행한다 (운영 수동 마이그레이션 절차는 루트 CLAUDE.md, 로컬 최초 1회).
 """
 
 from __future__ import annotations

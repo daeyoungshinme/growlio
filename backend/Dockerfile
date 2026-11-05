@@ -14,6 +14,6 @@ RUN adduser --disabled-password --gecos '' appuser
 COPY --from=builder /venv /venv
 COPY --chown=appuser:appuser . .
 USER appuser
-# 프로젝트를 설치하지 않으므로 scripts/*(preDeploy의 bootstrap_alembic.py)의 `import app`이 이 경로에 의존한다
+# 프로젝트를 설치하지 않으므로 scripts/*(bootstrap_alembic.py)의 `import app`이 이 경로에 의존한다
 ENV PATH="/venv/bin:$PATH" PYTHONPATH=/app
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

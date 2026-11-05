@@ -10,7 +10,7 @@ const devBackendPort = process.env.VITE_DEV_BACKEND_PORT ?? "8000";
 export default defineConfig({
   build: {
     // "hidden": 소스맵 생성하되 번들에 참조 주석 미포함 — Sentry 업로드 후 삭제.
-    // 업로드 토큰이 없으면(APK·nginx 이미지·로컬) 아예 만들지 않는다 — 삭제가 안 돼 .map이 그대로 배포됐다(plans/95 C)
+    // 업로드 토큰이 없으면(APK·로컬) 아예 만들지 않는다 — 삭제가 안 돼 .map이 그대로 배포됐다(plans/95 C)
     sourcemap: process.env.SENTRY_AUTH_TOKEN ? "hidden" : false,
     rollupOptions: {
       output: {
