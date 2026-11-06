@@ -518,9 +518,50 @@ async def test_notify_and_record_trigger_updates_trigger_even_if_push_raises(moc
     )
     push = AsyncMock(side_effect=RuntimeError("fcm down"))
     with patch("app.services.notifications.push_service.send_push_to_user", new=push):
-        await notify_and_record_trigger(mock_db, alert, "EXCHANGE_RATE", "msg", alert.user_id, "t", "b", "tok")
+        recorded = await notify_and_record_trigger(
+            mock_db, alert, "EXCHANGE_RATE", "msg", alert.user_id, "t", "b", "tok", email_sent=True
+        )
 
     push.assert_awaited_once()
+    assert recorded is True
     assert alert.trigger_count == 1
     assert alert.is_active is False
     mock_db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_notify_and_record_trigger_records_when_only_push_succeeds(mock_db):
+    """메일이 실패해도 푸시가 나갔으면 발동으로 기록한다(plans/115 A3)."""
+    from app.services.alerts.alert_service import notify_and_record_trigger
+
+    alert = SimpleNamespace(
+        user_id=uuid.uuid4(), trigger_count=0, max_trigger_count=1, triggered_at=None, is_active=True
+    )
+    push = AsyncMock(return_value=True)
+    with patch("app.services.notifications.push_service.send_push_to_user", new=push):
+        recorded = await notify_and_record_trigger(
+            mock_db, alert, "EXCHANGE_RATE", "msg", alert.user_id, "t", "b", "tok", email_sent=False
+        )
+
+    push.assert_awaited_once()
+    assert recorded is True
+    assert alert.trigger_count == 1
+    mock_db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_notify_and_record_trigger_skips_when_both_channels_fail(mock_db):
+    """두 채널 모두 실패하면 기록하지 않아 다음 회차에 다시 시도한다."""
+    from app.services.alerts.alert_service import notify_and_record_trigger
+
+    alert = SimpleNamespace(
+        user_id=uuid.uuid4(), trigger_count=0, max_trigger_count=1, triggered_at=None, is_active=True
+    )
+    with patch("app.services.notifications.push_service.send_push_to_user", new=AsyncMock(return_value=False)):
+        recorded = await notify_and_record_trigger(
+            mock_db, alert, "EXCHANGE_RATE", "msg", alert.user_id, "t", "b", None, email_sent=False
+        )
+
+    assert recorded is False
+    assert alert.trigger_count == 0
+    mock_db.commit.assert_not_called()

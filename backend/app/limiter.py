@@ -54,7 +54,7 @@ def ip_rate_limit_key(request: Request) -> str:
 
     남은 한계: 데코레이터 없는 인증 라우트의 기본 한도(120/min)는 SlowAPIMiddleware가 인증 전에 키를
     계산하므로, 피해자의 사용자 UUID를 아는 사람이 위조 토큰으로 그 버킷을 소진시킬 수 있다. UUID는
-    외부에 노출되지 않고 결과가 일시적 429뿐이라 서명 검증(JWKS, 비동기) 비용 대신 감수한다.
+    외부에 노출되지 않고 결과가 일시적 429뿐이라 토큰 서명 검증(JWKS) 비용 대신 감수한다.
     """
     forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
     return f"ip:{forwarded or get_remote_address(request)}"

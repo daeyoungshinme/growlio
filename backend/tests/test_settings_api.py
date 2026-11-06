@@ -1,5 +1,6 @@
 """설정 API 테스트 (GET/PUT /api/v1/settings)."""
 
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -148,7 +149,7 @@ class TestUpdateGoal:
                     json={"goal_amount": 200_000_000},
                     headers={"Authorization": "Bearer fake"},
                 )
-            assert resp.status_code in (200, 422)
+            assert resp.status_code == 200, resp.text
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db
@@ -189,7 +190,10 @@ class TestUpdateGoal:
                     },
                     headers={"Authorization": "Bearer fake"},
                 )
-            assert resp.status_code in (200, 422)
+            assert resp.status_code == 200, resp.text
+            # Date 컬럼(plans/114 B) — datetime으로 저장하면 asyncpg가 date 파라미터를 거부한다
+            assert settings.goal_start_date == date(2026, 1, 1)
+            assert type(settings.goal_start_date) is date
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db

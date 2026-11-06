@@ -129,3 +129,33 @@ class TestRunIntradayAssetSync:
         from app.constants import BROKER_API_DATA_SOURCES
 
         assert {"KIS_API", "KIWOOM_API", "TOSS_API"} == BROKER_API_DATA_SOURCES
+
+
+class TestSyncAccountsLock:
+    @pytest.mark.asyncio
+    async def test_skips_account_whose_sync_lock_is_held(self, make_account):
+        """단건 /sync가 잡은 계좌 락은 배치 동기화도 존중한다 — 병렬 delete→insert로 보유 종목이 중복되지 않게
+        (plans/115 A1). 락이 잡힌 계좌는 실패가 아닌 skip으로 처리한다."""
+        from app.core.cache_store import CacheStore
+        from app.services.accounts.sync_all_service import sync_accounts
+        from app.utils.cache_keys import sync_lock_key
+
+        busy, free = make_account(name="진행중"), make_account(name="대기")
+        cache = CacheStore()
+        await cache.set(sync_lock_key(busy.id), "other-request", nx=True, ex=120)
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.merge = AsyncMock(side_effect=lambda a: a)
+
+        with (
+            patch("app.services.accounts.sync_all_service.AsyncSessionLocal", return_value=mock_session),
+            patch("app.services.accounts.sync_all_service.get_cache_store", AsyncMock(return_value=cache)),
+            patch("app.services.accounts.sync_all_service.sync_account", new_callable=AsyncMock) as mock_sync,
+        ):
+            failed = await sync_accounts([busy, free], "test")
+
+        assert failed == []
+        assert [c.args[0] for c in mock_sync.await_args_list] == [free]
+        assert await cache.get(sync_lock_key(busy.id)) == "other-request"  # 남의 락은 풀지 않는다
+        assert await cache.get(sync_lock_key(free.id)) is None  # 자기 락은 해제

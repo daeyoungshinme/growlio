@@ -87,13 +87,15 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
     if not account:
         return None
 
-    creds = decrypt_kis_credentials(account)
-    if creds is None:
-        raise ValueError("KIS credentials are not configured for this account")
-    app_key, app_secret = creds
     is_mock = account.is_mock_mode
 
+    # 복호화도 try 안에서 — 키 회전·손상 값이면 docstring대로 None을 돌려 배당·리밸런싱 화면이 500이 되지 않게
+    # 한다(plans/115 A9). secret만 비어 있는 계좌도 같은 경로로 None.
     try:
+        creds = decrypt_kis_credentials(account)
+        if creds is None:
+            raise ValueError("KIS credentials are not configured for this account")
+        app_key, app_secret = creds
         cache = await get_cache_store()
         access_token = await get_access_token(
             app_key,

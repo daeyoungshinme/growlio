@@ -95,8 +95,10 @@ class TestCheckAndTriggerStockPriceAlerts:
 
     @pytest.mark.asyncio
     async def test_above_condition_triggers(self, mock_db, mock_cache):
-        """ABOVE 조건 충족 시 트리거된다."""
-        alert = _make_alert(ticker="AAPL", market="NASDAQ", target_price=200.0, direction="ABOVE", max_trigger_count=2)
+        """ABOVE 조건 충족 시 트리거된다 — 해외 종목은 USD 시세를 원화로 환산해 원화 목표가와 비교한다."""
+        alert = _make_alert(
+            ticker="AAPL", market="NASDAQ", target_price=280000.0, direction="ABOVE", max_trigger_count=2
+        )
         mock_db.execute.return_value.all.return_value = [_make_row(alert)]
 
         with (
@@ -104,6 +106,11 @@ class TestCheckAndTriggerStockPriceAlerts:
                 "app.services.market_data.price_service.fetch_prices_batch",
                 new_callable=AsyncMock,
                 return_value={"AAPL": 205.0},
+            ),
+            patch(
+                "app.services.market_data.price_service.get_usd_krw_rate",
+                new_callable=AsyncMock,
+                return_value=1400.0,
             ),
             patch("app.services.notifications.email_service.send_stock_price_alert", new_callable=AsyncMock),
             patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock),
@@ -113,6 +120,60 @@ class TestCheckAndTriggerStockPriceAlerts:
 
             await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
 
+        assert alert.trigger_count == 1  # 205 USD × 1400 = 287,000원 ≥ 280,000원
+
+    @pytest.mark.asyncio
+    async def test_overseas_below_not_falsely_triggered_by_usd_price(self, mock_db, mock_cache):
+        """원화 목표가를 USD 원시가와 비교하면 BELOW가 즉시 거짓 발동한다(plans/115 A8)."""
+        alert = _make_alert(ticker="SCHD", market="NYSE", target_price=38000.0, direction="BELOW")
+        mock_db.execute.return_value.all.return_value = [_make_row(alert)]
+        fetch = AsyncMock(return_value={"SCHD": 28.0})
+
+        with (
+            patch("app.services.market_data.price_service.fetch_prices_batch", new=fetch),
+            patch(
+                "app.services.market_data.price_service.get_usd_krw_rate",
+                new_callable=AsyncMock,
+                return_value=1400.0,
+            ),
+            patch("app.services.notifications.email_service.send_stock_price_alert", new_callable=AsyncMock),
+            patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock),
+        ):
+            from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
+
+            await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
+
+        assert alert.trigger_count == 0  # 28 × 1400 = 39,200원 > 38,000원
+        # 여러 유저 알림을 한 번에 조회하므로 특정 유저의 KIS로 폴백하지 않는다
+        assert fetch.await_args.kwargs["kis_accounts"] == {}
+
+    @pytest.mark.asyncio
+    async def test_push_sent_even_if_email_fails(self, mock_db, mock_cache):
+        """메일이 실패해도 푸시는 보내고 발동으로 기록한다(plans/115 A3)."""
+        alert = _make_alert(ticker="005930", target_price=60000.0, direction="BELOW")
+        mock_db.execute.return_value.all.return_value = [_make_row(alert, fcm_token="tok")]
+        push = AsyncMock(return_value=True)
+
+        with (
+            patch(
+                "app.services.market_data.price_service.fetch_prices_batch",
+                new_callable=AsyncMock,
+                return_value={"005930": 58000.0},
+            ),
+            patch(
+                "app.services.notifications.email_service.send_stock_price_alert",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("resend down"),
+            ),
+            patch("app.services.notifications.push_service.send_push_to_user", new=push),
+            patch("app.services.alerts.alert_service.save_alert_history", new_callable=AsyncMock),
+            patch("app.core.job_runner.sentry_sdk.capture_message"),
+        ):
+            from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
+
+            await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
+
+        push.assert_awaited_once()
         assert alert.trigger_count == 1
 
     @pytest.mark.asyncio

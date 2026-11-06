@@ -14,11 +14,12 @@ from app.jobs._job_helpers import run_alert_job
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.dividend.aggregator import get_annual_dividends_received
-from app.services.notifications.email_service import send_monthly_report_email
+from app.services.notifications.email_service import email_configured, send_monthly_report_email
 from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_net_deposits_for_year
 from app.utils.cache_keys import TTL_MONTHLY_REPORT_SENT, CacheStoreType, monthly_report_sent_key
 from app.utils.durable_state import get_durable, set_durable
 from app.utils.kst import today_kst
+from app.utils.masking import mask_email
 
 logger = structlog.get_logger()
 
@@ -69,6 +70,11 @@ async def _report_year_figures(user_id, db: AsyncSession, summary: dict, report_
 
 
 async def _run_monthly_report(db: AsyncSession, cache: CacheStoreType) -> None:
+    # 메일 미설정이면 유저마다 대시보드를 집계해 놓고 발송만 실패한다 — catch-up이 1~3일 매시간 다시 돌리므로
+    # 루프 전에 빠져나온다(plans/115 A6). 인앱 이력도 메일 발송 성공 후에만 남기므로 잃는 것이 없다.
+    if not email_configured():
+        logger.warning("monthly_report_skipped_email_not_configured")
+        return
     today = today_kst()
     report_month = _prev_month_label(today)
     month_key = _prev_month_key(today)
@@ -147,6 +153,6 @@ async def _send_report_for_user(
     logger.info(
         "monthly_report_sent",
         user_id=str(user.id),
-        to=to_email,
+        to=mask_email(to_email),
         month=report_month,
     )

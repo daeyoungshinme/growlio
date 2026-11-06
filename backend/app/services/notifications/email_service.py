@@ -15,7 +15,7 @@ import httpx
 import structlog
 from tenacity import (
     retry,
-    retry_if_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
@@ -52,8 +52,22 @@ from app.utils.masking import mask_email
 logger = structlog.get_logger()
 
 
+def _is_retryable_email_error(exc: BaseException) -> bool:
+    """연결·타임아웃·5xx·429만 재시도한다. 그 밖의 4xx(잘못된 주소·키·도메인)는 다시 보내도 같은 결과라
+    재시도하면 Resend 호출과 Sentry 이벤트만 두 배가 된다(plans/115 A6)."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code
+        return code >= 500 or code == 429
+    return isinstance(exc, (httpx.ConnectError, httpx.TimeoutException))
+
+
+def email_configured() -> bool:
+    """Resend 키가 있으면 True — 사용자 루프 전에 미설정을 판정해 헛도는 집계를 막는 데 쓴다."""
+    return bool(settings.resend_api_key)
+
+
 @retry(
-    retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError)),
+    retry=retry_if_exception(_is_retryable_email_error),
     stop=stop_after_attempt(2),
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True,
@@ -67,10 +81,6 @@ async def _send_html_email(to_email: str, subject: str, html: str) -> None:
             json={"from": settings.email_from, "to": [to_email], "subject": subject, "html": html},
         )
         resp.raise_for_status()
-
-
-def _email_configured() -> bool:
-    return bool(settings.resend_api_key)
 
 
 async def _send_templated(
@@ -88,7 +98,7 @@ async def _send_templated(
     렌더 방지). 로그 이벤트는 `{event}_email_sent` / `{event}_email_failed`.
     `log_fields`는 성공 로그에 추가로 실리는 구조화 키.
     """
-    if not _email_configured():
+    if not email_configured():
         logger.warning(not_configured_event, to=mask_email(to_email))
         return False
     subject, html = build_template()
@@ -370,7 +380,7 @@ async def send_test_email(to_email: str) -> bool:
     RuntimeError("email_not_configured")를 발생시킨다. 발송 자체가 실패하면
     다른 send_* 함수와 동일하게 예외를 삼키고 False를 반환한다.
     """
-    if not _email_configured():
+    if not email_configured():
         raise RuntimeError("email_not_configured")
     return await _send_templated(to_email, test_email_template, event="test")
 

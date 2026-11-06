@@ -138,3 +138,21 @@ class TestGetKisUserCredentials:
             result = await get_kis_user_credentials(uuid.uuid4(), db)
 
         assert result is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("bad_secret", ["not-a-valid-ciphertext", None])
+    async def test_returns_none_when_decrypt_fails_or_secret_missing(self, bad_secret):
+        """복호화 실패(키 회전)·secret 누락도 docstring대로 None — 예전엔 try 밖이라 500이었다(plans/115 A9)."""
+        import uuid
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
+        from app.services.accounts.credential_service import encrypt, get_kis_user_credentials
+
+        account = SimpleNamespace(
+            id=uuid.uuid4(), kis_app_key=encrypt("key"), kis_app_secret=bad_secret, is_mock_mode=False
+        )
+        db = AsyncMock()
+        db.scalar = AsyncMock(return_value=account)
+
+        assert await get_kis_user_credentials(uuid.uuid4(), db) is None

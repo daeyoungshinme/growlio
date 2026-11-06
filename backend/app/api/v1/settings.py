@@ -368,7 +368,8 @@ async def update_push_token(
 
 
 @router.post("/test-email")
-@limiter.limit("3/minute")
+# 분당 한도만으론 하루 4천 통까지 임의 주소로 보낼 수 있다 — 발신 평판 보호용 시간·일 상한(plans/115 A6)
+@limiter.limit("3/minute;10/hour;20/day")
 async def send_test_email_endpoint(
     request: Request,
     current_user: User = Depends(get_current_user),

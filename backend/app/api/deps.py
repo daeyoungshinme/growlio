@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from collections.abc import Sequence
 from typing import Annotated, Any, Protocol
@@ -22,13 +23,19 @@ def _extract_token(authorization: str | None) -> str:
     return authorization.removeprefix("Bearer ").strip()
 
 
+async def _verify_token(token: str) -> dict:
+    """서명 키 조회(PyJWKClient)는 캐시 만료(300초)마다 동기 urllib로 JWKS를 받아 이벤트 루프를 최대 5초 막는다 —
+    스레드에서 돌려 그동안 다른 요청·잡이 멈추지 않게 한다(plans/115 A5)."""
+    return await asyncio.to_thread(verify_supabase_token, token)
+
+
 async def get_token_payload(
     authorization: str | None = Header(default=None),
 ) -> dict:
     """DB 조회 없이 Supabase JWT payload만 반환. sync-profile 같은 엔드포인트에서 사용."""
     token = _extract_token(authorization)
     try:
-        return verify_supabase_token(token)
+        return await _verify_token(token)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from None
 
@@ -39,7 +46,7 @@ async def get_current_user(
 ) -> User:
     token = _extract_token(authorization)
     try:
-        payload = verify_supabase_token(token)
+        payload = await _verify_token(token)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from None
 

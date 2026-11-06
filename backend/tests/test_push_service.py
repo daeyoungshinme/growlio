@@ -241,6 +241,10 @@ class TestDeliverPushClassifiesErrors:
             ("Requested entity was not found. (registration-token-not-registered)", "invalid_token"),
             ("invalid-registration-token", "invalid_token"),
             ("503 unavailable", "failed"),
+            # firebase-admin 7.x 실제 형태 — 메시지에 옛 오류 코드 문자열이 없다(plans/115 A4)
+            (type("UnregisteredError", (Exception,), {})("Requested entity was not found."), "invalid_token"),
+            (type("SenderIdMismatchError", (Exception,), {})("SenderId mismatch"), "invalid_token"),
+            (type("InvalidArgumentError", (Exception,), {})("bad payload"), "failed"),
         ],
     )
     async def test_classifies(self, override_settings, error, expected):
@@ -254,7 +258,9 @@ class TestDeliverPushClassifiesErrors:
                 patch("app.services.notifications.push_service.asyncio.get_running_loop") as mock_loop,
                 patch.dict("sys.modules", {"firebase_admin": MagicMock(), "firebase_admin.messaging": MagicMock()}),
             ):
-                mock_loop.return_value.run_in_executor = AsyncMock(side_effect=Exception(error))
+                mock_loop.return_value.run_in_executor = AsyncMock(
+                    side_effect=error if isinstance(error, Exception) else Exception(error)
+                )
                 result = await ps.deliver_push("token", "제목", "내용")
             assert result == expected
         finally:

@@ -153,15 +153,16 @@ async def fetch_prices_batch_krw(
     tickers: list[tuple[str, str]],
     db: AsyncSession,
     cache: CacheStoreType = None,
+    kis_accounts: Mapping[str, AssetAccount] | None = None,
 ) -> dict[str, float]:
-    """`fetch_prices_batch()`의 원시 가격(해외는 USD)을 KRW로 환산해 반환한다.
+    """`fetch_prices_batch()`의 원시 가격(해외는 USD)을 KRW로 환산해 반환한다. `kis_accounts`는 그대로 전달.
 
     해외 종목은 Yahoo Finance가 원종목 통화(USD) 그대로 응답하므로, `positions.py` 동기화
     로직과 동일하게 환율을 곱해야 KRW 전용 필드(`current_price_krw` 등)에 안전하게 대입할 수
     있다 — 호출부가 직접 환산하지 않고 원시 가격을 그대로 쓰면 목표금액(KRW)을 USD 가격으로
     나누는 계산에서 수량이 환율 배수만큼 부풀려진다.
     """
-    price_map = await fetch_prices_batch(user_id, tickers, db, cache)
+    price_map = await fetch_prices_batch(user_id, tickers, db, cache, kis_accounts=kis_accounts)
     market_by_ticker = dict(tickers)
     has_overseas = any(market.upper() not in DOMESTIC_MARKETS for _, market in tickers)
     if not has_overseas:

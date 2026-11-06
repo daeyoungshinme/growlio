@@ -751,3 +751,31 @@ async def test_send_failure_reports_to_sentry(monkeypatch):
 
     assert result is False
     report.assert_called_once()
+
+
+# ── 재시도 판정 (plans/115 A6) ───────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("status_code", "retry"),
+    [(500, True), (503, True), (429, True), (400, False), (403, False), (422, False)],
+)
+def test_retryable_email_error_only_transient_status(status_code, retry):
+    """잘못된 주소·키(4xx)는 다시 보내도 같은 결과라 재시도하지 않는다."""
+    import httpx
+
+    from app.services.notifications.email_service import _is_retryable_email_error
+
+    req = httpx.Request("POST", "https://api.resend.com/emails")
+    exc = httpx.HTTPStatusError("x", request=req, response=httpx.Response(status_code, request=req))
+    assert _is_retryable_email_error(exc) is retry
+
+
+def test_retryable_email_error_network():
+    import httpx
+
+    from app.services.notifications.email_service import _is_retryable_email_error
+
+    assert _is_retryable_email_error(httpx.ConnectError("down")) is True
+    assert _is_retryable_email_error(httpx.ReadTimeout("slow")) is True
+    assert _is_retryable_email_error(ValueError("bug")) is False
