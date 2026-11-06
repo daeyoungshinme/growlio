@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.tax.tax_service import _get_rates
+from app.services.tax.tax_service import get_tax_rates
 
-_RATES_2025 = _get_rates(2025)
+_RATES_2025 = get_tax_rates(2025)
 
 
 def _make_position(
@@ -254,7 +254,6 @@ class TestTaxSummarySnapshotReadOnce:
             patch(f"{base}._latest_stock_rows", new=rows_mock),
             patch(f"{base}._calc_dividend_income", new=AsyncMock(return_value=0.0)),
             patch(f"{base}._calc_interest_income", new=AsyncMock(return_value=0.0)),
-            patch(f"{base}._calc_total_fees", new=AsyncMock(return_value=0.0)),
         )
 
     @pytest.mark.asyncio
@@ -263,8 +262,8 @@ class TestTaxSummarySnapshotReadOnce:
 
         pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=90_000.0, qty=10)
         rows_mock = AsyncMock(return_value=[_make_snap_acc([pos])])
-        p1, p2, p3, p4 = self._patches(rows_mock)
-        with p1, p2, p3, p4:
+        p1, p2, p3 = self._patches(rows_mock)
+        with p1, p2, p3:
             result = await get_tax_summary(uuid.uuid4(), 2025, mock_db)
 
         rows_mock.assert_awaited_once()
@@ -276,8 +275,8 @@ class TestTaxSummarySnapshotReadOnce:
 
         rows_mock = AsyncMock(return_value=[])
         pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=90_000.0, qty=10)
-        p1, p2, p3, p4 = self._patches(rows_mock)
-        with p1, p2, p3, p4:
+        p1, p2, p3 = self._patches(rows_mock)
+        with p1, p2, p3:
             result = await get_tax_summary(uuid.uuid4(), 2025, mock_db, stock_rows=[_make_snap_acc([pos])])
 
         rows_mock.assert_not_awaited()

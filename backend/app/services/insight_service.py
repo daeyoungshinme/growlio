@@ -14,6 +14,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.job_runner import report_handled_failure
 from app.services.portfolio.asset_aggregator import get_dashboard_summary
+from app.services.tax.overseas_realized_service import get_overseas_realized_summary
+from app.services.tax.tax_action_service import build_loss_harvest_actions
 from app.services.tax.tax_service import get_tax_summary, load_tax_stock_rows
 from app.utils.cache_keys import (
     TTL_INSIGHTS,
@@ -264,17 +266,31 @@ async def _check_tax_loss_harvest(
     user_id: uuid.UUID,
     db: AsyncSession,
 ) -> list[Insight]:
-    """해외 손실 종목이 있고 과세 이익도 있을 때 절세 기회 알림.
+    """해외 손실 종목이 있고 올해 이미 실현한 과세 이익도 있을 때 절세 기회 알림.
 
-    손실 수확 후보·절세액은 절세 탭·지금 할 일과 같은 `get_tax_summary`의 `harvesting_recommendations`를
-    쓴다 — 따로 계산하면 기본공제·손익통산 기준이 달라 화면마다 절세액이 어긋났다(plans/90 C4)."""
+    절세액은 절세 탭·지금 할 일의 손실수확 액션과 같은 `build_loss_harvest_actions`로 계산한다 —
+    추천 목록의 `tax_saved_krw`는 미실현 이익까지 전부 판다는 가정이라 그대로 더하면 부풀려진다(plans/90 C4).
+    실현손익을 확인하지 못했거나 공제 안쪽이면 금액이 없어 알리지 않는다."""
     rows, positions = await load_tax_stock_rows(user_id, db)
     if not any(p["unrealized_pnl_krw"] < 0 for p in positions):
         return []
 
-    summary = await get_tax_summary(user_id, today_kst().year, db, stock_rows=rows)
-    loss_positions = summary.get("harvesting_recommendations", [])
-    tax_saved = sum(float(p["tax_saved_krw"]) for p in loss_positions)
+    today = today_kst()
+    realized = await get_overseas_realized_summary(user_id, today.year, db, overseas_positions=positions)
+    summary = await get_tax_summary(
+        user_id, today.year, db, overseas_realized_krw=realized["realized_gain_krw"], stock_rows=rows
+    )
+    harvesting = summary.get("harvesting_recommendations", [])
+    actions = build_loss_harvest_actions(
+        harvesting,
+        today,
+        realized_krw=None if realized.get("lookup_failed", False) else realized["realized_gain_krw"],
+        deduction_krw=float(summary["overseas_gain_deduction_krw"]),
+        gain_tax_rate=float(summary["rates"]["overseas_tax_rate_pct"]) / 100,
+    )
+    # 액션은 추천 상위 항목과 같은 순서로 1:1 생성된다
+    loss_positions = [item for item, action in zip(harvesting, actions, strict=False) if action["benefit_krw"]]
+    tax_saved = sum(float(action["benefit_krw"] or 0) for action in actions)
 
     if tax_saved < 50_000:
         return []

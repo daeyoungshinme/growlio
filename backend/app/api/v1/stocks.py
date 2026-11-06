@@ -7,7 +7,6 @@ import uuid
 
 import structlog
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -18,9 +17,10 @@ from app.core.database import get_db
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.user import User
+from app.schemas.stock import StockPriceBatchRequest
 from app.services.goal.recommendation_universe import resolve_index_region
-from app.services.market_data.price_service import _price_via_kis, domestic_price_fallback
-from app.services.market_data.stock_search_service import _has_korean, _search_naver, _search_yahoo
+from app.services.market_data.price_service import domestic_price_fallback, price_via_kis
+from app.services.market_data.stock_search_service import search_stocks_by_query
 from app.utils.cache_keys import (
     TTL_ETF_INDEX_REGION,
     TTL_PRICE_CURRENT,
@@ -49,9 +49,7 @@ async def search_stocks(
     """종목명·티커 검색.
     한글 입력 → 네이버 금융, 영문/티커 → Yahoo Finance.
     """
-    if _has_korean(q):
-        return await _search_naver(q, limit)
-    return await _search_yahoo(q, limit)
+    return await search_stocks_by_query(q, limit)
 
 
 @router.get("/index-region")
@@ -114,7 +112,7 @@ async def _kis_price_fallback(
         return None
     try:
         account = await get_owned_account(account_id, current_user.id, db)
-        return await _price_via_kis(account, ticker, market, db, cache)
+        return await price_via_kis(account, ticker, market, db, cache)
     except Exception as e:
         logger.warning("kis_price_endpoint_failed", ticker=ticker, error=str(e), exc_type=type(e).__name__)
         return None
@@ -156,7 +154,7 @@ async def get_stock_price(
         logger.warning("price_lookup_exhausted", ticker=ticker, market=market, tried_stages=tried_stages)
         return {"price_krw": None, "price_usd": None, "usd_rate": None}
 
-    if market in OVERSEAS_MARKETS:
+    if market.upper() in OVERSEAS_MARKETS:
         usd_rate, _is_live = await refresh_usd_krw(cache)
         result = {
             "price_krw": round(price * usd_rate) if usd_rate else None,
@@ -169,16 +167,6 @@ async def get_stock_price(
     if result["price_krw"] is not None:
         await set_cached_json(cache, cache_key, result, TTL_PRICE_CURRENT)
     return result
-
-
-class _TickerMarket(BaseModel):
-    ticker: str = Field(..., min_length=1, max_length=20)
-    market: str
-    account_id: uuid.UUID | None = None  # KIS 연동 보유 계좌 — 다른 소스가 전부 실패했을 때만 사용
-
-
-class _BatchRequest(BaseModel):
-    items: list[_TickerMarket] = Field(..., max_length=50)
 
 
 async def _resolve_batch_prices(
@@ -233,7 +221,7 @@ async def _resolve_batch_prices(
 @limiter.limit("60/minute")
 async def get_stock_prices_batch(
     request: Request,
-    body: _BatchRequest,
+    body: StockPriceBatchRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     cache: CacheStore = Depends(get_cache_store),
@@ -265,7 +253,7 @@ async def get_stock_prices_batch(
     price_map = await _resolve_batch_prices(to_fetch, account_ids, loop, current_user, db, cache)
 
     # 해외 종목이 있으면 환율 1회 조회
-    overseas_tickers = {t for t, m in to_fetch if m in OVERSEAS_MARKETS}
+    overseas_tickers = {t for t, m in to_fetch if m.upper() in OVERSEAS_MARKETS}
     usd_rate: float = 0.0
     usd_rate_is_live = True
     if overseas_tickers:
@@ -277,7 +265,7 @@ async def get_stock_prices_batch(
             result[ticker] = {"price_krw": None, "price_usd": None, "usd_rate": None}
             continue
 
-        if market in OVERSEAS_MARKETS:
+        if market.upper() in OVERSEAS_MARKETS:
             entry = {
                 "price_krw": round(price * usd_rate) if usd_rate else None,
                 "price_usd": round(price, 2),

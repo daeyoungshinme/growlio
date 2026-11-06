@@ -11,7 +11,7 @@ import StockHoldingsTable, {
 } from "@/components/assets/StockHoldingsTable";
 import HorizonSummaryCard from "@/components/portfolio/HorizonSummaryCard";
 import DividendTab from "@/components/portfolio/DividendTab";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtPct, fmtSigned } from "@/utils/format";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
@@ -206,8 +206,6 @@ export default function PortfolioPage() {
     return <PageLoadError message="데이터를 불러오지 못했습니다" onRetry={() => void refetch()} />;
 
   const hasHorizonTags = horizonTaggedAccounts(data.accounts).length > 0;
-  const pnlSign = data.unrealized_pnl_krw >= 0 ? "+" : "";
-  const returnSign = data.stock_return_pct >= 0 ? "+" : "";
   const stockSharePct =
     data.total_assets_krw > 0 ? (data.total_stock_krw / data.total_assets_krw) * 100 : null;
 
@@ -276,8 +274,8 @@ export default function PortfolioPage() {
         <p
           className={`mt-2 text-sm font-semibold tabular-nums ${pnlColor(data.unrealized_pnl_krw)}`}
         >
-          평가손익 <span>{`${pnlSign}${fmtKrw(data.unrealized_pnl_krw)}`}</span> (
-          <span>{`${returnSign}${data.stock_return_pct.toFixed(2)}%`}</span>)
+          평가손익 <span>{fmtSigned(data.unrealized_pnl_krw, fmtKrw)}</span> (
+          <span>{fmtPct(data.stock_return_pct)}</span>)
         </p>
         {(stockSharePct !== null || data.total_non_stock_krw > 0) && (
           <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">

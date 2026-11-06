@@ -39,9 +39,9 @@ async def get_domestic_price(
     return float(output.get("stck_prpr", 0))
 
 
-def _parse_amount(raw: object, ticker: str, field: str, event_prefix: str) -> float:
+def _parse_amount(raw: str | float | None, ticker: str, field: str, event_prefix: str) -> float:
     try:
-        return float(raw or 0)  # type: ignore[arg-type]
+        return float(raw or 0)
     except (ValueError, TypeError):
         logger.warning(f"{event_prefix}_parse_error", ticker=ticker, field=field, value=raw)
         return 0.0
@@ -93,12 +93,15 @@ async def _fetch_dividend_fields(
         return 0.0, 0.0
 
     output = data.get("output", {})
-    raw_rate = next((output[f] for f in rate_fields if output.get(f)), None)
-    raw_amount = next((output[f] for f in amount_fields if output.get(f)), None)
+    # 값이 있는 첫 필드를 쓴다 — 파싱 오류 로그에도 실제로 읽은 필드명을 남긴다
+    rate_field = next((f for f in rate_fields if output.get(f)), rate_fields[0])
+    amount_field = next((f for f in amount_fields if output.get(f)), amount_fields[0])
+    raw_rate = output.get(rate_field) or None
+    raw_amount = output.get(amount_field) or None
     logger.info(f"{event_prefix}_raw_output", ticker=ticker, is_mock=is_mock, rate=raw_rate, amount=raw_amount)
     return (
-        _parse_amount(raw_rate, ticker, rate_fields[0], event_prefix),
-        _parse_amount(raw_amount, ticker, amount_fields[0], event_prefix),
+        _parse_amount(raw_rate, ticker, rate_field, event_prefix),
+        _parse_amount(raw_amount, ticker, amount_field, event_prefix),
     )
 
 

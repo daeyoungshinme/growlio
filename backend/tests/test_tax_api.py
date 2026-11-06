@@ -31,7 +31,6 @@ _MOCK_TAX_SUMMARY = {
     "total_estimated_tax_krw": 0.0,
     "comprehensive_tax_warning": False,
     "financial_income_krw": 0.0,
-    "total_fees_krw": 0.0,
     "harvesting_recommendations": [{"ticker": "AAPL"}],
 }
 
@@ -77,7 +76,6 @@ class TestTaxSummary:
         assert body["total_estimated_tax_krw"] == 0.0
         assert "harvesting_recommendations" not in body
         assert "financial_income_krw" not in body
-        assert "total_fees_krw" not in body
 
     def test_returns_200_with_year_param(self, override_settings):
         user = make_user()

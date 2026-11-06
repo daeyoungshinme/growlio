@@ -1,13 +1,23 @@
 repos:
   # ── Backend: Python ──────────────────────────────────────────
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.3
+  # ruff: ruff-pre-commit의 rev 핀 대신 local system 훅 — backend/.venv(uv.lock)의 ruff를 그대로 써서
+  # CI(`uv run ruff`)와 버전이 갈라지지 않는다. rev 핀은 Dependabot이 갱신하지 않았다. venv 없으면 스킵.
+  - repo: local
     hooks:
       - id: ruff-check
-        args: [--fix, --unsafe-fixes]
+        name: ruff check
+        language: system
+        entry: >-
+          bash -c 'if [ -x backend/.venv/Scripts/ruff.exe ] || [ -x backend/.venv/bin/ruff ]; then uv run --project backend ruff check --fix --unsafe-fixes "$@"; else echo "SKIP: backend/.venv 없음 — make install-backend 실행 필요" && exit 0; fi' dummy
         files: ^backend/
+        types: [python]
       - id: ruff-format
+        name: ruff format
+        language: system
+        entry: >-
+          bash -c 'if [ -x backend/.venv/Scripts/ruff.exe ] || [ -x backend/.venv/bin/ruff ]; then uv run --project backend ruff format "$@"; else echo "SKIP: backend/.venv 없음 — make install-backend 실행 필요" && exit 0; fi' dummy
         files: ^backend/
+        types: [python]
 
   # mypy: mirrors-mypy 대신 local system 훅 사용 — backend/.venv에 설치된 정확한 버전을 그대로 사용해야
   # `uv run mypy app/`(CI·make typecheck에서 사용)와 결과가 항상 일치함. venv 없으면 스킵.

@@ -5,6 +5,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { analyzePortfolio, fetchBrokerBalance, type RebalancingAnalysis } from "@/api/rebalancing";
 import { isBrokerBalanceAccount } from "@/utils/accounts";
 import { extractErrorMessage } from "@/utils/error";
+import { useLatestRef } from "@/hooks/useLatestRef";
 
 type AnalysisMode = "rebalancing" | "strategy";
 
@@ -123,14 +124,12 @@ export function useAnalysisState({
   const autoAnalyzedRef = useRef<string | undefined>(undefined);
 
   // 마지막으로 분석을 요청한 시점의 비중 시그니처 — 이후 값이 달라지면 재분석이 필요하다는 신호
-  const signatureRef = useRef(portfolioItemsSignature);
-  signatureRef.current = portfolioItemsSignature;
+  const signatureRef = useLatestRef(portfolioItemsSignature);
   const analyzedSignatureRef = useRef<string | undefined>(undefined);
   // 마지막 요청만 반영한다 — 포트폴리오를 빠르게 바꾸면 늦게 도착한 이전 응답이 새 포트폴리오 화면을
   // 덮어써 다른 포트폴리오의 분석이 보였다(plans/62 B5)
   const requestSeqRef = useRef(0);
-  const getDepositAccountsRef = useRef(getDepositAccounts);
-  getDepositAccountsRef.current = getDepositAccounts;
+  const getDepositAccountsRef = useLatestRef(getDepositAccounts);
 
   const triggerRebalancingAnalysis = useCallback(
     async (id: string, opts?: TriggerAnalysisOptions) => {
@@ -176,7 +175,7 @@ export function useAnalysisState({
         }));
       }
     },
-    [],
+    [getDepositAccountsRef, signatureRef],
   );
 
   const setMode = useCallback((mode: AnalysisMode) => {
@@ -219,8 +218,8 @@ export function useAnalysisState({
       return;
     }
     void triggerRebalancingAnalysis(autoAnalyzeId);
-    // selectedIds(Set)는 참조 비교가 불안정하므로 직렬화된 문자열로 의존성 추적. triggerRebalancingAnalysis는 deps가 []라 안정적
-  }, [autoAnalyzeId, selectedIdStr, accountsReady, triggerRebalancingAnalysis]);
+    // selectedIds(Set)는 참조 비교가 불안정하므로 직렬화된 문자열로 의존성 추적. triggerRebalancingAnalysis·ref는 안정적
+  }, [autoAnalyzeId, selectedIdStr, accountsReady, triggerRebalancingAnalysis, signatureRef]);
 
   // 이미 분석 결과를 보여주고 있는 포트폴리오의 목표 비중이 저장으로 바뀌면 자동 재분석
   useEffect(() => {

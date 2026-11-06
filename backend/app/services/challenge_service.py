@@ -323,10 +323,14 @@ async def get_challenge_summary(user_id: uuid.UUID, db: AsyncSession, cache: Cac
         )
     )
     challenges = list(result.scalars().all())
+    # 같은 계좌(또는 전체 계좌) 챌린지가 여러 개여도 이번 달 순입금은 계좌당 한 번만 조회한다
+    net_by_account: dict[uuid.UUID | None, float] = {}
     unmet = 0
     for ch in challenges:
-        monthly_net = await _monthly_net_deposits(user_id, db, current_month, ch.account_id)
-        if monthly_net.get(current_month, 0.0) <= 0:
+        if ch.account_id not in net_by_account:
+            monthly_net = await _monthly_net_deposits(user_id, db, current_month, ch.account_id)
+            net_by_account[ch.account_id] = monthly_net.get(current_month, 0.0)
+        if net_by_account[ch.account_id] <= 0:
             unmet += 1
     return ChallengeSummary(needs_attention=(unmet > 0 and today.day >= _NUDGE_DAY_OF_MONTH), count=unmet)
 

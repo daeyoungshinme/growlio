@@ -180,8 +180,14 @@ class TestStockSearch:
         from app.main import app
 
         with (
-            patch("app.api.v1.stocks._search_naver", new_callable=AsyncMock, return_value=_SEARCH_RESULTS),
-            patch("app.api.v1.stocks._search_yahoo", new_callable=AsyncMock, return_value=[]),
+            patch(
+                "app.services.market_data.stock_search_service._search_naver",
+                new_callable=AsyncMock,
+                return_value=_SEARCH_RESULTS,
+            ),
+            patch(
+                "app.services.market_data.stock_search_service._search_yahoo", new_callable=AsyncMock, return_value=[]
+            ),
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.get("/api/v1/stocks/search?q=삼성전자")
@@ -202,8 +208,12 @@ class TestStockSearch:
         from app.main import app
 
         with (
-            patch("app.api.v1.stocks._search_naver", new_callable=AsyncMock, return_value=[]),
-            patch("app.api.v1.stocks._search_yahoo", new_callable=AsyncMock, return_value=[]),
+            patch(
+                "app.services.market_data.stock_search_service._search_naver", new_callable=AsyncMock, return_value=[]
+            ),
+            patch(
+                "app.services.market_data.stock_search_service._search_yahoo", new_callable=AsyncMock, return_value=[]
+            ),
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.get("/api/v1/stocks/search?q=a")
@@ -442,7 +452,7 @@ class TestStockPrice:
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
-            patch("app.api.v1.stocks._price_via_kis", new_callable=AsyncMock, return_value=15490.0),
+            patch("app.api.v1.stocks.price_via_kis", new_callable=AsyncMock, return_value=15490.0),
         ):
             resp = client.get(f"/api/v1/stocks/price?ticker=402970&market=KOSPI&account_id={account.id}")
         assert resp.status_code == 200
@@ -455,7 +465,7 @@ class TestStockPrice:
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
-            patch("app.api.v1.stocks._price_via_kis", new_callable=AsyncMock) as mock_kis,
+            patch("app.api.v1.stocks.price_via_kis", new_callable=AsyncMock) as mock_kis,
         ):
             resp = client.get("/api/v1/stocks/price?ticker=402970&market=KOSPI")
         assert resp.status_code == 200
@@ -530,6 +540,24 @@ class TestStockPricesBatch:
         assert resp.status_code == 200
         assert resp.json()["AAPL"]["price_usd"] == 180.34
 
+    def test_lowercase_overseas_market_is_converted_to_krw(self, override_settings, auth_app):
+        """시장 코드는 대소문자를 가리지 않는다 — 소문자 해외 시장이 USD 값 그대로 원화로 반환되면 안 된다."""
+        app, _, _ = auth_app
+
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={"AAPL": 200.0}),
+            patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=1400.0),
+        ):
+            resp = client.post(
+                "/api/v1/stocks/prices-batch",
+                json={"items": [{"ticker": "AAPL", "market": "nasdaq"}]},
+            )
+        assert resp.status_code == 200
+        body = resp.json()["AAPL"]
+        assert body["price_usd"] == 200.0
+        assert body["price_krw"] == 280_000
+
     def test_kis_fallback_used_when_account_id_provided_and_others_fail(self, override_settings, auth_app):
         app, user, db = auth_app
         account = _make_kis_account(user.id)
@@ -539,7 +567,7 @@ class TestStockPricesBatch:
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={}),
             patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
-            patch("app.api.v1.stocks._price_via_kis", new_callable=AsyncMock, return_value=15490.0),
+            patch("app.api.v1.stocks.price_via_kis", new_callable=AsyncMock, return_value=15490.0),
         ):
             resp = client.post(
                 "/api/v1/stocks/prices-batch",

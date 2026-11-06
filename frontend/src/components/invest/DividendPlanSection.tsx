@@ -1,9 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ArrowRight, CalendarRange, Settings2, TrendingUp } from "lucide-react";
-import { fetchDividendPlan } from "@/api/invest";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { fmtKrw, fmtPct } from "@/utils/format";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { MONTH_LABELS } from "@/utils/dividendUtils";
@@ -11,7 +8,7 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
-import { goalRecommendationOverallQuery } from "@/api/queryOptions";
+import { dividendPlanQuery, goalRecommendationOverallQuery } from "@/api/queryOptions";
 import { TOUCH_HEIGHT_MIN, TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { portfolioUrl } from "@/utils/tabUrl";
 
@@ -40,11 +37,7 @@ function AchievementValue({ pct, sizeClass }: { pct: number | null; sizeClass: s
 }
 
 export default function DividendPlanSection({ onOpenSettings }: Props) {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: QUERY_KEYS.dividendPlan,
-    queryFn: fetchDividendPlan,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data, isLoading, isError } = useQuery(dividendPlanQuery);
 
   // GoalTimelineCard(적립 계획 탭)와 동일한 queryKey를 써서 캐시를 공유한다 — 중복 호출 없음.
   const { data: recommendation } = useQuery(goalRecommendationOverallQuery);

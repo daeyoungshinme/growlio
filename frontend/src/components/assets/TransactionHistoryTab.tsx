@@ -30,9 +30,6 @@ import {
 } from "@/constants/uiSizes";
 import { extractErrorMessage } from "@/utils/error";
 
-const currentYear = new Date().getFullYear();
-const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
 interface Props {
   accounts: AssetAccount[];
 }
@@ -48,6 +45,9 @@ const MOBILE_PAGE_SIZE = 50;
 
 export default function TransactionHistoryTab({ accounts }: Props) {
   const qc = useQueryClient();
+  // 연도 목록은 마운트 시점 기준 — 모듈 상수로 두면 앱을 켜 둔 채 새해를 넘겨도 작년이 "올해"로 남는다
+  const [currentYear] = useState(() => new Date().getFullYear());
+  const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [filterAccountId, setFilterAccountId] = useState("");
   const [filterType, setFilterType] = useState("");
@@ -201,7 +201,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
             aria-label="연도 필터"
             className={`${INPUT_SM} w-auto`}
           >
-            {YEAR_OPTIONS.map((y) => (
+            {yearOptions.map((y) => (
               <option key={y} value={y}>
                 {y}년
               </option>

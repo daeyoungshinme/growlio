@@ -46,9 +46,9 @@ export interface TaxSummary {
   overseas_gain_deduction_krw: number;
   overseas_tax_estimated_krw: number;
   domestic_large_holder_warning: boolean;
-  /** 대주주 기준 이상인 종목명(없거나 구버전 서버면 비어 있음) */
-  domestic_large_holder_name?: string | null;
-  domestic_large_holder_threshold_krw?: number;
+  /** 대주주 기준 이상인 종목명(경고가 없으면 null) */
+  domestic_large_holder_name: string | null;
+  domestic_large_holder_threshold_krw: number;
   comprehensive_tax_warning: boolean;
   comprehensive_tax_remaining_krw: number;
   total_estimated_tax_krw: number;

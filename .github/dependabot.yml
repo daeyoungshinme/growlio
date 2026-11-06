@@ -120,7 +120,8 @@ updates:
         update-types:
           - "version-update:semver-major"
 
-  # Dockerfile 베이스 이미지(python·node) — 없으면 아무도 추적하지 않았다. Render가 backend/Dockerfile로 배포한다
+  # backend/Dockerfile 베이스 이미지(python·uv) — 없으면 아무도 추적하지 않았다. Render가 이 Dockerfile로 배포한다.
+  # uv 이미지를 올리면 ci.yml setup-uv의 version도 같이 맞춘다
   - package-ecosystem: "docker"
     directory: "/backend"
     schedule:

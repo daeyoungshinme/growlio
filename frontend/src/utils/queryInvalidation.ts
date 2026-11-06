@@ -3,71 +3,58 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 
 // actionItems(홈 "지금 할 일")는 드리프트·예수금·세금·챌린지·알림 설정을 모두 읽으므로 그 원천 무효화 함수마다 함께 지운다.
 
-/** 계좌 sync 후 — accounts(last_synced_at/last_sync_error·예수금 등 갱신) + portfolio + dashboard + 배당 데이터 + 인사이트 + 드리프트 + 목표 추천 + 환전 계획(달러 예수금) */
-export function invalidateSyncData(qc: QueryClient) {
-  return Promise.all([
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.indexExposureBase }),
-    // 기간별 매수 추정은 스냅샷 포지션 기준 — sync·계좌 수정 시 함께 갱신
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.periodPurchasesBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTickerBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummaryBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPositionsBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasPositionsTaxBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasRealizedBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
-    // 목표 역산 추천·후보 중복 점검("보유 중" 표시)이 보유 포지션 기준 — 백엔드 sync도 같은 캐시를 지운다
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
-    // 환전 계획의 보유 달러는 계좌 deposit_usd 합 (plans/97 B2)
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
-    // 자산 합계 기준 카드 — 백엔드 sync도 같은 캐시를 지운다 (plans/110 D4)
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
-  ]);
+/** 보유 구성(포지션·예수금·계좌 목록)을 읽는 쿼리 — sync와 계좌·포지션 CUD가 함께 지운다.
+ * 두 함수가 목록을 따로 들고 있으면 새 키를 한쪽에만 넣는 누락이 생긴다(plans/113 B3). */
+const HOLDINGS_QUERY_KEYS = [
+  QUERY_KEYS.accounts,
+  QUERY_KEYS.accountPositionsBase,
+  QUERY_KEYS.portfolioOverviewBase,
+  QUERY_KEYS.indexExposureBase,
+  // 기간별 매수 추정은 스냅샷 포지션 기준
+  QUERY_KEYS.periodPurchasesBase,
+  QUERY_KEYS.dashboard,
+  QUERY_KEYS.dividendByTickerBase,
+  QUERY_KEYS.dividendSummaryBase,
+  QUERY_KEYS.dividendPositionsBase,
+  QUERY_KEYS.dividendPlan,
+  // 배당 약한 달 추천은 보유 종목 배당 요약으로 계산한다
+  QUERY_KEYS.monthlyOptimization,
+  QUERY_KEYS.taxSummaryBase,
+  QUERY_KEYS.overseasPositionsTaxBase,
+  QUERY_KEYS.overseasRealizedBase,
+  QUERY_KEYS.taxActionPlan,
+  QUERY_KEYS.isaStatus,
+  QUERY_KEYS.allocationHistoryBase,
+  // 보유 기반 카드 — 포지션 수동 저장·계좌 삭제도 보유 구성을 바꾼다(plans/95 F1)
+  QUERY_KEYS.insights,
+  QUERY_KEYS.portfolioRisk,
+  QUERY_KEYS.driftSummary,
+  // 목표 역산 추천·후보 중복 점검("보유 중" 표시)이 보유 포지션 기준 — 백엔드 sync도 같은 캐시를 지운다
+  QUERY_KEYS.goalRecommendationBase,
+  // 환전 계획의 보유 달러는 계좌 deposit_usd 합 (plans/97 B2)
+  QUERY_KEYS.fxPlanBase,
+  QUERY_KEYS.actionItems,
+  // 자산 합계 기준 카드 — 백엔드 sync도 같은 캐시를 지운다 (plans/110 D4)
+  QUERY_KEYS.dcaAnalysis,
+  QUERY_KEYS.challenges,
+] as const;
+
+function invalidateKeys(qc: QueryClient, keys: readonly (readonly unknown[])[]) {
+  return Promise.all(keys.map((queryKey) => qc.invalidateQueries({ queryKey })));
 }
 
-/** 계좌 CUD 후 — accounts + portfolio + dashboard + transactions + 목표 추천 + 환전 계획
- * (현금성 계좌 잔액 수정 시 백엔드가 입출금 거래를 자동 생성할 수 있음) */
+/** 계좌 sync 후 — 보유 기반 쿼리 전부(계좌 last_synced_at·예수금 포함) */
+export function invalidateSyncData(qc: QueryClient) {
+  return invalidateKeys(qc, HOLDINGS_QUERY_KEYS);
+}
+
+/** 계좌 CUD 후 — 보유 기반 쿼리 + 거래내역(현금성 계좌 잔액 수정 시 백엔드가 입출금 거래를 자동 생성할 수 있음)
+ * + 연금 납입 현황(연금·IRP 계좌 추가/삭제·tax_type 변경) */
 export function invalidateAccountData(qc: QueryClient) {
-  return Promise.all([
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.indexExposureBase }),
-    // 기간별 매수 추정은 스냅샷 포지션 기준 — sync·계좌 수정 시 함께 갱신
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.periodPurchasesBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.pensionContributionBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTickerBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummaryBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPositionsBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasPositionsTaxBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasRealizedBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
-    // 포지션 수동 저장·계좌 삭제도 보유 구성을 바꾼다 — sync와 같이 보유 기반 카드를 지운다(plans/95 F1)
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.goalRecommendationBase }),
-    // 환전 계획의 보유 달러는 계좌 deposit_usd 합 (plans/97 B2)
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.challenges }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
+  return invalidateKeys(qc, [
+    ...HOLDINGS_QUERY_KEYS,
+    QUERY_KEYS.transactionsBase,
+    QUERY_KEYS.pensionContributionBase,
   ]);
 }
 

@@ -32,9 +32,7 @@ export default memo(function HeroSummaryCard({
 }: Props) {
   // 금액은 기본 숨김, 탭하면 표시 — 남이 화면을 볼 수 있는 상황 대비. 저장하지 않아 홈에 올 때마다 다시 숨김
   const [amountVisible, setAmountVisible] = useState(false);
-  const updatedLabel = dataUpdatedAt
-    ? `${relativeTime(new Date(dataUpdatedAt).toISOString())} 업데이트`
-    : null;
+  const updatedLabel = dataUpdatedAt ? `${relativeTime(dataUpdatedAt)} 업데이트` : null;
 
   const allocationChartData = useMemo(() => {
     if (!data) return [];
@@ -182,7 +180,7 @@ export default memo(function HeroSummaryCard({
           <p className="text-xs text-gray-400 dark:text-gray-500 sm:self-end">{updatedLabel}</p>
         )}
 
-        {/* 범례: 비중만 표시 — 금액은 아래 카드(주식 투자 현황)·자산 탭과 중복이라 sm+에서만 (67 P1-2).
+        {/* 범례: 비중만 표시 — 금액은 자산 탭과 중복이라 sm+에서만 (67 P1-2).
             모바일 max-w-40: 2항목은 한 줄, 그 이상은 도넛 폭 근처에서 줄바꿈(지표 열을 밀어내지 않게) */}
         {allocationChartData.length > 0 && (
           <ul className="col-start-2 justify-self-center max-w-40 flex flex-wrap justify-center gap-x-2 gap-y-1 sm:max-w-none sm:justify-self-stretch sm:grid sm:grid-cols-2 sm:gap-x-1.5 sm:gap-y-0.5">

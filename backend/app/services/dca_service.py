@@ -12,8 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot
-from app.models.user import UserSettings
+from app.services._settings_queries import get_settings_row
 from app.services.goal.goal_return_solver import (
+    future_value_monthly,
     monthly_rate,
     solve_required_annual_return_pct,
     solve_required_monthly_deposit,
@@ -41,7 +42,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
     if cached is not None:
         return cached
 
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
+    settings_row = await get_settings_row(db, user_id)
 
     # 0은 유효한 값이다(수익률 0%, 거치식 적립 0원, 시작 금액 0원) — 비운 값은 None으로 저장된다
     def _number(value: Any) -> float | None:
@@ -223,10 +224,7 @@ def _build_projection_curve(
         month_date = start_date + relativedelta(months=n)
         month_key = _month_key(month_date)
 
-        if r == 0:
-            projected = initial_value + pmt * n
-        else:
-            projected = initial_value * ((1 + r) ** n) + pmt * (((1 + r) ** n - 1) / r)
+        projected = future_value_monthly(initial_value, pmt, r, n)
 
         actual = monthly_actuals.get(month_key)
         achievement_pct = round((actual / projected) * 100, 1) if actual and projected > 0 else None
@@ -276,11 +274,7 @@ def _calc_months_to_goal(initial_value: float, pmt: float, r: float, goal_amount
     if initial_value >= goal_amount:
         return 0
     for n in range(1, _DCA_MAX_MONTHS + 1):
-        if r == 0:
-            fv = initial_value + pmt * n
-        else:
-            fv = initial_value * ((1 + r) ** n) + pmt * (((1 + r) ** n - 1) / r)
-        if fv >= goal_amount:
+        if future_value_monthly(initial_value, pmt, r, n) >= goal_amount:
             return n
     return None
 
@@ -299,11 +293,7 @@ def _calc_goal_timeline(
     elapsed = _elapsed_months(start_date, today)
 
     # 이론 곡선에서 현재 월의 이론값
-    n = elapsed
-    if r == 0:
-        projected_now = initial_value + pmt * n
-    else:
-        projected_now = initial_value * ((1 + r) ** n) + pmt * (((1 + r) ** n - 1) / r)
+    projected_now = future_value_monthly(initial_value, pmt, r, elapsed)
 
     not_started = start_date > today
     # 시작 전에는 비교 대상이 없다 — 예전에는 경과 개월이 음수라 이론값이 초기금액보다 낮아져 "순항"으로 나왔다

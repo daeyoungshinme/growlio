@@ -102,7 +102,6 @@ class RebalancingAnalysis(BaseModel):
     base_type: str
     base_value_krw: float
     items: list[RebalancingItem]
-    # 항상 비어 있음 — 구버전 프론트(PWA 캐시 번들)가 `.forEach`로 읽어 남겨둔다. 다음 정리 때 제거(plans/78 A2).
     analyzed_at: str  # ISO timestamp
     current_portfolio_annual_dividend: float = 0.0  # 목표 포트폴리오 항목 기준 현재 연간 배당
     target_portfolio_annual_dividend: float = 0.0  # 목표 포트폴리오 연간 배당 합계

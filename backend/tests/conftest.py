@@ -125,6 +125,18 @@ def reset_rate_limiter():
     return
 
 
+@pytest.fixture(autouse=True)
+def _clear_dependency_overrides():
+    """테스트가 남긴 `app.dependency_overrides`(인증·DB 대체)를 매 테스트 뒤에 비운다.
+
+    `api_helpers.setup_app`만 쓰고 정리하지 않는 파일이 있어, 뒤 테스트가 앞 테스트의 가짜 유저·DB로
+    돌아 실행 순서에 따라 결과가 달라질 수 있었다(plans/113 C2)."""
+    yield
+    from app.main import app
+
+    app.dependency_overrides.clear()
+
+
 # ── DB 세션 Mock ────────────────────────────────────────────
 
 

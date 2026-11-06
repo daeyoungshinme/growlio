@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, useRef } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
@@ -451,7 +451,8 @@ export function useRebalancingExecution({
   const missingLimitPriceTickers = findMissingLimitPriceTickers(orders);
 
   // 확인 화면(모달)을 다시 열기 전까지 같은 키를 쓴다 — 서버가 처리했는데 응답만 못 받았어도 재주문되지 않는다
-  const idempotencyKeyRef = useRef(crypto.randomUUID());
+  const [initialIdempotencyKey] = useState(() => crypto.randomUUID());
+  const idempotencyKeyRef = useRef(initialIdempotencyKey);
 
   async function handleExecute() {
     if (orders.length === 0 || missingLimitPriceTickers.length > 0 || state.executionUncertain) {

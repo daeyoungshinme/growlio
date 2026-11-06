@@ -1,9 +1,18 @@
 import { useCallback, useState } from "react";
-import { BACKTEST_DEFAULT_END_DATE, BACKTEST_DEFAULT_START_DATE } from "@/constants/defaults";
+import { backtestDefaultEndDate, backtestDefaultStartDate } from "@/constants/defaults";
+
+/** 오늘(로컬)로부터 `years`년 전 "YYYY-MM-DD" — 2월 29일이면 평년의 2월 28일로 맞춘다 */
+export function yearsAgoLocal(years: number, today: Date = new Date()): string {
+  const year = today.getFullYear() - years;
+  const month = today.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const day = Math.min(today.getDate(), lastDay);
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 export function useBacktestDateRange() {
-  const [startDate, setStartDateRaw] = useState(BACKTEST_DEFAULT_START_DATE);
-  const [endDate, setEndDateRaw] = useState(BACKTEST_DEFAULT_END_DATE);
+  const [startDate, setStartDateRaw] = useState(backtestDefaultStartDate);
+  const [endDate, setEndDateRaw] = useState(backtestDefaultEndDate);
   const [activePreset, setActivePreset] = useState<number | null>(5);
 
   const setStartDate = useCallback((value: string) => {
@@ -18,13 +27,9 @@ export function useBacktestDateRange() {
 
   const setPreset = useCallback((years: number) => {
     const now = new Date();
-    const end = BACKTEST_DEFAULT_END_DATE;
-    const start =
-      years === 30
-        ? `${now.getFullYear() - 30}-01-01`
-        : `${now.getFullYear() - years}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const start = years === 30 ? `${now.getFullYear() - 30}-01-01` : yearsAgoLocal(years, now);
     setStartDateRaw(start);
-    setEndDateRaw(end);
+    setEndDateRaw(backtestDefaultEndDate());
     setActivePreset(years);
   }, []);
 

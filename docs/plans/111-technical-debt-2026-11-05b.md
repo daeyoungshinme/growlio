@@ -19,7 +19,7 @@
 | `rebalancing_plan_legs.execution_id` | 사용자 삭제 시 실행 건마다 legs 전체 스캔 |
 
 - `models/rebalancing_plan.py`, `models/asset.py`의 `__table_args__`에 `Index` 추가 + alembic 마이그레이션(작성 시점 head `dc2_drop_dead_columns`).
-- **함정**: `render.yaml`의 `preDeployCommand`가 `alembic upgrade head`를 돌리므로, 그 명령이 동작한다면 머지·배포가 곧 공유 Supabase(nestlio와 공용) 적용이다. 로컬 `.env`도 공유 Supabase를 가리킬 수 있으니 `alembic upgrade`를 로컬에서 돌리지 않는다.
+- **함정**: (작성 당시) `render.yaml`의 `preDeployCommand`가 `alembic upgrade head`를 돌린다고 봤다. 이후 Render 무료 플랜은 pre-deploy가 돌지 않아 112에서 지웠고, 마이그레이션은 배포 전 수동 실행이다(루트 CLAUDE.md 배포 절). 로컬 `.env`도 공유 Supabase를 가리킬 수 있으니 `alembic upgrade`를 로컬에서 돌리지 않는다.
 - 테이블이 작아 우선순위가 낮다. 2026-11-05 사용자가 미루기로 결정했다. 착수 전 다시 확인받는다.
 - 나머지 FK 8개는 판단을 마쳤다. 소형 테이블이거나 탈퇴 때만 발동해 추가하지 않는다.
 

@@ -49,7 +49,7 @@ bash dev.sh         # (또는 make dev)
 - `make migrate-down` — 1단계 롤백
 - `make db-reset` — **데이터 전체 삭제**(개발 환경 전용)
 - `make dev`·`make build-android-*` — Windows 전용(`bash dev.sh`, `gradlew.bat`). macOS/Linux는 `make dev-backend` + `make dev-frontend`
-- `make test-backend`는 커버리지 없이 빠르게, `make test-backend-cov`가 CI와 같은 89% 게이트
+- `make test-backend`는 커버리지 없이 빠르게, `make test-backend-cov`가 CI와 같은 91% 게이트
 - `make lint`·`make typecheck`는 CI와 같은 기준
 
 ---
@@ -80,7 +80,7 @@ growlio/
 
 - **실제 운영 배포**: 백엔드는 `render.yaml`(Render, Docker runtime) — 프론트엔드는 `frontend/vercel.json`(Vercel)이 실제 배포 경로. `vercel.json`이 `/api/*` → Render 백엔드로 rewrite하고, CSP를 포함한 보안 헤더도 여기서 설정됨(보안 헤더 수정은 반드시 `vercel.json`에). 새 API prefix 추가 시 `frontend/vercel.json`의 `rewrites`도 함께 확인.
 - **마이그레이션은 자동 실행되지 않는다**(Render 무료 플랜은 pre-deploy 미지원). 스키마 변경이 있으면 **코드 배포 전에** `backend/.env`의 `MIGRATION_DATABASE_URL`을 운영 DB로 지정하고 `cd backend && uv run python scripts/bootstrap_alembic.py && uv run alembic upgrade head`. `/metrics`는 `METRICS_TOKEN`으로 보호된 채 유지되지만 저장소에 수집 구성은 없다.
-- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build + 이미지 빌드 스모크 `docker-build` + 보안 스캔(TruffleHog·bandit·pip-audit·npm audit), push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (10분마다 운영 백엔드 `/health` 호출).
+- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build + 이미지 빌드 스모크 `docker-build` + 보안 스캔(TruffleHog·bandit·pip-audit·npm audit), push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (cron 10분이지만 GitHub 스로틀로 실측 2~9시간 간격 — 슬립은 못 막고 잠든 서버를 가끔 깨워 `periodic_catchup`을 돌리는 정도. 외부 핑 등록 후 제거 예정).
 - **Render 무료 플랜은 15분 무요청 시 잠들고 스케줄러도 함께 멈춘다** — `backend/CLAUDE.md` "스케줄러 실행 제약".
 
 ---
@@ -106,7 +106,7 @@ CI(`ci.yml`)와 같은 기준 — 커밋/PR 전에 변경 영역에 맞춰 실�
 ```bash
 make lint            # ruff + eslint --max-warnings 0
 make typecheck       # mypy + tsc --noEmit (앱·테스트 tsconfig 둘 다)
-make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-cov (89% 게이트)
+make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-cov (91% 게이트)
 make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.config.ts
 ```
 

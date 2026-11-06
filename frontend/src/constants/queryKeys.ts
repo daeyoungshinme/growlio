@@ -14,6 +14,8 @@ export const QUERY_KEYS = {
   portfolios: ["portfolios"] as const,
   accounts: ["accounts"] as const,
   accountPositions: (accountId: string) => ["account-positions", accountId] as const,
+  /** 무효화 프리픽스 전용 — 계좌별 보유 종목 목록 전부 */
+  accountPositionsBase: ["account-positions"] as const,
   transactions: (accountId: string) => ["transactions", accountId] as const,
   /** 무효화 프리픽스 전용 — 연도별(`allTransactions`)·합계(`transactionSummary`)·계좌별(`transactions(id)`)을 함께 지운다 */
   transactionsBase: ["transactions"] as const,

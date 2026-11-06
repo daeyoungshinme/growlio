@@ -105,10 +105,9 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["app"]
-omit = ["app/main.py"]
 
 [tool.coverage.report]
-fail_under = 89
+fail_under = 91  # 실측 93%(2026-11-06, main.py 포함) − 2 — 올릴 때도 실측보다 조금 낮게
 show_missing = true
 skip_empty = true
 exclude_lines = [

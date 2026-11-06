@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 import structlog
 from sqlalchemy import select
@@ -17,7 +17,8 @@ from app.models.user import User, UserSettings
 from app.services.alerts._dispatch import send_push_safely
 from app.services.notifications.email_service import send_goal_achievement_email
 from app.services.portfolio.asset_aggregator import get_dashboard_summary
-from app.utils.cache_keys import CacheStoreType
+from app.utils.cache_keys import TTL_ANNUAL_GOAL_ACHIEVED_SENT, CacheStoreType, goal_achieved_sent_key
+from app.utils.durable_state import get_durable, set_durable
 from app.utils.kst import KST, today_kst
 
 logger = structlog.get_logger()
@@ -26,7 +27,9 @@ _GOAL_CHECK_CONCURRENCY = 3
 
 
 async def _already_notified_this_month(db, user_id, alert_type: str) -> bool:
-    """이번 달 해당 타입 목표 알림이 이미 발송됐으면 True."""
+    """이번 달 해당 타입 목표 알림이 이미 발송됐으면 True.
+
+    목표별 1회 키(`goal_achieved_sent_key`) 도입 전 발송분을 다시 보내지 않기 위한 이행용 확인이다."""
     today = today_kst()
     # KST 월초 — UTC 자정이면 KST 1일 00~09시 발송분이 지난달로 잡혀 이번 달에 중복 발송된다
     month_start = datetime(today.year, today.month, 1, tzinfo=KST)
@@ -79,8 +82,10 @@ class _GoalSpec:
     pct_key: str  # get_dashboard_summary 응답 키
     label: str  # 메시지 접두 ("총 자산 목표")
     push_title: str
-    # True면 현재 금액을 대시보드 총자산에서, False면 목표 × 달성률로 역산
-    current_from_total_assets: bool = False
+    # True면 현재 금액을 대시보드 투자 자산(부동산 제외, 달성률과 같은 기준)에서, False면 목표 × 달성률로 역산
+    current_from_investable_assets: bool = False
+    # True면 연간 목표 — 같은 목표 금액이라도 해마다 한 번씩 알린다
+    annual: bool = True
 
     @property
     def alert_type(self) -> str:
@@ -98,7 +103,8 @@ _GOAL_SPECS: tuple[_GoalSpec, ...] = (
         pct_key="goal_achievement_pct",
         label="총 자산 목표",
         push_title="자산 목표 달성",
-        current_from_total_assets=True,
+        current_from_investable_assets=True,
+        annual=False,
     ),
     _GoalSpec(
         goal_type="DEPOSIT",
@@ -125,16 +131,26 @@ async def _notify_goal(
     summary: dict,
     to_email: str,
 ) -> None:
-    """목표 1개가 100% 이상이고 이번 달 미발송이면 이메일 → (성공 시) 이력 저장 → 푸시."""
+    """목표 1개가 100% 이상이고 이 목표로 아직 안 보냈으면 이메일 → (성공 시) 이력·발송 키 저장 → 푸시.
+
+    같은 목표는 한 번만 알린다(연간 목표는 연도별). 목표 금액을 바꾸면 새 목표로 보고 다시 알린다."""
     goal_raw = getattr(settings_row, spec.goal_attr)
     pct: float | None = summary.get(spec.pct_key)
     if not goal_raw or pct is None or pct < 100:
         return
-    if await _already_notified_this_month(db, user.id, spec.alert_type):
-        return
 
     goal = float(goal_raw)
-    current = float(summary.get("total_assets_krw") or 0) if spec.current_from_total_assets else goal * pct / 100
+    sent_key = goal_achieved_sent_key(user.id, spec.alert_type, _goal_scope(spec, goal, today_kst()))
+    sent_ttl = TTL_ANNUAL_GOAL_ACHIEVED_SENT if spec.annual else None
+    if await get_durable(db, sent_key) is not None:
+        return
+    if await _already_notified_this_month(db, user.id, spec.alert_type):
+        await set_durable(db, sent_key, "1", ttl=sent_ttl)
+        return
+
+    current = (
+        float(summary.get("investable_assets_krw") or 0) if spec.current_from_investable_assets else goal * pct / 100
+    )
     sent = await send_goal_achievement_email(
         to_email=to_email,
         goal_type=spec.goal_type,
@@ -147,6 +163,7 @@ async def _notify_goal(
 
     msg = f"{spec.label} 달성 {pct:.1f}% — {current:,.0f}원 / {goal:,.0f}원"
     db.add(AlertHistory(user_id=user.id, alert_type=spec.alert_type, message=msg))
+    await set_durable(db, sent_key, "1", ttl=sent_ttl, commit=False)
     await db.commit()
     logger.info(f"{spec.log_prefix}_sent", user_id=str(user.id), pct=pct)
     await send_push_safely(
@@ -157,6 +174,12 @@ async def _notify_goal(
         data={"type": spec.alert_type},
         failure_event=f"{spec.log_prefix}_push_failed",
     )
+
+
+def _goal_scope(spec: _GoalSpec, goal: float, today: date) -> str:
+    """발송 키의 목표 구분값 — 목표 금액, 연간 목표는 연도까지."""
+    amount = f"{goal:.0f}"
+    return f"{today.year}:{amount}" if spec.annual else amount
 
 
 async def _check_user_goals(user: User, settings_row: UserSettings, to_email: str, cache: CacheStoreType) -> None:

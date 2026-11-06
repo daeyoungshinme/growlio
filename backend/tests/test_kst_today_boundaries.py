@@ -41,7 +41,7 @@ def test_age_group_uses_kst_year(kst_new_year_dawn):
 
 
 def test_overseas_transfer_tax_default_year_is_kst(kst_new_year_dawn):
-    with patch.object(tax_service, "_get_rates", wraps=tax_service._get_rates) as mock_rates:
+    with patch.object(tax_service, "get_tax_rates", wraps=tax_service.get_tax_rates) as mock_rates:
         tax_service.estimate_overseas_transfer_tax(1_000_000.0)
     mock_rates.assert_called_once_with(2027)
 

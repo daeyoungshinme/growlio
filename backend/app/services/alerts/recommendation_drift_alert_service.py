@@ -63,7 +63,8 @@ async def _get_subscribers(db: AsyncSession) -> list[tuple[User, UserSettings]]:
     return [(user, user_settings) for user, user_settings in result.all()]
 
 
-async def _already_sent_this_week(db: AsyncSession, user_id: uuid.UUID) -> bool:
+async def _already_sent_today(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """오늘(KST) 이미 보냈으면 True — 주 1회 잡이 재시작·misfire로 같은 날 다시 돌 때 중복 발송 방지."""
     return await already_sent_alert_today(db, user_id, "RECOMMENDATION_DRIFT")
 
 
@@ -140,7 +141,7 @@ async def _send_alert_to_user(user: User, user_settings: UserSettings, to_email:
     from app.services.notifications.email_service import send_recommendation_drift_alert_email
 
     async with AsyncSessionLocal() as db:
-        if await _already_sent_this_week(db, user.id):
+        if await _already_sent_today(db, user.id):
             return
 
         cache = await get_cache_store()

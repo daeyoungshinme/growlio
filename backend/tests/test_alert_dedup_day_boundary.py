@@ -21,7 +21,7 @@ _TODAY = date(2026, 10, 1)
     ("module_path", "func_name"),
     [
         ("app.services.alerts.market_signal_alert_service", "_already_sent_digest_today"),
-        ("app.services.alerts.recommendation_drift_alert_service", "_already_sent_this_week"),
+        ("app.services.alerts.recommendation_drift_alert_service", "_already_sent_today"),
         ("app.services.alerts.tax_reminder_service", "_already_sent_reminder_today"),
     ],
 )

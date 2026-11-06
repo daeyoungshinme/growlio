@@ -145,7 +145,6 @@ async def delete_transaction(
 
 
 async def _invalidate_tx_caches(user_id: UUID) -> None:
-
     cache = await get_cache_store()
     await invalidate_user_caches(
         cache,

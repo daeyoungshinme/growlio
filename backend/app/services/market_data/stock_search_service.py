@@ -99,6 +99,13 @@ async def _search_yahoo(q: str, limit: int) -> list[dict]:
     return results
 
 
+async def search_stocks_by_query(q: str, limit: int) -> list[dict]:
+    """한글 입력은 네이버 금융, 영문·티커는 Yahoo Finance로 검색한다."""
+    if _has_korean(q):
+        return await _search_naver(q, limit)
+    return await _search_yahoo(q, limit)
+
+
 async def resolve_ticker_meta(ticker: str) -> tuple[str | None, str | None]:
     """티커로 Yahoo Finance를 조회해 (영문 캐노니컬 종목명, 상장 시장) 튜플을 반환한다.
 

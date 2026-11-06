@@ -27,7 +27,8 @@ const GAP = 1.9; // 조각 사이 간격(원주 길이 단위, 약 3.6도)
  * 파싱하던 것을 대체한다. 조각을 누르면 가운데에 이름·비중을 보여주고, 금액은 조각 툴팁(<title>)에만 둔다(recharts 툴팁 대체).
  */
 export default memo(function MiniDonut({ data, label = "자산 구성", hideValues }: Props) {
-  const [active, setActive] = useState<number | null>(null);
+  // 선택은 이름으로 기억한다 — 위치(index)로 두면 데이터 순서가 바뀔 때 다른 조각이 선택된 것처럼 보인다
+  const [active, setActive] = useState<string | null>(null);
   const total = data.reduce((sum, d) => sum + Math.max(d.value, 0), 0);
   if (total <= 0) return null;
 
@@ -45,7 +46,7 @@ export default memo(function MiniDonut({ data, label = "자산 구성", hideValu
     offset += length;
     return seg;
   });
-  const selected = active !== null ? data[active] : null;
+  const selected = active !== null ? (data.find((d) => d.name === active) ?? null) : null;
 
   return (
     <svg
@@ -55,7 +56,7 @@ export default memo(function MiniDonut({ data, label = "자산 구성", hideValu
       aria-label={`${label}: ${data.map((d) => `${d.name} ${d.pct.toFixed(0)}%`).join(", ")}`}
     >
       <g transform="rotate(-90 50 50)">
-        {segments.map((s, i) => (
+        {segments.map((s) => (
           <circle
             key={s.key}
             cx="50"
@@ -63,10 +64,10 @@ export default memo(function MiniDonut({ data, label = "자산 구성", hideValu
             r={RADIUS}
             fill="none"
             stroke={s.color}
-            strokeWidth={active === i ? STROKE + 2 : STROKE}
+            strokeWidth={active === s.datum.name ? STROKE + 2 : STROKE}
             strokeDasharray={`${s.dash} ${CIRCUMFERENCE - s.dash}`}
             strokeDashoffset={-s.offset}
-            onClick={() => setActive(active === i ? null : i)}
+            onClick={() => setActive(active === s.datum.name ? null : s.datum.name)}
             className="cursor-pointer transition-[stroke-width] duration-150"
           >
             <title>

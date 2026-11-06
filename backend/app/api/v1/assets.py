@@ -498,6 +498,6 @@ async def update_isa_pnl_override(
         account.isa_baseline_captured_at = None
     await db.commit()
     await db.refresh(account)
-    cache = await get_cache_store()
-    await invalidate_asset_account_caches(cache, current_user.id)
+    # 이 값은 ISA 현황·절세 액션(둘 다 캐시 없이 매번 계산)만 읽는다 — 계좌 캐시 전체 무효화는 목표 추천
+    # 세대 교체(콜드 MVO 재계산)까지 일으켜 불필요하다
     return _account_response(account)

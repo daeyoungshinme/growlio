@@ -13,8 +13,9 @@ from app.core.job_runner import run_per_user
 from app.jobs._job_helpers import run_alert_job
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
+from app.services.dividend.aggregator import get_annual_dividends_received
 from app.services.notifications.email_service import send_monthly_report_email
-from app.services.portfolio.asset_aggregator import get_dashboard_summary
+from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_net_deposits_for_year
 from app.utils.cache_keys import TTL_MONTHLY_REPORT_SENT, CacheStoreType, monthly_report_sent_key
 from app.utils.durable_state import get_durable, set_durable
 from app.utils.kst import today_kst
@@ -47,6 +48,24 @@ def _mom_change(monthly_trend: list[dict], month_key: str) -> tuple[float | None
     curr_val = float(monthly_trend[idx]["total_krw"])
     change = curr_val - prev_val
     return change, (change / prev_val * 100) if prev_val else None
+
+
+async def _report_year_figures(user_id, db: AsyncSession, summary: dict, report_year: int) -> dict:
+    """리포트 대상 연도의 연간 배당·입금 달성률.
+
+    대시보드 요약은 올해 기준이라, 1월 초에 보내는 12월 리포트에서는 새해 값(≈0)이 된다.
+    대상 연도가 올해가 아니면 그 연도로 다시 집계한다."""
+    if report_year == today_kst().year:
+        return {
+            "annual_dividends_received": float(summary.get("annual_dividends_received") or 0),
+            "deposit_achievement_pct": summary.get("deposit_achievement_pct"),
+        }
+    goal = summary.get("annual_deposit_goal")
+    net_deposits = await get_net_deposits_for_year(user_id, db, report_year)
+    return {
+        "annual_dividends_received": await get_annual_dividends_received(user_id, db, report_year),
+        "deposit_achievement_pct": (net_deposits / float(goal) * 100) if goal else None,
+    }
 
 
 async def _run_monthly_report(db: AsyncSession, cache: CacheStoreType) -> None:
@@ -90,6 +109,7 @@ async def _send_report_for_user(
             logger.info("monthly_report_skipped_already_sent", user_id=str(user.id), month=month_key)
             return
         summary = await get_dashboard_summary(user.id, db, cache)
+        year_figures = await _report_year_figures(user.id, db, summary, int(month_key[:4]))
 
     monthly_trend: list[dict] = summary.get("monthly_trend") or []
     mom_change_krw, mom_change_pct = _mom_change(monthly_trend, month_key)
@@ -105,8 +125,8 @@ async def _send_report_for_user(
         goal_amount=summary.get("goal_amount"),
         goal_achievement_pct=summary.get("goal_achievement_pct"),
         annual_deposit_goal=summary.get("annual_deposit_goal"),
-        deposit_achievement_pct=summary.get("deposit_achievement_pct"),
-        annual_dividends_received=float(summary.get("annual_dividends_received") or 0),
+        deposit_achievement_pct=year_figures["deposit_achievement_pct"],
+        annual_dividends_received=year_figures["annual_dividends_received"],
         asset_allocation=summary.get("asset_allocation") or [],
     )
     if not sent:
