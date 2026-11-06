@@ -56,6 +56,12 @@ async def get_dividend_summary(
     return result
 
 
+async def get_annual_dividends_received(user_id: uuid.UUID, db: AsyncSession, year: int) -> float:
+    """`year`에 받은 배당 합계 — 대시보드 `annual_dividends_received`와 같은 집계 기준(캐시 없음)."""
+    annual_received, _, _ = await _fetch_dividend_aggregates(user_id, db, year)
+    return annual_received
+
+
 async def _fetch_dividend_aggregates(
     user_id: uuid.UUID, db: AsyncSession, year: int, account_id: uuid.UUID | None = None
 ) -> tuple[float, list[dict], list[dict]]:

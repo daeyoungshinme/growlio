@@ -656,30 +656,35 @@ class TestRebalancingSchemaValidators:
 
 
 class TestBuildFailedGroupResult:
-    """계좌 그룹 실패 로그 — 예상 밖 예외는 error 레벨+예외 타입, 자격증명 노출 우려로 exc_info는 남기지 않는다."""
+    """계좌 그룹 실패 로그 — 예상 밖 예외는 스택 없는 Sentry 보고, 자격증명 노출 우려로 exc_info는 남기지 않는다."""
 
-    def test_unexpected_error_logs_error_with_type(self):
+    def test_unexpected_error_reports_handled_failure(self):
         from app.services.rebalancing import execution_service
 
-        with patch.object(execution_service, "logger") as mock_logger:
-            result = execution_service._build_failed_group_result(
-                uuid.uuid4(), "acc-1", [_make_order()], KeyError("output1")
-            )
+        error = KeyError("output1")
+        with (
+            patch.object(execution_service, "logger") as mock_logger,
+            patch.object(execution_service, "report_handled_failure") as mock_report,
+        ):
+            result = execution_service._build_failed_group_result(uuid.uuid4(), "acc-1", [_make_order()], error)
 
-        mock_logger.error.assert_called_once()
-        kwargs = mock_logger.error.call_args.kwargs
-        assert kwargs["error_type"] == "KeyError"
-        assert "exc_info" not in kwargs
+        mock_report.assert_called_once()
+        assert mock_report.call_args.args == ("rebalancing_group_failed", error)
+        assert mock_report.call_args.kwargs["account_id"] == "acc-1"
+        mock_logger.warning.assert_not_called()
         assert [o.status for o in result.orders] == ["FAILED"]
 
     def test_expected_error_logs_warning_with_detail(self):
         from app.services.rebalancing import execution_service
 
-        with patch.object(execution_service, "logger") as mock_logger:
+        with (
+            patch.object(execution_service, "logger") as mock_logger,
+            patch.object(execution_service, "report_handled_failure") as mock_report,
+        ):
             result = execution_service._build_failed_group_result(
                 uuid.uuid4(), "acc-1", [_make_order()], BadRequestError(detail="잔고 부족")
             )
+        mock_report.assert_not_called()
 
         mock_logger.warning.assert_called_once()
-        mock_logger.error.assert_not_called()
         assert result.orders[0].error_msg == "잔고 부족"

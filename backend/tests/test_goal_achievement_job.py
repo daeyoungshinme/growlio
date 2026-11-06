@@ -31,8 +31,19 @@ def _make_settings(
     )
 
 
+@pytest.fixture(autouse=True)
+def _no_durable_sent_flag():
+    """발송 키 저장소(app_state)는 기본적으로 비어 있다 — AsyncMock 세션의 db.get은 None을 돌려주지 않는다."""
+    with (
+        patch("app.jobs.goal_achievement.get_durable", new_callable=AsyncMock, return_value=None),
+        patch("app.jobs.goal_achievement.set_durable", new_callable=AsyncMock),
+    ):
+        yield
+
+
 _MOCK_SUMMARY_ACHIEVED = {
     "total_assets_krw": 100_000_000.0,
+    "investable_assets_krw": 100_000_000.0,
     "goal_achievement_pct": 100.0,
     "deposit_achievement_pct": 100.0,
     "dividend_goal_achievement_pct": 100.0,
@@ -40,6 +51,7 @@ _MOCK_SUMMARY_ACHIEVED = {
 
 _MOCK_SUMMARY_NOT_ACHIEVED = {
     "total_assets_krw": 50_000_000.0,
+    "investable_assets_krw": 50_000_000.0,
     "goal_achievement_pct": 50.0,
     "deposit_achievement_pct": 60.0,
     "dividend_goal_achievement_pct": 40.0,
@@ -369,3 +381,81 @@ class TestAlreadyNotifiedThisMonth:
         stmt = mock_db.execute.call_args.args[0]
         bound = [v for v in stmt.compile().params.values() if isinstance(v, datetime)]
         assert bound == [datetime(2026, 9, 30, 15, 0, tzinfo=UTC)]
+
+
+class TestNotifyGoalOncePerGoal:
+    """목표별 1회 발송 — 같은 목표는 다음 달에도 다시 보내지 않고, 목표 금액을 바꾸면 다시 보낸다."""
+
+    def _session(self, history_scalar=None):
+        db = AsyncMock()
+        history_result = MagicMock()
+        history_result.scalar.return_value = history_scalar
+        db.execute = AsyncMock(return_value=history_result)
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        return db
+
+    async def _notify(self, db, settings, summary, durable_value=None, today=None):
+        from datetime import date
+
+        from app.jobs import goal_achievement as job
+
+        spec = next(s for s in job._GOAL_SPECS if s.goal_type == "ASSET")
+        with (
+            patch.object(job, "get_durable", new_callable=AsyncMock, return_value=durable_value) as get_mock,
+            patch.object(job, "set_durable", new_callable=AsyncMock) as set_mock,
+            patch.object(job, "send_goal_achievement_email", new_callable=AsyncMock, return_value=True) as email,
+            patch.object(job, "send_push_safely", new_callable=AsyncMock),
+            patch.object(job, "today_kst", return_value=today or date(2026, 11, 6)),
+        ):
+            await job._notify_goal(db, _make_user(), settings, spec, summary, "a@test.com")
+        return get_mock, set_mock, email
+
+    @pytest.mark.asyncio
+    async def test_current_amount_excludes_real_estate(self):
+        """메일의 현재 금액은 달성률과 같은 기준(부동산 제외 투자 자산)이다."""
+        summary = {
+            "total_assets_krw": 1_500_000_000.0,
+            "investable_assets_krw": 502_000_000.0,
+            "goal_achievement_pct": 100.4,
+        }
+        _, set_mock, email = await self._notify(self._session(), _make_settings(goal_amount=500_000_000), summary)
+
+        assert email.call_args.kwargs["current_amount"] == 502_000_000.0
+        set_mock.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_skips_when_same_goal_already_sent(self):
+        summary = {"investable_assets_krw": 600_000_000.0, "goal_achievement_pct": 120.0}
+        _, _, email = await self._notify(
+            self._session(), _make_settings(goal_amount=500_000_000), summary, durable_value="1"
+        )
+        email.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_key_changes_with_goal_amount(self):
+        summary = {"investable_assets_krw": 600_000_000.0, "goal_achievement_pct": 120.0}
+        get_a, _, _ = await self._notify(self._session(), _make_settings(goal_amount=500_000_000), summary)
+        get_b, _, _ = await self._notify(self._session(), _make_settings(goal_amount=550_000_000), summary)
+        assert get_a.call_args.args[1] != get_b.call_args.args[1]
+
+    @pytest.mark.asyncio
+    async def test_already_sent_this_month_records_key_without_resending(self):
+        """키 도입 전 이번 달 발송분은 다시 보내지 않고 키만 남긴다."""
+        summary = {"investable_assets_krw": 600_000_000.0, "goal_achievement_pct": 120.0}
+        _, set_mock, email = await self._notify(
+            self._session(history_scalar=uuid.uuid4()), _make_settings(goal_amount=500_000_000), summary
+        )
+        email.assert_not_awaited()
+        set_mock.assert_awaited_once()
+
+    def test_annual_goal_scope_includes_year(self):
+        from datetime import date
+
+        from app.jobs import goal_achievement as job
+
+        deposit = next(s for s in job._GOAL_SPECS if s.goal_type == "DEPOSIT")
+        asset = next(s for s in job._GOAL_SPECS if s.goal_type == "ASSET")
+        assert job._goal_scope(deposit, 10_000_000, date(2026, 3, 1)) == "2026:10000000"
+        assert job._goal_scope(deposit, 10_000_000, date(2027, 3, 1)) == "2027:10000000"
+        assert job._goal_scope(asset, 500_000_000, date(2026, 3, 1)) == "500000000"

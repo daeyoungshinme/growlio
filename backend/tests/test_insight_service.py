@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -178,6 +179,25 @@ class TestCheckRebalancingOpportunity:
 # ── _check_tax_loss_harvest ───────────────────────────────────
 
 
+def _harvest_item(ticker: str, loss: float, tax_saved: float) -> dict:
+    return {"ticker": ticker, "name": ticker, "unrealized_loss_krw": loss, "tax_saved_krw": tax_saved}
+
+
+def _harvest_summary(items: list[dict]) -> dict:
+    return {
+        "harvesting_recommendations": items,
+        "overseas_gain_deduction_krw": 2_500_000,
+        "rates": {"overseas_tax_rate_pct": 22.0},
+    }
+
+
+def _patch_realized(realized_krw: float, lookup_failed: bool = False):
+    return patch(
+        "app.services.insight_service.get_overseas_realized_summary",
+        new=AsyncMock(return_value={"realized_gain_krw": realized_krw, "lookup_failed": lookup_failed}),
+    )
+
+
 class TestCheckTaxLossHarvest:
     @pytest.mark.asyncio
     async def test_no_positions_returns_empty(self, mock_db, override_settings):
@@ -208,20 +228,59 @@ class TestCheckTaxLossHarvest:
             {"ticker": "AAPL", "unrealized_pnl_krw": 3_000_000, "qty": 5},
             {"ticker": "TSLA", "unrealized_pnl_krw": -1_500_000, "qty": 3},
         ]
-        summary = {"harvesting_recommendations": [{"ticker": "TSLA", "tax_saved_krw": 330_000}]}
+        # 추천 목록의 tax_saved_krw(미실현 이익 전부 매도 가정)는 쓰지 않는다
+        summary = _harvest_summary([_harvest_item("TSLA", -1_500_000, tax_saved=330_000)])
         tax_summary = AsyncMock(return_value=summary)
         rows: list = []
         with (
             patch("app.services.insight_service.load_tax_stock_rows", new=AsyncMock(return_value=(rows, positions))),
             patch("app.services.insight_service.get_tax_summary", new=tax_summary),
+            _patch_realized(3_500_000),
+            patch("app.services.insight_service.today_kst", return_value=date(2026, 6, 1)),
         ):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
 
         assert len(result) == 1
         assert result[0].type == "TAX_LOSS_HARVEST"
-        assert result[0].metric_value == 330_000
+        # 실현 이익 350만 − 공제 250만 = 100만만 통산 가능 → 100만 × 22%
+        assert result[0].metric_value == 220_000
+        assert "TSLA" in result[0].detail
         # 같은 스냅샷 행을 넘겨 세금 요약이 스냅샷을 다시 읽지 않게 한다
         assert tax_summary.call_args.kwargs["stock_rows"] is rows
+        assert tax_summary.call_args.kwargs["overseas_realized_krw"] == 3_500_000
+
+    @pytest.mark.asyncio
+    async def test_no_realized_gain_returns_empty(self, mock_db, override_settings):
+        """올해 실현 이익이 공제 안쪽이면 손실만 팔아도 세금이 줄지 않으므로 알리지 않는다."""
+        from app.services.insight_service import _check_tax_loss_harvest
+
+        positions = [{"ticker": "TSLA", "unrealized_pnl_krw": -5_000_000, "qty": 3}]
+        summary = _harvest_summary([_harvest_item("TSLA", -5_000_000, tax_saved=1_100_000)])
+        with (
+            patch("app.services.insight_service.load_tax_stock_rows", new=AsyncMock(return_value=([], positions))),
+            patch("app.services.insight_service.get_tax_summary", new=AsyncMock(return_value=summary)),
+            _patch_realized(1_000_000),
+            patch("app.services.insight_service.today_kst", return_value=date(2026, 6, 1)),
+        ):
+            result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_realized_lookup_failed_returns_empty(self, mock_db, override_settings):
+        from app.services.insight_service import _check_tax_loss_harvest
+
+        positions = [{"ticker": "TSLA", "unrealized_pnl_krw": -5_000_000, "qty": 3}]
+        summary = _harvest_summary([_harvest_item("TSLA", -5_000_000, tax_saved=1_100_000)])
+        with (
+            patch("app.services.insight_service.load_tax_stock_rows", new=AsyncMock(return_value=([], positions))),
+            patch("app.services.insight_service.get_tax_summary", new=AsyncMock(return_value=summary)),
+            _patch_realized(9_000_000, lookup_failed=True),
+            patch("app.services.insight_service.today_kst", return_value=date(2026, 6, 1)),
+        ):
+            result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
+
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_small_tax_saving_returns_empty(self, mock_db, override_settings):
@@ -229,10 +288,12 @@ class TestCheckTaxLossHarvest:
         from app.services.insight_service import _check_tax_loss_harvest
 
         positions = [{"ticker": "TSLA", "unrealized_pnl_krw": -100_000, "qty": 1}]
-        summary = {"harvesting_recommendations": [{"ticker": "TSLA", "tax_saved_krw": 22_000}]}
+        summary = _harvest_summary([_harvest_item("TSLA", -100_000, tax_saved=22_000)])
         with (
             patch("app.services.insight_service.load_tax_stock_rows", new=AsyncMock(return_value=([], positions))),
             patch("app.services.insight_service.get_tax_summary", new=AsyncMock(return_value=summary)),
+            _patch_realized(10_000_000),
+            patch("app.services.insight_service.today_kst", return_value=date(2026, 6, 1)),
         ):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
 

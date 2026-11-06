@@ -78,7 +78,9 @@ async def get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, cache: CacheSt
     return data
 
 
-async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[date | None, float, float, float]:
+async def _get_scalar_init_data(
+    user_id: uuid.UUID, db: AsyncSession, year: int | None = None
+) -> tuple[date | None, float, float, float]:
     """first_snap_date + net_deposits_ytd + non_stock_first_total +
     non_stock_net_flows_after를 CTE 단일 쿼리로 조회.
 
@@ -86,8 +88,10 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
     제외한 계좌만의 첫 스냅샷 합계·순입금 — 주식은 매입원가(avg_price 기반 total_invested)로 별도
     계산하므로(get_dashboard_summary 참고) 여기서는 이중계산 방지를 위해 제외한다.
     first_snap_date는 연환산 기간 계산용으로 전체 계좌 기준을 유지한다.
+    순입금은 `year`(기본 올해) 기준이다.
     """
-    year = today_kst().year
+    if year is None:
+        year = today_kst().year
     row = (
         await db.execute(
             text("""
@@ -160,6 +164,12 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
         non_stock_first_total,
         non_stock_net_flows_after,
     )
+
+
+async def get_net_deposits_for_year(user_id: uuid.UUID, db: AsyncSession, year: int) -> float:
+    """`year`의 순입금(입금 − 출금) — 대시보드 `deposit_achievement_pct`와 같은 집계 기준."""
+    _, net_deposits, _, _ = await _get_scalar_init_data(user_id, db, year)
+    return net_deposits
 
 
 async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> dict[str, Any]:

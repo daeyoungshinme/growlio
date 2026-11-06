@@ -240,6 +240,8 @@ class TestRunMonthlyReport:
             patch("app.jobs.monthly_report.set_durable", new_callable=AsyncMock) as mock_set,
             patch("app.jobs.monthly_report.today_kst", return_value=date(2026, 1, 1)),
             patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
+            patch("app.jobs.monthly_report.get_net_deposits_for_year", new_callable=AsyncMock, return_value=0.0),
+            patch("app.jobs.monthly_report.get_annual_dividends_received", new_callable=AsyncMock, return_value=0.0),
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock, return_value=True),
         ):
             from app.jobs.monthly_report import run_monthly_report
@@ -304,3 +306,51 @@ class TestMomChange:
 
         trend = [{"month": "2026-08-01", "total_krw": 0}, {"month": "2026-09-01", "total_krw": 1_000}]
         assert _mom_change(trend, "2026-09") == (1_000, None)
+
+
+class TestReportYearFigures:
+    """1월 초 12월 리포트는 새해가 아니라 리포트 대상 연도의 연간 배당·입금 달성률을 보여야 한다."""
+
+    @pytest.mark.asyncio
+    async def test_same_year_uses_dashboard_values(self):
+        from app.jobs import monthly_report as job
+
+        with (
+            patch.object(job, "today_kst", return_value=date(2026, 7, 1)),
+            patch.object(job, "get_net_deposits_for_year", new_callable=AsyncMock) as deposits,
+            patch.object(job, "get_annual_dividends_received", new_callable=AsyncMock) as dividends,
+        ):
+            figures = await job._report_year_figures(uuid.uuid4(), AsyncMock(), _MOCK_SUMMARY, 2026)
+
+        assert figures == {"annual_dividends_received": 500_000.0, "deposit_achievement_pct": 60.0}
+        deposits.assert_not_awaited()
+        dividends.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_january_report_uses_previous_year(self):
+        from app.jobs import monthly_report as job
+
+        with (
+            patch.object(job, "today_kst", return_value=date(2026, 1, 1)),
+            patch.object(job, "get_net_deposits_for_year", new_callable=AsyncMock, return_value=12_000_000.0) as dep,
+            patch.object(job, "get_annual_dividends_received", new_callable=AsyncMock, return_value=1_800_000.0) as div,
+        ):
+            figures = await job._report_year_figures(uuid.uuid4(), AsyncMock(), _MOCK_SUMMARY, 2025)
+
+        assert figures == {"annual_dividends_received": 1_800_000.0, "deposit_achievement_pct": 120.0}
+        assert dep.await_args.args[2] == 2025
+        assert div.await_args.args[2] == 2025
+
+    @pytest.mark.asyncio
+    async def test_previous_year_without_deposit_goal(self):
+        from app.jobs import monthly_report as job
+
+        summary = {**_MOCK_SUMMARY, "annual_deposit_goal": None}
+        with (
+            patch.object(job, "today_kst", return_value=date(2026, 1, 2)),
+            patch.object(job, "get_net_deposits_for_year", new_callable=AsyncMock, return_value=5_000_000.0),
+            patch.object(job, "get_annual_dividends_received", new_callable=AsyncMock, return_value=0.0),
+        ):
+            figures = await job._report_year_figures(uuid.uuid4(), AsyncMock(), summary, 2025)
+
+        assert figures["deposit_achievement_pct"] is None

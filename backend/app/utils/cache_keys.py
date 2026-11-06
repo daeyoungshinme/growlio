@@ -65,6 +65,7 @@ TTL_MARKET_SIGNAL_GATE_ALERT_SENT = 86400  # 시장신호 게이트로 AUTO 계�
 TTL_STALE_SNAPSHOT_ALERT_SENT = 86400  # 동기화 끊김으로 AUTO 계획 생성 보류 알림, 알림당 1일 1회 제한 플래그
 TTL_DAILY_VALUE_CAP_ALERT_SENT = 86400  # 하루 합산 거래한도 게이트로 AUTO 계획 생성 보류 알림, 유저당 1일 1회
 TTL_MONTHLY_REPORT_SENT = 45 * 24 * 3600  # 월간 리포트 유저+대상월 1회 발송 플래그 (다음 달 실행 전까지 유지)
+TTL_ANNUAL_GOAL_ACHIEVED_SENT = 400 * 24 * 3600  # 연간 입금·배당 목표 달성 알림 연도별 1회 플래그
 TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
 TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7일 — 사실상 불변 데이터
 TTL_ETF_PROFILE = 7 * 24 * 3600  # ETF 총보수·기초지수·운용사 7일 — 보수 인하는 드물고 참고 정보라 허용
@@ -456,6 +457,13 @@ def daily_value_cap_gate_alert_sent_key(user_id: uuid.UUID, day: str) -> str:
 def monthly_report_sent_key(user_id: uuid.UUID, report_month: str) -> str:
     """월간 리포트가 발송된 유저+대상월(YYYY-MM)을 기록하는 키 — 재시작·misfire 재실행 시 중복 발송 억제."""
     return f"{_env_prefix()}monthly_report:sent:{user_id}:{report_month}"
+
+
+def goal_achieved_sent_key(user_id: uuid.UUID, alert_type: str, scope: str) -> str:
+    """목표 달성 알림을 보낸 유저+목표를 기록하는 키 — scope는 목표 금액(연간 목표는 `연도:금액`).
+
+    목표 금액을 바꾸면 키가 달라져 새 목표 달성 시 다시 알린다."""
+    return f"{_env_prefix()}goal_achieved:sent:{user_id}:{alert_type}:{scope}"
 
 
 async def get_cached_json(cache: CacheStoreType, key: str) -> Any:

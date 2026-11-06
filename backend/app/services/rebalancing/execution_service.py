@@ -91,17 +91,18 @@ def _build_failed_group_result(
     """계좌 그룹 실행 중 예외 발생 시 해당 그룹의 전체 주문을 FAILED로 표시한 ExecutionResult를 만든다."""
     # 응답·실행 이력에 남는 문구 — 예상 밖 예외 원문(SQL·URL)은 로그에만(계획 57 D1)
     detail = public_error_message(error)
-    # 예상 밖 예외는 원인 추적용으로 예외 타입을 남기고 error로 올린다. exc_info/Sentry 전송은 하지 않는다 —
-    # 이 경로의 프레임 지역변수에 복호화된 증권사 자격증명이 있다(_job_helpers.report_job_failure 참고).
-    expected = isinstance(error, AppError | SyncError)
-    log = logger.warning if expected else logger.error
-    log(
-        "rebalancing_group_failed",
-        user_id=str(user_id),
-        account_id=acc_id_str,
-        error=redact_secrets(str(error)),
-        error_type=type(error).__name__,
-    )
+    # 예상한 실패(잔고 부족 등)는 warning만. 예상 밖 예외는 스택 없는 Sentry 보고(report_handled_failure) —
+    # 이 경로의 프레임 지역변수에 복호화된 증권사 자격증명이 있어 capture_exception은 쓰지 않는다.
+    if isinstance(error, AppError | SyncError):
+        logger.warning(
+            "rebalancing_group_failed",
+            user_id=str(user_id),
+            account_id=acc_id_str,
+            error=redact_secrets(str(error)),
+            error_type=type(error).__name__,
+        )
+    else:
+        report_handled_failure("rebalancing_group_failed", error, user_id=str(user_id), account_id=acc_id_str)
     fail_orders = [
         OrderResult.for_order(
             o,
