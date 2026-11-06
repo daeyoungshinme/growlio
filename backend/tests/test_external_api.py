@@ -517,6 +517,72 @@ class TestPerformance:
         assert "total_assets_krw" not in body
 
 
+def _goal_row(**overrides):
+    defaults = dict(
+        goal_amount=300_000_000,
+        goal_annual_return_pct=6.0,
+        goal_start_date=None,
+        goal_initial_amount=None,
+        annual_deposit_goal=12_000_000,
+        annual_dividend_goal=None,
+        monthly_deposit_amount=1_000_000,
+        retirement_target_year=2045,
+    )
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
+
+
+class TestExternalGoal:
+    def _get(self, row, summary=None, summary_error=None):
+        user = _make_user()
+        app = setup_app(user, AsyncMock())
+        summary_mock = AsyncMock(return_value=summary or {}, side_effect=summary_error)
+        with (
+            patch("app.api.v1.external.get_settings_row", AsyncMock(return_value=row)),
+            patch("app.api.v1.external.get_dashboard_summary", summary_mock),
+            patch("app.api.v1.external.get_cache_store", AsyncMock(return_value=None)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/external/goal")
+        assert resp.status_code == 200
+        return resp.json(), summary_mock
+
+    def test_unconfigured_skips_summary(self, override_settings):
+        body, summary_mock = self._get(_goal_row(goal_amount=None))
+        assert body["is_configured"] is False
+        assert body["investable_assets_krw"] is None
+        summary_mock.assert_not_awaited()
+
+    def test_includes_progress_from_dashboard_summary(self, override_settings):
+        summary = {
+            "investable_assets_krw": 120_000_000.0,
+            "goal_achievement_pct": 40.0,
+            "annual_deposit_current": 9_000_000.0,
+            "estimated_annual_dividends": 1_500_000.0,
+            "xirr_pct": None,
+            "annual_return_pct": 7.2,
+            "cumulative_return_pct": 15.0,
+        }
+        body, _ = self._get(_goal_row(), summary)
+        assert body["is_configured"] is True
+        assert body["goal_amount"] == 300_000_000
+        assert body["monthly_deposit_amount"] == 1_000_000
+        assert body["retirement_target_year"] == 2045
+        assert body["investable_assets_krw"] == 120_000_000.0
+        assert body["goal_achievement_pct"] == 40.0
+        assert body["annual_deposit_current"] == 9_000_000.0
+        assert body["estimated_annual_dividend"] == 1_500_000.0
+        # XIRR이 없으면 연환산 수익률로 폴백(대시보드의 목표 수익률 비교와 같은 순서)
+        assert body["actual_return_pct"] == 7.2
+
+    def test_summary_failure_keeps_settings(self, override_settings):
+        body, _ = self._get(_goal_row(), summary_error=RuntimeError("dividend api down"))
+        assert body["is_configured"] is True
+        assert body["goal_amount"] == 300_000_000
+        assert body["investable_assets_krw"] is None
+        assert body["actual_return_pct"] is None
+
+
 class TestExternalGoalFeasibility:
     def test_returns_required_return_and_deposit_guide(self, override_settings):
         app = setup_app(_make_user(), AsyncMock())
