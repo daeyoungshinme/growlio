@@ -113,7 +113,10 @@ export default defineConfig({
         "src/**/*.d.ts",
         "src/main.tsx",
         "src/App.tsx",
-        "src/lib/**",
+        // lib은 SDK 초기화(Sentry·Supabase·SW)라 제외하되, 테스트가 있는 세션 로직(storedSession)은 측정한다
+        "src/lib/sentry.ts",
+        "src/lib/serviceWorker.ts",
+        "src/lib/supabase.ts",
         "src/plugins/**",
         "src/hooks/useBiometric.ts",
         "src/hooks/useHaptic.ts",
