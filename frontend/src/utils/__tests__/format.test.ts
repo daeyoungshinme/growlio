@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
+  fmtMonthDay,
   clampPct,
   daysUntilYmd,
   parseYmd,
@@ -196,6 +197,13 @@ describe("relativeTime", () => {
 
   it("N개월 전 — 30일 이상", () => {
     expect(relativeTime(nowIso(60 * 86_400_000))).toBe("2개월 전");
+  });
+});
+
+describe("fmtMonthDay", () => {
+  it("앞자리 0 없이 월/일", () => {
+    expect(fmtMonthDay("2026-03-05")).toBe("3/5");
+    expect(fmtMonthDay("2026-12-31")).toBe("12/31");
   });
 });
 

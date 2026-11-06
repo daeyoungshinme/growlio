@@ -127,7 +127,8 @@
 | [111](111-technical-debt-2026-11-05b.md) | 110 배치 E 정리. 완료: 차트 11개 대체 텍스트, CLAUDE.md·주석 드리프트, 적립만으로 달성 시 필요 수익률 -90%, 후보 20개 초과… | FK 인덱스 등 일부 보류 |
 | [112](112-project-cleanup-2026-11-05.md) | 프로젝트 전체 불필요·중복 정보 정리. 배치 0 표시 오류 → 1 문서 → 2 인프라 → 3 화면 → 4·5 코드 → 6 테스트 | keep-alive 제거 외 완료 |
 | [113](113-technical-debt-2026-11-06.md) | 실버그: 목표 달성 메일 금액에 부동산 포함·매달 재발송(→목표별 1회), 1월 발송 12월 리포트의 연간 배당·입금이 새해 값, 홈 손실수확 절세액 과대, 주문 그룹 예상 밖 실패 Sentry 누락. 프론트 보유 기반 무효화 목록 단일화(종목 목록·배당 약한 달 누락), 숨은 조회 실패, 2월 29일 프리셋. 세금 요약 미사용 계산·수수료 쿼리 제거, compose backend 삭제, ruff 훅 venv화, 커버리지 91 | 완료(시세 파이프라인 통합 등 이관) |
-| [114](114-technical-debt-2026-11-06b.md) | 113 이관 처리. 시세 파이프라인 단일화(라우터도 fetch_prices_batch, KIS는 지정 계좌만), 실버그: KIS 폴백 소문자 시장 → 해외 TR, 빈 CacheStore가 falsy라 콜드 스타트 직후 캐시 쓰기 생략. 마이그레이션 fk1(FK 인덱스 3)·gd1(goal_start_date → date), private 교차 import·죽은 4튜플·dev 전용 의존성 정리 | 구현 완료, 마이그레이션 수동 적용 대기 |
+| [114](114-technical-debt-2026-11-06b.md) | 113 이관 처리. 시세 파이프라인 단일화(라우터도 fetch_prices_batch, KIS는 지정 계좌만), 실버그: KIS 폴백 소문자 시장 → 해외 TR, 빈 CacheStore가 falsy라 콜드 스타트 직후 캐시 쓰기 생략. 마이그레이션 fk1(FK 인덱스 3)·gd1(goal_start_date → date), private 교차 import·죽은 4튜플·dev 전용 의존성 정리 | 완료(fk1·gd1 공유 Supabase 적용 확인 2026-11-06) |
+| [115](115-technical-debt-2026-11-06c.md) | 114 회귀 점검(이상 없음) + 동기화·알림·인증·푸시 첫 감사. 실버그: sync-all·정기 동기화가 계좌 락을 안 잡아 보유 종목 중복 가능, 환율·주가 알림이 메일 실패 시 푸시도 안 보냄, 해외 주가 알림이 원화 목표가를 USD 시세와 비교(BELOW 즉시 거짓 발동), FCM v1 폐기 토큰 미정리, 06:00 토큰 갱신 무동작, PWA가 js·css 미precache라 배포 후 부팅 멈춤, Android 비밀번호 재설정 링크 localhost. JWKS 스레드화·메일 한도·4xx 무재시도, Render checksPass·CI Android 스모크 | 완료 |
 
 ## 파일 없는 계획 기록
 

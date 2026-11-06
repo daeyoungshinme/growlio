@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache_store import CacheStore
+from app.core.job_runner import report_handled_failure
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User, UserSettings
 from app.services.alerts.alert_service import (
@@ -46,7 +47,7 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
         )
         .join(User, User.id == ExchangeRateAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .where(ExchangeRateAlert.is_active == True)
+        .where(ExchangeRateAlert.is_active == True, User.is_active == True)
     )
     rows = result.all()
 
@@ -57,17 +58,19 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
 
         email = notification_email or user_email
         target = float(alert.target_rate)
-        sent = await send_exchange_rate_alert(
-            to_email=email,
-            target_rate=target,
-            direction=alert.direction,
-            current_rate=current_rate,
-        )
-        if not sent:
-            return False
+        email_sent = False
+        try:
+            email_sent = await send_exchange_rate_alert(
+                to_email=email,
+                target_rate=target,
+                direction=alert.direction,
+                current_rate=current_rate,
+            )
+        except Exception as exc:
+            report_handled_failure("exchange_rate_alert_email_failed", exc, user_id=str(alert.user_id))
 
         direction_label = "이하" if alert.direction == "BELOW" else "이상"
-        await notify_and_record_trigger(
+        return await notify_and_record_trigger(
             db,
             alert,
             "EXCHANGE_RATE",
@@ -76,8 +79,8 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
             "환율 알림",
             f"USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
             fcm_token,
+            email_sent=email_sent,
         )
-        return True
 
     triggered_count = await run_isolated_alert_loop(db, rows, _handle, "exchange_rate_alert_item_failed")
     await finalize_alert_batch(db, "exchange_rate", triggered_count, current_rate=current_rate)

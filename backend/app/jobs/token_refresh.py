@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 import sentry_sdk
 import structlog
@@ -8,11 +9,16 @@ from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
 from app.kis.auth import get_access_token
 from app.models.asset import AssetAccount
+from app.models.token import KisToken
 from app.services.accounts.credential_service import decrypt_kis_credentials
 
 logger = structlog.get_logger()
 
 _TOKEN_REFRESH_CONCURRENCY = 3
+# 06:00에 이보다 적게 남은 토큰만 새로 발급한다 — 강제 갱신이 없으면 get_access_token은 남은 토큰을 그대로
+# 돌려줘, 전날 15:30 발급 토큰이 오늘 장중(15:30)에 만료됐다(plans/115 A7). 18시간이면 06:00 발급분이
+# 다음 날 06:00까지 가서 장중 만료가 없다. 하루 1회라 KIS 잦은 발급 경고 기준에 걸리지 않는다.
+_REFRESH_IF_EXPIRES_WITHIN = timedelta(hours=18)
 
 
 def _report_refresh_failure(account_id: str, exc: BaseException) -> None:
@@ -56,6 +62,8 @@ async def refresh_all_user_tokens() -> None:
                     return
                 app_key, app_secret = creds
                 async with AsyncSessionLocal() as db:
+                    expires_at = await db.scalar(select(KisToken.expires_at).where(KisToken.account_id == account.id))
+                    force = expires_at is None or expires_at - datetime.now(UTC) < _REFRESH_IF_EXPIRES_WITHIN
                     await get_access_token(
                         app_key,
                         app_secret,
@@ -64,8 +72,9 @@ async def refresh_all_user_tokens() -> None:
                         db=db,
                         user_id=str(account.user_id),
                         account_id=str(account.id),
+                        force_refresh=force,
                     )
-                logger.info("kis_account_token_refreshed", account_id=str(account.id))
+                logger.info("kis_account_token_refreshed", account_id=str(account.id), forced=force)
             except Exception as e:
                 logger.error("kis_account_token_refresh_failed", account_id=str(account.id), error=str(e))
                 _report_refresh_failure(str(account.id), e)

@@ -5,7 +5,7 @@ import { isaStatusQuery } from "@/api/queryOptions";
 import { updateIsaPnlOverride } from "@/api/assets";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
 import { INPUT_SM } from "@/constants/inputStyles";
-import { fmtKrw, fmtKrwPreview, parseYmd } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview, fmtMonthDay } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
@@ -14,11 +14,6 @@ import SegmentedControl from "@/components/common/SegmentedControl";
 import EmptyState from "@/components/common/EmptyState";
 
 /** 백엔드 date("YYYY-MM-DD") → "M/D". `new Date()`는 UTC 자정으로 해석해 UTC보다 늦은 타임존에서 전날이 된다. */
-function fmtMonthDay(ymd: string): string {
-  const { month, day } = parseYmd(ymd);
-  return `${month}/${day}`;
-}
-
 function MaturityBadge({ status }: { status: IsaAccountStatus }) {
   if (status.needs_open_date) {
     return (

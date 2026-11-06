@@ -3,6 +3,7 @@ import sentry_sdk
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_token_payload
@@ -105,10 +106,18 @@ async def sync_profile(
         needs_password_reset=False,
     )
     db.add(user)
-    await db.flush()
-
-    db.add(UserSettings(user_id=user.id))
-    await db.commit()
+    try:
+        await db.flush()
+        db.add(UserSettings(user_id=user.id))
+        await db.commit()
+    except IntegrityError:
+        # 가입 직후 두 기기·탭이 동시에 부르면 둘 다 위 존재 확인을 통과하고 나중 insert가 PK 충돌로 500이 됐다 —
+        # 먼저 만든 행을 그대로 돌려 멱등을 지킨다(plans/115 A9).
+        await db.rollback()
+        concurrent = await db.scalar(select(User).where(User.id == user_id))
+        if concurrent is None:
+            raise
+        return concurrent
     await db.refresh(user)
     return user
 

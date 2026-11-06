@@ -29,6 +29,7 @@ class TestRefreshAllUserTokens:
         mock_session.execute = AsyncMock(return_value=execute_result)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.scalar = AsyncMock(return_value=None)
 
         with (
             patch("app.jobs.token_refresh.AsyncSessionLocal", return_value=mock_session),
@@ -52,6 +53,7 @@ class TestRefreshAllUserTokens:
         mock_session.execute = AsyncMock(return_value=account_execute_result)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.scalar = AsyncMock(return_value=None)
 
         with (
             patch("app.jobs.token_refresh.AsyncSessionLocal", return_value=mock_session),
@@ -76,6 +78,7 @@ class TestRefreshAllUserTokens:
         mock_session.execute = AsyncMock(return_value=account_execute_result)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.scalar = AsyncMock(return_value=None)
 
         async def fail_token(*args, **kwargs):
             raise Exception("KIS API 오류")
@@ -96,3 +99,36 @@ class TestRefreshAllUserTokens:
         mock_sentry.capture_message.assert_called_once()
         assert "Exception" in mock_sentry.capture_message.call_args.args[0]
         assert "decrypted" not in mock_sentry.capture_message.call_args.args[0]
+
+
+class TestForceRefreshNearExpiry:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("hours_left", "forced"),
+        [(None, True), (9.5, True), (17.9, True), (18.1, False), (23.0, False)],
+    )
+    async def test_forces_only_when_expiring_within_18h(self, hours_left, forced):
+        """남은 토큰을 그대로 돌려받으면 전날 15:30 발급분이 장중에 만료된다(plans/115 A7)."""
+        from datetime import UTC, datetime, timedelta
+
+        account = _make_account()
+        mock_session = AsyncMock()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [account]
+        mock_session.execute = AsyncMock(return_value=result)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        expires_at = None if hours_left is None else datetime.now(UTC) + timedelta(hours=hours_left)
+        mock_session.scalar = AsyncMock(return_value=expires_at)
+
+        with (
+            patch("app.jobs.token_refresh.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs.token_refresh.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.token_refresh.decrypt_kis_credentials", return_value=("k", "s")),
+            patch("app.jobs.token_refresh.get_access_token", new_callable=AsyncMock) as mock_token,
+        ):
+            from app.jobs.token_refresh import refresh_all_user_tokens
+
+            await refresh_all_user_tokens()
+
+        assert mock_token.await_args.kwargs["force_refresh"] is forced

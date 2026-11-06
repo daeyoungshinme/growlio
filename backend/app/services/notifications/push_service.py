@@ -57,6 +57,9 @@ class PushResult(StrEnum):
     FAILED = "failed"
 
 
+_INVALID_TOKEN_ERRORS = frozenset({"UnregisteredError", "SenderIdMismatchError"})
+
+
 async def deliver_push(
     fcm_token: str | None,
     title: str,
@@ -86,7 +89,14 @@ async def deliver_push(
         return PushResult.SENT
     except Exception as exc:
         err = str(exc)
-        if "registration-token-not-registered" in err or "invalid-registration-token" in err:
+        # FCM v1(firebase-admin 6+)은 폐기 토큰을 UnregisteredError("Requested entity was not found.")로 던져
+        # 메시지에 예전 오류 코드 문자열이 없다 — 클래스로 판정해야 토큰이 정리된다(plans/115 A4).
+        # 이름으로 비교한다(firebase_admin은 지연 import). InvalidArgumentError는 페이로드 오류와 구분이 안 돼 제외.
+        if (
+            type(exc).__name__ in _INVALID_TOKEN_ERRORS
+            or "registration-token-not-registered" in err
+            or "invalid-registration-token" in err
+        ):
             logger.info("push_token_invalid")
             return PushResult.INVALID_TOKEN
         logger.warning("push_failed", error=err)

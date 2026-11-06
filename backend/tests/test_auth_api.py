@@ -167,6 +167,48 @@ class TestSyncProfile:
             app.dependency_overrides.pop(get_db, None)
             app.dependency_overrides.pop(get_token_payload, None)
 
+    def test_sync_profile_concurrent_insert_returns_existing(self):
+        """두 기기가 동시에 부르면 나중 insert가 PK 충돌 — 500 대신 먼저 생긴 행을 돌려준다(plans/115 A9)."""
+        from sqlalchemy.exc import IntegrityError
+
+        from app.api.deps import get_token_payload
+        from app.core.database import get_db
+        from app.main import app
+
+        user_id = str(uuid.uuid4())
+        winner = _make_user()
+        winner.id = uuid.UUID(user_id)
+        db = _make_mock_db()
+        # 존재 확인 → 고아 이메일 확인은 None, 충돌 후 재조회는 먼저 만든 행
+        db.scalar = AsyncMock(side_effect=[None, None, winner])
+        db.commit = AsyncMock(side_effect=IntegrityError("insert", {}, Exception("duplicate key")))
+        db.rollback = AsyncMock()
+
+        async def override_db():
+            yield db
+
+        async def override_payload():
+            return _valid_jwt_payload(user_id)
+
+        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_token_payload] = override_payload
+        try:
+            with (
+                patch("app.api.v1.auth.supabase_user_exists", new=AsyncMock(return_value=True)),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.post(
+                    "/api/v1/auth/sync-profile",
+                    json={"display_name": "새유저"},
+                    headers={"Authorization": "Bearer faketoken"},
+                )
+            assert resp.status_code == 200
+            assert resp.json()["id"] == user_id
+            db.rollback.assert_awaited_once()
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+            app.dependency_overrides.pop(get_token_payload, None)
+
     def test_sync_profile_invalid_payload_returns_401(self):
         """sub 또는 email 없는 페이로드로 요청하면 401을 반환한다 (line 36)."""
         from app.api.deps import get_token_payload

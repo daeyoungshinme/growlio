@@ -101,6 +101,12 @@ export function parseYmd(dateStr: string): { year: number; month: number; day: n
   return { year, month, day };
 }
 
+/** "YYYY-MM-DD" → "M/D" (앞자리 0 없음). 짧은 날짜 배지용. */
+export function fmtMonthDay(ymd: string): string {
+  const { month, day } = parseYmd(ymd);
+  return `${month}/${day}`;
+}
+
 /** ISO 시각 → 로컬 날짜·시각 표기 (예: "2026. 10. 14. 오후 5:30:00") */
 export function fmtDateTime(iso: string): string {
   return new Date(iso).toLocaleString("ko-KR");

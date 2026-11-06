@@ -17,10 +17,11 @@ import {
   shouldPersistQuery,
 } from "./constants/queryConfig";
 import { getLocalStorageOrUndefined } from "./utils/safeStorage";
-import { setupServiceWorker } from "./lib/serviceWorker";
+import { setupPreloadErrorReload, setupServiceWorker } from "./lib/serviceWorker";
 import { initSentryDeferred } from "./lib/sentry";
 
 setupServiceWorker();
+setupPreloadErrorReload();
 
 const queryClient = new QueryClient({
   defaultOptions: {

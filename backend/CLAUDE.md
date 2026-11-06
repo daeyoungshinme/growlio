@@ -179,7 +179,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `pension_contribution_service.py` · `isa_service.py`
 
 **알림 (`alerts/`)**
-- `alert_service.py` — 공통 저장·조회·격리 루프(rollback 뒤 행 객체는 refresh 후 사용), 오늘(KST) 발송 여부 `already_sent_alert_today`. 체크 함수 re-export 없음 — 구현 모듈에서 직접 import
+- `alert_service.py` — 공통 저장·조회·격리 루프(rollback 뒤 행 객체는 refresh 후 사용), 오늘(KST) 발송 여부 `already_sent_alert_today`. 환율·주가 알림 `notify_and_record_trigger`는 메일 결과(`email_sent`)를 받아 푸시를 따로 시도하고 한 채널이라도 성공해야 발동 기록. 주가 알림 목표가는 **원화** — 해외는 `fetch_prices_batch_krw`로 비교. 체크 함수 re-export 없음 — 구현 모듈에서 직접 import
 - `exchange_rate_service.py` · `stock_price_service.py` · `calculator.py`(조건 판단)
 - `market_signal_alert_service.py` — 등급 전환 즉시 알림 + 08:30 요약. `check_composite_signal`을 alert_check·diagnosis와 공유
 - `_dispatch.py` — 이메일+푸시 2채널, 하나라도 성공하면 AlertHistory 저장. 단독 푸시는 `send_push_safely`(예외 로깅 후 삼킴)
@@ -260,7 +260,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 | `challenge_deposit_reminder.py` | 매월 25일 09:00 | 옵트인 |
 | `year_end_tax_reminder.py` | 11~12월 매주 월 09:00 | 옵트인 |
 | `recommendation_drift_alert.py` | 매주 월 09:15 | 옵트인 |
-| `token_refresh.py` | 06:00 | 실패는 스택 없는 capture_message(자격증명 지역변수 전송 방지) |
+| `token_refresh.py` | 06:00 | 만료 18h 미만 토큰만 `force_refresh` — 없으면 남은 토큰을 돌려받아 장중 만료. 실패는 스택 없는 capture_message(자격증명 지역변수 전송 방지) |
 | `startup_warmup.py` | 기동 직후 1회 | 환율·시장신호·JWKS 예열 |
 | `periodic_catchup.py` | 기동 2분 뒤 + 10~21시 매시 25분 | 놓친 월간 잡 보충(1~3일: 리포트·챌린지 결산, 25~28일: 독려). 월 단위 dedup이 있는 잡만 넣을 것 |
 | `cache_sweep.py` / `app_state_sweep.py` | 15분 / 04:10 | 만료 캐시 / durable row 청소 |

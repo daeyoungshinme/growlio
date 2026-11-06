@@ -24,13 +24,20 @@ from app.core.job_runner import report_handled_failure
 from app.core.logging import format_sync_error
 from app.models.asset import AssetAccount
 from app.services.accounts.asset_service import sync_account
-from app.utils.cache_keys import TTL_SYNC_ALL_STATUS, get_cached_json, set_cached_json, sync_all_status_key
+from app.utils.cache_keys import (
+    TTL_SYNC_ALL_STATUS,
+    get_cached_json,
+    set_cached_json,
+    sync_all_status_key,
+    sync_lock_key,
+)
 from app.utils.inproc_lock import inproc_lock
 
 logger = structlog.get_logger()
 
 _LOCK_TTL_SECONDS = 600
 _ACCOUNT_SYNC_CONCURRENCY = 3
+_ACCOUNT_LOCK_TTL_SECONDS = 120  # 단건 /sync 엔드포인트와 같은 값
 
 ProgressCallback = Callable[[int, int, int], Awaitable[None]]
 
@@ -55,13 +62,19 @@ async def sync_accounts(
         nonlocal done_count
         async with sem:
             try:
-                async with AsyncSessionLocal() as db:
-                    # account는 이 함수 호출 전 다른(이미 닫힌) 세션에서 조회되어 detached 상태이므로,
-                    # merge로 새 세션에 편입해야 sync_account() 내부의 account.deposit_krw 등
-                    # 속성 변경이 commit 시 실제로 반영된다.
-                    merged_account = await db.merge(account)
-                    await sync_account(merged_account, db, cache)
-                logger.info("account_synced", job=job_name, account_id=str(account.id), name=account.name)
+                # 단건 /sync·수동 포지션 저장과 같은 계좌 락 — 병렬로 돌면 현재 포지션 delete→insert가
+                # READ COMMITTED에서 둘 다 살아남아 보유 종목이 중복된다(plans/115 A1).
+                async with inproc_lock(cache, sync_lock_key(account.id), ttl=_ACCOUNT_LOCK_TTL_SECONDS) as acquired:
+                    if not acquired:
+                        logger.info("account_sync_skipped_locked", job=job_name, account_id=str(account.id))
+                    else:
+                        async with AsyncSessionLocal() as db:
+                            # account는 이 함수 호출 전 다른(이미 닫힌) 세션에서 조회되어 detached 상태이므로,
+                            # merge로 새 세션에 편입해야 sync_account() 내부의 account.deposit_krw 등
+                            # 속성 변경이 commit 시 실제로 반영된다.
+                            merged_account = await db.merge(account)
+                            await sync_account(merged_account, db, cache)
+                        logger.info("account_synced", job=job_name, account_id=str(account.id), name=account.name)
             except Exception as e:
                 report_handled_failure(
                     "account_sync_failed", e, job=job_name, account_id=str(account.id), name=account.name

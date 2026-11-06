@@ -40,7 +40,29 @@ _MOCK_SUMMARY = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _email_configured():
+    """발송 경로 테스트는 메일이 설정된 상태를 전제로 한다(미설정 조기 종료는 별도 테스트)."""
+    with patch("app.jobs.monthly_report.email_configured", return_value=True):
+        yield
+
+
 class TestRunMonthlyReport:
+    @pytest.mark.asyncio
+    async def test_skips_before_aggregation_when_email_not_configured(self):
+        """메일 미설정이면 유저 조회·대시보드 집계 전에 끝낸다 — catch-up이 매시간 헛돌지 않게(plans/115 A6)."""
+        mock_db = AsyncMock()
+        with (
+            patch("app.jobs.monthly_report.email_configured", return_value=False),
+            patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock) as summary,
+        ):
+            from app.jobs.monthly_report import _run_monthly_report
+
+            await _run_monthly_report(mock_db, AsyncMock())
+
+        mock_db.execute.assert_not_called()
+        summary.assert_not_called()
+
     @pytest.mark.asyncio
     async def test_no_users_does_nothing(self):
         """유저 없을 때 이메일 발송하지 않는다."""

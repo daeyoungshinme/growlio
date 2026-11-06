@@ -575,6 +575,13 @@ class TestExternalGoal:
         # XIRR이 없으면 연환산 수익률로 폴백(대시보드의 목표 수익률 비교와 같은 순서)
         assert body["actual_return_pct"] == 7.2
 
+    def test_goal_start_date_serialized_as_date(self, override_settings):
+        """nestlio는 date("2024-01-01")로 받는다 — 시각·타임존이 붙으면 안 된다(plans/114 B)."""
+        from datetime import date
+
+        body, _ = self._get(_goal_row(goal_start_date=date(2024, 1, 1)), {})
+        assert body["goal_start_date"] == "2024-01-01"
+
     def test_summary_failure_keeps_settings(self, override_settings):
         body, _ = self._get(_goal_row(), summary_error=RuntimeError("dividend api down"))
         assert body["is_configured"] is True

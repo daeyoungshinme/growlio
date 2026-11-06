@@ -76,7 +76,8 @@ export function EditableMobilePositionCard({
             </span>
           )}
           <select
-            className="text-base border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg px-2 py-2 focus:outline-hidden"
+            aria-label="시장"
+            className="text-base border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg px-2 py-2 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500"
             value={row.market}
             onChange={(e) => handleMarketChange(i, e.target.value, row.market)}
           >
