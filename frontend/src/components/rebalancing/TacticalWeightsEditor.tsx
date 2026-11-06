@@ -7,7 +7,7 @@ import type {
   TacticalStrategyPayload,
 } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
-import { ToggleRow } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleRow";
 import SegmentedControl from "@/components/common/SegmentedControl";
 import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";

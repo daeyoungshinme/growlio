@@ -10,7 +10,7 @@ import { useMonthlyReportAlertsToggle } from "@/hooks/useMonthlyReportAlertsTogg
 import { useYearEndTaxReminderToggle } from "@/hooks/useYearEndTaxReminderToggle";
 import { useRecommendationDriftAlertToggle } from "@/hooks/useRecommendationDriftAlertToggle";
 import { useChallengeRemindersToggle } from "@/hooks/useChallengeRemindersToggle";
-import { ToggleRow } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleRow";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import EmptyState from "@/components/common/EmptyState";
 import Tabs from "@/components/common/Tabs";

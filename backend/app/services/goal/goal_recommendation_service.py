@@ -99,7 +99,7 @@ from app.utils.inproc_lock import inproc_lock
 
 logger = structlog.get_logger()
 
-_RECOMMENDATION_DRIFT_THRESHOLD_PCT = 3.0
+RECOMMENDATION_DRIFT_THRESHOLD_PCT = 3.0
 """`frontend/src/utils/recommendationDrift.ts`의 RECOMMENDATION_DRIFT_THRESHOLD_PCT와 동일하게
 유지 — 프론트(화면을 열었을 때 배지)와 백엔드(주간 알림 job)가 같은 기준으로 "유의미한 변화"를
 판단하게 하기 위함. 한쪽만 바꾸면 배지와 알림의 민감도가 어긋나므로 항상 함께 바꿀 것."""
@@ -111,7 +111,7 @@ def compute_recommendation_drift(
 ) -> tuple[float, int]:
     """`frontend/src/utils/recommendationDrift.ts`의 `computeRecommendationDrift()`와 동일한 로직을
     백엔드에 포팅한 것 — ticker+market 키로 매칭해 (최대 비중차이%p, 신규후보개수)를 반환한다.
-    "유의미한 변화" 판정(`_RECOMMENDATION_DRIFT_THRESHOLD_PCT` 이상 또는 신규후보 존재)은
+    "유의미한 변화" 판정(`RECOMMENDATION_DRIFT_THRESHOLD_PCT` 이상 또는 신규후보 존재)은
     호출측(`recommendation_drift_alert_service.py`)이 담당한다.
     """
     current_by_key = {(t, m): w for t, m, w in current}
@@ -470,7 +470,7 @@ async def _compute_goal_recommendation(
 
     risk_tolerance = getattr(settings_row, "goal_risk_tolerance", None) or "CONSERVATIVE"
     max_weight = _grc._max_weight_from_settings(settings_row)
-    cagr_lookback_years = _grc._cagr_lookback_years_from_settings(settings_row)
+    cagr_lookback_years = _grc.cagr_lookback_years_from_settings(settings_row)
     # 방금 보강한 후보도 등록 슬롯을 차지한다 — 빼지 않으면 "후보에 추가"가 상한을 넘는다
     dividend_capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts) - added_count
 

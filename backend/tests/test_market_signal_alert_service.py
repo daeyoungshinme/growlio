@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services.market_signal.market_signal_service import get_last_composite_level, set_last_composite_level
-from app.services.rebalancing.diagnosis_service import _MARKET_NOTES
+from app.services.rebalancing.diagnosis_service import MARKET_NOTES
 
 
 def _per_user_session() -> AsyncMock:
@@ -343,7 +343,7 @@ class TestSendMarketSignalDailyDigest:
         ):
             await send_market_signal_daily_digest(mock_db, mock_cache)
 
-        mock_email.assert_called_once_with("user@example.com", "RED", _MARKET_NOTES["RED"])
+        mock_email.assert_called_once_with("user@example.com", "RED", MARKET_NOTES["RED"])
         mock_push.assert_called_once()
         push_kwargs = mock_push.call_args.kwargs
         assert push_kwargs["fcm_token"] == "token-abc"
@@ -352,7 +352,7 @@ class TestSendMarketSignalDailyDigest:
 
     @pytest.mark.asyncio
     async def test_green_level_uses_fallback_reason(self, mock_db, mock_cache):
-        """GREEN은 _MARKET_NOTES에 None이 매핑되어 있으므로 안내 문구로 대체한다(빈 메시지 방지)."""
+        """GREEN은 MARKET_NOTES에 None이 매핑되어 있으므로 안내 문구로 대체한다(빈 메시지 방지)."""
         from app.services.alerts.market_signal_alert_service import send_market_signal_daily_digest
 
         user = SimpleNamespace(id=uuid.uuid4(), email="user@example.com", is_active=True)

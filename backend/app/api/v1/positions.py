@@ -17,7 +17,7 @@ from app.limiter import limiter
 from app.models.asset import Position
 from app.models.user import User
 from app.schemas.asset import ManualPosition, PositionListResponse
-from app.services.accounts.snapshot_service import _upsert_snapshot, sync_snapshot_positions
+from app.services.accounts.snapshot_service import sync_snapshot_positions, upsert_snapshot
 from app.services.market_data.price_service import fetch_prices_batch
 from app.services.portfolio._position_queries import fetch_manual_positions
 from app.utils.cache_invalidation import invalidate_asset_account_caches
@@ -133,7 +133,7 @@ async def save_positions(
         if account.deposit_usd:
             usd_rate = await require_live_usd_krw(cache)
 
-        snap = await _upsert_snapshot(
+        snap = await upsert_snapshot(
             db,
             account_id=account.id,
             user_id=account.user_id,
@@ -200,7 +200,7 @@ async def sync_position_prices(
         total_invested_dec = sum(Decimal(str(p["avg_price"])) * Decimal(str(p["qty"])) for p in updated_dicts)
         account.manual_amount = float(total_value_dec)
 
-        snap = await _upsert_snapshot(
+        snap = await upsert_snapshot(
             db,
             account_id=account.id,
             user_id=account.user_id,

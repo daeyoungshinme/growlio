@@ -8,11 +8,11 @@ import pytest
 
 from app.utils.kst import today_kst
 
-# ── _upsert_snapshot 테스트 ─────────────────────────────────
+# ── upsert_snapshot 테스트 ─────────────────────────────────
 
 
 class TestUpsertSnapshot:
-    """_upsert_snapshot: 스냅샷 upsert 로직 검증.
+    """upsert_snapshot: 스냅샷 upsert 로직 검증.
 
     구현은 pg_insert().on_conflict_do_update().returning() 방식을 사용한다.
     insert/update 분기 없이 단일 SQL 문으로 처리되므로 db.execute()와 db.commit() 호출만 검증한다.
@@ -21,7 +21,7 @@ class TestUpsertSnapshot:
     @pytest.mark.asyncio
     async def test_executes_upsert_without_committing(self, mock_db):
         """pg_insert upsert를 실행하되 commit은 호출자가 처리한다."""
-        from app.services.accounts.snapshot_service import _upsert_snapshot
+        from app.services.accounts.snapshot_service import upsert_snapshot
 
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()
@@ -39,7 +39,7 @@ class TestUpsertSnapshot:
         mock_execute_result.scalar_one.return_value = snap
         mock_db.execute = AsyncMock(return_value=mock_execute_result)
 
-        result = await _upsert_snapshot(
+        result = await upsert_snapshot(
             mock_db,
             account_id=account_id,
             user_id=user_id,
@@ -55,7 +55,7 @@ class TestUpsertSnapshot:
     @pytest.mark.asyncio
     async def test_upsert_passes_correct_amount(self, mock_db):
         """upsert 호출 시 amount_krw가 올바르게 전달된다."""
-        from app.services.accounts.snapshot_service import _upsert_snapshot
+        from app.services.accounts.snapshot_service import upsert_snapshot
 
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()
@@ -66,7 +66,7 @@ class TestUpsertSnapshot:
         mock_execute_result.scalar_one.return_value = snap
         mock_db.execute = AsyncMock(return_value=mock_execute_result)
 
-        result = await _upsert_snapshot(
+        result = await upsert_snapshot(
             mock_db,
             account_id=account_id,
             user_id=user_id,

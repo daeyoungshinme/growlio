@@ -14,7 +14,7 @@ from app.utils.kst import today_kst
 from app.utils.pnl import eval_value
 
 
-async def _upsert_snapshot(
+async def upsert_snapshot(
     db: AsyncSession,
     *,
     account_id,
@@ -140,7 +140,7 @@ async def write_manual_deposit_snapshot(
     `latest_snap`/`positions`는 이번 요청에서 스냅샷을 쓰기 **전에** 조회한 값이어야 한다. commit은 호출자가 한다.
     """
     total = eval_value(positions) + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate
-    snap = await _upsert_snapshot(
+    snap = await upsert_snapshot(
         db,
         account_id=account.id,
         user_id=account.user_id,

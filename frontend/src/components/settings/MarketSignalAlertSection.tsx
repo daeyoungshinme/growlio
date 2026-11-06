@@ -1,6 +1,6 @@
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import { useMarketSignalDigestToggle } from "@/hooks/useMarketSignalDigestToggle";
-import { ToggleRow } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleRow";
 import { SectionCard } from "./shared";
 
 /** `embedded`이면 자체 `SectionCard` 제목("시장 신호 알림")을 생략 — 부모(`SettingsPage`의 "시장 모니터링"

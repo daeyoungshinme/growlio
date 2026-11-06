@@ -87,7 +87,7 @@ class TestSavePositions:
                 mock_cm.__aexit__ = AsyncMock(return_value=None)
                 mock_lock.return_value = mock_cm
                 with (
-                    patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
+                    patch("app.api.v1.positions.upsert_snapshot", AsyncMock(return_value=mock_snap)),
                     TestClient(app, raise_server_exceptions=False) as client,
                 ):
                     resp = client.put(
@@ -185,7 +185,7 @@ class TestSavePositionsExtended:
             mock_gr.return_value = mock_cache
             with (
                 patch("app.utils.inproc_lock.inproc_lock", return_value=self._make_cache_lock_ctx(True)),
-                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions.upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.put(
@@ -226,7 +226,7 @@ class TestSavePositionsExtended:
             mock_gr.return_value = mock_cache
             with (
                 patch("app.utils.inproc_lock.inproc_lock", return_value=self._make_cache_lock_ctx(True)),
-                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions.upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=1350.0)),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -356,7 +356,7 @@ class TestSyncPositionPrices:
             with (
                 patch("app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={"005930": 76000.0})),
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=None)),
-                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions.upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -407,7 +407,7 @@ class TestSyncPositionPrices:
             with (
                 patch("app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={"AAPL": 210.0})),
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=1350.0)),
-                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions.upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -459,7 +459,7 @@ class TestSyncPositionPrices:
                     "app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={})
                 ),  # Empty → ticker not found
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=None)),
-                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions.upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):

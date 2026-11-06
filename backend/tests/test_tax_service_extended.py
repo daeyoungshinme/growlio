@@ -114,47 +114,24 @@ class TestGetOverseasPositionsDetail:
         assert result == []
 
 
-class TestStockUnrealizedFromRows:
-    def test_empty_rows_returns_zero_tuple(self):
-        from app.services.tax.tax_service import _stock_unrealized_from_rows
+class TestOverseasUnrealizedFromRows:
+    def test_empty_rows_returns_zero(self):
+        from app.services.tax.tax_service import _overseas_unrealized_from_rows
 
-        overseas, domestic_val, domestic_unrealized, tax_deferred = _stock_unrealized_from_rows([])
-        assert overseas == 0.0
-        assert domestic_val == 0.0
-        assert domestic_unrealized == 0.0
-        assert tax_deferred == 0.0
+        assert _overseas_unrealized_from_rows([]) == 0.0
 
     def test_overseas_position_unrealized_gain(self):
-        from app.services.tax.tax_service import _stock_unrealized_from_rows
+        from app.services.tax.tax_service import _overseas_unrealized_from_rows
 
         pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=150_000.0, qty=10)
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos])
         acc = SimpleNamespace(id=uuid.uuid4(), tax_type="GENERAL")
 
-        overseas, domestic_val, domestic_unrealized, tax_deferred = _stock_unrealized_from_rows([(snap, acc)])
+        # 150_000 * 10 - 100_000 * 10
+        assert _overseas_unrealized_from_rows([(snap, acc)]) == pytest.approx(500_000.0)
 
-        # overseas = 150_000 * 10 - 100_000 * 10 = 500_000
-        assert overseas == pytest.approx(500_000.0)
-        assert domestic_val == 0.0
-        assert domestic_unrealized == 0.0
-        assert tax_deferred == 0.0
-
-    def test_domestic_position_value_and_unrealized(self):
-        from app.services.tax.tax_service import _stock_unrealized_from_rows
-
-        pos = _make_position(ticker="005930", market="KOSPI", avg_price=60_000.0, current_price=70_000.0, qty=100)
-        snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos])
-        acc = SimpleNamespace(id=uuid.uuid4(), tax_type="GENERAL")
-
-        overseas, domestic_val, domestic_unrealized, tax_deferred = _stock_unrealized_from_rows([(snap, acc)])
-
-        assert overseas == 0.0
-        assert domestic_val == pytest.approx(7_000_000.0)  # 70_000 * 100
-        assert domestic_unrealized == pytest.approx(1_000_000.0)  # (70k-60k)*100
-        assert tax_deferred == 0.0
-
-    def test_mixed_positions(self):
-        from app.services.tax.tax_service import _stock_unrealized_from_rows
+    def test_domestic_position_is_ignored(self):
+        from app.services.tax.tax_service import _overseas_unrealized_from_rows
 
         pos_overseas = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=120_000.0, qty=5)
         pos_domestic = _make_position(
@@ -163,25 +140,15 @@ class TestStockUnrealizedFromRows:
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos_overseas, pos_domestic])
         acc = SimpleNamespace(id=uuid.uuid4(), tax_type="GENERAL")
 
-        overseas, domestic_val, domestic_unrealized, tax_deferred = _stock_unrealized_from_rows([(snap, acc)])
+        assert _overseas_unrealized_from_rows([(snap, acc)]) == pytest.approx(100_000.0)  # (120k-100k)*5
 
-        assert overseas == pytest.approx(100_000.0)  # (120k-100k)*5
-        assert domestic_val == pytest.approx(700_000.0)  # 70k*10
-        assert domestic_unrealized == pytest.approx(100_000.0)  # (70k-60k)*10
-        assert tax_deferred == 0.0
-
-    def test_tax_deferred_account_excluded_from_gain_and_counted_separately(self):
-        from app.services.tax.tax_service import _stock_unrealized_from_rows
+    def test_tax_deferred_account_excluded(self):
+        from app.services.tax.tax_service import _overseas_unrealized_from_rows
 
         pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=150_000.0, qty=10)
         snap, acc = _make_snap_acc([pos], tax_type="ISA")
 
-        overseas, domestic_val, domestic_unrealized, tax_deferred = _stock_unrealized_from_rows([(snap, acc)])
-
-        assert overseas == 0.0
-        assert domestic_val == 0.0
-        assert domestic_unrealized == 0.0
-        assert tax_deferred == pytest.approx(1_500_000.0)  # 150_000 * 10
+        assert _overseas_unrealized_from_rows([(snap, acc)]) == 0.0
 
 
 class TestEstimateOverseasTransferTax:
@@ -230,10 +197,10 @@ class TestMarketClassificationPinned:
     """세금 요약 미실현과 실현손익의 OTHER 판정이 갈리는 현재 동작 고정(세무 판단 보류 — docs/plans/105 D2)."""
 
     def test_other_market_excluded_from_unrealized_buckets(self):
-        from app.services.tax.tax_service import _stock_unrealized_from_rows
+        from app.services.tax.tax_service import _overseas_unrealized_from_rows
 
         pos = _make_position(ticker="XYZ", market="OTHER", avg_price=100_000.0, current_price=150_000.0, qty=10)
-        assert _stock_unrealized_from_rows([_make_snap_acc([pos])]) == (0.0, 0.0, 0.0, 0.0)
+        assert _overseas_unrealized_from_rows([_make_snap_acc([pos])]) == 0.0
 
     def test_other_market_is_overseas_for_realized(self):
         from app.services.tax.overseas_realized_service import _is_overseas

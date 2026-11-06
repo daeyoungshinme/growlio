@@ -180,7 +180,7 @@ async def _compute_age_based_recommendation(
         cache, db, user_id, settings_row, age_bracket, default_dividend_floor_pct
     )
     max_weight = _grc._max_weight_from_settings(settings_row)
-    cagr_lookback_years = _grc._cagr_lookback_years_from_settings(settings_row)
+    cagr_lookback_years = _grc.cagr_lookback_years_from_settings(settings_row)
 
     all_pos_map = await query_latest_position_map(user_id, db, include_name=True)
     existing_items = existing_items_from_positions(all_pos_map)

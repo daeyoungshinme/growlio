@@ -496,7 +496,7 @@ async def _compute_horizon_recommendations(
     태그된 계좌가 하나도 없는 (기간, 세제유형) 조합은 결과에서 생략한다.
     """
     max_weight = _grc._max_weight_from_settings(settings_row)
-    cagr_lookback_years = _grc._cagr_lookback_years_from_settings(settings_row)
+    cagr_lookback_years = _grc.cagr_lookback_years_from_settings(settings_row)
     short_term_equity_floor = _short_term_equity_floor_from_settings(settings_row)
 
     all_pos_map = await query_latest_position_map(user_id, db, include_name=True)
