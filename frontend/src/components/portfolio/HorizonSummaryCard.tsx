@@ -72,7 +72,7 @@ export default function HorizonSummaryCard({ overview }: Props) {
             >
               <span
                 aria-hidden="true"
-                className={`w-2 h-2 rounded-sm shrink-0 ${HORIZON_BAR_COLOR[g.horizon]}`}
+                className={`w-2 h-2 rounded-xs shrink-0 ${HORIZON_BAR_COLOR[g.horizon]}`}
               />
               <span className="text-gray-500 dark:text-gray-400">
                 {INVESTMENT_HORIZON_LABELS[g.horizon]}

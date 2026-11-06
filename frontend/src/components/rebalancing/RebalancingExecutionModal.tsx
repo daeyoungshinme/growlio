@@ -90,7 +90,7 @@ export function RebalancingExecutionModal({
                 </span>
                 <button
                   onClick={() => void loadAllPrices()}
-                  className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 gap-1 text-xs text-amber-700 dark:text-amber-300 hover:text-amber-600 dark:hover:text-amber-200 px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 border border-amber-300 dark:border-amber-700/40 transition-colors`}
+                  className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 gap-1 text-xs text-amber-700 dark:text-amber-300 hover:text-amber-600 dark:hover:text-amber-200 px-2 py-1 rounded-sm bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 border border-amber-300 dark:border-amber-700/40 transition-colors`}
                 >
                   <RefreshCw size={12} />
                   재조회

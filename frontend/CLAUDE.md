@@ -286,4 +286,5 @@ _기타_
 위험(삭제) px-5 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors
 ```
 
+- **Tailwind v4**: `tailwind.config.*` 없음 — 테마 색·`dark` variant·`card` 유틸은 `src/index.css`의 `@theme`/`@custom-variant`/`@utility`. v3 이름 금지(`shadow-sm`→`shadow-xs`, `rounded`→`rounded-sm`, `outline-none`→`outline-hidden`, `flex-shrink-0`→`shrink-0`) — 같은 이름이 v4에선 한 단계 큰 값.
 - 다크모드: `const { isDark } = useThemeStore()`. Tailwind `dark:`(HTML `class="dark"` 토글)를 `isDark`보다 우선.

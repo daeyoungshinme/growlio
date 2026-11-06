@@ -60,12 +60,12 @@ function PositionBlock({ position }: { position: NonNullable<FxPlanData["positio
       </div>
       <div>
         <div
-          className="relative h-2 rounded-full bg-gradient-to-r from-emerald-200 via-gray-200 to-rose-200 dark:from-emerald-900 dark:via-gray-700 dark:to-rose-900"
+          className="relative h-2 rounded-full bg-linear-to-r from-emerald-200 via-gray-200 to-rose-200 dark:from-emerald-900 dark:via-gray-700 dark:to-rose-900"
           role="img"
           aria-label={`1년 범위 중 현재 위치 ${markerPct.toFixed(0)}%`}
         >
           <span
-            className="absolute top-1/2 h-4 w-1 -translate-x-1/2 -translate-y-1/2 rounded bg-gray-900 dark:bg-gray-100"
+            className="absolute top-1/2 h-4 w-1 -translate-x-1/2 -translate-y-1/2 rounded-sm bg-gray-900 dark:bg-gray-100"
             style={{ left: `${markerPct}%` }}
           />
         </div>

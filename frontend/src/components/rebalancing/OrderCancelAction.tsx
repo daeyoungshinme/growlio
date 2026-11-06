@@ -58,7 +58,7 @@ export function OrderCancelAction({
   return (
     <div className="flex flex-col items-start gap-0.5">
       {canceled && (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
           미체결 취소됨
         </span>
       )}

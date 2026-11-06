@@ -3,7 +3,7 @@ import { TOUCH_HEIGHT_MIN } from "./uiSizes";
 const BASE =
   "border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 " +
   "text-gray-900 dark:text-gray-50 rounded-lg " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "focus:outline-hidden focus:ring-2 focus:ring-blue-500";
 
 export const INPUT_SM = BASE + ` px-3 py-2 text-sm ${TOUCH_HEIGHT_MIN}`;
 export const INPUT_MD = BASE + ` px-3 py-2.5 text-base ${TOUCH_HEIGHT_MIN}`;

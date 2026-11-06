@@ -143,7 +143,7 @@ const PortfolioCard = memo(function PortfolioCard({
             {...dragHandleListeners}
             onClick={(e) => e.stopPropagation()}
             aria-label="포트폴리오 순서 변경"
-            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none`}
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing shrink-0 touch-none`}
           >
             <GripVertical size={14} />
           </button>
@@ -181,7 +181,7 @@ const PortfolioCard = memo(function PortfolioCard({
             </p>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-0.5 flex-shrink-0 mt-0.5">
+        <div className="flex flex-wrap items-center justify-end gap-0.5 shrink-0 mt-0.5">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -428,7 +428,7 @@ export default function PortfolioListSection({
       {unassignedAccounts.length > 0 && portfolios.length > 0 && (
         <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3">
           <div className="flex items-center gap-1.5 mb-2">
-            <CircleAlert size={13} className="text-amber-500 flex-shrink-0" />
+            <CircleAlert size={13} className="text-amber-500 shrink-0" />
             <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
               기준 포트폴리오 미지정 계좌
             </p>
@@ -471,7 +471,7 @@ export default function PortfolioListSection({
                   key={step}
                   className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-300 dark:bg-blue-700 flex-shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-300 dark:bg-blue-700 shrink-0" />
                   {step}
                 </div>
               ),

@@ -211,7 +211,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                       {acc.is_mock_mode ? "모의" : "실계좌"}
                     </span>
                     {!acc.is_active && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 shrink-0">
+                      <span className="text-xs px-1.5 py-0.5 rounded-sm bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 shrink-0">
                         비활성
                       </span>
                     )}
@@ -240,7 +240,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                       onClick={() => loadLiveBalance(acc.id)}
                       disabled={bState === "loading"}
                       // 실주문 직전 화면 — 약 20px이던 버튼을 모바일 44px로 (docs/plans/67 P2-2)
-                      className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs px-3 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors border border-gray-300 dark:border-gray-600`}
+                      className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs px-3 rounded-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors border border-gray-300 dark:border-gray-600`}
                     >
                       {bState === "loading"
                         ? "조회 중..."
@@ -295,7 +295,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                           onChange={(e) => {
                             if (e.target.value) addBuyAccount(e.target.value, acc.id);
                           }}
-                          className={`${TOUCH_HEIGHT_MIN} w-full sm:w-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-sm sm:text-xs text-gray-500 dark:text-gray-400 focus:outline-none focus:border-indigo-500 hover:border-gray-400 dark:hover:border-gray-600 cursor-pointer`}
+                          className={`${TOUCH_HEIGHT_MIN} w-full sm:w-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-sm px-2 py-1 text-sm sm:text-xs text-gray-500 dark:text-gray-400 focus:outline-hidden focus:border-indigo-500 hover:border-gray-400 dark:hover:border-gray-600 cursor-pointer`}
                         >
                           <option value="">+ 이 계좌에 매수 종목 추가</option>
                           {unassignedBuyItems.map((i) => (

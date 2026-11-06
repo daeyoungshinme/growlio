@@ -69,7 +69,7 @@ function AlertHistorySection() {
   return (
     <SectionCard title="알림 발송 이력">
       {isLoading ? (
-        <div className="h-20 bg-gray-50 dark:bg-gray-800 rounded animate-pulse" />
+        <div className="h-20 bg-gray-50 dark:bg-gray-800 rounded-sm animate-pulse" />
       ) : isError ? (
         <EmptyState
           title="알림 이력을 불러오지 못했습니다."

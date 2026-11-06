@@ -77,7 +77,7 @@ export default function MarketSignalBanner({
           시장 상황
         </span>
         <MarketSignalLevelBadge level={composite_level} />
-        <span className="text-xs text-gray-500 dark:text-gray-400 order-last basis-full sm:order-none sm:basis-auto sm:flex-1 sm:min-w-0 sm:truncate">
+        <span className="text-xs text-gray-500 dark:text-gray-400 order-last basis-full sm:order-0 sm:basis-auto sm:flex-1 sm:min-w-0 sm:truncate">
           {SHORT_IMPLICATION[composite_level]}
           {data_freshness === "STALE" && " · 데이터 조회 불가"}
           {data_freshness === "PARTIAL" && " · 일부 데이터 없음"}
@@ -188,7 +188,7 @@ export default function MarketSignalBanner({
             <Link
               to={notificationSettingsUrl(MARKET_ALERT_SECTION)}
               aria-label="시장 위험 신호 알림 설정"
-              className={`${TOUCH_TARGET_ROW} !justify-end ml-auto text-xs text-blue-600 dark:text-blue-400`}
+              className={`${TOUCH_TARGET_ROW} justify-end! ml-auto text-xs text-blue-600 dark:text-blue-400`}
             >
               설정 →
             </Link>

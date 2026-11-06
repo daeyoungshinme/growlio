@@ -74,9 +74,9 @@ export default memo(function HeroSummaryCard({
           className="flex items-center gap-4 animate-pulse"
         >
           <div className="flex-1 space-y-2">
-            <div className="h-3 w-16 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-7 w-32 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-4 w-40 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-3 w-16 rounded-sm bg-gray-200 dark:bg-gray-700" />
+            <div className="h-7 w-32 rounded-sm bg-gray-200 dark:bg-gray-700" />
+            <div className="h-4 w-40 rounded-sm bg-gray-200 dark:bg-gray-700" />
           </div>
           <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-700 shrink-0" />
         </div>
@@ -114,7 +114,7 @@ export default memo(function HeroSummaryCard({
             title={
               amountVisible ? `${Math.floor(data.total_assets_krw).toLocaleString()}원` : undefined
             }
-            className={`self-start ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} flex items-center gap-2 text-left rounded-lg text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+            className={`self-start ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} flex items-center gap-2 text-left rounded-lg text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500`}
           >
             <span>{amountVisible ? fmtKrw(Math.floor(data.total_assets_krw)) : "••••••"}</span>
             {amountVisible ? (
@@ -187,7 +187,7 @@ export default memo(function HeroSummaryCard({
             {allocationChartData.map((item, i) => (
               <li key={i} className="flex items-center gap-1 min-w-0">
                 <span
-                  className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                  className="inline-block w-2.5 h-2.5 rounded-xs shrink-0"
                   style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
                 />
                 <span className="text-xs text-gray-600 dark:text-gray-400 leading-tight truncate min-w-0">

@@ -64,7 +64,7 @@ export default function AchievementTable({
         type="button"
         onClick={() => setShowAll((v) => !v)}
         aria-expanded={showAll}
-        className={`${visibilityClass} ${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400`}
+        className={`${visibilityClass} ${TOUCH_TARGET_ROW} w-full justify-center! text-xs font-medium text-gray-500 dark:text-gray-400`}
       >
         {showAll ? "접기" : `${reversed.length - initial}개월 더 보기`}
       </button>

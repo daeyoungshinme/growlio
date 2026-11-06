@@ -45,7 +45,7 @@ export default function RecommendationApplySection({
               aria-label="적용할 포트폴리오"
               value={selectedTargetId}
               onChange={(e) => onSelectTarget(e.target.value)}
-              className="text-xs border border-teal-200 dark:border-teal-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-2 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="text-xs border border-teal-200 dark:border-teal-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-2 sm:py-1.5 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
             >
               <option value="">포트폴리오 선택</option>
               {targetPortfolios.map((p) => (

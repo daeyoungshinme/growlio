@@ -31,7 +31,7 @@ export default function Toaster() {
   return (
     // 모달(z-60) 위에 떠야 모달 안 오류가 보이고, 좌우 여백을 줘 긴 문구가 화면 끝까지 붙지 않게 한다.
     // 탭하면 닫힌다(가린 버튼을 누를 수 있게) — docs/plans/67 P2-5
-    <div className="fixed bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+0.5rem)] left-3 right-3 lg:left-auto lg:bottom-5 lg:right-5 lg:max-w-sm z-[80] flex flex-col items-end gap-2 pointer-events-none">
+    <div className="fixed bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+0.5rem)] left-3 right-3 lg:left-auto lg:bottom-5 lg:right-5 lg:max-w-sm z-80 flex flex-col items-end gap-2 pointer-events-none">
       {toasts.map((t) => (
         <div
           key={t.id}

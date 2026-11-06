@@ -38,7 +38,7 @@ export default function StockDepositFields({
               id="stock-deposit-krw"
               type="number"
               inputMode="decimal"
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               value={depositKrw ?? ""}
               onChange={(e) =>
                 setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))
@@ -68,7 +68,7 @@ export default function StockDepositFields({
               id="stock-deposit-usd"
               type="number"
               inputMode="decimal"
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               value={depositUsd ?? ""}
               onChange={(e) =>
                 setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))
@@ -109,7 +109,7 @@ export default function StockDepositFields({
           id="stock-deposit-krw-edit"
           type="number"
           inputMode="decimal"
-          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           value={depositKrw ?? ""}
           onChange={(e) =>
             setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))
@@ -134,7 +134,7 @@ export default function StockDepositFields({
           type="number"
           inputMode="decimal"
           step="0.01"
-          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           value={depositUsd ?? ""}
           onChange={(e) =>
             setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))

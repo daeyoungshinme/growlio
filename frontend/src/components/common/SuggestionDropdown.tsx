@@ -103,7 +103,7 @@ export function SuggestionDropdown({
             <span className="font-medium text-gray-900 dark:text-gray-50">{s.name}</span>
             <span className="text-gray-400 dark:text-gray-500 font-mono text-xs">{s.ticker}</span>
           </span>
-          <span className="text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded px-2 py-0.5 ml-2 shrink-0 text-xs">
+          <span className="text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded-sm px-2 py-0.5 ml-2 shrink-0 text-xs">
             {s.market}
           </span>
         </button>

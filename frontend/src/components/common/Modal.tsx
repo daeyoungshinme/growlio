@@ -34,7 +34,7 @@ export default function Modal({
   const overlayPositionClass = avoidBottomNav
     ? "fixed inset-x-0 top-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] sm:inset-0"
     : "fixed inset-0 pb-[env(safe-area-inset-bottom)]";
-  const overlayZClass = avoidBottomNav ? "z-40 sm:z-[60]" : "z-[60]";
+  const overlayZClass = avoidBottomNav ? "z-40 sm:z-60" : "z-60";
 
   return (
     <div

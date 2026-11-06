@@ -42,14 +42,14 @@ export default function PortfolioItemRow({
     <div className="relative flex items-center gap-2">
       {item.ticker === CASH_TICKER ? (
         <div className="flex-1 flex items-center gap-2 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-sm">
             현금
           </span>
           <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">KRW 현금</span>
         </div>
       ) : item.market === KR_PROPERTY_MARKET ? (
         <div className="flex-1 flex items-center gap-2 border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
-          <span className="text-xs font-medium text-amber-700 bg-amber-200 px-2 py-0.5 rounded">
+          <span className="text-xs font-medium text-amber-700 bg-amber-200 px-2 py-0.5 rounded-sm">
             부동산
           </span>
           <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
@@ -58,7 +58,7 @@ export default function PortfolioItemRow({
         </div>
       ) : item.ticker === CASH_EQUIVALENT_TICKER ? (
         <div className="flex-1 flex items-center gap-2 border border-teal-200 dark:border-teal-700/50 bg-teal-50 dark:bg-teal-900/20 rounded-lg px-3 py-2">
-          <span className="text-xs font-medium text-teal-700 bg-teal-200 px-2 py-0.5 rounded">
+          <span className="text-xs font-medium text-teal-700 bg-teal-200 px-2 py-0.5 rounded-sm">
             현금성자산
           </span>
           <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
@@ -79,7 +79,7 @@ export default function PortfolioItemRow({
           <button
             type="button"
             onClick={() => onStartEditing(idx)}
-            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0`}
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap shrink-0`}
           >
             변경
           </button>
@@ -89,7 +89,7 @@ export default function PortfolioItemRow({
         <div className="flex-1 relative">
           <input
             ref={(el) => onRegisterInputRef(idx, el)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2.5 sm:py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2.5 sm:py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             placeholder="종목명 또는 티커 검색 (예: 삼성전자, AAPL)"
             value={item.ticker}
             onChange={(e) => onTickerInput(idx, e.target.value)}
@@ -125,7 +125,7 @@ export default function PortfolioItemRow({
         min={0}
         max={100}
         step={0.1}
-        className="w-20 sm:w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2.5 sm:py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-20 sm:w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2.5 sm:py-2 text-sm text-right focus:outline-hidden focus:ring-2 focus:ring-blue-500"
         placeholder="%"
         value={item.weight || ""}
         onChange={(e) => onUpdateWeight(idx, parseFloat(e.target.value) || 0)}

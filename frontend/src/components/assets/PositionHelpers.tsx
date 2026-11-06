@@ -25,7 +25,7 @@ export function MarketSelect({
 }) {
   return (
     <select
-      className="text-xs text-gray-400 dark:text-gray-500 border-0 bg-transparent p-0 cursor-pointer focus:outline-none"
+      className="text-xs text-gray-400 dark:text-gray-500 border-0 bg-transparent p-0 cursor-pointer focus:outline-hidden"
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}

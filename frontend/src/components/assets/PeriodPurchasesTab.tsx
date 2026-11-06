@@ -294,7 +294,7 @@ function PurchaseRow({
               {manual ? "기록" : "추정"}
             </span>
             {item.partially_sold && (
-              <span className="px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              <span className="px-1.5 py-0.5 rounded-sm text-xs bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                 {item.held_qty > 0 ? "일부 매도" : "전량 매도"}
               </span>
             )}

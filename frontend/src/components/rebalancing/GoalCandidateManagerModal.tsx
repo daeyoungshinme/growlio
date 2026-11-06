@@ -168,7 +168,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
                           changeAssetClass(c.ticker, c.market, e.target.value as AssetClass)
                         }
                         aria-label={`${c.name} 자산군`}
-                        className="shrink-0 min-h-9 sm:min-h-0 text-xs bg-transparent border border-purple-200 dark:border-purple-800/50 rounded-full px-1.5 py-0.5 text-purple-600 dark:text-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        className="shrink-0 min-h-9 sm:min-h-0 text-xs bg-transparent border border-purple-200 dark:border-purple-800/50 rounded-full px-1.5 py-0.5 text-purple-600 dark:text-purple-400 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                       >
                         {Object.entries(ASSET_CLASS_LABELS).map(([value, label]) => (
                           <option key={value} value={value}>
@@ -218,7 +218,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
               scheduleTimeout(() => setShowSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)
             }
             placeholder="추가할 ETF 종목명 또는 코드 검색"
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
           />
           {(isSearching || isResolvingRegion) && (
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
@@ -237,7 +237,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
                   role="option"
                   aria-selected={false}
                   tabIndex={0}
-                  className="px-2.5 py-1.5 hover:bg-purple-50 dark:hover:bg-purple-950 cursor-pointer text-xs flex items-center gap-2 focus:bg-purple-50 dark:focus:bg-purple-950 focus:outline-none"
+                  className="px-2.5 py-1.5 hover:bg-purple-50 dark:hover:bg-purple-950 cursor-pointer text-xs flex items-center gap-2 focus:bg-purple-50 dark:focus:bg-purple-950 focus:outline-hidden"
                   onMouseDown={() => void addCandidate(s)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {

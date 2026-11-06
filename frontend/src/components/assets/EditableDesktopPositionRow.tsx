@@ -31,7 +31,7 @@ export function EditableDesktopPositionRow({
       <td className="py-2 pr-3">
         <div className="relative">
           <input
-            className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-sm px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
             value={row.name}
             onChange={(e) => handleNameChange(i, e.target.value)}
             onFocus={() => {
@@ -76,7 +76,7 @@ export function EditableDesktopPositionRow({
                     <span className="font-medium text-gray-900 dark:text-gray-50">{s.name}</span>
                     <span className="text-gray-400 dark:text-gray-500 font-mono">{s.ticker}</span>
                   </span>
-                  <span className="text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded px-1.5 py-0.5 ml-2 shrink-0 text-xs">
+                  <span className="text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded-sm px-1.5 py-0.5 ml-2 shrink-0 text-xs">
                     {s.market}
                   </span>
                 </button>
@@ -89,7 +89,7 @@ export function EditableDesktopPositionRow({
         <input
           type="number"
           inputMode="numeric"
-          className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-sm px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
           value={row.qty || ""}
           onChange={(e) => setRow(i, { qty: Number(e.target.value) })}
           min={0}
@@ -104,7 +104,7 @@ export function EditableDesktopPositionRow({
               <input
                 type="number"
                 inputMode="decimal"
-                className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-sm px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                 value={row.avg_price_usd ?? ""}
                 onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
                 placeholder="0.00"
@@ -122,7 +122,7 @@ export function EditableDesktopPositionRow({
           <input
             type="number"
             inputMode="decimal"
-            className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-sm px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
             value={row.avg_price || ""}
             onChange={(e) => setRow(i, { avg_price: Number(e.target.value) })}
             min={0}
@@ -142,7 +142,7 @@ export function EditableDesktopPositionRow({
             <input
               type="number"
               inputMode="decimal"
-              className="w-full border border-gray-300 dark:border-gray-600 rounded pl-5 pr-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-sm pl-5 pr-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
               value={priceLoading ? "" : (rawRow.current_price_usd ?? "")}
               onChange={(e) => handleCurrentPriceUsd(i, e.target.value)}
               placeholder={priceLoading ? "조회중..." : "자동조회"}
@@ -166,7 +166,7 @@ export function EditableDesktopPositionRow({
             <input
               type="number"
               inputMode="decimal"
-              className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-sm px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
               value={priceLoading ? "" : (rawRow.current_price ?? "")}
               onChange={(e) =>
                 setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })
@@ -192,7 +192,7 @@ export function EditableDesktopPositionRow({
       <td className="py-2">
         <button
           onClick={() => removeRow(i)}
-          className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded`}
+          className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-sm`}
         >
           <Trash2 size={16} />
         </button>

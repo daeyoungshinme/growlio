@@ -181,7 +181,7 @@ export default function TaxPlannerSection({ positions, realized, realizedFailed,
             value={realizedAbsInput}
             onChange={(e) => applyRealized(e.target.value.replace(/-/g, ""), realizedSign)}
             placeholder={autoRealized !== null ? String(Math.round(autoRealized)) : "0"}
-            className={`flex-1 sm:flex-none sm:w-36 min-w-0 ${TOUCH_HEIGHT_MIN} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            className={`flex-1 sm:flex-none sm:w-36 min-w-0 ${TOUCH_HEIGHT_MIN} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500`}
           />
           {isManualRealized && alreadyRealized !== 0 && (
             <span className={`text-xs font-medium ${pnlColor(alreadyRealized)}`}>
@@ -238,7 +238,7 @@ export default function TaxPlannerSection({ positions, realized, realizedFailed,
             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
               수익 종목
             </span>
-            <span className="order-last basis-full sm:order-none sm:basis-auto text-xs text-gray-500 dark:text-gray-400 break-keep">
+            <span className="order-last basis-full sm:order-0 sm:basis-auto text-xs text-gray-500 dark:text-gray-400 break-keep">
               매도 수량을 입력해 세금을 계산하세요
             </span>
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
@@ -265,7 +265,7 @@ export default function TaxPlannerSection({ positions, realized, realizedFailed,
             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
               손실 종목
             </span>
-            <span className="order-last basis-full sm:order-none sm:basis-auto text-xs text-gray-500 dark:text-gray-400 break-keep">
+            <span className="order-last basis-full sm:order-0 sm:basis-auto text-xs text-gray-500 dark:text-gray-400 break-keep">
               매도하면 손익 통산으로 수익 종목 세금이 줄어요
             </span>
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">

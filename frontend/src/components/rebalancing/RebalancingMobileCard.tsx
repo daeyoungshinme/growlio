@@ -103,7 +103,7 @@ export function RebalancingMobileCard({
                       max: maxQty,
                     })
               }
-              className={`w-24 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-2.5 text-right font-medium text-sm focus:outline-none focus:border-indigo-500 ${
+              className={`w-24 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-2.5 text-right font-medium text-sm focus:outline-hidden focus:border-indigo-500 ${
                 isBuy ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"
               }`}
             />
@@ -150,7 +150,7 @@ export function RebalancingMobileCard({
                 onClick={() =>
                   dispatch({ type: "SET_LIMIT_PRICE", key: orderKey, price: currentNativePrice })
                 }
-                className={`text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 px-2 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors ${TOUCH_TARGET_MIN}`}
+                className={`text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 px-2 rounded-sm hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors ${TOUCH_TARGET_MIN}`}
               >
                 현재가로
               </button>
@@ -172,7 +172,7 @@ export function RebalancingMobileCard({
                   price: parseFloat(e.target.value) || 0,
                 })
               }
-              className="flex-1 bg-white dark:bg-gray-800 border border-indigo-300 dark:border-indigo-600/50 rounded px-2 py-2.5 text-right text-indigo-700 dark:text-indigo-300 font-medium text-sm focus:outline-none focus:border-indigo-500"
+              className="flex-1 bg-white dark:bg-gray-800 border border-indigo-300 dark:border-indigo-600/50 rounded-sm px-2 py-2.5 text-right text-indigo-700 dark:text-indigo-300 font-medium text-sm focus:outline-hidden focus:border-indigo-500"
             />
             <span className="text-gray-500 dark:text-gray-400 text-sm shrink-0">
               {overseas ? "USD" : "원"}

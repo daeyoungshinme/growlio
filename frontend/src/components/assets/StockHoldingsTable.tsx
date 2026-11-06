@@ -160,7 +160,7 @@ function StockHoldingsTable({ positions, dividendMap, divLoading, divError, sort
                 <button
                   onClick={() => setQuery("")}
                   aria-label="검색어 지우기"
-                  className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded`}
+                  className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-sm`}
                 >
                   <X size={14} />
                 </button>

@@ -33,7 +33,7 @@ function GroupRow({ group, basis }: { group: IndexExposureGroup; basis: Basis })
       pct={groupPct(group, basis)}
       badges={
         group.has_hedged && (
-          <span className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+          <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-sm bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
             (H) 포함
           </span>
         )

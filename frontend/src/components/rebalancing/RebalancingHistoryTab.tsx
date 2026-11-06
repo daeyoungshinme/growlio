@@ -455,7 +455,7 @@ export default function RebalancingHistoryTab() {
             <button
               type="button"
               onClick={() => setShowAllLegs(true)}
-              className={`${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400`}
+              className={`${TOUCH_TARGET_ROW} w-full justify-center! text-xs font-medium text-gray-500 dark:text-gray-400`}
             >
               종료된 플랜 {hiddenLegCount}개 더 보기
             </button>
@@ -478,7 +478,7 @@ export default function RebalancingHistoryTab() {
                   void fetchNextPage();
                 }
               }}
-              className={`${TOUCH_TARGET_ROW} w-full !justify-center text-xs font-medium text-gray-500 dark:text-gray-400 disabled:opacity-50`}
+              className={`${TOUCH_TARGET_ROW} w-full justify-center! text-xs font-medium text-gray-500 dark:text-gray-400 disabled:opacity-50`}
             >
               {hasNextPage
                 ? "실행 이력 더 보기"
