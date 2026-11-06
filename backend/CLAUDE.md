@@ -99,7 +99,7 @@ insights.py              인사이트·진단
 market_signals.py        복합 시장 신호
 tactical.py              전술 배분 — GET /tactical(켠 목록), GET /tactical/market(포트폴리오 무관 시장 입력 — **/{portfolio_id}보다 먼저 선언**), GET/PUT/DELETE /{id}, POST /{id}/apply(목표만 저장, **주문 없음**; fraction<1은 분할 적용), GET /{id}/backtest
 positions.py             포지션 CRUD + 현재가 sync (/assets/{id}/positions)
-external.py              자매 앱 nestlio 전용(같은 Supabase JWT, growlio 프론트 미사용). 조회 로직은 services/external_queries.py. POST /external/transactions의 external_ref는 멱등 키(같은 키 재전송 → duplicate=True로 기존 행)
+external.py              자매 앱 nestlio 전용(같은 Supabase JWT, growlio 프론트 미사용). 조회 로직은 services/external_queries.py. POST /external/transactions의 external_ref는 멱등 키(같은 키 재전송 → duplicate=True로 기존 행). GET /external/goal은 설정값 + 대시보드 요약의 목표 진행 상황(부동산 제외 투자자산·달성률 등 — nestlio 부부 통합 목표가 저장해 합산, 요약 실패 시 그 필드만 None)
 _account_deps.py         계좌 소유권 검증(get_owned_account) + get_owned_or_404 재노출
 _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토리, `count_user_alerts`(생성 상한)
 ```

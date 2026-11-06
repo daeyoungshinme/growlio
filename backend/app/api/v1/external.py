@@ -24,8 +24,8 @@ GET /net-deposits는 계좌별 월 순입금에서 nestlio가 넣은 내역(exte
 
 GET /goal은 사용자가 growlio 설정에서 입력한 투자목표(목표금액/목표수익률/연 납입목표 등)를
 읽기전용으로 노출한다 — nestlio가 재무목표를 새로 만들 때 이 값으로 폼을 미리 채워준다.
-진행률 자체는 nestlio가 이미 가져온 growlio 연동 자산 잔액으로 스스로 계산하므로, 이
-엔드포인트는 목표 "설정값"만 내려주고 진행률/달성 시점 같은 계산값은 포함하지 않는다.
+대시보드 요약의 목표 진행 상황(부동산 제외 투자자산·달성률 등)도 함께 주는데, nestlio "부부 통합 목표"가
+부부 각자의 growlio 목표를 합산하는 데 쓴다(nestlio는 배우자 JWT가 없어 각자 접속할 때 값을 저장해 둔다).
 """
 
 from datetime import UTC, datetime
@@ -195,7 +195,9 @@ async def get_investment_goal(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """nestlio가 재무목표를 미리 채우기 위해 조회하는, 사용자가 growlio에 설정한 투자목표.
+    """사용자가 growlio에 설정한 투자목표 + 그 진행 상황. nestlio는 설정값으로 재무목표 폼을 미리 채우고,
+    진행 상황(부동산 제외 투자자산·달성률·올해 입금·추정 배당·실제 수익률)은 "부부 통합 목표"에 부부 각자의
+    growlio 목표로 저장해 합산한다. 진행 상황은 대시보드 요약 캐시를 재사용하고, 실패하면 그 필드만 비운다.
 
     포트폴리오 구성용 필드(candidate_tickers, risk_tolerance 등)는 목표 진행상황
     모니터링과 무관해 내려주지 않는다.
@@ -203,6 +205,27 @@ async def get_investment_goal(
     row = await get_settings_row(db, current_user.id)
     if row is None or row.goal_amount is None:
         return ExternalGoalSettings(is_configured=False)
+    progress: dict = {}
+    try:
+        summary = await get_dashboard_summary(current_user.id, db, await get_cache_store())
+        actual_return = next(
+            (
+                summary.get(key)
+                for key in ("xirr_pct", "annual_return_pct", "cumulative_return_pct")
+                if summary.get(key) is not None
+            ),
+            None,
+        )
+        progress = {
+            "investable_assets_krw": summary.get("investable_assets_krw"),
+            "goal_achievement_pct": summary.get("goal_achievement_pct"),
+            "annual_deposit_current": summary.get("annual_deposit_current"),
+            "estimated_annual_dividend": summary.get("estimated_annual_dividends"),
+            "actual_return_pct": actual_return,
+        }
+    except Exception:
+        # 진행 상황은 부가 정보 — 요약 계산이 실패해도 목표 설정값(폼 프리필)은 내려준다.
+        logger.warning("external_goal_progress_unavailable", user_id=str(current_user.id), exc_info=True)
     return ExternalGoalSettings(
         is_configured=True,
         goal_amount=float(row.goal_amount),
@@ -211,6 +234,9 @@ async def get_investment_goal(
         goal_initial_amount=opt_float(row.goal_initial_amount),
         annual_deposit_goal=opt_float(row.annual_deposit_goal),
         annual_dividend_goal=opt_float(row.annual_dividend_goal),
+        monthly_deposit_amount=opt_float(row.monthly_deposit_amount),
+        retirement_target_year=row.retirement_target_year,
+        **progress,
     )
 
 

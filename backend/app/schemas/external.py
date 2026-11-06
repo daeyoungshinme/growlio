@@ -52,6 +52,15 @@ class ExternalGoalSettings(BaseModel):
     goal_initial_amount: float | None = None
     annual_deposit_goal: float | None = None
     annual_dividend_goal: float | None = None
+    monthly_deposit_amount: float | None = None
+    retirement_target_year: int | None = None
+    # 아래는 대시보드 요약에서 꺼낸 진행 상황 — nestlio "부부 통합 목표"가 각자의 growlio 목표를 합산할 때 쓴다.
+    # 요약 계산이 실패하면 None(설정값은 그대로 준다).
+    investable_assets_krw: float | None = None  # 목표 달성률 기준 자산(부동산 제외)
+    goal_achievement_pct: float | None = None
+    annual_deposit_current: float | None = None
+    estimated_annual_dividend: float | None = None
+    actual_return_pct: float | None = None  # XIRR → 연환산 → 누적 순(목표 수익률과 비교하는 값)
 
 
 class ExternalTransactionCreate(BaseModel):
