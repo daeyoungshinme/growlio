@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchFxPlan, type FxPlanData, type FxZone } from "@/api/invest";
@@ -40,7 +40,6 @@ const fmtRate = (n: number) => `${n.toLocaleString("ko-KR", { maximumFractionDig
 const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
 
 interface Props {
-  /** 접힘 카드 안에 임베드될 때 — 외곽 card 스타일 생략 */
   /** 월 적립액 미설정 시 "설정 편집" 열기 */
   onEditGoal?: () => void;
 }
@@ -145,14 +144,12 @@ export default function FxPlanCard({ onEditGoal }: Props) {
     },
   });
 
-  const wrap = (children: ReactNode) => <div className="space-y-5">{children}</div>;
-
   if (isLoading) return <SkeletonCard rows={4} height="h-5" />;
   if (isError || !data) {
-    return wrap(
+    return (
       <p className="text-sm text-gray-500 dark:text-gray-400">
         환전 계획을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>,
+      </p>
     );
   }
 
@@ -179,8 +176,8 @@ export default function FxPlanCard({ onEditGoal }: Props) {
     </select>
   );
 
-  return wrap(
-    <>
+  return (
+    <div className="space-y-5">
       {data.position ? (
         <>
           <PositionBlock position={data.position} />
@@ -312,6 +309,6 @@ export default function FxPlanCard({ onEditGoal }: Props) {
           )}
         </div>
       )}
-    </>,
+    </div>
   );
 }

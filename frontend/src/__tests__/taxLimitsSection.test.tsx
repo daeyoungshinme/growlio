@@ -64,6 +64,8 @@ const emptyTaxSummary: TaxSummary = {
   overseas_gain_deduction_krw: 0,
   overseas_tax_estimated_krw: 0,
   domestic_large_holder_warning: false,
+  domestic_large_holder_name: null,
+  domestic_large_holder_threshold_krw: 5_000_000_000,
   comprehensive_tax_warning: false,
   comprehensive_tax_remaining_krw: 20_000_000,
   total_estimated_tax_krw: 0,

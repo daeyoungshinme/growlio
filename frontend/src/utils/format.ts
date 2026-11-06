@@ -9,7 +9,8 @@ import { isOverseasMarket } from "@/constants/markets";
 export function fmtKrw(n: number): string {
   if (Math.abs(n) >= 1e8) return `${(n / 1e8).toFixed(2)}억원`;
   if (Math.abs(n) >= 1e4) return `${Math.round(n / 1e4).toLocaleString()}만원`;
-  return `${Math.floor(n).toLocaleString()}원`;
+  // 원 단위 절사는 0 방향 — floor면 음수가 커져 -0.3이 "-1원"이 된다
+  return `${(Math.trunc(n) || 0).toLocaleString()}원`;
 }
 
 /**
@@ -17,7 +18,7 @@ export function fmtKrw(n: number): string {
  * 예: 20_000 → "20,000원", 150_000 → "150,000원"
  */
 export function fmtKrwPrice(n: number): string {
-  return `${Math.floor(n).toLocaleString()}원`;
+  return `${(Math.trunc(n) || 0).toLocaleString()}원`;
 }
 
 /**
@@ -44,7 +45,7 @@ export function fmtNativePrice(price: number, market: string): string {
 export function fmtKrwShort(n: number): string {
   if (Math.abs(n) >= 1e8) return `${(n / 1e8).toFixed(1)}억`;
   if (Math.abs(n) >= 1e4) return `${Math.round(n / 1e4).toLocaleString()}만`;
-  return `${Math.floor(n).toLocaleString()}`;
+  return `${(Math.trunc(n) || 0).toLocaleString()}`;
 }
 
 /**
@@ -160,11 +161,11 @@ export function pctOf(part: number, total: number): number {
 }
 
 /**
- * ISO 날짜 문자열을 현재 시각 기준 상대 시간으로 변환
+ * ISO 날짜 문자열(또는 epoch ms)을 현재 시각 기준 상대 시간으로 변환
  * 예: "3일 전", "오늘", "1시간 전"
  */
-export function relativeTime(isoString: string): string {
-  const diffMs = Date.now() - new Date(isoString).getTime();
+export function relativeTime(at: string | number): string {
+  const diffMs = Date.now() - new Date(at).getTime();
   const diffMin = Math.floor(diffMs / 60_000);
   const diffHr = Math.floor(diffMs / 3_600_000);
   const diffDay = Math.floor(diffMs / 86_400_000);

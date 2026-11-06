@@ -261,3 +261,13 @@ describe("fmtDateTime", () => {
     expect(fmtDateTime(iso)).toMatch(/^2026\. 10\. 14\./);
   });
 });
+
+describe("원 단위 음수 절사 (plans/113 D2)", () => {
+  it("음수는 0 방향으로 자른다 — 1원 크게 보이지 않는다", () => {
+    expect(fmtKrw(-1234.5)).toBe("-1,234원");
+    expect(fmtKrw(-0.3)).toBe("0원");
+    expect(fmtKrwPrice(-1234.9)).toBe("-1,234원");
+    expect(fmtKrwShort(-999.9)).toBe("-999");
+    expect(fmtKrw(1234.9)).toBe("1,234원");
+  });
+});
