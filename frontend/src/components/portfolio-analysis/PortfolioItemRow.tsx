@@ -89,7 +89,7 @@ export default function PortfolioItemRow({
         <div className="flex-1 relative">
           <input
             ref={(el) => onRegisterInputRef(idx, el)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2.5 sm:py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg px-3 py-2.5 sm:py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             placeholder="종목명 또는 티커 검색 (예: 삼성전자, AAPL)"
             value={item.ticker}
             onChange={(e) => onTickerInput(idx, e.target.value)}

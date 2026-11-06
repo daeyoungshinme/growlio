@@ -180,6 +180,7 @@ export function DesktopOrderRow({
           checked={selected}
           onChange={toggle}
           onClick={(e) => e.stopPropagation()}
+          aria-label={`${item.name} 주문 선택`}
           className="accent-indigo-500"
         />
       </td>

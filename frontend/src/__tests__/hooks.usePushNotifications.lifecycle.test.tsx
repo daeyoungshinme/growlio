@@ -18,6 +18,7 @@ vi.mock("@/api/settings", () => ({ registerPushToken: vi.fn(async () => undefine
 
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useAuthStore } from "@/stores/authStore";
+import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 
 const harness: { navigate: ReturnType<typeof useNavigate> | null } = { navigate: null };
 
@@ -42,7 +43,7 @@ describe("usePushNotifications lifecycle", () => {
         <Harness />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(pushMock.addListener).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(pushMock.addListener).toHaveBeenCalledTimes(4));
 
     await act(async () => {
       void harness.navigate?.("/assets");
@@ -53,6 +54,17 @@ describe("usePushNotifications lifecycle", () => {
 
     expect(pushMock.register).toHaveBeenCalledTimes(1);
     expect(pushMock.requestPermissions).toHaveBeenCalledTimes(1);
-    expect(pushMock.addListener).toHaveBeenCalledTimes(3);
+    expect(pushMock.addListener).toHaveBeenCalledTimes(4);
+  });
+
+  it("권한 요청이 throw하면 requesting에 멈추지 않고 error로 바꾼다(plans/115 B4)", async () => {
+    pushMock.requestPermissions.mockRejectedValueOnce(new Error("plugin missing"));
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Harness />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(usePushNotificationStore.getState().status).toBe("error"));
+    expect(pushMock.register).not.toHaveBeenCalled();
   });
 });

@@ -25,7 +25,8 @@ export function MarketSelect({
 }) {
   return (
     <select
-      className="text-xs text-gray-400 dark:text-gray-500 border-0 bg-transparent p-0 cursor-pointer focus:outline-hidden"
+      aria-label="시장"
+      className="text-xs text-gray-400 dark:text-gray-500 border-0 bg-transparent p-0 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500"
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}

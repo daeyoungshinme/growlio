@@ -157,16 +157,22 @@ export function usePushNotifications() {
         },
       );
 
+      // FCM 등록 실패(구글 플레이 서비스 없음·네트워크) — 없으면 상태가 "requesting"에 멈춘다(plans/115 B4)
+      const h4 = await PushNotifications.addListener("registrationError", () => {
+        if (!cancelled) setStatus("error");
+      });
+
       if (!cancelled) {
-        handles.push(h1, h2, h3);
+        handles.push(h1, h2, h3, h4);
       } else {
-        await h1.remove();
-        await h2.remove();
-        await h3.remove();
+        await Promise.all([h1.remove(), h2.remove(), h3.remove(), h4.remove()]);
       }
     }
 
-    void setup();
+    // 권한 요청·register가 throw하면 처리되지 않은 rejection으로 남고 상태가 "requesting"에 멈췄다
+    setup().catch(() => {
+      if (!cancelled) setStatus("error");
+    });
 
     return () => {
       cancelled = true;

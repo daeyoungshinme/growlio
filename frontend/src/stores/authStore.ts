@@ -288,7 +288,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
     forgotPassword: async (email: string) => {
       const supabase = await getSupabase();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        // Capacitor WebView의 origin은 https://localhost라 메일 링크가 기기 밖에서 열리지 않는다 — 가입과 같은 배포 URL
+        redirectTo: `${import.meta.env.VITE_REDIRECT_URL}/reset-password`,
       });
       if (error) throw error;
     },

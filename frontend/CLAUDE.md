@@ -77,7 +77,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 **`layout/`**: `RefreshContext`, `AppLayout`(로그인 후 셸 — 모달 열림 판정은 `hasOpenModal()`(`useModalBehavior`), body overflow로 추정 금지), `AuthLayout`(AppLayout 밖 전체 화면 — 인증·딥링크 확인 페이지는 이걸로 감싸야 safe-area·dvh가 잡힘), `Sidebar`, `BottomNav`
 
 - `BiometricGuard` — Android 생체 인증 게이트. **UI 게이트일 뿐 보안 경계 아님**(캐시된 JWT로 API 호출은 막히지 않음).
-- `OfflineBanner` — PWA Workbox `StaleWhileRevalidate`(dashboard/portfolio-overview/accounts)와 함께 오프라인 안내.
+- `OfflineBanner` — 오프라인 안내. SW는 앱 셸(html·js·css)만 precache하고 API 응답은 캐시하지 않는다(오프라인 데이터는 쿼리 persist 캐시). `globPatterns`에서 js·css를 빼면 배포 후 옛 html이 사라진 청크를 가리켜 부팅이 멈춘다.
 
 **주요 화면 컴포넌트 — 진입 지점과 함정만**
 

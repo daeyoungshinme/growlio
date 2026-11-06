@@ -10,7 +10,7 @@ import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { useDcaTacticalLink } from "@/hooks/useDcaTacticalLink";
 import { useTacticalMutations, useTacticalStatus } from "@/hooks/useTacticalAllocation";
 import { extractErrorMessage } from "@/utils/error";
-import { localToday, parseYmd } from "@/utils/format";
+import { fmtMonthDay, localToday } from "@/utils/format";
 import { toast } from "@/utils/toast";
 import { useAutoExecutionNotice } from "@/hooks/useAutoExecutionNotice";
 import TacticalApplyConfirmModal from "./TacticalApplyConfirmModal";
@@ -40,11 +40,6 @@ interface Props {
 }
 
 /** "YYYY-MM-DD" → "M/D" */
-function fmtMd(ymd: string): string {
-  const { month, day } = parseYmd(ymd);
-  return `${month}/${day}`;
-}
-
 function TacticalStatusView({
   status,
   onGoToExecution,
@@ -139,7 +134,7 @@ function TacticalStatusView({
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {status.partial_applied_on === localToday()
                   ? "오늘"
-                  : fmtMd(status.partial_applied_on)}{" "}
+                  : fmtMonthDay(status.partial_applied_on)}{" "}
                 절반 적용 · 다음 거래일 이후 나머지 적용을 권장해요
               </p>
             )}
