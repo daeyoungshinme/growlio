@@ -6,7 +6,7 @@ import { fetchExchangeRateAlerts, fetchRebalancingAlerts } from "@/api/alerts";
 import { fetchPortfolioOverviewLite, fetchPortfolios } from "@/api/portfolios";
 import { fetchSettings } from "@/api/settings";
 import { fetchMarketSignal } from "@/api/marketSignals";
-import { fetchDCAAnalysis } from "@/api/invest";
+import { fetchDCAAnalysis, fetchDividendPlan } from "@/api/invest";
 import { fetchIsaStatus, fetchTaxSummary } from "@/api/tax";
 import { fetchDashboard } from "@/api/dashboard";
 import {
@@ -114,6 +114,13 @@ export const dcaAnalysisQuery = queryOptions({
   queryKey: QUERY_KEYS.dcaAnalysis,
   queryFn: () => fetchDCAAnalysis(),
   staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 백엔드 캐시 TTL과 동기화
+});
+
+/** 배당 계획 — 계획 탭 배당 계획 섹션과 자산 탭 연도별 실수령 배당 차트가 공유 */
+export const dividendPlanQuery = queryOptions({
+  queryKey: QUERY_KEYS.dividendPlan,
+  queryFn: () => fetchDividendPlan(),
+  staleTime: STALE_TIME.MEDIUM,
 });
 
 export const isaStatusQuery = queryOptions({

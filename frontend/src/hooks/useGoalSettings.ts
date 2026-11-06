@@ -53,7 +53,7 @@ export function useGoalSettings() {
   const [wizardMode, setWizardMode] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
 
-  const { data, isLoading, isError } = useQuery(dcaAnalysisQuery);
+  const { data, isLoading, isError, refetch } = useQuery(dcaAnalysisQuery);
 
   const {
     editing,
@@ -230,6 +230,7 @@ export function useGoalSettings() {
     data,
     isLoading,
     isError,
+    refetch,
     editing,
     saving,
     showCloseConfirm,

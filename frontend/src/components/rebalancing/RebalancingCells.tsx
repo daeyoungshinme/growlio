@@ -1,6 +1,6 @@
 import { RebalancingItem } from "@/api/rebalancing";
-import { fmtKrw } from "@/utils/format";
-import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
+import { fmtKrw, fmtSigned } from "@/utils/format";
+import { PROFIT_COLOR, LOSS_COLOR, pnlColor } from "@/utils/colors";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 
 export function DiffCell({ diff }: { diff: number }) {
@@ -74,15 +74,7 @@ export function QuantityCell({ item }: { item: RebalancingItem }) {
 
 export function DividendDiffCell({ diff }: { diff: number }) {
   if (diff === 0) return <span className="text-gray-500 dark:text-gray-400">-</span>;
-  const isIncrease = diff > 0;
-  return (
-    <span
-      className={`font-medium text-xs ${isIncrease ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-    >
-      {isIncrease ? "+" : ""}
-      {fmtKrw(diff)}
-    </span>
-  );
+  return <span className={`font-medium text-xs ${pnlColor(diff)}`}>{fmtSigned(diff, fmtKrw)}</span>;
 }
 
 export function Return10yCell({ item }: { item: RebalancingItem }) {

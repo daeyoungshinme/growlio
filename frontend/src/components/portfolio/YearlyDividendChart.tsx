@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { fetchDividendPlan } from "@/api/invest";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import { dividendPlanQuery } from "@/api/queryOptions";
+import EmptyState from "@/components/common/EmptyState";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { summarizeAmounts } from "@/utils/chartSummary";
@@ -13,11 +12,19 @@ import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 export default function YearlyDividendChart() {
   const { isDark } = useThemeStore();
   const tooltipStyle = chartTooltipStyle(isDark);
-  const { data } = useQuery({
-    queryKey: QUERY_KEYS.dividendPlan,
-    queryFn: fetchDividendPlan,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data, isError, refetch } = useQuery(dividendPlanQuery);
+  // 실패를 "배당 없음"(카드 숨김)으로 보이지 않게 한다
+  if (isError) {
+    return (
+      <div className="card">
+        <EmptyState
+          compact
+          title="연도별 배당을 불러오지 못했습니다."
+          action={{ label: "다시 시도", onClick: () => void refetch() }}
+        />
+      </div>
+    );
+  }
   const years = data?.yearly_received ?? [];
   if (years.length === 0) return null;
 

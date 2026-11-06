@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { RebalancingAnalysis } from "@/api/rebalancing";
-import { fmtKrw, fmtSigned } from "@/utils/format";
+import { fmtKrw, fmtPct, fmtSigned } from "@/utils/format";
+import { pnlColor } from "@/utils/colors";
 import { CASH_TICKER } from "@/constants/assets";
 import { DividendDiffCell } from "./RebalancingCells";
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -70,24 +71,14 @@ export default function RebalancingDividendSection({ analysis }: Props) {
             {fmtKrw(targetDiv)}
           </div>
         </div>
-        <div
-          className={`col-span-1 rounded-xl p-3 text-center ${
-            divDiff >= 0 ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"
-          }`}
-        >
+        {/* 앱 전체 규칙(pnlColor: 증가=빨강, 감소=파랑)을 따른다 — 초록/빨강이면 감소가 수익처럼 읽힌다 */}
+        <div className="col-span-1 bg-white dark:bg-gray-700 rounded-xl p-3 text-center">
           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">배당 증감</div>
-          <div
-            className={`text-sm font-semibold ${divDiff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-          >
+          <div className={`text-sm font-semibold ${pnlColor(divDiff)}`}>
             {fmtSigned(divDiff, fmtKrw)}
           </div>
           {currentDiv > 0 && (
-            <div
-              className={`text-xs ${divDiff >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500"}`}
-            >
-              ({divDiff >= 0 ? "+" : ""}
-              {divDiffPct.toFixed(1)}%)
-            </div>
+            <div className={`text-xs ${pnlColor(divDiff)}`}>({fmtPct(divDiffPct, 1)})</div>
           )}
         </div>
       </div>

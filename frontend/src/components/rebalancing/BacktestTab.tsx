@@ -6,7 +6,7 @@ import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import { BACKTEST_DEFAULT_END_DATE } from "@/constants/defaults";
+import { backtestDefaultEndDate } from "@/constants/defaults";
 import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
 import { portfoliosQuery } from "@/api/queryOptions";
 import {
@@ -153,7 +153,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 type="date"
                 value={endDate}
                 min={startDate}
-                max={BACKTEST_DEFAULT_END_DATE}
+                max={backtestDefaultEndDate()}
                 onChange={(e) => setEndDate(e.target.value)}
                 className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />

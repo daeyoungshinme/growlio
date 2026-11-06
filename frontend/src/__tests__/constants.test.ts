@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import {
   DOMESTIC_MARKETS,
@@ -7,7 +7,7 @@ import {
   POSITION_MARKETS,
   isOverseasMarket,
 } from "@/constants/markets";
-import { BACKTEST_DEFAULT_END_DATE, BACKTEST_DEFAULT_START_DATE } from "@/constants/defaults";
+import { backtestDefaultEndDate, backtestDefaultStartDate } from "@/constants/defaults";
 import { STALE_TIME, REFETCH_INTERVAL, PERSIST_CACHE_KEY } from "@/constants/queryConfig";
 import { ASSET_MANAGEMENT_TABS, PORTFOLIO_TABS } from "@/constants/tabs";
 import { NAV_ITEMS, NAV_ORDER } from "@/constants/nav";
@@ -115,13 +115,24 @@ describe("markets constants", () => {
 // defaults
 // ────────────────────────────────────────────
 describe("backtest defaults", () => {
-  it("BACKTEST_DEFAULT_END_DATE는 YYYY-MM-DD 형식이다", () => {
-    expect(BACKTEST_DEFAULT_END_DATE).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  it("backtestDefaultEndDate는 YYYY-MM-DD 형식이다", () => {
+    expect(backtestDefaultEndDate()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("BACKTEST_DEFAULT_START_DATE는 현재 연도 기준 5년 전 1월 1일이다", () => {
+  it("backtestDefaultStartDate는 현재 연도 기준 5년 전 1월 1일이다", () => {
     const expectedYear = new Date().getFullYear() - 5;
-    expect(BACKTEST_DEFAULT_START_DATE).toBe(`${expectedYear}-01-01`);
+    expect(backtestDefaultStartDate()).toBe(`${expectedYear}-01-01`);
+  });
+
+  it("호출 시점 날짜를 쓴다 — 앱을 켜 둔 채 새해를 넘겨도 옛 날짜가 남지 않는다", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2027, 0, 1, 9));
+      expect(backtestDefaultEndDate()).toBe("2027-01-01");
+      expect(backtestDefaultStartDate()).toBe("2022-01-01");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

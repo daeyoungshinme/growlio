@@ -9,7 +9,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import { useDividendPlanSettings } from "@/hooks/useDividendPlanSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -28,7 +28,7 @@ import AutoInvestStatusBanner from "@/components/invest/AutoInvestStatusBanner";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
 import { fmtKrw, fmtKrwPreview, localMonth } from "@/utils/format";
-import { invalidateDcaData } from "@/utils/queryInvalidation";
+import PageLoadError from "@/components/common/PageLoadError";
 import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
@@ -46,7 +46,6 @@ const TABS = INVEST_PLAN_TABS;
 type Tab = InvestPlanTab;
 
 export default function InvestPlanPage() {
-  const queryClient = useQueryClient();
   const [showAllStats, setShowAllStats] = useState(false);
   const [monthlyOpen, setMonthlyOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -94,6 +93,7 @@ export default function InvestPlanPage() {
     data,
     isLoading,
     isError,
+    refetch,
     editing,
     saving,
     showCloseConfirm,
@@ -141,17 +141,8 @@ export default function InvestPlanPage() {
   }
 
   if (isError && !data) {
-    return (
-      <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-center justify-between">
-        <span>데이터를 불러오지 못했습니다.</span>
-        <button
-          onClick={() => invalidateDcaData(queryClient)}
-          className={`underline font-medium ml-2 ${TOUCH_HEIGHT_MIN}`}
-        >
-          다시 시도
-        </button>
-      </div>
-    );
+    // 실패한 적립 분석만 다시 조회한다 — invalidateDcaData는 설정·대시보드 등 8계열을 함께 지운다
+    return <PageLoadError message="데이터를 불러오지 못했습니다." onRetry={() => void refetch()} />;
   }
 
   return (

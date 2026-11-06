@@ -62,7 +62,7 @@ import { useAccountMutations } from "@/hooks/useAccountMutations";
 import type { ExecutionState } from "@/hooks/rebalancingExecution/types";
 import { useAccountPositions } from "@/hooks/useAccountPositions";
 import { useOptimizationSuggestions } from "@/hooks/useOptimizationSuggestions";
-import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
+import { useBacktestDateRange, yearsAgoLocal } from "@/hooks/useBacktestDateRange";
 import { useAllocationHistory } from "@/hooks/useAllocationHistory";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
 import { clearAnalysisCache, useAnalysisState } from "@/hooks/useAnalysisState";
@@ -159,6 +159,13 @@ describe("useOptimizationSuggestions", () => {
 // ─── useBacktestDateRange ─────────────────────────────────────────────────────
 
 describe("useBacktestDateRange", () => {
+  it("2월 29일의 N년 전은 평년이면 2월 28일이다 (plans/113 B6)", () => {
+    const leapDay = new Date(2028, 1, 29);
+    expect(yearsAgoLocal(1, leapDay)).toBe("2027-02-28");
+    expect(yearsAgoLocal(4, leapDay)).toBe("2024-02-29");
+    expect(yearsAgoLocal(5, new Date(2026, 10, 6))).toBe("2021-11-06");
+  });
+
   it("기본 preset이 5로 설정된다", () => {
     const { result } = renderHook(() => useBacktestDateRange());
     expect(result.current.activePreset).toBe(5);

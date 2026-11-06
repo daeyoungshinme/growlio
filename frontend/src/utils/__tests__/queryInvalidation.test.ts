@@ -59,6 +59,28 @@ describe("invalidateAccountData", () => {
   });
 });
 
+describe("보유 기반 쿼리 공용 목록 (plans/113 B3)", () => {
+  async function keysOf(fn: (qc: never) => Promise<unknown>) {
+    const qc = makeQueryClient();
+    await fn(qc as never);
+    return qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0] as string);
+  }
+
+  it("sync와 계좌 CUD가 거래 입력 종목 목록·배당 약한 달 추천도 지운다", async () => {
+    for (const fn of [invalidateSyncData, invalidateAccountData]) {
+      const keys = await keysOf(fn);
+      expect(keys).toEqual(expect.arrayContaining(["account-positions", "monthly-optimization"]));
+    }
+  });
+
+  it("계좌 CUD는 sync가 지우는 키를 모두 지운다", async () => {
+    const syncKeys = await keysOf(invalidateSyncData);
+    const accountKeys = await keysOf(invalidateAccountData);
+    expect(accountKeys).toEqual(expect.arrayContaining(syncKeys));
+    expect(accountKeys).toEqual(expect.arrayContaining(["transactions", "pension-contribution"]));
+  });
+});
+
 describe("invalidateTransactionData", () => {
   it("transactions, dashboard, challenges 무효화", async () => {
     const qc = makeQueryClient();
