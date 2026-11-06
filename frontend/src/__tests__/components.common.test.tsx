@@ -9,7 +9,7 @@ import BankAccountCard from "@/components/assets/BankAccountCard";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
-import { ToggleRow } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleRow";
 
 vi.mock("@/context/ExchangeRateContext", () => ({
   useExchangeRateContext: vi.fn(() => ({ rate: 1350, isLoading: false, error: null })),

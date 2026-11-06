@@ -34,7 +34,7 @@ _ASSUMED_FEE_RATE_DOMESTIC = 0.00015  # 국내 온라인 매매 수수료 대략
 _ASSUMED_FEE_RATE_OVERSEAS = 0.0025  # 해외 온라인 매매 수수료 대략치 (참고용)
 _TAX_DETAIL_LIMIT = 5
 
-_MARKET_NOTES: dict[str, str | None] = {
+MARKET_NOTES: dict[str, str | None] = {
     "GREEN": None,  # 평시엔 굳이 문구 노출 안 함 (노이즈 감소)
     "YELLOW": "시장 변동성이 확대되는 국면입니다 — 분할 실행을 고려해보세요.",
     "RED": "시장 위험 신호가 높은 국면입니다 — 리밸런싱을 신중하게 진행하세요.",
@@ -345,7 +345,7 @@ async def build_diagnosis_context(
         market_note: str | None = None
         risk_note: str | None = None
     else:
-        market_note = _MARKET_NOTES.get(market_level) if market_level else None
+        market_note = MARKET_NOTES.get(market_level) if market_level else None
         risk_note = _risk_note(risk) if risk_available else None
 
     total_gain, overseas_tax, total_fee, tax_notes, tax_items = _build_tax_preview(analysis, overview)

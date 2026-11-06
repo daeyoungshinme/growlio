@@ -173,7 +173,7 @@ async def get_tax_summary(
     interest_tax = interest_income * rates["interest"]
 
     rows = stock_rows if stock_rows is not None else await _latest_stock_rows(user_id, db, account_id)
-    overseas_unrealized = _stock_unrealized_from_rows(rows)[0]
+    overseas_unrealized = _overseas_unrealized_from_rows(rows)
     realized = overseas_realized_krw or 0.0
     overseas_gain_taxable = max(0.0, realized + overseas_unrealized - rates["overseas_deduction"])
     overseas_tax_estimated = overseas_gain_taxable * rates["overseas_gain"]
@@ -386,40 +386,23 @@ def _largest_domestic_holding(rows: list[Any]) -> tuple[str | None, float]:
     return names[ticker], by_ticker[ticker]
 
 
-def _stock_unrealized_from_rows(rows: list[Any]) -> tuple[float, float, float, float]:
-    """최신 스냅샷 기준 해외/국내 미실현 손익과 국내 평가액 반환.
+def _overseas_unrealized_from_rows(rows: list[Any]) -> float:
+    """최신 스냅샷 기준 해외 주식 미실현 손익(KRW).
 
-    ISA/연금저축/IRP(과세이연) 계좌 보유분은 국내/해외 미실현손익 합산에서 제외하고
-    tax_deferred_value_krw로 별도 집계한다. `rows`는 `_latest_stock_rows()`의 (스냅샷, 계좌) 행.
-    OTHER 시장은 국내·해외 어디에도 넣지 않는다(실현손익 `overseas_realized_service`는 해외로 본다 — 세무 판단 보류).
-
-    Returns: (overseas_unrealized_krw, domestic_stock_value_krw, domestic_unrealized_krw, tax_deferred_value_krw)
+    ISA/연금저축/IRP(과세이연) 계좌 보유분은 제외한다. `rows`는 `_latest_stock_rows()`의 (스냅샷, 계좌) 행.
+    OTHER 시장은 넣지 않는다(실현손익 `overseas_realized_service`는 해외로 본다 — 세무 판단 보류).
     """
     overseas_value = 0.0
     overseas_invested = 0.0
-    domestic_value = 0.0
-    domestic_invested = 0.0
-    tax_deferred_value = 0.0
-
     for snap, acc in rows:
-        is_tax_deferred = acc.tax_type in TAX_DEFERRED_TAX_TYPES
+        if acc.tax_type in TAX_DEFERRED_TAX_TYPES:
+            continue
         for pos in snap.position_items:
-            market = pos.market
+            if pos.market not in OVERSEAS_MARKETS:
+                continue
             qty = float(pos.qty or 0)
             avg = float(pos.avg_price or 0)
             cur = float(pos.current_price or avg)
-
-            if is_tax_deferred:
-                tax_deferred_value += cur * qty
-                continue
-
-            if market in OVERSEAS_MARKETS:
-                overseas_value += cur * qty
-                overseas_invested += avg * qty
-            elif market in DOMESTIC_MARKETS:
-                domestic_value += cur * qty
-                domestic_invested += avg * qty
-
-    overseas_unrealized = overseas_value - overseas_invested
-    domestic_unrealized = domestic_value - domestic_invested
-    return overseas_unrealized, domestic_value, domestic_unrealized, tax_deferred_value
+            overseas_value += cur * qty
+            overseas_invested += avg * qty
+    return overseas_value - overseas_invested

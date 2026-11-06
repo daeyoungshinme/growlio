@@ -63,7 +63,7 @@ class TestSyncAccount:
 
         with (
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
@@ -92,7 +92,7 @@ class TestSyncAccount:
 
         with (
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
@@ -120,7 +120,7 @@ class TestSyncAccount:
 
         with (
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
@@ -147,7 +147,7 @@ class TestSyncAccount:
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.accounts.asset_service._CIRCUITS", {}),
             patch(
-                "app.services.accounts.asset_service._upsert_snapshot",
+                "app.services.accounts.asset_service.upsert_snapshot",
                 new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
             patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
@@ -174,7 +174,7 @@ class TestSyncAccount:
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.accounts.asset_service._CIRCUITS", {}),
             patch(
-                "app.services.accounts.asset_service._upsert_snapshot",
+                "app.services.accounts.asset_service.upsert_snapshot",
                 new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
             patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
@@ -212,7 +212,7 @@ class TestSyncAccount:
 
         with (
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.accounts.asset_service.sync_snapshot_positions", new=AsyncMock()),
             patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.accounts.asset_service.broker_sync_duration"),
@@ -248,7 +248,7 @@ class TestSyncAccount:
         # mock_db.execute 기본값(빈 리스트) = 동기화 전 보유 종목 없음
         with (
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.accounts.asset_service.sync_snapshot_positions", new=AsyncMock()),
             patch(
                 "app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()
@@ -291,7 +291,7 @@ class TestSyncAccount:
 
         with (
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.accounts.asset_service.sync_snapshot_positions", new=AsyncMock()),
             patch(
                 "app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()
@@ -320,7 +320,7 @@ class TestSyncAccount:
 
         with (
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
-            patch("app.services.accounts.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.accounts.asset_service.upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.accounts.asset_service.broker_sync_duration"),
         ):
@@ -373,7 +373,7 @@ class TestSyncAccountPositionReplacement:
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.accounts.asset_service._CIRCUITS", {}),
             patch(
-                "app.services.accounts.asset_service._upsert_snapshot",
+                "app.services.accounts.asset_service.upsert_snapshot",
                 new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
             ),
             patch("app.services.accounts.asset_service.sync_snapshot_positions", new=AsyncMock()),
@@ -446,7 +446,7 @@ class TestSyncAccountPositionReplacement:
         with (
             patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.accounts.asset_service._CIRCUITS", {}),
-            patch("app.services.accounts.asset_service._upsert_snapshot", new=upsert),
+            patch("app.services.accounts.asset_service.upsert_snapshot", new=upsert),
             patch("app.services.accounts.asset_service.sync_snapshot_positions", new=snap_positions),
             patch(
                 "app.services.accounts.asset_service._preserved_overseas_positions",
@@ -564,7 +564,7 @@ class TestSyncSnapshotConsistency:
         sync_positions = AsyncMock()
         with (
             patch("app.services.accounts.asset_service.get_provider", return_value=provider),
-            patch("app.services.accounts.asset_service._upsert_snapshot", new=upsert),
+            patch("app.services.accounts.asset_service.upsert_snapshot", new=upsert),
             patch("app.services.accounts.asset_service.sync_snapshot_positions", new=sync_positions),
             patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
             patch("app.services.accounts.asset_service.broker_sync_duration"),

@@ -198,7 +198,7 @@ class TestCreateExternalTransaction:
                 "app.api.v1.external.get_latest_snapshot_with_positions",
                 AsyncMock(return_value=(snapshot, positions or [])),
             ),
-            patch("app.services.accounts.snapshot_service._upsert_snapshot", AsyncMock()),
+            patch("app.services.accounts.snapshot_service.upsert_snapshot", AsyncMock()),
             patch("app.api.v1.external.invalidate_asset_account_caches", AsyncMock()),
         )
 
@@ -275,7 +275,7 @@ class TestCreateExternalTransaction:
             patches[2],
             patches[3],
             patch(
-                "app.services.accounts.snapshot_service._upsert_snapshot", AsyncMock(return_value=new_snap)
+                "app.services.accounts.snapshot_service.upsert_snapshot", AsyncMock(return_value=new_snap)
             ) as upsert_mock,
             patch("app.services.accounts.snapshot_service.sync_snapshot_positions", AsyncMock()) as sync_mock,
             patches[5],

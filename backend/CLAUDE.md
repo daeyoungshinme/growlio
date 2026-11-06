@@ -126,7 +126,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - 쿼리 헬퍼: `_position_queries.py`, `_portfolio_queries.py`
 
 **시세 (`market_data/`)**
-- `price_service.py` — 현재가(Yahoo → KIS). `yahoo_price.py` — Yahoo 유틸. **브로커 잔고는 국내 market을 전부 "KOSPI"로 채운다** — `to_yf_symbol()`이 `_kosdaq_tickers`(FDR, 매일 07:00 갱신)로 `.KQ` 교정. 저장된 market은 매칭 키라 바꾸지 않음. pykrx 상장목록은 KRX 로그인 요구로 사용 불가
+- `price_service.py` — 현재가 단일 경로 `fetch_prices_batch`(캐시 → 국내 Naver/pykrx → Yahoo → KIS). `/stocks/price`·`prices-batch`도 이걸 쓰고 `kis_accounts`로 **요청에 지정된 소유 계좌만** KIS 폴백(내부 호출은 아무 KIS 계좌). `yahoo_price.py` — Yahoo 유틸. **브로커 잔고는 국내 market을 전부 "KOSPI"로 채운다** — `to_yf_symbol()`이 `_kosdaq_tickers`(FDR, 매일 07:00 갱신)로 `.KQ` 교정. 저장된 market은 매칭 키라 바꾸지 않음. pykrx 상장목록은 KRX 로그인 요구로 사용 불가
 - `price_sync_sources.py` — 국내 Naver/pykrx 폴백 (Yahoo 클라우드 IP 차단 대비)
 - `stock_search_service.py` — 네이버(한글)/Yahoo(영문·티커) 검색
 - `market_data_fetcher.py` — 팩터·리스크용 배치 수익률 (개별 현재가와 별개)
@@ -214,7 +214,7 @@ core/
   job_runner.py report_job_failure(로그+Sentry 스택) · report_handled_failure(루프 안 삼키는 항목 실패 — 스택 없는 capture, 자격증명 지역변수 보호) · run_per_user(유저별 동시성·실패 격리) — jobs와 알림 서비스 공용. **`except`+`logger.error`만으로는 Sentry에 안 간다**(structlog는 stdlib logging 미경유)
   logging.py    structlog 시크릿 redact + yfinance 404 소음 필터. 계좌번호·이메일은 utils/masking.py.
                 **응답·DB·알림에 예외 사유는 str(e) 대신 public_error_message(e)** (SQL 파라미터·URL의 계좌번호 유출 방지)
-  cache_store.py in-memory TTL 캐시(LRU 20,000). **프로세스 로컬** — 워커/인스턴스 2개↑면 적중률 급락·무효화 미전파(render.yaml은 단일 전제)
+  cache_store.py in-memory TTL 캐시(LRU 20,000). `__bool__`은 항상 참(`__len__`만 있으면 빈 store가 falsy라 `if cache:`가 콜드 스타트 직후 쓰기를 건너뜀). **프로세스 로컬** — 워커/인스턴스 2개↑면 적중률 급락·무효화 미전파(render.yaml은 단일 전제)
 kis/            KIS 클라이언트. **해외 거래소 코드 체계가 둘**: 주문/잔고 NASD/NYSE/AMEX vs 시세 NAS/NYS/AMS. **잔고의 NASD는 실전=미국 전체, 모의=나스닥** — 합치면 이중 집계라 ticker로 중복 제거한다.
                 KIS는 NYSE Arca ETF(SPY·VOO 등)를 AMEX로 분류 → exchange_master.resolve_kis_overseas_market()로 주문·시세 직전 보정(키움은 무보정)
                 현재가 조회: domestic_quote.py / overseas_quote.py · 주문: order.py

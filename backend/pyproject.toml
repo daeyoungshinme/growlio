@@ -11,8 +11,6 @@ dependencies = [
     "uvicorn>=0.29.0,<1.0.0",
     "uvloop>=0.15.1,<1.0.0; sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'PyPy'",
     "httptools>=0.6.3,<1.0.0",
-    "websockets>=10.4,<18.0",
-    "watchfiles>=0.20,<2.0",
     "python-dotenv>=0.13,<2.0",
     "pyyaml>=5.1,<7.0",
     "colorama>=0.4,<1.0; sys_platform == 'win32'",
@@ -80,6 +78,9 @@ dev = [
     "pytest-cov>=5.0.0,<8.0.0",
     # make install-backend가 훅 설치에 사용 — venv 재생성 시 사라지지 않게 명시
     "pre-commit>=4.0.0,<5.0.0",
+    # uvicorn[standard] 중 개발에만 쓰는 것 — 운영은 --reload도 WebSocket 라우트도 없다(plans/114 C3)
+    "watchfiles>=0.20,<2.0",  # uvicorn --reload (make dev-backend, dev.sh)
+    "websockets>=10.4,<18.0",
 ]
 
 [build-system]

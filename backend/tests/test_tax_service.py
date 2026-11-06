@@ -108,8 +108,8 @@ class TestGetTaxSummary:
         return (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=dividend),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(overseas_unrealized, 0.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=overseas_unrealized,
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         )
@@ -157,8 +157,8 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(0.0, 0.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=0.0,
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):
@@ -196,8 +196,8 @@ class TestGetTaxSummary:
                 return_value=dividend_income,
             ),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(0.0, 0.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=0.0,
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):
@@ -215,8 +215,8 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(overseas_unrealized, 0.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=overseas_unrealized,
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):
@@ -234,8 +234,8 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(1_000_000.0, 0.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=1_000_000.0,
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):
@@ -265,8 +265,8 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(0.0, 6_000_000_000.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=0.0,
             ),
             patch(
                 "app.services.tax.tax_service._largest_domestic_holding",
@@ -291,8 +291,8 @@ class TestGetTaxSummary:
                 return_value=20_000_001.0,
             ),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(0.0, 0.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=0.0,
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):
@@ -313,8 +313,8 @@ class TestGetTaxSummary:
                 return_value=5_000_000.0,
             ),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(3_000_000.0, 0.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=3_000_000.0,
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):
@@ -334,8 +334,8 @@ class TestGetTaxSummary:
                 "app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=1_000_000.0
             ),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(50_000_000.0, 0.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=50_000_000.0,
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):
@@ -352,8 +352,8 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(0.0, 0.0, 0.0, 0.0),
+                "app.services.tax.tax_service._overseas_unrealized_from_rows",
+                return_value=0.0,
             ),
             patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
         ):

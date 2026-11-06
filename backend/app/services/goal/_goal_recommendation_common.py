@@ -95,7 +95,7 @@ _DIVIDEND_IMPROVEMENT_THRESHOLD_PCT = 0.5
 """이미 배당 목표를 달성했어도, 미등록 후보를 추가했을 때 그리디 최대 달성 가능 배당수익률이
 이 값(%p) 이상 개선되면 `_suggest_for_dividend_goal()`이 "더 나은 옵션이 있습니다"로 제안한다.
 노이즈성 제안(0.1%p 차이로 계속 새 종목을 권유)을 막기 위한 최소 유의미 기준 —
-`_RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3.0%p, 비중 변화 감지용, goal_recommendation_service.py)와는
+`RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3.0%p, 비중 변화 감지용, goal_recommendation_service.py)와는
 판단 축이 달라 값도 다르게 잡는다."""
 
 _MIN_SUGGESTABLE_DIVIDEND_YIELD_PCT = 2.5
@@ -370,7 +370,7 @@ def _max_weight_from_settings(settings_row: object) -> float:
     return float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
 
 
-def _cagr_lookback_years_from_settings(settings_row: object) -> int:
+def cagr_lookback_years_from_settings(settings_row: object) -> int:
     return int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
 
 

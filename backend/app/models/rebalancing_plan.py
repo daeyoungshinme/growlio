@@ -46,6 +46,7 @@ class RebalancingPlan(Base):
     __table_args__ = (
         Index("idx_rebalancing_plans_user_created", "user_id", "created_at"),
         Index("idx_rebalancing_plans_alert", "alert_id"),
+        Index("idx_rebalancing_plans_portfolio", "portfolio_id"),
     )
 
 
@@ -94,6 +95,7 @@ class RebalancingPlanLeg(Base):
 
     __table_args__ = (
         Index("idx_rebalancing_plan_legs_plan", "plan_id"),
+        Index("idx_rebalancing_plan_legs_execution", "execution_id"),
         Index("idx_rebalancing_plan_legs_status_deadline", "status", "deadline_at"),
         Index(
             "uq_rebalancing_plan_legs_token_hash",

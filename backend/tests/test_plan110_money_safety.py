@@ -76,9 +76,7 @@ class TestUsdRateCachePoisoning:
         user = SimpleNamespace(id=uuid.uuid4())
         with (
             patch("app.services.market_data.yahoo_price.fetch_usdkrw", new=AsyncMock(return_value=0.0)),
-            patch.object(stocks, "_resolve_batch_prices", new=AsyncMock(return_value={"AAPL": 100.0})),
-            patch.object(stocks, "get_cached_json", new=AsyncMock(return_value=None)),
-            patch.object(stocks, "set_cached_json", new=AsyncMock()) as price_cache,
+            patch.object(stocks, "fetch_prices_batch", new=AsyncMock(return_value={"AAPL": 100.0})),
         ):
             body = SimpleNamespace(items=[SimpleNamespace(ticker="AAPL", market="NASDAQ", account_id=None)])
             result = await stocks.get_stock_prices_batch.__wrapped__(
@@ -87,7 +85,6 @@ class TestUsdRateCachePoisoning:
 
         assert cache.value is None
         assert result["AAPL"]["usd_rate"] == currency.settings.usd_krw_fallback_rate
-        price_cache.assert_not_awaited()  # 추정 환율로 환산한 금액도 캐시하지 않는다
 
 
 class TestPersistentRecordsNeedRealRate:

@@ -107,7 +107,7 @@
 - **stocks 시세 파이프라인 통합**(C5 나머지): 라우터는 Yahoo → 국내 → 계좌 지정 KIS, `price_service.fetch_prices_batch`는 국내 → Yahoo → 임의 KIS 계좌 순서다. 합치면 동작이 바뀌어 별도 판단이 필요하다. 배치 응답은 계약상 ticker 키라 같은 티커·다른 시장 충돌도 그대로다.
 - `goal_start_date`의 Date 컬럼 전환: `external.py`(nestlio 전송)와 마이그레이션을 수반한다.
 - FK 인덱스(111 E1 보류 유지, 공유 Supabase 마이그레이션).
-- yfinance 1.x, React 19·recharts 3·tailwind 4·TS 7 메이저: 기존 결정대로 유지.
+- yfinance 1.x, React 19·recharts 3·TS 7 메이저: 기존 결정대로 유지. (tailwind 4는 #240에서 완료 — 114)
 - CI 이미지 스모크(`/app/scripts`)와 Dockerfile `PYTHONPATH`: 운영 이미지에서 bootstrap을 돌릴 일이 다시 생길 수 있어 유지 여부를 따로 판단한다.
 - 그 밖:
   - `websockets`·`watchfiles` 운영 의존성 분리

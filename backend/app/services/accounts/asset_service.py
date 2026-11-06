@@ -30,7 +30,7 @@ from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.manual_provider import ManualProvider
 from app.providers.toss_provider import TossProvider
 from app.services.accounts._account_queries import active_accounts_stmt
-from app.services.accounts.snapshot_service import _upsert_snapshot, sync_snapshot_positions
+from app.services.accounts.snapshot_service import sync_snapshot_positions, upsert_snapshot
 from app.services.market_data.yahoo_price import fetch_yahoo_batch
 from app.utils.cache_invalidation import invalidate_asset_account_caches
 from app.utils.cache_keys import CacheStoreType
@@ -217,7 +217,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         pnl_krw += preserved_value - preserved_invested
         snapshot_positions = [*balance.positions, *preserved]
 
-    snapshot = await _upsert_snapshot(
+    snapshot = await upsert_snapshot(
         db,
         account_id=account.id,
         user_id=account.user_id,

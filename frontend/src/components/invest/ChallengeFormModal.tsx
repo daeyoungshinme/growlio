@@ -5,7 +5,7 @@ import type { SettingsData } from "@/api/settings";
 import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import FormInput from "@/components/common/FormInput";
-import { ToggleRow } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleRow";
 import { challengeFormSchema } from "@/schemas/challenge";
 import { isStockAccount } from "@/utils/accounts";
 import { fmtKrw, fmtKrwPreview, localMonth } from "@/utils/format";

@@ -26,7 +26,7 @@ from app.services.market_signal.market_signal_service import (
     get_confirmed_composite_level,
     get_market_signal,
 )
-from app.services.rebalancing.diagnosis_service import _MARKET_NOTES
+from app.services.rebalancing.diagnosis_service import MARKET_NOTES
 from app.utils.cache_keys import (
     TTL_MARKET_SIGNAL_CHANGE_SENT,
     CacheStoreType,
@@ -101,7 +101,7 @@ async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreTy
     if old_level == new_level:
         return
 
-    reason = _MARKET_NOTES.get(new_level)
+    reason = MARKET_NOTES.get(new_level)
     subscribers = await _get_composite_subscribers(db)
     await db.commit()  # 발송 내내 커넥션을 잡고 있지 않는다 — 유저마다 새 세션을 연다
 
@@ -210,7 +210,7 @@ async def send_market_signal_daily_digest(db: AsyncSession, cache: CacheStoreTyp
         logger.warning("market_signal_daily_digest_fetch_failed", error=str(exc))
         return
 
-    reason = _MARKET_NOTES.get(level) or "오늘도 안정적입니다."
+    reason = MARKET_NOTES.get(level) or "오늘도 안정적입니다."
     subscribers = await _get_daily_digest_subscribers(db)
 
     await run_per_user(

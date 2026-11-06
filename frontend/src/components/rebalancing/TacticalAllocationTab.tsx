@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { TacticalStatus } from "@/api/tactical";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { ToggleRow } from "@/components/common/ToggleSwitch";
+import { ToggleRow } from "@/components/common/ToggleRow";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { LABEL_SM, SELECT_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";

@@ -54,8 +54,8 @@ from app.services.accounts.asset_service import (
 )
 from app.services.accounts.credential_service import encrypt, encrypt_if_present
 from app.services.accounts.snapshot_service import (
-    _upsert_snapshot,
     get_latest_snapshot_with_positions,
+    upsert_snapshot,
     write_manual_deposit_snapshot,
 )
 from app.services.accounts.sync_all_service import get_sync_all_status, is_sync_all_running, run_sync_all
@@ -219,7 +219,7 @@ async def create_account(
         cache = await get_cache_store()
         await promote_user_token_to_account(str(current_user.id), str(account.id), account.is_mock_mode, cache, db)
     if account.manual_amount:
-        await _upsert_snapshot(
+        await upsert_snapshot(
             db,
             account_id=account.id,
             user_id=account.user_id,
@@ -280,7 +280,7 @@ async def update_account(
     )
     deposit_trigger = req.deposit_krw is not None or req.deposit_usd is not None
     if needs_snapshot and account.manual_amount and not deposit_trigger:
-        await _upsert_snapshot(
+        await upsert_snapshot(
             db,
             account_id=account.id,
             user_id=account.user_id,

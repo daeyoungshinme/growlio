@@ -35,7 +35,7 @@ from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.alerts.alert_service import already_sent_alert_today
 from app.services.goal.goal_horizon_recommendation_service import get_horizon_recommendations
 from app.services.goal.goal_recommendation_service import (
-    _RECOMMENDATION_DRIFT_THRESHOLD_PCT,
+    RECOMMENDATION_DRIFT_THRESHOLD_PCT,
     build_overall_recommendation_inputs,
     compute_recommendation_drift,
     fold_into_portfolio_groups,
@@ -95,7 +95,7 @@ async def _find_drifted_portfolios(
     drifted_names: list[str] = []
 
     def _is_significant(max_delta_pct: float, new_candidate_count: int) -> bool:
-        return max_delta_pct >= _RECOMMENDATION_DRIFT_THRESHOLD_PCT or new_candidate_count > 0
+        return max_delta_pct >= RECOMMENDATION_DRIFT_THRESHOLD_PCT or new_candidate_count > 0
 
     # 전체(overall) 경로 — /rebalancing?rtab=포트폴리오의 "전체" 탭과 동일한 입력 구성
     base_krw, existing_items = await build_overall_recommendation_inputs(user_id, db, cache)

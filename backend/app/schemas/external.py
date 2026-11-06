@@ -1,6 +1,6 @@
 """외부 서비스(nestlio) API(`api/v1/external.py`) 요청·응답 스키마."""
 
-from datetime import date, datetime
+from datetime import date
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -48,7 +48,7 @@ class ExternalGoalSettings(BaseModel):
     is_configured: bool
     goal_amount: float | None = None
     goal_annual_return_pct: float | None = None
-    goal_start_date: datetime | None = None
+    goal_start_date: date | None = None  # nestlio도 date로 받는다("2024-01-01")
     goal_initial_amount: float | None = None
     annual_deposit_goal: float | None = None
     annual_dividend_goal: float | None = None

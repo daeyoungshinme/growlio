@@ -16,7 +16,6 @@ from app.utils.cache_keys import (
     alloc_history_key,
     backtest_key,
     composite_alert_sent_key,
-    current_price_display_key,
     current_price_key,
     dca_analysis_key,
     dividend_info_key,
@@ -40,12 +39,6 @@ from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 class TestCacheKeyBuilders:
     def test_current_price_key(self, override_settings):
         assert current_price_key("AAPL", "NASDAQ") == "test:price:current:AAPL:NASDAQ"
-
-    def test_current_price_display_key_differs_from_current_price_key(self, override_settings):
-        """price_service.py의 plain float 캐시(current_price_key)와 stocks.py의 JSON 캐시
-        (current_price_display_key)는 같은 키를 공유하면 안 된다 — 공유 시 float(cached)가
-        JSON 문자열을 파싱하려다 크래시하는 회귀가 있었다."""
-        assert current_price_display_key("AAPL", "NASDAQ") != current_price_key("AAPL", "NASDAQ")
 
     def test_price_return_key(self, override_settings):
         assert price_return_key(3, "AAPL", "NASDAQ") == "test:return:3y:AAPL:NASDAQ"
