@@ -11,12 +11,11 @@ from app.services.tax.tax_service import (
     _build_harvesting_recommendations,
     _calc_dividend_income,
     _calc_health_insurance_estimate,
-    _calc_total_fees,
-    _get_rates,
+    get_tax_rates,
     get_tax_summary,
 )
 
-_RATES_2025 = _get_rates(2025)
+_RATES_2025 = get_tax_rates(2025)
 
 
 # ── _build_harvesting_recommendations ────────────────────────
@@ -108,7 +107,6 @@ class TestGetTaxSummary:
     def _base_patches(dividend: float = 0.0, overseas_unrealized: float = 0.0):
         return (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=dividend),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(overseas_unrealized, 0.0, 0.0, 0.0),
@@ -120,8 +118,8 @@ class TestGetTaxSummary:
     async def test_interest_income_counts_toward_financial_income(self, mock_db, override_settings, interest_mock):
         """E7: 이자소득이 금융소득(종합과세 판정·건보 추정)에 합산되고 이자소득세가 총 세금에 포함된다."""
         interest_mock.return_value = 6_000_000.0
-        p1, p2, p3, p4 = self._base_patches(dividend=15_000_000.0)
-        with p1, p2, p3, p4:
+        p1, p2, p3 = self._base_patches(dividend=15_000_000.0)
+        with p1, p2, p3:
             result = await get_tax_summary(uuid.uuid4(), 2026, mock_db)
 
         assert result["interest_income_krw"] == 6_000_000
@@ -134,36 +132,22 @@ class TestGetTaxSummary:
 
     @pytest.mark.asyncio
     async def test_realized_unknown_leaves_realized_fields_none(self, mock_db, override_settings):
-        p1, p2, p3, p4 = self._base_patches(overseas_unrealized=3_000_000.0)
-        with p1, p2, p3, p4:
+        p1, p2, p3 = self._base_patches(overseas_unrealized=3_000_000.0)
+        with p1, p2, p3:
             result = await get_tax_summary(uuid.uuid4(), 2026, mock_db)
 
         assert result["overseas_realized_gain_krw"] is None
-        assert result["overseas_tax_free_room_krw"] is None
-        assert result["overseas_realized_tax_krw"] is None
         assert result["overseas_tax_estimated_krw"] == round(500_000 * 0.22)
 
     @pytest.mark.asyncio
     async def test_realized_gain_reduces_room_and_adds_to_estimate(self, mock_db, override_settings):
         """E6: 실현 300만 → 공제 초과 50만 과세, 추가 무세 실현 여유 0, 추정세금은 실현+미실현 합산."""
-        p1, p2, p3, p4 = self._base_patches(overseas_unrealized=1_000_000.0)
-        with p1, p2, p3, p4:
+        p1, p2, p3 = self._base_patches(overseas_unrealized=1_000_000.0)
+        with p1, p2, p3:
             result = await get_tax_summary(uuid.uuid4(), 2026, mock_db, overseas_realized_krw=3_000_000.0)
 
         assert result["overseas_realized_gain_krw"] == 3_000_000
-        assert result["overseas_tax_free_room_krw"] == 0
-        assert result["overseas_realized_tax_krw"] == round(500_000 * 0.22)
         assert result["overseas_tax_estimated_krw"] == round(1_500_000 * 0.22)
-
-    @pytest.mark.asyncio
-    async def test_realized_loss_expands_tax_free_room(self, mock_db, override_settings):
-        """실현 손실 100만이면 손익통산으로 350만까지 무세 실현 가능."""
-        p1, p2, p3, p4 = self._base_patches()
-        with p1, p2, p3, p4:
-            result = await get_tax_summary(uuid.uuid4(), 2026, mock_db, overseas_realized_krw=-1_000_000.0)
-
-        assert result["overseas_tax_free_room_krw"] == 3_500_000
-        assert result["overseas_realized_tax_krw"] == 0
 
     @pytest.mark.asyncio
     async def test_returns_required_fields(self, mock_db, override_settings):
@@ -172,7 +156,6 @@ class TestGetTaxSummary:
 
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(0.0, 0.0, 0.0, 0.0),
@@ -188,15 +171,10 @@ class TestGetTaxSummary:
             "overseas_unrealized_gain_krw",
             "overseas_gain_deduction_krw",
             "overseas_tax_estimated_krw",
-            "domestic_stock_value_krw",
-            "domestic_unrealized_gain_krw",
             "domestic_large_holder_warning",
-            "domestic_large_holder_excess_krw",
             "comprehensive_tax_warning",
             "comprehensive_tax_remaining_krw",
             "total_estimated_tax_krw",
-            "total_fees_krw",
-            "tax_deferred_value_krw",
             "harvesting_recommendations",
             "health_insurance_estimate",
             "note",
@@ -217,7 +195,6 @@ class TestGetTaxSummary:
                 new_callable=AsyncMock,
                 return_value=dividend_income,
             ),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(0.0, 0.0, 0.0, 0.0),
@@ -237,7 +214,6 @@ class TestGetTaxSummary:
 
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(overseas_unrealized, 0.0, 0.0, 0.0),
@@ -257,7 +233,6 @@ class TestGetTaxSummary:
 
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(1_000_000.0, 0.0, 0.0, 0.0),
@@ -273,7 +248,6 @@ class TestGetTaxSummary:
         """한 종목 보유액이 50억 이상이면 대주주 경고."""
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._largest_domestic_holding",
                 return_value=("삼성전자", 5_000_000_000.0),
@@ -284,14 +258,12 @@ class TestGetTaxSummary:
 
         assert result["domestic_large_holder_warning"] is True
         assert result["domestic_large_holder_name"] == "삼성전자"
-        assert result["domestic_large_holder_excess_krw"] == 0.0
 
     @pytest.mark.asyncio
     async def test_domestic_total_over_threshold_without_large_ticker_has_no_warning(self, mock_db, override_settings):
         """합계가 커도 종목당 기준 미만이면 경고하지 않는다 — 예전에는 합계를 10억과 비교했다."""
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(0.0, 6_000_000_000.0, 0.0, 0.0),
@@ -318,7 +290,6 @@ class TestGetTaxSummary:
                 new_callable=AsyncMock,
                 return_value=20_000_001.0,
             ),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(0.0, 0.0, 0.0, 0.0),
@@ -341,7 +312,6 @@ class TestGetTaxSummary:
                 new_callable=AsyncMock,
                 return_value=5_000_000.0,
             ),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(3_000_000.0, 0.0, 0.0, 0.0),
@@ -363,7 +333,6 @@ class TestGetTaxSummary:
             patch(
                 "app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=1_000_000.0
             ),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(50_000_000.0, 0.0, 0.0, 0.0),
@@ -376,31 +345,12 @@ class TestGetTaxSummary:
         assert result["comprehensive_tax_remaining_krw"] == 19_000_000.0
 
     @pytest.mark.asyncio
-    async def test_total_fees_included(self, mock_db, override_settings):
-        """총 거래 수수료가 결과에 포함된다."""
-        user_id = uuid.uuid4()
-
-        with (
-            patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=15_000.0),
-            patch(
-                "app.services.tax.tax_service._stock_unrealized_from_rows",
-                return_value=(0.0, 0.0, 0.0, 0.0),
-            ),
-            patch("app.services.tax.tax_service._overseas_positions_from_rows", return_value=[]),
-        ):
-            result = await get_tax_summary(user_id, 2025, mock_db)
-
-        assert result["total_fees_krw"] == 15_000
-
-    @pytest.mark.asyncio
     async def test_year_in_result(self, mock_db, override_settings):
         """요청 연도가 결과에 반영된다."""
         user_id = uuid.uuid4()
 
         with (
             patch("app.services.tax.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
             patch(
                 "app.services.tax.tax_service._stock_unrealized_from_rows",
                 return_value=(0.0, 0.0, 0.0, 0.0),
@@ -451,60 +401,7 @@ class TestCalcHealthInsuranceEstimate:
         assert "참고" in result["note"]
 
 
-# ── _calc_total_fees / _calc_dividend_income DB 헬퍼 ────────
-
-
-class TestCalcTotalFeesDb:
-    @pytest.mark.asyncio
-    async def test_returns_sum_when_fees_exist(self, mock_db, override_settings):
-        execute_result = MagicMock()
-        execute_result.scalar.return_value = 50_000.0
-        mock_db.execute = AsyncMock(return_value=execute_result)
-
-        result = await _calc_total_fees(uuid.uuid4(), 2024, mock_db)
-
-        assert result == pytest.approx(50_000.0)
-
-    @pytest.mark.asyncio
-    async def test_returns_zero_when_no_fees(self, mock_db, override_settings):
-        execute_result = MagicMock()
-        execute_result.scalar.return_value = None
-        mock_db.execute = AsyncMock(return_value=execute_result)
-
-        result = await _calc_total_fees(uuid.uuid4(), 2024, mock_db)
-
-        assert result == 0.0
-
-    @pytest.mark.asyncio
-    async def test_returns_zero_when_scalar_zero(self, mock_db, override_settings):
-        execute_result = MagicMock()
-        execute_result.scalar.return_value = 0
-        mock_db.execute = AsyncMock(return_value=execute_result)
-
-        result = await _calc_total_fees(uuid.uuid4(), 2024, mock_db)
-
-        assert result == 0.0
-
-    @pytest.mark.asyncio
-    async def test_account_id_adds_extra_filter_condition(self, mock_db, override_settings):
-        captured = {}
-
-        async def mock_execute(query):
-            captured["query"] = query
-            result = MagicMock()
-            result.scalar.return_value = 0
-            return result
-
-        mock_db.execute = mock_execute
-
-        await _calc_total_fees(uuid.uuid4(), 2024, mock_db)
-        without_filter = str(captured["query"])
-
-        await _calc_total_fees(uuid.uuid4(), 2024, mock_db, account_id=uuid.uuid4())
-        with_filter = str(captured["query"])
-
-        assert "transactions.account_id" not in without_filter
-        assert "transactions.account_id" in with_filter
+# ── _calc_dividend_income DB 헬퍼 ────────
 
 
 class TestCalcDividendIncomeDb:

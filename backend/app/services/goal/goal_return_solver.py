@@ -1,7 +1,7 @@
 """투자 목표(목표금액/월적립액/목표연도)로부터 필요 연평균 수익률을 역산하는 순수 계산 함수.
 
-`dca_service.py`의 미래가치(FV) 수식(`initial*(1+r)^n + pmt*((1+r)^n-1)/r`)과 동일한 공식을
-사용하되, r 대신 n(개월수)과 목표금액을 고정하고 r을 미지수로 풀이한다.
+미래가치(FV) 수식(`initial*(1+r)^n + pmt*((1+r)^n-1)/r`)은 `future_value_monthly` 한 곳에 두고
+`dca_service.py`(적립 곡선·목표 도달 개월)와 여기(n과 목표금액을 고정하고 r을 푸는 역산)가 함께 쓴다.
 """
 
 from __future__ import annotations
@@ -38,8 +38,8 @@ def monthly_rate(annual_r: float) -> float:
     return (1 + annual_r) ** (1 / 12) - 1
 
 
-def _future_value(pv: float, pmt: float, annual_r: float, n_months: int) -> float:
-    r_m = monthly_rate(annual_r)
+def future_value_monthly(pv: float, pmt: float, r_m: float, n_months: int) -> float:
+    """월 수익률 `r_m`으로 `n_months` 동안 매월 `pmt`를 적립했을 때의 미래가치."""
     if abs(r_m) < 1e-12:
         return pv + pmt * n_months
     try:
@@ -48,6 +48,10 @@ def _future_value(pv: float, pmt: float, annual_r: float, n_months: int) -> floa
         # 매우 긴 기간(수백년) × 높은 수익률 조합 — FV가 목표를 훨씬 초과한다는 뜻이므로 +inf로 취급
         return float("inf")
     return pv * growth + pmt * ((growth - 1) / r_m)
+
+
+def _future_value(pv: float, pmt: float, annual_r: float, n_months: int) -> float:
+    return future_value_monthly(pv, pmt, monthly_rate(annual_r), n_months)
 
 
 def solve_required_annual_return_pct(

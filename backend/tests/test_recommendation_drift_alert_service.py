@@ -15,7 +15,7 @@ from app.schemas.rebalancing import (
     HorizonRecommendationResponse,
 )
 from app.services.alerts.recommendation_drift_alert_service import (
-    _already_sent_this_week,
+    _already_sent_today,
     _find_drifted_portfolios,
     _get_subscribers,
     _is_full_target,
@@ -103,7 +103,7 @@ class TestAlreadySentThisWeek:
         result_mock.scalar.return_value = None
         mock_db.execute = AsyncMock(return_value=result_mock)
 
-        assert await _already_sent_this_week(mock_db, uuid.uuid4()) is False
+        assert await _already_sent_today(mock_db, uuid.uuid4()) is False
 
     @pytest.mark.asyncio
     async def test_returns_true_when_history_exists(self, mock_db):
@@ -111,7 +111,7 @@ class TestAlreadySentThisWeek:
         result_mock.scalar.return_value = uuid.uuid4()
         mock_db.execute = AsyncMock(return_value=result_mock)
 
-        assert await _already_sent_this_week(mock_db, uuid.uuid4()) is True
+        assert await _already_sent_today(mock_db, uuid.uuid4()) is True
 
 
 class TestFindDriftedPortfolios:

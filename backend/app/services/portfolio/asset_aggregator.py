@@ -7,11 +7,11 @@ from datetime import date
 from typing import Any
 
 import structlog
-from sqlalchemy import bindparam, select, text
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import POSITION_STOCK_ASSET_TYPES
-from app.models.user import UserSettings
+from app.services._settings_queries import get_settings_row
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.portfolio.composition_calculator import (
     build_asset_totals,
@@ -206,7 +206,7 @@ async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache
         non_stock_first_total,
         non_stock_net_flows_after,
     ) = await _get_scalar_init_data(user_id, db)
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
+    settings_row = await get_settings_row(db, user_id)
     monthly_trend = await get_monthly_trend(user_id, db, cache)
     div_summary = await get_dividend_summary(user_id, db, cache)
 

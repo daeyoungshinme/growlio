@@ -179,7 +179,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `pension_contribution_service.py` · `isa_service.py`
 
 **알림 (`alerts/`)**
-- `alert_service.py` — 공통 저장·조회·격리 루프(rollback 뒤 행 객체는 refresh 후 사용). 체크 함수 re-export 없음 — 구현 모듈에서 직접 import
+- `alert_service.py` — 공통 저장·조회·격리 루프(rollback 뒤 행 객체는 refresh 후 사용), 오늘(KST) 발송 여부 `already_sent_alert_today`. 체크 함수 re-export 없음 — 구현 모듈에서 직접 import
 - `exchange_rate_service.py` · `stock_price_service.py` · `calculator.py`(조건 판단)
 - `market_signal_alert_service.py` — 등급 전환 즉시 알림 + 08:30 요약. `check_composite_signal`을 alert_check·diagnosis와 공유
 - `_dispatch.py` — 이메일+푸시 2채널, 하나라도 성공하면 AlertHistory 저장. 단독 푸시는 `send_push_safely`(예외 로깅 후 삼킴)
@@ -255,7 +255,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 | `market_signal_alert.py` / `market_signal_daily_digest.py` | 1시간 / 08:30 | 등급 전환 / 요약(옵트인) |
 | `tactical_regime_check.py` | 07:40 | 국면 확정·틸트 + 국면/웅덩이 알림. 주문 없음 |
 | `dca_cash_shortfall.py` | 18:30 | 적립 자동매수 1~3일 전 예수금 부족 알림. 판정은 `services/dca_cash_shortfall_service.py`(action-items와 공유) |
-| `goal_achievement.py` | 18:45 | |
+| `goal_achievement.py` | 18:45 | 같은 목표는 1회만(연간 목표는 연도별, 목표 금액 바꾸면 재발송) — `app_state` 발송 키 |
 | `monthly_report.py` / `challenge_monthly_wrap.py` | 매월 1일 09:00 / 09:30 | |
 | `challenge_deposit_reminder.py` | 매월 25일 09:00 | 옵트인 |
 | `year_end_tax_reminder.py` | 11~12월 매주 월 09:00 | 옵트인 |
@@ -265,7 +265,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 | `periodic_catchup.py` | 기동 2분 뒤 + 10~21시 매시 25분 | 놓친 월간 잡 보충(1~3일: 리포트·챌린지 결산, 25~28일: 독려). 월 단위 dedup이 있는 잡만 넣을 것 |
 | `cache_sweep.py` / `app_state_sweep.py` | 15분 / 04:10 | 만료 캐시 / durable row 청소 |
 | `kosdaq_tickers_refresh` (`market_data/yahoo_price.py`, jobs 파일 없음) | 기동 직후 + 07:00 | KOSDAQ 종목 목록(`.KQ` 교정용) |
-| `_job_helpers.py` | — | job 공통 헬퍼(`run_alert_job`·`peak_rss_mb`). 유저별 루프 `run_per_user`·`report_job_failure`는 `core/job_runner.py`(알림 서비스도 쓰므로 core) |
+| `_job_helpers.py` | — | job 공통 헬퍼(`run_alert_job`·`peak_rss_mb`·`challenge_reminder_recipients`). 유저별 루프 `run_per_user`·`report_job_failure`는 `core/job_runner.py`(알림 서비스도 쓰므로 core) |
 
 - **새 job**: 파일 생성 → `scheduler.py` `init_scheduler()` jobs 리스트에 `(함수, 트리거, id)` 추가(cron은 `kst(...)` 헬퍼) → `tests/test_scheduler.py` `EXPECTED_JOB_IDS` 갱신.
 

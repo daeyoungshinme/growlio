@@ -235,7 +235,7 @@ async def _fetch_fallback(
     account: AssetAccount, ticker: str, market: str, db: AsyncSession, cache: CacheStoreType
 ) -> float | None:
     try:
-        price = await _price_via_kis(account, ticker, market, db, cache)
+        price = await price_via_kis(account, ticker, market, db, cache)
         if price:
             return price
     except Exception as e:
@@ -243,7 +243,7 @@ async def _fetch_fallback(
     return None
 
 
-async def _price_via_kis(
+async def price_via_kis(
     account: AssetAccount, ticker: str, market: str, db: AsyncSession, cache: CacheStoreType
 ) -> float | None:
     """KIS API로 현재가 조회 — 다른 소스가 실패했을 때만 쓰는 최후 폴백.

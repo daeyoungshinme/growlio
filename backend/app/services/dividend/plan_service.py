@@ -5,10 +5,10 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import UserSettings
+from app.services._settings_queries import get_settings_row
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.portfolio.portfolio_service import build_portfolio_overview
@@ -26,7 +26,7 @@ async def get_dividend_plan(
     cache: CacheStore | None = None,
 ) -> dict:
     """연배당 목표 달성 현황 및 월별/연도별 배당 분포 반환."""
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
+    settings_row = await get_settings_row(db, user_id)
     annual_dividend_goal = (
         float(settings_row.annual_dividend_goal) if settings_row and settings_row.annual_dividend_goal else None
     )

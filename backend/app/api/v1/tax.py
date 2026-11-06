@@ -39,20 +39,8 @@ async def overseas_positions_tax(
     return result
 
 
-# 내부 서비스(인사이트·절세 플랜)나 테스트가 쓰는 값 — 화면은 읽지 않아 응답에서 뺀다
-_TAX_SUMMARY_INTERNAL_FIELDS = frozenset(
-    {
-        "financial_income_krw",
-        "overseas_tax_free_room_krw",
-        "overseas_realized_tax_krw",
-        "domestic_stock_value_krw",
-        "domestic_unrealized_gain_krw",
-        "domestic_large_holder_excess_krw",
-        "total_fees_krw",
-        "tax_deferred_value_krw",
-        "harvesting_recommendations",
-    }
-)
+# 서비스 내부 소비자(절세 액션·인사이트·지금 할 일)만 쓰는 값 — 화면은 읽지 않아 응답에서 뺀다
+_TAX_SUMMARY_INTERNAL_FIELDS = frozenset({"financial_income_krw", "harvesting_recommendations"})
 
 
 @router.get("/summary")

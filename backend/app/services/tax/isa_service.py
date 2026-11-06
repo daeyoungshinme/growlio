@@ -13,18 +13,16 @@ from app.constants import OVERSEAS_MARKETS
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.accounts._snapshot_queries import latest_snapshot_subquery
+from app.services.tax.tax_service import get_tax_rates
 from app.utils.kst import today_kst
 
 ISA_MATURITY_YEARS = 3
 _ISA_TAX_FREE_LIMIT: dict[str, int] = {"GENERAL": 2_000_000, "PREFERENTIAL": 4_000_000}
 _ISA_EXCESS_TAX_RATE = 0.099  # 비과세 한도 초과분 9.9% 분리과세 (지방소득세 포함)
 
-# 일반계좌 대비 절세액 계산용 — tax_service.py와 동일 세율(값 변경 시 두 파일 함께 수정).
+# 일반계좌 대비 절세액은 tax_service의 연도별 세율(get_tax_rates)로 계산한다.
 # 해외시장 분류는 app.constants.OVERSEAS_MARKETS. 여기 없는 시장(국내 KOSPI/KOSDAQ/KONEX 포함)은 전부 국내로
 # 취급 — 기존 손익통산 합계(시장 구분 없이 전량 합산)를 그대로 보존하기 위함(미분류 시장을 누락시키지 않음).
-_GENERAL_DIVIDEND_TAX_RATE = 0.154  # 일반계좌 배당/이자소득세 원천징수율 (tax_service.py dividend 세율과 동일)
-_OVERSEAS_GAIN_TAX_RATE = 0.22  # 일반계좌 해외주식 양도세율 (tax_service.py overseas_gain과 동일)
-_OVERSEAS_GAIN_DEDUCTION_KRW = 2_500_000  # 해외주식 양도세 연간 공제 (tax_service.py overseas_deduction과 동일)
 
 _ISA_STATUS_NOTE = (
     "ISA 손익은 최신 스냅샷 기준 미실현손익과 배당/이자 내역(수기 입력분 포함) 합산 추정치입니다. "
@@ -72,6 +70,7 @@ async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> IsaSta
     dividend_by_account = await _calc_dividend_total_by_account(user_id, account_ids, db)
 
     today = today_kst()
+    rates = get_tax_rates(today.year)
     statuses: list[IsaAccountStatus] = []
     for acc in accounts:
         unrealized = unrealized_by_account.get(acc.id, {"domestic": 0.0, "overseas": 0.0})
@@ -104,12 +103,12 @@ async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> IsaSta
 
         if is_override:
             # 수기 입력값은 배당/국내/해외 구성요소가 분리되지 않으므로 전체를 배당소득으로 가정한 근사치
-            general_account_tax = max(0.0, effective_pnl) * _GENERAL_DIVIDEND_TAX_RATE
+            general_account_tax = max(0.0, effective_pnl) * rates["dividend"]
             calculation_basis = "MANUAL_OVERRIDE_APPROX"
         else:
-            dividend_tax = max(0.0, dividend) * _GENERAL_DIVIDEND_TAX_RATE
-            overseas_taxable = max(0.0, unrealized["overseas"] - _OVERSEAS_GAIN_DEDUCTION_KRW)
-            overseas_tax = overseas_taxable * _OVERSEAS_GAIN_TAX_RATE
+            dividend_tax = max(0.0, dividend) * rates["dividend"]
+            overseas_taxable = max(0.0, unrealized["overseas"] - rates["overseas_deduction"])
+            overseas_tax = overseas_taxable * rates["overseas_gain"]
             # 국내주식 매매손익은 일반계좌에서도 비과세이므로 세금 기여분 없음
             general_account_tax = dividend_tax + overseas_tax
             calculation_basis = "AUTO_SPLIT"
