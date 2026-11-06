@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from collections.abc import Mapping
 from functools import partial
 
 import structlog
@@ -95,11 +96,15 @@ async def fetch_prices_batch(
     tickers: list[tuple[str, str]],
     db: AsyncSession,
     cache: CacheStoreType = None,
+    kis_accounts: Mapping[str, AssetAccount] | None = None,
 ) -> dict[str, float]:
     """여러 종목 현재가를 한 번에 조회. {ticker: price}
 
     국내 종목은 Naver/pykrx로 먼저 채우고, 남은 종목만 Yahoo Finance 배치 조회 →
     그래도 실패한 종목은 KIS로 보완한다. 캐시(15분)를 우선 조회하고, 새로 조회한 가격은 캐시에 반영한다.
+
+    `kis_accounts`(티커 → 소유 검증된 계좌)를 주면 KIS 폴백은 그 계좌로만, 매핑된 티커만 시도한다
+    (`/stocks` 라우터 — 사용자가 지정한 계좌). `None`이면 유저의 아무 KIS 계좌를 쓴다(내부 호출).
     """
     if not tickers:
         return {}
@@ -122,18 +127,21 @@ async def fetch_prices_batch(
 
     missing = [(t, m) for t, m in remaining if t not in price_map or price_map[t] == 0]
     if missing:
-        account = await _get_any_kis_account(user_id, db)
-        if account:
-            # KIS 폴백은 토큰 조회·저장으로 같은 AsyncSession을 쓴다 — 동시 사용 불가라 순차 실행
-            # (KIS 호출 자체도 rate limiter로 직렬화되므로 느려지지 않는다).
-            for ticker, market in missing:
-                try:
-                    result = await _fetch_fallback(account, ticker, market, db, cache)
-                except Exception as e:
-                    logger.warning("kis_price_fallback_failed", ticker=ticker, error=str(e))
-                    continue
-                if isinstance(result, (int, float)) and result > 0:
-                    price_map[ticker] = float(result)
+        if kis_accounts is None:
+            any_account = await _get_any_kis_account(user_id, db)
+            kis_targets = [(t, m, any_account) for t, m in missing] if any_account else []
+        else:
+            kis_targets = [(t, m, kis_accounts[t]) for t, m in missing if t in kis_accounts]
+        # KIS 폴백은 토큰 조회·저장으로 같은 AsyncSession을 쓴다 — 동시 사용 불가라 순차 실행
+        # (KIS 호출 자체도 rate limiter로 직렬화되므로 느려지지 않는다).
+        for ticker, market, account in kis_targets:
+            try:
+                result = await _fetch_fallback(account, ticker, market, db, cache)
+            except Exception as e:
+                logger.warning("kis_price_fallback_failed", ticker=ticker, error=str(e))
+                continue
+            if isinstance(result, (int, float)) and result > 0:
+                price_map[ticker] = float(result)
 
     await _write_cached_prices(cache, remaining, price_map)
 
@@ -250,6 +258,8 @@ async def price_via_kis(
     반복 실패 시 빠른 실패를 위해 `kis_circuit`으로 보호한다."""
     if not kis_circuit.is_available():
         return None
+    # 소문자 "kospi"가 해외 시세 TR로 가지 않게 — 국내/해외 판정과 KIS 거래소 코드 매핑 모두 대문자 기준
+    market = market.upper()
 
     from app.kis.auth import get_access_token
 

@@ -97,6 +97,11 @@ class CacheStore:
     def __len__(self) -> int:
         return len(self._data)
 
+    def __bool__(self) -> bool:
+        # __len__만 있으면 빈 store가 falsy — 호출부의 `if cache:`/`if not cache: return`이 콜드 스타트
+        # (Render 슬립 복귀) 직후 캐시 쓰기를 통째로 건너뛰었다(plans/114 A6). store 객체는 항상 참.
+        return True
+
     async def setex(self, key: str, ttl: int, value: str) -> None:
         await self.set(key, value, ex=ttl)
 

@@ -141,3 +141,11 @@ class TestRouteLabel:
         from app.main import _route_label
 
         assert _route_label(SimpleNamespace(scope={})) == "unmatched"
+
+
+class TestTruthiness:
+    def test_empty_store_is_truthy(self):
+        """빈 store가 falsy면 `if cache:` 호출부가 콜드 스타트 직후 캐시 쓰기를 건너뛴다(plans/114 A6)."""
+        store = CacheStore()
+        assert len(store) == 0
+        assert bool(store) is True

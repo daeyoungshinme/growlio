@@ -16,15 +16,14 @@ from app.core.cache_store import CacheStore, get_cache_store
 from app.core.database import get_db
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
+from app.models.asset import AssetAccount
 from app.models.user import User
 from app.schemas.stock import StockPriceBatchRequest
 from app.services.goal.recommendation_universe import resolve_index_region
-from app.services.market_data.price_service import domestic_price_fallback, price_via_kis
+from app.services.market_data.price_service import fetch_prices_batch
 from app.services.market_data.stock_search_service import search_stocks_by_query
 from app.utils.cache_keys import (
     TTL_ETF_INDEX_REGION,
-    TTL_PRICE_CURRENT,
-    current_price_display_key,
     etf_index_region_key,
     get_cached_json,
     set_cached_json,
@@ -98,24 +97,58 @@ async def get_exchange_rate(request: Request, cache: CacheStore = Depends(get_ca
     return {"usd_krw": rate, "is_fallback": not is_live}
 
 
-async def _kis_price_fallback(
-    account_id: uuid.UUID | None,
-    ticker: str,
-    market: str,
+async def _owned_kis_accounts(
+    account_ids: dict[str, uuid.UUID], current_user: User, db: AsyncSession
+) -> dict[str, AssetAccount]:
+    """티커별로 지정된 계좌 중 소유가 확인된 것만 남긴다 — 남의 계좌·삭제된 계좌는 KIS 폴백 없이 조용히 건너뛴다."""
+    owned: dict[uuid.UUID, AssetAccount | None] = {}
+    result: dict[str, AssetAccount] = {}
+    for ticker, account_id in account_ids.items():
+        if account_id not in owned:
+            try:
+                owned[account_id] = await get_owned_account(account_id, current_user.id, db)
+            except Exception as e:
+                logger.warning("kis_price_account_rejected", ticker=ticker, error=str(e), exc_type=type(e).__name__)
+                owned[account_id] = None
+        account = owned[account_id]
+        if account is not None:
+            result[ticker] = account
+    return result
+
+
+async def _price_entries(
+    items: list[tuple[str, str, uuid.UUID | None]],
     current_user: User,
     db: AsyncSession,
     cache: CacheStore,
-) -> float | None:
-    """다른 소스가 전부 실패했을 때만 쓰는 최후 폴백 — 소유 계좌 검증 후 KIS API로 조회.
-    계좌 미검증/KIS 호출 실패는 가격 조회 전체를 깨지 않도록 조용히 무시한다."""
-    if account_id is None:
-        return None
-    try:
-        account = await get_owned_account(account_id, current_user.id, db)
-        return await price_via_kis(account, ticker, market, db, cache)
-    except Exception as e:
-        logger.warning("kis_price_endpoint_failed", ticker=ticker, error=str(e), exc_type=type(e).__name__)
-        return None
+) -> dict[str, dict]:
+    """{ticker: {price_krw, price_usd, usd_rate}} — 시세는 내부와 같은 `fetch_prices_batch`
+    (캐시 → 국내 Naver/pykrx → Yahoo → 지정 계좌 KIS)로 얻고, 해외 종목만 환율로 환산한다.
+    원시 시세가 캐시되므로 환산 결과는 캐시하지 않는다(fallback 환율 금액이 TTL 동안 남지 않게)."""
+    tickers = [(t, m) for t, m, _ in items]
+    account_ids = {t: a for t, _, a in items if a is not None}
+    kis_accounts = await _owned_kis_accounts(account_ids, current_user, db)
+    price_map = await fetch_prices_batch(current_user.id, tickers, db, cache, kis_accounts=kis_accounts)
+
+    usd_rate = 0.0
+    if any(m in OVERSEAS_MARKETS and price_map.get(t) for t, m in tickers):
+        usd_rate, _is_live = await refresh_usd_krw(cache)
+
+    result: dict[str, dict] = {}
+    for ticker, market in tickers:
+        price = price_map.get(ticker)
+        if not price:
+            logger.warning("price_lookup_exhausted", ticker=ticker, market=market, had_account_id=ticker in account_ids)
+            result[ticker] = {"price_krw": None, "price_usd": None, "usd_rate": None}
+        elif market in OVERSEAS_MARKETS:
+            result[ticker] = {
+                "price_krw": round(price * usd_rate) if usd_rate else None,
+                "price_usd": round(price, 2),
+                "usd_rate": usd_rate or None,
+            }
+        else:
+            result[ticker] = {"price_krw": price, "price_usd": None, "usd_rate": None}
+    return result
 
 
 @router.get("/price")
@@ -129,92 +162,11 @@ async def get_stock_price(
     db: AsyncSession = Depends(get_db),
     cache: CacheStore = Depends(get_cache_store),
 ):
-    """단일 종목 현재가 조회.
-    Yahoo Finance를 먼저 시도하고, 국내 종목이면서 Yahoo가 실패한 경우에만 Naver/pykrx로 폴백한다.
-    그래도 없고 `account_id`(KIS 연동 보유 계좌)가 주어진 경우 최후로 KIS API를 시도한다.
-    해외 종목은 USD → KRW 변환 후 반환. 캐시 TTL 900s.
+    """단일 종목 현재가 조회 — `/prices-batch`와 같은 경로(`_price_entries`).
+    `account_id`(KIS 연동 보유 계좌)는 다른 소스가 전부 실패했을 때만 쓴다. 해외 종목은 USD → KRW 환산.
     """
-    from app.services.market_data.yahoo_price import fetch_yahoo_price
-
-    cache_key = current_price_display_key(ticker, market)
-    cached = await get_cached_json(cache, cache_key)
-    if cached is not None:
-        return cached
-
-    loop = asyncio.get_running_loop()
-    tried_stages = ["yahoo"]
-    price = await fetch_yahoo_price(ticker, market)
-    if not price and market.upper() in DOMESTIC_MARKETS:
-        tried_stages.append("domestic")
-        price = await domestic_price_fallback(ticker, loop)
-    if not price:
-        tried_stages.append("kis" if account_id is not None else "kis_skipped_no_account")
-        price = await _kis_price_fallback(account_id, ticker, market, current_user, db, cache)
-    if not price:
-        logger.warning("price_lookup_exhausted", ticker=ticker, market=market, tried_stages=tried_stages)
-        return {"price_krw": None, "price_usd": None, "usd_rate": None}
-
-    if market.upper() in OVERSEAS_MARKETS:
-        usd_rate, _is_live = await refresh_usd_krw(cache)
-        result = {
-            "price_krw": round(price * usd_rate) if usd_rate else None,
-            "price_usd": round(price, 2),
-            "usd_rate": usd_rate or None,
-        }
-    else:
-        result = {"price_krw": price, "price_usd": None, "usd_rate": None}
-
-    if result["price_krw"] is not None:
-        await set_cached_json(cache, cache_key, result, TTL_PRICE_CURRENT)
-    return result
-
-
-async def _resolve_batch_prices(
-    to_fetch: list[tuple[str, str]],
-    account_ids: dict[str, uuid.UUID],
-    loop: asyncio.AbstractEventLoop,
-    current_user: User,
-    db: AsyncSession,
-    cache: CacheStore,
-) -> dict[str, float]:
-    """Yahoo 배치 조회로 먼저 채우고, 그중 국내 마켓이면서 여전히 없는 티커만 Naver/pykrx로 폴백한다.
-    그래도 없고 `account_id`가 주어진 티커만 최후로 KIS API를 시도한다."""
-    from app.services.market_data.yahoo_price import fetch_yahoo_batch
-
-    price_map: dict[str, float] = await fetch_yahoo_batch(to_fetch)
-
-    domestic_missing = [(t, m) for t, m in to_fetch if t not in price_map and m.upper() in DOMESTIC_MARKETS]
-    if domestic_missing:
-        domestic_results = await asyncio.gather(
-            *(domestic_price_fallback(t, loop) for t, _ in domestic_missing), return_exceptions=True
-        )
-        for (ticker, _), fallback_price in zip(domestic_missing, domestic_results, strict=False):
-            if isinstance(fallback_price, (int, float)) and fallback_price > 0:
-                price_map[ticker] = float(fallback_price)
-
-    kis_missing = [(t, m) for t, m in to_fetch if t not in price_map and t in account_ids]
-    if kis_missing:
-        # KIS 폴백은 토큰 조회·저장으로 같은 AsyncSession을 쓴다 — 동시 사용 불가라 순차 실행
-        # (KIS 호출 자체도 rate limiter로 직렬화되므로 느려지지 않는다).
-        for ticker, market in kis_missing:
-            try:
-                kis_price = await _kis_price_fallback(account_ids[ticker], ticker, market, current_user, db, cache)
-            except Exception as e:
-                logger.warning("kis_price_fallback_failed", ticker=ticker, error=str(e))
-                continue
-            if isinstance(kis_price, (int, float)) and kis_price > 0:
-                price_map[ticker] = float(kis_price)
-
-    still_missing = [(t, m) for t, m in to_fetch if t not in price_map]
-    for ticker, market in still_missing:
-        logger.warning(
-            "price_lookup_exhausted",
-            ticker=ticker,
-            market=market,
-            had_account_id=ticker in account_ids,
-        )
-
-    return price_map
+    entries = await _price_entries([(ticker, market.upper(), account_id)], current_user, db, cache)
+    return entries[ticker]
 
 
 @router.post("/prices-batch")
@@ -228,55 +180,9 @@ async def get_stock_prices_batch(
 ):
     """복수 종목 현재가 일괄 조회.
     Response: {ticker: {price_krw, price_usd, usd_rate}}
+    ticker 키라 같은 티커가 여러 시장으로 오면 마지막 것만 남는다(계약 유지).
     """
     if not body.items:
         return {}
-
-    # 캐시 히트 먼저 처리
-    result: dict[str, dict] = {}
-    to_fetch: list[tuple[str, str]] = []
-    account_ids: dict[str, uuid.UUID] = {}
-    for item in body.items:
-        cache_key = current_price_display_key(item.ticker, item.market)
-        cached = await get_cached_json(cache, cache_key)
-        if cached is not None:
-            result[item.ticker] = cached
-        else:
-            to_fetch.append((item.ticker, item.market))
-            if item.account_id is not None:
-                account_ids[item.ticker] = item.account_id
-
-    if not to_fetch:
-        return result
-
-    loop = asyncio.get_running_loop()
-    price_map = await _resolve_batch_prices(to_fetch, account_ids, loop, current_user, db, cache)
-
-    # 해외 종목이 있으면 환율 1회 조회
-    overseas_tickers = {t for t, m in to_fetch if m.upper() in OVERSEAS_MARKETS}
-    usd_rate: float = 0.0
-    usd_rate_is_live = True
-    if overseas_tickers:
-        usd_rate, usd_rate_is_live = await refresh_usd_krw(cache)
-
-    for ticker, market in to_fetch:
-        price = price_map.get(ticker)
-        if not price:
-            result[ticker] = {"price_krw": None, "price_usd": None, "usd_rate": None}
-            continue
-
-        if market.upper() in OVERSEAS_MARKETS:
-            entry = {
-                "price_krw": round(price * usd_rate) if usd_rate else None,
-                "price_usd": round(price, 2),
-                "usd_rate": usd_rate or None,
-            }
-        else:
-            entry = {"price_krw": price, "price_usd": None, "usd_rate": None}
-
-        result[ticker] = entry
-        # fallback 환율로 환산한 값은 응답에만 쓴다 — 캐시하면 환율이 돌아와도 TTL 동안 옛 금액이 남는다
-        if entry["price_krw"] is not None and (usd_rate_is_live or market not in OVERSEAS_MARKETS):
-            await set_cached_json(cache, current_price_display_key(ticker, market), entry, TTL_PRICE_CURRENT)
-
-    return result
+    items = [(item.ticker, item.market.upper(), item.account_id) for item in body.items]
+    return await _price_entries(items, current_user, db, cache)

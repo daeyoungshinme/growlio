@@ -359,18 +359,26 @@ def auth_app():
     app.dependency_overrides.pop(get_db, None)
 
 
+_PS = "app.services.market_data.price_service"
+_YAHOO_BATCH = "app.services.market_data.yahoo_price._sync_yahoo_batch"
+_USDKRW = "app.services.market_data.yahoo_price._sync_usdkrw"
+
+
 class TestStockPrice:
-    def test_returns_200_for_domestic_ticker(self, override_settings, auth_app):
+    """단일 조회도 `fetch_prices_batch`(국내 Naver/pykrx → Yahoo → 지정 계좌 KIS)를 탄다 — plans/114 A."""
+
+    def test_domestic_uses_naver_pykrx_first_and_skips_yahoo(self, override_settings, auth_app):
         app, _, _ = auth_app
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=75000.0),
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=75000.0),
+            patch(_YAHOO_BATCH) as mock_yahoo,
         ):
             resp = client.get("/api/v1/stocks/price?ticker=005930&market=KOSPI")
         assert resp.status_code == 200
-        data = resp.json()
-        assert "price_krw" in data
+        assert resp.json() == {"price_krw": 75000.0, "price_usd": None, "usd_rate": None}
+        mock_yahoo.assert_not_called()
 
     def test_requires_ticker_and_market(self, override_settings, auth_app):
         app, _, _ = auth_app
@@ -388,28 +396,13 @@ class TestStockPrice:
             resp = client.get("/api/v1/stocks/price?ticker=005930&market=KOSPI")
         assert resp.status_code == 401
 
-    def test_yahoo_success_skips_domestic_fallback(self, override_settings, auth_app):
-        """Yahoo가 정상 응답하면 (느린) Naver/pykrx 폴백을 타지 않아야 한다 — 회귀 방지."""
+    def test_domestic_miss_falls_back_to_yahoo(self, override_settings, auth_app):
         app, _, _ = auth_app
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=75000.0),
-            patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock) as mock_domestic,
-        ):
-            resp = client.get("/api/v1/stocks/price?ticker=005930&market=KOSPI")
-        assert resp.status_code == 200
-        assert resp.json()["price_krw"] == 75000.0
-        mock_domestic.assert_not_called()
-
-    def test_yahoo_fails_falls_back_to_naver_pykrx(self, override_settings, auth_app):
-        """402970류 — Yahoo가 실패하는 소수 국내 티커만 Naver/pykrx 폴백을 탄다."""
-        app, _, _ = auth_app
-
-        with (
-            TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
-            patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=15500.0),
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
+            patch(_YAHOO_BATCH, return_value={"402970": 15500.0}),
         ):
             resp = client.get("/api/v1/stocks/price?ticker=402970&market=KOSPI")
         assert resp.status_code == 200
@@ -420,12 +413,13 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock) as mock_domestic,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=180.0),
-            patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=1350.0),
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock) as mock_domestic,
+            patch(_YAHOO_BATCH, return_value={"AAPL": 180.0}),
+            patch(_USDKRW, return_value=1350.0),
         ):
             resp = client.get("/api/v1/stocks/price?ticker=AAPL&market=NASDAQ")
         assert resp.status_code == 200
+        assert resp.json()["price_krw"] == 243_000
         mock_domestic.assert_not_called()
 
     def test_overseas_price_usd_rounded_to_two_decimals(self, override_settings, auth_app):
@@ -435,103 +429,135 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=180.336789),
-            patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=1350.0),
+            patch(_YAHOO_BATCH, return_value={"AAPL": 180.336789}),
+            patch(_USDKRW, return_value=1350.0),
         ):
             resp = client.get("/api/v1/stocks/price?ticker=AAPL&market=NASDAQ")
         assert resp.status_code == 200
         assert resp.json()["price_usd"] == 180.34
 
+    def test_lowercase_domestic_market_is_domestic(self, override_settings, auth_app):
+        """소문자 "kospi"도 국내로 판정 — 원화 그대로, 국내 폴백 경로."""
+        app, _, _ = auth_app
+
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=75000.0) as mock_domestic,
+        ):
+            resp = client.get("/api/v1/stocks/price?ticker=005930&market=kospi")
+        assert resp.status_code == 200
+        assert resp.json() == {"price_krw": 75000.0, "price_usd": None, "usd_rate": None}
+        mock_domestic.assert_awaited_once()
+
     def test_kis_fallback_used_as_last_resort(self, override_settings, auth_app):
-        """Yahoo/Naver/pykrx 모두 실패하고 account_id가 주어지면 소유 계좌 검증 후 KIS로 조회한다."""
+        """국내·Yahoo 모두 실패하고 account_id가 주어지면 소유 계좌 검증 후 그 계좌로 KIS 조회한다."""
         app, user, db = auth_app
         account = _make_kis_account(user.id)
         db.scalar = AsyncMock(return_value=account)
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
-            patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
-            patch("app.api.v1.stocks.price_via_kis", new_callable=AsyncMock, return_value=15490.0),
+            patch(_YAHOO_BATCH, return_value={}),
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
+            patch(f"{_PS}.price_via_kis", new_callable=AsyncMock, return_value=15490.0) as mock_kis,
+            patch(f"{_PS}._get_any_kis_account", new_callable=AsyncMock) as mock_any,
         ):
             resp = client.get(f"/api/v1/stocks/price?ticker=402970&market=KOSPI&account_id={account.id}")
         assert resp.status_code == 200
         assert resp.json()["price_krw"] == 15490.0
+        assert mock_kis.await_args.args[0] is account
+        mock_any.assert_not_called()
 
     def test_kis_fallback_skipped_without_account_id(self, override_settings, auth_app):
+        """지정 계좌가 없으면 유저의 다른 KIS 계좌로도 폴백하지 않는다(내부 호출과 다른 점)."""
         app, _, _ = auth_app
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
-            patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
-            patch("app.api.v1.stocks.price_via_kis", new_callable=AsyncMock) as mock_kis,
+            patch(_YAHOO_BATCH, return_value={}),
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
+            patch(f"{_PS}.price_via_kis", new_callable=AsyncMock) as mock_kis,
+            patch(f"{_PS}._get_any_kis_account", new_callable=AsyncMock) as mock_any,
         ):
             resp = client.get("/api/v1/stocks/price?ticker=402970&market=KOSPI")
         assert resp.status_code == 200
         assert resp.json()["price_krw"] is None
         mock_kis.assert_not_called()
+        mock_any.assert_not_called()
 
     def test_kis_fallback_ignores_unowned_account(self, override_settings, auth_app):
-        """account_id가 다른 유저 소유이면 404로 실패하지만, 가격 조회 자체는 조용히 null로 끝난다."""
+        """account_id가 다른 유저 소유이면 KIS를 부르지 않고, 가격 조회 자체는 조용히 null로 끝난다."""
         app, _, db = auth_app
         db.scalar = AsyncMock(return_value=None)  # get_owned_account: 소유 계좌 없음
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_price", return_value=None),
-            patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
+            patch(_YAHOO_BATCH, return_value={}),
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
+            patch(f"{_PS}.price_via_kis", new_callable=AsyncMock) as mock_kis,
         ):
             resp = client.get(f"/api/v1/stocks/price?ticker=402970&market=KOSPI&account_id={uuid.uuid4()}")
         assert resp.status_code == 200
         assert resp.json()["price_krw"] is None
+        mock_kis.assert_not_called()
+
+    def test_result_fills_shared_raw_price_cache(self, override_settings, auth_app):
+        """라우터 결과도 내부와 같은 원시 캐시를 채워, 두 번째 요청은 소스를 다시 부르지 않는다."""
+        app, _, _ = auth_app
+
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=75000.0) as mock_domestic,
+        ):
+            client.get("/api/v1/stocks/price?ticker=005930&market=KOSPI")
+            resp = client.get("/api/v1/stocks/price?ticker=005930&market=kospi")
+        assert resp.json()["price_krw"] == 75000.0
+        mock_domestic.assert_awaited_once()
 
 
 class TestStockPricesBatch:
-    def test_yahoo_success_skips_domestic_fallback(self, override_settings, auth_app):
-        """Yahoo 배치가 전부 채우면 (느린) Naver/pykrx 폴백을 타지 않아야 한다 — 회귀 방지."""
+    def test_domestic_and_overseas_mixed(self, override_settings, auth_app):
         app, _, _ = auth_app
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={"005930": 75000.0}),
-            patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock) as mock_domestic,
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=75000.0),
+            patch(_YAHOO_BATCH, return_value={"AAPL": 200.0}) as mock_yahoo,
+            patch(_USDKRW, return_value=1400.0),
         ):
             resp = client.post(
                 "/api/v1/stocks/prices-batch",
-                json={"items": [{"ticker": "005930", "market": "KOSPI"}]},
+                json={"items": [{"ticker": "005930", "market": "KOSPI"}, {"ticker": "AAPL", "market": "NASDAQ"}]},
             )
         assert resp.status_code == 200
-        assert resp.json()["005930"]["price_krw"] == 75000.0
-        mock_domestic.assert_not_called()
+        data = resp.json()
+        assert data["005930"] == {"price_krw": 75000.0, "price_usd": None, "usd_rate": None}
+        assert data["AAPL"] == {"price_krw": 280_000, "price_usd": 200.0, "usd_rate": 1400.0}
+        # 국내가 채워졌으니 Yahoo에는 해외 종목만 간다
+        assert [t for t, _ in mock_yahoo.call_args.args[0]] == ["AAPL"]
 
-    def test_yahoo_miss_falls_back_to_naver_pykrx(self, override_settings, auth_app):
+    def test_domestic_miss_falls_back_to_yahoo(self, override_settings, auth_app):
         app, _, _ = auth_app
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={}),
-            patch(
-                "app.api.v1.stocks.domestic_price_fallback",
-                new_callable=AsyncMock,
-                return_value=15500.0,
-            ),
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
+            patch(_YAHOO_BATCH, return_value={"402970": 15500.0}),
         ):
             resp = client.post(
                 "/api/v1/stocks/prices-batch",
                 json={"items": [{"ticker": "402970", "market": "KOSPI"}]},
             )
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["402970"]["price_krw"] == 15500.0
+        assert resp.json()["402970"]["price_krw"] == 15500.0
 
     def test_overseas_price_usd_rounded_to_two_decimals(self, override_settings, auth_app):
         app, _, _ = auth_app
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={"AAPL": 180.336789}),
-            patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=1350.0),
+            patch(_YAHOO_BATCH, return_value={"AAPL": 180.336789}),
+            patch(_USDKRW, return_value=1350.0),
         ):
             resp = client.post(
                 "/api/v1/stocks/prices-batch",
@@ -546,8 +572,8 @@ class TestStockPricesBatch:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={"AAPL": 200.0}),
-            patch("app.services.market_data.yahoo_price._sync_usdkrw", return_value=1400.0),
+            patch(_YAHOO_BATCH, return_value={"AAPL": 200.0}),
+            patch(_USDKRW, return_value=1400.0),
         ):
             resp = client.post(
                 "/api/v1/stocks/prices-batch",
@@ -558,23 +584,31 @@ class TestStockPricesBatch:
         assert body["price_usd"] == 200.0
         assert body["price_krw"] == 280_000
 
-    def test_kis_fallback_used_when_account_id_provided_and_others_fail(self, override_settings, auth_app):
+    def test_kis_fallback_only_for_ticker_with_account_id(self, override_settings, auth_app):
         app, user, db = auth_app
         account = _make_kis_account(user.id)
         db.scalar = AsyncMock(return_value=account)
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.services.market_data.yahoo_price._sync_yahoo_batch", return_value={}),
-            patch("app.api.v1.stocks.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
-            patch("app.api.v1.stocks.price_via_kis", new_callable=AsyncMock, return_value=15490.0),
+            patch(_YAHOO_BATCH, return_value={}),
+            patch(f"{_PS}.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
+            patch(f"{_PS}.price_via_kis", new_callable=AsyncMock, return_value=15490.0) as mock_kis,
         ):
             resp = client.post(
                 "/api/v1/stocks/prices-batch",
-                json={"items": [{"ticker": "402970", "market": "KOSPI", "account_id": str(account.id)}]},
+                json={
+                    "items": [
+                        {"ticker": "402970", "market": "KOSPI", "account_id": str(account.id)},
+                        {"ticker": "005930", "market": "KOSPI"},
+                    ]
+                },
             )
         assert resp.status_code == 200
-        assert resp.json()["402970"]["price_krw"] == 15490.0
+        data = resp.json()
+        assert data["402970"]["price_krw"] == 15490.0
+        assert data["005930"]["price_krw"] is None
+        assert [c.args[1] for c in mock_kis.await_args_list] == ["402970"]
 
     def test_empty_items_returns_empty_dict(self, override_settings, auth_app):
         app, _, _ = auth_app
@@ -583,3 +617,21 @@ class TestStockPricesBatch:
             resp = client.post("/api/v1/stocks/prices-batch", json={"items": []})
         assert resp.status_code == 200
         assert resp.json() == {}
+
+
+class TestPriceViaKisMarketCase:
+    async def test_lowercase_domestic_market_uses_domestic_quote(self, override_settings):
+        """소문자 "kospi"가 해외 시세 TR로 가던 버그 — plans/114 A4."""
+        from app.services.market_data import price_service
+
+        account = _make_kis_account(uuid.uuid4())
+        with (
+            patch.object(price_service, "decrypt_kis_credentials", return_value=("k", "s")),
+            patch("app.kis.auth.get_access_token", new_callable=AsyncMock, return_value="tok"),
+            patch("app.kis.domestic_quote.get_domestic_price", new_callable=AsyncMock, return_value=70000.0) as dom,
+            patch("app.kis.overseas_quote.get_overseas_price", new_callable=AsyncMock) as ovs,
+        ):
+            price = await price_service.price_via_kis(account, "005930", "kospi", AsyncMock(), None)
+        assert price == 70000.0
+        dom.assert_awaited_once()
+        ovs.assert_not_called()
