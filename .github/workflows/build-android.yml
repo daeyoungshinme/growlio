@@ -54,10 +54,12 @@ jobs:
           VITE_API_DOMAIN: ${{ vars.VITE_API_DOMAIN }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-        # 비어 있으면 앱이 localhost:8000 / 빈 Supabase를 가리키는 APK가 조용히 만들어진다
+          VITE_REDIRECT_URL: ${{ vars.VITE_REDIRECT_URL }}
+        # 비어 있으면 앱이 localhost:8000 / 빈 Supabase를 가리키는 APK가 조용히 만들어진다.
+        # VITE_REDIRECT_URL이 비면 가입·비밀번호 재설정 메일 링크가 "undefined/..."가 된다(plans/115 B3)
         run: |
           missing=""
-          for name in VITE_API_DOMAIN VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY; do
+          for name in VITE_API_DOMAIN VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY VITE_REDIRECT_URL; do
             [ -n "${!name}" ] || missing="$missing $name"
           done
           if [ -n "$missing" ]; then

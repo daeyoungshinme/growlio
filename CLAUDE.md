@@ -79,8 +79,9 @@ growlio/
 ## 배포 & CI
 
 - **실제 운영 배포**: 백엔드는 `render.yaml`(Render, Docker runtime) — 프론트엔드는 `frontend/vercel.json`(Vercel)이 실제 배포 경로. `vercel.json`이 `/api/*` → Render 백엔드로 rewrite하고, CSP를 포함한 보안 헤더도 여기서 설정됨(보안 헤더 수정은 반드시 `vercel.json`에). 새 API prefix 추가 시 `frontend/vercel.json`의 `rewrites`도 함께 확인.
+- Render는 `autoDeployTrigger: checksPass` — main의 CI가 통과해야 배포된다(대시보드가 Blueprint 동기화 상태여야 반영).
 - **마이그레이션은 자동 실행되지 않는다**(Render 무료 플랜은 pre-deploy 미지원). 스키마 변경이 있으면 **코드 배포 전에** `backend/.env`의 `MIGRATION_DATABASE_URL`을 운영 DB로 지정하고 `cd backend && uv run python scripts/bootstrap_alembic.py && uv run alembic upgrade head`. `/metrics`는 `METRICS_TOKEN`으로 보호된 채 유지되지만 저장소에 수집 구성은 없다.
-- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build + 이미지 빌드 스모크 `docker-build` + 보안 스캔(TruffleHog·bandit·pip-audit·npm audit), push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (cron 10분이지만 GitHub 스로틀로 실측 2~9시간 간격 — 슬립은 못 막고 잠든 서버를 가끔 깨워 `periodic_catchup`을 돌리는 정도. 외부 핑 등록 후 제거 예정).
+- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build + 이미지 빌드 스모크 `docker-build` + 보안 스캔(TruffleHog·bandit·pip-audit·npm audit), push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`/`VITE_REDIRECT_URL` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (cron 10분이지만 GitHub 스로틀로 실측 2~9시간 간격 — 슬립은 못 막고 잠든 서버를 가끔 깨워 `periodic_catchup`을 돌리는 정도. 외부 핑 등록 후 제거 예정).
 - **Render 무료 플랜은 15분 무요청 시 잠들고 스케줄러도 함께 멈춘다** — `backend/CLAUDE.md` "스케줄러 실행 제약".
 
 ---

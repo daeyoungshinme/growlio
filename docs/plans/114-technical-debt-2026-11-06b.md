@@ -1,6 +1,6 @@
 # 114. 113 이관 기술부채 처리 (2026-11-06)
 
-> **진행 상태**: A~D 구현 완료, 브랜치 `chore/tech-debt-2026-11-06b`. **B는 공유 Supabase에 수동 적용해야 한다**(아래 배포 순서).
+> **진행 상태**: 완료(PR #242 머지). B(fk1·gd1)는 공유 Supabase에 적용됨 — 2026-11-06 `alembic current` = `gd1_goal_start_date_to_date`(head) 확인(plans/115 배치 0).
 
 ## 배경
 
