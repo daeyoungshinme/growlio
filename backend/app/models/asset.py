@@ -255,7 +255,10 @@ class RebalancingExecution(Base):
         cascade="all, delete-orphan",
     )
 
-    __table_args__ = (Index("idx_rebalancing_executions_user", "user_id", "executed_at"),)
+    __table_args__ = (
+        Index("idx_rebalancing_executions_user", "user_id", "executed_at"),
+        Index("idx_rebalancing_executions_portfolio", "portfolio_id"),
+    )
 
 
 class RebalancingExecutionResult(Base):

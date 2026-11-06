@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
@@ -60,7 +60,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
         "monthly_deposit_amount": pmt,
         "goal_annual_return_pct": annual_return_pct,
         "goal_amount": goal_amount,
-        "goal_start_date": start_dt.date().isoformat() if start_dt else None,
+        "goal_start_date": start_dt.isoformat() if start_dt else None,
         "goal_initial_amount": manual_initial,
     }
 
@@ -85,12 +85,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
     if pmt is None or annual_return_pct is None or goal_amount is None or start_dt is None:
         raise ValueError("DCA 목표 설정값이 누락되었습니다.")
 
-    if isinstance(start_dt, datetime):
-        # 저장부(api/v1/settings.py)가 날짜를 UTC 자정으로 넣으므로 tz 변환 없이 .date()가 원래 날짜다 —
-        # KST로 바꾼 뒤 .date()를 하거나 저장을 KST 자정으로 바꾸면 하루가 밀린다
-        start_date: date = start_dt.date()
-    else:
-        start_date = start_dt
+    start_date: date = start_dt  # Date 컬럼(plans/114 B2) — tz 변환 없음
     today = today_kst()
     r = monthly_rate(annual_return_pct / 100)
 

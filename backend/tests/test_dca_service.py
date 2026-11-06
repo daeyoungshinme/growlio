@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -402,7 +402,7 @@ class TestGetDcaAnalysisConfigured:
             monthly_deposit_amount=1_000_000,
             goal_annual_return_pct=7.0,
             goal_amount=50_000_000.0,
-            goal_start_date=datetime(2020, 1, 1),
+            goal_start_date=date(2020, 1, 1),
             goal_initial_amount=None,
         )
         mock_db.scalar = AsyncMock(return_value=settings_obj)
@@ -428,7 +428,7 @@ class TestGetDcaAnalysisConfigured:
             monthly_deposit_amount=500_000,
             goal_annual_return_pct=5.0,
             goal_amount=10_000_000.0,
-            goal_start_date=datetime(2023, 1, 1),
+            goal_start_date=date(2023, 1, 1),
             goal_initial_amount=None,
         )
         mock_db.scalar = AsyncMock(return_value=settings_obj)
@@ -452,7 +452,7 @@ class TestGetDcaAnalysisConfigured:
             monthly_deposit_amount=1_000_000,
             goal_annual_return_pct=5.0,
             goal_amount=50_000_000.0,
-            goal_start_date=datetime(2024, 1, 1),
+            goal_start_date=date(2024, 1, 1),
             goal_initial_amount=10_000_000,
         )
         mock_db.scalar = AsyncMock(return_value=settings_obj)
@@ -475,7 +475,7 @@ class TestGetDcaAnalysisConfigured:
             monthly_deposit_amount=1_000_000,
             goal_annual_return_pct=0.0,
             goal_amount=12_000_000.0,
-            goal_start_date=datetime(2024, 1, 1),
+            goal_start_date=date(2024, 1, 1),
             goal_initial_amount=0,
         )
         mock_db.scalar = AsyncMock(return_value=settings_obj)
@@ -503,7 +503,7 @@ class TestGetDcaAnalysisConfigured:
             monthly_deposit_amount=1_000_000,
             goal_annual_return_pct=7.0,
             goal_amount=50_000_000.0,
-            goal_start_date=datetime(2020, 1, 1),
+            goal_start_date=date(2020, 1, 1),
             goal_initial_amount=10_000_000,
         )
         mock_db.scalar = AsyncMock(return_value=settings_obj)
@@ -536,7 +536,7 @@ class TestGetDcaAnalysisConfigured:
             monthly_deposit_amount=1_000_000,
             goal_annual_return_pct=7.0,
             goal_amount=50_000_000.0,
-            goal_start_date=datetime(2020, 1, 1),
+            goal_start_date=date(2020, 1, 1),
             goal_initial_amount=10_000_000,
         )
         mock_db.scalar = AsyncMock(return_value=settings_obj)
@@ -603,7 +603,7 @@ class TestGetDcaAnalysisCache:
             monthly_deposit_amount=1_000_000,
             goal_annual_return_pct=7.0,
             goal_amount=50_000_000.0,
-            goal_start_date=datetime(2020, 1, 1),
+            goal_start_date=date(2020, 1, 1),
             goal_initial_amount=None,
         )
         mock_db.scalar = AsyncMock(return_value=settings_obj)

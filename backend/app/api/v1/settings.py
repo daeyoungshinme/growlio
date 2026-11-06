@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,6 +52,7 @@ _GOAL_PLAIN_FIELDS = (
     "retirement_target_year",
     "goal_initial_amount",
     "annual_dividend_goal",
+    "goal_start_date",
 )
 
 
@@ -162,12 +161,6 @@ async def update_goal(
     for field in _GOAL_PLAIN_FIELDS:
         if field in sent:
             setattr(row, field, getattr(req, field))
-    if "goal_start_date" in sent:
-        row.goal_start_date = (
-            datetime.combine(req.goal_start_date, datetime.min.time()).replace(tzinfo=UTC)
-            if req.goal_start_date is not None
-            else None
-        )
     if "birth_year" in sent:
         row.birth_year = req.birth_year
         # age_group은 추천 옵션에서 직접 고를 수도 있으므로, 출생연도를 지울 때는 건드리지 않는다

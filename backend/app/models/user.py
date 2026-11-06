@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,7 +38,7 @@ class UserSettings(Base):
     # 투자 목표
     goal_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     goal_annual_return_pct: Mapped[float | None] = mapped_column(Numeric(5, 2))
-    goal_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    goal_start_date: Mapped[date | None] = mapped_column(Date)
     goal_initial_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     annual_deposit_goal: Mapped[float | None] = mapped_column(Numeric(18, 2))
     monthly_deposit_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
