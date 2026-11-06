@@ -70,7 +70,7 @@ export default function PortfolioAccountSelector({
                     type="checkbox"
                     checked={selectedAccountIds.has(acc.id)}
                     onChange={() => onToggleAccount(acc.id)}
-                    className="w-4 h-4 rounded text-blue-600 shrink-0"
+                    className="w-4 h-4 rounded-sm text-blue-600 shrink-0"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">{acc.name}</span>
                   {acc.is_mock_mode && (

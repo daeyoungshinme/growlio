@@ -112,7 +112,7 @@ export default function RegionAllocationView({ basis, onBasisChange, amounts, fa
             >
               {segments.map((s) => (
                 <li key={s.key} className="flex items-start gap-2 min-w-0">
-                  <span className={`mt-1 w-3 h-3 rounded-sm shrink-0 ${s.colorClassName}`} />
+                  <span className={`mt-1 w-3 h-3 rounded-xs shrink-0 ${s.colorClassName}`} />
                   <div className="min-w-0">
                     <div className="text-xs text-gray-500 dark:text-gray-400">{s.label}</div>
                     <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 tabular-nums">

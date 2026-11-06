@@ -21,7 +21,7 @@ function bestIdx(values: number[], higherIsBetter: boolean): number {
   }, 0);
 }
 
-const HIGHLIGHT = "bg-blue-50 dark:bg-blue-950/40 rounded";
+const HIGHLIGHT = "bg-blue-50 dark:bg-blue-950/40 rounded-sm";
 
 function TooltipLabel({ label, tip }: { label: string; tip: string }) {
   return (

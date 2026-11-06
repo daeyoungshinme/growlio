@@ -30,7 +30,7 @@ export default function SegmentedControl<T extends string>({
           onClick={() => onChange(opt.value)}
           className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} ${stretch ? "flex-1 justify-center" : ""} px-3 text-xs rounded-md transition-colors ${
             value === opt.value
-              ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium shadow-sm"
+              ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium shadow-xs"
               : "text-gray-500 dark:text-gray-400"
           }`}
         >

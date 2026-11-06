@@ -237,7 +237,7 @@ export default function StockPositionsModal({
       )}
 
       {/* 하단 버튼 */}
-      <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-6 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sm:rounded-b-2xl">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-6 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sm:rounded-b-2xl">
         <button
           onClick={handleSyncAll}
           disabled={syncing || editor.rows.every((r) => !r.ticker)}

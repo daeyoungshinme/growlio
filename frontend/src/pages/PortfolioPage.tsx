@@ -244,7 +244,7 @@ export default function PortfolioPage() {
               <select
                 value={selectedAccountId ?? ""}
                 onChange={(e) => handleAccountChange(e.target.value)}
-                className={`${SELECT_SM} min-w-0 max-w-[10rem] sm:max-w-none truncate`}
+                className={`${SELECT_SM} min-w-0 max-w-40 sm:max-w-none truncate`}
                 aria-label="계좌 선택"
               >
                 <option value="">전체 계좌 ({stockAccounts.length}개)</option>

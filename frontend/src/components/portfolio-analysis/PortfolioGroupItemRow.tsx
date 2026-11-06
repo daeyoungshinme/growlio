@@ -61,7 +61,7 @@ export default function PortfolioGroupItemRow({
   return (
     <div className="border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-lg px-3 py-2.5 space-y-2">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-indigo-700 bg-indigo-100 dark:text-indigo-300 dark:bg-indigo-900/50 px-2 py-0.5 rounded shrink-0">
+        <span className="text-xs font-medium text-indigo-700 bg-indigo-100 dark:text-indigo-300 dark:bg-indigo-900/50 px-2 py-0.5 rounded-sm shrink-0">
           지수
         </span>
         <span className="flex-1 min-w-0 text-sm font-semibold text-gray-800 dark:text-gray-50 truncate">
@@ -74,7 +74,7 @@ export default function PortfolioGroupItemRow({
           max={100}
           step={0.1}
           aria-label={`${group.label} 목표 비중`}
-          className="w-20 sm:w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-20 sm:w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm text-right focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           placeholder="%"
           value={item.weight || ""}
           onChange={(e) => onChange(idx, { ...item, weight: parseFloat(e.target.value) || 0 })}

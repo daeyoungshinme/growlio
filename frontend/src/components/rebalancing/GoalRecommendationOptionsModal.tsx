@@ -138,7 +138,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
           <select
             value={currentRiskTolerance}
             onChange={(e) => setRiskTolerance(e.target.value as GoalRiskTolerance)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
           >
             {RISK_TOLERANCE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -164,7 +164,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
               step={5}
               value={currentMaxWeightPctStr}
               onChange={(e) => setMaxWeightPctInput(e.target.value)}
-              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
             />
             <span className="text-xs text-gray-500 dark:text-gray-400">% (10~100)</span>
           </div>
@@ -180,7 +180,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
           <select
             value={currentCagrLookbackYears}
             onChange={(e) => setCagrLookbackYears(Number(e.target.value))}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
           >
             {CAGR_LOOKBACK_OPTIONS.map((years) => (
               <option key={years} value={years}>
@@ -207,7 +207,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
               step={5}
               value={currentShortTermEquityFloorPctStr}
               onChange={(e) => setShortTermEquityFloorPctInput(e.target.value)}
-              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
             />
             <span className="text-xs text-gray-500 dark:text-gray-400">% (0~100)</span>
           </div>
@@ -231,7 +231,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
               placeholder="상한 없음"
               value={currentBondCeilingPctStr}
               onChange={(e) => setBondCeilingPctInput(e.target.value)}
-              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
             />
             <span className="text-xs text-gray-500 dark:text-gray-400">
               % (0~100, 비워두면 상한 없음)
@@ -253,7 +253,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
               placeholder="상한 없음"
               value={currentCashCeilingPctStr}
               onChange={(e) => setCashCeilingPctInput(e.target.value)}
-              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
             />
             <span className="text-xs text-gray-500 dark:text-gray-400">
               % (0~100, 비워두면 상한 없음)
@@ -283,7 +283,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
             <select
               value={currentAgeGroup ?? ""}
               onChange={(e) => setAgeGroupInput((e.target.value || "") as AgeGroup | "")}
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
             >
               <option value="">선택 안 함</option>
               {AGE_GROUP_OPTIONS.map((opt) => (

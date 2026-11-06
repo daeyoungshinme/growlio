@@ -91,8 +91,8 @@ export default function InfoTip({ content, label, children, className = "" }: Pr
         aria-controls={open ? popId : undefined}
         className={
           children
-            ? `underline decoration-dotted decoration-gray-400 underline-offset-2 rounded ${className}`
-            : `${TOUCH_TARGET_COMPACT_MOBILE_ONLY} -my-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 rounded ${className}`
+            ? `underline decoration-dotted decoration-gray-400 underline-offset-2 rounded-sm ${className}`
+            : `${TOUCH_TARGET_COMPACT_MOBILE_ONLY} -my-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 rounded-sm ${className}`
         }
       >
         {children ?? <Info size={14} aria-hidden="true" />}
@@ -108,7 +108,7 @@ export default function InfoTip({ content, label, children, className = "" }: Pr
             width: pos.width,
             transform: pos.above ? "translateY(-100%)" : undefined,
           }}
-          className="fixed z-[80] px-3 py-2 text-xs leading-relaxed font-normal text-left text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-normal break-keep"
+          className="fixed z-80 px-3 py-2 text-xs leading-relaxed font-normal text-left text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-normal break-keep"
         >
           {content}
         </span>

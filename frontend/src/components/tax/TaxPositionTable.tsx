@@ -37,7 +37,7 @@ function QtyInput({
         value={qty === 0 ? "" : qty}
         onChange={(e) => handleQtyChange(pos, e.target.value)}
         placeholder="0"
-        className={`w-20 ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded px-2 py-1 text-sm sm:text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400`}
+        className={`w-20 ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-sm px-2 py-1 text-sm sm:text-xs text-right focus:outline-hidden focus:ring-1 focus:ring-blue-400`}
       />
       <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
         / {Math.floor(pos.qty)}주
@@ -80,7 +80,7 @@ export function TaxPositionTable({
                     {marketLabel(pos.market)}
                   </span>
                   {isWithinBudget && (
-                    <span className="px-1 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded text-xs font-medium">
+                    <span className="px-1 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-sm text-xs font-medium">
                       무세 실현 가능
                     </span>
                   )}
@@ -164,7 +164,7 @@ export function TaxPositionTable({
                         {marketLabel(pos.market)}
                       </span>
                       {isWithinBudget && (
-                        <span className="ml-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded text-xs font-medium">
+                        <span className="ml-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-sm text-xs font-medium">
                           무세 실현 가능
                         </span>
                       )}

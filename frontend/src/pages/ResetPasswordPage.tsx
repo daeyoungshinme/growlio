@@ -59,7 +59,7 @@ export default function ResetPasswordPage() {
   if (!sessionReady) {
     return (
       <AuthLayout>
-        <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8 text-center">
+        <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-xs border border-gray-200 dark:border-gray-700 p-6 sm:p-8 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             비밀번호 재설정 링크를 확인 중입니다...
           </p>
@@ -116,7 +116,7 @@ export default function ResetPasswordPage() {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
+      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-xs border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-8 justify-center">
           <ChartLine className="text-blue-600 dark:text-blue-400" size={28} />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>

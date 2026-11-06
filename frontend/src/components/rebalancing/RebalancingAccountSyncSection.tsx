@@ -56,7 +56,7 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
             checked={isAllSelected}
             onChange={toggleAll}
             disabled={isSyncing}
-            className="rounded text-blue-600"
+            className="rounded-sm text-blue-600"
           />
           전체 선택
         </label>
@@ -77,10 +77,10 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
               checked={selectedIds.has(account.id)}
               onChange={() => toggleAccount(account.id)}
               disabled={isSyncing}
-              className="rounded text-blue-600"
+              className="rounded-sm text-blue-600"
             />
             <span className="font-medium truncate max-w-[120px]">{account.name}</span>
-            <span className="shrink-0 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded text-xs">
+            <span className="shrink-0 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-sm text-xs">
               {STOCK_TYPE_LABELS[account.asset_type] ?? account.data_source}
             </span>
           </label>

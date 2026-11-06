@@ -23,7 +23,7 @@ import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 
 function GroupBadge() {
   return (
-    <span className="text-xs font-medium text-indigo-700 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-900/40 px-1.5 py-0.5 rounded shrink-0">
+    <span className="text-xs font-medium text-indigo-700 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-900/40 px-1.5 py-0.5 rounded-sm shrink-0">
       지수
     </span>
   );

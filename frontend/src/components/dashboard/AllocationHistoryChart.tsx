@@ -74,8 +74,8 @@ function AllocationHistoryChart({
   if (isLoading) {
     return (
       <div className="card">
-        <div className="h-4 w-40 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-4" />
-        <div className="h-52 bg-gray-50 dark:bg-gray-800 rounded animate-pulse" />
+        <div className="h-4 w-40 bg-gray-100 dark:bg-gray-800 rounded-sm animate-pulse mb-4" />
+        <div className="h-52 bg-gray-50 dark:bg-gray-800 rounded-sm animate-pulse" />
       </div>
     );
   }
@@ -275,7 +275,7 @@ function AllocationHistoryChart({
                                     >
                                       <div className="flex items-center gap-1.5">
                                         <span
-                                          className="w-2 h-2 rounded-full flex-shrink-0"
+                                          className="w-2 h-2 rounded-full shrink-0"
                                           style={{
                                             backgroundColor:
                                               TYPE_COLORS[alloc.asset_type] ?? DEFAULT_COLOR,

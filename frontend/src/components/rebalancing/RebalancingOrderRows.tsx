@@ -97,7 +97,7 @@ export function PriceErrorBanner({ onRetry }: { onRetry: () => void }) {
       <span>현재가 조회 실패 — 지정가를 직접 입력하거나 다시 시도하세요.</span>
       <button
         onClick={onRetry}
-        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 gap-1 px-2 py-1 rounded bg-amber-200 dark:bg-amber-800/40 hover:bg-amber-300 dark:hover:bg-amber-800/60 text-amber-800 dark:text-amber-200 transition-colors`}
+        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 gap-1 px-2 py-1 rounded-sm bg-amber-200 dark:bg-amber-800/40 hover:bg-amber-300 dark:hover:bg-amber-800/60 text-amber-800 dark:text-amber-200 transition-colors`}
       >
         <RefreshCw size={12} />
         재조회
@@ -128,7 +128,7 @@ export function QtyInput({
         value={value || ""}
         onFocus={(e) => e.target.select()}
         onChange={(e) => onChange(parseInt(e.target.value) || 0)}
-        className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} w-16 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-right ${colorClass} font-medium focus:outline-none focus:border-indigo-500`}
+        className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} w-16 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-sm px-2 py-0.5 text-right ${colorClass} font-medium focus:outline-hidden focus:border-indigo-500`}
       />
       <span className="text-gray-500 dark:text-gray-400">주</span>
     </div>

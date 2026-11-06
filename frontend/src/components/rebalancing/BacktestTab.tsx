@@ -98,7 +98,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                         else next.delete(p.id);
                         setBacktestSelectedIds(next);
                       }}
-                      className="rounded text-blue-600"
+                      className="rounded-sm text-blue-600"
                     />
                     {p.name}
                   </label>
@@ -142,7 +142,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 value={startDate}
                 max={endDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500`}
               />
             </div>
             <div>
@@ -155,7 +155,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 min={startDate}
                 max={backtestDefaultEndDate()}
                 onChange={(e) => setEndDate(e.target.value)}
-                className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`${TOUCH_HEIGHT_MIN_MOBILE_ONLY} border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500`}
               />
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 type="checkbox"
                 checked={includeSpy}
                 onChange={(e) => setIncludeSpy(e.target.checked)}
-                className="rounded text-blue-600"
+                className="rounded-sm text-blue-600"
               />
               S&P 500 포함
             </label>
@@ -178,7 +178,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 type="checkbox"
                 checked={includeReal}
                 onChange={(e) => setIncludeReal(e.target.checked)}
-                className="rounded text-blue-600"
+                className="rounded-sm text-blue-600"
               />
               실제 포트폴리오 포함
             </label>
@@ -189,7 +189,7 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
                 type="checkbox"
                 checked={reinvestDividends}
                 onChange={(e) => setReinvestDividends(e.target.checked)}
-                className="rounded text-blue-600"
+                className="rounded-sm text-blue-600"
               />
               배당금 재투자
             </label>

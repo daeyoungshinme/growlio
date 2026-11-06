@@ -42,7 +42,7 @@ export function OrderResultList({ results }: { results: ExecutionResult[] }) {
                 {result.account_name}
               </span>
               {result.is_mock && (
-                <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-700/50 px-2 py-0.5 rounded">
+                <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-700/50 px-2 py-0.5 rounded-sm">
                   모의투자
                 </span>
               )}
@@ -84,7 +84,7 @@ export function OrderResultList({ results }: { results: ExecutionResult[] }) {
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
                   <span
-                    className={`px-1.5 py-0.5 rounded font-medium text-xs ${o.order_type === "LIMIT" ? "bg-indigo-100 text-indigo-700 border border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700/40" : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"}`}
+                    className={`px-1.5 py-0.5 rounded-sm font-medium text-xs ${o.order_type === "LIMIT" ? "bg-indigo-100 text-indigo-700 border border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700/40" : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"}`}
                   >
                     {o.order_type === "LIMIT" ? "지정가" : "시장가"}
                   </span>

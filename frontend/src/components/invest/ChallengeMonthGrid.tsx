@@ -56,22 +56,22 @@ export default function ChallengeMonthGrid({ months, hasTarget }: Props) {
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> 완료
+          <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500" /> 완료
         </span>
         {hasTarget && (
           <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-sm bg-amber-400" /> 일부 달성
+            <span className="w-2.5 h-2.5 rounded-xs bg-amber-400" /> 일부 달성
           </span>
         )}
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-gray-200 dark:bg-gray-600" /> 미완료
+          <span className="w-2.5 h-2.5 rounded-xs bg-gray-200 dark:bg-gray-600" /> 미완료
         </span>
         <span>· 칸을 누르면 입금액</span>
         {hiddenCount > 0 && (
           <button
             type="button"
             onClick={() => setShowAll(true)}
-            className={`${TOUCH_TARGET_ROW} ml-auto !min-w-0 font-medium text-blue-600 dark:text-blue-400`}
+            className={`${TOUCH_TARGET_ROW} ml-auto min-w-0! font-medium text-blue-600 dark:text-blue-400`}
           >
             이전 {hiddenCount}개월 보기
           </button>

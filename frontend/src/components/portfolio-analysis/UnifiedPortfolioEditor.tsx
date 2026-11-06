@@ -168,7 +168,7 @@ export default function UnifiedPortfolioEditor({
     <ErrorBoundary variant="section">
       <div
         ref={overlayRef}
-        className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] sm:p-4 pb-16 lg:pb-0"
+        className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-60 sm:p-4 pb-16 lg:pb-0"
       >
         <div
           ref={dialogRef}
@@ -201,7 +201,7 @@ export default function UnifiedPortfolioEditor({
                 포트폴리오 이름
               </label>
               <input
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2.5 sm:py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2.5 sm:py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 placeholder="예: 성장형 포트폴리오"
                 value={name}
                 onChange={(e) => setName(e.target.value)}

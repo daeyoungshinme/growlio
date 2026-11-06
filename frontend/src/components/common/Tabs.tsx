@@ -59,11 +59,11 @@ export default function Tabs<T extends string>({
             tabIndex={activeTab === tab ? 0 : -1}
             onClick={() => onChange(tab)}
             className={[
-              "px-3 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap [scroll-snap-align:start]",
+              "px-3 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap snap-start",
               fullWidth ? "flex-1 sm:flex-none" : "shrink-0",
               TOUCH_TARGET_MIN,
               activeTab === tab
-                ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-50"
+                ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-50"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200",
             ].join(" ")}
           >

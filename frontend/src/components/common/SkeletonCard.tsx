@@ -10,7 +10,7 @@ export default function SkeletonCard({
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className={`${height} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`}
+          className={`${height} bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse`}
           style={{ width: `${80 - i * 10}%` }}
         />
       ))}

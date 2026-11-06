@@ -238,7 +238,7 @@ export default function RebalancingStatusCard({
         </p>
         <button
           onClick={emptyStateCta}
-          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} !justify-start gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} justify-start! gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline`}
         >
           포트폴리오 만들기 <ArrowRight size={12} />
         </button>

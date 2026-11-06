@@ -149,8 +149,8 @@ export default function TaxActionPlanCard() {
             aria-label="절세 액션 플랜 로딩 중"
             aria-busy="true"
           >
-            <div className="h-4 w-4/5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            <div className="h-4 w-3/5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-4/5 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse" />
+            <div className="h-4 w-3/5 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse" />
           </div>
         )}
       </div>

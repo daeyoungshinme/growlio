@@ -117,7 +117,7 @@ export function InvestorProfileStep({ form, setForm }: StepFormProps) {
               goal_risk_tolerance: e.target.value as GoalRiskTolerance,
             }))
           }
-          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
         >
           {RISK_TOLERANCE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>

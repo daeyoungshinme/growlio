@@ -108,7 +108,7 @@ export function TickerSearchField({
                     role="option"
                     aria-selected={false}
                     tabIndex={0}
-                    className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950 cursor-pointer text-sm flex items-center gap-2 focus:bg-blue-50 dark:focus:bg-blue-950 focus:outline-none"
+                    className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950 cursor-pointer text-sm flex items-center gap-2 focus:bg-blue-50 dark:focus:bg-blue-950 focus:outline-hidden"
                     onMouseDown={() => handleSelect(s.name, s.ticker)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
