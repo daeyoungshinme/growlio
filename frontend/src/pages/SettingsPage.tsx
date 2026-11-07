@@ -38,7 +38,7 @@ import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
-import { invalidateSettingsData } from "@/utils/queryInvalidation";
+import { invalidateDartKeyData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { fmtKrwShort } from "@/utils/format";
 import { accountsQuery, compositeSignalStatusQuery, settingsQuery } from "@/api/queryOptions";
@@ -98,16 +98,15 @@ export default function SettingsPage() {
 
   const { data: current } = useQuery(settingsQuery);
 
-  const invalidateSettings = () => invalidateSettingsData(qc);
-
   const saveDart = async () => {
     setSaving("dart");
     try {
-      await saveDartApiKey(dart.api_key);
+      // 붙여넣은 키의 앞뒤 공백·개행이 DART 호출을 실패시키지 않게(plans/118 C2 — 백엔드도 strip)
+      await saveDartApiKey(dart.api_key.trim());
       // 저장한 키를 입력칸(DOM)에 남겨두지 않는다 — 저장 여부는 placeholder(••••)로 보인다
       setDart({ api_key: "" });
       toast("DART API 키가 저장되었습니다", "success");
-      void invalidateSettings();
+      void invalidateDartKeyData(qc);
     } catch (e) {
       toast(extractErrorMessage(e, "저장에 실패했습니다"), "error");
     } finally {
@@ -120,7 +119,7 @@ export default function SettingsPage() {
     try {
       await deleteDartApiKey();
       toast("DART API 키가 삭제되었습니다", "success");
-      void invalidateSettings();
+      void invalidateDartKeyData(qc);
     } catch (e) {
       toast(extractErrorMessage(e, "삭제에 실패했습니다"), "error");
     } finally {
@@ -266,8 +265,11 @@ export default function SettingsPage() {
           에서 발급받은 API 키를 입력하세요. 국내 주식 배당 데이터 조회에 사용됩니다.
         </p>
         <div>
-          <label className={labelClass}>API Key</label>
+          <label htmlFor="dart-api-key" className={labelClass}>
+            API Key
+          </label>
           <input
+            id="dart-api-key"
             type="password"
             className={inputClass}
             value={dart.api_key}

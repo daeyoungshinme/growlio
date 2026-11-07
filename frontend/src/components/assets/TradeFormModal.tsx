@@ -186,7 +186,12 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
             <select
               id="trade-account"
               value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
+              onChange={(e) => {
+                // 수정 중 계좌를 바꾸면 목록은 새 계좌인데 "기록 수정"은 옛 계좌의 기록을 고친다 —
+                // 종목 변경과 같이 수정 모드를 끝낸다(plans/118 C4)
+                if (editing) cancelEdit();
+                setAccountId(e.target.value);
+              }}
               disabled={!!prefill}
               className={`${INPUT_SM} w-full`}
             >

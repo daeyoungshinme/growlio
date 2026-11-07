@@ -76,8 +76,11 @@ export function ExchangeRateAlertSection() {
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div className="col-span-2 sm:col-span-1">
-          <label className={LABEL_MD}>목표환율 (원)</label>
+          <label htmlFor="fx-alert-target" className={LABEL_MD}>
+            목표환율 (원)
+          </label>
           <input
+            id="fx-alert-target"
             type="number"
             inputMode="decimal"
             className={FORM_INPUT_SM}
@@ -88,8 +91,11 @@ export function ExchangeRateAlertSection() {
           />
         </div>
         <div>
-          <label className={LABEL_MD}>조건</label>
+          <label htmlFor="fx-alert-direction" className={LABEL_MD}>
+            조건
+          </label>
           <select
+            id="fx-alert-direction"
             className={FORM_INPUT_SM}
             value={alertForm.direction}
             onChange={(e) =>
@@ -101,8 +107,11 @@ export function ExchangeRateAlertSection() {
           </select>
         </div>
         <div>
-          <label className={LABEL_MD}>알림 횟수</label>
+          <label htmlFor="fx-alert-count" className={LABEL_MD}>
+            알림 횟수
+          </label>
           <input
+            id="fx-alert-count"
             type="number"
             inputMode="numeric"
             className={FORM_INPUT_SM}

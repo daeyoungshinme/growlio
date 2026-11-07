@@ -3,13 +3,17 @@ import { Link } from "react-router-dom";
 import { Anchor, X } from "lucide-react";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useCollapsible } from "@/hooks/useCollapsible";
+import { useAuthStore } from "@/stores/authStore";
+import { targetPortfolioBannerDismissedKey } from "@/constants/storageKeys";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { portfoliosQuery } from "@/api/queryOptions";
 
 export default function SetupTargetPortfolioBanner() {
+  const userId = useAuthStore((s) => s.userId);
+  // 사용자별 키 — 기기 단위면 한 계정이 닫은 배너가 같은 기기의 다른 계정에서도 안 떴다(plans/118 C7)
   const [dismissed, , setDismissed] = useCollapsible(
     false,
-    "growlio:dashboard:target-portfolio-banner-dismissed",
+    userId ? targetPortfolioBannerDismissedKey(userId) : undefined,
   );
   const { data: portfolios } = useQuery(portfoliosQuery);
 

@@ -74,6 +74,17 @@ describe("usePushNotifications lifecycle", () => {
     expect(pushMock.register).not.toHaveBeenCalled();
   });
 
+  it("토큰 삭제가 실패하면 끈 기록 없이 켜진 상태를 유지한다(plans/118 C1)", async () => {
+    const { registerPushToken } = await import("@/api/settings");
+    vi.mocked(registerPushToken).mockRejectedValueOnce(new Error("503"));
+    usePushNotificationStore.getState().setStatus("registered");
+
+    await disablePushNotifications();
+
+    expect(localStorage.getItem(pushOptOutKey("user-1"))).toBeNull();
+    expect(usePushNotificationStore.getState().status).toBe("registered");
+  });
+
   it("설정에서 끈 푸시는 앱을 다시 켜도 자동 등록하지 않는다(plans/117 C2)", async () => {
     await disablePushNotifications();
     expect(localStorage.getItem(pushOptOutKey("user-1"))).toBe("1");

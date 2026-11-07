@@ -256,12 +256,14 @@ describe("SettingsPage", () => {
       expect(screen.getByPlaceholderText("DART OpenAPI 인증키")).toBeInTheDocument();
     });
     fireEvent.change(screen.getByPlaceholderText("DART OpenAPI 인증키"), {
-      target: { value: "test-api-key" },
+      target: { value: "  test-api-key\n" },
     });
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() => {
       expect(toast).toHaveBeenCalledWith("DART API 키가 저장되었습니다", "success");
     });
+    // plans/118 C2: 붙여넣은 키의 앞뒤 공백·개행을 지워 보낸다
+    expect(vi.mocked(api.put).mock.calls[0]?.[1]).toEqual({ api_key: "test-api-key" });
     // plans/117 C7: 저장한 키를 입력칸에 남기지 않고, 빈 값이면 저장 버튼을 막는다
     expect(screen.getByPlaceholderText("DART OpenAPI 인증키")).toHaveValue("");
     expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();

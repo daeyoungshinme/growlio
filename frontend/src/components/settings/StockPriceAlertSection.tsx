@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchStockPriceAlerts,
@@ -10,6 +10,9 @@ import {
 import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { isOverseasMarket } from "@/constants/markets";
+import { convertUsdToKrw, fmtKrwPrice } from "@/utils/format";
 import {
   TOUCH_HEIGHT_MIN,
   TOUCH_TARGET_COMPACT_MOBILE_ONLY,
@@ -34,6 +37,15 @@ export function StockPriceAlertSection() {
   });
   const { suggestions, isSearching, search: runSearch, clearSuggestions } = useStockSearch();
   const [selectedStock, setSelectedStock] = useState<StockSuggestion | null>(null);
+  const rate = useExchangeRate();
+  const idBase = useId();
+  const fieldId = (name: string) => `${idBase}-${name}`;
+  // 백엔드는 목표가를 원화로 비교한다 — 해외 종목은 달러로 받아 현재 환율로 환산해 보낸다(plans/118 C6).
+  // 예전엔 "목표가 (원)"에 SCHD 27을 넣으면 27원으로 저장돼 이상(↑) 알림이 즉시, 이하(↓)는 영영 울리지 않았다.
+  const inUsd = selectedStock ? isOverseasMarket(selectedStock.market) : false;
+  const targetKrw = inUsd
+    ? convertUsdToKrw(Number(form.target_price), rate)
+    : Number(form.target_price);
 
   const [pendingDelete, setPendingDelete] = useState<StockPriceAlert | null>(null);
   const {
@@ -51,11 +63,14 @@ export function StockPriceAlertSection() {
   const createMutation = useMutation({
     mutationFn: () => {
       if (!selectedStock || !form.target_price) throw new Error("입력값 없음");
+      if (inUsd && !rate) {
+        throw new Error("환율 정보를 불러오지 못해 달러 목표가를 원화로 환산할 수 없습니다");
+      }
       return createStockPriceAlert({
         ticker: selectedStock.ticker,
         market: selectedStock.market,
         name: selectedStock.name,
-        target_price: Number(form.target_price),
+        target_price: targetKrw,
         direction: form.direction,
         max_trigger_count: Math.max(1, Number(form.max_trigger_count) || 1),
       });
@@ -83,8 +98,11 @@ export function StockPriceAlertSection() {
       </p>
       <div className="space-y-3">
         <div className="relative">
-          <label className={LABEL_MD}>종목 검색</label>
+          <label htmlFor={fieldId("query")} className={LABEL_MD}>
+            종목 검색
+          </label>
           <input
+            id={fieldId("query")}
             type="text"
             className={FORM_INPUT_SM}
             value={form.query}
@@ -122,20 +140,32 @@ export function StockPriceAlertSection() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <div className="col-span-2 sm:col-span-1">
-            <label className={LABEL_MD}>목표가 (원)</label>
+            <label htmlFor={fieldId("target")} className={LABEL_MD}>
+              {inUsd ? "목표가 (USD)" : "목표가 (원)"}
+            </label>
             <input
+              id={fieldId("target")}
               type="number"
               inputMode="decimal"
               className={FORM_INPUT_SM}
               value={form.target_price}
               onChange={(e) => setForm((f) => ({ ...f, target_price: e.target.value }))}
-              placeholder="예: 30000"
+              placeholder={inUsd ? "예: 27.5" : "예: 30000"}
               min="0"
+              step={inUsd ? "0.01" : undefined}
             />
+            {inUsd && rate && form.target_price !== "" && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                ≈ {fmtKrwPrice(targetKrw)} (현재 환율로 저장)
+              </p>
+            )}
           </div>
           <div>
-            <label className={LABEL_MD}>조건</label>
+            <label htmlFor={fieldId("direction")} className={LABEL_MD}>
+              조건
+            </label>
             <select
+              id={fieldId("direction")}
               className={FORM_INPUT_SM}
               value={form.direction}
               onChange={(e) =>
@@ -147,8 +177,11 @@ export function StockPriceAlertSection() {
             </select>
           </div>
           <div>
-            <label className={LABEL_MD}>알림 횟수</label>
+            <label htmlFor={fieldId("count")} className={LABEL_MD}>
+              알림 횟수
+            </label>
             <input
+              id={fieldId("count")}
               type="number"
               inputMode="numeric"
               className={FORM_INPUT_SM}

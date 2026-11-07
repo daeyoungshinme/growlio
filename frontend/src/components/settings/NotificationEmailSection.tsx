@@ -47,8 +47,11 @@ export function NotificationEmailSection({ userEmail, savedEmail, onSettingsChan
   return (
     <SectionCard title="알림 수신 이메일">
       <div>
-        <label className={LABEL_MD}>이메일 주소</label>
+        <label htmlFor="notification-email" className={LABEL_MD}>
+          이메일 주소
+        </label>
         <input
+          id="notification-email"
           type="email"
           className={FORM_INPUT_SM}
           value={notificationEmail}

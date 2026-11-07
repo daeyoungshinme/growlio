@@ -3,6 +3,7 @@ import { screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import ChallengeEmptyStateCard from "@/components/dashboard/ChallengeEmptyStateCard";
+import { useAuthStore } from "@/stores/authStore";
 
 function render() {
   return renderWithProviders(
@@ -15,6 +16,8 @@ function render() {
 describe("ChallengeEmptyStateCard", () => {
   beforeEach(() => {
     localStorage.clear();
+    // 닫기 기록은 사용자별 키 — 로그인 사용자가 있어야 저장된다(plans/118 C7)
+    useAuthStore.setState({ userId: "user-1" });
   });
 
   it("shows a CTA linking to the challenge tab", () => {

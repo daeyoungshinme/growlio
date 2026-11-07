@@ -98,6 +98,8 @@ export function invalidateTradeData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.taxActionPlan }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+    // 백엔드도 매매 기록 CUD에서 인사이트 캐시를 지운다(실현손익 기반 카드, plans/117 B4·118 C5)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
   ]);
 }
 
@@ -109,6 +111,19 @@ export function invalidateChallengeData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
     // 첫 챌린지를 만들면 백엔드가 리마인더 설정을 켠다 — 토글이 꺼진 채로 남지 않게
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
+  ]);
+}
+
+/** DART API 키 저장·삭제 후 — 설정 + 국내 종목 배당(DPS)을 쓰는 쿼리. 백엔드도 같은 시점에 배당 캐시를 지운다
+ * (plans/117 B1). 프론트 배당 쿼리는 staleTime이 1시간이라 함께 지우지 않으면 키를 넣어도 DPS 0이 남는다(plans/118 C2). */
+export function invalidateDartKeyData(qc: QueryClient) {
+  return invalidateKeys(qc, [
+    QUERY_KEYS.settings,
+    QUERY_KEYS.dividendSummaryBase,
+    QUERY_KEYS.dividendByTickerBase,
+    QUERY_KEYS.dividendPositionsBase,
+    QUERY_KEYS.dividendPlan,
+    QUERY_KEYS.monthlyOptimization,
   ]);
 }
 
