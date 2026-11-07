@@ -107,12 +107,21 @@ class TestManualProvider:
         from app.exceptions import BadRequestError
         from app.providers.manual_provider import ManualProvider
 
-        account = make_account(manual_amount=0, asset_type="CASH_OTHER")
+        account = make_account(manual_amount=None, asset_type="CASH_OTHER")
         # mock_db.execute returns [] by default (no positions)
 
         provider = ManualProvider()
         with pytest.raises(BadRequestError, match="수동 금액이 설정되지 않았습니다"):
             await provider.sync(account, mock_db, cache=None)
+
+    @pytest.mark.asyncio
+    async def test_zero_manual_amount_is_valid_balance(self, mock_db, make_account):
+        """nestlio 전액 출금으로 잔액이 0이 된 계좌 — 거부하지 않고 0을 잔액으로 쓴다(plans/117 A1)."""
+        from app.providers.manual_provider import ManualProvider
+
+        account = make_account(manual_amount=0, asset_type="CASH_OTHER")
+        result = await ManualProvider().sync(account, mock_db, cache=None)
+        assert result.total_value_krw == 0
 
     @pytest.mark.asyncio
     async def test_uses_manual_amount_when_no_positions(self, mock_db, make_account):
