@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
 from app.core.cache_store import get_cache_store
+from app.core.job_runner import report_handled_failure
 from app.enums import AssetType, DataSource, TransactionType
 from app.limiter import limiter
 from app.models.asset import Transaction
@@ -60,6 +61,7 @@ from app.services.accounts.asset_service import list_accounts as _list_accounts
 from app.services.accounts.snapshot_service import (
     get_latest_snapshot_with_positions,
     get_latest_snapshots_by_account,
+    upsert_snapshot,
     write_manual_deposit_snapshot,
 )
 from app.services.external_queries import (
@@ -71,7 +73,7 @@ from app.services.goal.goal_return_solver import build_feasibility_preview
 from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_monthly_trend
 from app.utils.cache_invalidation import invalidate_asset_account_caches
 from app.utils.currency import require_live_usd_krw
-from app.utils.kst import KST
+from app.utils.kst import KST, today_kst
 from app.utils.numbers import opt_float
 
 router = APIRouter(prefix="/external", tags=["external"])
@@ -223,9 +225,10 @@ async def get_investment_goal(
             "estimated_annual_dividend": summary.get("estimated_annual_dividends"),
             "actual_return_pct": actual_return,
         }
-    except Exception:
-        # 진행 상황은 부가 정보 — 요약 계산이 실패해도 목표 설정값(폼 프리필)은 내려준다.
-        logger.warning("external_goal_progress_unavailable", user_id=str(current_user.id), exc_info=True)
+    except Exception as e:
+        # 진행 상황은 부가 정보 — 요약 계산이 실패해도 목표 설정값(폼 프리필)은 내려준다. 다만 실패가 조용히 묻히면
+        # nestlio 부부 목표 진행률이 계속 비므로 Sentry에 남긴다(plans/116 B4, insight_service와 같은 방식).
+        report_handled_failure("external_goal_progress_unavailable", e, user_id=str(current_user.id))
     return ExternalGoalSettings(
         is_configured=True,
         goal_amount=float(row.goal_amount),
@@ -275,8 +278,9 @@ async def create_external_transaction(
     """nestlio 가계부의 "저축/투자" 내역을 growlio 입출금 내역에 반영한다.
 
     DEPOSIT/WITHDRAWAL만 허용한다(DIVIDEND는 growlio 자체 배당 기능의 영역이라 이 경로로 들어오지 않는다).
-    수동(MANUAL) 계좌는 예수금(deposit_krw)까지 함께 갱신하고 오늘자 스냅샷을 재계산한다 —
-    `PUT /assets/{account_id}`가 예수금 직접 수정 시 하는 일과 동일한 계산이다. KIS/키움 자동
+    수동(MANUAL) 계좌는 잔액까지 함께 갱신하고 오늘자 스냅샷을 재계산한다 — 보유종목·예수금 계좌는 예수금
+    (`PUT /assets/{account_id}`의 예수금 수정과 같은 계산), 금액 직접 입력 계좌는 manual_amount를 고친다.
+    부동산은 시세가 기준이라 내역만 기록한다. KIS/키움 자동
     연동 계좌는 내역만 기록하고 예수금은 다음 브로커 동기화가 채우도록 그대로 둔다.
     """
     if req.transaction_type not in (TransactionType.DEPOSIT, TransactionType.WITHDRAWAL):
@@ -304,16 +308,32 @@ async def create_external_transaction(
     db.add(tx)
 
     deposit_krw_adjusted = False
-    if account.data_source == DataSource.MANUAL:
-        deposit_krw_adjusted = True
+    if account.data_source == DataSource.MANUAL and account.asset_type != AssetType.REAL_ESTATE:
+        # 부동산은 사용자가 입력한 시세가 기준이라 내역만 기록한다.
         delta = req.amount if req.transaction_type == TransactionType.DEPOSIT else -req.amount
-        account.deposit_krw = float(account.deposit_krw or 0) + delta
-        account.manual_updated_at = datetime.now(UTC)
-
-        cache = await get_cache_store()
-        usd_rate = await require_live_usd_krw(cache) if account.deposit_usd else 1.0
         latest_snap, pos_list = await get_latest_snapshot_with_positions(db, account.id)
-        await write_manual_deposit_snapshot(db, account, latest_snap=latest_snap, positions=pos_list, usd_rate=usd_rate)
+        account.manual_updated_at = datetime.now(UTC)
+        # 잔액 출처는 ManualProvider와 같은 순서로 판정한다 — 보유종목·예수금이 있으면 예수금, 아니면 manual_amount.
+        # manual_amount 계좌의 예수금을 건드리면 오늘 스냅샷이 입금액만 남고 이후 동기화도 예수금을 잔액으로
+        # 써서 기존 잔액이 사라졌다(plans/116 B2).
+        if pos_list or account.deposit_krw is not None or account.deposit_usd is not None:
+            deposit_krw_adjusted = True
+            account.deposit_krw = float(account.deposit_krw or 0) + delta
+            cache = await get_cache_store()
+            usd_rate = await require_live_usd_krw(cache) if account.deposit_usd else 1.0
+            await write_manual_deposit_snapshot(
+                db, account, latest_snap=latest_snap, positions=pos_list, usd_rate=usd_rate
+            )
+        else:
+            account.manual_amount = float(account.manual_amount or 0) + delta
+            await upsert_snapshot(
+                db,
+                account_id=account.id,
+                user_id=account.user_id,
+                snapshot_date=today_kst(),
+                amount_krw=account.manual_amount,
+                source="MANUAL",
+            )
 
     try:
         await db.commit()

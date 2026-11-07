@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.core.cache_store import get_cache_store
 from app.core.config import settings
+from app.core.job_runner import report_handled_failure
 from app.services.accounts._snapshot_queries import latest_snapshot_rows
 from app.services.accounts.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key
@@ -50,7 +51,11 @@ async def _collect_positions(
     )
 
     positions_map: dict[tuple[str, str], dict] = {}
-    for snap, _acc in rows:
+    for snap, acc in rows:
+        # 전체 통합 집계는 총자산 합산 제외 계좌를 뺀다(입출금·XIRR·월별 추이와 같은 기준, plans/116 B3).
+        # 계좌를 지정한 조회는 그 계좌를 그대로 본다.
+        if not account_ids and not acc.include_in_total:
+            continue
         if not snap.position_items:
             continue
         for p in snap.position_items:
@@ -153,7 +158,8 @@ async def _fetch_received_dividends_by_ticker(
         )
         params["account_ids"] = [str(a) for a in account_ids]
     else:
-        stmt = text(base_sql + " GROUP BY 1")
+        # 전체 통합은 합산 제외 계좌 배당을 뺀다(plans/116 B3) — 계좌 미지정 배당은 유지
+        stmt = text(base_sql + " AND (t.account_id IS NULL OR a.include_in_total = TRUE) GROUP BY 1")
     result = await db.execute(stmt, params)
     return {row.ticker_key: float(row.total) for row in result}
 
@@ -183,10 +189,11 @@ async def _gather_position_dividends(
     failure_event: str,
     usd_krw_rate: float = 0.0,
     with_ex_dividend_date: bool = False,
-) -> list[dict]:
-    """보유 포지션별 배당 정보를 동시 조회해 `calculate_position_dividend` 결과 목록을 반환한다.
+) -> tuple[list[dict], int]:
+    """보유 포지션별 배당 정보를 동시 조회해 (`calculate_position_dividend` 결과 목록, 실패 종목 수)를 반환한다.
 
-    종목 하나의 조회 실패는 `failure_event`로 경고만 남기고 건너뛴다(나머지 종목은 그대로).
+    종목 하나의 조회 실패는 `failure_event`로 경고만 남기고 건너뛴다(나머지 종목은 그대로). 전부 실패하면
+    예상 배당이 통째로 0이 되므로 Sentry에도 한 번 보고한다(plans/116 B4).
     """
 
     async def _one(ticker: str, market: str, info: dict) -> dict:
@@ -210,12 +217,16 @@ async def _gather_position_dividends(
         *(_one(ticker, market, info) for (ticker, market), info in positions.items()), return_exceptions=True
     )
     results: list[dict] = []
+    failures: list[BaseException] = []
     for item in raw:
-        if isinstance(item, Exception):
+        if isinstance(item, BaseException):
             logger.warning(failure_event, error=str(item))
+            failures.append(item)
         elif isinstance(item, dict):
             results.append(item)
-    return results
+    if failures and not results:
+        report_handled_failure(f"{failure_event}_all", failures[0], count=str(len(failures)))
+    return results, len(failures)
 
 
 async def _fetch_estimated_dividend_map(
@@ -224,9 +235,9 @@ async def _fetch_estimated_dividend_map(
     kis_creds,
     dart_key,
     usd_krw_rate: float,
-) -> dict[tuple[str, str], dict]:
-    """보유 포지션별 예상 배당금을 동시 조회해 (ticker, market) → 집계 dict로 병합한다."""
-    estimated_results = await _gather_position_dividends(
+) -> tuple[dict[tuple[str, str], dict], int]:
+    """보유 포지션별 예상 배당금을 동시 조회해 ((ticker, market) → 집계 dict, 실패 종목 수)를 반환한다."""
+    estimated_results, failed = await _gather_position_dividends(
         positions, cache, kis_creds, dart_key, failure_event="dividend_estimate_fetch_failed", usd_krw_rate=usd_krw_rate
     )
 
@@ -246,7 +257,7 @@ async def _fetch_estimated_dividend_map(
             existing["dividend_months"] = sorted(
                 set(existing.get("dividend_months", []) + item.get("dividend_months", []))
             )
-    return estimated_map
+    return estimated_map, failed
 
 
 def _assemble_ticker_dividend_output(
@@ -320,7 +331,7 @@ async def get_ticker_dividend_summary(
     kis_creds = await get_kis_user_credentials(user_id, db)
     usd_krw_rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
 
-    estimated_map = await _fetch_estimated_dividend_map(positions, cache, kis_creds, dart_key, usd_krw_rate)
+    estimated_map, failed = await _fetch_estimated_dividend_map(positions, cache, kis_creds, dart_key, usd_krw_rate)
 
     output = _assemble_ticker_dividend_output(received_map, estimated_map, positions)
 
@@ -328,6 +339,9 @@ async def get_ticker_dividend_summary(
     ttl = TTL_DIVIDEND_INFO if has_yield else TTL_DART
     if not rate_is_live:
         # 환율 fallback(설정값)으로 계산한 해외 배당 원화 환산이 24h 캐시에 굳지 않게 짧게
+        ttl = min(ttl, TTL_DIVIDEND_FALLBACK_FX)
+    if failed:
+        # 일부 종목 조회 실패로 빠진 예상 배당이 1~24h 캐시에 굳지 않게 짧게(plans/116 B4)
         ttl = min(ttl, TTL_DIVIDEND_FALLBACK_FX)
     await cache.setex(cache_key, ttl, json.dumps(output))
     logger.info("dividend_by_ticker_computed", user_id=str(user_id), count=len(output))
@@ -345,6 +359,7 @@ async def get_position_dividend_yields(
     cache = await get_cache_store()
 
     # 환율을 넘기지 않으므로 estimated_monthly_usd는 None — 이 응답은 원화 기준만 쓴다
-    return await _gather_position_dividends(
+    results, _ = await _gather_position_dividends(
         positions, cache, kis_creds, dart_key, failure_event="position_yield_fetch_failed", with_ex_dividend_date=True
     )
+    return results

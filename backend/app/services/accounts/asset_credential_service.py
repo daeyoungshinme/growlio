@@ -17,7 +17,7 @@ from app.kis.auth import ACCOUNT_TOKEN_CACHE_KEY as KIS_ACCOUNT_TOKEN_CACHE_KEY
 from app.kiwoom.constants import KIWOOM_TOKEN_CACHE_KEY
 from app.models.asset import AssetAccount
 from app.models.token import KisToken, KiwoomToken, TossToken
-from app.toss.constants import TOSS_TOKEN_CACHE_KEY
+from app.toss.constants import TOSS_ACCTSEQ_CACHE_KEY, TOSS_TOKEN_CACHE_KEY
 
 
 async def verify_kis_credentials(
@@ -80,6 +80,8 @@ class BrokerCredentialSpec:
     missing_detail: str  # 생성 시 필수값 누락 400 메시지
     token_model: type[KisToken] | type[KiwoomToken] | type[TossToken]
     token_cache_key: str  # "{account_id}" 템플릿
+    # 키로 발급·조회해 캐시한 다른 값(토스 accountSeq 등) — 키가 바뀌면 토큰과 함께 지운다
+    derived_cache_keys: tuple[str, ...] = ()
 
     @property
     def credential_attrs(self) -> tuple[str, str]:
@@ -121,6 +123,7 @@ BROKER_CREDENTIAL_SPECS: dict[str, BrokerCredentialSpec] = {
             missing_detail="토스 계좌번호와 API 자격증명(Client ID, Client Secret)을 모두 입력하세요.",
             token_model=TossToken,
             token_cache_key=TOSS_TOKEN_CACHE_KEY,
+            derived_cache_keys=(TOSS_ACCTSEQ_CACHE_KEY,),
         ),
     )
 }
@@ -133,8 +136,20 @@ async def delete_credentials(account: AssetAccount, db: AsyncSession, cache, spe
     """계좌별 브로커 자격증명과 발급 토큰(DB·캐시)을 삭제한다."""
     setattr(account, spec.key_attr, None)
     setattr(account, spec.secret_attr, None)
-    token_model = spec.token_model
-    await db.execute(sql_delete(token_model).where(token_model.account_id == account.id))
+    await delete_issued_tokens(db, account.id, spec)
     await db.commit()
 
-    await cache.delete(spec.token_cache_key.format(account_id=account.id))
+    await clear_issued_token_cache(cache, account.id, spec)
+
+
+async def delete_issued_tokens(db: AsyncSession, account_id: uuid.UUID, spec: BrokerCredentialSpec) -> None:
+    """계좌의 발급 토큰 DB 행을 지운다(commit은 호출자). 키 삭제·교체 때 함께 불러야 한다 — 토큰은 계좌 id로만
+    조회되므로, 남겨 두면 키를 바꿔도 만료(약 하루) 전까지 옛 키로 발급된 토큰을 계속 쓴다(plans/116 B1)."""
+    token_model = spec.token_model
+    await db.execute(sql_delete(token_model).where(token_model.account_id == account_id))
+
+
+async def clear_issued_token_cache(cache, account_id: uuid.UUID, spec: BrokerCredentialSpec) -> None:
+    """토큰 캐시와 키로 조회해 캐시한 값을 지운다 — DB commit 뒤에 호출한다."""
+    for key in (spec.token_cache_key, *spec.derived_cache_keys):
+        await cache.delete(key.format(account_id=account_id))

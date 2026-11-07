@@ -81,6 +81,8 @@ async def _fetch_dividend_aggregates(
                   AND (CAST(:account_id AS uuid) IS NULL OR t.account_id = CAST(:account_id AS uuid))
                   -- 삭제(soft) 계좌 배당 제외 — 입출금 집계와 같은 기준(plans/95 A4), 세금 집계는 유지
                   AND (t.account_id IS NULL OR a.is_active = TRUE)
+                  -- 전체 통합은 총자산 합산 제외 계좌를 뺀다(plans/116 B3). 계좌 지정 조회는 그 계좌를 그대로 본다.
+                  AND (CAST(:account_id AS uuid) IS NOT NULL OR t.account_id IS NULL OR a.include_in_total = TRUE)
             ),
             annual AS (
                 SELECT SUM(amount) AS total FROM base

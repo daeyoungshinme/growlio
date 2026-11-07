@@ -75,7 +75,7 @@ class TestCollectPositions:
             avg_price=95_000.0,
         )
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos1])
-        acc = SimpleNamespace(id=uuid.uuid4())
+        acc = SimpleNamespace(id=uuid.uuid4(), include_in_total=True)
 
         exec_result = MagicMock()
         exec_result.all.return_value = [(snap, acc)]
@@ -85,6 +85,22 @@ class TestCollectPositions:
 
         assert ("AAPL", "NASDAQ") in result
         assert result[("AAPL", "NASDAQ")]["value_krw"] == pytest.approx(1_000_000.0)
+
+    @pytest.mark.asyncio
+    async def test_excludes_non_total_accounts_unless_selected(self, mock_db, override_settings):
+        """plans/116 B3: 전체 통합은 총자산 합산 제외 계좌를 빼고, 계좌를 지정하면 그대로 본다."""
+        from app.services.dividend.orchestrator import _collect_positions
+
+        pos = SimpleNamespace(
+            ticker="AAPL", market="NASDAQ", name="Apple", value_krw=1.0, qty=1.0, current_price=1.0, avg_price=1.0
+        )
+        acc = SimpleNamespace(id=uuid.uuid4(), include_in_total=False)
+        exec_result = MagicMock()
+        exec_result.all.return_value = [(SimpleNamespace(id=uuid.uuid4(), position_items=[pos]), acc)]
+        mock_db.execute = AsyncMock(return_value=exec_result)
+
+        assert await _collect_positions(uuid.uuid4(), mock_db) == {}
+        assert ("AAPL", "NASDAQ") in await _collect_positions(uuid.uuid4(), mock_db, account_ids=[acc.id])
 
     @pytest.mark.asyncio
     async def test_skips_positions_with_zero_value(self, mock_db, override_settings):
@@ -100,7 +116,7 @@ class TestCollectPositions:
             avg_price=0.0,
         )
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos_zero])
-        acc = SimpleNamespace(id=uuid.uuid4())
+        acc = SimpleNamespace(id=uuid.uuid4(), include_in_total=True)
 
         exec_result = MagicMock()
         exec_result.all.return_value = [(snap, acc)]
