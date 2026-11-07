@@ -104,6 +104,8 @@ export default function SettingsPage() {
     setSaving("dart");
     try {
       await saveDartApiKey(dart.api_key);
+      // 저장한 키를 입력칸(DOM)에 남겨두지 않는다 — 저장 여부는 placeholder(••••)로 보인다
+      setDart({ api_key: "" });
       toast("DART API 키가 저장되었습니다", "success");
       void invalidateSettings();
     } catch (e) {
@@ -276,7 +278,7 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={saveDart}
-            disabled={saving === "dart"}
+            disabled={saving === "dart" || !dart.api_key.trim()}
             className={`${TOUCH_HEIGHT_MIN} bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
           >
             {saving === "dart" ? "저장 중..." : "저장"}

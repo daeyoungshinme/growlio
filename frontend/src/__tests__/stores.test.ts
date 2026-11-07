@@ -159,15 +159,6 @@ describe("useAuthStore", () => {
     expect(useAuthStore.getState().isAuthChecking).toBe(false);
   });
 
-  it("findAccount가 API 응답을 반환한다", async () => {
-    const { api } = await import("@/api/client");
-    vi.mocked(api.post).mockResolvedValue({ data: { message: "계정을 찾았습니다" } });
-
-    const { useAuthStore } = await import("@/stores/authStore");
-    const msg = await useAuthStore.getState().findAccount("홍길동");
-    expect(msg).toBe("계정을 찾았습니다");
-  });
-
   it("forgotPassword가 이메일을 전송한다", async () => {
     vi.mocked(mockSupabaseAuth.resetPasswordForEmail).mockResolvedValue({
       data: {},

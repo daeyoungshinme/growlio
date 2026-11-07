@@ -29,7 +29,7 @@ describe("PriceCell", () => {
   it("해외 종목에 usd 값이 있으면 USD 주표시 + KRW 보조 표시한다", () => {
     renderWithProviders(<PriceCell krw={135000} usd={100} isOverseas />);
     expect(screen.getByText("$100.00")).toBeInTheDocument();
-    expect(screen.getByText("₩135,000")).toBeInTheDocument();
+    expect(screen.getByText("135,000원")).toBeInTheDocument();
   });
 
   it("해외 종목이어도 usd가 없으면 원 단위로 표시한다", () => {
@@ -40,7 +40,7 @@ describe("PriceCell", () => {
   it("해외 종목이고 krw가 0이면 KRW 보조 표시를 안 한다", () => {
     renderWithProviders(<PriceCell krw={0} usd={100} isOverseas />);
     expect(screen.getByText("$100.00")).toBeInTheDocument();
-    expect(screen.queryByText(/₩/)).toBeNull();
+    expect(screen.queryByText(/원$/)).toBeNull();
   });
 });
 

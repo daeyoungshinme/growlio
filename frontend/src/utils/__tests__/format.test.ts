@@ -289,6 +289,13 @@ describe("plans/116 C6·C3·C4 포맷", () => {
     expect(fmtKrwShort(99_995_000)).toBe("1.0억");
   });
 
+  it("음수도 억 경계·만 단위 반올림이 양수와 대칭(plans/117 C7)", () => {
+    expect(fmtKrw(-99_995_000)).toBe("-1.00억원");
+    expect(fmtKrw(-99_994_999)).toBe("-9,999만원");
+    expect(fmtKrw(-15_000)).toBe("-2만원");
+    expect(fmtKrwShort(-99_995_000)).toBe("-1.0억");
+  });
+
   it("depositTotalKrw — 달러가 있는데 환율이 없으면 null", () => {
     expect(depositTotalKrw({ deposit_krw: 1000, deposit_usd: 3000 }, null)).toBeNull();
     expect(depositTotalKrw({ deposit_krw: 1000, deposit_usd: 2 }, 1400)).toBe(3800);

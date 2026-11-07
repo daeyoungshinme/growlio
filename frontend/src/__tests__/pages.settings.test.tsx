@@ -262,6 +262,9 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(toast).toHaveBeenCalledWith("DART API 키가 저장되었습니다", "success");
     });
+    // plans/117 C7: 저장한 키를 입력칸에 남기지 않고, 빈 값이면 저장 버튼을 막는다
+    expect(screen.getByPlaceholderText("DART OpenAPI 인증키")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();
   });
 
   it("DART API 키 저장 실패 시 에러 토스트를 표시한다", async () => {
@@ -270,6 +273,9 @@ describe("SettingsPage", () => {
     renderSettings();
     await waitFor(() => {
       expect(screen.getByPlaceholderText("DART OpenAPI 인증키")).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByPlaceholderText("DART OpenAPI 인증키"), {
+      target: { value: "bad-key" },
     });
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() => {

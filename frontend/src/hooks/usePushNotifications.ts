@@ -15,28 +15,44 @@ import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import { investPlanUrl } from "@/utils/tabUrl";
+import { storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
+import { pushOptOutKey } from "@/constants/storageKeys";
 
-/** 설정탭 "다시 시도" 버튼 등에서 등록을 재시도할 때 사용 — 실제 토큰 수신은 usePushNotifications()가
- * 마운트해둔 "registration" 리스너가 처리하므로, 여기서는 권한 재요청 + register() 호출만 한다. */
+function currentOptOutKey(): string | null {
+  const userId = useAuthStore.getState().userId;
+  return userId ? pushOptOutKey(userId) : null;
+}
+
+/** 설정탭 "다시 시도"·"켜기"에서 사용 — 실제 토큰 수신은 usePushNotifications()가 마운트해둔
+ * "registration" 리스너가 처리하므로, 여기서는 끈 기록 해제 + 권한 재요청 + register() 호출만 한다. */
 export async function retryPushRegistration(): Promise<void> {
   const { setStatus } = usePushNotificationStore.getState();
   if (!isNativePlatform()) {
     setStatus("unsupported");
     return;
   }
-  const { PushNotifications } = await import("@capacitor/push-notifications");
+  const optOutKey = currentOptOutKey();
+  if (optOutKey) storageRemove(optOutKey);
   setStatus("requesting");
-  const permission = await PushNotifications.requestPermissions();
-  if (permission.receive !== "granted") {
-    setStatus("denied");
-    return;
+  // 호출부가 void로 부르므로 여기서 잡지 않으면 처리되지 않은 rejection이 되고 버튼이 "확인 중"에 멈춘다
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+    const permission = await PushNotifications.requestPermissions();
+    if (permission.receive !== "granted") {
+      setStatus("denied");
+      return;
+    }
+    await PushNotifications.register();
+  } catch {
+    setStatus("error");
   }
-  await PushNotifications.register();
 }
 
-/** 설정탭에서 푸시 알림을 끌 때 사용 — 백엔드에 저장된 FCM 토큰을 삭제한다. */
+/** 설정탭에서 푸시 알림을 끌 때 사용 — 백엔드에 저장된 FCM 토큰을 삭제하고 끈 기록을 남긴다. */
 export async function disablePushNotifications(): Promise<void> {
   const { setStatus } = usePushNotificationStore.getState();
+  const optOutKey = currentOptOutKey();
+  if (optOutKey) storageSet(optOutKey, "1");
   try {
     await registerPushToken(null);
   } finally {
@@ -101,6 +117,7 @@ export function resolvePushDeepLink(
 
 export function usePushNotifications() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const userId = useAuthStore((s) => s.userId);
   const navigate = useNavigate();
   // navigate는 경로마다 새로 만들어진다 — deps에 넣으면 화면 이동마다 권한 요청·register·토큰 PUT이 반복된다
   const navigateRef = useLatestRef(navigate);
@@ -119,16 +136,8 @@ export function usePushNotifications() {
     async function setup() {
       const { PushNotifications } = await import("@capacitor/push-notifications");
 
-      setStatus("requesting");
-      const permission = await PushNotifications.requestPermissions();
-      if (cancelled) return;
-      if (permission.receive !== "granted") {
-        setStatus("denied");
-        return;
-      }
-
-      await PushNotifications.register();
-
+      // 리스너는 권한·끈 기록 확인보다 먼저 붙인다 — 거부·끔 상태에서 일찍 return하면 설정탭 "다시 시도"가
+      // register()를 불러도 토큰을 받을 리스너가 없어 상태가 "requesting"에 멈췄다(plans/117 C3)
       // FCM 토큰 수신 → 백엔드 등록
       const h1 = await PushNotifications.addListener("registration", async ({ value }) => {
         if (cancelled) return;
@@ -162,11 +171,26 @@ export function usePushNotifications() {
         if (!cancelled) setStatus("error");
       });
 
-      if (!cancelled) {
-        handles.push(h1, h2, h3, h4);
-      } else {
+      if (cancelled) {
         await Promise.all([h1.remove(), h2.remove(), h3.remove(), h4.remove()]);
+        return;
       }
+      handles.push(h1, h2, h3, h4);
+
+      if (userId && storageGet(pushOptOutKey(userId)) === "1") {
+        setStatus("disabled");
+        return;
+      }
+
+      setStatus("requesting");
+      const permission = await PushNotifications.requestPermissions();
+      if (cancelled) return;
+      if (permission.receive !== "granted") {
+        setStatus("denied");
+        return;
+      }
+
+      await PushNotifications.register();
     }
 
     // 권한 요청·register가 throw하면 처리되지 않은 rejection으로 남고 상태가 "requesting"에 멈췄다
@@ -178,5 +202,5 @@ export function usePushNotifications() {
       cancelled = true;
       handles.forEach((h) => h.remove());
     };
-  }, [isAuthenticated, navigateRef, setStatus]);
+  }, [isAuthenticated, userId, navigateRef, setStatus]);
 }

@@ -5,7 +5,6 @@ import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import LoginPage from "@/pages/LoginPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
-import FindAccountPage from "@/pages/FindAccountPage";
 
 const mockNavigate = vi.fn();
 
@@ -16,7 +15,6 @@ vi.mock("react-router-dom", async (importOriginal) => {
 
 const mockLogin = vi.fn();
 const mockForgotPassword = vi.fn();
-const mockFindAccount = vi.fn();
 
 vi.mock("@/api/dashboard", () => ({ fetchDashboard: vi.fn().mockResolvedValue({}) }));
 vi.mock("@/api/assets", () => ({
@@ -31,7 +29,6 @@ vi.mock("@/stores/authStore", () => ({
     const state = {
       login: mockLogin,
       forgotPassword: mockForgotPassword,
-      findAccount: mockFindAccount,
     };
     return typeof selector === "function" ? selector(state) : state;
   }),
@@ -166,30 +163,5 @@ describe("ForgotPasswordPage", () => {
     });
     fireEvent.submit(screen.getByRole("button"));
     await waitFor(() => expect(screen.getByText(/오류가 발생했습니다/)).toBeInTheDocument());
-  });
-});
-
-describe("FindAccountPage", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockFindAccount.mockResolvedValue("test@example.com으로 가입된 계정이 있습니다.");
-  });
-
-  it("계정 찾기 제목을 표시한다", () => {
-    renderWithRouter(<FindAccountPage />);
-    expect(screen.getByText("아이디 찾기")).toBeInTheDocument();
-  });
-
-  it("이름 입력 필드를 렌더링한다", () => {
-    renderWithRouter(<FindAccountPage />);
-    expect(screen.getByRole("textbox")).toBeInTheDocument();
-  });
-
-  it("계정 찾기 성공 시 메시지를 표시한다", async () => {
-    renderWithRouter(<FindAccountPage />);
-    const input = screen.getByRole("textbox");
-    fireEvent.change(input, { target: { value: "홍길동" } });
-    fireEvent.submit(screen.getByRole("button", { name: /이메일 확인/ }));
-    await waitFor(() => expect(screen.getByText(/가입된 계정이 있습니다/)).toBeInTheDocument());
   });
 });

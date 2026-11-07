@@ -39,7 +39,7 @@ make build-android-debug / build-android-release
 
 ### 라우트 (`src/App.tsx`, 인증 필요 라우트는 `PrivateRoute` 하위)
 
-- 인증: `/login`, `/register`, `/find-account`, `/forgot-password`, `/reset-password`, `/auth/callback`(이메일 인증 랜딩, 인증 불필요)
+- 인증: `/login`, `/register`, `/forgot-password`, `/reset-password`, `/auth/callback`(이메일 인증 랜딩, 인증 불필요)
 - `/rebalancing/plan-confirm?token=` — 이메일 링크 전용 매수 취소/매도 승인(인증 불필요)
 - `/dashboard` — 홈
 - `/assets` — 단일 라우트, `?tab=` 투자현황/계좌관리 (`ASSETS_TOP_TABS`). 계좌관리 `?atab=` 기본은 증권계좌(`ASSET_MANAGEMENT_TABS[0]`)
@@ -158,6 +158,7 @@ _기타_
 - `markets.ts` · `inputStyles.ts` — 아래 Absolute Rules
 - `transaction.ts`(`TX_TYPES`/`TX_LABELS`/`TX_COLORS`) · `validation.ts`(`PORTFOLIO_WEIGHT_TOLERANCE`) · `timers.ts` · `assets.ts` · `defaults.ts` · `goalRiskTolerance.ts` · `savingsPresets.ts` · `nav.ts` · `index.ts`(re-export)
 - `brokerCredentials.ts` — 자격증명 폼 테이블. **새 브로커는 여기 추가**
+- `storageKeys.ts` — 사용자별 localStorage 키(`pushOptOutKey`·`goalWizardShownKey`). **기기 공유 시 계정 간에 번지면 안 되는 플래그는 user id를 붙여 여기 추가**하고 `userScopedStorageKeys`에도 넣는다(탈퇴 시 삭제)
 
 **타입**: 도메인 API 타입은 `src/api/*`, 공용 일부만 `src/types/`. **Zod(`src/schemas/`)**: `challenge`, `trade`, `transaction` — 실제 폼이 쓰는 스키마만, 새 폼 추가 시 여기에.
 

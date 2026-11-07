@@ -106,13 +106,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-3">
-          <Link
-            to="/find-account"
-            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-blue-600 dark:text-blue-400 hover:underline`}
-          >
-            아이디 찾기
-          </Link>
+        <div className="flex justify-end text-xs text-gray-500 dark:text-gray-400 mt-3">
           <Link
             to="/forgot-password"
             className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-blue-600 dark:text-blue-400 hover:underline`}

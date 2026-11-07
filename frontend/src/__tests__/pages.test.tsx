@@ -13,7 +13,6 @@ vi.mock("@/stores/authStore", () => ({
     const state = {
       user: { email: "test@example.com", displayName: "Test" },
       forgotPassword: vi.fn().mockResolvedValue(undefined),
-      findAccount: vi.fn().mockResolvedValue("해당 이름으로 등록된 이메일: test@example.com"),
       logout: vi.fn(),
     };
     if (typeof selector === "function") return selector(state);
@@ -191,7 +190,6 @@ import InvestPlanPage from "@/pages/InvestPlanPage";
 import PortfolioPage from "@/pages/PortfolioPage";
 import AssetManagementPage from "@/pages/AssetManagementPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
-import FindAccountPage from "@/pages/FindAccountPage";
 
 // =========================================
 // DashboardPage
@@ -498,94 +496,13 @@ describe("ForgotPasswordPage", () => {
     });
   });
 
-  it("has links to find-account and login", () => {
+  it("has a link back to login and no dead find-account link", () => {
     renderWithProviders(
       <MemoryRouter>
         <ForgotPasswordPage />
       </MemoryRouter>,
     );
-    expect(screen.getByText("아이디 찾기")).toBeDefined();
-    expect(screen.getByText("로그인으로 돌아가기")).toBeDefined();
-  });
-});
-
-// =========================================
-// FindAccountPage
-// =========================================
-describe("FindAccountPage", () => {
-  it("renders find account page", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <FindAccountPage />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("아이디 찾기")).toBeDefined();
-  });
-
-  it("renders name input", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <FindAccountPage />
-      </MemoryRouter>,
-    );
-    expect(screen.getByPlaceholderText("가입 시 사용한 이름")).toBeDefined();
-  });
-
-  it("renders submit button", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <FindAccountPage />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("이메일 확인")).toBeDefined();
-  });
-
-  it("submit button disabled when input empty", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <FindAccountPage />
-      </MemoryRouter>,
-    );
-    const btn = screen.getByText("이메일 확인");
-    expect((btn as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("submit button enabled when input has value", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <FindAccountPage />
-      </MemoryRouter>,
-    );
-    const input = screen.getByPlaceholderText("가입 시 사용한 이름");
-    fireEvent.change(input, { target: { value: "홍길동" } });
-    const btn = screen.getByText("이메일 확인");
-    expect((btn as HTMLButtonElement).disabled).toBe(false);
-  });
-
-  it("shows result after submitting", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <FindAccountPage />
-      </MemoryRouter>,
-    );
-    const input = screen.getByPlaceholderText("가입 시 사용한 이름");
-    fireEvent.change(input, { target: { value: "홍길동" } });
-    const form = document.querySelector("form");
-    if (form) fireEvent.submit(form);
-    await waitFor(() => {
-      const msg = screen.queryByText(/해당 이름으로 등록된 이메일/);
-      if (msg) expect(msg).toBeDefined();
-      else expect(document.body).toBeDefined();
-    });
-  });
-
-  it("has links to forgot-password and login", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <FindAccountPage />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("비밀번호 찾기")).toBeDefined();
+    expect(screen.queryByText("아이디 찾기")).toBeNull();
     expect(screen.getByText("로그인으로 돌아가기")).toBeDefined();
   });
 });

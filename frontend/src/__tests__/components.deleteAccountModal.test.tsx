@@ -72,6 +72,7 @@ describe("DeleteAccountModal", () => {
 
   it("탈퇴 성공 시 세션을 정리하고 인증 상태를 초기화한다", async () => {
     vi.mocked(deleteAccount).mockResolvedValue(undefined);
+    localStorage.setItem("growlio:goal-wizard-auto-shown:user-1", "true");
     const { onClose, clearSpy } = renderModal();
 
     fireEvent.change(screen.getByLabelText("비밀번호 확인"), {
@@ -87,6 +88,8 @@ describe("DeleteAccountModal", () => {
     });
     expect(clearSpy).toHaveBeenCalled();
     expect(mockSupabaseAuth.signOut).toHaveBeenCalled();
+    // plans/117 C5: 탈퇴한 사용자의 기기 키도 지운다
+    expect(localStorage.getItem("growlio:goal-wizard-auto-shown:user-1")).toBeNull();
     expect(toast).toHaveBeenCalledWith("회원 탈퇴가 완료되었습니다", "success");
     expect(onClose).toHaveBeenCalled();
   });

@@ -6,10 +6,16 @@ import { isOverseasMarket } from "@/constants/markets";
  * 금액을 억원/만원/원 단위로 변환 (음수 지원)
  * 예: 150_000_000 → "1.50억원", 50_000 → "5만원", 3_000 → "3,000원"
  */
+/** 만 단위 반올림 — 부호와 무관하게 절댓값으로 반올림한다. Math.round(-9999.5)는 -9999라
+ * -99,995,000이 "-9,999만원"(양수는 "1.00억원")으로 어긋났다(plans/117 C7). */
+function roundMan(n: number): number {
+  return Math.sign(n) * Math.round(Math.abs(n) / 1e4);
+}
+
 export function fmtKrw(n: number): string {
   // 억 경계는 만 단위로 반올림한 값으로 판정 — 99,995,000이 "10,000만원"으로 보이지 않게(plans/116 C6)
-  if (Math.abs(Math.round(n / 1e4)) >= 1e4) return `${(n / 1e8).toFixed(2)}억원`;
-  if (Math.abs(n) >= 1e4) return `${Math.round(n / 1e4).toLocaleString()}만원`;
+  if (Math.abs(roundMan(n)) >= 1e4) return `${(n / 1e8).toFixed(2)}억원`;
+  if (Math.abs(n) >= 1e4) return `${roundMan(n).toLocaleString()}만원`;
   // 원 단위 절사는 0 방향 — floor면 음수가 커져 -0.3이 "-1원"이 된다
   return `${(Math.trunc(n) || 0).toLocaleString()}원`;
 }
@@ -49,8 +55,8 @@ export function fmtNativePrice(price: number, market: string): string {
  * 예: 150_000_000 → "1.5억", 50_000 → "5만"
  */
 export function fmtKrwShort(n: number): string {
-  if (Math.abs(Math.round(n / 1e4)) >= 1e4) return `${(n / 1e8).toFixed(1)}억`;
-  if (Math.abs(n) >= 1e4) return `${Math.round(n / 1e4).toLocaleString()}만`;
+  if (Math.abs(roundMan(n)) >= 1e4) return `${(n / 1e8).toFixed(1)}억`;
+  if (Math.abs(n) >= 1e4) return `${roundMan(n).toLocaleString()}만`;
   return `${(Math.trunc(n) || 0).toLocaleString()}`;
 }
 
