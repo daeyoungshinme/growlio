@@ -13,7 +13,6 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
@@ -42,7 +41,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await register(email, password, displayName || undefined);
+      await register(email, password);
       void navigate("/dashboard");
     } catch (err: unknown) {
       const msg = (err as Error)?.message ?? "";
@@ -111,23 +110,6 @@ export default function RegisterPage() {
               required
               className={`w-full ${INPUT_SM}`}
               placeholder="you@example.com"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="register-display-name"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              이름 (선택)
-            </label>
-            <input
-              id="register-display-name"
-              autoComplete="name"
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className={`w-full ${INPUT_SM}`}
-              placeholder="홍길동"
             />
           </div>
           <div>

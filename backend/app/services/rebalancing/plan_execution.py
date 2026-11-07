@@ -438,6 +438,7 @@ async def fail_stuck_consumed_legs(db: AsyncSession) -> int:
         try:
             locked = await _lock_leg(leg_id, db)
             if locked is None or locked.status != "PENDING":
+                await db.rollback()  # FOR UPDATE 락을 다음 leg 커밋까지 붙잡지 않게 바로 푼다
                 continue
             side = locked.side
             _decide_leg(locked, "FAILED", "SYSTEM_EXPIRY")
@@ -477,6 +478,7 @@ async def expire_due_sell_legs(db: AsyncSession) -> int:
         try:
             locked = await _lock_leg(leg_id, db)
             if locked is None or locked.status != "PENDING" or locked.token_consumed_at is not None:
+                await db.rollback()  # FOR UPDATE 락을 다음 leg 커밋까지 붙잡지 않게 바로 푼다
                 continue
             _decide_leg(locked, "EXPIRED", "SYSTEM_EXPIRY", at=now)
             plan = await db.get(RebalancingPlan, locked.plan_id)

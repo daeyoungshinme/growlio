@@ -239,7 +239,9 @@ class TestAnalyze:
         }
         close = {"360750.KS": _series(base_returns), "360200.KS": _series(base_returns)}
         with (
-            patch.object(svc, "get_etf_profiles", AsyncMock(return_value=profiles)) as mock_profiles,
+            patch.object(
+                svc, "get_etf_profiles_with_status", AsyncMock(return_value=(profiles, set()))
+            ) as mock_profiles,
             patch.object(svc, "fetch_yf_close_series", return_value=close) as mock_close,
         ):
             first = await svc.analyze_candidate_overlap(cache, candidates, held)
@@ -260,7 +262,7 @@ class TestAnalyze:
         candidates = [{"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI"}]
         held = [("360200", "ACE 미국S&P500", "KOSPI")]
         with (
-            patch.object(svc, "get_etf_profiles", AsyncMock(return_value={})),
+            patch.object(svc, "get_etf_profiles_with_status", AsyncMock(return_value=({}, set()))),
             patch.object(svc, "fetch_yf_close_series", return_value={}) as mock_close,
         ):
             first = await svc.analyze_candidate_overlap(cache, candidates, held)
@@ -268,6 +270,24 @@ class TestAnalyze:
         assert not first.price_data_available
         assert len(first.groups) == 1  # SAME_INDEX는 시세 없이도 판정
         assert mock_close.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_unresolved_profile_not_cached(self, base_returns):
+        """plans/117 B3: 프로필 조회가 일부 실패하면 보유 ETF·기초지수 매칭이 빠진 결과라 캐싱하지 않는다."""
+        cache = CacheStore()
+        candidates = [{"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI"}]
+        held = [("360200", "ACE 미국S&P500", "KOSPI")]
+        profiles = {("360750", "KOSPI"): _profile(0.0068, "S&P 500"), ("360200", "KOSPI"): None}
+        close = {"360750.KS": _series(base_returns), "360200.KS": _series(base_returns)}
+        with (
+            patch.object(
+                svc, "get_etf_profiles_with_status", AsyncMock(return_value=(profiles, {("360200", "KOSPI")}))
+            ) as mock_profiles,
+            patch.object(svc, "fetch_yf_close_series", return_value=close),
+        ):
+            await svc.analyze_candidate_overlap(cache, candidates, held)
+            await svc.analyze_candidate_overlap(cache, candidates, held)
+        assert mock_profiles.await_count == 2
 
     @pytest.mark.asyncio
     async def test_partial_price_result_not_cached(self, base_returns):
@@ -280,7 +300,7 @@ class TestAnalyze:
         held = [("360200", "ACE 미국S&P500", "KOSPI"), ("SPY", "SPDR S&P 500 ETF", "NYSE")]
         partial = {"360750.KS": _series(base_returns), "360200.KS": _series(base_returns)}
         with (
-            patch.object(svc, "get_etf_profiles", AsyncMock(return_value={})),
+            patch.object(svc, "get_etf_profiles_with_status", AsyncMock(return_value=({}, set()))),
             patch.object(svc, "fetch_yf_close_series", return_value=partial) as mock_close,
         ):
             first = await svc.analyze_candidate_overlap(cache, candidates, held)

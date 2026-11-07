@@ -1,12 +1,7 @@
 import { create } from "zustand";
 import { getSupabase } from "@/lib/supabase";
 import { hasStoredSession, readStoredSession } from "@/lib/storedSession";
-import {
-  fetchAuthMe,
-  findAccount as requestFindAccount,
-  markPasswordResetComplete,
-  syncProfile,
-} from "@/api/auth";
+import { fetchAuthMe, markPasswordResetComplete, syncProfile } from "@/api/auth";
 import { getHttpStatus } from "@/utils/error";
 import { BIOMETRIC_SESSION_KEY } from "@/hooks/useBiometric";
 import { sessionSet, storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
@@ -39,10 +34,9 @@ export interface AuthState {
   email: string | null;
   needsPasswordReset: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName?: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: (onSessionFound?: () => void) => Promise<void>;
-  findAccount: (displayName: string) => Promise<string>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (newPassword: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -131,7 +125,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       if (error || !data.user) throw new Error(error?.message ?? "Login failed");
 
       // sync-profile은 멱등(이미 있으면 기존 반환)이므로 await 없이 백그라운드 실행해도 안전.
-      syncProfile(null).catch(() => {});
+      syncProfile().catch(() => {});
 
       // 이메일/비밀번호 인증 = 생체인증과 동급 → 이번 세션 마킹으로 BiometricGuard 통과
       sessionSet(BIOMETRIC_SESSION_KEY, "1");
@@ -163,7 +157,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       })();
     },
 
-    register: async (email, password, displayName?) => {
+    register: async (email, password) => {
       const supabase = await getSupabase();
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -179,7 +173,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
         throw new Error("EMAIL_CONFIRMATION_REQUIRED");
       }
 
-      await syncProfile(displayName ?? null);
+      await syncProfile();
+      // 로그인과 같이 방금 비밀번호로 인증했으므로 이번 세션은 생체인증을 다시 묻지 않는다
+      sessionSet(BIOMETRIC_SESSION_KEY, "1");
       setLoggedIn(data.user);
     },
 
@@ -259,7 +255,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           }
           if (httpStatus === 401) {
             try {
-              await syncProfile(null);
+              await syncProfile();
               const me = await fetchAuthMe();
               const needsPasswordReset = me.needs_password_reset ?? false;
               storageSet(
@@ -282,8 +278,6 @@ export const useAuthStore = create<AuthState>((set, get) => {
         setLoggedOut();
       }
     },
-
-    findAccount: (displayName) => requestFindAccount(displayName),
 
     forgotPassword: async (email: string) => {
       const supabase = await getSupabase();

@@ -1,7 +1,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
 import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS } from "@/api/assets";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtKrwPrice } from "@/utils/format";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import EditableNameField from "@/components/common/EditableNameField";
 import { BANK_TYPE_LABELS } from "@/constants";
@@ -67,8 +67,7 @@ export default function BankAccountCard({
             </p>
             {hasDepositFields && account.deposit_usd != null && account.deposit_usd > 0 && (
               <p className="text-xs text-gray-400 dark:text-gray-500">
-                ₩{(account.deposit_krw ?? 0).toLocaleString()} + $
-                {account.deposit_usd.toLocaleString()}
+                {fmtKrwPrice(account.deposit_krw ?? 0)} + ${account.deposit_usd.toLocaleString()}
                 {usdRate ? ` (환율 ${usdRate.toLocaleString()}원/USD)` : ""}
               </p>
             )}

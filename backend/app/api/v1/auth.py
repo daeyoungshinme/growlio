@@ -2,20 +2,19 @@ import httpx
 import sentry_sdk
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_token_payload
 from app.core.cache_store import get_cache_store
 from app.core.job_runner import report_handled_failure
-from app.limiter import ip_rate_limit_key, limiter, peer_rate_limit_key
+from app.limiter import limiter
+from app.models.app_state import AppState
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
 from app.schemas.auth import (
     AccountDeleteRequest,
-    FindAccountRequest,
-    FindAccountResponse,
     SyncProfileRequest,
     UserResponse,
 )
@@ -140,15 +139,6 @@ async def password_reset_complete(
     return current_user
 
 
-@router.post("/find-account", response_model=FindAccountResponse)
-@limiter.limit("3/hour", key_func=ip_rate_limit_key)
-@limiter.limit("30/hour", key_func=peer_rate_limit_key)
-async def find_account(request: Request, req: FindAccountRequest):
-    # 계정 존재 여부를 응답에서 노출하지 않음 (사용자 열거 방지)
-    msg = "가입 시 사용하신 이름과 이메일로 로그인을 시도해 보세요."
-    return FindAccountResponse(message=msg)
-
-
 @router.post("/account/delete", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("3/hour")
 async def delete_account(
@@ -178,6 +168,9 @@ async def delete_account(
     # 로컬 삭제를 먼저 flush해 실패할 수 있는 건 Supabase 삭제 전에 드러나게 한다 — 반대 순서면 로컬 실패 시
     # 로그인은 못 하는데 자격증명과 잡 대상 데이터만 남는다. 트랜잭션은 Supabase 삭제가 끝난 뒤 확정한다.
     try:
+        # app_state는 user FK가 없어 CASCADE로 지워지지 않는다 — 만료 없는 키(목표 달성 발송 기록 등)가
+        # 탈퇴자 id를 영구히 남기지 않게 키에 user_id가 들어간 행을 함께 지운다(plans/117 B5).
+        await db.execute(delete(AppState).where(AppState.key.contains(str(user_id))))
         await db.delete(current_user)
         await db.flush()
     except Exception as e:

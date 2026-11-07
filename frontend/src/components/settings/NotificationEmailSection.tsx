@@ -7,12 +7,16 @@ import { FORM_INPUT_SM, LABEL_MD } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
+  /** 로그인 이메일 — 알림 이메일을 비워두면 이 주소로 발송된다(입력칸 placeholder). */
   userEmail?: string;
+  /** 저장된 알림 이메일. 초기값으로 한 번만 읽으므로 호출부가 값이 바뀔 때 `key`로 다시 마운트한다. */
+  savedEmail?: string | null;
   onSettingsChange: () => void;
 }
 
-export function NotificationEmailSection({ userEmail, onSettingsChange }: Props) {
-  const [notificationEmail, setNotificationEmail] = useState(userEmail ?? "");
+export function NotificationEmailSection({ userEmail, savedEmail, onSettingsChange }: Props) {
+  // 로그인 이메일로 채우면 저장 버튼 한 번에 따로 설정한 알림 이메일을 덮어쓴다(plans/117 C1)
+  const [notificationEmail, setNotificationEmail] = useState(savedEmail ?? "");
   const [saving, setSaving] = useState<string | null>(null);
 
   const saveNotificationEmail = async () => {

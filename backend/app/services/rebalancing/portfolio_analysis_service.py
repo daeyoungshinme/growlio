@@ -69,7 +69,14 @@ async def analyze_portfolio_rebalancing(
 
     # 같은 AsyncSession을 쓰는 호출은 동시 실행 불가(SQLAlchemy) — 순차 실행한다.
     overview = await build_portfolio_overview(user_id, db, account_ids=effective_ids, cache=cache)
-    base_dividend_items = await get_ticker_dividend_summary(user_id, db, account_ids=effective_ids)
+    # 연동 계좌가 없으면 개요는 합산 제외 계좌의 보유분까지 all_positions에 담는다. 배당 요약은 계좌 미지정 시
+    # 합산 제외 계좌를 빼므로(plans/116 B3) 개요가 실제로 쓴 계좌를 명시해 두 집합을 맞춘다(plans/117 A4).
+    dividend_ids = (
+        effective_ids
+        if effective_ids is not None
+        else [uuid.UUID(acc["id"]) for acc in overview.get("accounts", []) if acc.get("id")]
+    )
+    base_dividend_items = await get_ticker_dividend_summary(user_id, db, account_ids=dividend_ids)
     base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
 
     target_tickers = [

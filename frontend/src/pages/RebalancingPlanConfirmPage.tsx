@@ -23,6 +23,7 @@ const REASON_LABEL: Record<string, string> = {
   NOT_FOUND: "존재하지 않는 링크입니다.",
   ALREADY_DECIDED: "이미 처리된 계획입니다.",
   EXPIRED: "만료된 계획입니다.",
+  IN_PROGRESS: "이미 실행 중입니다. 결과는 알림으로 알려드립니다.",
 };
 
 function ItemsTable({ items }: { items: RebalancingPlanItemOut[] }) {

@@ -168,6 +168,94 @@ class TestRebalancingAnalyze:
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
+    def test_unlinked_portfolio_dividend_uses_overview_accounts(self, override_settings):
+        """plans/117 A4: 연동 계좌가 없으면 개요는 합산 제외 계좌 보유분도 담는다 — 배당 조회도 개요가 쓴
+        계좌(합산 제외 포함)를 명시해야 그 종목 배당이 빠지지 않는다(계좌 미지정이면 합산 제외 계좌를 뺀다)."""
+        user = make_user()
+        db = _make_mock_db()
+
+        scoped_account_id = uuid.uuid4()
+        portfolio_id = uuid.uuid4()
+        portfolio = SimpleNamespace(
+            id=portfolio_id,
+            name="해외주식 포트폴리오",
+            base_type="STOCK_ONLY",
+            account_ids=None,
+            items=[{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100.0}],
+        )
+        db.scalar = AsyncMock(return_value=portfolio)
+
+        overview = {
+            "total_assets_krw": 1_000_000.0,
+            "total_stock_krw": 1_000_000.0,
+            "accounts": [{"id": str(scoped_account_id), "include_in_total": False}],
+            "all_positions": [
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 1_000_000.0,
+                    "current_price": 200_000.0,
+                    "qty": 5.0,
+                }
+            ],
+        }
+
+        app = setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.get_cache_store",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(get=AsyncMock(return_value=None)),
+                ),
+                patch(
+                    "app.services.rebalancing.portfolio_analysis_service.build_portfolio_overview",
+                    new_callable=AsyncMock,
+                    return_value=overview,
+                ),
+                patch(
+                    "app.services.rebalancing.portfolio_analysis_service.get_ticker_dividend_summary",
+                    new_callable=AsyncMock,
+                    return_value=[],
+                ) as mock_dividend_summary,
+                patch(
+                    "app.services.rebalancing.portfolio_analysis_service.collect_dividend_map",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ),
+                patch(
+                    "app.services.rebalancing.portfolio_analysis_service.get_historical_returns",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ),
+                patch(
+                    "app.services.rebalancing.portfolio_analysis_service.enrich_overview_with_prices",
+                    new_callable=AsyncMock,
+                    return_value=overview,
+                ),
+                patch(
+                    "app.services.rebalancing.portfolio_analysis_service.get_settings_row",
+                    new_callable=AsyncMock,
+                    return_value=None,
+                ),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    f"/api/v1/rebalancing/portfolios/{portfolio_id}/analyze",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+
+            call_kwargs = mock_dividend_summary.call_args.kwargs
+            assert call_kwargs.get("account_ids") == [scoped_account_id]
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
 
 class TestRebalancingHistory:
     def test_returns_401_without_auth(self, override_settings):

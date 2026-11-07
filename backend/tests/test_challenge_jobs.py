@@ -252,6 +252,41 @@ class TestMonthlyWrapJob:
         assert invalidate.await_args.args[1] == user.id
 
     @pytest.mark.asyncio
+    async def test_failed_send_keeps_challenge_active_for_retry(self):
+        """plans/117 B2: 알림이 나가지 않으면 COMPLETED로 바꾸지 않는다 — 재실행은 ACTIVE만 조회하므로
+        먼저 바꾸면 "챌린지 달성" 알림이 영영 나가지 않는다."""
+        user, settings = _user(), _settings()
+        ch = _challenge(user_id=user.id, target_months=3, start_month="2025-01")
+        session = _session([(user, settings)], [ch])
+        with (
+            patch("app.jobs.challenge_monthly_wrap.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.challenge_monthly_wrap._prev_month_str", return_value="2026-02"),
+            patch(
+                "app.services.challenge_service.compute_progress",
+                new_callable=AsyncMock,
+                return_value=_progress(
+                    current_streak=3,
+                    longest_streak=3,
+                    months=[SimpleNamespace(month="2026-02", net_krw=500000.0, satisfied=True, target_met=True)],
+                ),
+            ),
+            patch(
+                "app.jobs.challenge_monthly_wrap.dispatch_dual_channel_alert",
+                new_callable=AsyncMock,
+                return_value=False,
+            ) as dispatch,
+            patch("app.services.challenge_service.invalidate_challenge_cache", new_callable=AsyncMock),
+        ):
+            from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
+
+            await run_challenge_monthly_wrap()
+        assert dispatch.called
+        assert ch.status == "ACTIVE"
+        assert ch.completed_at is None
+
+    @pytest.mark.asyncio
     async def test_return_pct_wrap_only_sends_when_complete(self):
         user, settings = _user(), _settings()
         ch = _challenge(user_id=user.id, challenge_type="RETURN_PCT", target_pct=10.0, target_months=None)

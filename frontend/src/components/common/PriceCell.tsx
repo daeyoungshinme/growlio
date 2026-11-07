@@ -25,7 +25,7 @@ export default function PriceCell({
       <div>
         <p className={textClass}>${usd.toFixed(2)}</p>
         {(krw ?? 0) > 0 && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">₩{(krw ?? 0).toLocaleString()}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{fmtKrwPrice(krw ?? 0)}</p>
         )}
       </div>
     );

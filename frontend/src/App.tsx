@@ -19,7 +19,6 @@ import { CACHE_OWNER_CHANGED_EVENT } from "./utils/cacheOwner";
 
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
-const FindAccountPage = lazy(() => import("./pages/FindAccountPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const AuthCallbackPage = lazy(() => import("./pages/AuthCallbackPage"));
@@ -67,7 +66,6 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={<LazyRoute Component={LoginPage} />} />
         <Route path="/register" element={<LazyRoute Component={RegisterPage} />} />
-        <Route path="/find-account" element={<LazyRoute Component={FindAccountPage} />} />
         <Route path="/forgot-password" element={<LazyRoute Component={ForgotPasswordPage} />} />
         <Route path="/reset-password" element={<LazyRoute Component={ResetPasswordPage} />} />
         <Route path="/auth/callback" element={<LazyRoute Component={AuthCallbackPage} />} />

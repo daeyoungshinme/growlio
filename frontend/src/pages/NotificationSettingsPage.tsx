@@ -222,7 +222,9 @@ export default function NotificationSettingsPage() {
 
       {/* 공통 알림 수신 이메일 — 전체 알림 유형에 적용 */}
       <NotificationEmailSection
+        key={current?.notification_email ?? ""}
         userEmail={current?.user_email}
+        savedEmail={current?.notification_email}
         onSettingsChange={invalidateSettings}
       />
 

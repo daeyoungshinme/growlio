@@ -382,38 +382,6 @@ class TestSyncProfile:
         db.add.assert_not_called()
 
 
-# ── POST /auth/find-account ───────────────────────────────────
-
-
-class TestFindAccount:
-    """POST /api/v1/auth/find-account"""
-
-    @pytest.mark.asyncio
-    async def test_find_account_returns_fixed_message(self, override_settings):
-        """display_name 검색 시 사용자 열거 방지를 위해 항상 고정 메시지를 반환한다."""
-        from starlette.requests import Request
-
-        from app.api.v1.auth import find_account
-        from app.schemas.auth import FindAccountRequest
-
-        scope = {
-            "type": "http",
-            "method": "POST",
-            "path": "/api/v1/auth/find-account",
-            "query_string": b"",
-            "headers": [],
-            "client": ("127.0.0.1", 12345),
-        }
-        mock_req = Request(scope=scope)
-        body = FindAccountRequest(display_name="홍길동")
-
-        # __wrapped__ bypasses @limiter.limit decorator (slowapi uses @wraps)
-        result = await find_account.__wrapped__(request=mock_req, req=body)
-
-        assert result.message
-        assert len(result.message) > 0
-
-
 # ── POST /auth/account/delete ───────────────────────────────────
 
 
@@ -516,6 +484,14 @@ class TestDeleteAccount:
         assert resp.status_code == 204
         db.delete.assert_called_once_with(user)
         db.commit.assert_called_once()
+        # plans/117 B5: FK 없는 app_state의 탈퇴자 키(만료 없는 목표 달성 기록 등)도 지운다
+        from sqlalchemy.dialects import postgresql
+
+        sqls = [
+            str(c.args[0].compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})).lower()
+            for c in db.execute.call_args_list
+        ]
+        assert any(sql.startswith("delete from app_state") and str(user.id) in sql for sql in sqls)
         app.dependency_overrides.clear()
 
     def test_local_delete_failure_returns_502(self, override_settings):

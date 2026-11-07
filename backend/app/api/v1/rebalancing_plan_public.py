@@ -44,6 +44,9 @@ async def _build_preview(leg, db: AsyncSession) -> PlanTokenPreview:
     summary = build_leg_summary(leg, plan, portfolio_name, account_name)
     if summary.actionable:
         reason = None
+    elif leg.status == "PENDING" and leg.token_consumed_at is not None:
+        # 실행이 시작돼(토큰 소비) 결과를 기다리는 중 — "만료"로 보이면 주문이 안 나간 것으로 오해한다
+        reason = "IN_PROGRESS"
     elif leg.status in ("PENDING", "EXPIRED"):
         reason = "EXPIRED"
     else:

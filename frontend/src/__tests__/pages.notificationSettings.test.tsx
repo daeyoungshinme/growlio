@@ -53,8 +53,16 @@ vi.mock("@/components/settings/MarketSignalAlertSection", () => ({
   ),
 }));
 vi.mock("@/components/settings/NotificationEmailSection", () => ({
-  NotificationEmailSection: ({ userEmail }: { userEmail?: string }) => (
-    <div data-testid="notification-email-section">{userEmail ?? "no-email"}</div>
+  NotificationEmailSection: ({
+    userEmail,
+    savedEmail,
+  }: {
+    userEmail?: string;
+    savedEmail?: string | null;
+  }) => (
+    <div data-testid="notification-email-section">
+      {userEmail ?? "no-email"}|{savedEmail ?? "no-saved"}
+    </div>
   ),
 }));
 
@@ -318,13 +326,15 @@ describe("NotificationSettingsPage", () => {
     expect(screen.queryByRole("button", { name: "더 보기" })).toBeNull();
   });
 
-  it("NotificationEmailSection에 user_email을 전달한다", async () => {
+  it("NotificationEmailSection에 로그인 이메일과 저장된 알림 이메일을 따로 전달한다", async () => {
     vi.mocked(api.get).mockResolvedValue({
-      data: { ...mockSettings, user_email: "test@test.com" },
+      data: { ...mockSettings, user_email: "test@test.com", notification_email: "me@work.com" },
     });
     renderNotificationSettings();
     await waitFor(() => {
-      expect(screen.getByTestId("notification-email-section")).toHaveTextContent("test@test.com");
+      expect(screen.getByTestId("notification-email-section")).toHaveTextContent(
+        "test@test.com|me@work.com",
+      );
     });
   });
 });

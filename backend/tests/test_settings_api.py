@@ -876,6 +876,8 @@ class TestUpdateDartKey:
         try:
             with (
                 _patch("app.api.v1.settings.encrypt", return_value="enc_key"),
+                _patch("app.api.v1.settings.reset_corp_code_failures") as mock_reset,
+                _patch("app.api.v1.settings.invalidate_dividend_caches", new_callable=AsyncMock) as mock_invalidate,
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.put(
@@ -884,6 +886,9 @@ class TestUpdateDartKey:
                     headers={"Authorization": "Bearer fake"},
                 )
             assert resp.status_code == 200
+            # plans/117 B1: 키 없이 계산된 종목별 배당(DPS 0) 캐시를 지우고 이전 실패 기록을 푼다
+            mock_reset.assert_called_once()
+            assert mock_invalidate.await_args.args[1] == user.id
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db

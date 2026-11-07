@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { TriangleAlert, Loader2 } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { deleteAccount } from "@/api/auth";
-import { getSupabase } from "@/lib/supabase";
-import { AUTH_ME_CACHE_KEY, useAuthStore } from "@/stores/authStore";
-import { PERSIST_CACHE_KEY } from "@/constants/queryConfig";
+import { useAuthStore } from "@/stores/authStore";
+import { usePushNotificationStore } from "@/stores/pushNotificationStore";
+import { useLogout } from "@/hooks/useLogout";
+import { userScopedStorageKeys } from "@/constants/storageKeys";
 import { INPUT_SM, LABEL_SM } from "@/constants/inputStyles";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
@@ -17,23 +18,19 @@ interface Props {
 }
 
 export default function DeleteAccountModal({ onClose }: Props) {
-  const queryClient = useQueryClient();
+  const logout = useLogout();
   const [password, setPassword] = useState("");
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteAccount(password),
     onSuccess: async () => {
-      queryClient.clear();
-      storageRemove(PERSIST_CACHE_KEY);
-      storageRemove(AUTH_ME_CACHE_KEY);
-      const supabase = await getSupabase();
-      await supabase.auth.signOut().catch(() => {});
-      useAuthStore.setState({
-        isAuthenticated: false,
-        userId: null,
-        email: null,
-        needsPasswordReset: false,
-      });
+      const userId = useAuthStore.getState().userId;
+      if (userId) userScopedStorageKeys(userId).forEach(storageRemove);
+      // 서버에서 토큰은 계정과 함께 지워졌다 — 로그아웃이 삭제된 계정으로 토큰 삭제를 다시 부르지 않게 한다
+      usePushNotificationStore.getState().setStatus("idle");
+      // 로그아웃과 같은 정리(쿼리·영속 캐시·인증 상태·동기화 상태·Supabase 세션)를 한 경로로 — 예전 사본은
+      // 동기화 상태 초기화가 빠져 있었다(plans/117 C5)
+      await logout();
       toast("회원 탈퇴가 완료되었습니다", "success");
       onClose();
     },

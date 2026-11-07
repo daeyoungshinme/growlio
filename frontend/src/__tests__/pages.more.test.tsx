@@ -8,7 +8,6 @@ vi.mock("@/stores/authStore", () => ({
   useAuthStore: vi.fn((selector) => {
     const state = {
       forgotPassword: vi.fn(),
-      findAccount: vi.fn(),
       resetPassword: vi.fn(),
     };
     return typeof selector === "function" ? selector(state) : state;
@@ -35,7 +34,6 @@ vi.mock("@/utils/toast", () => ({
 }));
 
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
-import FindAccountPage from "@/pages/FindAccountPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { consumePasswordRecovery } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
@@ -121,118 +119,8 @@ describe("ForgotPasswordPage", () => {
     resolveFn?.();
   });
 
-  it("has a link to find-account page", () => {
-    renderWithRouter(<ForgotPasswordPage />);
-    expect(screen.getByRole("link", { name: /아이디 찾기/ })).toHaveAttribute(
-      "href",
-      "/find-account",
-    );
-  });
-
   it("has a link back to login page", () => {
     renderWithRouter(<ForgotPasswordPage />);
-    expect(screen.getByRole("link", { name: /로그인으로 돌아가기/ })).toHaveAttribute(
-      "href",
-      "/login",
-    );
-  });
-});
-
-// FindAccountPage tests
-describe("FindAccountPage", () => {
-  let findAccountMock: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    findAccountMock = vi.fn();
-    vi.mocked(useAuthStore).mockImplementation((selector: (s: AuthState) => unknown) => {
-      const state = { findAccount: findAccountMock } as unknown as AuthState;
-      return typeof selector === "function" ? selector(state) : state;
-    });
-  });
-
-  it("renders form with disabled button initially", () => {
-    renderWithRouter(<FindAccountPage />);
-    expect(screen.getByPlaceholderText(/가입 시 사용한 이름/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /이메일 확인/ })).toBeDisabled();
-  });
-
-  it("enables the button when name is entered", () => {
-    renderWithRouter(<FindAccountPage />);
-    fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
-      target: { value: "testuser" },
-    });
-    expect(screen.getByRole("button", { name: /이메일 확인/ })).not.toBeDisabled();
-  });
-
-  it("button stays disabled when only whitespace entered", () => {
-    renderWithRouter(<FindAccountPage />);
-    fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
-      target: { value: "   " },
-    });
-    expect(screen.getByRole("button", { name: /이메일 확인/ })).toBeDisabled();
-  });
-
-  it("calls findAccount on submit", async () => {
-    findAccountMock.mockResolvedValue("email found: user@example.com");
-    renderWithRouter(<FindAccountPage />);
-    fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
-      target: { value: "testuser" },
-    });
-    fireEvent.submit(screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!);
-    await waitFor(() => {
-      expect(findAccountMock).toHaveBeenCalledWith("testuser");
-    });
-  });
-
-  it("shows result message on success", async () => {
-    findAccountMock.mockResolvedValue("email found: user@example.com");
-    renderWithRouter(<FindAccountPage />);
-    fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
-      target: { value: "testuser" },
-    });
-    fireEvent.submit(screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!);
-    await waitFor(() => {
-      expect(screen.getByText("email found: user@example.com")).toBeInTheDocument();
-    });
-  });
-
-  it("shows error message on API failure", async () => {
-    findAccountMock.mockRejectedValue(new Error("not found"));
-    renderWithRouter(<FindAccountPage />);
-    fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
-      target: { value: "testuser" },
-    });
-    fireEvent.submit(screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!);
-    await waitFor(() => {
-      expect(screen.getByText(/조회 중 오류가 발생했습니다/)).toBeInTheDocument();
-    });
-  });
-
-  it("shows loading button text while submitting", async () => {
-    let resolveFn: ((v: string) => void) | undefined;
-    findAccountMock.mockReturnValue(
-      new Promise<string>((resolve) => {
-        resolveFn = resolve;
-      }),
-    );
-    renderWithRouter(<FindAccountPage />);
-    fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
-      target: { value: "testuser" },
-    });
-    fireEvent.submit(screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!);
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /조회 중/ })).toBeInTheDocument();
-    });
-    resolveFn?.("done");
-  });
-
-  it("has links to other auth pages", () => {
-    renderWithRouter(<FindAccountPage />);
-    expect(screen.getByRole("link", { name: /비밀번호 찾기/ })).toHaveAttribute(
-      "href",
-      "/forgot-password",
-    );
     expect(screen.getByRole("link", { name: /로그인으로 돌아가기/ })).toHaveAttribute(
       "href",
       "/login",

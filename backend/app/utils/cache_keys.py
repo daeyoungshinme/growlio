@@ -50,6 +50,7 @@ TTL_FACTOR_ANALYSIS = 3600  # 팩터 분석 1시간
 TTL_PORTFOLIO_OPTIMIZER = 3600  # 포트폴리오 최적화 1시간
 TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
 TTL_INSIGHTS = 3600  # 스마트 인사이트 & 포트폴리오 진단 1시간
+TTL_INSIGHTS_DEGRADED = 60  # 체커 일부가 실패·조회 실패로 빠진 인사이트 목록은 1분만 — 빠진 채 1시간 고정 방지
 TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 TTL_JOB_LOCK_REBALANCING_AUTO = 3600  # 리밸런싱 자동 실행 분산 락 (중복 실행 방지)
 TTL_REBALANCING_EXECUTE_CLAIM = 86400  # 수동 실행 멱등 키 — 확인 화면을 다시 열면 새 키라 하루면 충분

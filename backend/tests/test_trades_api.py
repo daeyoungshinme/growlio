@@ -234,8 +234,16 @@ class TestTradeCrud:
         trade = _trade(user.id)
         db.scalar = AsyncMock(return_value=trade)
         inv = AsyncMock()
-        with patch("app.api.v1.trades.invalidate_tax_overseas_caches", new=inv):
+        inv_user = AsyncMock()
+        with (
+            patch("app.api.v1.trades.invalidate_tax_overseas_caches", new=inv),
+            patch("app.api.v1.trades.invalidate_user_caches", new=inv_user),
+        ):
             assert client.put(f"/api/v1/trades/{trade.id}", json={"qty": 5}, headers=AUTH).status_code == 200
             assert client.delete(f"/api/v1/trades/{trade.id}", headers=AUTH).status_code == 204
         assert inv.await_count == 2
         assert inv.call_args.args[1] == user.id
+        # plans/117 B4: 절세 인사이트도 같은 실현손익을 쓴다
+        from app.utils.cache_keys import insights_key
+
+        assert inv_user.call_args.args[1] == insights_key(user.id)

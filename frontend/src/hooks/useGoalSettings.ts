@@ -14,6 +14,8 @@ import { invalidateDcaData } from "@/utils/queryInvalidation";
 import { useQuery } from "@tanstack/react-query";
 import { numberFieldPayload, useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
 import { storageGet, storageSet } from "@/utils/safeStorage";
+import { goalWizardShownKey } from "@/constants/storageKeys";
+import { useAuthStore } from "@/stores/authStore";
 
 export interface GoalForm {
   monthly_deposit_amount: string;
@@ -49,6 +51,7 @@ const EMPTY_FORM: GoalForm = {
 export function useGoalSettings() {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const userId = useAuthStore((s) => s.userId);
   const autoOpenTriggeredRef = useRef(false);
   const [wizardMode, setWizardMode] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
@@ -134,7 +137,9 @@ export function useGoalSettings() {
   }, [location.state, isLoading, data, openEdit]);
 
   useEffect(() => {
-    const alreadyShown = storageGet("growlio:goal-wizard-auto-shown") === "true";
+    if (!userId) return;
+    const shownKey = goalWizardShownKey(userId);
+    const alreadyShown = storageGet(shownKey) === "true";
     if (
       !isLoading &&
       !autoOpenTriggeredRef.current &&
@@ -143,10 +148,10 @@ export function useGoalSettings() {
       !alreadyShown
     ) {
       autoOpenTriggeredRef.current = true;
-      storageSet("growlio:goal-wizard-auto-shown", "true");
+      storageSet(shownKey, "true");
       void openWizard();
     }
-  }, [isLoading, data, openWizard]);
+  }, [userId, isLoading, data, openWizard]);
 
   /** wizardMode에서는 5단계(투자성향·배당목표) 저장 후 6단계(추천 포트폴리오)로 넘어가므로
    * 모달을 닫지 않는다 — 플랫 편집 모달(!wizardMode)만 저장 즉시 닫힌다.

@@ -17,7 +17,8 @@ export function useBiometric() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isEnabled = storageGet(STORAGE_KEY) === "1";
+  // 렌더 중 저장소를 읽기만 하면 토글이 다시 그려지지 않아 눌러도 "꺼짐/켜짐"이 그대로였다(plans/117 C4)
+  const [isEnabled, setIsEnabled] = useState(() => storageGet(STORAGE_KEY) === "1");
 
   const availabilityChecked = useRef(false);
 
@@ -63,6 +64,7 @@ export function useBiometric() {
   }, [impact]);
 
   const setEnabled = useCallback((enabled: boolean) => {
+    setIsEnabled(enabled);
     if (enabled) {
       storageSet(STORAGE_KEY, "1");
     } else {

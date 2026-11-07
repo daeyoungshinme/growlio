@@ -115,7 +115,8 @@ def build_leg_summary(
         decided_at=leg.decided_at,
         execution_id=leg.execution_id,
         error_message=leg.error_message,
-        actionable=(leg.status == "PENDING" and not is_leg_past_deadline(leg)),
+        # 실행이 시작된(토큰 소비) leg는 취소·승인 요청이 거부되므로 버튼을 보이지 않는다(plans/117 B6)
+        actionable=(leg.status == "PENDING" and leg.token_consumed_at is None and not is_leg_past_deadline(leg)),
         partially_executed=sibling_executed and leg.status in _TERMINAL_UNEXECUTED_STATUSES,
         items=[RebalancingPlanItemOut.model_validate(item) for item in leg.items],
     )

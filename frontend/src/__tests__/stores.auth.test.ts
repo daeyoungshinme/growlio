@@ -148,7 +148,7 @@ describe("authStore — register", () => {
     vi.mocked(api.post).mockResolvedValue({ data: {} });
 
     const store = await getStore();
-    await store.register("confirmed@example.com", "password123", "테스트 유저");
+    await store.register("confirmed@example.com", "password123");
 
     const state = (await import("@/stores/authStore")).useAuthStore.getState();
     expect(state.isAuthenticated).toBe(true);
@@ -167,7 +167,7 @@ describe("authStore — register", () => {
     );
   });
 
-  it("displayName 없이 register 호출 시 display_name이 null로 전송된다", async () => {
+  it("register는 이름 없이 sync-profile을 부르고 이번 세션 생체인증을 통과시킨다", async () => {
     vi.mocked(mockSupabaseAuth.signUp).mockResolvedValue({
       data: {
         user: { id: "user-5", email: "u@example.com" },
@@ -179,7 +179,9 @@ describe("authStore — register", () => {
 
     const store = await getStore();
     await store.register("u@example.com", "password123");
-    expect(api.post).toHaveBeenCalledWith("/auth/sync-profile", { display_name: null });
+    expect(api.post).toHaveBeenCalledWith("/auth/sync-profile", {});
+    // plans/117 C5: 방금 비밀번호로 가입했으므로 로그인처럼 생체인증을 다시 묻지 않는다
+    expect(sessionStorage.getItem("growlio_biometric_verified")).toBe("1");
   });
 
   it("emailRedirectTo가 /auth/callback 경로로 전송된다", async () => {
@@ -381,7 +383,7 @@ describe("authStore — checkAuth", () => {
     const store = await getStore();
     await store.checkAuth();
 
-    expect(api.post).toHaveBeenCalledWith("/auth/sync-profile", { display_name: null });
+    expect(api.post).toHaveBeenCalledWith("/auth/sync-profile", {});
     const state = (await import("@/stores/authStore")).useAuthStore.getState();
     expect(state.isAuthenticated).toBe(true);
   });
@@ -454,20 +456,6 @@ describe("authStore — checkAuth", () => {
 
     const state = (await import("@/stores/authStore")).useAuthStore.getState();
     expect(state.needsPasswordReset).toBe(true);
-  });
-});
-
-describe("authStore — findAccount", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("이름으로 계정을 찾으면 메시지를 반환한다", async () => {
-    vi.mocked(api.post).mockResolvedValue({ data: { message: "가입된 이메일: user@example.com" } });
-    const store = await getStore();
-    const msg = await store.findAccount("홍길동");
-    expect(api.post).toHaveBeenCalledWith("/auth/find-account", { display_name: "홍길동" });
-    expect(msg).toBe("가입된 이메일: user@example.com");
   });
 });
 

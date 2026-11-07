@@ -73,9 +73,11 @@ class ManualProvider(BrokerProvider):
             usd_rate2 = await sync_usd_krw_rate(cache, needs_usd=bool(account.deposit_usd))
             amount_krw = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate2
         else:
-            amount_krw = float(account.manual_amount or 0)
-            if amount_krw == 0:
+            # 미설정(None)만 거부한다 — 입력 스키마는 0을 받지 않지만 nestlio 출금이 잔액을 정확히 0으로
+            # 만들 수 있고, 그 0은 실제 잔액이다(거부하면 매일 동기화가 실패하고 스냅샷이 끊긴다, plans/117 A1).
+            if account.manual_amount is None:
                 raise BadRequestError("수동 금액이 설정되지 않았습니다")
+            amount_krw = float(account.manual_amount)
 
         return BalanceResult(
             positions=positions,

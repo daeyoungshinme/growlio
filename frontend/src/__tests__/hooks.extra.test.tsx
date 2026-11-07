@@ -24,6 +24,7 @@ vi.mock("@/stores/authStore", () => ({
   useAuthStore: (selector: (s: object) => unknown) => {
     const state = {
       user: { email: "test@example.com" },
+      userId: "user-1",
       logout: vi.fn().mockResolvedValue(undefined),
     };
     if (typeof selector === "function") return selector(state);
@@ -437,7 +438,7 @@ describe("useGoalSettings", () => {
   });
 
   it("auto-opens the wizard once when the goal is unconfigured", async () => {
-    localStorage.removeItem("growlio:goal-wizard-auto-shown");
+    localStorage.removeItem("growlio:goal-wizard-auto-shown:user-1");
     const { fetchDCAAnalysis } = await import("@/api/invest");
     vi.mocked(fetchDCAAnalysis).mockResolvedValueOnce({
       is_configured: false,
@@ -465,11 +466,44 @@ describe("useGoalSettings", () => {
     const { result } = renderHook(() => useGoalSettings(), { wrapper });
     await vi.waitFor(() => expect(result.current.editing).toBe(true));
     expect(result.current.wizardMode).toBe(true);
-    expect(localStorage.getItem("growlio:goal-wizard-auto-shown")).toBe("true");
+    expect(localStorage.getItem("growlio:goal-wizard-auto-shown:user-1")).toBe("true");
+    localStorage.removeItem("growlio:goal-wizard-auto-shown:user-1");
+  });
+
+  it("다른 계정이 이 기기에서 이미 본 마법사 기록은 무시한다(plans/117 C5)", async () => {
+    localStorage.setItem("growlio:goal-wizard-auto-shown:other-user", "true");
+    const { fetchDCAAnalysis } = await import("@/api/invest");
+    vi.mocked(fetchDCAAnalysis).mockResolvedValueOnce({
+      is_configured: false,
+      settings: {
+        monthly_deposit_amount: null,
+        goal_annual_return_pct: null,
+        goal_amount: null,
+        goal_start_date: null,
+        goal_initial_amount: null,
+      },
+      projection_months: [],
+      yearly_achievements: [],
+      goal_timeline: {
+        months_to_goal: null,
+        expected_goal_date: null,
+        actual_expected_goal_date: null,
+        current_progress_pct: null,
+        on_track: null,
+        lead_lag_months: null,
+        acceleration_scenarios: [],
+      },
+    });
+    const { useGoalSettings } = await import("@/hooks/useGoalSettings");
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useGoalSettings(), { wrapper });
+    await vi.waitFor(() => expect(result.current.wizardMode).toBe(true));
+    localStorage.removeItem("growlio:goal-wizard-auto-shown:other-user");
+    localStorage.removeItem("growlio:goal-wizard-auto-shown:user-1");
   });
 
   it("does not auto-open the wizard again once already shown once (avoids re-nagging on every tab revisit)", async () => {
-    localStorage.setItem("growlio:goal-wizard-auto-shown", "true");
+    localStorage.setItem("growlio:goal-wizard-auto-shown:user-1", "true");
     const { fetchDCAAnalysis } = await import("@/api/invest");
     vi.mocked(fetchDCAAnalysis).mockResolvedValueOnce({
       is_configured: false,
@@ -497,7 +531,7 @@ describe("useGoalSettings", () => {
     const { result } = renderHook(() => useGoalSettings(), { wrapper });
     await vi.waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.editing).toBe(false);
-    localStorage.removeItem("growlio:goal-wizard-auto-shown");
+    localStorage.removeItem("growlio:goal-wizard-auto-shown:user-1");
   });
 });
 

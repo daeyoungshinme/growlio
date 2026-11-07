@@ -79,13 +79,7 @@ export default function ForgotPasswordPage() {
           </form>
         )}
 
-        <div className="mt-6 flex justify-between text-xs text-gray-500 dark:text-gray-400">
-          <Link
-            to="/find-account"
-            className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} text-blue-600 dark:text-blue-400 hover:underline`}
-          >
-            아이디 찾기
-          </Link>
+        <div className="mt-6 flex justify-end text-xs text-gray-500 dark:text-gray-400">
           <Link
             to="/login"
             className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} hover:underline`}

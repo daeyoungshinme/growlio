@@ -23,7 +23,8 @@ from app.schemas.trade import (
     TradeUpdate,
 )
 from app.services.portfolio.period_purchase_service import get_period_purchases, resolve_period
-from app.utils.cache_invalidation import invalidate_tax_overseas_caches
+from app.utils.cache_invalidation import invalidate_tax_overseas_caches, invalidate_user_caches
+from app.utils.cache_keys import insights_key
 from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/trades", tags=["trades"])
@@ -71,7 +72,7 @@ async def list_trades(
     if market:
         stmt = stmt.where(TradeRecord.market == market)
     stmt = (
-        stmt.order_by(TradeRecord.trade_date.desc(), TradeRecord.created_at.desc())
+        stmt.order_by(TradeRecord.trade_date.desc(), TradeRecord.created_at.desc(), TradeRecord.id.desc())
         .offset(pagination.skip)
         .limit(pagination.limit)
     )
@@ -143,5 +144,7 @@ async def delete_trade(
 
 async def _invalidate_trade_caches(user_id: UUID) -> None:
     # 해외 SELL 기록은 미지원 계좌(키움·토스·수기)의 올해 실현손익이 된다
-    # — 양도세 요약·절세 액션이 1시간 캐시에 묶이지 않게 지운다
-    await invalidate_tax_overseas_caches(await get_cache_store(), user_id)
+    # — 양도세 요약·절세 액션과 절세 인사이트(같은 실현손익 사용)가 1시간 캐시에 묶이지 않게 지운다
+    cache = await get_cache_store()
+    await invalidate_tax_overseas_caches(cache, user_id)
+    await invalidate_user_caches(cache, insights_key(user_id))
