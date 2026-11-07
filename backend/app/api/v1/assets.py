@@ -32,7 +32,10 @@ from app.services.accounts._account_queries import portfolio_accounts_stmt
 from app.services.accounts.asset_credential_service import (
     BROKER_CREDENTIAL_SPECS,
     CREDENTIAL_FIELDS,
+    BrokerCredentialSpec,
+    clear_issued_token_cache,
     delete_credentials,
+    delete_issued_tokens,
 )
 from app.services.accounts.asset_credential_service import (
     verify_kis_credentials as _verify_kis_credentials_service,
@@ -254,11 +257,15 @@ async def update_account(
         if getattr(req, field) is None:
             setattr(account, field, None)
 
-    # 키가 전송된 브로커만 키·시크릿 쌍을 함께 교체 (시크릿만 단독 전송은 무시 — 기존 동작 유지)
+    # 키가 전송된 브로커만 키·시크릿 쌍을 함께 교체 (시크릿만 단독 전송은 무시 — 기존 동작 유지).
+    # 옛 키로 발급된 토큰도 지운다 — 남기면 만료 전까지 옛 키 토큰으로 동기화한다(plans/116 B1).
+    stale_token_specs: list[BrokerCredentialSpec] = []
     for spec in BROKER_CREDENTIAL_SPECS.values():
         if getattr(req, spec.key_attr) is not None:
             setattr(account, spec.key_attr, encrypt_if_present(getattr(req, spec.key_attr)))
             setattr(account, spec.secret_attr, encrypt_if_present(getattr(req, spec.secret_attr)))
+            await delete_issued_tokens(db, account.id, spec)
+            stale_token_specs.append(spec)
 
     if (
         req.manual_amount is not None
@@ -269,6 +276,10 @@ async def update_account(
         account.manual_updated_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(account)
+    if stale_token_specs:
+        token_cache = await get_cache_store()
+        for spec in stale_token_specs:
+            await clear_issued_token_cache(token_cache, account.id, spec)
 
     # 두 블록이 참조할 "요청 시작 시점의" 최신 스냅샷/포지션을 한 번만 조회해 재사용.
     # 블록 1이 오늘자 스냅샷을 먼저 써버리면 아래 조회가 포지션 0개인 방금 쓴 스냅샷을

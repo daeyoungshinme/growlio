@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount, Transaction
 from app.services.accounts.snapshot_service import get_latest_snapshots_by_account
-from app.services.portfolio.returns_calculator import xirr
+from app.services.portfolio.returns_calculator import anchored_cashflows, get_opening_snapshots, xirr_from_cashflows
 from app.utils.kst import today_kst
 
 _FLOW_TYPES = ("DEPOSIT", "WITHDRAWAL")
@@ -70,19 +70,9 @@ async def monthly_net_deposits_by_account(
     ]
 
 
-def build_account_cashflows(
-    flows: list[tuple[date, str, float]], current_value: float, today: date
-) -> list[tuple[date, float]]:
-    """XIRR 현금흐름 — 입금은 투자자 관점의 유출(−), 출금은 유입(+), 마지막에 현재 평가액을 유입으로.
-    `returns_calculator.calc_xirr`와 같은 부호 규칙이다."""
-    cashflows = [(d, -amount if tx_type == "DEPOSIT" else amount) for d, tx_type, amount in flows]
-    cashflows.append((today, current_value))
-    return cashflows
-
-
 async def account_scoped_performance(db: AsyncSession, user_id: uuid.UUID, account_ids: list[uuid.UUID]) -> dict:
     """{xirr_pct, current_value_krw, net_invested_krw, account_count} — 지정 계좌 중 호출자 소유·활성 계좌만 본다.
-    입출금 내역이 없거나 XIRR이 수렴하지 않으면 xirr_pct는 None."""
+    스냅샷·입출금이 모두 없거나 XIRR이 수렴하지 않으면 xirr_pct는 None. net_invested_krw는 기초 잔액 + 순입금."""
     owned = (
         await db.scalars(
             select(AssetAccount.id).where(
@@ -98,7 +88,9 @@ async def account_scoped_performance(db: AsyncSession, user_id: uuid.UUID, accou
 
     rows = (
         await db.execute(
-            select(Transaction.transaction_date, Transaction.transaction_type, Transaction.amount)
+            select(
+                Transaction.account_id, Transaction.transaction_date, Transaction.transaction_type, Transaction.amount
+            )
             .where(
                 Transaction.user_id == user_id,
                 Transaction.account_id.in_(owned),
@@ -107,13 +99,16 @@ async def account_scoped_performance(db: AsyncSession, user_id: uuid.UUID, accou
             .order_by(Transaction.transaction_date)
         )
     ).all()
-    flows = [(row.transaction_date, row.transaction_type, float(row.amount)) for row in rows]
-    net_invested = sum(amount if tx_type == "DEPOSIT" else -amount for _, tx_type, amount in flows)
+    flows = [(row.account_id, row.transaction_date, row.transaction_type, float(row.amount)) for row in rows]
+    openings = await get_opening_snapshots(db, list(owned))
     xirr_pct = None
-    if flows:
-        cashflows = build_account_cashflows(flows, current_value, today_kst())
+    net_invested = 0.0
+    if flows or openings:
+        # 계좌별 첫 스냅샷 평가액을 기초 유출로 넣는다 — 대시보드 XIRR과 같은 규칙(plans/116 A1)
+        cashflows = anchored_cashflows(flows, openings, current_value, today_kst())
+        net_invested = -sum(amount for _, amount in cashflows[:-1])
         loop = asyncio.get_running_loop()
-        xirr_pct = await loop.run_in_executor(None, xirr, cashflows)
+        xirr_pct = await loop.run_in_executor(None, xirr_from_cashflows, cashflows)
     return {
         "xirr_pct": xirr_pct,
         "current_value_krw": current_value,

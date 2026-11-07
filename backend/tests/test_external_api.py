@@ -326,6 +326,52 @@ class TestCreateExternalTransaction:
         assert resp.status_code == 201
         assert resp.json()["deposit_krw"] == 70_000.0
 
+    def _post(self, account, upsert_mock, tx_type="DEPOSIT", amount=50_000):
+        user = _make_user()
+        account.user_id = user.id
+        db = _make_mock_db()
+        app = setup_app(user, db)
+        patches = self._patches(account)
+        with (
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
+            patch("app.api.v1.external.upsert_snapshot", upsert_mock),
+            patches[5],
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            return client.post(
+                "/api/v1/external/transactions",
+                json={
+                    "account_id": str(account.id),
+                    "transaction_type": tx_type,
+                    "amount": amount,
+                    "transaction_date": "2026-08-01",
+                },
+            )
+
+    def test_manual_amount_account_adds_to_balance_not_deposit(self, override_settings):
+        """plans/116 B2: 금액 직접 입력 계좌는 manual_amount에 더한다 — 예수금에 넣으면 잔액이 입금액만 남았다."""
+        account = _make_account(uuid.uuid4(), asset_type="BANK_ACCOUNT", manual_amount=300_000_000.0)
+        upsert_mock = AsyncMock()
+        resp = self._post(account, upsert_mock)
+        assert resp.status_code == 201
+        assert resp.json()["deposit_krw_adjusted"] is False
+        assert account.deposit_krw is None
+        assert account.manual_amount == 300_050_000.0
+        assert upsert_mock.call_args.kwargs["amount_krw"] == 300_050_000.0
+
+    def test_real_estate_records_history_only(self, override_settings):
+        account = _make_account(uuid.uuid4(), asset_type="REAL_ESTATE", manual_amount=500_000_000.0)
+        upsert_mock = AsyncMock()
+        resp = self._post(account, upsert_mock, tx_type="WITHDRAWAL")
+        assert resp.status_code == 201
+        assert resp.json()["deposit_krw_adjusted"] is False
+        assert account.manual_amount == 500_000_000.0
+        assert account.deposit_krw is None
+        upsert_mock.assert_not_awaited()
+
     def test_auto_synced_account_records_history_without_touching_deposit_krw(self, override_settings):
         user = _make_user()
         account = _make_account(

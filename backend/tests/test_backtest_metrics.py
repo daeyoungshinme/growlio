@@ -101,3 +101,19 @@ class TestComputePortfolioSeries:
         price_data = {k: v for k, v in price_data_list.items()}
         _, metrics = compute_portfolio_series("m", holdings, price_data, dates)
         assert metrics.name == "m"
+
+
+class TestHolidayForwardFill:
+    def test_one_market_holiday_does_not_jump(self):
+        """plans/116 A3: 국내 휴장일에 국내 종목이 빠져 미국 수익률로 튀지 않고 직전 가격으로 이월된다."""
+        dates = ["2025-10-01", "2025-10-02", "2025-10-03"]
+        holdings = [
+            {"ticker": "005930", "market": "KOSPI", "weight": 50},
+            {"ticker": "AAPL", "market": "NASDAQ", "weight": 50},
+        ]
+        price_data = {
+            "005930.KS": [("2025-10-01", 100.0), ("2025-10-03", 100.0)],  # 10-02 국내 휴장
+            "AAPL": [("2025-10-01", 100.0), ("2025-10-02", 120.0), ("2025-10-03", 120.0)],
+        }
+        series, _ = compute_portfolio_series("p", holdings, price_data, dates)
+        assert series.values == [100.0, 110.0, 110.0]

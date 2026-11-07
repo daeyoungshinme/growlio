@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { fmtKrw } from "@/utils/format";
+import { depositTotalKrw, fmtKrw } from "@/utils/format";
 import type { AssetAccount } from "@/api/assets";
 import type { AccountStats } from "./StockAccountCard";
 
@@ -10,18 +10,22 @@ interface Props {
 
 // 평가금액·평가손익은 자산 › 투자현황 요약 카드가 권위 표면이라 여기서는 계좌 합계성 값만 보여준다.
 export default function StockAccountSummaryCard({ perAccountStats, usdRate }: Props) {
-  const { totalDeposit, totalDividend, totalDepositKrw } = useMemo(() => {
+  const { totalDeposit, totalDividend, totalDepositKrw, rateMissing } = useMemo(() => {
     const deposit = perAccountStats.reduce((s, { stats }) => s + stats.deposit_total, 0);
     const dividend = perAccountStats.reduce((s, { stats }) => s + stats.dividend_total, 0);
-    const depositKrw = perAccountStats.reduce(
-      (s, { account }) =>
-        s + (account.deposit_krw ?? 0) + (account.deposit_usd ?? 0) * (usdRate ?? 1),
-      0,
-    );
+    // 환율이 없으면 달러 예수금은 빼고 원화만 합친다 — 1:1로 더하면 $가 원으로 보였다(plans/116 C3)
+    let depositKrw = 0;
+    let missing = false;
+    for (const { account } of perAccountStats) {
+      const total = depositTotalKrw(account, usdRate);
+      if (total == null) missing = true;
+      depositKrw += total ?? account.deposit_krw ?? 0;
+    }
     return {
       totalDeposit: deposit,
       totalDividend: dividend,
       totalDepositKrw: depositKrw,
+      rateMissing: missing,
     };
   }, [perAccountStats, usdRate]);
 
@@ -46,6 +50,9 @@ export default function StockAccountSummaryCard({ perAccountStats, usdRate }: Pr
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
             {fmtKrw(totalDepositKrw)}
           </p>
+          {rateMissing && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">달러 제외 · 환율 조회 중</p>
+          )}
         </div>
       </div>
     </div>

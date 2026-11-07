@@ -86,11 +86,89 @@ def calc_returns(
     return annualized, cumulative
 
 
-async def calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) -> tuple[float | None, bool]:
-    """Transaction 기반 XIRR 계산. 트랜잭션 없으면 스냅샷으로 추정."""
+def anchored_cashflows(
+    flows: list[tuple[uuid.UUID | None, date, str, float]],
+    openings: dict[uuid.UUID, tuple[date, float]],
+    current_total: float,
+    today: date,
+) -> list[tuple[date, float]]:
+    """XIRR 현금흐름 — 계좌별 첫 스냅샷 평가액(기초 잔액)을 첫 유출로, 그 뒤 입출금, 마지막에 현재 총액을 유입으로.
 
+    flows: [(account_id, 날짜, "DEPOSIT"|"WITHDRAWAL", 금액)] / openings: {account_id: (첫 스냅샷일, 평가액)}.
+    입금은 투자자 관점의 유출(−), 출금은 유입(+).
+
+    - 기초 잔액을 빼면 증권사 동기화 계좌처럼 입출금 기록이 거의 없는 계좌의 평가액 전체가 소수의 입금에 대한
+      "수익"으로 잡혀 XIRR이 수백 %로 튀거나 범위 밖(None)이 된다(plans/116 A1).
+    - 첫 스냅샷일 이전·당일 거래는 그 스냅샷에 이미 반영돼 있으므로 버린다(현금 계좌 첫 잔액 수정은 기준값 자체).
+    - 단 그 계좌에 첫 스냅샷보다 **앞선** 거래가 있으면 입력된 거래 이력이 기초 잔액까지 설명한다고 보고
+      기초 잔액을 넣지 않는다(과거 입금을 직접 기록한 사용자) — 넣으면 이중 계산된다.
+    - 계좌 미지정 입출금과 첫 스냅샷이 없는 계좌의 입출금은 그대로 둔다.
+    """
+    by_account: dict[uuid.UUID | None, list[tuple[date, str, float]]] = {}
+    for account_id, d, tx_type, amount in flows:
+        by_account.setdefault(account_id, []).append((d, tx_type, amount))
+
+    cashflows: list[tuple[date, float]] = []
+    for account_id, (d0, opening) in openings.items():
+        account_flows = by_account.get(account_id, [])
+        if any(d < d0 for d, _, _ in account_flows):
+            continue
+        if opening > 0:
+            cashflows.append((d0, -opening))
+        by_account[account_id] = [f for f in account_flows if f[0] > d0]
+
+    for account_flows in by_account.values():
+        cashflows.extend((d, -amount if tx_type == "DEPOSIT" else amount) for d, tx_type, amount in account_flows)
+    cashflows.sort(key=lambda cf: cf[0])
+    cashflows.append((today, current_total))
+    return cashflows
+
+
+def xirr_from_cashflows(cashflows: list[tuple[date, float]]) -> float | None:
+    """모든 흐름이 같은 날이면(기간 0) 계산하지 않는다 — 도함수가 0이라 초기 추정치가 그대로 반환될 수 있다."""
+    if len({d for d, _ in cashflows}) < 2:
+        return None
+    return xirr(cashflows)
+
+
+async def get_opening_snapshots(db: AsyncSession, account_ids: list[uuid.UUID]) -> dict[uuid.UUID, tuple[date, float]]:
+    """계좌별 첫 스냅샷 (날짜, 평가액). (account_id, snapshot_date)가 유일하므로 계좌당 1행."""
+    if not account_ids:
+        return {}
+    first = (
+        select(AssetSnapshot.account_id, func.min(AssetSnapshot.snapshot_date).label("first_date"))
+        .where(AssetSnapshot.account_id.in_(account_ids))
+        .group_by(AssetSnapshot.account_id)
+        .subquery()
+    )
+    rows = await db.execute(
+        select(AssetSnapshot.account_id, AssetSnapshot.snapshot_date, AssetSnapshot.amount_krw).join(
+            first,
+            and_(AssetSnapshot.account_id == first.c.account_id, AssetSnapshot.snapshot_date == first.c.first_date),
+        )
+    )
+    return {
+        row.account_id: (row.snapshot_date, float(row.amount_krw or 0))
+        for row in rows.all()
+        if row.account_id is not None
+    }
+
+
+async def calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) -> tuple[float | None, bool]:
+    """계좌별 기초 잔액 + 입출금 기반 XIRR. 두 번째 값은 입출금 기록 없이 스냅샷만으로 추정했는지 여부."""
+    account_ids = list(
+        (
+            await db.scalars(
+                select(AssetAccount.id).where(
+                    AssetAccount.user_id == user_id,
+                    AssetAccount.is_active.is_(True),
+                    AssetAccount.include_in_total.is_(True),
+                )
+            )
+        ).all()
+    )
     result = await db.execute(
-        select(Transaction.transaction_date, Transaction.transaction_type, Transaction.amount)
+        select(Transaction.account_id, Transaction.transaction_date, Transaction.transaction_type, Transaction.amount)
         # 종료값(current_total)은 활성·합산 계좌만 더하므로 입출금도 같은 계좌 집합으로 거른다 —
         # 삭제(soft)·합산 제외 계좌의 입금만 남으면 XIRR이 크게 음수로 왜곡된다. 계좌 미지정 입출금은 유지.
         .outerjoin(AssetAccount, AssetAccount.id == Transaction.account_id)
@@ -104,42 +182,11 @@ async def calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) 
         )
         .order_by(asc(Transaction.transaction_date))
     )
-    rows = result.all()
+    flows = [(row.account_id, row.transaction_date, row.transaction_type, float(row.amount)) for row in result.all()]
+    openings = await get_opening_snapshots(db, account_ids)
+    if not flows and not openings:
+        return None, False
 
-    if not rows:
-        snap_result = await db.execute(
-            select(
-                AssetSnapshot.snapshot_date,
-                func.sum(AssetSnapshot.amount_krw).label("total"),
-            )
-            .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-            .where(
-                AssetSnapshot.user_id == user_id,
-                AssetAccount.is_active == True,
-                AssetAccount.include_in_total == True,
-            )
-            .group_by(AssetSnapshot.snapshot_date)
-            .order_by(asc(AssetSnapshot.snapshot_date))
-            .limit(1)
-        )
-        first = snap_result.first()
-        today = today_kst()
-        if not first or float(first.total) <= 0 or first.snapshot_date >= today:
-            return None, False
-        cashflows: list[tuple[date, float]] = [
-            (first.snapshot_date, -float(first.total)),
-            (today, current_total),
-        ]
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, xirr, cashflows), True
-
-    cashflows = []
-    for row in rows:
-        if row.transaction_type == "DEPOSIT":
-            cashflows.append((row.transaction_date, -float(row.amount)))
-        else:
-            cashflows.append((row.transaction_date, float(row.amount)))
-
-    cashflows.append((today_kst(), current_total))
+    cashflows = anchored_cashflows(flows, openings, current_total, today_kst())
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, xirr, cashflows), False
+    return await loop.run_in_executor(None, xirr_from_cashflows, cashflows), not flows

@@ -92,6 +92,30 @@ class TestUpdateAccount:
             resp = client.put(f"/api/v1/assets/{account.id}", json=payload)
         assert resp.status_code == 200
 
+    def test_rotating_toss_key_deletes_old_tokens_and_caches(self, override_settings):
+        """plans/116 B1: 키를 바꾸면 옛 키로 발급된 토큰(DB·캐시)과 accountSeq 캐시를 지운다."""
+        user = make_user()
+        account = _make_account(user.id)
+        db = make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock()
+        cache = _make_cache_mock()
+        app = setup_app(user, db)
+        with (
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=cache)),
+            patch("app.api.v1.assets.encrypt_if_present", side_effect=lambda v: f"enc:{v}"),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put(
+                f"/api/v1/assets/{account.id}", json={"toss_client_id": "new-id", "toss_client_secret": "new-secret"}
+            )
+        assert resp.status_code == 200
+        assert account.toss_client_id == "enc:new-id"
+        executed = [str(c.args[0]) for c in db.execute.await_args_list]
+        assert any("toss_tokens" in sql for sql in executed)
+        deleted = {c.args[0] for c in cache.delete.await_args_list}
+        assert f"toss_acctseq:{account.id}" in deleted
+
     def test_update_account_returns_404_for_nonexistent(self, override_settings):
         user = make_user()
         db = make_mock_db()

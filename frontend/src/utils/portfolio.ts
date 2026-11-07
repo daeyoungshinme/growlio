@@ -31,7 +31,13 @@ export function groupPositionsByTicker(
         sub_positions: [p],
       });
     } else {
-      existing.total_qty += p.qty;
+      // 평단가는 수량 가중 평균 — 첫 계좌 값을 그대로 두면 계좌별 평단이 다를 때 틀린 값이 보인다(plans/116 C1)
+      const qty = existing.total_qty + p.qty;
+      if (qty > 0) {
+        existing.weighted_avg_price =
+          (existing.weighted_avg_price * existing.total_qty + p.avg_price * p.qty) / qty;
+      }
+      existing.total_qty = qty;
       existing.total_value_krw += p.value_krw;
       existing.total_invested_krw += p.invested_krw;
       existing.total_pnl += p.pnl;

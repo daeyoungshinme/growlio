@@ -4,11 +4,18 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.portfolio.returns_calculator import calc_returns, calc_xirr, xirr
+from app.services.portfolio.returns_calculator import (
+    anchored_cashflows,
+    calc_returns,
+    calc_xirr,
+    xirr,
+    xirr_from_cashflows,
+)
 from app.utils.kst import today_kst
 
 
@@ -119,64 +126,116 @@ class TestCalcReturns:
         assert cumulative == pytest.approx(100.0, abs=0.1)
 
 
+def _db(account_ids, tx_rows, opening_rows):
+    """calc_xirr 조회 순서: scalars(계좌 id) → execute(입출금) → execute(계좌별 첫 스냅샷)."""
+    db = AsyncMock()
+    ids = MagicMock()
+    ids.all.return_value = account_ids
+    db.scalars = AsyncMock(return_value=ids)
+    tx = MagicMock()
+    tx.all.return_value = tx_rows
+    op = MagicMock()
+    op.all.return_value = opening_rows
+    db.execute = AsyncMock(side_effect=[tx, op])
+    return db
+
+
+def _tx(account_id, d, tx_type, amount):
+    return SimpleNamespace(account_id=account_id, transaction_date=d, transaction_type=tx_type, amount=amount)
+
+
+def _opening(account_id, d, amount):
+    return SimpleNamespace(account_id=account_id, snapshot_date=d, amount_krw=amount)
+
+
+class TestAnchoredCashflows:
+    A = uuid.uuid4()
+    B = uuid.uuid4()
+    TODAY = date(2026, 10, 1)
+
+    def test_opening_balance_is_first_outflow_and_same_day_tx_dropped(self):
+        flows = [
+            (self.A, date(2025, 10, 1), "DEPOSIT", 999.0),  # 첫 스냅샷 당일 — 스냅샷에 이미 반영
+            (self.A, date(2026, 4, 1), "DEPOSIT", 1_000_000.0),
+        ]
+        openings = {self.A: (date(2025, 10, 1), 50_000_000.0)}
+        assert anchored_cashflows(flows, openings, 56_000_000.0, self.TODAY) == [
+            (date(2025, 10, 1), -50_000_000.0),
+            (date(2026, 4, 1), -1_000_000.0),
+            (self.TODAY, 56_000_000.0),
+        ]
+
+    def test_history_before_first_snapshot_skips_opening(self):
+        """거래 이력이 첫 스냅샷보다 앞서면 이력이 기초 잔액을 설명 — 기초 잔액을 넣으면 이중 계산."""
+        flows = [(self.A, date(2024, 1, 1), "DEPOSIT", 10_000.0), (self.A, date(2025, 6, 1), "WITHDRAWAL", 1_000.0)]
+        openings = {self.A: (date(2025, 1, 1), 12_000.0)}
+        assert anchored_cashflows(flows, openings, 11_000.0, self.TODAY) == [
+            (date(2024, 1, 1), -10_000.0),
+            (date(2025, 6, 1), 1_000.0),
+            (self.TODAY, 11_000.0),
+        ]
+
+    def test_unassigned_and_snapshotless_flows_kept(self):
+        flows = [(None, date(2025, 3, 1), "DEPOSIT", 100.0), (self.B, date(2025, 2, 1), "DEPOSIT", 200.0)]
+        openings = {self.A: (date(2025, 5, 1), 0.0)}  # 0원 기초 잔액은 넣지 않는다
+        assert anchored_cashflows(flows, openings, 400.0, self.TODAY) == [
+            (date(2025, 2, 1), -200.0),
+            (date(2025, 3, 1), -100.0),
+            (self.TODAY, 400.0),
+        ]
+
+    def test_synced_account_with_small_deposit_gives_sane_xirr(self):
+        """plans/116 A1 회귀: 50M 동기화 계좌 + 1달 전 1M 입금. 기초 잔액이 빠지면 XIRR이 범위 밖(None)이 됐다."""
+        flows = [(self.B, date(2026, 9, 1), "DEPOSIT", 1_000_000.0)]
+        openings = {self.A: (date(2025, 10, 1), 50_000_000.0), self.B: (date(2025, 10, 1), 0.0)}
+        result = xirr_from_cashflows(anchored_cashflows(flows, openings, 56_000_000.0, self.TODAY))
+        assert result is not None
+        assert 8 < result < 12
+
+    def test_all_same_day_returns_none(self):
+        assert xirr_from_cashflows([(self.TODAY, -100.0), (self.TODAY, 110.0)]) is None
+
+
 class TestCalcXirr:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_transactions_no_snapshots(self):
-        db = AsyncMock()
-        execute_result = MagicMock()
-        execute_result.all.return_value = []
-        execute_result.first.return_value = None
-        db.execute = AsyncMock(return_value=execute_result)
-
-        result, used_snapshot = await calc_xirr(uuid.uuid4(), 10000.0, db)
-        assert result is None
-        assert used_snapshot is False
+        db = _db([], [], [])
+        assert await calc_xirr(uuid.uuid4(), 10000.0, db) == (None, False)
 
     @pytest.mark.asyncio
-    async def test_uses_snapshot_fallback_when_no_transactions(self):
-        db = AsyncMock()
-        no_tx_result = MagicMock()
-        no_tx_result.all.return_value = []
-
-        snap_row = MagicMock()
-        snap_row.total = 5000.0
-        snap_row.snapshot_date = date(2022, 1, 1)
-        snap_result = MagicMock()
-        snap_result.first.return_value = snap_row
-
-        db.execute = AsyncMock(side_effect=[no_tx_result, snap_result])
-
-        result, used_snapshot = await calc_xirr(uuid.uuid4(), 6000.0, db)
-        assert used_snapshot is True
+    async def test_snapshot_only_is_estimated(self):
+        acc = uuid.uuid4()
+        db = _db([acc], [], [_opening(acc, date(2022, 1, 1), 5000.0)])
+        result, estimated = await calc_xirr(uuid.uuid4(), 6000.0, db)
+        assert estimated is True
         assert result is not None
+        assert result > 0
 
     @pytest.mark.asyncio
-    async def test_uses_transaction_cashflows(self):
-        db = AsyncMock()
-        tx_row = MagicMock()
-        tx_row.transaction_date = date(2022, 1, 1)
-        tx_row.transaction_type = "DEPOSIT"
-        tx_row.amount = 10000.0
+    async def test_snapshot_from_today_returns_none(self):
+        acc = uuid.uuid4()
+        db = _db([acc], [], [_opening(acc, today_kst(), 5000.0)])
+        assert await calc_xirr(uuid.uuid4(), 6000.0, db) == (None, True)
 
-        tx_result = MagicMock()
-        tx_result.all.return_value = [tx_row]
-        db.execute = AsyncMock(return_value=tx_result)
-
-        result, used_snapshot = await calc_xirr(uuid.uuid4(), 11000.0, db)
-        assert used_snapshot is False
+    @pytest.mark.asyncio
+    async def test_transactions_combined_with_opening_balance(self):
+        acc = uuid.uuid4()
+        start = date(today_kst().year - 1, today_kst().month, 1)
+        db = _db(
+            [acc],
+            [_tx(acc, today_kst().replace(day=1), "DEPOSIT", 1_000_000.0)],
+            [_opening(acc, start, 50_000_000.0)],
+        )
+        result, estimated = await calc_xirr(uuid.uuid4(), 56_000_000.0, db)
+        assert estimated is False
         assert result is not None
+        assert 0 < result < 20
 
     @pytest.mark.asyncio
-    async def test_withdrawal_transaction_adds_positive_cashflow(self):
-        db = AsyncMock()
-        tx_row = MagicMock()
-        tx_row.transaction_date = date(2022, 6, 1)
-        tx_row.transaction_type = "WITHDRAWAL"
-        tx_row.amount = 2000.0
-
-        tx_result = MagicMock()
-        tx_result.all.return_value = [tx_row]
-        db.execute = AsyncMock(return_value=tx_result)
-
-        result, used_snapshot = await calc_xirr(uuid.uuid4(), 9000.0, db)
-        assert used_snapshot is False
+    async def test_withdrawal_only_transactions_without_snapshot(self):
+        db = _db(
+            [], [_tx(None, date(2022, 1, 1), "DEPOSIT", 10000.0), _tx(None, date(2022, 6, 1), "WITHDRAWAL", 2000.0)], []
+        )
+        result, estimated = await calc_xirr(uuid.uuid4(), 9000.0, db)
+        assert estimated is False
+        assert result is not None

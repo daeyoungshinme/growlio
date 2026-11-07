@@ -148,3 +148,27 @@ jobs:
           name: growlio-release-${{ github.ref_name }}-${{ github.sha }}
           path: frontend/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
+
+  # tag 빌드의 서명 APK는 GitHub Release에 첨부한다 — artifact는 30일 뒤 사라져 옛 릴리스를 다시 받을 수 없었다(plans/116 D2).
+  # 쓰기 권한은 키스토어 Secrets를 다루는 빌드 잡과 분리한다.
+  publish-release:
+    name: Attach APK to GitHub Release
+    needs: build-apk
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: growlio-release-${{ github.ref_name }}-${{ github.sha }}
+          path: apk
+
+      - name: Rename APK
+        run: mv apk/app-release.apk "apk/growlio-${GITHUB_REF_NAME}.apk"
+
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: apk/growlio-${{ github.ref_name }}.apk
+          generate_release_notes: true

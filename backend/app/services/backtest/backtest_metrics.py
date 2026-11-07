@@ -112,11 +112,17 @@ def compute_portfolio_series(
         return SeriesData(name=name, values=empty_vals), metrics
 
     values: list[float] = []
+    # 한쪽 시장만 쉬는 날(추석·미국 공휴일)에는 그 종목 가격이 없다 — 빼고 남은 비중으로 재정규화하면 그날만
+    # 다른 시장 수익률로 값이 튀었다가 돌아와 MDD·변동성·샤프가 틀어진다. 직전 가격을 이월한다(plans/116 A3).
+    last_price: dict[str, float] = {}
     for d in dates:
         portfolio_val = 0.0
         total_weight = 0.0
         for sym, w in weight_map.items():
-            p_now = price_by_sym.get(sym, {}).get(d)
+            price_today = price_by_sym.get(sym, {}).get(d)
+            if price_today and price_today > 0:
+                last_price[sym] = price_today
+            p_now = last_price.get(sym)
             p_init = init_prices.get(sym)
             if p_now and p_init and p_init > 0:
                 portfolio_val += w * (p_now / p_init)

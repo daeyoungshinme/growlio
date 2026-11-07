@@ -23,7 +23,7 @@ format-backend:
 	cd backend && uv run ruff format . && uv run ruff check . --fix
 
 install-frontend:
-	cd frontend && npm install
+	cd frontend && npm ci
 
 dev:
 	bash dev.sh

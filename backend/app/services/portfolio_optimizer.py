@@ -65,9 +65,11 @@ def _compute_frontier(
     w_arr = np.array(valid_weights, dtype=float)
     w_arr /= w_arr.sum()  # 비중 정규화
 
-    # 공통 기간 수익률 행렬 구성
+    # 공통 기간 수익률 행렬 구성 — 시계열은 오래된 날짜부터라 **최근 구간**으로 맞춘다.
+    # 앞에서 자르면 신규 상장 종목의 최근 구간과 다른 종목의 옛 구간을 짝지어 상관이 사라진다
+    # (goal_portfolio_optimizer와 같은 규칙, plans/116 A2).
     min_len = min(len(returns_map[s]) for s in valid_syms)
-    rets = np.array([returns_map[s][:min_len] for s in valid_syms])  # (n, T)
+    rets = np.array([returns_map[s][-min_len:] for s in valid_syms])  # (n, T)
 
     # 연율화 기대수익률 및 공분산 행렬 — 표본 추정치를 축소추정(shrinkage)으로 보정해 추정오차로
     # 인한 과최적화(극단적 프론티어/비중)를 완화한다. 종목이 3개 미만이면 James-Stein 축소는
@@ -158,7 +160,7 @@ def _compute_portfolio_position(
     w_arr /= total
 
     min_len = min(len(returns_map[s]) for s in valid_syms)
-    rets = np.array([returns_map[s][:min_len] for s in valid_syms])
+    rets = np.array([returns_map[s][-min_len:] for s in valid_syms])  # 최근 구간 정렬(위와 같은 규칙)
     # `_compute_frontier`가 그리는 프론티어 곡선과 같은 척도로 비교되도록 동일하게 축소추정 적용
     # — 그렇지 않으면 비교 포트폴리오 점이 축소추정으로 이동한 프론티어 곡선 기준에서 어긋난다.
     mean_annual = shrink_expected_returns(rets.mean(axis=1) * 252)

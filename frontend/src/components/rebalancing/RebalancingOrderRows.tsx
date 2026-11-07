@@ -18,7 +18,7 @@ export interface OrderRowModel {
   /** 시장가 예상 원화(지정가면 null일 수 있음) */
   est: number | null;
   /** 지정가 × 수량 원화 환산 */
-  estKrw: number;
+  estKrw: number | null;
   /** 같은 종목을 여러 계좌로 나눠 사는 매수 행 */
   isMultiAccount: boolean;
   allocated: number;

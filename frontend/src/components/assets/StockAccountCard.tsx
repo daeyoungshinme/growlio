@@ -15,7 +15,7 @@ import {
 } from "@/api/assets";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useHaptic } from "@/hooks/useHaptic";
-import { convertUsdToKrw, fmtKrw, fmtPct, relativeTime, fmtUsd, fmtSigned } from "@/utils/format";
+import { depositTotalKrw, fmtKrw, fmtPct, relativeTime, fmtUsd, fmtSigned } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { isSyncableAccount } from "@/utils/accounts";
@@ -216,12 +216,11 @@ export default function StockAccountCard({
                   const krw = account.deposit_krw ?? 0;
                   const usd = account.deposit_usd ?? 0;
                   const hasUsd = usd > 0;
-                  const usdAsKrw = convertUsdToKrw(hasUsd ? usd : null, usdRate);
-                  const total = krw + usdAsKrw;
+                  const total = depositTotalKrw(account, usdRate);
                   return (
                     <>
                       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 break-keep">
-                        {fmtKrw(hasUsd && usdRate ? total : krw)}
+                        {fmtKrw(total ?? krw)}
                       </p>
                       {hasUsd && (
                         <p className="text-xs text-gray-400 dark:text-gray-500">

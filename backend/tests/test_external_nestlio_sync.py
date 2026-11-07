@@ -5,15 +5,15 @@ from __future__ import annotations
 
 import uuid
 from contextlib import ExitStack
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
-from app.services.external_queries import build_account_cashflows
-from app.services.portfolio.returns_calculator import xirr
+from app.services.portfolio.returns_calculator import anchored_cashflows, xirr
+from app.utils.kst import today_kst
 from tests.api_helpers import setup_app
 
 
@@ -298,8 +298,9 @@ class TestAccountPerformance:
 
 class TestAccountCashflows:
     def test_deposits_are_outflows_withdrawals_inflows_and_value_last(self):
-        flows = [(date(2025, 10, 1), "DEPOSIT", 1_000_000.0), (date(2026, 4, 1), "WITHDRAWAL", 100_000.0)]
-        cashflows = build_account_cashflows(flows, 1_000_000.0, date(2026, 10, 1))
+        acc = uuid.uuid4()
+        flows = [(acc, date(2025, 10, 1), "DEPOSIT", 1_000_000.0), (acc, date(2026, 4, 1), "WITHDRAWAL", 100_000.0)]
+        cashflows = anchored_cashflows(flows, {}, 1_000_000.0, date(2026, 10, 1))
         assert cashflows == [
             (date(2025, 10, 1), -1_000_000.0),
             (date(2026, 4, 1), 100_000.0),
@@ -307,10 +308,33 @@ class TestAccountCashflows:
         ]
 
     def test_one_year_ten_percent_gain_is_about_ten_percent_xirr(self):
-        cashflows = build_account_cashflows(
-            [(date(2025, 10, 1), "DEPOSIT", 1_000_000.0)], 1_100_000.0, date(2026, 10, 1)
+        cashflows = anchored_cashflows(
+            [(uuid.uuid4(), date(2025, 10, 1), "DEPOSIT", 1_000_000.0)], {}, 1_100_000.0, date(2026, 10, 1)
         )
         assert xirr(cashflows) == 10.0
+
+
+async def test_account_performance_counts_opening_balance():
+    """plans/116 A1: 입출금 기록이 없는 동기화 계좌도 첫 스냅샷을 기초 잔액으로 XIRR·순투입을 낸다."""
+    from app.services.external_queries import account_scoped_performance
+
+    acc = uuid.uuid4()
+    one_year_ago = today_kst() - timedelta(days=365)
+    db = AsyncMock()
+    owned = MagicMock()
+    owned.all.return_value = [acc]
+    db.scalars = AsyncMock(return_value=owned)
+    tx = MagicMock()
+    tx.all.return_value = []
+    opening = MagicMock()
+    opening.all.return_value = [SimpleNamespace(account_id=acc, snapshot_date=one_year_ago, amount_krw=1_000_000)]
+    db.execute = AsyncMock(side_effect=[tx, opening])
+    latest = {acc: SimpleNamespace(amount_krw=1_100_000)}
+    with patch("app.services.external_queries.get_latest_snapshots_by_account", AsyncMock(return_value=latest)):
+        out = await account_scoped_performance(db, uuid.uuid4(), [acc])
+    assert out["net_invested_krw"] == 1_000_000.0
+    assert out["xirr_pct"] is not None
+    assert 9 < out["xirr_pct"] < 11
 
 
 async def test_monthly_net_deposits_query_scopes_user_active_and_prefix():

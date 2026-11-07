@@ -74,6 +74,12 @@ class TestCalcBeta:
         result = _calc_beta(port, bench)
         assert abs(result - 2.0) < 0.1
 
+    def test_aligns_recent_window_when_lengths_differ(self, override_settings):
+        """plans/116 A2: 벤치마크가 더 길면 최근 구간끼리 짝지어야 한다 — 앞에서 자르면 옛 구간과 짝지어진다."""
+        recent = [0.01 * ((i % 5) - 2) for i in range(30)]
+        bench = [0.05 * ((i % 3) - 1) for i in range(20)] + recent  # 앞 20일은 무관한 옛 구간
+        assert abs(_calc_beta(recent, bench) - 1.0) < 1e-9
+
     def test_zero_variance_bench_returns_one(self, override_settings):
         port = [0.01] * 20
         bench = [0.0] * 20  # zero variance
@@ -104,6 +110,14 @@ class TestCalcDiversificationScore:
         r2 = [-r for r in r1]
         result = _calc_diversification_score(["A", "B"], [0.5, 0.5], {"A": r1, "B": r2})
         assert result >= 50
+
+    def test_new_listing_correlated_on_recent_window(self, override_settings):
+        """plans/116 A2: 상장이 짧은 종목은 다른 종목의 최근 구간과 비교해야 같은 움직임이 상관 1로 잡힌다."""
+        recent = [0.01 * ((i % 7) - 3) for i in range(30)]
+        old = [0.02 * ((i % 2) * 2 - 1) for i in range(30)]
+        score = _calc_diversification_score(["A", "B"], [0.5, 0.5], {"A": old + recent, "B": recent})
+        same = _calc_diversification_score(["A", "B"], [0.5, 0.5], {"A": recent, "B": recent})
+        assert score == same
 
     def test_positive_correlation_low_score(self, override_settings):
         # Perfectly positive correlation → low diversification

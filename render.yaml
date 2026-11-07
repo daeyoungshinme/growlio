@@ -9,7 +9,7 @@ services:
     healthCheckPath: /health
     # main 푸시마다가 아니라 GitHub 체크(CI) 통과 후에만 자동 배포 — 마이그레이션은 여전히 머지 전에 수동 적용(plans/115 C1)
     autoDeployTrigger: checksPass
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    # 시작 명령은 backend/Dockerfile CMD 한 곳에서만 관리한다(plans/116 D4)
     envVars:
       - key: APP_ENV
         value: production

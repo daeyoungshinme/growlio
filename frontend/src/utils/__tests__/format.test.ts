@@ -5,6 +5,8 @@ import {
   daysUntilYmd,
   parseYmd,
   convertUsdToKrw,
+  depositTotalKrw,
+  fmtKrwOrDash,
   formatUsdAsKrw,
   fmtKrw,
   fmtKrwPrice,
@@ -277,5 +279,24 @@ describe("원 단위 음수 절사 (plans/113 D2)", () => {
     expect(fmtKrwPrice(-1234.9)).toBe("-1,234원");
     expect(fmtKrwShort(-999.9)).toBe("-999");
     expect(fmtKrw(1234.9)).toBe("1,234원");
+  });
+});
+
+describe("plans/116 C6·C3·C4 포맷", () => {
+  it("억 경계 반올림은 억 단위로 표시", () => {
+    expect(fmtKrw(99_995_000)).toBe("1.00억원");
+    expect(fmtKrw(99_994_999)).toBe("9,999만원");
+    expect(fmtKrwShort(99_995_000)).toBe("1.0억");
+  });
+
+  it("depositTotalKrw — 달러가 있는데 환율이 없으면 null", () => {
+    expect(depositTotalKrw({ deposit_krw: 1000, deposit_usd: 3000 }, null)).toBeNull();
+    expect(depositTotalKrw({ deposit_krw: 1000, deposit_usd: 2 }, 1400)).toBe(3800);
+    expect(depositTotalKrw({ deposit_krw: 1000, deposit_usd: null }, null)).toBe(1000);
+  });
+
+  it("fmtKrwOrDash", () => {
+    expect(fmtKrwOrDash(null)).toBe("—");
+    expect(fmtKrwOrDash(3000)).toBe("3,000원");
   });
 });

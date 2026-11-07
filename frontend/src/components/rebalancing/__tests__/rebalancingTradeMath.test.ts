@@ -131,8 +131,13 @@ describe("estimateLimitKrw", () => {
     expect(limitPriceKrw(100, "NASDAQ", 1400)).toBe(140_000);
   });
 
-  it("국내 또는 환율 미로딩이면 입력값 × 수량", () => {
+  it("국내는 입력값 × 수량", () => {
     expect(estimateLimitKrw(70_000, 2, "KOSPI", 1400)).toBe(140_000);
-    expect(estimateLimitKrw(100, 3, "NASDAQ", null)).toBe(300);
+    expect(estimateLimitKrw(70_000, 2, "KOSPI", null)).toBe(140_000);
+  });
+
+  it("해외인데 환율 미로딩이면 null — 달러를 원으로 보여주지 않는다", () => {
+    expect(estimateLimitKrw(100, 3, "NASDAQ", null)).toBeNull();
+    expect(limitPriceKrw(100, "NASDAQ", null)).toBeNull();
   });
 });

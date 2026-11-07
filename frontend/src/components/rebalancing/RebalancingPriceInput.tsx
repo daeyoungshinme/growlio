@@ -1,5 +1,5 @@
 import React from "react";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrwOrDash } from "@/utils/format";
 import { isOverseasMarket } from "@/constants/markets";
 import { estimateLimitKrw, limitPriceKrw } from "./rebalancingTradeMath";
 import type { ExecutionAction, OrderType, PriceLoadState } from "@/hooks/useRebalancingExecution";
@@ -73,9 +73,9 @@ export function RebalancingPriceInput({
       {nativeVal > 0 && (
         <div className="text-xs text-gray-500 dark:text-gray-600 mt-0.5 text-right leading-tight">
           <div>
-            ≈ {fmtKrw(limitPriceKrw(nativeVal, market, globalUsdRate))} × {qty}주
+            ≈ {fmtKrwOrDash(limitPriceKrw(nativeVal, market, globalUsdRate))} × {qty}주
           </div>
-          <div>= {fmtKrw(estKrw)}</div>
+          <div>= {fmtKrwOrDash(estKrw)}</div>
         </div>
       )}
     </td>

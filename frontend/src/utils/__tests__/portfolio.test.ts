@@ -46,6 +46,14 @@ describe("groupPositionsByTicker", () => {
     expect(result[0]!.sub_positions).toHaveLength(1);
   });
 
+  it("평단가는 수량 가중 평균", () => {
+    const result = groupPositionsByTicker([
+      makePos({ account_id: "acc-1", qty: 10, avg_price: 400_000 }),
+      makePos({ account_id: "acc-2", qty: 30, avg_price: 500_000 }),
+    ]);
+    expect(result[0]!.weighted_avg_price).toBe(475_000);
+  });
+
   it("같은 ticker+market은 합산", () => {
     const positions = [
       makePos({
