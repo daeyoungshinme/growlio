@@ -45,8 +45,9 @@ def _calc_beta(portfolio_rets: list[float], bench_rets: list[float]) -> float:
     n = min(len(portfolio_rets), len(bench_rets))
     if n < 10:
         return 1.0
-    p = portfolio_rets[:n]
-    b = bench_rets[:n]
+    # 시계열은 오래된 날짜부터 — 최근 구간끼리 짝짓는다(plans/116 A2)
+    p = portfolio_rets[-n:]
+    b = bench_rets[-n:]
     mean_p = sum(p) / n
     mean_b = sum(b) / n
     cov = sum((p[i] - mean_p) * (b[i] - mean_b) for i in range(n)) / (n - 1)
@@ -79,8 +80,8 @@ def _calc_diversification_score(
             k = min(len(r1), len(r2))
             if k < _MIN_RETURN_POINTS_FOR_CORRELATION:
                 continue
-            r1 = r1[:k]
-            r2 = r2[:k]
+            r1 = r1[-k:]  # 최근 구간끼리 짝짓는다(plans/116 A2)
+            r2 = r2[-k:]
             mean1 = sum(r1) / k
             mean2 = sum(r2) / k
             cov = sum((r1[i2] - mean1) * (r2[i2] - mean2) for i2 in range(k)) / (k - 1)
@@ -134,18 +135,20 @@ async def get_portfolio_risk_metrics(
         loop = asyncio.get_running_loop()
         returns_map = await loop.run_in_executor(None, _sync_fetch_risk_data, yf_symbols, [_SP500_SYMBOL])
 
-        # 포트폴리오 가중 수익률 시계열 구성
+        # 포트폴리오 가중 수익률 시계열 구성 — 시계열은 오래된 날짜부터라 **최근** min_len일로 맞춘다.
+        # 앞에서 자르면 신규 상장 종목의 최근 구간과 다른 종목의 옛 구간이 같은 날로 합쳐진다(plans/116 A2).
         min_len = min(
             (len(returns_map[s]) for s in yf_symbols if s in returns_map),
             default=0,
         )
         portfolio_rets: list[float] = []
         if min_len >= 10:
+            recent = {s: returns_map[s][-min_len:] for s in yf_symbols if s in returns_map}
             for i in range(min_len):
                 r = 0.0
                 for sym, w in zip(yf_symbols, weights, strict=False):
-                    if sym in returns_map and i < len(returns_map[sym]):
-                        r += returns_map[sym][i] * w
+                    if sym in recent:
+                        r += recent[sym][i] * w
                 portfolio_rets.append(r)
 
         # 지표 계산

@@ -83,78 +83,7 @@ class TestXirr:
 
 
 class TestCalcXirr:
-    """_calc_xirr: 트랜잭션 or 스냅샷 경로 XIRR."""
-
-    @pytest.mark.asyncio
-    async def test_returns_estimated_when_no_transactions(self, mock_db):
-        """트랜잭션 없을 때 스냅샷 기반 추정 경로."""
-        from app.services.portfolio.asset_aggregator import _calc_xirr
-
-        user_id = uuid.uuid4()
-        current_total = 11_000_000.0
-
-        # 첫 번째 execute: 트랜잭션 조회 → 빈 결과
-        no_tx_result = MagicMock()
-        no_tx_result.all.return_value = []
-
-        # 두 번째 execute: 스냅샷 조회 → 1년 전 데이터
-        snap_row = SimpleNamespace(
-            snapshot_date=_one_year_before(today_kst()),
-            total=10_000_000.0,
-        )
-        snap_result = MagicMock()
-        snap_result.first.return_value = snap_row
-
-        mock_db.execute = AsyncMock(side_effect=[no_tx_result, snap_result])
-
-        xirr_pct, is_estimated = await _calc_xirr(user_id, current_total, mock_db)
-
-        assert is_estimated is True
-        assert xirr_pct is not None
-        assert 5.0 < xirr_pct < 15.0  # 10% 수익 근방
-
-    @pytest.mark.asyncio
-    async def test_returns_none_when_no_transactions_and_no_snapshot(self, mock_db):
-        """트랜잭션도 스냅샷도 없으면 None 반환."""
-        from app.services.portfolio.asset_aggregator import _calc_xirr
-
-        user_id = uuid.uuid4()
-
-        no_tx_result = MagicMock()
-        no_tx_result.all.return_value = []
-
-        snap_result = MagicMock()
-        snap_result.first.return_value = None
-
-        mock_db.execute = AsyncMock(side_effect=[no_tx_result, snap_result])
-
-        xirr_pct, is_estimated = await _calc_xirr(user_id, 0.0, mock_db)
-        assert xirr_pct is None
-        assert is_estimated is False
-
-    @pytest.mark.asyncio
-    async def test_uses_transactions_when_available(self, mock_db):
-        """트랜잭션이 있으면 직접 계산."""
-        from app.services.portfolio.asset_aggregator import _calc_xirr
-
-        user_id = uuid.uuid4()
-        current_total = 11_000_000.0
-        one_year_ago = _one_year_before(today_kst())
-
-        tx_row = SimpleNamespace(
-            transaction_date=one_year_ago,
-            transaction_type="DEPOSIT",
-            amount=10_000_000.0,
-        )
-        tx_result = MagicMock()
-        tx_result.all.return_value = [tx_row]
-
-        mock_db.execute = AsyncMock(return_value=tx_result)
-
-        xirr_pct, is_estimated = await _calc_xirr(user_id, current_total, mock_db)
-
-        assert is_estimated is False
-        assert xirr_pct is not None
+    """_calc_xirr의 계산 경로는 tests/test_returns_calculator.py가 다룬다 — 여기서는 SQL 계좌 범위만 고정한다."""
 
     @pytest.mark.asyncio
     async def test_transaction_query_excludes_deleted_and_excluded_accounts(self, mock_db):
@@ -164,9 +93,13 @@ class TestCalcXirr:
 
         from app.services.portfolio.asset_aggregator import _calc_xirr
 
+        ids_result = MagicMock()
+        ids_result.all.return_value = []
+        mock_db.scalars = AsyncMock(return_value=ids_result)
         tx_result = MagicMock()
         tx_result.all.return_value = [
             SimpleNamespace(
+                account_id=None,
                 transaction_date=_one_year_before(today_kst()),
                 transaction_type="DEPOSIT",
                 amount=10_000_000.0,
@@ -176,6 +109,9 @@ class TestCalcXirr:
 
         await _calc_xirr(uuid.uuid4(), 11_000_000.0, mock_db)
 
+        ids_sql = str(mock_db.scalars.call_args.args[0].compile(dialect=postgresql.dialect())).lower()
+        assert "asset_accounts.is_active" in ids_sql
+        assert "asset_accounts.include_in_total" in ids_sql
         stmt = mock_db.execute.call_args_list[0].args[0]
         sql = str(stmt.compile(dialect=postgresql.dialect())).lower()
         assert "left outer join asset_accounts" in sql
