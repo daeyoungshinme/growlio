@@ -7,7 +7,7 @@ const update = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/utils/platform", () => ({ isNativePlatform: () => true, getApiBaseUrl: () => "" }));
 vi.mock("@/plugins/WidgetPlugin", () => ({ WidgetPlugin: { update } }));
 
-import { useWidget } from "@/hooks/useWidget";
+import { clearWidget, useWidget } from "@/hooks/useWidget";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
 describe("useWidget", () => {
@@ -26,5 +26,11 @@ describe("useWidget", () => {
     expect(qc.getQueryCache().find({ queryKey: QUERY_KEYS.dashboard })?.getObserversCount()).toBe(
       0,
     );
+  });
+
+  it("clearWidget은 위젯을 빈 값(—)으로 되돌린다(plans/118 C3)", async () => {
+    update.mockClear();
+    await clearWidget();
+    expect(update).toHaveBeenCalledWith({ totalAssets: "—", stockReturn: "—" });
   });
 });

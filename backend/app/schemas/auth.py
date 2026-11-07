@@ -3,11 +3,6 @@ import uuid
 from pydantic import BaseModel, Field
 
 
-class SyncProfileRequest(BaseModel):
-    # users.display_name은 String(100) — 상한이 없으면 긴 이름이 DB 오류(500)로 끝났다
-    display_name: str | None = Field(default=None, max_length=100)
-
-
 class AccountDeleteRequest(BaseModel):
     password: str = Field(min_length=1)
 

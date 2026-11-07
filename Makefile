@@ -16,7 +16,7 @@ migrate-down:
 	cd backend && uv run alembic downgrade -1
 
 install-backend:
-	cd backend && uv sync --extra dev
+	cd backend && uv sync --extra dev --locked
 	uv run --project backend pre-commit install
 
 format-backend:

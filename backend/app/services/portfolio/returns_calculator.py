@@ -94,6 +94,7 @@ def anchored_cashflows(
     openings: dict[uuid.UUID, tuple[date, float]],
     current_total: float,
     today: date,
+    original_openings: dict[uuid.UUID, tuple[date, float]] | None = None,
 ) -> list[tuple[date, float]]:
     """XIRR 현금흐름 — 계좌별 첫 스냅샷 평가액(기초 잔액)을 첫 유출로, 그 뒤 입출금, 마지막에 현재 총액을 유입으로.
 
@@ -106,7 +107,10 @@ def anchored_cashflows(
     - 단 그 계좌에 첫 스냅샷보다 **앞선** 거래가 있으면 입력된 거래 이력이 기초 잔액까지 설명한다고 보고
       기초 잔액을 넣지 않는다(과거 입금을 직접 기록한 사용자) — 넣으면 이중 계산된다.
     - 계좌 미지정 입출금과 첫 스냅샷이 없는 계좌의 입출금은 그대로 둔다.
+    - original_openings: `offset_transfer_openings`로 줄이기 전 기초 잔액. 당일 거래를 버릴지는 이 값으로 판정한다 —
+      상쇄로 0이 된 계좌를 "입금 전 동기화"로 보면 이미 첫 스냅샷에 반영된 당일 입금이 다시 유출로 잡힌다(plans/118 A2).
     """
+    raw_openings = original_openings if original_openings is not None else openings
     by_account: dict[uuid.UUID | None, list[tuple[date, str, float]]] = {}
     for account_id, d, tx_type, amount in flows:
         by_account.setdefault(account_id, []).append((d, tx_type, amount))
@@ -118,6 +122,7 @@ def anchored_cashflows(
             continue
         if opening > 0:
             cashflows.append((d0, -opening))
+        if raw_openings.get(account_id, (d0, opening))[1] > 0:
             by_account[account_id] = [f for f in account_flows if f[0] > d0]
         # 기초 잔액이 0이면(입금 전 동기화) 당일 입금은 스냅샷에 반영되지 않은 실제 유출이라 남긴다(plans/117 A3).
 
@@ -276,7 +281,7 @@ async def calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) 
 
     # 사용자 전체 수익률에서만 계좌 간 이전을 상쇄한다 — 계좌 단위 조회(external_queries)에선
     # 이전도 그 계좌의 실제 유입이다.
-    openings = offset_transfer_openings(openings, await get_transfer_window_snapshots(db, openings), flows)
-    cashflows = anchored_cashflows(flows, openings, current_total, today_kst())
+    adjusted = offset_transfer_openings(openings, await get_transfer_window_snapshots(db, openings), flows)
+    cashflows = anchored_cashflows(flows, adjusted, current_total, today_kst(), original_openings=openings)
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, xirr_from_cashflows, cashflows), not flows

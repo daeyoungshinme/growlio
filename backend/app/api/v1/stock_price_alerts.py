@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,8 +23,9 @@ async def list_stock_price_alerts(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 200,
+    # 음수 skip은 Postgres OFFSET 오류로 500이 났다 — 검증으로 422를 돌려준다(plans/118 B4)
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=200, ge=1, le=500),
 ):
     """주가 목표 알림 목록 조회."""
     result = await db.execute(
@@ -32,7 +33,7 @@ async def list_stock_price_alerts(
         .where(StockPriceAlert.user_id == current_user.id)
         .order_by(StockPriceAlert.created_at.desc())
         .offset(skip)
-        .limit(min(limit, 500))
+        .limit(limit)
     )
     return [StockPriceAlertResponse.model_validate(a) for a in result.scalars().all()]
 

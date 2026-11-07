@@ -3,6 +3,8 @@ import { screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfolioBanner";
 import { renderWithProviders } from "@/test/renderWithProviders";
+import { useAuthStore } from "@/stores/authStore";
+import { targetPortfolioBannerDismissedKey } from "@/constants/storageKeys";
 
 const fetchPortfolios = vi.fn();
 
@@ -10,7 +12,7 @@ vi.mock("@/api/portfolios", () => ({
   fetchPortfolios: (...args: unknown[]) => fetchPortfolios(...args),
 }));
 
-const STORAGE_KEY = "growlio:dashboard:target-portfolio-banner-dismissed";
+const STORAGE_KEY = targetPortfolioBannerDismissedKey("user-1");
 
 function renderBanner() {
   return renderWithProviders(
@@ -23,7 +25,8 @@ function renderBanner() {
 describe("SetupTargetPortfolioBanner", () => {
   beforeEach(() => {
     fetchPortfolios.mockReset();
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.clear();
+    useAuthStore.setState({ userId: "user-1" });
   });
 
   it("포트폴리오가 없으면 배너를 표시한다", async () => {
@@ -55,5 +58,15 @@ describe("SetupTargetPortfolioBanner", () => {
     renderBanner();
     await waitFor(() => expect(fetchPortfolios).toHaveBeenCalledTimes(2));
     expect(screen.queryByText("기준 포트폴리오를 만들어보세요")).not.toBeInTheDocument();
+  });
+
+  it("한 계정이 닫은 배너는 같은 기기의 다른 계정에선 다시 뜬다(plans/118 C7)", async () => {
+    fetchPortfolios.mockResolvedValue([]);
+    localStorage.setItem(STORAGE_KEY, "true");
+    useAuthStore.setState({ userId: "user-2" });
+    renderBanner();
+    await waitFor(() => {
+      expect(screen.getByText("기준 포트폴리오를 만들어보세요")).toBeInTheDocument();
+    });
   });
 });

@@ -5,16 +5,24 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { fmtKrwShort, fmtPct } from "@/utils/format";
 import { isNativePlatform } from "@/utils/platform";
 
-async function pushToWidget(snapshot: DashboardData) {
+async function updateWidget(totalAssets: string, stockReturn: string) {
   try {
     const { WidgetPlugin } = await import("@/plugins/WidgetPlugin");
-    await WidgetPlugin.update({
-      totalAssets: fmtKrwShort(snapshot.total_assets_krw),
-      stockReturn: fmtPct(snapshot.stock_return_pct),
-    });
+    await WidgetPlugin.update({ totalAssets, stockReturn });
   } catch {
     // 위젯 미설치 또는 플러그인 미사용 환경에서는 무시
   }
+}
+
+function pushToWidget(snapshot: DashboardData) {
+  return updateWidget(fmtKrwShort(snapshot.total_assets_krw), fmtPct(snapshot.stock_return_pct));
+}
+
+/** 로그아웃·탈퇴 때 홈 화면 위젯을 빈 값("—", 위젯 기본값)으로 되돌린다 — 안 하면 SharedPreferences에 남은
+ * 이전 계정의 총자산·수익률이 같은 기기의 다음 사용자에게 보인다(plans/118 C3). */
+export async function clearWidget(): Promise<void> {
+  if (!isNativePlatform()) return;
+  await updateWidget("—", "—");
 }
 
 // 앱 데이터가 갱신될 때마다 Android 홈 화면 위젯 데이터를 SharedPreferences로 동기화한다.

@@ -48,16 +48,20 @@ export async function retryPushRegistration(): Promise<void> {
   }
 }
 
-/** 설정탭에서 푸시 알림을 끌 때 사용 — 백엔드에 저장된 FCM 토큰을 삭제하고 끈 기록을 남긴다. */
+/** 설정탭에서 푸시 알림을 끌 때 사용 — 백엔드에 저장된 FCM 토큰을 삭제하고 끈 기록을 남긴다.
+ * 토큰 삭제가 실패하면 서버엔 토큰이 남아 푸시가 계속 오므로, 끈 기록·"꺼짐" 표시 없이 켜진 상태를 유지하고
+ * 오류를 알린다(plans/118 C1). 호출부가 void로 부르므로 여기서 잡는다. */
 export async function disablePushNotifications(): Promise<void> {
   const { setStatus } = usePushNotificationStore.getState();
-  const optOutKey = currentOptOutKey();
-  if (optOutKey) storageSet(optOutKey, "1");
   try {
     await registerPushToken(null);
-  } finally {
-    setStatus("disabled");
+  } catch {
+    toast("푸시 알림을 끄지 못했습니다. 잠시 후 다시 시도하세요.", "error");
+    return;
   }
+  const optOutKey = currentOptOutKey();
+  if (optOutKey) storageSet(optOutKey, "1");
+  setStatus("disabled");
 }
 
 /** 백엔드 push_service.py의 data.type 값 → 앱 내 딥링크 경로 매핑 (data가 없거나 알 수 없는 type이면 null). */

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.constants import (
     DEFAULT_GOAL_CAGR_LOOKBACK_YEARS,
@@ -23,6 +23,9 @@ MAX_GOAL_YEARS_AHEAD = 100
 
 
 class DartApiKeyUpdate(BaseModel):
+    # 붙여넣은 키의 앞뒤 공백·개행이 DART 호출을 실패시키고 그 실패가 10분 쿨다운으로 남지 않게 한다(plans/118 B1)
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     api_key: str = Field(min_length=1, max_length=MAX_CREDENTIAL_LENGTH)  # 암호화 후 String(512)
 
 

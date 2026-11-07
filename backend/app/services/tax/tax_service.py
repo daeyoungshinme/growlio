@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Any, TypedDict
 
 from sqlalchemy import func, or_, select
@@ -351,7 +352,7 @@ async def _calc_taxable_income_by_type(
     conditions = [
         Transaction.user_id == user_id,
         Transaction.transaction_type == transaction_type,
-        func.extract("year", Transaction.transaction_date) == year,
+        Transaction.transaction_date.between(date(year, 1, 1), date(year, 12, 31)),
         or_(AssetAccount.tax_type.is_(None), AssetAccount.tax_type.not_in(TAX_DEFERRED_TAX_TYPES)),
     ]
     if account_id is not None:

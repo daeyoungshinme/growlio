@@ -896,6 +896,63 @@ class TestUpdateDartKey:
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
+    def test_put_dart_strips_whitespace(self, override_settings):
+        """plans/118 B1: 붙여넣은 키의 앞뒤 공백·개행을 지운 뒤 암호화한다."""
+        from unittest.mock import patch as _patch
+
+        user = make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=SimpleNamespace(dart_api_key=None))
+        app = setup_app(user, db)
+        try:
+            with (
+                _patch("app.api.v1.settings.encrypt", return_value="enc_key") as mock_encrypt,
+                _patch("app.api.v1.settings.reset_corp_code_failures"),
+                _patch("app.api.v1.settings.invalidate_dividend_caches", new_callable=AsyncMock),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                ok = client.put(
+                    "/api/v1/settings/dart", json={"api_key": "  key123\n"}, headers={"Authorization": "Bearer fake"}
+                )
+                blank = client.put(
+                    "/api/v1/settings/dart", json={"api_key": "   "}, headers={"Authorization": "Bearer fake"}
+                )
+            assert ok.status_code == 200
+            mock_encrypt.assert_called_once_with("key123")
+            assert blank.status_code == 422
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_delete_dart_invalidates_dividend_caches(self, override_settings):
+        """plans/118 B1: 삭제도 저장과 대칭으로 배당 캐시를 지운다."""
+        from unittest.mock import patch as _patch
+
+        user = make_user()
+        db = _make_mock_db()
+        row = SimpleNamespace(dart_api_key="enc")
+        db.scalar = AsyncMock(return_value=row)
+        app = setup_app(user, db)
+        try:
+            with (
+                _patch("app.api.v1.settings.get_settings_row", new_callable=AsyncMock, return_value=row),
+                _patch("app.api.v1.settings.invalidate_dividend_caches", new_callable=AsyncMock) as mock_invalidate,
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.delete("/api/v1/settings/dart", headers={"Authorization": "Bearer fake"})
+            assert resp.status_code == 200
+            assert row.dart_api_key is None
+            assert mock_invalidate.await_args.args[1] == user.id
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
 
 class TestUpdateChallengeReminders:
     def test_put_challenge_reminders_returns_200_and_sets_flag(self, override_settings):

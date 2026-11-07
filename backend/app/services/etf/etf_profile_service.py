@@ -39,6 +39,8 @@ _NAVER_FETCH_CONCURRENCY = 6
 _FETCH_DEADLINE_SECONDS = 20.0
 """프로필 조회 전체 상한 — Naver 최대 20건 × (10초 타임아웃 + 재시도)가 엔드포인트를 붙잡지 않게 한다.
 초과하면 그때까지 받은 프로필만 쓰고 나머지는 None(캐싱 안 함 → 다음 요청에 재시도)."""
+_EMPTY_INFO_STREAK_AS_MISSING = 3
+"""Yahoo가 살아 있는 배치에서 이 횟수만큼 연속으로 빈 응답을 준 해외 심볼은 "데이터 없음"으로 확정한다."""
 
 
 class EtfProfile(TypedDict):
@@ -106,6 +108,40 @@ async def get_etf_profiles(
     return profiles
 
 
+async def _empty_info_confirms_missing(cache: CacheStoreType, ticker: str, market: str, yahoo_alive: bool) -> bool:
+    """해외 심볼의 연속 빈 응답 횟수를 세고, `_EMPTY_INFO_STREAK_AS_MISSING`에 닿으면 True("데이터 없음" 확정)."""
+    streak_key = etf_profile_key(ticker, market) + ":empty"
+    prev = int((await get_cached_json(cache, streak_key) or {}).get("n", 0))
+    if prev == 0 and not yahoo_alive:
+        return False  # 첫 빈 응답이 배치 전체 실패와 겹치면 조회 실패와 구분되지 않는다
+    if prev + 1 >= _EMPTY_INFO_STREAK_AS_MISSING:
+        return True
+    await set_cached_json(cache, streak_key, {"n": prev + 1}, TTL_ETF_PROFILE_MISSING)
+    return False
+
+
+async def _resolve_overseas(
+    cache: CacheStoreType, overseas: list[tuple[str, str]]
+) -> list[tuple[str, str, EtfProfile | None, bool]]:
+    """해외 심볼을 Yahoo로 조회해 캐싱할 (ticker, market, profile, definitive) 목록을 돌려준다(미확정은 빠진다)."""
+    symbol_to_key = {to_yf_symbol(t, m): (t, m) for t, m in overseas}
+    info_map = await run_yf_bounded(fetch_yf_info, list(symbol_to_key))
+    # 다른 심볼은 응답을 받은 배치에서 빈 응답이 시작돼 연속으로 이어지면 상장폐지·비정상 심볼로 보고
+    # "데이터 없음"(1일)으로 캐싱한다. 안 그러면 그런 종목 하나 때문에 겹침 분석이 매 요청 캐시 없이 다시 돈다
+    # (plans/118 B2). 한 번의 빈 응답은 일시 실패일 수 있고, 배치 전체가 빈 응답에서 시작한 연속은
+    # 조회 실패(서킷브레이커·네트워크)와 구분되지 않으므로 세지 않는다.
+    yahoo_alive = any(info_map.get(symbol) for symbol in symbol_to_key)
+    out: list[tuple[str, str, EtfProfile | None, bool]] = []
+    for symbol, (t, m) in symbol_to_key.items():
+        info = info_map.get(symbol)
+        if not info:
+            if await _empty_info_confirms_missing(cache, t, m, yahoo_alive):
+                out.append((t, m, None, False))
+            continue
+        out.append((t, m, parse_yahoo_etf_profile(info), bool(info.get("quoteType"))))
+    return out
+
+
 async def get_etf_profiles_with_status(
     cache: CacheStoreType, items: list[tuple[str, str, str]]
 ) -> tuple[dict[tuple[str, str], EtfProfile | None], set[tuple[str, str]]]:
@@ -155,14 +191,8 @@ async def get_etf_profiles_with_status(
     async def _fetch_overseas() -> None:
         if not overseas:
             return
-        symbol_to_key = {to_yf_symbol(t, m): (t, m) for t, m in overseas}
-        info_map = await run_yf_bounded(fetch_yf_info, list(symbol_to_key))
-        for symbol, (t, m) in symbol_to_key.items():
-            info = info_map.get(symbol)
-            if not info:
-                # 빈 응답은 조회 실패(서킷브레이커·네트워크)와 구분되지 않으므로 캐싱하지 않는다.
-                continue
-            await _store(t, m, parse_yahoo_etf_profile(info), definitive=bool(info.get("quoteType")))
+        for t, m, profile, definitive in await _resolve_overseas(cache, overseas):
+            await _store(t, m, profile, definitive=definitive)
 
     try:
         await asyncio.wait_for(

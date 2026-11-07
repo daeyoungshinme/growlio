@@ -252,9 +252,9 @@ class TestMonthlyWrapJob:
         assert invalidate.await_args.args[1] == user.id
 
     @pytest.mark.asyncio
-    async def test_failed_send_keeps_challenge_active_for_retry(self):
-        """plans/117 B2: 알림이 나가지 않으면 COMPLETED로 바꾸지 않는다 — 재실행은 ACTIVE만 조회하므로
-        먼저 바꾸면 "챌린지 달성" 알림이 영영 나가지 않는다."""
+    async def test_failed_send_still_completes_challenge(self):
+        """plans/118 A1: 알림이 실패해도(채널 없음 등) 완료는 저장한다 — 117 B2처럼 알림 성공 시에만 바꾸면
+        채널이 없는 사용자는 영영 ACTIVE로 남는다. 알림 재시도는 '이번 달 완료' 조회가 맡는다."""
         user, settings = _user(), _settings()
         ch = _challenge(user_id=user.id, target_months=3, start_month="2025-01")
         session = _session([(user, settings)], [ch])
@@ -283,8 +283,73 @@ class TestMonthlyWrapJob:
 
             await run_challenge_monthly_wrap()
         assert dispatch.called
-        assert ch.status == "ACTIVE"
-        assert ch.completed_at is None
+        assert ch.status == "COMPLETED"
+        assert ch.completed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_retries_alert_for_completed_challenge_even_if_progress_dropped(self):
+        """이번 달 완료됐지만 알림이 안 나간(dedup 키 없음) RETURN_PCT 챌린지 — 재실행 시점에 수익률이
+        목표 아래로 내려가도 달성 알림을 다시 시도하고, 완료 상태·완료 시각은 그대로 둔다."""
+        from datetime import UTC, datetime
+
+        user, settings = _user(), _settings()
+        done_at = datetime(2026, 3, 1, 1, 0, tzinfo=UTC)
+        ch = _challenge(
+            user_id=user.id,
+            challenge_type="RETURN_PCT",
+            target_pct=10.0,
+            target_months=None,
+            status="COMPLETED",
+            completed_at=done_at,
+        )
+        session = _session([(user, settings)], [ch])
+        with (
+            patch("app.jobs.challenge_monthly_wrap.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.challenge_monthly_wrap._prev_month_str", return_value="2026-02"),
+            patch(
+                "app.services.challenge_service.compute_progress",
+                new_callable=AsyncMock,
+                return_value=_progress(progress_pct=80.0),
+            ),
+            patch(
+                "app.jobs.challenge_monthly_wrap.dispatch_dual_channel_alert", new_callable=AsyncMock, return_value=True
+            ) as dispatch,
+            patch("app.services.challenge_service.invalidate_challenge_cache", new_callable=AsyncMock),
+        ):
+            from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
+
+            await run_challenge_monthly_wrap()
+        dispatch.assert_awaited_once()
+        assert "달성" in dispatch.call_args.kwargs["history_message"]
+        assert ch.status == "COMPLETED"
+        assert ch.completed_at == done_at
+
+    @pytest.mark.asyncio
+    async def test_query_includes_challenges_completed_this_month(self):
+        """조회는 ACTIVE + 이번 달(KST 월초 이후) 완료분 — 지난달 이전 완료분은 새 월 키로 재발송되지 않게 뺀다."""
+        user, settings = _user(), _settings()
+        session = _session([(user, settings)], [])
+        captured = []
+        orig_execute = session.execute
+
+        async def cap(stmt):
+            captured.append(stmt)
+            return await orig_execute(stmt)
+
+        session.execute = cap
+        with (
+            patch("app.jobs.challenge_monthly_wrap.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+        ):
+            from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
+
+            await run_challenge_monthly_wrap()
+        sql = " ".join(str(st.compile(compile_kwargs={"literal_binds": True})) for st in captured)
+        assert "investment_challenges.status = 'COMPLETED'" in sql
+        assert "investment_challenges.completed_at >=" in sql
 
     @pytest.mark.asyncio
     async def test_return_pct_wrap_only_sends_when_complete(self):

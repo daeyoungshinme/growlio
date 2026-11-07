@@ -41,6 +41,7 @@ cd backend && uv run mypy app/
 - `conftest.py`가 외부 DNS 조회를 막고 시도한 테스트를 실패시킨다 → 해당 호출을 mock. `settings.fred_api_key`도 비운다. `curl_cffi`(yfinance)는 안 걸리니 직접 mock.
 
 - 실제 DB 없이 mocked `AsyncSession`(`tests/conftest.py`). 환경변수(`KIS_CRED_ENCRYPTION_KEY` 등)도 conftest가 override — `.env` 없이 실행 가능.
+- 예외: `@pytest.mark.db`(`tests/test_real_db_upserts.py`)는 `GROWLIO_TEST_DATABASE_URL`이 있을 때만 실 Postgres에 붙는다(CI는 서비스 컨테이너, 로컬은 skip). `DATABASE_URL`로 바꾸지 말 것 — 로컬 `.env`가 공유 Supabase를 가리킬 수 있다. ON CONFLICT·제약 이름·타입 캐스트처럼 mock으로 못 잡는 SQL은 여기에 추가.
 - 주요 fixtures: `mock_db`, `mock_cache`(in-memory get/set/setex), `make_account`, `make_snapshot`, `make_user_settings`.
 - API 라우트 테스트 공용 헬퍼: `tests/api_helpers.py`(`make_user`·`make_mock_db`·`setup_app`). 구성이 다르면 로컬 헬퍼를 둔다.
 - **Windows**: 전체 실행이 `N passed` 후 exit `-1073741819`(0xC0000005)로 끝나는 건 네이티브 확장 teardown 이슈 — 테스트 실패 아님. 판정은 `N passed` 출력과 CI 기준.

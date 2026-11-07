@@ -15,6 +15,7 @@ import {
   invalidateChallengeData,
   invalidateSettingsData,
   invalidateTradeData,
+  invalidateDartKeyData,
   invalidateRebalancingPlanData,
   invalidateTacticalData,
 } from "../queryInvalidation";
@@ -232,6 +233,8 @@ describe("invalidateTradeData", () => {
       "tax-summary",
       "tax-action-plan",
       "action-items",
+      // 백엔드도 매매 기록 CUD에서 인사이트 캐시를 지운다(plans/117 B4·118 C5)
+      "insights",
     ]);
   });
 
@@ -330,5 +333,22 @@ describe("자산 합계 기준 카드 무효화 (plans/110 D4)", () => {
     const spy = vi.spyOn(qc, "invalidateQueries").mockResolvedValue();
     await invalidateChallengeData(qc);
     expect(keysOf(spy)).toContain(JSON.stringify(QUERY_KEYS.settings));
+  });
+});
+
+describe("invalidateDartKeyData", () => {
+  it("DART 키 저장·삭제는 설정과 배당 쿼리를 함께 지운다(plans/118 C2)", async () => {
+    const qc = makeQueryClient();
+    await invalidateDartKeyData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        QUERY_KEYS.settings,
+        QUERY_KEYS.dividendSummaryBase,
+        QUERY_KEYS.dividendByTickerBase,
+        QUERY_KEYS.dividendPositionsBase,
+        QUERY_KEYS.dividendPlan,
+      ]),
+    );
   });
 });

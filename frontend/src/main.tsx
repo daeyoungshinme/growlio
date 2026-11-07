@@ -17,11 +17,13 @@ import {
   shouldPersistQuery,
 } from "./constants/queryConfig";
 import { getLocalStorageOrUndefined } from "./utils/safeStorage";
+import { removeLegacyDeviceKeys } from "./constants/storageKeys";
 import { setupPreloadErrorReload, setupServiceWorker } from "./lib/serviceWorker";
 import { initSentryDeferred } from "./lib/sentry";
 
 setupServiceWorker();
 setupPreloadErrorReload();
+removeLegacyDeviceKeys();
 
 const queryClient = new QueryClient({
   defaultOptions: {

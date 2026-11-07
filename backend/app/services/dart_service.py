@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import time
 import zipfile
@@ -26,7 +27,12 @@ _CORP_CODE_TTL_HOURS = 24
 # 국내 종목마다 30초 타임아웃 ZIP 다운로드를 락 뒤에서 줄줄이 반복해 배당 화면이 수 분씩 멈췄다(plans/117 B1).
 # 전역 서킷브레이커는 쓰지 않는다 — 키는 사용자마다 달라 한 사용자의 잘못된 키가 모두를 막으면 안 된다.
 _CORP_CODE_RETRY_COOLDOWN_SEC = 600
-_corp_code_failed_at: dict[str, float] = {}  # api_key → time.monotonic()
+# 키는 평문 API 키 대신 해시로 둔다 — 프로세스 메모리에 사용자 키를 오래 들고 있지 않게(plans/118 B1)
+_corp_code_failed_at: dict[str, float] = {}  # sha256(api_key) → time.monotonic()
+
+
+def _failure_key(api_key: str) -> str:
+    return hashlib.sha256(api_key.encode()).hexdigest()
 
 
 def reset_corp_code_failures() -> None:
@@ -74,7 +80,7 @@ async def _ensure_corp_code_map(api_key: str) -> dict[str, str]:
         return age < _CORP_CODE_TTL_HOURS * 3600
 
     def _in_cooldown() -> bool:
-        failed_at = _corp_code_failed_at.get(api_key)
+        failed_at = _corp_code_failed_at.get(_failure_key(api_key))
         return failed_at is not None and time.monotonic() - failed_at < _CORP_CODE_RETRY_COOLDOWN_SEC
 
     if _is_fresh() or _in_cooldown():
@@ -88,9 +94,9 @@ async def _ensure_corp_code_map(api_key: str) -> dict[str, str]:
         if new_map:
             _corp_code_map = new_map
             _corp_code_loaded_at = time.monotonic()
-            _corp_code_failed_at.pop(api_key, None)
+            _corp_code_failed_at.pop(_failure_key(api_key), None)
         else:
-            _corp_code_failed_at[api_key] = time.monotonic()
+            _corp_code_failed_at[_failure_key(api_key)] = time.monotonic()
             logger.warning("dart_corp_code_refresh_failed", stale_count=len(_corp_code_map))
 
         return _corp_code_map

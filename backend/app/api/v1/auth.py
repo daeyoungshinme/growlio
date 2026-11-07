@@ -15,7 +15,6 @@ from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
 from app.schemas.auth import (
     AccountDeleteRequest,
-    SyncProfileRequest,
     UserResponse,
 )
 from app.services.auth_service import delete_supabase_user, supabase_user_exists, verify_password
@@ -49,11 +48,12 @@ async def _supabase_user_exists_or_503(user_id: str, *, event: str) -> bool:
 @limiter.limit("10/minute")
 async def sync_profile(
     request: Request,
-    req: SyncProfileRequest,
     payload: dict = Depends(get_token_payload),
     db: AsyncSession = Depends(get_db),
 ):
-    """Supabase 회원가입 후 앱 DB에 users + user_settings 행 생성. 멱등 (이미 있으면 기존 반환)."""
+    """Supabase 회원가입 후 앱 DB에 users + user_settings 행 생성. 멱등 (이미 있으면 기존 반환).
+
+    요청 본문은 받지 않는다 — 가입 이름 입력은 117 C6에서 없어졌다. 예전 클라이언트가 보내는 본문은 무시된다."""
     user_id = payload.get("sub")
     email = payload.get("email")
     if not user_id or not email:
@@ -101,7 +101,6 @@ async def sync_profile(
     user = User(
         id=user_id,
         email=email,
-        display_name=req.display_name,
         needs_password_reset=False,
     )
     db.add(user)
