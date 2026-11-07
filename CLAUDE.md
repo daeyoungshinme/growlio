@@ -25,7 +25,7 @@ docker compose up -d db
 
 # 2. 의존성 설치
 make install-backend   # backend uv sync(uv.lock 기준, CI와 동일) + pre-commit install (최초 1회)
-make install-frontend  # npm install
+make install-frontend  # npm ci (package-lock.json 기준, CI와 동일)
 
 # 3. 환경 변수 설정
 cp backend/.env.example backend/.env    # 값 채우기 (backend/CLAUDE.md Environment 섹션 참고)

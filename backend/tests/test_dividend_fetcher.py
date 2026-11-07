@@ -86,9 +86,8 @@ class TestFetchTickerDividendInfo:
         """KNOWN_DIVIDEND_SCHEDULES에 있는 종목은 배당월 직접 사용."""
         from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES
 
-        # Find a ticker in KNOWN_DIVIDEND_SCHEDULES
-        if not KNOWN_DIVIDEND_SCHEDULES:
-            pytest.skip("KNOWN_DIVIDEND_SCHEDULES is empty")
+        # 비어 있으면 조용히 skip하지 않고 실패한다 — 이 테스트가 지키는 경로가 사라졌다는 뜻이다(plans/116 D5)
+        assert KNOWN_DIVIDEND_SCHEDULES, "KNOWN_DIVIDEND_SCHEDULES is empty"
 
         known_ticker, known_market = next(iter(KNOWN_DIVIDEND_SCHEDULES.keys()))
         expected_months = KNOWN_DIVIDEND_SCHEDULES[(known_ticker, known_market.upper())]

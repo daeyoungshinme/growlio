@@ -12,7 +12,6 @@ dependencies = [
     "uvloop>=0.15.1,<1.0.0; sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'PyPy'",
     "httptools>=0.6.3,<1.0.0",
     "python-dotenv>=0.13,<2.0",
-    "pyyaml>=5.1,<7.0",
     "colorama>=0.4,<1.0; sys_platform == 'win32'",
     # Database
     "sqlalchemy>=2.0.0,<3.0.0",
