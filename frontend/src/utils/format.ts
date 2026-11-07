@@ -7,10 +7,16 @@ import { isOverseasMarket } from "@/constants/markets";
  * 예: 150_000_000 → "1.50억원", 50_000 → "5만원", 3_000 → "3,000원"
  */
 export function fmtKrw(n: number): string {
-  if (Math.abs(n) >= 1e8) return `${(n / 1e8).toFixed(2)}억원`;
+  // 억 경계는 만 단위로 반올림한 값으로 판정 — 99,995,000이 "10,000만원"으로 보이지 않게(plans/116 C6)
+  if (Math.abs(Math.round(n / 1e4)) >= 1e4) return `${(n / 1e8).toFixed(2)}억원`;
   if (Math.abs(n) >= 1e4) return `${Math.round(n / 1e4).toLocaleString()}만원`;
   // 원 단위 절사는 0 방향 — floor면 음수가 커져 -0.3이 "-1원"이 된다
   return `${(Math.trunc(n) || 0).toLocaleString()}원`;
+}
+
+/** 금액을 모를 때(환율 미로딩 등) "—" — 그 외엔 fmtKrw */
+export function fmtKrwOrDash(n: number | null | undefined): string {
+  return n == null ? "—" : fmtKrw(n);
 }
 
 /**
@@ -43,7 +49,7 @@ export function fmtNativePrice(price: number, market: string): string {
  * 예: 150_000_000 → "1.5억", 50_000 → "5만"
  */
 export function fmtKrwShort(n: number): string {
-  if (Math.abs(n) >= 1e8) return `${(n / 1e8).toFixed(1)}억`;
+  if (Math.abs(Math.round(n / 1e4)) >= 1e4) return `${(n / 1e8).toFixed(1)}억`;
   if (Math.abs(n) >= 1e4) return `${Math.round(n / 1e4).toLocaleString()}만`;
   return `${(Math.trunc(n) || 0).toLocaleString()}`;
 }
@@ -68,6 +74,20 @@ export function convertUsdToKrw(
 ): number {
   if (!usd || !rate) return 0;
   return Math.round(usd * rate);
+}
+
+/**
+ * 원화 + 달러 예수금 합계(원). 달러 예수금이 있는데 환율이 없으면 null — 1:1로 더하면 $3,000이 3,000원으로
+ * 보인다(plans/116 C3). 호출부는 null일 때 원화만 보여주고 "환율 조회 중"을 붙인다.
+ */
+export function depositTotalKrw(
+  account: { deposit_krw?: number | null; deposit_usd?: number | null },
+  rate: number | null | undefined,
+): number | null {
+  const krw = account.deposit_krw ?? 0;
+  const usd = account.deposit_usd ?? 0;
+  if (usd <= 0) return krw;
+  return rate ? krw + convertUsdToKrw(usd, rate) : null;
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import { clampPct, fmtKrwShort, fmtPct, fmtSigned } from "@/utils/format";
+import { clampPct, fmtKrwShort, fmtPct, fmtSigned, fmtKrwPrice } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { weightBarColor } from "@/utils/dividendUtils";
 import type { DividendYield } from "@/types";
@@ -97,10 +97,8 @@ export default function StockHoldingMobileCard({
             </span>
           </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            <DetailItem label="평단가">
-              {Math.round(agg.weighted_avg_price).toLocaleString()}
-            </DetailItem>
-            <DetailItem label="현재가">{agg.current_price.toLocaleString()}</DetailItem>
+            <DetailItem label="평단가">{fmtKrwPrice(agg.weighted_avg_price)}</DetailItem>
+            <DetailItem label="현재가">{fmtKrwPrice(agg.current_price)}</DetailItem>
             {divReady && divData.investment_yield > 0 && (
               <DetailItem label="투자배당율">
                 <span className="text-green-600 dark:text-green-500">

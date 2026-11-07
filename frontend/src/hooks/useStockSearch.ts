@@ -16,9 +16,18 @@ export function useStockSearch(debounceMs = 300) {
     };
   }, []);
 
+  // 진행 중인 요청을 끊는다 — 끊지 않으면 검색창을 비운 뒤 도착한 응답이 옛 결과를 다시 띄운다(plans/116 C5)
+  const cancelPending = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsSearching(false);
+  };
+
   const search = (query: string) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (!query.trim()) {
+      cancelPending();
       setSuggestions([]);
       setIsSearchError(false);
       return;
@@ -45,6 +54,7 @@ export function useStockSearch(debounceMs = 300) {
   };
 
   const clearSuggestions = () => {
+    cancelPending();
     setSuggestions([]);
     setIsSearchError(false);
   };

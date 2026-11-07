@@ -30,4 +30,22 @@ describe("useStockSearch 중단된 이전 검색", () => {
     expect(result.current.isSearching).toBe(false);
     vi.useRealTimers();
   });
+
+  it("검색창을 비우면 진행 중인 응답이 옛 결과를 다시 띄우지 않는다", async () => {
+    vi.useFakeTimers();
+    let resolveFirst!: (v: unknown[]) => void;
+    vi.mocked(searchStocks).mockImplementationOnce(
+      () => new Promise((r) => (resolveFirst = r as never)),
+    );
+    const { result } = renderHook(() => useStockSearch(10));
+
+    act(() => result.current.search("삼성"));
+    await act(async () => vi.advanceTimersByTime(10));
+    act(() => result.current.search(""));
+    await act(async () => resolveFirst([{ ticker: "005930", name: "삼성전자", market: "KOSPI" }]));
+
+    expect(result.current.suggestions).toEqual([]);
+    expect(result.current.isSearching).toBe(false);
+    vi.useRealTimers();
+  });
 });

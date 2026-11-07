@@ -1,6 +1,6 @@
 import React from "react";
 import type { RebalancingItem } from "@/api/rebalancing";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtKrwOrDash } from "@/utils/format";
 import { SideBadge } from "./RebalancingBadges";
 import { isOverseasMarket } from "@/constants/markets";
 import { limitPriceKrw } from "./rebalancingTradeMath";
@@ -27,7 +27,7 @@ export interface RebalancingMobileCardProps {
   globalUsdRate: number | null;
   nativeLimitPrice: number;
   currentNativePrice: number | undefined;
-  estKrw: number;
+  estKrw: number | null;
   marketOrderEst: number | null;
   dispatch: React.Dispatch<ExecutionAction>;
 }
@@ -180,8 +180,8 @@ export function RebalancingMobileCard({
           </div>
           {nativeLimitPrice > 0 && (
             <p className="text-xs text-gray-500 dark:text-gray-600 mt-0.5 text-right">
-              ≈ {fmtKrw(limitPriceKrw(nativeLimitPrice, item.market, globalUsdRate))} × {qty}주 ={" "}
-              {fmtKrw(estKrw)}
+              ≈ {fmtKrwOrDash(limitPriceKrw(nativeLimitPrice, item.market, globalUsdRate))} × {qty}
+              주 = {fmtKrwOrDash(estKrw)}
             </p>
           )}
         </div>

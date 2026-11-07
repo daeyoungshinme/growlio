@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { clampPct, fmtKrwShort, fmtPct, fmtSigned } from "@/utils/format";
+import { clampPct, fmtKrwShort, fmtPct, fmtSigned, fmtKrwPrice } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import type { DividendYield } from "@/types";
 import { marketLabel } from "@/constants/markets";
@@ -205,10 +205,10 @@ export default function StockHoldingsDesktopTable({
                     {agg.total_qty.toLocaleString()}
                   </td>
                   <td className="py-3 px-4 text-right text-xs text-gray-500 dark:text-gray-400">
-                    {Math.round(agg.weighted_avg_price).toLocaleString()}
+                    {fmtKrwPrice(agg.weighted_avg_price)}
                   </td>
                   <td className="py-3 px-4 text-right text-xs font-medium">
-                    {agg.current_price.toLocaleString()}
+                    {fmtKrwPrice(agg.current_price)}
                   </td>
                   <td className="py-3 px-4 text-right text-xs font-semibold">
                     {fmtKrwShort(agg.total_value_krw)}원
@@ -259,10 +259,10 @@ export default function StockHoldingsDesktopTable({
                         {sub.qty.toLocaleString()}
                       </td>
                       <td className="py-2 px-4 text-right text-xs text-gray-400 dark:text-gray-500">
-                        {sub.avg_price.toLocaleString()}
+                        {fmtKrwPrice(sub.avg_price)}
                       </td>
                       <td className="py-2 px-4 text-right text-xs text-gray-500 dark:text-gray-400">
-                        {sub.current_price.toLocaleString()}
+                        {fmtKrwPrice(sub.current_price)}
                       </td>
                       <td className="py-2 px-4 text-right text-xs text-gray-600 dark:text-gray-400">
                         {fmtKrwShort(sub.value_krw)}원
