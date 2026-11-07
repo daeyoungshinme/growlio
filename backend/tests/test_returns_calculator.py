@@ -254,6 +254,25 @@ class TestOffsetTransferOpenings:
         assert adjusted[self.B][1] == 0.0
         assert adjusted[self.C][1] == 2_000_000.0
 
+    def test_offset_to_zero_keeps_dropping_same_day_deposit(self):
+        """plans/118 A2: 상쇄로 B 기초 잔액이 0이 돼도 B의 d0 당일 입금은 원래 첫 스냅샷에 반영돼 있다.
+        '입금 전 동기화된 0'으로 보고 남기면 투자금이 2천만으로 이중 계산된다."""
+        openings = {self.A: (date(2024, 1, 1), 10_000_000.0), self.B: (date(2026, 3, 10), 10_000_000.0)}
+        snapshots = {self.A: [(date(2026, 3, 8), 10_000_000.0), (date(2026, 3, 11), 0.0)]}
+        flows = [(self.B, date(2026, 3, 10), "DEPOSIT", 10_000_000.0)]
+        adjusted = offset_transfer_openings(openings, snapshots, flows)
+        assert adjusted[self.B][1] == 0.0
+        cashflows = anchored_cashflows(flows, adjusted, 10_000_000.0, self.TODAY, original_openings=openings)
+        invested = -sum(amount for _, amount in cashflows if amount < 0)
+        assert invested == 10_000_000.0
+
+    def test_zero_opening_without_offset_keeps_same_day_deposit(self):
+        """원래부터 0인 기초 잔액(입금 전 동기화)은 여전히 당일 입금을 남긴다(plans/117 A3)."""
+        openings = {self.B: (date(2026, 3, 10), 0.0)}
+        flows = [(self.B, date(2026, 3, 10), "DEPOSIT", 10_000_000.0)]
+        cashflows = anchored_cashflows(flows, openings, 10_000_000.0, self.TODAY, original_openings=openings)
+        assert (date(2026, 3, 10), -10_000_000.0) in cashflows
+
     def test_drop_outside_window_ignored(self):
         openings = {self.A: (date(2024, 1, 1), 10_000_000.0), self.B: (date(2026, 3, 10), 10_000_000.0)}
         snapshots = {self.A: [(date(2026, 2, 1), 10_000_000.0), (date(2026, 3, 11), 0.0)]}

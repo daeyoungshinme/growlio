@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
@@ -27,8 +27,8 @@ from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.notifications.email_service import send_challenge_wrap_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
+from app.utils.kst import kst_day_start, today_kst
 from app.utils.kst import month_label as _month_label
-from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -65,14 +65,24 @@ async def _run_challenge_monthly_wrap(db: AsyncSession, cache: CacheStoreType) -
 
 async def _wrap_user(user: User, settings_row: UserSettings, to_email: str, cache: CacheStoreType) -> None:
     prev_month = _prev_month_str()
+    # 이번 달(KST)에 완료 처리된 챌린지도 다시 본다 — 완료 전환은 알림과 무관하게 저장하므로, 결산 알림이
+    # 실패했으면 같은 달 재실행(catch-up)이 dedup 키 없는 완료 챌린지에 알림을 다시 시도한다(plans/118 A1).
+    # 다음 달에는 빠지므로 이미 알림이 나간 완료 챌린지가 새 월 키로 다시 발송되지 않는다.
+    month_start = kst_day_start(today_kst().replace(day=1))
     async with AsyncSessionLocal() as db:
         challenges = (
             (
                 await db.execute(
                     select(InvestmentChallenge).where(
                         InvestmentChallenge.user_id == user.id,
-                        InvestmentChallenge.status == CHALLENGE_ACTIVE,
                         InvestmentChallenge.reminder_enabled == True,
+                        or_(
+                            InvestmentChallenge.status == CHALLENGE_ACTIVE,
+                            and_(
+                                InvestmentChallenge.status == CHALLENGE_COMPLETED,
+                                InvestmentChallenge.completed_at >= month_start,
+                            ),
+                        ),
                     )
                 )
             )
@@ -101,6 +111,8 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
         return
 
     progress = await challenge_service.compute_progress(challenge, user.id, db)
+    # 이번 달 결산에서 이미 완료로 바뀐 챌린지(알림 재시도) — 그 뒤 수익률이 내려가도 달성은 확정이다
+    already_completed = challenge.status == CHALLENGE_COMPLETED
 
     if challenge.challenge_type == CHALLENGE_DEPOSIT:
         if challenge.start_month > prev_month:
@@ -108,11 +120,13 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
         prev_entry = next((mo for mo in progress.months if mo.month == prev_month), None)
         prev_net = prev_entry.net_krw if prev_entry else 0.0
         target_met = prev_entry.target_met if prev_entry else False
-        completed = bool(challenge.target_months and progress.current_streak >= challenge.target_months)
+        completed = already_completed or bool(
+            challenge.target_months and progress.current_streak >= challenge.target_months
+        )
         milestone = progress.current_streak if progress.current_streak in _MILESTONES else None
     else:
         # RETURN_PCT / TARGET_VALUE — 목표 도달 시에만 발송
-        completed = progress.progress_pct is not None and progress.progress_pct >= 100
+        completed = already_completed or (progress.progress_pct is not None and progress.progress_pct >= 100)
         if not completed:
             await set_durable(db, key, "1", ttl=_DEDUP_TTL, commit=False)
             return
@@ -144,12 +158,18 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
         commit=False,
         after_sent=lambda: set_durable(db, key, "1", ttl=_DEDUP_TTL, commit=False),
     )
-    # 완료 전환은 알림이 나간 뒤에만 한다 — 먼저 바꾸면 발송 실패 시 재실행(catch-up)이 ACTIVE만 조회해
-    # "챌린지 달성" 알림이 영영 나가지 않는다(plans/117 B2). 실패하면 ACTIVE로 남아 다음 실행이 다시 시도한다.
-    if sent and completed and challenge.status != CHALLENGE_COMPLETED:
+    # 완료 전환은 알림 결과와 무관하게 저장한다 — 알림 채널이 하나도 없는 사용자(FCM 토큰 없음·메일 미설정)도
+    # 달성이 기록돼야 하고, RETURN_PCT는 다음 달 수익률이 내려가면 달성 자체가 사라진다(plans/118 A1).
+    # 알림 재시도는 위 조회가 "이번 달 완료 + dedup 키 없음"으로 처리한다.
+    if completed and challenge.status != CHALLENGE_COMPLETED:
         challenge.status = CHALLENGE_COMPLETED
         challenge.completed_at = datetime.now(UTC)
-    logger.info("challenge_wrap_sent", user_id=str(user.id), challenge_id=str(challenge.id), completed=completed)
+    logger.info(
+        "challenge_wrap_sent" if sent else "challenge_wrap_not_sent",
+        user_id=str(user.id),
+        challenge_id=str(challenge.id),
+        completed=completed,
+    )
 
 
 def _history_message(title: str, month: str, target_met: bool, streak: int, completed: bool) -> str:
