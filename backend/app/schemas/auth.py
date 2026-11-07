@@ -8,14 +8,6 @@ class SyncProfileRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=100)
 
 
-class FindAccountRequest(BaseModel):
-    display_name: str = Field(min_length=1, max_length=100)
-
-
-class FindAccountResponse(BaseModel):
-    message: str
-
-
 class AccountDeleteRequest(BaseModel):
     password: str = Field(min_length=1)
 

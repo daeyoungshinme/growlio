@@ -9,14 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db, get_token_payload
 from app.core.cache_store import get_cache_store
 from app.core.job_runner import report_handled_failure
-from app.limiter import ip_rate_limit_key, limiter, peer_rate_limit_key
+from app.limiter import limiter
 from app.models.app_state import AppState
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
 from app.schemas.auth import (
     AccountDeleteRequest,
-    FindAccountRequest,
-    FindAccountResponse,
     SyncProfileRequest,
     UserResponse,
 )
@@ -139,15 +137,6 @@ async def password_reset_complete(
         current_user.needs_password_reset = False
         await db.commit()
     return current_user
-
-
-@router.post("/find-account", response_model=FindAccountResponse)
-@limiter.limit("3/hour", key_func=ip_rate_limit_key)
-@limiter.limit("30/hour", key_func=peer_rate_limit_key)
-async def find_account(request: Request, req: FindAccountRequest):
-    # 계정 존재 여부를 응답에서 노출하지 않음 (사용자 열거 방지)
-    msg = "가입 시 사용하신 이름과 이메일로 로그인을 시도해 보세요."
-    return FindAccountResponse(message=msg)
 
 
 @router.post("/account/delete", status_code=status.HTTP_204_NO_CONTENT)

@@ -88,7 +88,7 @@ def _route_limits() -> dict:
 def test_sensitive_public_routes_stack_ip_and_peer_keys():
     # 인증 없이 상태를 바꾸거나 토큰을 받는 라우트: 첫 hop IP 한도 + 위조 불가 peer 상한
     limits = _route_limits()
-    for name in ("find_account", "preview_plan_action", "cancel_buy_by_token", "decide_sell_by_token"):
+    for name in ("preview_plan_action", "cancel_buy_by_token", "decide_sell_by_token"):
         key_funcs = {lim.key_func for lim in limits[name]}
         assert key_funcs == {ip_rate_limit_key, peer_rate_limit_key}, name
 
@@ -101,19 +101,26 @@ def test_low_value_lookup_routes_use_default_user_key():
 
 
 def test_forged_forwarded_for_cannot_bypass_peer_cap():
+    from unittest.mock import AsyncMock, patch
+
     from fastapi.testclient import TestClient
 
+    from app.core.database import get_db
     from app.main import app
 
-    client = TestClient(app)
-    statuses = [
-        client.post(
-            "/api/v1/auth/find-account",
-            json={"display_name": "x"},
-            headers={"X-Forwarded-For": f"203.0.113.{i}, 198.51.100.9"},
-        ).status_code
-        for i in range(31)
-    ]
-    # 첫 hop을 매번 바꿔 ip 한도(3/hour)는 피하지만 peer 상한(30/hour)에 걸린다
-    assert statuses[:30] == [200] * 30
-    assert statuses[30] == 429
+    app.dependency_overrides[get_db] = lambda: AsyncMock()
+    try:
+        with patch("app.api.v1.rebalancing_plan_public.get_plan_leg_by_token", new=AsyncMock(return_value=None)):
+            client = TestClient(app)
+            statuses = [
+                client.get(
+                    "/api/v1/rebalancing/plan-actions/x",
+                    headers={"X-Forwarded-For": f"203.0.113.{i % 250}, 198.51.100.9"},
+                ).status_code
+                for i in range(201)
+            ]
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    # 첫 hop을 매번 바꿔 ip 한도(20/minute)는 피하지만 peer 상한(200/minute)에 걸린다
+    assert statuses[:200] == [200] * 200
+    assert statuses[200] == 429

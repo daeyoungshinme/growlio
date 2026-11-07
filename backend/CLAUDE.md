@@ -76,7 +76,7 @@ cd backend && uv run mypy app/
 
 ```
 assets.py                계좌 CRUD + 동기화 트리거, 브로커 자격증명 검증·삭제, ISA 누적손익 수동입력
-auth.py                  /me, /sync-profile, /password-reset-complete, /find-account, /account/delete. 로그인·가입·refresh는 프론트가 Supabase에 직접 — 백엔드엔 없음
+auth.py                  /me, /sync-profile, /password-reset-complete, /account/delete. 로그인·가입·refresh는 프론트가 Supabase에 직접 — 백엔드엔 없음
 alerts.py                알림 목록·읽음 (+ 하위 /alerts/*: exchange_rate_alerts.py / stock_price_alerts.py / rebalancing_alerts.py)
 backtest.py              백테스트
 dashboard.py             대시보드 집계(구현은 asset_aggregator) + GET /dashboard/action-items
