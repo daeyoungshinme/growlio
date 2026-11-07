@@ -75,7 +75,9 @@ async def deliver_push(
         from firebase_admin import messaging
 
         # firebase-admin 7.x는 token을 deprecated로 경고하지만 대체 인자 fid는 Firebase 설치 ID다 — 저장 값은
-        # Capacitor "registration" 리스너가 준 FCM 등록 토큰이라 fid로 바꾸면 발송이 깨진다 (plans/99 A7)
+        # Capacitor "registration" 리스너가 준 FCM 등록 토큰이라 fid로 바꾸면 발송이 깨진다 (plans/99 A7).
+        # pyproject의 firebase-admin 상한(<8)을 올릴 때 token 인자가 남아 있는지 먼저 확인한다 — 경고를 숨겨 두어
+        # 제거 예고가 테스트 출력에 보이지 않는다(plans/118 D6)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="Message.token is deprecated", category=DeprecationWarning)
             message = messaging.Message(

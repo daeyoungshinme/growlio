@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Prerequisites
 
-Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.13+, Node 24(CI·이미지 기준 LTS, 22+에서도 동작), [uv](https://docs.astral.sh/uv/) 필수.
+Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.13+, Node 24(CI·이미지 기준 LTS — `frontend/package.json` `engines`가 `24.x`라 다른 버전은 `npm ci`가 EBADENGINE 경고), [uv](https://docs.astral.sh/uv/) 필수.
 
 > Android 빌드 시 추가 필요: JDK 21+, Android Studio (SDK 포함).
 
@@ -105,7 +105,7 @@ growlio/
 CI(`ci.yml`)와 같은 기준 — 커밋/PR 전에 변경 영역에 맞춰 실행:
 
 ```bash
-make lint            # ruff + eslint --max-warnings 0
+make lint            # ruff check·format + eslint --max-warnings 0 + prettier --check
 make typecheck       # mypy + tsc --noEmit (앱·테스트 tsconfig 둘 다)
 make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-cov (91% 게이트)
 make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.config.ts

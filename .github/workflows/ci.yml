@@ -49,6 +49,9 @@ jobs:
     env:
       KIS_CRED_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/growlio_test
+      # 실 DB 테스트(@pytest.mark.db)는 이 변수가 있을 때만 돈다 — 로컬 .env의 DATABASE_URL(공유 Supabase일 수 있음)을
+      # 테스트가 쓰지 않게 따로 둔다(plans/118 D1)
+      GROWLIO_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/growlio_test
       APP_ENV: development
 
     steps:
@@ -93,6 +96,10 @@ jobs:
 
       - name: Rollback check (alembic downgrade -1)
         run: .venv/bin/alembic downgrade -1
+
+      # 다운그레이드가 남긴 찌꺼기가 재적용을 깨는지까지 확인하고, 실 DB 테스트가 head 스키마로 돌게 한다(plans/118 D2)
+      - name: Re-apply check (alembic upgrade head)
+        run: .venv/bin/alembic upgrade head
 
       # 보안 스캔은 테스트 앞에 둔다 — 뒤에 두면 테스트가 하나만 실패해도 건너뛰어 결과가 안 보였다
       - name: Security scan (bandit)

@@ -120,11 +120,9 @@ export default defineConfig({
         "src/lib/serviceWorker.ts",
         "src/lib/supabase.ts",
         "src/plugins/**",
-        "src/hooks/useBiometric.ts",
+        // useBiometric·usePushNotifications·useWidget은 테스트가 생겨 측정한다(plans/118 D3)
         "src/hooks/useHaptic.ts",
         "src/hooks/usePullToRefresh.ts",
-        "src/hooks/usePushNotifications.ts",
-        "src/hooks/useWidget.ts",
         "src/hooks/useSwipeNavigation.ts",
         "src/hooks/useRegisterRefresh.ts",
         "src/hooks/rebalancingExecution/types.ts",
