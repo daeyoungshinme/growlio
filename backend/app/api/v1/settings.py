@@ -148,6 +148,8 @@ async def delete_dart_api_key(
     if row:
         row.dart_api_key = None
         await db.commit()
+    # 저장 경로와 대칭 — 삭제한 키로 계산된 종목별 배당이 24h 캐시에 남지 않게 한다(plans/118 B1)
+    await invalidate_dividend_caches(await get_cache_store(), current_user.id, today_kst().year)
     return {"detail": "DART API 키가 삭제되었습니다"}
 
 

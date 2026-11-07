@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,8 +93,9 @@ def _calc_manual_snap_amount(account: AssetAccount) -> float:
 
 @router.get("", response_model=list[AssetAccountResponse])
 async def list_accounts(
-    skip: int = 0,
-    limit: int = 200,
+    # 음수 skip은 Postgres OFFSET 오류로 500이 났고 limit은 상한이 없었다(plans/118 B4)
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=200, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

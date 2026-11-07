@@ -96,6 +96,41 @@ class TestSavePositions:
                     )
         assert resp.status_code == 200
 
+    def test_save_positions_manual_amount_includes_deposit(self, override_settings):
+        """plans/118 B5: manual_amount는 ManualProvider.sync와 같은 정의(평가액 + 예수금)로 저장한다."""
+        user = make_user()
+        db = _make_mock_db()
+        account = _make_account(user.id)
+        account.deposit_krw = 300_000.0
+        db.scalar = AsyncMock(return_value=account)
+        app = setup_app(user, db)
+        mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id, user_id=user.id)
+        payload = [
+            {
+                "ticker": "005930",
+                "name": "삼성전자",
+                "market": "KOSPI",
+                "qty": 10.0,
+                "avg_price": 70000.0,
+                "current_price": 80000.0,
+            }
+        ]
+        with (
+            patch("app.api.v1.positions.get_cache_store", AsyncMock(return_value=AsyncMock())),
+            patch("app.api.v1.positions.inproc_lock") as mock_lock,
+            patch("app.api.v1.positions.invalidate_asset_account_caches", AsyncMock()),
+            patch("app.api.v1.positions.upsert_snapshot", AsyncMock(return_value=mock_snap)) as mock_upsert,
+        ):
+            mock_cm = MagicMock()
+            mock_cm.__aenter__ = AsyncMock(return_value=True)
+            mock_cm.__aexit__ = AsyncMock(return_value=None)
+            mock_lock.return_value = mock_cm
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(f"/api/v1/assets/{account.id}/positions", json=payload)
+        assert resp.status_code == 200
+        assert account.manual_amount == 1_100_000.0
+        assert mock_upsert.await_args.kwargs["amount_krw"] == 1_100_000.0
+
     def test_save_positions_rejects_synced_account(self, override_settings):
         """plans/117 B6: 증권사 연동 계좌의 오늘 스냅샷을 수동 값으로 덮지 않는다."""
         user = make_user()

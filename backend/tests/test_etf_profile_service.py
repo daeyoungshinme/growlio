@@ -98,6 +98,21 @@ class TestGetProfiles:
         assert mock_yf.call_count == 2
 
     @pytest.mark.asyncio
+    async def test_empty_info_cached_as_missing_when_other_symbols_resolved(self):
+        """plans/118 B2: 다른 심볼은 응답을 받은 배치에서 연속으로 빈 응답이면 '데이터 없음'으로 캐싱해 확정한다 —
+        상장폐지 종목 하나 때문에 겹침 분석이 매 요청 캐시 없이 다시 돌지 않게."""
+        cache = CacheStore()
+        items = [("SPY", "SPDR S&P 500", "NYSE"), ("DEAD", "Delisted", "NASDAQ")]
+        with patch.object(
+            svc, "fetch_yf_info", return_value={"SPY": {"quoteType": "ETF", "netExpenseRatio": 0.0945}}
+        ) as mock_yf:
+            runs = [await svc.get_etf_profiles_with_status(cache, items) for _ in range(4)]
+        # 1·2번째 빈 응답은 일시 실패일 수 있어 미확정, 3번째에 '데이터 없음'으로 캐싱 → 4번째는 조회하지 않는다
+        assert [r[1] for r in runs] == [{("DEAD", "NASDAQ")}, {("DEAD", "NASDAQ")}, set(), set()]
+        assert runs[3][0][("DEAD", "NASDAQ")] is None
+        assert mock_yf.call_count == 3
+
+    @pytest.mark.asyncio
     async def test_non_etf_result_is_cached(self):
         cache = CacheStore()
         items = [("AAPL", "Apple", "NASDAQ")]

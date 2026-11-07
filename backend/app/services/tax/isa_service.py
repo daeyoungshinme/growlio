@@ -233,13 +233,14 @@ async def calc_isa_contribution_status(user_id: uuid.UUID, year: int, db: AsyncS
         select(
             Transaction.account_id,
             func.sum(Transaction.amount),
-            func.sum(Transaction.amount).filter(func.extract("year", Transaction.transaction_date) == year),
+            func.sum(Transaction.amount).filter(Transaction.transaction_date >= date(year, 1, 1)),
         )
         .where(
             Transaction.user_id == user_id,
             Transaction.account_id.in_([acc.id for acc in accounts]),
             Transaction.transaction_type == "DEPOSIT",
-            func.extract("year", Transaction.transaction_date) <= year,
+            # 범위 조건 — extract(year)는 (user_id, transaction_date) 인덱스를 타지 못한다(plans/118 B3)
+            Transaction.transaction_date <= date(year, 12, 31),
         )
         .group_by(Transaction.account_id)
     )

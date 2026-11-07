@@ -66,6 +66,23 @@ class TestListAccounts:
         assert resp.status_code == 200
         assert resp.json() == []
 
+    def test_rejects_invalid_pagination(self, override_settings):
+        """plans/118 B4: 음수 skip(Postgres OFFSET 오류 → 500)·상한 초과 limit은 422."""
+        user = make_user()
+        app = setup_app(user, make_mock_db())
+        with TestClient(app, raise_server_exceptions=False) as client:
+            codes = [
+                client.get(url).status_code
+                for url in (
+                    "/api/v1/assets?skip=-1",
+                    "/api/v1/assets?limit=0",
+                    "/api/v1/assets?limit=10000",
+                    "/api/v1/alerts/stock-price?skip=-1",
+                    "/api/v1/alerts/stock-price?limit=501",
+                )
+            ]
+        assert codes == [422] * 5
+
     def test_returns_accounts(self, override_settings):
         user = make_user()
         db = make_mock_db()

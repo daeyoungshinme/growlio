@@ -91,7 +91,7 @@ async def save_positions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """수동 종목 저장 — 매입금액 합계를 manual_amount로 업데이트."""
+    """수동 종목 저장 — 평가액 + 예수금을 manual_amount와 오늘 스냅샷에 반영한다."""
     account = await get_owned_account(account_id, current_user.id, db)
     if account.data_source != DataSource.MANUAL:
         # 증권사 연동 계좌의 오늘 스냅샷을 MANUAL로 덮으면 다음 동기화 전까지 보유종목이 틀어진다(화면도 읽기 전용)
@@ -110,7 +110,6 @@ async def save_positions(
 
         total_invested_dec = sum(Decimal(str(p.qty)) * Decimal(str(p.avg_price)) for p in positions)
         total_value_dec = sum(Decimal(str(p.current_price or p.avg_price)) * Decimal(str(p.qty)) for p in positions)
-        account.manual_amount = float(total_value_dec)
         account.manual_updated_at = datetime.now(UTC)
 
         def _build(p: ManualPosition, snapshot_id) -> Position:
@@ -142,15 +141,19 @@ async def save_positions(
         usd_rate = 1.0
         if account.deposit_usd:
             usd_rate = await require_live_usd_krw(cache)
+        amount_krw = (
+            float(total_value_dec) + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate
+        )
+        # ManualProvider.sync와 같은 정의(평가액 + 예수금) — 예전엔 평가액만 넣어 저장 직후와 동기화 직후의
+        # manual_amount가 예수금만큼 달랐다(plans/118 B5)
+        account.manual_amount = amount_krw
 
         snap = await upsert_snapshot(
             db,
             account_id=account.id,
             user_id=account.user_id,
             snapshot_date=today_kst(),
-            amount_krw=(
-                float(total_value_dec) + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate
-            ),
+            amount_krw=amount_krw,
             invested_amount=float(total_invested_dec),
             unrealized_pnl=float(total_value_dec - total_invested_dec),
             source="MANUAL",

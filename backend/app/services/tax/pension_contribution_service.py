@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import TypedDict
 
 from sqlalchemy import func, select
@@ -52,7 +53,7 @@ async def calc_pension_contribution_status(
             AssetAccount.user_id == user_id,
             AssetAccount.tax_type.in_(PENSION_TAX_TYPES),
             Transaction.transaction_type == "DEPOSIT",
-            func.extract("year", Transaction.transaction_date) == year,
+            Transaction.transaction_date.between(date(year, 1, 1), date(year, 12, 31)),
         )
         .group_by(AssetAccount.tax_type)
     )
