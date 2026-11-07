@@ -38,9 +38,9 @@ cd backend && uv run mypy app/
 - 운영 이미지(`backend/Dockerfile`)는 의존성만 설치하고 프로젝트는 설치하지 않는다(`--no-install-project`). `scripts/*`의 `import app`은 `ENV PYTHONPATH=/app`에 의존하므로 이 줄을 지우면 이미지에서 스크립트가 `ModuleNotFoundError`로 실패한다. CI `docker-build` 잡이 scripts/ 작업 경로 import로 이를 확인한다.
 
 ### Tests 주의
-- `conftest.py`가 외부 DNS 조회를 막고 시도한 테스트를 실패시킨다 → 해당 호출을 mock. `settings.fred_api_key`도 비운다. `curl_cffi`(yfinance)는 안 걸리니 직접 mock.
 
 - 실제 DB 없이 mocked `AsyncSession`(`tests/conftest.py`). 환경변수(`KIS_CRED_ENCRYPTION_KEY` 등)도 conftest가 override — `.env` 없이 실행 가능.
+- `conftest.py`가 외부 DNS 조회를 막고 시도한 테스트를 실패시킨다 → 해당 호출을 mock. `settings.fred_api_key`도 비운다. `curl_cffi`(yfinance)는 안 걸리니 직접 mock.
 - 예외: `@pytest.mark.db`(`tests/test_real_db_upserts.py`)는 `GROWLIO_TEST_DATABASE_URL`이 있을 때만 실 Postgres에 붙는다(CI는 서비스 컨테이너, 로컬은 skip). `DATABASE_URL`로 바꾸지 말 것 — 로컬 `.env`가 공유 Supabase를 가리킬 수 있다. ON CONFLICT·제약 이름·타입 캐스트처럼 mock으로 못 잡는 SQL은 여기에 추가.
 - 주요 fixtures: `mock_db`, `mock_cache`(in-memory get/set/setex), `make_account`, `make_snapshot`, `make_user_settings`.
 - API 라우트 테스트 공용 헬퍼: `tests/api_helpers.py`(`make_user`·`make_mock_db`·`setup_app`). 구성이 다르면 로컬 헬퍼를 둔다.
@@ -156,7 +156,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `goal_age_recommendation_service.py`(연령대) · `goal_horizon_recommendation_service.py`(투자기간 × 세제유형, 최대 15조합, IRP 안전자산 30% 하한)
 - `goal_portfolio_optimizer.py` — MVO(SLSQP). **배당 목표 사전검증은 `class_bounds` 그룹 예산도 반영 필수** — 종목 상한만 보면 SLSQP 전체 실패(빈 추천)
 - `goal_candidate_service.py` — 후보 관리(락). `pension_ineligibility_reason()`은 종목명 브랜드 휴리스틱 — 신규 ETF 브랜드는 `_KR_ETF_BRAND_PREFIXES`에 추가
-- `goal_return_solver.py` — 역산 순수 함수 + `build_feasibility_preview`(마법사·nestlio 공유)
+- `goal_return_solver.py` — 역산 순수 함수 + `build_feasibility_preview`(마법사·nestlio 공유). **월 수익률은 `monthly_rate`(복리)만** — 프론트 `utils/savingsProjection.monthlyRate`와 같은 식이고, 필요 수익률은 CAGR과 비교되므로 `annual/12`(명목)로 풀면 안 된다
 - `recommendation_universe.py` — 큐레이션 ETF 유니버스. `index_key_from_base_index`는 중복 분석·지수 분류 공용 — **복제 금지**
 
 **ETF·지수 (`etf/`)**
@@ -175,7 +175,6 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - **세금 집계 함정**: 삭제 계좌도 포함한다(실제 소득·납입). 모의 계좌 판정은 `is_paper_account` — `is_mock_mode` 컬럼 기본값이 True라 토스·수기 계좌를 그 값만으로 빼면 안 된다. 취득가는 현재 환율 환산이라 환차익이 빠진 추정이다(`OVERSEAS_FX_BASIS_NOTE`).
 - `tax_service.py` — 연도별 세금 추정·종합과세·건보 피부양자. 해외 실현손익은 직접 조회하지 않고 `overseas_realized_krw` 인자로 받음
 - `overseas_realized_service.py` — 해외 실현손익. KIS 실전은 브로커(TTTS3039R), 그 외는 해외 SELL `TradeRecord`(KIS 실전 계좌 기록은 이중 집계 방지로 무시). 성공 시만 1h 캐시
-- **수익률 공식 함정**: 월 수익률은 `goal_return_solver.monthly_rate`(복리)만 쓴다 — 프론트 `utils/savingsProjection.monthlyRate`와 같은 식이고, 필요 수익률은 CAGR과 비교되므로 `annual/12`(명목)로 풀면 안 된다.
 - `tax_action_service.py` — 절세 액션 플랜(조합만). 세법 수치는 `_DEDUCTION_RULES` 연도별 테이블
 - `pension_contribution_service.py` · `isa_service.py`
 
@@ -278,7 +277,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 
 ### 횡단 관심사
 
-- **현재가**: Yahoo(yfinance) → KIS. yfinance는 `run_in_executor`.
+- **현재가**: `market_data/price_service.fetch_prices_batch` 한 경로만(캐시 15분 → 국내 Naver→pykrx → Yahoo → KIS). 새 시세 조회를 따로 만들지 말 것.
 - **USD/KRW**: `utils/currency.get_usd_krw_rate(cache)` → 캐시 없으면 `settings.usd_krw_fallback_rate`. KIS 성공 시 `cache_usd_krw_rate()`. 테스트 patch 경로 `app.utils.currency.cache_usd_krw_rate`.
   - **함정**: 새로 조회한 값만 캐시한다(`refresh_usd_krw`) — fallback을 `cache_usd_krw_rate`에 넣으면 모든 경로가 실환율로 믿는다. 스냅샷·거래 행 같은 영구 기록은 `require_live_usd_krw`(없으면 503), 브로커 동기화는 `sync_usd_krw_rate`(달러 자산이 있으면 실패 처리).
   - **함정**: fallback(1300)은 평가액 환산용. 환율로 알림 발동·위치 판정을 하면 `fetch_usd_krw(..., allow_fallback=False)`(없으면 0.0) 또는 `get_live_or_cached_usd_krw`의 실값 여부로 거를 것 — 고정값이 실환율로 쓰이면 BELOW 알림 거짓 발동.
@@ -310,7 +309,8 @@ db.add(obj); await db.commit(); await db.refresh(obj)
 - 운영 서버는 UTC. 사용자 기준 "오늘"(스냅샷 날짜·연도·dedup)은 `date.today()`/`datetime.now()` 금지 → `app.utils.kst`의 `today_kst()`/`now_kst()`/`KST`.
 - 예외: 미국 데이터 소스 기준이 필요한 곳(FRED `realtime_start` 등)은 `economic_indicator_service._fred_today()`(US Central).
 - DB 타임스탬프(`created_at` 등)는 `datetime.now(UTC)`.
-- `alert_history.alert_type`은 `String(40)` — 새 타입 문자열은 40자 이하(`tests/test_alert_type_length.py`가 검사, 초과 시 조용히 저장 실패).
+
+**알림 타입**: `alert_history.alert_type`은 `String(40)` — 새 타입 문자열은 40자 이하(`tests/test_alert_type_length.py`가 검사, 초과 시 조용히 저장 실패).
 
 **HTTP 에러**: 사용자 노출 메시지는 한국어. 서비스는 `app.exceptions`의 `AppError` 하위(`BadRequestError`·`NotFoundError`·`ConflictError`·`UnprocessableError` 등)를 raise — `HTTPException`은 라우터·의존성에서만. 서비스에서 `except AppError: raise`로 다시 올려야 하는 곳(아래 `except Exception`이 502로 덮는 경로)을 놓치지 말 것.
 

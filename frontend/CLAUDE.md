@@ -5,7 +5,7 @@
 ## Commands
 
 ```bash
-cd frontend && npm install
+cd frontend && npm ci                 # package-lock 기준(= make install-frontend, CI와 동일). 의존성 추가 때만 npm install
 cd frontend && npm run dev            # localhost:5173, /api/* → localhost:8000 프록시
 cd frontend && npm run build          # tsc -b && vite build
 cd frontend && npm run typecheck      # tsc --noEmit(앱) + -p tsconfig.test.json(테스트 포함, 같은 엄격도·noUncheckedIndexedAccess on) — build의 tsc -b는 앱만 본다
@@ -225,8 +225,8 @@ _기타_
 - `utils/cacheOwner.ts` — 사용자 전환 시 persist 캐시 폐기(쿼리키에 user id가 없음)
 
 **도메인 유틸 (`utils/`)** — 인라인 재구현 금지, 백엔드 공식 포팅본은 **양쪽을 함께 수정**
-- `depositDelta.ts` — 거래 수정 후 예수금 반영 제안액(차액만). 전액을 제안하면 이중 반영된다
 
+- `depositDelta.ts` — 거래 수정 후 예수금 반영 제안액(차액만). 전액을 제안하면 이중 반영된다
 - `accounts.ts` — `isPortfolioAccount`/`isStockAccount`/`isBankAccount`(**`account.asset_type` 문자열을 전달**, 인라인 비교 금지), `isSyncableAccount`, `isBrokerBalanceAccount`(3사), `isOrderExecutableAccount`(KIS·키움만 — 백엔드 `ORDER_EXECUTABLE_ASSET_TYPES`와 같은 집합), `horizonTaggedAccounts`(기간별 합산은 `invested_krw + unrealized_pnl` — `amount_krw`는 예수금 포함이라 주식 총액보다 커짐)
 - `portfolio.ts` — `groupPositionsByTicker`, `getPortfolioTargetState`, `getPortfolioHorizon(TaxType)`, `inferHorizonTaxTypeFromAccounts`, `mergeAlertsByPortfolio`
 - `portfolioGroups.ts` — 지수 그룹 편집 순수 함수. 레버리지 멤버는 대표·국내 대체 후보에서 제외(백엔드 검증과 같은 규칙)

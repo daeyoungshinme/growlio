@@ -80,7 +80,8 @@ growlio/
 
 - **실제 운영 배포**: 백엔드는 `render.yaml`(Render, Docker runtime) — 프론트엔드는 `frontend/vercel.json`(Vercel)이 실제 배포 경로. `vercel.json`이 `/api/*` → Render 백엔드로 rewrite하고, CSP를 포함한 보안 헤더도 여기서 설정됨(보안 헤더 수정은 반드시 `vercel.json`에). 새 API prefix 추가 시 `frontend/vercel.json`의 `rewrites`도 함께 확인.
 - Render는 `autoDeployTrigger: checksPass` — main의 CI가 통과해야 배포된다(대시보드가 Blueprint 동기화 상태여야 반영).
-- **마이그레이션은 자동 실행되지 않는다**(Render 무료 플랜은 pre-deploy 미지원). 스키마 변경이 있으면 **코드 배포 전에** `backend/.env`의 `MIGRATION_DATABASE_URL`을 운영 DB로 지정하고 `cd backend && uv run python scripts/bootstrap_alembic.py && uv run alembic upgrade head`. `/metrics`는 `METRICS_TOKEN`으로 보호된 채 유지되지만 저장소에 수집 구성은 없다.
+- **마이그레이션은 자동 실행되지 않는다**(Render 무료 플랜은 pre-deploy 미지원). 스키마 변경이 있으면 **코드 배포 전에** `backend/.env`의 `MIGRATION_DATABASE_URL`을 운영 DB로 지정하고 `cd backend && uv run python scripts/bootstrap_alembic.py && uv run alembic upgrade head`.
+- `/metrics`는 `METRICS_TOKEN`으로 보호된 채 유지되지만 저장소에 수집 구성은 없다.
 - `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build + 이미지 빌드 스모크 `docker-build` + 보안 스캔(TruffleHog·bandit·pip-audit·npm audit), push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`/`VITE_REDIRECT_URL` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (cron 10분이지만 GitHub 스로틀로 실측 2~9시간 간격 — 슬립은 못 막고 잠든 서버를 가끔 깨워 `periodic_catchup`을 돌리는 정도. 외부 핑 등록 후 제거 예정).
 - **Render 무료 플랜은 15분 무요청 시 잠들고 스케줄러도 함께 멈춘다** — `backend/CLAUDE.md` "스케줄러 실행 제약".
 
@@ -111,6 +112,13 @@ make test-backend    # 빠른 반복용 — 최종 확인은 make test-backend-c
 make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.config.ts
 ```
 
+`make`가 없는 Windows 환경에선 같은 명령을 직접 실행:
+
+```bash
+cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy app/ && uv run pytest
+cd frontend && npm run lint -- --max-warnings 0 && npm run format:check && npm run typecheck && npm run test
+```
+
 - Windows pytest 종료 코드 `-1073741819`는 실패가 아님 (`backend/CLAUDE.md` Tests).
 - 파일 추가·삭제·이동 시 `backend/CLAUDE.md`·`frontend/CLAUDE.md`의 해당 목록(라우터·서비스·훅·유틸 등)도 함께 갱신 — 각 목록이 "추가/삭제 시 갱신"을 전제로 유지됨.
 - CLAUDE.md 항목은 **한 줄 요약 + 코드만 봐선 모르는 함정**까지만. 구현 세부·설계 경위·`plans/NN` 이력은 계획서와 커밋 메시지에 남기고 여기엔 쓰지 않는다(하위 CLAUDE.md는 해당 디렉토리 작업 때마다 통째로 컨텍스트에 로드됨).
@@ -125,4 +133,5 @@ make test-frontend   # CI는 --coverage로 실행, 임계값은 frontend/vite.co
 - `dev.sh`는 기본적으로 8000/5173 포트를 점유한 이전(좀비) 프로세스를 강제 종료 후 재기동함. 다른 세션에서 의도적으로 띄워둔 백엔드까지 종료되는 게 문제라면 `bash dev.sh --keep-port`(또는 `make dev-keep-port`) 사용 — 8000이 사용 중이면 종료하지 않고 다음 빈 포트로 대신 구동, 프론트엔드 Vite 프록시도 자동으로 그 포트를 따라감
 - 백엔드(8000)만 뜨고 `localhost:5173` 연결 불가: dev.sh를 `Git\usr\bin\bash.exe`로 직접 실행하면 `/usr/bin`이 PATH에 없어 npm이 실패함 — dev.sh가 PATH를 자동 보정하므로, 재발 시 dev.sh 상단의 PATH 보정 블록을 먼저 확인
 - pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인
+- **Windows에서 Python 스크립트로 파일을 고치면 CRLF가 섞인다**(`open(..., 'w')`·`Path.write_text` 텍스트 모드) → prettier `format:check` 대량 실패. `open(..., newline='')`로 쓰거나 사후 `sed -i 's/\r$//' <파일>`. 반대로 `core.autocrlf=true`라 작업 트리의 일부 파일은 CRLF여서, 여러 줄 문자열 치환이 안 맞으면 Edit 도구를 쓴다(커밋은 `.gitattributes`의 `eol=lf`로 LF)
 - **동시 세션 작업**: 이 저장소는 여러 창/세션에서 병행 작업되는 경우가 잦음 — 계획 수립·구현 도중 `git status`가 대화 시작 시점과 달라져 있다면 다른 세션의 진행 중 작업일 가능성이 높음. 무시하거나 되돌리지 말고 먼저 `git diff`로 변경 내용을 확인할 것
