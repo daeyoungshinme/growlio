@@ -40,7 +40,7 @@ export interface PlanActionResponse {
 
 export interface PlanTokenPreview {
   valid: boolean;
-  reason: "NOT_FOUND" | "ALREADY_DECIDED" | "EXPIRED" | null;
+  reason: "NOT_FOUND" | "ALREADY_DECIDED" | "EXPIRED" | "IN_PROGRESS" | null;
   actionable: boolean;
   leg: RebalancingPlanLegSummary | null;
 }

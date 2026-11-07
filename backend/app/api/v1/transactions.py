@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from sqlalchemy import extract, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import PaginationDep, get_current_user, get_db, get_owned_or_404
@@ -37,11 +38,11 @@ async def list_transactions(
     if account_id:
         stmt = stmt.where(Transaction.account_id == account_id)
     if year:
-        stmt = stmt.where(extract("year", Transaction.transaction_date) == year)
+        stmt = stmt.where(Transaction.transaction_date.between(date(year, 1, 1), date(year, 12, 31)))
     if transaction_type:
         stmt = stmt.where(Transaction.transaction_type == transaction_type)
     stmt = (
-        stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+        stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc(), Transaction.id.desc())
         .offset(pagination.skip)
         .limit(pagination.limit)
     )
@@ -68,7 +69,7 @@ async def summarize_transactions(
     if account_id:
         stmt = stmt.where(Transaction.account_id == account_id)
     if year:
-        stmt = stmt.where(extract("year", Transaction.transaction_date) == year)
+        stmt = stmt.where(Transaction.transaction_date.between(date(year, 1, 1), date(year, 12, 31)))
     stmt = stmt.group_by(Transaction.account_id, Transaction.transaction_type)
     rows = (await db.execute(stmt)).all()
     return [

@@ -104,6 +104,26 @@ class TestEnsureCorpCodeMap:
 
         # Empty map returned by fetch means stale map is kept
         assert result == {"existing": "code"}
+        ds._corp_code_failed_at.clear()
+
+    @pytest.mark.asyncio
+    async def test_failure_cooldown_per_key_and_reset(self, override_settings):
+        """plans/117 B1: 실패한 키는 쿨다운 동안 다시 받지 않는다. 다른 키·키 재저장 후에는 바로 다시 시도."""
+        import app.services.dart_service as ds
+
+        ds._corp_code_map = {}
+        ds._corp_code_loaded_at = None
+        ds._corp_code_failed_at.clear()
+        with patch.object(ds, "_fetch_corp_code_map", new=AsyncMock(return_value={})) as mock_fetch:
+            await ds._ensure_corp_code_map("bad")
+            await ds._ensure_corp_code_map("bad")
+            assert mock_fetch.await_count == 1
+            await ds._ensure_corp_code_map("other")
+            assert mock_fetch.await_count == 2
+            ds.reset_corp_code_failures()
+            await ds._ensure_corp_code_map("bad")
+            assert mock_fetch.await_count == 3
+        ds._corp_code_failed_at.clear()
 
 
 class TestLookupCorpCode:

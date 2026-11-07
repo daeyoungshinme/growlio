@@ -278,9 +278,12 @@ class TestCheckTaxLossHarvest:
             _patch_realized(9_000_000, lookup_failed=True),
             patch("app.services.insight_service.today_kst", return_value=date(2026, 6, 1)),
         ):
-            result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
+            degraded = MagicMock()
+            result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db, on_partial_failure=degraded)
 
         assert result == []
+        # plans/117 B4: 조회 실패로 빠진 목록은 짧게만 캐싱하도록 알린다
+        degraded.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_small_tax_saving_returns_empty(self, mock_db, override_settings):
@@ -341,7 +344,7 @@ class TestGenerateInsights:
     async def test_degraded_result_cached_briefly(self, mock_db, override_settings, failing):
         """일부 실패로 줄어든 목록은 1시간이 아니라 짧게만 캐싱한다 (plans/99 A3)."""
         from app.services.insight_service import generate_insights
-        from app.utils.cache_keys import TTL_INSIGHTS, TTL_MARKET_SIGNAL_DEGRADED
+        from app.utils.cache_keys import TTL_INSIGHTS, TTL_INSIGHTS_DEGRADED
 
         cache = AsyncMock()
         cache.get = AsyncMock(return_value=None)
@@ -367,7 +370,7 @@ class TestGenerateInsights:
             await generate_insights(uuid.uuid4(), mock_db, cache=cache)
 
         ttl = set_cached.call_args.args[3]
-        assert ttl == TTL_MARKET_SIGNAL_DEGRADED
+        assert ttl == TTL_INSIGHTS_DEGRADED
         assert ttl < TTL_INSIGHTS
 
     @pytest.mark.asyncio

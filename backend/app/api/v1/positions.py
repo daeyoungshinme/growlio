@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.api.v1._account_deps import get_owned_account
 from app.core.cache_store import get_cache_store
+from app.enums import DataSource
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.asset import Position
@@ -68,7 +69,9 @@ def _enrich_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 @router.get("/{account_id}/positions", response_model=PositionListResponse)
+@limiter.limit("60/minute")
 async def get_positions(
+    request: Request,
     account_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -80,7 +83,9 @@ async def get_positions(
 
 
 @router.put("/{account_id}/positions", response_model=PositionListResponse)
+@limiter.limit("20/minute")
 async def save_positions(
+    request: Request,
     account_id: UUID,
     positions: list[ManualPosition],
     current_user: User = Depends(get_current_user),
@@ -88,6 +93,11 @@ async def save_positions(
 ):
     """수동 종목 저장 — 매입금액 합계를 manual_amount로 업데이트."""
     account = await get_owned_account(account_id, current_user.id, db)
+    if account.data_source != DataSource.MANUAL:
+        # 증권사 연동 계좌의 오늘 스냅샷을 MANUAL로 덮으면 다음 동기화 전까지 보유종목이 틀어진다(화면도 읽기 전용)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="연동 계좌의 종목은 직접 수정할 수 없습니다"
+        )
     cache = await get_cache_store()
 
     lock_key = sync_lock_key(account_id)

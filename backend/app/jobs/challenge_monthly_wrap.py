@@ -120,12 +120,7 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
         target_met = True
         milestone = None
 
-    if completed and challenge.status != CHALLENGE_COMPLETED:
-        challenge.status = CHALLENGE_COMPLETED
-        challenge.completed_at = datetime.now(UTC)
-        await db.flush()  # 발송 성공 여부와 무관하게 완료 상태는 영속화(챌린지 단위 커밋에 포함)
-
-    await dispatch_dual_channel_alert(
+    sent = await dispatch_dual_channel_alert(
         db,
         user.id,
         event_prefix="challenge_wrap",
@@ -149,6 +144,11 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
         commit=False,
         after_sent=lambda: set_durable(db, key, "1", ttl=_DEDUP_TTL, commit=False),
     )
+    # 완료 전환은 알림이 나간 뒤에만 한다 — 먼저 바꾸면 발송 실패 시 재실행(catch-up)이 ACTIVE만 조회해
+    # "챌린지 달성" 알림이 영영 나가지 않는다(plans/117 B2). 실패하면 ACTIVE로 남아 다음 실행이 다시 시도한다.
+    if sent and completed and challenge.status != CHALLENGE_COMPLETED:
+        challenge.status = CHALLENGE_COMPLETED
+        challenge.completed_at = datetime.now(UTC)
     logger.info("challenge_wrap_sent", user_id=str(user.id), challenge_id=str(challenge.id), completed=completed)
 
 

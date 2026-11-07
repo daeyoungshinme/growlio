@@ -312,6 +312,25 @@ class TestPreviewPlanAction:
         assert body["actionable"] is True
         assert body["leg"]["side"] == "BUY"
 
+    def test_consumed_pending_leg_reports_in_progress(self):
+        """plans/117 B6: 실행이 시작된(토큰 소비) PENDING leg는 "만료"가 아니라 실행 중으로 안내한다."""
+        db = _make_mock_db()
+        leg = _make_leg(side="BUY")
+        leg.token_consumed_at = datetime.now(tz=UTC)
+        leg.plan = SimpleNamespace(id=leg.plan_id, portfolio_id=None, account_id=None)
+
+        with patch("app.api.v1.rebalancing_plan_public.get_plan_leg_by_token", new=AsyncMock(return_value=leg)):
+            app = _setup_public_app(db)
+            client = TestClient(app)
+            try:
+                resp = client.get("/api/v1/rebalancing/plan-actions/valid-token")
+            finally:
+                _teardown_app()
+
+        body = resp.json()
+        assert body["actionable"] is False
+        assert body["reason"] == "IN_PROGRESS"
+
     def test_get_does_not_mutate_db(self):
         """GET은 부작용이 없어야 한다 — db.commit()이 호출되지 않아야 함."""
         db = _make_mock_db()

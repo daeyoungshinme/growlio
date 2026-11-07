@@ -262,7 +262,8 @@ _INFLATION_CODES = ("CPI_US", "CORE_CPI_US", "PCE_US")
 async def fetch_inflation_summary(cache=None) -> list[dict[str, Any]]:
     """CPI·Core CPI 요약 반환: 최신값, 전월/전년 대비 변화율, 다음 발표일.
 
-    리밸런싱 화면 참고용 — history/calendar 캐시를 그대로 재사용하므로 신규 FRED 호출이 없다.
+    리밸런싱 화면 참고용 — history/calendar 캐시(시장 신호의 인플레이션 판정과 공유)를 재사용한다.
+    캐시가 비어 있을 때만 FRED를 부른다.
     """
     calendar_events = await get_calendar_events(cache)
     next_release_by_name: dict[str, str] = {}

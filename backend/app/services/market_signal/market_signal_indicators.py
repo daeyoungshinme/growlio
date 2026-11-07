@@ -466,9 +466,11 @@ def _ma20(points: list[dict[str, Any]]) -> tuple[dict[str, Any], float] | None:
 
 async def _yoy_inflation_signal(indicator: str) -> dict[str, Any] | None:
     """13개월 윈도우 YoY % → `_inflation_bucket`. `fetch_inflation_summary`와 같은 산식을 재사용한다."""
+    from app.core.cache_store import get_cache_store
     from app.services.market_signal.economic_indicator_service import fetch_indicator_history
 
-    points = await fetch_indicator_history(indicator, months=13)
+    # 인플레이션 요약과 같은 history 캐시(6시간)를 쓴다 — 없으면 매 신호 갱신마다 FRED를 지표당 한 번씩 더 불렀다
+    points = await fetch_indicator_history(indicator, months=13, cache=await get_cache_store())
     if len(points) < 13:
         return None
 

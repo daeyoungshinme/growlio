@@ -43,7 +43,7 @@ from app.schemas.rebalancing.goal import (
     OverlapMember,
 )
 from app.services._settings_queries import get_settings_row
-from app.services.etf.etf_profile_service import EtfProfile, get_etf_profiles
+from app.services.etf.etf_profile_service import EtfProfile, get_etf_profiles_with_status
 from app.services.goal.goal_candidate_service import LEVERAGED_INVERSE_RE, existing_items_from_positions
 from app.services.goal.recommendation_universe import (
     guess_tracking_index,
@@ -322,7 +322,7 @@ async def analyze_candidate_overlap(
     if cached is not None:
         return CandidateOverlapResponse(**cached)
 
-    profiles = await get_etf_profiles(cache, [(i.ticker, i.name, i.market) for i in items])
+    profiles, unresolved = await get_etf_profiles_with_status(cache, [(i.ticker, i.name, i.market) for i in items])
     for i in items:
         i.profile = profiles.get(i.key)
     items = [i for i in items if _is_relevant_held(i)]
@@ -347,7 +347,9 @@ async def analyze_candidate_overlap(
     )
     # 시세 조회가 전부/일부 실패한 결과(상관 판정 누락)는 캐싱하지 않는다 — 일시 장애를 하루 동안 고정하지 않기 위함.
     # Yahoo 서킷이 열리면 국내 심볼만 pykrx로 채워진 부분 결과가 오므로 "비어 있지 않음"만으로는 부족하다.
-    if weekly is not None and prices_complete:
+    # 프로필을 못 받은 종목(네이버 타임아웃 등)이 있으면 보유 ETF가 판정에서 빠지고 기초지수 매칭·보수도 비므로
+    # 같은 이유로 캐싱하지 않는다(plans/117 B3).
+    if weekly is not None and prices_complete and not unresolved:
         await set_cached_json(cache, cache_key, result.model_dump(mode="json"), TTL_CANDIDATE_OVERLAP)
     return result
 

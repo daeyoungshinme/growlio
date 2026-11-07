@@ -105,7 +105,6 @@ def reset_circuit_breakers():
         _cb.kiwoom_circuit,
         _cb.toss_circuit,
         _cb.yahoo_circuit,
-        _cb.dart_circuit,
         _cb.naver_circuit,
         _cb.fdr_circuit,
     ):

@@ -516,6 +516,14 @@ class TestDeleteAccount:
         assert resp.status_code == 204
         db.delete.assert_called_once_with(user)
         db.commit.assert_called_once()
+        # plans/117 B5: FK 없는 app_state의 탈퇴자 키(만료 없는 목표 달성 기록 등)도 지운다
+        from sqlalchemy.dialects import postgresql
+
+        sqls = [
+            str(c.args[0].compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})).lower()
+            for c in db.execute.call_args_list
+        ]
+        assert any(sql.startswith("delete from app_state") and str(user.id) in sql for sql in sqls)
         app.dependency_overrides.clear()
 
     def test_local_delete_failure_returns_502(self, override_settings):

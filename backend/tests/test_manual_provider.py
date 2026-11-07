@@ -118,7 +118,7 @@ class TestManualProviderSync:
     async def test_sync_raises_when_no_amount_and_no_positions(self, override_settings, make_account):
         from app.exceptions import BadRequestError
 
-        account = make_account(manual_amount=0.0, asset_type="STOCK_OTHER")
+        account = make_account(manual_amount=None, asset_type="STOCK_OTHER")
         db = _make_mock_db(positions=[])
         cache = AsyncMock()
 

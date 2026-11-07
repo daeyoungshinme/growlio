@@ -96,6 +96,19 @@ class TestSavePositions:
                     )
         assert resp.status_code == 200
 
+    def test_save_positions_rejects_synced_account(self, override_settings):
+        """plans/117 B6: 증권사 연동 계좌의 오늘 스냅샷을 수동 값으로 덮지 않는다."""
+        user = make_user()
+        db = _make_mock_db()
+        account = _make_account(user.id)
+        account.data_source = "KIS_API"
+        db.scalar = AsyncMock(return_value=account)
+        app = setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put(f"/api/v1/assets/{account.id}/positions", json=[])
+        assert resp.status_code == 400
+        db.commit.assert_not_called()
+
 
 class TestGetPositions:
     def test_returns_401_without_auth(self, override_settings):

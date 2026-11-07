@@ -19,7 +19,7 @@ from app.services.tax.tax_action_service import build_loss_harvest_actions
 from app.services.tax.tax_service import get_tax_summary, load_tax_stock_rows
 from app.utils.cache_keys import (
     TTL_INSIGHTS,
-    TTL_MARKET_SIGNAL_DEGRADED,
+    TTL_INSIGHTS_DEGRADED,
     CacheStoreType,
     get_cached_json,
     insights_key,
@@ -92,7 +92,7 @@ async def generate_insights(
     checkers = (
         lambda: _check_concentration(dashboard),
         lambda: _check_rebalancing_opportunity(user_id, db, cache, on_partial_failure=_mark_degraded),
-        lambda: _check_tax_loss_harvest(user_id, db),
+        lambda: _check_tax_loss_harvest(user_id, db, on_partial_failure=_mark_degraded),
     )
     insights: list[Insight] = []
     for run_checker in checkers:
@@ -113,7 +113,7 @@ async def generate_insights(
 
     data = [asdict(i) for i in insights]
 
-    await set_cached_json(cache, insights_key(user_id), data, TTL_MARKET_SIGNAL_DEGRADED if degraded else TTL_INSIGHTS)
+    await set_cached_json(cache, insights_key(user_id), data, TTL_INSIGHTS_DEGRADED if degraded else TTL_INSIGHTS)
     return data
 
 
@@ -265,6 +265,7 @@ async def _check_rebalancing_opportunity(
 async def _check_tax_loss_harvest(
     user_id: uuid.UUID,
     db: AsyncSession,
+    on_partial_failure: Callable[[], None] | None = None,
 ) -> list[Insight]:
     """해외 손실 종목이 있고 올해 이미 실현한 과세 이익도 있을 때 절세 기회 알림.
 
@@ -277,6 +278,9 @@ async def _check_tax_loss_harvest(
 
     today = today_kst()
     realized = await get_overseas_realized_summary(user_id, today.year, db, overseas_positions=positions)
+    if realized.get("lookup_failed", False) and on_partial_failure is not None:
+        # 실현손익을 못 읽으면 절세 금액이 없어 인사이트가 빠진다 — 그 목록을 1시간 캐싱하지 않게(plans/117 B4)
+        on_partial_failure()
     summary = await get_tax_summary(
         user_id, today.year, db, overseas_realized_krw=realized["realized_gain_krw"], stock_rows=rows
     )

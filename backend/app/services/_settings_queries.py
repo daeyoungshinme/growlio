@@ -7,6 +7,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.enums import DataSource
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
 
@@ -29,7 +30,7 @@ async def has_active_kis_credentials(db: AsyncSession, user_id: uuid.UUID) -> bo
     account = await db.scalar(
         select(AssetAccount).where(
             AssetAccount.user_id == user_id,
-            AssetAccount.data_source == "KIS_API",
+            AssetAccount.data_source == DataSource.KIS_API,
             AssetAccount.is_active == True,
             AssetAccount.kis_app_key.is_not(None),
         )

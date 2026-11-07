@@ -32,13 +32,16 @@ from app.schemas.settings import (
 )
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.accounts.credential_service import encrypt
+from app.services.dart_service import reset_corp_code_failures
 from app.services.goal.goal_age_recommendation_service import age_group_from_birth_year
 from app.utils.cache_invalidation import (
+    invalidate_dividend_caches,
     invalidate_goal_recommendation_caches,
     invalidate_rebalancing_analysis_cache_all,
     invalidate_user_caches,
 )
 from app.utils.cache_keys import challenge_progress_key, dashboard_summary_key, dca_analysis_key
+from app.utils.kst import today_kst
 from app.utils.numbers import opt_float
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -128,6 +131,9 @@ async def update_dart_api_key(
     row = await get_or_create_settings(db, current_user.id)
     row.dart_api_key = encrypt(req.api_key)
     await db.commit()
+    # 키가 없거나 틀렸을 때 계산된 종목별 배당(DPS 0)이 24h 캐시에 남지 않게 지우고, 이전 키의 실패 기록도 푼다
+    reset_corp_code_failures()
+    await invalidate_dividend_caches(await get_cache_store(), current_user.id, today_kst().year)
     return {"detail": "DART API 키가 저장되었습니다"}
 
 

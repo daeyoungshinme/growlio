@@ -22,6 +22,16 @@ _corp_code_map: dict[str, str] = {}  # "005930" → "00126380"
 _corp_code_loaded_at: float | None = None  # time.monotonic()
 _corp_code_lock = asyncio.Lock()
 _CORP_CODE_TTL_HOURS = 24
+# 다운로드 실패(잘못된 키·DART 장애)를 키별로 기억해 이 시간 동안 다시 받지 않는다. 기억하지 않으면 DPS가 비는
+# 국내 종목마다 30초 타임아웃 ZIP 다운로드를 락 뒤에서 줄줄이 반복해 배당 화면이 수 분씩 멈췄다(plans/117 B1).
+# 전역 서킷브레이커는 쓰지 않는다 — 키는 사용자마다 달라 한 사용자의 잘못된 키가 모두를 막으면 안 된다.
+_CORP_CODE_RETRY_COOLDOWN_SEC = 600
+_corp_code_failed_at: dict[str, float] = {}  # api_key → time.monotonic()
+
+
+def reset_corp_code_failures() -> None:
+    """DART 키를 새로 저장하면 이전 실패 기록을 지워 바로 다시 시도하게 한다."""
+    _corp_code_failed_at.clear()
 
 
 async def _fetch_corp_code_map(api_key: str) -> dict[str, str]:
@@ -63,18 +73,24 @@ async def _ensure_corp_code_map(api_key: str) -> dict[str, str]:
         age = time.monotonic() - _corp_code_loaded_at
         return age < _CORP_CODE_TTL_HOURS * 3600
 
-    if _is_fresh():
+    def _in_cooldown() -> bool:
+        failed_at = _corp_code_failed_at.get(api_key)
+        return failed_at is not None and time.monotonic() - failed_at < _CORP_CODE_RETRY_COOLDOWN_SEC
+
+    if _is_fresh() or _in_cooldown():
         return _corp_code_map
 
     async with _corp_code_lock:
-        if _is_fresh():
+        if _is_fresh() or _in_cooldown():
             return _corp_code_map
 
         new_map = await _fetch_corp_code_map(api_key)
         if new_map:
             _corp_code_map = new_map
             _corp_code_loaded_at = time.monotonic()
+            _corp_code_failed_at.pop(api_key, None)
         else:
+            _corp_code_failed_at[api_key] = time.monotonic()
             logger.warning("dart_corp_code_refresh_failed", stale_count=len(_corp_code_map))
 
         return _corp_code_map
