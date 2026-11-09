@@ -85,6 +85,27 @@ describe("usePushNotifications lifecycle", () => {
     expect(usePushNotificationStore.getState().status).toBe("registered");
   });
 
+  it("끄기 요청 중 다시 눌러도 토큰 삭제를 한 번만 보낸다(plans/119 C4)", async () => {
+    const { registerPushToken } = await import("@/api/settings");
+    vi.mocked(registerPushToken).mockClear();
+    let release!: () => void;
+    vi.mocked(registerPushToken).mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }) as never,
+    );
+    usePushNotificationStore.getState().setStatus("registered");
+
+    const first = disablePushNotifications();
+    expect(usePushNotificationStore.getState().status).toBe("requesting");
+    await disablePushNotifications();
+    release();
+    await first;
+
+    expect(registerPushToken).toHaveBeenCalledTimes(1);
+    expect(usePushNotificationStore.getState().status).toBe("disabled");
+  });
+
   it("설정에서 끈 푸시는 앱을 다시 켜도 자동 등록하지 않는다(plans/117 C2)", async () => {
     await disablePushNotifications();
     expect(localStorage.getItem(pushOptOutKey("user-1"))).toBe("1");

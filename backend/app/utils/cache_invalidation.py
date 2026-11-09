@@ -148,6 +148,15 @@ async def invalidate_rebalancing_analysis_cache(
     await invalidate_rebalancing_strategy_cache(cache, user_id, portfolio_id)
     await invalidate_user_caches(cache, factor_analysis_portfolio_key(portfolio_id))
     await _scan_unlink(cache, f"{_env_prefix()}efficient_frontier:{user_id}:{portfolio_id}:*")
+    await invalidate_backtest_cache(cache, user_id)
+
+
+async def invalidate_backtest_cache(cache: CacheStoreType, user_id: uuid.UUID) -> None:
+    """백테스트 결과 캐시(24h)를 지운다. 키가 요청 해시라 어떤 포트폴리오가 들었는지 몰라 유저 전체를 지운다.
+
+    빠지면 포트폴리오 비중 수정·전술 적용·동기화 뒤 같은 조건 재실행에 옛 결과가 하루 동안 나왔다(plans/119 A1).
+    """
+    await _scan_unlink(cache, f"{_env_prefix()}backtest:{user_id}:*")
 
 
 async def invalidate_rebalancing_analysis_cache_all(cache: CacheStoreType, user_id: uuid.UUID) -> None:
@@ -157,6 +166,8 @@ async def invalidate_rebalancing_analysis_cache_all(cache: CacheStoreType, user_
     """
     await _scan_unlink(cache, f"{_env_prefix()}rebalancing_analysis:{user_id}:*")
     await _scan_unlink(cache, f"{_env_prefix()}rebalancing_strategy:{user_id}:*")
+    # 실제 보유 포함 백테스트(include_real_portfolio)가 보유 구성을 쓴다
+    await invalidate_backtest_cache(cache, user_id)
 
 
 async def invalidate_asset_account_caches(

@@ -317,6 +317,12 @@ class TestMonthlyWrapJob:
                 "app.jobs.challenge_monthly_wrap.dispatch_dual_channel_alert", new_callable=AsyncMock, return_value=True
             ) as dispatch,
             patch("app.services.challenge_service.invalidate_challenge_cache", new_callable=AsyncMock),
+            # 결산 잡이 완료로 바꾼 표시는 있고, 알림 dedup 키는 없다
+            patch(
+                "app.jobs.challenge_monthly_wrap.get_durable",
+                new_callable=AsyncMock,
+                side_effect=lambda _db, key, **_kw: "1" if key.startswith("challenge_wrap_completed:") else None,
+            ),
         ):
             from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
 
@@ -325,6 +331,35 @@ class TestMonthlyWrapJob:
         assert "달성" in dispatch.call_args.kwargs["history_message"]
         assert ch.status == "COMPLETED"
         assert ch.completed_at == done_at
+
+    @pytest.mark.asyncio
+    async def test_manually_completed_challenge_is_not_congratulated(self):
+        """plans/119 B3: 사용자가 직접 완료한 챌린지(결산 잡의 완료 표시 없음)에는
+        catch-up 결산이 '달성 🎉'을 보내지 않는다."""
+        from datetime import UTC, datetime
+
+        user, settings = _user(), _settings()
+        ch = _challenge(
+            user_id=user.id,
+            target_months=3,
+            start_month="2025-01",
+            status="COMPLETED",
+            completed_at=datetime(2026, 3, 2, 1, 0, tzinfo=UTC),
+        )
+        session = _session([(user, settings)], [ch])
+        with (
+            patch("app.jobs.challenge_monthly_wrap.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.challenge_monthly_wrap._prev_month_str", return_value="2026-02"),
+            patch("app.services.challenge_service.compute_progress", new_callable=AsyncMock, return_value=_progress()),
+            patch("app.jobs.challenge_monthly_wrap.get_durable", new_callable=AsyncMock, return_value=None),
+            patch("app.jobs.challenge_monthly_wrap.dispatch_dual_channel_alert", new_callable=AsyncMock) as dispatch,
+        ):
+            from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
+
+            await run_challenge_monthly_wrap()
+        dispatch.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_query_includes_challenges_completed_this_month(self):

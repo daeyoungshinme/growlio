@@ -6,9 +6,19 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
+from app.kis.constants import OVERSEAS_MARKETS
 from app.schemas._validators import MAX_AMOUNT_KRW
+
+# 해외 주가 알림 목표가가 이 원화 값보다 작으면 달러 숫자를 원화로 저장한 것으로 본다($1 ≈ 1,300원 이상).
+# plans/118 C6 이전 화면은 해외 종목도 "목표가 (원)"으로 받아 SCHD $27이 27원으로 저장됐다(plans/119 A3).
+SUSPECT_USD_UNIT_MAX_KRW = 1_000.0
+
+
+def is_suspect_usd_unit(market: str, target_price: float) -> bool:
+    """해외 종목 목표가가 달러 숫자 그대로 원화 칸에 저장된 것으로 보이는지."""
+    return market in OVERSEAS_MARKETS and float(target_price) < SUSPECT_USD_UNIT_MAX_KRW
 
 
 class ExchangeRateAlertCreate(BaseModel):
@@ -83,6 +93,12 @@ class StockPriceAlertResponse(BaseModel):
     trigger_count: int
     triggered_at: datetime | None
     created_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def needs_reentry(self) -> bool:
+        """목표가 단위가 의심돼 판정에서 빠진 알림 — 화면이 다시 입력하라고 안내한다."""
+        return is_suspect_usd_unit(self.market, self.target_price)
 
 
 class AlertHistoryItem(BaseModel):

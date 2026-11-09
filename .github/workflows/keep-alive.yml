@@ -27,7 +27,8 @@ jobs:
           # 저장소 변수로 덮어쓸 수 있음 (Settings → Secrets and variables → Actions → Variables)
           HEALTH_URL: ${{ vars.BACKEND_HEALTH_URL || 'https://growlio-w5wc.onrender.com/health' }}
         run: |
-          # 콜드 스타트는 수십 초 걸릴 수 있어 넉넉한 타임아웃 + 재시도
-          curl --fail --silent --show-error --max-time 90 \
+          # 콜드 스타트는 수십 초 걸릴 수 있어 넉넉한 타임아웃 + 재시도.
+          # 실패 응답의 헤더·본문을 남긴다 — 429가 앱(slowapi JSON 본문)인지 Render 엣지인지 구분하려고(plans/119 D2)
+          curl --fail-with-body --silent --show-error --include --max-time 90 \
             --retry 3 --retry-delay 10 --retry-all-errors \
             "$HEALTH_URL"

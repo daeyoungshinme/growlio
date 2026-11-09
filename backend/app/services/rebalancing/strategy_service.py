@@ -17,6 +17,7 @@ from app.services.rebalancing.group_expansion import group_owner_map
 from app.utils.cache_keys import (
     TTL_REBALANCING_STRATEGY,
     CacheStoreType,
+    account_ids_suffix,
     get_cached_json,
     rebalancing_strategy_key,
     set_cached_json,
@@ -243,7 +244,7 @@ async def get_rebalancing_strategy(
     portfolio_acct_ids: list[uuid.UUID] | None = (
         [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
     )
-    acct_suffix = "_".join(sorted(str(a) for a in portfolio_acct_ids)) if portfolio_acct_ids else "all"
+    acct_suffix = account_ids_suffix(portfolio_acct_ids)
     cache_key = rebalancing_strategy_key(user_id, portfolio_id, acct_suffix)
 
     cached = await get_cached_json(cache, cache_key)
@@ -253,7 +254,7 @@ async def get_rebalancing_strategy(
     # 1+2. 팩터·프론티어 조회 — 셋 다 같은 AsyncSession으로 DB를 읽으므로 순차 실행한다.
     # (캐시 미스 시 asyncio.gather로 같은 세션을 동시에 쓰면 SQLAlchemy가 거부한다)
     current_factors_data = await get_factor_analysis(user_id, db, cache, account_ids=portfolio_acct_ids)
-    target_factors_data = await get_factor_analysis_for_portfolio(portfolio_id, db, cache)
+    target_factors_data = await get_factor_analysis_for_portfolio(portfolio_id, db, cache, user_id=user_id)
     frontier_data = await get_efficient_frontier(
         user_id, db, cache, compare_portfolio_id=portfolio_id, account_ids=portfolio_acct_ids
     )

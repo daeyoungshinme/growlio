@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -238,6 +239,15 @@ def portfolio_overview_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
 
 def portfolio_overview_lite_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
     return f"{_env_prefix()}portfolio_overview_lite:{user_id}:{acct_suffix}"
+
+
+def account_ids_suffix(account_ids: Iterable[uuid.UUID | str] | None) -> str:
+    """팩터·프론티어·전략 캐시 키의 계좌 조합 suffix — 정렬해 순서와 무관하게 같은 키를 쓴다(plans/119 B6).
+
+    `portfolio_overview_acct_suffix`와 구분자(`_` vs `-`)가 다르다 — 기존 캐시 키를 그대로 두려고 맞추지 않았다.
+    """
+    ids = sorted(str(a) for a in account_ids) if account_ids else []
+    return "_".join(ids) if ids else "all"
 
 
 def portfolio_overview_acct_suffix(account_ids: list[uuid.UUID] | None) -> str:

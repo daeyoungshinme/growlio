@@ -9,6 +9,7 @@ import { CACHE_OWNER_CHANGED_EVENT, claimCacheOwner } from "@/utils/cacheOwner";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { registerPushToken } from "@/api/settings";
 import { useSyncStore } from "@/stores/syncStore";
+import { clearWidget } from "@/hooks/useWidget";
 
 /** 로그아웃이 푸시 토큰 삭제 응답을 기다리는 최대 시간 — api 기본 타임아웃(60s)만큼 막히지 않게 한다. */
 const LOGOUT_PUSH_CLEAR_TIMEOUT_MS = 3000;
@@ -193,6 +194,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
       storageRemove(AUTH_ME_CACHE_KEY);
       // 앱을 새로 열지 않고 계정을 바꾸면 이전 계정의 실패 계좌명이 남는다
       useSyncStore.getState().reset();
+      // 명시적 로그아웃뿐 아니라 세션 만료(App.tsx)도 이 경로를 탄다 — 예전엔 useLogout에서만 지워 만료 뒤
+      // 위젯에 이전 계정 자산이 남았다(plans/119 C1). 푸시 토큰 대기 뒤라 그 사이 갱신이 덮어쓰지 못한다.
+      void clearWidget();
       const supabase = await getSupabase();
       await supabase.auth.signOut();
     },

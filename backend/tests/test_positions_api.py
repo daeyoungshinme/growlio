@@ -363,10 +363,11 @@ class TestSyncPositionPrices:
         assert resp.status_code == 409
 
     def test_sync_prices_success(self, override_settings):
-        """현재가 동기화 성공 경로 (lines 175-215)."""
+        """현재가 동기화 성공 경로. manual_amount도 저장 경로처럼 예수금을 포함한다(plans/119 A2)."""
         user = make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
+        account.deposit_krw = 100_000.0
         db.scalar = AsyncMock(return_value=account)
 
         mock_pos = SimpleNamespace(
@@ -412,6 +413,7 @@ class TestSyncPositionPrices:
         assert resp.status_code == 200
         data = resp.json()
         assert "positions" in data
+        assert account.manual_amount == pytest.approx(mock_pos.current_price * mock_pos.qty + 100_000.0)
 
     def test_sync_prices_overseas_applies_usd_rate(self, override_settings):
         """해외 종목 환율 적용 경로 (lines 181, 187)."""

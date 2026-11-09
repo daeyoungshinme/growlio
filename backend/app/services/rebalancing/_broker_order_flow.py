@@ -14,6 +14,7 @@ import structlog
 
 # 주문 라우팅용 해외 판정은 KIS 주문 가능 거래소(NYSE/NASDAQ/AMEX) 기준이다 — app.constants.OVERSEAS_MARKETS
 # (TSE·HKEX 등 포함)로 바꾸면 그 거래소 주문이 해외 주문 API로 가 거부된다.
+from app.core.job_runner import report_handled_failure
 from app.kis.order import is_overseas_market
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
 from app.services.rebalancing._order_quantity_guard import clamp_buy_orders_to_budget, clamp_sell_orders
@@ -26,7 +27,7 @@ class BrokerOrderOps:
     place: Callable[[ExecutionOrderItem], Awaitable[OrderResult]]
     domestic_balance: Callable[[], Awaitable[dict]]
     overseas_balance: Callable[[], Awaitable[dict]]
-    # FULL 전략 국내 매수 예산(원). 실패 시 예외를 던지면 clamp 없이 원래 수량으로 주문한다.
+    # FULL 전략 국내 매수 예산(원). 실패 시 예외를 던지면 예산 0으로 보고 매수를 건너뛴다(plans/119 B4).
     domestic_buy_budget: Callable[[], Awaitable[float]]
     # 해외 잔고 position → 보유수량 키, 주문 → 같은 키. KIS는 거래소까지, 키움은 잔고 market이
     # "US" 센티널이라 ticker 단독(계획 55 A1)이다.
@@ -64,7 +65,8 @@ async def execute_sells_with_clamp(ops: BrokerOrderOps, sells: list[ExecutionOrd
             held = _held_qty(balance.get("positions", []), lambda p: p["ticker"])
             adjusted, skipped = clamp_sell_orders(domestic_sells, held)
         except Exception as exc:
-            logger.warning(f"{ops.log_prefix}sell_clamp_domestic_balance_failed", error=str(exc))
+            # 보유수량 초과 매도는 브로커가 거부할 뿐이라 원래 수량으로 시도한다 — 실자금 경로라 Sentry에 남긴다
+            report_handled_failure(f"{ops.log_prefix}sell_clamp_domestic_balance_failed", exc)
             adjusted, skipped = domestic_sells, []
         results.extend(skipped)
         for order in adjusted:
@@ -76,7 +78,8 @@ async def execute_sells_with_clamp(ops: BrokerOrderOps, sells: list[ExecutionOrd
             held = _held_qty(balance.get("positions", []), ops.overseas_position_key)
             adjusted, skipped = clamp_sell_orders(overseas_sells, held, key_fn=ops.overseas_order_key)
         except Exception as exc:
-            logger.warning(f"{ops.log_prefix}sell_clamp_overseas_balance_failed", error=str(exc))
+            # 보유수량 초과 매도는 브로커가 거부할 뿐이라 원래 수량으로 시도한다 — 실자금 경로라 Sentry에 남긴다
+            report_handled_failure(f"{ops.log_prefix}sell_clamp_overseas_balance_failed", exc)
             adjusted, skipped = overseas_sells, []
         results.extend(skipped)
         for order in adjusted:
@@ -93,7 +96,8 @@ async def execute_buys_with_cash_check(ops: BrokerOrderOps, buys: list[Execution
     남은 주문이 줄줄이 실패로 떨어질 수 있다. TWO_PHASE 전략(Phase1/3)과 같은 개념의 clamp를 1회 적용한다.
 
     해외 주식이 섞이면 국내 예산으로 clamp하는 것이 의미가 없어(통화가 다름) 원래 수량 그대로 실행한다.
-    예산 조회 자체가 실패해도 clamp 없이 원래 수량으로 시도한다(기존 동작 유지).
+    예산 조회가 실패하면 예산 0으로 보고 매수를 건너뛴다 — TWO_PHASE 경로(`_kis_order_executor`)와 같다.
+    예전엔 clamp 없이 원래 수량을 그대로 발주했다(plans/119 B4).
     """
     if not buys:
         return []
@@ -104,8 +108,8 @@ async def execute_buys_with_cash_check(ops: BrokerOrderOps, buys: list[Execution
     try:
         budget = await ops.domestic_buy_budget()
     except Exception as exc:
-        logger.warning(f"{ops.log_prefix}full_strategy_buy_budget_failed", error=str(exc))
-        return [await ops.place(order) for order in buys]
+        report_handled_failure(f"{ops.log_prefix}full_strategy_buy_budget_failed", exc)
+        budget = 0.0
 
     adjusted, skipped = clamp_buy_orders_to_budget(buys, budget)
     results: list[OrderResult] = list(skipped)

@@ -23,6 +23,7 @@ from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import (
     TTL_FACTOR_ANALYSIS,
     CacheStoreType,
+    account_ids_suffix,
     factor_analysis_key,
     factor_analysis_portfolio_key,
     get_cached_json,
@@ -171,8 +172,13 @@ async def get_factor_analysis_for_portfolio(
     portfolio_id: str,
     db: AsyncSession,
     cache: CacheStoreType = None,
+    *,
+    user_id: uuid.UUID,
 ) -> dict:
-    """저장된 포트폴리오(Portfolio.items)의 팩터 노출도 분석 반환."""
+    """저장된 포트폴리오(Portfolio.items)의 팩터 노출도 분석 반환.
+
+    조회는 소유자로 거른다 — 호출부가 확인하더라도 새 호출부가 빠뜨리면 남의 포트폴리오를 읽었다(plans/119 B6).
+    """
     from app.models.portfolio import Portfolio
 
     cache_key = factor_analysis_portfolio_key(portfolio_id)
@@ -182,7 +188,9 @@ async def get_factor_analysis_for_portfolio(
         return cached
 
     portfolio = await db.scalar(
-        select(Portfolio).options(selectinload(Portfolio.items)).where(Portfolio.id == portfolio_id)
+        select(Portfolio)
+        .options(selectinload(Portfolio.items))
+        .where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
     )
     if not portfolio or not portfolio.items:
         return _empty_factor_result()
@@ -220,7 +228,7 @@ async def get_factor_analysis(
     account_ids: list[uuid.UUID] | None = None,
 ) -> dict:
     """포트폴리오 팩터 노출도 분석 반환."""
-    acct_suffix = "_".join(sorted(str(a) for a in account_ids)) if account_ids else "all"
+    acct_suffix = account_ids_suffix(account_ids)
     cache_key = factor_analysis_key(user_id, acct_suffix)
 
     cached = await get_cached_json(cache, cache_key)

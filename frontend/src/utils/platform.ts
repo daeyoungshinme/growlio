@@ -22,3 +22,17 @@ export function getApiBaseUrl(): string {
   const domain = (import.meta.env.VITE_API_DOMAIN as string | undefined) ?? "localhost:8000";
   return `https://${domain}`;
 }
+
+/**
+ * UUID v4 문자열. `crypto.randomUUID`는 Chrome/WebView 92+ 전용이라, minSdk 24 기기의 갱신 안 된
+ * System WebView에서는 없다 — 그때는 `getRandomValues`로 같은 형식을 만든다(plans/119 C5).
+ * 주문 멱등 키에 쓰므로 `Math.random`으로 떨어지지 않는다.
+ */
+export function randomId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}

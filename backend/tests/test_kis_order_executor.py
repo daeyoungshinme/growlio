@@ -283,8 +283,8 @@ class TestExecuteBuysWithCashCheck:
         assert results[0].quantity == 5
 
     @pytest.mark.asyncio
-    async def test_cash_lookup_failure_falls_back_to_unclamped_execution(self, override_settings):
-        """기존 매도 clamp 폴백 정책과 동일 — 조회 실패 시 clamp 없이 원래 수량으로 시도."""
+    async def test_cash_lookup_failure_skips_buys(self, override_settings):
+        """매도 폴백과 달리 매수는 예산을 모르면 건너뛴다 — 초과 매수는 거부가 아니라 실제 체결될 수 있다."""
         buy_order = _make_order(ticker="005930", side="BUY", quantity=10, limit_price=1000.0)
 
         async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
@@ -299,14 +299,15 @@ class TestExecuteBuysWithCashCheck:
 
         with (
             patch.object(_kis_order_executor, "get_orderable_cash", AsyncMock(side_effect=Exception("timeout"))),
-            patch.object(_kis_order_executor, "_execute_single_order", side_effect=mock_execute_single),
+            patch.object(_kis_order_executor, "_execute_single_order", side_effect=mock_execute_single) as mock_place,
         ):
             results = await _kis_order_executor._execute_buys_with_cash_check(
                 [buy_order], "key", "secret", "token", "12345678-01", True
             )
 
-        assert results[0].quantity == 10
-        assert results[0].status == "SUCCESS"
+        # plans/119 B4: 예산을 모르면 실자금 매수를 발주하지 않는다(TWO_PHASE와 같은 예산 0 취급)
+        mock_place.assert_not_called()
+        assert results[0].status == "SKIPPED"
 
     @pytest.mark.asyncio
     async def test_empty_buys_returns_empty(self, override_settings):

@@ -32,6 +32,7 @@ from app.utils.cache_keys import (
     get_cached_json,
     set_cached_json,
 )
+from app.utils.circuit_breaker import yahoo_circuit
 
 logger = structlog.get_logger()
 
@@ -108,9 +109,13 @@ async def get_etf_profiles(
     return profiles
 
 
+def _empty_streak_key(ticker: str, market: str) -> str:
+    return etf_profile_key(ticker, market) + ":empty"
+
+
 async def _empty_info_confirms_missing(cache: CacheStoreType, ticker: str, market: str, yahoo_alive: bool) -> bool:
     """해외 심볼의 연속 빈 응답 횟수를 세고, `_EMPTY_INFO_STREAK_AS_MISSING`에 닿으면 True("데이터 없음" 확정)."""
-    streak_key = etf_profile_key(ticker, market) + ":empty"
+    streak_key = _empty_streak_key(ticker, market)
     prev = int((await get_cached_json(cache, streak_key) or {}).get("n", 0))
     if prev == 0 and not yahoo_alive:
         return False  # 첫 빈 응답이 배치 전체 실패와 겹치면 조회 실패와 구분되지 않는다
@@ -125,6 +130,9 @@ async def _resolve_overseas(
 ) -> list[tuple[str, str, EtfProfile | None, bool]]:
     """해외 심볼을 Yahoo로 조회해 캐싱할 (ticker, market, profile, definitive) 목록을 돌려준다(미확정은 빠진다)."""
     symbol_to_key = {to_yf_symbol(t, m): (t, m) for t, m in overseas}
+    # 서킷이 열려 있으면 fetch_yf_info는 조회 없이 {}를 돌려준다 — 장애 중의 빈 응답은 세지 않는다. 예전엔
+    # 첫 빈 응답만 걸러, 이미 한 번 센 정상 ETF가 장애 중 요청 두 번으로 "데이터 없음"에 닿았다(plans/119 B2)
+    circuit_open = not yahoo_circuit.is_available()
     info_map = await run_yf_bounded(fetch_yf_info, list(symbol_to_key))
     # 다른 심볼은 응답을 받은 배치에서 빈 응답이 시작돼 연속으로 이어지면 상장폐지·비정상 심볼로 보고
     # "데이터 없음"(1일)으로 캐싱한다. 안 그러면 그런 종목 하나 때문에 겹침 분석이 매 요청 캐시 없이 다시 돈다
@@ -135,9 +143,12 @@ async def _resolve_overseas(
     for symbol, (t, m) in symbol_to_key.items():
         info = info_map.get(symbol)
         if not info:
-            if await _empty_info_confirms_missing(cache, t, m, yahoo_alive):
+            if not circuit_open and await _empty_info_confirms_missing(cache, t, m, yahoo_alive):
                 out.append((t, m, None, False))
             continue
+        if cache is not None:
+            # 정상 응답이 오면 "연속" 빈 응답이 끊긴 것이다 — 남겨 두면 띄엄띄엄 난 일시 실패가 합산됐다
+            await cache.delete(_empty_streak_key(t, m))
         out.append((t, m, parse_yahoo_etf_profile(info), bool(info.get("quoteType"))))
     return out
 

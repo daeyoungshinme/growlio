@@ -349,7 +349,8 @@ class TestExecuteKiwoomBuysWithCashCheck:
         assert results[0].quantity == 5
 
     @pytest.mark.asyncio
-    async def test_deposit_lookup_failure_falls_back_to_unclamped_execution(self, override_settings):
+    async def test_deposit_lookup_failure_skips_buys(self, override_settings):
+        """plans/119 B4: 예산 조회가 실패하면 실자금 매수를 발주하지 않는다(KIS FULL·TWO_PHASE와 같은 예산 0 취급)."""
         buy_order = _make_order(ticker="005930", side="BUY", quantity=10, order_type="LIMIT", limit_price=1000.0)
 
         with (
@@ -358,14 +359,16 @@ class TestExecuteKiwoomBuysWithCashCheck:
                 "kiwoom_get_domestic_balance",
                 AsyncMock(side_effect=RuntimeError("network")),
             ),
-            patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "1"})),
+            patch.object(
+                _kiwoom_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "1"})
+            ) as mock_place,
         ):
             results = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
                 [buy_order], "token", "1234567890", True
             )
 
-        assert results[0].quantity == 10
-        assert results[0].status == "SUCCESS"
+        mock_place.assert_not_called()
+        assert results[0].status == "SKIPPED"
 
     @pytest.mark.asyncio
     async def test_empty_buys_returns_empty(self):

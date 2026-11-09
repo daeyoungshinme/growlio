@@ -326,6 +326,65 @@ async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_cache):
 
 
 @pytest.mark.asyncio
+async def test_check_stock_price_alerts_skips_suspect_usd_unit(mock_db, mock_cache):
+    """plans/119 A3: 달러 숫자가 원화로 저장된 옛 해외 알림(SCHD 27원)은 ABOVE라도 거짓 발동하지 않는다."""
+    alert = SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        ticker="SCHD",
+        market="NYSE",
+        name="SCHD",
+        target_price=27.0,
+        direction="ABOVE",
+        is_active=True,
+        max_trigger_count=1,
+        trigger_count=0,
+        triggered_at=None,
+    )
+    execute_result = MagicMock()
+    execute_result.all.return_value = [(alert, "user@example.com", None, None)]
+    mock_db.execute = AsyncMock(return_value=execute_result)
+
+    with (
+        patch(
+            "app.services.market_data.price_service.fetch_prices_batch_krw",
+            AsyncMock(return_value={"SCHD": 38_000.0}),
+        ),
+        patch("app.services.notifications.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
+    ):
+        from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
+
+        await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
+
+    mock_email.assert_not_called()
+    assert alert.trigger_count == 0
+    assert alert.is_active is True
+
+
+def test_stock_price_alert_response_flags_suspect_usd_unit():
+    """plans/119 A3: 목록 응답의 needs_reentry — 해외 종목의 1,000원 미만 목표가만 의심한다."""
+    from datetime import UTC, datetime
+
+    from app.schemas.alert import StockPriceAlertResponse
+
+    base = {
+        "id": uuid.uuid4(),
+        "ticker": "SCHD",
+        "name": "SCHD",
+        "direction": "BELOW",
+        "is_active": True,
+        "max_trigger_count": 1,
+        "trigger_count": 0,
+        "triggered_at": None,
+        "created_at": datetime.now(UTC),
+    }
+    assert StockPriceAlertResponse(**base, market="NYSE", target_price=27.0).needs_reentry is True
+    assert StockPriceAlertResponse(**base, market="NYSE", target_price=37_800.0).needs_reentry is False
+    assert StockPriceAlertResponse(**base, market="KOSDAQ", target_price=500.0).needs_reentry is False
+    assert "needs_reentry" in StockPriceAlertResponse(**base, market="NYSE", target_price=27.0).model_dump()
+
+
+@pytest.mark.asyncio
 async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_cache):
     """가격 조회 실패(ticker 미포함) 시 해당 알림을 건너뛴다."""
     user_id = uuid.uuid4()

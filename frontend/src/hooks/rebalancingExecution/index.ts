@@ -30,6 +30,7 @@ import type {
   PriceLoadState,
   Strategy,
 } from "./types";
+import { randomId } from "@/utils/platform";
 import { executionReducer } from "./reducer";
 import {
   buyRowItem,
@@ -451,7 +452,7 @@ export function useRebalancingExecution({
   const missingLimitPriceTickers = findMissingLimitPriceTickers(orders);
 
   // 확인 화면(모달)을 다시 열기 전까지 같은 키를 쓴다 — 서버가 처리했는데 응답만 못 받았어도 재주문되지 않는다
-  const [initialIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [initialIdempotencyKey] = useState(() => randomId());
   const idempotencyKeyRef = useRef(initialIdempotencyKey);
 
   async function handleExecute() {
@@ -485,7 +486,7 @@ export function useRebalancingExecution({
         });
       } else if (status !== undefined && status >= 400 && status < 500) {
         // 검증·한도 거절은 주문이 나가지 않았다 — 고쳐서 다시 낼 수 있게 새 키를 쓴다
-        idempotencyKeyRef.current = crypto.randomUUID();
+        idempotencyKeyRef.current = randomId();
         dispatch({
           type: "EXECUTE_ERROR",
           msg: extractErrorMessage(e, "주문 실행 중 오류가 발생했습니다."),

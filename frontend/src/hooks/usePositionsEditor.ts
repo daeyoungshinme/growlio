@@ -3,6 +3,7 @@ import { fetchStockPrice } from "@/api/assets";
 import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "./useStockSearch";
 import { extractErrorMessage } from "@/utils/error";
+import { randomId } from "@/utils/platform";
 import { toast } from "@/utils/toast";
 import { isOverseasMarket } from "@/constants/markets";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
@@ -75,7 +76,7 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
         usd_rate: null,
         current_price: null,
         current_price_usd: null,
-        _rowKey: crypto.randomUUID(),
+        _rowKey: randomId(),
       },
     ]);
 

@@ -85,6 +85,25 @@ class TestHealth:
         assert resp.status_code == 200
         db.execute.assert_awaited_once()
 
+    def test_health_is_exempt_from_default_rate_limit(self, override_settings):
+        """plans/119 B1: Render 헬스체크 경로라 기본 한도(120/min)를 넘겨도 429를 내지 않는다."""
+        from app.limiter import limiter
+        from app.main import app
+
+        db = AsyncMock()
+        was_enabled = limiter.enabled
+        limiter.enabled = True
+        try:
+            with (
+                patch("app.main.get_db", self._get_db_yielding(db)),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                codes = {client.get("/health").status_code for _ in range(125)}
+        finally:
+            limiter.enabled = was_enabled
+            limiter.reset()
+        assert codes == {200}
+
     def test_health_returns_503_when_db_fails(self, override_settings):
         from app.main import app
 

@@ -47,6 +47,11 @@ def _wrap_dedup_key(challenge_id, month: str) -> str:
     return f"challenge_wrap:{challenge_id}:{month}"
 
 
+def _auto_completed_key(challenge_id, month: str) -> str:
+    """결산 잡이 이 달 결산에서 완료로 바꿨다는 표시 — 사용자가 직접 완료한 챌린지(PATCH)와 구분한다."""
+    return f"challenge_wrap_completed:{challenge_id}:{month}"
+
+
 async def run_challenge_monthly_wrap() -> None:
     """매월 1일 09:30 KST — 지난달 적립 챌린지 결산 + 목표 도달 챌린지 완료 처리."""
     await run_alert_job(_run_challenge_monthly_wrap, "challenge_monthly_wrap_job", needs_cache=True)
@@ -113,6 +118,9 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
     progress = await challenge_service.compute_progress(challenge, user.id, db)
     # 이번 달 결산에서 이미 완료로 바뀐 챌린지(알림 재시도) — 그 뒤 수익률이 내려가도 달성은 확정이다
     already_completed = challenge.status == CHALLENGE_COMPLETED
+    if already_completed and await get_durable(db, _auto_completed_key(challenge.id, prev_month), commit=False) is None:
+        # 결산 잡이 아니라 사용자가 직접 완료한 챌린지 — 결산이 밀린 catch-up이 "달성 🎉"을 보내지 않게(plans/119 B3)
+        return
 
     if challenge.challenge_type == CHALLENGE_DEPOSIT:
         if challenge.start_month > prev_month:
@@ -164,6 +172,7 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
     if completed and challenge.status != CHALLENGE_COMPLETED:
         challenge.status = CHALLENGE_COMPLETED
         challenge.completed_at = datetime.now(UTC)
+        await set_durable(db, _auto_completed_key(challenge.id, prev_month), "1", ttl=_DEDUP_TTL, commit=False)
     logger.info(
         "challenge_wrap_sent" if sent else "challenge_wrap_not_sent",
         user_id=str(user.id),

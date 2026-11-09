@@ -120,11 +120,10 @@ export default defineConfig({
         "src/lib/serviceWorker.ts",
         "src/lib/supabase.ts",
         "src/plugins/**",
-        // useBiometric·usePushNotifications·useWidget은 테스트가 생겨 측정한다(plans/118 D3)
+        // useBiometric·usePushNotifications·useWidget(plans/118 D3), usePullToRefresh·useRegisterRefresh(plans/119 D5)는
+        // 테스트가 생겨 측정한다. 남은 둘은 Capacitor 햅틱·스와이프 제스처 래퍼다
         "src/hooks/useHaptic.ts",
-        "src/hooks/usePullToRefresh.ts",
         "src/hooks/useSwipeNavigation.ts",
-        "src/hooks/useRegisterRefresh.ts",
         "src/hooks/rebalancingExecution/types.ts",
       ],
       // 2026-10-28 실측(lines 79.38/functions 67.33/branches 67.75/statements 77.97%)에서

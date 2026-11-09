@@ -22,8 +22,6 @@ vi.mock("@/utils/toast", () => ({
   toast: vi.fn(),
 }));
 
-vi.mock("@/hooks/useWidget", () => ({ clearWidget: vi.fn().mockResolvedValue(undefined) }));
-
 vi.mock("@/stores/authStore", () => ({
   useAuthStore: vi.fn((selector) => {
     const state = { logout: vi.fn().mockResolvedValue(undefined) };
@@ -185,14 +183,5 @@ describe("useLogout", () => {
     });
 
     expect(logoutFn).toHaveBeenCalled();
-  });
-
-  it("로그아웃·탈퇴 때 홈 화면 위젯을 비운다(plans/118 C3)", async () => {
-    const { clearWidget } = await import("@/hooks/useWidget");
-    const { result } = renderHook(() => useLogout(), { wrapper: createWrapper() });
-    await act(async () => {
-      await result.current();
-    });
-    expect(clearWidget).toHaveBeenCalledTimes(1);
   });
 });
