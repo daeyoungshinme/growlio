@@ -238,6 +238,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 
 @app.get("/health")
+@limiter.exempt  # Render 헬스체크·외부 핑 경로 — 기본 한도(120/min)에 걸리면 인스턴스가 unhealthy로 보인다
 async def health():
     db_ok = False
     try:

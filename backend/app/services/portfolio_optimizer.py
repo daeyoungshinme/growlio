@@ -18,7 +18,7 @@ from sqlalchemy.orm import selectinload
 from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 from app.services.market_data.yahoo_price import to_yf_symbol as _to_yf_symbol
 from app.services.portfolio.position_aggregator import query_latest_position_map
-from app.utils.cache_keys import TTL_PORTFOLIO_OPTIMIZER, CacheStoreType, efficient_frontier_key
+from app.utils.cache_keys import TTL_PORTFOLIO_OPTIMIZER, CacheStoreType, account_ids_suffix, efficient_frontier_key
 
 logger = structlog.get_logger()
 _MIN_POSITIONS = 2  # 최적화에 필요한 최소 종목 수
@@ -184,7 +184,7 @@ async def get_efficient_frontier(
     account_ids: list[uuid.UUID] | None = None,
 ) -> dict:
     """효율적 프론티어 데이터 반환. compare_portfolio_id 지정 시 목표 포트폴리오 위치도 포함."""
-    acct_suffix = "_".join(sorted(str(a) for a in account_ids)) if account_ids else "all"
+    acct_suffix = account_ids_suffix(account_ids)
     cache_key = efficient_frontier_key(user_id, compare_portfolio_id, acct_suffix)
 
     if cache:
@@ -227,11 +227,14 @@ async def get_efficient_frontier(
     if compare_portfolio_id:
         from app.models.portfolio import Portfolio
 
+        # 소유자로 거른다 — 지금 호출부는 미리 확인하지만 새 호출부가 빠뜨려도 남의 포트폴리오를 섞지 않게(plans/119 B6)
         portfolio = await db.get(
             Portfolio,
             compare_portfolio_id,
             options=[selectinload(Portfolio.items)],
         )
+        if portfolio is not None and portfolio.user_id != user_id:
+            portfolio = None
         if portfolio and portfolio.items:
             total_w = sum(float(item.weight) for item in portfolio.items)
             for item in portfolio.items:

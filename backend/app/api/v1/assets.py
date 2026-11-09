@@ -473,8 +473,10 @@ async def batch_set_target_portfolio(
         return []
     if body.portfolio_id is not None:
         await get_owned_or_404(db, Portfolio, body.portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
-    accounts = await _list_accounts_by_ids(body.account_ids, current_user.id, db)
-    if len(accounts) != len(body.account_ids):
+    # 중복 ID가 있으면 조회 결과 수와 어긋나 정상 요청도 403이 났다(plans/119 B5)
+    account_ids = list(dict.fromkeys(body.account_ids))
+    accounts = await _list_accounts_by_ids(account_ids, current_user.id, db)
+    if len(accounts) != len(account_ids):
         raise HTTPException(status_code=403, detail="접근 권한이 없는 계좌가 포함되어 있습니다")
     for account in accounts:
         account.target_portfolio_id = body.portfolio_id

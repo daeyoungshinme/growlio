@@ -113,6 +113,32 @@ class TestGetProfiles:
         assert mock_yf.call_count == 3
 
     @pytest.mark.asyncio
+    async def test_open_circuit_does_not_advance_empty_streak(self):
+        """plans/119 B2: 서킷이 열린 동안의 빈 응답은 세지 않는다 — 한 번 센 정상 ETF가 장애 중 요청으로
+        '데이터 없음'에 닿지 않는다. 정상 응답이 오면 연속 횟수도 리셋한다."""
+        cache = CacheStore()
+        items = [("SPY", "SPDR S&P 500", "NYSE"), ("QQQ", "Invesco QQQ", "NASDAQ")]
+        alive = {"SPY": {"quoteType": "ETF", "netExpenseRatio": 0.0945}}
+        with patch.object(svc, "fetch_yf_info", return_value=alive):
+            await svc.get_etf_profiles_with_status(cache, items)  # QQQ 빈 응답 1회(n=1)
+        assert await svc.get_cached_json(cache, svc._empty_streak_key("QQQ", "NASDAQ")) == {"n": 1}
+
+        with (
+            patch.object(svc.yahoo_circuit, "is_available", return_value=False),
+            patch.object(svc, "fetch_yf_info", return_value={}),
+        ):
+            for _ in range(3):
+                _, unresolved = await svc.get_etf_profiles_with_status(cache, items)
+                assert ("QQQ", "NASDAQ") in unresolved
+        assert await svc.get_cached_json(cache, svc._empty_streak_key("QQQ", "NASDAQ")) == {"n": 1}
+
+        qqq = {"QQQ": {"quoteType": "ETF", "netExpenseRatio": 0.2}}
+        with patch.object(svc, "fetch_yf_info", return_value=qqq):
+            profiles, _ = await svc.get_etf_profiles_with_status(cache, items)
+        assert profiles[("QQQ", "NASDAQ")]["ter_pct"] == 0.2
+        assert await svc.get_cached_json(cache, svc._empty_streak_key("QQQ", "NASDAQ")) is None
+
+    @pytest.mark.asyncio
     async def test_non_etf_result_is_cached(self):
         cache = CacheStore()
         items = [("AAPL", "Apple", "NASDAQ")]

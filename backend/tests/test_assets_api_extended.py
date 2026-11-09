@@ -488,6 +488,26 @@ class TestBatchSetTargetPortfolio:
         assert account1.target_portfolio_id == portfolio_id
         assert account2.target_portfolio_id == portfolio_id
 
+    def test_batch_set_duplicate_ids_are_deduplicated(self, override_settings):
+        """plans/119 B5: 같은 계좌 ID가 두 번 와도 403이 아니라 한 번 지정한다. 조회는 활성 계좌만 본다."""
+        user = make_user()
+        account = _make_account(user.id)
+        db = make_mock_db()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [account]
+        db.execute = AsyncMock(return_value=result)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.patch(
+                "/api/v1/assets/batch-target-portfolio",
+                json={"portfolio_id": None, "account_ids": [str(account.id), str(account.id)]},
+            )
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1
+        sql = str(db.execute.await_args.args[0].compile(compile_kwargs={"literal_binds": False}))
+        assert "asset_accounts.is_active" in sql
+
     def test_batch_set_rejects_portfolio_not_owned(self, override_settings):
         """다른 사용자의 포트폴리오 id는 지정할 수 없다 — 계좌 소유만 보고 포트폴리오 소유는 안 보던 허점."""
         user = make_user()

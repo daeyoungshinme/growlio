@@ -295,10 +295,12 @@ async def list_accounts_by_ids(
     user_id: uuid.UUID,
     db: AsyncSession,
 ) -> Sequence[AssetAccount]:
+    """소유한 활성 계좌만 — 삭제(is_active=False) 계좌는 목표 포트폴리오 일괄 지정 대상이 아니다(plans/119 B5)."""
     result = await db.execute(
         select(AssetAccount).where(
             AssetAccount.id.in_(account_ids),
             AssetAccount.user_id == user_id,
+            AssetAccount.is_active == True,
         )
     )
     return result.scalars().all()

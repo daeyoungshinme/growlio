@@ -197,7 +197,7 @@ class TestGetFactorAnalysisForPortfolio:
     async def test_portfolio_not_found_returns_empty(self, mock_db, override_settings):
         mock_db.scalar = AsyncMock(return_value=None)
 
-        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db)
+        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, user_id=uuid.uuid4())
 
         assert result["position_count"] == 0
         assert result["holdings"] == []
@@ -208,7 +208,7 @@ class TestGetFactorAnalysisForPortfolio:
         portfolio.items = []
         mock_db.scalar = AsyncMock(return_value=portfolio)
 
-        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db)
+        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, user_id=uuid.uuid4())
 
         assert result["position_count"] == 0
 
@@ -225,7 +225,7 @@ class TestGetFactorAnalysisForPortfolio:
             mock_executor = AsyncMock(return_value=factor_data)
             mock_loop.return_value.run_in_executor = mock_executor
 
-            result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db)
+            result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, user_id=uuid.uuid4())
 
         assert result["position_count"] == 1
         assert len(result["holdings"]) == 1
@@ -243,7 +243,9 @@ class TestGetFactorAnalysisForPortfolio:
         cache = AsyncMock()
         cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, cache=cache)
+        result = await get_factor_analysis_for_portfolio(
+            "some-portfolio-id", mock_db, cache=cache, user_id=uuid.uuid4()
+        )
 
         assert result["position_count"] == 2
         mock_db.scalar.assert_not_called()
@@ -265,7 +267,7 @@ class TestGetFactorAnalysisForPortfolio:
             mock_executor = AsyncMock(return_value=factor_data)
             mock_loop.return_value.run_in_executor = mock_executor
 
-            await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, cache=cache)
+            await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, cache=cache, user_id=uuid.uuid4())
 
         cache.setex.assert_called_once()
 
@@ -277,7 +279,7 @@ class TestGetFactorAnalysisForPortfolio:
         portfolio.name = "포트폴리오"
         mock_db.scalar = AsyncMock(return_value=portfolio)
 
-        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db)
+        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, user_id=uuid.uuid4())
 
         assert result["position_count"] == 0
 
