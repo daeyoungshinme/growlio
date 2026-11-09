@@ -244,7 +244,7 @@ _기타_
 - `isOverseasMarket(market)`, `marketLabel(market)`(화면엔 원시 코드 대신), `POSITION_MARKETS`
 - **토스 해외 포지션 market은 `"US"`라 `isOverseasMarket`이 못 잡는다** — 국내/해외 이분은 `DOMESTIC_MARKETS.includes(m.toUpperCase())`
 
-**플랫폼 (`utils/platform.ts`)**: `isNativePlatform()`, `getApiBaseUrl()`(네이티브는 `VITE_API_DOMAIN` 절대 URL, 웹은 `""`) — 인라인 `window.Capacitor` 접근 금지.
+**플랫폼 (`utils/platform.ts`)**: `isNativePlatform()`, `getApiBaseUrl()`(네이티브는 `VITE_API_DOMAIN` 절대 URL, 웹은 `""`) — 인라인 `window.Capacitor` 접근 금지. `randomId()` — `crypto.randomUUID` 직접 호출 금지(minSdk 24 구형 WebView엔 없음).
 
 **차트 (`utils/chart.ts`)**: `chartTooltipStyle(isDark)`, `chartTickStyle(isDark)`/`CHART_TICK_FONT_SIZE`(12) — 인라인 스타일·`fontSize: 11` 금지. Recharts는 `dark:` 미지원이라 `isDark`로.
 

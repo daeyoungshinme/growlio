@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchStockPriceAlerts,
@@ -43,6 +43,8 @@ export function StockPriceAlertSection() {
   // 백엔드는 목표가를 원화로 비교한다 — 해외 종목은 달러로 받아 현재 환율로 환산해 보낸다(plans/118 C6).
   // 예전엔 "목표가 (원)"에 SCHD 27을 넣으면 27원으로 저장돼 이상(↑) 알림이 즉시, 이하(↓)는 영영 울리지 않았다.
   const inUsd = selectedStock ? isOverseasMarket(selectedStock.market) : false;
+  // 목표가를 입력한 시점의 단위 — 종목을 다시 고를 때 단위가 바뀌었는지 판단한다
+  const targetTypedInUsd = useRef(false);
   const targetKrw = inUsd
     ? convertUsdToKrw(Number(form.target_price), rate)
     : Number(form.target_price);
@@ -125,7 +127,14 @@ export function StockPriceAlertSection() {
                   className={`w-full text-left px-3 ${TOUCH_HEIGHT_MIN} text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}
                   onClick={() => {
                     setSelectedStock(s);
-                    setForm((f) => ({ ...f, query: `${s.name} (${s.ticker})` }));
+                    // 입력할 때와 단위(원↔달러)가 달라지면 숫자를 지운다 — 30000(원)이 $30,000으로,
+                    // 27(달러)이 27원으로 바뀌어 저장되지 않게(plans/119 C2)
+                    const unitChanged = isOverseasMarket(s.market) !== targetTypedInUsd.current;
+                    setForm((f) => ({
+                      ...f,
+                      query: `${s.name} (${s.ticker})`,
+                      target_price: unitChanged ? "" : f.target_price,
+                    }));
                     clearSuggestions();
                   }}
                 >
@@ -149,7 +158,10 @@ export function StockPriceAlertSection() {
               inputMode="decimal"
               className={FORM_INPUT_SM}
               value={form.target_price}
-              onChange={(e) => setForm((f) => ({ ...f, target_price: e.target.value }))}
+              onChange={(e) => {
+                targetTypedInUsd.current = inUsd;
+                setForm((f) => ({ ...f, target_price: e.target.value }));
+              }}
               placeholder={inUsd ? "예: 27.5" : "예: 30000"}
               min="0"
               step={inUsd ? "0.01" : undefined}
@@ -212,7 +224,7 @@ export function StockPriceAlertSection() {
                   {alert.name} ({alert.ticker})
                 </span>
                 <span className="ml-2 text-xs text-gray-400">
-                  {Number(alert.target_price).toLocaleString("ko-KR")}원{" "}
+                  {fmtKrwPrice(Number(alert.target_price))}{" "}
                   {alert.direction === "BELOW" ? "이하" : "이상"}
                 </span>
                 <span className="ml-2 text-xs text-gray-400">
@@ -222,6 +234,12 @@ export function StockPriceAlertSection() {
                   <span className="ml-2 text-xs text-green-600 dark:text-green-400">활성</span>
                 ) : (
                   <span className="ml-2 text-xs text-gray-400">비활성</span>
+                )}
+                {alert.needs_reentry && (
+                  <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
+                    다시 입력 필요 — 달러 목표가가 원화로 저장돼 알림이 울리지 않아요. 삭제 후
+                    달러로 다시 등록해 주세요.
+                  </p>
                 )}
               </div>
               <div className="flex items-center gap-1 ml-2 shrink-0">
@@ -249,7 +267,7 @@ export function StockPriceAlertSection() {
       )}
       {pendingDelete && (
         <ConfirmModal
-          message={`${pendingDelete.name} ${Number(pendingDelete.target_price).toLocaleString("ko-KR")}원 ${pendingDelete.direction === "BELOW" ? "이하" : "이상"} 알림을 삭제할까요?`}
+          message={`${pendingDelete.name} ${fmtKrwPrice(Number(pendingDelete.target_price))} ${pendingDelete.direction === "BELOW" ? "이하" : "이상"} 알림을 삭제할까요?`}
           confirmLabel="삭제"
           onConfirm={() => {
             deleteMutation.mutate(pendingDelete.id);

@@ -13,6 +13,8 @@ const { mockSupabaseAuth } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("@/hooks/useWidget", () => ({ clearWidget: vi.fn().mockResolvedValue(undefined) }));
+
 vi.mock("@/lib/supabase", () => ({
   getSupabase: async () => ({ auth: mockSupabaseAuth }),
 }));
@@ -217,6 +219,16 @@ describe("authStore — logout", () => {
     expect(state.isAuthenticated).toBe(false);
     expect(state.userId).toBe(null);
     expect(state.email).toBe(null);
+  });
+
+  it("세션 만료 경로도 타는 logout()이 홈 화면 위젯을 비운다(plans/119 C1)", async () => {
+    vi.mocked(mockSupabaseAuth.signOut).mockResolvedValue({ error: null } as never);
+    const { clearWidget } = await import("@/hooks/useWidget");
+
+    const store = await getStore();
+    await store.logout();
+
+    expect(clearWidget).toHaveBeenCalledTimes(1);
   });
 });
 

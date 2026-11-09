@@ -52,10 +52,14 @@ export async function retryPushRegistration(): Promise<void> {
  * 토큰 삭제가 실패하면 서버엔 토큰이 남아 푸시가 계속 오므로, 끈 기록·"꺼짐" 표시 없이 켜진 상태를 유지하고
  * 오류를 알린다(plans/118 C1). 호출부가 void로 부르므로 여기서 잡는다. */
 export async function disablePushNotifications(): Promise<void> {
-  const { setStatus } = usePushNotificationStore.getState();
+  const { status, setStatus } = usePushNotificationStore.getState();
+  if (status === "requesting") return;
+  // 요청 중에는 설정 버튼이 "확인 중..."으로 잠긴다 — 이중 탭으로 DELETE가 두 번 가지 않게(plans/119 C4)
+  setStatus("requesting");
   try {
     await registerPushToken(null);
   } catch {
+    setStatus(status);
     toast("푸시 알림을 끄지 못했습니다. 잠시 후 다시 시도하세요.", "error");
     return;
   }

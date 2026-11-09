@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { isNativePlatform, getApiBaseUrl } from "@/utils/platform";
+import { isNativePlatform, getApiBaseUrl, randomId } from "@/utils/platform";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -40,5 +40,25 @@ describe("getApiBaseUrl", () => {
   it("네이티브 환경에서 VITE_API_DOMAIN 미설정 시 localhost:8000을 기본값으로 사용한다", () => {
     vi.stubGlobal("Capacitor", { isNativePlatform: () => true });
     expect(getApiBaseUrl()).toBe("https://localhost:8000");
+  });
+});
+
+describe("randomId (plans/119 C5)", () => {
+  const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+  it("crypto.randomUUID가 없는 구형 WebView에서도 UUID v4를 만든다", () => {
+    const original = crypto.randomUUID;
+    Object.defineProperty(crypto, "randomUUID", { value: undefined, configurable: true });
+    try {
+      const a = randomId();
+      expect(a).toMatch(UUID_V4);
+      expect(randomId()).not.toBe(a);
+    } finally {
+      Object.defineProperty(crypto, "randomUUID", { value: original, configurable: true });
+    }
+  });
+
+  it("crypto.randomUUID가 있으면 그대로 쓴다", () => {
+    expect(randomId()).toMatch(UUID_V4);
   });
 });

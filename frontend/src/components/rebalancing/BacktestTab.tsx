@@ -32,13 +32,24 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
   const [backtestSelectedIds, setBacktestSelectedIds] = useState<Set<string>>(
     () => new Set(defaultPortfolioIds),
   );
-  const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
+  const [lastRun, setLastRun] = useState<{ key: string; result: BacktestResult } | null>(null);
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
   const [reinvestDividends, setReinvestDividends] = useState(true);
 
+  // 결과는 실행한 조건에만 붙인다 — 조건을 바꾸면 옛 결과가 새 조건의 결과처럼 남지 않게(plans/119 C6)
+  const paramsKey = JSON.stringify([
+    [...backtestSelectedIds].sort(),
+    startDate,
+    endDate,
+    includeSpy,
+    includeReal,
+    reinvestDividends,
+  ]);
+  const backtestResult = lastRun?.key === paramsKey ? lastRun.result : null;
+
   const runMut = useMutation({
-    mutationFn: () =>
+    mutationFn: (_key: string) =>
       runBacktest({
         portfolio_ids: Array.from(backtestSelectedIds),
         start_date: startDate,
@@ -47,12 +58,16 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
         include_real_portfolio: includeReal,
         reinvest_dividends: reinvestDividends,
       }),
-    onSuccess: (data) => setBacktestResult(data),
+    onSuccess: (data, key) => setLastRun({ key, result: data }),
     onError: (e) => toast(extractErrorMessage(e, "백테스트 실행에 실패했습니다"), "error"),
   });
 
+  // 날짜 칸을 비우면 ""라 `"" < endDate`가 참이 돼 422로 실패했다(plans/119 C6)
   const canRunBacktest =
-    startDate < endDate && (backtestSelectedIds.size > 0 || includeSpy || includeReal);
+    startDate !== "" &&
+    endDate !== "" &&
+    startDate < endDate &&
+    (backtestSelectedIds.size > 0 || includeSpy || includeReal);
 
   if (isLoading) {
     return <SkeletonCard />;
@@ -197,8 +212,8 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
           <div className="flex justify-end">
             <button
               onClick={() => {
-                setBacktestResult(null);
-                runMut.mutate();
+                setLastRun(null);
+                runMut.mutate(paramsKey);
               }}
               disabled={!canRunBacktest || runMut.isPending}
               aria-busy={runMut.isPending}

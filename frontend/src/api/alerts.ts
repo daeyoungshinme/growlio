@@ -155,6 +155,8 @@ export interface StockPriceAlert {
   trigger_count: number;
   triggered_at: string | null;
   created_at: string;
+  /** 해외 종목인데 목표가가 1,000원 미만 — 달러 숫자를 원화로 저장한 옛 알림이라 판정에서 빠진다(plans/119 A3) */
+  needs_reentry: boolean;
 }
 
 export const fetchStockPriceAlerts = () => apiGet<StockPriceAlert[]>("/alerts/stock-price");

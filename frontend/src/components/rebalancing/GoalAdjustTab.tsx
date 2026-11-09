@@ -55,9 +55,12 @@ export default function GoalAdjustTab({
     { preferTactical: isTactical },
   );
 
-  // 반대쪽 모드 청크를 미리 받아 서브탭 전환 시 청크 대기가 없게 한다
+  // 반대쪽 모드 청크를 미리 받아 서브탭 전환 시 청크 대기가 없게 한다. 선로딩은 최적화일 뿐이라 실패(오프라인·배포
+  // 직후 옛 청크)는 삼킨다 — 실제 전환 때 lazy가 다시 받는다. 안 잡으면 미처리 rejection이 Sentry로 갔다(plans/119 C7)
   useEffect(() => {
-    void (mode === "추천" ? loadTacticalAllocationTab() : loadRecommendationCard());
+    (mode === "추천" ? loadTacticalAllocationTab() : loadRecommendationCard()).catch(
+      () => undefined,
+    );
   }, [mode]);
 
   return (
