@@ -31,6 +31,16 @@ from app.utils.pnl import calc_position_pnl, reprice_positions_krw
 router = APIRouter(tags=["positions"])
 
 
+def _manual_total_krw(account: Any, total_value: Decimal | int, usd_rate: float | None) -> float:
+    """수동 계좌 총액 = 평가액 + 예수금. ManualProvider.sync와 같은 정의다.
+
+    저장·현재가 동기화가 따로 계산하면 `manual_amount`가 예수금만큼 어긋났다(plans/118 B5, 119 A2).
+    달러 예수금이 있으면 호출부가 실환율(`require_live_usd_krw`)을 넘긴다.
+    """
+    deposit_usd = float(account.deposit_usd or 0)
+    return float(total_value) + float(account.deposit_krw or 0) + (deposit_usd * usd_rate if usd_rate else 0.0)
+
+
 def _enrich_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:
     """합계·수익률을 계산해 응답 형태로 변환."""
     items = []
@@ -141,11 +151,7 @@ async def save_positions(
         usd_rate = 1.0
         if account.deposit_usd:
             usd_rate = await require_live_usd_krw(cache)
-        amount_krw = (
-            float(total_value_dec) + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate
-        )
-        # ManualProvider.sync와 같은 정의(평가액 + 예수금) — 예전엔 평가액만 넣어 저장 직후와 동기화 직후의
-        # manual_amount가 예수금만큼 달랐다(plans/118 B5)
+        amount_krw = _manual_total_krw(account, total_value_dec, usd_rate)
         account.manual_amount = amount_krw
 
         snap = await upsert_snapshot(
@@ -211,18 +217,15 @@ async def sync_position_prices(
 
         total_value_dec = sum(Decimal(str(p["current_price"])) * Decimal(str(p["qty"])) for p in updated_dicts)
         total_invested_dec = sum(Decimal(str(p["avg_price"])) * Decimal(str(p["qty"])) for p in updated_dicts)
-        account.manual_amount = float(total_value_dec)
+        amount_krw = _manual_total_krw(account, total_value_dec, usd_rate)
+        account.manual_amount = amount_krw
 
         snap = await upsert_snapshot(
             db,
             account_id=account.id,
             user_id=account.user_id,
             snapshot_date=today_kst(),
-            amount_krw=(
-                float(total_value_dec)
-                + float(account.deposit_krw or 0)
-                + float(account.deposit_usd or 0) * (usd_rate or 1)
-            ),
+            amount_krw=amount_krw,
             invested_amount=float(total_invested_dec),
             unrealized_pnl=float(total_value_dec - total_invested_dec),
             source="MANUAL",

@@ -637,6 +637,7 @@ class TestInvalidationPatternsMatchBuilders:
             ck.monthly_trend_key(uid),
             ck.dashboard_summary_key(uid),
             ck.insights_key(uid),
+            ck.backtest_key(uid, "hash1"),
         ]
         store = CacheStore()
         for k in keys:
@@ -657,6 +658,7 @@ class TestInvalidationPatternsMatchBuilders:
             ck.rebalancing_strategy_key(uid, pid, "acct1"),
             ck.factor_analysis_portfolio_key(pid),
             ck.efficient_frontier_key(uid, str(pid), "acct1"),
+            ck.backtest_key(uid, "hash1"),
         ]
         kept = ck.rebalancing_analysis_key(uid, other, "acct1", 50000.0)
         store = CacheStore()

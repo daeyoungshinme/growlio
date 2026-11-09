@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.job_runner import report_handled_failure
 from app.models.alert import StockPriceAlert
 from app.models.user import User, UserSettings
+from app.schemas.alert import is_suspect_usd_unit
 from app.services.alerts.alert_service import (
     finalize_alert_batch,
     notify_and_record_trigger,
@@ -53,6 +54,11 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, cache) -> None:
 
     async def _handle(row) -> bool:
         alert, user_email, notification_email, fcm_token = row
+        if is_suspect_usd_unit(alert.market, float(alert.target_price)):
+            # 달러 숫자가 원화로 저장된 옛 알림 — ABOVE는 즉시 거짓 발동, BELOW는 영영 안 울린다.
+            # 화면이 재입력을 안내하므로(needs_reentry) 판정만 건너뛴다(plans/119 A3)
+            logger.info("stock_price_alert_suspect_unit_skipped", alert_id=str(alert.id))
+            return False
         price = price_maps.get(alert.market, {}).get(alert.ticker)
         if not price:
             return False
