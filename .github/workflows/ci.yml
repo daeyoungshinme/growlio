@@ -191,6 +191,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # 차단 단계 — 런타임 의존성(prod)만 본다. devDependency(빌드·테스트 도구) 취약점은 Dependabot으로 관리(계획 59 D7).
+      # 테스트 앞에 둔다 — 뒤에 두면 테스트가 하나만 실패해도 건너뛰어 결과가 안 보였다(backend와 같게, plans/119 D3)
+      - name: Dependency vulnerability check (npm audit)
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Lint (eslint)
         run: npm run lint -- --max-warnings 0
 
@@ -206,10 +211,6 @@ jobs:
 
       - name: Build + typecheck (tsc + vite)
         run: npm run build
-
-      # 차단 단계 — 런타임 의존성(prod)만 본다. devDependency(빌드·테스트 도구) 취약점은 Dependabot으로 관리(계획 59 D7)
-      - name: Dependency vulnerability check (npm audit)
-        run: npm audit --omit=dev --audit-level=high
 
   # 네이티브 회귀 스모크(plans/115 C2) — Gradle·@capacitor/* Dependabot 업데이트가 APK 빌드 없이 머지되던 사각지대.
   # android/·package*.json·capacitor.config가 바뀐 경우만 실제로 빌드한다(스텝 단위 조건이라 잡은 항상 녹색으로 끝나

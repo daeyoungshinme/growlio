@@ -31,6 +31,9 @@ _TEST_DB_URL = os.environ.get("GROWLIO_TEST_DATABASE_URL")
 @pytest.fixture
 async def pg() -> AsyncIterator[AsyncSession]:
     if not _TEST_DB_URL:
+        if os.environ.get("CI"):
+            # CI에서 변수가 빠지면(이름 변경·잡 env 정리) 4건이 조용히 skip되고 녹색이 됐다(plans/119 D1)
+            pytest.fail("CI인데 GROWLIO_TEST_DATABASE_URL이 없다 — ci.yml backend 잡 env를 확인할 것")
         pytest.skip("GROWLIO_TEST_DATABASE_URL 미설정 — 실 DB 테스트는 CI 서비스 컨테이너에서만 돈다")
     engine = create_async_engine(_TEST_DB_URL, poolclass=NullPool)
     try:
