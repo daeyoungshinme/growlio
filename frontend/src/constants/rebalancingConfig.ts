@@ -113,6 +113,7 @@ export const DCA_AUTO_BUY_THRESHOLD_PCT = 0.5;
  */
 export const PLAN_LEG_STATUS_LABEL: Record<string, string> = {
   PENDING: "대기 중",
+  WAITING_FX: "환전 대기",
   EXECUTED: "실행됨",
   CANCELED: "취소됨",
   REJECTED: "거부됨",

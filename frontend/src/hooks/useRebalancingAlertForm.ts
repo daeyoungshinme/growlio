@@ -22,6 +22,7 @@ import { toast } from "@/utils/toast";
 import { recommendDriftThresholdPct } from "@/utils/rebalancingThresholdRecommendation";
 import { isOrderExecutableAccount } from "@/utils/accounts";
 import { accountsQuery, marketSignalQuery } from "@/api/queryOptions";
+import { DCA_AMOUNT_MIN_KRW, isDcaAutoBuyPreset } from "@/utils/dcaAutoBuy";
 
 const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
@@ -143,6 +144,14 @@ export function useRebalancingAlertFormState({
   const [maxTaxImpactKrw, setMaxTaxImpactKrw] = useState<number | null>(
     alert?.max_tax_impact_krw ?? null,
   );
+  const [dcaAmountKrw, setDcaAmountKrw] = useState<number | null>(alert?.dca_amount_krw ?? null);
+  // 정액은 적립식 프리셋 조합에서만 저장된다(백엔드가 다른 조합이면 422) — 화면 값도 같은 규칙으로 판정
+  const isDcaPreset = isDcaAutoBuyPreset({
+    schedule_type: scheduleType,
+    trigger_condition: triggerCondition,
+    mode,
+    strategy,
+  });
 
   // 저장된 알림과 화면 값이 다른지 — "지금 계획 생성"은 임계치·트리거 등을 저장된 행에서 읽으므로,
   // 미저장 변경이 있으면 저장 값과 화면 값이 섞인 계획이 만들어진다(plans/63 P4-2)
@@ -158,7 +167,8 @@ export function useRebalancingAlertFormState({
       marketConditionMode !== (alert.market_condition_mode ?? "DISABLED") ||
       buyWaitMinutes !== (alert.buy_wait_minutes ?? 10) ||
       taxImpactGateMode !== (alert.tax_impact_gate_mode ?? "DISABLED") ||
-      maxTaxImpactKrw !== (alert.max_tax_impact_krw ?? null));
+      maxTaxImpactKrw !== (alert.max_tax_impact_krw ?? null) ||
+      (isDcaPreset ? dcaAmountKrw : null) !== (alert.dca_amount_krw ?? null));
 
   const upsertMut = useMutation({
     mutationFn: () => {
@@ -171,6 +181,9 @@ export function useRebalancingAlertFormState({
         !(maxTaxImpactKrw && maxTaxImpactKrw > 0)
       ) {
         throw new Error("세금영향 게이트를 켰다면 추정 양도세 상한을 입력해야 합니다");
+      }
+      if (isDcaPreset && dcaAmountKrw !== null && dcaAmountKrw < DCA_AMOUNT_MIN_KRW) {
+        throw new Error(`적립 금액은 ${DCA_AMOUNT_MIN_KRW.toLocaleString()}원 이상이어야 합니다`);
       }
 
       const body = {
@@ -190,6 +203,7 @@ export function useRebalancingAlertFormState({
         tax_impact_gate_mode: mode === "AUTO" ? taxImpactGateMode : "DISABLED",
         max_tax_impact_krw:
           mode === "AUTO" && taxImpactGateMode === "ENABLED" ? maxTaxImpactKrw : null,
+        dca_amount_krw: isDcaPreset ? dcaAmountKrw : null,
       };
       return targetAccountId
         ? upsertAccountRebalancingAlert(portfolioId, targetAccountId, body)
@@ -251,6 +265,9 @@ export function useRebalancingAlertFormState({
     setTaxImpactGateMode,
     maxTaxImpactKrw,
     setMaxTaxImpactKrw,
+    dcaAmountKrw,
+    setDcaAmountKrw,
+    isDcaPreset,
     // mutations
     upsertMut,
     deleteMut,

@@ -7,9 +7,13 @@ import { activeAlertsOnly, mergeAlertsByPortfolio } from "@/utils/portfolio";
 import {
   dcaAccountCashKrw,
   dcaCashShortfallKrw,
+  dcaFixedAmountShortfall,
   describeDcaAutoBuy,
   isDcaAutoBuyPreset,
 } from "@/utils/dcaAutoBuy";
+import { fetchRecentPlanLegs } from "@/api/rebalancingPlan";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import {
@@ -34,6 +38,13 @@ export default function AutoInvestStatusBanner() {
   const { data: accounts } = useQuery(accountsQuery);
   const { data: settings } = useQuery(settingsQuery);
   const usdRate = useExchangeRate();
+  // 이력 탭과 같은 키 — 환전 대기(WAITING_FX) 해외 매수가 있으면 여기서도 알린다(plans/120)
+  const { data: planLegs } = useQuery({
+    queryKey: QUERY_KEYS.rebalancingPlans,
+    queryFn: () => fetchRecentPlanLegs(30),
+    staleTime: STALE_TIME.VERY_SHORT,
+  });
+  const fxWaitingCount = planLegs?.filter((leg) => leg.status === "WAITING_FX").length ?? 0;
 
   if (!portfolios || portfolios.length === 0) return null;
 
@@ -70,8 +81,23 @@ export default function AutoInvestStatusBanner() {
           usdRate,
         )
       : null;
-  const shortfallKrw =
-    cashKrw != null ? dcaCashShortfallKrw(cashKrw, settings?.monthly_deposit_amount) : null;
+  const fixedAmount = activeEntry?.alert.dca_amount_krw ?? null;
+  // 정액이면 알림 금액 기준으로 원화·달러를 따로 본다 — 월 적립액 합산 비교는 정액이 없을 때만
+  const fixed =
+    activeEntry && execAccount && fixedAmount
+      ? dcaFixedAmountShortfall(
+          execAccount,
+          activeEntry.portfolio.items,
+          fixedAmount,
+          execAccount.tax_type,
+          usdRate,
+        )
+      : null;
+  const shortfallKrw = fixed
+    ? fixed.krwShort
+    : cashKrw != null
+      ? dcaCashShortfallKrw(cashKrw, settings?.monthly_deposit_amount)
+      : null;
 
   // 대상 포트폴리오가 하나로 정해지면(DCA 설정된 포트폴리오, 또는 포트폴리오가 1개뿐) 알림 설정 모달까지
   // 바로 연다 — 미설정이면 `openAlert=dca`로 정기 적립식 프리셋 화면에 직행(M6), 설정돼 있으면 편집 화면.
@@ -110,9 +136,24 @@ export default function AutoInvestStatusBanner() {
         </p>
         {shortfallKrw != null && cashKrw != null && (
           <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mt-0.5">
-            예수금 {fmtKrw(cashKrw)} · 월 적립액보다 {fmtKrw(shortfallKrw)} 부족 — 예정일 전에
-            입금하세요
+            {fixed
+              ? `원화 예수금이 국내 몫보다 ${fmtKrw(shortfallKrw)} 부족 — 예정일 전에 입금하세요`
+              : `예수금 ${fmtKrw(cashKrw)} · 월 적립액보다 ${fmtKrw(shortfallKrw)} 부족 — 예정일 전에 입금하세요`}
           </p>
+        )}
+        {fixed?.usd && (
+          <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mt-0.5">
+            해외 몫 ${fixed.usd.required.toLocaleString()} 필요 · 보유 $
+            {fixed.usd.available.toLocaleString()} — 예정일 전에 환전하세요
+          </p>
+        )}
+        {fxWaitingCount > 0 && (
+          <Link
+            to={rebalancingUrl({ tab: "이력" })}
+            className="block text-xs font-medium text-amber-700 dark:text-amber-300 mt-0.5 hover:underline"
+          >
+            달러 부족으로 기다리는 해외 매수가 있어요 — 환전 후 다시 매수 →
+          </Link>
         )}
       </div>
       <Link

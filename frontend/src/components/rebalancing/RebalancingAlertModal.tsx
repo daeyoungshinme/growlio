@@ -17,6 +17,7 @@ import { AlertTriggerSection } from "@/components/rebalancing/alertModal/AlertTr
 import { AlertModeSection } from "@/components/rebalancing/alertModal/AlertModeSection";
 import { AlertAutoModeSection } from "@/components/rebalancing/alertModal/AlertAutoModeSection";
 import { AlertQuickDcaSection } from "@/components/rebalancing/alertModal/AlertQuickDcaSection";
+import { DcaAmountField } from "@/components/rebalancing/alertModal/DcaAmountField";
 import { AlertSummarySection } from "@/components/rebalancing/alertModal/AlertSummarySection";
 import { AlertActionsSection } from "@/components/rebalancing/alertModal/AlertActionsSection";
 
@@ -242,6 +243,7 @@ function AlertFormBody({
       {setupMode === "quick" ? (
         <AlertQuickDcaSection
           form={form}
+          portfolioId={portfolioId}
           autoExecutionAccounts={autoExecutionAccounts}
           onSwitchToAdvanced={() => setSetupMode("advanced")}
         />
@@ -264,6 +266,13 @@ function AlertFormBody({
               canSwitchToPerAccount={canSwitchToPerAccount}
               switchToPerAccountMut={switchToPerAccountMut}
               marketSignal={marketSignal}
+            />
+          )}
+          {form.isDcaPreset && (
+            <DcaAmountField
+              form={form}
+              portfolioId={portfolioId}
+              autoExecutionAccounts={autoExecutionAccounts}
             />
           )}
         </>

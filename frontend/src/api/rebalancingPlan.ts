@@ -12,7 +12,7 @@ export interface RebalancingPlanItemOut {
 }
 
 export type RebalancingPlanLegStatus =
-  "PENDING" | "EXECUTED" | "CANCELED" | "REJECTED" | "EXPIRED" | "FAILED";
+  "PENDING" | "WAITING_FX" | "EXECUTED" | "CANCELED" | "REJECTED" | "EXPIRED" | "FAILED";
 
 export interface RebalancingPlanLegSummary {
   plan_id: string;
@@ -30,12 +30,18 @@ export interface RebalancingPlanLegSummary {
   actionable: boolean;
   /** 이 leg는 실행되지 않고 끝났는데 같은 플랜의 다른 leg는 체결된 "반쪽 실행" 상태 */
   partially_executed: boolean;
+  /** 환전 대기(WAITING_FX, plans/120) — 마지막 판정의 필요/보유 달러와 자동 재확인 기한 */
+  required_usd?: number | null;
+  available_usd?: number | null;
+  fx_retry_until?: string | null;
   items: RebalancingPlanItemOut[];
 }
 
 export interface PlanActionResponse {
   status: string;
   message: string;
+  required_usd?: number | null;
+  available_usd?: number | null;
 }
 
 export interface PlanTokenPreview {
@@ -55,6 +61,10 @@ export const cancelPlanLeg = (planId: string, legId: string) =>
 
 export const approvePlanLeg = (planId: string, legId: string) =>
   apiPost<PlanActionResponse>(`/rebalancing/plans/${planId}/legs/${legId}/approve`);
+
+/** 환전 대기 적립 해외 매수 '다시 매수' — status: EXECUTED | SCHEDULED | STILL_SHORT | FAILED */
+export const retryFxPlanLeg = (planId: string, legId: string) =>
+  apiPost<PlanActionResponse>(`/rebalancing/plans/${planId}/legs/${legId}/retry-fx`);
 
 // ── 인증 없음 (이메일 링크 전용) ─────────────────────────────────────────
 

@@ -4,8 +4,11 @@ import {
   describeDcaAutoBuy,
   dcaAccountCashKrw,
   dcaCashShortfallKrw,
+  dcaFixedAmountShortfall,
+  splitDcaAmount,
 } from "@/utils/dcaAutoBuy";
 import type { RebalancingAlert } from "@/api/alerts";
+import type { PortfolioItem } from "@/api/portfolios";
 
 const baseAlert: RebalancingAlert = {
   id: "alert-1",
@@ -94,5 +97,81 @@ describe("dcaAccountCashKrw / dcaCashShortfallKrw (E5)", () => {
     expect(dcaCashShortfallKrw(300_000, 1_000_000)).toBe(700_000);
     expect(dcaCashShortfallKrw(1_000_000, 1_000_000)).toBeNull();
     expect(dcaCashShortfallKrw(0, null)).toBeNull();
+  });
+});
+
+describe("정액 적립 (plans/120)", () => {
+  const items: PortfolioItem[] = [
+    { ticker: "069500", name: "KODEX 200", market: "KOSPI", weight: 50 },
+    {
+      ticker: "VOO",
+      name: "VOO",
+      market: "NYSE",
+      weight: 40,
+      group: {
+        key: "sp500",
+        label: "S&P500",
+        members: [],
+        domestic_alt: { ticker: "360750", market: "KOSPI", name: "TIGER 미국S&P500" },
+      },
+    },
+    { ticker: "CASH", name: "현금", market: "CASH", weight: 10 },
+  ];
+
+  it("describeDcaAutoBuy는 금액이 있으면 함께 보여준다", () => {
+    expect(describeDcaAutoBuy({ ...baseAlert, dca_amount_krw: 500_000 })).toBe(
+      "매월 25일 50만원 자동매수 중",
+    );
+    expect(describeDcaAutoBuy({ ...baseAlert, dca_amount_krw: 123_456 })).toBe(
+      "매월 25일 123,456원 자동매수 중",
+    );
+  });
+
+  it("splitDcaAmount는 현금을 빼고 재정규화하며 해외는 달러로 환산한다", () => {
+    const rows = splitDcaAmount(items, 900_000, "GENERAL", 1500);
+    expect(rows.map((r) => [r.ticker, r.amountKrw, r.usd])).toEqual([
+      ["069500", 500_000, null],
+      ["VOO", 400_000, 266.67],
+    ]);
+  });
+
+  it("절세 계좌는 그룹의 국내 대체 종목으로, 대체가 없는 해외 종목은 제외한다", () => {
+    const rows = splitDcaAmount(
+      [...items, { ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 10 }],
+      1_000_000,
+      "ISA",
+      1500,
+    );
+    expect(rows.map((r) => r.ticker)).toEqual(["069500", "360750"]);
+    expect(rows.every((r) => r.usd === null)).toBe(true);
+  });
+
+  it("splitDcaAmount는 금액·비중이 없으면 빈 배열", () => {
+    expect(splitDcaAmount(items, 0, "GENERAL", 1500)).toEqual([]);
+    expect(splitDcaAmount([], 100_000, "GENERAL", 1500)).toEqual([]);
+  });
+
+  it("dcaFixedAmountShortfall은 원화가 넉넉해도 달러가 모자라면 환전 필요로 본다", () => {
+    const result = dcaFixedAmountShortfall(
+      { deposit_krw: 5_000_000, deposit_usd: 10 },
+      items,
+      900_000,
+      "GENERAL",
+      1500,
+    );
+    expect(result.krwShort).toBeNull();
+    expect(result.usd).toEqual({ required: 266.67, available: 10 });
+  });
+
+  it("dcaFixedAmountShortfall은 국내 몫 대비 원화 부족분을 계산한다", () => {
+    const result = dcaFixedAmountShortfall(
+      { deposit_krw: 100_000, deposit_usd: 1000 },
+      items,
+      900_000,
+      "GENERAL",
+      1500,
+    );
+    expect(result.krwShort).toBe(400_000);
+    expect(result.usd).toBeNull();
   });
 });
