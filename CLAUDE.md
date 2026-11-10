@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Prerequisites
 
-Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.13+, Node 24(CI·이미지 기준 LTS — `frontend/package.json` `engines`가 `24.x`라 다른 버전은 `npm ci`가 EBADENGINE 경고), [uv](https://docs.astral.sh/uv/) 필수.
+Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.13+, Node 24.15+(CI·이미지 기준 LTS — `frontend/package.json` `engines`가 `>=24.15.0 <25`라 다른 버전은 `npm ci`가 EBADENGINE 경고. jsdom 31이 24.15 미만에서 vitest를 깨뜨린다), [uv](https://docs.astral.sh/uv/) 필수.
 
 > Android 빌드 시 추가 필요: JDK 21+, Android Studio (SDK 포함).
 
