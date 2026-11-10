@@ -443,3 +443,45 @@ class TestDecideSellByToken:
         assert resp.json()["status"] == "REJECTED"
         mock_reject.assert_called_once()
         mock_approve.assert_not_called()
+
+
+class TestRetryFxPlanLeg:
+    """환전 대기 적립 해외 매수 '다시 매수'(plans/120)."""
+
+    def _post(self, outcome, execution_id=None, required=None, available=None):
+        user = make_user()
+        db = _make_mock_db()
+        leg = _make_leg(status="WAITING_FX")
+        db.scalar = AsyncMock(return_value=leg)
+        latest = SimpleNamespace(required_usd=required, available_usd=available)
+        with patch(
+            "app.api.v1.rebalancing_plan.retry_fx_waiting_leg",
+            new=AsyncMock(return_value=(outcome, execution_id, latest)),
+        ):
+            app = _setup_authenticated_app(user, db)
+            client = TestClient(app)
+            try:
+                return client.post(f"/api/v1/rebalancing/plans/{leg.plan_id}/legs/{leg.id}/retry-fx")
+            finally:
+                _teardown_app()
+
+    def test_still_short_returns_amounts(self):
+        resp = self._post("STILL_SHORT", required=300.0, available=50.0)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "STILL_SHORT"
+        assert body["required_usd"] == 300.0
+        assert body["available_usd"] == 50.0
+        assert "$300.00" in body["message"]
+
+    def test_scheduled(self):
+        body = self._post("SCHEDULED").json()
+        assert body["status"] == "SCHEDULED"
+
+    def test_executed(self):
+        body = self._post("EXECUTED", execution_id=uuid.uuid4()).json()
+        assert body["status"] == "EXECUTED"
+
+    def test_failed(self):
+        body = self._post("FAILED").json()
+        assert body["status"] == "FAILED"

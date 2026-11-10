@@ -23,6 +23,7 @@ from app.services.notifications.email_templates.market_signal import (
 from app.services.notifications.email_templates.rebalancing import (
     daily_value_cap_gate_blocked_template,
     dca_cash_shortfall_template,
+    dca_fx_required_template,
     market_signal_gate_blocked_template,
     rebalancing_alert_template,
     rebalancing_execution_template,
@@ -47,6 +48,7 @@ __all__ = [
     "challenge_wrap_template",
     "daily_value_cap_gate_blocked_template",
     "dca_cash_shortfall_template",
+    "dca_fx_required_template",
     "exchange_rate_alert_template",
     "goal_achievement_template",
     "market_signal_change_template",

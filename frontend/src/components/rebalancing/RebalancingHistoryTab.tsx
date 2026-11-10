@@ -10,6 +10,7 @@ import {
 import {
   approvePlanLeg,
   cancelPlanLeg,
+  retryFxPlanLeg,
   fetchRecentPlanLegs,
   type RebalancingPlanLegSummary,
 } from "@/api/rebalancingPlan";
@@ -196,22 +197,48 @@ function PendingPlanItemsDetail({ items }: { items: RebalancingPlanLegSummary["i
   );
 }
 
+/** 백엔드가 코드로 남기는 leg 사유 → 화면 문구 */
+const LEG_ERROR_LABEL: Record<string, string> = {
+  market_closed_before_execution: "실행 시점에 장이 닫혀 있어 진행되지 않았어요.",
+  fx_wait_expired: "환전 대기 기한이 지나 이번 회차 해외 매수는 진행되지 않았어요.",
+};
+
+function fmtUsd(v: number | null | undefined): string {
+  return `$${(v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** 환전 대기 leg 안내 — 필요/보유 달러와 자동 재확인 기한(plans/120) */
+function FxWaitNotice({ leg }: { leg: RebalancingPlanLegSummary }) {
+  const until = leg.fx_retry_until ? new Date(leg.fx_retry_until) : null;
+  return (
+    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 leading-relaxed">
+      달러가 부족해 해외 매수를 기다리고 있어요 (필요 {fmtUsd(leg.required_usd)} · 보유{" "}
+      {fmtUsd(leg.available_usd)}). 증권사 앱에서 환전한 뒤 다시 매수를 눌러주세요.
+      {until &&
+        ` ${until.getMonth() + 1}/${until.getDate()}까지는 미국장 중에 자동으로 다시 확인합니다.`}
+    </p>
+  );
+}
+
 function PendingPlanRow({
   leg,
   onCancel,
   onApprove,
+  onRetryFx,
   isPending,
 }: {
   leg: RebalancingPlanLegSummary;
   onCancel: () => void;
   onApprove: () => void;
+  onRetryFx: () => void;
   isPending: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const countdown = useCountdownLabel(leg.deadline_at);
-  const sideLabel = leg.side === "BUY" ? "매수 대기" : "매도 승인대기";
+  const waitingFx = leg.status === "WAITING_FX";
+  const sideLabel = waitingFx ? "환전 대기" : leg.side === "BUY" ? "매수 대기" : "매도 승인대기";
   const sideColor =
     leg.side === "BUY" ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400";
   const itemsSummary = leg.items.map((it) => it.name ?? it.ticker).join(", ");
@@ -256,8 +283,11 @@ function PendingPlanRow({
           {itemsSummary} ({leg.items.length}건)
         </p>
         {leg.error_message && (
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1">{leg.error_message}</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+            {LEG_ERROR_LABEL[leg.error_message] ?? leg.error_message}
+          </p>
         )}
+        {waitingFx && <FxWaitNotice leg={leg} />}
         {leg.partially_executed && (
           <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
             같은 계획의 {leg.side === "BUY" ? "매도" : "매수"} 주문은 이미 체결됐어요. 비중이 한쪽만
@@ -266,6 +296,25 @@ function PendingPlanRow({
         )}
 
         {open && <PendingPlanItemsDetail items={leg.items} />}
+
+        {waitingFx && (
+          <div className="flex items-center gap-4 mt-2">
+            <button
+              onClick={onRetryFx}
+              disabled={isPending}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 disabled:opacity-50`}
+            >
+              환전했어요, 다시 매수
+            </button>
+            <button
+              onClick={() => setConfirmingCancel(true)}
+              disabled={isPending}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 text-sm text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 disabled:opacity-50`}
+            >
+              이번 회차 건너뛰기
+            </button>
+          </div>
+        )}
 
         {leg.status === "PENDING" && leg.actionable && (
           <div className="flex items-center gap-4 mt-2">
@@ -376,8 +425,20 @@ export default function RebalancingHistoryTab() {
     onError: (e) => toast(extractErrorMessage(e, "처리 중 오류가 발생했습니다"), "error"),
   });
 
-  const pendingLegs = planLegs.filter((leg) => leg.status === "PENDING");
-  const closedLegs = planLegs.filter((leg) => leg.status !== "PENDING");
+  const retryFxMut = useMutation({
+    mutationFn: (leg: RebalancingPlanLegSummary) => retryFxPlanLeg(leg.plan_id, leg.leg_id),
+    onSuccess: (res) => {
+      const ok = res.status === "EXECUTED" || res.status === "SCHEDULED";
+      toast(res.message, ok ? "success" : "error");
+      void invalidateRebalancingPlanData(qc, { executed: res.status === "EXECUTED" });
+    },
+    onError: (e) => toast(extractErrorMessage(e, "처리 중 오류가 발생했습니다"), "error"),
+  });
+
+  const isOpenLeg = (leg: RebalancingPlanLegSummary) =>
+    leg.status === "PENDING" || leg.status === "WAITING_FX";
+  const pendingLegs = planLegs.filter(isOpenLeg);
+  const closedLegs = planLegs.filter((leg) => !isOpenLeg(leg));
   const visibleLegs = showAllLegs
     ? planLegs
     : [...pendingLegs, ...closedLegs.slice(0, CLOSED_LEGS_VISIBLE)];
@@ -448,7 +509,8 @@ export default function RebalancingHistoryTab() {
               leg={leg}
               onCancel={() => cancelMut.mutate(leg)}
               onApprove={() => approveMut.mutate(leg)}
-              isPending={cancelMut.isPending || approveMut.isPending}
+              onRetryFx={() => retryFxMut.mutate(leg)}
+              isPending={cancelMut.isPending || approveMut.isPending || retryFxMut.isPending}
             />
           ))}
           {hiddenLegCount > 0 && (

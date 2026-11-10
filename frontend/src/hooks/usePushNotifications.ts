@@ -82,9 +82,12 @@ export function resolvePushDeepLink(
         ? rebalancingUrl({ tab: "포트폴리오", portfolioId, openExecution: true })
         : rebalancingUrl({ tab: "진단" });
     }
+    // 매수 만료·적립 해외 매수 환전 대기(plans/120)도 이력 탭에서 확인·다시 매수
     case "REBALANCING_PLAN_PENDING":
     case "REBALANCING_EXECUTED":
     case "REBALANCING_PLAN_EXECUTION_FAILED":
+    case "REBALANCING_PLAN_EXPIRED":
+    case "DCA_FX_REQUIRED":
       return rebalancingUrl({ tab: "이력" });
     // 세금·시장·하루 한도 게이트로 자동 실행이 보류된 알림 — 해결은 자동화 설정 조정이라 설정 모달로 연다
     // (예전엔 매핑이 없어 알림을 눌러도 앱 첫 화면에 머물렀다, plans/63 P3-4)

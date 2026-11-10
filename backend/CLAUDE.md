@@ -88,7 +88,7 @@ portfolios.py            포트폴리오 CRUD — 항목은 단독 종목 또는
 portfolio_analysis.py    /portfolio/{overview,allocation-history,risk,rebalancing-strategy,index-exposure}
 rebalancing.py           리밸런싱 분석(portfolios/{id}/analyze) + 목표 역산 추천(goal-recommendation/{by-horizon,by-age}) + expected-metrics + candidates/overlap + broker-balance(/{id}, -all) + drift-summary + composite-signal
 rebalancing_execution.py 주문 실행·이력 + 미체결 취소(POST /history/results/{id}/cancel)
-rebalancing_plan.py      대기 플랜 조회/취소/승인 (인증 필요)
+rebalancing_plan.py      대기 플랜 조회/취소/승인 + 환전 대기 재매수(retry-fx) (인증 필요)
 rebalancing_plan_public.py 이메일 링크 토큰 액션 — **인증 없음, Depends(get_current_user) 사용 금지**
 settings.py              DART 키 + 목표/알림 설정 (브로커 자격증명은 assets.py 소관)
 stocks.py                종목 검색 + /stocks/{index-region,exchange-rate,price,prices-batch}
@@ -138,7 +138,9 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `order_builder.py` — 주문 생성 공용(AUTO·원클릭·플랜). 시장 게이트 단일 판정 `is_market_signal_blocking_auto_mode`(CAUTIOUS=RED, STRICT=YELLOW·RED, TACTICAL=같은 포트폴리오 확정 국면 RISK_OFF면 매수 보류 — 호출부는 `tactical_regime_for_gate()` 결과를 함께 넘긴다). `clamp_orders_to_max_value()` 1건당 상한. 방법론 `docs/plans/21-market-signal-methodology.md`
 - `plan_service.py` — AUTO 2단계 플랜 진입점, 하위 3모듈 심볼 재노출. **테스트 patch는 `plan_service.X`가 아니라 실제 호출부 서브모듈 경로로**
   - `plan_generation.py` — 플랜 생성. 게이트 차단 시 `TaxGateBlocked`/`MarketSignalGateBlocked`/`DailyValueCapBlocked` sentinel(플랜 미생성)
-  - `plan_execution.py` — leg 실행/취소/만료. 매수는 대기 후 자동(실행 직전 시장 게이트 재확인), 매도는 이메일 승인. 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 방지. `token_consumed_at`만 찍힌 채 30분 넘은 PENDING은 `fail_stuck_consumed_legs()`가 FAILED 마감(재실행 안 함) **세션에 이미 읽은 행을 `FOR UPDATE`로 다시 읽을 땐 `populate_existing=True` 필수** — 없으면 락을 기다린 뒤에도 옛 값으로 판정해 주문이 두 번 나간다.
+  - `plan_execution.py` — leg 실행/취소/만료. 매수는 대기 후 자동(실행 직전 시장 게이트 재확인), 매도는 이메일 승인. 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 방지. `token_consumed_at`만 찍힌 채 30분 넘은 PENDING은 `fail_stuck_consumed_legs()`가 FAILED 마감(재실행 안 함) **세션에 이미 읽은 행을 `FOR UPDATE`로 다시 읽을 땐 `populate_existing=True` 필수** — 없으면 락을 기다린 뒤에도 옛 값으로 판정해 주문이 두 번 나간다. 정액 적립 해외 매수 leg는 실행 직전 실시간 달러를 확인해 부족하면 `WAITING_FX`(재매수 `retry_fx_waiting_leg`, 자동 재확인 `recheck_fx_waiting_legs`) — **달러 조회(토큰 발급 commit)는 락이 풀리므로 조회 뒤 다시 잠그고 상태 재확인**. `WAITING_FX`도 대기 중으로 센다(`plan_generation.OPEN_LEG_STATUSES` — 중복 플랜·하루 한도)
+  - `dca_allocation.py` — 정액 적립 분할(순수). 알림 `dca_amount_krw`가 있으면(`is_dca_amount_mode`) 드리프트 대신 금액을 목표 비중대로 나눈다. **`refresh_live_prices`가 `shares_to_trade`를 재계산하므로 분할은 반드시 시세 갱신 뒤**
+  - `usd_buying_power.py` — 실행 계좌 실시간 달러 예수금(KIS `frcr_dncl_amt_2`·키움 `fc_entra`)과 필요 달러. 조회 실패는 None(확인 없이 기존처럼 주문)
   - `plan_notifications.py` — 플랜 알림 (차단 안내는 하루 1회 durable dedup)
 - `quick_execute_service.py` — "지금 계획 생성". 상태 enum만 반환, 문구는 라우터가 조립. 계좌 소유권 검증은 콜백 주입(**서비스→API 계층 import 금지**)
 - `execution_service.py` — 주문 조율. 실제 주문은 `_kis_order_executor.py`/`_kiwoom_order_executor.py`(FULL 매수는 실행 직전 가용현금으로 예산 clamp), 공용 `_order_executor_common.py`(국내 지정가 호가 보정 `snap_domestic_limit_price` 포함), `_order_quantity_guard.py`(매도→보유수량, 매수→예산), `_broker_order_flow.py`(매도 clamp·FULL 예산 clamp 흐름 — 브로커 차이는 `BrokerOrderOps`로 주입)
@@ -195,7 +197,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `estimation.py` — Ledoit-Wolf 공분산·James-Stein 기대수익률 축소(고정 노이즈분산 사용 — 표본분산 재사용 시 축소 상쇄 버그). `goal/goal_portfolio_optimizer`·`portfolio_optimizer` 공용이라 평면
 - `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
-- `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
+- `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유. 정액 알림은 사용자 월 적립액 합산과 섞지 않고 원화·달러를 따로 비교) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
 - `fx_plan_service.py` — 환율 1년 위치(백분위·이평 이격·1개월 ±1σ)와 해외 적립 필요 달러의 분할 환전 구간. **예측 아님**. 현재값은 실시간 캐시(없으면 1년 일봉 마지막 종가, `rate_is_live`), Yahoo `USDKRW=X` 1년 일봉은 통계용(6h 캐시). 구간 알림 등록은 프론트가 기존 환율 알림 API로
 - `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → FDR(+pykrx 펀더멘털) → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_ticker_dividend_summary`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
@@ -255,6 +257,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 | `market_signal_alert.py` / `market_signal_daily_digest.py` | 1시간 / 08:30 | 등급 전환 / 요약(옵트인) |
 | `tactical_regime_check.py` | 07:40 | 국면 확정·틸트 + 국면/웅덩이 알림. 주문 없음 |
 | `dca_cash_shortfall.py` | 18:30 | 적립 자동매수 1~3일 전 예수금 부족 알림. 판정은 `services/dca_cash_shortfall_service.py`(action-items와 공유) |
+| `dca_fx_wait_retry.py` | 30분 | 환전 대기(WAITING_FX) leg — 미국장 중 달러 재확인해 충분하면 PENDING 복귀, 기한(평일 5일) 지나면 만료 |
 | `goal_achievement.py` | 18:45 | 같은 목표는 1회만(연간 목표는 연도별, 목표 금액 바꾸면 재발송) — `app_state` 발송 키 |
 | `monthly_report.py` / `challenge_monthly_wrap.py` | 매월 1일 09:00 / 09:30 | |
 | `challenge_deposit_reminder.py` | 매월 25일 09:00 | 옵트인 |

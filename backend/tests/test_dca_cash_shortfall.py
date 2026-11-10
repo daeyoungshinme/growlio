@@ -167,3 +167,45 @@ def test_email_template_shows_shortfall_and_run_date():
     assert "11월 25일(수)" in subject
     assert "700,000 원" in html
     assert "11/23 18:00 동기화 기준" in html
+
+
+# ── 정액 모드(plans/120) — 알림마다 원화·달러 따로 ───────────────────
+
+
+def _fixed_alert(amount=1_000_000.0):
+    alert = _alert()
+    alert.dca_amount_krw = amount
+    return alert
+
+
+def _weighted_portfolio():
+    return SimpleNamespace(
+        name="해외 적립",
+        items=[
+            SimpleNamespace(ticker="A", market="KOSPI", weight=50, group_key=None, members=[]),
+            SimpleNamespace(ticker="VOO", market="NYSE", weight=50, group_key=None, members=[]),
+        ],
+    )
+
+
+@pytest.mark.asyncio
+async def test_fixed_amount_notifies_fx_needed_even_with_plenty_of_krw():
+    account = _account(deposit_krw=5_000_000.0, deposit_usd=10.0)
+    account.tax_type = "GENERAL"
+    rows = [(_fixed_alert(), _weighted_portfolio(), account, _user(), _settings(monthly=None))]
+    dispatch = await _run(rows, date(2026, 11, 23))
+
+    dispatch.assert_awaited_once()
+    kwargs = dispatch.await_args.kwargs
+    assert kwargs["push_title"] == "자동매수 전 달러를 환전해주세요"
+    assert "환전 필요" in kwargs["push_body"]
+
+
+@pytest.mark.asyncio
+async def test_fixed_amount_ignores_user_monthly_total():
+    """정액 알림은 사용자 월 적립액 합산 판정과 섞지 않는다 — 원화·달러 모두 충분하면 알림 없음."""
+    account = _account(deposit_krw=600_000.0, deposit_usd=400.0)
+    account.tax_type = "GENERAL"
+    rows = [(_fixed_alert(), _weighted_portfolio(), account, _user(), _settings(monthly=50_000_000.0))]
+    dispatch = await _run(rows, date(2026, 11, 23))
+    dispatch.assert_not_awaited()

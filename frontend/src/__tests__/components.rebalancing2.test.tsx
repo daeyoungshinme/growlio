@@ -18,11 +18,13 @@ vi.mock("@/api/rebalancing", () => ({
 const mockFetchRecentPlanLegs = vi.fn();
 const mockCancelPlanLeg = vi.fn();
 const mockApprovePlanLeg = vi.fn();
+const mockRetryFxPlanLeg = vi.fn();
 
 vi.mock("@/api/rebalancingPlan", () => ({
   fetchRecentPlanLegs: (...args: unknown[]) => mockFetchRecentPlanLegs(...args),
   cancelPlanLeg: (...args: unknown[]) => mockCancelPlanLeg(...args),
   approvePlanLeg: (...args: unknown[]) => mockApprovePlanLeg(...args),
+  retryFxPlanLeg: (...args: unknown[]) => mockRetryFxPlanLeg(...args),
 }));
 
 vi.mock("@/api/marketSignals", () => ({
@@ -727,6 +729,70 @@ describe("RebalancingHistoryTab", () => {
     fireEvent.click(within(dialog).getByText("실행"));
 
     await waitFor(() => expect(mockApprovePlanLeg).toHaveBeenCalledWith("plan-1", "leg-1"));
+  });
+
+  const fxLeg = {
+    ...buyLeg,
+    leg_id: "leg-fx",
+    status: "WAITING_FX" as const,
+    actionable: false,
+    required_usd: 350,
+    available_usd: 12.5,
+    fx_retry_until: "2026-11-17T21:00:00Z",
+    items: [{ ...buyLeg.items[0]!, ticker: "VOO", name: "VOO", market: "NYSE" }],
+  };
+
+  it("환전 대기 leg는 필요/보유 달러를 보여주고 '다시 매수'로 retryFxPlanLeg를 호출한다 (plans/120)", async () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([fxLeg]);
+    mockRetryFxPlanLeg.mockResolvedValue({
+      status: "STILL_SHORT",
+      message: "달러가 아직 부족합니다",
+    });
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findAllByText("환전 대기")).not.toHaveLength(0);
+    expect(screen.getByText(/필요 \$350\.00/)).toBeDefined();
+    expect(screen.getByText(/보유 \$12\.50/)).toBeDefined();
+    expect(screen.queryByText("지금 매수 실행")).toBeNull();
+
+    fireEvent.click(screen.getByText("환전했어요, 다시 매수"));
+    await waitFor(() => expect(mockRetryFxPlanLeg).toHaveBeenCalledWith("plan-1", "leg-fx"));
+  });
+
+  it("환전 대기 leg도 '이번 회차 건너뛰기'로 취소할 수 있다", async () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([fxLeg]);
+    mockCancelPlanLeg.mockResolvedValue({ status: "CANCELED", message: "취소" });
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByText("이번 회차 건너뛰기"));
+    const confirmButtons = await screen.findAllByRole("button", { name: "매수 취소" });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
+    await waitFor(() => expect(mockCancelPlanLeg).toHaveBeenCalledWith("plan-1", "leg-fx"));
+  });
+
+  it("환전 대기 만료 사유 코드는 문장으로 보여준다", async () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([
+      {
+        ...buyLeg,
+        status: "EXPIRED" as const,
+        actionable: false,
+        error_message: "fx_wait_expired",
+      },
+    ]);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/환전 대기 기한이 지나/)).toBeDefined();
   });
 
   it("cancels a pending buy leg only after confirming", async () => {

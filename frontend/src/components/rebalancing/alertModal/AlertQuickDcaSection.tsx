@@ -2,24 +2,31 @@ import type { AssetAccount } from "@/api/assets";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { INPUT_SM } from "@/constants/inputStyles";
 import AutoExecutionAccountPicker from "./AutoExecutionAccountPicker";
+import { DcaAmountField } from "./DcaAmountField";
 
 const inputClass = `w-full ${INPUT_SM}`;
 
 interface Props {
   form: RebalancingAlertFormState;
+  portfolioId: string;
   autoExecutionAccounts: AssetAccount[];
   onSwitchToAdvanced: () => void;
 }
 
 /** "정기 적립식 자동매수" 빠른 설정 — 매월 며칠/실행 계좌만 고르면 되도록 스케줄/조건/모드/전략은
  * RebalancingAlertModal이 미리 고정값으로 세팅해둔 상태에서 렌더된다 (DCA_AUTO_BUY_THRESHOLD_PCT 등). */
-export function AlertQuickDcaSection({ form, autoExecutionAccounts, onSwitchToAdvanced }: Props) {
+export function AlertQuickDcaSection({
+  form,
+  portfolioId,
+  autoExecutionAccounts,
+  onSwitchToAdvanced,
+}: Props) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2 leading-relaxed">
-        이 계좌에 남은 예수금을 매월 지정한 날짜에 포트폴리오 목표 비중대로 자동으로 나눠
-        매수합니다. 미리 계좌에 입금해두면, 다음 지정일에 예수금만큼 자동 매수됩니다 (Growlio가 은행
-        이체를 대신 해주지는 않습니다). 토스 계좌는 자동매수를 지원하지 않습니다.
+        매월 지정한 날짜에 정한 금액(비우면 예수금 전체)을 포트폴리오 목표 비중대로 나눠 자동
+        매수합니다. 미리 계좌에 입금해두세요 (Growlio가 은행 이체·환전을 대신 해주지는 않습니다).
+        토스 계좌는 자동매수를 지원하지 않습니다.
       </p>
 
       <div>
@@ -52,6 +59,12 @@ export function AlertQuickDcaSection({ form, autoExecutionAccounts, onSwitchToAd
           onChange={form.setAccountId}
         />
       </div>
+
+      <DcaAmountField
+        form={form}
+        portfolioId={portfolioId}
+        autoExecutionAccounts={autoExecutionAccounts}
+      />
 
       <details className="text-xs text-gray-500 dark:text-gray-400">
         <summary className="cursor-pointer select-none">고급 옵션 (실행 시각)</summary>

@@ -35,7 +35,7 @@ from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.schemas.action_items import ActionItem
 from app.services.challenge_service import get_challenge_summary
-from app.services.dca_cash_shortfall_service import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls
+from app.services.dca_cash_shortfall_service import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls, shortfall_detail
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
 from app.services.tactical import tactical_allocation_service as tactical
 from app.services.tax.tax_action_service import get_tax_action_plan_with_summary
@@ -55,6 +55,7 @@ _LINK_DCA_PLAN = "/invest-plan?tab=적립 계획"
 # 프론트 `REBALANCE_GROUP_ID`(api/dashboard.ts)와 같은 값 — 이 id면 홈 카드가 drift-summary로 펼침 목록을 그린다
 REBALANCE_GROUP_ID = "rebalance:all"
 _LINK_REBALANCING = "/rebalancing"
+_LINK_REBALANCING_HISTORY = "/rebalancing?rtab=이력"  # 프론트 rebalancingUrl({ tab: "이력" })과 같은 값
 
 
 def _portfolio_link(portfolio_id: uuid.UUID | str) -> str:
@@ -183,21 +184,57 @@ async def _rebalance_items(
 async def _dca_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
     items: list[ActionItem] = []
     for sf in await find_dca_cash_shortfalls(db, cache, user_id=user_id):
-        if sf.expected_krw:
-            detail = f"예수금 {sf.cash_krw:,.0f}원 — 월 적립액보다 {sf.expected_krw - sf.cash_krw:,.0f}원 부족"
-        else:
-            detail = f"예수금 {sf.cash_krw:,.0f}원 — 매수할 예수금이 거의 없어요"
+        detail = shortfall_detail(sf)
         items.append(
             ActionItem(
                 id=f"dca:{sf.alert.id}",
                 kind="DCA_SHORTFALL",
                 # 잡 알림 창(1~3일 전)에 들어오면 급함 — 그 전에는 미리 알려두기만 한다
                 priority="HIGH" if sf.days_until <= NOTICE_WINDOW_DAYS[1] else "MEDIUM",
-                title=f"{sf.run_date.month}월 {sf.run_date.day}일 자동매수 전 예수금 채우기",
+                title=(
+                    f"{sf.run_date.month}월 {sf.run_date.day}일 자동매수 전 "
+                    + ("달러 환전하기" if sf.required_usd is not None else "예수금 채우기")
+                ),
                 detail=f"{sf.portfolio.name} · {sf.account.name} {detail}",
                 cta_label="확인하기",
                 link=_LINK_DCA_PLAN,
                 deadline=sf.run_date.isoformat(),
+            )
+        )
+    return items + await _fx_waiting_items(user_id, db)
+
+
+async def _fx_waiting_items(user_id: uuid.UUID, db: AsyncSession) -> list[ActionItem]:
+    """환전 대기(WAITING_FX) 적립 해외 매수 — 환전 후 '다시 매수'가 필요하다(plans/120)."""
+    from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanLeg
+    from app.utils.kst import KST
+
+    rows = (
+        await db.execute(
+            select(RebalancingPlanLeg, Portfolio.name)
+            .join(RebalancingPlan, RebalancingPlan.id == RebalancingPlanLeg.plan_id)
+            .outerjoin(Portfolio, Portfolio.id == RebalancingPlan.portfolio_id)
+            .where(RebalancingPlan.user_id == user_id, RebalancingPlanLeg.status == "WAITING_FX")
+        )
+    ).all()
+    items: list[ActionItem] = []
+    for leg, portfolio_name in rows:
+        required = float(leg.required_usd or 0)
+        available = float(leg.available_usd or 0)
+        until = leg.fx_retry_until.astimezone(KST) if leg.fx_retry_until else None
+        items.append(
+            ActionItem(
+                id=f"dca-fx:{leg.id}",
+                kind="DCA_FX_WAITING",
+                priority="HIGH",
+                title="달러 환전 후 해외 적립 다시 매수",
+                detail=(
+                    f"{portfolio_name or '포트폴리오'} · 필요 ${required:,.2f} / 보유 ${available:,.2f}"
+                    + (f" · {until.month}/{until.day}까지 자동 재확인" if until else "")
+                ),
+                cta_label="다시 매수",
+                link=_LINK_REBALANCING_HISTORY,
+                deadline=until.date().isoformat() if until else None,
             )
         )
     return items

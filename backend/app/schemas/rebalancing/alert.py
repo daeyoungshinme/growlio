@@ -4,7 +4,12 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
+
+from app.schemas._validators import validate_positive_amount
+
+DCA_AMOUNT_MIN_KRW = 10_000
+"""정액 적립 최소 금액(원) — 프론트 `AlertQuickDcaSection`의 입력 하한과 같다."""
 
 
 class RebalancingAlertCreate(BaseModel):
@@ -31,6 +36,9 @@ class RebalancingAlertCreate(BaseModel):
     # 세금영향 게이트: DISABLED(기본) | ENABLED — 매도로 인한 추정 양도세가 max_tax_impact_krw를 넘으면 AUTO 보류
     tax_impact_gate_mode: Literal["DISABLED", "ENABLED"] = "DISABLED"
     max_tax_impact_krw: float | None = None
+    # 정기 적립 정액 모드(plans/120): 스케줄일에 이 금액(원)만 목표 비중대로 나눠 매수. None이면 목표 비중 채우기.
+    # 적립식 자동매수 프리셋(MONTHLY·SCHEDULE_ONLY·AUTO·BUY_ONLY)에서만 허용한다.
+    dca_amount_krw: float | None = None
 
     @field_validator("threshold_pct")
     @classmethod
@@ -93,6 +101,26 @@ class RebalancingAlertCreate(BaseModel):
             raise ValueError("세금영향 상한은 0보다 커야 합니다")
         return v
 
+    @field_validator("dca_amount_krw")
+    @classmethod
+    def validate_dca_amount_krw(cls, v: float | None) -> float | None:
+        v = validate_positive_amount(v)
+        if v is not None and v < DCA_AMOUNT_MIN_KRW:
+            raise ValueError(f"적립 금액은 {DCA_AMOUNT_MIN_KRW:,}원 이상이어야 합니다")
+        return round(v, 0) if v is not None else None
+
+    @model_validator(mode="after")
+    def validate_dca_amount_preset(self) -> "RebalancingAlertCreate":
+        # 정액은 '스케줄일에 매수만' 하는 적립식에서만 의미가 있다 — 드리프트·매도 전략에 붙으면 조용히 무시된다
+        if self.dca_amount_krw is not None and not (
+            self.schedule_type == "MONTHLY"
+            and self.trigger_condition == "SCHEDULE_ONLY"
+            and self.mode == "AUTO"
+            and self.strategy == "BUY_ONLY"
+        ):
+            raise ValueError("적립 금액은 매월 정기 자동매수(매수만)에서만 설정할 수 있습니다")
+        return self
+
 
 class AlertScopeUpdate(BaseModel):
     alert_scope: Literal["AGGREGATE", "PER_ACCOUNT"]
@@ -123,6 +151,7 @@ class RebalancingAlertResponse(BaseModel):
     buy_wait_minutes: int
     tax_impact_gate_mode: str
     max_tax_impact_krw: float | None
+    dca_amount_krw: float | None = None
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime

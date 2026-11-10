@@ -54,6 +54,7 @@ def init_scheduler() -> None:
     from app.jobs.challenge_deposit_reminder import run_challenge_deposit_reminder
     from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
     from app.jobs.dca_cash_shortfall import run_dca_cash_shortfall_check
+    from app.jobs.dca_fx_wait_retry import run_dca_fx_wait_retry
     from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
     from app.jobs.goal_achievement import run_goal_achievement_check
     from app.jobs.market_signal_alert import run_market_signal_alert_check
@@ -87,6 +88,7 @@ def init_scheduler() -> None:
         (run_rebalancing_auto_execution, kst(minute="*/5"), "rebalancing_auto_execution_intraday"),
         (run_rebalancing_plan_buy_execution, IntervalTrigger(minutes=1), "rebalancing_plan_buy_execution"),
         (run_rebalancing_plan_sell_expiry, IntervalTrigger(minutes=15), "rebalancing_plan_sell_expiry"),
+        (run_dca_fx_wait_retry, IntervalTrigger(minutes=30), "dca_fx_wait_retry"),
         (run_stock_price_alert_check, IntervalTrigger(minutes=10), "stock_price_alert_check"),
         (run_monthly_report, kst(day=1, hour=9, minute=0), "monthly_report_job"),
         (run_goal_achievement_check, kst(hour=18, minute=45), "goal_achievement_check_daily"),

@@ -57,6 +57,8 @@ export interface RebalancingAlert {
   buy_wait_minutes: number;
   tax_impact_gate_mode: TaxImpactGateMode;
   max_tax_impact_krw: number | null;
+  /** 정기 적립 정액(원, plans/120) — 있으면 매회 이 금액만 목표 비중대로 나눠 매수. 없으면 예수금 전체로 비중 채우기 */
+  dca_amount_krw?: number | null;
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
@@ -79,6 +81,7 @@ export interface RebalancingAlertUpsert {
   buy_wait_minutes: number;
   tax_impact_gate_mode: TaxImpactGateMode;
   max_tax_impact_krw: number | null;
+  dca_amount_krw?: number | null;
 }
 
 export const fetchRebalancingAlerts = () => apiGet<RebalancingAlert[]>("/alerts/rebalancing");

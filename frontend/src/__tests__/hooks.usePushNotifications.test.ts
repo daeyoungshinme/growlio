@@ -66,6 +66,11 @@ describe("resolvePushDeepLink", () => {
     expect(link({ type: "REBALANCING_PLAN_EXECUTION_FAILED" })).toBe("/rebalancing?rtab=이력");
   });
 
+  it("적립 해외 매수 환전 대기·매수 만료는 이력 탭으로 연다 (plans/120)", () => {
+    expect(link({ type: "DCA_FX_REQUIRED" })).toBe("/rebalancing?rtab=이력");
+    expect(link({ type: "REBALANCING_PLAN_EXPIRED" })).toBe("/rebalancing?rtab=이력");
+  });
+
   it("챌린지·시장 요약·연말 절세 알림도 해당 화면으로 연다 (plans/90 B5)", () => {
     expect(link({ type: "CHALLENGE_REMINDER" })).toBe("/invest-plan?tab=챌린지");
     expect(link({ type: "CHALLENGE_WRAPUP" })).toBe("/invest-plan?tab=챌린지");

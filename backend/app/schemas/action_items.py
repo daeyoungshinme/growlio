@@ -3,7 +3,14 @@ from typing import Literal
 from pydantic import BaseModel
 
 ActionItemKind = Literal[
-    "TACTICAL", "REBALANCE", "DCA_SHORTFALL", "TAX_WARNING", "TAX_ACTION", "CHALLENGE", "PARTIAL_FAILURE"
+    "TACTICAL",
+    "REBALANCE",
+    "DCA_SHORTFALL",
+    "DCA_FX_WAITING",
+    "TAX_WARNING",
+    "TAX_ACTION",
+    "CHALLENGE",
+    "PARTIAL_FAILURE",
 ]
 ActionItemPriority = Literal["HIGH", "MEDIUM", "LOW"]
 

@@ -14,6 +14,10 @@ vi.mock("@/api/alerts", () => ({
 vi.mock("@/api/assets", () => ({
   fetchAccounts: vi.fn().mockResolvedValue([]),
 }));
+vi.mock("@/api/rebalancingPlan", () => ({
+  fetchRecentPlanLegs: vi.fn().mockResolvedValue([]),
+}));
+vi.mock("@/hooks/useExchangeRate", () => ({ useExchangeRate: () => 1500 }));
 vi.mock("@/api/settings", () => ({
   fetchSettings: vi.fn().mockResolvedValue({ monthly_deposit_amount: null }),
 }));
@@ -22,6 +26,7 @@ import { fetchPortfolios } from "@/api/portfolios";
 import { fetchAccounts } from "@/api/assets";
 import { fetchSettings } from "@/api/settings";
 import { fetchRebalancingAlerts } from "@/api/alerts";
+import { fetchRecentPlanLegs } from "@/api/rebalancingPlan";
 import AutoInvestStatusBanner from "@/components/invest/AutoInvestStatusBanner";
 
 const portfolio: Portfolio = {
@@ -155,4 +160,46 @@ describe("AutoInvestStatusBanner 조회 실패 (plans/110 D3)", () => {
     await screen.findByText("자동매수 상태를 불러오지 못했습니다.", undefined, { timeout: 6000 });
     expect(screen.queryByText("정기 적립식 자동매수를 설정해보세요")).toBeNull();
   }, 10000);
+
+  it("정액 적립은 원화가 넉넉해도 달러가 모자라면 환전 경고를 보여준다 (plans/120)", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValue([
+      {
+        ...portfolio,
+        items: [
+          { ticker: "069500", name: "KODEX 200", market: "KOSPI", weight: 50 },
+          { ticker: "VOO", name: "VOO", market: "NYSE", weight: 50 },
+        ],
+      },
+    ]);
+    vi.mocked(fetchRebalancingAlerts).mockResolvedValue([{ ...dcaAlert, dca_amount_krw: 600_000 }]);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "acc-1", deposit_krw: 5_000_000, deposit_usd: 10, tax_type: "GENERAL" },
+    ] as never);
+    vi.mocked(fetchSettings).mockResolvedValue({ monthly_deposit_amount: 100_000_000 } as never);
+
+    renderWithProviders(
+      <MemoryRouter>
+        <AutoInvestStatusBanner />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/매월 25일 60만원 자동매수 중/)).toBeInTheDocument();
+    expect(await screen.findByText(/해외 몫 \$200 필요/)).toBeInTheDocument();
+    expect(screen.queryByText(/월 적립액보다/)).toBeNull();
+  });
+
+  it("환전 대기 매수가 있으면 이력 탭으로 안내한다 (plans/120)", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValue([portfolio]);
+    vi.mocked(fetchRebalancingAlerts).mockResolvedValue([dcaAlert]);
+    vi.mocked(fetchRecentPlanLegs).mockResolvedValue([{ status: "WAITING_FX" }] as never);
+
+    renderWithProviders(
+      <MemoryRouter>
+        <AutoInvestStatusBanner />
+      </MemoryRouter>,
+    );
+
+    const link = await screen.findByText(/달러 부족으로 기다리는 해외 매수/);
+    expect(link.closest("a")?.getAttribute("href")).toBe("/rebalancing?rtab=%EC%9D%B4%EB%A0%A5");
+  });
 });

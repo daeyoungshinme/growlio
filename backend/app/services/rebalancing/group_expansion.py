@@ -48,7 +48,8 @@ def group_owner_map(items: Iterable[Any]) -> dict[tuple[str, str], tuple[tuple[s
     return owner
 
 
-def _buy_target(members: list[RebalancingItem], buy_account_tax_type: str | None) -> RebalancingItem:
+def buy_target_member(members: list[RebalancingItem], buy_account_tax_type: str | None) -> RebalancingItem:
+    """그룹 매수 대상 멤버 — 대표 종목, 과세이연 계좌에서 대표가 해외면 국내 대체 종목(있을 때)."""
     primary = next(m for m in members if m.group_role == ROLE_PRIMARY)
     if buy_account_tax_type in TAX_DEFERRED_TAX_TYPES and primary.market not in DOMESTIC_MARKETS:
         alt = next((m for m in members if m.group_role == ROLE_DOMESTIC_ALT), None)
@@ -99,7 +100,7 @@ def allocate_group_trades(group: RebalancingItem, buy_account_tax_type: str | No
         m.shares_to_trade = 0.0
     diff = group.target_value_krw - group.current_value_krw
     if diff > 0:
-        buyer = _buy_target(members, buy_account_tax_type)
+        buyer = buy_target_member(members, buy_account_tax_type)
         _set_trade(buyer, buyer.current_value_krw + diff, base_krw)
     elif diff < 0:
         remaining = -diff

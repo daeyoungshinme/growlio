@@ -441,3 +441,61 @@ async def _notify_buy_leg_expired(plan: RebalancingPlan, market: str | None, db:
         failure_event="rebalancing_plan_buy_expired_push_failed",
         plan_id=str(plan.id),
     )
+
+
+def _kst_date_label(at) -> str:
+    from app.utils.kst import KST
+
+    return at.astimezone(KST).strftime("%m/%d") if at is not None else "기한"
+
+
+async def notify_dca_fx_required(
+    plan: RebalancingPlan, required_usd: float, available_usd: float, retry_until, db: AsyncSession
+) -> None:
+    """정액 적립 해외 매수 leg가 달러 부족으로 환전 대기(WAITING_FX)에 들어갔음을 메일·푸시로 알린다(plans/120).
+
+    메일에는 로그인 없이 누르는 매수 버튼을 넣지 않는다 — 재매수는 실주문이라 앱(인증)에서만 받는다.
+    """
+    from app.services.notifications.email_service import send_dca_fx_required_email
+
+    recipient = await _plan_recipient(plan, db)
+    if recipient is None:
+        return
+    portfolio_name, email, fcm_token = recipient
+    until_label = _kst_date_label(retry_until)
+
+    if email:
+        try:
+            await send_dca_fx_required_email(email, portfolio_name, required_usd, available_usd, until_label)
+        except Exception as exc:
+            report_handled_failure("dca_fx_required_email_failed", exc, plan_id=str(plan.id))
+
+    await send_push_safely(
+        plan.user_id,
+        title=f"달러 환전 필요 — {portfolio_name} 적립",
+        body=(
+            f"해외 적립 매수에 ${required_usd:,.2f}가 필요한데 보유 달러는 ${available_usd:,.2f}입니다. "
+            f"환전 후 '다시 매수'를 눌러주세요 ({until_label}까지 자동 재확인)."
+        ),
+        fcm_token=fcm_token,
+        data={"type": "DCA_FX_REQUIRED", "portfolio_id": str(plan.portfolio_id or "")},
+        failure_event="dca_fx_required_push_failed",
+        plan_id=str(plan.id),
+    )
+
+
+async def notify_dca_fx_wait_expired(plan: RebalancingPlan, db: AsyncSession) -> None:
+    """환전 대기 기한이 지나 이번 회차 해외 적립 매수를 마감했음을 푸시로 알린다."""
+    recipient = await _plan_recipient(plan, db)
+    if recipient is None:
+        return
+    portfolio_name, _email, fcm_token = recipient
+    await send_push_safely(
+        plan.user_id,
+        title=f"해외 적립 매수 미실행 — {portfolio_name}",
+        body="환전 대기 기한이 지나 이번 회차 해외 매수는 진행되지 않았습니다. 다음 적립일에 다시 매수합니다.",
+        fcm_token=fcm_token,
+        data={"type": "REBALANCING_PLAN_EXPIRED", "portfolio_id": str(plan.portfolio_id or "")},
+        failure_event="dca_fx_wait_expired_push_failed",
+        plan_id=str(plan.id),
+    )

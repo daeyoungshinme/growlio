@@ -28,6 +28,9 @@ vi.mock("@/api/client", () => {
   };
 });
 
+vi.mock("@/api/rebalancingPlan", () => ({
+  fetchRecentPlanLegs: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/api/settings", () => ({
   fetchSettings: vi.fn(),
   updateGoalSettings: vi.fn(),

@@ -106,6 +106,7 @@ _ALERT_BODY_FIELDS = (
     "buy_wait_minutes",
     "tax_impact_gate_mode",
     "max_tax_impact_krw",
+    "dca_amount_krw",
 )
 """요청 본문에서 그대로 옮기는 알림 설정 필드 — account_id/alert_scope는 호출부 책임."""
 
