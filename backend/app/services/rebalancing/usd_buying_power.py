@@ -5,7 +5,8 @@
 
 - KIS: 해외잔고 `output2.frcr_dncl_amt_2`(외화예수금), 키움: 예수금 `fc_entra`(USD) — 둘 다 각 클라이언트가
   `deposit_usd`로 정규화한다.
-- 조회 실패·미지원 계좌는 None(미확인) — 호출부는 확인 없이 기존처럼 주문을 시도한다(증권사가 최종 판정).
+- 조회 실패·미지원 계좌·시세 실패는 `USD_UNKNOWN`(미확인). 실행 경로는 확인 없이 기존처럼 주문을 시도하지만
+  (증권사가 최종 판정), 자동 재확인은 미확인을 "충분"으로 보지 않고 대기를 유지한다(plans/122 A2).
 
 **함정**: 토큰 발급은 DB commit을 한다 — leg를 `FOR UPDATE`로 잠그기 *전에* 호출해야 락이 중간에 풀리지 않는다.
 """
@@ -33,6 +34,17 @@ FX_FEE_BUFFER = 1.003
 class UsdShortfall:
     required_usd: float
     available_usd: float
+
+
+@dataclass(frozen=True)
+class UsdUnknown:
+    """달러가 충분한지 판정하지 못했다(잔고·시세 조회 실패, 실행 계좌 없음)."""
+
+
+USD_UNKNOWN = UsdUnknown()
+
+UsdCheck = UsdShortfall | UsdUnknown | None
+"""`check_usd_shortfall` 결과 — 부족(UsdShortfall)·미확인(USD_UNKNOWN)·충분(None)."""
 
 
 async def fetch_usd_buying_power(account_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, cache) -> float | None:
@@ -93,22 +105,24 @@ async def check_usd_shortfall(
     user_id: uuid.UUID,
     db: AsyncSession,
     cache,
-) -> UsdShortfall | None:
-    """이 leg를 사려면 달러가 부족한지. 부족할 때만 UsdShortfall, 충분하거나 판정 불가(미확인)면 None."""
+) -> UsdCheck:
+    """이 leg를 사려면 달러가 부족한지. 부족하면 UsdShortfall, 판정 불가면 USD_UNKNOWN, 충분하면 None."""
     from app.services.rebalancing.plan_execution import _rebuild_orders_from_items
 
     try:
         orders = await _rebuild_orders_from_items(items, "BUY", user_id, db, cache)
     except ValueError:
         # 해외 현재가를 못 받아 지정가를 정할 수 없다 — 실행 경로가 같은 이유로 FAILED 처리·알림한다
-        return None
+        return USD_UNKNOWN
     required = required_usd_for_orders(orders)
-    if required is None or required <= 0:
+    if required is None:
+        return USD_UNKNOWN
+    if required <= 0:
         return None
     available = await fetch_usd_buying_power(account_id, user_id, db, cache)
     if available is None:
         logger.info("dca_usd_buying_power_unknown", account_id=str(account_id))
-        return None
+        return USD_UNKNOWN
     if available + 1e-6 >= required:
         return None
     logger.info(

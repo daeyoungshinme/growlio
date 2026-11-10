@@ -369,6 +369,20 @@ async def test_held_usd_falls_back_to_synced_when_live_fails():
         assert await svc._account_usd(MagicMock(), None, uuid.uuid4(), kis) == (42.0, False)
 
 
+async def test_held_usd_remembers_live_failure_for_ttl():
+    """실패도 2분 기억 — 화면을 열 때마다 증권사 재조회·Sentry 이벤트를 남기지 않는다(plans/122 B4)."""
+    from app.core.cache_store import CacheStore
+
+    kis = _acct(42.0, asset_type="STOCK_KIS", kis_account_no="1")
+    cache = CacheStore()
+    user_id = uuid.uuid4()
+    live = AsyncMock(return_value=None)
+    with patch.object(svc, "fetch_usd_buying_power", new=live):
+        assert await svc._account_usd(MagicMock(), cache, user_id, kis) == (42.0, False)
+        assert await svc._account_usd(MagicMock(), cache, user_id, kis) == (42.0, False)
+    assert live.await_count == 1
+
+
 async def test_held_usd_skips_live_for_account_without_number():
     kis = _acct(5.0, asset_type="STOCK_KIS", kis_account_no=None)
     live = AsyncMock()
@@ -482,13 +496,20 @@ def test_api_months_out_of_range_422(api, months):
 # ── 계획 알림 동기화 (plans/121) ─────────────────────────────
 
 
-def _alert(rate, *, source="FX_PLAN", portfolio_id=None, triggered=False, usd=100.0):
+def _alert(rate, *, source="FX_PLAN", portfolio_id=None, triggered=False, usd=100.0, is_active=True):
+    from datetime import UTC, datetime, timedelta
+
+    if triggered is True:
+        triggered = datetime.now(UTC)
+    elif isinstance(triggered, int) and triggered is not False:
+        triggered = datetime.now(UTC) - timedelta(days=triggered)  # 며칠 전 발동
     return SimpleNamespace(
         target_rate=rate,
         source=source,
         portfolio_id=portfolio_id,
-        triggered_at=object() if triggered else None,
+        triggered_at=triggered or None,
         planned_usd=usd,
+        is_active=is_active,
     )
 
 
@@ -551,6 +572,34 @@ async def test_sync_leaves_other_portfolio_and_triggered_plan_alerts():
 
     assert result.removed == 0
     db.delete.assert_not_awaited()
+
+
+async def test_sync_removes_old_triggered_plan_alerts_only():
+    """발동 후 "지금 할 일" 기간이 지난 계획 알림은 지운다 — 쌓이면 알림 상한 409(plans/122 B5)."""
+    pid = uuid.uuid4()
+    recent = _alert(1300.0, portfolio_id=pid, triggered=1)
+    old = _alert(1290.0, portfolio_id=pid, triggered=10)
+    other_old = _alert(1280.0, portfolio_id=uuid.uuid4(), triggered=10)
+    db = _sync_db([recent, old, other_old])
+
+    result = await _sync(db, pid, [])
+
+    assert result.removed == 1
+    db.delete.assert_awaited_once_with(old)
+
+
+async def test_sync_reuses_paused_plan_alert_instead_of_duplicating():
+    """일시정지한 미발동 계획 알림도 같은 목표면 다시 켜서 쓴다 — 같은 환율 알림이 둘 생기지 않게(plans/122 B5)."""
+    pid = uuid.uuid4()
+    paused = _alert(1320.0, portfolio_id=pid, is_active=False)
+    db = _sync_db([paused])
+
+    result = await _sync(db, pid, [(1320.0, 80.0)])
+
+    assert (result.created, result.updated) == (0, 1)
+    assert paused.is_active is True
+    assert paused.planned_usd == 80.0
+    db.add.assert_not_called()
 
 
 async def test_sync_dedupes_duplicate_plan_alerts_for_same_target():
@@ -616,3 +665,27 @@ def test_api_sync_alerts_returns_counts(api):
 def test_api_sync_alerts_validation_422(api, targets):
     res = api.put("/api/v1/invest/fx-plan/alerts", json={"portfolio_id": str(uuid.uuid4()), "targets": targets})
     assert res.status_code == 422
+
+
+async def test_delete_portfolio_removes_its_fx_plan_alerts():
+    """포트폴리오 FK가 SET NULL이라 계획 알림이 계획 없이 계속 발동했다 — 함께 지운다(plans/122 B5)."""
+    from sqlalchemy.sql.dml import Delete
+
+    from app.services.portfolio import portfolio_crud_service as crud
+
+    portfolio = SimpleNamespace(id=uuid.uuid4())
+    db = MagicMock()
+    db.scalar = AsyncMock(return_value=portfolio)
+    db.execute = AsyncMock()
+    db.delete = AsyncMock()
+    db.commit = AsyncMock()
+    with patch("app.services.rebalancing.plan_execution.cancel_pending_buy_legs", new=AsyncMock()):
+        await crud.delete_portfolio(db, uuid.uuid4(), portfolio.id)
+
+    deletes = [c.args[0] for c in db.execute.await_args_list if isinstance(c.args[0], Delete)]
+    assert len(deletes) == 1
+    assert deletes[0].table.name == "exchange_rate_alerts"
+    sql = str(deletes[0].compile())
+    assert "portfolio_id" in sql
+    assert "source" in sql
+    db.delete.assert_awaited_once_with(portfolio)

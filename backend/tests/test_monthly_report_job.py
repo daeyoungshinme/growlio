@@ -228,7 +228,7 @@ class TestRunMonthlyReport:
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
-            patch("app.jobs.monthly_report.get_durable", new_callable=AsyncMock, return_value="1"),
+            patch("app.jobs.monthly_report.claim_durable", new_callable=AsyncMock, return_value=False),
             patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock) as mock_summary,
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
         ):
@@ -258,7 +258,8 @@ class TestRunMonthlyReport:
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
-            patch("app.jobs.monthly_report.get_durable", new_callable=AsyncMock, return_value=None),
+            patch("app.jobs.monthly_report.claim_durable", new_callable=AsyncMock, return_value=True) as mock_claim,
+            patch("app.jobs.monthly_report.delete_durable", new_callable=AsyncMock) as mock_delete,
             patch("app.jobs.monthly_report.set_durable", new_callable=AsyncMock) as mock_set,
             patch("app.jobs.monthly_report.today_kst", return_value=date(2026, 1, 1)),
             patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
@@ -274,6 +275,41 @@ class TestRunMonthlyReport:
         key = mock_set.await_args.args[1]
         assert key.endswith(f"monthly_report:sent:{user.id}:2025-12")
         assert mock_set.await_args.kwargs["commit"] is False
+        # 발송 전에 짧은 TTL로 선점하고, 성공하면 전체 TTL로 덮는다(plans/122 A4)
+        assert mock_claim.await_args.args[1] == key
+        mock_delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_releases_claim_when_send_fails(self):
+        """발송 실패면 선점을 풀어 catch-up 잡이 다시 보낼 수 있게 한다."""
+        user = _make_user()
+        settings = _make_settings(enabled=True)
+
+        mock_session = AsyncMock()
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(user, settings)]
+        mock_session.execute = AsyncMock(return_value=execute_result)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.monthly_report.claim_durable", new_callable=AsyncMock, return_value=True),
+            patch("app.jobs.monthly_report.delete_durable", new_callable=AsyncMock) as mock_delete,
+            patch("app.jobs.monthly_report.set_durable", new_callable=AsyncMock) as mock_set,
+            patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
+            patch("app.jobs.monthly_report.get_net_deposits_for_year", new_callable=AsyncMock, return_value=0.0),
+            patch("app.jobs.monthly_report.get_annual_dividends_received", new_callable=AsyncMock, return_value=0.0),
+            patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock, return_value=False),
+        ):
+            from app.jobs.monthly_report import run_monthly_report
+
+            await run_monthly_report()
+
+        mock_delete.assert_awaited_once()
+        mock_set.assert_not_awaited()
 
 
 class TestPrevMonthLabel:

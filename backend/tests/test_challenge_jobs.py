@@ -149,7 +149,7 @@ class TestDepositReminderJob:
                 new_callable=AsyncMock,
                 return_value=_progress(this_month_satisfied=False),
             ),
-            patch("app.jobs.challenge_deposit_reminder.get_durable", new_callable=AsyncMock, return_value="1"),
+            patch("app.jobs.challenge_deposit_reminder.claim_durable", new_callable=AsyncMock, return_value=False),
             patch(
                 "app.jobs.challenge_deposit_reminder.dispatch_dual_channel_alert", new_callable=AsyncMock
             ) as dispatch,
@@ -158,6 +158,34 @@ class TestDepositReminderJob:
 
             await run_challenge_deposit_reminder()
         dispatch.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_unsent_reminder_releases_claim(self):
+        """선점 후 발송 못 하면(채널 없음·실패) 선점을 풀어 다음 실행이 다시 시도한다(plans/122 A4)."""
+        user, settings = _user(), _settings()
+        ch = _challenge(user_id=user.id)
+        session = _session([(user, settings)], [ch])
+        with (
+            patch("app.jobs.challenge_deposit_reminder.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch(
+                "app.services.challenge_service.compute_progress",
+                new_callable=AsyncMock,
+                return_value=_progress(this_month_satisfied=False),
+            ),
+            patch("app.jobs.challenge_deposit_reminder.claim_durable", new_callable=AsyncMock, return_value=True),
+            patch("app.jobs.challenge_deposit_reminder.delete_durable", new_callable=AsyncMock) as release,
+            patch(
+                "app.jobs.challenge_deposit_reminder.dispatch_dual_channel_alert",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            from app.jobs.challenge_deposit_reminder import run_challenge_deposit_reminder
+
+            await run_challenge_deposit_reminder()
+        release.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_query_filters_by_challenge_reminders_enabled(self):

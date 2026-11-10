@@ -791,6 +791,7 @@ def _make_pending_buy_leg(plan_id, quantity=5):
         id=uuid.uuid4(),
         plan_id=plan_id,
         side="BUY",
+        market="KR",
         status="PENDING",
         token_consumed_at=None,
         items=[item],
@@ -798,11 +799,34 @@ def _make_pending_buy_leg(plan_id, quantity=5):
         decided_by=None,
         execution_id=None,
         error_message=None,
+        fx_retry_until=None,
     )
 
 
 class TestApproveBuyLeg:
     """앱에서 매수 대기시간을 건너뛰고 즉시 실행하는 경로 — approve_sell_leg과 동일한 _approve_leg_now 공유."""
+
+    @pytest.fixture(autouse=True)
+    def _krx_open(self):
+        with patch("app.utils.market_hours.is_korean_market_open", return_value=True):
+            yield
+
+    @pytest.mark.asyncio
+    async def test_rejects_when_market_closed(self, mock_db):
+        """닫힌 장에 즉시 승인하면 지정가가 거부돼 FAILED로 끝난다 — 409로 막고 leg는 그대로 둔다(plans/122 B2)."""
+        from app.exceptions import ConflictError
+
+        leg = _make_pending_buy_leg(uuid.uuid4())
+        leg.market = "US"
+        mock_db.scalar = AsyncMock()
+        with (
+            patch("app.utils.market_hours.is_us_market_open", return_value=False),
+            pytest.raises(ConflictError),
+        ):
+            await svc.approve_buy_leg(leg, mock_db, MagicMock(), decided_by="USER_APP")
+        mock_db.scalar.assert_not_awaited()
+        assert leg.status == "PENDING"
+        assert leg.token_consumed_at is None
 
     @pytest.mark.asyncio
     async def test_approve_executes_and_marks_executed(self, mock_db):
@@ -850,7 +874,12 @@ class TestApproveBuyLeg:
     @pytest.mark.asyncio
     async def test_rejects_already_consumed_leg(self, mock_db):
         locked_leg = SimpleNamespace(
-            id=uuid.uuid4(), plan_id=uuid.uuid4(), side="BUY", status="PENDING", token_consumed_at=datetime.now(UTC)
+            id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            side="BUY",
+            market="KR",
+            status="PENDING",
+            token_consumed_at=datetime.now(UTC),
         )
         mock_db.scalar = AsyncMock(return_value=locked_leg)
 
@@ -873,6 +902,7 @@ class TestExecuteDueBuyLegs:
             plan_id=uuid.uuid4(),
             side="BUY",
             market="KR",
+            fx_retry_until=None,
             status="PENDING",
             deadline_at=datetime.now(tz=UTC) - timedelta(minutes=5),
             decided_at=None,
@@ -1115,6 +1145,7 @@ class TestExecuteDueBuyLegs:
             plan_id=uuid.uuid4(),
             side="BUY",
             market="US",
+            fx_retry_until=None,
             status="PENDING",
             deadline_at=datetime.now(tz=UTC) - timedelta(minutes=5),
             decided_at=None,
@@ -1351,6 +1382,7 @@ class TestPlanLegFailureIsolation:
             plan_id=uuid.uuid4(),
             side="BUY",
             market="KR",
+            fx_retry_until=None,
             status="PENDING",
             decided_at=None,
             decided_by=None,

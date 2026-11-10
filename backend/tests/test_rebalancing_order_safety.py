@@ -186,7 +186,12 @@ class TestBuyLegExpiryIsAnnounced:
     @pytest.mark.asyncio
     async def test_market_closed_expiry_records_history_and_pushes(self):
         leg = SimpleNamespace(
-            id=uuid.uuid4(), plan_id=uuid.uuid4(), status="PENDING", token_consumed_at=None, market="KR"
+            id=uuid.uuid4(),
+            plan_id=uuid.uuid4(),
+            status="PENDING",
+            token_consumed_at=None,
+            market="KR",
+            fx_retry_until=None,
         )
         plan = SimpleNamespace(id=leg.plan_id, user_id=uuid.uuid4())
         db = MagicMock()

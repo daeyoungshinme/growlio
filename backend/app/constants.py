@@ -35,6 +35,9 @@ MAX_EXCHANGE_RATE_ALERTS_PER_USER = 50
 중복 점검 요청 검증(`CandidateOverlapRequest`)·추천 서비스의 잔여 슬롯 계산이 공유한다."""
 FX_PLAN_ALERT_SOURCE = "FX_PLAN"
 """환율 알림 출처 — 달러 환전 계획 구간(plans/121). 그 외는 "MANUAL"."""
+FX_PLAN_ACTION_DAYS = 3
+"""발동한 환전 계획 알림이 홈 "지금 할 일"에 보이는 일수(KST, 오늘 포함).
+계획 맞추기는 이보다 오래된 발동 알림을 지운다."""
 
 DEFAULT_GOAL_MAX_WEIGHT_PCT = 40.0
 """목표 추천 종목당 최대 비중(%) 기본값 — `UserSettings.goal_max_weight_pct`가 NULL일 때.

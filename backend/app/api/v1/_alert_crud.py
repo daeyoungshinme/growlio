@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
+from app.constants import FX_PLAN_ALERT_SOURCE
 from app.limiter import limiter
 from app.models.user import User
 
@@ -49,6 +50,10 @@ def register_alert_reactivate_delete(
         alert = await get_owned_or_404(db, model, alert_id, current_user.id, not_found_msg)
         alert.is_active = True
         alert.trigger_count = 0
+        if getattr(alert, "source", None) == FX_PLAN_ALERT_SOURCE:
+            # 발동 시각이 남아 있으면 계획 맞추기가 "이력"으로 보고 건드리지 않아, 다시 켠 알림이 계획 밖에
+            # 고아로 남고 같은 환율에 계획 알림이 하나 더 생긴다 — 미발동 계획 알림으로 돌린다(plans/122 C7)
+            alert.triggered_at = None
         await db.commit()
         await db.refresh(alert)
         if invalidate_cache:

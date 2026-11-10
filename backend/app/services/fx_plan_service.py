@@ -13,17 +13,18 @@ from __future__ import annotations
 import math
 import uuid
 from dataclasses import asdict, dataclass
-from datetime import timedelta
+from datetime import UTC, timedelta
 from typing import Any, Literal
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.constants import (
     CASH_EQUIVALENT_MARKET,
     DOMESTIC_MARKETS,
+    FX_PLAN_ACTION_DAYS,
     FX_PLAN_ALERT_SOURCE,
     MAX_EXCHANGE_RATE_ALERTS_PER_USER,
     ORDER_EXECUTABLE_ASSET_TYPES,
@@ -49,7 +50,7 @@ from app.utils.cache_keys import (
 )
 from app.utils.currency import get_live_or_cached_usd_krw
 from app.utils.inproc_lock import inproc_lock
-from app.utils.kst import today_kst
+from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
 
@@ -269,6 +270,9 @@ def _can_fetch_live_usd(account: AssetAccount) -> bool:
     return False
 
 
+_LIVE_USD_FAILED = "failed"
+
+
 async def _account_usd(
     db: AsyncSession, cache: CacheStoreType, user_id: uuid.UUID, account: AssetAccount
 ) -> tuple[float, bool]:
@@ -280,8 +284,13 @@ async def _account_usd(
     cached = await get_cached_json(cache, key)
     if isinstance(cached, int | float):
         return float(cached), True
+    if cached == _LIVE_USD_FAILED:
+        return synced, False
     live = await fetch_usd_buying_power(account.id, user_id, db, cache)
     if live is None:
+        # 실패도 같은 TTL만큼 기억한다 — 만료 토큰·키 없는 계좌가 화면을 열 때마다 증권사(KIS 최대 3회)를 다시 부르고
+        # Sentry 이벤트를 남기지 않게(plans/122 B4). 동기화 무효화가 이 키도 지운다
+        await set_cached_json(cache, key, _LIVE_USD_FAILED, TTL_USD_BUYING_POWER)
         return synced, False
     await set_cached_json(cache, key, live, TTL_USD_BUYING_POWER)
     return live, True
@@ -455,7 +464,10 @@ async def sync_fx_plan_alerts(
     - 같은 목표가 이미 있으면 금액만 갱신, 새 목표면 BELOW 1회 알림 생성, 목표에서 빠진 계획 알림은 삭제.
     - 같은 목표의 **직접 등록한(MANUAL) 활성 BELOW 알림**이 있으면 만들지 않는다(중복 발송 방지).
       MANUAL 알림은 계획이 지우거나 바꾸지 않는다.
-    - 발동된 계획 알림은 이력이라 건드리지 않는다.
+    - 일시정지한 미발동 계획 알림도 계획 알림이다 — 목표에 있으면 다시 켜고, 없으면 지운다(중복 생성 방지).
+    - 발동된 계획 알림은 "지금 할 일"이 보이는 동안(`FX_PLAN_ACTION_DAYS`) 두고, 그보다 오래된 것은 지운다 —
+      쌓이면 사용자당 알림 상한(50)에 걸려 맞추기·직접 등록이 모두 409가 된다(plans/122 B5).
+      발동 기록은 알림 이력에 남는다.
     """
     owned = await db.scalar(select(Portfolio.id).where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id))
     if owned is None:
@@ -470,14 +482,20 @@ async def sync_fx_plan_alerts(
                 await db.execute(
                     select(ExchangeRateAlert).where(
                         ExchangeRateAlert.user_id == user_id,
-                        ExchangeRateAlert.is_active == True,
-                        ExchangeRateAlert.direction == "BELOW",
+                        or_(
+                            and_(ExchangeRateAlert.is_active == True, ExchangeRateAlert.direction == "BELOW"),
+                            and_(
+                                ExchangeRateAlert.source == FX_PLAN_ALERT_SOURCE,
+                                ExchangeRateAlert.portfolio_id == portfolio_id,
+                            ),
+                        ),
                     )
                 )
             )
             .scalars()
             .all()
         )
+        triggered_cutoff = kst_day_start(today_kst() - timedelta(days=FX_PLAN_ACTION_DAYS - 1))
         plan_alerts: dict[int, ExchangeRateAlert] = {}
         stale: list[ExchangeRateAlert] = []
         manual_keys: set[int] = set()
@@ -485,12 +503,17 @@ async def sync_fx_plan_alerts(
             key = _rate_key(alert.target_rate)
             if alert.source != FX_PLAN_ALERT_SOURCE:
                 manual_keys.add(key)
-            elif alert.portfolio_id == portfolio_id and alert.triggered_at is None:
-                # 같은 목표가 둘이면(동시 등록 경합의 흔적) 하나만 남긴다
-                if key in plan_alerts:
+            elif alert.portfolio_id != portfolio_id:
+                continue  # 다른 포트폴리오의 계획 알림은 그 계획이 관리한다
+            elif alert.triggered_at is not None:
+                fired = alert.triggered_at
+                if (fired if fired.tzinfo else fired.replace(tzinfo=UTC)) < triggered_cutoff:
                     stale.append(alert)
-                else:
-                    plan_alerts[key] = alert
+            # 같은 목표가 둘이면(동시 등록 경합의 흔적) 하나만 남긴다
+            elif key in plan_alerts:
+                stale.append(alert)
+            else:
+                plan_alerts[key] = alert
 
         wanted = {_rate_key(rate): (rate, usd) for rate, usd in targets}
         stale.extend(alert for key, alert in plan_alerts.items() if key not in wanted)
@@ -500,6 +523,7 @@ async def sync_fx_plan_alerts(
         for key, (rate, usd) in wanted.items():
             if key in plan_alerts:
                 plan_alerts[key].planned_usd = round(usd, 2)
+                plan_alerts[key].is_active = True
                 updated += 1
             elif key in manual_keys:
                 skipped += 1

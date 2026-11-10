@@ -18,7 +18,7 @@ from app.services import challenge_service
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.notifications.email_service import send_challenge_reminder_email
 from app.utils.cache_keys import CacheStoreType
-from app.utils.durable_state import get_durable, set_durable
+from app.utils.durable_state import claim_durable, delete_durable
 from app.utils.kst import month_label as _month_label
 from app.utils.kst import now_kst
 
@@ -84,12 +84,13 @@ async def _remind_one(db, user, settings_row, challenge, to_email: str, month: s
     if done:
         return
     key = _reminder_dedup_key(challenge.id, month)
-    if await get_durable(db, key, commit=False) is not None:
+    # 확인 후 발송이면 catch-up 잡과 겹칠 때 두 번 보낸다 — savepoint 안에서 먼저 선점한다(plans/122 A4)
+    if not await claim_durable(db, key, ttl=_DEDUP_TTL, commit=False):
         return
 
     target_amount = float(challenge.target_amount) if challenge.target_amount else None
     body = "이번 달 적립을 아직 완료하지 않았어요 — 습관을 이어가세요."
-    await dispatch_dual_channel_alert(
+    sent = await dispatch_dual_channel_alert(
         db,
         user.id,
         event_prefix="challenge_reminder",
@@ -108,6 +109,8 @@ async def _remind_one(db, user, settings_row, challenge, to_email: str, month: s
         push_type="CHALLENGE_REMINDER",
         fcm_token=settings_row.fcm_token,
         commit=False,
-        after_sent=lambda: set_durable(db, key, "1", ttl=_DEDUP_TTL, commit=False),
     )
+    if not sent:
+        await delete_durable(db, key, commit=False)  # 다음 실행이 다시 시도하게 선점을 푼다
+        return
     logger.info("challenge_reminder_sent", user_id=str(user.id), challenge_id=str(challenge.id))

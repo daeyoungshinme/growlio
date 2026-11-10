@@ -31,7 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.constants import FX_PLAN_ALERT_SOURCE
+from app.constants import FX_PLAN_ACTION_DAYS, FX_PLAN_ALERT_SOURCE
 from app.core.job_runner import report_handled_failure
 from app.models.alert import ExchangeRateAlert, RebalancingAlert
 from app.models.portfolio import Portfolio
@@ -55,7 +55,6 @@ _LINK_CHALLENGE = "/invest-plan?tab=챌린지"
 _LINK_DCA_PLAN = "/invest-plan?tab=적립 계획"
 # 환전 계획 카드를 펼치고 스크롤한다 — 프론트 `FX_PLAN_ANCHOR`(InvestPlanPage)와 같은 해시
 _LINK_FX_PLAN = "/invest-plan?tab=적립 계획#fx-plan"
-FX_PLAN_ACTION_DAYS = 3
 """환전 계획 구간 알림이 발동한 뒤 "지금 할 일"에 남는 일수(오늘 포함) — 환전했는지는 알 수 없어 기간으로 끈다."""
 
 

@@ -1,6 +1,7 @@
 """AUTO 모드 스케줄일 판정(alerts.calculator.is_auto_schedule_day / next_auto_schedule_date) — 계획 37 E5.
 
-AUTO 잡은 장이 열린 평일에만 돌기 때문에 지정일이 주말이면 다음 평일로 미뤄야 그달 실행이 누락되지 않는다.
+AUTO 잡은 장이 열린 거래일에만 돌기 때문에 지정일이 주말·KRX 휴장일이면 다음 거래일로 미뤄야 그달 실행이
+누락되지 않는다(휴장일은 plans/122 A1).
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services.alerts.calculator import is_auto_schedule_day, next_auto_schedule_date
+from app.utils.market_hours import is_krx_trading_day
 
 
 def _alert(schedule_type="MONTHLY", day_of_month=None, day_of_week=None, last_triggered_at=None):
@@ -41,9 +43,17 @@ def test_monthly_weekend_target_rolls_to_next_monday():
 
 
 def test_month_end_weekend_target_rolls_into_next_month():
-    alert = _alert(day_of_month=28)  # 2026-02-28 = 토요일 → 3월 2일(월)
-    assert is_auto_schedule_day(alert, date(2026, 3, 2))
-    assert not is_auto_schedule_day(alert, date(2026, 3, 3))
+    # 2026-02-28 = 토요일, 3월 2일(월)은 삼일절 대체 휴장 → 3월 3일(화)
+    alert = _alert(day_of_month=28)
+    assert not is_auto_schedule_day(alert, date(2026, 3, 2))
+    assert is_auto_schedule_day(alert, date(2026, 3, 3))
+    assert not is_auto_schedule_day(alert, date(2026, 3, 4))
+
+
+def test_monthly_target_on_krx_holiday_rolls_to_next_trading_day():
+    alert = _alert(day_of_month=25)  # 2026-09-25 = 추석(금) → 9월 28일(월)
+    assert not is_auto_schedule_day(alert, date(2026, 9, 25))
+    assert is_auto_schedule_day(alert, date(2026, 9, 28))
 
 
 @pytest.mark.parametrize(
@@ -70,7 +80,7 @@ def test_quarterly_respects_cooldown():
 def test_next_auto_schedule_date_excludes_today_and_rolls_weekend():
     alert = _alert(day_of_month=25)
     assert next_auto_schedule_date(alert, date(2026, 10, 22)) == date(2026, 10, 26)
-    assert next_auto_schedule_date(alert, date(2026, 11, 25)) == date(2026, 12, 25)
+    assert next_auto_schedule_date(alert, date(2026, 11, 25)) == date(2026, 12, 28)  # 12-25 성탄절 휴장
 
 
 # ── NOTIFY(should_fire_today)·AUTO 공용 규칙 일관성 (docs/plans/39 N2) ─────────────
@@ -108,7 +118,8 @@ _CONSISTENCY_ALERTS = [
 
 @pytest.mark.parametrize("alert", _CONSISTENCY_ALERTS)
 def test_notify_and_auto_share_rules(alert):
-    """NOTIFY는 이전 규칙과 동일하고, 평일 NOTIFY 발송일은 AUTO에서도 실행일이다(차이는 주말 이월뿐)."""
+    """NOTIFY는 이전 규칙과 동일하고, 거래일 NOTIFY 발송일은 AUTO에서도 실행일이다(차이는 주말·휴장 이월뿐)."""
+    from datetime import timedelta
     from unittest.mock import patch
 
     from app.services.alerts import calculator
@@ -117,7 +128,8 @@ def test_notify_and_auto_share_rules(alert):
         with patch.object(calculator, "today_kst", return_value=d):
             notify = calculator.should_fire_today(alert)
         assert notify == _oracle_notify(alert, d), d
-        if notify and d.weekday() < 5:
+        if notify and is_krx_trading_day(d):
             assert is_auto_schedule_day(alert, d), d
         if is_auto_schedule_day(alert, d) and not notify:
-            assert d.weekday() == 0, d  # 주말 지정일이 월요일로 밀린 경우만
+            assert is_krx_trading_day(d), d
+            assert not is_krx_trading_day(d - timedelta(days=1)), d  # 휴장 지정일이 다음 거래일로 밀린 경우만
