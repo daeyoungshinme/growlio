@@ -6,6 +6,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import FX_PLAN_ALERT_SOURCE
 from app.core.cache_store import CacheStore
 from app.core.job_runner import report_handled_failure
 from app.models.alert import ExchangeRateAlert
@@ -19,6 +20,9 @@ from app.services.alerts.calculator import should_trigger_exchange_rate
 from app.utils.currency import fetch_usd_krw
 
 logger = structlog.get_logger()
+
+FX_PLAN_PUSH_TYPE = "FX_PLAN"
+"""환전 계획 구간 알림 푸시 data.type — 프론트 `usePushNotifications.resolvePushDeepLink`가 적립 계획 탭으로 연다."""
 
 
 async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = None) -> None:
@@ -58,6 +62,10 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
 
         email = notification_email or user_email
         target = float(alert.target_rate)
+        # 환전 계획 구간 알림이면 환전할 금액을 함께 알린다(plans/121)
+        planned_usd = (
+            float(alert.planned_usd) if alert.source == FX_PLAN_ALERT_SOURCE and alert.planned_usd is not None else None
+        )
         email_sent = False
         try:
             email_sent = await send_exchange_rate_alert(
@@ -65,21 +73,32 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
                 target_rate=target,
                 direction=alert.direction,
                 current_rate=current_rate,
+                planned_usd=planned_usd,
             )
         except Exception as exc:
             report_handled_failure("exchange_rate_alert_email_failed", exc, user_id=str(alert.user_id))
 
         direction_label = "이하" if alert.direction == "BELOW" else "이상"
+        summary = f"USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})"
+        if planned_usd is not None:
+            plan_note = f" — 계획 구간 ${planned_usd:,.0f}(약 {planned_usd * current_rate:,.0f}원) 환전"
+            push_title = "환전 계획 구간 도달"
+            push_data: dict[str, str] | None = {"type": FX_PLAN_PUSH_TYPE}
+        else:
+            plan_note = ""
+            push_title = "환율 알림"
+            push_data = None
         return await notify_and_record_trigger(
             db,
             alert,
             "EXCHANGE_RATE",
-            f"환율 알림: USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
+            f"환율 알림: {summary}{plan_note}",
             alert.user_id,
-            "환율 알림",
-            f"USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
+            push_title,
+            f"{summary}{plan_note}",
             fcm_token,
             email_sent=email_sent,
+            push_data=push_data,
         )
 
     triggered_count = await run_isolated_alert_loop(db, rows, _handle, "exchange_rate_alert_item_failed")

@@ -9,19 +9,42 @@ def exchange_rate_alert_template(
     target_rate: float,
     direction: str,
     current_rate: float,
+    planned_usd: float | None = None,
+    plan_link: str | None = None,
 ) -> tuple[str, str]:
+    """`planned_usd`가 있으면 달러 환전 계획 구간 알림(plans/121) — 환전할 금액과 계획 화면 링크를 함께 싣는다."""
     direction_label = "이하" if direction == "BELOW" else "이상"
+    rows = [
+        ("목표환율", f"{target_rate:,.0f} 원 ({direction_label})"),
+        ("현재환율", f"<span style='color:#1d4ed8;font-weight:bold;'>{current_rate:,.2f} 원</span>"),
+    ]
+    if planned_usd is not None:
+        subject = f"[Growlio] 환전 계획 구간 도달 — {target_rate:,.0f}원 {direction_label}, ${planned_usd:,.0f} 환전"
+        rows.append(
+            (
+                "이번 구간 환전",
+                f"<b>${planned_usd:,.0f}</b> (약 {planned_usd * current_rate:,.0f}원)",
+            )
+        )
+        link_html = (
+            f"<p style='margin-top:16px;'><a href='{plan_link}' style='color:#2563eb;'>앱에서 환전 계획 보기</a></p>"
+            if plan_link
+            else ""
+        )
+        html = _email_div(
+            "환전 계획 구간 도달",
+            "#1d4ed8",
+            _kv_table(rows) + link_html,
+            "증권사 앱에서 이번 구간 금액을 환전하세요. 환전 후 계좌를 동기화하면 남은 계획이 다시 계산됩니다."
+            "<br>이 알림은 1회 발동 후 자동으로 비활성화됩니다.",
+        )
+        return subject, html
+
     subject = f"[Growlio] 목표환율 도달 알림 — {target_rate:,.0f}원 {direction_label}"
-    table = _kv_table(
-        [
-            ("목표환율", f"{target_rate:,.0f} 원 ({direction_label})"),
-            ("현재환율", f"<span style='color:#1d4ed8;font-weight:bold;'>{current_rate:,.2f} 원</span>"),
-        ]
-    )
     html = _email_div(
         "목표환율 도달 알림",
         "#1d4ed8",
-        table,
+        _kv_table(rows),
         "이 알림은 설정하신 목표환율 조건이 충족되어 발송되었습니다.<br>알림은 1회 발동 후 자동으로 비활성화됩니다.",
     )
     return subject, html

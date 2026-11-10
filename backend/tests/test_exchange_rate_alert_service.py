@@ -21,6 +21,8 @@ def _make_alert(
     trigger_count: int = 0,
     max_trigger_count: int = 1,
     triggered_at=None,
+    source: str = "MANUAL",
+    planned_usd: float | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid.uuid4(),
@@ -31,6 +33,8 @@ def _make_alert(
         max_trigger_count=max_trigger_count,
         triggered_at=triggered_at,
         is_active=True,
+        source=source,
+        planned_usd=planned_usd,
     )
 
 
@@ -190,3 +194,49 @@ class TestCheckAndTriggerAlerts:
 
         mock_db.commit.assert_not_called()
         assert alert.trigger_count == 0
+
+
+class TestFxPlanAlert:
+    """환전 계획 구간 알림(plans/121) — 메일·푸시에 구간 금액과 계획 딥링크 type이 실린다."""
+
+    @pytest.mark.asyncio
+    async def test_plan_alert_sends_amount_and_push_type(self, mock_db):
+        alert = _make_alert(target_rate=1300.0, source="FX_PLAN", planned_usd=500.0)
+        mock_db.execute.return_value.all.return_value = [_make_db_row(alert)]
+
+        with (
+            patch(_FETCH_RATE, new_callable=AsyncMock, return_value=1290.0),
+            patch(_SEND_EMAIL, new_callable=AsyncMock, return_value=True) as mock_email,
+            patch(_SEND_PUSH, new_callable=AsyncMock, return_value=True) as mock_push,
+            patch(_SAVE_HIST, new_callable=AsyncMock) as mock_hist,
+        ):
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
+
+            await check_and_trigger_alerts(mock_db)
+
+        assert mock_email.await_args.kwargs["planned_usd"] == 500.0
+        push = mock_push.await_args.kwargs
+        assert push["title"] == "환전 계획 구간 도달"
+        assert "$500" in push["body"]
+        assert "645,000원" in push["body"]
+        assert push["data"] == {"type": "FX_PLAN"}
+        assert "$500" in mock_hist.await_args.args[3]
+
+    @pytest.mark.asyncio
+    async def test_manual_alert_keeps_plain_message(self, mock_db):
+        alert = _make_alert(target_rate=1300.0, planned_usd=500.0)  # MANUAL이면 금액이 있어도 무시
+        mock_db.execute.return_value.all.return_value = [_make_db_row(alert)]
+
+        with (
+            patch(_FETCH_RATE, new_callable=AsyncMock, return_value=1290.0),
+            patch(_SEND_EMAIL, new_callable=AsyncMock, return_value=True) as mock_email,
+            patch(_SEND_PUSH, new_callable=AsyncMock, return_value=True) as mock_push,
+            patch(_SAVE_HIST, new_callable=AsyncMock),
+        ):
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
+
+            await check_and_trigger_alerts(mock_db)
+
+        assert mock_email.await_args.kwargs["planned_usd"] is None
+        assert mock_push.await_args.kwargs["title"] == "환율 알림"
+        assert mock_push.await_args.kwargs["data"] is None

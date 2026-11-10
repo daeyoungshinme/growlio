@@ -16,7 +16,8 @@ vi.mock("@/api/client", () => ({
   },
 }));
 
-vi.mock("@/api/alerts", () => ({
+vi.mock("@/api/alerts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/alerts")>()),
   fetchExchangeRateAlerts: vi.fn().mockResolvedValue([]),
   createExchangeRateAlert: vi.fn().mockResolvedValue({}),
   reactivateExchangeRateAlert: vi.fn().mockResolvedValue({}),
@@ -196,6 +197,27 @@ describe("ExchangeRateAlertSection", () => {
       const selects = document.querySelectorAll("select");
       expect(selects.length).toBeGreaterThan(0);
     });
+  });
+
+  it("환전 계획에서 만든 알림은 출처와 구간 금액을 보여준다", async () => {
+    const { fetchExchangeRateAlerts } = await import("@/api/alerts");
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValueOnce([
+      {
+        id: "a1",
+        target_rate: 1320,
+        direction: "BELOW",
+        is_active: true,
+        max_trigger_count: 1,
+        trigger_count: 0,
+        triggered_at: null,
+        created_at: "2026-11-10T00:00:00Z",
+        source: "FX_PLAN",
+        planned_usd: 500,
+        portfolio_id: "p1",
+      },
+    ]);
+    renderWithProviders(<ExchangeRateAlertSection />);
+    expect(await screen.findByText("환전 계획 · $500")).toBeInTheDocument();
   });
 });
 

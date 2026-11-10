@@ -89,6 +89,35 @@ async def test_send_exchange_rate_alert_success(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_send_exchange_rate_alert_plan_tranche_has_amount_and_link(monkeypatch):
+    """환전 계획 구간 알림은 제목·본문에 환전 금액과 계획 화면 링크가 실린다(plans/121)."""
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.frontend_url", "https://app.test")
+
+    captured = {}
+
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured.update(subject=json["subject"], html=json["html"])
+        return _ok_response(url)
+
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.notifications.email_service import send_exchange_rate_alert
+
+        await send_exchange_rate_alert(
+            to_email="user@example.com",
+            target_rate=1300.0,
+            direction="BELOW",
+            current_rate=1290.0,
+            planned_usd=500.0,
+        )
+
+    assert "$500" in captured["subject"]
+    assert "645,000원" in captured["html"]
+    assert "https://app.test/invest-plan?tab=%EC%A0%81%EB%A6%BD+%EA%B3%84%ED%9A%8D#fx-plan" in captured["html"]
+
+
+@pytest.mark.asyncio
 async def test_send_exchange_rate_alert_above_direction(monkeypatch):
     """direction=ABOVE이면 제목에 '이상'이 포함된다."""
     monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")

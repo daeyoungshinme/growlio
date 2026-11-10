@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -89,6 +89,7 @@ async def _run(
     linked=frozenset(),
     today=date(2026, 11, 23),
     fx_waiting=None,
+    fx_plan_alerts=(),
 ):
     db = MagicMock()
     db.rollback = AsyncMock()
@@ -98,6 +99,7 @@ async def _run(
         patch.object(svc, "get_drift_summaries", new=drift or AsyncMock(return_value=[])),
         patch.object(svc, "find_dca_cash_shortfalls", new=dca or AsyncMock(return_value=[])),
         patch.object(svc, "_fx_waiting_items", new=fx_waiting or AsyncMock(return_value=[])),
+        patch.object(svc, "_recent_fx_plan_alerts", new=AsyncMock(return_value=list(fx_plan_alerts))),
         patch.object(
             svc,
             "get_tax_action_plan_with_summary",
@@ -300,3 +302,44 @@ async def test_tactical_failure_keeps_rebalance_rows():
     )
     assert [i.kind for i in items] == ["REBALANCE", "PARTIAL_FAILURE"]
     db.rollback.assert_awaited_once()
+
+
+# ── FX_PLAN — 최근 발동한 환전 계획 구간 (plans/121 C) ─────────
+
+
+@pytest.mark.asyncio
+async def test_fx_plan_triggered_tranches_merge_into_one_row():
+    alerts = [
+        SimpleNamespace(target_rate=1320.0, planned_usd=300.0),
+        SimpleNamespace(target_rate=1300.0, planned_usd=250.5),
+    ]
+    items, _ = await _run(fx_plan_alerts=alerts)
+    assert len(items) == 1
+    item = items[0]
+    assert item.kind == "FX_PLAN"
+    assert item.priority == "HIGH"
+    assert item.title == "목표 환율 도달 — $550 환전"
+    assert "1,320원 · 1,300원 이하" in item.detail
+    assert item.link == "/invest-plan?tab=적립 계획#fx-plan"
+
+
+@pytest.mark.asyncio
+async def test_fx_plan_without_amount_still_prompts():
+    items, _ = await _run(fx_plan_alerts=[SimpleNamespace(target_rate=1320.0, planned_usd=None)])
+    assert items[0].title == "목표 환율 도달 — 환전"
+
+
+@pytest.mark.asyncio
+async def test_recent_fx_plan_alerts_window_starts_kst_two_days_ago():
+    from app.utils.kst import KST
+
+    db = MagicMock()
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = []
+    db.execute = AsyncMock(return_value=result)
+    with patch.object(svc, "today_kst", return_value=date(2026, 11, 10)):
+        await svc._recent_fx_plan_alerts(uuid.uuid4(), db)
+    stmt = db.execute.await_args.args[0]
+    params = stmt.compile().params
+    assert datetime(2026, 11, 8, tzinfo=KST) in params.values()
+    assert "FX_PLAN" in params.values()

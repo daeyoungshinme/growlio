@@ -253,6 +253,23 @@ class TestInvalidateAssetAccountCachesGoalRecommendation:
         assert await get_goal_recommendation_generation(cache, uid) != gen
 
     @pytest.mark.asyncio
+    async def test_sync_clears_live_usd_buying_power_only_for_user(self, override_settings):
+        """계좌 동기화(환전 후 새로고침)는 환전 계획의 실시간 달러 캐시를 그 사용자 것만 지운다(plans/121 B)."""
+        from app.core.cache_store import CacheStore
+        from app.utils.cache_keys import usd_buying_power_key
+
+        cache = CacheStore()
+        uid, other = uuid.uuid4(), uuid.uuid4()
+        mine, theirs = usd_buying_power_key(uid, uuid.uuid4()), usd_buying_power_key(other, uuid.uuid4())
+        await cache.set(mine, "10")
+        await cache.set(theirs, "20")
+
+        await invalidate_asset_account_caches(cache, uid, positions_changed=False)
+
+        assert await cache.get(mine) is None
+        assert await cache.get(theirs) == "20"
+
+    @pytest.mark.asyncio
     async def test_positions_unchanged_keeps_goal_recommendation(self, override_settings):
         from app.core.cache_store import CacheStore
         from app.utils.cache_invalidation import invalidate_asset_account_caches

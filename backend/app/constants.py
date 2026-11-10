@@ -33,6 +33,8 @@ MAX_STOCK_PRICE_ALERTS_PER_USER = 100
 MAX_EXCHANGE_RATE_ALERTS_PER_USER = 50
 """사용자가 등록 가능한 목표 역산 추천 후보 종목 최대 개수 — 설정 저장 검증(`GoalCandidateTickersUpdate`)·
 중복 점검 요청 검증(`CandidateOverlapRequest`)·추천 서비스의 잔여 슬롯 계산이 공유한다."""
+FX_PLAN_ALERT_SOURCE = "FX_PLAN"
+"""환율 알림 출처 — 달러 환전 계획 구간(plans/121). 그 외는 "MANUAL"."""
 
 DEFAULT_GOAL_MAX_WEIGHT_PCT = 40.0
 """목표 추천 종목당 최대 비중(%) 기본값 — `UserSettings.goal_max_weight_pct`가 NULL일 때.

@@ -1,7 +1,7 @@
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 
 class DCAProjectionPoint(BaseModel):
@@ -117,3 +117,36 @@ class FxPlanResponse(BaseModel):
     held_usd: float
     need_usd: float
     tranches: list[FxTrancheResponse]
+    # plans/121 B
+    # DCA_AMOUNT = 정액 적립 알림 금액의 해외 몫, MONTHLY_GOAL = 월 적립액 × 해외 비중. 계산 전 상태면 None
+    deposit_source: Literal["DCA_AMOUNT", "MONTHLY_GOAL"] | None = None
+    held_usd_is_live: bool = False  # 달러가 있는 계좌를 모두 증권사에서 실시간으로 읽었는지
+    waiting_fx_usd: float = 0.0  # 환전 대기 중인 적립 매수를 진행하려면 지금 더 필요한 달러
+
+
+class FxPlanAlertTarget(BaseModel):
+    # ExchangeRateAlert.target_rate는 Numeric(10,2), planned_usd는 Numeric(18,2)
+    target_rate: float = Field(gt=0, le=100_000, allow_inf_nan=False)
+    usd: float = Field(ge=0, le=100_000_000, allow_inf_nan=False)
+
+
+class FxPlanAlertSyncRequest(BaseModel):
+    """계획 구간 목표로 환율 알림을 맞춘다 — 빈 목록이면 이 포트폴리오의 미발동 계획 알림을 모두 지운다."""
+
+    portfolio_id: uuid.UUID
+    targets: list[FxPlanAlertTarget] = Field(max_length=5)
+
+    @field_validator("targets")
+    @classmethod
+    def unique_targets(cls, v: list[FxPlanAlertTarget]) -> list[FxPlanAlertTarget]:
+        rates = [round(t.target_rate, 2) for t in v]
+        if len(rates) != len(set(rates)):
+            raise ValueError("같은 목표 환율이 중복되었습니다")
+        return v
+
+
+class FxPlanAlertSyncResponse(BaseModel):
+    created: int
+    updated: int
+    removed: int
+    skipped_manual: int  # 같은 목표의 직접 등록한 BELOW 알림이 이미 있어 만들지 않은 구간 수

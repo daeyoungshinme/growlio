@@ -127,7 +127,8 @@ def test_plan_without_position_single_tranche():
 
 
 def _item(market, weight, group_key=None, members=()):
-    return SimpleNamespace(market=market, weight=weight, group_key=group_key, members=list(members))
+    ticker = "QQQ" if market not in ("KOSPI", "KOSDAQ") else "069500"
+    return SimpleNamespace(ticker=ticker, market=market, weight=weight, group_key=group_key, members=list(members))
 
 
 def test_overseas_weight_excludes_domestic_and_cash():
@@ -180,15 +181,30 @@ def _portfolio(name="해외 적립", items=None, linked=(), tax_type=None):
     )
 
 
-def _db(portfolios, *, dca_portfolio_id=None, monthly=1_400_000.0, accounts=()):
-    """execute 호출 순서: 포트폴리오 목록 → (필요 시) 브로커 계좌. scalar 순서: 적립 자동매수 포트폴리오 → 월 적립액."""
+def _acct(deposit_usd=None, asset_type="MANUAL", **kw):
+    return SimpleNamespace(
+        id=kw.pop("id", uuid.uuid4()),
+        asset_type=asset_type,
+        deposit_usd=deposit_usd,
+        kis_account_no=kw.pop("kis_account_no", None),
+        kiwoom_account_no=kw.pop("kiwoom_account_no", None),
+        tax_type=kw.pop("tax_type", None),
+    )
+
+
+def _db(portfolios, *, dca_portfolio_id=None, monthly=1_400_000.0, accounts=(), fixed=(), waiting_usd=0.0):
+    """execute 순서: 포트폴리오 목록 → 정액 적립 알림 → (필요 시) 브로커 계좌.
+    scalar 순서: 적립 자동매수 포트폴리오 → (정액이 없을 때) 월 적립액 → 환전 대기 필요 달러."""
     db = MagicMock()
     portfolios_result = MagicMock()
     portfolios_result.scalars.return_value.all.return_value = portfolios
+    fixed_result = MagicMock()
+    fixed_result.all.return_value = list(fixed)
     accounts_result = MagicMock()
     accounts_result.scalars.return_value.all.return_value = list(accounts)
-    db.execute = AsyncMock(side_effect=[portfolios_result, accounts_result])
-    db.scalar = AsyncMock(side_effect=[dca_portfolio_id, monthly])
+    db.execute = AsyncMock(side_effect=[portfolios_result, fixed_result, accounts_result])
+    scalars = [dca_portfolio_id] + ([] if fixed else [monthly]) + [waiting_usd]
+    db.scalar = AsyncMock(side_effect=scalars)
     return db
 
 
@@ -202,7 +218,7 @@ async def _plan(db, *, portfolio_id=None, months=3, closes=None, rate=1400.0, ra
 
 async def test_plan_need_usd_from_deposit_overseas_weight_and_held():
     p = _portfolio()
-    db = _db([p], accounts=[SimpleNamespace(deposit_usd=100.0), SimpleNamespace(deposit_usd=None)])
+    db = _db([p], accounts=[_acct(100.0), _acct(None)])
     result = await _plan(db, closes=_closes())
     # 월 140만 × 60% / 1400 = 600달러 × 3개월 − 보유 100
     assert result["status"] == "OK"
@@ -253,7 +269,7 @@ async def test_plan_no_deposit_goal():
 
 
 async def test_plan_sufficient_when_held_covers_need():
-    db = _db([_portfolio()], accounts=[SimpleNamespace(deposit_usd=5000.0)])
+    db = _db([_portfolio()], accounts=[_acct(5000.0)])
     result = await _plan(db)
     assert result["status"] == "SUFFICIENT"
     assert result["need_usd"] == 0
@@ -291,10 +307,110 @@ async def test_plan_rate_is_live_flag_default():
 
 async def test_held_usd_limited_to_linked_accounts():
     account_id = uuid.uuid4()
-    db = _db([_portfolio(linked=[account_id])], accounts=[SimpleNamespace(deposit_usd=10.0)])
+    db = _db([_portfolio(linked=[account_id])], accounts=[_acct(10.0)])
     await _plan(db)
-    stmt = db.execute.await_args_list[1].args[0]
+    stmt = db.execute.await_args_list[2].args[0]
     assert "asset_accounts.id IN" in str(stmt)
+
+
+# ── plans/121 B — 정액 적립·실시간 달러·환전 대기 ─────────────
+
+
+def _fixed_alert(amount):
+    return SimpleNamespace(dca_amount_krw=amount)
+
+
+async def test_plan_uses_fixed_dca_amount_over_monthly_goal():
+    acct = _acct(0.0)
+    p = _portfolio()  # 해외 60 / 국내 40
+    db = _db([p], fixed=[(_fixed_alert(1_000_000), acct)], accounts=[])
+    result = await _plan(db)
+    assert result["deposit_source"] == "DCA_AMOUNT"
+    assert result["monthly_deposit_krw"] == 1_000_000
+    # 100만 × 60% / 1400 = 428.57달러 — 월 적립액(140만)이 아니라 정액 금액 기준
+    assert result["monthly_need_usd"] == round(1_000_000 * 0.6 / 1400, 2)
+    # 월 적립액은 조회하지 않는다(scalar: 적립 포트폴리오 → 환전 대기)
+    assert db.scalar.await_count == 2
+
+
+async def test_plan_fixed_amount_in_tax_deferred_account_has_no_overseas_share():
+    isa = _acct(0.0, tax_type="ISA")
+    result = await _plan(_db([_portfolio()], fixed=[(_fixed_alert(1_000_000), isa)]))
+    assert result["status"] == "NO_OVERSEAS"
+    assert result["deposit_source"] == "DCA_AMOUNT"
+
+
+async def test_plan_monthly_goal_source_without_fixed_alert():
+    result = await _plan(_db([_portfolio()]))
+    assert result["deposit_source"] == "MONTHLY_GOAL"
+
+
+async def test_held_usd_reads_live_for_broker_accounts_and_caches(mock_cache):
+    from app.core.cache_store import CacheStore
+
+    kis = _acct(10.0, asset_type="STOCK_KIS", kis_account_no="123")
+    manual = _acct(0.0)
+    cache = CacheStore()
+    live = AsyncMock(return_value=250.0)
+    with patch.object(svc, "fetch_usd_buying_power", new=live):
+        held, is_live = await svc._account_usd(MagicMock(), cache, uuid.uuid4(), kis)
+        assert (held, is_live) == (250.0, True)
+        # 두 번째 조회는 2분 캐시
+        user_id = uuid.uuid4()
+        await svc._account_usd(MagicMock(), cache, user_id, kis)
+        await svc._account_usd(MagicMock(), cache, user_id, kis)
+    assert live.await_count == 2  # 첫 user_id 1회 + 두 번째 user_id 1회(캐시 키가 사용자별)
+    assert await svc._account_usd(MagicMock(), cache, uuid.uuid4(), manual) == (0.0, False)
+
+
+async def test_held_usd_falls_back_to_synced_when_live_fails():
+    kis = _acct(42.0, asset_type="STOCK_KIWOOM", kiwoom_account_no="9")
+    with patch.object(svc, "fetch_usd_buying_power", new=AsyncMock(return_value=None)):
+        assert await svc._account_usd(MagicMock(), None, uuid.uuid4(), kis) == (42.0, False)
+
+
+async def test_held_usd_skips_live_for_account_without_number():
+    kis = _acct(5.0, asset_type="STOCK_KIS", kis_account_no=None)
+    live = AsyncMock()
+    with patch.object(svc, "fetch_usd_buying_power", new=live):
+        assert await svc._account_usd(MagicMock(), None, uuid.uuid4(), kis) == (5.0, False)
+    live.assert_not_awaited()
+
+
+async def test_plan_held_usd_live_flag_and_fixed_account_included():
+    kis = _acct(0.0, asset_type="STOCK_KIS", kis_account_no="1")
+    db = _db([_portfolio()], fixed=[(_fixed_alert(1_400_000), kis)], accounts=[])
+    with patch.object(svc, "fetch_usd_buying_power", new=AsyncMock(return_value=300.0)):
+        result = await _plan(db)
+    # 연결 계좌 조회 결과가 비어도 정액 적립 실행 계좌의 달러는 센다
+    assert result["held_usd"] == 300.0
+    assert result["held_usd_is_live"] is True
+
+
+async def test_plan_waiting_fx_forces_now_tranche():
+    # 월 600달러 × 1개월 − 보유 100 = 500 필요. 환전 대기 매수 450달러 − 보유 100 = 350은 지금 환전해야 한다
+    db = _db([_portfolio()], accounts=[_acct(100.0)], waiting_usd=450.0)
+    result = await _plan(db, months=1, closes=_closes())
+    assert result["waiting_fx_usd"] == 350.0
+    now = result["tranches"][0]
+    assert now["label"] == "지금"
+    assert now["usd"] >= 350.0
+
+
+async def test_plan_waiting_fx_covered_by_held_dollars():
+    db = _db([_portfolio()], accounts=[_acct(500.0)], waiting_usd=450.0)
+    result = await _plan(db)
+    assert result["waiting_fx_usd"] == 0.0
+
+
+def test_plan_urgent_exceeding_zone_share_takes_whole_need():
+    tranches = svc.compute_fx_plan(_pos("EXPENSIVE"), 100.0, 1400.0, urgent_usd=150.0)
+    assert [(t.label, t.usd) for t in tranches] == [("지금", 100.0)]
+
+
+def test_plan_urgent_without_position_splits_now_and_run_day():
+    tranches = svc.compute_fx_plan(None, 1000.0, 1400.0, urgent_usd=300.0)
+    assert [(t.label, t.usd) for t in tranches] == [("지금", 300.0), ("적립일에 환전", 700.0)]
 
 
 # ── GET /invest/fx-plan ──────────────────────────────────────
@@ -360,4 +476,143 @@ def test_api_not_owned_portfolio_404(api):
 @pytest.mark.parametrize("months", [0, 13])
 def test_api_months_out_of_range_422(api, months):
     res = api.get(f"/api/v1/invest/fx-plan?months={months}")
+    assert res.status_code == 422
+
+
+# ── 계획 알림 동기화 (plans/121) ─────────────────────────────
+
+
+def _alert(rate, *, source="FX_PLAN", portfolio_id=None, triggered=False, usd=100.0):
+    return SimpleNamespace(
+        target_rate=rate,
+        source=source,
+        portfolio_id=portfolio_id,
+        triggered_at=object() if triggered else None,
+        planned_usd=usd,
+    )
+
+
+def _sync_db(alerts, *, owned=True, total=None):
+    db = MagicMock()
+    db.scalar = AsyncMock(side_effect=[uuid.uuid4() if owned else None, len(alerts) if total is None else total])
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = alerts
+    db.execute = AsyncMock(return_value=result)
+    db.delete = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+    return db
+
+
+async def _sync(db, portfolio_id, targets):
+    from app.core.cache_store import CacheStore
+
+    return await svc.sync_fx_plan_alerts(db, CacheStore(), uuid.uuid4(), portfolio_id, targets)
+
+
+async def test_sync_creates_updates_and_removes_plan_alerts():
+    pid = uuid.uuid4()
+    keep = _alert(1320.0, portfolio_id=pid, usd=50.0)
+    old = _alert(1350.0, portfolio_id=pid)
+    db = _sync_db([keep, old])
+
+    result = await _sync(db, pid, [(1320.0, 120.0), (1300.0, 130.0)])
+
+    assert result == svc.FxPlanAlertSyncResult(created=1, updated=1, removed=1, skipped_manual=0)
+    assert keep.planned_usd == 120.0
+    db.delete.assert_awaited_once_with(old)
+    created = db.add.call_args.args[0]
+    assert (float(created.target_rate), created.direction, created.max_trigger_count) == (1300.0, "BELOW", 1)
+    assert (created.source, created.planned_usd, created.portfolio_id) == ("FX_PLAN", 130.0, pid)
+    db.commit.assert_awaited_once()
+
+
+async def test_sync_skips_target_with_manual_alert_and_never_touches_it():
+    pid = uuid.uuid4()
+    manual = _alert(1300.0, source="MANUAL", usd=None)
+    db = _sync_db([manual])
+
+    result = await _sync(db, pid, [(1300.0, 100.0)])
+
+    assert result.skipped_manual == 1
+    assert result.created == 0
+    db.add.assert_not_called()
+    db.delete.assert_not_awaited()
+    assert manual.planned_usd is None
+
+
+async def test_sync_leaves_other_portfolio_and_triggered_plan_alerts():
+    pid = uuid.uuid4()
+    other = _alert(1310.0, portfolio_id=uuid.uuid4())
+    fired = _alert(1290.0, portfolio_id=pid, triggered=True)
+    db = _sync_db([other, fired])
+
+    result = await _sync(db, pid, [])
+
+    assert result.removed == 0
+    db.delete.assert_not_awaited()
+
+
+async def test_sync_dedupes_duplicate_plan_alerts_for_same_target():
+    pid = uuid.uuid4()
+    first, dup = _alert(1320.0, portfolio_id=pid), _alert(1320.0, portfolio_id=pid)
+    db = _sync_db([first, dup])
+
+    result = await _sync(db, pid, [(1320.0, 80.0)])
+
+    assert (result.updated, result.removed) == (1, 1)
+    db.delete.assert_awaited_once_with(dup)
+
+
+async def test_sync_rejects_over_alert_cap():
+    from app.exceptions import ConflictError
+
+    db = _sync_db([], total=49)
+    with pytest.raises(ConflictError):
+        await _sync(db, uuid.uuid4(), [(1300.0, 1.0), (1290.0, 1.0)])
+    db.add.assert_not_called()
+    db.commit.assert_not_awaited()
+
+
+async def test_sync_not_owned_portfolio_raises():
+    db = _sync_db([], owned=False)
+    with pytest.raises(NotFoundError):
+        await _sync(db, uuid.uuid4(), [(1300.0, 1.0)])
+    db.execute.assert_not_awaited()
+
+
+async def test_sync_conflict_when_lock_held():
+    from app.core.cache_store import CacheStore
+    from app.exceptions import ConflictError
+
+    cache = CacheStore()
+    user_id = uuid.uuid4()
+    await cache.set(f"lock:fx_plan_alerts:{user_id}", "other", nx=True, ex=30)
+    with pytest.raises(ConflictError):
+        await svc.sync_fx_plan_alerts(_sync_db([]), cache, user_id, uuid.uuid4(), [])
+
+
+def test_api_sync_alerts_returns_counts(api):
+    result = svc.FxPlanAlertSyncResult(created=2, updated=0, removed=1, skipped_manual=0)
+    with patch.object(svc, "sync_fx_plan_alerts", new=AsyncMock(return_value=result)) as mocked:
+        res = api.put(
+            "/api/v1/invest/fx-plan/alerts",
+            json={"portfolio_id": str(uuid.uuid4()), "targets": [{"target_rate": 1320, "usd": 100.5}]},
+        )
+    assert res.status_code == 200
+    assert res.json() == {"created": 2, "updated": 0, "removed": 1, "skipped_manual": 0}
+    assert mocked.await_args.args[4] == [(1320.0, 100.5)]
+
+
+@pytest.mark.parametrize(
+    "targets",
+    [
+        [{"target_rate": 1320, "usd": 1}, {"target_rate": 1320.0, "usd": 2}],  # 중복 목표
+        [{"target_rate": 0, "usd": 1}],
+        [{"target_rate": 1300, "usd": -1}],
+        [{"target_rate": 1000 + i * 10, "usd": 1} for i in range(6)],  # 6개 초과
+    ],
+)
+def test_api_sync_alerts_validation_422(api, targets):
+    res = api.put("/api/v1/invest/fx-plan/alerts", json={"portfolio_id": str(uuid.uuid4()), "targets": targets})
     assert res.status_code == 422

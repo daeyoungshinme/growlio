@@ -8,6 +8,7 @@
 - REBALANCE: 비중 이탈이 임계값을 넘은 포트폴리오 (`get_drift_summaries` — `/rebalancing/drift-summary`와 같은 판정).
   2개 이상이면 1행으로 묶는다 — 포트폴리오별 행이 상한 5건을 차지해 다른 할 일을 밀어내지 않게(docs/plans/73).
 - DCA_SHORTFALL: 정기 적립식 자동매수 다음 실행일 기준 예수금 부족 (`find_dca_cash_shortfalls` — 18:30 잡과 같은 판정)
+- FX_PLAN: 최근 발동한 달러 환전 계획 구간 알림(plans/121) — 환전할 금액. 발동 후 `FX_PLAN_ACTION_DAYS`일 동안 보인다
 - TAX_WARNING: 건보 피부양자·금융소득 종합과세·국내 대주주 경고 (세금 추정 요약)
 - TAX_ACTION: 절세 액션 플랜 1순위 (손실수확도 이 플랜의 한 카테고리라 별도 항목을 만들지 않는다)
 - CHALLENGE: 이번 달 아직 입금하지 않은 적립 챌린지 (`get_challenge_summary` — 20일 이후만, BottomNav 배지와 같은 판정)
@@ -21,6 +22,7 @@ from __future__ import annotations
 import calendar
 import uuid
 from collections.abc import Awaitable, Callable, Collection
+from datetime import timedelta
 from functools import partial
 from typing import Any
 
@@ -29,8 +31,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.constants import FX_PLAN_ALERT_SOURCE
 from app.core.job_runner import report_handled_failure
-from app.models.alert import RebalancingAlert
+from app.models.alert import ExchangeRateAlert, RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.schemas.action_items import ActionItem
@@ -40,7 +43,7 @@ from app.services.rebalancing.drift_summary_service import get_drift_summaries
 from app.services.tactical import tactical_allocation_service as tactical
 from app.services.tax.tax_action_service import get_tax_action_plan_with_summary
 from app.utils.cache_keys import CacheStoreType
-from app.utils.kst import today_kst
+from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
 
@@ -50,6 +53,10 @@ _LINK_TAX_ESTIMATE = "/invest-plan?tab=절세&taxTab=세금 추정"
 _LINK_CHALLENGE = "/invest-plan?tab=챌린지"
 # 예수금 부족 푸시(DCA_CASH_SHORTFALL)와 같은 목적지 — 적립 계획의 자동매수 배너가 부족액과 설정 링크를 함께 보여 준다
 _LINK_DCA_PLAN = "/invest-plan?tab=적립 계획"
+# 환전 계획 카드를 펼치고 스크롤한다 — 프론트 `FX_PLAN_ANCHOR`(InvestPlanPage)와 같은 해시
+_LINK_FX_PLAN = "/invest-plan?tab=적립 계획#fx-plan"
+FX_PLAN_ACTION_DAYS = 3
+"""환전 계획 구간 알림이 발동한 뒤 "지금 할 일"에 남는 일수(오늘 포함) — 환전했는지는 알 수 없어 기간으로 끈다."""
 
 
 # 프론트 `REBALANCE_GROUP_ID`(api/dashboard.ts)와 같은 값 — 이 id면 홈 카드가 drift-summary로 펼침 목록을 그린다
@@ -204,6 +211,42 @@ async def _dca_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
     return items + await _fx_waiting_items(user_id, db)
 
 
+async def _recent_fx_plan_alerts(user_id: uuid.UUID, db: AsyncSession) -> list[ExchangeRateAlert]:
+    """최근 `FX_PLAN_ACTION_DAYS`일(KST, 오늘 포함) 안에 발동한 환전 계획 구간 알림(목표 높은 순)."""
+    since = kst_day_start(today_kst() - timedelta(days=FX_PLAN_ACTION_DAYS - 1))
+    result = await db.execute(
+        select(ExchangeRateAlert)
+        .where(
+            ExchangeRateAlert.user_id == user_id,
+            ExchangeRateAlert.source == FX_PLAN_ALERT_SOURCE,
+            ExchangeRateAlert.triggered_at >= since,
+        )
+        .order_by(ExchangeRateAlert.target_rate.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def _fx_plan_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
+    """최근 발동한 환전 계획 구간 알림을 한 행으로 — 같은 날 두 구간이 닿아도 행 하나에 금액을 합친다(plans/121)."""
+    alerts = await _recent_fx_plan_alerts(user_id, db)
+    if not alerts:
+        return []
+    total_usd = sum(float(a.planned_usd or 0) for a in alerts)
+    rates = " · ".join(f"{float(a.target_rate):,.0f}원" for a in alerts)
+    amount = f"${total_usd:,.0f} 환전" if total_usd > 0 else "환전"
+    return [
+        ActionItem(
+            id="fx-plan:triggered",
+            kind="FX_PLAN",
+            priority="HIGH",
+            title=f"목표 환율 도달 — {amount}",
+            detail=f"환전 계획 구간 {rates} 이하 도달 · 증권사 앱에서 환전 후 계좌를 동기화하세요",
+            cta_label="계획 보기",
+            link=_LINK_FX_PLAN,
+        )
+    ]
+
+
 async def _fx_waiting_items(user_id: uuid.UUID, db: AsyncSession) -> list[ActionItem]:
     """환전 대기(WAITING_FX) 적립 해외 매수 — 환전 후 '다시 매수'가 필요하다(plans/120)."""
     from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanLeg
@@ -310,6 +353,7 @@ _Source = Callable[[uuid.UUID, AsyncSession, CacheStoreType], Awaitable[list[Act
 # 전술·리밸런싱은 get_action_items가 앞에 붙인다(전술 항목이 난 포트폴리오를 리밸런싱에서 빼야 해서)
 _SOURCES: list[tuple[str, _Source]] = [
     ("dca", _dca_items),
+    ("fx_plan", _fx_plan_items),
     ("tax", _tax_items),
     ("challenge", _challenge_items),
 ]
@@ -319,6 +363,7 @@ _SOURCE_LABELS = {
     "tactical": "전술 배분",
     "rebalance": "리밸런싱",
     "dca": "적립",
+    "fx_plan": "환전 계획",
     "tax": "세금",
     "challenge": "챌린지",
 }

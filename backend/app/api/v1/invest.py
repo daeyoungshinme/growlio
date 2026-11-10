@@ -1,6 +1,7 @@
 """적립식 투자(DCA) 복리계산 및 목표달성율 API."""
 
 import uuid
+from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,11 +10,18 @@ from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
-from app.schemas.invest import DCAAnalysisResponse, FxPlanResponse, GoalFeasibilityPreview
+from app.schemas.invest import (
+    DCAAnalysisResponse,
+    FxPlanAlertSyncRequest,
+    FxPlanAlertSyncResponse,
+    FxPlanResponse,
+    GoalFeasibilityPreview,
+)
 from app.services import dca_service, fx_plan_service
 from app.services.dividend import plan_service as dividend_plan_service
 from app.services.goal.goal_return_solver import build_feasibility_preview, months_until_year_end
 from app.services.portfolio.composition_calculator import build_asset_totals, exclude_real_estate
+from app.utils.cache_invalidation import invalidate_exchange_rate_alert_caches
 
 router = APIRouter(prefix="/invest", tags=["invest"])
 
@@ -90,3 +98,24 @@ async def get_fx_plan(
     """환율 1년 위치·범위 + 해외 적립에 필요한 달러의 분할 환전 계획(저장 없음, 예측 아님)."""
     cache = await get_cache_store()
     return await fx_plan_service.get_fx_plan(db, cache, current_user.id, portfolio_id, months)
+
+
+@router.put("/fx-plan/alerts", response_model=FxPlanAlertSyncResponse)
+@limiter.limit("20/minute")
+async def sync_fx_plan_alerts(
+    request: Request,
+    req: FxPlanAlertSyncRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """환전 계획 구간 목표로 환율 알림을 맞춘다 — 새 목표는 만들고, 빠진 미발동 계획 알림은 지운다(plans/121)."""
+    cache = await get_cache_store()
+    result = await fx_plan_service.sync_fx_plan_alerts(
+        db,
+        cache,
+        current_user.id,
+        req.portfolio_id,
+        [(t.target_rate, t.usd) for t in req.targets],
+    )
+    await invalidate_exchange_rate_alert_caches(cache, current_user.id)
+    return FxPlanAlertSyncResponse(**asdict(result))

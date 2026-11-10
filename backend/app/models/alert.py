@@ -50,8 +50,18 @@ class ExchangeRateAlert(_AlertMixin, Base):
     max_trigger_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     trigger_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 출처(plans/121): MANUAL(사용자가 직접) | FX_PLAN(달러 환전 계획 구간). FX_PLAN은 계획을 다시 등록할 때
+    # 같은 포트폴리오의 미발동 알림이 새 목표로 교체되고, 발동 메일·푸시에 구간 환전 금액이 실린다.
+    source: Mapped[str] = mapped_column(String(10), nullable=False, server_default="MANUAL")
+    planned_usd: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    portfolio_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
+    )
 
-    __table_args__ = (Index("idx_exchange_rate_alerts_user", "user_id"),)
+    __table_args__ = (
+        Index("idx_exchange_rate_alerts_user", "user_id"),
+        Index("idx_exchange_rate_alerts_portfolio", "portfolio_id"),
+    )
 
 
 class RebalancingAlert(_AlertMixin, Base):

@@ -1,4 +1,4 @@
-import { apiGet } from "./client";
+import { apiGet, apiPut } from "./client";
 
 export interface DCAProjectionPoint {
   month: string;
@@ -146,6 +146,13 @@ export interface FxPlanData {
   held_usd: number;
   need_usd: number;
   tranches: FxTranche[];
+  /** plans/121 B — 아래 셋은 옛 persist 캐시엔 없을 수 있다 */
+  /** DCA_AMOUNT = 정액 적립 금액의 해외 몫, MONTHLY_GOAL = 월 적립액 × 해외 비중 */
+  deposit_source?: "DCA_AMOUNT" | "MONTHLY_GOAL" | null;
+  /** 달러가 있는 계좌를 모두 증권사에서 실시간으로 읽었는지(false면 동기화 기준) */
+  held_usd_is_live?: boolean;
+  /** 환전 대기 중인 적립 매수를 진행하려면 지금 더 필요한 달러 */
+  waiting_fx_usd?: number;
 }
 
 export const fetchFxPlan = (months: number, portfolioId?: string | null) => {
@@ -153,3 +160,18 @@ export const fetchFxPlan = (months: number, portfolioId?: string | null) => {
   if (portfolioId) params.set("portfolio_id", portfolioId);
   return apiGet<FxPlanData>(`/invest/fx-plan?${params.toString()}`);
 };
+
+export interface FxPlanAlertSyncResult {
+  created: number;
+  updated: number;
+  removed: number;
+  /** 같은 목표의 직접 등록한 알림이 있어 만들지 않은 구간 수 */
+  skipped_manual: number;
+}
+
+/** 계획 구간 목표로 환율 알림을 맞춘다 — 새 목표는 만들고 빠진 미발동 계획 알림은 지운다(plans/121). */
+export const syncFxPlanAlerts = (
+  portfolioId: string,
+  targets: { target_rate: number; usd: number }[],
+) =>
+  apiPut<FxPlanAlertSyncResult>("/invest/fx-plan/alerts", { portfolio_id: portfolioId, targets });

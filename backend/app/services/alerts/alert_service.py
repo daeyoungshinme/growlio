@@ -72,6 +72,7 @@ async def notify_and_record_trigger(
     fcm_token: str | None,
     *,
     email_sent: bool,
+    push_data: dict[str, str] | None = None,
 ) -> bool:
     """알림 발동 시 공용 후속 처리: 푸시 발송(실패는 로깅만) → 한 채널이라도 성공하면 trigger 갱신·이력 저장.
 
@@ -91,7 +92,7 @@ async def notify_and_record_trigger(
         title=push_title,
         body=push_body,
         fcm_token=fcm_token,
-        data=None,
+        data=push_data,
         failure_event=f"{history_alert_type.lower()}_alert_push_failed",
     )
     if not (email_sent or push_sent):

@@ -73,6 +73,7 @@ async def create_exchange_rate_alert(
         target_rate=req.target_rate,
         direction=req.direction,
         max_trigger_count=req.max_trigger_count,
+        source="MANUAL",
     )
     db.add(alert)
     await db.commit()

@@ -72,6 +72,9 @@ class TestExchangeRateAlerts:
             instance.trigger_count = 0
             instance.triggered_at = None
             instance.created_at = datetime.now(UTC)
+            instance.source = "MANUAL"
+            instance.planned_usd = None
+            instance.portfolio_id = None
             MockAlert.return_value = instance
             resp = client.post("/api/v1/alerts/exchange-rate", json=payload)
         assert resp.status_code in (200, 201)

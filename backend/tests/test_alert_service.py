@@ -143,6 +143,8 @@ async def test_check_and_trigger_alerts_below_condition(mock_db):
         max_trigger_count=1,
         trigger_count=0,
         triggered_at=None,
+        source="MANUAL",
+        planned_usd=None,
     )
 
     execute_result = MagicMock()
@@ -179,6 +181,8 @@ async def test_check_and_trigger_alerts_above_not_met(mock_db):
         max_trigger_count=1,
         trigger_count=0,
         triggered_at=None,
+        source="MANUAL",
+        planned_usd=None,
     )
 
     execute_result = MagicMock()
@@ -244,6 +248,8 @@ async def test_check_and_trigger_alerts_email_failure_continues(mock_db):
         max_trigger_count=1,
         trigger_count=0,
         triggered_at=None,
+        source="MANUAL",
+        planned_usd=None,
     )
 
     execute_result = MagicMock()
@@ -302,6 +308,8 @@ async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_cache):
         max_trigger_count=1,
         trigger_count=0,
         triggered_at=None,
+        source="MANUAL",
+        planned_usd=None,
     )
 
     execute_result = MagicMock()
@@ -340,6 +348,8 @@ async def test_check_stock_price_alerts_skips_suspect_usd_unit(mock_db, mock_cac
         max_trigger_count=1,
         trigger_count=0,
         triggered_at=None,
+        source="MANUAL",
+        planned_usd=None,
     )
     execute_result = MagicMock()
     execute_result.all.return_value = [(alert, "user@example.com", None, None)]
@@ -401,6 +411,8 @@ async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_cache):
         max_trigger_count=1,
         trigger_count=0,
         triggered_at=None,
+        source="MANUAL",
+        planned_usd=None,
     )
 
     execute_result = MagicMock()
@@ -500,6 +512,8 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_cache):
         max_trigger_count=1,
         trigger_count=0,
         triggered_at=None,
+        source="MANUAL",
+        planned_usd=None,
     )
 
     execute_result = MagicMock()
