@@ -2,7 +2,7 @@ import { ArrowRight, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtUsdPrice } from "@/utils/format";
 import { activeAlertsOnly, mergeAlertsByPortfolio } from "@/utils/portfolio";
 import {
   dcaAccountCashKrw,
@@ -143,8 +143,8 @@ export default function AutoInvestStatusBanner() {
         )}
         {fixed?.usd && (
           <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mt-0.5">
-            해외 몫 ${fixed.usd.required.toLocaleString()} 필요 · 보유 $
-            {fixed.usd.available.toLocaleString()} — 예정일 전에 환전하세요
+            해외 몫 {fmtUsdPrice(fixed.usd.required)} 필요 · 보유 {fmtUsdPrice(fixed.usd.available)}{" "}
+            — 예정일 전에 환전하세요
           </p>
         )}
         {fxWaitingCount > 0 && (

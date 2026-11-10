@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   ChevronDown,
@@ -24,6 +24,8 @@ const SavingsSimulatorCard = lazy(() => import("../components/invest/SavingsSimu
 const FxPlanCard = lazy(() => import("../components/invest/FxPlanCard"));
 /** 환전 계획 카드 앵커 — 백엔드 `action_items_service._LINK_FX_PLAN`·`email_service.fx_plan_link`·푸시 딥링크와 같은 해시 */
 const FX_PLAN_ANCHOR = "fx-plan";
+/** 해시 진입 스크롤을 한 번 더 맞추는 시점 — 지연 로드 차트·배너가 카드 위에서 높이를 바꾸는 시간 */
+const FX_PLAN_SCROLL_SETTLE_MS = 600;
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
 import AutoInvestStatusBanner from "@/components/invest/AutoInvestStatusBanner";
@@ -92,12 +94,20 @@ export default function InvestPlanPage() {
   const { data: settingsData } = useQuery(settingsQuery);
 
   // 환전 계획 알림(메일·푸시·홈 "지금 할 일")의 `#fx-plan`으로 들어오면 접어 둔 카드도 펼치고 스크롤한다(plans/121 C).
-  // 카드는 페이지 데이터를 받은 뒤에야 렌더되므로 로딩이 끝날 때 다시 시도한다
-  const { hash } = useLocation();
-  const fxPlanLinked = hash === `#${FX_PLAN_ANCHOR}` && activeTab === "적립 계획";
-  useEffect(() => {
-    if (fxPlanLinked) setFxPlanOpen(true);
-  }, [fxPlanLinked, setFxPlanOpen]);
+  // 펼침은 이번 진입(location.key)에만 적용하고 저장하지 않는다 — 링크 한 번에 사용자가 접어 둔 선택이 영구히
+  // 바뀌지 않게, 같은 링크를 다시 눌러도(새 key) 다시 펼치게(plans/122 C1·C6)
+  const location = useLocation();
+  const fxPlanLinked = location.hash === `#${FX_PLAN_ANCHOR}` && activeTab === "적립 계획";
+  const [fxPlanDismissedKey, setFxPlanDismissedKey] = useState<string | null>(null);
+  const fxPlanForcedOpen = fxPlanLinked && fxPlanDismissedKey !== location.key;
+  const handleFxPlanToggle = useCallback(() => {
+    if (!fxPlanForcedOpen) {
+      toggleFxPlanOpen();
+      return;
+    }
+    setFxPlanDismissedKey(location.key);
+    if (isFxPlanOpen) setFxPlanOpen(false);
+  }, [fxPlanForcedOpen, isFxPlanOpen, location.key, setFxPlanOpen, toggleFxPlanOpen]);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, activeTab, setActiveTab);
@@ -136,14 +146,20 @@ export default function InvestPlanPage() {
     saveSettings: saveDividendSettings,
   } = useDividendPlanSettings();
 
-  // `#fx-plan`으로 들어왔으면 페이지 로딩이 끝나 카드가 그려진 뒤 그 위치로 스크롤한다
+  // `#fx-plan`으로 들어왔으면 페이지 로딩이 끝나 카드가 그려진 뒤 그 위치로 스크롤한다. 위쪽 배너·차트가
+  // 늦게 그려져 카드를 밀어내므로 잠시 뒤 한 번 더 맞춘다. 같은 링크 재진입(새 key)에도 다시 돈다
+  const linkKey = location.key;
   useEffect(() => {
     if (!fxPlanLinked || isLoading) return;
-    const frame = requestAnimationFrame(() =>
-      document.getElementById(FX_PLAN_ANCHOR)?.scrollIntoView({ block: "start" }),
-    );
-    return () => cancelAnimationFrame(frame);
-  }, [fxPlanLinked, isLoading]);
+    const scroll = () =>
+      document.getElementById(FX_PLAN_ANCHOR)?.scrollIntoView({ block: "start" });
+    const frame = requestAnimationFrame(scroll);
+    const settle = window.setTimeout(scroll, FX_PLAN_SCROLL_SETTLE_MS);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(settle);
+    };
+  }, [fxPlanLinked, isLoading, linkKey]);
 
   const s = data?.settings;
   const isConfigured = data?.is_configured;
@@ -351,8 +367,8 @@ export default function InvestPlanPage() {
                 iconWrapClassName="bg-sky-50 dark:bg-sky-950"
                 iconColorClassName="text-sky-600 dark:text-sky-400"
                 title="달러 환전 계획"
-                isOpen={isFxPlanOpen}
-                onToggle={toggleFxPlanOpen}
+                isOpen={isFxPlanOpen || fxPlanForcedOpen}
+                onToggle={handleFxPlanToggle}
                 collapsedHint="지금 환율이 1년 중 어디쯤인지 보고 해외 적립용 달러를 나눠 환전"
               >
                 <ErrorBoundary variant="section">

@@ -1,4 +1,4 @@
-import { fmtKrwPrice } from "@/utils/format";
+import { fmtKrwPrice, fmtUsdPrice } from "@/utils/format";
 
 interface PriceCellProps {
   krw: number | null | undefined;
@@ -23,7 +23,7 @@ export default function PriceCell({
   if (isOverseas && usd) {
     return (
       <div>
-        <p className={textClass}>${usd.toFixed(2)}</p>
+        <p className={textClass}>{fmtUsdPrice(usd)}</p>
         {(krw ?? 0) > 0 && (
           <p className="text-xs text-gray-400 dark:text-gray-500">{fmtKrwPrice(krw ?? 0)}</p>
         )}

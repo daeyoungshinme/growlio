@@ -218,6 +218,22 @@ describe("InvestPlanPage", () => {
     renderPage("/invest-plan?tab=적립 계획#fx-plan");
     expect(await screen.findByTestId("fx-plan")).toBeInTheDocument();
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    // 링크로 펼친 것은 이번 진입에만 — 사용자가 접어 둔 저장값은 그대로(plans/122 C1)
+    expect(window.localStorage.getItem("growlio:invest:fxPlanOpen")).toBe("false");
+    Element.prototype.scrollIntoView = original;
+    window.localStorage.removeItem("growlio:invest:fxPlanOpen");
+  });
+
+  it("#fx-plan으로 펼친 카드도 접을 수 있고, 접어도 저장값은 바꾸지 않는다", async () => {
+    window.localStorage.setItem("growlio:invest:fxPlanOpen", "false");
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage("/invest-plan?tab=적립 계획#fx-plan");
+    expect(await screen.findByTestId("fx-plan")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("달러 환전 계획"));
+    await waitFor(() => expect(screen.queryByTestId("fx-plan")).toBeNull());
+    expect(window.localStorage.getItem("growlio:invest:fxPlanOpen")).toBe("false");
     Element.prototype.scrollIntoView = original;
     window.localStorage.removeItem("growlio:invest:fxPlanOpen");
   });

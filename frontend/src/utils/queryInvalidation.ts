@@ -227,6 +227,10 @@ export function invalidateRebalancingPlanData(qc: QueryClient, opts: { executed?
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingPlans }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingHistory }),
+    // 환전 대기 leg의 재개·건너뛰기·만료는 홈 "다시 매수" 행과 환전 계획의 "지금" 구간을 바꾼다 — 실행이
+    // 아니어도 함께 갱신한다(plans/122 C4)
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase }),
     ...(opts.executed ? [invalidateSyncData(qc)] : []),
   ]);
 }
