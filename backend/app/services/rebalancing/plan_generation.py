@@ -39,6 +39,10 @@ from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
 
+OPEN_LEG_STATUSES: tuple[str, ...] = ("PENDING", "WAITING_FX")
+"""아직 끝나지 않은 leg 상태 — 환전 대기(WAITING_FX, plans/120)도 곧 매수될 수 있어 대기 중으로 센다
+(중복 플랜 생성 방지·하루 합산 한도)."""
+
 
 @dataclass(frozen=True)
 class TaxGateBlocked:
@@ -174,7 +178,7 @@ async def has_pending_plan_for_alert(alert_id: uuid.UUID, db: AsyncSession) -> b
     result = await db.execute(
         select(RebalancingPlanLeg.id)
         .join(RebalancingPlan, RebalancingPlan.id == RebalancingPlanLeg.plan_id)
-        .where(RebalancingPlan.alert_id == alert_id, RebalancingPlanLeg.status == "PENDING")
+        .where(RebalancingPlan.alert_id == alert_id, RebalancingPlanLeg.status.in_(OPEN_LEG_STATUSES))
         .limit(1)
     )
     return result.first() is not None
@@ -196,7 +200,7 @@ async def sum_today_auto_plan_value_krw(user_id: uuid.UUID, db: AsyncSession) ->
         .where(
             RebalancingPlan.user_id == user_id,
             RebalancingPlan.created_at >= today_start_utc,
-            RebalancingPlanLeg.status.in_(["PENDING", "EXECUTED"]),
+            RebalancingPlanLeg.status.in_([*OPEN_LEG_STATUSES, "EXECUTED"]),
         )
     )
     return float(total or 0)
@@ -214,7 +218,7 @@ async def get_alert_ids_with_pending_plan(alert_ids: list[uuid.UUID], db: AsyncS
     result = await db.execute(
         select(RebalancingPlan.alert_id)
         .join(RebalancingPlanLeg, RebalancingPlanLeg.plan_id == RebalancingPlan.id)
-        .where(RebalancingPlan.alert_id.in_(alert_ids), RebalancingPlanLeg.status == "PENDING")
+        .where(RebalancingPlan.alert_id.in_(alert_ids), RebalancingPlanLeg.status.in_(OPEN_LEG_STATUSES))
         .distinct()
     )
     return {alert_id for alert_id in result.scalars().all() if alert_id is not None}
@@ -265,7 +269,12 @@ async def generate_pending_plan_for_alert(
     반환: (plan, buy_tokens, sell_tokens). 각 tokens는 [(market, raw_token), ...] 형태로
     비어있는 side는 빈 리스트. 실행할 주문이 전혀 없으면 (None, [], []).
     """
-    from app.utils.market_hours import korean_market_close_datetime, us_market_close_datetime
+    from app.utils.market_hours import (
+        is_us_market_open,
+        korean_market_close_datetime,
+        next_us_market_open,
+        us_market_close_datetime,
+    )
 
     strategy = strategy_override or alert.strategy
     order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], alert.order_type)
@@ -299,7 +308,12 @@ async def generate_pending_plan_for_alert(
     for mkt, group in (("KR", buy_kr), ("US", buy_us)):
         if not group:
             continue
-        leg, token = _build_plan_leg(plan, "BUY", mkt, group, buy_deadline)
+        leg_deadline = buy_deadline
+        # 정액 적립(plans/120)은 국내 장중에 만들어도 해외 몫을 미국장 개장까지 기다린다 — 그대로 두면 실행 시점에
+        # 장이 닫혀 있어 곧바로 만료되고 그 달 해외 적립이 통째로 빠진다
+        if mkt == "US" and is_dca_amount_mode(alert) and not is_us_market_open():
+            leg_deadline = next_us_market_open().astimezone(UTC) + timedelta(minutes=buy_wait_minutes)
+        leg, token = _build_plan_leg(plan, "BUY", mkt, group, leg_deadline)
         db.add(leg)
         db.add_all(leg.items)
         buy_tokens.append((mkt, token))
@@ -374,6 +388,52 @@ async def _drifting_items_for_alert(
     # 같은 객체를 참조하므로 여기서 갱신하면 세금영향 미리보기(_build_tax_preview(analysis, ...))에도 반영된다.
     await refresh_live_prices(drifting, alert.user_id, db, cache)
     return analysis, overview, drifting
+
+
+def is_dca_amount_mode(alert: RebalancingAlert) -> bool:
+    """정기 적립 정액 모드(plans/120) — 금액이 있고 스케줄일 매수만 하는 적립식 프리셋일 때."""
+    amount = getattr(alert, "dca_amount_krw", None)
+    if not amount or float(amount) <= 0:
+        return False
+    return alert.trigger_condition == "SCHEDULE_ONLY" and alert.strategy == "BUY_ONLY"
+
+
+async def _dca_items_for_alert(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    db: AsyncSession,
+    buy_account_id: uuid.UUID | None,
+    cache: Any,
+) -> tuple[Any, Any, list] | None:
+    """정액 모드 — 금액을 목표 비중대로 나눈 매수 행. 살 게 없으면 None.
+
+    반환 모양은 `_drifting_items_for_alert`와 같다(analysis, overview, items). items는 분석 행의 사본이라
+    세금 게이트(매수만이라 매도 없음)에 영향을 주지 않는다.
+    """
+    from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
+    from app.services.rebalancing.dca_allocation import allocate_dca_amount, dca_buy_rows
+
+    overview = await load_alert_overview(alert, portfolio, db, cache)
+    analysis = analyze_alert_overview(portfolio, overview)
+    buy_tax_type = _flatten_account_tax_types(analysis.ticker_account_map).get(str(buy_account_id), "GENERAL")
+    rows = dca_buy_rows(analysis.items, buy_tax_type)
+    if not rows:
+        logger.info("dca_plan_no_buy_rows", alert_id=str(alert.id))
+        return None
+    # refresh_live_prices는 시세와 함께 shares_to_trade를 목표금액 기준으로 다시 계산한다 — 분할은 반드시 그 뒤에
+    await refresh_live_prices([item for item, _ in rows], alert.user_id, db, cache)
+    allocation = allocate_dca_amount(rows, float(alert.dca_amount_krw or 0))
+    logger.info(
+        "dca_plan_allocated",
+        alert_id=str(alert.id),
+        amount_krw=float(alert.dca_amount_krw or 0),
+        spent_krw=allocation.spent_krw,
+        items=len(allocation.items),
+        unaffordable=allocation.unaffordable,
+    )
+    if not allocation.items:
+        return None
+    return analysis, overview, allocation.items
 
 
 def _check_tax_gate(alert: RebalancingAlert, analysis: Any, overview: Any) -> TaxGateBlocked | None:
@@ -547,7 +607,10 @@ async def build_pending_plan_for_alert(
         logger.info("rebalancing_plan_blocked_snapshot", alert_id=str(alert.id), reason=type(stale).__name__)
         return stale
 
-    prepared = await _drifting_items_for_alert(alert, portfolio, db, buy_account_id, cache)
+    if is_dca_amount_mode(alert):
+        prepared = await _dca_items_for_alert(alert, portfolio, db, buy_account_id, cache)
+    else:
+        prepared = await _drifting_items_for_alert(alert, portfolio, db, buy_account_id, cache)
     if prepared is None:
         return None
     analysis, overview, drifting = prepared

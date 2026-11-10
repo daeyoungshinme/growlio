@@ -28,7 +28,7 @@ class RebalancingPlanLegSummary(BaseModel):
     account_id: uuid.UUID | None
     account_name: str | None
     side: Literal["BUY", "SELL"]
-    status: Literal["PENDING", "EXECUTED", "CANCELED", "REJECTED", "EXPIRED", "FAILED"]
+    status: Literal["PENDING", "WAITING_FX", "EXECUTED", "CANCELED", "REJECTED", "EXPIRED", "FAILED"]
     deadline_at: datetime
     decided_at: datetime | None
     execution_id: uuid.UUID | None
@@ -36,12 +36,19 @@ class RebalancingPlanLegSummary(BaseModel):
     actionable: bool  # status == PENDING and now < deadline_at
     # 이 leg는 실행되지 않고 끝났는데(FAILED/EXPIRED/REJECTED/CANCELED) 같은 플랜의 다른 leg는 체결된 "반쪽 실행"
     partially_executed: bool = False
+    # 환전 대기(WAITING_FX, plans/120) — 마지막 판정의 필요/보유 달러와 자동 재확인 기한
+    required_usd: float | None = None
+    available_usd: float | None = None
+    fx_retry_until: datetime | None = None
     items: list[RebalancingPlanItemOut]
 
 
 class PlanActionResponse(BaseModel):
     status: str
     message: str
+    # 환전 대기 재매수(STILL_SHORT) 응답에서 최신 필요/보유 달러
+    required_usd: float | None = None
+    available_usd: float | None = None
 
 
 class SellDecisionRequest(BaseModel):

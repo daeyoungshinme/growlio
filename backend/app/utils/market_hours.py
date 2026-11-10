@@ -1,6 +1,6 @@
 """장 중 여부 판단 유틸리티 — KRX/NYSE 정규 거래시간 기준."""
 
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from app.utils.kst import KST as _KST
@@ -49,6 +49,32 @@ def us_market_close_datetime(now: datetime | None = None) -> datetime:
     """
     t = (now or datetime.now(_EST)).astimezone(_EST)
     return t.replace(hour=_NYSE_CLOSE.hour, minute=_NYSE_CLOSE.minute, second=0, microsecond=0)
+
+
+def next_us_market_open(now: datetime | None = None) -> datetime:
+    """다음 NYSE 정규장 개장 시각(09:30 ET, 평일) — 지금 장중이면 오늘 개장 시각이 아니라 다음 거래일 개장.
+
+    `is_us_market_open`처럼 미국 휴장일은 반영하지 않는다(휴장일이면 실행 시점에 장이 닫혀 있어 다음 날로 밀린다).
+    """
+    t = (now or datetime.now(_EST)).astimezone(_EST)
+    candidate = t.replace(hour=_NYSE_OPEN.hour, minute=_NYSE_OPEN.minute, second=0, microsecond=0)
+    if candidate <= t:
+        candidate += timedelta(days=1)
+    while candidate.weekday() >= 5:
+        candidate += timedelta(days=1)
+    return candidate
+
+
+def us_market_close_after_weekdays(weekdays: int, now: datetime | None = None) -> datetime:
+    """ET 기준 오늘부터 평일 `weekdays`일 뒤의 NYSE 정규장 마감 시각 — 환전 대기 자동 재확인 기한 계산용."""
+    t = (now or datetime.now(_EST)).astimezone(_EST)
+    day = t
+    remaining = weekdays
+    while remaining > 0:
+        day += timedelta(days=1)
+        if day.weekday() < 5:
+            remaining -= 1
+    return day.replace(hour=_NYSE_CLOSE.hour, minute=_NYSE_CLOSE.minute, second=0, microsecond=0)
 
 
 def is_alert_execution_time(alert_time_str: str | None, now: datetime | None = None) -> bool:

@@ -27,6 +27,7 @@ EXPECTED_JOB_IDS = {
     "challenge_deposit_reminder",
     "challenge_monthly_wrap",
     "dca_cash_shortfall_check",
+    "dca_fx_wait_retry",
     "cache_sweep",
     "app_state_sweep",
     "kosdaq_tickers_refresh",

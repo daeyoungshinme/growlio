@@ -42,13 +42,15 @@ def _tactical(
 
 def _shortfall(days_until=2, expected=1_000_000.0, cash=300_000.0):
     return SimpleNamespace(
-        alert=SimpleNamespace(id=uuid.uuid4()),
+        alert=SimpleNamespace(id=uuid.uuid4(), dca_amount_krw=None),
         portfolio=SimpleNamespace(id=uuid.uuid4(), name="적립식"),
         account=SimpleNamespace(name="키움"),
         run_date=date(2026, 11, 25),
         days_until=days_until,
         cash_krw=cash,
         expected_krw=expected,
+        required_usd=None,
+        available_usd=None,
     )
 
 
@@ -78,7 +80,15 @@ def _tax_summary(**warnings):
 
 
 async def _run(
-    *, drift=None, dca=None, tax=None, challenge=None, tactical=None, linked=frozenset(), today=date(2026, 11, 23)
+    *,
+    drift=None,
+    dca=None,
+    tax=None,
+    challenge=None,
+    tactical=None,
+    linked=frozenset(),
+    today=date(2026, 11, 23),
+    fx_waiting=None,
 ):
     db = MagicMock()
     db.rollback = AsyncMock()
@@ -87,6 +97,7 @@ async def _run(
         patch.object(svc, "_dca_tactical_linked_portfolio_ids", new=AsyncMock(return_value=set(linked))),
         patch.object(svc, "get_drift_summaries", new=drift or AsyncMock(return_value=[])),
         patch.object(svc, "find_dca_cash_shortfalls", new=dca or AsyncMock(return_value=[])),
+        patch.object(svc, "_fx_waiting_items", new=fx_waiting or AsyncMock(return_value=[])),
         patch.object(
             svc,
             "get_tax_action_plan_with_summary",

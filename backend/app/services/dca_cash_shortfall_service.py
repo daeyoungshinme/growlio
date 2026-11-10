@@ -5,6 +5,8 @@
   해외 종목이 있으면 `deposit_usd`를 환율로 환산해 더한다.
 - 기준 금액: `UserSettings.monthly_deposit_amount`. 미설정이면 "사실상 비어 있음"(`_MIN_CASH_KRW` 미만)일 때만
   부족으로 본다.
+- 정액 모드(알림에 `dca_amount_krw`, plans/120): 알림마다 그 금액을 국내/해외 몫으로 나눠 원화 예수금과 **달러 예수금을
+  따로** 비교한다 — 해외 몫은 환전한 달러로만 사므로 원화가 넉넉해도 달러가 없으면 부족(환전 필요)이다.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, TAX_DEFERRED_TAX_TYPES
+from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, TAX_DEFERRED_TAX_TYPES, is_non_tradable
 from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
@@ -78,6 +80,32 @@ def account_cash_krw(account: AssetAccount, portfolio: Portfolio, usd_krw: float
     return cash
 
 
+def fixed_amount_needs(
+    amount_krw: float, account: AssetAccount, portfolio: Portfolio, usd_krw: float | None
+) -> tuple[float, float, bool]:
+    """정액 적립 금액의 (원화 필요액, 달러 필요액, 해외 몫 존재). 달러 필요액은 실환율이 없으면 0으로 둔다(판정 보류).
+
+    과세이연 계좌의 해외 종목은 살 수 없어 다른 종목에 재배분되므로(`dca_allocation`) 몫에서 뺀다.
+    """
+    tax_type = getattr(account, "tax_type", None)
+    kr_weight = us_weight = 0.0
+    for item in portfolio.items:
+        weight = float(item.weight or 0)
+        market = buy_market(item, tax_type)
+        if weight <= 0 or market == CASH_EQUIVALENT_MARKET or is_non_tradable(item.ticker, market):
+            continue
+        if (market or "").upper() in DOMESTIC_MARKETS:
+            kr_weight += weight
+        elif tax_type not in TAX_DEFERRED_TAX_TYPES:
+            us_weight += weight
+    total = kr_weight + us_weight
+    if total <= 0:
+        return 0.0, 0.0, False
+    krw_needed = amount_krw * kr_weight / total
+    usd_needed = amount_krw * us_weight / total / usd_krw if us_weight > 0 and usd_krw else 0.0
+    return krw_needed, usd_needed, us_weight > 0
+
+
 def _cash_is_unknown(account: AssetAccount, portfolio: Portfolio, usd_krw: float | None) -> bool:
     """예수금을 모르는 경우 — 동기화 전이거나 달러로 사야 하는데 실환율이 없다. 모르는 것을 부족으로 단정하지 않는다."""
     if account.deposit_krw is None and not account.deposit_usd:
@@ -105,6 +133,55 @@ class DcaShortfall:
     days_until: int
     cash_krw: float
     expected_krw: float | None
+    # 정액 모드에서 달러가 모자랄 때만 채운다(plans/120) — 원화 몫 부족과 별개로 "환전 필요"를 안내한다
+    required_usd: float | None = None
+    available_usd: float | None = None
+
+
+def shortfall_detail(sf: DcaShortfall) -> str:
+    """알림·홈 할 일에 쓰는 부족 설명 한 줄."""
+    parts: list[str] = []
+    if sf.expected_krw and sf.cash_krw < sf.expected_krw:
+        label = "적립 금액" if getattr(sf.alert, "dca_amount_krw", None) else "월 적립액"
+        parts.append(f"예수금 {sf.cash_krw:,.0f}원 — {label}보다 {sf.expected_krw - sf.cash_krw:,.0f}원 부족")
+    if sf.required_usd is not None:
+        parts.append(f"달러 ${sf.available_usd or 0:,.2f} — 해외 몫 ${sf.required_usd:,.2f} 환전 필요")
+    if not parts:
+        parts.append(f"예수금 {sf.cash_krw:,.0f}원 — 매수할 예수금이 거의 없어요")
+    return " · ".join(parts)
+
+
+def _fixed_amount_shortfall(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    account: AssetAccount,
+    user: User,
+    settings_row: UserSettings | None,
+    run_date: date,
+    today: date,
+    usd_krw: float | None,
+) -> DcaShortfall | None:
+    """정액 모드 1건 판정 — 원화 예수금 vs 국내 몫, 달러 예수금 vs 해외 몫. 둘 다 충분하면 None."""
+    krw_needed, usd_needed, has_us = fixed_amount_needs(float(alert.dca_amount_krw or 0), account, portfolio, usd_krw)
+    cash_krw = float(account.deposit_krw or 0)
+    deposit_usd = float(account.deposit_usd or 0)
+    krw_short = krw_needed > 0 and cash_krw < krw_needed
+    usd_short = has_us and usd_needed > 0 and deposit_usd + 1e-6 < usd_needed
+    if not (krw_short or usd_short):
+        return None
+    return DcaShortfall(
+        alert,
+        portfolio,
+        account,
+        user,
+        settings_row,
+        run_date,
+        (run_date - today).days,
+        cash_krw,
+        round(krw_needed, 0) if krw_short else None,
+        required_usd=round(usd_needed, 2) if usd_short else None,
+        available_usd=round(deposit_usd, 2) if usd_short else None,
+    )
 
 
 async def find_dca_cash_shortfalls(
@@ -143,15 +220,25 @@ async def find_dca_cash_shortfalls(
     usd_krw: float | None = None
     usd_checked = False
     by_user: dict[uuid.UUID, list[DcaShortfall]] = {}
+    fixed: list[DcaShortfall] = []
     for alert, portfolio, account, user, settings_row in rows:
         try:
             run_date = _upcoming_run_date(alert, today)
             if run_date is None:
                 continue
-            if account.deposit_usd and not usd_checked:
+            is_fixed = bool(getattr(alert, "dca_amount_krw", None))
+            if (account.deposit_usd or (is_fixed and _buys_overseas(account, portfolio))) and not usd_checked:
                 # 판정에 쓰는 값이라 고정 fallback을 쓰지 않는다 — 1300이면 달러 예수금이 적게 잡혀 거짓 알림이 간다
                 usd_krw = await fetch_usd_krw(cache, allow_fallback=False)
                 usd_checked = True
+            if is_fixed:
+                # 정액은 알림마다 금액이 있어 사용자 합산 판정(월 적립액)과 섞지 않는다
+                if account.deposit_krw is None and account.deposit_usd is None:
+                    continue
+                sf = _fixed_amount_shortfall(alert, portfolio, account, user, settings_row, run_date, today, usd_krw)
+                if sf is not None and (notice_window is None or notice_window[0] <= sf.days_until <= notice_window[1]):
+                    fixed.append(sf)
+                continue
             if _cash_is_unknown(account, portfolio, usd_krw):
                 continue
             expected_raw = settings_row.monthly_deposit_amount if settings_row else None
@@ -171,7 +258,7 @@ async def find_dca_cash_shortfalls(
         except Exception as e:
             report_handled_failure("dca_cash_shortfall_evaluate_failed", e, alert_id=str(alert.id))
 
-    shortfalls: list[DcaShortfall] = []
+    shortfalls: list[DcaShortfall] = list(fixed)
     for evaluated in by_user.values():
         shortfalls.extend(_shortfalls_for_user(evaluated, notice_window))
     return shortfalls

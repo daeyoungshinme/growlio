@@ -34,7 +34,9 @@ from app.services.rebalancing.plan_execution import (
     fail_stuck_consumed_legs,
     get_plan_leg_by_token,
     is_leg_past_deadline,
+    recheck_fx_waiting_legs,
     reject_sell_leg,
+    retry_fx_waiting_leg,
 )
 from app.services.rebalancing.plan_generation import (
     DailyValueCapBlocked,
@@ -57,6 +59,7 @@ from app.services.rebalancing.plan_notifications import (
     notify_stale_snapshot_blocked,
     notify_tax_gate_blocked,
 )
+from app.utils.numbers import opt_float
 
 __all__ = [
     "DailyValueCapBlocked",
@@ -86,7 +89,9 @@ __all__ = [
     "notify_market_signal_gate_blocked",
     "notify_plan_generated",
     "notify_tax_gate_blocked",
+    "recheck_fx_waiting_legs",
     "reject_sell_leg",
+    "retry_fx_waiting_leg",
     "sum_today_auto_plan_value_krw",
 ]
 
@@ -118,6 +123,9 @@ def build_leg_summary(
         # 실행이 시작된(토큰 소비) leg는 취소·승인 요청이 거부되므로 버튼을 보이지 않는다(plans/117 B6)
         actionable=(leg.status == "PENDING" and leg.token_consumed_at is None and not is_leg_past_deadline(leg)),
         partially_executed=sibling_executed and leg.status in _TERMINAL_UNEXECUTED_STATUSES,
+        required_usd=opt_float(getattr(leg, "required_usd", None)),
+        available_usd=opt_float(getattr(leg, "available_usd", None)),
+        fx_retry_until=getattr(leg, "fx_retry_until", None),
         items=[RebalancingPlanItemOut.model_validate(item) for item in leg.items],
     )
 

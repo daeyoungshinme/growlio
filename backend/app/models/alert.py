@@ -94,6 +94,9 @@ class RebalancingAlert(_AlertMixin, Base):
     # max_tax_impact_krw를 초과할 때 AUTO 플랜 생성을 건너뛴다. market_condition_mode와 대칭 설계.
     tax_impact_gate_mode: Mapped[str] = mapped_column(String(10), nullable=False, server_default="DISABLED")
     max_tax_impact_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    # 정기 적립식 정액 모드(plans/120) — 값이 있으면 스케줄일에 이 금액(원)만 목표 비중대로 나눠 매수한다.
+    # 예수금이 더 많아도 이 금액까지만. None이면 기존 동작(예수금 전체로 목표 비중 채우기).
+    dca_amount_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

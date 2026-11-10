@@ -22,6 +22,7 @@ from app.services.rebalancing.plan_service import (
     executed_plan_ids,
     list_recent_plan_legs,
     reject_sell_leg,
+    retry_fx_waiting_leg,
 )
 
 router = APIRouter(prefix="/rebalancing/plans", tags=["rebalancing-plans"])
@@ -100,3 +101,36 @@ async def approve_plan_leg(
     if execution_id is None and leg.status != "EXECUTED":
         return PlanActionResponse(status="FAILED", message=f"{label} 주문 실행에 실패했습니다")
     return PlanActionResponse(status="EXECUTED", message=leg_executed_message(label, execution_id))
+
+
+@router.post("/{plan_id}/legs/{leg_id}/retry-fx", response_model=PlanActionResponse)
+@limiter.limit("5/minute")
+async def retry_fx_plan_leg(
+    request: Request,
+    plan_id: uuid.UUID,
+    leg_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """환전 대기 중인 적립 해외 매수를 다시 시도한다 — 달러가 충분하면 바로 매수(장 마감이면 다음 개장에 예약)."""
+    from app.core.cache_store import get_cache_store
+
+    leg = await _get_owned_leg(plan_id, leg_id, current_user.id, db)
+    cache = await get_cache_store()
+    outcome, execution_id, latest = await retry_fx_waiting_leg(leg, db, cache, decided_by="USER_APP")
+    if outcome == "STILL_SHORT":
+        required = float(latest.required_usd or 0)
+        available = float(latest.available_usd or 0)
+        return PlanActionResponse(
+            status="STILL_SHORT",
+            message=(
+                f"달러가 아직 부족합니다 (필요 ${required:,.2f}, 보유 ${available:,.2f}). 환전 후 다시 시도해주세요."
+            ),
+            required_usd=required,
+            available_usd=available,
+        )
+    if outcome == "SCHEDULED":
+        return PlanActionResponse(status="SCHEDULED", message="달러가 확인됐습니다. 미국장이 열리면 매수합니다.")
+    if outcome == "FAILED":
+        return PlanActionResponse(status="FAILED", message="매수 주문 실행에 실패했습니다")
+    return PlanActionResponse(status="EXECUTED", message=leg_executed_message("매수", execution_id))

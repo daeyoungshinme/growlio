@@ -66,7 +66,9 @@ class RebalancingPlanLeg(Base):
     # KR | US — leg에 속한 주문의 시장(leg는 항상 단일 시장으로 균질). 매수 실행/매도 만료 job이
     # item을 로드하지 않고도 어느 시장 개장 시각을 기준으로 게이팅할지 판단하는 데 쓰인다.
     market: Mapped[str] = mapped_column(String(10), nullable=False, server_default="KR")
-    # PENDING | EXECUTED | CANCELED | REJECTED | EXPIRED | FAILED
+    # PENDING | WAITING_FX | EXECUTED | CANCELED | REJECTED | EXPIRED | FAILED
+    # WAITING_FX(plans/120): 정액 적립 해외 매수 leg가 달러 예수금 부족으로 환전을 기다리는 중 —
+    # 사용자 '다시 매수' 또는 자동 재확인 잡이 달러가 충분해지면 PENDING으로 되돌린다.
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
     # BUY: 자동 실행 예정 시각. SELL: 승인 만료(당일 장마감) 시각.
     deadline_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -80,6 +82,10 @@ class RebalancingPlanLeg(Base):
         UUID(as_uuid=True), ForeignKey("rebalancing_executions.id", ondelete="SET NULL"), nullable=True
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # WAITING_FX 전용 — 자동 재확인 기한과 마지막 판정 시점의 필요/보유 달러(안내·화면 표시용)
+    fx_retry_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    required_usd: Mapped[float | None] = mapped_column(Numeric(18, 4), nullable=True)
+    available_usd: Mapped[float | None] = mapped_column(Numeric(18, 4), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # DB 컬럼이 아닌 transient 속성 — 이메일 발송용 원문 토큰을 leg 생성 직후 잠깐 실어 나르는

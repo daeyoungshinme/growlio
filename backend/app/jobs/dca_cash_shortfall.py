@@ -26,7 +26,11 @@ from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
-from app.services.dca_cash_shortfall_service import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls
+from app.services.dca_cash_shortfall_service import (
+    NOTICE_WINDOW_DAYS,
+    find_dca_cash_shortfalls,
+    shortfall_detail,
+)
 from app.services.notifications.email_service import send_dca_cash_shortfall_email
 from app.utils.cache_keys import CacheStoreType
 from app.utils.durable_state import get_durable, set_durable
@@ -69,6 +73,8 @@ async def _run_dca_cash_shortfall_check(db: AsyncSession, cache: CacheStoreType)
                     sf.cash_krw,
                     sf.expected_krw,
                     key,
+                    detail=shortfall_detail(sf),
+                    needs_fx=sf.required_usd is not None,
                 )
         except Exception as e:
             report_job_failure("dca_cash_shortfall_check_alert_failed", e, alert_id=str(sf.alert.id))
@@ -85,14 +91,13 @@ async def _notify(
     cash_krw: float,
     expected_krw: float | None,
     key: str,
+    *,
+    detail: str,
+    needs_fx: bool = False,
 ) -> None:
     label = run_date_label(run_date)
     synced_label = account.last_synced_at.astimezone(KST).strftime("%m/%d %H:%M") if account.last_synced_at else None
     to_email = (settings_row.notification_email if settings_row else None) or user.email
-    if expected_krw:
-        detail = f"예수금 {cash_krw:,.0f}원 — 월 적립액보다 {expected_krw - cash_krw:,.0f}원 부족"
-    else:
-        detail = f"예수금 {cash_krw:,.0f}원 — 매수할 예수금이 거의 없어요"
 
     sent = await dispatch_dual_channel_alert(
         db,
@@ -103,7 +108,7 @@ async def _notify(
         send_email=lambda: send_dca_cash_shortfall_email(
             to_email, portfolio.name, account.name, label, cash_krw, expected_krw, synced_label
         ),
-        push_title="자동매수 전 예수금을 채워주세요",
+        push_title="자동매수 전 달러를 환전해주세요" if needs_fx else "자동매수 전 예수금을 채워주세요",
         push_body=f"{label} {portfolio.name} 자동매수 · {detail}",
         push_type="DCA_CASH_SHORTFALL",
         fcm_token=settings_row.fcm_token if settings_row else None,
