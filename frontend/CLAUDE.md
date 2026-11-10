@@ -237,7 +237,7 @@ _기타_
 - `marketSignalRows.ts` — 매크로 8지표 행 변환(Tier 분류는 백엔드 `market_signal_service` 재사용)
 - `dcaScenarioProjection.ts` — 백엔드 `dca_service._build_projection_curve()` 포팅
 - `legacyTabRedirect.ts` — 이메일·푸시에 저장된 옛 딥링크 호환 — **지우지 말 것**
-- 그 외: `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `riskLevel`, `dividendUtils`(`weightBarColor` — 비중 막대 색 인라인 금지), `savingsProjection`, `goalFeasibility`, `dcaAutoBuy`, `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
+- 그 외: `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `riskLevel`, `dividendUtils`(`weightBarColor` — 비중 막대 색 인라인 금지), `savingsProjection`, `goalFeasibility`, `dcaAutoBuy`(정액 분할·사전 부족 판정은 백엔드 `dca_allocation`·`dca_cash_shortfall_service`와 같은 규칙 — 함께 맞출 것), `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
 
 **마켓 (`constants/markets.ts`)** — 인라인 문자열 비교 금지.
 
