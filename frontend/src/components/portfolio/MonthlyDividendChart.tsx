@@ -52,13 +52,7 @@ function MonthlyDividendChart({
           >
             <XAxis dataKey="name" tick={chartTickStyle(isDark)} axisLine={false} tickLine={false} />
             <YAxis
-              tickFormatter={(v: number) =>
-                v >= 1e8
-                  ? `${(v / 1e8).toFixed(1)}억`
-                  : v >= 1e4
-                    ? `${Math.round(v / 1e4)}만`
-                    : `${v}`
-              }
+              tickFormatter={(v: number) => fmtKrwShort(v)}
               tick={chartTickStyle(isDark)}
               axisLine={false}
               tickLine={false}

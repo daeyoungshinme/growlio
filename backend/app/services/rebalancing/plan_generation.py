@@ -391,11 +391,17 @@ async def _drifting_items_for_alert(
 
 
 def is_dca_amount_mode(alert: RebalancingAlert) -> bool:
-    """정기 적립 정액 모드(plans/120) — 금액이 있고 스케줄일 매수만 하는 적립식 프리셋일 때."""
+    """정기 적립 정액 모드(plans/120) — 금액이 있고 적립식 자동매수 프리셋(월간·스케줄일·AUTO·매수만)일 때.
+
+    판정을 프리셋 전체로 맞춘다 — 스키마 검증·사전 부족 판정(`_fixed_dca_alerts`)과 어긋나면 옛 행에서
+    한쪽만 정액으로 다룬다(plans/122 B6).
+    """
+    from app.services.dca_cash_shortfall_service import DCA_AUTO_BUY_PRESET
+
     amount = getattr(alert, "dca_amount_krw", None)
     if not amount or float(amount) <= 0:
         return False
-    return alert.trigger_condition == "SCHEDULE_ONLY" and alert.strategy == "BUY_ONLY"
+    return all(getattr(alert, field, None) == value for field, value in DCA_AUTO_BUY_PRESET.items())
 
 
 async def _dca_items_for_alert(

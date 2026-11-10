@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.api_helpers import make_mock_db, make_user, setup_app
@@ -181,6 +182,34 @@ class TestExchangeRateAlertExtended:
         assert resp.status_code == 200
         assert alert_orm.is_active is True
         assert alert_orm.trigger_count == 0
+
+    @pytest.mark.parametrize(("source", "cleared"), [("FX_PLAN", True), ("MANUAL", False)])
+    def test_reactivate_fx_plan_alert_clears_triggered_at(self, override_settings, source, cleared):
+        """발동한 계획 알림을 다시 켜면 미발동 계획 알림으로 — 계획 맞추기가 관리할 수 있게(plans/122 C7)."""
+        user = make_user()
+        db = make_mock_db()
+        fired = datetime.now(UTC)
+        alert_orm = SimpleNamespace(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            target_rate=1300.0,
+            direction="BELOW",
+            is_active=False,
+            max_trigger_count=1,
+            trigger_count=1,
+            triggered_at=fired,
+            created_at=datetime.now(UTC),
+            source=source,
+            planned_usd=100.0,
+            portfolio_id=uuid.uuid4(),
+        )
+        db.scalar = AsyncMock(return_value=alert_orm)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.patch(f"/api/v1/alerts/exchange-rate/{alert_orm.id}/reactivate")
+        assert resp.status_code == 200
+        assert (alert_orm.triggered_at is None) is cleared
 
     def test_delete_exchange_rate_alert_success(self, override_settings):
         user = make_user()

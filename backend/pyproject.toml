@@ -59,6 +59,8 @@ dependencies = [
     "pandas>=2.0.0,<3.0.0",
     # XML 파서 (DART API — XXE/XML bomb 방어)
     "defusedxml>=0.7.1,<1.0.0",
+    # KRX·NYSE 휴장일 — 장 개장 판정(market_hours). python-dateutil<3을 요구해 dateutil은 2.9에 묶인다(plans/122 A1)
+    "holidays>=0.60,<1.0",
 ]
 
 [project.optional-dependencies]

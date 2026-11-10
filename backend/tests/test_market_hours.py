@@ -162,3 +162,34 @@ class TestIsAlertExecutionTime:
 
         now = datetime(2024, 1, _MON, 10, 0, tzinfo=_KST)
         assert is_alert_execution_time("", now) is False
+
+
+class TestExchangeHolidays:
+    """plans/122 A1 — 평일 휴장일을 장중으로 보면 닫힌 거래소로 발주돼 FAILED가 된다."""
+
+    def test_us_closed_on_thanksgiving(self):
+        from app.utils.market_hours import is_us_market_open
+
+        assert is_us_market_open(datetime(2026, 11, 26, 11, 0, tzinfo=_EST)) is False
+        assert is_us_market_open(datetime(2026, 11, 27, 11, 0, tzinfo=_EST)) is True
+
+    def test_next_us_open_skips_thanksgiving(self):
+        from app.utils.market_hours import next_us_market_open
+
+        nxt = next_us_market_open(datetime(2026, 11, 25, 17, 0, tzinfo=_EST))
+        assert (nxt.date(), nxt.hour, nxt.minute) == (datetime(2026, 11, 27).date(), 9, 30)
+
+    def test_fx_wait_deadline_counts_trading_days_only(self):
+        from app.utils.market_hours import us_market_close_after_weekdays
+
+        # 수(11-25)부터 거래일 5일: 금 27·월 30·화 12-1·수 2·목 3 (추수감사절 26일 제외)
+        deadline = us_market_close_after_weekdays(5, datetime(2026, 11, 25, 12, 0, tzinfo=_EST))
+        assert deadline.date() == datetime(2026, 12, 3).date()
+        assert (deadline.hour, deadline.minute) == (16, 0)
+
+    def test_krx_closed_on_chuseok_and_year_end(self):
+        from app.utils.market_hours import is_korean_market_open
+
+        assert is_korean_market_open(datetime(2026, 9, 25, 10, 0, tzinfo=_KST)) is False
+        assert is_korean_market_open(datetime(2026, 12, 31, 10, 0, tzinfo=_KST)) is False
+        assert is_korean_market_open(datetime(2026, 9, 28, 10, 0, tzinfo=_KST)) is True

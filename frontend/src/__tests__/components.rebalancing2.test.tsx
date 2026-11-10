@@ -760,6 +760,10 @@ describe("RebalancingHistoryTab", () => {
     expect(screen.queryByText("지금 매수 실행")).toBeNull();
 
     fireEvent.click(screen.getByText("환전했어요, 다시 매수"));
+    // 미국장 중이면 바로 실거래 주문이 나간다 — 확인을 거친다(plans/122 C5)
+    expect(mockRetryFxPlanLeg).not.toHaveBeenCalled();
+    const confirmButtons = await screen.findAllByRole("button", { name: "다시 매수" });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
     await waitFor(() => expect(mockRetryFxPlanLeg).toHaveBeenCalledWith("plan-1", "leg-fx"));
   });
 

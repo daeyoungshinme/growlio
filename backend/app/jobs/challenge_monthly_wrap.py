@@ -26,7 +26,7 @@ from app.services import challenge_service
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
 from app.services.notifications.email_service import send_challenge_wrap_email
 from app.utils.cache_keys import CacheStoreType
-from app.utils.durable_state import get_durable, set_durable
+from app.utils.durable_state import claim_durable, delete_durable, get_durable, set_durable
 from app.utils.kst import kst_day_start, today_kst
 from app.utils.kst import month_label as _month_label
 
@@ -112,7 +112,9 @@ async def _wrap_user(user: User, settings_row: UserSettings, to_email: str, cach
 
 async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month: str) -> None:
     key = _wrap_dedup_key(challenge.id, prev_month)
-    if await get_durable(db, key, commit=False) is not None:
+    # 확인 후 발송은 catch-up 잡과 본 잡이 겹치면 둘 다 보낸다 — 먼저 선점한다. 같은 키의 미커밋 INSERT는
+    # 상대 트랜잭션이 끝날 때까지 기다리므로 savepoint 안 선점이 락 역할을 한다(plans/122 A4)
+    if not await claim_durable(db, key, ttl=_DEDUP_TTL, commit=False):
         return
 
     progress = await challenge_service.compute_progress(challenge, user.id, db)
@@ -164,8 +166,9 @@ async def _wrap_one(db, user, settings_row, challenge, to_email: str, prev_month
         push_type="CHALLENGE_WRAPUP",
         fcm_token=settings_row.fcm_token,
         commit=False,
-        after_sent=lambda: set_durable(db, key, "1", ttl=_DEDUP_TTL, commit=False),
     )
+    if not sent:
+        await delete_durable(db, key, commit=False)  # 채널 없음·발송 실패 — 다음 실행이 다시 시도하게 선점을 푼다
     # 완료 전환은 알림 결과와 무관하게 저장한다 — 알림 채널이 하나도 없는 사용자(FCM 토큰 없음·메일 미설정)도
     # 달성이 기록돼야 하고, RETURN_PCT는 다음 달 수익률이 내려가면 달성 자체가 사라진다(plans/118 A1).
     # 알림 재시도는 위 조회가 "이번 달 완료 + dedup 키 없음"으로 처리한다.

@@ -12,7 +12,9 @@ from sqlalchemy import case, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.constants import FX_PLAN_ALERT_SOURCE
 from app.exceptions import BadRequestError, NotFoundError
+from app.models.alert import ExchangeRateAlert
 from app.models.asset import AssetAccount
 from app.models.portfolio import (
     GROUP_ROLE_DOMESTIC_ALT,
@@ -198,6 +200,14 @@ async def delete_portfolio(db: AsyncSession, user_id: uuid.UUID, portfolio_id: u
 
     # 삭제되면 알림은 CASCADE, 플랜 FK는 SET NULL이라 대기 매수만 게이트 없이 살아남는다
     await cancel_pending_buy_legs(db, portfolio_id=portfolio_id)
+    # 환전 계획 알림도 FK가 SET NULL이라 계획 없이 계속 발동한다 — 계획과 함께 지운다(plans/122 B5)
+    await db.execute(
+        delete(ExchangeRateAlert).where(
+            ExchangeRateAlert.user_id == user_id,
+            ExchangeRateAlert.portfolio_id == portfolio_id,
+            ExchangeRateAlert.source == FX_PLAN_ALERT_SOURCE,
+        )
+    )
     await db.delete(portfolio)
     await db.commit()
 

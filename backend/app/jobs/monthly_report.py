@@ -17,11 +17,14 @@ from app.services.dividend.aggregator import get_annual_dividends_received
 from app.services.notifications.email_service import email_configured, send_monthly_report_email
 from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_net_deposits_for_year
 from app.utils.cache_keys import TTL_MONTHLY_REPORT_SENT, CacheStoreType, monthly_report_sent_key
-from app.utils.durable_state import get_durable, set_durable
+from app.utils.durable_state import claim_durable, delete_durable, set_durable
 from app.utils.kst import today_kst
 from app.utils.masking import mask_email
 
 logger = structlog.get_logger()
+
+_SENDING_CLAIM_TTL = 30 * 60
+"""발송 중 선점 TTL — 리포트 생성·발송이 이보다 오래 걸리지 않는다. 발송 성공 시 전체 TTL로 덮어쓴다."""
 
 _MONTHLY_REPORT_CONCURRENCY = 3
 
@@ -110,10 +113,42 @@ async def _send_report_for_user(
 
     dedup_key = monthly_report_sent_key(user.id, month_key)
     async with AsyncSessionLocal() as db:
-        # 재시작·misfire로 같은 달 잡이 다시 돌아도 한 번만 보낸다
-        if await get_durable(db, dedup_key) is not None:
+        # 재시작·misfire·catch-up 잡과 겹쳐도 한 번만 보낸다 — 확인 후 발송이 아니라 먼저 선점한다(plans/122 A4).
+        # 선점은 짧게 잡는다: 발송 중 프로세스가 죽어도 그달 리포트가 영영 막히지 않게(발송 후 전체 TTL로 연장)
+        if not await claim_durable(db, dedup_key, ttl=_SENDING_CLAIM_TTL):
             logger.info("monthly_report_skipped_already_sent", user_id=str(user.id), month=month_key)
             return
+    try:
+        sent = await _build_and_send(user, to_email, report_month, month_key, cache)
+    except BaseException:
+        await _release_claim(dedup_key)
+        raise
+    if not sent:
+        await _release_claim(dedup_key)
+        return
+
+    # 이메일 발송 성공 후 인앱 AlertHistory 저장
+    async with AsyncSessionLocal() as db:
+        db.add(
+            AlertHistory(
+                user_id=user.id,
+                alert_type="MONTHLY_REPORT",
+                message=f"{report_month} 월간 포트폴리오 리포트가 발송되었습니다.",
+            )
+        )
+        await set_durable(db, dedup_key, "1", ttl=TTL_MONTHLY_REPORT_SENT, commit=False)
+        await db.commit()
+
+    logger.info("monthly_report_sent", user_id=str(user.id), to=mask_email(to_email), month=report_month)
+
+
+async def _release_claim(dedup_key: str) -> None:
+    async with AsyncSessionLocal() as db:
+        await delete_durable(db, dedup_key)
+
+
+async def _build_and_send(user, to_email: str, report_month: str, month_key: str, cache: CacheStoreType) -> bool:
+    async with AsyncSessionLocal() as db:
         summary = await get_dashboard_summary(user.id, db, cache)
         year_figures = await _report_year_figures(user.id, db, summary, int(month_key[:4]))
 
@@ -135,24 +170,4 @@ async def _send_report_for_user(
         annual_dividends_received=year_figures["annual_dividends_received"],
         asset_allocation=summary.get("asset_allocation") or [],
     )
-    if not sent:
-        return
-
-    # 이메일 발송 성공 후 인앱 AlertHistory 저장
-    async with AsyncSessionLocal() as db:
-        db.add(
-            AlertHistory(
-                user_id=user.id,
-                alert_type="MONTHLY_REPORT",
-                message=f"{report_month} 월간 포트폴리오 리포트가 발송되었습니다.",
-            )
-        )
-        await set_durable(db, dedup_key, "1", ttl=TTL_MONTHLY_REPORT_SENT, commit=False)
-        await db.commit()
-
-    logger.info(
-        "monthly_report_sent",
-        user_id=str(user.id),
-        to=mask_email(to_email),
-        month=report_month,
-    )
+    return sent

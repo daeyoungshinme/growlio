@@ -42,8 +42,13 @@ const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
 
 /** 목표 환율 비교 키(센트 단위 정수) — 백엔드 `fx_plan_service._rate_key`와 같은 규칙 */
 const rateKey = (rate: number) => Math.round(Number(rate) * 100);
-/** 계획 금액이 이만큼(달러) 넘게 달라지면 알림을 다시 맞춰야 한다고 본다 */
-const PLANNED_USD_TOLERANCE = 1;
+/**
+ * 계획 금액이 이 비율(최소 1달러) 넘게 달라지면 알림을 다시 맞춰야 한다고 본다. 구간 금액은 실시간 환율·보유
+ * 달러로 매번 다시 계산돼 몇 달러씩 흔들린다 — 절대 1달러면 5분 재조회마다 "바꾸기"로 돌아갔다(plans/122 C3)
+ */
+const PLANNED_USD_TOLERANCE_RATIO = 0.05;
+const usdMatches = (registered: number, planned: number) =>
+  Math.abs(registered - planned) <= Math.max(1, planned * PLANNED_USD_TOLERANCE_RATIO);
 
 /**
  * 계획 구간과 등록된 환율 알림 비교(plans/121).
@@ -75,7 +80,7 @@ function planAlertState(alerts: ExchangeRateAlert[] | undefined, data: FxPlanDat
       const key = rateKey(t.target_rate);
       if (manualRates.has(key)) return true;
       const usd = planUsdByRate.get(key);
-      return usd != null && Math.abs(Number(usd) - t.usd) < PLANNED_USD_TOLERANCE;
+      return usd != null && usdMatches(Number(usd), t.usd);
     });
   return {
     targets,
@@ -90,8 +95,16 @@ function syncToastMessage(
   result: { created: number; updated: number; removed: number; skipped_manual: number },
   targetCount: number,
 ): string {
-  if (targetCount === 0) return `환전 계획 알림 ${result.removed}건을 해제했습니다`;
-  const parts = [`목표 환율 알림 ${result.created + result.updated}건을 맞췄습니다`];
+  if (targetCount === 0) {
+    return result.removed > 0
+      ? `환전 계획 알림 ${result.removed}건을 해제했습니다`
+      : "해제할 환전 계획 알림이 없습니다";
+  }
+  const synced = result.created + result.updated;
+  const parts =
+    synced > 0
+      ? [`목표 환율 알림 ${synced}건을 맞췄습니다`]
+      : ["계획 목표에 직접 등록한 알림이 이미 있어 새로 만들지 않았습니다"];
   if (result.removed > 0) parts.push(`옛 목표 ${result.removed}건 해제`);
   if (result.skipped_manual > 0) parts.push(`직접 등록한 알림 ${result.skipped_manual}건은 그대로`);
   return parts.join(" · ");
@@ -192,6 +205,18 @@ export default function FxPlanCard({ onEditGoal }: Props) {
     },
   });
 
+  // 계획 구간이 없어진 상태(달러 충분·월 적립액 없음·해외 종목 없음)에도 옛 계획 알림은 남아 다시 발동한다 —
+  // 어느 상태에서든 지울 수 있게 한다(plans/122 C2)
+  const releaseButton = plan.planAlertCount > 0 && data?.portfolio_id && (
+    <button
+      onClick={() => syncMutation.mutate([])}
+      disabled={syncMutation.isPending}
+      className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 disabled:opacity-50`}
+    >
+      이 계획으로 등록한 알림 {plan.planAlertCount}건 해제
+    </button>
+  );
+
   if (isLoading) return <SkeletonCard rows={4} height="h-5" />;
   if (isError || !data) {
     return (
@@ -249,11 +274,14 @@ export default function FxPlanCard({ onEditGoal }: Props) {
           해외 종목이 들어 있는 포트폴리오가 없어 환전 계획을 세우지 않았습니다.
         </p>
       ) : data.status === "NO_OVERSEAS" ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {data.portfolio_options.length > 0
-            ? "선택한 포트폴리오에 해외 종목이 없습니다. 다른 포트폴리오를 골라 주세요."
-            : "해외 종목이 들어 있는 포트폴리오가 없어 환전 계획을 세우지 않았습니다."}
-        </p>
+        <div className="space-y-2">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {data.portfolio_options.length > 0
+              ? "선택한 포트폴리오에 해외 종목이 없습니다. 다른 포트폴리오를 골라 주세요."
+              : "해외 종목이 들어 있는 포트폴리오가 없어 환전 계획을 세우지 않았습니다."}
+          </p>
+          {releaseButton}
+        </div>
       ) : data.status === "NO_RATE" ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           환율을 불러오지 못해 필요한 달러를 계산하지 않았습니다. 잠시 후 다시 시도해 주세요.
@@ -269,6 +297,7 @@ export default function FxPlanCard({ onEditGoal }: Props) {
               월 적립액 설정
             </button>
           )}
+          {releaseButton}
         </div>
       ) : (
         <div className="space-y-4 border-t border-gray-100 dark:border-gray-800 pt-4">
@@ -322,15 +351,7 @@ export default function FxPlanCard({ onEditGoal }: Props) {
               <p className="text-sm text-emerald-700 dark:text-emerald-300">
                 이미 보유한 달러로 {data.months}개월치 해외 적립이 가능합니다.
               </p>
-              {plan.planAlertCount > 0 && (
-                <button
-                  onClick={() => syncMutation.mutate([])}
-                  disabled={syncMutation.isPending}
-                  className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 disabled:opacity-50`}
-                >
-                  이 계획으로 등록한 알림 {plan.planAlertCount}건 해제
-                </button>
-              )}
+              {releaseButton}
             </div>
           ) : (
             <>
@@ -368,7 +389,8 @@ export default function FxPlanCard({ onEditGoal }: Props) {
                 {data.months}개월 안에 목표 환율에 닿지 않으면 남은 금액은 적립일에 환전하세요.
                 환전은 증권사 앱에서 직접 진행합니다.
               </p>
-              {plan.targets.length > 0 && (
+              {/* 목표 구간이 없어도(1년 시세 실패·환전 대기가 전액 등) 옛 계획 알림은 지울 수 있어야 한다(plans/122 C2) */}
+              {(plan.targets.length > 0 || plan.planAlertCount > 0) && (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <button
                     onClick={() => syncMutation.mutate(plan.targets)}
@@ -381,9 +403,11 @@ export default function FxPlanCard({ onEditGoal }: Props) {
                         ? "등록 중…"
                         : plan.inSync
                           ? "목표 환율 알림 등록됨"
-                          : plan.planAlertCount > 0
-                            ? "알림을 새 계획으로 바꾸기"
-                            : "목표 환율 알림 등록"}
+                          : plan.targets.length === 0
+                            ? `이 계획으로 등록한 알림 ${plan.planAlertCount}건 해제`
+                            : plan.planAlertCount > 0
+                              ? "알림을 새 계획으로 바꾸기"
+                              : "목표 환율 알림 등록"}
                   </button>
                   {/* 등록한 알림의 수정·삭제는 설정 › 알림 설정 › 환율 알림에서 (계획 106 C2) */}
                   {(plan.planAlertCount > 0 || plan.manualRates.size > 0) && (

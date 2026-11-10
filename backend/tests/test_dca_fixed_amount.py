@@ -303,12 +303,23 @@ class TestUsdBuyingPower:
         assert short.available_usd == 50.0
         assert short.required_usd > 300.0
 
-        for available in (500.0, None):
+        for available, expected in ((500.0, None), (None, ubp.USD_UNKNOWN)):
             with (
                 patch.object(svc_exec, "_rebuild_orders_from_items", new=AsyncMock(return_value=[order])),
                 patch.object(ubp, "fetch_usd_buying_power", new=AsyncMock(return_value=available)),
             ):
-                assert await ubp.check_usd_shortfall([], uuid.uuid4(), uuid.uuid4(), mock_db, None) is None
+                assert await ubp.check_usd_shortfall([], uuid.uuid4(), uuid.uuid4(), mock_db, None) is expected
+
+    @pytest.mark.asyncio
+    async def test_check_unknown_when_price_or_limit_missing(self, mock_db):
+        """시세 실패·지정가 없음은 "충분"이 아니라 미확인이다(plans/122 A2)."""
+        from app.services.rebalancing import usd_buying_power as ubp
+
+        with patch.object(svc_exec, "_rebuild_orders_from_items", new=AsyncMock(side_effect=ValueError("no price"))):
+            assert await ubp.check_usd_shortfall([], uuid.uuid4(), uuid.uuid4(), mock_db, None) is ubp.USD_UNKNOWN
+        no_limit = SimpleNamespace(market="NASDAQ", quantity=1, limit_price=None)
+        with patch.object(svc_exec, "_rebuild_orders_from_items", new=AsyncMock(return_value=[no_limit])):
+            assert await ubp.check_usd_shortfall([], uuid.uuid4(), uuid.uuid4(), mock_db, None) is ubp.USD_UNKNOWN
 
     @pytest.mark.asyncio
     async def test_fetch_returns_none_on_error(self, mock_db):
@@ -435,6 +446,74 @@ class TestRunDueBuyLegFx:
         assert leg.token_consumed_at is not None
 
     @pytest.mark.asyncio
+    async def test_reentering_wait_does_not_notify_again(self, mock_db):
+        """재개 → 또 부족이면 상태만 대기로 — 환전 안내 메일·푸시를 반복하지 않는다(plans/122 B1)."""
+        from app.services.rebalancing.usd_buying_power import UsdShortfall
+
+        alert = _dca_alert()
+        first_until = datetime.now(tz=UTC) + timedelta(days=2)
+        leg = _us_leg(fx_retry_until=first_until)
+        _wire_db(mock_db, leg, _plan(alert), alert)
+        notify = AsyncMock()
+        with (
+            patch("app.utils.market_hours.is_us_market_open", return_value=True),
+            patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(return_value=UsdShortfall(350.0, 12.0))),
+            patch("app.services.rebalancing.plan_notifications.notify_dca_fx_required", new=notify),
+        ):
+            await svc_exec.execute_due_buy_legs(mock_db, MagicMock())
+        assert leg.status == "WAITING_FX"
+        assert leg.fx_retry_until == first_until
+        notify.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_short_after_wait_deadline_expires_instead_of_waiting(self, mock_db):
+        from app.services.rebalancing.usd_buying_power import UsdShortfall
+
+        alert = _dca_alert()
+        leg = _us_leg(fx_retry_until=datetime.now(tz=UTC) - timedelta(minutes=5))
+        _wire_db(mock_db, leg, _plan(alert), alert)
+        required = AsyncMock()
+        with (
+            patch("app.utils.market_hours.is_us_market_open", return_value=True),
+            patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(return_value=UsdShortfall(350.0, 12.0))),
+            patch("app.services.rebalancing.plan_notifications.notify_dca_fx_required", new=required),
+            patch("app.services.rebalancing.plan_notifications.notify_dca_fx_wait_expired", new=AsyncMock()),
+        ):
+            await svc_exec.execute_due_buy_legs(mock_db, MagicMock())
+        assert leg.status == "EXPIRED"
+        required.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_resumed_leg_returns_to_waiting_when_market_closed(self, mock_db):
+        """재개된 leg가 장 밖(서버 슬립·장마감 경계)에 돌면 만료가 아니라 대기로 돌아간다(plans/122 A3)."""
+        alert = _dca_alert()
+        leg = _us_leg(fx_retry_until=datetime.now(tz=UTC) + timedelta(days=2))
+        _wire_db(mock_db, leg, _plan(alert), alert)
+        expired = AsyncMock()
+        with (
+            patch("app.utils.market_hours.is_us_market_open", return_value=False),
+            patch.object(svc_exec, "_notify_buy_leg_expired", new=expired),
+            patch.object(svc_exec, "_execute_leg", new=AsyncMock()) as execute,
+        ):
+            await svc_exec.execute_due_buy_legs(mock_db, MagicMock())
+        assert leg.status == "WAITING_FX"
+        assert leg.decided_at is None
+        execute.assert_not_awaited()
+        expired.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_plain_leg_still_expires_when_market_closed(self, mock_db):
+        alert = _dca_alert()
+        leg = _us_leg()
+        _wire_db(mock_db, leg, _plan(alert), alert)
+        with (
+            patch("app.utils.market_hours.is_us_market_open", return_value=False),
+            patch.object(svc_exec, "_notify_buy_leg_expired", new=AsyncMock()),
+        ):
+            await svc_exec.execute_due_buy_legs(mock_db, MagicMock())
+        assert leg.status == "EXPIRED"
+
+    @pytest.mark.asyncio
     async def test_non_dca_alert_skips_usd_check(self, mock_db):
         alert = _dca_alert(dca_amount_krw=None)
         leg = _us_leg()
@@ -488,6 +567,8 @@ class TestRetryFxWaitingLeg:
         execution_id = uuid.uuid4()
 
         async def _approve(locked, *_args, **_kwargs):
+            # 재개와 선점 사이에 commit하면 락이 풀려 1분 잡이 끼어든다(plans/122 B3)
+            assert mock_db.commit.await_count == 0
             locked.status = "EXECUTED"
             return execution_id
 
@@ -558,6 +639,21 @@ class TestRecheckFxWaitingLegs:
         assert leg.status == "EXPIRED"
         assert leg.error_message == svc_exec.FX_WAIT_EXPIRED_MESSAGE
         notify.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_unknown_usd_stays_waiting(self, mock_db):
+        """잔고 조회 실패를 "충분"으로 보고 재개하면 달러 없이 발주된다 — 대기를 유지한다(plans/122 A2)."""
+        from app.services.rebalancing.usd_buying_power import USD_UNKNOWN
+
+        alert = _dca_alert()
+        leg = _us_leg(status="WAITING_FX", fx_retry_until=datetime.now(tz=UTC) + timedelta(days=2))
+        _wire_db(mock_db, leg, _plan(alert), alert)
+        with (
+            patch("app.utils.market_hours.is_us_market_open", return_value=True),
+            patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(return_value=USD_UNKNOWN)),
+        ):
+            assert await svc_exec.recheck_fx_waiting_legs(mock_db, None) == 0
+        assert leg.status == "WAITING_FX"
 
     @pytest.mark.asyncio
     async def test_still_short_stays_waiting(self, mock_db):

@@ -177,6 +177,40 @@ describe("FxPlanCard", () => {
     expect(await screen.findByRole("button", { name: "알림을 새 계획으로 바꾸기" })).toBeEnabled();
   });
 
+  it("실시간 재계산으로 몇 달러 흔들린 것은 맞춰진 상태로 본다(plans/122 C3)", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([
+      planAlert(1380, 570),
+      planAlert(1360, 552),
+    ]);
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByRole("button", { name: "목표 환율 알림 등록됨" })).toBeDisabled();
+    expect(screen.queryByText(/새 목표로 교체됩니다/)).toBeNull();
+  });
+
+  it("목표 구간이 없어져도 옛 계획 알림을 해제할 수 있다(plans/122 C2)", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      position: null,
+      tranches: [{ label: "지금", target_rate: null, usd: 1700, krw_estimate: 2_380_000 }],
+    });
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([planAlert(1380)]);
+    renderWithProviders(<FxPlanCard />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "이 계획으로 등록한 알림 1건 해제" }),
+    );
+    await waitFor(() => expect(syncFxPlanAlerts).toHaveBeenCalledWith("p1", []));
+  });
+
+  it("월 적립액이 없어져도 옛 계획 알림을 해제할 수 있다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, status: "NO_DEPOSIT_GOAL", tranches: [] });
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([planAlert(1380)]);
+    renderWithProviders(<FxPlanCard onEditGoal={vi.fn()} />);
+    expect(
+      await screen.findByRole("button", { name: "이 계획으로 등록한 알림 1건 해제" }),
+    ).toBeEnabled();
+  });
+
   it("다른 포트폴리오·발동된 계획 알림은 이 계획의 등록으로 보지 않는다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
     vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([

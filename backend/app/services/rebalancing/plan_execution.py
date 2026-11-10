@@ -27,6 +27,7 @@ from app.services.rebalancing.plan_notifications import (
     _notify_leg_execution_failed,
     _send_leg_execution_email,
 )
+from app.services.rebalancing.usd_buying_power import USD_UNKNOWN, UsdCheck, UsdShortfall, UsdUnknown
 from app.utils.numbers import opt_float
 
 logger = structlog.get_logger()
@@ -335,7 +336,18 @@ async def approve_sell_leg(leg: RebalancingPlanLeg, db: AsyncSession, cache, dec
 
 
 async def approve_buy_leg(leg: RebalancingPlanLeg, db: AsyncSession, cache, decided_by: str) -> uuid.UUID | None:
-    """대기중인 매수 leg를 앱에서 즉시 실행한다 — 대기시간(buy_wait_minutes) 경과를 기다리지 않고 바로 체결."""
+    """대기중인 매수 leg를 앱에서 즉시 실행한다 — 대기시간(buy_wait_minutes) 경과를 기다리지 않고 바로 체결.
+
+    그 시장이 닫혀 있으면 거부한다 — 닫힌 장에 낸 지정가는 증권사가 거부해 leg가 FAILED로 끝나고, 개장 시
+    자동 매수될 기회까지 잃는다(정액 적립 해외 leg는 다음 미국장 개장까지 하루 종일 승인 버튼이 보인다, plans/122 B2).
+    """
+    from app.utils.market_hours import is_korean_market_open, is_us_market_open
+
+    if leg.side == "BUY":
+        if leg.market == "US" and not is_us_market_open():
+            raise ConflictError(detail="미국장이 닫혀 있어 지금 매수할 수 없습니다. 개장하면 예정대로 매수합니다")
+        if leg.market == "KR" and not is_korean_market_open():
+            raise ConflictError(detail="국내장이 닫혀 있어 지금 매수할 수 없습니다")
     return await _approve_leg_now(leg, db, cache, decided_by, expected_side="BUY")
 
 
@@ -389,6 +401,12 @@ async def _run_due_buy_leg(
         return False
 
     market_open = is_korean_market_open() if locked.market == "KR" else is_us_market_open()
+    if not market_open and locked.fx_retry_until is not None and not _fx_wait_past_deadline(locked):
+        # 환전 대기에서 재개된 leg — 서버 슬립·장마감 경계·시장 게이트로 장 안에 못 샀어도 기한이 남았으면
+        # 만료하지 않고 대기로 되돌린다. 다음 미국장 재확인(30분 잡)이 다시 재개한다(plans/122 A3)
+        locked.status = "WAITING_FX"
+        await db.commit()
+        return True
     if not market_open:
         _decide_leg(locked, "EXPIRED", "SYSTEM_AUTO", at=now)
         locked.error_message = "market_closed_before_execution"
@@ -425,7 +443,11 @@ async def _run_due_buy_leg(
         if relocked is None or relocked.status != "PENDING" or relocked.token_consumed_at is not None:
             return False
         locked = relocked
-        if shortfall is not None:
+        if isinstance(shortfall, UsdShortfall):
+            if _fx_wait_past_deadline(locked):
+                # 대기 기한이 지난 뒤 예약 매수가 돌아왔는데 또 부족 — 지난 기한을 알리지 말고 마감한다
+                await _expire_fx_waiting_leg(locked, plan, db)
+                return True
             await _enter_fx_wait(locked, plan, shortfall, db)
             return True
 
@@ -452,31 +474,36 @@ def _needs_usd_check(leg: RebalancingPlanLeg, alert) -> bool:
     return leg.side == "BUY" and leg.market == "US" and _alert_is_dca(alert)
 
 
-async def _usd_shortfall_for_leg(leg: RebalancingPlanLeg, plan: RebalancingPlan, db: AsyncSession, cache):
-    """leg 매수에 달러가 모자라면 UsdShortfall, 충분하거나 확인 불가면 None."""
+async def _usd_shortfall_for_leg(leg: RebalancingPlanLeg, plan: RebalancingPlan, db: AsyncSession, cache) -> UsdCheck:
+    """leg 매수에 달러가 모자라면 UsdShortfall, 확인 불가면 USD_UNKNOWN, 충분하면 None."""
     from app.services.rebalancing.usd_buying_power import check_usd_shortfall
 
     if plan.account_id is None:
-        return None
+        return USD_UNKNOWN
     await db.refresh(leg, attribute_names=["items"])
     return await check_usd_shortfall(list(leg.items), plan.account_id, plan.user_id, db, cache)
 
 
-async def _enter_fx_wait(locked: RebalancingPlanLeg, plan: RebalancingPlan, shortfall, db: AsyncSession) -> None:
-    """잠긴 PENDING 매수 leg를 환전 대기로 바꾸고 메일·푸시로 알린다."""
+async def _enter_fx_wait(
+    locked: RebalancingPlanLeg, plan: RebalancingPlan, shortfall: UsdShortfall, db: AsyncSession
+) -> None:
+    """잠긴 PENDING 매수 leg를 환전 대기로 바꾸고, 처음 대기에 들어갈 때만 메일·푸시로 알린다."""
     from app.services.rebalancing.plan_notifications import notify_dca_fx_required
     from app.utils.market_hours import us_market_close_after_weekdays
 
+    first_wait = locked.fx_retry_until is None
     locked.status = "WAITING_FX"
     locked.required_usd = shortfall.required_usd
     locked.available_usd = shortfall.available_usd
     # 재시도로 다시 PENDING이 됐다가 또 부족하면 처음 기한을 유지한다 — 기한이 계속 밀리면 영영 안 끝난다
-    if locked.fx_retry_until is None:
+    if first_wait:
         locked.fx_retry_until = us_market_close_after_weekdays(FX_WAIT_WEEKDAYS).astimezone(UTC)
+        await save_alert_history(db, plan.user_id, "REBALANCING", "적립 해외 매수 대기 — 달러 환전 필요")
     retry_until = locked.fx_retry_until
-    await save_alert_history(db, plan.user_id, "REBALANCING", "적립 해외 매수 대기 — 달러 환전 필요")
     await db.commit()
-    await notify_dca_fx_required(plan, shortfall.required_usd, shortfall.available_usd, retry_until, db)
+    # 재개 → 또 부족은 30분마다 반복될 수 있다 — 이미 받은 환전 안내를 다시 보내지 않는다(plans/122 B1)
+    if first_wait and retry_until is not None:
+        await notify_dca_fx_required(plan, shortfall.required_usd, shortfall.available_usd, retry_until, db)
 
 
 def _fx_wait_past_deadline(leg: RebalancingPlanLeg) -> bool:
@@ -535,7 +562,8 @@ async def retry_fx_waiting_leg(
         await _expire_fx_waiting_leg(locked, plan, db)
         raise ConflictError(detail="환전 대기 기한이 지나 이번 회차 해외 매수는 마감되었습니다")
 
-    if shortfall is not None:
+    # 미확인(USD_UNKNOWN)이면 사용자가 환전했다고 누른 것이라 그대로 진행한다 — 증권사가 최종 판정
+    if isinstance(shortfall, UsdShortfall):
         locked.required_usd = shortfall.required_usd
         locked.available_usd = shortfall.available_usd
         await db.commit()
@@ -548,7 +576,9 @@ async def retry_fx_waiting_leg(
         return "SCHEDULED", None, locked
 
     _resume_fx_waiting_leg(locked, datetime.now(tz=UTC))
-    await db.commit()
+    # commit하면 락이 풀려 1분 매수 잡이 먼저 선점하고 사용자는 "이미 처리" 409를 받는다 — flush만 하고
+    # 같은 트랜잭션의 락을 쥔 채 바로 선점한다(plans/122 B3)
+    await db.flush()
     execution_id = await _approve_leg_now(locked, db, cache, decided_by, expected_side="BUY")
     outcome: FxRetryOutcome = "EXECUTED" if locked.status == "EXECUTED" else "FAILED"
     return outcome, execution_id, locked
@@ -580,7 +610,7 @@ async def recheck_fx_waiting_legs(db: AsyncSession, cache) -> int:
             plan = await db.get(RebalancingPlan, leg.plan_id)
             if not _fx_wait_past_deadline(leg) and (not market_open or plan is None):
                 continue
-            shortfall = None
+            shortfall: UsdCheck = None
             if not _fx_wait_past_deadline(leg) and plan is not None:
                 alert = await db.get(RebalancingAlert, plan.alert_id) if plan.alert_id else None
                 # 알림이 정액 모드가 아니게 바뀌었으면 확인 없이 되돌린다 — 실행 경로가 기존 방식(증권사 판정)으로 처리
@@ -597,7 +627,11 @@ async def recheck_fx_waiting_legs(db: AsyncSession, cache) -> int:
             if plan is None:
                 await db.rollback()
                 continue
-            if shortfall is not None:
+            if isinstance(shortfall, UsdUnknown):
+                # 조회 실패를 "충분"으로 보고 재개하면 달러 없이 발주돼 FAILED로 끝난다 — 다음 주기에 다시 본다
+                await db.rollback()
+                continue
+            if isinstance(shortfall, UsdShortfall):
                 locked.required_usd = shortfall.required_usd
                 locked.available_usd = shortfall.available_usd
                 await db.commit()

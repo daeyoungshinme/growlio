@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 from app.models.alert import ExchangeRateAlert, RebalancingAlert, StockPriceAlert
 from app.utils.kst import KST as _KST
 from app.utils.kst import today_kst
+from app.utils.market_hours import is_krx_trading_day
 
 _MULTI_TRIGGER_COOLDOWN = timedelta(hours=1)
 
@@ -29,9 +30,9 @@ def _same_day(d: date) -> date:
     return d
 
 
-def _roll_to_weekday(d: date) -> date:
-    """주말이면 다음 월요일로 미룬다(공휴일은 캘린더가 없어 고려하지 않음)."""
-    while d.weekday() >= 5:
+def _roll_to_trading_day(d: date) -> date:
+    """주말·KRX 휴장일이면 다음 KRX 거래일로 미룬다 — AUTO 잡은 장이 닫힌 날에 돌지 않는다(plans/122 A1)."""
+    while not is_krx_trading_day(d):
         d += timedelta(days=1)
     return d
 
@@ -76,10 +77,10 @@ def _is_schedule_day(alert: RebalancingAlert, today: date, *, roll: Callable[[da
 def is_auto_schedule_day(alert: RebalancingAlert, today: date | None = None) -> bool:
     """AUTO 모드 전용 스케줄일 판정.
 
-    `should_fire_today`와 규칙은 같되, AUTO 잡은 장이 열린 평일에만 돌기 때문에 지정일이 주말이면 다음
-    평일로 미룬다 — 그대로 두면 "매월 25일"이 토요일인 달은 실행이 통째로 누락된다.
+    `should_fire_today`와 규칙은 같되, AUTO 잡은 장이 열린 거래일에만 돌기 때문에 지정일이 주말·KRX 휴장일이면
+    다음 거래일로 미룬다 — 그대로 두면 "매월 25일"이 토요일·추석인 달은 실행이 통째로 누락된다.
     """
-    return _is_schedule_day(alert, today or today_kst(), roll=_roll_to_weekday)
+    return _is_schedule_day(alert, today or today_kst(), roll=_roll_to_trading_day)
 
 
 def next_auto_schedule_date(alert: RebalancingAlert, today: date | None = None, horizon_days: int = 400) -> date | None:

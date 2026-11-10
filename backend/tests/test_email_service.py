@@ -808,3 +808,22 @@ def test_retryable_email_error_network():
     assert _is_retryable_email_error(httpx.ConnectError("down")) is True
     assert _is_retryable_email_error(httpx.ReadTimeout("slow")) is True
     assert _is_retryable_email_error(ValueError("bug")) is False
+
+
+def test_plan_buy_section_shows_date_when_not_today():
+    """다음 미국장 개장으로 미뤄진 매수는 날짜까지 보여야 오늘 밤으로 오해하지 않는다(plans/122 B6)."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.services.notifications.email_templates.rebalancing import _render_plan_buy_section
+    from app.utils.kst import KST, today_kst
+
+    def section(at):
+        return {"market": "US", "deadline_at": at, "items": [], "link": "https://x"}
+
+    tomorrow = datetime.combine(today_kst() + timedelta(days=1), datetime.min.time(), tzinfo=KST).replace(
+        hour=0, minute=30
+    )
+    html = _render_plan_buy_section(section(tomorrow.astimezone(UTC)), "", "")
+    assert f"{tomorrow.month}월 {tomorrow.day}일 00:30 KST" in html
+    now = datetime.now(KST).replace(second=0, microsecond=0)
+    assert f"<strong>{now:%H:%M} KST</strong>" in _render_plan_buy_section(section(now), "", "")

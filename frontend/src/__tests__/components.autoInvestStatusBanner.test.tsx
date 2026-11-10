@@ -184,7 +184,7 @@ describe("AutoInvestStatusBanner 조회 실패 (plans/110 D3)", () => {
     );
 
     expect(await screen.findByText(/매월 25일 60만원 자동매수 중/)).toBeInTheDocument();
-    expect(await screen.findByText(/해외 몫 \$200 필요/)).toBeInTheDocument();
+    expect(await screen.findByText(/해외 몫 \$200\.00 필요/)).toBeInTheDocument();
     expect(screen.queryByText(/월 적립액보다/)).toBeNull();
   });
 

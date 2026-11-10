@@ -19,7 +19,7 @@ from app.services.notifications.email_templates._shared import (
     _name_ticker_cell,
     _notice_banner,
 )
-from app.utils.kst import KST
+from app.utils.kst import KST, today_kst
 
 
 def _to_kst(dt: datetime) -> datetime:
@@ -274,7 +274,11 @@ _PLAN_MARKET_LABEL = {"KR": "국내", "US": "미국"}
 
 def _render_plan_buy_section(section: dict, account_note: str, btn_style: str) -> str:
     market_label = _PLAN_MARKET_LABEL.get(section["market"], section["market"])
-    buy_time_str = _to_kst(section["deadline_at"]).strftime("%H:%M")
+    buy_at = _to_kst(section["deadline_at"])
+    # 해외 정액 적립은 다음 미국장 개장(KST 자정 넘어 다음 날일 수 있다)으로 미뤄진다 — 날짜가 다르면 날짜도 쓴다
+    buy_time_str = f"{buy_at:%H:%M}"
+    if buy_at.date() != today_kst():
+        buy_time_str = f"{buy_at.month}월 {buy_at.day}일 {buy_time_str}"
     return (
         f"<div style='margin-top:20px;padding:16px;background:#eff6ff;border-radius:8px;'>"
         f"<h3 style='margin:0;color:#1d4ed8;font-size:15px;'>매수 주문 ({market_label}){account_note}</h3>"
