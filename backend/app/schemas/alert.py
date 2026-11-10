@@ -53,6 +53,9 @@ class ExchangeRateAlertResponse(BaseModel):
     trigger_count: int
     triggered_at: datetime | None
     created_at: datetime
+    source: Literal["MANUAL", "FX_PLAN"] = "MANUAL"
+    planned_usd: float | None = None
+    portfolio_id: uuid.UUID | None = None
 
 
 class StockPriceAlertCreate(BaseModel):

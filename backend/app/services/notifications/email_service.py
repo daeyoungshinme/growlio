@@ -112,6 +112,13 @@ async def _send_templated(
         return False
 
 
+def fx_plan_link() -> str:
+    """앱 계획 › 적립 계획 링크(환전 계획 카드가 있는 탭). 탭 이름은 frontend `constants/tabs.ts`의
+    INVEST_PLAN_TABS와 같아야 한다. 메일 href라 공백·한글을 인코딩한다(`_rebalancing_link`와 같은 방식).
+    `#fx-plan`은 카드를 펼치고 스크롤하는 해시(프론트 InvestPlanPage `FX_PLAN_ANCHOR`)."""
+    return f"{settings.frontend_url}/invest-plan?{urlencode({'tab': '적립 계획'})}#fx-plan"
+
+
 def _rebalancing_link(tab: str, **params: str) -> str:
     """앱 리밸런싱 페이지 링크. 탭 이름은 frontend `utils/rebalancingUrl.ts`의 REBALANCING_TABS와 같아야 한다."""
     return f"{settings.frontend_url}/rebalancing?{urlencode({'rtab': tab, **params})}"
@@ -122,11 +129,16 @@ async def send_exchange_rate_alert(
     target_rate: float,
     direction: str,
     current_rate: float,
+    planned_usd: float | None = None,
 ) -> bool:
-    """목표환율 도달 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
+    """목표환율 도달 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환.
+
+    `planned_usd`가 있으면 환전 계획 구간 알림으로 금액·계획 화면 링크를 싣는다(plans/121).
+    """
+    plan_link = fx_plan_link() if planned_usd is not None else None
     return await _send_templated(
         to_email,
-        lambda: exchange_rate_alert_template(target_rate, direction, current_rate),
+        lambda: exchange_rate_alert_template(target_rate, direction, current_rate, planned_usd, plan_link),
         event="exchange_rate_alert",
         target_rate=target_rate,
         current_rate=current_rate,
