@@ -36,6 +36,7 @@ export type ActionItemKind =
   | "REBALANCE"
   | "DCA_SHORTFALL"
   | "DCA_FX_WAITING"
+  | "FX_PLAN"
   | "TAX_WARNING"
   | "TAX_ACTION"
   | "CHALLENGE"

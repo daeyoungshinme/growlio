@@ -10,7 +10,14 @@ export interface ExchangeRateAlert {
   trigger_count: number;
   triggered_at: string | null;
   created_at: string;
+  /** 출처(plans/121) — FX_PLAN = 달러 환전 계획 구간. 옛 persist 캐시엔 없을 수 있어 생략은 MANUAL로 본다 */
+  source?: "MANUAL" | "FX_PLAN";
+  /** FX_PLAN 구간 환전 금액(달러) */
+  planned_usd?: number | null;
+  portfolio_id?: string | null;
 }
+
+export const isFxPlanAlert = (alert: ExchangeRateAlert) => alert.source === "FX_PLAN";
 
 export const fetchExchangeRateAlerts = () => apiGet<ExchangeRateAlert[]>("/alerts/exchange-rate");
 

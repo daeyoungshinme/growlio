@@ -209,6 +209,28 @@ describe("InvestPlanPage", () => {
     expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
   });
 
+  it("#fx-plan으로 들어오면 접어 둔 환전 계획 카드를 펼치고 스크롤한다(plans/121 C)", async () => {
+    window.localStorage.setItem("growlio:invest:fxPlanOpen", "false");
+    const scrollIntoView = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage("/invest-plan?tab=적립 계획#fx-plan");
+    expect(await screen.findByTestId("fx-plan")).toBeInTheDocument();
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    Element.prototype.scrollIntoView = original;
+    window.localStorage.removeItem("growlio:invest:fxPlanOpen");
+  });
+
+  it("해시 없이 들어오면 접어 둔 환전 계획 카드는 접힌 채로 둔다", async () => {
+    window.localStorage.setItem("growlio:invest:fxPlanOpen", "false");
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage("/invest-plan?tab=적립 계획");
+    expect(await screen.findByText("달러 환전 계획")).toBeInTheDocument();
+    expect(screen.queryByTestId("fx-plan")).toBeNull();
+    window.localStorage.removeItem("growlio:invest:fxPlanOpen");
+  });
+
   it("renders main page when data is configured", async () => {
     vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
     renderPage();

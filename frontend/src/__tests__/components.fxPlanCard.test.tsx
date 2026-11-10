@@ -9,16 +9,16 @@ const renderWithProviders = (ui: ReactNode) => renderBase(<MemoryRouter>{ui}</Me
 import type { FxPlanData } from "@/api/invest";
 import type { ExchangeRateAlert } from "@/api/alerts";
 
-vi.mock("@/api/invest", () => ({ fetchFxPlan: vi.fn() }));
-vi.mock("@/api/alerts", () => ({
+vi.mock("@/api/invest", () => ({ fetchFxPlan: vi.fn(), syncFxPlanAlerts: vi.fn() }));
+vi.mock("@/api/alerts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/alerts")>()),
   fetchExchangeRateAlerts: vi.fn(),
-  createExchangeRateAlert: vi.fn(),
 }));
 vi.mock("@/utils/queryInvalidation", () => ({ invalidateAlertData: vi.fn() }));
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
 
-import { fetchFxPlan } from "@/api/invest";
-import { createExchangeRateAlert, fetchExchangeRateAlerts } from "@/api/alerts";
+import { fetchFxPlan, syncFxPlanAlerts } from "@/api/invest";
+import { fetchExchangeRateAlerts } from "@/api/alerts";
 import { toast } from "@/utils/toast";
 import FxPlanCard from "@/components/invest/FxPlanCard";
 
@@ -69,11 +69,20 @@ const alert = (target_rate: number, over: Partial<ExchangeRateAlert> = {}): Exch
   ...over,
 });
 
+/** 이 계획(p1)으로 만든 구간 알림 */
+const planAlert = (target_rate: number, planned_usd = 561, over: Partial<ExchangeRateAlert> = {}) =>
+  alert(target_rate, { source: "FX_PLAN", planned_usd, portfolio_id: "p1", ...over });
+
 describe("FxPlanCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([]);
-    vi.mocked(createExchangeRateAlert).mockResolvedValue(alert(0));
+    vi.mocked(syncFxPlanAlerts).mockResolvedValue({
+      created: 2,
+      updated: 0,
+      removed: 0,
+      skipped_manual: 0,
+    });
   });
 
   it("위치·필요 달러·구간을 보여준다", async () => {
@@ -86,6 +95,40 @@ describe("FxPlanCard", () => {
     expect(fetchFxPlan).toHaveBeenCalledWith(3, null);
   });
 
+  it("정액 적립이면 적립 금액의 해외 몫 기준임을 보여준다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      deposit_source: "DCA_AMOUNT",
+      monthly_deposit_krw: 1_000_000,
+      held_usd_is_live: true,
+    });
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByText(/정액 적립 월 100만원의 해외 몫/)).toBeInTheDocument();
+    expect(screen.getByText(/\(실시간\)/)).toBeInTheDocument();
+  });
+
+  it("실시간 달러를 못 읽었으면 동기화 기준임을 보여준다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, held_usd_is_live: false });
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByText(/\(동기화 기준\)/)).toBeInTheDocument();
+    expect(screen.getByText(/해외 비중 60%/)).toBeInTheDocument();
+  });
+
+  it("환전 대기 중인 매수가 있으면 지금 환전할 금액과 이력 링크를 보여준다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, waiting_fx_usd: 350 });
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByText(/\$350를 지금/)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "대기 중인 매수 보기" });
+    expect(decodeURIComponent(link.getAttribute("href") ?? "")).toContain("rtab=이력");
+  });
+
+  it("환전 대기가 없으면 안내를 보이지 않는다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    renderWithProviders(<FxPlanCard />);
+    await screen.findByText(/\$1,700 필요/);
+    expect(screen.queryByRole("link", { name: "대기 중인 매수 보기" })).toBeNull();
+  });
+
   it("기간을 바꾸면 그 기간으로 다시 조회한다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
     renderWithProviders(<FxPlanCard />);
@@ -93,19 +136,79 @@ describe("FxPlanCard", () => {
     await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(6, null));
   });
 
-  it("이미 등록된 목표 환율은 건너뛰고 나머지만 알림 등록한다", async () => {
+  it("구간 목표와 금액을 한 번에 맞춰 등록한다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    renderWithProviders(<FxPlanCard />);
+    fireEvent.click(await screen.findByRole("button", { name: "목표 환율 알림 등록" }));
+    await waitFor(() =>
+      expect(syncFxPlanAlerts).toHaveBeenCalledWith("p1", [
+        { target_rate: 1380, usd: 561 },
+        { target_rate: 1360, usd: 561 },
+      ]),
+    );
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith("목표 환율 알림 2건을 맞췄습니다", "success"),
+    );
+  });
+
+  it("직접 등록한 같은 목표 알림은 표시만 하고 서버가 건너뛴다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([alert(1380), planAlert(1360)]);
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByText("직접 등록한 알림 있음")).toBeInTheDocument();
+    expect(screen.getByText("알림 등록됨")).toBeInTheDocument();
+    // 직접 등록 1380 + 계획 1360(금액 일치) → 맞춰진 상태
+    expect(screen.getByRole("button", { name: "목표 환율 알림 등록됨" })).toBeDisabled();
+  });
+
+  it("계획 목표가 바뀌면 새 계획으로 바꾸기를 제안한다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([planAlert(1380), planAlert(1350)]);
+    renderWithProviders(<FxPlanCard />);
+    fireEvent.click(await screen.findByRole("button", { name: "알림을 새 계획으로 바꾸기" }));
+    expect(screen.getByText(/새 목표로 교체됩니다/)).toBeInTheDocument();
+    await waitFor(() => expect(syncFxPlanAlerts).toHaveBeenCalledTimes(1));
+  });
+
+  it("금액만 달라져도 다시 맞추도록 한다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([planAlert(1380, 300), planAlert(1360)]);
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByRole("button", { name: "알림을 새 계획으로 바꾸기" })).toBeEnabled();
+  });
+
+  it("다른 포트폴리오·발동된 계획 알림은 이 계획의 등록으로 보지 않는다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
     vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([
-      alert(1380),
-      alert(1360, { is_active: false }),
+      planAlert(1380, 561, { portfolio_id: "p2" }),
+      planAlert(1360, 561, { triggered_at: "2026-11-01T00:00:00Z" }),
     ]);
     renderWithProviders(<FxPlanCard />);
-    expect(await screen.findByText("알림 등록됨")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "목표 환율 알림 등록" }));
-    await waitFor(() => expect(createExchangeRateAlert).toHaveBeenCalledTimes(1));
-    expect(createExchangeRateAlert).toHaveBeenCalledWith(1360, "BELOW", 1);
+    expect(await screen.findByRole("button", { name: "목표 환율 알림 등록" })).toBeEnabled();
+    expect(screen.queryByText("알림 등록됨")).toBeNull();
+  });
+
+  it("달러가 충분해지면 이 계획의 알림을 해제할 수 있다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      status: "SUFFICIENT",
+      need_usd: 0,
+      tranches: [],
+    });
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([planAlert(1380)]);
+    vi.mocked(syncFxPlanAlerts).mockResolvedValue({
+      created: 0,
+      updated: 0,
+      removed: 1,
+      skipped_manual: 0,
+    });
+    renderWithProviders(<FxPlanCard />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "이 계획으로 등록한 알림 1건 해제" }),
+    );
+    await waitFor(() => expect(syncFxPlanAlerts).toHaveBeenCalledWith("p1", []));
     await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith(expect.stringContaining("1건"), "success"),
+      expect(toast).toHaveBeenCalledWith("환전 계획 알림 1건을 해제했습니다", "success"),
     );
   });
 
@@ -121,7 +224,7 @@ describe("FxPlanCard", () => {
 
   it("모든 목표가 등록돼 있으면 버튼이 비활성화된다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
-    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([alert(1380), alert(1360)]);
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([planAlert(1380), planAlert(1360)]);
     renderWithProviders(<FxPlanCard />);
     expect(await screen.findByRole("button", { name: "목표 환율 알림 등록됨" })).toBeDisabled();
     // 등록한 알림은 설정 › 알림 설정 › 환율 알림에서 관리

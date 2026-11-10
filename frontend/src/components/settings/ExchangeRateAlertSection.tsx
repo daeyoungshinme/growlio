@@ -5,8 +5,10 @@ import {
   createExchangeRateAlert,
   reactivateExchangeRateAlert,
   deleteExchangeRateAlert,
+  isFxPlanAlert,
   type ExchangeRateAlert,
 } from "@/api/alerts";
+import { fmtUsd } from "@/utils/format";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
 import {
@@ -146,6 +148,12 @@ export function ExchangeRateAlertSection() {
                 <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
                   {alert.trigger_count}/{alert.max_trigger_count}회
                 </span>
+                {isFxPlanAlert(alert) && (
+                  <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
+                    환전 계획
+                    {alert.planned_usd != null && ` · ${fmtUsd(Number(alert.planned_usd), 0)}`}
+                  </span>
+                )}
                 {alert.is_active ? (
                   <span className="ml-2 text-xs text-green-600 dark:text-green-400">활성</span>
                 ) : (
