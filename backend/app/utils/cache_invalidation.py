@@ -201,9 +201,11 @@ async def invalidate_asset_account_caches(
         # 보유 포지션 기반 인사이트·리스크 지표를 바꾼다 — 빠지면 TTL 동안 삭제 계좌가 남는다
         challenge_progress_key(user_id),
         insights_key(user_id),
-        risk_key(user_id),
     ]
     if positions_changed:
+        # 리스크 지표(1년 일봉 yfinance 재다운로드)는 보유 구성이 바뀔 때만 — 평가액 변동은 TTL 1시간으로
+        # 충분하고, 매 sync마다 지우면 홈의 drift-summary·action-items가 콜드로 다시 받았다(plans/125 A4)
+        keys.append(risk_key(user_id))
         await invalidate_goal_recommendation_caches(cache, user_id)
         # 보유 기반 팩터 분석·효율적 프론티어(현재 위치) — 무거운 yfinance 재계산이라 목표 추천처럼
         # 구성이 바뀐 경우에만 지운다(plans/95 A2). 포트폴리오 단위 팩터 키는 목표 비중만 써서 대상 아님
@@ -214,13 +216,23 @@ async def invalidate_asset_account_caches(
     await _scan_unlink(cache, f"{_env_prefix()}usd_buying_power:{user_id}:*")
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
-    await invalidate_tax_overseas_caches(cache, user_id)
+    await invalidate_tax_overseas_caches(cache, user_id, realized=positions_changed)
     await invalidate_portfolio_overview_cache(cache, user_id)
     await invalidate_rebalancing_analysis_cache_all(cache, user_id)
 
 
-async def invalidate_tax_overseas_caches(cache: CacheStoreType, user_id: uuid.UUID) -> None:
+async def invalidate_tax_overseas_caches(cache: CacheStoreType, user_id: uuid.UUID, *, realized: bool = True) -> None:
     """해외주식 양도세(보유 포지션·실현손익) 캐시 삭제 — 계좌 sync뿐 아니라 계좌 CRUD(삭제·tax_type
-    변경·API 키 등록)도 과세 대상 계좌 집합을 바꾸므로 양쪽에서 호출한다."""
+    변경·API 키 등록)도 과세 대상 계좌 집합을 바꾸므로 양쪽에서 호출한다.
+
+    `realized=False`: 보유 수량이 그대로인 sync — 새 매도가 없으니 실현손익(KIS 계좌당 최대 20초)은 남긴다.
+    """
     await _scan_unlink(cache, f"{_env_prefix()}tax:overseas:{user_id}:*")
-    await _scan_unlink(cache, f"{_env_prefix()}tax:overseas_realized:{user_id}:*")
+    await invalidate_tax_action_items_cache(cache, user_id)
+    if realized:
+        await _scan_unlink(cache, f"{_env_prefix()}tax:overseas_realized:{user_id}:*")
+
+
+async def invalidate_tax_action_items_cache(cache: CacheStoreType, user_id: uuid.UUID) -> None:
+    """홈 "지금 할 일" 세금 소스 캐시(2분) — 거래·매매기록·계좌 sync/CRUD·소득 구간 변경이 부른다."""
+    await _scan_unlink(cache, f"{_env_prefix()}tax:action_items:{user_id}:*")

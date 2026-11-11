@@ -149,3 +149,21 @@ class TestTruthiness:
         store = CacheStore()
         assert len(store) == 0
         assert bool(store) is True
+
+
+class TestScanPrefixFastPath:
+    """plans/125 B5 — "접두어*" 패턴은 startswith로, 그 외는 fnmatch로 같은 결과를 낸다."""
+
+    @pytest.mark.asyncio
+    async def test_prefix_and_glob_patterns_match_same_keys(self):
+        from app.core.cache_store import CacheStore
+
+        store = CacheStore()
+        for key in ["a:u1:x", "a:u1:y", "a:u2:x", "b:u1:x"]:
+            await store.set(key, "1")
+
+        _, prefix = await store.scan(0, match="a:u1:*")
+        _, glob = await store.scan(0, match="a:*:x")
+
+        assert sorted(prefix) == ["a:u1:x", "a:u1:y"]
+        assert sorted(glob) == ["a:u1:x", "a:u2:x"]

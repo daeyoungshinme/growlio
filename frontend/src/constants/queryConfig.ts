@@ -8,23 +8,39 @@ export const PERSIST_CACHE_KEY = "rq-persist-cache";
  * 배포마다 자동으로 바꾸지 않는 건 매 배포 첫 부팅이 콜드가 되어 persist의 목적(즉시 표시)이 사라지기 때문이다.
  * "v1"(2026-06-09)에서 한 번도 안 올라가 그 사이 dashboard·portfolios 응답 변경이 누적돼 있었다(plans/61 B4).
  */
-export const PERSIST_CACHE_BUSTER = "2026-10-20";
+export const PERSIST_CACHE_BUSTER = "2026-11-11";
 
-/** 앱 재시작 시 즉시 표시할 쿼리(첫 키 기준) — 응답 형태를 바꾸면 PERSIST_CACHE_BUSTER를 올린다. */
-const PERSIST_QUERY_KEYS = new Set([
+/**
+ * 앱 재시작 시 즉시 표시할 쿼리(첫 키 기준) — 응답 형태를 바꾸면 PERSIST_CACHE_BUSTER를 올린다.
+ * 홈 첫 화면 카드(지금 할 일·챌린지·시장 신호 배지·환율)도 넣어 콜드 스타트에 스켈레톤·빈 카드가 먼저 뜨지 않게 한다
+ * (plans/125 C2). main.tsx가 이 키들의 gcTime을 maxAge(24h)로 맞춘다 — 기본 30분이면 관찰자가 없는 동안 캐시에서
+ * 지워져 persist 저장본에서도 빠졌다.
+ */
+export const PERSIST_QUERY_KEYS: readonly string[] = [
   "dashboard",
   "portfolio-overview",
   "accounts",
   "dca-analysis",
   "goal-recommendation",
-]);
+  "action-items",
+  "challenges",
+  "portfolios",
+  "market-signal",
+  "exchange-rate",
+];
+const PERSIST_QUERY_KEY_SET = new Set(PERSIST_QUERY_KEYS);
 
 /**
  * persist 대상 판정. 커스텀 필터는 라이브러리 기본값(성공한 쿼리만)을 대체하므로 반드시 합친다 —
  * 빠뜨리면 실패·진행 중 쿼리까지 저장돼 다음 부팅이 에러 화면으로 시작한다(plans/61 B4).
+ * 목표 추천은 첫 화면에 쓰는 전체(overall)만 — 기간별·연령대·후보 중복 변형까지 저장하면 매 저장(2초 throttle)마다
+ * 메인 스레드에서 직렬화하는 양이 커진다.
  */
 export function shouldPersistQuery(query: Query): boolean {
-  return defaultShouldDehydrateQuery(query) && PERSIST_QUERY_KEYS.has(query.queryKey[0] as string);
+  const [head, second] = query.queryKey;
+  if (!defaultShouldDehydrateQuery(query) || !PERSIST_QUERY_KEY_SET.has(head as string))
+    return false;
+  return head !== "goal-recommendation" || second === "overall";
 }
 
 export const STALE_TIME = {

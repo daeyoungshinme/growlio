@@ -45,8 +45,9 @@ logger = structlog.get_logger()
 
 # ── 개별 소스 fetcher (try/except 캡슐화) ────────────────────────
 
-_EMPTY_DIV: dict = {"dps": 0, "dividend_yield": 0}
-_EMPTY_DIV_WITH_MONTHS: dict = {"dps": 0, "dividend_yield": 0, "dividend_months": []}
+# 예외로 끝난 소스 — "배당 없음" 응답과 구분해야 무배당 음성 캐시가 장애를 0으로 굳히지 않는다
+_EMPTY_DIV: dict = {"dps": 0, "dividend_yield": 0, "fetch_failed": True}
+_EMPTY_DIV_WITH_MONTHS: dict = {"dps": 0, "dividend_yield": 0, "dividend_months": [], "fetch_failed": True}
 
 
 async def _try_source(coro, log_key: str, ticker: str, fallback: dict | None = None) -> dict:
@@ -196,12 +197,17 @@ async def _fetch_from_network(
     need_months_fetch: bool,
     kis_creds: dict | None,
     dart_key: str,
-) -> tuple[float, float, str | None, list[int], bool]:
-    """네트워크 소스 전체 체인. (yield_decimal, dps, ex_div_date, months, need_months_fetch) 반환."""
+) -> tuple[float, float, str | None, list[int], bool, bool]:
+    """네트워크 소스 전체 체인. (yield_decimal, dps, ex_div_date, months, need_months_fetch, answered) 반환.
+
+    answered: 주 소스(Naver·Yahoo) 중 하나라도 예외 없이 응답했는지 — 0이 "배당 없음"인지 "조회 실패"인지 가른다.
+    """
     ex_dividend_date = None
+    answered = False
 
     if is_korean:
         naver_info = await _try_naver(ticker, is_etf, loop)
+        answered = answered or not naver_info.get("fetch_failed")
         dps, yield_decimal = _merge_source(naver_info, dps, yield_decimal)
         if need_months_fetch and naver_info["dividend_months"]:
             months = naver_info["dividend_months"]
@@ -211,6 +217,7 @@ async def _fetch_from_network(
 
     if dps == 0.0 or yield_decimal == 0.0:
         info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
+        answered = answered or not info.get("fetch_failed")
         prev_dps, prev_yield = dps, yield_decimal
         dps, yield_decimal = _merge_source(info, dps, yield_decimal)
         if dps != prev_dps or yield_decimal != prev_yield:
@@ -225,7 +232,7 @@ async def _fetch_from_network(
         if need_months_fetch:
             months = await loop.run_in_executor(None, partial(sync_fetch_dividend_months, yahoo_sym))
 
-    return yield_decimal, dps, ex_dividend_date, months, need_months_fetch
+    return yield_decimal, dps, ex_dividend_date, months, need_months_fetch, answered
 
 
 # ── 공개 API ────────────────────────────────────────────────────
@@ -273,6 +280,9 @@ async def fetch_ticker_dividend_info(
     if cached_info:
         try:
             cached = json.loads(cached_info)
+            if cached.get("no_dividend"):
+                # 소스가 정상 응답한 "배당 없음" — 성장주·TR ETF·금이 매 미스마다 7개 소스를 다시 타지 않게
+                return 0.0, 0.0, months, ex_dividend_date
             dps = cached["dps"] if dps == 0.0 else dps
             yield_decimal = cached["yield_decimal"] if yield_decimal == 0.0 else yield_decimal
         except (json.JSONDecodeError, TypeError, KeyError):
@@ -282,7 +292,7 @@ async def fetch_ticker_dividend_info(
         return yield_decimal, dps, months, ex_dividend_date
 
     async with sem:
-        yield_decimal, dps, ex_dividend_date, months, need_months_fetch = await _fetch_from_network(
+        yield_decimal, dps, ex_dividend_date, months, need_months_fetch, answered = await _fetch_from_network(
             ticker,
             market,
             is_korean,
@@ -302,6 +312,10 @@ async def fetch_ticker_dividend_info(
 
     if dps > 0 or yield_decimal > 0:
         await cache.setex(info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": dps, "yield_decimal": yield_decimal}))
+    elif answered:
+        await cache.setex(
+            info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": 0.0, "yield_decimal": 0.0, "no_dividend": True})
+        )
     else:
         logger.warning("dividend_all_sources_failed", ticker=ticker, market=market)
 

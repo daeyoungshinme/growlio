@@ -1,4 +1,4 @@
-import { useMemo, type ComponentProps, type ReactNode } from "react";
+import { lazy, Suspense, useMemo, type ComponentProps, type ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
 import type { GoalRecommendationItem, SuggestedGoalCandidate } from "@/api/rebalancing";
 import type { MarketRiskLevel } from "@/api/marketSignals";
@@ -16,7 +16,13 @@ import {
   itemKey,
   weightedTerPct,
 } from "@/utils/etfOverlap";
-import PortfolioWeightChart from "@/components/portfolio-analysis/PortfolioWeightChart";
+import { useIsSmUp } from "@/hooks/useMediaQuery";
+import SkeletonCard from "@/components/common/SkeletonCard";
+
+// recharts(약 435KB) 청크를 끌고 온다 — 모바일에선 숨기는 차트라 데스크톱에서만 받는다(plans/125 E3)
+const PortfolioWeightChart = lazy(
+  () => import("@/components/portfolio-analysis/PortfolioWeightChart"),
+);
 
 function driftBadgeLabel(drift: RecommendationDrift): string {
   const parts: string[] = [];
@@ -58,6 +64,7 @@ export default function RecommendationResultPanel({
   applySection,
 }: Props) {
   const { data: overlap } = useCandidateOverlap();
+  const isSmUp = useIsSmUp();
   const terMap = useMemo(() => buildTerMap(overlap), [overlap]);
   const avgTer = weightedTerPct(items, terMap);
   const overlapGroups = useMemo(
@@ -89,9 +96,13 @@ export default function RecommendationResultPanel({
       )}
 
       {/* 바로 위 비중 리스트와 같은 정보 — 모바일에선 세로 길이만 늘려 데스크탑에서만 (docs/plans/67 P1-8) */}
-      <div className="hidden sm:block">
-        <PortfolioWeightChart items={items} />
-      </div>
+      {isSmUp !== false && (
+        <div className="hidden sm:block">
+          <Suspense fallback={<SkeletonCard rows={3} />}>
+            <PortfolioWeightChart items={items} />
+          </Suspense>
+        </div>
+      )}
 
       {extraNoticeAfterWeightList}
 

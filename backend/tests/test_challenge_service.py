@@ -226,7 +226,9 @@ class TestChallengeSummary:
         with patch.object(cs, "today_kst", return_value=__import__("datetime").date(2026, 3, 5)):
             summary = await cs.get_challenge_summary(challenge.user_id, db)
         assert summary.needs_attention is False
-        assert summary.count == 1
+        # 20일 전엔 결과가 정해져 있어 쿼리하지 않는다(plans/125 B6)
+        assert summary.count == 0
+        db.execute.assert_not_awaited()
 
 
 class TestListAndSerialize:

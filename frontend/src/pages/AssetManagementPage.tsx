@@ -16,12 +16,13 @@ const BankAccountModal = lazy(() => import("@/components/assets/BankAccountModal
 const StockAccountModal = lazy(() => import("@/components/assets/StockAccountModal"));
 import StockAccountCard from "@/components/assets/StockAccountCard";
 import StockAccountSummaryCard from "@/components/assets/StockAccountSummaryCard";
-import AccountHistoryTab from "@/components/assets/AccountHistoryTab";
+// 내역 탭은 거래 폼(zod 스키마 포함)까지 끌고 온다 — 기본 탭(증권계좌)만 보는 방문에선 받지 않는다(plans/125 E4)
+const AccountHistoryTab = lazy(() => import("@/components/assets/AccountHistoryTab"));
 import { legacyHistorySegment } from "@/utils/legacyTabRedirect";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import EmptyState from "@/components/common/EmptyState";
-import { invalidateAccountData } from "@/utils/queryInvalidation";
+import { invalidateAccountData, refetchActiveData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "@/constants";
 import { useAssetManagementData } from "@/hooks/useAssetManagementData";
@@ -100,7 +101,7 @@ export default function AssetManagementPage() {
   const queryClient = useQueryClient();
 
   const handleRefresh = useCallback(async () => {
-    await invalidateAccountData(queryClient);
+    await refetchActiveData(queryClient);
   }, [queryClient]);
   useRegisterRefresh(handleRefresh);
   const { accounts, isLoading, error, refetchAccounts, overview, txTotals, usdRate } =
@@ -161,7 +162,11 @@ export default function AssetManagementPage() {
 
       <div ref={tabContentRef}>
         {/* 옛 링크는 URL을 고쳐 쓴 다음 렌더 — 그 전에 그리면 기본 세그먼트가 한 번 깜빡인다 */}
-        {tab === "내역" && !legacySegment && <AccountHistoryTab accounts={accounts} />}
+        {tab === "내역" && !legacySegment && (
+          <Suspense fallback={<SkeletonCard rows={4} />}>
+            <AccountHistoryTab accounts={accounts} />
+          </Suspense>
+        )}
 
         {tab === "부동산" && (
           <>

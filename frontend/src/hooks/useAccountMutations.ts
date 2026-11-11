@@ -3,7 +3,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
 import { createAccount, updateAccount, deleteAccount, syncAccount } from "@/api/assets";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
-import { invalidateAccountData, invalidateSyncData } from "@/utils/queryInvalidation";
+import {
+  invalidateAccountData,
+  invalidateAccountListData,
+  invalidateSyncData,
+} from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { isSyncableAccount } from "@/utils/accounts";
@@ -32,18 +36,20 @@ export function useAccountMutations({
   const createMutation = useMutation({
     mutationFn: createAccount,
     onSuccess: async (data) => {
-      void invalidateAll();
+      const syncable = isSyncableAccount(data.data_source);
+      // 동기화할 계좌는 첫 sync 뒤에 한 번만 전체 무효화한다 — 그 전엔 목록만(plans/125 D3)
+      void (syncable ? invalidateAccountListData(queryClient) : invalidateAll());
       onBankModalClose();
       onStockModalClose();
-      if (isSyncableAccount(data.data_source)) {
+      if (syncable) {
         setSyncingStockIds((prev) => new Set(prev).add(data.id));
         try {
           await syncAccount(data.id);
-          // 첫 sync로 보유 종목이 생기므로 수동 sync와 같은 범위(드리프트·리스크·인사이트 포함)를 무효화
-          void invalidateSyncData(queryClient);
+          // 첫 sync로 보유 종목이 생기므로 계좌 CUD 범위(보유 기반 + 거래·연금 납입) 전체를 무효화
+          void invalidateAll();
           toast("계좌가 추가되었습니다", "success");
         } catch (e) {
-          void invalidateSyncData(queryClient);
+          void invalidateAll();
           const fallback = "초기 동기화 실패. 계좌 카드의 동기화 버튼으로 재시도하세요.";
           toast(getHttpStatus(e) != null ? extractErrorMessage(e, fallback) : fallback);
         } finally {

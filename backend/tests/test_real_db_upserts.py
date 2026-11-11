@@ -138,3 +138,25 @@ class TestYearRangeFilters:
 
         status = await calc_pension_contribution_status(user.id, 2026, pg)
         assert status["irp_deposit_krw"] == 500
+
+
+async def test_release_read_connection_returns_connection_to_pool():
+    """plans/125 — 읽기 후 반납하면 풀의 checkedout이 0이 되고, 이후 쿼리는 새로 커넥션을 받는다."""
+    if not _TEST_DB_URL:
+        if os.environ.get("CI"):
+            pytest.fail("CI인데 GROWLIO_TEST_DATABASE_URL이 없다")
+        pytest.skip("GROWLIO_TEST_DATABASE_URL 미설정")
+    from sqlalchemy import text
+
+    from app.core.database import release_read_connection
+
+    engine = create_async_engine(_TEST_DB_URL, pool_size=2, max_overflow=0)
+    try:
+        async with AsyncSession(engine, expire_on_commit=False) as session:
+            await session.execute(text("SELECT 1"))
+            assert engine.pool.checkedout() == 1  # type: ignore[attr-defined]
+            await release_read_connection(session)
+            assert engine.pool.checkedout() == 0  # type: ignore[attr-defined]
+            assert (await session.execute(text("SELECT 2"))).scalar() == 2
+    finally:
+        await engine.dispose()

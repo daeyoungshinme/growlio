@@ -175,7 +175,9 @@ async def _resolve_confirmed_level(cache: CacheStore | None, db: AsyncSession) -
         return raw_level, freshness
 
     if raw_level == confirmed:
-        await delete_durable(db, market_signal_pending_confirmation_key())
+        # 평상시(raw == 확정)엔 대기 후보가 없다 — 매 전술 GET마다 DELETE+commit(WAL 쓰기)을 하지 않게 있을 때만 지운다
+        if await get_durable(db, market_signal_pending_confirmation_key()) is not None:
+            await delete_durable(db, market_signal_pending_confirmation_key())
         return confirmed, freshness
 
     pending_raw = await get_durable(db, market_signal_pending_confirmation_key())

@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from typing import TYPE_CHECKING, Literal, TypedDict
 
@@ -126,17 +127,23 @@ async def get_tilt_inputs(cache: CacheStore | None) -> TiltInputs:
 
     from app.services.market_signal.technical_signal_service import fetch_close_history
 
-    try:
-        yields = await _fetch_real_yields()
-    except Exception as exc:
-        logger.warning("tactical_tilt_real_yield_failed", error=str(exc))
-        yields = []
-    try:
-        closes = await fetch_close_history(["QQQ", "SPY"], _CLOSE_HISTORY_DAYS)
-        rs = relative_strength_pct(closes["QQQ"], closes["SPY"]) if {"QQQ", "SPY"} <= set(closes) else None
-    except Exception as exc:
-        logger.warning("tactical_tilt_closes_failed", error=str(exc))
-        rs = None
+    async def _yields() -> list[float]:
+        try:
+            return await _fetch_real_yields()
+        except Exception as exc:
+            logger.warning("tactical_tilt_real_yield_failed", error=str(exc))
+            return []
+
+    async def _rs() -> float | None:
+        try:
+            closes = await fetch_close_history(["QQQ", "SPY"], _CLOSE_HISTORY_DAYS)
+            return relative_strength_pct(closes["QQQ"], closes["SPY"]) if {"QQQ", "SPY"} <= set(closes) else None
+        except Exception as exc:
+            logger.warning("tactical_tilt_closes_failed", error=str(exc))
+            return None
+
+    # FRED와 Yahoo는 서로 무관해 동시에 받는다(plans/125 B2)
+    yields, rs = await asyncio.gather(_yields(), _rs())
 
     result = TiltInputs(
         real_yield=yields[-1] if yields else None,

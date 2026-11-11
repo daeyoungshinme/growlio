@@ -36,7 +36,7 @@ export function useDashboardData() {
     isError: accountsFailed,
   } = useQuery(accountsQuery);
 
-  const { data: challenges = [] } = useChallenges();
+  const { data: challenges = [], isLoading: challengesLoading } = useChallenges();
 
   const exchangeRate = useExchangeRate();
 
@@ -60,5 +60,6 @@ export function useDashboardData() {
     exchangeRate,
     marketSignal,
     challenges,
+    challengesLoading,
   };
 }

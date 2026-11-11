@@ -33,6 +33,7 @@ async def run_startup_warmup() -> None:
     from app.services.fx_plan_service import fetch_usd_krw_closes
     from app.services.market_signal.market_signal_service import get_market_signal
     from app.services.market_signal.technical_signal_service import get_technical_signals
+    from app.services.tactical.tactical_tilt import get_tilt_inputs
     from app.utils.currency import fetch_usd_krw
 
     cache = await get_cache_store()
@@ -43,6 +44,8 @@ async def run_startup_warmup() -> None:
         "technical_signals": lambda: get_technical_signals(cache),
         # 환전 계획·추가 환전의 1년 위치 계산용 일봉 — 슬립 후 첫 진입이 Yahoo 1년 다운로드를 기다리지 않게(plans/124 C)
         "usd_krw_history": lambda: fetch_usd_krw_closes(cache),
+        # 전술 탭 틸트 입력(FRED 실질금리 + QQQ/SPY 종가) — 깨어난 뒤 첫 전술 조회가 기다리지 않게(plans/125 B2)
+        "tilt_inputs": lambda: get_tilt_inputs(cache),
     }
     results = await asyncio.gather(*(fn() for fn in tasks.values()), return_exceptions=True)
     failed = {name: str(r) for name, r in zip(tasks, results, strict=True) if isinstance(r, BaseException)}

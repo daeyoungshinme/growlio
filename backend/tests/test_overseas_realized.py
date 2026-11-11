@@ -517,3 +517,70 @@ class TestRealizedCoverageGaps:
 
         fetch.assert_not_awaited()
         assert "삭제" in summary["uncovered_accounts"][0]["reason"]
+
+
+class TestOverseasRealizedConcurrency:
+    """plans/125 A3 — KIS 계좌 조회는 동시에, 콜드 캐시 동시 호출은 계산 1회."""
+
+    @pytest.fixture(autouse=True)
+    def _today(self):
+        with (
+            patch("app.services.tax.overseas_realized_service.today_kst", return_value=TODAY),
+            patch(
+                "app.services.tax.overseas_realized_service.load_trade_record_realized",
+                new=AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.tax.overseas_realized_service.get_overseas_positions_detail",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            yield
+
+    @pytest.mark.asyncio
+    async def test_kis_accounts_fetched_concurrently(self, make_account, mock_cache):
+        import asyncio
+
+        a, b = _acc(make_account, "A"), _acc(make_account, "B")
+        in_flight = 0
+        peak = 0
+
+        async def fake_fetch(acc, start, end, session, cache):
+            nonlocal in_flight, peak
+            in_flight += 1
+            peak = max(peak, in_flight)
+            await asyncio.sleep(0.01)
+            in_flight -= 1
+            return KisRealized(100.0, False)
+
+        with patch("app.services.tax.overseas_realized_service._fetch_kis_realized", new=fake_fetch):
+            summary = await get_overseas_realized_summary(
+                uuid.uuid4(), 2026, _db_with_accounts([a, b]), cache=mock_cache
+            )
+
+        assert peak == 2
+        assert summary["realized_gain_krw"] == 200
+
+    @pytest.mark.asyncio
+    async def test_concurrent_cold_calls_compute_once(self, make_account):
+        import asyncio
+
+        from app.core.cache_store import CacheStore
+
+        cache = CacheStore()
+        kis = _acc(make_account, "KIS")
+
+        async def slow_fetch(*_args):
+            await asyncio.sleep(0.05)
+            return KisRealized(10.0, False)
+
+        fetch = AsyncMock(side_effect=slow_fetch)
+        user_id = uuid.uuid4()
+        with patch("app.services.tax.overseas_realized_service._fetch_kis_realized", new=fetch):
+            r1, r2 = await asyncio.gather(
+                get_overseas_realized_summary(user_id, 2026, _db_with_accounts([kis]), cache=cache),
+                get_overseas_realized_summary(user_id, 2026, _db_with_accounts([kis]), cache=cache),
+            )
+
+        assert fetch.await_count == 1
+        assert r1["realized_gain_krw"] == r2["realized_gain_krw"] == 10

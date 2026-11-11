@@ -13,6 +13,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import is_non_tradable
+from app.core.database import release_read_connection
 from app.models.portfolio import Portfolio
 from app.services.accounts.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key
@@ -41,6 +42,8 @@ async def collect_dividend_map(
     sem = asyncio.Semaphore(_DIVIDEND_FETCH_CONCURRENCY)
     kis_creds = await get_kis_user_credentials(user_id, db)
     dart_key = await fetch_dart_api_key(user_id, db)
+    # 미보유 목표 종목의 배당 소스 체인 동안 커넥션을 쥐지 않게(plans/125 A5)
+    await release_read_connection(db)
 
     async def _fetch_one(raw_item) -> None:
         ticker = str(_item_attr(raw_item, "ticker"))

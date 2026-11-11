@@ -39,7 +39,9 @@ import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
-import GoalSettingWizard from "@/components/invest/GoalSettingWizard";
+// 6단계 마법사(약 600줄)는 목표 최초 설정·재설정 때만 — 계획 탭 첫 진입 청크에서 분리(plans/125 E5)
+import { useInView } from "@/hooks/useInView";
+const GoalSettingWizard = lazy(() => import("@/components/invest/GoalSettingWizard"));
 import Tabs from "@/components/common/Tabs";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { settingsQuery } from "@/api/queryOptions";
@@ -168,20 +170,12 @@ export default function InvestPlanPage() {
     .filter((d) => d.month <= today && d.has_data)
     .slice(-1)[0];
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <SkeletonCard rows={2} height="h-6" />
-        <SkeletonCard rows={7} height="h-10" />
-        <SkeletonCard rows={5} height="h-5" />
-      </div>
-    );
-  }
+  const [projectionChartRef, projectionChartInView] = useInView<HTMLDivElement>();
 
-  if (isError && !data) {
-    // 실패한 적립 분석만 다시 조회한다 — invalidateDcaData는 설정·대시보드 등 8계열을 함께 지운다
-    return <PageLoadError message="데이터를 불러오지 못했습니다." onRetry={() => void refetch()} />;
-  }
+  // 적립 분석(dca-analysis)은 "적립 계획" 탭만 쓴다 — 예전엔 페이지 전체를 막아 챌린지·배당·절세 탭도 이 응답을
+  // 기다렸다(plans/125 E7). 로딩·실패 표시는 그 탭 안에서만 한다.
+  const dcaPending = isLoading;
+  const dcaFailed = isError && !data;
 
   return (
     <div className="space-y-6">
@@ -193,7 +187,18 @@ export default function InvestPlanPage() {
 
       <div ref={tabContentRef}>
         {/* 적립 계획 탭 */}
-        {activeTab === "적립 계획" && (
+        {activeTab === "적립 계획" && dcaPending && (
+          <div className="space-y-6">
+            <SkeletonCard rows={2} height="h-6" />
+            <SkeletonCard rows={7} height="h-10" />
+            <SkeletonCard rows={5} height="h-5" />
+          </div>
+        )}
+        {activeTab === "적립 계획" && !dcaPending && dcaFailed && (
+          // 실패한 적립 분석만 다시 조회한다 — invalidateDcaData는 설정·대시보드 등 8계열을 함께 지운다
+          <PageLoadError message="데이터를 불러오지 못했습니다." onRetry={() => void refetch()} />
+        )}
+        {activeTab === "적립 계획" && !dcaPending && !dcaFailed && (
           <div className="space-y-6">
             {/* 리밸런싱 추천 탭 "목표 설정하러 가기"에서 온 경우, 목표 저장 후 추천으로 돌아가는 길(U16) */}
             {fromRecommendation && isConfigured && (
@@ -328,12 +333,19 @@ export default function InvestPlanPage() {
               {isConfigured && data && (
                 <ErrorBoundary variant="section">
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
-                    <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-                      <DCAProjectionChart
-                        data={data.projection_months}
-                        monthlyDepositAmount={s?.monthly_deposit_amount}
-                      />
-                    </Suspense>
+                    {/* 추이 차트는 recharts(약 435KB) — 화면 근처에 왔을 때만 받는다(plans/125 E6) */}
+                    <div ref={projectionChartRef}>
+                      {projectionChartInView ? (
+                        <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+                          <DCAProjectionChart
+                            data={data.projection_months}
+                            monthlyDepositAmount={s?.monthly_deposit_amount}
+                          />
+                        </Suspense>
+                      ) : (
+                        <SkeletonCard rows={4} height="h-5" />
+                      )}
+                    </div>
                     <div className="card divide-y divide-gray-100 dark:divide-gray-700">
                       <div className="pb-4">
                         <GoalTimelineCard timeline={data.goal_timeline} />
@@ -427,14 +439,16 @@ export default function InvestPlanPage() {
 
       {/* 적립 계획 설정 편집 마법사 (신규/재설정 가이드) */}
       {editing && wizardMode && (
-        <GoalSettingWizard
-          form={form}
-          setForm={setForm}
-          step={wizardStep}
-          setStep={setWizardStep}
-          onSave={saveSettings}
-          onClose={handleCloseModal}
-        />
+        <Suspense fallback={null}>
+          <GoalSettingWizard
+            form={form}
+            setForm={setForm}
+            step={wizardStep}
+            setStep={setWizardStep}
+            onSave={saveSettings}
+            onClose={handleCloseModal}
+          />
+        </Suspense>
       )}
 
       {/* 적립 계획 설정 편집 모달 (플랫 폼, 재설정용) */}

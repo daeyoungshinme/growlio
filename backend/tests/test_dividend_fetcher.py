@@ -142,3 +142,69 @@ class TestFetchTickerDividendInfo:
             await _call_fetcher("AAPL", "NASDAQ", mock_cache)
 
         mock_cache.setex.assert_called()
+
+
+class TestNoDividendNegativeCache:
+    """plans/125 A2 — 소스가 정상 응답한 "배당 없음"은 캐시하고, 전부 실패는 캐시하지 않는다."""
+
+    @staticmethod
+    def _loop():
+        loop_mock = MagicMock()
+
+        async def fake_executor(_, fn, *args):
+            return fn(*args) if callable(fn) else None
+
+        loop_mock.run_in_executor = fake_executor
+        return loop_mock
+
+    @pytest.mark.asyncio
+    async def test_answered_zero_is_cached(self, mock_cache, override_settings):
+        with (
+            patch(
+                "app.services.dividend.fetcher.sync_yahoo_dividend_info",
+                return_value={"dividend_yield": 0.0, "dps": 0.0, "ex_dividend_date": None},
+            ),
+            patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[]),
+            patch("asyncio.get_running_loop", return_value=self._loop()),
+        ):
+            result = await _call_fetcher("TSLA", "NASDAQ", mock_cache)
+
+        assert result[0] == 0.0
+        assert result[1] == 0.0
+        info_writes = [c for c in mock_cache.setex.call_args_list if json.loads(c.args[2]) != []]
+        assert len(info_writes) == 1
+        assert json.loads(info_writes[0].args[2])["no_dividend"] is True
+
+    @pytest.mark.asyncio
+    async def test_all_failed_is_not_cached(self, mock_cache, override_settings):
+        with (
+            patch(
+                "app.services.dividend.fetcher.sync_yahoo_dividend_info",
+                return_value={"dividend_yield": 0.0, "dps": 0.0, "ex_dividend_date": None, "fetch_failed": True},
+            ),
+            patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[]),
+            patch("asyncio.get_running_loop", return_value=self._loop()),
+        ):
+            await _call_fetcher("TSLA", "NASDAQ", mock_cache)
+
+        written = [json.loads(c.args[2]) for c in mock_cache.setex.call_args_list]
+        assert not any(isinstance(w, dict) for w in written)
+
+    @pytest.mark.asyncio
+    async def test_no_dividend_cache_hit_skips_network(self, mock_cache, override_settings):
+        mock_cache.get = AsyncMock(
+            side_effect=[
+                None,  # months cache miss
+                json.dumps({"dps": 0.0, "yield_decimal": 0.0, "no_dividend": True}).encode(),
+            ]
+        )
+        with (
+            patch("app.services.dividend.fetcher.sync_yahoo_dividend_info") as mock_yahoo,
+            patch("app.services.dividend.fetcher.sync_fetch_dividend_months") as mock_months,
+        ):
+            result = await _call_fetcher("TSLA", "NASDAQ", mock_cache)
+
+        mock_yahoo.assert_not_called()
+        mock_months.assert_not_called()
+        assert result[0] == 0.0
+        assert result[1] == 0.0

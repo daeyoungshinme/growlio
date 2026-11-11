@@ -15,6 +15,7 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import release_read_connection
 from app.models.challenge import (
     CHALLENGE_ACTIVE,
     CHALLENGE_DEPOSIT,
@@ -233,6 +234,9 @@ async def list_challenges_with_progress(
         return [ChallengeResponse(**item) for item in cached]
 
     challenges = await _fetch_challenges(user_id, db)
+    # RETURN_PCT는 대시보드 single-flight(최대 15초)를 기다린다 — 앱 시작 때 대시보드와 겹치므로 그동안
+    # 커넥션을 쥐지 않게 먼저 반납한다(plans/125 A6). 이후 쿼리는 새 트랜잭션을 연다
+    await release_read_connection(db)
     responses = []
     for ch in challenges:
         progress = await compute_progress(ch, user_id, db, cache)
@@ -313,6 +317,9 @@ async def delete_challenge(challenge: InvestmentChallenge, db: AsyncSession, cac
 
 async def get_challenge_summary(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> ChallengeSummary:
     today = today_kst()
+    if today.day < _NUDGE_DAY_OF_MONTH:
+        # 배지·지금 할 일 모두 needs_attention만 본다 — 20일 전엔 결과가 정해져 있으니 쿼리하지 않는다(plans/125 B6)
+        return ChallengeSummary(needs_attention=False, count=0)
     current_month = _month_key(today)
     result = await db.execute(
         select(InvestmentChallenge).where(

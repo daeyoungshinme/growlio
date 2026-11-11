@@ -686,3 +686,39 @@ class TestInvalidationPatternsMatchBuilders:
 
         assert [k for k in target if await store.get(k) is not None] == []
         assert await store.get(kept) == "1"
+
+
+class TestSyncKeepsHeavyCachesWhenPositionsUnchanged:
+    """plans/125 A3·A4 — 보유 수량이 그대로인 sync는 리스크 지표·해외 실현손익 캐시를 남긴다."""
+
+    @pytest.mark.asyncio
+    async def test_positions_unchanged_keeps_risk_and_realized(self, override_settings):
+        from app.core.cache_store import CacheStore
+        from app.utils.cache_invalidation import invalidate_asset_account_caches
+        from app.utils.cache_keys import risk_key, tax_overseas_realized_key
+
+        cache = CacheStore()
+        uid = uuid.uuid4()
+        await cache.set(risk_key(uid), "{}")
+        await cache.set(tax_overseas_realized_key(uid, 2026, "all"), "{}")
+
+        await invalidate_asset_account_caches(cache, uid, positions_changed=False)
+
+        assert await cache.get(risk_key(uid)) == "{}"
+        assert await cache.get(tax_overseas_realized_key(uid, 2026, "all")) == "{}"
+
+    @pytest.mark.asyncio
+    async def test_positions_changed_clears_risk_and_realized(self, override_settings):
+        from app.core.cache_store import CacheStore
+        from app.utils.cache_invalidation import invalidate_asset_account_caches
+        from app.utils.cache_keys import risk_key, tax_overseas_realized_key
+
+        cache = CacheStore()
+        uid = uuid.uuid4()
+        await cache.set(risk_key(uid), "{}")
+        await cache.set(tax_overseas_realized_key(uid, 2026, "all"), "{}")
+
+        await invalidate_asset_account_caches(cache, uid)
+
+        assert await cache.get(risk_key(uid)) is None
+        assert await cache.get(tax_overseas_realized_key(uid, 2026, "all")) is None

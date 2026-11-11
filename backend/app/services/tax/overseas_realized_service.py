@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import DOMESTIC_MARKETS, POSITION_STOCK_ASSET_TYPES, TAX_DEFERRED_TAX_TYPES
 from app.core.cache_store import CacheStore, get_cache_store
+from app.core.database import AsyncSessionLocal, release_read_connection
 from app.enums import TradeSide
 from app.kis.auth import get_access_token
 from app.kis.client import KisTokenExpiredError
@@ -47,6 +48,7 @@ from app.utils.cache_keys import (
     set_cached_json,
     tax_overseas_realized_key,
 )
+from app.utils.inproc_lock import single_flight_fetch
 from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
@@ -325,10 +327,13 @@ async def get_overseas_realized_summary(
     cache: CacheStore | None = None,
     overseas_positions: list[dict] | None = None,
 ) -> OverseasRealizedSummary:
-    """올해(또는 지정 연도) 해외주식 실현손익 합계. 계좌 조회는 순차(같은 AsyncSession 동시 사용 금지).
+    """올해(또는 지정 연도) 해외주식 실현손익 합계.
 
     `overseas_positions`: 호출부가 이미 조회한 `get_overseas_positions_detail` 결과(같은 account_id 기준).
     None이면 직접 조회한다.
+
+    KIS 조회(계좌당 최대 20초)는 계좌별 짧은 세션으로 동시에 보내고, 요청 세션은 그 전에 커넥션을 반납한다.
+    홈의 action-items와 insights가 앱 시작 때 동시에 부르므로 콜드 캐시 계산은 single-flight로 1회만 한다.
     """
     cache = cache if cache is not None else await get_cache_store()
     cache_key = tax_overseas_realized_key(user_id, year, str(account_id) if account_id else "all")
@@ -336,6 +341,35 @@ async def get_overseas_realized_summary(
     if cached is not None:
         return cached
 
+    async def _get_cached() -> OverseasRealizedSummary | None:
+        return await get_cached_json(cache, cache_key)
+
+    async def _compute() -> OverseasRealizedSummary:
+        return await _compute_overseas_realized_summary(
+            user_id, year, db, account_id, cache, cache_key, overseas_positions
+        )
+
+    # 대기하는 쪽도 커넥션을 쥔 채 기다리지 않게 먼저 반납한다(읽기 경로 전용 함수)
+    await release_read_connection(db)
+    # KIS 조회 상한(20초)보다 길게 기다려야 대기자가 중간에 포기하고 각자 다시 조회하지 않는다
+    return await single_flight_fetch(cache, cache_key, _get_cached, _compute, lock_ttl=30, max_wait_iterations=150)
+
+
+async def _fetch_kis_realized_isolated(acc: AssetAccount, start: date, end: date, cache: CacheStore) -> KisRealized:
+    """계좌별 짧은 세션으로 조회 — 토큰 발급이 commit하므로 동시 실행 시 요청 세션을 공유할 수 없다."""
+    async with AsyncSessionLocal() as session:
+        return await _fetch_kis_realized(acc, start, end, session, cache)
+
+
+async def _compute_overseas_realized_summary(
+    user_id: uuid.UUID,
+    year: int,
+    db: AsyncSession,
+    account_id: uuid.UUID | None,
+    cache: CacheStore,
+    cache_key: str,
+    overseas_positions: list[dict] | None,
+) -> OverseasRealizedSummary:
     # 삭제한 계좌의 올해 매도도 실제 소득이라 활성 여부로 거르지 않는다(세금 집계 기준, plans/60·95)
     conditions = [
         AssetAccount.user_id == user_id,
@@ -375,16 +409,30 @@ async def get_overseas_realized_summary(
         db,
     )
 
+    ordered = sorted(accounts, key=lambda a: a.name)
+    kis_accounts = [acc for acc in ordered if _is_kis_auto(acc)]
+    kis_results: dict[str, KisRealized | BaseException] = {}
+    if kis_accounts:
+        await release_read_connection(db)
+        results = await asyncio.gather(
+            *(_fetch_kis_realized_isolated(acc, start, end, cache) for acc in kis_accounts),
+            return_exceptions=True,
+        )
+        kis_results = {str(acc.id): res for acc, res in zip(kis_accounts, results, strict=True)}
+
     covered: list[RealizedAccount] = []
     uncovered: list[UncoveredAccount] = []
     had_failure = False
-    for acc in sorted(accounts, key=lambda a: a.name):
+    for acc in ordered:
         acc_id = str(acc.id)
         record = by_records.get(acc_id)
         if _is_kis_auto(acc):
-            try:
-                realized = await _fetch_kis_realized(acc, start, end, db, cache)
-            except Exception as e:  # 브로커 장애가 세금 화면 전체를 깨지 않게 — 계좌 단위로 격리
+            realized = kis_results[acc_id]
+            if isinstance(realized, BaseException):
+                if not isinstance(realized, Exception):
+                    raise realized
+                # 브로커 장애가 세금 화면 전체를 깨지 않게 — 계좌 단위로 격리
+                e = realized
                 logger.warning("overseas_realized_fetch_failed", account_id=acc_id, error=str(e))
                 had_failure = True
                 uncovered.append({"account_id": acc_id, "account_name": acc.name, "reason": "조회 실패"})

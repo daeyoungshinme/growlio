@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import { useIsSmUp } from "@/hooks/useMediaQuery";
 import type { StockSuggestion } from "@/api/assets";
 import { fmtKrwPrice, fmtKrwShort, fmtUsdPrice } from "@/utils/format";
 import { isOverseasMarket, marketLabel } from "@/constants/markets";
@@ -156,60 +157,66 @@ export function PositionsTable({
     handleCurrentPriceUsd,
     handleMarketChange,
   };
+  // 편집 입력이 모바일 카드·데스크톱 표 양쪽에 그려져 입력마다 두 벌이 다시 렌더됐다 — 보이는 쪽만(plans/125 E9)
+  const isSmUp = useIsSmUp();
 
   return (
     <>
       {/* ── 모바일 카드 뷰 (sm 미만) ── */}
-      <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
-        {readonly
-          ? liveRows.map((row, i) => (
-              <ReadonlyMobileCard key={row._rowKey ?? String(i)} row={row} />
-            ))
-          : liveRows.map((row, i) => (
-              <EditableMobilePositionCard
-                key={row._rowKey ?? String(i)}
-                row={row}
-                rawRow={rows[i] ?? row}
-                index={i}
-                priceLoading={priceLoadingRows.has(i)}
-                {...sharedProps}
-              />
-            ))}
-      </div>
+      {isSmUp !== true && (
+        <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
+          {readonly
+            ? liveRows.map((row, i) => (
+                <ReadonlyMobileCard key={row._rowKey ?? String(i)} row={row} />
+              ))
+            : liveRows.map((row, i) => (
+                <EditableMobilePositionCard
+                  key={row._rowKey ?? String(i)}
+                  row={row}
+                  rawRow={rows[i] ?? row}
+                  index={i}
+                  priceLoading={priceLoadingRows.has(i)}
+                  {...sharedProps}
+                />
+              ))}
+        </div>
+      )}
 
       {/* ── 데스크탑 테이블 뷰 (sm 이상) ── */}
-      <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
-              <th className="text-left py-2.5 pr-3 pl-1 font-medium w-52">종목명</th>
-              <th className="text-right py-2.5 pr-3 font-medium w-24">보유수량</th>
-              <th className="text-right py-2.5 pr-3 font-medium w-32">평단가</th>
-              <th className="text-right py-2.5 pr-3 font-medium">매입금액</th>
-              <th className="text-right py-2.5 pr-3 font-medium w-32">현재가</th>
-              <th className="text-right py-2.5 pr-3 font-medium">평가금액</th>
-              <th className="text-right py-2.5 font-medium">수익률</th>
-              <th className="w-8" />
-            </tr>
-          </thead>
-          <tbody>
-            {readonly
-              ? liveRows.map((row, i) => (
-                  <ReadonlyDesktopRow key={row._rowKey ?? String(i)} row={row} />
-                ))
-              : liveRows.map((row, i) => (
-                  <EditableDesktopPositionRow
-                    key={row._rowKey ?? String(i)}
-                    row={row}
-                    rawRow={rows[i] ?? row}
-                    index={i}
-                    priceLoading={priceLoadingRows.has(i)}
-                    {...sharedProps}
-                  />
-                ))}
-          </tbody>
-        </table>
-      </div>
+      {isSmUp !== false && (
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                <th className="text-left py-2.5 pr-3 pl-1 font-medium w-52">종목명</th>
+                <th className="text-right py-2.5 pr-3 font-medium w-24">보유수량</th>
+                <th className="text-right py-2.5 pr-3 font-medium w-32">평단가</th>
+                <th className="text-right py-2.5 pr-3 font-medium">매입금액</th>
+                <th className="text-right py-2.5 pr-3 font-medium w-32">현재가</th>
+                <th className="text-right py-2.5 pr-3 font-medium">평가금액</th>
+                <th className="text-right py-2.5 font-medium">수익률</th>
+                <th className="w-8" />
+              </tr>
+            </thead>
+            <tbody>
+              {readonly
+                ? liveRows.map((row, i) => (
+                    <ReadonlyDesktopRow key={row._rowKey ?? String(i)} row={row} />
+                  ))
+                : liveRows.map((row, i) => (
+                    <EditableDesktopPositionRow
+                      key={row._rowKey ?? String(i)}
+                      row={row}
+                      rawRow={rows[i] ?? row}
+                      index={i}
+                      priceLoading={priceLoadingRows.has(i)}
+                      {...sharedProps}
+                    />
+                  ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {!readonly && (
         <button

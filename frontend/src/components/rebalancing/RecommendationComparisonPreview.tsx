@@ -7,7 +7,13 @@ import {
 import type { PortfolioItem } from "@/api/portfolios";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { buildWeightDiffRows } from "@/utils/recommendationDrift";
-import PortfolioWeightChart from "@/components/portfolio-analysis/PortfolioWeightChart";
+import { lazy, Suspense } from "react";
+import { useIsSmUp } from "@/hooks/useMediaQuery";
+
+// recharts 청크 — 모바일에선 숨기는 도넛이라 데스크톱에서만 받는다(plans/125 E3)
+const PortfolioWeightChart = lazy(
+  () => import("@/components/portfolio-analysis/PortfolioWeightChart"),
+);
 
 function MetricCompareCell({
   label,
@@ -55,20 +61,27 @@ export default function RecommendationComparisonPreview({
   });
 
   const rows = buildWeightDiffRows(recommendedItems, currentItems);
+  const isSmUp = useIsSmUp();
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
       {/* 범례 없는 150px 도넛 2개는 모바일에서 식별이 어렵고 아래 표와 같은 정보 — sm+에서만 (docs/plans/67) */}
-      <div className="hidden sm:grid grid-cols-2 gap-2">
-        <div>
-          <p className="text-center text-xs text-gray-500 dark:text-gray-400">현재</p>
-          <PortfolioWeightChart items={currentItems} />
-        </div>
-        <div>
-          <p className="text-center text-xs text-teal-600 dark:text-teal-400 font-medium">추천</p>
-          <PortfolioWeightChart items={recommendedItems} />
-        </div>
-      </div>
+      {isSmUp !== false && (
+        <Suspense fallback={null}>
+          <div className="hidden sm:grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-center text-xs text-gray-500 dark:text-gray-400">현재</p>
+              <PortfolioWeightChart items={currentItems} />
+            </div>
+            <div>
+              <p className="text-center text-xs text-teal-600 dark:text-teal-400 font-medium">
+                추천
+              </p>
+              <PortfolioWeightChart items={recommendedItems} />
+            </div>
+          </div>
+        </Suspense>
+      )}
       {/* 확인창 자체가 스크롤되므로 표 안의 중첩 스크롤(max-h-40)은 두지 않는다 */}
       <div>
         <table className="w-full text-xs">

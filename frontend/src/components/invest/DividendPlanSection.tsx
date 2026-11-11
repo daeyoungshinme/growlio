@@ -40,7 +40,11 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
   const { data, isLoading, isError } = useQuery(dividendPlanQuery);
 
   // GoalTimelineCard(적립 계획 탭)와 동일한 queryKey를 써서 캐시를 공유한다 — 중복 호출 없음.
-  const { data: recommendation } = useQuery(goalRecommendationOverallQuery);
+  // 배당 목표가 있을 때만 그리므로 그때만 조회한다 — 콜드 계산이 수십 초인 무거운 추천이다(plans/125 E10)
+  const { data: recommendation } = useQuery({
+    ...goalRecommendationOverallQuery,
+    enabled: !!data?.annual_dividend_goal,
+  });
   // 월별 균등화 추천은 실적(자산 › 배당)이 아니라 계획 행동이라 여기 둔다. 접힌 동안엔 조회하지 않는다.
   const [optimizationOpen, toggleOptimization] = useCollapsible(
     false,

@@ -1,16 +1,21 @@
-import { useState, useMemo, useRef } from "react";
+import { lazy, Suspense, useState, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import EmptyState from "@/components/common/EmptyState";
 import { useIsSmUp } from "@/hooks/useMediaQuery";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { updateAccount, type AssetAccount } from "@/api/assets";
 import { fetchAllTransactions, deleteTransaction, type Transaction } from "@/api/transactions";
-import { TransactionForm } from "./TransactionForm";
+// 폼(zod 스키마)은 "내역 추가"·수정을 누를 때만 받는다(plans/125 E4)
+import SkeletonCard from "@/components/common/SkeletonCard";
+const TransactionForm = lazy(() =>
+  import("./TransactionForm").then((m) => ({ default: m.TransactionForm })),
+);
 import DepositReflectPrompt from "./DepositReflectPrompt";
 import { fmtKrw } from "@/utils/format";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidateAccountData, invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { STOCK_TYPES } from "@/constants";
@@ -67,9 +72,13 @@ export default function TransactionHistoryTab({ accounts }: Props) {
     isLoading,
     isError,
     refetch,
+    isPlaceholderData,
   } = useQuery<Transaction[]>({
     queryKey: QUERY_KEYS.allTransactions(selectedYear),
     queryFn: () => fetchAllTransactions({ year: selectedYear }),
+    // 연 단위 전체를 페이지로 끝까지 받는 무거운 조회 — 거래 CUD는 transactionsBase 무효화가 지운다(plans/125 E8)
+    staleTime: STALE_TIME.FIVE_MINUTES,
+    placeholderData: keepPreviousData,
   });
 
   const deleteMut = useMutation({
@@ -154,7 +163,10 @@ export default function TransactionHistoryTab({ accounts }: Props) {
   const paddingBottom = lastVirtual ? rowVirtualizer.getTotalSize() - lastVirtual.end : 0;
 
   return (
-    <div className="space-y-5">
+    <div
+      className={`space-y-5 transition-opacity ${isPlaceholderData ? "opacity-60" : ""}`}
+      aria-busy={isPlaceholderData}
+    >
       <div className="grid grid-cols-2 gap-4">
         <div className="card">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
@@ -235,13 +247,15 @@ export default function TransactionHistoryTab({ accounts }: Props) {
       </div>
 
       {showForm && (
-        <TransactionForm
-          key={editingTx?.id ?? "new"}
-          accounts={accounts}
-          editingTx={editingTx}
-          onSuccess={handleFormSuccess}
-          onCancel={handleFormCancel}
-        />
+        <Suspense fallback={<SkeletonCard rows={4} />}>
+          <TransactionForm
+            key={editingTx?.id ?? "new"}
+            accounts={accounts}
+            editingTx={editingTx}
+            onSuccess={handleFormSuccess}
+            onCancel={handleFormCancel}
+          />
+        </Suspense>
       )}
 
       {depositPrompt && (

@@ -94,7 +94,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+# 기본 압축 레벨 9는 0.1 CPU에서 큰 응답(overview·백테스트)마다 비싸다 —
+# 5면 크기는 거의 같고 CPU는 훨씬 적다(plans/125 B6)
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 
 app.include_router(router)
 

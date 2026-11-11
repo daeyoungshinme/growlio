@@ -10,7 +10,7 @@ import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 
 /** 연도별 실수령 배당 — 계좌 필터와 무관한 전체 계좌 합계라 화면에 기준을 표시한다 */
 export default function YearlyDividendChart() {
-  const { isDark } = useThemeStore();
+  const isDark = useThemeStore((s) => s.isDark);
   const tooltipStyle = chartTooltipStyle(isDark);
   const { data, isError, refetch } = useQuery(dividendPlanQuery);
   // 실패를 "배당 없음"(카드 숨김)으로 보이지 않게 한다
