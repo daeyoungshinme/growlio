@@ -127,12 +127,15 @@ class CacheStore:
     async def scan(self, cursor: int, match: str, count: int = 100) -> tuple[int, list[str]]:
         """SCAN 흉내 — in-memory라 커서 없이 한 번에 전체 매칭 키를 반환하고 cursor=0을 돌려준다."""
         async with self._lock:
-            regex = re.compile(fnmatch.translate(match))
-            matched = [
-                key
-                for key, (_, expires_at) in self._data.items()
-                if not self._is_expired(expires_at) and regex.match(key)
-            ]
+            # 무효화 패턴은 거의 전부 "접두어*" — 정규식 대신 startswith로 본다. sync 한 번에 패턴 십여 개로 전체 키
+            # (최대 2만)를 훑는데 0.1 CPU에서 정규식 매칭이 이벤트 루프를 붙잡았다(plans/125 B5)
+            body = match[:-1]
+            live = ((key, expires_at) for key, (_, expires_at) in self._data.items())
+            if match.endswith("*") and not any(ch in body for ch in "*?["):
+                matched = [key for key, exp in live if not self._is_expired(exp) and key.startswith(body)]
+            else:
+                regex = re.compile(fnmatch.translate(match))
+                matched = [key for key, exp in live if not self._is_expired(exp) and regex.match(key)]
             return 0, matched
 
     async def sweep_expired(self) -> int:

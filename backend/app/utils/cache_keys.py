@@ -59,6 +59,9 @@ TTL_REBALANCING_AUTO_CLAIM = 2 * 86400  # AUTO 플랜 생성 claim — 일자 �
 TTL_JOB_LOCK_REBALANCING_PLAN_BUY = 300  # 리밸런싱 매수 대기 플랜 실행 분산 락 (1분 간격 job, 중복 실행 방지)
 TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
 TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
+# 홈 "지금 할 일"의 세금 소스(액션 플랜 + 세금 요약) — DB 왕복 수십 번이라 앱 시작 버스트만 흡수할 만큼 짧게.
+# 거래·매매기록·sync·계좌·소득 구간 변경은 무효화가 primary(plans/125 B1)
+TTL_TAX_ACTION_ITEMS = 120
 TTL_TAX_OVERSEAS_REALIZED = 3600  # 해외 실현손익(KIS 기간손익 API) 1시간 — sync 시 무효화가 primary
 TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감지 마지막 값 (job이 계속 갱신, 만료는 안전망)
 TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저당 1일 1회 제한 플래그
@@ -308,6 +311,10 @@ def rebalancing_analysis_key(
 
 def tax_overseas_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
     return f"{_env_prefix()}tax:overseas:{user_id}:{acct_suffix}"
+
+
+def tax_action_items_key(user_id: uuid.UUID, year: int) -> str:
+    return f"{_env_prefix()}tax:action_items:{user_id}:{year}"
 
 
 def tax_overseas_realized_key(user_id: uuid.UUID, year: int, acct_suffix: str = "all") -> str:

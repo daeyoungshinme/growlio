@@ -16,7 +16,11 @@ from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionTotal, TransactionUpdate
-from app.utils.cache_invalidation import invalidate_dividend_caches, invalidate_user_caches
+from app.utils.cache_invalidation import (
+    invalidate_dividend_caches,
+    invalidate_tax_action_items_cache,
+    invalidate_user_caches,
+)
 from app.utils.cache_keys import challenge_progress_key, dashboard_summary_key, monthly_trend_key
 from app.utils.kst import today_kst
 
@@ -154,6 +158,8 @@ async def _invalidate_tx_caches(user_id: UUID) -> None:
         challenge_progress_key(user_id),
     )
     await invalidate_dividend_caches(cache, user_id, today_kst().year)
+    # 입금·배당은 연금/ISA 납입·금융소득 판정에 들어간다
+    await invalidate_tax_action_items_cache(cache, user_id)
 
 
 async def _get_owned_tx(tx_id: UUID, user_id: UUID, db: AsyncSession) -> Transaction:

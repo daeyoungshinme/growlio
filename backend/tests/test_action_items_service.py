@@ -347,3 +347,25 @@ async def test_recent_fx_plan_alerts_window_starts_kst_two_days_ago():
     params = stmt.compile().params
     assert datetime(2026, 11, 8, tzinfo=KST) in params.values()
     assert "FX_PLAN" in params.values()
+
+
+@pytest.mark.asyncio
+async def test_tax_source_cached_between_calls():
+    """plans/125 B1 — 세금 소스는 2분 캐시로 연속 호출 시 한 번만 계산하고, 무효화하면 다시 계산한다."""
+    from app.core.cache_store import CacheStore
+    from app.utils.cache_invalidation import invalidate_tax_action_items_cache
+
+    cache = CacheStore()
+    user_id = uuid.uuid4()
+    tax = AsyncMock(return_value=({"actions": []}, _tax_summary()))
+    with (
+        patch.object(svc, "get_tax_action_plan_with_summary", new=tax),
+        patch.object(svc, "today_kst", return_value=date(2026, 11, 23)),
+    ):
+        await svc._tax_items(user_id, MagicMock(), cache)
+        await svc._tax_items(user_id, MagicMock(), cache)
+        assert tax.await_count == 1
+
+        await invalidate_tax_action_items_cache(cache, user_id)
+        await svc._tax_items(user_id, MagicMock(), cache)
+        assert tax.await_count == 2

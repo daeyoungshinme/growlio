@@ -38,6 +38,7 @@ from app.utils.cache_invalidation import (
     invalidate_dividend_caches,
     invalidate_goal_recommendation_caches,
     invalidate_rebalancing_analysis_cache_all,
+    invalidate_tax_action_items_cache,
     invalidate_user_caches,
 )
 from app.utils.cache_keys import challenge_progress_key, dashboard_summary_key, dca_analysis_key
@@ -253,6 +254,8 @@ async def update_income_bracket(
     row = await get_or_create_settings(db, current_user.id)
     row.income_bracket = req.income_bracket.value if req.income_bracket else None
     await db.commit()
+    # 연금 세액공제율이 바뀐다 — 홈 "지금 할 일"의 절세 항목(plans/125 B1)
+    await invalidate_tax_action_items_cache(await get_cache_store(), current_user.id)
     return {"detail": "소득 구간이 저장되었습니다"}
 
 

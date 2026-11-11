@@ -176,7 +176,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 **세금 (`tax/`)**
 - **세금 집계 함정**: 삭제 계좌도 포함한다(실제 소득·납입). 모의 계좌 판정은 `is_paper_account` — `is_mock_mode` 컬럼 기본값이 True라 토스·수기 계좌를 그 값만으로 빼면 안 된다. 취득가는 현재 환율 환산이라 환차익이 빠진 추정이다(`OVERSEAS_FX_BASIS_NOTE`).
 - `tax_service.py` — 연도별 세금 추정·종합과세·건보 피부양자. 해외 실현손익은 직접 조회하지 않고 `overseas_realized_krw` 인자로 받음
-- `overseas_realized_service.py` — 해외 실현손익. KIS 실전은 브로커(TTTS3039R), 그 외는 해외 SELL `TradeRecord`(KIS 실전 계좌 기록은 이중 집계 방지로 무시). 성공 시만 1h 캐시
+- `overseas_realized_service.py` — 해외 실현손익. KIS 실전은 브로커(TTTS3039R), 그 외는 해외 SELL `TradeRecord`(KIS 실전 계좌 기록은 이중 집계 방지로 무시). 성공 시만 1h 캐시. KIS 계좌는 **계좌별 짧은 세션으로 동시 조회**(토큰 발급이 commit하므로 요청 세션 공유 금지) + single-flight
 - `tax_action_service.py` — 절세 액션 플랜(조합만). 세법 수치는 `_DEDUCTION_RULES` 연도별 테이블
 - `pension_contribution_service.py` · `isa_service.py`
 
@@ -195,7 +195,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 **기타**
 - `factor_service.py` · `insight_service.py` · `risk_service.py` · `portfolio_optimizer.py`(효율적 프론티어)
 - `estimation.py` — Ledoit-Wolf 공분산·James-Stein 기대수익률 축소(고정 노이즈분산 사용 — 표본분산 재사용 시 축소 상쇄 버그). `goal/goal_portfolio_optimizer`·`portfolio_optimizer` 공용이라 평면
-- `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음
+- `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음(세금 소스만 2분 캐시 — 세금 입력이 바뀌는 새 경로는 `invalidate_tax_action_items_cache`도 부를 것)
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
 - `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유. 정액 알림은 사용자 월 적립액 합산과 섞지 않고 원화·달러를 따로 비교) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
 - `fx_plan_service.py` — 환율 1년 위치(백분위·이평 이격·1개월 ±1σ)와 해외 적립 필요 달러의 분할 환전 구간. **예측 아님**. 현재값은 실시간 캐시(없으면 1년 일봉 마지막 종가, `rate_is_live`), Yahoo `USDKRW=X` 1년 일봉은 통계용(6h 캐시). 구간 알림은 `sync_fx_plan_alerts`가 `ExchangeRateAlert.source=FX_PLAN`(+`planned_usd`·`portfolio_id`)으로 맞춘다 — 같은 포트폴리오의 미발동 계획 알림만 교체·삭제하고 **MANUAL 알림은 건드리지 않는다**(같은 목표면 건너뜀). 발동 메일·푸시(`type=FX_PLAN`)에 구간 금액이 실린다. 필요 달러는 정액 적립 알림이 있으면 `fixed_amount_needs`의 해외 몫(없으면 월 적립액 × 해외 비중), 보유 달러는 연결 증권 계좌(**수기 `STOCK_OTHER` 포함** — 직접 입력 `deposit_usd`) 합, KIS·키움은 실시간(`usd_buying_power`, 2분 캐시 — 계좌 동기화 무효화가 지움), 계좌별 내역 `held_usd_accounts`. `WAITING_FX` 부족분은 **주문 실행 계좌 달러로만** 상쇄해 "지금" 구간에 강제(수기 계좌 달러로는 KIS·키움 주문 불가). 앱 링크는 `#fx-plan` 해시(카드 펼침) — 메일·푸시·`action_items_service._LINK_FX_PLAN`이 프론트 `FX_PLAN_ANCHOR`와 같아야 함. 알림 맞추기 범위는 `portfolio_id` 또는 `fx_need_id` 하나 — 한 범위가 다른 범위의 계획 알림을 건드리지 않는다(`_in_scope`, 프론트 `utils/fxPlanAlerts`와 같은 규칙)
@@ -213,7 +213,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 schemas/        Pydantic(라우터 인라인 스키마 금지 — 알림은 schemas/alert.py). rebalancing/ 패키지는 __init__.py 재노출(from app.schemas.rebalancing import X 유지). service_dtypes.py는 서비스 내부 TypedDict, _validators.py는 공용 금액 검증(NaN·Infinity 거부)
 core/
   config.py     Settings(pydantic-settings)
-  database.py   async engine/session, Base
+  database.py   async engine/session, Base. `release_read_connection(db)` — 외부 I/O(증권사·시세·배당) 직전에 읽기 트랜잭션을 끝내 커넥션 반납(풀 5+2 고갈 방지). 읽기 경로에서만(flush된 쓰기는 구분 못 함)
   job_runner.py report_job_failure(로그+Sentry 스택) · report_handled_failure(루프 안 삼키는 항목 실패 — 스택 없는 capture, 자격증명 지역변수 보호) · run_per_user(유저별 동시성·실패 격리) — jobs와 알림 서비스 공용. **`except`+`logger.error`만으로는 Sentry에 안 간다**(structlog는 stdlib logging 미경유)
   logging.py    structlog 시크릿 redact + yfinance 404 소음 필터. 계좌번호·이메일은 utils/masking.py.
                 **응답·DB·알림에 예외 사유는 str(e) 대신 public_error_message(e)** (SQL 파라미터·URL의 계좌번호 유출 방지)

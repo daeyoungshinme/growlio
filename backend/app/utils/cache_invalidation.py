@@ -228,5 +228,11 @@ async def invalidate_tax_overseas_caches(cache: CacheStoreType, user_id: uuid.UU
     `realized=False`: 보유 수량이 그대로인 sync — 새 매도가 없으니 실현손익(KIS 계좌당 최대 20초)은 남긴다.
     """
     await _scan_unlink(cache, f"{_env_prefix()}tax:overseas:{user_id}:*")
+    await invalidate_tax_action_items_cache(cache, user_id)
     if realized:
         await _scan_unlink(cache, f"{_env_prefix()}tax:overseas_realized:{user_id}:*")
+
+
+async def invalidate_tax_action_items_cache(cache: CacheStoreType, user_id: uuid.UUID) -> None:
+    """홈 "지금 할 일" 세금 소스 캐시(2분) — 거래·매매기록·계좌 sync/CRUD·소득 구간 변경이 부른다."""
+    await _scan_unlink(cache, f"{_env_prefix()}tax:action_items:{user_id}:*")

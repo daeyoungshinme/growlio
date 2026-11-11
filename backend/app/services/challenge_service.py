@@ -317,6 +317,9 @@ async def delete_challenge(challenge: InvestmentChallenge, db: AsyncSession, cac
 
 async def get_challenge_summary(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> ChallengeSummary:
     today = today_kst()
+    if today.day < _NUDGE_DAY_OF_MONTH:
+        # 배지·지금 할 일 모두 needs_attention만 본다 — 20일 전엔 결과가 정해져 있으니 쿼리하지 않는다(plans/125 B6)
+        return ChallengeSummary(needs_attention=False, count=0)
     current_month = _month_key(today)
     result = await db.execute(
         select(InvestmentChallenge).where(

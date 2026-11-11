@@ -42,8 +42,14 @@ from app.services.challenge_service import get_challenge_summary
 from app.services.dca_cash_shortfall_service import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls, shortfall_detail
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
 from app.services.tactical import tactical_allocation_service as tactical
-from app.services.tax.tax_action_service import get_tax_action_plan_with_summary
-from app.utils.cache_keys import CacheStoreType
+from app.services.tax.tax_action_service import TaxActionPlan, get_tax_action_plan_with_summary
+from app.utils.cache_keys import (
+    TTL_TAX_ACTION_ITEMS,
+    CacheStoreType,
+    get_cached_json,
+    set_cached_json,
+    tax_action_items_key,
+)
 from app.utils.kst import kst_day_start, today_kst
 
 logger = structlog.get_logger()
@@ -308,8 +314,23 @@ def _tax_warning_text(summary: dict[str, Any]) -> str | None:
     return None
 
 
+async def _tax_plan_and_summary(
+    user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
+) -> tuple[TaxActionPlan, dict[str, Any]]:
+    """세금 소스는 action-items에서 DB 왕복이 가장 많다 — 앱 시작 때 프리페치·카드·재진입이 겹쳐도 한 번만 계산하게
+    2분 캐시한다(plans/125 B1). 무효화는 `invalidate_tax_action_items_cache`."""
+    year = today_kst().year
+    key = tax_action_items_key(user_id, year)
+    cached = await get_cached_json(cache, key)
+    if cached is not None:
+        return cached["plan"], cached["summary"]
+    plan, summary = await get_tax_action_plan_with_summary(user_id, year, db)
+    await set_cached_json(cache, key, {"plan": plan, "summary": summary}, TTL_TAX_ACTION_ITEMS)
+    return plan, summary
+
+
 async def _tax_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
-    plan, summary = await get_tax_action_plan_with_summary(user_id, today_kst().year, db)
+    plan, summary = await _tax_plan_and_summary(user_id, db, cache)
     items: list[ActionItem] = []
     warning = _tax_warning_text(summary)
     if warning:
