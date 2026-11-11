@@ -275,7 +275,11 @@ export default function FxPlanCard({ onEditGoal }: Props) {
             )}{" "}
             → 월 {fmtUsdWhole(data.monthly_need_usd)} × {data.months}개월 − 보유{" "}
             {fmtUsdWhole(data.held_usd)}
-            {heldUsdLabel(data)} ={" "}
+            {heldUsdLabel(data)}
+            {(data.reserved_usd ?? 0) > 0 && (
+              <> (추가 환전 {fmtUsdWhole(data.reserved_usd ?? 0)} 제외)</>
+            )}{" "}
+            ={" "}
             <span className="font-semibold text-gray-900 dark:text-gray-100">
               {fmtUsdWhole(data.need_usd)} 필요
             </span>
@@ -285,7 +289,14 @@ export default function FxPlanCard({ onEditGoal }: Props) {
             <p className="text-xs text-gray-500 dark:text-gray-400">
               보유 달러:{" "}
               {data.held_usd_accounts
-                ?.map((a) => `${a.name} ${fmtUsdWhole(a.usd)}(${HELD_SOURCE_LABEL[a.source]})`)
+                ?.map(
+                  (a) =>
+                    `${a.name} ${fmtUsdWhole(a.usd)}(${HELD_SOURCE_LABEL[a.source]}${
+                      (a.reserved_usd ?? 0) > 0
+                        ? `, 추가 환전 ${fmtUsdWhole(a.reserved_usd ?? 0)} 제외`
+                        : ""
+                    })`,
+                )
                 .join(" · ")}
             </p>
           )}

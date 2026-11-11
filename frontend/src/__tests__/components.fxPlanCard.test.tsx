@@ -425,3 +425,26 @@ describe("FxPlanCard", () => {
     expect(screen.queryByText(/필요$/)).not.toBeInTheDocument();
   });
 });
+
+describe("FxPlanCard — 추가 환전 보관 달러 제외(plans/123 후속)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([]);
+  });
+
+  it("보유 달러에서 뺀 추가 환전 달러를 산식과 계좌별 내역에 보여준다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      held_usd: 700,
+      reserved_usd: 500,
+      held_usd_accounts: [
+        { account_id: "m1", name: "메리츠", usd: 700, source: "MANUAL", reserved_usd: 500 },
+      ],
+    });
+    renderWithProviders(<FxPlanCard />);
+    // 산식과 계좌별 내역 두 곳에 보인다
+    const shown = await screen.findAllByText(/추가 환전 \$500 제외/);
+    expect(shown).toHaveLength(2);
+    expect(shown[1]).toHaveTextContent("메리츠 $700(직접 입력, 추가 환전 $500 제외)");
+  });
+});

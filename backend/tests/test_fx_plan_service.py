@@ -193,8 +193,17 @@ def _acct(deposit_usd=None, asset_type="STOCK_OTHER", **kw):
     )
 
 
-def _db(portfolios, *, dca_portfolio_id=None, monthly=1_400_000.0, accounts=(), fixed=(), waiting_usd=0.0):
-    """execute 순서: 포트폴리오 목록 → 정액 적립 알림 → (필요 시) 브로커 계좌.
+def _db(
+    portfolios,
+    *,
+    dca_portfolio_id=None,
+    monthly=1_400_000.0,
+    accounts=(),
+    fixed=(),
+    waiting_usd=0.0,
+    reserved=(),
+):
+    """execute 순서: 포트폴리오 목록 → 정액 적립 알림 → (필요 시) 브로커 계좌 → 추가 환전 보관 달러(계좌별 합).
     scalar 순서: 적립 자동매수 포트폴리오 → (정액이 없을 때) 월 적립액 → 환전 대기 필요 달러."""
     db = MagicMock()
     portfolios_result = MagicMock()
@@ -203,7 +212,9 @@ def _db(portfolios, *, dca_portfolio_id=None, monthly=1_400_000.0, accounts=(), 
     fixed_result.all.return_value = list(fixed)
     accounts_result = MagicMock()
     accounts_result.scalars.return_value.all.return_value = list(accounts)
-    db.execute = AsyncMock(side_effect=[portfolios_result, fixed_result, accounts_result])
+    reserved_result = MagicMock()
+    reserved_result.all.return_value = list(reserved)
+    db.execute = AsyncMock(side_effect=[portfolios_result, fixed_result, accounts_result, reserved_result])
     scalars = [dca_portfolio_id] + ([] if fixed else [monthly]) + [waiting_usd]
     db.scalar = AsyncMock(side_effect=scalars)
     return db
@@ -739,3 +750,64 @@ async def test_delete_portfolio_removes_its_fx_plan_alerts():
     assert "portfolio_id" in sql
     assert "source" in sql
     db.delete.assert_awaited_once_with(portfolio)
+
+
+# ── plans/123 후속 — 추가 환전(여행 등) 달러를 보유 달러에서 제외 ─────
+
+
+async def test_reserved_travel_usd_is_subtracted_from_that_account_only():
+    """여행용으로 증권 계좌에 둔 달러는 그 계좌의 적립 보유 달러에서 빠진다(다른 계좌는 그대로)."""
+    meritz = _acct(1200.0, name="메리츠")
+    other = _acct(300.0, name="다른 계좌")
+    db = _db([_portfolio()], accounts=[meritz, other], reserved=[(meritz.id, 500.0)])
+    result = await _plan(db)
+    assert result["held_usd"] == 1000.0  # (1200 − 500) + 300
+    assert result["reserved_usd"] == 500.0
+    # 600달러 × 3개월 − 1000
+    assert result["need_usd"] == 800.0
+    assert [(a["name"], a["usd"], a["reserved_usd"]) for a in result["held_usd_accounts"]] == [
+        ("메리츠", 700.0, 500.0),
+        ("다른 계좌", 300.0, 0.0),
+    ]
+
+
+async def test_reserved_usd_floors_at_zero_and_account_still_listed():
+    """계좌 달러보다 여행 달러가 커도 보유 달러가 음수가 되지 않고, 0이 된 계좌도 이유와 함께 보인다."""
+    meritz = _acct(200.0, name="메리츠")
+    db = _db([_portfolio()], accounts=[meritz], reserved=[(meritz.id, 500.0)])
+    result = await _plan(db)
+    assert result["held_usd"] == 0.0
+    assert [(a["usd"], a["reserved_usd"]) for a in result["held_usd_accounts"]] == [(0.0, 500.0)]
+
+
+async def test_reserved_usd_for_unrelated_account_has_no_effect():
+    meritz = _acct(1200.0)
+    db = _db([_portfolio()], accounts=[meritz], reserved=[(uuid.uuid4(), 500.0)])
+    result = await _plan(db)
+    assert (result["held_usd"], result["reserved_usd"]) == (1200.0, 0.0)
+
+
+async def test_waiting_fx_offset_does_not_use_reserved_travel_usd():
+    """여행 달러로 환전 대기 매수를 다시 진행시키지 않는다 — 상쇄도 뺀 뒤 값을 쓴다."""
+    kis = _acct(0.0, asset_type="STOCK_KIS", kis_account_no="1")
+    db = _db([_portfolio()], accounts=[kis], waiting_usd=450.0, reserved=[(kis.id, 400.0)])
+    with patch.object(svc, "fetch_usd_buying_power", new=AsyncMock(return_value=500.0)):
+        result = await _plan(db, months=1, closes=_closes())
+    assert result["held_usd"] == 100.0
+    assert result["waiting_fx_usd"] == 350.0
+
+
+async def test_reserved_query_counts_only_upcoming_needs_with_account():
+    from datetime import date
+
+    db = MagicMock()
+    result = MagicMock()
+    result.all.return_value = []
+    db.execute = AsyncMock(return_value=result)
+    with patch.object(svc, "today_kst", return_value=date(2026, 11, 11)):
+        await svc.reserved_usd_by_account(db, uuid.uuid4())
+    stmt = db.execute.await_args.args[0]
+    sql = str(stmt)
+    assert "fx_extra_needs.reserved_account_id IS NOT NULL" in sql
+    assert "fx_extra_needs.due_date >=" in sql
+    assert date(2026, 11, 11) in stmt.compile().params.values()

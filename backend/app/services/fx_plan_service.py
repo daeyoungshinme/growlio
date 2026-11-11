@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import math
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, timedelta
 from typing import Any, Literal
 
@@ -284,6 +284,7 @@ class HeldUsdAccount:
     usd: float
     source: HeldUsdSource
     live_failed: bool = False  # 실시간 조회 대상인데 실패해 동기화 값을 썼다
+    reserved_usd: float = 0.0  # 추가 환전 항목이 이 계좌에 둔 달러 — `usd`는 이미 이만큼 뺀 값이다
 
 
 async def _account_usd(
@@ -330,7 +331,35 @@ async def _held_usd(
     accounts: dict[uuid.UUID, AssetAccount] = {a.id: a for a in (await db.execute(stmt)).scalars().all()}
     for account in extra_accounts:
         accounts.setdefault(account.id, account)
-    return [await _account_usd(db, cache, user_id, account) for account in accounts.values()]
+    held = [await _account_usd(db, cache, user_id, account) for account in accounts.values()]
+    reserved = await reserved_usd_by_account(db, user_id)
+    return [_minus_reserved(h, reserved.get(h.account.id, 0.0)) for h in held]
+
+
+async def reserved_usd_by_account(db: AsyncSession, user_id: uuid.UUID) -> dict[uuid.UUID, float]:
+    """추가 환전 항목(plans/123)이 증권 계좌에 둔 달러 — 계좌별 `exchanged_usd` 합.
+
+    필요일이 지난 항목은 여행에 쓴 것으로 보고 세지 않는다(남은 달러는 다시 적립용으로 센다).
+    """
+    rows = (
+        await db.execute(
+            select(FxExtraNeed.reserved_account_id, func.sum(FxExtraNeed.exchanged_usd))
+            .where(
+                FxExtraNeed.user_id == user_id,
+                FxExtraNeed.reserved_account_id.is_not(None),
+                FxExtraNeed.due_date >= today_kst(),
+            )
+            .group_by(FxExtraNeed.reserved_account_id)
+        )
+    ).all()
+    return {account_id: float(total or 0) for account_id, total in rows if account_id is not None}
+
+
+def _minus_reserved(held: HeldUsdAccount, reserved: float) -> HeldUsdAccount:
+    """여행 등으로 둔 달러를 적립용 보유 달러에서 뺀다(계좌별 0 하한)."""
+    if reserved <= 0:
+        return held
+    return replace(held, usd=max(0.0, held.usd - reserved), reserved_usd=round(reserved, 2))
 
 
 def _held_is_live(held: list[HeldUsdAccount]) -> bool:
@@ -410,6 +439,7 @@ async def get_fx_plan(
         "held_usd_is_live": False,
         "held_usd_accounts": [],
         "waiting_fx_usd": 0.0,
+        "reserved_usd": 0.0,  # 추가 환전 항목이 증권 계좌에 둔 달러 — 보유 달러에서 뺐다(plans/123 후속)
     }
     if portfolio is None:
         result["status"] = "NO_PORTFOLIO"
@@ -450,6 +480,7 @@ async def get_fx_plan(
         monthly_need_usd = monthly_deposit * overseas_pct / 100 / live_rate
 
     held = await _held_usd(db, cache, user_id, portfolio, [account for _, account in fixed])
+    # 추가 환전 항목이 둔 달러는 이미 뺀 값이다(`_held_usd`) — WAITING_FX 상쇄도 여행 달러를 쓰지 않는다
     held_usd = sum(h.usd for h in held)
     waiting_required = await _waiting_fx_required_usd(db, user_id, portfolio)
     # 대기 중인 매수는 보유 달러로 먼저 채운다 — 남는 부족분만 "지금" 환전해야 매수가 다시 진행된다.
@@ -464,10 +495,18 @@ async def get_fx_plan(
         held_usd=round(held_usd, 2),
         held_usd_is_live=_held_is_live(held),
         held_usd_accounts=[
-            {"account_id": h.account.id, "name": h.account.name, "usd": round(h.usd, 2), "source": h.source}
+            {
+                "account_id": h.account.id,
+                "name": h.account.name,
+                "usd": round(h.usd, 2),
+                "source": h.source,
+                "reserved_usd": h.reserved_usd,
+            }
             for h in sorted(held, key=lambda h: h.usd, reverse=True)
-            if h.usd > 0
+            # 다 빼서 0이 된 계좌도 보여 준다 — 왜 보유 달러가 0인지 알 수 있게
+            if h.usd > 0 or h.reserved_usd > 0
         ],
+        reserved_usd=round(sum(h.reserved_usd for h in held), 2),
         waiting_fx_usd=round(waiting_fx_usd, 2),
         need_usd=round(need_usd, 2),
         tranches=[asdict(t) for t in compute_fx_plan(position, need_usd, live_rate, waiting_fx_usd)],

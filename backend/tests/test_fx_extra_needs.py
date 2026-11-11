@@ -35,6 +35,7 @@ def _need(*, amount=1000.0, exchanged=0.0, days=30, name="도쿄 여행"):
         amount_usd=amount,
         exchanged_usd=exchanged,
         due_date=TODAY + timedelta(days=days),
+        reserved_account_id=None,
     )
 
 
@@ -94,10 +95,10 @@ def test_need_row_caps_exchanged_at_amount():
 # ── 목록 ────────────────────────────────────────────────────
 
 
-def _list_db(needs):
+def _list_db(needs, names=None):
     db = MagicMock()
     result = MagicMock()
-    result.scalars.return_value.all.return_value = needs
+    result.all.return_value = list(zip(needs, names or [None] * len(needs), strict=True))
     db.execute = AsyncMock(return_value=result)
     return db
 
@@ -419,6 +420,7 @@ def _row_need():
         exchanged_usd=0.0,
         due_date=date.today() + timedelta(days=60),
         created_at=datetime.now(UTC),
+        reserved_account_id=None,
     )
 
 
@@ -511,3 +513,82 @@ def test_api_list(api):
         res = client.get("/api/v1/invest/fx-extra-needs")
     assert res.status_code == 200
     assert res.json()["needs"] == []
+
+
+# ── 보관 증권 계좌(plans/123 후속) ───────────────────────────
+
+
+def test_need_row_includes_reserved_account():
+    n = _need()
+    n.reserved_account_id = uuid.uuid4()
+    row = svc.build_need_row(n, None, 1400.0, True, TODAY, "메리츠")
+    assert (row["reserved_account_id"], row["reserved_account_name"]) == (n.reserved_account_id, "메리츠")
+    n.reserved_account_id = None
+    assert svc.build_need_row(n, None, 1400.0, True, TODAY, "메리츠")["reserved_account_name"] is None
+
+
+async def test_list_returns_reserved_account_name():
+    n = _need()
+    n.reserved_account_id = uuid.uuid4()
+    ctx = fx_plan_service.FxRateContext(1400.0, True, None, has_rate=True)
+    with (
+        patch.object(svc, "load_fx_rate_context", new=AsyncMock(return_value=ctx)),
+        patch.object(svc, "today_kst", return_value=TODAY),
+    ):
+        data = await svc.list_fx_extra_needs(_list_db([n], ["메리츠"]), CacheStore(), uuid.uuid4())
+    assert data["needs"][0]["reserved_account_name"] == "메리츠"
+
+
+async def test_create_rejects_unowned_or_non_stock_account():
+    db = MagicMock()
+    db.scalar = AsyncMock(return_value=None)  # 소유한 활성 증권 계좌가 아님
+    with patch.object(svc, "today_kst", return_value=TODAY), pytest.raises(NotFoundError):
+        await svc.create_fx_extra_need(db, uuid.uuid4(), "여행", 100.0, 0.0, TODAY, reserved_account_id=uuid.uuid4())
+    stmt = db.scalar.await_args.args[0]
+    sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+    assert "STOCK_OTHER" in sql
+    assert "is_active" in sql
+
+
+async def test_create_saves_reserved_account():
+    account = SimpleNamespace(id=uuid.uuid4())
+    db = MagicMock()
+    db.scalar = AsyncMock(side_effect=[account, 0])
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    with patch.object(svc, "today_kst", return_value=TODAY):
+        need = await svc.create_fx_extra_need(
+            db, uuid.uuid4(), "여행", 100.0, 0.0, TODAY, reserved_account_id=account.id
+        )
+    assert need.reserved_account_id == account.id
+
+
+async def test_update_clears_reserved_account_with_null():
+    need = _need()
+    need.reserved_account_id = uuid.uuid4()
+    db = _crud_db(need=need)
+    with patch.object(svc, "today_kst", return_value=TODAY):
+        await svc.update_fx_extra_need(db, uuid.uuid4(), need.id, {"reserved_account_id": None})
+    assert need.reserved_account_id is None
+
+
+async def test_update_validates_new_reserved_account():
+    need = _need()
+    db = MagicMock()
+    db.scalar = AsyncMock(side_effect=[need, None])
+    with patch.object(svc, "today_kst", return_value=TODAY), pytest.raises(NotFoundError):
+        await svc.update_fx_extra_need(db, uuid.uuid4(), need.id, {"reserved_account_id": uuid.uuid4()})
+
+
+def test_api_patch_passes_null_reserved_account(api):
+    client, _ = api
+    need = _row_need()
+    ctx = fx_plan_service.FxRateContext(1400.0, True, None, has_rate=True)
+    with (
+        patch.object(svc, "update_fx_extra_need", new=AsyncMock(return_value=need)) as update,
+        patch.object(fx_plan_service, "load_fx_rate_context", new=AsyncMock(return_value=ctx)),
+    ):
+        res = client.patch(f"/api/v1/invest/fx-extra-needs/{need.id}", json={"reserved_account_id": None, "name": None})
+    assert res.status_code == 200, res.text
+    # name의 null은 무시, 보관 계좌의 null은 해제 값으로 전달
+    assert update.await_args.args[3] == {"reserved_account_id": None}

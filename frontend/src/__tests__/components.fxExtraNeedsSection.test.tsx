@@ -17,6 +17,10 @@ vi.mock("@/api/alerts", async (importOriginal) => ({
 }));
 vi.mock("@/utils/queryInvalidation", () => ({ invalidateFxExtraNeedData: vi.fn() }));
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
+vi.mock("@/api/assets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/assets")>()),
+  fetchAccounts: vi.fn(),
+}));
 
 import {
   createFxExtraNeed,
@@ -26,7 +30,11 @@ import {
   updateFxExtraNeed,
 } from "@/api/invest";
 import { fetchExchangeRateAlerts } from "@/api/alerts";
+import { fetchAccounts, type AssetAccount } from "@/api/assets";
 import FxExtraNeedsSection from "@/components/invest/FxExtraNeedsSection";
+
+const account = (id: string, name: string, asset_type: string, is_active = true) =>
+  ({ id, name, asset_type, is_active }) as AssetAccount;
 
 const need = (over: Partial<FxExtraNeed> = {}): FxExtraNeed => ({
   id: "n1",
@@ -67,6 +75,12 @@ describe("FxExtraNeedsSection (plans/123)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fetchExchangeRateAlerts).mockResolvedValue([]);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      account("k1", "한국투자", "STOCK_KIS"),
+      account("m1", "메리츠", "STOCK_OTHER"),
+      account("b1", "생활비 통장", "BANK_SAVINGS"),
+      account("old", "해지 계좌", "STOCK_KIWOOM", false),
+    ]);
     vi.mocked(syncFxExtraNeedAlerts).mockResolvedValue({
       created: 2,
       updated: 0,
@@ -174,7 +188,57 @@ describe("FxExtraNeedsSection (plans/123)", () => {
         amount_usd: 1000,
         exchanged_usd: 0,
         due_date: "2099-01-01",
+        reserved_account_id: null,
       }),
+    );
+  });
+
+  it("보관 증권 계좌를 고르면 함께 저장한다 — 활성 증권 계좌만 고를 수 있다(plans/123 후속)", async () => {
+    mockNeeds([]);
+    vi.mocked(createFxExtraNeed).mockResolvedValue(need());
+    renderWithProviders(<FxExtraNeedsSection />);
+
+    fireEvent.click(await screen.findByText("추가 환전 등록"));
+    fireEvent.change(await screen.findByLabelText("이름"), { target: { value: "여행" } });
+    fireEvent.change(screen.getByLabelText("필요한 금액 (USD)"), { target: { value: "500" } });
+    fireEvent.change(screen.getByLabelText("필요일"), { target: { value: "2099-01-01" } });
+    const select = screen.getByLabelText("이 달러를 둔 곳");
+    await screen.findByRole("option", { name: "메리츠 달러 예수금" });
+    expect(screen.getByRole("option", { name: "한국투자 달러 예수금" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /생활비 통장/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /해지 계좌/ })).not.toBeInTheDocument();
+    fireEvent.change(select, { target: { value: "m1" } });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() =>
+      expect(createFxExtraNeed).toHaveBeenCalledWith(
+        expect.objectContaining({ reserved_account_id: "m1" }),
+      ),
+    );
+  });
+
+  it("수정에서 계좌 밖으로 바꾸면 null로 해제한다", async () => {
+    mockNeeds([need({ reserved_account_id: "m1", reserved_account_name: "메리츠" })]);
+    vi.mocked(updateFxExtraNeed).mockResolvedValue(need());
+    renderWithProviders(<FxExtraNeedsSection />);
+
+    expect(
+      await screen.findByText("메리츠 달러 예수금 · 적립 환전 계획에서 제외"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "도쿄 여행 더 보기" }));
+    fireEvent.click(screen.getByText("수정"));
+    const select = await screen.findByLabelText("이 달러를 둔 곳");
+    // 계좌 목록이 늦게 와도 고른 계좌는 상태로 유지된다 — 옵션이 생기면 그대로 선택돼 보인다
+    await screen.findByRole("option", { name: "메리츠 달러 예수금" });
+    expect(select).toHaveValue("m1");
+    fireEvent.change(select, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() =>
+      expect(updateFxExtraNeed).toHaveBeenCalledWith(
+        "n1",
+        expect.objectContaining({ reserved_account_id: null }),
+      ),
     );
   });
 
