@@ -14,6 +14,7 @@ from app.constants import MAX_EXCHANGE_RATE_ALERTS_PER_USER
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.alert import ExchangeRateAlert
+from app.models.fx_extra_need import FxExtraNeed
 from app.models.user import User
 from app.schemas.alert import ExchangeRateAlertCreate, ExchangeRateAlertResponse
 from app.utils.cache_invalidation import invalidate_exchange_rate_alert_caches
@@ -40,13 +41,17 @@ async def list_exchange_rate_alerts(
             return cached
 
     result = await db.execute(
-        select(ExchangeRateAlert)
+        select(ExchangeRateAlert, FxExtraNeed.name)
+        .outerjoin(FxExtraNeed, FxExtraNeed.id == ExchangeRateAlert.fx_need_id)
         .where(ExchangeRateAlert.user_id == current_user.id)
         .order_by(ExchangeRateAlert.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
-    alerts_list = [ExchangeRateAlertResponse.model_validate(a) for a in result.scalars().all()]
+    alerts_list = [
+        ExchangeRateAlertResponse.model_validate(a).model_copy(update={"fx_need_name": name})
+        for a, name in result.all()
+    ]
 
     if skip == 0 and limit == 50:
         payload = [a.model_dump(mode="json") for a in alerts_list]

@@ -56,6 +56,9 @@ class ExchangeRateAlertResponse(BaseModel):
     source: Literal["MANUAL", "FX_PLAN"] = "MANUAL"
     planned_usd: float | None = None
     portfolio_id: uuid.UUID | None = None
+    # 추가 환전 항목(여행 등, plans/123)의 구간 알림이면 그 항목 — 목록 조회만 이름을 채운다
+    fx_need_id: uuid.UUID | None = None
+    fx_need_name: str | None = None
 
 
 class StockPriceAlertCreate(BaseModel):

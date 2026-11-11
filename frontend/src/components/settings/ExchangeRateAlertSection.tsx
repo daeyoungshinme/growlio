@@ -150,7 +150,7 @@ export function ExchangeRateAlertSection() {
                 </span>
                 {isFxPlanAlert(alert) && (
                   <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
-                    환전 계획
+                    {alert.fx_need_id ? `추가 환전 · ${alert.fx_need_name ?? "항목"}` : "환전 계획"}
                     {alert.planned_usd != null && ` · ${fmtUsd(Number(alert.planned_usd), 0)}`}
                   </span>
                 )}

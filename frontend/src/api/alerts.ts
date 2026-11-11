@@ -15,6 +15,9 @@ export interface ExchangeRateAlert {
   /** FX_PLAN 구간 환전 금액(달러) */
   planned_usd?: number | null;
   portfolio_id?: string | null;
+  /** 추가 환전 항목(여행 등, plans/123)의 구간 알림이면 그 항목 — 이름은 목록 조회에만 실린다 */
+  fx_need_id?: string | null;
+  fx_need_name?: string | null;
 }
 
 export const isFxPlanAlert = (alert: ExchangeRateAlert) => alert.source === "FX_PLAN";

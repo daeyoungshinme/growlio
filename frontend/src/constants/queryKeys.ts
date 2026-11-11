@@ -47,6 +47,8 @@ export const QUERY_KEYS = {
   fxPlanBase: ["fx-plan"] as const,
   fxPlan: (months: number, portfolioId: string | null) =>
     ["fx-plan", months, portfolioId ?? "auto"] as const,
+  /** 추가 환전 항목(여행 등, plans/123) */
+  fxExtraNeeds: ["fx-extra-needs"] as const,
   challenges: ["challenges"] as const,
   challengeSummary: ["challenges", "summary"] as const,
   settings: ["settings"] as const,

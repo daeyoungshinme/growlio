@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import FX_PLAN_ALERT_SOURCE
 from app.core.cache_store import CacheStore
 from app.core.job_runner import report_handled_failure
 from app.models.alert import ExchangeRateAlert
+from app.models.fx_extra_need import FxExtraNeed
 from app.models.user import User, UserSettings
 from app.services.alerts.alert_service import (
     finalize_alert_batch,
@@ -18,6 +19,7 @@ from app.services.alerts.alert_service import (
 )
 from app.services.alerts.calculator import should_trigger_exchange_rate
 from app.utils.currency import fetch_usd_krw
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -48,15 +50,22 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
             User.email,
             UserSettings.notification_email,
             UserSettings.fcm_token,
+            FxExtraNeed.name,
         )
         .join(User, User.id == ExchangeRateAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .where(ExchangeRateAlert.is_active == True, User.is_active == True)
+        .outerjoin(FxExtraNeed, FxExtraNeed.id == ExchangeRateAlert.fx_need_id)
+        .where(
+            ExchangeRateAlert.is_active == True,
+            User.is_active == True,
+            # 필요일이 지난 추가 환전 항목(plans/123)의 구간 알림은 보내지 않는다(여행이 끝난 뒤 환전하라는 알림)
+            or_(ExchangeRateAlert.fx_need_id.is_(None), FxExtraNeed.due_date >= today_kst()),
+        )
     )
     rows = result.all()
 
     async def _handle(row) -> bool:
-        alert, user_email, notification_email, fcm_token = row
+        alert, user_email, notification_email, fcm_token, need_name = row
         if not should_trigger_exchange_rate(alert, current_rate):
             return False
 
@@ -74,6 +83,7 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
                 direction=alert.direction,
                 current_rate=current_rate,
                 planned_usd=planned_usd,
+                plan_label=need_name,
             )
         except Exception as exc:
             report_handled_failure("exchange_rate_alert_email_failed", exc, user_id=str(alert.user_id))
@@ -81,7 +91,8 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
         direction_label = "이하" if alert.direction == "BELOW" else "이상"
         summary = f"USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})"
         if planned_usd is not None:
-            plan_note = f" — 계획 구간 ${planned_usd:,.0f}(약 {planned_usd * current_rate:,.0f}원) 환전"
+            scope_label = f"{need_name} 구간" if need_name else "계획 구간"
+            plan_note = f" — {scope_label} ${planned_usd:,.0f}(약 {planned_usd * current_rate:,.0f}원) 환전"
             push_title = "환전 계획 구간 도달"
             push_data: dict[str, str] | None = {"type": FX_PLAN_PUSH_TYPE}
         else:

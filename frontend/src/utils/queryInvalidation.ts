@@ -197,6 +197,15 @@ export function invalidateAlertData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.exchangeRateAlerts });
 }
 
+/** 추가 환전 항목(여행 등) CUD·구간 알림 맞추기 후 — 항목 삭제는 서버가 그 알림도 지운다 */
+export function invalidateFxExtraNeedData(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.fxExtraNeeds }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.exchangeRateAlerts }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.actionItems }),
+  ]);
+}
+
 /** 주가 알림 CUD 후 */
 export function invalidateStockPriceAlertData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts });

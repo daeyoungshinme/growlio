@@ -38,8 +38,8 @@ def _make_alert(
     )
 
 
-def _make_db_row(alert, email="user@test.com", notification_email=None, fcm_token=None):
-    return (alert, email, notification_email, fcm_token)
+def _make_db_row(alert, email="user@test.com", notification_email=None, fcm_token=None, need_name=None):
+    return (alert, email, notification_email, fcm_token, need_name)
 
 
 class TestCheckAndTriggerAlerts:

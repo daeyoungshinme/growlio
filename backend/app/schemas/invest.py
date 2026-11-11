@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -139,19 +140,28 @@ class FxPlanAlertTarget(BaseModel):
     usd: float = Field(ge=0, le=100_000_000, allow_inf_nan=False)
 
 
-class FxPlanAlertSyncRequest(BaseModel):
-    """계획 구간 목표로 환율 알림을 맞춘다 — 빈 목록이면 이 포트폴리오의 미발동 계획 알림을 모두 지운다."""
+def _unique_targets(v: list[FxPlanAlertTarget]) -> list[FxPlanAlertTarget]:
+    rates = [round(t.target_rate, 2) for t in v]
+    if len(rates) != len(set(rates)):
+        raise ValueError("같은 목표 환율이 중복되었습니다")
+    return v
 
-    portfolio_id: uuid.UUID
+
+class FxPlanAlertTargets(BaseModel):
+    """계획 구간 목표 — 빈 목록이면 이 범위의 미발동 계획 알림을 모두 지운다."""
+
     targets: list[FxPlanAlertTarget] = Field(max_length=5)
 
     @field_validator("targets")
     @classmethod
     def unique_targets(cls, v: list[FxPlanAlertTarget]) -> list[FxPlanAlertTarget]:
-        rates = [round(t.target_rate, 2) for t in v]
-        if len(rates) != len(set(rates)):
-            raise ValueError("같은 목표 환율이 중복되었습니다")
-        return v
+        return _unique_targets(v)
+
+
+class FxPlanAlertSyncRequest(FxPlanAlertTargets):
+    """계획 구간 목표로 환율 알림을 맞춘다 — 빈 목록이면 이 포트폴리오의 미발동 계획 알림을 모두 지운다."""
+
+    portfolio_id: uuid.UUID
 
 
 class FxPlanAlertSyncResponse(BaseModel):
@@ -159,3 +169,61 @@ class FxPlanAlertSyncResponse(BaseModel):
     updated: int
     removed: int
     skipped_manual: int  # 같은 목표의 직접 등록한 BELOW 알림이 이미 있어 만들지 않은 구간 수
+
+
+# ── 추가 환전 항목(여행 등, plans/123) ─────────────────────────
+
+_MAX_USD = 100_000_000  # planned_usd·amount_usd Numeric(18,2) 안쪽의 넉넉한 상한
+
+
+class FxExtraNeedCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    amount_usd: float = Field(gt=0, le=_MAX_USD, allow_inf_nan=False)
+    exchanged_usd: float = Field(0, ge=0, le=_MAX_USD, allow_inf_nan=False)
+    due_date: date
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("이름을 입력해 주세요")
+        return v
+
+
+class FxExtraNeedUpdate(BaseModel):
+    """보낸 필드만 바꾼다(null은 무시)."""
+
+    name: str | None = Field(None, min_length=1, max_length=40)
+    amount_usd: float | None = Field(None, gt=0, le=_MAX_USD, allow_inf_nan=False)
+    exchanged_usd: float | None = Field(None, ge=0, le=_MAX_USD, allow_inf_nan=False)
+    due_date: date | None = None
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("이름을 입력해 주세요")
+        return v
+
+
+class FxExtraNeedResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    amount_usd: float
+    exchanged_usd: float
+    remaining_usd: float
+    due_date: date
+    days_left: int  # 음수면 필요일이 지남
+    # OK = 구간 있음, DONE = 다 환전함, PAST_DUE = 필요일 지남, NO_RATE = 환율을 몰라 구간 계산 안 함
+    status: Literal["OK", "DONE", "PAST_DUE", "NO_RATE"]
+    tranches: list[FxTrancheResponse]
+
+
+class FxExtraNeedsResponse(BaseModel):
+    rate: float | None  # 구간 계산에 쓴 환율(항목이 없거나 환율을 모르면 None)
+    rate_is_live: bool = True
+    needs: list[FxExtraNeedResponse]

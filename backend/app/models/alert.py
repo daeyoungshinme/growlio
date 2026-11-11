@@ -57,10 +57,15 @@ class ExchangeRateAlert(_AlertMixin, Base):
     portfolio_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
     )
+    # 추가 환전 항목(plans/123)의 구간 알림이면 그 항목 — 항목을 지우면 알림도 지운다. portfolio_id와 동시에 쓰지 않는다
+    fx_need_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("fx_extra_needs.id", ondelete="CASCADE"), nullable=True
+    )
 
     __table_args__ = (
         Index("idx_exchange_rate_alerts_user", "user_id"),
         Index("idx_exchange_rate_alerts_portfolio", "portfolio_id"),
+        Index("idx_exchange_rate_alerts_fx_need", "fx_need_id"),
     )
 
 

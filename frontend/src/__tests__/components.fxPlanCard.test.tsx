@@ -9,12 +9,24 @@ const renderWithProviders = (ui: ReactNode) => renderBase(<MemoryRouter>{ui}</Me
 import type { FxPlanData } from "@/api/invest";
 import type { ExchangeRateAlert } from "@/api/alerts";
 
-vi.mock("@/api/invest", () => ({ fetchFxPlan: vi.fn(), syncFxPlanAlerts: vi.fn() }));
+// 카드 아래 추가 환전 섹션(plans/123)은 components.fxExtraNeedsSection.test.tsx에서 본다 — 여기선 빈 목록
+vi.mock("@/api/invest", () => ({
+  fetchFxPlan: vi.fn(),
+  syncFxPlanAlerts: vi.fn(),
+  fetchFxExtraNeeds: vi.fn(() => Promise.resolve({ rate: null, rate_is_live: true, needs: [] })),
+  createFxExtraNeed: vi.fn(),
+  updateFxExtraNeed: vi.fn(),
+  deleteFxExtraNeed: vi.fn(),
+  syncFxExtraNeedAlerts: vi.fn(),
+}));
 vi.mock("@/api/alerts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/api/alerts")>()),
   fetchExchangeRateAlerts: vi.fn(),
 }));
-vi.mock("@/utils/queryInvalidation", () => ({ invalidateAlertData: vi.fn() }));
+vi.mock("@/utils/queryInvalidation", () => ({
+  invalidateAlertData: vi.fn(),
+  invalidateFxExtraNeedData: vi.fn(),
+}));
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
 
 import { fetchFxPlan, syncFxPlanAlerts } from "@/api/invest";

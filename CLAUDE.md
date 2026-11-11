@@ -132,6 +132,7 @@ cd frontend && npm run lint -- --max-warnings 0 && npm run format:check && npm r
 - `make migrate`가 Supabase(nestlio와 `public` 스키마 공유) DB에서 버전 충돌/실패: `backend/CLAUDE.md` "Alembic 주의"의 `growlio_alembic_version`
 - `dev.sh`는 기본적으로 8000/5173 포트를 점유한 이전(좀비) 프로세스를 강제 종료 후 재기동함. 다른 세션에서 의도적으로 띄워둔 백엔드까지 종료되는 게 문제라면 `bash dev.sh --keep-port`(또는 `make dev-keep-port`) 사용 — 8000이 사용 중이면 종료하지 않고 다음 빈 포트로 대신 구동, 프론트엔드 Vite 프록시도 자동으로 그 포트를 따라감
 - 백엔드(8000)만 뜨고 `localhost:5173` 연결 불가: dev.sh를 `Git\usr\bin\bash.exe`로 직접 실행하면 `/usr/bin`이 PATH에 없어 npm이 실패함 — dev.sh가 PATH를 자동 보정하므로, 재발 시 dev.sh 상단의 PATH 보정 블록을 먼저 확인
+- Windows에서 vitest가 모든 파일을 `TypeError: Cannot read properties of undefined (reading 'config')`(describe 줄)로 실패: 작업 경로 드라이브 문자가 소문자(`d:\…`, Git Bash `/d/…`)면 vitest가 두 번 로드된다 — `D:\project\growlio\frontend`(대문자)에서 실행. CI·코드 문제 아님
 - pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인
 - **Windows에서 Python 스크립트로 파일을 고치면 CRLF가 섞인다**(`open(..., 'w')`·`Path.write_text` 텍스트 모드) → prettier `format:check` 대량 실패. `open(..., newline='')`로 쓰거나 사후 `sed -i 's/\r$//' <파일>`. 반대로 `core.autocrlf=true`라 작업 트리의 일부 파일은 CRLF여서, 여러 줄 문자열 치환이 안 맞으면 Edit 도구를 쓴다(커밋은 `.gitattributes`의 `eol=lf`로 LF)
 - **동시 세션 작업**: 이 저장소는 여러 창/세션에서 병행 작업되는 경우가 잦음 — 계획 수립·구현 도중 `git status`가 대화 시작 시점과 달라져 있다면 다른 세션의 진행 중 작업일 가능성이 높음. 무시하거나 되돌리지 말고 먼저 `git diff`로 변경 내용을 확인할 것

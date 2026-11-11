@@ -148,7 +148,7 @@ async def test_check_and_trigger_alerts_below_condition(mock_db):
     )
 
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, "user@example.com", None, None)]
+    execute_result.all.return_value = [(alert, "user@example.com", None, None, None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     # send_exchange_rate_alert는 함수 내부에서 로컬 임포트됨 → 소스 모듈 경로로 패치

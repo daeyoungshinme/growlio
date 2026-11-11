@@ -14,6 +14,7 @@ from app.models.asset import (
     Transaction,
 )
 from app.models.challenge import InvestmentChallenge
+from app.models.fx_extra_need import FxExtraNeed
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem, PortfolioItemMember
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.models.tactical import TacticalStrategy
@@ -36,6 +37,7 @@ __all__ = [
     "KiwoomToken",
     "TossToken",
     "InvestmentChallenge",
+    "FxExtraNeed",
     "Portfolio",
     "PortfolioItem",
     "PortfolioItemMember",

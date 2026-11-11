@@ -76,6 +76,8 @@ class TestExchangeRateAlerts:
             instance.source = "MANUAL"
             instance.planned_usd = None
             instance.portfolio_id = None
+            instance.fx_need_id = None
+            instance.fx_need_name = None
             MockAlert.return_value = instance
             resp = client.post("/api/v1/alerts/exchange-rate", json=payload)
         assert resp.status_code in (200, 201)
