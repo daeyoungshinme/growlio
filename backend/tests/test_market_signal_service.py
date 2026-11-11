@@ -821,6 +821,9 @@ class TestConfirmedCompositeLevel:
         ):
             level, freshness = await get_confirmed_composite_level(mock_cache, mock_db)
         assert (level, freshness) == ("GREEN", "LIVE")
+        # 대기 후보가 없으면 DELETE+commit을 하지 않는다 — 전술 GET마다 WAL 쓰기가 나갔다(plans/125 B2)
+        mock_db.execute.assert_not_called()
+        mock_db.commit.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_first_deviation_does_not_promote_yet(self, mock_db, mock_cache):

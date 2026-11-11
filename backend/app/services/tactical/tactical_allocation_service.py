@@ -8,6 +8,7 @@ import X`·`patch.object(tactical, ...)` 호출부는 그대로 유효하다. �
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -120,9 +121,18 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
     """유저 무관 공통 입력(매크로 확정 등급 + 차트 지표)과 관측 국면."""
     from app.services.market_signal.market_signal_service import get_confirmed_composite_level
 
-    # 실패하면 내부에서 (GREEN, STALE)로 폴백한다
-    macro_level, freshness = await get_confirmed_composite_level(cache, db)
-    technicals: dict[str, TechnicalSnapshot] = await get_technical_signals(cache)
+    # 차트 지표·틸트 입력은 세션을 쓰지 않아 매크로 확정(세션 사용)과 동시에 조회한다(plans/125 B2)
+    technicals_task = asyncio.create_task(get_technical_signals(cache))
+    tilt_task = asyncio.create_task(get_tilt_inputs(cache))
+    try:
+        # 실패하면 내부에서 (GREEN, STALE)로 폴백한다
+        macro_level, freshness = await get_confirmed_composite_level(cache, db)
+        technicals: dict[str, TechnicalSnapshot] = await technicals_task
+        tilt_inputs = await tilt_task
+    except BaseException:
+        technicals_task.cancel()
+        tilt_task.cancel()
+        raise
     trends = {t: s["trend"] for t, s in technicals.items()}
     qqq_snap = technicals.get("QQQ")
     qqq_stage = qqq_snap.get("pullback_stage", "UNKNOWN") if qqq_snap else "UNKNOWN"
@@ -131,7 +141,6 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
     observed_on, reasons_on = classify_regime(macro_level, freshness, trends, prev="RISK_ON")
     # 매크로를 끈 전략용 — 매크로가 GREEN 고정이라 공격 유지 히스테리시스와 무관(prev 불필요)
     observed_nm, reasons_nm = classify_regime(macro_level, freshness, trends, use_macro=False)
-    tilt_inputs = await get_tilt_inputs(cache)
     observed_tilt = classify_tilt(tilt_inputs["real_yield_change_pp"], tilt_inputs["relative_strength_pct"])
     return {
         "macro_level": macro_level,
