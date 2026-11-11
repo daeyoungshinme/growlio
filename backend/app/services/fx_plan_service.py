@@ -299,7 +299,7 @@ async def _fetch_live_usd(user_id: uuid.UUID, account_id: uuid.UUID, cache: Cach
     계좌들을 병렬로 조회하려고 `sync_all_service.sync_accounts`와 같은 패턴을 쓴다(plans/124 B).
     """
     async with AsyncSessionLocal() as session:
-        return await fetch_usd_buying_power(account_id, user_id, session, cache)
+        return await fetch_usd_buying_power(account_id, user_id, session, cache, release_db=True)
 
 
 async def _account_usd(cache: CacheStoreType, user_id: uuid.UUID, account: AssetAccount) -> HeldUsdAccount:
@@ -344,6 +344,10 @@ async def _held_usd(
     accounts: dict[uuid.UUID, AssetAccount] = {a.id: a for a in (await db.execute(stmt)).scalars().all()}
     for account in extra_accounts:
         accounts.setdefault(account.id, account)
+    # 증권사 대기(수 초) 동안 요청 세션이 커넥션을 쥐지 않게 반납한다 — 계좌별 세션 3개와 겹치면 풀(5+2)이
+    # 고갈돼 다른 요청이 get_current_user에서 pool_timeout까지 줄을 섰다. 읽기만 했고 expire_on_commit=False라
+    # 위에서 읽은 객체는 그대로 쓰며, 이후 쿼리는 새 트랜잭션을 autobegin한다
+    await db.commit()
     # 계좌마다 증권사 조회(토큰 + 잔고)가 수 초 걸린다 — 순차로 쌓지 않고 병렬로(plans/124 B)
     sem = asyncio.Semaphore(_LIVE_USD_CONCURRENCY)
 
