@@ -131,6 +131,16 @@ export interface FxTranche {
   krw_estimate: number;
 }
 
+/** LIVE = 증권사 실시간, SYNCED = 마지막 동기화 값(토스·실시간 실패), MANUAL = 수기 계좌에 직접 입력한 값 */
+export type FxHeldUsdSource = "LIVE" | "SYNCED" | "MANUAL";
+
+export interface FxPlanHeldAccount {
+  account_id: string;
+  name: string;
+  usd: number;
+  source: FxHeldUsdSource;
+}
+
 export interface FxPlanData {
   position: FxPosition | null;
   /** false = 실시간 환율이 없어 1년 일봉 마지막 종가 기준 */
@@ -151,6 +161,8 @@ export interface FxPlanData {
   deposit_source?: "DCA_AMOUNT" | "MONTHLY_GOAL" | null;
   /** 달러가 있는 계좌를 모두 증권사에서 실시간으로 읽었는지(false면 동기화 기준) */
   held_usd_is_live?: boolean;
+  /** 보유 달러 계좌별 내역(0달러 제외, 큰 순) — 옛 persist 캐시엔 없을 수 있다 */
+  held_usd_accounts?: FxPlanHeldAccount[];
   /** 환전 대기 중인 적립 매수를 진행하려면 지금 더 필요한 달러 */
   waiting_fx_usd?: number;
 }

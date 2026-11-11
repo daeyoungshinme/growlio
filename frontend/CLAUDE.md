@@ -92,7 +92,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 진입점은 `portfolioId=<id>&openAlert=1`(`openAlert=dca`는 적립식 자동매수 프리셋) URL 파라미터로 요청. 모달을 직접 마운트하지 말 것.
 - `invest/ChallengeSection` — 챌린지 탭. 홈 요약 `dashboard/ChallengeProgressCard`, 네비 빨간 점 `useChallengeNudge`.
 - `invest/GoalSettingWizard` — 목표 최초 설정 6단계 마법사(`InvestPlanPage`의 재설정 모달과 별개).
-- `invest/FxPlanCard` — 적립 계획 탭 접힘 카드 "달러 환전 계획"(`GET /invest/fx-plan`). 목표 환율 구간은 `syncFxPlanAlerts`(`PUT /invest/fx-plan/alerts`)로 한 번에 맞춘다 — 계획 알림(`source=FX_PLAN`)은 목표·금액이 바뀌면 교체, 같은 목표의 직접 등록 알림은 표시만. 산식은 `deposit_source`(정액/월 적립)·`held_usd_is_live`(실시간/동기화)를 표시하고 `waiting_fx_usd`>0이면 리밸런싱 이력 링크 안내. `InvestPlanPage`는 `#fx-plan`(`FX_PLAN_ANCHOR`, 백엔드 링크·푸시 `FX_PLAN`과 같은 해시)으로 들어오면 카드를 펼치고 스크롤. `fxPlanBase`는 적립(`invalidateDcaData`)·동기화·계좌·포트폴리오·리밸런싱 알림·전술 연동 해제 무효화가 함께 지운다. 환율이 없으면 서버가 `NO_RATE`(달러 계산 안 함).
+- `invest/FxPlanCard` — 적립 계획 탭 접힘 카드 "달러 환전 계획"(`GET /invest/fx-plan`). 목표 환율 구간은 `syncFxPlanAlerts`(`PUT /invest/fx-plan/alerts`)로 한 번에 맞춘다 — 계획 알림(`source=FX_PLAN`)은 목표·금액이 바뀌면 교체, 같은 목표의 직접 등록 알림은 표시만. 산식은 `deposit_source`(정액/월 적립)·`held_usd_is_live`(실시간/동기화, 수기 계좌가 섞이면 "직접 입력 포함")와 계좌별 `held_usd_accounts`를 표시하고 `waiting_fx_usd`>0이면 리밸런싱 이력 링크 안내. `InvestPlanPage`는 `#fx-plan`(`FX_PLAN_ANCHOR`, 백엔드 링크·푸시 `FX_PLAN`과 같은 해시)으로 들어오면 카드를 펼치고 스크롤. `fxPlanBase`는 적립(`invalidateDcaData`)·동기화·계좌·포트폴리오·리밸런싱 알림·전술 연동 해제 무효화가 함께 지운다. 환율이 없으면 서버가 `NO_RATE`(달러 계산 안 함).
 
 **Android 홈 위젯**: `useWidget.ts` ↔ `plugins/WidgetPlugin.ts` ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java` — 위젯 UI 변경 시 Java도 함께.
 

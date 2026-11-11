@@ -103,6 +103,14 @@ class FxPortfolioOption(BaseModel):
     name: str
 
 
+class FxPlanHeldAccount(BaseModel):
+    account_id: uuid.UUID
+    name: str
+    usd: float
+    # LIVE = 증권사 실시간, SYNCED = 마지막 동기화 값(토스·실시간 실패), MANUAL = 수기 계좌에 직접 입력한 값
+    source: Literal["LIVE", "SYNCED", "MANUAL"]
+
+
 class FxPlanResponse(BaseModel):
     position: FxPositionResponse | None  # 1년 시계열 조회 실패 시 None
     rate_is_live: bool = True  # False면 실시간 환율이 없어 1년 일봉 마지막 종가(없으면 설정 fallback) 기준
@@ -121,6 +129,7 @@ class FxPlanResponse(BaseModel):
     # DCA_AMOUNT = 정액 적립 알림 금액의 해외 몫, MONTHLY_GOAL = 월 적립액 × 해외 비중. 계산 전 상태면 None
     deposit_source: Literal["DCA_AMOUNT", "MONTHLY_GOAL"] | None = None
     held_usd_is_live: bool = False  # 달러가 있는 계좌를 모두 증권사에서 실시간으로 읽었는지
+    held_usd_accounts: list[FxPlanHeldAccount] = []  # 보유 달러 계좌별 내역(0달러 제외, 큰 순)
     waiting_fx_usd: float = 0.0  # 환전 대기 중인 적립 매수를 진행하려면 지금 더 필요한 달러
 
 

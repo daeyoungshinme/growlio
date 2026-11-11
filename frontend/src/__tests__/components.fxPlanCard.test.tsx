@@ -114,6 +114,22 @@ describe("FxPlanCard", () => {
     expect(screen.getByText(/해외 비중 60%/)).toBeInTheDocument();
   });
 
+  it("보유 달러를 계좌별로 보여주고 수기 계좌가 섞이면 직접 입력 포함으로 표시한다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      held_usd_is_live: false,
+      held_usd_accounts: [
+        { account_id: "m", name: "메리츠", usd: 1200, source: "MANUAL" },
+        { account_id: "k", name: "한국투자", usd: 333, source: "LIVE" },
+      ],
+    });
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByText(/\(직접 입력 포함\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText("보유 달러: 메리츠 $1,200(직접 입력) · 한국투자 $333(실시간)"),
+    ).toBeInTheDocument();
+  });
+
   it("환전 대기 중인 매수가 있으면 지금 환전할 금액과 이력 링크를 보여준다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, waiting_fx_usd: 350 });
     renderWithProviders(<FxPlanCard />);

@@ -181,9 +181,10 @@ def _portfolio(name="해외 적립", items=None, linked=(), tax_type=None):
     )
 
 
-def _acct(deposit_usd=None, asset_type="MANUAL", **kw):
+def _acct(deposit_usd=None, asset_type="STOCK_OTHER", **kw):
     return SimpleNamespace(
         id=kw.pop("id", uuid.uuid4()),
+        name=kw.pop("name", "계좌"),
         asset_type=asset_type,
         deposit_usd=deposit_usd,
         kis_account_no=kw.pop("kis_account_no", None),
@@ -311,6 +312,8 @@ async def test_held_usd_limited_to_linked_accounts():
     await _plan(db)
     stmt = db.execute.await_args_list[2].args[0]
     assert "asset_accounts.id IN" in str(stmt)
+    # 수기 증권 계좌(STOCK_OTHER, 메리츠 등)도 대상이다 — 브로커 API 계좌만 고르면 직접 입력한 달러가 빠진다
+    assert "STOCK_OTHER" in str(stmt.compile(compile_kwargs={"literal_binds": True}))
 
 
 # ── plans/121 B — 정액 적립·실시간 달러·환전 대기 ─────────────
@@ -353,20 +356,22 @@ async def test_held_usd_reads_live_for_broker_accounts_and_caches(mock_cache):
     cache = CacheStore()
     live = AsyncMock(return_value=250.0)
     with patch.object(svc, "fetch_usd_buying_power", new=live):
-        held, is_live = await svc._account_usd(MagicMock(), cache, uuid.uuid4(), kis)
-        assert (held, is_live) == (250.0, True)
+        held = await svc._account_usd(MagicMock(), cache, uuid.uuid4(), kis)
+        assert (held.usd, held.source) == (250.0, "LIVE")
         # 두 번째 조회는 2분 캐시
         user_id = uuid.uuid4()
         await svc._account_usd(MagicMock(), cache, user_id, kis)
         await svc._account_usd(MagicMock(), cache, user_id, kis)
     assert live.await_count == 2  # 첫 user_id 1회 + 두 번째 user_id 1회(캐시 키가 사용자별)
-    assert await svc._account_usd(MagicMock(), cache, uuid.uuid4(), manual) == (0.0, False)
+    held = await svc._account_usd(MagicMock(), cache, uuid.uuid4(), manual)
+    assert (held.usd, held.source) == (0.0, "MANUAL")
 
 
 async def test_held_usd_falls_back_to_synced_when_live_fails():
     kis = _acct(42.0, asset_type="STOCK_KIWOOM", kiwoom_account_no="9")
     with patch.object(svc, "fetch_usd_buying_power", new=AsyncMock(return_value=None)):
-        assert await svc._account_usd(MagicMock(), None, uuid.uuid4(), kis) == (42.0, False)
+        held = await svc._account_usd(MagicMock(), None, uuid.uuid4(), kis)
+    assert (held.usd, held.source, held.live_failed) == (42.0, "SYNCED", True)
 
 
 async def test_held_usd_remembers_live_failure_for_ttl():
@@ -378,8 +383,9 @@ async def test_held_usd_remembers_live_failure_for_ttl():
     user_id = uuid.uuid4()
     live = AsyncMock(return_value=None)
     with patch.object(svc, "fetch_usd_buying_power", new=live):
-        assert await svc._account_usd(MagicMock(), cache, user_id, kis) == (42.0, False)
-        assert await svc._account_usd(MagicMock(), cache, user_id, kis) == (42.0, False)
+        for _ in range(2):
+            held = await svc._account_usd(MagicMock(), cache, user_id, kis)
+            assert (held.usd, held.source, held.live_failed) == (42.0, "SYNCED", True)
     assert live.await_count == 1
 
 
@@ -387,7 +393,8 @@ async def test_held_usd_skips_live_for_account_without_number():
     kis = _acct(5.0, asset_type="STOCK_KIS", kis_account_no=None)
     live = AsyncMock()
     with patch.object(svc, "fetch_usd_buying_power", new=live):
-        assert await svc._account_usd(MagicMock(), None, uuid.uuid4(), kis) == (5.0, False)
+        held = await svc._account_usd(MagicMock(), None, uuid.uuid4(), kis)
+    assert (held.usd, held.source, held.live_failed) == (5.0, "SYNCED", False)
     live.assert_not_awaited()
 
 
@@ -401,9 +408,51 @@ async def test_plan_held_usd_live_flag_and_fixed_account_included():
     assert result["held_usd_is_live"] is True
 
 
+async def test_plan_includes_manual_stock_account_usd_with_breakdown():
+    """포트폴리오에 연결된 수기 계좌(메리츠 등)의 직접 입력 달러도 보유 달러에 더하고 계좌별로 보여준다."""
+    kis = _acct(0.0, asset_type="STOCK_KIS", kis_account_no="1", name="한국투자")
+    meritz = _acct(1200.0, name="메리츠")
+    db = _db([_portfolio()], accounts=[kis, meritz])
+    with patch.object(svc, "fetch_usd_buying_power", new=AsyncMock(return_value=333.0)):
+        result = await _plan(db)
+    assert result["held_usd"] == 1533.0
+    # 600달러 × 3개월 − 1533
+    assert result["need_usd"] == 267.0
+    assert result["held_usd_is_live"] is False
+    assert [(a["name"], a["usd"], a["source"]) for a in result["held_usd_accounts"]] == [
+        ("메리츠", 1200.0, "MANUAL"),
+        ("한국투자", 333.0, "LIVE"),
+    ]
+
+
+async def test_plan_live_failure_with_zero_synced_is_not_live():
+    """실시간 조회에 실패한 계좌는 동기화 값이 0이어도 '실시간'으로 표시하지 않는다."""
+    kis = _acct(0.0, asset_type="STOCK_KIS", kis_account_no="1")
+    kiwoom = _acct(0.0, asset_type="STOCK_KIWOOM", kiwoom_account_no="2")
+    live = AsyncMock(side_effect=[100.0, None])
+    db = _db([_portfolio()], accounts=[kis, kiwoom])
+    with patch.object(svc, "fetch_usd_buying_power", new=live):
+        result = await _plan(db)
+    assert result["held_usd"] == 100.0
+    assert result["held_usd_is_live"] is False
+
+
+async def test_plan_waiting_fx_offset_only_by_executable_account_usd():
+    """수기 계좌 달러로는 KIS·키움 대기 매수를 채울 수 없다 — 환전 대기 부족분은 실행 계좌 달러로만 상쇄한다."""
+    kis = _acct(0.0, asset_type="STOCK_KIS", kis_account_no="1")
+    meritz = _acct(1000.0)
+    db = _db([_portfolio()], accounts=[kis, meritz], waiting_usd=450.0)
+    with patch.object(svc, "fetch_usd_buying_power", new=AsyncMock(return_value=100.0)):
+        result = await _plan(db, months=1, closes=_closes())
+    assert result["held_usd"] == 1100.0
+    assert result["waiting_fx_usd"] == 350.0
+    # 전체 필요(600 − 1100 < 0)보다 대기 부족분이 크다 — 지금 350달러는 환전해야 한다
+    assert result["need_usd"] == 350.0
+
+
 async def test_plan_waiting_fx_forces_now_tranche():
     # 월 600달러 × 1개월 − 보유 100 = 500 필요. 환전 대기 매수 450달러 − 보유 100 = 350은 지금 환전해야 한다
-    db = _db([_portfolio()], accounts=[_acct(100.0)], waiting_usd=450.0)
+    db = _db([_portfolio()], accounts=[_acct(100.0, asset_type="STOCK_KIS")], waiting_usd=450.0)
     result = await _plan(db, months=1, closes=_closes())
     assert result["waiting_fx_usd"] == 350.0
     now = result["tranches"][0]
@@ -412,7 +461,7 @@ async def test_plan_waiting_fx_forces_now_tranche():
 
 
 async def test_plan_waiting_fx_covered_by_held_dollars():
-    db = _db([_portfolio()], accounts=[_acct(500.0)], waiting_usd=450.0)
+    db = _db([_portfolio()], accounts=[_acct(500.0, asset_type="STOCK_KIS")], waiting_usd=450.0)
     result = await _plan(db)
     assert result["waiting_fx_usd"] == 0.0
 
