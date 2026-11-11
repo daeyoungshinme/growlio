@@ -185,8 +185,7 @@ class TestGetPortfolioRiskMetrics:
         returns = [0.01 * (i % 5 - 2) for i in range(300)]
         returns_map = {"AAPL": returns, "^GSPC": returns}
 
-        with patch("app.services.risk_service.asyncio.get_running_loop") as mock_loop:
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=returns_map)
+        with patch("app.services.risk_service.run_yf_bounded", new=AsyncMock(return_value=returns_map)):
             result = await get_portfolio_risk_metrics(uuid.uuid4(), mock_db)
 
         assert result["position_count"] == 1
