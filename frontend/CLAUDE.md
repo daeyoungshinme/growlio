@@ -187,7 +187,7 @@ _기타_
 | 상황 | 함수 |
 | --- | --- |
 | 계좌 sync | `invalidateSyncData` |
-| 계좌 CUD | `invalidateAccountData` |
+| 계좌 CUD | `invalidateAccountData` (동기화할 계좌 생성 직후엔 `invalidateAccountListData`, 전체는 첫 sync 뒤 1회) |
 | 브로커 연동 해제 | `invalidateBrokerCredentialData` |
 | 거래내역 CUD | `invalidateTransactionData` |
 | 수기 매매 기록 CUD | `invalidateTradeData` (해외 SELL이 양도세 실현손익이 되므로 세금·지금 할 일 포함) |
@@ -203,7 +203,8 @@ _기타_
 | 복합신호 설정 / 추천 후보 변경 | `invalidateCompositeSignalData` / `invalidateGoalRecommendationData` |
 | 다른 화면 영향 없는 설정 | `invalidateSettingsData` (옵트인 토글 기본값) |
 
-- 당겨서 새로고침처럼 자기 쿼리 하나만 다시 받을 땐 그 `useQuery`의 `refetch`.
+- 당겨서 새로고침은 `refetchActiveData`(화면에 붙은 쿼리만) — sync 무효화를 쓰면 화면 밖 무거운 쿼리까지 stale이 된다. 자기 쿼리 하나만 다시 받을 땐 그 `useQuery`의 `refetch`.
+- 헬퍼의 무효화는 같은 틱 안에서 모아 키마다 1회(상위 프리픽스에 덮이는 키 생략)로 보낸다 — 헬퍼를 연달아 불러도 중복 요청이 나가지 않는다. 새 헬퍼도 `invalidateKeys`를 거칠 것.
 - 목표 비중 저장 후 열린 분석 화면은 `portfolioItemsSignature` 변경으로 자동 재분석된다 — **`Portfolio.updated_at`은 비중만 바뀐 저장에선 갱신되지 않으니 신선도 판단에 쓰지 말 것.**
 
 **쿼리 설정 상수 (`constants/queryConfig.ts`)** — staleTime/refetchInterval 매직 넘버 금지.

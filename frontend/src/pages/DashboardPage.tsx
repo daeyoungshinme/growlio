@@ -4,7 +4,7 @@ import { Circle, RefreshCw, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
-import { invalidateSyncData } from "@/utils/queryInvalidation";
+import { invalidateSyncData, refetchActiveData } from "@/utils/queryInvalidation";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import ChallengeProgressCard from "@/components/dashboard/ChallengeProgressCard";
@@ -83,7 +83,7 @@ export default function DashboardPage() {
   const [syncing, setSyncing] = useState(false);
 
   const handleRefresh = useCallback(async () => {
-    await invalidateSyncData(qc);
+    await refetchActiveData(qc);
   }, [qc]);
   useRegisterRefresh(handleRefresh);
 

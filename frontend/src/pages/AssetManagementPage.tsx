@@ -22,7 +22,7 @@ import { legacyHistorySegment } from "@/utils/legacyTabRedirect";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import EmptyState from "@/components/common/EmptyState";
-import { invalidateAccountData } from "@/utils/queryInvalidation";
+import { invalidateAccountData, refetchActiveData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "@/constants";
 import { useAssetManagementData } from "@/hooks/useAssetManagementData";
@@ -101,7 +101,7 @@ export default function AssetManagementPage() {
   const queryClient = useQueryClient();
 
   const handleRefresh = useCallback(async () => {
-    await invalidateAccountData(queryClient);
+    await refetchActiveData(queryClient);
   }, [queryClient]);
   useRegisterRefresh(handleRefresh);
   const { accounts, isLoading, error, refetchAccounts, overview, txTotals, usdRate } =

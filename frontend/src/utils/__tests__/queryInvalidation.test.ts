@@ -352,3 +352,38 @@ describe("invalidateDartKeyData", () => {
     );
   });
 });
+
+describe("같은 틱 무효화 병합 (plans/125 D1)", () => {
+  it("헬퍼 둘을 연달아 불러도 겹치는 키는 한 번만 무효화한다", async () => {
+    const qc = makeQueryClient();
+    await Promise.all([invalidatePortfolioData(qc as any), invalidateSyncData(qc as any)]);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => JSON.stringify(c[0].queryKey));
+    expect(keys.filter((k) => k === JSON.stringify(QUERY_KEYS.actionItems))).toHaveLength(1);
+    expect(keys.filter((k) => k === JSON.stringify(QUERY_KEYS.driftSummary))).toHaveLength(1);
+    expect(keys.filter((k) => k === JSON.stringify(QUERY_KEYS.fxPlanBase))).toHaveLength(1);
+  });
+
+  it("다음 틱의 무효화는 따로 보낸다", async () => {
+    const qc = makeQueryClient();
+    await invalidateChallengeData(qc as any);
+    await invalidateChallengeData(qc as any);
+    const challengeCalls = qc.invalidateQueries.mock.calls.filter(
+      (c) => JSON.stringify(c[0].queryKey) === JSON.stringify(QUERY_KEYS.challenges),
+    );
+    expect(challengeCalls).toHaveLength(2);
+  });
+});
+
+describe("dedupeQueryKeys", () => {
+  it("상위 프리픽스가 있으면 하위 키를 생략한다", async () => {
+    const { dedupeQueryKeys } = await import("../queryInvalidation");
+    expect(
+      dedupeQueryKeys([
+        ["portfolio-overview", "lite"],
+        ["portfolio-overview"],
+        ["accounts"],
+        ["accounts"],
+      ]),
+    ).toEqual([["portfolio-overview"], ["accounts"]]);
+  });
+});
