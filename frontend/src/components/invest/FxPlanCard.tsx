@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchFxPlan, syncFxPlanAlerts, type FxPlanData, type FxZone } from "@/api/invest";
+import {
+  fetchFxPlan,
+  syncFxPlanAlerts,
+  type FxHeldUsdSource,
+  type FxPlanData,
+  type FxZone,
+} from "@/api/invest";
 import { isFxPlanAlert, type ExchangeRateAlert } from "@/api/alerts";
 import { exchangeRateAlertsQuery } from "@/api/queryOptions";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -39,6 +45,18 @@ const ZONE_LABEL: Record<FxZone, { text: string; className: string }> = {
 
 const fmtRate = (n: number) => `${n.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}원`;
 const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
+
+const HELD_SOURCE_LABEL: Record<FxHeldUsdSource, string> = {
+  LIVE: "실시간",
+  SYNCED: "동기화 기준",
+  MANUAL: "직접 입력",
+};
+
+/** 산식의 보유 달러 괄호 라벨 — 수기 계좌 달러가 섞이면 실시간 여부보다 그 사실을 먼저 알린다 */
+function heldUsdLabel(data: FxPlanData) {
+  if ((data.held_usd_accounts ?? []).some((a) => a.source === "MANUAL")) return "(직접 입력 포함)";
+  return data.held_usd_is_live ? "(실시간)" : "(동기화 기준)";
+}
 
 /** 목표 환율 비교 키(센트 단위 정수) — 백엔드 `fx_plan_service._rate_key`와 같은 규칙 */
 const rateKey = (rate: number) => Math.round(Number(rate) * 100);
@@ -325,11 +343,20 @@ export default function FxPlanCard({ onEditGoal }: Props) {
             )}{" "}
             → 월 {fmtUsdWhole(data.monthly_need_usd)} × {data.months}개월 − 보유{" "}
             {fmtUsdWhole(data.held_usd)}
-            {data.held_usd_is_live ? "(실시간)" : "(동기화 기준)"} ={" "}
+            {heldUsdLabel(data)} ={" "}
             <span className="font-semibold text-gray-900 dark:text-gray-100">
               {fmtUsdWhole(data.need_usd)} 필요
             </span>
           </p>
+
+          {(data.held_usd_accounts?.length ?? 0) > 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              보유 달러:{" "}
+              {data.held_usd_accounts
+                ?.map((a) => `${a.name} ${fmtUsdWhole(a.usd)}(${HELD_SOURCE_LABEL[a.source]})`)
+                .join(" · ")}
+            </p>
+          )}
 
           {(data.waiting_fx_usd ?? 0) > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">

@@ -22,12 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.constants import (
+    BROKER_API_ASSET_TYPES,
     CASH_EQUIVALENT_MARKET,
     DOMESTIC_MARKETS,
     FX_PLAN_ACTION_DAYS,
     FX_PLAN_ALERT_SOURCE,
     MAX_EXCHANGE_RATE_ALERTS_PER_USER,
     ORDER_EXECUTABLE_ASSET_TYPES,
+    POSITION_STOCK_ASSET_TYPES,
 )
 from app.core.cache_store import CacheStore
 from app.exceptions import ConflictError, NotFoundError
@@ -36,7 +38,7 @@ from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanLeg
 from app.models.user import UserSettings
-from app.services.accounts._account_queries import active_broker_accounts_stmt
+from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.dca_cash_shortfall_service import DCA_AUTO_BUY_PRESET, buy_market, fixed_amount_needs
 from app.services.rebalancing.usd_buying_power import fetch_usd_buying_power
 from app.utils.cache_keys import (
@@ -272,28 +274,40 @@ def _can_fetch_live_usd(account: AssetAccount) -> bool:
 
 _LIVE_USD_FAILED = "failed"
 
+HeldUsdSource = Literal["LIVE", "SYNCED", "MANUAL"]
+
+
+@dataclass(frozen=True)
+class HeldUsdAccount:
+    account: AssetAccount
+    usd: float
+    source: HeldUsdSource
+    live_failed: bool = False  # 실시간 조회 대상인데 실패해 동기화 값을 썼다
+
 
 async def _account_usd(
     db: AsyncSession, cache: CacheStoreType, user_id: uuid.UUID, account: AssetAccount
-) -> tuple[float, bool]:
-    """(달러 예수금, 실시간 여부). KIS·키움은 증권사 실시간 조회(2분 캐시), 실패·그 외 계좌는 동기화 값."""
+) -> HeldUsdAccount:
+    """계좌의 달러 예수금과 출처. KIS·키움은 증권사 실시간 조회(2분 캐시), 실패·토스는 동기화 값, 수기는 직접 입력값."""
     synced = float(account.deposit_usd or 0)
+    if account.asset_type not in BROKER_API_ASSET_TYPES:
+        return HeldUsdAccount(account, synced, "MANUAL")
     if account.asset_type not in ORDER_EXECUTABLE_ASSET_TYPES or not _can_fetch_live_usd(account):
-        return synced, False
+        return HeldUsdAccount(account, synced, "SYNCED")
     key = usd_buying_power_key(user_id, account.id)
     cached = await get_cached_json(cache, key)
     if isinstance(cached, int | float):
-        return float(cached), True
+        return HeldUsdAccount(account, float(cached), "LIVE")
     if cached == _LIVE_USD_FAILED:
-        return synced, False
+        return HeldUsdAccount(account, synced, "SYNCED", live_failed=True)
     live = await fetch_usd_buying_power(account.id, user_id, db, cache)
     if live is None:
         # 실패도 같은 TTL만큼 기억한다 — 만료 토큰·키 없는 계좌가 화면을 열 때마다 증권사(KIS 최대 3회)를 다시 부르고
         # Sentry 이벤트를 남기지 않게(plans/122 B4). 동기화 무효화가 이 키도 지운다
         await set_cached_json(cache, key, _LIVE_USD_FAILED, TTL_USD_BUYING_POWER)
-        return synced, False
+        return HeldUsdAccount(account, synced, "SYNCED", live_failed=True)
     await set_cached_json(cache, key, live, TTL_USD_BUYING_POWER)
-    return live, True
+    return HeldUsdAccount(account, live, "LIVE")
 
 
 async def _held_usd(
@@ -302,29 +316,30 @@ async def _held_usd(
     user_id: uuid.UUID,
     portfolio: Portfolio,
     extra_accounts: list[AssetAccount],
-) -> tuple[float, bool]:
-    """포트폴리오 연결 계좌(없으면 활성 브로커 계좌 전체)와 정액 적립 실행 계좌의 달러 예수금 합, 전부 실시간인지.
+) -> list[HeldUsdAccount]:
+    """포트폴리오 연결 증권 계좌(없으면 활성 증권 계좌 전체, 수기 포함)와 정액 적립 실행 계좌의 계좌별 달러 예수금.
 
     환전 직후 동기화(하루 1~2회) 전이면 보유 달러가 옛 값이라 같은 돈을 또 환전하라고 하게 된다(plans/121 B) —
-    주문 가능한 계좌는 증권사에서 실시간으로 읽는다.
+    주문 가능한 계좌는 증권사에서 실시간으로 읽는다. 수기 증권 계좌(메리츠 등)는 직접 입력한 달러를 센다.
     """
     linked_ids = [pa.account_id for pa in portfolio.linked_accounts]
-    stmt = active_broker_accounts_stmt(user_id)
+    stmt = active_accounts_stmt(user_id).where(AssetAccount.asset_type.in_(POSITION_STOCK_ASSET_TYPES))
     if linked_ids:
         stmt = stmt.where(AssetAccount.id.in_(linked_ids))
     accounts: dict[uuid.UUID, AssetAccount] = {a.id: a for a in (await db.execute(stmt)).scalars().all()}
     for account in extra_accounts:
         accounts.setdefault(account.id, account)
+    return [await _account_usd(db, cache, user_id, account) for account in accounts.values()]
 
-    total = 0.0
-    all_live = bool(accounts)
-    for account in accounts.values():
-        usd, is_live = await _account_usd(db, cache, user_id, account)
-        total += usd
-        # 달러가 없는 수기·토스 계좌까지 "실시간 아님"으로 표시할 이유는 없다
-        if not is_live and usd > 0:
-            all_live = False
-    return total, all_live
+
+def _held_is_live(held: list[HeldUsdAccount]) -> bool:
+    """달러가 있는 계좌를 모두 실시간으로 읽었고, 실시간 조회에 실패한 계좌도 없는지.
+
+    실패한 계좌는 동기화 값이 0이어도 실제 달러를 모르는 것이라 "실시간"이라 할 수 없다.
+    """
+    if not held or any(h.live_failed for h in held):
+        return False
+    return all(h.source == "LIVE" for h in held if h.usd > 0)
 
 
 async def _waiting_fx_required_usd(db: AsyncSession, user_id: uuid.UUID, portfolio: Portfolio) -> float:
@@ -375,6 +390,7 @@ async def get_fx_plan(
         # plans/121 B — 필요 달러 기준(정액 적립 / 월 적립액), 보유 달러 실시간 여부, 환전 대기 매수 부족분
         "deposit_source": None,
         "held_usd_is_live": False,
+        "held_usd_accounts": [],
         "waiting_fx_usd": 0.0,
     }
     if portfolio is None:
@@ -417,17 +433,25 @@ async def get_fx_plan(
     else:
         monthly_need_usd = monthly_deposit * overseas_pct / 100 / live_rate
 
-    held_usd, held_is_live = await _held_usd(db, cache, user_id, portfolio, [account for _, account in fixed])
+    held = await _held_usd(db, cache, user_id, portfolio, [account for _, account in fixed])
+    held_usd = sum(h.usd for h in held)
     waiting_required = await _waiting_fx_required_usd(db, user_id, portfolio)
-    # 대기 중인 매수는 보유 달러로 먼저 채운다 — 남는 부족분만 "지금" 환전해야 매수가 다시 진행된다
-    waiting_fx_usd = max(0.0, waiting_required - held_usd)
+    # 대기 중인 매수는 보유 달러로 먼저 채운다 — 남는 부족분만 "지금" 환전해야 매수가 다시 진행된다.
+    # 수기 계좌(메리츠 등)의 달러는 KIS·키움 주문에 쓸 수 없으니 실행 계좌 달러로만 상쇄한다
+    executable_usd = sum(h.usd for h in held if h.account.asset_type in ORDER_EXECUTABLE_ASSET_TYPES)
+    waiting_fx_usd = max(0.0, waiting_required - executable_usd)
     need_usd = max(0.0, monthly_need_usd * months - held_usd, waiting_fx_usd)
     result.update(
         deposit_source="DCA_AMOUNT" if fixed else "MONTHLY_GOAL",
         monthly_deposit_krw=monthly_deposit,
         monthly_need_usd=round(monthly_need_usd, 2),
         held_usd=round(held_usd, 2),
-        held_usd_is_live=held_is_live,
+        held_usd_is_live=_held_is_live(held),
+        held_usd_accounts=[
+            {"account_id": h.account.id, "name": h.account.name, "usd": round(h.usd, 2), "source": h.source}
+            for h in sorted(held, key=lambda h: h.usd, reverse=True)
+            if h.usd > 0
+        ],
         waiting_fx_usd=round(waiting_fx_usd, 2),
         need_usd=round(need_usd, 2),
         tranches=[asdict(t) for t in compute_fx_plan(position, need_usd, live_rate, waiting_fx_usd)],
