@@ -32,9 +32,10 @@ from app.constants import (
     POSITION_STOCK_ASSET_TYPES,
 )
 from app.core.cache_store import CacheStore
-from app.exceptions import ConflictError, NotFoundError
+from app.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.models.alert import ExchangeRateAlert, RebalancingAlert
 from app.models.asset import AssetAccount
+from app.models.fx_extra_need import FxExtraNeed
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanLeg
 from app.models.user import UserSettings
@@ -356,6 +357,26 @@ async def _waiting_fx_required_usd(db: AsyncSession, user_id: uuid.UUID, portfol
     return float(total or 0)
 
 
+@dataclass(frozen=True)
+class FxRateContext:
+    rate: float
+    rate_is_live: bool
+    position: FxPosition | None
+    # 실시간·캐시 환율도 1년 종가도 없으면 rate는 설정 fallback(1300)이다 — 그 값으로 달러를 원화로 계산하면
+    # 실제 수치처럼 보인다(plans/99 A6)
+    has_rate: bool
+
+
+async def load_fx_rate_context(cache: CacheStoreType) -> FxRateContext:
+    """현재 환율(실시간·캐시, 없으면 1년 일봉 마지막 종가)과 1년 위치. 적립 계획·추가 환전(plans/123)이 함께 쓴다."""
+    live_rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
+    closes = await fetch_usd_krw_closes(cache)
+    if not rate_is_live and closes:
+        live_rate = closes[-1]
+    position = compute_fx_position(closes, live_rate) if closes else None
+    return FxRateContext(live_rate, rate_is_live, position, has_rate=rate_is_live or bool(closes))
+
+
 async def get_fx_plan(
     db: AsyncSession,
     cache: CacheStoreType,
@@ -363,11 +384,8 @@ async def get_fx_plan(
     portfolio_id: uuid.UUID | None,
     months: int,
 ) -> dict[str, Any]:
-    live_rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
-    closes = await fetch_usd_krw_closes(cache)
-    if not rate_is_live and closes:
-        live_rate = closes[-1]
-    position = compute_fx_position(closes, live_rate) if closes else None
+    ctx = await load_fx_rate_context(cache)
+    live_rate, rate_is_live, position = ctx.rate, ctx.rate_is_live, ctx.position
 
     portfolio, candidates = await _pick_portfolio(db, user_id, portfolio_id)
     if portfolio_id is not None and portfolio is None:
@@ -415,9 +433,7 @@ async def get_fx_plan(
         result["status"] = "NO_DEPOSIT_GOAL"
         return result
 
-    # 실시간·캐시 환율도 1년 종가도 없으면 live_rate는 설정 fallback(1300)이다 — 그 값으로 달러를 계산하면
-    # 실제 수치처럼 보인다 (plans/99 A6)
-    if not rate_is_live and not closes:
+    if not ctx.has_rate:
         result["status"] = "NO_RATE"
         return result
 
@@ -476,14 +492,50 @@ def _rate_key(rate: float) -> int:
     return round(float(rate) * 100)
 
 
+async def _check_scope_owned(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    portfolio_id: uuid.UUID | None,
+    fx_need_id: uuid.UUID | None,
+    has_targets: bool,
+) -> None:
+    if (portfolio_id is None) == (fx_need_id is None):
+        raise ValueError("portfolio_id와 fx_need_id 중 하나만 지정한다")
+    if portfolio_id is not None:
+        owned = await db.scalar(select(Portfolio.id).where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id))
+        if owned is None:
+            raise NotFoundError(detail="포트폴리오를 찾을 수 없습니다")
+        return
+    due = await db.scalar(
+        select(FxExtraNeed.due_date).where(FxExtraNeed.id == fx_need_id, FxExtraNeed.user_id == user_id)
+    )
+    if due is None:
+        raise NotFoundError(detail="추가 환전 항목을 찾을 수 없습니다")
+    # 지난 항목의 알림은 발송하지 않는다 — 새로 만들지도 않는다(해제는 허용)
+    if has_targets and due < today_kst():
+        raise BadRequestError(detail="필요일이 지난 항목에는 알림을 등록할 수 없습니다")
+
+
+def _in_scope(alert: ExchangeRateAlert, portfolio_id: uuid.UUID | None, fx_need_id: uuid.UUID | None) -> bool:
+    """계획 알림이 이번 맞추기 범위인지 — 추가 환전 항목 알림은 portfolio_id가 없다."""
+    if fx_need_id is not None:
+        return alert.fx_need_id == fx_need_id
+    return alert.portfolio_id == portfolio_id and alert.fx_need_id is None
+
+
 async def sync_fx_plan_alerts(
     db: AsyncSession,
     cache: CacheStore,
     user_id: uuid.UUID,
-    portfolio_id: uuid.UUID,
+    portfolio_id: uuid.UUID | None,
     targets: list[tuple[float, float]],
+    *,
+    fx_need_id: uuid.UUID | None = None,
 ) -> FxPlanAlertSyncResult:
-    """포트폴리오의 계획 알림(FX_PLAN, 활성·미발동)을 `targets`[(목표 환율, 달러)]에 맞춘다(plans/121).
+    """한 계획 범위의 알림(FX_PLAN, 활성·미발동)을 `targets`[(목표 환율, 달러)]에 맞춘다(plans/121).
+
+    범위는 포트폴리오 적립 계획(`portfolio_id`) 또는 추가 환전 항목(`fx_need_id`, plans/123) 중 하나다 —
+    한 범위의 맞추기는 다른 범위의 계획 알림을 건드리지 않는다.
 
     - 같은 목표가 이미 있으면 금액만 갱신, 새 목표면 BELOW 1회 알림 생성, 목표에서 빠진 계획 알림은 삭제.
     - 같은 목표의 **직접 등록한(MANUAL) 활성 BELOW 알림**이 있으면 만들지 않는다(중복 발송 방지).
@@ -493,9 +545,12 @@ async def sync_fx_plan_alerts(
       쌓이면 사용자당 알림 상한(50)에 걸려 맞추기·직접 등록이 모두 409가 된다(plans/122 B5).
       발동 기록은 알림 이력에 남는다.
     """
-    owned = await db.scalar(select(Portfolio.id).where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id))
-    if owned is None:
-        raise NotFoundError(detail="포트폴리오를 찾을 수 없습니다")
+    await _check_scope_owned(db, user_id, portfolio_id, fx_need_id, bool(targets))
+    scope_filter = (
+        ExchangeRateAlert.fx_need_id == fx_need_id
+        if fx_need_id is not None
+        else and_(ExchangeRateAlert.portfolio_id == portfolio_id, ExchangeRateAlert.fx_need_id.is_(None))
+    )
 
     async with inproc_lock(cache, f"lock:fx_plan_alerts:{user_id}", ttl=_SYNC_LOCK_TTL_SECONDS) as acquired:
         if not acquired:
@@ -508,10 +563,7 @@ async def sync_fx_plan_alerts(
                         ExchangeRateAlert.user_id == user_id,
                         or_(
                             and_(ExchangeRateAlert.is_active == True, ExchangeRateAlert.direction == "BELOW"),
-                            and_(
-                                ExchangeRateAlert.source == FX_PLAN_ALERT_SOURCE,
-                                ExchangeRateAlert.portfolio_id == portfolio_id,
-                            ),
+                            and_(ExchangeRateAlert.source == FX_PLAN_ALERT_SOURCE, scope_filter),
                         ),
                     )
                 )
@@ -527,8 +579,8 @@ async def sync_fx_plan_alerts(
             key = _rate_key(alert.target_rate)
             if alert.source != FX_PLAN_ALERT_SOURCE:
                 manual_keys.add(key)
-            elif alert.portfolio_id != portfolio_id:
-                continue  # 다른 포트폴리오의 계획 알림은 그 계획이 관리한다
+            elif not _in_scope(alert, portfolio_id, fx_need_id):
+                continue  # 다른 포트폴리오·추가 환전 항목의 계획 알림은 그 계획이 관리한다
             elif alert.triggered_at is not None:
                 fired = alert.triggered_at
                 if (fired if fired.tzinfo else fired.replace(tzinfo=UTC)) < triggered_cutoff:
@@ -577,6 +629,7 @@ async def sync_fx_plan_alerts(
                     source=FX_PLAN_ALERT_SOURCE,
                     planned_usd=round(usd, 2),
                     portfolio_id=portfolio_id,
+                    fx_need_id=fx_need_id,
                 )
             )
         await db.commit()
@@ -584,6 +637,7 @@ async def sync_fx_plan_alerts(
     logger.info(
         "fx_plan_alerts_synced",
         user_id=str(user_id),
+        scope="fx_need" if fx_need_id is not None else "portfolio",
         created=len(to_create),
         updated=updated,
         removed=len(stale),

@@ -3,25 +3,32 @@
 import uuid
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
+from app.models.fx_extra_need import FxExtraNeed
 from app.models.user import User
 from app.schemas.invest import (
     DCAAnalysisResponse,
+    FxExtraNeedCreate,
+    FxExtraNeedResponse,
+    FxExtraNeedsResponse,
+    FxExtraNeedUpdate,
     FxPlanAlertSyncRequest,
     FxPlanAlertSyncResponse,
+    FxPlanAlertTargets,
     FxPlanResponse,
     GoalFeasibilityPreview,
 )
-from app.services import dca_service, fx_plan_service
+from app.services import dca_service, fx_extra_need_service, fx_plan_service
 from app.services.dividend import plan_service as dividend_plan_service
 from app.services.goal.goal_return_solver import build_feasibility_preview, months_until_year_end
 from app.services.portfolio.composition_calculator import build_asset_totals, exclude_real_estate
 from app.utils.cache_invalidation import invalidate_exchange_rate_alert_caches
+from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/invest", tags=["invest"])
 
@@ -116,6 +123,96 @@ async def sync_fx_plan_alerts(
         current_user.id,
         req.portfolio_id,
         [(t.target_rate, t.usd) for t in req.targets],
+    )
+    await invalidate_exchange_rate_alert_caches(cache, current_user.id)
+    return FxPlanAlertSyncResponse(**asdict(result))
+
+
+# ── 추가 환전 항목(여행 등, plans/123) ─────────────────────────
+
+
+async def _need_row(need: FxExtraNeed) -> FxExtraNeedResponse:
+    """생성·수정 응답 한 행 — 목록과 같은 규칙으로 구간까지 계산한다."""
+    cache = await get_cache_store()
+    ctx = await fx_plan_service.load_fx_rate_context(cache)
+    return FxExtraNeedResponse(
+        **fx_extra_need_service.build_need_row(need, ctx.position, ctx.rate, ctx.has_rate, today_kst())
+    )
+
+
+@router.get("/fx-extra-needs", response_model=FxExtraNeedsResponse)
+@limiter.limit("30/minute")
+async def list_fx_extra_needs(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """추가 환전 항목(여행 등)과 항목별 분할 환전 구간 — 증권 계좌 달러로 상쇄하지 않는다."""
+    cache = await get_cache_store()
+    return await fx_extra_need_service.list_fx_extra_needs(db, cache, current_user.id)
+
+
+@router.post("/fx-extra-needs", response_model=FxExtraNeedResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
+async def create_fx_extra_need(
+    request: Request,
+    req: FxExtraNeedCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    need = await fx_extra_need_service.create_fx_extra_need(
+        db, current_user.id, req.name, req.amount_usd, req.exchanged_usd, req.due_date
+    )
+    return await _need_row(need)
+
+
+@router.patch("/fx-extra-needs/{need_id}", response_model=FxExtraNeedResponse)
+@limiter.limit("30/minute")
+async def update_fx_extra_need(
+    request: Request,
+    need_id: uuid.UUID,
+    req: FxExtraNeedUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    changes = {k: v for k, v in req.model_dump(include=req.model_fields_set).items() if v is not None}
+    need = await fx_extra_need_service.update_fx_extra_need(db, current_user.id, need_id, changes)
+    return await _need_row(need)
+
+
+@router.delete("/fx-extra-needs/{need_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")
+async def delete_fx_extra_need(
+    request: Request,
+    need_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """항목과 그 구간 알림을 함께 지운다."""
+    await fx_extra_need_service.delete_fx_extra_need(db, current_user.id, need_id)
+    cache = await get_cache_store()
+    await invalidate_exchange_rate_alert_caches(cache, current_user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/fx-extra-needs/{need_id}/alerts", response_model=FxPlanAlertSyncResponse)
+@limiter.limit("20/minute")
+async def sync_fx_extra_need_alerts(
+    request: Request,
+    need_id: uuid.UUID,
+    req: FxPlanAlertTargets,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """추가 환전 항목의 구간 목표로 환율 알림을 맞춘다 — 적립 계획 알림은 건드리지 않는다."""
+    cache = await get_cache_store()
+    result = await fx_plan_service.sync_fx_plan_alerts(
+        db,
+        cache,
+        current_user.id,
+        None,
+        [(t.target_rate, t.usd) for t in req.targets],
+        fx_need_id=need_id,
     )
     await invalidate_exchange_rate_alert_caches(cache, current_user.id)
     return FxPlanAlertSyncResponse(**asdict(result))

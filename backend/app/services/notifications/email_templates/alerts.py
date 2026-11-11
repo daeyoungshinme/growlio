@@ -11,15 +11,21 @@ def exchange_rate_alert_template(
     current_rate: float,
     planned_usd: float | None = None,
     plan_link: str | None = None,
+    plan_label: str | None = None,
 ) -> tuple[str, str]:
-    """`planned_usd`가 있으면 달러 환전 계획 구간 알림(plans/121) — 환전할 금액과 계획 화면 링크를 함께 싣는다."""
+    """`planned_usd`가 있으면 달러 환전 계획 구간 알림(plans/121) — 환전할 금액과 계획 화면 링크를 함께 싣는다.
+
+    `plan_label`이 있으면 추가 환전 항목(여행 등, plans/123) 구간이다 — 제목에 항목 이름을 싣고,
+    증권 계좌 동기화 대신 앱에서 이미 환전한 금액을 고치도록 안내한다.
+    """
     direction_label = "이하" if direction == "BELOW" else "이상"
     rows = [
         ("목표환율", f"{target_rate:,.0f} 원 ({direction_label})"),
         ("현재환율", f"<span style='color:#1d4ed8;font-weight:bold;'>{current_rate:,.2f} 원</span>"),
     ]
     if planned_usd is not None:
-        subject = f"[Growlio] 환전 계획 구간 도달 — {target_rate:,.0f}원 {direction_label}, ${planned_usd:,.0f} 환전"
+        title = f"{plan_label} 환전 구간 도달" if plan_label else "환전 계획 구간 도달"
+        subject = f"[Growlio] {title} — {target_rate:,.0f}원 {direction_label}, ${planned_usd:,.0f} 환전"
         rows.append(
             (
                 "이번 구간 환전",
@@ -31,12 +37,16 @@ def exchange_rate_alert_template(
             if plan_link
             else ""
         )
+        guide = (
+            "이번 구간 금액을 환전하세요. 환전한 뒤 앱에서 이미 환전한 금액을 고치면 남은 계획이 다시 계산됩니다."
+            if plan_label
+            else "증권사 앱에서 이번 구간 금액을 환전하세요. 환전 후 계좌를 동기화하면 남은 계획이 다시 계산됩니다."
+        )
         html = _email_div(
-            "환전 계획 구간 도달",
+            title,
             "#1d4ed8",
             _kv_table(rows) + link_html,
-            "증권사 앱에서 이번 구간 금액을 환전하세요. 환전 후 계좌를 동기화하면 남은 계획이 다시 계산됩니다."
-            "<br>이 알림은 1회 발동 후 자동으로 비활성화됩니다.",
+            f"{guide}<br>이 알림은 1회 발동 후 자동으로 비활성화됩니다.",
         )
         return subject, html
 

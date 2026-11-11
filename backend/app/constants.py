@@ -38,6 +38,10 @@ FX_PLAN_ALERT_SOURCE = "FX_PLAN"
 FX_PLAN_ACTION_DAYS = 3
 """발동한 환전 계획 알림이 홈 "지금 할 일"에 보이는 일수(KST, 오늘 포함).
 계획 맞추기는 이보다 오래된 발동 알림을 지운다."""
+MAX_FX_EXTRA_NEEDS_PER_USER = 10
+"""추가 환전 항목(여행 등, plans/123) 사용자당 상한."""
+FX_EXTRA_URGENT_DAYS = 14
+"""추가 환전 필요일까지 이 일수 이하로 남으면 목표 환율을 기다리지 않고 남은 금액을 전부 "지금" 구간으로 둔다."""
 
 DEFAULT_GOAL_MAX_WEIGHT_PCT = 40.0
 """목표 추천 종목당 최대 비중(%) 기본값 — `UserSettings.goal_max_weight_pct`가 NULL일 때.

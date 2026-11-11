@@ -130,15 +130,17 @@ async def send_exchange_rate_alert(
     direction: str,
     current_rate: float,
     planned_usd: float | None = None,
+    plan_label: str | None = None,
 ) -> bool:
     """목표환율 도달 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환.
 
     `planned_usd`가 있으면 환전 계획 구간 알림으로 금액·계획 화면 링크를 싣는다(plans/121).
+    `plan_label`은 추가 환전 항목 이름(plans/123) — 적립 계획 알림이면 None.
     """
     plan_link = fx_plan_link() if planned_usd is not None else None
     return await _send_templated(
         to_email,
-        lambda: exchange_rate_alert_template(target_rate, direction, current_rate, planned_usd, plan_link),
+        lambda: exchange_rate_alert_template(target_rate, direction, current_rate, planned_usd, plan_link, plan_label),
         event="exchange_rate_alert",
         target_rate=target_rate,
         current_rate=current_rate,

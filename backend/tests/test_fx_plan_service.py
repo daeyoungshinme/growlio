@@ -545,7 +545,7 @@ def test_api_months_out_of_range_422(api, months):
 # ── 계획 알림 동기화 (plans/121) ─────────────────────────────
 
 
-def _alert(rate, *, source="FX_PLAN", portfolio_id=None, triggered=False, usd=100.0, is_active=True):
+def _alert(rate, *, source="FX_PLAN", portfolio_id=None, fx_need_id=None, triggered=False, usd=100.0, is_active=True):
     from datetime import UTC, datetime, timedelta
 
     if triggered is True:
@@ -556,6 +556,7 @@ def _alert(rate, *, source="FX_PLAN", portfolio_id=None, triggered=False, usd=10
         target_rate=rate,
         source=source,
         portfolio_id=portfolio_id,
+        fx_need_id=fx_need_id,
         triggered_at=triggered or None,
         planned_usd=usd,
         is_active=is_active,

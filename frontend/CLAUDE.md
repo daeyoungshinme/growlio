@@ -92,7 +92,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 진입점은 `portfolioId=<id>&openAlert=1`(`openAlert=dca`는 적립식 자동매수 프리셋) URL 파라미터로 요청. 모달을 직접 마운트하지 말 것.
 - `invest/ChallengeSection` — 챌린지 탭. 홈 요약 `dashboard/ChallengeProgressCard`, 네비 빨간 점 `useChallengeNudge`.
 - `invest/GoalSettingWizard` — 목표 최초 설정 6단계 마법사(`InvestPlanPage`의 재설정 모달과 별개).
-- `invest/FxPlanCard` — 적립 계획 탭 접힘 카드 "달러 환전 계획"(`GET /invest/fx-plan`). 목표 환율 구간은 `syncFxPlanAlerts`(`PUT /invest/fx-plan/alerts`)로 한 번에 맞춘다 — 계획 알림(`source=FX_PLAN`)은 목표·금액이 바뀌면 교체, 같은 목표의 직접 등록 알림은 표시만. 산식은 `deposit_source`(정액/월 적립)·`held_usd_is_live`(실시간/동기화, 수기 계좌가 섞이면 "직접 입력 포함")와 계좌별 `held_usd_accounts`를 표시하고 `waiting_fx_usd`>0이면 리밸런싱 이력 링크 안내. `InvestPlanPage`는 `#fx-plan`(`FX_PLAN_ANCHOR`, 백엔드 링크·푸시 `FX_PLAN`과 같은 해시)으로 들어오면 카드를 펼치고 스크롤. `fxPlanBase`는 적립(`invalidateDcaData`)·동기화·계좌·포트폴리오·리밸런싱 알림·전술 연동 해제 무효화가 함께 지운다. 환율이 없으면 서버가 `NO_RATE`(달러 계산 안 함).
+- `invest/FxPlanCard` — 적립 계획 탭 접힘 카드 "달러 환전 계획"(`GET /invest/fx-plan`). 목표 환율 구간은 `syncFxPlanAlerts`(`PUT /invest/fx-plan/alerts`)로 한 번에 맞춘다 — 계획 알림(`source=FX_PLAN`)은 목표·금액이 바뀌면 교체, 같은 목표의 직접 등록 알림은 표시만. 산식은 `deposit_source`(정액/월 적립)·`held_usd_is_live`(실시간/동기화, 수기 계좌가 섞이면 "직접 입력 포함")와 계좌별 `held_usd_accounts`를 표시하고 `waiting_fx_usd`>0이면 리밸런싱 이력 링크 안내. `InvestPlanPage`는 `#fx-plan`(`FX_PLAN_ANCHOR`, 백엔드 링크·푸시 `FX_PLAN`과 같은 해시)으로 들어오면 카드를 펼치고 스크롤. `fxPlanBase`는 적립(`invalidateDcaData`)·동기화·계좌·포트폴리오·리밸런싱 알림·전술 연동 해제 무효화가 함께 지운다. 환율이 없으면 서버가 `NO_RATE`(달러 계산 안 함). 카드 맨 아래 `FxExtraNeedsSection`(추가 환전 — 여행 등, `GET /invest/fx-extra-needs`)은 상태 분기 밖이라 해외 포트폴리오가 없어도 보인다. 구간 목록 `FxTrancheList`, 알림 등록 상태 `utils/fxPlanAlerts.planAlertState`(범위 `portfolioId`/`fxNeedId` — 항목 알림은 `portfolio_id`가 null이라 범위 없이 비교하면 적립 계획 알림으로 잘못 센다)는 둘이 공유.
 
 **Android 홈 위젯**: `useWidget.ts` ↔ `plugins/WidgetPlugin.ts` ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java` — 위젯 UI 변경 시 Java도 함께.
 
@@ -160,7 +160,7 @@ _기타_
 - `brokerCredentials.ts` — 자격증명 폼 테이블. **새 브로커는 여기 추가**
 - `storageKeys.ts` — 사용자별 localStorage 키(`pushOptOutKey`·`goalWizardShownKey`). **기기 공유 시 계정 간에 번지면 안 되는 플래그는 user id를 붙여 여기 추가**하고 `userScopedStorageKeys`에도 넣는다(탈퇴 시 삭제)
 
-**타입**: 도메인 API 타입은 `src/api/*`, 공용 일부만 `src/types/`. **Zod(`src/schemas/`)**: `challenge`, `trade`, `transaction` — 실제 폼이 쓰는 스키마만, 새 폼 추가 시 여기에.
+**타입**: 도메인 API 타입은 `src/api/*`, 공용 일부만 `src/types/`. **Zod(`src/schemas/`)**: `challenge`, `fxExtraNeed`, `trade`, `transaction` — 실제 폼이 쓰는 스키마만, 새 폼 추가 시 여기에.
 
 ### 테스트 (Vitest)
 
@@ -196,6 +196,7 @@ _기타_
 | 소득 구간 변경 | `invalidateIncomeBracketData` |
 | 챌린지 CUD | `invalidateChallengeData` |
 | 환율 / 주가 / 리밸런싱 알림 CUD | `invalidateAlertData` / `invalidateStockPriceAlertData` / `invalidateRebalancingAlertData(qc, portfolioId)` |
+| 추가 환전 항목 CUD·항목 알림 맞추기 | `invalidateFxExtraNeedData` (항목 삭제는 서버가 그 알림도 지움) |
 | 주문 실행 / 미체결 취소 | `invalidateRebalancingHistoryData` |
 | 대기 플랜 취소/승인 | `invalidateRebalancingPlanData(qc, { executed })` — 응답 `EXECUTED`면 `executed: true` |
 | 복합신호 설정 / 추천 후보 변경 | `invalidateCompositeSignalData` / `invalidateGoalRecommendationData` |

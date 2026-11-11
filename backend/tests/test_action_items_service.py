@@ -99,7 +99,11 @@ async def _run(
         patch.object(svc, "get_drift_summaries", new=drift or AsyncMock(return_value=[])),
         patch.object(svc, "find_dca_cash_shortfalls", new=dca or AsyncMock(return_value=[])),
         patch.object(svc, "_fx_waiting_items", new=fx_waiting or AsyncMock(return_value=[])),
-        patch.object(svc, "_recent_fx_plan_alerts", new=AsyncMock(return_value=list(fx_plan_alerts))),
+        patch.object(
+            svc,
+            "_recent_fx_plan_alerts",
+            new=AsyncMock(return_value=[a if isinstance(a, tuple) else (a, None) for a in fx_plan_alerts]),
+        ),
         patch.object(
             svc,
             "get_tax_action_plan_with_summary",
@@ -335,7 +339,7 @@ async def test_recent_fx_plan_alerts_window_starts_kst_two_days_ago():
 
     db = MagicMock()
     result = MagicMock()
-    result.scalars.return_value.all.return_value = []
+    result.all.return_value = []
     db.execute = AsyncMock(return_value=result)
     with patch.object(svc, "today_kst", return_value=date(2026, 11, 10)):
         await svc._recent_fx_plan_alerts(uuid.uuid4(), db)

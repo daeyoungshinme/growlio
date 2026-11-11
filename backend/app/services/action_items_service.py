@@ -34,6 +34,7 @@ from sqlalchemy.orm import selectinload
 from app.constants import FX_PLAN_ACTION_DAYS, FX_PLAN_ALERT_SOURCE
 from app.core.job_runner import report_handled_failure
 from app.models.alert import ExchangeRateAlert, RebalancingAlert
+from app.models.fx_extra_need import FxExtraNeed
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.schemas.action_items import ActionItem
@@ -210,11 +211,15 @@ async def _dca_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
     return items + await _fx_waiting_items(user_id, db)
 
 
-async def _recent_fx_plan_alerts(user_id: uuid.UUID, db: AsyncSession) -> list[ExchangeRateAlert]:
-    """최근 `FX_PLAN_ACTION_DAYS`일(KST, 오늘 포함) 안에 발동한 환전 계획 구간 알림(목표 높은 순)."""
+async def _recent_fx_plan_alerts(user_id: uuid.UUID, db: AsyncSession) -> list[tuple[ExchangeRateAlert, str | None]]:
+    """최근 `FX_PLAN_ACTION_DAYS`일(KST, 오늘 포함) 안에 발동한 환전 계획 구간 알림(목표 높은 순).
+
+    추가 환전 항목(plans/123)의 알림이면 항목 이름을 함께 돌려준다(적립 계획 알림은 None).
+    """
     since = kst_day_start(today_kst() - timedelta(days=FX_PLAN_ACTION_DAYS - 1))
     result = await db.execute(
-        select(ExchangeRateAlert)
+        select(ExchangeRateAlert, FxExtraNeed.name)
+        .outerjoin(FxExtraNeed, FxExtraNeed.id == ExchangeRateAlert.fx_need_id)
         .where(
             ExchangeRateAlert.user_id == user_id,
             ExchangeRateAlert.source == FX_PLAN_ALERT_SOURCE,
@@ -222,14 +227,23 @@ async def _recent_fx_plan_alerts(user_id: uuid.UUID, db: AsyncSession) -> list[E
         )
         .order_by(ExchangeRateAlert.target_rate.desc())
     )
-    return list(result.scalars().all())
+    return [(alert, name) for alert, name in result.all()]
 
 
 async def _fx_plan_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
     """최근 발동한 환전 계획 구간 알림을 한 행으로 — 같은 날 두 구간이 닿아도 행 하나에 금액을 합친다(plans/121)."""
-    alerts = await _recent_fx_plan_alerts(user_id, db)
-    if not alerts:
+    rows = await _recent_fx_plan_alerts(user_id, db)
+    if not rows:
         return []
+    alerts = [a for a, _ in rows]
+    # 추가 환전 항목 이름(plans/123) — 같은 항목의 두 구간이면 이름은 한 번만
+    names = list(dict.fromkeys(name for _, name in rows if name))
+    has_dca_plan = any(name is None for _, name in rows)
+    scope = ""
+    if names:
+        others = len(names) - 1 + (1 if has_dca_plan else 0)
+        scope = f" ({names[0]} 외 {others}건)" if others else f" ({names[0]})"
+    guide = "증권사 앱에서 환전 후 계좌를 동기화하세요" if has_dca_plan else "환전한 뒤 이미 환전한 금액을 고쳐 주세요"
     total_usd = sum(float(a.planned_usd or 0) for a in alerts)
     rates = " · ".join(f"{float(a.target_rate):,.0f}원" for a in alerts)
     amount = f"${total_usd:,.0f} 환전" if total_usd > 0 else "환전"
@@ -238,8 +252,8 @@ async def _fx_plan_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStore
             id="fx-plan:triggered",
             kind="FX_PLAN",
             priority="HIGH",
-            title=f"목표 환율 도달 — {amount}",
-            detail=f"환전 계획 구간 {rates} 이하 도달 · 증권사 앱에서 환전 후 계좌를 동기화하세요",
+            title=f"목표 환율 도달 — {amount}{scope}",
+            detail=f"환전 계획 구간 {rates} 이하 도달 · {guide}",
             cta_label="계획 보기",
             link=_LINK_FX_PLAN,
         )

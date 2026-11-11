@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "./client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
 
 export interface DCAProjectionPoint {
   month: string;
@@ -187,3 +187,53 @@ export const syncFxPlanAlerts = (
   targets: { target_rate: number; usd: number }[],
 ) =>
   apiPut<FxPlanAlertSyncResult>("/invest/fx-plan/alerts", { portfolio_id: portfolioId, targets });
+
+// ── 추가 환전 항목(여행 등, plans/123) — 적립 계획과 따로, 증권 계좌 달러로 상쇄하지 않는다 ──
+
+/** OK = 구간 있음, DONE = 다 환전함, PAST_DUE = 필요일 지남, NO_RATE = 환율을 몰라 구간 계산 안 함 */
+export type FxExtraNeedStatus = "OK" | "DONE" | "PAST_DUE" | "NO_RATE";
+
+export interface FxExtraNeed {
+  id: string;
+  name: string;
+  amount_usd: number;
+  exchanged_usd: number;
+  remaining_usd: number;
+  /** YYYY-MM-DD */
+  due_date: string;
+  /** 음수면 필요일이 지남 */
+  days_left: number;
+  status: FxExtraNeedStatus;
+  tranches: FxTranche[];
+}
+
+export interface FxExtraNeedsData {
+  /** 구간 계산에 쓴 환율(항목이 없거나 환율을 모르면 null) */
+  rate: number | null;
+  rate_is_live: boolean;
+  needs: FxExtraNeed[];
+}
+
+export interface FxExtraNeedInput {
+  name: string;
+  amount_usd: number;
+  exchanged_usd: number;
+  due_date: string;
+}
+
+export const fetchFxExtraNeeds = () => apiGet<FxExtraNeedsData>("/invest/fx-extra-needs");
+
+export const createFxExtraNeed = (data: FxExtraNeedInput) =>
+  apiPost<FxExtraNeed>("/invest/fx-extra-needs", data);
+
+export const updateFxExtraNeed = (id: string, data: Partial<FxExtraNeedInput>) =>
+  apiPatch<FxExtraNeed>(`/invest/fx-extra-needs/${id}`, data);
+
+/** 항목을 지운다 — 이 항목으로 등록한 구간 알림도 서버에서 함께 지워진다 */
+export const deleteFxExtraNeed = (id: string) => apiDelete(`/invest/fx-extra-needs/${id}`);
+
+/** 추가 환전 항목의 구간 목표로 환율 알림을 맞춘다 — 적립 계획 알림은 건드리지 않는다 */
+export const syncFxExtraNeedAlerts = (
+  id: string,
+  targets: { target_rate: number; usd: number }[],
+) => apiPut<FxPlanAlertSyncResult>(`/invest/fx-extra-needs/${id}/alerts`, { targets });
