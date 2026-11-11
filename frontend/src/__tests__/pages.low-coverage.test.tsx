@@ -384,7 +384,7 @@ describe("InvestPlanPage", () => {
     expect(screen.getByText(/월 적립액, 목표 수익률/)).toBeInTheDocument();
   });
 
-  it("isLoading 상태에서 스켈레톤을 표시한다", async () => {
+  it("isLoading 상태에서도 탭은 보이고 적립 계획 탭 안에만 스켈레톤을 표시한다 (plans/125 E7)", async () => {
     const { useGoalSettings } = await import("@/hooks/useGoalSettings");
     vi.mocked(useGoalSettings).mockReturnValueOnce({
       data: undefined,
@@ -419,7 +419,8 @@ describe("InvestPlanPage", () => {
       openWizard: vi.fn(),
     });
     const { container } = renderPage(<InvestPlanPage />);
-    expect(screen.queryByText("적립 계획")).not.toBeInTheDocument();
+    // 챌린지·배당·절세 탭은 적립 분석을 쓰지 않아 페이지 전체를 막지 않는다
+    expect(screen.getByText("챌린지")).toBeInTheDocument();
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
   });
 });

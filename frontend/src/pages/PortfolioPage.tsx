@@ -36,7 +36,7 @@ import {
   isStockAccount,
   isSyncableAccount,
 } from "@/utils/accounts";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { fetchPortfolioOverview } from "@/api/portfolios";
 import { accountsQuery } from "@/api/queryOptions";
 import PageLoadError from "@/components/common/PageLoadError";
@@ -120,10 +120,12 @@ export default function PortfolioPage() {
   );
   const canSyncSelected = !!selectedAccount && isSyncableAccount(selectedAccount.data_source);
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error, refetch, isPlaceholderData } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview(selectedAccountId),
     queryFn: () => fetchPortfolioOverview(selectedAccountId),
     staleTime: STALE_TIME.EXCHANGE_RATE,
+    // 계좌를 바꿀 때 페이지 전체(계좌 선택 포함)가 스켈레톤으로 바뀌지 않게 이전 결과를 흐리게 남긴다(plans/125 E8)
+    placeholderData: keepPreviousData,
     refetchInterval: isNativePlatform() ? false : REFETCH_INTERVAL.PORTFOLIO,
   });
 
@@ -232,7 +234,10 @@ export default function PortfolioPage() {
       };
 
   return (
-    <div className="space-y-6">
+    <div
+      className={`space-y-6 transition-opacity ${isPlaceholderData ? "opacity-60" : ""}`}
+      aria-busy={isPlaceholderData}
+    >
       {/* 상단 요약 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
         <div className="flex items-center justify-between flex-wrap gap-2">

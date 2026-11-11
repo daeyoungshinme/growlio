@@ -5,7 +5,10 @@ import { MemoryRouter } from "react-router-dom";
 
 // ---- Store mocks ----
 vi.mock("@/stores/themeStore", () => ({
-  useThemeStore: () => ({ isDark: false, toggle: vi.fn() }),
+  useThemeStore: (sel?: (s: { isDark: boolean; toggle: () => void }) => unknown) => {
+    const state = { isDark: false, toggle: vi.fn() };
+    return sel ? sel(state) : state;
+  },
 }));
 
 vi.mock("@/stores/authStore", () => ({

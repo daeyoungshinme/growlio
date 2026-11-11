@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ChevronDown, Loader2, RefreshCw, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
@@ -7,7 +7,10 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import { AssetAccount } from "@/api/assets";
 import { isOrderExecutableAccount, isSyncableAccount } from "@/utils/accounts";
 import { RebalancingAccountSyncSection } from "./RebalancingAccountSyncSection";
-import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
+// 실행 모달(확인·주문표·결과 하위 트리 약 1,300줄)은 "실행"을 누를 때만 받는다 — 포트폴리오 탭 청크에서 분리(plans/125 E5)
+const RebalancingExecutionModal = lazy(() =>
+  import("./RebalancingExecutionModal").then((m) => ({ default: m.RebalancingExecutionModal })),
+);
 import ErrorBoundary from "@/components/ErrorBoundary";
 import RebalancingDividendSection from "./RebalancingDividendSection";
 import RebalancingDiagnosisCard from "./RebalancingDiagnosisCard";
@@ -239,14 +242,16 @@ export default function RebalancingTable({
 
       {executionOpen && (
         <ErrorBoundary variant="section">
-          <RebalancingExecutionModal
-            portfolioId={portfolioId}
-            analysis={analysis}
-            accounts={accounts}
-            onExecuted={handleExecuted}
-            onSynced={onReanalyze}
-            onClose={() => setExecutionOpen(false)}
-          />
+          <Suspense fallback={null}>
+            <RebalancingExecutionModal
+              portfolioId={portfolioId}
+              analysis={analysis}
+              accounts={accounts}
+              onExecuted={handleExecuted}
+              onSynced={onReanalyze}
+              onClose={() => setExecutionOpen(false)}
+            />
+          </Suspense>
         </ErrorBoundary>
       )}
     </div>

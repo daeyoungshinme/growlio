@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { arrayMove } from "@dnd-kit/sortable";
 import { DragEndEvent } from "@dnd-kit/core";
@@ -13,11 +13,14 @@ import {
 } from "@/api/portfolios";
 import { PortfolioDriftSummary } from "@/api/rebalancing";
 import { batchSetTargetPortfolio, type AccountTaxType, type InvestmentHorizon } from "@/api/assets";
-import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
+// 편집기·자동화 설정 모달은 열 때만 받는다 — 목록만 보는 방문에서 탭 청크를 줄인다(plans/125 E5)
+const UnifiedPortfolioEditor = lazy(() => import("./UnifiedPortfolioEditor"));
 import PortfolioListSection from "./PortfolioListSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import RebalancingAlertModalRouter from "@/components/rebalancing/RebalancingAlertModalRouter";
+const RebalancingAlertModalRouter = lazy(
+  () => import("@/components/rebalancing/RebalancingAlertModalRouter"),
+);
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData, invalidateAccountData } from "@/utils/queryInvalidation";
@@ -307,16 +310,18 @@ export default function PortfolioManageTab({
       />
 
       {isEditorOpen && (
-        <UnifiedPortfolioEditor
-          initial={editingTarget}
-          initialItems={prefillItems ?? undefined}
-          initialName={prefillName}
-          initialAccountIds={prefillAccountIds ?? undefined}
-          accounts={stockAccounts}
-          onSave={handleSave}
-          onClose={closeEditor}
-          saving={createMut.isPending || updateMut.isPending}
-        />
+        <Suspense fallback={null}>
+          <UnifiedPortfolioEditor
+            initial={editingTarget}
+            initialItems={prefillItems ?? undefined}
+            initialName={prefillName}
+            initialAccountIds={prefillAccountIds ?? undefined}
+            accounts={stockAccounts}
+            onSave={handleSave}
+            onClose={closeEditor}
+            saving={createMut.isPending || updateMut.isPending}
+          />
+        </Suspense>
       )}
       {confirmDeleteId && (
         <ConfirmModal
@@ -333,19 +338,21 @@ export default function PortfolioManageTab({
         (() => {
           const alertPortfolio = sortedPortfolios.find((p) => p.id === alertModalPortfolioId);
           return (
-            <RebalancingAlertModalRouter
-              key={alertModalPortfolioId}
-              portfolioId={alertModalPortfolioId}
-              portfolioName={alertPortfolio?.name ?? ""}
-              alertScope={alertPortfolio?.alert_scope}
-              accountIds={alertPortfolio?.account_ids ?? null}
-              accounts={accounts}
-              initialPreset={alertInitialPreset}
-              onClose={() => {
-                setAlertModalPortfolioId(null);
-                setAlertInitialPreset(undefined);
-              }}
-            />
+            <Suspense fallback={null}>
+              <RebalancingAlertModalRouter
+                key={alertModalPortfolioId}
+                portfolioId={alertModalPortfolioId}
+                portfolioName={alertPortfolio?.name ?? ""}
+                alertScope={alertPortfolio?.alert_scope}
+                accountIds={alertPortfolio?.account_ids ?? null}
+                accounts={accounts}
+                initialPreset={alertInitialPreset}
+                onClose={() => {
+                  setAlertModalPortfolioId(null);
+                  setAlertInitialPreset(undefined);
+                }}
+              />
+            </Suspense>
           );
         })()}
     </ErrorBoundary>

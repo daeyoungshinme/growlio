@@ -6,7 +6,8 @@ import { useLogout } from "@/hooks/useLogout";
 
 export default function Sidebar() {
   const logout = useLogout();
-  const { isDark, toggle } = useThemeStore();
+  const isDark = useThemeStore((s) => s.isDark);
+  const toggle = useThemeStore((s) => s.toggle);
 
   return (
     <aside

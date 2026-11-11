@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Info, Plus } from "lucide-react";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -53,7 +53,7 @@ export default function PeriodPurchasesTab({ accounts }: Props) {
   );
 
   const monthParam = period === "month" ? month : null;
-  const { data, isLoading, isError } = useQuery<PeriodPurchaseSummary>({
+  const { data, isLoading, isError, isPlaceholderData } = useQuery<PeriodPurchaseSummary>({
     queryKey: QUERY_KEYS.periodPurchases(period, year, monthParam, accountId || null),
     queryFn: () =>
       fetchPeriodPurchases({
@@ -63,6 +63,8 @@ export default function PeriodPurchasesTab({ accounts }: Props) {
         account_id: accountId || undefined,
       }),
     staleTime: STALE_TIME.MEDIUM,
+    // 기간 이동 때 목록이 스켈레톤으로 깜빡이지 않게 이전 기간을 흐리게 남긴다(plans/125 E8)
+    placeholderData: keepPreviousData,
   });
 
   const isCurrent =
@@ -83,7 +85,10 @@ export default function PeriodPurchasesTab({ accounts }: Props) {
   const hasEstimated = items.some((i) => i.source === "ESTIMATED");
 
   return (
-    <div className="space-y-5">
+    <div
+      className={`space-y-5 transition-opacity ${isPlaceholderData ? "opacity-60" : ""}`}
+      aria-busy={isPlaceholderData}
+    >
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex items-center gap-2">
           <div className="flex gap-1.5" role="group" aria-label="기간 단위">

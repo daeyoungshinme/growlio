@@ -107,6 +107,7 @@ _공통/입력_
 - `useModalBehavior` — 스크롤 잠금·포커스 트랩·Escape. Escape·트랩은 **맨 위 모달만**(Android 뒤로가기가 Escape를 보내므로)
 - `useEditableSettingsForm` — 설정 편집 모달 상태 머신. `numberFieldPayload()`로 부분 갱신 payload를 만든다(빈 칸 → 키 생략, 지움 → null) — `PUT /settings/goal`이 보낸 키만 바꾸기 때문
 - `useMediaQuery`(`useIsSmUp`) — 모바일 카드/데스크톱 표 중 보이는 쪽만 렌더
+- `useInView` — 화면 근처에 처음 들어왔는지(콜백 ref). 아래쪽 무거운 차트를 스크롤해 닿을 때만 마운트
 
 _자산관리/대시보드_
 

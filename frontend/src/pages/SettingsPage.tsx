@@ -84,7 +84,8 @@ const inputClass = `mt-1 w-full ${INPUT_MD}`;
 const labelClass = LABEL_MD;
 
 export default function SettingsPage() {
-  const { isDark, toggle } = useThemeStore();
+  const isDark = useThemeStore((s) => s.isDark);
+  const toggle = useThemeStore((s) => s.toggle);
   const logout = useLogout();
   const { isAvailable, isEnabled, setEnabled } = useBiometric();
   const pushStatus = usePushNotificationStore((s) => s.status);
