@@ -110,6 +110,7 @@ export default function DashboardPage() {
     exchangeRate,
     marketSignal,
     challenges,
+    challengesLoading,
   } = useDashboardData();
 
   // SetupTargetPortfolioBanner와 동일 queryKey를 재사용 — 캐시 공유로 추가 네트워크 요청 없음.
@@ -174,7 +175,11 @@ export default function DashboardPage() {
 
         {/* 적립 챌린지 진행 현황 — ACTIVE 챌린지가 있으면 진행률, 없으면 만들기 유도(닫기 가능) */}
         <ErrorBoundary variant="section">
-          {challenges.some((c) => c.status === "ACTIVE") ? (
+          {/* 목록이 오기 전엔 빈 상태 카드 대신 자리만 — 진행 중 챌린지가 있는 사용자에게 "만들기" 카드가 먼저
+              떴다가 바뀌던 깜빡임 방지(plans/125 C6) */}
+          {challengesLoading ? (
+            <SkeletonCard rows={2} />
+          ) : challenges.some((c) => c.status === "ACTIVE") ? (
             <ChallengeProgressCard challenges={challenges} />
           ) : (
             <ChallengeEmptyStateCard />

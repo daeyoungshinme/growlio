@@ -8,7 +8,8 @@ import { fetchSettings } from "@/api/settings";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchDCAAnalysis, fetchDividendPlan } from "@/api/invest";
 import { fetchIsaStatus, fetchTaxSummary } from "@/api/tax";
-import { fetchDashboard } from "@/api/dashboard";
+import { fetchActionItems, fetchDashboard } from "@/api/dashboard";
+import { fetchChallenges } from "@/api/challenges";
 import {
   fetchCompositeSignalStatus,
   fetchDriftSummary,
@@ -65,6 +66,21 @@ export const settingsQuery = queryOptions({
 export const marketSignalQuery = queryOptions({
   queryKey: QUERY_KEYS.marketSignal,
   queryFn: () => fetchMarketSignal(),
+  staleTime: STALE_TIME.MEDIUM,
+});
+
+/** 홈 "지금 할 일" — 카드·하단 내비 배지·부팅 프리페치가 공유. 백엔드는 결과 캐시가 없는 무거운 집계라 5분 —
+ * 관련 변경(sync·포트폴리오·알림·거래·전술 등)은 무효화 헬퍼가 정밀하게 지운다(plans/125 C5) */
+export const actionItemsQuery = queryOptions({
+  queryKey: QUERY_KEYS.actionItems,
+  queryFn: () => fetchActionItems(),
+  staleTime: STALE_TIME.FIVE_MINUTES,
+});
+
+/** 적립 챌린지 목록 + 진행률 — 홈·계획 탭·하단 내비 배지·부팅 프리페치 공용 */
+export const challengesQuery = queryOptions({
+  queryKey: QUERY_KEYS.challenges,
+  queryFn: () => fetchChallenges(),
   staleTime: STALE_TIME.MEDIUM,
 });
 

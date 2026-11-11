@@ -3,7 +3,11 @@ import { QueryClient } from "@tanstack/react-query";
 import { prefetchDashboardData } from "@/api/prefetch";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
-vi.mock("@/api/dashboard", () => ({ fetchDashboard: vi.fn().mockResolvedValue({}) }));
+vi.mock("@/api/dashboard", () => ({
+  fetchDashboard: vi.fn().mockResolvedValue({}),
+  fetchActionItems: vi.fn().mockResolvedValue([]),
+}));
+vi.mock("@/api/challenges", () => ({ fetchChallenges: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/api/assets", () => ({
   fetchAccounts: vi.fn().mockResolvedValue([]),
   fetchExchangeRate: vi.fn().mockResolvedValue({ usd_krw: 1300 }),
@@ -16,7 +20,7 @@ vi.mock("@/api/invest", () => ({ fetchDCAAnalysis: vi.fn().mockResolvedValue({})
 vi.mock("@/api/settings", () => ({ fetchSettings: vi.fn().mockResolvedValue({}) }));
 
 describe("prefetchDashboardData", () => {
-  it("앱 부팅과 로그인이 같은 대시보드 쿼리 목록을 미리 가져온다(settings 포함)", () => {
+  it("앱 부팅과 로그인이 같은 홈 쿼리 목록을 미리 가져온다(지금 할 일·챌린지 포함, plans/125 C3)", () => {
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, "prefetchQuery");
 
@@ -29,7 +33,8 @@ describe("prefetchDashboardData", () => {
       QUERY_KEYS.portfolioOverviewLite,
       QUERY_KEYS.dcaAnalysis,
       QUERY_KEYS.exchangeRate,
-      QUERY_KEYS.settings,
+      QUERY_KEYS.actionItems,
+      QUERY_KEYS.challenges,
     ]);
   });
 });

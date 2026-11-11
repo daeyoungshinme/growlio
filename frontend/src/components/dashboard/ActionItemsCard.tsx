@@ -1,10 +1,8 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, ChevronDown, ChevronRight, ListChecks, RotateCw } from "lucide-react";
-import { fetchActionItems, REBALANCE_GROUP_ID, type ActionItem } from "@/api/dashboard";
+import { REBALANCE_GROUP_ID, type ActionItem } from "@/api/dashboard";
 import type { MarketSignalResponse } from "@/api/marketSignals";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -12,7 +10,7 @@ import { ACTION_PRIORITY_STYLE, deadlineLabel } from "@/utils/actionPriority";
 import { MARKET_SIGNAL_BADGE_CLASS, MARKET_SIGNAL_LABEL } from "@/utils/marketSignalBadge";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
-import { driftSummaryQuery } from "@/api/queryOptions";
+import { actionItemsQuery, driftSummaryQuery } from "@/api/queryOptions";
 
 const VISIBLE_LIMIT = 3;
 
@@ -166,11 +164,7 @@ interface Props {
 export default function ActionItemsCard({ marketSignal }: Props) {
   const [isOpen, toggleOpen] = useCollapsible(true, "growlio:dashboard:actionItemsOpen");
   const [showAll, toggleShowAll] = useCollapsible(false);
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: QUERY_KEYS.actionItems,
-    queryFn: fetchActionItems,
-    staleTime: STALE_TIME.MEDIUM,
-  });
+  const { data, isLoading, isError, refetch, isFetching } = useQuery(actionItemsQuery);
 
   if (isLoading) return <SkeletonCard rows={2} />;
   // 집계 실패는 홈 전체를 막지 않는다 — 다만 조용히 사라지면 "할 일 없음"으로 오해하므로 한 줄로 알린다

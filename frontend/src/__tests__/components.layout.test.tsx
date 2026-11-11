@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { Challenge, ChallengeSummary } from "@/api/challenges";
@@ -39,6 +41,12 @@ const fetchChallengeSummaryMock = vi.fn();
 vi.mock("@/api/challenges", () => ({
   fetchChallenges: (...args: unknown[]) => fetchChallengesMock(...args),
   fetchChallengeSummary: (...args: unknown[]) => fetchChallengeSummaryMock(...args),
+}));
+
+const fetchDriftSummaryMock = vi.fn();
+vi.mock("@/api/rebalancing", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/rebalancing")>()),
+  fetchDriftSummary: (...args: unknown[]) => fetchDriftSummaryMock(...args),
 }));
 
 import AppLayout from "@/components/layout/AppLayout";
@@ -148,6 +156,53 @@ describe("BottomNav 챌린지 배지 게이팅", () => {
 
     await waitFor(() => expect(fetchChallengeSummaryMock).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByLabelText("이번 달 적립 챌린지 미완료")).toBeDefined());
+  });
+});
+
+// ------- BottomNav 리밸런싱 배지 (plans/125 C4) -------
+// 모든 화면에 떠 있는 내비가 drift-summary(무거운 이탈 계산)를 직접 부르지 않고, 받아 둔 캐시에서만 판정한다.
+describe("BottomNav 리밸런싱 배지", () => {
+  function renderWithClient(seed: (qc: QueryClient) => void) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    seed(qc);
+    return render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <BottomNav />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    fetchChallengesMock.mockReset().mockResolvedValue([]);
+    fetchDriftSummaryMock.mockReset();
+  });
+
+  it("drift 캐시가 없으면 지금 할 일의 REBALANCE 행으로 배지를 표시하고 drift-summary는 호출하지 않는다", async () => {
+    renderWithClient((qc) =>
+      qc.setQueryData(QUERY_KEYS.actionItems, [{ id: "rebalance:all", kind: "REBALANCE" }]),
+    );
+    expect(await screen.findByLabelText("리밸런싱 필요 1개")).toBeDefined();
+    expect(fetchDriftSummaryMock).not.toHaveBeenCalled();
+  });
+
+  it("drift 캐시가 있으면 그 판정을 쓴다", async () => {
+    renderWithClient((qc) => {
+      qc.setQueryData(QUERY_KEYS.actionItems, []);
+      qc.setQueryData(QUERY_KEYS.driftSummary, [
+        { needs_rebalancing: true },
+        { needs_rebalancing: true },
+        { needs_rebalancing: false },
+      ]);
+    });
+    expect(await screen.findByLabelText("리밸런싱 필요 2개")).toBeDefined();
+  });
+
+  it("아무 캐시도 없으면 배지가 없다", () => {
+    renderWithClient(() => {});
+    expect(screen.queryByLabelText(/리밸런싱 필요/)).toBeNull();
+    expect(fetchDriftSummaryMock).not.toHaveBeenCalled();
   });
 });
 
