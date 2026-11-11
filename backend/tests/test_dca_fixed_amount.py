@@ -208,7 +208,8 @@ class TestDcaPlanGeneration:
                 current_price_krw=300000.0,
             ),
         ]  # fmt: skip
-        next_open = datetime(2026, 11, 10, 9, 30, tzinfo=_ET)
+        # 고정 날짜면 그날이 지나는 순간 KR leg 마감(지금 + 대기)이 더 늦어져 깨진다 — 항상 미래로 둔다
+        next_open = (datetime.now(tz=_ET) + timedelta(days=2)).replace(hour=9, minute=30, second=0, microsecond=0)
         with (
             patch("app.utils.market_hours.is_us_market_open", return_value=False),
             patch("app.utils.market_hours.next_us_market_open", return_value=next_open),
@@ -550,7 +551,8 @@ class TestRetryFxWaitingLeg:
     @pytest.mark.asyncio
     async def test_schedules_for_next_open_when_market_closed(self, mock_db):
         leg = self._setup(mock_db)
-        next_open = datetime(2026, 11, 10, 9, 30, tzinfo=_ET)
+        # 고정 날짜면 그날이 지나는 순간 KR leg 마감(지금 + 대기)이 더 늦어져 깨진다 — 항상 미래로 둔다
+        next_open = (datetime.now(tz=_ET) + timedelta(days=2)).replace(hour=9, minute=30, second=0, microsecond=0)
         with (
             patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(return_value=None)),
             patch("app.utils.market_hours.is_us_market_open", return_value=False),
