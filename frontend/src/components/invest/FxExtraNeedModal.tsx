@@ -1,9 +1,16 @@
 import { useId, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
-import { createFxExtraNeed, updateFxExtraNeed, type FxExtraNeed } from "@/api/invest";
+import {
+  createFxExtraNeed,
+  updateFxExtraNeed,
+  type FxExtraNeed,
+  type FxExtraNeedInput,
+} from "@/api/invest";
+import { accountsQuery } from "@/api/queryOptions";
 import { fxExtraNeedSchema } from "@/schemas/fxExtraNeed";
 import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
+import { isStockAccount } from "@/utils/accounts";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { invalidateFxExtraNeedData } from "@/utils/queryInvalidation";
 import { localToday } from "@/utils/format";
@@ -28,16 +35,16 @@ export default function FxExtraNeedModal({ need, onClose }: Props) {
     need && need.exchanged_usd > 0 ? String(need.exchanged_usd) : "",
   );
   const [dueDate, setDueDate] = useState(need?.due_date ?? "");
+  // "" = 계좌 밖(은행·트래블카드) — 저장 때 null로 보낸다
+  const [reservedAccountId, setReservedAccountId] = useState(need?.reserved_account_id ?? "");
+  const { data: accounts } = useQuery(accountsQuery);
+  const stockAccounts = (accounts ?? []).filter((a) => a.is_active && isStockAccount(a.asset_type));
   const [error, setError] = useState<string | null>(null);
   const today = localToday();
 
   const mutation = useMutation({
-    mutationFn: (data: {
-      name: string;
-      amount_usd: number;
-      exchanged_usd: number;
-      due_date: string;
-    }) => (need ? updateFxExtraNeed(need.id, data) : createFxExtraNeed(data)),
+    mutationFn: (data: FxExtraNeedInput) =>
+      need ? updateFxExtraNeed(need.id, data) : createFxExtraNeed(data),
     onSuccess: () => {
       void invalidateFxExtraNeedData(qc);
       toast(need ? "추가 환전 항목을 고쳤습니다" : "추가 환전 항목을 만들었습니다", "success");
@@ -64,7 +71,7 @@ export default function FxExtraNeedModal({ need, onClose }: Props) {
       setError("필요일은 오늘 이후여야 합니다");
       return;
     }
-    mutation.mutate(parsed.data);
+    mutation.mutate({ ...parsed.data, reserved_account_id: reservedAccountId || null });
   };
 
   return (
@@ -126,6 +133,28 @@ export default function FxExtraNeedModal({ need, onClose }: Props) {
               placeholder="0"
               className={`${INPUT_SM} w-full`}
             />
+          </div>
+          <div>
+            <label htmlFor="fx-need-account" className={FORM_LABEL}>
+              이 달러를 둔 곳
+            </label>
+            <select
+              id="fx-need-account"
+              value={reservedAccountId}
+              onChange={(e) => setReservedAccountId(e.target.value)}
+              className={`${INPUT_SM} w-full`}
+            >
+              <option value="">증권 계좌 밖 (은행·트래블카드 등)</option>
+              {stockAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} 달러 예수금
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              증권 계좌를 고르면 달러 환전 계획(적립)의 보유 달러에서 이미 환전한 금액만큼 뺍니다.
+              필요일이 지나면 다시 적립용으로 셉니다.
+            </p>
           </div>
           {error && (
             <p role="alert" className="text-sm text-red-600 dark:text-red-400">

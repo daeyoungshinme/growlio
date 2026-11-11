@@ -139,6 +139,8 @@ export interface FxPlanHeldAccount {
   name: string;
   usd: number;
   source: FxHeldUsdSource;
+  /** 추가 환전 항목(여행 등)이 이 계좌에 둔 달러 — usd는 이미 뺀 값. 옛 persist 캐시엔 없을 수 있다 */
+  reserved_usd?: number;
 }
 
 export interface FxPlanData {
@@ -165,6 +167,8 @@ export interface FxPlanData {
   held_usd_accounts?: FxPlanHeldAccount[];
   /** 환전 대기 중인 적립 매수를 진행하려면 지금 더 필요한 달러 */
   waiting_fx_usd?: number;
+  /** 추가 환전 항목(여행 등)이 증권 계좌에 둔 달러 — held_usd에서 뺐다(plans/123 후속) */
+  reserved_usd?: number;
 }
 
 export const fetchFxPlan = (months: number, portfolioId?: string | null) => {
@@ -205,6 +209,9 @@ export interface FxExtraNeed {
   days_left: number;
   status: FxExtraNeedStatus;
   tranches: FxTranche[];
+  /** 이 달러를 둔 증권 계좌 — 있으면 적립 환전 계획 보유 달러에서 exchanged_usd만큼 뺀다 */
+  reserved_account_id?: string | null;
+  reserved_account_name?: string | null;
 }
 
 export interface FxExtraNeedsData {
@@ -219,6 +226,8 @@ export interface FxExtraNeedInput {
   amount_usd: number;
   exchanged_usd: number;
   due_date: string;
+  /** null = 계좌 밖(은행·트래블카드) — 수정 때 null을 보내면 해제된다 */
+  reserved_account_id: string | null;
 }
 
 export const fetchFxExtraNeeds = () => apiGet<FxExtraNeedsData>("/invest/fx-extra-needs");

@@ -131,12 +131,13 @@ async def sync_fx_plan_alerts(
 # ── 추가 환전 항목(여행 등, plans/123) ─────────────────────────
 
 
-async def _need_row(need: FxExtraNeed) -> FxExtraNeedResponse:
+async def _need_row(db: AsyncSession, need: FxExtraNeed) -> FxExtraNeedResponse:
     """생성·수정 응답 한 행 — 목록과 같은 규칙으로 구간까지 계산한다."""
     cache = await get_cache_store()
     ctx = await fx_plan_service.load_fx_rate_context(cache)
+    account_name = await fx_extra_need_service.reserved_account_name(db, need)
     return FxExtraNeedResponse(
-        **fx_extra_need_service.build_need_row(need, ctx.position, ctx.rate, ctx.has_rate, today_kst())
+        **fx_extra_need_service.build_need_row(need, ctx.position, ctx.rate, ctx.has_rate, today_kst(), account_name)
     )
 
 
@@ -161,9 +162,15 @@ async def create_fx_extra_need(
     db: AsyncSession = Depends(get_db),
 ):
     need = await fx_extra_need_service.create_fx_extra_need(
-        db, current_user.id, req.name, req.amount_usd, req.exchanged_usd, req.due_date
+        db,
+        current_user.id,
+        req.name,
+        req.amount_usd,
+        req.exchanged_usd,
+        req.due_date,
+        reserved_account_id=req.reserved_account_id,
     )
-    return await _need_row(need)
+    return await _need_row(db, need)
 
 
 @router.patch("/fx-extra-needs/{need_id}", response_model=FxExtraNeedResponse)
@@ -175,9 +182,14 @@ async def update_fx_extra_need(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    changes = {k: v for k, v in req.model_dump(include=req.model_fields_set).items() if v is not None}
+    # null은 무시하되 보관 계좌의 null은 "계좌 밖"으로 해제하는 값이다
+    changes = {
+        k: v
+        for k, v in req.model_dump(include=req.model_fields_set).items()
+        if v is not None or k == "reserved_account_id"
+    }
     need = await fx_extra_need_service.update_fx_extra_need(db, current_user.id, need_id, changes)
-    return await _need_row(need)
+    return await _need_row(db, need)
 
 
 @router.delete("/fx-extra-needs/{need_id}", status_code=status.HTTP_204_NO_CONTENT)

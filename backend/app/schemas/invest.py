@@ -110,6 +110,7 @@ class FxPlanHeldAccount(BaseModel):
     usd: float
     # LIVE = 증권사 실시간, SYNCED = 마지막 동기화 값(토스·실시간 실패), MANUAL = 수기 계좌에 직접 입력한 값
     source: Literal["LIVE", "SYNCED", "MANUAL"]
+    reserved_usd: float = 0.0  # 추가 환전 항목이 이 계좌에 둔 달러(usd는 이미 뺀 값)
 
 
 class FxPlanResponse(BaseModel):
@@ -132,6 +133,7 @@ class FxPlanResponse(BaseModel):
     held_usd_is_live: bool = False  # 달러가 있는 계좌를 모두 증권사에서 실시간으로 읽었는지
     held_usd_accounts: list[FxPlanHeldAccount] = []  # 보유 달러 계좌별 내역(0달러 제외, 큰 순)
     waiting_fx_usd: float = 0.0  # 환전 대기 중인 적립 매수를 진행하려면 지금 더 필요한 달러
+    reserved_usd: float = 0.0  # 추가 환전 항목(여행 등)이 증권 계좌에 둔 달러 — held_usd에서 뺐다
 
 
 class FxPlanAlertTarget(BaseModel):
@@ -181,6 +183,8 @@ class FxExtraNeedCreate(BaseModel):
     amount_usd: float = Field(gt=0, le=_MAX_USD, allow_inf_nan=False)
     exchanged_usd: float = Field(0, ge=0, le=_MAX_USD, allow_inf_nan=False)
     due_date: date
+    # 이 달러를 둔 증권 계좌 — 지정하면 적립 환전 계획 보유 달러에서 뺀다
+    reserved_account_id: uuid.UUID | None = None
 
     @field_validator("name")
     @classmethod
@@ -192,12 +196,13 @@ class FxExtraNeedCreate(BaseModel):
 
 
 class FxExtraNeedUpdate(BaseModel):
-    """보낸 필드만 바꾼다(null은 무시)."""
+    """보낸 필드만 바꾼다. null은 무시하되 reserved_account_id의 null은 "계좌 밖"으로 해제한다."""
 
     name: str | None = Field(None, min_length=1, max_length=40)
     amount_usd: float | None = Field(None, gt=0, le=_MAX_USD, allow_inf_nan=False)
     exchanged_usd: float | None = Field(None, ge=0, le=_MAX_USD, allow_inf_nan=False)
     due_date: date | None = None
+    reserved_account_id: uuid.UUID | None = None
 
     @field_validator("name")
     @classmethod
@@ -221,6 +226,8 @@ class FxExtraNeedResponse(BaseModel):
     # OK = 구간 있음, DONE = 다 환전함, PAST_DUE = 필요일 지남, NO_RATE = 환율을 몰라 구간 계산 안 함
     status: Literal["OK", "DONE", "PAST_DUE", "NO_RATE"]
     tranches: list[FxTrancheResponse]
+    reserved_account_id: uuid.UUID | None = None
+    reserved_account_name: str | None = None
 
 
 class FxExtraNeedsResponse(BaseModel):

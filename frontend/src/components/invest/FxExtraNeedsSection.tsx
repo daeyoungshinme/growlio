@@ -84,6 +84,11 @@ function NeedRow({ need, alerts, onEdit, onDelete, onDone }: RowProps) {
           >
             {dueLabel(need)}
           </p>
+          {need.reserved_account_id && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {need.reserved_account_name ?? "증권 계좌"} 달러 예수금 · 적립 환전 계획에서 제외
+            </p>
+          )}
         </div>
         <AccountActionsMenu
           ariaLabel={`${need.name} 더 보기`}
