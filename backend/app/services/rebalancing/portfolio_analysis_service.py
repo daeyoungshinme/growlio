@@ -76,9 +76,6 @@ async def analyze_portfolio_rebalancing(
         if effective_ids is not None
         else [uuid.UUID(acc["id"]) for acc in overview.get("accounts", []) if acc.get("id")]
     )
-    base_dividend_items = await get_ticker_dividend_summary(user_id, db, account_ids=dividend_ids)
-    base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
-
     target_tickers = [
         (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
         for raw_item in portfolio.items
@@ -90,11 +87,16 @@ async def analyze_portfolio_rebalancing(
         if p.get("ticker") and p.get("ticker") != "CASH"
     ]
 
-    # 과거 수익률은 세션을 쓰지 않으니 병렬로 돌리고, 세션을 쓰는 두 호출은 순차 실행한다.
+    # 과거 수익률(10년 Yahoo 배치)은 세션을 쓰지 않아 overview 직후 바로 시작한다 — 예전엔 배당 요약(외부 체인)이
+    # 끝난 뒤에야 시작해 둘이 직렬로 쌓였다(plans/125 A5). 세션을 쓰는 호출은 순차 실행한다.
     returns_task = asyncio.create_task(
         get_historical_returns(list(set(target_tickers) | set(current_tickers)), cache=cache)
     )
     try:
+        base_dividend_items = await get_ticker_dividend_summary(user_id, db, account_ids=dividend_ids)
+        base_dividend_map = {
+            (item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")
+        }
         dividend_map = await collect_dividend_map(user_id, db, cache, portfolio, base_dividend_map)
         overview = await enrich_overview_with_prices(portfolio, overview, user_id, db, cache)
     except BaseException:

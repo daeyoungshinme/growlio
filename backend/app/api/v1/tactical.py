@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
+from app.core.database import release_read_connection
 from app.limiter import limiter
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
@@ -29,6 +30,9 @@ router = APIRouter(prefix="/tactical", tags=["tactical"])
 async def _status(
     portfolio: Portfolio, strategy: TacticalStrategy | None, db: AsyncSession, *, advance: bool
 ) -> dict[str, Any]:
+    # 시장 신호·차트 지표(외부 조회) 동안 커넥션을 쥐지 않게 — 포트폴리오·전략은 이미 읽었고
+    # expire_on_commit=False라 그대로 쓰며, 국면 갱신 commit은 새 트랜잭션에서 한다(plans/125 A6)
+    await release_read_connection(db)
     market = await tactical.evaluate_market(await get_cache_store(), db)
     if advance and strategy is not None and tactical.advance_strategy(strategy, market, today_kst()):
         await db.commit()

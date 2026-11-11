@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import POSITION_STOCK_ASSET_TYPES
 from app.core.cache_store import get_cache_store
 from app.core.config import settings
+from app.core.database import release_read_connection
 from app.core.job_runner import report_handled_failure
 from app.services.accounts._snapshot_queries import latest_snapshot_rows
 from app.services.accounts.credential_service import get_kis_user_credentials
@@ -330,6 +331,8 @@ async def get_ticker_dividend_summary(
     dart_key = await fetch_dart_api_key(user_id, db)
     kis_creds = await get_kis_user_credentials(user_id, db)
     usd_krw_rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
+    # 종목별 배당 소스 체인(Naver→Yahoo→KIS→pykrx→FDR→DART) 동안 커넥션을 쥐지 않게(plans/125 A1)
+    await release_read_connection(db)
 
     estimated_map, failed = await _fetch_estimated_dividend_map(positions, cache, kis_creds, dart_key, usd_krw_rate)
 
@@ -357,6 +360,7 @@ async def get_position_dividend_yields(
     kis_creds = await get_kis_user_credentials(user_id, db)
 
     cache = await get_cache_store()
+    await release_read_connection(db)
 
     # 환율을 넘기지 않으므로 estimated_monthly_usd는 None — 이 응답은 원화 기준만 쓴다
     results, _ = await _gather_position_dividends(

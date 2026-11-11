@@ -59,3 +59,17 @@ class Base(DeclarativeBase):
 async def get_db() -> AsyncGenerator[AsyncSession]:
     async with AsyncSessionLocal() as session:
         yield session
+
+
+async def release_read_connection(db: AsyncSession) -> None:
+    """외부 I/O(증권사·시세·배당 소스) 직전에 읽기 트랜잭션을 끝내 커넥션을 풀에 돌려준다.
+
+    풀이 5+2라 외부 응답(수 초~20초)을 기다리는 요청 몇 개가 커넥션을 쥐면 다른 요청이 `get_current_user`에서
+    pool_timeout까지 줄을 선다(#260). `expire_on_commit=False`라 이미 읽은 객체는 그대로 쓰고, 이후 쿼리는 새
+    트랜잭션을 autobegin한다. 세션에 아직 flush하지 않은 변경이 있으면 호출부의 트랜잭션 경계를 바꾸지 않게
+    아무것도 하지 않는다 — 읽기 경로에서만 부른다(flush된 쓰기는 구분할 수 없다).
+    """
+    if db.new or db.dirty or db.deleted:
+        return
+    if db.in_transaction():
+        await db.commit()

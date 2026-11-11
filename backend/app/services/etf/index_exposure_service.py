@@ -12,6 +12,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from app.constants import is_non_tradable
+from app.core.database import release_read_connection
 from app.schemas.portfolio import (
     IndexExposureGroup,
     IndexExposureMember,
@@ -138,6 +139,8 @@ async def get_index_exposure(
     if not holdings:
         return IndexExposureResponse()
 
+    # ETF 프로필 조회(Naver/Yahoo, 최대 20초) 동안 커넥션을 쥐지 않게(plans/125 A6)
+    await release_read_connection(db)
     profiles, unresolved = await get_etf_profiles_with_status(
         cache, [(h["ticker"], h["name"], h["market"]) for h in holdings]
     )
