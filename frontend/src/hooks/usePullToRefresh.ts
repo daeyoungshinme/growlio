@@ -47,13 +47,15 @@ export function usePullToRefresh({
     });
   }, []);
 
+  /** 맨 위에서 시작한 터치면 당김을 준비하고 true — 그때만 non-passive touchmove를 붙인다 */
   const handleTouchStart = useCallback(
-    (e: TouchEvent) => {
+    (e: TouchEvent): boolean => {
       const el = containerRef.current;
       const touch = e.touches[0];
-      if (disabled || !el || el.scrollTop > 0 || !touch) return;
+      if (disabled || !el || el.scrollTop > 0 || !touch) return false;
       startYRef.current = touch.clientY;
       hapticFiredRef.current = false;
+      return true;
     },
     [disabled, containerRef],
   );
@@ -113,14 +115,35 @@ export function usePullToRefresh({
     const el = containerRef.current;
     if (!el) return;
 
-    el.addEventListener("touchstart", handleTouchStart, { passive: true });
-    el.addEventListener("touchmove", handleTouchMove, { passive: false });
-    el.addEventListener("touchend", handleTouchEnd, { passive: true });
+    // non-passive touchmove는 맨 위에서 시작한 제스처 동안만 붙인다 — 앱의 유일한 스크롤 컨테이너에 항상 붙어 있으면
+    // 모든 스크롤이 JS 메인 스레드 응답을 기다려(청크 파싱·쿼리 폭주 중) 저사양 Android에서 버벅였다(plans/125 E2)
+    let moveAttached = false;
+    const detachMove = () => {
+      if (!moveAttached) return;
+      el.removeEventListener("touchmove", handleTouchMove);
+      moveAttached = false;
+    };
+    const onStart = (e: TouchEvent) => {
+      detachMove();
+      if (handleTouchStart(e)) {
+        el.addEventListener("touchmove", handleTouchMove, { passive: false });
+        moveAttached = true;
+      }
+    };
+    const onEnd = () => {
+      detachMove();
+      void handleTouchEnd();
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
 
     return () => {
-      el.removeEventListener("touchstart", handleTouchStart);
-      el.removeEventListener("touchmove", handleTouchMove);
-      el.removeEventListener("touchend", handleTouchEnd);
+      detachMove();
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
     };
   }, [handleTouchStart, handleTouchMove, handleTouchEnd, containerRef]);
 

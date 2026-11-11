@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { App } from "@capacitor/app";
 import Sidebar from "./Sidebar";
@@ -28,6 +28,11 @@ export default function AppLayout() {
   const registerRefresh = useCallback((fn: (() => Promise<void>) | null) => {
     refreshFnRef.current = fn;
   }, []);
+  // 당기는 동안 이 레이아웃은 프레임마다 다시 그려진다 — 컨텍스트 값·내비 요소를 고정해 페이지(useRegisterRefresh
+  // 구독자)와 하단 내비·사이드바가 같이 다시 그려지지 않게 한다(plans/125 E1)
+  const refreshContextValue = useMemo(() => ({ registerRefresh }), [registerRefresh]);
+  const sidebar = useMemo(() => <Sidebar />, []);
+  const bottomNav = useMemo(() => <BottomNav />, []);
 
   const { isPulling, pullDistance, isRefreshing } = usePullToRefresh({
     onRefresh: async () => {
@@ -75,11 +80,11 @@ export default function AppLayout() {
 
   return (
     <ExchangeRateProvider>
-      <RefreshContext.Provider value={{ registerRefresh }}>
+      <RefreshContext.Provider value={refreshContextValue}>
         {/* h-dvh: 모바일 주소창을 뺀 실제 높이(미지원 WebView는 h-screen 규칙이 남는다). 상단 safe-area는
             Android 15+ edge-to-edge에서 상태바와 겹치지 않게(그 외 환경은 0) — plans/79 F */}
         <div className="flex h-screen h-dvh pt-[env(safe-area-inset-top)] bg-gray-50 dark:bg-gray-950">
-          <Sidebar />
+          {sidebar}
           <div className="flex-1 flex flex-col overflow-hidden">
             {needsPasswordReset && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-700 px-4 py-2 text-sm text-yellow-800 dark:text-yellow-300 flex items-center justify-between">
@@ -126,7 +131,7 @@ export default function AppLayout() {
               <Outlet />
             </main>
           </div>
-          <BottomNav />
+          {bottomNav}
         </div>
       </RefreshContext.Provider>
     </ExchangeRateProvider>

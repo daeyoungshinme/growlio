@@ -106,3 +106,33 @@ describe("useRegisterRefresh (plans/119 D5)", () => {
     expect(registerRefresh).toHaveBeenLastCalledWith(null);
   });
 });
+
+describe("usePullToRefresh non-passive 리스너 범위 (plans/125 E2)", () => {
+  it("스크롤된 상태에서 시작한 터치에는 touchmove를 가로채지 않는다", () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    const { getByTestId } = render(<Harness onRefresh={onRefresh} />);
+    const el = getByTestId("scroller");
+    Object.defineProperty(el, "scrollTop", { value: 120, configurable: true });
+    const add = vi.spyOn(el, "addEventListener");
+
+    touch(el, "touchstart", 0);
+    const move = touch(el, "touchmove", 200);
+
+    expect(move.defaultPrevented).toBe(false);
+    expect(add.mock.calls.some(([type]) => type === "touchmove")).toBe(false);
+  });
+
+  it("맨 위에서 시작한 제스처가 끝나면 touchmove 리스너를 뗀다", async () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    const { getByTestId } = render(<Harness onRefresh={onRefresh} />);
+    const el = getByTestId("scroller");
+    const remove = vi.spyOn(el, "removeEventListener");
+
+    touch(el, "touchstart", 0);
+    await act(async () => {
+      touch(el, "touchend");
+    });
+
+    expect(remove.mock.calls.some(([type]) => type === "touchmove")).toBe(true);
+  });
+});
