@@ -50,9 +50,9 @@ UsdCheck = UsdShortfall | UsdUnknown | None
 async def fetch_usd_buying_power(account_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, cache) -> float | None:
     """실행 계좌의 실시간 달러 예수금. 조회 실패·미지원 계좌·필드 없음이면 None."""
     from app.kis.auth import get_access_token
-    from app.kis.balance import get_overseas_balance as kis_overseas_balance
+    from app.kis.balance import get_overseas_deposit_usd as kis_overseas_deposit_usd
     from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
-    from app.kiwoom.balance import get_overseas_balance as kiwoom_overseas_balance
+    from app.kiwoom.balance import get_overseas_deposit_usd as kiwoom_overseas_deposit_usd
     from app.services.rebalancing.execution_service import (
         load_executable_account,
         load_kis_credentials,
@@ -60,24 +60,25 @@ async def fetch_usd_buying_power(account_id: uuid.UUID, user_id: uuid.UUID, db: 
     )
 
     token_args = {"cache": cache, "db": db, "user_id": str(user_id), "account_id": str(account_id)}
+    raw: float | None
     try:
         account = await load_executable_account(account_id, user_id, db)
         is_mock = account.is_mock_mode
+        # 예수금만 필요하다 — 보유종목 전체 잔고(거래소 3곳 × 연속조회)는 받지 않는다(plans/124 A)
         if account.asset_type == "STOCK_KIWOOM":
             app_key, app_secret = load_kiwoom_credentials(account)
             token = await kiwoom_get_access_token(app_key, app_secret, is_mock=is_mock, **token_args)
-            balance = await kiwoom_overseas_balance(token, account.kiwoom_account_no or "", is_mock=is_mock)
+            raw = await kiwoom_overseas_deposit_usd(token, is_mock=is_mock)
         else:
             app_key, app_secret = load_kis_credentials(account)
             token = await get_access_token(app_key, app_secret, is_mock=is_mock, **token_args)
-            balance = await kis_overseas_balance(
+            raw = await kis_overseas_deposit_usd(
                 app_key, app_secret, token, account.kis_account_no or "", is_mock=is_mock
             )
     except Exception as exc:
         report_handled_failure("dca_usd_buying_power_fetch_failed", exc, account_id=str(account_id))
         return None
 
-    raw = balance.get("deposit_usd")
     if raw is None:
         return None
     try:

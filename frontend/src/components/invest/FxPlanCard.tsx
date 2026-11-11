@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -121,19 +121,48 @@ function PositionBlock({ position }: { position: NonNullable<FxPlanData["positio
   );
 }
 
+const fxPlanQuery = (months: number, portfolioId: string | null) => ({
+  queryKey: QUERY_KEYS.fxPlan(months, portfolioId),
+  queryFn: () => fetchFxPlan(months, portfolioId),
+  staleTime: STALE_TIME.FIVE_MINUTES,
+});
+
+/**
+ * 추가 환전 섹션은 환전 계획 응답(증권사 실시간 달러 조회로 느릴 수 있음)을 기다리지 않고 함께 조회한다 —
+ * 계획 본문 안에 두면 본문 로딩이 끝난 뒤에야 마운트돼 요청이 직렬로 쌓인다(plans/124 D)
+ */
 export default function FxPlanCard({ onEditGoal }: Props) {
+  return (
+    <div className="space-y-5">
+      <FxPlanBody onEditGoal={onEditGoal} />
+      <FxExtraNeedsSection />
+    </div>
+  );
+}
+
+function FxPlanBody({ onEditGoal }: Props) {
   const qc = useQueryClient();
   const [monthOption, setMonthOption] = useState<MonthOption>("3개월");
   const [portfolioId, setPortfolioId] = useState<string | null>(null);
   const months = MONTHS[monthOption];
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: QUERY_KEYS.fxPlan(months, portfolioId),
-    queryFn: () => fetchFxPlan(months, portfolioId),
-    staleTime: STALE_TIME.FIVE_MINUTES,
+  const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
+    ...fxPlanQuery(months, portfolioId),
     // 월 탭·포트폴리오를 바꿀 때 카드 전체가 스켈레톤으로 바뀌며 탭 포커스가 사라지지 않게 (plans/99 B1)
     placeholderData: keepPreviousData,
   });
+
+  // 기간 탭은 계획이 나온 상태(OK·SUFFICIENT)에서만 보인다 — 그때 나머지 기간을 미리 받아 탭 전환을 즉시로.
+  // 서버는 실시간 달러를 2분 캐시하므로 증권사를 다시 부르지 않는다(plans/124 D)
+  const prefetchOtherMonths =
+    !!data && !isPlaceholderData && (data.status === "OK" || data.status === "SUFFICIENT");
+  useEffect(() => {
+    if (!prefetchOtherMonths) return;
+    for (const option of MONTH_OPTIONS) {
+      if (MONTHS[option] !== months)
+        void qc.prefetchQuery(fxPlanQuery(MONTHS[option], portfolioId));
+    }
+  }, [prefetchOtherMonths, months, portfolioId, qc]);
   const { data: alerts } = useQuery(exchangeRateAlertsQuery);
 
   const plan = planAlertState(alerts, data?.tranches, { portfolioId: data?.portfolio_id ?? null });
@@ -365,8 +394,6 @@ export default function FxPlanCard({ onEditGoal }: Props) {
           )}
         </div>
       )}
-
-      <FxExtraNeedsSection />
     </div>
   );
 }

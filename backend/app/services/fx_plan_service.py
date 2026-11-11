@@ -10,7 +10,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
+import time
 import uuid
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, timedelta
@@ -32,6 +34,7 @@ from app.constants import (
     POSITION_STOCK_ASSET_TYPES,
 )
 from app.core.cache_store import CacheStore
+from app.core.database import AsyncSessionLocal
 from app.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.models.alert import ExchangeRateAlert, RebalancingAlert
 from app.models.asset import AssetAccount
@@ -287,9 +290,19 @@ class HeldUsdAccount:
     reserved_usd: float = 0.0  # 추가 환전 항목이 이 계좌에 둔 달러 — `usd`는 이미 이만큼 뺀 값이다
 
 
-async def _account_usd(
-    db: AsyncSession, cache: CacheStoreType, user_id: uuid.UUID, account: AssetAccount
-) -> HeldUsdAccount:
+_LIVE_USD_CONCURRENCY = 3
+
+
+async def _fetch_live_usd(user_id: uuid.UUID, account_id: uuid.UUID, cache: CacheStoreType) -> float | None:
+    """계좌별 짧은 세션으로 실시간 달러를 읽는다 — 요청 세션은 동시 사용할 수 없고 토큰 발급이 commit을 한다.
+
+    계좌들을 병렬로 조회하려고 `sync_all_service.sync_accounts`와 같은 패턴을 쓴다(plans/124 B).
+    """
+    async with AsyncSessionLocal() as session:
+        return await fetch_usd_buying_power(account_id, user_id, session, cache)
+
+
+async def _account_usd(cache: CacheStoreType, user_id: uuid.UUID, account: AssetAccount) -> HeldUsdAccount:
     """계좌의 달러 예수금과 출처. KIS·키움은 증권사 실시간 조회(2분 캐시), 실패·토스는 동기화 값, 수기는 직접 입력값."""
     synced = float(account.deposit_usd or 0)
     if account.asset_type not in BROKER_API_ASSET_TYPES:
@@ -302,7 +315,7 @@ async def _account_usd(
         return HeldUsdAccount(account, float(cached), "LIVE")
     if cached == _LIVE_USD_FAILED:
         return HeldUsdAccount(account, synced, "SYNCED", live_failed=True)
-    live = await fetch_usd_buying_power(account.id, user_id, db, cache)
+    live = await _fetch_live_usd(user_id, account.id, cache)
     if live is None:
         # 실패도 같은 TTL만큼 기억한다 — 만료 토큰·키 없는 계좌가 화면을 열 때마다 증권사(KIS 최대 3회)를 다시 부르고
         # Sentry 이벤트를 남기지 않게(plans/122 B4). 동기화 무효화가 이 키도 지운다
@@ -331,7 +344,14 @@ async def _held_usd(
     accounts: dict[uuid.UUID, AssetAccount] = {a.id: a for a in (await db.execute(stmt)).scalars().all()}
     for account in extra_accounts:
         accounts.setdefault(account.id, account)
-    held = [await _account_usd(db, cache, user_id, account) for account in accounts.values()]
+    # 계좌마다 증권사 조회(토큰 + 잔고)가 수 초 걸린다 — 순차로 쌓지 않고 병렬로(plans/124 B)
+    sem = asyncio.Semaphore(_LIVE_USD_CONCURRENCY)
+
+    async def one(account: AssetAccount) -> HeldUsdAccount:
+        async with sem:
+            return await _account_usd(cache, user_id, account)
+
+    held = list(await asyncio.gather(*(one(account) for account in accounts.values())))
     reserved = await reserved_usd_by_account(db, user_id)
     return [_minus_reserved(h, reserved.get(h.account.id, 0.0)) for h in held]
 
@@ -398,8 +418,10 @@ class FxRateContext:
 
 async def load_fx_rate_context(cache: CacheStoreType) -> FxRateContext:
     """현재 환율(실시간·캐시, 없으면 1년 일봉 마지막 종가)과 1년 위치. 적립 계획·추가 환전(plans/123)이 함께 쓴다."""
-    live_rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
-    closes = await fetch_usd_krw_closes(cache)
+    # 둘은 독립이다 — 캐시 미스면 각각 Yahoo를 기다리므로 함께 기다린다(plans/124 C)
+    (live_rate, rate_is_live), closes = await asyncio.gather(
+        get_live_or_cached_usd_krw(cache), fetch_usd_krw_closes(cache)
+    )
     if not rate_is_live and closes:
         live_rate = closes[-1]
     position = compute_fx_position(closes, live_rate) if closes else None
@@ -413,7 +435,9 @@ async def get_fx_plan(
     portfolio_id: uuid.UUID | None,
     months: int,
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     ctx = await load_fx_rate_context(cache)
+    rate_ctx_ms = _elapsed_ms(started)
     live_rate, rate_is_live, position = ctx.rate, ctx.rate_is_live, ctx.position
 
     portfolio, candidates = await _pick_portfolio(db, user_id, portfolio_id)
@@ -479,7 +503,9 @@ async def get_fx_plan(
     else:
         monthly_need_usd = monthly_deposit * overseas_pct / 100 / live_rate
 
+    held_started = time.perf_counter()
     held = await _held_usd(db, cache, user_id, portfolio, [account for _, account in fixed])
+    held_usd_ms = _elapsed_ms(held_started)
     # 추가 환전 항목이 둔 달러는 이미 뺀 값이다(`_held_usd`) — WAITING_FX 상쇄도 여행 달러를 쓰지 않는다
     held_usd = sum(h.usd for h in held)
     waiting_required = await _waiting_fx_required_usd(db, user_id, portfolio)
@@ -512,7 +538,19 @@ async def get_fx_plan(
         tranches=[asdict(t) for t in compute_fx_plan(position, need_usd, live_rate, waiting_fx_usd)],
         status="OK" if need_usd > 0 else "SUFFICIENT",
     )
+    # 로딩 지연 추적용(plans/124 E) — 환율 컨텍스트(Yahoo)와 증권사 실시간 달러 중 어디가 느린지
+    logger.info(
+        "fx_plan_timing",
+        rate_ctx_ms=rate_ctx_ms,
+        held_usd_ms=held_usd_ms,
+        accounts=len(held),
+        ms=_elapsed_ms(started),
+    )
     return result
+
+
+def _elapsed_ms(started: float) -> int:
+    return round((time.perf_counter() - started) * 1000)
 
 
 _SYNC_LOCK_TTL_SECONDS = 30

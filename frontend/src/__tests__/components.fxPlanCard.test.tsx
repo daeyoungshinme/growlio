@@ -29,7 +29,7 @@ vi.mock("@/utils/queryInvalidation", () => ({
 }));
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
 
-import { fetchFxPlan, syncFxPlanAlerts } from "@/api/invest";
+import { fetchFxExtraNeeds, fetchFxPlan, syncFxPlanAlerts } from "@/api/invest";
 import { fetchExchangeRateAlerts } from "@/api/alerts";
 import { toast } from "@/utils/toast";
 import FxPlanCard from "@/components/invest/FxPlanCard";
@@ -155,6 +155,27 @@ describe("FxPlanCard", () => {
     renderWithProviders(<FxPlanCard />);
     await screen.findByText(/\$1,700 필요/);
     expect(screen.queryByRole("link", { name: "대기 중인 매수 보기" })).toBeNull();
+  });
+
+  it("계획이 나오면 다른 기간도 미리 받아 둔다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    renderWithProviders(<FxPlanCard />);
+    await screen.findByText(/\$1,700 필요/);
+    await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(1, null));
+    expect(fetchFxPlan).toHaveBeenCalledWith(6, null);
+  });
+
+  it("계획이 없는 상태면 다른 기간을 미리 받지 않는다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, status: "NO_DEPOSIT_GOAL", tranches: [] });
+    renderWithProviders(<FxPlanCard />);
+    await screen.findByText(/월 적립액을 설정하면/);
+    expect(fetchFxPlan).toHaveBeenCalledTimes(1);
+  });
+
+  it("환전 계획을 기다리지 않고 추가 환전 항목을 함께 조회한다", async () => {
+    vi.mocked(fetchFxPlan).mockReturnValue(new Promise(() => {}));
+    renderWithProviders(<FxPlanCard />);
+    await waitFor(() => expect(fetchFxExtraNeeds).toHaveBeenCalled());
   });
 
   it("기간을 바꾸면 그 기간으로 다시 조회한다", async () => {
@@ -393,7 +414,10 @@ describe("FxPlanCard", () => {
     renderWithProviders(<FxPlanCard />);
     fireEvent.change(await screen.findByLabelText("포트폴리오 선택"), { target: { value: "p2" } });
     expect(await screen.findByText(/환전 계획을 불러오지 못했습니다/)).toBeInTheDocument();
-    expect(vi.mocked(fetchFxPlan).mock.calls.filter(([, pid]) => pid === null)).toHaveLength(1);
+    // 다른 기간 프리페치(plans/124 D)는 빼고 — 자동 선택(null)으로 되돌아가 3개월을 다시 받지 않았다
+    expect(
+      vi.mocked(fetchFxPlan).mock.calls.filter(([m, pid]) => m === 3 && pid === null),
+    ).toHaveLength(1);
   });
 
   it("고른 포트폴리오에 해외 종목이 없어져도 선택기로 다른 후보를 고를 수 있다", async () => {
