@@ -217,6 +217,7 @@ def _db(
     db.execute = AsyncMock(side_effect=[portfolios_result, fixed_result, accounts_result, reserved_result])
     scalars = [dca_portfolio_id] + ([] if fixed else [monthly]) + [waiting_usd]
     db.scalar = AsyncMock(side_effect=scalars)
+    db.commit = AsyncMock()
     return db
 
 
@@ -378,6 +379,21 @@ async def test_held_usd_reads_live_for_broker_accounts_and_caches(mock_cache):
     assert (held.usd, held.source) == (0.0, "MANUAL")
 
 
+async def test_held_usd_releases_request_connection_before_broker_calls():
+    """증권사 대기 동안 요청 세션이 커넥션을 쥐면 계좌별 세션과 겹쳐 풀(5+2)이 고갈된다 — 조회 전에 commit으로 반납."""
+    db = _db([_portfolio()], accounts=[_acct(100.0)])
+    order: list[str] = []
+    db.commit = AsyncMock(side_effect=lambda: order.append("commit"))
+
+    async def fake_account_usd(cache, user_id, account):
+        order.append("broker")
+        return svc.HeldUsdAccount(account, 100.0, "LIVE")
+
+    with patch.object(svc, "_account_usd", new=fake_account_usd):
+        await _plan(db, closes=_closes())
+    assert order[:2] == ["commit", "broker"]
+
+
 async def test_held_usd_falls_back_to_synced_when_live_fails():
     kis = _acct(42.0, asset_type="STOCK_KIWOOM", kiwoom_account_no="9")
     with patch.object(svc, "fetch_usd_buying_power", new=AsyncMock(return_value=None)):
@@ -432,7 +448,8 @@ async def test_held_usd_fetches_broker_accounts_in_parallel_with_own_sessions():
     started: list[uuid.UUID] = []
     used_sessions: list[object] = []
 
-    async def live(account_id, user_id, db, cache):
+    async def live(account_id, user_id, db, cache, *, release_db=False):
+        assert release_db  # 짧은 세션도 증권사 대기 전에 커넥션을 반납한다
         started.append(account_id)
         used_sessions.append(db)
         if len(started) == 2:
@@ -448,6 +465,7 @@ async def test_held_usd_fetches_broker_accounts_in_parallel_with_own_sessions():
     reserved_result = MagicMock()
     reserved_result.all.return_value = []
     request_db.execute = AsyncMock(side_effect=[accounts_result, reserved_result])
+    request_db.commit = AsyncMock()
     with (
         patch.object(svc, "fetch_usd_buying_power", new=live),
         patch.object(svc, "AsyncSessionLocal", new=factory),

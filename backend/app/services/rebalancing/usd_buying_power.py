@@ -47,8 +47,14 @@ UsdCheck = UsdShortfall | UsdUnknown | None
 """`check_usd_shortfall` 결과 — 부족(UsdShortfall)·미확인(USD_UNKNOWN)·충분(None)."""
 
 
-async def fetch_usd_buying_power(account_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, cache) -> float | None:
-    """실행 계좌의 실시간 달러 예수금. 조회 실패·미지원 계좌·필드 없음이면 None."""
+async def fetch_usd_buying_power(
+    account_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, cache, *, release_db: bool = False
+) -> float | None:
+    """실행 계좌의 실시간 달러 예수금. 조회 실패·미지원 계좌·필드 없음이면 None.
+
+    `release_db=True`면 토큰을 받은 뒤 예수금 HTTP 전에 commit해 커넥션을 풀에 돌려준다 — 이 함수만을 위해 연
+    짧은 세션(환전 계획의 계좌별 병렬 조회)용. 쥔 채로 증권사를 기다리면 풀(5+2)이 고갈된다.
+    """
     from app.kis.auth import get_access_token
     from app.kis.balance import get_overseas_deposit_usd as kis_overseas_deposit_usd
     from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
@@ -68,10 +74,14 @@ async def fetch_usd_buying_power(account_id: uuid.UUID, user_id: uuid.UUID, db: 
         if account.asset_type == "STOCK_KIWOOM":
             app_key, app_secret = load_kiwoom_credentials(account)
             token = await kiwoom_get_access_token(app_key, app_secret, is_mock=is_mock, **token_args)
+            if release_db:
+                await db.commit()
             raw = await kiwoom_overseas_deposit_usd(token, is_mock=is_mock)
         else:
             app_key, app_secret = load_kis_credentials(account)
             token = await get_access_token(app_key, app_secret, is_mock=is_mock, **token_args)
+            if release_db:
+                await db.commit()
             raw = await kis_overseas_deposit_usd(
                 app_key, app_secret, token, account.kis_account_no or "", is_mock=is_mock
             )
