@@ -300,14 +300,28 @@ async def get_overseas_balance(
             }
         )
 
-    deposit_usd = 0.0
-    for row in deposit_data.get("result_list", []):
-        if row.get("crnc_code") == "USD":
-            deposit_usd = _parse_required_num(row.get("fc_entra"))
-            break
-
     return {
         "positions": positions,
         "total_value_usd": sum(p["value_usd"] for p in positions),
-        "deposit_usd": deposit_usd,
+        "deposit_usd": _parse_usd_deposit(deposit_data),
     }
+
+
+def _parse_usd_deposit(deposit_data: dict[str, Any]) -> float:
+    """ust21110 응답의 USD 행 `fc_entra`(외화예수금). USD 행이 없으면 0.0."""
+    for row in deposit_data.get("result_list", []):
+        if row.get("crnc_code") == "USD":
+            return _parse_required_num(row.get("fc_entra"))
+    return 0.0
+
+
+async def get_overseas_deposit_usd(access_token: str, *, is_mock: bool) -> float:
+    """미국주식 달러 예수금만 — 예수금(ust21110) 1회(plans/124 A). 보유종목(ust21070) 연속조회는 하지 않는다."""
+    deposit_data = await kiwoom_request(
+        "POST",
+        _OVERSEAS_ACCOUNT_PATH,
+        is_mock=is_mock,
+        headers=auth_headers(access_token, API_ID_OVERSEAS_DEPOSIT),
+        json={},
+    )
+    return _parse_usd_deposit(deposit_data)

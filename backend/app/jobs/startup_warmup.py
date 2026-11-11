@@ -1,7 +1,7 @@
 """기동 직후 1회 — 콜드 스타트 첫 요청들이 외부 API를 직접 기다리지 않도록 공용 캐시를 미리 채운다.
 
 Render 무료 플랜은 15분 무요청 시 잠들어 인메모리 캐시가 비워진다. 깨어난 직후 홈 화면 요청이 한꺼번에
-들어오면 환율·시장 신호(FRED 8종)·기술적 신호(yfinance)·Supabase JWKS를 각 요청이 동기 대기했다.
+들어오면 환율·환율 1년 일봉·시장 신호(FRED 8종)·기술적 신호(yfinance)·Supabase JWKS를 각 요청이 동기 대기했다.
 특히 환율 캐시가 비어 있으면 설정 fallback(1300원)으로 계산된 배당 요약·대시보드가 캐시에 남았다.
 항목별로 실패를 격리한다 — 예열 실패는 기존처럼 요청 시점 조회로 폴백할 뿐이다.
 """
@@ -30,6 +30,7 @@ async def _warm_jwks() -> None:
 
 
 async def run_startup_warmup() -> None:
+    from app.services.fx_plan_service import fetch_usd_krw_closes
     from app.services.market_signal.market_signal_service import get_market_signal
     from app.services.market_signal.technical_signal_service import get_technical_signals
     from app.utils.currency import fetch_usd_krw
@@ -40,6 +41,8 @@ async def run_startup_warmup() -> None:
         "jwks": _warm_jwks,
         "market_signal": lambda: get_market_signal(cache),
         "technical_signals": lambda: get_technical_signals(cache),
+        # 환전 계획·추가 환전의 1년 위치 계산용 일봉 — 슬립 후 첫 진입이 Yahoo 1년 다운로드를 기다리지 않게(plans/124 C)
+        "usd_krw_history": lambda: fetch_usd_krw_closes(cache),
     }
     results = await asyncio.gather(*(fn() for fn in tasks.values()), return_exceptions=True)
     failed = {name: str(r) for name, r in zip(tasks, results, strict=True) if isinstance(r, BaseException)}

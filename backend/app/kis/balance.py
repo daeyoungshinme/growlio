@@ -250,10 +250,9 @@ async def get_overseas_balance(
 
         # 외화예수금은 거래소별 응답에 동일하게 포함되므로 첫 번째 값만 사용
         if not deposit_usd:
-            summary = data.get("output2", {}) or {}
-            raw_deposit = summary.get("frcr_dncl_amt_2")
-            if raw_deposit not in (None, ""):
-                deposit_usd = float(raw_deposit)
+            parsed = _parse_deposit_usd(data)
+            if parsed is not None:
+                deposit_usd = parsed
 
     if failed_exchanges:
         # 나머지 거래소 조회는 끝까지 시도(로그 확보)하되, 결과는 불완전하므로 실패로 전파 →
@@ -265,3 +264,54 @@ async def get_overseas_balance(
         "total_value_usd": sum(p["value_usd"] for p in all_positions),
         "deposit_usd": deposit_usd,
     }
+
+
+def _parse_deposit_usd(data: dict[str, Any]) -> float | None:
+    """해외잔고 응답 `output2.frcr_dncl_amt_2`(외화예수금). 필드가 없으면 None(미확인)."""
+    summary = data.get("output2", {}) or {}
+    raw_deposit = summary.get("frcr_dncl_amt_2")
+    if raw_deposit in (None, ""):
+        return None
+    return float(raw_deposit)
+
+
+async def get_overseas_deposit_usd(
+    app_key: str,
+    app_secret: str,
+    access_token: str,
+    account_no: str,
+    *,
+    is_mock: bool,
+) -> float | None:
+    """해외 달러 예수금만 — 거래소당 첫 페이지 1회, 값이 나오면 바로 반환한다(plans/124 A).
+
+    외화예수금은 거래소별 응답에 같은 값으로 실리므로 전 거래소·전 페이지 보유종목을 받을 필요가 없다.
+    `get_overseas_balance`와 같은 값을 내도록 0이면 다음 거래소도 본다. 포지션이 필요한 동기화는 그대로
+    `get_overseas_balance`를 쓴다. 실패는 그대로 raise(호출부가 미확인으로 처리).
+    """
+    cano, acnt_prdt_cd = split_account_no(account_no)
+    tr_id = TR_OVERSEAS_BALANCE_MOCK if is_mock else TR_OVERSEAS_BALANCE_REAL
+    headers = auth_headers(app_key, app_secret, access_token, tr_id)
+
+    deposit_usd: float | None = None
+    for market_name in _OVERSEAS_BALANCE_QUERY_ORDER:
+        data = await kis_request(
+            "GET",
+            "/uapi/overseas-stock/v1/trading/inquire-balance",
+            is_mock=is_mock,
+            headers=headers,
+            params={
+                "CANO": cano,
+                "ACNT_PRDT_CD": acnt_prdt_cd,
+                "OVRS_EXCG_CD": OVERSEAS_MARKET_CODES[market_name],
+                "TR_CRCY_CD": "USD",
+                "CTX_AREA_FK200": "",
+                "CTX_AREA_NK200": "",
+            },
+        )
+        parsed = _parse_deposit_usd(data)
+        if parsed is not None:
+            deposit_usd = parsed
+        if deposit_usd:
+            break
+    return deposit_usd

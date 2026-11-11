@@ -367,21 +367,21 @@ async def test_held_usd_reads_live_for_broker_accounts_and_caches(mock_cache):
     cache = CacheStore()
     live = AsyncMock(return_value=250.0)
     with patch.object(svc, "fetch_usd_buying_power", new=live):
-        held = await svc._account_usd(MagicMock(), cache, uuid.uuid4(), kis)
+        held = await svc._account_usd(cache, uuid.uuid4(), kis)
         assert (held.usd, held.source) == (250.0, "LIVE")
         # 두 번째 조회는 2분 캐시
         user_id = uuid.uuid4()
-        await svc._account_usd(MagicMock(), cache, user_id, kis)
-        await svc._account_usd(MagicMock(), cache, user_id, kis)
+        await svc._account_usd(cache, user_id, kis)
+        await svc._account_usd(cache, user_id, kis)
     assert live.await_count == 2  # 첫 user_id 1회 + 두 번째 user_id 1회(캐시 키가 사용자별)
-    held = await svc._account_usd(MagicMock(), cache, uuid.uuid4(), manual)
+    held = await svc._account_usd(cache, uuid.uuid4(), manual)
     assert (held.usd, held.source) == (0.0, "MANUAL")
 
 
 async def test_held_usd_falls_back_to_synced_when_live_fails():
     kis = _acct(42.0, asset_type="STOCK_KIWOOM", kiwoom_account_no="9")
     with patch.object(svc, "fetch_usd_buying_power", new=AsyncMock(return_value=None)):
-        held = await svc._account_usd(MagicMock(), None, uuid.uuid4(), kis)
+        held = await svc._account_usd(None, uuid.uuid4(), kis)
     assert (held.usd, held.source, held.live_failed) == (42.0, "SYNCED", True)
 
 
@@ -395,16 +395,106 @@ async def test_held_usd_remembers_live_failure_for_ttl():
     live = AsyncMock(return_value=None)
     with patch.object(svc, "fetch_usd_buying_power", new=live):
         for _ in range(2):
-            held = await svc._account_usd(MagicMock(), cache, user_id, kis)
+            held = await svc._account_usd(cache, user_id, kis)
             assert (held.usd, held.source, held.live_failed) == (42.0, "SYNCED", True)
     assert live.await_count == 1
+
+
+class _FakeSessionFactory:
+    """`AsyncSessionLocal` 대역 — 계좌마다 새 세션을 열었는지 센다."""
+
+    def __init__(self):
+        self.sessions: list[object] = []
+
+    def __call__(self):
+        factory = self
+
+        class _Ctx:
+            async def __aenter__(self):
+                session = object()
+                factory.sessions.append(session)
+                return session
+
+            async def __aexit__(self, *exc):
+                return False
+
+        return _Ctx()
+
+
+async def test_held_usd_fetches_broker_accounts_in_parallel_with_own_sessions():
+    """계좌별 증권사 조회는 병렬이고, 요청 세션 대신 계좌마다 짧은 세션을 쓴다(plans/124 B)."""
+    import asyncio
+
+    kis = _acct(0.0, asset_type="STOCK_KIS", kis_account_no="1")
+    kiwoom = _acct(0.0, asset_type="STOCK_KIWOOM", kiwoom_account_no="2")
+    manual = _acct(70.0)
+    both_started = asyncio.Event()
+    started: list[uuid.UUID] = []
+    used_sessions: list[object] = []
+
+    async def live(account_id, user_id, db, cache):
+        started.append(account_id)
+        used_sessions.append(db)
+        if len(started) == 2:
+            both_started.set()
+        # 순차라면 첫 조회가 여기서 영원히 기다린다
+        await asyncio.wait_for(both_started.wait(), timeout=1)
+        return 100.0 if account_id == kis.id else 200.0
+
+    factory = _FakeSessionFactory()
+    request_db = MagicMock()
+    accounts_result = MagicMock()
+    accounts_result.scalars.return_value.all.return_value = [kis, kiwoom, manual]
+    reserved_result = MagicMock()
+    reserved_result.all.return_value = []
+    request_db.execute = AsyncMock(side_effect=[accounts_result, reserved_result])
+    with (
+        patch.object(svc, "fetch_usd_buying_power", new=live),
+        patch.object(svc, "AsyncSessionLocal", new=factory),
+    ):
+        held = await svc._held_usd(request_db, None, uuid.uuid4(), _portfolio(), [])
+
+    assert [(h.usd, h.source) for h in held] == [(100.0, "LIVE"), (200.0, "LIVE"), (70.0, "MANUAL")]
+    assert len(factory.sessions) == 2  # 수기 계좌는 증권사 조회도 새 세션도 없다
+    assert sorted(map(id, used_sessions)) == sorted(map(id, factory.sessions))
+    assert request_db not in used_sessions
+
+
+async def test_load_fx_rate_context_fetches_rate_and_history_concurrently():
+    """실시간 환율과 1년 일봉은 서로 기다리지 않는다(plans/124 C)."""
+    import asyncio
+
+    both_started = asyncio.Event()
+    calls: list[str] = []
+
+    async def mark(name):
+        calls.append(name)
+        if len(calls) == 2:
+            both_started.set()
+        await asyncio.wait_for(both_started.wait(), timeout=1)
+
+    async def rate(cache):
+        await mark("rate")
+        return 1400.0, True
+
+    async def closes(cache):
+        await mark("closes")
+        return _closes()
+
+    with (
+        patch.object(svc, "get_live_or_cached_usd_krw", new=rate),
+        patch.object(svc, "fetch_usd_krw_closes", new=closes),
+    ):
+        ctx = await svc.load_fx_rate_context(None)
+    assert ctx.rate == 1400.0
+    assert ctx.position is not None
 
 
 async def test_held_usd_skips_live_for_account_without_number():
     kis = _acct(5.0, asset_type="STOCK_KIS", kis_account_no=None)
     live = AsyncMock()
     with patch.object(svc, "fetch_usd_buying_power", new=live):
-        held = await svc._account_usd(MagicMock(), None, uuid.uuid4(), kis)
+        held = await svc._account_usd(None, uuid.uuid4(), kis)
     assert (held.usd, held.source, held.live_failed) == (5.0, "SYNCED", False)
     live.assert_not_awaited()
 

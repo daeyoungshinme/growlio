@@ -344,7 +344,7 @@ class TestUsdBuyingPower:
             ),
             patch("app.services.rebalancing.execution_service.load_kiwoom_credentials", return_value=("k", "s")),
             patch("app.kiwoom.auth.get_access_token", new=AsyncMock(return_value="tok")),
-            patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock(return_value={"deposit_usd": 123.45})),
+            patch("app.kiwoom.balance.get_overseas_deposit_usd", new=AsyncMock(return_value=123.45)),
         ):
             assert await ubp.fetch_usd_buying_power(uuid.uuid4(), uuid.uuid4(), mock_db, None) == 123.45
 

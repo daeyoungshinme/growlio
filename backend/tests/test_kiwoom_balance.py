@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.kiwoom.balance import get_domestic_balance, get_overseas_balance
+from app.kiwoom.balance import get_domestic_balance, get_overseas_balance, get_overseas_deposit_usd
 
 
 def _ust21070_item(stk_cd="QQQ", name="Invesco QQQ Trust", qty="000000005"):
@@ -384,3 +384,28 @@ class TestRequiredNumbers:
         from app.kiwoom.balance import _parse_num
 
         assert _parse_num("N/A") == 0.0
+
+
+class TestGetOverseasDepositUsd:
+    """달러 예수금만 — ust21110 1회, 보유종목 연속조회 없음(plans/124 A)."""
+
+    @pytest.mark.asyncio
+    async def test_single_deposit_call(self):
+        api_ids: list[str] = []
+        dispatch = _make_dispatch([], deposit_fc_entra="000000321.50")
+
+        async def _spy(method, path, *, is_mock, headers, json=None, **kwargs):
+            api_ids.append(headers["api-id"])
+            return await dispatch(method, path, is_mock=is_mock, headers=headers, json=json, **kwargs)
+
+        with patch("app.kiwoom.balance.kiwoom_request", side_effect=_spy):
+            assert await get_overseas_deposit_usd("token", is_mock=False) == 321.5
+        assert api_ids == ["ust21110"]
+
+    @pytest.mark.asyncio
+    async def test_no_usd_row_is_zero(self):
+        async def _no_usd(*args, **kwargs):
+            return {"return_code": 0, "result_list": [{"crnc_code": "JPY", "fc_entra": "100"}]}
+
+        with patch("app.kiwoom.balance.kiwoom_request", side_effect=_no_usd):
+            assert await get_overseas_deposit_usd("token", is_mock=False) == 0.0

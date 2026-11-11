@@ -108,6 +108,52 @@ class TestKisOverseasBalance:
             await get_overseas_balance("k", "s", "t", "12345678", is_mock=False)
 
 
+class TestKisOverseasDepositUsd:
+    """달러 예수금만 — 거래소당 첫 페이지 1회(plans/124 A)."""
+
+    @pytest.mark.asyncio
+    async def test_first_exchange_value_returns_after_one_call(self):
+        from app.kis.balance import get_overseas_deposit_usd
+
+        calls: list[str] = []
+
+        async def _fake(*args, **kwargs):
+            calls.append(kwargs["params"]["OVRS_EXCG_CD"])
+            assert "tr_cont" not in kwargs["headers"]  # 연속조회 안 함
+            return _overseas_response(kwargs["params"]["OVRS_EXCG_CD"])
+
+        with patch("app.kis.balance.kis_request", side_effect=_fake):
+            assert await get_overseas_deposit_usd("k", "s", "t", "12345678", is_mock=False) == 50.0
+        assert len(calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_zero_checks_next_exchange_like_full_balance(self):
+        from app.kis.balance import get_overseas_deposit_usd
+
+        responses = [{"output2": {"frcr_dncl_amt_2": "0"}}, {"output2": {"frcr_dncl_amt_2": "12.5"}}]
+        with patch("app.kis.balance.kis_request", side_effect=responses):
+            assert await get_overseas_deposit_usd("k", "s", "t", "12345678", is_mock=False) == 12.5
+
+    @pytest.mark.asyncio
+    async def test_all_zero_returns_zero_and_missing_returns_none(self):
+        from app.kis.balance import get_overseas_deposit_usd
+
+        with patch("app.kis.balance.kis_request", return_value={"output2": {"frcr_dncl_amt_2": "0"}}):
+            assert await get_overseas_deposit_usd("k", "s", "t", "12345678", is_mock=False) == 0.0
+        with patch("app.kis.balance.kis_request", return_value={"output2": {}}):
+            assert await get_overseas_deposit_usd("k", "s", "t", "12345678", is_mock=False) is None
+
+    @pytest.mark.asyncio
+    async def test_error_propagates(self):
+        from app.kis.balance import get_overseas_deposit_usd
+
+        with (
+            patch("app.kis.balance.kis_request", side_effect=RuntimeError("boom")),
+            pytest.raises(RuntimeError),
+        ):
+            await get_overseas_deposit_usd("k", "s", "t", "12345678", is_mock=False)
+
+
 def _domestic_row(ticker: str) -> dict:
     return {
         "pdno": ticker,

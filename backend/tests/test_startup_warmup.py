@@ -12,7 +12,9 @@ async def test_warmup_isolates_failures():
     fx = AsyncMock(return_value=1400.0)
     signal = AsyncMock(side_effect=RuntimeError("fred down"))
     tech = AsyncMock(return_value={})
+    closes = AsyncMock(return_value=[1400.0])
     with (
+        patch("app.services.fx_plan_service.fetch_usd_krw_closes", closes),
         patch("app.utils.currency.fetch_usd_krw", fx),
         patch("app.services.market_signal.market_signal_service.get_market_signal", signal),
         patch("app.services.market_signal.technical_signal_service.get_technical_signals", tech),
@@ -24,6 +26,7 @@ async def test_warmup_isolates_failures():
     fx.assert_awaited_once()
     assert fx.await_args.kwargs == {"force_refresh": True}
     tech.assert_awaited_once()
+    closes.assert_awaited_once()
     log.warning.assert_called_once()
     assert "market_signal" in log.warning.call_args.kwargs["failed"]
 
