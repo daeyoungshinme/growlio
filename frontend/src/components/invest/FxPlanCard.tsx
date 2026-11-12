@@ -186,10 +186,12 @@ function FxPlanBody({ onEditGoal }: Props) {
 
   // 계획 구간이 없어진 상태(달러 충분·월 적립액 없음·해외 종목 없음)에도 옛 계획 알림은 남아 다시 발동한다 —
   // 어느 상태에서든 지울 수 있게 한다(plans/122 C2)
+  // 기간·포트폴리오를 바꾸는 동안 data는 이전 계획(keepPreviousData) — 그 구간·포트폴리오로 알림을 맞추지 않게
+  // 새 계획이 올 때까지 등록·해제 버튼을 막는다(plans/126 A3)
   const releaseButton = plan.planAlertCount > 0 && data?.portfolio_id && (
     <button
       onClick={() => syncMutation.mutate([])}
-      disabled={syncMutation.isPending}
+      disabled={syncMutation.isPending || isPlaceholderData}
       className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 disabled:opacity-50`}
     >
       이 계획으로 등록한 알림 {plan.planAlertCount}건 해제
@@ -368,7 +370,7 @@ function FxPlanBody({ onEditGoal }: Props) {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <button
                     onClick={() => syncMutation.mutate(plan.targets)}
-                    disabled={!alerts || plan.inSync || syncMutation.isPending}
+                    disabled={!alerts || plan.inSync || syncMutation.isPending || isPlaceholderData}
                     className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                   >
                     {syncButtonLabel(plan, !!alerts, syncMutation.isPending)}

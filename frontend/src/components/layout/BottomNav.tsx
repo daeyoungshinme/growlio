@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { NavLink } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NAV_ITEMS } from "@/constants/nav";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeNudge } from "@/hooks/useChallengeNudge";
@@ -13,12 +13,20 @@ import { actionItemsQuery, driftSummaryQuery } from "@/api/queryOptions";
  * 없으면 지금 할 일(같은 판정 `get_drift_summaries`)의 REBALANCE 행으로 대신한다.
  */
 function useRebalancingNeedsCount(): number {
+  const qc = useQueryClient();
   const { data: driftSummaries } = useQuery({ ...driftSummaryQuery, enabled: false });
   const { data: actionItems } = useQuery({ ...actionItemsQuery, enabled: false });
+  // enabled:false 관찰자는 무효화돼도 다시 받지 않는다(v5는 isStale도 항상 false) — 무효화된 drift 캐시는
+  // 리밸런싱 탭을 다시 열 때까지 옛 판정이라, 그동안은 지금 할 일(홈이 다시 받음)로 대신한다(plans/126 A2)
+  const driftInvalidated = useSyncExternalStore(
+    useCallback((onChange) => qc.getQueryCache().subscribe(onChange), [qc]),
+    () => qc.getQueryState(driftSummaryQuery.queryKey)?.isInvalidated ?? false,
+  );
   return useMemo(() => {
-    if (driftSummaries) return driftSummaries.filter((s) => s.needs_rebalancing).length;
+    if (driftSummaries && !driftInvalidated)
+      return driftSummaries.filter((s) => s.needs_rebalancing).length;
     return (actionItems ?? []).filter((item) => item.kind === "REBALANCE").length;
-  }, [driftSummaries, actionItems]);
+  }, [driftSummaries, driftInvalidated, actionItems]);
 }
 
 export default function BottomNav() {

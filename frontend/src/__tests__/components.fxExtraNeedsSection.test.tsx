@@ -242,6 +242,24 @@ describe("FxExtraNeedsSection (plans/123)", () => {
     );
   });
 
+  it("목록에 없는(삭제된) 보관 계좌는 화면대로 '계좌 밖'으로 해제해 저장한다 — plans/126 A4", async () => {
+    mockNeeds([need({ reserved_account_id: "gone", reserved_account_name: "옛 계좌" })]);
+    vi.mocked(updateFxExtraNeed).mockResolvedValue(need());
+    renderWithProviders(<FxExtraNeedsSection />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "도쿄 여행 더 보기" }));
+    fireEvent.click(screen.getByText("수정"));
+    await screen.findByRole("option", { name: "메리츠 달러 예수금" });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() =>
+      expect(updateFxExtraNeed).toHaveBeenCalledWith(
+        "n1",
+        expect.objectContaining({ reserved_account_id: null }),
+      ),
+    );
+  });
+
   it("이미 환전한 금액이 필요한 금액보다 크면 저장하지 않는다", async () => {
     mockNeeds([]);
     renderWithProviders(<FxExtraNeedsSection />);

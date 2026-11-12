@@ -170,6 +170,27 @@ export default function RebalancingPlanConfirmPage() {
                   {resultMessage}
                 </p>
               </div>
+            ) : data.reason === "WAITING_FX" ? (
+              // 환전 대기 매수는 끝난 계획이 아니다 — 이번 회차를 건너뛰려면 여기서 취소할 수 있다(plans/126 A5)
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                  달러가 부족해 환전을 기다리고 있어요.
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {leg.fx_retry_until
+                    ? `${fmtDateTime(leg.fx_retry_until)}까지 달러가 채워지면 자동으로 매수합니다. `
+                    : ""}
+                  이번 매수를 건너뛰려면 취소하세요.
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full justify-center"
+                  loading={isPending}
+                  onClick={() => cancelMut.mutate()}
+                >
+                  매수 취소하기
+                </Button>
+              </div>
             ) : leg.actionable ? (
               leg.side === "BUY" ? (
                 <div className="space-y-2">
