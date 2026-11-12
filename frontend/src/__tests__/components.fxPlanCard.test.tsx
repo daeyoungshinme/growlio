@@ -23,14 +23,22 @@ vi.mock("@/api/alerts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/api/alerts")>()),
   fetchExchangeRateAlerts: vi.fn(),
 }));
+vi.mock("@/api/assets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/assets")>()),
+  fetchAccounts: vi.fn(() => Promise.resolve([])),
+  syncAccount: vi.fn(() => Promise.resolve({})),
+}));
 vi.mock("@/utils/queryInvalidation", () => ({
   invalidateAlertData: vi.fn(),
   invalidateFxExtraNeedData: vi.fn(),
+  invalidateSyncData: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
 
 import { fetchFxExtraNeeds, fetchFxPlan, syncFxPlanAlerts } from "@/api/invest";
 import { fetchExchangeRateAlerts } from "@/api/alerts";
+import { fetchAccounts, syncAccount, type AssetAccount } from "@/api/assets";
+import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import FxPlanCard from "@/components/invest/FxPlanCard";
 
@@ -113,33 +121,53 @@ describe("FxPlanCard", () => {
       ...plan,
       deposit_source: "DCA_AMOUNT",
       monthly_deposit_krw: 1_000_000,
-      held_usd_is_live: true,
     });
     renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/정액 적립 월 100만원의 해외 몫/)).toBeInTheDocument();
-    expect(screen.getByText(/\(실시간\)/)).toBeInTheDocument();
   });
 
-  it("실시간 달러를 못 읽었으면 동기화 기준임을 보여준다", async () => {
-    vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, held_usd_is_live: false });
+  it("보유 달러는 동기화 기준이고 기준 시각을 함께 보여준다", async () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, held_usd_synced_at: twoHoursAgo });
     renderWithProviders(<FxPlanCard />);
-    expect(await screen.findByText(/\(동기화 기준\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/\(동기화 기준 · 2시간 전\)/)).toBeInTheDocument();
     expect(screen.getByText(/해외 비중 60%/)).toBeInTheDocument();
+  });
+
+  it("달러 예수금 새로 받기는 동기화 가능한 증권 계좌만 동기화한다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "kis", asset_type: "STOCK_KIS", data_source: "KIS_API" },
+      { id: "meritz", asset_type: "STOCK_OTHER", data_source: "MANUAL" },
+      { id: "bank", asset_type: "BANK", data_source: "MANUAL" },
+    ] as unknown as AssetAccount[]);
+    renderWithProviders(<FxPlanCard />);
+    fireEvent.click(await screen.findByRole("button", { name: "달러 예수금 새로 받기" }));
+    await waitFor(() => expect(invalidateSyncData).toHaveBeenCalled());
+    expect(syncAccount).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(syncAccount).mock.calls[0]?.[0]).toBe("kis");
+  });
+
+  it("동기화할 증권 계좌가 없으면 새로 받기 버튼을 숨긴다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    vi.mocked(fetchAccounts).mockResolvedValue([]);
+    renderWithProviders(<FxPlanCard />);
+    await screen.findByText(/\$1,700 필요/);
+    expect(screen.queryByRole("button", { name: "달러 예수금 새로 받기" })).toBeNull();
   });
 
   it("보유 달러를 계좌별로 보여주고 수기 계좌가 섞이면 직접 입력 포함으로 표시한다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue({
       ...plan,
-      held_usd_is_live: false,
       held_usd_accounts: [
         { account_id: "m", name: "메리츠", usd: 1200, source: "MANUAL" },
-        { account_id: "k", name: "한국투자", usd: 333, source: "LIVE" },
+        { account_id: "k", name: "한국투자", usd: 333, source: "SYNCED" },
       ],
     });
     renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/\(직접 입력 포함\)/)).toBeInTheDocument();
     expect(
-      screen.getByText("보유 달러: 메리츠 $1,200(직접 입력) · 한국투자 $333(실시간)"),
+      screen.getByText("보유 달러: 메리츠 $1,200(직접 입력) · 한국투자 $333(동기화 기준)"),
     ).toBeInTheDocument();
   });
 

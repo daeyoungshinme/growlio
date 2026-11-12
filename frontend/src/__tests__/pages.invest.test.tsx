@@ -39,6 +39,7 @@ vi.mock("@/api/settings", () => ({
 
 vi.mock("@/api/invest", () => ({
   fetchDCAAnalysis: vi.fn(),
+  fetchFxPlan: vi.fn(() => new Promise(() => {})),
 }));
 
 // AutoInvestStatusBanner("정기 적립식 자동매수" 상태 배너)가 적립 계획 탭에서 이 두 API를 조회한다 —
@@ -130,7 +131,7 @@ vi.mock("@/components/common/ConfirmModal", () => ({
 import InvestPlanPage from "@/pages/InvestPlanPage";
 import { api } from "@/api/client";
 import { fetchSettings, updateGoalSettings } from "@/api/settings";
-import { fetchDCAAnalysis } from "@/api/invest";
+import { fetchDCAAnalysis, fetchFxPlan } from "@/api/invest";
 import { toast } from "@/utils/toast";
 
 const mockConfiguredData = {
@@ -244,6 +245,17 @@ describe("InvestPlanPage", () => {
     renderPage("/invest-plan?tab=적립 계획");
     expect(await screen.findByText("달러 환전 계획")).toBeInTheDocument();
     expect(screen.queryByTestId("fx-plan")).toBeNull();
+    // 접힌 카드는 환전 계획을 미리 받지 않는다
+    expect(fetchFxPlan).not.toHaveBeenCalled();
+    window.localStorage.removeItem("growlio:invest:fxPlanOpen");
+  });
+
+  it("환전 계획 카드를 펼치면 lazy 청크와 함께 기본 계획 요청을 바로 보낸다(plans/127)", async () => {
+    window.localStorage.setItem("growlio:invest:fxPlanOpen", "false");
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage("/invest-plan?tab=적립 계획");
+    fireEvent.click(await screen.findByText("달러 환전 계획"));
+    await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(3, null));
     window.localStorage.removeItem("growlio:invest:fxPlanOpen");
   });
 

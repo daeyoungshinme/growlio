@@ -219,8 +219,6 @@ async def invalidate_asset_account_caches(
         await _scan_unlink(cache, f"{_env_prefix()}factor_analysis:{user_id}:*")
         await _scan_unlink(cache, f"{_env_prefix()}efficient_frontier:{user_id}:*")
     await invalidate_user_caches(cache, *keys)
-    # 환전 계획 화면의 실시간 달러 예수금 — 동기화(=환전 후 새로고침)하면 바로 다시 조회한다
-    await _scan_unlink(cache, f"{_env_prefix()}usd_buying_power:{user_id}:*")
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
     await invalidate_tax_overseas_caches(cache, user_id, realized=holdings_changed)

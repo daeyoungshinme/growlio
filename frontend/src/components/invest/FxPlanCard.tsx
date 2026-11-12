@@ -1,22 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  fetchFxPlan,
-  syncFxPlanAlerts,
-  type FxHeldUsdSource,
-  type FxPlanData,
-  type FxZone,
-} from "@/api/invest";
-import { exchangeRateAlertsQuery } from "@/api/queryOptions";
-import { QUERY_KEYS } from "@/constants/queryKeys";
+import { syncFxPlanAlerts, type FxHeldUsdSource, type FxPlanData, type FxZone } from "@/api/invest";
+import { accountsQuery, exchangeRateAlertsQuery, fxPlanQuery } from "@/api/queryOptions";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { SELECT_SM } from "@/constants/inputStyles";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { ALERT_TABS } from "@/constants/tabs";
 import Tabs from "@/components/common/Tabs";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { fmtKrw, fmtPct, clampPct, fmtUsd } from "@/utils/format";
+import { fmtKrw, fmtPct, clampPct, fmtUsd, relativeTime } from "@/utils/format";
+import { isStockAccount, isSyncableAccount } from "@/utils/accounts";
+import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { planAlertState, syncButtonLabel, syncToastMessage } from "@/utils/fxPlanAlerts";
 import FxTrancheList from "@/components/invest/FxTrancheList";
 import FxExtraNeedsSection from "@/components/invest/FxExtraNeedsSection";
@@ -26,6 +20,7 @@ import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { notificationSettingsUrl } from "@/utils/tabUrl";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
+// 기본 "3개월"은 `FX_PLAN_DEFAULT_MONTHS`(페이지 프리페치 키)와 같아야 한다
 const MONTH_OPTIONS = ["1개월", "3개월", "6개월"] as const;
 type MonthOption = (typeof MONTH_OPTIONS)[number];
 const MONTHS: Record<MonthOption, number> = { "1개월": 1, "3개월": 3, "6개월": 6 };
@@ -49,15 +44,46 @@ const fmtRate = (n: number) => `${n.toLocaleString("ko-KR", { maximumFractionDig
 const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
 
 const HELD_SOURCE_LABEL: Record<FxHeldUsdSource, string> = {
-  LIVE: "실시간",
   SYNCED: "동기화 기준",
   MANUAL: "직접 입력",
 };
 
-/** 산식의 보유 달러 괄호 라벨 — 수기 계좌 달러가 섞이면 실시간 여부보다 그 사실을 먼저 알린다 */
+/** 산식의 보유 달러 괄호 라벨 — 계좌관리 동기화 값이라 언제 기준인지 보여 준다(plans/127) */
 function heldUsdLabel(data: FxPlanData) {
-  if ((data.held_usd_accounts ?? []).some((a) => a.source === "MANUAL")) return "(직접 입력 포함)";
-  return data.held_usd_is_live ? "(실시간)" : "(동기화 기준)";
+  const syncedAt = data.held_usd_synced_at ? ` · ${relativeTime(data.held_usd_synced_at)}` : "";
+  if ((data.held_usd_accounts ?? []).some((a) => a.source === "MANUAL"))
+    return `(직접 입력 포함${syncedAt})`;
+  return `(동기화 기준${syncedAt})`;
+}
+
+/**
+ * 보유 달러는 계좌관리의 동기화 값이다 — 증권사 앱에서 환전한 직후엔 옛 값이라 증권 계좌를 동기화해 새로 받는다.
+ * 0달러 계좌는 계획 응답의 계좌 내역에 없으므로 계좌 목록에서 고른다. 동기화 무효화가 계획도 다시 받는다.
+ */
+function RefreshHeldUsdButton() {
+  const { data: accounts } = useQuery(accountsQuery);
+  const { state, run } = useSyncAccounts();
+  const ids = (accounts ?? [])
+    .filter((a) => isStockAccount(a.asset_type) && isSyncableAccount(a.data_source))
+    .map((a) => a.id);
+  if (ids.length === 0) return null;
+  const syncing = state === "syncing";
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 text-xs text-gray-500 dark:text-gray-400">
+      <span>증권사 앱에서 환전했다면 새로 받아 주세요.</span>
+      <button
+        onClick={() => {
+          void run(ids).then((ok) => {
+            if (!ok) toast("일부 계좌의 달러 예수금을 받지 못했습니다", "error");
+          });
+        }}
+        disabled={syncing}
+        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} font-medium text-blue-600 dark:text-blue-400 disabled:opacity-50`}
+      >
+        {syncing ? "받는 중…" : "달러 예수금 새로 받기"}
+      </button>
+    </div>
+  );
 }
 
 interface Props {
@@ -121,12 +147,6 @@ function PositionBlock({ position }: { position: NonNullable<FxPlanData["positio
   );
 }
 
-const fxPlanQuery = (months: number, portfolioId: string | null) => ({
-  queryKey: QUERY_KEYS.fxPlan(months, portfolioId),
-  queryFn: () => fetchFxPlan(months, portfolioId),
-  staleTime: STALE_TIME.FIVE_MINUTES,
-});
-
 /**
  * 추가 환전 섹션은 환전 계획 응답(증권사 실시간 달러 조회로 느릴 수 있음)을 기다리지 않고 함께 조회한다 —
  * 계획 본문 안에 두면 본문 로딩이 끝난 뒤에야 마운트돼 요청이 직렬로 쌓인다(plans/124 D)
@@ -153,7 +173,7 @@ function FxPlanBody({ onEditGoal }: Props) {
   });
 
   // 기간 탭은 계획이 나온 상태(OK·SUFFICIENT)에서만 보인다 — 그때 나머지 기간을 미리 받아 탭 전환을 즉시로.
-  // 서버는 실시간 달러를 2분 캐시하므로 증권사를 다시 부르지 않는다(plans/124 D)
+  // 서버는 증권사를 부르지 않는다(동기화 값, plans/127)
   const prefetchOtherMonths =
     !!data && !isPlaceholderData && (data.status === "OK" || data.status === "SUFFICIENT");
   useEffect(() => {
@@ -331,6 +351,8 @@ function FxPlanBody({ onEditGoal }: Props) {
                 .join(" · ")}
             </p>
           )}
+
+          <RefreshHeldUsdButton />
 
           {(data.waiting_fx_usd ?? 0) > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
