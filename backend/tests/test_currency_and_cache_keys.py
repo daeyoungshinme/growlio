@@ -722,3 +722,29 @@ class TestSyncKeepsHeavyCachesWhenPositionsUnchanged:
 
         assert await cache.get(risk_key(uid)) is None
         assert await cache.get(tax_overseas_realized_key(uid, 2026, "all")) is None
+
+    @pytest.mark.asyncio
+    async def test_quantity_change_clears_risk_and_realized_but_keeps_goal(self, override_settings):
+        """plans/126 A1 — 종목 구성은 같고 수량만 바뀐 sync(일부 매도)는 실현손익·리스크를 지우고
+        목표 추천(종목 구성 기준)은 남긴다."""
+        from app.core.cache_store import CacheStore
+        from app.utils.cache_invalidation import invalidate_asset_account_caches
+        from app.utils.cache_keys import (
+            get_goal_recommendation_generation,
+            goal_recommendation_key,
+            risk_key,
+            tax_overseas_realized_key,
+        )
+
+        cache = CacheStore()
+        uid = uuid.uuid4()
+        gen = await get_goal_recommendation_generation(cache, uid)
+        await cache.set(goal_recommendation_key(uid, gen), "{}")
+        await cache.set(risk_key(uid), "{}")
+        await cache.set(tax_overseas_realized_key(uid, 2026, "all"), "{}")
+
+        await invalidate_asset_account_caches(cache, uid, positions_changed=False, holdings_changed=True)
+
+        assert await cache.get(risk_key(uid)) is None
+        assert await cache.get(tax_overseas_realized_key(uid, 2026, "all")) is None
+        assert await get_goal_recommendation_generation(cache, uid) == gen

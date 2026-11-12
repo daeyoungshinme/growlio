@@ -44,6 +44,9 @@ async def _build_preview(leg, db: AsyncSession) -> PlanTokenPreview:
     summary = build_leg_summary(leg, plan, portfolio_name, account_name)
     if summary.actionable:
         reason = None
+    elif leg.status == "WAITING_FX" and leg.side == "BUY":
+        # 달러가 부족해 환전을 기다리는 매수 — 끝난 계획이 아니라 취소할 수 있다(cancel_buy_leg가 받는다, plans/126 A5)
+        reason = "WAITING_FX"
     elif leg.status == "PENDING" and leg.token_consumed_at is not None:
         # 실행이 시작돼(토큰 소비) 결과를 기다리는 중 — "만료"로 보이면 주문이 안 나간 것으로 오해한다
         reason = "IN_PROGRESS"
