@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape
+
 from app.services.notifications.email_templates._shared import _email_div, _kv_table
 
 
@@ -25,6 +27,7 @@ def exchange_rate_alert_template(
     ]
     if planned_usd is not None:
         title = f"{plan_label} 환전 구간 도달" if plan_label else "환전 계획 구간 도달"
+        title_html = f"{escape(plan_label)} 환전 구간 도달" if plan_label else title
         subject = f"[Growlio] {title} — {target_rate:,.0f}원 {direction_label}, ${planned_usd:,.0f} 환전"
         rows.append(
             (
@@ -43,7 +46,7 @@ def exchange_rate_alert_template(
             else "증권사 앱에서 이번 구간 금액을 환전하세요. 환전 후 계좌를 동기화하면 남은 계획이 다시 계산됩니다."
         )
         html = _email_div(
-            title,
+            title_html,
             "#1d4ed8",
             _kv_table(rows) + link_html,
             f"{guide}<br>이 알림은 1회 발동 후 자동으로 비활성화됩니다.",

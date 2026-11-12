@@ -383,6 +383,8 @@ async def test_held_usd_releases_request_connection_before_broker_calls():
     """증권사 대기 동안 요청 세션이 커넥션을 쥐면 계좌별 세션과 겹쳐 풀(5+2)이 고갈된다 — 조회 전에 commit으로 반납."""
     db = _db([_portfolio()], accounts=[_acct(100.0)])
     order: list[str] = []
+    db.new, db.dirty, db.deleted = [], [], []  # 읽기만 한 세션 — release_read_connection이 반납한다
+    db.in_transaction = MagicMock(return_value=True)
     db.commit = AsyncMock(side_effect=lambda: order.append("commit"))
 
     async def fake_account_usd(cache, user_id, account):

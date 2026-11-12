@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import FX_EXTRA_URGENT_DAYS, MAX_FX_EXTRA_NEEDS_PER_USER, POSITION_STOCK_ASSET_TYPES
+from app.core.database import release_read_connection
 from app.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.models.asset import AssetAccount
 from app.models.fx_extra_need import FxExtraNeed
@@ -87,7 +88,9 @@ def build_need_row(
         "days_left": days_left,
         "status": status,
         "tranches": [asdict(t) for t in tranches],
-        "reserved_account_id": need.reserved_account_id,
+        # 보관 계좌가 삭제(비활성)되면 이름이 None으로 온다 — 예약이 없는 것으로 보여 준다(fx_plan_service._held_usd도
+        # 활성 계좌만 세므로 실제로 적용되지 않는다)
+        "reserved_account_id": need.reserved_account_id if reserved_account_name else None,
         "reserved_account_name": reserved_account_name if need.reserved_account_id else None,
     }
 
@@ -97,7 +100,10 @@ async def _user_needs(db: AsyncSession, user_id: uuid.UUID) -> list[tuple[FxExtr
     rows = (
         await db.execute(
             select(FxExtraNeed, AssetAccount.name)
-            .outerjoin(AssetAccount, AssetAccount.id == FxExtraNeed.reserved_account_id)
+            .outerjoin(
+                AssetAccount,
+                (AssetAccount.id == FxExtraNeed.reserved_account_id) & (AssetAccount.is_active == True),
+            )
             .where(FxExtraNeed.user_id == user_id)
             .order_by(FxExtraNeed.due_date, FxExtraNeed.created_at)
         )
@@ -110,6 +116,8 @@ async def list_fx_extra_needs(db: AsyncSession, cache: CacheStoreType, user_id: 
     needs = await _user_needs(db, user_id)
     if not needs:
         return {"rate": None, "rate_is_live": True, "needs": []}
+    # 환율 1년 일봉(콜드면 Yahoo 수 초) 대기 중 커넥션을 쥐지 않는다(plans/126 B3)
+    await release_read_connection(db)
     ctx = await load_fx_rate_context(cache)
     today = today_kst()
     return {
@@ -142,7 +150,9 @@ async def reserved_account_name(db: AsyncSession, need: FxExtraNeed) -> str | No
     """생성·수정 응답 한 행에 실을 보관 계좌 이름."""
     if need.reserved_account_id is None:
         return None
-    name: str | None = await db.scalar(select(AssetAccount.name).where(AssetAccount.id == need.reserved_account_id))
+    name: str | None = await db.scalar(
+        select(AssetAccount.name).where(AssetAccount.id == need.reserved_account_id, AssetAccount.is_active == True)
+    )
     return name
 
 
@@ -202,7 +212,8 @@ async def update_fx_extra_need(
     _check_amounts(amount, exchanged)
     if "reserved_account_id" in changes:
         account_id = changes["reserved_account_id"]
-        if account_id is not None and account_id != need.reserved_account_id:
+        # 같은 id를 다시 보내도 확인한다 — 그 사이 계좌가 삭제됐으면 예약을 살려 두지 않는다
+        if account_id is not None:
             await _owned_stock_account(db, user_id, account_id)
         need.reserved_account_id = account_id
     for field in ("name", "amount_usd", "exchanged_usd", "due_date"):

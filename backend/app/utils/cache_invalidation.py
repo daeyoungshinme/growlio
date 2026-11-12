@@ -176,6 +176,7 @@ async def invalidate_asset_account_caches(
     year: int | None = None,
     *,
     positions_changed: bool = True,
+    holdings_changed: bool | None = None,
 ) -> None:
     """계좌 생성/수정/삭제/동기화·포지션 수정 후 관련 캐시 일괄 무효화.
 
@@ -190,7 +191,12 @@ async def invalidate_asset_account_caches(
     참고. 계좌 CRUD 등 변경 여부를 모르는 호출부는 기본값(True, 항상 전체 무효화)을 쓴다.
     목표 역산 추천 캐시도 이 값이 True일 때만 지운다 — 평가액만 바뀐 정기 sync마다 지우면 무거운
     MVO 재계산이 거의 매번 콜드로 돌았다(평가액 변동은 TTL 1시간까지 미반영 — 허용된 트레이드오프).
+
+    `holdings_changed`: 종목 구성 또는 **수량**이 바뀌었는지(생략 시 `positions_changed`). 일부 매도처럼
+    종목은 그대로인데 수량만 바뀐 sync도 실현손익·리스크 지표는 다시 계산해야 한다.
     """
+    if holdings_changed is None:
+        holdings_changed = positions_changed
 
     _year = year if year is not None else today_kst().year
     keys = [
@@ -202,10 +208,11 @@ async def invalidate_asset_account_caches(
         challenge_progress_key(user_id),
         insights_key(user_id),
     ]
-    if positions_changed:
-        # 리스크 지표(1년 일봉 yfinance 재다운로드)는 보유 구성이 바뀔 때만 — 평가액 변동은 TTL 1시간으로
+    if holdings_changed:
+        # 리스크 지표(1년 일봉 yfinance 재다운로드)는 보유 종목·수량이 바뀔 때만 — 평가액 변동은 TTL 1시간으로
         # 충분하고, 매 sync마다 지우면 홈의 drift-summary·action-items가 콜드로 다시 받았다(plans/125 A4)
         keys.append(risk_key(user_id))
+    if positions_changed:
         await invalidate_goal_recommendation_caches(cache, user_id)
         # 보유 기반 팩터 분석·효율적 프론티어(현재 위치) — 무거운 yfinance 재계산이라 목표 추천처럼
         # 구성이 바뀐 경우에만 지운다(plans/95 A2). 포트폴리오 단위 팩터 키는 목표 비중만 써서 대상 아님
@@ -216,7 +223,7 @@ async def invalidate_asset_account_caches(
     await _scan_unlink(cache, f"{_env_prefix()}usd_buying_power:{user_id}:*")
     await _invalidate_alloc_history(cache, user_id)
     await invalidate_dividend_caches(cache, user_id, _year, positions_changed=positions_changed)
-    await invalidate_tax_overseas_caches(cache, user_id, realized=positions_changed)
+    await invalidate_tax_overseas_caches(cache, user_id, realized=holdings_changed)
     await invalidate_portfolio_overview_cache(cache, user_id)
     await invalidate_rebalancing_analysis_cache_all(cache, user_id)
 

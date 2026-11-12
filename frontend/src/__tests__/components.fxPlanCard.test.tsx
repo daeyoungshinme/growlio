@@ -185,6 +185,18 @@ describe("FxPlanCard", () => {
     await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(6, null));
   });
 
+  it("다른 기간 계획을 받는 동안(이전 계획 표시 중) 알림 등록을 막는다 — plans/126 A3", async () => {
+    vi.mocked(fetchFxPlan)
+      .mockResolvedValueOnce(plan)
+      .mockReturnValue(new Promise(() => {}));
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByRole("button", { name: "목표 환율 알림 등록" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("tab", { name: "6개월" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "목표 환율 알림 등록" })).toBeDisabled(),
+    );
+  });
+
   it("구간 목표와 금액을 한 번에 맞춰 등록한다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
     renderWithProviders(<FxPlanCard />);

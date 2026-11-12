@@ -411,6 +411,9 @@ class TestDeleteAccount:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete(f"/api/v1/assets/{account.id}")
         assert resp.status_code == 204
+        # plans/126 A4 — 소프트 삭제라 FK SET NULL 대신 추가 환전 보관 계좌 지정을 직접 푼다
+        sqls = [str(c.args[0]) for c in db.execute.await_args_list if c.args]
+        assert any("UPDATE fx_extra_needs SET reserved_account_id" in sql for sql in sqls)
 
     def test_delete_broker_account_removes_credentials_and_stops_automation(self, override_settings):
         """plans/109 C5 — 복구 경로가 없으니 자격증명을 남기지 않고, 이 계좌로 주문하던 알림·대기 매수도 멈춘다."""

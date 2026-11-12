@@ -41,7 +41,8 @@ FX_PLAN_ACTION_DAYS = 3
 MAX_FX_EXTRA_NEEDS_PER_USER = 10
 """추가 환전 항목(여행 등, plans/123) 사용자당 상한."""
 FX_EXTRA_URGENT_DAYS = 14
-"""추가 환전 필요일까지 이 일수 이하로 남으면 목표 환율을 기다리지 않고 남은 금액을 전부 "지금" 구간으로 둔다."""
+"""추가 환전 필요일까지 이 일수 이하로 남으면 목표 환율을 기다리지 않고 남은 금액을 전부 "지금" 구간으로 둔다.
+프론트 `FxExtraNeedsSection`의 같은 이름 상수(강조 색)와 함께 바꾼다."""
 
 DEFAULT_GOAL_MAX_WEIGHT_PCT = 40.0
 """목표 추천 종목당 최대 비중(%) 기본값 — `UserSettings.goal_max_weight_pct`가 NULL일 때.

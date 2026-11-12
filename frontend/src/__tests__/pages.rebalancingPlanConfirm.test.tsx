@@ -156,6 +156,22 @@ describe("RebalancingPlanConfirmPage", () => {
     expect(decideSellPlanByToken).toHaveBeenCalledWith("tok", "REJECT");
   });
 
+  it("환전 대기 매수는 '이미 처리됨' 대신 대기 안내와 취소 버튼을 보여준다", async () => {
+    vi.mocked(fetchPlanPreview).mockResolvedValue({
+      ...makePreview({ side: "BUY", status: "WAITING_FX", actionable: false }),
+      actionable: false,
+      reason: "WAITING_FX",
+    });
+    vi.mocked(cancelBuyPlanByToken).mockResolvedValue({ status: "OK", message: "취소되었습니다" });
+    renderPage();
+
+    expect(await screen.findByText("달러가 부족해 환전을 기다리고 있어요.")).toBeInTheDocument();
+    expect(screen.queryByText("이미 처리된 계획입니다.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "매수 취소하기" }));
+    expect(await screen.findByText("취소되었습니다")).toBeInTheDocument();
+    expect(cancelBuyPlanByToken).toHaveBeenCalledWith("tok");
+  });
+
   it("매수 계획은 취소 버튼만 노출하고 취소 API를 호출", async () => {
     vi.mocked(fetchPlanPreview).mockResolvedValue(makePreview({ side: "BUY" }));
     vi.mocked(cancelBuyPlanByToken).mockResolvedValue({ status: "OK", message: "취소되었습니다" });

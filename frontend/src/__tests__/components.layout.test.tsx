@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { renderWithProviders } from "@/test/renderWithProviders";
@@ -200,6 +200,22 @@ describe("BottomNav 리밸런싱 배지", () => {
       ]);
     });
     expect(await screen.findByLabelText("리밸런싱 필요 2개")).toBeDefined();
+  });
+
+  it("drift 캐시가 무효화되면(다시 받지 않으므로) 지금 할 일 판정으로 바꾼다 — plans/126 A2", async () => {
+    let client: QueryClient | undefined;
+    renderWithClient((qc) => {
+      client = qc;
+      qc.setQueryData(QUERY_KEYS.actionItems, []);
+      qc.setQueryData(QUERY_KEYS.driftSummary, [{ needs_rebalancing: true }]);
+    });
+    expect(await screen.findByLabelText("리밸런싱 필요 1개")).toBeDefined();
+
+    await act(async () => {
+      await client!.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary });
+    });
+    await waitFor(() => expect(screen.queryByLabelText(/리밸런싱 필요/)).toBeNull());
+    expect(fetchDriftSummaryMock).not.toHaveBeenCalled();
   });
 
   it("아무 캐시도 없으면 배지가 없다", () => {

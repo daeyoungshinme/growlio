@@ -18,6 +18,9 @@ import {
   invalidateDartKeyData,
   invalidateRebalancingPlanData,
   invalidateTacticalData,
+  invalidateFxExtraNeedData,
+  invalidateAccountListData,
+  refetchActiveData,
 } from "../queryInvalidation";
 
 function makeQueryClient() {
@@ -169,11 +172,55 @@ describe("invalidateTacticalData", () => {
 });
 
 describe("invalidateAlertData", () => {
-  it("exchange-rate-alerts 무효화", async () => {
+  it("exchange-rate-alerts와 지금 할 일(발동한 환전 계획 알림 행) 무효화 — plans/126 C1", async () => {
     const qc = makeQueryClient();
     await invalidateAlertData(qc as any);
-    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
-    expect(keys).toContain("exchange-rate-alerts");
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey);
+    expect(keys).toContainEqual(QUERY_KEYS.exchangeRateAlerts);
+    expect(keys).toContainEqual(QUERY_KEYS.actionItems);
+  });
+});
+
+describe("invalidateFxExtraNeedData", () => {
+  it("항목·적립 환전 계획(보관 계좌 달러)·환율 알림·지금 할 일 무효화", async () => {
+    const qc = makeQueryClient();
+    await invalidateFxExtraNeedData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey);
+    for (const key of [
+      QUERY_KEYS.fxExtraNeeds,
+      QUERY_KEYS.fxPlanBase,
+      QUERY_KEYS.exchangeRateAlerts,
+      QUERY_KEYS.actionItems,
+    ]) {
+      expect(keys).toContainEqual(key);
+    }
+  });
+});
+
+describe("invalidateAccountData — 추가 환전 보관 계좌 (plans/126 C1)", () => {
+  it("계좌 이름 변경·삭제가 추가 환전 항목의 보관 계좌 표시를 바꾸므로 함께 무효화", async () => {
+    const qc = makeQueryClient();
+    await invalidateAccountData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey);
+    expect(keys).toContainEqual(QUERY_KEYS.fxExtraNeeds);
+  });
+});
+
+describe("invalidateAccountListData", () => {
+  it("계좌 목록만 무효화 — 보유 기반 쿼리는 첫 동기화 뒤에", async () => {
+    const qc = makeQueryClient();
+    await invalidateAccountListData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey);
+    expect(keys).toEqual([QUERY_KEYS.accounts]);
+  });
+});
+
+describe("refetchActiveData", () => {
+  it("화면에 붙은 쿼리만 다시 받는다 — 무효화하지 않는다", async () => {
+    const qc = { refetchQueries: vi.fn().mockResolvedValue(undefined), invalidateQueries: vi.fn() };
+    await refetchActiveData(qc as any);
+    expect(qc.refetchQueries).toHaveBeenCalledWith({ type: "active" });
+    expect(qc.invalidateQueries).not.toHaveBeenCalled();
   });
 });
 

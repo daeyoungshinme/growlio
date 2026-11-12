@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -65,6 +65,11 @@ class SyncAccountResult:
 
     snapshot: AssetSnapshot
     positions_changed: bool
+
+
+def _holding_quantities(rows: Iterable[Any]) -> list[tuple[str, str, float]]:
+    """(종목, 시장, 수량) 정렬 목록 — DB Numeric(18, 4)와 브로커 float를 같은 자릿수로 맞춰 비교한다."""
+    return sorted((row.ticker, row.market, round(float(row.qty), 4)) for row in rows)
 
 
 def get_provider(account: AssetAccount) -> BrokerProvider:
@@ -159,6 +164,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         account.deposit_usd = balance.deposit_foreign
 
     positions_changed = False
+    holdings_changed = False
     # 브로커 소스는 조회 성공 = 보유 종목 확정이므로 빈 결과(전량 매도)도 교체해 stale 포지션을 지운다.
     # MANUAL은 DB 포지션을 그대로 읽어 반환하므로 비었을 때 건드릴 필요가 없다.
     replace_positions = bool(balance.positions) or account.data_source != "MANUAL"
@@ -167,10 +173,15 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         if not balance.overseas_known:
             # 해외 조회 실패 — 결과에 해외 종목이 없으므로 국내(KRW) 포지션만 교체하고 해외는 보존
             current_filter.append(Position.currency == "KRW")
-        existing_positions = await db.execute(select(Position.ticker, Position.market).where(*current_filter))
-        old_tickers = {(row.ticker, row.market) for row in existing_positions.all()}
+        existing_positions = await db.execute(
+            select(Position.ticker, Position.market, Position.qty).where(*current_filter)
+        )
+        old_rows = existing_positions.all()
+        old_tickers = {(row.ticker, row.market) for row in old_rows}
         new_tickers = {(p.ticker, p.market) for p in balance.positions}
         positions_changed = old_tickers != new_tickers
+        # 종목 구성은 같아도 수량이 바뀌면(일부 매도·추가 매수) 실현손익·리스크 지표가 달라진다
+        holdings_changed = positions_changed or _holding_quantities(old_rows) != _holding_quantities(balance.positions)
 
         await db.execute(sql_delete(Position).where(*current_filter))
         for p in balance.positions:
@@ -237,7 +248,9 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
     await db.commit()
 
     # sync 완료 후 관련 캐시 즉시 무효화 — sync 직후에도 최신 데이터 표시
-    await invalidate_asset_account_caches(cache, account.user_id, positions_changed=positions_changed)
+    await invalidate_asset_account_caches(
+        cache, account.user_id, positions_changed=positions_changed, holdings_changed=holdings_changed
+    )
 
     broker_sync_duration.labels(data_source=account.data_source, status="success").observe(
         time.monotonic() - _sync_start

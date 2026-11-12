@@ -15,6 +15,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import AccountActionsMenu from "@/components/common/AccountActionsMenu";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import SkeletonCard from "@/components/common/SkeletonCard";
 import FxTrancheList from "@/components/invest/FxTrancheList";
 import { clampPct, fmtUsd, pctOf } from "@/utils/format";
 import { planAlertState, syncButtonLabel, syncToastMessage } from "@/utils/fxPlanAlerts";
@@ -26,6 +27,8 @@ const FxExtraNeedModal = lazy(() => import("@/components/invest/FxExtraNeedModal
 
 /** 백엔드 `MAX_FX_EXTRA_NEEDS_PER_USER`와 같은 값 */
 export const MAX_FX_EXTRA_NEEDS = 10;
+/** 필요일까지 이 일수 이하면 남은 금액 전액을 "지금"으로 — 백엔드 `FX_EXTRA_URGENT_DAYS`와 같은 값 */
+const FX_EXTRA_URGENT_DAYS = 14;
 
 const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
 
@@ -77,7 +80,7 @@ function NeedRow({ need, alerts, onEdit, onDelete, onDone }: RowProps) {
             className={`text-xs tabular-nums ${
               pastDue
                 ? "text-gray-400 dark:text-gray-500"
-                : need.days_left <= 14
+                : need.days_left <= FX_EXTRA_URGENT_DAYS
                   ? "text-amber-600 dark:text-amber-400"
                   : "text-gray-500 dark:text-gray-400"
             }`}
@@ -158,7 +161,8 @@ function NeedRow({ need, alerts, onEdit, onDelete, onDone }: RowProps) {
 
 /**
  * 추가 환전 항목(여행 등, plans/123) — 적립 환전 계획과 따로 계산한다.
- * 증권 계좌 보유 달러로 상쇄하지 않는다(여행 달러는 보통 은행·트래블카드로 따로 바꾼다).
+ * 증권 계좌에 이미 있는 달러로 이 항목을 채우지 않는다(여행 달러는 보통 은행·트래블카드로 따로 바꾼다).
+ * 보관 증권 계좌를 지정하면 반대로 그 계좌의 이미 환전한 금액이 적립 계획 보유 달러에서 빠진다.
  */
 export default function FxExtraNeedsSection() {
   const qc = useQueryClient();
@@ -205,6 +209,7 @@ export default function FxExtraNeedsSection() {
                 ? toast(`추가 환전 항목은 ${MAX_FX_EXTRA_NEEDS}개까지 만들 수 있습니다`, "info")
                 : setEditing("new")
             }
+            aria-label="추가 환전 항목 추가"
             className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1 px-2 py-1 text-sm font-medium text-blue-600 dark:text-blue-400`}
           >
             <Plus size={16} aria-hidden />
@@ -213,7 +218,9 @@ export default function FxExtraNeedsSection() {
         )}
       </div>
 
-      {isLoading ? null : isError ? (
+      {isLoading ? (
+        <SkeletonCard rows={2} />
+      ) : isError ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           추가 환전 항목을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
         </p>
@@ -243,8 +250,9 @@ export default function FxExtraNeedsSection() {
             ))}
           </ul>
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            증권 계좌 달러와 따로 계산합니다. 필요일이 2주 안이면 남은 금액을 지금 바꾸도록
-            제안합니다. 환전한 뒤 항목의 &lsquo;이미 환전한 금액&rsquo;을 고쳐 주세요.
+            증권 계좌에 이미 있는 달러로 채우지 않고 따로 계산합니다. 필요일이 2주 안이면 남은
+            금액을 지금 바꾸도록 제안합니다. 환전한 뒤 항목의 &lsquo;이미 환전한 금액&rsquo;을 고쳐
+            주세요.
           </p>
         </>
       )}

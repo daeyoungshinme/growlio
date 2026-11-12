@@ -481,6 +481,39 @@ def test_api_delete_invalidates_alert_cache(api):
     inv.assert_awaited_once()
 
 
+def test_api_patch_invalidates_alert_list(api):
+    """plans/126 B4 — 환율 알림 목록(5분 캐시)에 항목 이름이 실린다 — 수정하면 알림 목록도 지운다."""
+    client, _ = api
+    need = _row_need()
+    ctx = fx_plan_service.FxRateContext(1400.0, True, None, has_rate=True)
+    with (
+        patch.object(svc, "update_fx_extra_need", new=AsyncMock(return_value=need)),
+        patch.object(fx_plan_service, "load_fx_rate_context", new=AsyncMock(return_value=ctx)),
+        patch("app.api.v1.invest.invalidate_exchange_rate_alert_caches", new=AsyncMock()) as inv,
+    ):
+        res = client.patch(f"/api/v1/invest/fx-extra-needs/{need.id}", json={"name": "오사카 여행"})
+    assert res.status_code == 200, res.text
+    inv.assert_awaited_once()
+
+
+async def test_list_releases_connection_before_rate_lookup():
+    """plans/126 B3 — 항목을 읽은 뒤 환율 1년 일봉(콜드면 Yahoo) 대기 전에 커넥션을 반납한다."""
+    order: list[str] = []
+    db = _list_db([_need()])
+    db.new, db.dirty, db.deleted = [], [], []
+    db.in_transaction = MagicMock(return_value=True)
+    db.commit = AsyncMock(side_effect=lambda: order.append("commit"))
+    ctx = fx_plan_service.FxRateContext(1400.0, True, None, has_rate=True)
+
+    async def rate(_cache):
+        order.append("rate")
+        return ctx
+
+    with patch.object(svc, "load_fx_rate_context", new=rate), patch.object(svc, "today_kst", return_value=TODAY):
+        await svc.list_fx_extra_needs(db, CacheStore(), uuid.uuid4())
+    assert order == ["commit", "rate"]
+
+
 def test_api_alert_sync_uses_need_scope(api):
     client, user = api
     need_id = uuid.uuid4()
@@ -578,6 +611,37 @@ async def test_update_validates_new_reserved_account():
     db.scalar = AsyncMock(side_effect=[need, None])
     with patch.object(svc, "today_kst", return_value=TODAY), pytest.raises(NotFoundError):
         await svc.update_fx_extra_need(db, uuid.uuid4(), need.id, {"reserved_account_id": uuid.uuid4()})
+
+
+def test_need_row_hides_reservation_of_deleted_account():
+    """plans/126 A4 — 보관 계좌가 삭제(비활성)되면 조인 이름이 None — 예약 없음으로 보인다."""
+    n = _need()
+    n.reserved_account_id = uuid.uuid4()
+    row = svc.build_need_row(n, None, 1400.0, True, TODAY, None)
+    assert (row["reserved_account_id"], row["reserved_account_name"]) == (None, None)
+
+
+async def test_list_joins_only_active_reserved_account():
+    n = _need()
+    db = _list_db([n], [None])
+    ctx = fx_plan_service.FxRateContext(1400.0, True, None, has_rate=True)
+    with (
+        patch.object(svc, "load_fx_rate_context", new=AsyncMock(return_value=ctx)),
+        patch.object(svc, "today_kst", return_value=TODAY),
+    ):
+        await svc.list_fx_extra_needs(db, CacheStore(), uuid.uuid4())
+    stmt = db.execute.await_args_list[0].args[0]
+    assert "is_active" in str(stmt.compile(compile_kwargs={"literal_binds": True}))
+
+
+async def test_update_revalidates_same_reserved_account():
+    """같은 id를 다시 보내도 확인한다 — 그 사이 삭제된 계좌의 예약을 살려 두지 않는다."""
+    need = _need()
+    need.reserved_account_id = uuid.uuid4()
+    db = MagicMock()
+    db.scalar = AsyncMock(side_effect=[need, None])
+    with patch.object(svc, "today_kst", return_value=TODAY), pytest.raises(NotFoundError):
+        await svc.update_fx_extra_need(db, uuid.uuid4(), need.id, {"reserved_account_id": need.reserved_account_id})
 
 
 def test_api_patch_passes_null_reserved_account(api):

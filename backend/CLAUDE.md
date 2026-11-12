@@ -176,7 +176,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 **세금 (`tax/`)**
 - **세금 집계 함정**: 삭제 계좌도 포함한다(실제 소득·납입). 모의 계좌 판정은 `is_paper_account` — `is_mock_mode` 컬럼 기본값이 True라 토스·수기 계좌를 그 값만으로 빼면 안 된다. 취득가는 현재 환율 환산이라 환차익이 빠진 추정이다(`OVERSEAS_FX_BASIS_NOTE`).
 - `tax_service.py` — 연도별 세금 추정·종합과세·건보 피부양자. 해외 실현손익은 직접 조회하지 않고 `overseas_realized_krw` 인자로 받음
-- `overseas_realized_service.py` — 해외 실현손익. KIS 실전은 브로커(TTTS3039R), 그 외는 해외 SELL `TradeRecord`(KIS 실전 계좌 기록은 이중 집계 방지로 무시). 성공 시만 1h 캐시. KIS 계좌는 **계좌별 짧은 세션으로 동시 조회**(토큰 발급이 commit하므로 요청 세션 공유 금지) + single-flight
+- `overseas_realized_service.py` — 해외 실현손익. KIS 실전은 브로커(TTTS3039R), 그 외는 해외 SELL `TradeRecord`(KIS 실전 계좌 기록은 이중 집계 방지로 무시). 성공 시만 1h 캐시 — sync 무효화는 종목 **또는 수량**이 바뀌었을 때(`holdings_changed`, 일부 매도). KIS 계좌는 **계좌별 짧은 세션으로 동시 조회**(토큰 발급이 commit하므로 요청 세션 공유 금지, 동시 3개) + single-flight
 - `tax_action_service.py` — 절세 액션 플랜(조합만). 세법 수치는 `_DEDUCTION_RULES` 연도별 테이블
 - `pension_contribution_service.py` · `isa_service.py`
 
@@ -199,7 +199,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
 - `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유. 정액 알림은 사용자 월 적립액 합산과 섞지 않고 원화·달러를 따로 비교) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
 - `fx_plan_service.py` — 환율 1년 위치(백분위·이평 이격·1개월 ±1σ)와 해외 적립 필요 달러의 분할 환전 구간. **예측 아님**. 현재값은 실시간 캐시(없으면 1년 일봉 마지막 종가, `rate_is_live`), Yahoo `USDKRW=X` 1년 일봉은 통계용(6h 캐시). 구간 알림은 `sync_fx_plan_alerts`가 `ExchangeRateAlert.source=FX_PLAN`(+`planned_usd`·`portfolio_id`)으로 맞춘다 — 같은 포트폴리오의 미발동 계획 알림만 교체·삭제하고 **MANUAL 알림은 건드리지 않는다**(같은 목표면 건너뜀). 발동 메일·푸시(`type=FX_PLAN`)에 구간 금액이 실린다. 필요 달러는 정액 적립 알림이 있으면 `fixed_amount_needs`의 해외 몫(없으면 월 적립액 × 해외 비중), 보유 달러는 연결 증권 계좌(**수기 `STOCK_OTHER` 포함** — 직접 입력 `deposit_usd`) 합, KIS·키움은 실시간(`usd_buying_power`, 2분 캐시 — 계좌 동기화 무효화가 지움), 계좌별 내역 `held_usd_accounts`. `WAITING_FX` 부족분은 **주문 실행 계좌 달러로만** 상쇄해 "지금" 구간에 강제(수기 계좌 달러로는 KIS·키움 주문 불가). 앱 링크는 `#fx-plan` 해시(카드 펼침) — 메일·푸시·`action_items_service._LINK_FX_PLAN`이 프론트 `FX_PLAN_ANCHOR`와 같아야 함. 알림 맞추기 범위는 `portfolio_id` 또는 `fx_need_id` 하나 — 한 범위가 다른 범위의 계획 알림을 건드리지 않는다(`_in_scope`, 프론트 `utils/fxPlanAlerts`와 같은 규칙)
-- `fx_extra_need_service.py` — 추가 환전 항목(여행 등, `FxExtraNeed`)과 항목별 구간. **증권 계좌 달러로 상쇄하지 않는다**(적립 계획과 별개), 필요일 14일 이하면 전액 "지금". 항목 알림은 `ExchangeRateAlert.fx_need_id`(**CASCADE** — 항목 삭제 시 알림도 삭제), 필요일 지난 항목의 알림은 `exchange_rate_service` 조회가 거른다(발송 안 함). `reserved_account_id`(보관 증권 계좌, 선택)를 지정하면 `fx_plan_service._held_usd`가 필요일 전까지 그 계좌 보유 달러에서 `exchanged_usd`를 뺀다(계좌별 0 하한, WAITING_FX 상쇄도 뺀 값) — **적립 환전 계획만**이고 총자산·리밸런싱·자동매수 가용 현금은 그대로
+- `fx_extra_need_service.py` — 추가 환전 항목(여행 등, `FxExtraNeed`)과 항목별 구간. **증권 계좌 달러로 상쇄하지 않는다**(적립 계획과 별개), 필요일 14일 이하면 전액 "지금". 항목 알림은 `ExchangeRateAlert.fx_need_id`(**CASCADE** — 항목 삭제 시 알림도 삭제), 필요일 지난 항목의 알림은 `exchange_rate_service` 조회가 거른다(발송 안 함). `reserved_account_id`(보관 증권 계좌, 선택 — **계좌는 소프트 삭제라 FK SET NULL이 안 걸려 계좌 삭제 라우트가 직접 해제**)를 지정하면 `fx_plan_service._held_usd`가 필요일 전까지 그 계좌 보유 달러에서 `exchanged_usd`를 뺀다(계좌별 0 하한, WAITING_FX 상쇄도 뺀 값) — **적립 환전 계획만**이고 총자산·리밸런싱·자동매수 가용 현금은 그대로
 - `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → FDR(+pykrx 펀더멘털) → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_ticker_dividend_summary`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
 - `external_queries.py` — nestlio 전용 조회(멱등 조회, 월 순입금, 계좌 범위 XIRR) · `_settings_queries.py`
@@ -265,7 +265,7 @@ scheduler.py    init_scheduler()의 jobs 스펙 리스트. 예외를 밖으로 �
 | `year_end_tax_reminder.py` | 11~12월 매주 월 09:00 | 옵트인 |
 | `recommendation_drift_alert.py` | 매주 월 09:15 | 옵트인 |
 | `token_refresh.py` | 06:00 | 만료 18h 미만 토큰만 `force_refresh` — 없으면 남은 토큰을 돌려받아 장중 만료. 실패는 스택 없는 capture_message(자격증명 지역변수 전송 방지) |
-| `startup_warmup.py` | 기동 직후 1회 | 환율·시장신호·JWKS 예열 |
+| `startup_warmup.py` | 기동 직후 1회 | 환율·JWKS·시장신호·차트 지표·환율 1년 일봉·전술 틸트 입력 예열 |
 | `periodic_catchup.py` | 기동 2분 뒤 + 10~21시 매시 25분 | 놓친 월간 잡 보충(1~3일: 리포트·챌린지 결산, 25~28일: 독려). 월 단위 dedup이 있는 잡만 넣을 것 |
 | `cache_sweep.py` / `app_state_sweep.py` | 15분 / 04:10 | 만료 캐시 / durable row 청소 |
 | `kosdaq_tickers_refresh` (`market_data/yahoo_price.py`, jobs 파일 없음) | 기동 직후 + 07:00 | KOSDAQ 종목 목록(`.KQ` 교정용) |

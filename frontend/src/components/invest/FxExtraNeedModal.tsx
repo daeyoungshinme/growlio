@@ -71,7 +71,10 @@ export default function FxExtraNeedModal({ need, onClose }: Props) {
       setError("필요일은 오늘 이후여야 합니다");
       return;
     }
-    mutation.mutate({ ...parsed.data, reserved_account_id: reservedAccountId || null });
+    // 목록에 없는(삭제된) 계좌는 select에 보이지 않아 "계좌 밖"으로 보인다 — 화면과 같게 해제해서 보낸다(plans/126 A4)
+    const reservedVisible =
+      !accounts || stockAccounts.some((a) => a.id === reservedAccountId) ? reservedAccountId : "";
+    mutation.mutate({ ...parsed.data, reserved_account_id: reservedVisible || null });
   };
 
   return (
@@ -80,7 +83,7 @@ export default function FxExtraNeedModal({ need, onClose }: Props) {
         <form id={formId} onSubmit={handleSubmit} className="space-y-4">
           <p className="text-xs text-gray-500 dark:text-gray-400">
             여행·해외 결제처럼 날짜가 정해진 달러를 적립 계획과 따로 나눠 바꾸도록 구간을
-            제안합니다. 증권 계좌 달러로는 빼지 않습니다.
+            제안합니다. 증권 계좌에 이미 있는 달러로 이 금액을 채우지는 않습니다.
           </p>
           <div>
             <label htmlFor="fx-need-name" className={FORM_LABEL}>

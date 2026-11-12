@@ -96,6 +96,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     await waitFor(() => {
@@ -120,6 +121,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     expect(screen.getByText("데이터를 불러오지 못했습니다")).toBeInTheDocument();
@@ -143,6 +145,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     expect(screen.getByText("데이터를 불러오지 못했습니다")).toBeInTheDocument();
@@ -165,6 +168,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     expect(screen.queryByText("데이터를 불러오지 못했습니다")).not.toBeInTheDocument();
@@ -188,6 +192,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     expect(screen.getByText("Growlio 시작하기")).toBeInTheDocument();
@@ -211,6 +216,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     // accountsLoading=true means we skip the empty-accounts branch
@@ -236,6 +242,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
@@ -244,6 +251,35 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("리밸런싱 점검")).not.toBeInTheDocument();
     expect(screen.getByTestId("allocation-chart")).toBeInTheDocument();
   });
+
+  it.each([
+    [false, true],
+    [true, false],
+  ])(
+    "챌린지 목록 조회 실패(%s)면 '만들기' 카드로 오해시키지 않는다 — plans/126 C4",
+    (challengesError, showsEmptyCard) => {
+      vi.mocked(useDashboardData).mockReturnValue({
+        data: mockDashboardData as never,
+        isLoading: false,
+        error: null,
+        dataUpdatedAt: Date.now(),
+        refetch: vi.fn(),
+        overview: mockOverview as never,
+        dcaData: undefined,
+        dcaLoading: false,
+        accounts: [{ id: "acc-1", name: "KB증권", asset_type: "STOCK_KIS" }] as never,
+        accountsLoading: false,
+        accountsFailed: false,
+        exchangeRate: 1350,
+        marketSignal: undefined,
+        challenges: [],
+        challengesLoading: false,
+        challengesError,
+      });
+      renderDashboard();
+      expect(screen.queryByText("적립 습관을 챌린지로 만들어보세요") !== null).toBe(showsEmptyCard);
+    },
+  );
 
   it("estimated_annual_dividends가 있을 때 섹션이 정상 렌더링된다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
@@ -262,6 +298,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
@@ -284,6 +321,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
@@ -306,6 +344,7 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
       challenges: [],
       challengesLoading: false,
+      challengesError: false,
     });
     renderDashboard();
     const retryBtn = screen.getByRole("button", { name: "다시 시도" });

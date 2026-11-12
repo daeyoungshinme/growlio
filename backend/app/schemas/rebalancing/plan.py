@@ -57,6 +57,6 @@ class SellDecisionRequest(BaseModel):
 
 class PlanTokenPreview(BaseModel):
     valid: bool
-    reason: str | None = None  # "NOT_FOUND" | "ALREADY_DECIDED" | "EXPIRED" | "IN_PROGRESS"
+    reason: str | None = None  # "NOT_FOUND" | "ALREADY_DECIDED" | "EXPIRED" | "IN_PROGRESS" | "WAITING_FX"
     actionable: bool = False
     leg: RebalancingPlanLegSummary | None = None

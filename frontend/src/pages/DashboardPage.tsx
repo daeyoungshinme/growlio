@@ -111,7 +111,9 @@ export default function DashboardPage() {
     marketSignal,
     challenges,
     challengesLoading,
+    challengesError,
   } = useDashboardData();
+  const challengesUnavailable = challengesError && challenges.length === 0;
 
   // SetupTargetPortfolioBanner와 동일 queryKey를 재사용 — 캐시 공유로 추가 네트워크 요청 없음.
   const { data: portfolios } = useQuery(portfoliosQuery);
@@ -176,10 +178,11 @@ export default function DashboardPage() {
         {/* 적립 챌린지 진행 현황 — ACTIVE 챌린지가 있으면 진행률, 없으면 만들기 유도(닫기 가능) */}
         <ErrorBoundary variant="section">
           {/* 목록이 오기 전엔 빈 상태 카드 대신 자리만 — 진행 중 챌린지가 있는 사용자에게 "만들기" 카드가 먼저
-              떴다가 바뀌던 깜빡임 방지(plans/125 C6) */}
+              떴다가 바뀌던 깜빡임 방지(plans/125 C6). 목록을 못 받았으면 "만들기" 카드로 오해시키지 않고
+              숨긴다(plans/126 C4) */}
           {challengesLoading ? (
             <SkeletonCard rows={2} />
-          ) : challenges.some((c) => c.status === "ACTIVE") ? (
+          ) : challengesUnavailable ? null : challenges.some((c) => c.status === "ACTIVE") ? (
             <ChallengeProgressCard challenges={challenges} />
           ) : (
             <ChallengeEmptyStateCard />

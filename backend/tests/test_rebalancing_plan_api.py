@@ -331,6 +331,25 @@ class TestPreviewPlanAction:
         assert body["actionable"] is False
         assert body["reason"] == "IN_PROGRESS"
 
+    def test_waiting_fx_buy_leg_reports_waiting_fx(self):
+        """plans/126 A5: 환전 대기 매수는 "이미 처리됨"이 아니다 — 취소 엔드포인트가 받으므로 WAITING_FX로 안내."""
+        db = _make_mock_db()
+        leg = _make_leg(side="BUY")
+        leg.status = "WAITING_FX"
+        leg.plan = SimpleNamespace(id=leg.plan_id, portfolio_id=None, account_id=None)
+
+        with patch("app.api.v1.rebalancing_plan_public.get_plan_leg_by_token", new=AsyncMock(return_value=leg)):
+            app = _setup_public_app(db)
+            client = TestClient(app)
+            try:
+                resp = client.get("/api/v1/rebalancing/plan-actions/valid-token")
+            finally:
+                _teardown_app()
+
+        body = resp.json()
+        assert body["actionable"] is False
+        assert body["reason"] == "WAITING_FX"
+
     def test_get_does_not_mutate_db(self):
         """GET은 부작용이 없어야 한다 — db.commit()이 호출되지 않아야 함."""
         db = _make_mock_db()

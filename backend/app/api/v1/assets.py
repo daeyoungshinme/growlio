@@ -3,7 +3,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
@@ -16,6 +16,7 @@ from app.kiwoom.client import KiwoomTokenIssueError
 from app.limiter import limiter
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount, Transaction
+from app.models.fx_extra_need import FxExtraNeed
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.asset import (
@@ -388,6 +389,10 @@ async def delete_account(
     account = await _get_owned_account(account_id, current_user.id, db)
     account.is_active = False
     await _stop_automation_for_account(account.id, db)
+    # 소프트 삭제라 FK SET NULL이 안 걸린다 — 추가 환전 보관 계좌 지정을 직접 푼다(plans/126 A4)
+    await db.execute(
+        update(FxExtraNeed).where(FxExtraNeed.reserved_account_id == account.id).values(reserved_account_id=None)
+    )
     cache = await get_cache_store()
     # 삭제 계좌는 복구 경로가 없다 — 쓸 일 없는 App Key·토큰을 남겨두지 않는다(commit 포함)
     spec = BROKER_CREDENTIAL_SPECS.get(account.data_source)

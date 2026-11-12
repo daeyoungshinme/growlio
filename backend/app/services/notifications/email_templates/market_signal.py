@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape
+
 from app.services.notifications.email_templates._shared import (
     _SIGNAL_LEVEL_COLOR,
     _SIGNAL_LEVEL_LABEL,
@@ -67,7 +69,7 @@ def tactical_regime_change_template(
     subject = f"[Growlio] 전술 배분 국면 변경 — {old_label} → {new_label}"
     body = _kv_table(
         [
-            ("포트폴리오", portfolio_name),
+            ("포트폴리오", escape(portfolio_name)),
             ("이전 국면", old_label),
             ("현재 국면", f"<span style='font-weight:bold;'>{new_label}</span>"),
             ("제안 비중", weights_text),
@@ -100,7 +102,7 @@ def tactical_dip_template(
     subject = f"[Growlio] 웅덩이 매수 제안 — {stage_label}"
     body = _kv_table(
         [
-            ("포트폴리오", portfolio_name),
+            ("포트폴리오", escape(portfolio_name)),
             ("웅덩이 단계", f"<span style='font-weight:bold;'>{stage_label}</span>"),
             ("현금 → 주식", f"{deploy_pct:g}%p"),
             ("제안 비중", weights_text),
