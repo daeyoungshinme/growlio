@@ -204,4 +204,4 @@ class ChallengeResponse(BaseModel):
 
 class ChallengeSummary(BaseModel):
     needs_attention: bool
-    count: int  # 이번 달 미충족 상태인 ACTIVE 입금 챌린지 수
+    count: int  # 이번 달 미충족 ACTIVE 입금 챌린지 수 — 독려 기간(매월 20일~) 밖에서는 조회하지 않아 항상 0

@@ -57,6 +57,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
   └── api/{도메인}.ts → React Query useQuery/useMutation → Page
 ```
 
+- `api/retryPolicy.ts` — 전역 쿼리 재시도(`main.tsx`). 네트워크·타임아웃·5xx·429만 1회, 4xx는 즉시 실패.
 - `api/fetchAllPages.ts` — skip/limit 목록을 끝까지 받는다. **목록 전체를 걸러 쓰거나 합계를 내는 화면은 이걸로** — 기본 limit(100)만 받으면 합계가 조용히 줄어든다.
 
 - **인증**: 로그인·가입·갱신은 전부 Supabase Auth. 백엔드는 JWKS 검증만 — 별도 "백엔드 JWT" 없음.
@@ -180,7 +181,7 @@ _기타_
 
 - 키 정의는 `constants/queryKeys.ts` 하나 — 문자열 하드코딩 금지, 전부 `QUERY_KEYS`에서 import.
 - 계좌·연도별로 분기되는 키는 무효화 전용 `xxxBase` 프리픽스 키(`portfolioOverviewBase`, `transactionsBase`, `taxSummaryBase` 등)가 따로 있다 — **무효화는 항상 Base 키로**(특정 accountId 키만 지우면 다른 조합이 stale).
-- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status·exchange-rate·exchange-rate-alerts·dashboard·tax-summary(`taxSummaryQuery(year, accountId)`)·dividend-plan(`dividendPlanQuery`))는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
+- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status·exchange-rate·exchange-rate-alerts·dashboard·tax-summary(`taxSummaryQuery(year, accountId)`)·dividend-plan(`dividendPlanQuery`)·action-items(`actionItemsQuery`)·challenges(`challengesQuery`))는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
 
 **캐시 무효화 (`src/utils/queryInvalidation.ts`)** — 컴포넌트·훅에서 `queryClient.invalidateQueries()` 직접 호출 금지. 새 함수는 `invalidate<Domain>Data(queryClient)` 형태로 여기에 추가. 각 함수의 정확한 대상은 소스 확인.
 
@@ -240,6 +241,7 @@ _기타_
 - `marketSignalRows.ts` — 매크로 8지표 행 변환(Tier 분류는 백엔드 `market_signal_service` 재사용)
 - `dcaScenarioProjection.ts` — 백엔드 `dca_service._build_projection_curve()` 포팅
 - `legacyTabRedirect.ts` — 이메일·푸시에 저장된 옛 딥링크 호환 — **지우지 말 것**
+- `fxPlanAlerts.ts` — 환전 계획·추가 환전 항목의 알림 등록 상태(`planAlertState`). 범위 규칙은 백엔드 `fx_plan_service._in_scope`와 같게
 - 그 외: `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `riskLevel`, `dividendUtils`(`weightBarColor` — 비중 막대 색 인라인 금지), `savingsProjection`, `goalFeasibility`, `dcaAutoBuy`(정액 분할·사전 부족 판정은 백엔드 `dca_allocation`·`dca_cash_shortfall_service`와 같은 규칙 — 함께 맞출 것), `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
 
 **마켓 (`constants/markets.ts`)** — 인라인 문자열 비교 금지.

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from html import escape
 
 from app.services.notifications.email_templates._shared import (
     _SIGNAL_LEVEL_COLOR,
@@ -119,7 +120,7 @@ def rebalancing_alert_template(
     elif is_scheduled_report:
         subject = f"{test_prefix}[Growlio] {schedule_label} 리밸런싱 리포트 — {portfolio_name}"
         heading = "정기 리밸런싱 현황"
-        subheading = f"포트폴리오 <strong>{portfolio_name}</strong>의 {schedule_label} 리밸런싱 현황입니다."
+        subheading = f"포트폴리오 <strong>{escape(portfolio_name)}</strong>의 {schedule_label} 리밸런싱 현황입니다."
         if drifting_count:
             subheading += (
                 f" 현재 <strong style='color:#f59e0b;'>{drifting_count}개 종목</strong>이 "
@@ -129,7 +130,7 @@ def rebalancing_alert_template(
         subject = f"{test_prefix}[Growlio] 리밸런싱 알림 — {portfolio_name} (비중 이탈 감지)"
         heading = "비중 이탈 감지"
         subheading = (
-            f"포트폴리오 <strong>{portfolio_name}</strong>의 {len(items_to_show)}개 종목이 "
+            f"포트폴리오 <strong>{escape(portfolio_name)}</strong>의 {len(items_to_show)}개 종목이 "
             f"목표 비중에서 ±{threshold_pct:.1f}% 이상 벗어났습니다."
         )
 
@@ -244,7 +245,7 @@ def rebalancing_execution_template(
     summary_color = "#16a34a" if not has_fail else "#f59e0b"
     body = (
         f"<p style='color:#374151;margin-top:8px;'>"
-        f"포트폴리오 <strong>{portfolio_name}</strong>의 리밸런싱이 자동으로 실행되었습니다.<br>"
+        f"포트폴리오 <strong>{escape(portfolio_name)}</strong>의 리밸런싱이 자동으로 실행되었습니다.<br>"
         f"실행 시각: {time_str}</p>"
         f"<div style='background:#f8fafc;border-radius:8px;padding:12px 16px;margin:16px 0;"
         f"font-size:14px;border-left:4px solid {summary_color};'>"
@@ -328,7 +329,7 @@ def rebalancing_plan_pending_template(
     )
     subject = f"[Growlio] 리밸런싱 자동화 — {portfolio_name} {subject_action} 대기"
 
-    account_note = f" (실행 계좌: {account_name})" if account_name else ""
+    account_note = f" (실행 계좌: {escape(account_name)})" if account_name else ""
 
     btn_style = (
         "display:inline-block;padding:10px 20px;border-radius:8px;font-weight:bold;"
@@ -339,7 +340,7 @@ def rebalancing_plan_pending_template(
     sell_section_html = "".join(_render_plan_sell_section(s, account_note, btn_style) for s in sell_sections)
 
     body = (
-        f"<p style='color:#374151;'>포트폴리오 <strong>{portfolio_name}</strong>의 리밸런싱 자동화 조건이 "
+        f"<p style='color:#374151;'>포트폴리오 <strong>{escape(portfolio_name)}</strong>의 리밸런싱 자동화 조건이 "
         f"충족되어 아래 계획이 생성되었습니다.</p>"
         f"{buy_section_html}"
         f"{sell_section_html}"
@@ -361,7 +362,7 @@ def rebalancing_plan_execution_failed_template(
     subject = f"[Growlio] 리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}"
     table = _kv_table(
         [
-            ("포트폴리오", portfolio_name),
+            ("포트폴리오", escape(portfolio_name)),
             ("실행 유형", f"자동 {side_label}"),
             ("실패 사유", error_message or "알 수 없는 오류"),
         ]
@@ -384,7 +385,7 @@ def dca_fx_required_template(
     subject = f"[Growlio] 적립 해외 매수 대기 — 달러 환전이 필요합니다 ({portfolio_name})"
     table = _kv_table(
         [
-            ("포트폴리오", portfolio_name),
+            ("포트폴리오", escape(portfolio_name)),
             ("필요 달러", f"${required_usd:,.2f}"),
             ("보유 달러", f"${available_usd:,.2f}"),
             ("부족분", f"약 ${shortfall:,.2f}"),
@@ -409,7 +410,7 @@ def tax_impact_gate_blocked_template(
     subject = f"[Growlio] 리밸런싱 자동화 보류 — 세금영향 상한 초과 ({portfolio_name})"
     table = _kv_table(
         [
-            ("포트폴리오", portfolio_name),
+            ("포트폴리오", escape(portfolio_name)),
             ("추정 양도세", f"약 {estimated_tax_krw:,.0f} 원"),
             ("설정된 상한", f"{max_tax_impact_krw:,.0f} 원"),
         ]
@@ -430,8 +431,8 @@ def stale_snapshot_blocked_template(portfolio_name: str, account_name: str, days
     subject = f"[Growlio] 리밸런싱 자동화 보류 — 계좌 동기화 끊김 ({portfolio_name})"
     table = _kv_table(
         [
-            ("포트폴리오", portfolio_name),
-            ("계좌", account_name),
+            ("포트폴리오", escape(portfolio_name)),
+            ("계좌", escape(account_name)),
             ("마지막 동기화", f"{days_since_sync}일 전"),
         ]
     )
@@ -461,7 +462,7 @@ def market_signal_gate_blocked_template(
     subject = f"[Growlio] 리밸런싱 자동화 보류 — 시장신호 게이트 ({portfolio_name})"
     table = _kv_table(
         [
-            ("포트폴리오", portfolio_name),
+            ("포트폴리오", escape(portfolio_name)),
             ("현재 시장 신호", f"<span style='color:{level_color};font-weight:bold;'>{level_label}</span>"),
             ("설정된 게이트", mode_label),
         ]
@@ -482,7 +483,7 @@ def _tactical_gate_blocked_template(portfolio_name: str) -> tuple[str, str]:
     subject = f"[Growlio] 적립 매수 보류 — 전술 방어 국면 ({portfolio_name})"
     table = _kv_table(
         [
-            ("포트폴리오", portfolio_name),
+            ("포트폴리오", escape(portfolio_name)),
             ("전술 배분 국면", f"<span style='color:{color};font-weight:bold;'>방어</span>"),
             ("설정된 게이트", "전술 연동(방어 국면이면 보류)"),
         ]
@@ -504,7 +505,7 @@ def daily_value_cap_gate_blocked_template(
     subject = "[Growlio] 리밸런싱 자동화 보류 — 하루 합산 거래한도 초과"
     table = _kv_table(
         [
-            ("포트폴리오", portfolio_name),
+            ("포트폴리오", escape(portfolio_name)),
             ("오늘 이미 실행된 금액", f"약 {today_total_krw:,.0f} 원"),
             ("이번 계획 예상 금액", f"약 {attempted_value_krw:,.0f} 원"),
             ("설정된 하루 상한", f"{cap_krw:,.0f} 원"),
@@ -532,8 +533,8 @@ def dca_cash_shortfall_template(
     """정기 적립식 자동매수(AUTO·SCHEDULE_ONLY·BUY_ONLY) 실행 1~3일 전, 실행 계좌 예수금이 부족할 때 발송."""
     subject = f"[Growlio] {run_date_label} 자동매수 전에 예수금을 채워주세요"
     rows: list[tuple[str, str]] = [
-        ("포트폴리오", portfolio_name),
-        ("실행 계좌", account_name),
+        ("포트폴리오", escape(portfolio_name)),
+        ("실행 계좌", escape(account_name)),
         ("자동매수 예정일", run_date_label),
         ("현재 예수금", f"{cash_krw:,.0f} 원" + (f" ({synced_label} 동기화 기준)" if synced_label else "")),
     ]

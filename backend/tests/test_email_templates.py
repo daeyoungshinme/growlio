@@ -282,3 +282,21 @@ class TestRebalancingPlanPendingTemplate:
         assert "매수 주문 (미국)" in html
         assert "token=buy-kr" in html
         assert "token=buy-us" in html
+
+
+class TestUserProvidedNamesAreEscaped:
+    """plans/126 D3 — 사용자가 지은 이름(항목·포트폴리오·계좌)은 HTML 본문에서 이스케이프하고 제목은 그대로 둔다."""
+
+    def test_fx_need_name_escaped_in_html_not_subject(self):
+        subject, html = exchange_rate_alert_template(
+            target_rate=1380.0, direction="BELOW", current_rate=1379.0, planned_usd=300.0, plan_label="<b>도쿄</b>"
+        )
+        assert "&lt;b&gt;도쿄&lt;/b&gt;" in html
+        assert "<b>도쿄</b>" not in html
+        assert "<b>도쿄</b>" in subject
+
+    def test_portfolio_name_escaped_in_kv_rows(self):
+        from app.services.notifications.email_templates import rebalancing_plan_execution_failed_template
+
+        _, html = rebalancing_plan_execution_failed_template("A&B <코어>", "BUY", None)
+        assert "A&amp;B &lt;코어&gt;" in html
