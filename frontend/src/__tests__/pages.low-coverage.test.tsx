@@ -38,6 +38,7 @@ vi.mock("@/utils/queryInvalidation", () => ({
   invalidateRebalancingAlertData: vi.fn(),
   invalidateAccountData: vi.fn(),
   invalidateSyncData: vi.fn(),
+  refetchActiveData: vi.fn(),
   invalidateAlertData: vi.fn(),
   invalidateDcaData: vi.fn(),
   invalidateGoalRecommendationData: vi.fn(),

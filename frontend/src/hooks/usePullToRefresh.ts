@@ -87,29 +87,33 @@ export function usePullToRefresh({
     [disabled, containerRef, threshold, setDistance],
   );
 
-  const handleTouchEnd = useCallback(async () => {
-    if (!isPullingRef.current) return;
-    if (frameRef.current !== null) {
-      cancelAnimationFrame(frameRef.current);
-      frameRef.current = null;
-    }
-    const reached = pullDistanceRef.current >= threshold;
-    isPullingRef.current = false;
-    pullDistanceRef.current = 0;
-    setIsPulling(false);
-    setPullDistance(0);
-
-    if (reached && !isRefreshingRef.current) {
-      isRefreshingRef.current = true;
-      setIsRefreshing(true);
-      try {
-        await onRefreshRef.current();
-      } finally {
-        isRefreshingRef.current = false;
-        setIsRefreshing(false);
+  /** `cancelled`: 시스템이 제스처를 가로챈 touchcancel(Android 가장자리 제스처·통화 오버레이) — 상태만 되돌린다 */
+  const handleTouchEnd = useCallback(
+    async (cancelled = false) => {
+      if (!isPullingRef.current) return;
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
       }
-    }
-  }, [threshold]);
+      const reached = !cancelled && pullDistanceRef.current >= threshold;
+      isPullingRef.current = false;
+      pullDistanceRef.current = 0;
+      setIsPulling(false);
+      setPullDistance(0);
+
+      if (reached && !isRefreshingRef.current) {
+        isRefreshingRef.current = true;
+        setIsRefreshing(true);
+        try {
+          await onRefreshRef.current();
+        } finally {
+          isRefreshingRef.current = false;
+          setIsRefreshing(false);
+        }
+      }
+    },
+    [threshold],
+  );
 
   useEffect(() => {
     const el = containerRef.current;
@@ -134,16 +138,21 @@ export function usePullToRefresh({
       detachMove();
       void handleTouchEnd();
     };
+    // 취소된 제스처는 임계값을 넘었어도 새로고침하지 않는다(plans/126 C3)
+    const onCancel = () => {
+      detachMove();
+      void handleTouchEnd(true);
+    };
 
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchend", onEnd, { passive: true });
-    el.addEventListener("touchcancel", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onCancel, { passive: true });
 
     return () => {
       detachMove();
       el.removeEventListener("touchstart", onStart);
       el.removeEventListener("touchend", onEnd);
-      el.removeEventListener("touchcancel", onEnd);
+      el.removeEventListener("touchcancel", onCancel);
     };
   }, [handleTouchStart, handleTouchMove, handleTouchEnd, containerRef]);
 

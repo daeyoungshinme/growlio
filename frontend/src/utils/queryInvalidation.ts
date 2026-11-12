@@ -106,12 +106,13 @@ export function invalidateSyncData(qc: QueryClient) {
 }
 
 /** 계좌 CUD 후 — 보유 기반 쿼리 + 거래내역(현금성 계좌 잔액 수정 시 백엔드가 입출금 거래를 자동 생성할 수 있음)
- * + 연금 납입 현황(연금·IRP 계좌 추가/삭제·tax_type 변경) */
+ * + 연금 납입 현황(연금·IRP 계좌 추가/삭제·tax_type 변경) + 추가 환전 항목(보관 계좌 이름·삭제 시 예약 해제) */
 export function invalidateAccountData(qc: QueryClient) {
   return invalidateKeys(qc, [
     ...HOLDINGS_QUERY_KEYS,
     QUERY_KEYS.transactionsBase,
     QUERY_KEYS.pensionContributionBase,
+    QUERY_KEYS.fxExtraNeeds,
   ]);
 }
 
@@ -255,7 +256,8 @@ export function invalidateDcaData(qc: QueryClient, opts: { goalRecommendation?: 
 
 /** 환율 알림 CUD 후 */
 export function invalidateAlertData(qc: QueryClient) {
-  return invalidateKeys(qc, [QUERY_KEYS.exchangeRateAlerts]);
+  // 발동한 환전 계획(FX_PLAN) 알림은 홈 지금 할 일 행이 된다 — 지우거나 끄면 그 행도 함께 사라져야 한다
+  return invalidateKeys(qc, [QUERY_KEYS.exchangeRateAlerts, QUERY_KEYS.actionItems]);
 }
 
 /**

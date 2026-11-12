@@ -12,7 +12,7 @@ import StockHoldingsTable, {
 import HorizonSummaryCard from "@/components/portfolio/HorizonSummaryCard";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { fmtKrw, fmtPct, fmtSigned } from "@/utils/format";
-import { invalidateSyncData } from "@/utils/queryInvalidation";
+import { invalidateSyncData, refetchActiveData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { toast } from "@/utils/toast";
@@ -50,8 +50,9 @@ type Tab = (typeof TABS)[number];
 export default function PortfolioPage() {
   const qc = useQueryClient();
 
+  // 당겨서 새로고침은 화면에 붙은 쿼리만 — sync 무효화는 화면 밖 무거운 쿼리까지 stale로 만든다(plans/126 C2)
   const handleRefresh = useCallback(async () => {
-    await invalidateSyncData(qc);
+    await refetchActiveData(qc);
   }, [qc]);
   useRegisterRefresh(handleRefresh);
 

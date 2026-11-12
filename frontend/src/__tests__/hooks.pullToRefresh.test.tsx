@@ -56,6 +56,22 @@ describe("usePullToRefresh (plans/119 D5)", () => {
     expect(el.textContent).toBe("");
   });
 
+  it("시스템이 제스처를 취소(touchcancel)하면 임계값을 넘었어도 새로고침하지 않는다 — plans/126 C3", async () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    const { getByTestId } = render(<Harness onRefresh={onRefresh} />);
+    const el = getByTestId("scroller");
+
+    touch(el, "touchstart", 0);
+    act(() => {
+      touch(el, "touchmove", 200);
+    });
+    await act(async () => {
+      touch(el, "touchcancel");
+    });
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(el.textContent).toBe("");
+  });
+
   it("임계값 미만이면 새로고침하지 않는다", async () => {
     const onRefresh = vi.fn().mockResolvedValue(undefined);
     const { getByTestId } = render(<Harness onRefresh={onRefresh} />);

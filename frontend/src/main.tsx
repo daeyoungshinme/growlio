@@ -49,8 +49,11 @@ const queryClient = new QueryClient({
 
 // persist 대상은 gcTime을 maxAge(24h)와 맞춘다 — 기본 30분이면 다른 탭에 머무는 동안(또는 WebView가 백그라운드에
 // 살아 있는 동안) 관찰자 없는 홈 쿼리가 지워지고, persister가 그 상태를 저장해 다음 콜드 스타트가 빈 화면이 됐다
+// setQueryDefaults는 프리픽스로 맞추므로 goal-recommendation은 persist하는 overall만 — 기간별·연령대·중복 분석
+// 변형까지 하루 동안 메모리에 남기지 않는다(shouldPersistQuery와 같은 범위, plans/126 C5)
 for (const key of PERSIST_QUERY_KEYS) {
-  queryClient.setQueryDefaults([key], { gcTime: STALE_TIME.DAY });
+  const prefix = key === "goal-recommendation" ? [key, "overall"] : [key];
+  queryClient.setQueryDefaults(prefix, { gcTime: STALE_TIME.DAY });
 }
 
 // 앱 재시작 시 대시보드·포트폴리오·계좌 캐시를 즉시 표시하기 위한 persistence (24h TTL)
