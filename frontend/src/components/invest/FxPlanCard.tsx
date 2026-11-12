@@ -360,6 +360,7 @@ function FxPlanBody({ onEditGoal }: Props) {
                 tranches={data.tranches}
                 planRates={plan.planRates}
                 manualRates={plan.manualRates}
+                sharedRates={plan.sharedRates}
               />
               <p className="text-xs text-gray-400 dark:text-gray-500">
                 {data.months}개월 안에 목표 환율에 닿지 않으면 남은 금액은 적립일에 환전하세요.

@@ -94,6 +94,7 @@ describe("FxPlanCard", () => {
       updated: 0,
       removed: 0,
       skipped_manual: 0,
+      skipped_shared: 0,
     });
   });
 
@@ -296,6 +297,7 @@ describe("FxPlanCard", () => {
       updated: 0,
       removed: 1,
       skipped_manual: 0,
+      skipped_shared: 0,
     });
     renderWithProviders(<FxPlanCard />);
     fireEvent.click(

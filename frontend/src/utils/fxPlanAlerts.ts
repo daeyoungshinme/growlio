@@ -21,10 +21,22 @@ const inScope = (a: ExchangeRateAlert, scope: FxPlanAlertScope) =>
     : a.portfolio_id === scope.portfolioId && !a.fx_need_id;
 
 /**
+ * 다른 포트폴리오 적립 계획이 가진 활성·미발동 알림 — 같은 목표면 서버가 새로 만들지 않고 함께 쓴다.
+ * 서버 `sync_fx_plan_alerts`의 shared_keys와 같은 규칙. 추가 환전 항목 범위는 함께 쓰지 않는다.
+ */
+const sharedWith = (a: ExchangeRateAlert, scope: FxPlanAlertScope) =>
+  !("fxNeedId" in scope) &&
+  isFxPlanAlert(a) &&
+  !a.fx_need_id &&
+  a.portfolio_id !== scope.portfolioId &&
+  a.triggered_at === null;
+
+/**
  * 계획 구간과 등록된 환율 알림 비교(plans/121).
  * - planRates: 이 범위에서 계획으로 만든 활성·미발동 알림의 목표
  * - manualRates: 계획 구간과 같은 목표의 직접 등록한 활성 BELOW 알림(서버가 건너뜀)
- * - inSync: 모든 구간이 (금액까지) 등록돼 있고 빠진 목표의 계획 알림이 없음
+ * - sharedRates: 다른 포트폴리오 계획이 이미 알림을 가진 구간 목표(서버가 건너뛰고, 이 계획의 같은 목표 알림은 지움)
+ * - inSync: 모든 구간이 (금액까지) 등록돼 있고 빠진 목표·겹친 목표의 계획 알림이 없음
  * 알림을 불러오기 전엔 inSync=false — 버튼은 "확인 중"으로 잠긴다.
  */
 export function planAlertState(
@@ -46,13 +58,22 @@ export function planAlertState(
       .map((a) => rateKey(a.target_rate))
       .filter((k) => targetKeys.has(k)),
   );
+  const sharedRates = new Set(
+    active
+      .filter((a) => sharedWith(a, scope))
+      .map((a) => rateKey(a.target_rate))
+      .filter((k) => targetKeys.has(k)),
+  );
   const planUsdByRate = new Map(planAlerts.map((a) => [rateKey(a.target_rate), a.planned_usd]));
   const inSync =
     alerts !== undefined &&
-    planAlerts.every((a) => targetKeys.has(rateKey(a.target_rate))) &&
+    planAlerts.every((a) => {
+      const key = rateKey(a.target_rate);
+      return targetKeys.has(key) && !sharedRates.has(key);
+    }) &&
     targets.every((t) => {
       const key = rateKey(t.target_rate);
-      if (manualRates.has(key)) return true;
+      if (manualRates.has(key) || sharedRates.has(key)) return true;
       const usd = planUsdByRate.get(key);
       return usd != null && usdMatches(Number(usd), t.usd);
     });
@@ -60,6 +81,7 @@ export function planAlertState(
     targets,
     planRates: new Set(planUsdByRate.keys()),
     manualRates,
+    sharedRates,
     planAlertCount: planAlerts.length,
     inSync,
   };
@@ -68,7 +90,13 @@ export function planAlertState(
 export type PlanAlertState = ReturnType<typeof planAlertState>;
 
 export function syncToastMessage(
-  result: { created: number; updated: number; removed: number; skipped_manual: number },
+  result: {
+    created: number;
+    updated: number;
+    removed: number;
+    skipped_manual: number;
+    skipped_shared?: number;
+  },
   targetCount: number,
 ): string {
   if (targetCount === 0) {
@@ -77,12 +105,18 @@ export function syncToastMessage(
       : "해제할 환전 계획 알림이 없습니다";
   }
   const synced = result.created + result.updated;
+  const shared = result.skipped_shared ?? 0;
   const parts =
     synced > 0
       ? [`목표 환율 알림 ${synced}건을 맞췄습니다`]
-      : ["계획 목표에 직접 등록한 알림이 이미 있어 새로 만들지 않았습니다"];
+      : [
+          result.skipped_manual > 0
+            ? "계획 목표에 직접 등록한 알림이 이미 있어 새로 만들지 않았습니다"
+            : "같은 목표의 알림이 이미 있어 새로 만들지 않았습니다",
+        ];
   if (result.removed > 0) parts.push(`옛 목표 ${result.removed}건 해제`);
   if (result.skipped_manual > 0) parts.push(`직접 등록한 알림 ${result.skipped_manual}건은 그대로`);
+  if (shared > 0) parts.push(`다른 포트폴리오 계획과 같은 목표 ${shared}건은 그 알림을 함께 사용`);
   return parts.join(" · ");
 }
 

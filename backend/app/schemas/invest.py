@@ -171,6 +171,7 @@ class FxPlanAlertSyncResponse(BaseModel):
     updated: int
     removed: int
     skipped_manual: int  # 같은 목표의 직접 등록한 BELOW 알림이 이미 있어 만들지 않은 구간 수
+    skipped_shared: int = 0  # 다른 포트폴리오 계획이 같은 목표 알림을 이미 가져 만들지 않은 구간 수
 
 
 # ── 추가 환전 항목(여행 등, plans/123) ─────────────────────────

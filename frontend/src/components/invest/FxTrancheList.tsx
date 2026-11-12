@@ -8,10 +8,12 @@ interface Props {
   planRates: Set<number>;
   /** 같은 목표의 직접 등록한 알림 키 */
   manualRates: Set<number>;
+  /** 다른 포트폴리오 계획의 알림을 함께 쓰는 키 — 적립 계획에서만 넘긴다 */
+  sharedRates?: Set<number>;
 }
 
 /** 분할 환전 구간 목록 — 적립 환전 계획과 추가 환전 항목(plans/123)이 함께 쓴다 */
-export default function FxTrancheList({ tranches, planRates, manualRates }: Props) {
+export default function FxTrancheList({ tranches, planRates, manualRates, sharedRates }: Props) {
   return (
     <ul className="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-100 dark:border-gray-800">
       {tranches.map((t) => (
@@ -27,6 +29,13 @@ export default function FxTrancheList({ tranches, planRates, manualRates }: Prop
             {t.target_rate !== null && manualRates.has(rateKey(t.target_rate)) && (
               <p className="text-xs text-gray-500 dark:text-gray-400">직접 등록한 알림 있음</p>
             )}
+            {t.target_rate !== null &&
+              !planRates.has(rateKey(t.target_rate)) &&
+              sharedRates?.has(rateKey(t.target_rate)) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  다른 포트폴리오 계획 알림으로 받음
+                </p>
+              )}
           </div>
           <div className="text-right tabular-nums">
             <p className="text-sm font-semibold">{fmtUsd(t.usd, 0)}</p>

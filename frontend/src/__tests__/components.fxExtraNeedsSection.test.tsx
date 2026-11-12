@@ -86,6 +86,7 @@ describe("FxExtraNeedsSection (plans/123)", () => {
       updated: 0,
       removed: 0,
       skipped_manual: 0,
+      skipped_shared: 0,
     });
   });
 
