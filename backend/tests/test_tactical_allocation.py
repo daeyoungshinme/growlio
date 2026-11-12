@@ -1002,6 +1002,37 @@ class TestFetchWrappers:
         assert series.to_dict() == {pd.Timestamp("2026-10-02"): 18.5}
 
     @pytest.mark.asyncio
+    async def test_evaluate_market_releases_connection_before_waiting_external(self):
+        """plans/126 B2 — 확정 등급(durable 읽기) 뒤 차트·틸트 외부 조회를 기다리기 전에 트랜잭션을 끝낸다."""
+        import asyncio
+
+        order: list[str] = []
+        db = MagicMock()
+        db.new, db.dirty, db.deleted = [], [], []
+        db.in_transaction = MagicMock(return_value=True)
+        db.commit = AsyncMock(side_effect=lambda: order.append("commit"))
+
+        async def technicals(_cache):
+            await asyncio.sleep(0)
+            order.append("technicals_awaited")
+            return {"QQQ": {"trend": "UP"}, "SPY": {"trend": "UP"}}
+
+        with (
+            patch(
+                "app.services.market_signal.market_signal_service.get_confirmed_composite_level",
+                AsyncMock(return_value=("GREEN", "FRESH")),
+            ),
+            patch.object(tactical, "get_technical_signals", technicals),
+            patch.object(
+                tactical,
+                "get_tilt_inputs",
+                AsyncMock(return_value={"real_yield": 2.0, "real_yield_change_pp": 0.0, "relative_strength_pct": 0.0}),
+            ),
+        ):
+            await tactical.evaluate_market(None, db)
+        assert order[0] == "commit"
+
+    @pytest.mark.asyncio
     async def test_evaluate_market_macro_failure_is_stale(self):
         with (
             patch(

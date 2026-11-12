@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import FX_EXTRA_URGENT_DAYS, MAX_FX_EXTRA_NEEDS_PER_USER, POSITION_STOCK_ASSET_TYPES
+from app.core.database import release_read_connection
 from app.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.models.asset import AssetAccount
 from app.models.fx_extra_need import FxExtraNeed
@@ -115,6 +116,8 @@ async def list_fx_extra_needs(db: AsyncSession, cache: CacheStoreType, user_id: 
     needs = await _user_needs(db, user_id)
     if not needs:
         return {"rate": None, "rate_is_live": True, "needs": []}
+    # 환율 1년 일봉(콜드면 Yahoo 수 초) 대기 중 커넥션을 쥐지 않는다(plans/126 B3)
+    await release_read_connection(db)
     ctx = await load_fx_rate_context(cache)
     today = today_kst()
     return {

@@ -481,6 +481,39 @@ def test_api_delete_invalidates_alert_cache(api):
     inv.assert_awaited_once()
 
 
+def test_api_patch_invalidates_alert_list(api):
+    """plans/126 B4 — 환율 알림 목록(5분 캐시)에 항목 이름이 실린다 — 수정하면 알림 목록도 지운다."""
+    client, _ = api
+    need = _row_need()
+    ctx = fx_plan_service.FxRateContext(1400.0, True, None, has_rate=True)
+    with (
+        patch.object(svc, "update_fx_extra_need", new=AsyncMock(return_value=need)),
+        patch.object(fx_plan_service, "load_fx_rate_context", new=AsyncMock(return_value=ctx)),
+        patch("app.api.v1.invest.invalidate_exchange_rate_alert_caches", new=AsyncMock()) as inv,
+    ):
+        res = client.patch(f"/api/v1/invest/fx-extra-needs/{need.id}", json={"name": "오사카 여행"})
+    assert res.status_code == 200, res.text
+    inv.assert_awaited_once()
+
+
+async def test_list_releases_connection_before_rate_lookup():
+    """plans/126 B3 — 항목을 읽은 뒤 환율 1년 일봉(콜드면 Yahoo) 대기 전에 커넥션을 반납한다."""
+    order: list[str] = []
+    db = _list_db([_need()])
+    db.new, db.dirty, db.deleted = [], [], []
+    db.in_transaction = MagicMock(return_value=True)
+    db.commit = AsyncMock(side_effect=lambda: order.append("commit"))
+    ctx = fx_plan_service.FxRateContext(1400.0, True, None, has_rate=True)
+
+    async def rate(_cache):
+        order.append("rate")
+        return ctx
+
+    with patch.object(svc, "load_fx_rate_context", new=rate), patch.object(svc, "today_kst", return_value=TODAY):
+        await svc.list_fx_extra_needs(db, CacheStore(), uuid.uuid4())
+    assert order == ["commit", "rate"]
+
+
 def test_api_alert_sync_uses_need_scope(api):
     client, user = api
     need_id = uuid.uuid4()

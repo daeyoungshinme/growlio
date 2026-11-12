@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
+from app.core.database import release_read_connection
 from app.limiter import limiter
 from app.models.fx_extra_need import FxExtraNeed
 from app.models.user import User
@@ -134,8 +135,10 @@ async def sync_fx_plan_alerts(
 async def _need_row(db: AsyncSession, need: FxExtraNeed) -> FxExtraNeedResponse:
     """생성·수정 응답 한 행 — 목록과 같은 규칙으로 구간까지 계산한다."""
     cache = await get_cache_store()
-    ctx = await fx_plan_service.load_fx_rate_context(cache)
     account_name = await fx_extra_need_service.reserved_account_name(db, need)
+    # 환율 1년 일봉(콜드면 Yahoo 수 초) 대기 중 커넥션을 쥐지 않게 DB 읽기를 먼저 끝내고 반납(plans/126 B3)
+    await release_read_connection(db)
+    ctx = await fx_plan_service.load_fx_rate_context(cache)
     return FxExtraNeedResponse(
         **fx_extra_need_service.build_need_row(need, ctx.position, ctx.rate, ctx.has_rate, today_kst(), account_name)
     )
@@ -189,6 +192,8 @@ async def update_fx_extra_need(
         if v is not None or k == "reserved_account_id"
     }
     need = await fx_extra_need_service.update_fx_extra_need(db, current_user.id, need_id, changes)
+    # 환율 알림 목록(5분 캐시)에 항목 이름이 실린다 — 이름을 바꾸면 알림 화면도 바로 따라가게(plans/126 B4)
+    await invalidate_exchange_rate_alert_caches(await get_cache_store(), current_user.id)
     return await _need_row(db, need)
 
 

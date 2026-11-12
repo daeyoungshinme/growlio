@@ -31,6 +31,7 @@ TTL_DAILY_RETURNS = 86400  # 일별수익률(MVO 입력) 1일
 TTL_BACKTEST = 86400  # 백테스트 결과 1일
 TTL_ALLOC_HISTORY = 86400  # 포트폴리오 배분 이력 1일
 TTL_DIVIDEND_INFO = 86400  # 배당 정보 1일
+TTL_DIVIDEND_NO_DIVIDEND_UNCERTAIN = 600  # 후속 소스 장애 중 "배당 없음" — 장애를 하루 동안 0으로 굳히지 않게
 TTL_DIVIDEND_FALLBACK_FX = 300  # 환율 fallback으로 계산된 배당 요약 5분 — 1300원 고정값이 24h 굳는 것 방지
 TTL_DART = 3600  # DART 공시 1시간
 TTL_DIVIDEND_MONTHS = 604800  # 배당 월별 데이터 7일

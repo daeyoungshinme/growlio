@@ -54,6 +54,7 @@ from app.utils.kst import today_kst
 logger = structlog.get_logger()
 
 _FETCH_TIMEOUT_SECONDS = 20.0
+_KIS_REALIZED_CONCURRENCY = 3
 _QTY_EPS = 1e-6
 # 매도일 직전 스냅샷을 찾는 하한 — 1월 초 매도도 작년 말 스냅샷 평단을 쓸 수 있게 1년 앞까지 본다
 _BASIS_SNAPSHOT_LOOKBACK_DAYS = 366
@@ -124,7 +125,7 @@ async def _fetch_kis_realized(
     account_no: str = acc.kis_account_no
 
     async def _get_token(force_refresh: bool) -> str:
-        return await get_access_token(
+        token = await get_access_token(
             app_key,
             app_secret,
             is_mock=False,
@@ -134,6 +135,10 @@ async def _fetch_kis_realized(
             account_id=str(acc.id),
             force_refresh=force_refresh,
         )
+        # 콜드 토큰 캐시면 DB에서 토큰을 읽어 트랜잭션이 열린다 — 최대 20초 HTTP 동안
+        # 커넥션을 쥐지 않게 반납한다(plans/126 B1)
+        await release_read_connection(db)
+        return token
 
     async def _fetch(token: str) -> KisRealized:
         # 타임아웃은 순수 HTTP 조회에만 건다 — 토큰 발급(`store_token`)은 공유 세션에서 commit하므로
@@ -352,7 +357,8 @@ async def get_overseas_realized_summary(
     # 대기하는 쪽도 커넥션을 쥔 채 기다리지 않게 먼저 반납한다(읽기 경로 전용 함수)
     await release_read_connection(db)
     # KIS 조회 상한(20초)보다 길게 기다려야 대기자가 중간에 포기하고 각자 다시 조회하지 않는다
-    return await single_flight_fetch(cache, cache_key, _get_cached, _compute, lock_ttl=30, max_wait_iterations=150)
+    # 락은 토큰 발급(httpx 30초)+조회(20초)보다 길어야 대기자가 만료된 락을 보고 같은 조회를 다시 하지 않는다
+    return await single_flight_fetch(cache, cache_key, _get_cached, _compute, lock_ttl=60, max_wait_iterations=300)
 
 
 async def _fetch_kis_realized_isolated(acc: AssetAccount, start: date, end: date, cache: CacheStore) -> KisRealized:
@@ -414,10 +420,14 @@ async def _compute_overseas_realized_summary(
     kis_results: dict[str, KisRealized | BaseException] = {}
     if kis_accounts:
         await release_read_connection(db)
-        results = await asyncio.gather(
-            *(_fetch_kis_realized_isolated(acc, start, end, cache) for acc in kis_accounts),
-            return_exceptions=True,
-        )
+        # 계좌별 세션이 동시에 커넥션을 잡으므로 풀(5+2)을 다 쓰지 않게 동시 조회 수를 묶는다(fx_plan과 같은 3)
+        sem = asyncio.Semaphore(_KIS_REALIZED_CONCURRENCY)
+
+        async def _bounded(acc: AssetAccount) -> KisRealized:
+            async with sem:
+                return await _fetch_kis_realized_isolated(acc, start, end, cache)
+
+        results = await asyncio.gather(*(_bounded(acc) for acc in kis_accounts), return_exceptions=True)
         kis_results = {str(acc.id): res for acc, res in zip(kis_accounts, results, strict=True)}
 
     covered: list[RealizedAccount] = []

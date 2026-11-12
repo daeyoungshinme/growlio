@@ -191,6 +191,33 @@ class TestNoDividendNegativeCache:
         assert not any(isinstance(w, dict) for w in written)
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(("fdr_failed", "expected_ttl"), [(True, 600), (False, 86400)])
+    async def test_korean_zero_with_failed_fallback_is_cached_briefly(
+        self, mock_cache, override_settings, fdr_failed, expected_ttl
+    ):
+        """plans/126 B5 — Naver가 0으로 답해도 후속 소스(FDR 등)가 장애였으면 "배당 없음"을 10분만 기억한다."""
+        zero = {"dps": 0, "dividend_yield": 0, "dividend_months": []}
+        fdr = {"dps": 0, "dividend_yield": 0, "fetch_failed": True} if fdr_failed else {"dps": 0, "dividend_yield": 0}
+        with (
+            patch("app.services.dividend.fetcher.is_korean_etf", return_value=True),
+            patch("app.services.dividend.fetcher._try_naver", new=AsyncMock(return_value=zero)),
+            patch(
+                "app.services.dividend.fetcher.sync_yahoo_dividend_info",
+                return_value={"dividend_yield": 0.0, "dps": 0.0, "ex_dividend_date": None},
+            ),
+            patch("app.services.dividend.fetcher._try_fdr", new=AsyncMock(return_value=fdr)),
+            patch("app.services.dividend.fetcher.fetch_dart_dividend", new=AsyncMock(return_value=None)),
+            patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[]),
+            patch("asyncio.get_running_loop", return_value=self._loop()),
+        ):
+            await _call_fetcher("123450", "KOSPI", mock_cache)
+
+        info_writes = [c for c in mock_cache.setex.call_args_list if isinstance(json.loads(c.args[2]), dict)]
+        assert len(info_writes) == 1
+        assert json.loads(info_writes[0].args[2])["no_dividend"] is True
+        assert info_writes[0].args[1] == expected_ttl
+
+    @pytest.mark.asyncio
     async def test_no_dividend_cache_hit_skips_network(self, mock_cache, override_settings):
         mock_cache.get = AsyncMock(
             side_effect=[

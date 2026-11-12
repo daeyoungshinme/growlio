@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import release_read_connection
 from app.core.job_runner import report_handled_failure
 from app.exceptions import NotFoundError
 from app.models.alert import RebalancingAlert
@@ -127,6 +128,9 @@ async def evaluate_market(cache: CacheStore | None, db: AsyncSession) -> dict[st
     try:
         # 실패하면 내부에서 (GREEN, STALE)로 폴백한다
         macro_level, freshness = await get_confirmed_composite_level(cache, db)
+        # 확정 등급 조회(durable 읽기)가 연 트랜잭션을 차트·틸트 외부 조회(콜드면 수 초) 대기 전에 끝낸다.
+        # 저장 전 변경이 있으면(save_strategy) 아무것도 하지 않는다(plans/126 B2)
+        await release_read_connection(db)
         technicals: dict[str, TechnicalSnapshot] = await technicals_task
         tilt_inputs = await tilt_task
     except BaseException:

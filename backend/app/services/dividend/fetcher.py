@@ -32,6 +32,7 @@ from app.services.market_data.yahoo_price import to_yf_symbol as _to_yahoo_symbo
 from app.utils.cache_keys import (
     TTL_DIVIDEND_INFO,
     TTL_DIVIDEND_MONTHS,
+    TTL_DIVIDEND_NO_DIVIDEND_UNCERTAIN,
     dividend_info_key,
     dividend_months_key,
 )
@@ -153,32 +154,35 @@ async def _fetch_korean_fallbacks(
     yield_decimal: float,
     kis_creds: dict | None,
     dart_key: str,
-) -> tuple[float, float]:
-    """국내 종목 fallback 체인: KIS ETF → FDR(+pykrx 펀더멘털) → KIS 일반 → DART → 정적."""
+) -> tuple[float, float, bool]:
+    """국내 종목 fallback 체인: KIS ETF → FDR(+pykrx 펀더멘털) → KIS 일반 → DART → 정적.
+
+    세 번째 값은 예외로 끝난 소스가 있었는지 — 0으로 끝났을 때 "배당 없음"을 오래 굳히지 않는 데 쓴다.
+    """
+    failed = False
     if is_etf and (dps == 0.0 or yield_decimal == 0.0) and kis_creds:
         prev_dps = dps
-        dps, yield_decimal = _merge_source(
-            await _try_kis(get_domestic_etf_dividend_info, ticker, kis_creds, "kis_etf_dividend_fallback_failed"),
-            dps,
-            yield_decimal,
-        )
+        src = await _try_kis(get_domestic_etf_dividend_info, ticker, kis_creds, "kis_etf_dividend_fallback_failed")
+        failed = failed or bool(src.get("fetch_failed"))
+        dps, yield_decimal = _merge_source(src, dps, yield_decimal)
         if dps != prev_dps:
             logger.info("kis_etf_dividend_fallback_used", ticker=ticker)
 
     if is_etf and (dps == 0.0 or yield_decimal == 0.0):
-        dps, yield_decimal = _merge_source(await _try_fdr(ticker, loop), dps, yield_decimal)
+        src = await _try_fdr(ticker, loop)
+        failed = failed or bool(src.get("fetch_failed"))
+        dps, yield_decimal = _merge_source(src, dps, yield_decimal)
 
     if (dps == 0.0 or yield_decimal == 0.0) and kis_creds:
         prev_dps = dps
-        dps, yield_decimal = _merge_source(
-            await _try_kis(get_domestic_dividend_info, ticker, kis_creds, "kis_dividend_fallback_failed"),
-            dps,
-            yield_decimal,
-        )
+        src = await _try_kis(get_domestic_dividend_info, ticker, kis_creds, "kis_dividend_fallback_failed")
+        failed = failed or bool(src.get("fetch_failed"))
+        dps, yield_decimal = _merge_source(src, dps, yield_decimal)
         if dps != prev_dps:
             logger.info("kis_dividend_fallback_used", ticker=ticker)
 
-    return await _fetch_dart_and_static(ticker, market, dart_key, dps, yield_decimal)
+    dps, yield_decimal = await _fetch_dart_and_static(ticker, market, dart_key, dps, yield_decimal)
+    return dps, yield_decimal, failed
 
 
 # ── 네트워크 소스 체인 (sem 내부) ──────────────────────────────────
@@ -197,13 +201,16 @@ async def _fetch_from_network(
     need_months_fetch: bool,
     kis_creds: dict | None,
     dart_key: str,
-) -> tuple[float, float, str | None, list[int], bool, bool]:
-    """네트워크 소스 전체 체인. (yield_decimal, dps, ex_div_date, months, need_months_fetch, answered) 반환.
+) -> tuple[float, float, str | None, list[int], bool, bool, bool]:
+    """네트워크 소스 전체 체인. (yield_decimal, dps, ex_div_date, months, need_months_fetch, answered,
+    fallback_failed) 반환.
 
     answered: 주 소스(Naver·Yahoo) 중 하나라도 예외 없이 응답했는지 — 0이 "배당 없음"인지 "조회 실패"인지 가른다.
+    fallback_failed: 국내 후속 소스(KIS·FDR) 중 예외로 끝난 게 있는지 — 있으면 "배당 없음"을 짧게만 기억한다.
     """
     ex_dividend_date = None
     answered = False
+    fallback_failed = False
 
     if is_korean:
         naver_info = await _try_naver(ticker, is_etf, loop)
@@ -225,14 +232,14 @@ async def _fetch_from_network(
         ex_dividend_date = info.get("ex_dividend_date")
 
         if is_korean:
-            dps, yield_decimal = await _fetch_korean_fallbacks(
+            dps, yield_decimal, fallback_failed = await _fetch_korean_fallbacks(
                 ticker, market, is_etf, loop, dps, yield_decimal, kis_creds, dart_key
             )
 
         if need_months_fetch:
             months = await loop.run_in_executor(None, partial(sync_fetch_dividend_months, yahoo_sym))
 
-    return yield_decimal, dps, ex_dividend_date, months, need_months_fetch, answered
+    return yield_decimal, dps, ex_dividend_date, months, need_months_fetch, answered, fallback_failed
 
 
 # ── 공개 API ────────────────────────────────────────────────────
@@ -292,7 +299,15 @@ async def fetch_ticker_dividend_info(
         return yield_decimal, dps, months, ex_dividend_date
 
     async with sem:
-        yield_decimal, dps, ex_dividend_date, months, need_months_fetch, answered = await _fetch_from_network(
+        (
+            yield_decimal,
+            dps,
+            ex_dividend_date,
+            months,
+            need_months_fetch,
+            answered,
+            fallback_failed,
+        ) = await _fetch_from_network(
             ticker,
             market,
             is_korean,
@@ -313,9 +328,9 @@ async def fetch_ticker_dividend_info(
     if dps > 0 or yield_decimal > 0:
         await cache.setex(info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": dps, "yield_decimal": yield_decimal}))
     elif answered:
-        await cache.setex(
-            info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": 0.0, "yield_decimal": 0.0, "no_dividend": True})
-        )
+        # 후속 소스가 장애였으면 그 소스가 배당을 알려줬을 수도 있다 — 하루가 아니라 짧게만 "배당 없음"(plans/126 B5)
+        ttl = TTL_DIVIDEND_NO_DIVIDEND_UNCERTAIN if fallback_failed else TTL_DIVIDEND_INFO
+        await cache.setex(info_cache_key, ttl, json.dumps({"dps": 0.0, "yield_decimal": 0.0, "no_dividend": True}))
     else:
         logger.warning("dividend_all_sources_failed", ticker=ticker, market=market)
 

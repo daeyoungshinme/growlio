@@ -254,6 +254,31 @@ class TestGetOverseasRealizedSummary:
             ):
                 await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, MagicMock(), mock_cache)
 
+    @pytest.mark.asyncio
+    async def test_token_read_transaction_released_before_broker_call(self, make_account, mock_cache):
+        """plans/126 B1 — 콜드 토큰 캐시의 DB 조회로 열린 트랜잭션을 조회 HTTP(최대 20초) 전에 끝낸다."""
+        from app.services.tax.overseas_realized_service import _fetch_kis_realized
+
+        acc = _acc(make_account, "KIS")
+        order: list[str] = []
+        db = MagicMock()
+        db.new, db.dirty, db.deleted = [], [], []
+        db.in_transaction = MagicMock(return_value=True)
+        db.commit = AsyncMock(side_effect=lambda: order.append("commit"))
+
+        async def pnl(*args, **kwargs):
+            order.append("http")
+            return {"total_krw": 1.0, "trades": []}
+
+        with (
+            patch("app.services.tax.overseas_realized_service.decrypt_kis_credentials", return_value=("k", "s")),
+            patch("app.services.tax.overseas_realized_service.get_access_token", new=AsyncMock(return_value="t")),
+            patch("app.services.tax.overseas_realized_service.get_overseas_realized_pnl", new=pnl),
+        ):
+            await _fetch_kis_realized(acc, date(2026, 1, 1), TODAY, db, mock_cache)
+
+        assert order == ["commit", "http"]
+
 
 def test_resolve_source():
     covered = [{"account_id": "a", "account_name": "A", "realized_krw": 0.0}]
