@@ -9,7 +9,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import { useDividendPlanSettings } from "@/hooks/useDividendPlanSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -44,7 +44,7 @@ import { useInView } from "@/hooks/useInView";
 const GoalSettingWizard = lazy(() => import("@/components/invest/GoalSettingWizard"));
 import Tabs from "@/components/common/Tabs";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
-import { settingsQuery } from "@/api/queryOptions";
+import { FX_PLAN_DEFAULT_MONTHS, fxPlanQuery, settingsQuery } from "@/api/queryOptions";
 import { INVEST_PLAN_TABS, type InvestPlanTab } from "@/constants/tabs";
 
 // 절세는 자산 › 투자현황 › 세금에서 이동(plans/50 M1) — 목표·배당·절세 "계획"을 한 탭에 모은다
@@ -110,6 +110,13 @@ export default function InvestPlanPage() {
     setFxPlanDismissedKey(location.key);
     if (isFxPlanOpen) setFxPlanOpen(false);
   }, [fxPlanForcedOpen, isFxPlanOpen, location.key, setFxPlanOpen, toggleFxPlanOpen]);
+
+  // 카드 본문은 lazy 청크라 열린 뒤 청크를 받고 나서야 요청이 나간다 — 펼쳐지는 순간 요청을 함께 출발시킨다(plans/127)
+  const queryClient = useQueryClient();
+  const fxPlanVisible = activeTab === "적립 계획" && (isFxPlanOpen || fxPlanForcedOpen);
+  useEffect(() => {
+    if (fxPlanVisible) void queryClient.prefetchQuery(fxPlanQuery(FX_PLAN_DEFAULT_MONTHS, null));
+  }, [fxPlanVisible, queryClient]);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, activeTab, setActiveTab);

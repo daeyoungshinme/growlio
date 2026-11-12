@@ -347,29 +347,7 @@ class TestUsdBuyingPower:
             patch("app.kiwoom.balance.get_overseas_deposit_usd", new=AsyncMock(return_value=123.45)),
         ):
             assert await ubp.fetch_usd_buying_power(uuid.uuid4(), uuid.uuid4(), mock_db, None) == 123.45
-            mock_db.commit.assert_not_awaited()  # 기본값은 호출자 세션을 건드리지 않는다
-
-    @pytest.mark.asyncio
-    async def test_fetch_release_db_commits_before_broker_call(self, mock_db):
-        """짧은 세션용 release_db — 증권사 HTTP 전에 커넥션을 풀에 돌려준다(풀 고갈 방지)."""
-        from app.services.rebalancing import usd_buying_power as ubp
-
-        account = SimpleNamespace(is_mock_mode=False, asset_type="STOCK_KIS", kis_account_no="123")
-
-        async def deposit(*args, **kwargs):
-            mock_db.commit.assert_awaited_once()
-            return 7.0
-
-        with (
-            patch(
-                "app.services.rebalancing.execution_service.load_executable_account",
-                new=AsyncMock(return_value=account),
-            ),
-            patch("app.services.rebalancing.execution_service.load_kis_credentials", return_value=("k", "s")),
-            patch("app.kis.auth.get_access_token", new=AsyncMock(return_value="tok")),
-            patch("app.kis.balance.get_overseas_deposit_usd", new=deposit),
-        ):
-            assert await ubp.fetch_usd_buying_power(uuid.uuid4(), uuid.uuid4(), mock_db, None, release_db=True) == 7.0
+            mock_db.commit.assert_not_awaited()  # 호출자 세션을 건드리지 않는다
 
 
 # ── 실행 경로 ─────────────────────────────────────────────

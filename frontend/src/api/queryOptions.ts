@@ -6,7 +6,7 @@ import { fetchExchangeRateAlerts, fetchRebalancingAlerts } from "@/api/alerts";
 import { fetchPortfolioOverviewLite, fetchPortfolios } from "@/api/portfolios";
 import { fetchSettings } from "@/api/settings";
 import { fetchMarketSignal } from "@/api/marketSignals";
-import { fetchDCAAnalysis, fetchDividendPlan } from "@/api/invest";
+import { fetchDCAAnalysis, fetchDividendPlan, fetchFxPlan } from "@/api/invest";
 import { fetchIsaStatus, fetchTaxSummary } from "@/api/tax";
 import { fetchActionItems, fetchDashboard } from "@/api/dashboard";
 import { fetchChallenges } from "@/api/challenges";
@@ -144,3 +144,14 @@ export const isaStatusQuery = queryOptions({
   queryFn: () => fetchIsaStatus(),
   staleTime: STALE_TIME.MEDIUM,
 });
+
+/** 달러 환전 계획 카드의 기본 기간(개월) — 카드 첫 탭("3개월")과 페이지 프리페치가 같은 키를 쓰게 */
+export const FX_PLAN_DEFAULT_MONTHS = 3;
+
+/** 달러 환전 계획 — 카드와 `InvestPlanPage` 프리페치(lazy 청크 로드와 동시에 출발, plans/127)가 공유 */
+export const fxPlanQuery = (months: number, portfolioId: string | null) =>
+  queryOptions({
+    queryKey: QUERY_KEYS.fxPlan(months, portfolioId),
+    queryFn: () => fetchFxPlan(months, portfolioId),
+    staleTime: STALE_TIME.FIVE_MINUTES,
+  });
