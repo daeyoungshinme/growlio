@@ -14,6 +14,7 @@ import asyncio
 import math
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, timedelta
 from typing import Any, Literal
@@ -566,6 +567,7 @@ class FxPlanAlertSyncResult:
     updated: int
     removed: int
     skipped_manual: int
+    skipped_shared: int = 0
 
 
 def _rate_key(rate: float) -> int:
@@ -604,6 +606,44 @@ def _in_scope(alert: ExchangeRateAlert, portfolio_id: uuid.UUID | None, fx_need_
     return alert.portfolio_id == portfolio_id and alert.fx_need_id is None
 
 
+def _is_shareable_portfolio_alert(alert: ExchangeRateAlert) -> bool:
+    """다른 포트폴리오 적립 계획의 활성·미발동 알림인지 — 같은 목표면 새로 만들지 않고 함께 쓴다.
+
+    추가 환전 항목 알림은 항목 이름이 실려 따로 둔다. 프론트 `utils/fxPlanAlerts.sharedWith`와 같은 규칙.
+    """
+    return alert.fx_need_id is None and alert.is_active and alert.direction == "BELOW" and alert.triggered_at is None
+
+
+def _classify_alerts(
+    alerts: Sequence[ExchangeRateAlert], portfolio_id: uuid.UUID | None, fx_need_id: uuid.UUID | None
+) -> tuple[dict[int, ExchangeRateAlert], list[ExchangeRateAlert], set[int], set[int]]:
+    """맞추기 대상 알림을 나눈다 — (이 범위 미발동 계획 알림[목표 키별 하나], 지울 이 범위 계획 알림,
+    직접 등록한 활성 BELOW 목표, 다른 포트폴리오 계획의 활성·미발동 목표[포트폴리오 범위에서만])."""
+    triggered_cutoff = kst_day_start(today_kst() - timedelta(days=FX_PLAN_ACTION_DAYS - 1))
+    plan_alerts: dict[int, ExchangeRateAlert] = {}
+    stale: list[ExchangeRateAlert] = []
+    manual_keys: set[int] = set()
+    shared_keys: set[int] = set()
+    for alert in alerts:
+        key = _rate_key(alert.target_rate)
+        if alert.source != FX_PLAN_ALERT_SOURCE:
+            manual_keys.add(key)
+        elif not _in_scope(alert, portfolio_id, fx_need_id):
+            # 다른 포트폴리오·추가 환전 항목의 계획 알림은 그 계획이 관리한다
+            if fx_need_id is None and _is_shareable_portfolio_alert(alert):
+                shared_keys.add(key)
+        elif alert.triggered_at is not None:
+            fired = alert.triggered_at
+            if (fired if fired.tzinfo else fired.replace(tzinfo=UTC)) < triggered_cutoff:
+                stale.append(alert)
+        # 같은 목표가 둘이면(동시 등록 경합의 흔적) 하나만 남긴다
+        elif key in plan_alerts:
+            stale.append(alert)
+        else:
+            plan_alerts[key] = alert
+    return plan_alerts, stale, manual_keys, shared_keys
+
+
 async def sync_fx_plan_alerts(
     db: AsyncSession,
     cache: CacheStore,
@@ -621,6 +661,9 @@ async def sync_fx_plan_alerts(
     - 같은 목표가 이미 있으면 금액만 갱신, 새 목표면 BELOW 1회 알림 생성, 목표에서 빠진 계획 알림은 삭제.
     - 같은 목표의 **직접 등록한(MANUAL) 활성 BELOW 알림**이 있으면 만들지 않는다(중복 발송 방지).
       MANUAL 알림은 계획이 지우거나 바꾸지 않는다.
+    - 포트폴리오 적립 계획끼리는 목표 환율이 같으면 알림을 하나만 둔다 — 다른 포트폴리오 계획의 활성·미발동
+      알림이 그 목표에 있으면 만들지 않고, 이 계획에 이미 있던 같은 목표 알림은 지운다(먼저 맞춘 쪽이 남는다).
+      같은 환율에 메일·푸시가 두 번 오지 않게 한다. 추가 환전 항목(`fx_need_id`) 알림은 항목 이름이 실려 따로 둔다.
     - 일시정지한 미발동 계획 알림도 계획 알림이다 — 목표에 있으면 다시 켜고, 없으면 지운다(중복 생성 방지).
     - 발동된 계획 알림은 "지금 할 일"이 보이는 동안(`FX_PLAN_ACTION_DAYS`) 두고, 그보다 오래된 것은 지운다 —
       쌓이면 사용자당 알림 상한(50)에 걸려 맞추기·직접 등록이 모두 409가 된다(plans/122 B5).
@@ -652,33 +695,18 @@ async def sync_fx_plan_alerts(
             .scalars()
             .all()
         )
-        triggered_cutoff = kst_day_start(today_kst() - timedelta(days=FX_PLAN_ACTION_DAYS - 1))
-        plan_alerts: dict[int, ExchangeRateAlert] = {}
-        stale: list[ExchangeRateAlert] = []
-        manual_keys: set[int] = set()
-        for alert in alerts:
-            key = _rate_key(alert.target_rate)
-            if alert.source != FX_PLAN_ALERT_SOURCE:
-                manual_keys.add(key)
-            elif not _in_scope(alert, portfolio_id, fx_need_id):
-                continue  # 다른 포트폴리오·추가 환전 항목의 계획 알림은 그 계획이 관리한다
-            elif alert.triggered_at is not None:
-                fired = alert.triggered_at
-                if (fired if fired.tzinfo else fired.replace(tzinfo=UTC)) < triggered_cutoff:
-                    stale.append(alert)
-            # 같은 목표가 둘이면(동시 등록 경합의 흔적) 하나만 남긴다
-            elif key in plan_alerts:
-                stale.append(alert)
-            else:
-                plan_alerts[key] = alert
+        plan_alerts, stale, manual_keys, shared_keys = _classify_alerts(alerts, portfolio_id, fx_need_id)
 
         wanted = {_rate_key(rate): (rate, usd) for rate, usd in targets}
-        stale.extend(alert for key, alert in plan_alerts.items() if key not in wanted)
+        # 다른 포트폴리오 계획과 겹친 목표의 이 계획 알림도 지운다 — 같은 환율 알림을 하나로
+        stale.extend(alert for key, alert in plan_alerts.items() if key not in wanted or key in shared_keys)
 
         to_create: list[tuple[float, float]] = []
-        updated = skipped = 0
+        updated = skipped = shared = 0
         for key, (rate, usd) in wanted.items():
-            if key in plan_alerts:
+            if key in shared_keys:
+                shared += 1
+            elif key in plan_alerts:
                 plan_alerts[key].planned_usd = round(usd, 2)
                 plan_alerts[key].is_active = True
                 updated += 1
@@ -723,5 +751,6 @@ async def sync_fx_plan_alerts(
         updated=updated,
         removed=len(stale),
         skipped_manual=skipped,
+        skipped_shared=shared,
     )
-    return FxPlanAlertSyncResult(len(to_create), updated, len(stale), skipped)
+    return FxPlanAlertSyncResult(len(to_create), updated, len(stale), skipped, shared)

@@ -681,6 +681,7 @@ def _alert(rate, *, source="FX_PLAN", portfolio_id=None, fx_need_id=None, trigge
         triggered_at=triggered or None,
         planned_usd=usd,
         is_active=is_active,
+        direction="BELOW",
     )
 
 
@@ -743,6 +744,70 @@ async def test_sync_leaves_other_portfolio_and_triggered_plan_alerts():
 
     assert result.removed == 0
     db.delete.assert_not_awaited()
+
+
+async def test_sync_shares_same_target_with_other_portfolio_plan():
+    """다른 포트폴리오 계획이 같은 목표 알림을 이미 가지면 만들지 않는다 — 같은 환율 알림·발송은 하나."""
+    pid = uuid.uuid4()
+    other = _alert(1300.0, portfolio_id=uuid.uuid4())
+    db = _sync_db([other])
+
+    result = await _sync(db, pid, [(1300.0, 100.0), (1280.0, 50.0)])
+
+    assert (result.created, result.skipped_shared, result.removed) == (1, 1, 0)
+    created = db.add.call_args.args[0]
+    assert float(created.target_rate) == 1280.0
+    db.delete.assert_not_awaited()
+
+
+async def test_sync_removes_own_duplicate_of_other_portfolio_target():
+    """이미 두 포트폴리오가 같은 목표 알림을 가졌으면, 맞추는 쪽이 자기 알림을 지워 하나로 줄인다."""
+    pid = uuid.uuid4()
+    other = _alert(1300.0, portfolio_id=uuid.uuid4())
+    own = _alert(1300.0, portfolio_id=pid)
+    db = _sync_db([other, own])
+
+    result = await _sync(db, pid, [(1300.0, 100.0)])
+
+    assert (result.created, result.updated, result.skipped_shared, result.removed) == (0, 0, 1, 1)
+    db.delete.assert_awaited_once_with(own)
+    db.add.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        pytest.param({"triggered": True}, id="triggered"),
+        pytest.param({"is_active": False}, id="paused"),
+        pytest.param({"fx_need_id": "need"}, id="fx-need"),
+    ],
+)
+async def test_sync_does_not_share_with_inactive_or_need_alerts(other):
+    """발동·일시정지된 다른 계획 알림이나 추가 환전 항목 알림은 같은 목표여도 함께 쓰지 않는다."""
+    pid = uuid.uuid4()
+    kwargs = {**other}
+    if kwargs.get("fx_need_id") == "need":
+        kwargs["fx_need_id"] = uuid.uuid4()
+    db = _sync_db([_alert(1300.0, portfolio_id=None if "fx_need_id" in kwargs else uuid.uuid4(), **kwargs)])
+
+    result = await _sync(db, pid, [(1300.0, 100.0)])
+
+    assert (result.created, result.skipped_shared) == (1, 0)
+
+
+async def test_need_sync_ignores_portfolio_plan_with_same_target():
+    """추가 환전 항목 알림은 적립 계획 알림과 목표가 같아도 따로 만든다(항목 이름이 실린다)."""
+    from datetime import date
+
+    from app.core.cache_store import CacheStore
+
+    need_id = uuid.uuid4()
+    db = _sync_db([_alert(1300.0, portfolio_id=uuid.uuid4())])
+    db.scalar = AsyncMock(side_effect=[date(2999, 1, 1), 1])
+
+    result = await svc.sync_fx_plan_alerts(db, CacheStore(), uuid.uuid4(), None, [(1300.0, 100.0)], fx_need_id=need_id)
+
+    assert (result.created, result.skipped_shared) == (1, 0)
 
 
 async def test_sync_removes_old_triggered_plan_alerts_only():
@@ -820,7 +885,7 @@ def test_api_sync_alerts_returns_counts(api):
             json={"portfolio_id": str(uuid.uuid4()), "targets": [{"target_rate": 1320, "usd": 100.5}]},
         )
     assert res.status_code == 200
-    assert res.json() == {"created": 2, "updated": 0, "removed": 1, "skipped_manual": 0}
+    assert res.json() == {"created": 2, "updated": 0, "removed": 1, "skipped_manual": 0, "skipped_shared": 0}
     assert mocked.await_args.args[4] == [(1320.0, 100.5)]
 
 

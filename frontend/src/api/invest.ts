@@ -183,6 +183,8 @@ export interface FxPlanAlertSyncResult {
   removed: number;
   /** 같은 목표의 직접 등록한 알림이 있어 만들지 않은 구간 수 */
   skipped_manual: number;
+  /** 다른 포트폴리오 계획이 같은 목표 알림을 이미 가져 만들지 않은 구간 수 — 같은 환율 알림은 하나만 둔다 */
+  skipped_shared: number;
 }
 
 /** 계획 구간 목표로 환율 알림을 맞춘다 — 새 목표는 만들고 빠진 미발동 계획 알림은 지운다(plans/121). */
