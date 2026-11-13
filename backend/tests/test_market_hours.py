@@ -242,3 +242,28 @@ class TestIrregularSessions:
         assert is_korean_market_open(datetime(2026, 1, 2, 10, 30, tzinfo=_KST)) is True
         assert is_korean_market_open(datetime(2026, 1, 2, 15, 40, tzinfo=_KST)) is False
         assert is_korean_market_open(datetime(2026, 1, 5, 9, 30, tzinfo=_KST)) is True
+
+
+class TestLastCompletedUsSession:
+    """plans/128 C1 — 일봉 지표는 정규장이 끝난 거래일의 종가만 쓴다."""
+
+    def test_during_session_is_previous_trading_day(self):
+        from app.utils.market_hours import last_completed_us_session
+
+        # 화요일 장중 → 월요일, 월요일 개장 전 → 지난 금요일
+        assert last_completed_us_session(datetime(2026, 11, 10, 14, 0, tzinfo=_EST)) == datetime(2026, 11, 9).date()
+        assert last_completed_us_session(datetime(2026, 11, 9, 8, 0, tzinfo=_EST)) == datetime(2026, 11, 6).date()
+
+    def test_after_close_is_today(self):
+        from app.utils.market_hours import last_completed_us_session
+
+        assert last_completed_us_session(datetime(2026, 11, 10, 16, 0, tzinfo=_EST)) == datetime(2026, 11, 10).date()
+        # 07:40 KST 수요일 = 화요일 17:40 ET — 국면 잡은 화요일 종가를 본다
+        assert last_completed_us_session(datetime(2026, 11, 11, 7, 40, tzinfo=_KST)) == datetime(2026, 11, 10).date()
+
+    def test_holiday_and_early_close(self):
+        from app.utils.market_hours import last_completed_us_session
+
+        # 추수감사절(휴장) 낮 → 수요일, 조기 폐장일 13:30 → 그날
+        assert last_completed_us_session(datetime(2026, 11, 26, 12, 0, tzinfo=_EST)) == datetime(2026, 11, 25).date()
+        assert last_completed_us_session(datetime(2026, 11, 27, 13, 30, tzinfo=_EST)) == datetime(2026, 11, 27).date()

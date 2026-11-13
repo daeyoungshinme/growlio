@@ -118,6 +118,20 @@ def us_market_close_datetime(now: datetime | None = None) -> datetime:
     return t.replace(hour=close_at.hour, minute=close_at.minute, second=0, microsecond=0)
 
 
+def last_completed_us_session(now: datetime | None = None) -> date:
+    """정규장이 끝난 가장 최근 NYSE 거래일(ET 날짜) — 일봉 종가가 확정된 마지막 날.
+
+    장중·개장 전이면 직전 거래일이다. 그날 일봉은 종가가 아니라 현재가라 일봉 지표에 쓰면 안 된다(plans/128 C1).
+    """
+    t = (now or datetime.now(_EST)).astimezone(_EST)
+    d = t.date()
+    if not (is_nyse_trading_day(d) and t.time() >= nyse_close_time(d)):
+        d -= timedelta(days=1)
+        while not is_nyse_trading_day(d):
+            d -= timedelta(days=1)
+    return d
+
+
 def next_us_market_open(now: datetime | None = None) -> datetime:
     """다음 NYSE 정규장 개장 시각(09:30 ET, 거래일) — 지금 장중이면 오늘 개장 시각이 아니라 다음 거래일 개장."""
     t = (now or datetime.now(_EST)).astimezone(_EST)
