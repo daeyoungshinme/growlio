@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders as renderBase } from "@/test/renderWithProviders";
@@ -41,6 +42,7 @@ import { fetchAccounts, syncAccount, type AssetAccount } from "@/api/assets";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import FxPlanCard from "@/components/invest/FxPlanCard";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 
 const position: NonNullable<FxPlanData["position"]> = {
   rate: 1400,
@@ -146,6 +148,68 @@ describe("FxPlanCard", () => {
     await waitFor(() => expect(invalidateSyncData).toHaveBeenCalled());
     expect(syncAccount).toHaveBeenCalledTimes(1);
     expect(vi.mocked(syncAccount).mock.calls[0]?.[0]).toBe("kis");
+  });
+
+  it("새로 받기가 일부만 실패하면 몇 개가 실패했는지, 전부 실패하면 다시 시도를 안내한다 — plans/128 A2", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "kis", asset_type: "STOCK_KIS", data_source: "KIS_API" },
+      { id: "kiwoom", asset_type: "STOCK_KIWOOM", data_source: "KIWOOM_API" },
+    ] as unknown as AssetAccount[]);
+    vi.mocked(syncAccount)
+      .mockResolvedValueOnce({} as never)
+      .mockRejectedValueOnce(new Error("x"));
+    renderWithProviders(<FxPlanCard />);
+    const button = await screen.findByRole("button", { name: "달러 예수금 새로 받기" });
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        "계좌 2개 중 1개의 달러 예수금을 받지 못했습니다",
+        "error",
+      ),
+    );
+
+    vi.mocked(syncAccount).mockRejectedValue(new Error("x"));
+    fireEvent.click(await screen.findByRole("button", { name: "달러 예수금 새로 받기" }));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        "달러 예수금을 받지 못했습니다. 잠시 후 다시 시도해 주세요",
+        "error",
+      ),
+    );
+  });
+
+  it("재조회가 실패해도 받아 둔 계획을 계속 보여 준다 — plans/128 A3", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(fetchFxPlan).mockResolvedValueOnce(plan).mockRejectedValue(new Error("503"));
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <FxPlanCard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await screen.findByText(/\$1,700 필요/);
+    await qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase });
+    await waitFor(() => expect(vi.mocked(fetchFxPlan).mock.calls.length).toBeGreaterThan(1));
+    expect(screen.getByText(/\$1,700 필요/)).toBeInTheDocument();
+    expect(screen.queryByText(/환전 계획을 불러오지 못했습니다/)).toBeNull();
+  });
+
+  it("계획이 다시 받아지면 다른 기간도 다시 받아 둔다 — plans/128 A4", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(fetchFxPlan).mockResolvedValue(plan);
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <FxPlanCard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledTimes(3));
+    await qc.invalidateQueries({ queryKey: QUERY_KEYS.fxPlanBase });
+    // 화면의 3개월 + 무효화돼 stale이 된 1·6개월
+    await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledTimes(6));
   });
 
   it("동기화할 증권 계좌가 없으면 새로 받기 버튼을 숨긴다", async () => {

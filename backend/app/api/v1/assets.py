@@ -13,7 +13,7 @@ from app.core.cache_store import get_cache_store
 from app.exceptions import BadRequestError
 from app.kis.auth import promote_user_token_to_account
 from app.kiwoom.client import KiwoomTokenIssueError
-from app.limiter import limiter
+from app.limiter import account_rate_limit_key, limiter
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount, Transaction
 from app.models.fx_extra_need import FxExtraNeed
@@ -404,7 +404,8 @@ async def delete_account(
 
 
 @router.post("/{account_id}/sync")
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=account_rate_limit_key)
+@limiter.limit("30/minute")
 async def sync_account(
     request: Request,
     account_id: UUID,

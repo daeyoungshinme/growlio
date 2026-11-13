@@ -220,7 +220,7 @@ export default function FxExtraNeedsSection() {
 
       {isLoading ? (
         <SkeletonCard rows={2} />
-      ) : isError ? (
+      ) : isError && !data ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           추가 환전 항목을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
         </p>

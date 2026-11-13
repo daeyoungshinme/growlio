@@ -33,7 +33,7 @@ from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.accounts.snapshot_service import sync_snapshot_positions, upsert_snapshot
 from app.services.market_data.yahoo_price import fetch_yahoo_batch
 from app.utils.cache_invalidation import invalidate_asset_account_caches
-from app.utils.cache_keys import CacheStoreType
+from app.utils.cache_keys import CacheStoreType, has_overseas_key
 from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit, toss_circuit
 from app.utils.kst import today_kst
 from app.utils.metrics import broker_sync_duration
@@ -270,7 +270,13 @@ async def sync_account_now(account: AssetAccount, cache: CacheStoreType) -> dict
     요청 스코프 세션이 아닌 별도의 짧게 스코프된 세션을 사용한다 — 브로커 HTTP 호출(재시도 포함)
     동안 요청의 DB 커넥션 풀 슬롯을 오래 붙잡지 않기 위함 (jobs/asset_sync.py와 동일 패턴).
     SyncError/CircuitOpenError는 main.py 전역 핸들러가 처리한다.
+
+    사용자가 직접 누른 동기화라 "해외 없음" 표식(15분)을 지우고 증권사를 다시 부른다 — 달러 0인 계좌는 환전 직후
+    동기화해도 표식 때문에 조회를 건너뛰어 0달러가 "방금 동기화"로 저장됐다(plans/128 A1). 정기 잡·전체 갱신은
+    표식을 그대로 써 국내 전용 계좌의 해외 조회를 아낀다.
     """
+    if cache is not None:
+        await cache.delete(has_overseas_key(account.id))
     async with AsyncSessionLocal() as db:
         merged_account = await db.merge(account)
         sync_result = await sync_account(merged_account, db, cache)

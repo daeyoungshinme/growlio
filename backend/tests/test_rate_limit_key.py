@@ -7,7 +7,7 @@ import json
 
 from starlette.requests import Request
 
-from app.limiter import ip_rate_limit_key, peer_rate_limit_key, rate_limit_key
+from app.limiter import account_rate_limit_key, ip_rate_limit_key, peer_rate_limit_key, rate_limit_key
 
 
 def _request(headers: dict[str, str], client_host: str = "10.0.0.1") -> Request:
@@ -124,3 +124,18 @@ def test_forged_forwarded_for_cannot_bypass_peer_cap():
     # 첫 hop을 매번 바꿔 ip 한도(20/minute)는 피하지만 peer 상한(200/minute)에 걸린다
     assert statuses[:200] == [200] * 200
     assert statuses[200] == 429
+
+
+def test_account_key_separates_accounts_of_same_user():
+    # plans/128 A2 — 계좌 여러 개를 한 번에 동기화해도 계좌마다 따로 센다
+    auth = {"Authorization": f"Bearer {_jwt({'sub': 'user-a'})}"}
+    a, b = _request(auth), _request(auth)
+    a.scope["path_params"] = {"account_id": "acc-1"}
+    b.scope["path_params"] = {"account_id": "acc-2"}
+    assert account_rate_limit_key(a) == "user:user-a:account:acc-1"
+    assert account_rate_limit_key(a) != account_rate_limit_key(b)
+
+
+def test_account_sync_stacks_per_account_limit_and_user_cap():
+    limits = {str(lim.limit): lim.key_func for lim in _route_limits()["sync_account"]}
+    assert limits == {"5 per 1 minute": account_rate_limit_key, "30 per 1 minute": rate_limit_key}

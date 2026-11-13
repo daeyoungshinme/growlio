@@ -578,7 +578,7 @@ class TestSyncAccountNow:
 
         from app.services.accounts.asset_service import SyncAccountResult
 
-        cache = MagicMock()
+        cache = AsyncMock()
         fake_result = SyncAccountResult(snapshot=fake_snapshot, positions_changed=False)
         with (
             patch("app.services.accounts.asset_service.AsyncSessionLocal", return_value=mock_db),
@@ -590,6 +590,10 @@ class TestSyncAccountNow:
 
         mock_db.merge.assert_awaited_once_with(account)
         mock_sync.assert_awaited_once_with(account, mock_db, cache)
+        # plans/128 A1 — 사용자가 누른 동기화는 "해외 없음" 표식을 지워 달러 예수금을 다시 조회한다
+        from app.utils.cache_keys import has_overseas_key
+
+        cache.delete.assert_awaited_once_with(has_overseas_key(account.id))
         assert result == {
             "detail": "동기화 완료",
             "snapshot_date": "2026-09-12",
