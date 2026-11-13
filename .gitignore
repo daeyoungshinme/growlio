@@ -44,3 +44,6 @@ frontend/tsc_output.txt
 
 # ── Firebase 설정 (로컬 FCM 빌드 전용) ─────────────
 google-services.json
+
+# ── Claude Code 로컬 설정 ─────────────────────────
+.claude/settings.local.json

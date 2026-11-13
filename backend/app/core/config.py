@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     # Render는 SENTRY_RELEASE를 채우지 않으므로 Render가 자동 주입하는 RENDER_GIT_COMMIT으로 폴백한다(plans/95 D)
     sentry_release: str = Field(default="", validation_alias=AliasChoices("SENTRY_RELEASE", "RENDER_GIT_COMMIT"))
 
-    # Prometheus /metrics 엔드포인트 보호 토큰 (비어 있으면 인증 없음)
+    # Prometheus /metrics 엔드포인트 보호 토큰 (비어 있으면 개발 환경만 인증 없음 — 운영은 403)
     metrics_token: str = Field("", repr=False)
 
     # FCM 푸시 알림 — 서비스 계정 JSON 전체 문자열 (비어 있으면 푸시 비활성화)

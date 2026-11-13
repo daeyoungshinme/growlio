@@ -146,45 +146,6 @@ class TestSyncUsdkrw:
         assert result == 0.0
 
 
-# ── _sync_yahoo_price (yfinance mocked) ──────────────────────
-
-
-class TestSyncYahooPrice:
-    def test_returns_price_from_history(self, override_settings):
-        from app.services.market_data.yahoo_price import _sync_yahoo_price
-
-        hist_df = pd.DataFrame({"Close": [185.0, 187.0]})
-        mock_ticker = MagicMock()
-        mock_ticker.history.return_value = hist_df
-
-        with patch("yfinance.Ticker", return_value=mock_ticker):
-            result = _sync_yahoo_price("AAPL", "NASDAQ")
-
-        assert result == 187.0
-
-    def test_returns_none_on_empty(self, override_settings):
-        from app.services.market_data.yahoo_price import _sync_yahoo_price
-
-        mock_ticker = MagicMock()
-        mock_ticker.history.return_value = pd.DataFrame()
-
-        with patch("yfinance.Ticker", return_value=mock_ticker):
-            result = _sync_yahoo_price("INVALID", "NASDAQ")
-
-        assert result is None
-
-    def test_returns_none_on_exception(self, override_settings):
-        from app.services.market_data.yahoo_price import _sync_yahoo_price
-
-        mock_ticker = MagicMock()
-        mock_ticker.history.side_effect = Exception("timeout")
-
-        with patch("yfinance.Ticker", return_value=mock_ticker):
-            result = _sync_yahoo_price("AAPL", "NASDAQ")
-
-        assert result is None
-
-
 # ── _sync_yahoo_batch (yfinance mocked) ──────────────────────
 
 
@@ -421,13 +382,12 @@ class TestGuardedEntrypoints:
 
         with (
             patch.object(yahoo_price.yahoo_circuit, "is_available", return_value=False),
-            patch.object(yahoo_price, "_sync_yahoo_price") as sync_price,
+            patch.object(yahoo_price, "_sync_yahoo_batch") as sync_batch,
             patch.object(yahoo_price, "_sync_usdkrw") as sync_fx,
         ):
-            assert await yahoo_price.fetch_yahoo_price("AAPL", "NASDAQ") is None
             assert await yahoo_price.fetch_usdkrw() == 0.0
             assert await yahoo_price.fetch_yahoo_batch([("AAPL", "NASDAQ")]) == {}
-        sync_price.assert_not_called()
+        sync_batch.assert_not_called()
         sync_fx.assert_not_called()
 
     @pytest.mark.asyncio

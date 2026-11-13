@@ -5,7 +5,7 @@
       "destination": "https://growlio-w5wc.onrender.com/api/:path*"
     },
     {
-      "source": "/((?!api|assets|icons|sw\\.js|workbox.*\\.js|manifest\\.webmanifest).*)",
+      "source": "/((?!api|assets/|icons/|sw\\.js|workbox.*\\.js|manifest\\.webmanifest).*)",
       "destination": "/index.html"
     }
   ],

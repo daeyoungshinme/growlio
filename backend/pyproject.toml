@@ -94,6 +94,8 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# app/ 안의 `*_test.py`(예: rebalancing/alert_test.py)가 테스트 모듈로 수집되지 않게
+testpaths = ["tests"]
 addopts = "--tb=short"
 # 커버리지는 CI(.github/workflows/ci.yml)와 `make test-backend-cov`에서만 측정 —
 # 모든 로컬 pytest 실행(-k·--collect-only·단일 파일)에 강제되던 마찰 제거.
