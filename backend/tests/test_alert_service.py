@@ -638,3 +638,38 @@ async def test_notify_and_record_trigger_skips_when_both_channels_fail(mock_db):
     assert recorded is False
     assert alert.trigger_count == 0
     mock_db.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_exchange_rate_trigger_invalidates_alert_list_cache(mock_db, mock_cache):
+    """plans/128 C4 — 발동(triggered_at·비활성)이 목록 캐시(5분)에 안 보이면 환전 계획 카드가 등록된 것으로 센다."""
+    from app.utils.cache_keys import exchange_rate_alerts_key
+
+    user_id = uuid.uuid4()
+    alert = SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        target_rate=1300.0,
+        direction="BELOW",
+        is_active=True,
+        max_trigger_count=1,
+        trigger_count=0,
+        triggered_at=None,
+        source="MANUAL",
+        planned_usd=None,
+    )
+    execute_result = MagicMock()
+    execute_result.all.return_value = [(alert, "user@example.com", None, None, None)]
+    mock_db.execute = AsyncMock(return_value=execute_result)
+    await mock_cache.setex(exchange_rate_alerts_key(user_id), 300, "[]")
+
+    with (
+        patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=1290.0)),
+        patch("app.services.notifications.email_service.send_exchange_rate_alert", AsyncMock()),
+    ):
+        from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
+
+        await check_and_trigger_alerts(mock_db, mock_cache)
+
+    assert alert.trigger_count == 1
+    assert await mock_cache.get(exchange_rate_alerts_key(user_id)) is None

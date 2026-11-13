@@ -18,7 +18,11 @@ from app.schemas.portfolio import (
 )
 from app.services.etf.index_exposure_service import get_index_group_suggestions
 from app.services.portfolio import portfolio_crud_service as crud
-from app.utils.cache_invalidation import invalidate_rebalancing_analysis_cache, invalidate_user_caches
+from app.utils.cache_invalidation import (
+    invalidate_exchange_rate_alert_caches,
+    invalidate_rebalancing_analysis_cache,
+    invalidate_user_caches,
+)
 from app.utils.cache_keys import TTL_PORTFOLIO_LIST, get_cached_json, insights_key, portfolio_list_key, set_cached_json
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
@@ -107,6 +111,9 @@ async def delete_portfolio(
     cache = await get_cache_store()
     await invalidate_user_caches(cache, portfolio_list_key(current_user.id), insights_key(current_user.id))
     await invalidate_rebalancing_analysis_cache(cache, current_user.id, portfolio_id)
+    # 삭제가 그 포트폴리오의 환전 계획 알림도 지운다 — 목록 캐시(5분)에 남으면 다른 포트폴리오 카드가 없는 알림을
+    # "다른 포트폴리오 계획 알림으로 받음"으로 본다(plans/128 C4)
+    await invalidate_exchange_rate_alert_caches(cache, current_user.id)
 
 
 @router.patch("/reorder", status_code=status.HTTP_204_NO_CONTENT)

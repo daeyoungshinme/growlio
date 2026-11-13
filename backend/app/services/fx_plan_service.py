@@ -328,18 +328,38 @@ def _held_synced_at(held: list[HeldUsdAccount]) -> datetime | None:
     return min(times) if times else None
 
 
-async def _waiting_fx_required_usd(db: AsyncSession, user_id: uuid.UUID, portfolio: Portfolio) -> float:
-    """이 포트폴리오에서 환전을 기다리는(WAITING_FX, plans/120) 적립 해외 매수 leg들의 필요 달러 합."""
-    total = await db.scalar(
-        select(func.coalesce(func.sum(RebalancingPlanLeg.required_usd), 0))
-        .join(RebalancingPlan, RebalancingPlan.id == RebalancingPlanLeg.plan_id)
-        .where(
-            RebalancingPlan.user_id == user_id,
-            RebalancingPlan.portfolio_id == portfolio.id,
-            RebalancingPlanLeg.status == "WAITING_FX",
+async def _waiting_fx_required_usd(
+    db: AsyncSession, user_id: uuid.UUID, portfolio: Portfolio
+) -> list[tuple[uuid.UUID | None, float]]:
+    """이 포트폴리오에서 환전을 기다리는(WAITING_FX, plans/120) 적립 해외 매수 leg들의 실행 계좌별 필요 달러."""
+    rows = (
+        await db.execute(
+            select(RebalancingPlan.account_id, func.coalesce(func.sum(RebalancingPlanLeg.required_usd), 0))
+            .join(RebalancingPlan, RebalancingPlan.id == RebalancingPlanLeg.plan_id)
+            .where(
+                RebalancingPlan.user_id == user_id,
+                RebalancingPlan.portfolio_id == portfolio.id,
+                RebalancingPlanLeg.status == "WAITING_FX",
+            )
+            .group_by(RebalancingPlan.account_id)
         )
+    ).all()
+    return [(account_id, float(usd or 0)) for account_id, usd in rows]
+
+
+def _waiting_fx_shortfall(waiting: list[tuple[uuid.UUID | None, float]], held: list[HeldUsdAccount]) -> float:
+    """환전 대기 매수를 진행하려면 지금 더 필요한 달러 — leg의 **실행 계좌** 달러로만 상쇄한다.
+
+    재매수 판정(`usd_buying_power`)은 그 계좌의 달러만 본다. 다른 계좌(다른 증권사·수기 계좌)에 달러가 있어도
+    그 leg는 진행되지 않으므로, 합쳐서 상쇄하면 "지금" 구간이 사라진 채 leg가 만료된다(plans/128 C2).
+    계좌를 모르는 옛 플랜(account_id 없음)만 주문 실행 계좌 달러 합으로 상쇄한다.
+    """
+    executable = {h.account.id: h.usd for h in held if h.account.asset_type in ORDER_EXECUTABLE_ASSET_TYPES}
+    total_executable = sum(executable.values())
+    return sum(
+        max(0.0, need - (executable.get(account_id, 0.0) if account_id is not None else total_executable))
+        for account_id, need in waiting
     )
-    return float(total or 0)
 
 
 @dataclass(frozen=True)
@@ -471,10 +491,8 @@ async def _build_fx_plan(
 
     # 추가 환전 항목이 둔 달러는 이미 뺀 값이다(`_held_usd`) — WAITING_FX 상쇄도 여행 달러를 쓰지 않는다
     held_usd = sum(h.usd for h in held)
-    # 대기 중인 매수는 보유 달러로 먼저 채운다 — 남는 부족분만 "지금" 환전해야 매수가 다시 진행된다.
-    # 수기 계좌(메리츠 등)의 달러는 KIS·키움 주문에 쓸 수 없으니 실행 계좌 달러로만 상쇄한다
-    executable_usd = sum(h.usd for h in held if h.account.asset_type in ORDER_EXECUTABLE_ASSET_TYPES)
-    waiting_fx_usd = max(0.0, waiting_required - executable_usd)
+    # 대기 중인 매수는 그 실행 계좌의 달러로 먼저 채운다 — 남는 부족분만 "지금" 환전해야 매수가 다시 진행된다
+    waiting_fx_usd = _waiting_fx_shortfall(waiting_required, held)
     need_usd = max(0.0, monthly_need_usd * months - held_usd, waiting_fx_usd)
     result.update(
         deposit_source="DCA_AMOUNT" if fixed else "MONTHLY_GOAL",

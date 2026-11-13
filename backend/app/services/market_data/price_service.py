@@ -39,7 +39,7 @@ from app.utils.cache_keys import (
     price_return_key,
 )
 from app.utils.circuit_breaker import CircuitOpenError, kis_circuit, naver_circuit
-from app.utils.currency import get_usd_krw_rate
+from app.utils.currency import get_live_or_cached_usd_krw, get_usd_krw_rate
 
 logger = structlog.get_logger()
 
@@ -154,8 +154,13 @@ async def fetch_prices_batch_krw(
     db: AsyncSession,
     cache: CacheStoreType = None,
     kis_accounts: Mapping[str, AssetAccount] | None = None,
+    *,
+    require_live_rate: bool = False,
 ) -> dict[str, float]:
     """`fetch_prices_batch()`의 원시 가격(해외는 USD)을 KRW로 환산해 반환한다. `kis_accounts`는 그대로 전달.
+
+    `require_live_rate=True`면 실환율(실시간·캐시)이 없을 때 해외 종목을 결과에서 뺀다 — 고정 fallback(1300)으로
+    환산한 값으로 알림을 판정하면 BELOW가 거짓 발동한다(plans/128 C3). 평가액 환산 호출부는 기본값(fallback 허용).
 
     해외 종목은 Yahoo Finance가 원종목 통화(USD) 그대로 응답하므로, `positions.py` 동기화
     로직과 동일하게 환율을 곱해야 KRW 전용 필드(`current_price_krw` 등)에 안전하게 대입할 수
@@ -168,11 +173,17 @@ async def fetch_prices_batch_krw(
     if not has_overseas:
         return price_map
 
-    usd_rate = await get_usd_krw_rate(cache)
-    return {
-        ticker: (price * usd_rate if market_by_ticker.get(ticker, "").upper() not in DOMESTIC_MARKETS else price)
-        for ticker, price in price_map.items()
-    }
+    def is_overseas(ticker: str) -> bool:
+        return market_by_ticker.get(ticker, "").upper() not in DOMESTIC_MARKETS
+
+    if require_live_rate:
+        usd_rate, is_live = await get_live_or_cached_usd_krw(cache)
+        if not is_live:
+            logger.warning("overseas_prices_skipped_no_live_rate", tickers=len(price_map))
+            return {ticker: price for ticker, price in price_map.items() if not is_overseas(ticker)}
+    else:
+        usd_rate = await get_usd_krw_rate(cache)
+    return {ticker: (price * usd_rate if is_overseas(ticker) else price) for ticker, price in price_map.items()}
 
 
 async def get_historical_returns(
