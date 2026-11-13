@@ -133,6 +133,23 @@ describe("invalidatePortfolioData", () => {
   });
 });
 
+describe("invalidatePortfolioData — 삭제 (plans/128 C5)", () => {
+  it("삭제면 환율 알림 목록·대기 플랜도 다시 받는다", async () => {
+    const qc = makeQueryClient();
+    await invalidatePortfolioData(qc as any, { deleted: true });
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toContain(QUERY_KEYS.exchangeRateAlerts[0]);
+    expect(keys).toContain(QUERY_KEYS.rebalancingPlans[0]);
+  });
+
+  it("삭제가 아니면 환율 알림 목록은 건드리지 않는다", async () => {
+    const qc = makeQueryClient();
+    await invalidatePortfolioData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).not.toContain(QUERY_KEYS.exchangeRateAlerts[0]);
+  });
+});
+
 describe("invalidateDcaData", () => {
   it("dca-analysis, settings, dashboard 무효화", async () => {
     const qc = makeQueryClient();

@@ -122,8 +122,9 @@ export function invalidateAccountListData(qc: QueryClient) {
   return invalidateKeys(qc, [QUERY_KEYS.accounts]);
 }
 
-/** 계좌 브로커 API 키 삭제(연동 해제) 후 — 계좌 데이터 + 리밸런싱 알림/대기 플랜
- * (자동 매매 가능 여부가 바뀌므로 리밸런싱 화면이 해제된 계좌를 거래가능으로 계속 표시하지 않게) */
+/** 계좌 브로커 API 키 삭제(연동 해제)·계좌 삭제 후 — 계좌 데이터 + 리밸런싱 알림/대기 플랜
+ * (자동 매매 가능 여부가 바뀌므로 리밸런싱 화면이 해제된 계좌를 거래가능으로 계속 표시하지 않게.
+ * 계좌 삭제도 서버가 그 계좌의 자동 실행 알림을 끄고 대기 매수를 취소한다, plans/128 C5) */
 export function invalidateBrokerCredentialData(qc: QueryClient) {
   return Promise.all([
     invalidateAccountData(qc),
@@ -196,9 +197,19 @@ export function invalidateSettingsData(qc: QueryClient) {
   return invalidateKeys(qc, [QUERY_KEYS.settings]);
 }
 
-/** 포트폴리오/백테스트/리밸런싱 CUD 후 */
-export function invalidatePortfolioData(qc: QueryClient) {
+/**
+ * 포트폴리오/백테스트/리밸런싱 CUD 후. 삭제(`deleted`)는 서버가 그 포트폴리오의 환전 계획 알림을 지우고 대기 매수를
+ * 취소한다 — 환율 알림 목록이 남으면 다른 포트폴리오의 환전 계획 카드가 없는 알림을 "함께 사용"으로 보고 등록 버튼을
+ * 잠근다(plans/128 C5)
+ */
+export function invalidatePortfolioData(qc: QueryClient, opts: { deleted?: boolean } = {}) {
   return Promise.all([
+    ...(opts.deleted
+      ? [
+          invalidateKeys(qc, [QUERY_KEYS.exchangeRateAlerts]),
+          invalidateKeys(qc, [QUERY_KEYS.rebalancingPlans]),
+        ]
+      : []),
     invalidateKeys(qc, [QUERY_KEYS.portfolios]),
     invalidateKeys(qc, [QUERY_KEYS.accounts]),
     invalidateKeys(qc, [QUERY_KEYS.driftSummary]),
