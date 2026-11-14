@@ -31,6 +31,11 @@ KRW_OVERSEAS_ORDER_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIWOOM"})
 """해외 매수를 원화 예수금으로 결제(자동 환전)하는 서비스를 표시할 수 있는 계좌 — 키움 "원화주문"."""
 
 
+KRW_ORDER_FX_MARGIN = 1.03
+"""원화주문 계좌의 원화를 달러 매수여력으로 볼 때 환율에 얹는 여유(3%) — 증권사 가환율·결제일 환율 변동 대비.
+실행 직전 판정(`usd_buying_power`)과 사전 부족 알림(`dca_cash_shortfall_service`)이 같은 값을 쓴다."""
+
+
 def uses_krw_overseas_order(account: object) -> bool:
     """해외 매수가 원화로 결제되는 계좌인지 — 키움 계좌 + 사용자가 원화주문 신청을 표시(`krw_overseas_order`)."""
     return getattr(account, "asset_type", None) in KRW_OVERSEAS_ORDER_ASSET_TYPES and bool(

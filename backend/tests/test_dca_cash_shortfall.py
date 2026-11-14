@@ -209,3 +209,53 @@ async def test_fixed_amount_ignores_user_monthly_total():
     rows = [(_fixed_alert(), _weighted_portfolio(), account, _user(), _settings(monthly=50_000_000.0))]
     dispatch = await _run(rows, date(2026, 11, 23))
     dispatch.assert_not_awaited()
+
+
+# ── 키움 원화주문 계좌(plans/129 A1) — 달러 부족분은 원화로 결제 ──────
+
+
+def _krw_order_account(deposit_krw, deposit_usd=0.0):
+    account = _account(deposit_krw=deposit_krw, deposit_usd=deposit_usd)
+    account.tax_type = "GENERAL"
+    account.asset_type = "STOCK_KIWOOM"
+    account.krw_overseas_order = True
+    return account
+
+
+@pytest.mark.asyncio
+async def test_krw_order_account_no_fx_notice_when_krw_covers_overseas_share():
+    """달러 0이어도 원화가 국내 몫 + 해외 몫(여유 3%)을 덮으면 알림 없음 — 예전엔 '환전 필요'가 갔다."""
+    account = _krw_order_account(deposit_krw=1_100_000.0)
+    rows = [(_fixed_alert(), _weighted_portfolio(), account, _user(), _settings(monthly=None))]
+    dispatch = await _run(rows, date(2026, 11, 23))
+    dispatch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_krw_order_account_flags_krw_short_for_overseas_share():
+    """원화가 국내 몫(50만)은 넘지만 해외 몫까지는 못 덮으면 원화 부족 — 달러 환전 문구는 없다."""
+    account = _krw_order_account(deposit_krw=700_000.0)
+    rows = [(_fixed_alert(), _weighted_portfolio(), account, _user(), _settings(monthly=None))]
+    dispatch = await _run(rows, date(2026, 11, 23))
+
+    dispatch.assert_awaited_once()
+    body = dispatch.await_args.kwargs["push_body"]
+    assert "환전 필요" not in body
+    assert "원 부족" in body
+
+
+def test_krw_order_account_uses_held_usd_first():
+    """보유 달러로 채우는 몫은 원화 필요액에 더하지 않는다."""
+    account = _krw_order_account(deposit_krw=520_000.0, deposit_usd=400.0)
+    sf = svc._fixed_amount_shortfall(
+        _fixed_alert(), _weighted_portfolio(), account, _user(), None, date(2026, 11, 25), date(2026, 11, 23), 1250.0
+    )
+    assert sf is None  # 해외 몫 50만 = $400 → 달러로 전부, 원화는 국내 몫 50만만
+
+
+def test_krw_order_account_without_live_rate_is_unknown():
+    account = _krw_order_account(deposit_krw=0.0)
+    sf = svc._fixed_amount_shortfall(
+        _fixed_alert(), _weighted_portfolio(), account, _user(), None, date(2026, 11, 25), date(2026, 11, 23), None
+    )
+    assert sf is None

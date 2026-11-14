@@ -7,14 +7,17 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Awaitable, Callable
+from types import SimpleNamespace
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.constants import uses_krw_overseas_order
 from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
+from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan
 from app.models.user import User, UserSettings
@@ -449,12 +452,29 @@ def _kst_date_label(at) -> str:
     return at.astimezone(KST).strftime("%m/%d") if at is not None else "기한"
 
 
+async def plan_account_is_krw_order(plan: RebalancingPlan, db: AsyncSession) -> bool:
+    """플랜 실행 계좌가 키움 원화주문 계좌인지 — 그 계좌의 환전 대기는 달러가 아니라 원화가 모자란 것이다."""
+    account_id = getattr(plan, "account_id", None)
+    if account_id is None:
+        return False
+    row = (
+        await db.execute(
+            select(AssetAccount.asset_type, AssetAccount.krw_overseas_order).where(AssetAccount.id == account_id)
+        )
+    ).first()
+    if row is None:
+        return False
+    return uses_krw_overseas_order(SimpleNamespace(asset_type=row[0], krw_overseas_order=row[1]))
+
+
 async def notify_dca_fx_required(
     plan: RebalancingPlan, required_usd: float, available_usd: float, retry_until, db: AsyncSession
 ) -> None:
     """정액 적립 해외 매수 leg가 달러 부족으로 환전 대기(WAITING_FX)에 들어갔음을 메일·푸시로 알린다(plans/120).
 
     메일에는 로그인 없이 누르는 매수 버튼을 넣지 않는다 — 재매수는 실주문이라 앱(인증)에서만 받는다.
+    키움 원화주문 계좌는 `available_usd`가 원화 매수여력 환산분을 포함하고 할 일이 원화 입금이라
+    문구를 바꾼다(plans/129 A3).
     """
     from app.services.notifications.email_service import send_dca_fx_required_email
 
@@ -463,20 +483,32 @@ async def notify_dca_fx_required(
         return
     portfolio_name, email, fcm_token = recipient
     until_label = _kst_date_label(retry_until)
+    krw_order = await plan_account_is_krw_order(plan, db)
 
     if email:
         try:
-            await send_dca_fx_required_email(email, portfolio_name, required_usd, available_usd, until_label)
+            await send_dca_fx_required_email(
+                email, portfolio_name, required_usd, available_usd, until_label, krw_order=krw_order
+            )
         except Exception as exc:
             report_handled_failure("dca_fx_required_email_failed", exc, plan_id=str(plan.id))
 
-    await send_push_safely(
-        plan.user_id,
-        title=f"달러 환전 필요 — {portfolio_name} 적립",
-        body=(
+    if krw_order:
+        title = f"원화 예수금 부족 — {portfolio_name} 적립"
+        body = (
+            f"해외 적립 매수에 ${required_usd:,.2f}가 필요한데 매수여력(원화 환산 포함)은 ${available_usd:,.2f}입니다. "
+            f"원화를 입금한 뒤 '다시 매수'를 눌러주세요 ({until_label}까지 자동 재확인)."
+        )
+    else:
+        title = f"달러 환전 필요 — {portfolio_name} 적립"
+        body = (
             f"해외 적립 매수에 ${required_usd:,.2f}가 필요한데 보유 달러는 ${available_usd:,.2f}입니다. "
             f"환전 후 '다시 매수'를 눌러주세요 ({until_label}까지 자동 재확인)."
-        ),
+        )
+    await send_push_safely(
+        plan.user_id,
+        title=title,
+        body=body,
         fcm_token=fcm_token,
         data={"type": "DCA_FX_REQUIRED", "portfolio_id": str(plan.portfolio_id or "")},
         failure_event="dca_fx_required_push_failed",

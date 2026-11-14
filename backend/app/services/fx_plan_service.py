@@ -17,6 +17,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any, Literal
 
 import structlog
@@ -332,20 +333,34 @@ def _held_synced_at(held: list[HeldUsdAccount]) -> datetime | None:
 async def _waiting_fx_required_usd(
     db: AsyncSession, user_id: uuid.UUID, portfolio: Portfolio
 ) -> list[tuple[uuid.UUID | None, float]]:
-    """이 포트폴리오에서 환전을 기다리는(WAITING_FX, plans/120) 적립 해외 매수 leg들의 실행 계좌별 필요 달러."""
+    """이 포트폴리오에서 환전을 기다리는(WAITING_FX, plans/120) 적립 해외 매수 leg들의 실행 계좌별 필요 달러.
+
+    키움 원화주문 계좌의 leg는 뺀다 — 그 계좌는 달러 부족분을 원화로 결제하므로 아직 대기 중이면 원화까지 모자란
+    것이고, 풀 방법은 달러 환전이 아니라 원화 입금이다(plans/129 A2).
+    """
     rows = (
         await db.execute(
-            select(RebalancingPlan.account_id, func.coalesce(func.sum(RebalancingPlanLeg.required_usd), 0))
+            select(
+                RebalancingPlan.account_id,
+                AssetAccount.asset_type,
+                AssetAccount.krw_overseas_order,
+                func.coalesce(func.sum(RebalancingPlanLeg.required_usd), 0),
+            )
             .join(RebalancingPlan, RebalancingPlan.id == RebalancingPlanLeg.plan_id)
+            .outerjoin(AssetAccount, AssetAccount.id == RebalancingPlan.account_id)
             .where(
                 RebalancingPlan.user_id == user_id,
                 RebalancingPlan.portfolio_id == portfolio.id,
                 RebalancingPlanLeg.status == "WAITING_FX",
             )
-            .group_by(RebalancingPlan.account_id)
+            .group_by(RebalancingPlan.account_id, AssetAccount.asset_type, AssetAccount.krw_overseas_order)
         )
     ).all()
-    return [(account_id, float(usd or 0)) for account_id, usd in rows]
+    return [
+        (account_id, float(usd or 0))
+        for account_id, asset_type, krw_order, usd in rows
+        if not uses_krw_overseas_order(SimpleNamespace(asset_type=asset_type, krw_overseas_order=krw_order))
+    ]
 
 
 def _waiting_fx_shortfall(waiting: list[tuple[uuid.UUID | None, float]], held: list[HeldUsdAccount]) -> float:

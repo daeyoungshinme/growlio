@@ -228,12 +228,20 @@ async def send_rebalancing_plan_execution_failed_email(
 
 
 async def send_dca_fx_required_email(
-    to_email: str, portfolio_name: str, required_usd: float, available_usd: float, retry_until_label: str
+    to_email: str,
+    portfolio_name: str,
+    required_usd: float,
+    available_usd: float,
+    retry_until_label: str,
+    *,
+    krw_order: bool = False,
 ) -> bool:
     """정액 적립 해외 매수 달러 부족(환전 대기) 안내. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
     return await _send_templated(
         to_email,
-        lambda: dca_fx_required_template(portfolio_name, required_usd, available_usd, retry_until_label),
+        lambda: dca_fx_required_template(
+            portfolio_name, required_usd, available_usd, retry_until_label, krw_order=krw_order
+        ),
         event="dca_fx_required",
         portfolio=portfolio_name,
     )

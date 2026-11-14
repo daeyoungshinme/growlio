@@ -7,6 +7,8 @@
   부족으로 본다.
 - 정액 모드(알림에 `dca_amount_krw`, plans/120): 알림마다 그 금액을 국내/해외 몫으로 나눠 원화 예수금과 **달러 예수금을
   따로** 비교한다 — 해외 몫은 환전한 달러로만 사므로 원화가 넉넉해도 달러가 없으면 부족(환전 필요)이다.
+  단 키움 원화주문 계좌(`uses_krw_overseas_order`)는 달러 부족분을 원화로 결제하므로 달러를 따로 보지 않고, 달러로
+  못 채우는 해외 몫을 원화 필요액에 더한다(`KRW_ORDER_FX_MARGIN` 여유 포함).
 """
 
 from __future__ import annotations
@@ -21,7 +23,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.constants import CASH_EQUIVALENT_MARKET, DOMESTIC_MARKETS, TAX_DEFERRED_TAX_TYPES, is_non_tradable
+from app.constants import (
+    CASH_EQUIVALENT_MARKET,
+    DOMESTIC_MARKETS,
+    KRW_ORDER_FX_MARGIN,
+    TAX_DEFERRED_TAX_TYPES,
+    is_non_tradable,
+    uses_krw_overseas_order,
+)
 from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
@@ -161,12 +170,21 @@ def _fixed_amount_shortfall(
     today: date,
     usd_krw: float | None,
 ) -> DcaShortfall | None:
-    """정액 모드 1건 판정 — 원화 예수금 vs 국내 몫, 달러 예수금 vs 해외 몫. 둘 다 충분하면 None."""
+    """정액 모드 1건 판정 — 원화 예수금 vs 국내 몫, 달러 예수금 vs 해외 몫. 둘 다 충분하면 None.
+
+    원화주문 계좌는 달러 부족분을 원화 몫에 더해 원화 하나로 판정한다(실환율 없으면 판정 보류)."""
     krw_needed, usd_needed, has_us = fixed_amount_needs(float(alert.dca_amount_krw or 0), account, portfolio, usd_krw)
     cash_krw = float(account.deposit_krw or 0)
     deposit_usd = float(account.deposit_usd or 0)
+    if uses_krw_overseas_order(account) and has_us:
+        # 원화주문 계좌 — 달러로 못 채우는 해외 몫은 증권사가 원화로 결제한다. 실환율이 없으면 원화 환산을 모른다
+        if not usd_krw:
+            return None
+        krw_needed += max(0.0, usd_needed - deposit_usd) * usd_krw * KRW_ORDER_FX_MARGIN
+        usd_short = False
+    else:
+        usd_short = has_us and usd_needed > 0 and deposit_usd + 1e-6 < usd_needed
     krw_short = krw_needed > 0 and cash_krw < krw_needed
-    usd_short = has_us and usd_needed > 0 and deposit_usd + 1e-6 < usd_needed
     if not (krw_short or usd_short):
         return None
     return DcaShortfall(

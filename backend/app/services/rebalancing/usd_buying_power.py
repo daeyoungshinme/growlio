@@ -22,7 +22,7 @@ from dataclasses import dataclass
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import uses_krw_overseas_order
+from app.constants import KRW_ORDER_FX_MARGIN, uses_krw_overseas_order
 from app.core.job_runner import report_handled_failure
 from app.models.rebalancing_plan import RebalancingPlanItem
 from app.services.rebalancing.order_builder import market_group
@@ -31,9 +31,6 @@ logger = structlog.get_logger()
 
 FX_FEE_BUFFER = 1.003
 """필요 달러에 더하는 수수료·호가 여유(0.3%) — 지정가 갱신분과 해외 매매수수료를 덮는다."""
-
-KRW_ORDER_FX_MARGIN = 1.03
-"""원화주문 계좌의 원화 매수여력을 달러로 바꿀 때 환율에 얹는 여유(3%) — 증권사 가환율·결제일 환율 변동 대비."""
 
 
 @dataclass(frozen=True)
