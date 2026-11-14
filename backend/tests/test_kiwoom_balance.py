@@ -79,6 +79,29 @@ class TestGetOverseasBalance:
         assert result["total_value_usd"] == 0.0
 
     @pytest.mark.asyncio
+    async def test_fractional_qty_logs_warning(self):
+        """소수 수량 응답 여부를 확인하지 못해 정수 처리는 그대로 두고, 오면 경고로 드러낸다(plans/116 B5)."""
+        bulk_items = [
+            _ust21070_item(stk_cd="QQQ", qty="000000001.5"),
+            _ust21070_item(stk_cd="SPY", qty="000000000.5"),
+            _ust21070_item(stk_cd="DIA", qty="000000002"),
+        ]
+
+        with (
+            patch("app.kiwoom.balance.kiwoom_request", side_effect=_make_dispatch(bulk_items)),
+            patch("app.kiwoom.balance.logger") as mock_logger,
+        ):
+            result = await get_overseas_balance("token", "1234567890", is_mock=True)
+
+        assert {p["ticker"]: p["qty"] for p in result["positions"]} == {"QQQ": 1, "DIA": 2}
+        warned = [
+            c.kwargs["ticker"]
+            for c in mock_logger.warning.call_args_list
+            if c.args == ("kiwoom_overseas_fractional_qty",)
+        ]
+        assert warned == ["QQQ", "SPY"]
+
+    @pytest.mark.asyncio
     async def test_parses_position_fields_and_deposit(self):
         bulk_items = [_ust21070_item()]
 

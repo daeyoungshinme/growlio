@@ -185,3 +185,19 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  # pre-commit 원격 훅의 rev(.pre-commit-config.yaml) — 2026-03부터 Dependabot이 pre-commit 생태계를 지원(plans/131 B2).
+  # ruff·mypy·eslint·prettier 훅은 `repo: local`(venv·node_modules 버전을 그대로 씀)이라 대상이 아니고,
+  # 지금은 pre-commit/pre-commit-hooks 하나만 갱신된다.
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      pre-commit-hooks:
+        patterns:
+          - "*"

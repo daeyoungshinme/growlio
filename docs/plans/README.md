@@ -144,7 +144,7 @@
 | [128](128-full-review-2026-11-13.md) | 127 첫 감사 + 전체 재검토. 실버그: 환전 직후 "달러 예수금 새로 받기"가 "해외 없음" 표식(15분) 때문에 0달러로 저장, 버튼이 동기화 한도(사용자 5/분)에 걸림, NYSE 조기 폐장·수능일/연초 지연 개장 미반영(닫힌 장 발주), 전술 국면이 장중 미완성 일봉으로 확정 가능, 환전 대기 상쇄가 다른 계좌 달러를 셈, 해외 주가 알림 fallback 1300 환산, 삭제 뒤 환율 알림·리밸런싱 알림 stale. Vercel `/assets` rewrite, 문서 드리프트, 죽은 코드 정리 | 완료(수능일은 `_KRX_CSAT_DAYS`에 해마다 추가, 운영·실기기 확인 대기) |
 | [129](129-technical-debt-2026-11-14.md) | #266(키움 원화주문) 첫 감사 + 128 이관. 실버그: 원화주문 계좌에 적립 사전 '환전 필요' 알림·원화 부족 누락, 환전 계획이 그 계좌 대기 leg를 '지금' 달러 환전으로, 환전 대기 안내가 원화 환산분을 '보유 달러'로 표시. 같은 계좌 정액 leg 둘의 달러 이중 통과(잡 실행 내 `UsdLedger`), 해외 조회 실패 동기화가 달러 기준 시각을 갱신(`deposit_usd_synced_at`, du1), 생성 상한 동시 요청 경합(users 행 잠금). fx3 FK 인덱스·EXTRACT(year) 5곳·틸트 캐시 키 거래일·PWA 아이콘 | 완료(du1·kw1 공유 Supabase 적용 확인, 메이저 상한은 다음 메이저 미출시, 파일 분할은 130) |
 | [130](130-split-large-files-2026-11-14.md) | 122부터 이관된 대형 파일 분할 — 백엔드 10개(fx_plan_alerts·plan_fx_wait·plan_sweeps·plan_gates·analysis_items·goal_portfolio_weights·_goal_dividend_suggestions·recommendation_drift·goal_horizon_policy·tax_action_builders·rebalancing_blocked 신설), 프론트 4개. 동작 변경 없음, patch 경로 보존 | 완료(email_service는 평면 API라 보류) |
-| [131](131-a11y-labels-2026-11-14.md) | 119 이관 접근성: 컨트롤과 연결 안 된 label 31개(htmlFor·useId, 묶음 제목은 role=group+aria-labelledby, 표시용은 p), `FORM_LABEL_XS` 추가·하드코딩 라벨 클래스 29곳 상수화, AST 기반 회귀 테스트 `a11y.labels.test.ts` | 완료 |
+| [131](131-a11y-labels-2026-11-14.md) | 119 이관 접근성: 컨트롤과 연결 안 된 label 31개(htmlFor·useId, 묶음 제목은 role=group+aria-labelledby, 표시용은 p), `FORM_LABEL_XS` 추가·하드코딩 라벨 클래스 29곳 상수화, AST 기반 회귀 테스트 `a11y.labels.test.ts`. 추가: Dependabot `pre-commit` 생태계(119 D4), 키움 해외 소수 수량 경고 로그(116 B5) | 완료(B5는 실계좌 경고 관찰) |
 
 ## 파일 없는 계획 기록
 
