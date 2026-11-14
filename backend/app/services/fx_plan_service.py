@@ -290,7 +290,8 @@ async def _held_usd(db: AsyncSession, user_id: uuid.UUID) -> list[HeldUsdAccount
     accounts = (await db.execute(stmt)).scalars().all()
     reserved = await reserved_usd_by_account(db, user_id)
     held = [
-        HeldUsdAccount(account, float(account.deposit_usd or 0), "SYNCED", account.last_synced_at)
+        # 기준 시각은 달러가 실제로 확정된 시각 — 해외 조회 실패로 옛 달러를 유지한 동기화는 시각을 갱신하지 않는다
+        HeldUsdAccount(account, float(account.deposit_usd or 0), "SYNCED", account.deposit_usd_synced_at)
         if account.asset_type in BROKER_API_ASSET_TYPES
         else HeldUsdAccount(account, float(account.deposit_usd or 0), "MANUAL")
         for account in accounts

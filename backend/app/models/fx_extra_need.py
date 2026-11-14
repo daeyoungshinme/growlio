@@ -37,4 +37,7 @@ class FxExtraNeed(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    __table_args__ = (Index("idx_fx_extra_needs_user", "user_id"),)
+    __table_args__ = (
+        Index("idx_fx_extra_needs_user", "user_id"),
+        Index("idx_fx_extra_needs_reserved_account", "reserved_account_id"),
+    )

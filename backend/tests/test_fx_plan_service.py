@@ -190,7 +190,8 @@ def _acct(deposit_usd=None, asset_type="STOCK_OTHER", **kw):
         kis_account_no=kw.pop("kis_account_no", None),
         kiwoom_account_no=kw.pop("kiwoom_account_no", None),
         tax_type=kw.pop("tax_type", None),
-        last_synced_at=kw.pop("last_synced_at", None),
+        last_synced_at=(synced := kw.pop("last_synced_at", None)),
+        deposit_usd_synced_at=kw.pop("deposit_usd_synced_at", synced),
     )
 
 
@@ -431,6 +432,16 @@ async def test_plan_uses_synced_deposit_usd_with_sources_and_sync_time():
         ("한국투자", 300.0, "SYNCED", new),
         ("키움", 33.0, "SYNCED", old),
     ]
+
+
+async def test_plan_sync_time_is_when_usd_was_confirmed():
+    """plans/129 B2 — 해외 조회 실패로 옛 달러를 유지한 동기화는 '방금' 기준 시각이 되지 않는다."""
+    from datetime import UTC, datetime
+
+    usd_at, synced = datetime(2026, 11, 10, 9, tzinfo=UTC), datetime(2026, 11, 14, 9, tzinfo=UTC)
+    kis = _acct(300.0, asset_type="STOCK_KIS", last_synced_at=synced, deposit_usd_synced_at=usd_at)
+    result = await _plan(_db([_portfolio()], accounts=[kis]))
+    assert result["held_usd_synced_at"] == usd_at
 
 
 async def test_plan_rate_fetch_overlaps_db_reads():

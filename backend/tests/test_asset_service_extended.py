@@ -376,6 +376,33 @@ class TestSyncAccount:
         assert account.last_sync_error is None
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(("deposit_foreign", "confirmed"), [(None, False), (0.0, True), (120.5, True)])
+    async def test_sync_marks_usd_time_only_when_usd_confirmed(
+        self, mock_db, override_settings, make_account, deposit_foreign, confirmed
+    ):
+        """plans/129 B2 — 해외 조회 실패(None)는 달러를 유지하고 달러 기준 시각도 그대로 둔다."""
+        from app.providers.base import BalanceResult
+        from app.services.accounts.asset_service import sync_account
+
+        account = make_account(data_source="MANUAL")
+        account.deposit_usd_synced_at = None
+        balance = BalanceResult(total_value_krw=1_000_000.0, positions=[], deposit_foreign=deposit_foreign)
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(return_value=balance)
+        with (
+            patch("app.services.accounts.asset_service.get_provider", return_value=mock_provider),
+            patch(
+                "app.services.accounts.asset_service.upsert_snapshot",
+                new=AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
+            ),
+            patch("app.services.accounts.asset_service.invalidate_asset_account_caches", new=AsyncMock()),
+            patch("app.services.accounts.asset_service.broker_sync_duration"),
+        ):
+            await sync_account(account, mock_db, cache=MagicMock())
+
+        assert (account.deposit_usd_synced_at is not None) is confirmed
+
+    @pytest.mark.asyncio
     async def test_sync_account_provider_failure_persists_error_and_reraises(
         self, mock_db, override_settings, make_account
     ):
