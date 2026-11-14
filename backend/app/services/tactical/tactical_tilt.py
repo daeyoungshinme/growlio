@@ -121,7 +121,9 @@ async def _fetch_real_yields() -> list[float]:
 
 
 async def get_tilt_inputs(cache: CacheStore | None) -> TiltInputs:
-    key = tactical_tilt_key()
+    from app.utils.market_hours import last_completed_us_session
+
+    key = tactical_tilt_key(last_completed_us_session())
     if cached := await get_cached_json(cache, key):
         return cached
 

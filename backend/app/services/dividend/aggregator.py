@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import date
 from typing import TYPE_CHECKING
 
 import structlog
@@ -77,7 +78,8 @@ async def _fetch_dividend_aggregates(
                 LEFT JOIN asset_accounts a ON a.id = t.account_id
                 WHERE t.user_id = :uid
                   AND t.transaction_type = 'DIVIDEND'
-                  AND EXTRACT(year FROM t.transaction_date) = :yr
+                  -- 범위 조건 — EXTRACT(year)는 transaction_date 인덱스를 타지 못한다(plans/129 B4)
+                  AND t.transaction_date >= :year_start AND t.transaction_date < :next_year_start
                   AND (CAST(:account_id AS uuid) IS NULL OR t.account_id = CAST(:account_id AS uuid))
                   -- 삭제(soft) 계좌 배당 제외 — 입출금 집계와 같은 기준(plans/95 A4), 세금 집계는 유지
                   AND (t.account_id IS NULL OR a.is_active = TRUE)
@@ -105,7 +107,12 @@ async def _fetch_dividend_aggregates(
             UNION ALL
             SELECT 'monthly_ticker',         month,           ticker,          total FROM monthly_ticker
         """),
-        {"uid": str(user_id), "yr": year, "account_id": str(account_id) if account_id else None},
+        {
+            "uid": str(user_id),
+            "year_start": date(year, 1, 1),
+            "next_year_start": date(year + 1, 1, 1),
+            "account_id": str(account_id) if account_id else None,
+        },
     )
     rows = result.all()
 

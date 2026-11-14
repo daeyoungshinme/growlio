@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from datetime import date
 
 import structlog
 from sqlalchemy import bindparam, text
@@ -148,11 +149,16 @@ async def _fetch_received_dividends_by_ticker(
         LEFT JOIN asset_accounts a ON a.id = t.account_id
         WHERE t.user_id = :uid
           AND t.transaction_type = 'DIVIDEND'
-          AND EXTRACT(year FROM t.transaction_date) = :yr
+          -- 범위 조건 — EXTRACT(year)는 transaction_date 인덱스를 타지 못한다(plans/129 B4)
+          AND t.transaction_date >= :year_start AND t.transaction_date < :next_year_start
           -- 삭제(soft) 계좌 배당 제외 — 입출금 집계와 같은 기준(plans/95 A4), 세금 집계는 유지
           AND (t.account_id IS NULL OR a.is_active = TRUE)
     """
-    params: dict = {"uid": str(user_id), "yr": year}
+    params: dict = {
+        "uid": str(user_id),
+        "year_start": date(year, 1, 1),
+        "next_year_start": date(year + 1, 1, 1),
+    }
     if account_ids:
         stmt = text(base_sql + " AND t.account_id IN :account_ids GROUP BY 1").bindparams(
             bindparam("account_ids", expanding=True)

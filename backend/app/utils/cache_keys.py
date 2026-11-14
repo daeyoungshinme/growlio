@@ -111,7 +111,7 @@ _ETF_PROFILE_VERSION = "v1"  # v1: 첫 버전 태깅 — EtfProfile TypedDict �
 _TECHNICAL_SIGNAL_VERSION = "v5"  # 버전 이력은 technical_signal_key docstring
 _TACTICAL_BACKTEST_VERSION = "v4"  # 버전 이력은 tactical_backtest_key docstring
 _USD_KRW_HISTORY_VERSION = "v1"
-_TACTICAL_TILT_VERSION = "v1"
+_TACTICAL_TILT_VERSION = "v2"  # 버전 이력은 tactical_tilt_key docstring
 _MARKET_SIGNAL_VERSION = "v7"
 """v4: exchange_rate.value 산출 소스를 FRED 지연값 → 실시간 캐시(get_usd_krw_rate)로 변경
 (필드 구성은 동일하나 값 자체가 달라지므로, 기존 v3 캐시가 최대 1시간 TTL 동안
@@ -219,9 +219,11 @@ def usd_krw_history_key() -> str:
     return f"{_env_prefix()}usd_krw_history:{_USD_KRW_HISTORY_VERSION}"
 
 
-def tactical_tilt_key() -> str:
-    """QQQ/SPY 틸트 입력(실질금리·상대강도) 캐시 키 — 유저 무관 전역 공유."""
-    return f"{_env_prefix()}tactical_tilt:{_TACTICAL_TILT_VERSION}"
+def tactical_tilt_key(session: date) -> str:
+    """QQQ/SPY 틸트 입력(실질금리·상대강도) 캐시 키 — 유저 무관 전역 공유.
+    v2: 마지막으로 끝난 미국 거래일(`session`)을 키에 넣는다 — 장중에 만든 값이 마감 뒤 6시간 남지 않게
+    (`technical_signal_key` v5와 같은 이유, plans/129 B4)."""
+    return f"{_env_prefix()}tactical_tilt:{_TACTICAL_TILT_VERSION}:{session.isoformat()}"
 
 
 def tactical_backtest_key(settings_hash: str, years: int) -> str:

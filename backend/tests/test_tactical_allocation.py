@@ -281,7 +281,9 @@ class TestTilt:
         assert fetch.await_count == 1  # 부분 실패도 짧게 캐시 — 장애 중 매 요청 재조회 방지
         assert ttls == [TTL_MARKET_SIGNAL_DEGRADED]
 
-        await cache.delete(tilt.tactical_tilt_key())  # 짧은 TTL 경과
+        from app.utils.market_hours import last_completed_us_session
+
+        await cache.delete(tilt.tactical_tilt_key(last_completed_us_session()))  # 짧은 TTL 경과
         with (
             patch.object(tilt, "set_cached_json", spy_set),
             patch("app.services.market_signal.technical_signal_service.fetch_close_history", fetch),
@@ -290,6 +292,12 @@ class TestTilt:
             full = await tilt.get_tilt_inputs(cache)
         assert full["real_yield_change_pp"] == pytest.approx(-0.2)
         assert ttls[-1] == TTL_TECHNICAL_SIGNAL
+
+    def test_tilt_key_changes_with_completed_session(self):
+        """plans/129 B4 — 장중에 만든 틸트 입력이 마감 뒤에도 6시간 남지 않게 끝난 거래일을 키에 넣는다."""
+        from datetime import date
+
+        assert tilt.tactical_tilt_key(date(2026, 11, 12)) != tilt.tactical_tilt_key(date(2026, 11, 13))
 
     @pytest.mark.asyncio
     async def test_get_inputs_survive_price_failure(self):

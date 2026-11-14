@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import TYPE_CHECKING
 
 from sqlalchemy import text
@@ -111,13 +112,14 @@ async def _fetch_yearly_received(user_id: uuid.UUID, db: AsyncSession) -> list[d
             LEFT JOIN asset_accounts a ON a.id = t.account_id
             WHERE t.user_id = :uid
               AND t.transaction_type = 'DIVIDEND'
-              AND EXTRACT(year FROM t.transaction_date) >= :start_year
+              -- 범위 조건 — EXTRACT(year)는 transaction_date 인덱스를 타지 못한다(plans/129 B4)
+              AND t.transaction_date >= :start_date
               -- 삭제(soft) 계좌 배당 제외 — 입출금 집계와 같은 기준(plans/95 A4), 세금 집계는 유지
               AND (t.account_id IS NULL OR a.is_active = TRUE)
             GROUP BY 1
             ORDER BY 1
         """),
-        {"uid": str(user_id), "start_year": start_year},
+        {"uid": str(user_id), "start_date": date(start_year, 1, 1)},
     )
     rows = result.fetchall()
     return [{"year": row.year, "amount_krw": round(row.amount_krw)} for row in rows]

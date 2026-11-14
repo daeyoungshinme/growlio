@@ -77,6 +77,8 @@ export default defineConfig({
         // js·css도 precache해야 한다 — html만 캐시하면 배포 후 SW가 내준 옛 index.html이 이미 사라진 해시 청크를
         // 가리켜 404, React가 뜨기 전이라 ErrorBoundary도 못 잡고 부팅 스피너에 멈췄다(plans/115 B1).
         globPatterns: ["**/*.{html,js,css,ico,png,svg,woff,woff2,webmanifest}"],
+        // 브라우저 탭 파비콘 후보(16/32/48)는 index.html이 쓰지 않는다 — 설치마다 내려받을 이유가 없다
+        globIgnores: ["**/icons/icon-{16,32,48}.png"],
         cleanupOutdatedCaches: true,
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
