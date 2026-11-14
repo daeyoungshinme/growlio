@@ -95,6 +95,9 @@ class AssetAccount(Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     include_in_total: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # 키움 "원화주문" 서비스 신청 계좌 — 증권사가 해외 매수를 원화 예수금으로 결제(자동 환전)한다.
+    # 앱은 주문에 통화를 지정하지 않는다(키움 API에 필드 없음). 적립 해외 매수 전 달러 부족 판정·환전 계획에만 쓴다
+    krw_overseas_order: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

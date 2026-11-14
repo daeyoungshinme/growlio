@@ -168,6 +168,7 @@ class AssetAccountCreate(BaseModel):
     sort_order: int = Field(default=0, ge=0, le=10_000)
     real_estate_details: RealEstateDetails | None = None
     include_in_total: bool = True
+    krw_overseas_order: bool = False  # 키움 원화주문 서비스 신청 계좌(키움 외 계좌에선 무시)
     tax_type: AccountTaxType = AccountTaxType.GENERAL
     investment_horizon: InvestmentHorizon | None = None
     isa_open_date: date | None = None
@@ -227,6 +228,7 @@ class AssetAccountUpdate(BaseModel):
     sort_order: int | None = Field(default=None, ge=0, le=10_000)
     real_estate_details: RealEstateDetails | None = None
     include_in_total: bool | None = None
+    krw_overseas_order: bool | None = None
     tax_type: AccountTaxType | None = None
     investment_horizon: InvestmentHorizon | None = None
     isa_open_date: date | None = None
@@ -250,6 +252,7 @@ class AssetAccountResponse(BaseModel):
     deposit_usd: float | None = None
     real_estate_details: dict | None = None
     include_in_total: bool
+    krw_overseas_order: bool = False
     is_active: bool
     sort_order: int
     notes: str | None

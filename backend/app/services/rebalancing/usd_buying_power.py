@@ -5,6 +5,8 @@
 
 - KIS: 해외잔고 `output2.frcr_dncl_amt_2`(외화예수금), 키움: 예수금 `fc_entra`(USD) — 둘 다 각 클라이언트가
   `deposit_usd`로 정규화한다.
+- 키움 원화주문 계좌(`AssetAccount.krw_overseas_order`)는 원화 매수여력(kt00001)을 실환율로 달러 환산해 더한다 —
+  증권사가 부족분을 원화로 결제하므로 달러만 보면 "환전 대기"로 잘못 막는다. 실환율이 없으면 미확인.
 - 조회 실패·미지원 계좌·시세 실패는 `USD_UNKNOWN`(미확인). 실행 경로는 확인 없이 기존처럼 주문을 시도하지만
   (증권사가 최종 판정), 자동 재확인은 미확인을 "충분"으로 보지 않고 대기를 유지한다(plans/122 A2).
 
@@ -20,6 +22,7 @@ from dataclasses import dataclass
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import uses_krw_overseas_order
 from app.core.job_runner import report_handled_failure
 from app.models.rebalancing_plan import RebalancingPlanItem
 from app.services.rebalancing.order_builder import market_group
@@ -28,6 +31,9 @@ logger = structlog.get_logger()
 
 FX_FEE_BUFFER = 1.003
 """필요 달러에 더하는 수수료·호가 여유(0.3%) — 지정가 갱신분과 해외 매매수수료를 덮는다."""
+
+KRW_ORDER_FX_MARGIN = 1.03
+"""원화주문 계좌의 원화 매수여력을 달러로 바꿀 때 환율에 얹는 여유(3%) — 증권사 가환율·결제일 환율 변동 대비."""
 
 
 @dataclass(frozen=True)
@@ -69,6 +75,11 @@ async def fetch_usd_buying_power(account_id: uuid.UUID, user_id: uuid.UUID, db: 
             app_key, app_secret = load_kiwoom_credentials(account)
             token = await kiwoom_get_access_token(app_key, app_secret, is_mock=is_mock, **token_args)
             raw = await kiwoom_overseas_deposit_usd(token, is_mock=is_mock)
+            if uses_krw_overseas_order(account) and raw is not None:
+                krw_usd = await _krw_order_usd(token, is_mock, cache)
+                if krw_usd is None:
+                    return None
+                raw = float(raw) + krw_usd
         else:
             app_key, app_secret = load_kis_credentials(account)
             token = await get_access_token(app_key, app_secret, is_mock=is_mock, **token_args)
@@ -86,6 +97,21 @@ async def fetch_usd_buying_power(account_id: uuid.UUID, user_id: uuid.UUID, db: 
     except (TypeError, ValueError):
         return None
     return value if math.isfinite(value) else None
+
+
+async def _krw_order_usd(token: str, is_mock: bool, cache) -> float | None:
+    """키움 원화주문 계좌의 원화 매수여력을 달러로 — 실환율이 없으면 None(판정 불가).
+
+    증권사가 원화주문 증거금에 쓰는 환율·여유율은 공개 API로 알 수 없어 `KRW_ORDER_FX_MARGIN`만큼 보수적으로 깎는다.
+    """
+    from app.kiwoom.balance import get_orderable_krw
+    from app.utils.currency import get_live_or_cached_usd_krw
+
+    rate, is_live = await get_live_or_cached_usd_krw(cache)
+    if not is_live or rate <= 0:
+        return None
+    orderable_krw = await get_orderable_krw(token, is_mock=is_mock)
+    return max(0.0, float(orderable_krw)) / (rate * KRW_ORDER_FX_MARGIN)
 
 
 def required_usd_for_orders(orders: list) -> float | None:

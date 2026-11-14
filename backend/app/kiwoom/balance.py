@@ -187,6 +187,11 @@ async def _get_deposit_info(access_token: str, *, is_mock: bool) -> dict[str, fl
     return {"deposit_krw": deposit_krw, "orderable_krw": orderable_krw}
 
 
+async def get_orderable_krw(access_token: str, *, is_mock: bool) -> float:
+    """원화 현금 매수여력만 — 예수금상세(kt00001) 1회. 원화주문 계좌의 해외 매수 여력 판정용(보유종목 조회 없음)."""
+    return (await _get_deposit_info(access_token, is_mock=is_mock))["orderable_krw"]
+
+
 async def get_domestic_balance(
     access_token: str,
     account_no: str,

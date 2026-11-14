@@ -292,6 +292,14 @@ function FxPlanBody({ onEditGoal }: Props) {
           </p>
           {releaseButton}
         </div>
+      ) : data.status === "KRW_ORDER" ? (
+        <div className="space-y-2">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            정액 적립 계좌({(data.krw_order_accounts ?? []).join(", ")})가 키움 원화주문 계좌라 해외
+            매수가 원화로 결제됩니다. 미리 바꿔 둘 달러가 없습니다.
+          </p>
+          {releaseButton}
+        </div>
       ) : data.status === "NO_RATE" ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           환율을 불러오지 못해 필요한 달러를 계산하지 않았습니다. 잠시 후 다시 시도해 주세요.
@@ -326,6 +334,9 @@ function FxPlanBody({ onEditGoal }: Props) {
             {data.deposit_source === "DCA_AMOUNT" ? (
               <>
                 {data.portfolio_name} 정액 적립 월 {fmtKrw(data.monthly_deposit_krw ?? 0)}의 해외 몫
+                {(data.krw_order_accounts?.length ?? 0) > 0 && (
+                  <> (원화주문 계좌 {data.krw_order_accounts?.join(", ")} 제외)</>
+                )}
               </>
             ) : (
               <>

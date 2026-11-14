@@ -33,6 +33,7 @@ from app.constants import (
     MAX_EXCHANGE_RATE_ALERTS_PER_USER,
     ORDER_EXECUTABLE_ASSET_TYPES,
     POSITION_STOCK_ASSET_TYPES,
+    uses_krw_overseas_order,
 )
 from app.core.cache_store import CacheStore
 from app.core.database import release_read_connection
@@ -443,6 +444,7 @@ async def _build_fx_plan(
         "held_usd_synced_at": None,  # 보유 달러 기준 시각(plans/127 — 계좌 동기화 값)
         "held_usd_accounts": [],
         "waiting_fx_usd": 0.0,
+        "krw_order_accounts": [],  # 원화주문 계좌라 필요 달러에서 뺀 정액 적립 실행 계좌 이름
         "reserved_usd": 0.0,  # 추가 환전 항목이 증권 계좌에 둔 달러 — 보유 달러에서 뺐다(plans/123 후속)
     }
     if portfolio is None:
@@ -478,13 +480,21 @@ async def _build_fx_plan(
     live_rate = ctx.rate
 
     if fixed:
+        # 키움 원화주문 계좌는 증권사가 원화로 결제(자동 환전)하므로 미리 바꿀 달러가 아니다
+        krw_order_names = sorted({account.name for _, account in fixed if uses_krw_overseas_order(account)})
+        result["krw_order_accounts"] = krw_order_names
         # ISA·연금 계좌는 해외 종목 대신 다른 종목을 사므로(`dca_allocation`) 계좌별로 해외 몫을 나눈다
         monthly_need_usd = sum(
             fixed_amount_needs(float(alert.dca_amount_krw or 0), account, portfolio, live_rate)[1]
             for alert, account in fixed
+            if not uses_krw_overseas_order(account)
         )
         if monthly_need_usd <= 0:
-            result.update(status="NO_OVERSEAS", deposit_source="DCA_AMOUNT", monthly_deposit_krw=monthly_deposit)
+            result.update(
+                status="KRW_ORDER" if krw_order_names else "NO_OVERSEAS",
+                deposit_source="DCA_AMOUNT",
+                monthly_deposit_krw=monthly_deposit,
+            )
             return result
     else:
         monthly_need_usd = monthly_deposit * overseas_pct / 100 / live_rate

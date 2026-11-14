@@ -55,6 +55,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     is_mock_mode: initialAccount?.is_mock_mode ?? true,
     notes: initialAccount?.notes ?? "",
     include_in_total: initialAccount?.include_in_total ?? true,
+    krw_overseas_order: initialAccount?.krw_overseas_order ?? false,
     tax_type: initialAccount?.tax_type ?? "GENERAL",
     investment_horizon: initialAccount?.investment_horizon ?? undefined,
     isa_open_date: initialAccount?.isa_open_date ?? undefined,
@@ -145,6 +146,8 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
       institution: form.institution || (initialAccount ? null : undefined),
       notes: form.notes || (initialAccount ? null : undefined),
       include_in_total: form.include_in_total,
+      krw_overseas_order:
+        initialAccount.asset_type === "STOCK_KIWOOM" ? form.krw_overseas_order : undefined,
       deposit_krw: depositKrw ?? 0,
       deposit_usd: depositUsd ?? 0,
       tax_type: form.tax_type,
@@ -410,6 +413,31 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                 전체 자산 합계에 포함
               </label>
             </div>
+
+            {isKiwoom && (
+              <div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="stock-krw-overseas-order"
+                    checked={form.krw_overseas_order ?? false}
+                    onChange={(e) => set("krw_overseas_order", e.target.checked)}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <label
+                    htmlFor="stock-krw-overseas-order"
+                    className="text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    원화주문 서비스 신청 계좌
+                  </label>
+                </div>
+                <p className="mt-1 ml-6 text-xs text-gray-500 dark:text-gray-400">
+                  키움에서 원화주문을 신청했다면 켜 주세요. 적립 해외 매수 때 달러가 모자라도 원화
+                  예수금으로 살 수 있다고 보고 환전 대기로 막지 않으며, 환전 계획의 필요 달러에서도
+                  뺍니다. 실제 결제 통화는 키움 계좌 설정을 따릅니다.
+                </p>
+              </div>
+            )}
           </div>
         </ModalBody>
         <ModalFooter>

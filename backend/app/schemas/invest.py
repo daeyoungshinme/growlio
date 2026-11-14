@@ -117,7 +117,8 @@ class FxPlanHeldAccount(BaseModel):
 class FxPlanResponse(BaseModel):
     position: FxPositionResponse | None  # 1년 시계열 조회 실패 시 None
     rate_is_live: bool = True  # False면 실시간 환율이 없어 1년 일봉 마지막 종가(없으면 설정 fallback) 기준
-    status: Literal["OK", "SUFFICIENT", "NO_DEPOSIT_GOAL", "NO_OVERSEAS", "NO_PORTFOLIO", "NO_RATE"]
+    # KRW_ORDER = 정액 적립 실행 계좌가 모두 키움 원화주문 계좌라 미리 바꿀 달러가 없다
+    status: Literal["OK", "SUFFICIENT", "NO_DEPOSIT_GOAL", "NO_OVERSEAS", "NO_PORTFOLIO", "NO_RATE", "KRW_ORDER"]
     portfolio_id: uuid.UUID | None
     portfolio_name: str | None
     portfolio_options: list[FxPortfolioOption]  # 해외 비중이 있는 포트폴리오
@@ -133,6 +134,7 @@ class FxPlanResponse(BaseModel):
     deposit_source: Literal["DCA_AMOUNT", "MONTHLY_GOAL"] | None = None
     held_usd_synced_at: datetime | None = None  # 달러가 있는 브로커 계좌 중 가장 오래된 동기화 시각
     held_usd_accounts: list[FxPlanHeldAccount] = []  # 보유 달러 계좌별 내역(0달러 제외, 큰 순)
+    krw_order_accounts: list[str] = []  # 원화주문 계좌라 필요 달러에서 뺀 정액 적립 실행 계좌 이름
     waiting_fx_usd: float = 0.0  # 환전 대기 중인 적립 매수를 진행하려면 지금 더 필요한 달러
     reserved_usd: float = 0.0  # 추가 환전 항목(여행 등)이 증권 계좌에 둔 달러 — held_usd에서 뺐다
 

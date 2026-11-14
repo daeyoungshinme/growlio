@@ -363,6 +363,41 @@ async def test_plan_fixed_amount_in_tax_deferred_account_has_no_overseas_share()
     assert result["deposit_source"] == "DCA_AMOUNT"
 
 
+def _krw_order_acct(name="키움 원화주문"):
+    acct = _acct(0.0, asset_type="STOCK_KIWOOM", name=name)
+    acct.krw_overseas_order = True
+    return acct
+
+
+async def test_plan_excludes_krw_order_account_from_need():
+    """키움 원화주문 계좌의 정액 적립은 증권사가 원화로 결제한다 — 미리 바꿀 달러에서 뺀다."""
+    usd_acct = _acct(0.0)
+    db = _db(
+        [_portfolio()],
+        fixed=[(_fixed_alert(1_000_000), usd_acct), (_fixed_alert(500_000), _krw_order_acct())],
+        accounts=[],
+    )
+    result = await _plan(db)
+    assert result["monthly_deposit_krw"] == 1_500_000
+    assert result["monthly_need_usd"] == round(1_000_000 * 0.6 / 1400, 2)
+    assert result["krw_order_accounts"] == ["키움 원화주문"]
+
+
+async def test_plan_krw_order_status_when_all_accounts_pay_in_krw():
+    result = await _plan(_db([_portfolio()], fixed=[(_fixed_alert(1_000_000), _krw_order_acct())], accounts=[]))
+    assert result["status"] == "KRW_ORDER"
+    assert result["need_usd"] == 0.0
+    assert result["tranches"] == []
+
+
+async def test_plan_ignores_krw_flag_on_non_kiwoom_account():
+    kis = _acct(0.0, asset_type="STOCK_KIS")
+    kis.krw_overseas_order = True  # 키움 외 계좌의 표시는 무시한다
+    result = await _plan(_db([_portfolio()], fixed=[(_fixed_alert(1_000_000), kis)], accounts=[]))
+    assert result["status"] == "OK"
+    assert result["krw_order_accounts"] == []
+
+
 async def test_plan_monthly_goal_source_without_fixed_alert():
     result = await _plan(_db([_portfolio()]))
     assert result["deposit_source"] == "MONTHLY_GOAL"

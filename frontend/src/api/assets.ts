@@ -26,6 +26,8 @@ export interface AssetAccount {
   deposit_usd: number | null;
   real_estate_details: RealEstateDetails | null;
   include_in_total: boolean;
+  /** 키움 원화주문 서비스 신청 계좌 — 해외 매수를 원화로 결제(자동 환전) */
+  krw_overseas_order?: boolean;
   is_active: boolean;
   sort_order: number;
   notes: string | null;
@@ -97,6 +99,7 @@ export interface AssetAccountCreate {
   sort_order?: number;
   real_estate_details?: RealEstateDetails;
   include_in_total?: boolean;
+  krw_overseas_order?: boolean;
 }
 
 export const fetchAccounts = () => apiGet<AssetAccount[]>("/assets");
