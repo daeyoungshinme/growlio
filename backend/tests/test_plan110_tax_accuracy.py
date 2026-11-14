@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.services.tax.pension_contribution_service import calc_pension_contribution_status
-from app.services.tax.tax_action_service import (
+from app.services.tax.tax_action_builders import (
     _get_rules,
     build_financial_income_action,
     build_isa_transfer_actions,
