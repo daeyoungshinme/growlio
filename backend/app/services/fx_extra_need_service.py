@@ -30,6 +30,7 @@ from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.fx_plan_service import FxPosition, FxTranche, compute_fx_plan, load_fx_rate_context
 from app.utils.cache_keys import CacheStoreType
 from app.utils.kst import today_kst
+from app.utils.quota_lock import lock_user_for_quota
 
 logger = structlog.get_logger()
 
@@ -176,6 +177,7 @@ async def create_fx_extra_need(
     _check_amounts(amount_usd, exchanged_usd)
     if reserved_account_id is not None:
         await _owned_stock_account(db, user_id, reserved_account_id)
+    await lock_user_for_quota(db, user_id)  # 동시 생성이 상한을 넘지 않게(plans/129 B3)
     count = await db.scalar(select(func.count()).select_from(FxExtraNeed).where(FxExtraNeed.user_id == user_id))
     if (count or 0) >= MAX_FX_EXTRA_NEEDS_PER_USER:
         raise ConflictError(

@@ -19,12 +19,15 @@ from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.constants import FX_PLAN_ALERT_SOURCE
 from app.limiter import limiter
 from app.models.user import User
+from app.utils.quota_lock import lock_user_for_quota
 
 InvalidateCache = Callable[[uuid.UUID], Awaitable[None]]
 
 
 async def count_user_alerts(db: AsyncSession, model: Any, user_id: uuid.UUID) -> int:
-    """사용자당 알림 개수 — 생성 상한 판정용."""
+    """사용자당 알림 개수 — 생성 상한 판정용. 세기 전에 사용자 행을 잠가 동시 생성이 상한을 넘지 않게 한다
+    (호출부는 같은 트랜잭션에서 insert·commit한다)."""
+    await lock_user_for_quota(db, user_id)
     return await db.scalar(select(func.count()).select_from(model).where(model.user_id == user_id)) or 0
 
 

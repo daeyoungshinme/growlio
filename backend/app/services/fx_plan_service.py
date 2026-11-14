@@ -57,6 +57,7 @@ from app.utils.cache_keys import (
 from app.utils.currency import get_live_or_cached_usd_krw
 from app.utils.inproc_lock import inproc_lock
 from app.utils.kst import kst_day_start, today_kst
+from app.utils.quota_lock import lock_user_for_quota
 
 logger = structlog.get_logger()
 
@@ -710,6 +711,7 @@ async def sync_fx_plan_alerts(
             else:
                 to_create.append((rate, usd))
 
+        await lock_user_for_quota(db, user_id)  # 수동 알림 생성과 동시에 상한을 넘지 않게(plans/129 B3)
         total = await db.scalar(
             select(func.count()).select_from(ExchangeRateAlert).where(ExchangeRateAlert.user_id == user_id)
         )
