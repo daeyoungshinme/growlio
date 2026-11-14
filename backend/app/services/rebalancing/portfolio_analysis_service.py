@@ -21,9 +21,10 @@ from app.services._settings_queries import get_settings_row
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.market_data.price_service import get_historical_returns
 from app.services.portfolio.portfolio_service import build_portfolio_overview
+from app.services.rebalancing.analysis_items import _item_attr
 from app.services.rebalancing.diagnosis_service import build_diagnosis_context
 from app.services.rebalancing.overview_enrichment import collect_dividend_map, enrich_overview_with_prices
-from app.services.rebalancing.service import _item_attr, analyze_rebalancing
+from app.services.rebalancing.service import analyze_rebalancing
 from app.utils.cache_keys import (
     TTL_REBALANCING_ANALYSIS,
     get_cached_json,

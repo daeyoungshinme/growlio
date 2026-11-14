@@ -23,7 +23,7 @@ from app.models.rebalancing_plan import RebalancingPlan
 from app.models.user import User, UserSettings
 from app.services.alerts._dispatch import send_push_safely
 from app.services.alerts.alert_service import save_alert_history
-from app.services.rebalancing.plan_generation import (
+from app.services.rebalancing.plan_gates import (
     DailyValueCapBlocked,
     MarketSignalGateBlocked,
     SnapshotTooStale,

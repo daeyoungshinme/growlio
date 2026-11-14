@@ -47,7 +47,7 @@ class TestRegimeLookup:
 
 class TestBlockedNotice:
     def test_email_labels_match_gate_rules(self):
-        from app.services.notifications.email_templates.rebalancing import market_signal_gate_blocked_template
+        from app.services.notifications.email_templates.rebalancing_blocked import market_signal_gate_blocked_template
 
         _, cautious = market_signal_gate_blocked_template("P", "RED", "CAUTIOUS")
         _, strict = market_signal_gate_blocked_template("P", "YELLOW", "STRICT")
@@ -55,7 +55,7 @@ class TestBlockedNotice:
         assert "엄격(YELLOW·RED 차단)" in strict
 
     def test_tactical_email(self):
-        from app.services.notifications.email_templates.rebalancing import market_signal_gate_blocked_template
+        from app.services.notifications.email_templates.rebalancing_blocked import market_signal_gate_blocked_template
 
         subject, html = market_signal_gate_blocked_template("적립", "GREEN", "TACTICAL")
         assert "적립 매수 보류" in subject
@@ -64,7 +64,7 @@ class TestBlockedNotice:
     @pytest.mark.asyncio
     async def test_tactical_push_and_history(self):
         from app.services.rebalancing import plan_notifications as pn
-        from app.services.rebalancing.plan_generation import MarketSignalGateBlocked
+        from app.services.rebalancing.plan_gates import MarketSignalGateBlocked
 
         alert = SimpleNamespace(id=uuid.uuid4(), user_id=uuid.uuid4())
         portfolio = SimpleNamespace(id=uuid.uuid4(), name="적립")
