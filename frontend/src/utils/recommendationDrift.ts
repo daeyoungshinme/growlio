@@ -18,7 +18,7 @@ function itemKey(item: { ticker: string; market: string }): string {
 
 /** 추천 종목 중 포트폴리오 지수 그룹(plans/74)에 속한 종목은 그 그룹(대표 종목 키)으로 합산한다 —
  * 그룹 항목은 대표 종목 키 하나로 목표 비중을 가지므로, 같은 지수의 다른 종목(예: SPY ↔ 그룹 대표 VOO)을
- * "신규 후보"로 세지 않기 위함. 백엔드 `goal_recommendation_service.fold_into_portfolio_groups()`와 같은 규칙. */
+ * "신규 후보"로 세지 않기 위함. 백엔드 `goal/recommendation_drift.fold_into_portfolio_groups()`와 같은 규칙. */
 export function foldIntoPortfolioGroups(
   recommended: GoalRecommendationItem[],
   current: PortfolioItem[],
