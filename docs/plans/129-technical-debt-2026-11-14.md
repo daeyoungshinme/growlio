@@ -28,12 +28,12 @@ cryptography·structlog·tenacity·firebase-admin·pytest-httpx·mypy·websocket
 
 ## 이관
 
-- 550줄↑ 백엔드 11·500줄↑ 프론트 4 파일 분할, drift N+1(의도적 순차), 해외 주가 알림 `target_price_usd`(저장 단위 = 제품 결정)
+- 550줄↑ 백엔드 11·500줄↑ 프론트 4 파일 분할(→ 계획 130 완료), drift N+1(의도적 순차), 해외 주가 알림 `target_price_usd`(저장 단위 = 제품 결정)
 - B1의 실행 간 차감 — 키움·KIS 실계좌에서 주문 직후 달러 예수금이 줄어드는지 확인되면 PENDING·최근 실행 leg의 `required_usd`로 확장
 - 사용자 작업:
-  - **kw1·du1 공유 Supabase 적용 후 배포**(둘 다 컬럼·인덱스 추가라 옛 코드 호환)
+  - ~~kw1·du1 공유 Supabase 적용 후 배포~~ — 2026-11-14 확인: 공유 Supabase가 이미 `du1` head
   - 키움 REST 주문이 원화주문 설정을 따르는지 실계좌 1회
-  - 병합 브랜치 삭제, 외부 핑 등록 후 `keep-alive.yml` 제거, 2027 수능일 `_KRX_CSAT_DAYS` 추가
+  - ~~병합 브랜치 삭제~~(2026-11-14 완료), 외부 핑 등록 후 `keep-alive.yml` 제거, 2027 수능일 `_KRX_CSAT_DAYS` 추가
 
 ## 검증
 
