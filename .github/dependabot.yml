@@ -49,6 +49,12 @@ updates:
       - dependency-name: "pandas"
         update-types:
           - "version-update:semver-major"
+      # python-dateutil major: holidays가 "python-dateutil<3"을 요구 → 3.x+로 올리면 uv가
+      # holidays를 XKRX 캘린더가 없는 구버전(0.86)으로 내려 장 개장 판정 테스트가 깨짐(PR #275).
+      # holidays 쪽 dateutil 3+ 지원이 먼저 필요.
+      - dependency-name: "python-dateutil"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "npm"
     directory: "/frontend"
