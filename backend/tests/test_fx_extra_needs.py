@@ -130,6 +130,7 @@ def _crud_db(*, count=0, need=None):
     db.commit = AsyncMock()
     db.refresh = AsyncMock()
     db.delete = AsyncMock()
+    db.execute = AsyncMock()  # 생성 상한 판정 전 사용자 행 잠금(plans/129 B3)
     return db
 
 
@@ -164,6 +165,9 @@ async def test_create_saves_need():
     )
     db.add.assert_called_once_with(need)
     db.commit.assert_awaited_once()
+    # 개수를 세기 전에 사용자 행을 FOR UPDATE로 잠근다 — 동시 생성이 상한을 넘지 않게
+    lock_sql = str(db.execute.await_args.args[0])
+    assert "FOR UPDATE" in lock_sql
 
 
 async def test_update_missing_need_is_404():
@@ -587,6 +591,7 @@ async def test_create_saves_reserved_account():
     account = SimpleNamespace(id=uuid.uuid4())
     db = MagicMock()
     db.scalar = AsyncMock(side_effect=[account, 0])
+    db.execute = AsyncMock()
     db.commit = AsyncMock()
     db.refresh = AsyncMock()
     with patch.object(svc, "today_kst", return_value=TODAY):

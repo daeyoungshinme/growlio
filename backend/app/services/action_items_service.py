@@ -268,30 +268,39 @@ async def _fx_plan_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStore
 
 async def _fx_waiting_items(user_id: uuid.UUID, db: AsyncSession) -> list[ActionItem]:
     """환전 대기(WAITING_FX) 적립 해외 매수 — 환전 후 '다시 매수'가 필요하다(plans/120)."""
+    from types import SimpleNamespace
+
+    from app.constants import uses_krw_overseas_order
+    from app.models.asset import AssetAccount
     from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanLeg
     from app.utils.kst import KST
 
     rows = (
         await db.execute(
-            select(RebalancingPlanLeg, Portfolio.name)
+            select(RebalancingPlanLeg, Portfolio.name, AssetAccount.asset_type, AssetAccount.krw_overseas_order)
             .join(RebalancingPlan, RebalancingPlan.id == RebalancingPlanLeg.plan_id)
             .outerjoin(Portfolio, Portfolio.id == RebalancingPlan.portfolio_id)
+            .outerjoin(AssetAccount, AssetAccount.id == RebalancingPlan.account_id)
             .where(RebalancingPlan.user_id == user_id, RebalancingPlanLeg.status == "WAITING_FX")
         )
     ).all()
     items: list[ActionItem] = []
-    for leg, portfolio_name in rows:
+    for leg, portfolio_name, asset_type, krw_flag in rows:
         required = float(leg.required_usd or 0)
         available = float(leg.available_usd or 0)
         until = leg.fx_retry_until.astimezone(KST) if leg.fx_retry_until else None
+        # 키움 원화주문 계좌는 원화 매수여력 환산분까지 본 값이라 "보유 달러"가 아니고,
+        # 할 일은 원화 입금이다(plans/129 A3)
+        krw_order = uses_krw_overseas_order(SimpleNamespace(asset_type=asset_type, krw_overseas_order=krw_flag))
         items.append(
             ActionItem(
                 id=f"dca-fx:{leg.id}",
                 kind="DCA_FX_WAITING",
                 priority="HIGH",
-                title="달러 환전 후 해외 적립 다시 매수",
+                title="원화 입금 후 해외 적립 다시 매수" if krw_order else "달러 환전 후 해외 적립 다시 매수",
                 detail=(
-                    f"{portfolio_name or '포트폴리오'} · 필요 ${required:,.2f} / 보유 ${available:,.2f}"
+                    f"{portfolio_name or '포트폴리오'} · 필요 ${required:,.2f} / "
+                    + (f"매수여력(원화 환산 포함) ${available:,.2f}" if krw_order else f"보유 ${available:,.2f}")
                     + (f" · {until.month}/{until.day}까지 자동 재확인" if until else "")
                 ),
                 cta_label="다시 매수",

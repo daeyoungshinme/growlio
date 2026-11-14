@@ -312,6 +312,27 @@ class TestUsdBuyingPower:
                 assert await ubp.check_usd_shortfall([], uuid.uuid4(), uuid.uuid4(), mock_db, None) is expected
 
     @pytest.mark.asyncio
+    async def test_ledger_stops_second_leg_on_same_account(self, mock_db):
+        """plans/129 B1 — 같은 계좌 $600, leg 둘이 각 ~$400이면 하나만 통과한다. 다른 계좌는 따로 센다."""
+        from app.services.rebalancing import usd_buying_power as ubp
+
+        order = SimpleNamespace(market="NASDAQ", quantity=4, limit_price=100.0)  # 400 × 1.003
+        account, other = uuid.uuid4(), uuid.uuid4()
+        ledger: dict = {}
+        with (
+            patch.object(svc_exec, "_rebuild_orders_from_items", new=AsyncMock(return_value=[order])),
+            patch.object(ubp, "fetch_usd_buying_power", new=AsyncMock(return_value=600.0)),
+        ):
+            first = await ubp.check_usd_shortfall([], account, uuid.uuid4(), mock_db, None, ledger)
+            second = await ubp.check_usd_shortfall([], account, uuid.uuid4(), mock_db, None, ledger)
+            elsewhere = await ubp.check_usd_shortfall([], other, uuid.uuid4(), mock_db, None, ledger)
+        assert first is None
+        assert isinstance(second, ubp.UsdShortfall)
+        assert second.available_usd == pytest.approx(600.0 - 401.2)
+        assert elsewhere is None
+        assert ledger[account] == pytest.approx(401.2)
+
+    @pytest.mark.asyncio
     async def test_check_unknown_when_price_or_limit_missing(self, mock_db):
         """시세 실패·지정가 없음은 "충분"이 아니라 미확인이다(plans/122 A2)."""
         from app.services.rebalancing import usd_buying_power as ubp
@@ -803,6 +824,28 @@ class TestFxNotifications:
         assert "$350.00" in push.await_args.kwargs["body"]
 
     @pytest.mark.asyncio
+    async def test_fx_required_krw_order_account_asks_for_krw(self, mock_db):
+        from app.services.rebalancing import plan_notifications as pn
+
+        plan = SimpleNamespace(
+            id=uuid.uuid4(), user_id=uuid.uuid4(), portfolio_id=uuid.uuid4(), account_id=uuid.uuid4()
+        )
+        push = AsyncMock()
+        email = AsyncMock(return_value=True)
+        row = MagicMock()
+        row.first.return_value = ("STOCK_KIWOOM", True)
+        mock_db.execute = AsyncMock(return_value=row)
+        with (
+            patch.object(pn, "_plan_recipient", new=AsyncMock(return_value=("적립", "a@b.c", "tok"))),
+            patch.object(pn, "send_push_safely", new=push),
+            patch("app.services.notifications.email_service.send_dca_fx_required_email", new=email),
+        ):
+            await pn.notify_dca_fx_required(plan, 350.0, 12.0, datetime(2026, 11, 17, 21, 0, tzinfo=UTC), mock_db)
+        assert email.await_args.kwargs["krw_order"] is True
+        assert push.await_args.kwargs["title"].startswith("원화 예수금 부족")
+        assert "원화를 입금" in push.await_args.kwargs["body"]
+
+    @pytest.mark.asyncio
     async def test_fx_wait_expired_push(self, mock_db):
         from app.services.rebalancing import plan_notifications as pn
 
@@ -821,6 +864,10 @@ class TestFxNotifications:
         subject, html = dca_fx_required_template("적립", 350.0, 12.0, "11/17")
         assert "환전" in subject
         assert "$338.00" in html  # 부족분
+
+        subject, html = dca_fx_required_template("적립", 350.0, 12.0, "11/17", krw_order=True)
+        assert "원화 예수금" in subject
+        assert "원화를 입금" in html
 
     @pytest.mark.asyncio
     async def test_send_email_uses_template(self):
@@ -843,14 +890,28 @@ class TestFxWaitingActionItem:
             fx_retry_until=datetime(2026, 11, 17, 21, 0, tzinfo=UTC),
         )
         result = MagicMock()
-        result.all.return_value = [(leg, "적립")]
+        result.all.return_value = [(leg, "적립", "STOCK_KIS", False)]
         mock_db.execute = AsyncMock(return_value=result)
         items = await svc._fx_waiting_items(uuid.uuid4(), mock_db)
         assert len(items) == 1
+        assert items[0].title.startswith("달러 환전")
         assert items[0].kind == "DCA_FX_WAITING"
         assert "$350.00" in items[0].detail
         assert items[0].link == "/rebalancing?rtab=이력"
         assert items[0].deadline == "2026-11-18"
+
+    @pytest.mark.asyncio
+    async def test_krw_order_account_leg_asks_for_krw_deposit(self, mock_db):
+        """plans/129 A3 — 원화주문 계좌 leg는 '보유 달러'가 아니라 원화 환산 포함 매수여력이고, 할 일은 원화 입금."""
+        from app.services import action_items_service as svc
+
+        leg = SimpleNamespace(id=uuid.uuid4(), required_usd=350.0, available_usd=120.0, fx_retry_until=None)
+        result = MagicMock()
+        result.all.return_value = [(leg, "적립", "STOCK_KIWOOM", True)]
+        mock_db.execute = AsyncMock(return_value=result)
+        items = await svc._fx_waiting_items(uuid.uuid4(), mock_db)
+        assert items[0].title.startswith("원화 입금")
+        assert "매수여력(원화 환산 포함) $120.00" in items[0].detail
 
 
 @pytest.mark.asyncio

@@ -133,7 +133,8 @@ async def _get_scalar_init_data(
                     FROM transactions t
                     LEFT JOIN asset_accounts a ON a.id = t.account_id
                     WHERE t.user_id = :uid
-                      AND EXTRACT(YEAR FROM t.transaction_date) = :year
+                      -- 범위 조건 — EXTRACT(year)는 transaction_date 인덱스를 타지 못한다(plans/129 B4)
+                      AND t.transaction_date >= :year_start AND t.transaction_date < :next_year_start
                       AND t.transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
                       AND (t.account_id IS NULL OR (a.is_active = TRUE AND a.include_in_total = TRUE))
                   ),
@@ -151,7 +152,12 @@ async def _get_scalar_init_data(
                        fs_ns.non_stock_first_total, net_after_ns.non_stock_net_flows_after
                 FROM fs, nd, fs_ns, net_after_ns
             """).bindparams(bindparam("stock_types", expanding=True)),
-            {"uid": str(user_id), "year": year, "stock_types": sorted(POSITION_STOCK_ASSET_TYPES)},
+            {
+                "uid": str(user_id),
+                "year_start": date(year, 1, 1),
+                "next_year_start": date(year + 1, 1, 1),
+                "stock_types": sorted(POSITION_STOCK_ASSET_TYPES),
+            },
         )
     ).first()
     first_snap = row.first_date if row else None

@@ -788,3 +788,23 @@ class TestAlertPerUserLimit:
         assert resp.status_code == 409
         db.commit.assert_not_awaited()
         app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_count_user_alerts_locks_user_row_before_counting():
+    """plans/129 B3 — 동시 생성 두 건이 같은 개수를 보고 상한을 넘지 않게 사용자 행을 먼저 잠근다."""
+    import uuid as _uuid
+    from unittest.mock import AsyncMock as _AsyncMock
+    from unittest.mock import MagicMock as _MagicMock
+
+    from app.api.v1._alert_crud import count_user_alerts
+    from app.models.alert import ExchangeRateAlert
+
+    calls: list[str] = []
+    db = _MagicMock()
+    db.execute = _AsyncMock(side_effect=lambda stmt: calls.append(f"lock:{stmt}"))
+    db.scalar = _AsyncMock(side_effect=lambda stmt: calls.append("count") or 3)
+    assert await count_user_alerts(db, ExchangeRateAlert, _uuid.uuid4()) == 3
+    assert calls[0].startswith("lock:")
+    assert "FOR UPDATE" in calls[0]
+    assert calls[1] == "count"

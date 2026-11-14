@@ -378,10 +378,38 @@ def rebalancing_plan_execution_failed_template(
 
 
 def dca_fx_required_template(
-    portfolio_name: str, required_usd: float, available_usd: float, retry_until_label: str
+    portfolio_name: str,
+    required_usd: float,
+    available_usd: float,
+    retry_until_label: str,
+    *,
+    krw_order: bool = False,
 ) -> tuple[str, str]:
-    """정액 적립 해외 매수 직전 달러 예수금이 모자라 환전을 기다릴 때 발송(plans/120)."""
+    """정액 적립 해외 매수 직전 달러 예수금이 모자라 환전을 기다릴 때 발송(plans/120).
+
+    `krw_order`(키움 원화주문 계좌)면 보유 달러가 아니라 원화 환산 포함 매수여력이 모자란 것이라
+    원화 입금을 안내한다."""
     shortfall = max(required_usd - available_usd, 0.0)
+    if krw_order:
+        subject = f"[Growlio] 적립 해외 매수 대기 — 원화 예수금이 부족합니다 ({portfolio_name})"
+        table = _kv_table(
+            [
+                ("포트폴리오", escape(portfolio_name)),
+                ("필요 금액", f"${required_usd:,.2f}"),
+                ("매수여력(원화 환산 포함)", f"${available_usd:,.2f}"),
+                ("부족분", f"약 ${shortfall:,.2f}"),
+                ("자동 재확인", f"{retry_until_label}까지"),
+            ]
+        )
+        html = _email_div(
+            "적립 해외 매수 — 원화 예수금 부족",
+            "#d97706",
+            table,
+            "원화주문 계좌라 해외 매수가 원화로 결제되는데, 원화 매수여력이 모자라 매수를 잠시 멈췄습니다. "
+            "계좌에 원화를 입금한 뒤 Growlio 앱 리밸런싱 &gt; 이력 탭에서 <b>다시 매수</b>를 눌러주세요. 누르지 않아도 "
+            "기한까지 미국장 중에 매수여력을 다시 확인해 충분하면 자동으로 매수합니다.",
+        )
+        return subject, html
     subject = f"[Growlio] 적립 해외 매수 대기 — 달러 환전이 필요합니다 ({portfolio_name})"
     table = _kv_table(
         [

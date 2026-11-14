@@ -190,7 +190,8 @@ def _acct(deposit_usd=None, asset_type="STOCK_OTHER", **kw):
         kis_account_no=kw.pop("kis_account_no", None),
         kiwoom_account_no=kw.pop("kiwoom_account_no", None),
         tax_type=kw.pop("tax_type", None),
-        last_synced_at=kw.pop("last_synced_at", None),
+        last_synced_at=(synced := kw.pop("last_synced_at", None)),
+        deposit_usd_synced_at=kw.pop("deposit_usd_synced_at", synced),
     )
 
 
@@ -206,7 +207,8 @@ def _db(
 ):
     """execute 순서: 포트폴리오 목록 → 정액 적립 알림 → (필요 시) 브로커 계좌 → 추가 환전 보관 달러(계좌별 합)
     → 환전 대기 필요 달러(실행 계좌별 합). scalar 순서: 적립 자동매수 포트폴리오 → (정액이 없을 때) 월 적립액.
-    `waiting_usd`가 숫자면 계좌를 모르는 플랜 한 줄, 목록이면 [(account_id, usd)]."""
+    `waiting_usd`가 숫자면 계좌를 모르는 플랜 한 줄, 목록이면 [(account_id, usd)] 또는
+    [(account_id, asset_type, krw_overseas_order, usd)]."""
     db = MagicMock()
     portfolios_result = MagicMock()
     portfolios_result.scalars.return_value.all.return_value = portfolios
@@ -218,7 +220,9 @@ def _db(
     reserved_result.all.return_value = list(reserved)
     waiting_result = MagicMock()
     waiting_result.all.return_value = (
-        list(waiting_usd) if isinstance(waiting_usd, list) else ([(None, waiting_usd)] if waiting_usd else [])
+        [row if len(row) == 4 else (row[0], None, None, row[1]) for row in waiting_usd]
+        if isinstance(waiting_usd, list)
+        else ([(None, None, None, waiting_usd)] if waiting_usd else [])
     )
     db.execute = AsyncMock(
         side_effect=[portfolios_result, fixed_result, accounts_result, reserved_result, waiting_result]
@@ -430,6 +434,16 @@ async def test_plan_uses_synced_deposit_usd_with_sources_and_sync_time():
     ]
 
 
+async def test_plan_sync_time_is_when_usd_was_confirmed():
+    """plans/129 B2 — 해외 조회 실패로 옛 달러를 유지한 동기화는 '방금' 기준 시각이 되지 않는다."""
+    from datetime import UTC, datetime
+
+    usd_at, synced = datetime(2026, 11, 10, 9, tzinfo=UTC), datetime(2026, 11, 14, 9, tzinfo=UTC)
+    kis = _acct(300.0, asset_type="STOCK_KIS", last_synced_at=synced, deposit_usd_synced_at=usd_at)
+    result = await _plan(_db([_portfolio()], accounts=[kis]))
+    assert result["held_usd_synced_at"] == usd_at
+
+
 async def test_plan_rate_fetch_overlaps_db_reads():
     """환율(Yahoo)은 DB 읽기를 다 기다린 뒤 시작하지 않는다 — 마지막 DB 읽기 전에 이미 출발해 있다(plans/127)."""
     import asyncio
@@ -565,6 +579,19 @@ async def test_plan_waiting_fx_offset_per_account():
     db = _db([_portfolio()], accounts=[kis, kiwoom], waiting_usd=[(kis.id, 450.0), (kiwoom.id, 300.0)])
     result = await _plan(db, months=1, closes=_closes())
     assert result["waiting_fx_usd"] == 200.0  # KIS는 충분, 키움만 300 − 100
+
+
+async def test_plan_waiting_fx_skips_krw_order_account_leg():
+    """plans/129 A2 — 원화주문 계좌 leg가 대기 중이면 원화가 모자란 것이라 '지금' 달러 환전으로 넣지 않는다."""
+    kis = _acct(0.0, asset_type="STOCK_KIS", kis_account_no="1")
+    kiwoom = _acct(0.0, asset_type="STOCK_KIWOOM", kiwoom_account_no="2")
+    db = _db(
+        [_portfolio()],
+        accounts=[kis, kiwoom],
+        waiting_usd=[(kis.id, "STOCK_KIS", False, 200.0), (kiwoom.id, "STOCK_KIWOOM", True, 300.0)],
+    )
+    result = await _plan(db, months=1, closes=_closes())
+    assert result["waiting_fx_usd"] == 200.0
 
 
 async def test_plan_waiting_fx_forces_now_tranche():

@@ -139,6 +139,29 @@ class TestYearRangeFilters:
         status = await calc_pension_contribution_status(user.id, 2026, pg)
         assert status["irp_deposit_krw"] == 500
 
+    async def test_dividend_year_filters_keep_year_boundaries(self, pg: AsyncSession):
+        """plans/129 B4: 배당 집계의 extract(year) → 날짜 범위 전환이 12/31·1/1 경계를 지키는지(date 바인딩 포함)."""
+        from app.services.dividend.aggregator import get_annual_dividends_received
+        from app.services.dividend.orchestrator import _fetch_received_dividends_by_ticker
+
+        user, account = await _user_and_account(pg)
+        for d, amount in ((date(2025, 12, 31), 100), (date(2026, 1, 1), 200), (date(2026, 12, 31), 300)):
+            pg.add(
+                Transaction(
+                    user_id=user.id,
+                    account_id=account.id,
+                    transaction_type="DIVIDEND",
+                    ticker="AAA",
+                    amount=amount,
+                    transaction_date=d,
+                )
+            )
+        await pg.flush()
+
+        assert await get_annual_dividends_received(user.id, pg, 2026) == 500
+        by_ticker = await _fetch_received_dividends_by_ticker(pg, user.id, 2026)
+        assert by_ticker == {"AAA": 500}
+
 
 async def test_release_read_connection_returns_connection_to_pool():
     """plans/125 — 읽기 후 반납하면 풀의 checkedout이 0이 되고, 이후 쿼리는 새로 커넥션을 받는다."""

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import uses_krw_overseas_order
+from app.constants import KRW_ORDER_FX_MARGIN, uses_krw_overseas_order
 from app.core.job_runner import report_handled_failure
 from app.models.rebalancing_plan import RebalancingPlanItem
 from app.services.rebalancing.order_builder import market_group
@@ -31,9 +31,6 @@ logger = structlog.get_logger()
 
 FX_FEE_BUFFER = 1.003
 """필요 달러에 더하는 수수료·호가 여유(0.3%) — 지정가 갱신분과 해외 매매수수료를 덮는다."""
-
-KRW_ORDER_FX_MARGIN = 1.03
-"""원화주문 계좌의 원화 매수여력을 달러로 바꿀 때 환율에 얹는 여유(3%) — 증권사 가환율·결제일 환율 변동 대비."""
 
 
 @dataclass(frozen=True)
@@ -51,6 +48,12 @@ USD_UNKNOWN = UsdUnknown()
 
 UsdCheck = UsdShortfall | UsdUnknown | None
 """`check_usd_shortfall` 결과 — 부족(UsdShortfall)·미확인(USD_UNKNOWN)·충분(None)."""
+
+UsdLedger = dict[uuid.UUID, float]
+"""한 잡 실행 안에서 계좌별로 이미 통과시킨 필요 달러 — 같은 계좌의 두 leg가 같은 잔고로 둘 다 통과하지 않게 한다.
+
+증권사 달러 예수금은 방금 낸 주문을 곧바로 빼지 않을 수 있어(결제 전) 앞 leg 몫을 직접 뺀다(plans/129 B1).
+잡 실행 하나에서만 쓴다 — 실행 간에는 잔고 반영 여부를 몰라 이중 차감으로 거짓 대기를 만들 수 있다."""
 
 
 async def fetch_usd_buying_power(account_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, cache) -> float | None:
@@ -132,8 +135,12 @@ async def check_usd_shortfall(
     user_id: uuid.UUID,
     db: AsyncSession,
     cache,
+    ledger: UsdLedger | None = None,
 ) -> UsdCheck:
-    """이 leg를 사려면 달러가 부족한지. 부족하면 UsdShortfall, 판정 불가면 USD_UNKNOWN, 충분하면 None."""
+    """이 leg를 사려면 달러가 부족한지. 부족하면 UsdShortfall, 판정 불가면 USD_UNKNOWN, 충분하면 None.
+
+    `ledger`가 있으면 같은 계좌에서 앞서 통과한 몫을 잔고에서 빼고 비교하며, 통과하면 이 leg 몫을 더한다.
+    """
     from app.services.rebalancing.plan_execution import _rebuild_orders_from_items
 
     try:
@@ -150,7 +157,11 @@ async def check_usd_shortfall(
     if available is None:
         logger.info("dca_usd_buying_power_unknown", account_id=str(account_id))
         return USD_UNKNOWN
+    committed = ledger.get(account_id, 0.0) if ledger is not None else 0.0
+    available = max(0.0, available - committed)
     if available + 1e-6 >= required:
+        if ledger is not None:
+            ledger[account_id] = committed + required
         return None
     logger.info(
         "dca_usd_shortfall",
