@@ -14,10 +14,10 @@ import pytest
 from app.services import dca_cash_shortfall_service as shortfall
 from app.services.dca_service import _calc_goal_timeline, _calc_months_to_goal, _elapsed_months
 from app.services.goal import _goal_recommendation_common as grc
-from app.services.goal.goal_portfolio_optimizer import (
+from app.services.goal.goal_portfolio_optimizer import _optimize_goal_portfolio
+from app.services.goal.goal_portfolio_weights import (
     _annualized_covariance,
     _class_bounds_violated,
-    _optimize_goal_portfolio,
     _weights_to_items,
     compute_weighted_expected_metrics,
 )

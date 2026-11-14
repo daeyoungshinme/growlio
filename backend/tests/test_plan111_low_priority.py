@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.services.goal import _goal_dividend_suggestions as gds
 from app.services.goal import _goal_recommendation_common as grc
 from app.services.goal.goal_recommendation_service import (
     MAX_GOAL_CANDIDATE_TICKERS,
@@ -84,7 +85,7 @@ class TestDividendCapacityCountsAugmentedCandidates:
                 AsyncMock(return_value={}),
             ),
             patch(f"{grc.__name__}._fetch_dividend_yields", AsyncMock(return_value={})),
-            patch(f"{grc.__name__}._suggest_for_dividend_goal", suggest),
+            patch(f"{gds.__name__}._suggest_for_dividend_goal", suggest),
         ):
             await get_goal_recommendation(None, 10_000_000.0, [], settings_row, db)
 

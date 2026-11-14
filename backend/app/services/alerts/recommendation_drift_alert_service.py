@@ -5,7 +5,7 @@
 `RecommendationCard.tsx`의 "추천이 달라졌어요" 배지(Phase A)를 주기적으로 알려주는 Phase B —
 `docs/plans/03-recommendation-diagnosis-linkage.md` 참고.
 
-`goal_recommendation_service.compute_recommendation_drift()`가 프론트
+`goal.recommendation_drift.compute_recommendation_drift()`가 프론트
 `frontend/src/utils/recommendationDrift.ts`의 `computeRecommendationDrift()`와 동일한 로직이다.
 
 타겟 포트폴리오 판별은 프론트 `utils/portfolio.ts`의 `getPortfolioTargetState`/`getPortfolioHorizonTaxType`을
@@ -34,12 +34,11 @@ from app.services._settings_queries import get_settings_row
 from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.alerts.alert_service import already_sent_alert_today
 from app.services.goal.goal_horizon_recommendation_service import get_horizon_recommendations
-from app.services.goal.goal_recommendation_service import (
+from app.services.goal.goal_recommendation_service import build_overall_recommendation_inputs, get_goal_recommendation
+from app.services.goal.recommendation_drift import (
     RECOMMENDATION_DRIFT_THRESHOLD_PCT,
-    build_overall_recommendation_inputs,
     compute_recommendation_drift,
     fold_into_portfolio_groups,
-    get_goal_recommendation,
 )
 from app.services.portfolio._portfolio_queries import get_linked_portfolios
 from app.utils.cache_keys import CacheStoreType, get_goal_recommendation_generation
