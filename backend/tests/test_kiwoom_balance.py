@@ -230,6 +230,21 @@ class TestGetDomesticBalance:
         mock_logger.warning.assert_called_once_with("kiwoom_deposit_d2_missing_fallback_entr", entr="000000100000")
 
     @pytest.mark.asyncio
+    async def test_get_orderable_krw_only_calls_deposit(self):
+        """원화 매수여력만 — kt00001 1회, 보유종목(kt00018)은 조회하지 않는다."""
+        from app.kiwoom.balance import get_orderable_krw
+
+        calls: list[str] = []
+
+        async def _fake_request(method, path, *, is_mock, headers, json=None, **kwargs):
+            calls.append(headers["api-id"])
+            return _deposit_response()
+
+        with patch("app.kiwoom.balance.kiwoom_request", side_effect=_fake_request):
+            assert await get_orderable_krw("token", is_mock=True) == 110000.0
+        assert calls == ["kt00001"]
+
+    @pytest.mark.asyncio
     async def test_orderable_krw_fallback_chain(self):
         """100stk_ord_alow_amt → ord_alow_amt → deposit_krw 순 폴백."""
 

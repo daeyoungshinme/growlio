@@ -104,8 +104,15 @@ export const fetchGoalFeasibility = (params: {
 // ── 달러 환전 계획(plans/96) — 예측이 아닌 1년 통계적 위치 + 해외 적립 필요 달러 분할 ──
 
 export type FxZone = "CHEAP" | "NEUTRAL" | "EXPENSIVE";
+/** KRW_ORDER = 정액 적립 실행 계좌가 모두 키움 원화주문 계좌라 미리 바꿀 달러가 없다 */
 export type FxPlanStatus =
-  "OK" | "SUFFICIENT" | "NO_DEPOSIT_GOAL" | "NO_OVERSEAS" | "NO_PORTFOLIO" | "NO_RATE";
+  | "OK"
+  | "SUFFICIENT"
+  | "NO_DEPOSIT_GOAL"
+  | "NO_OVERSEAS"
+  | "NO_PORTFOLIO"
+  | "NO_RATE"
+  | "KRW_ORDER";
 
 export interface FxPosition {
   rate: number;
@@ -171,6 +178,8 @@ export interface FxPlanData {
   waiting_fx_usd?: number;
   /** 추가 환전 항목(여행 등)이 증권 계좌에 둔 달러 — held_usd에서 뺐다(plans/123 후속) */
   reserved_usd?: number;
+  /** 원화주문 계좌라 필요 달러에서 뺀 정액 적립 실행 계좌 이름 — 옛 persist 캐시엔 없을 수 있다 */
+  krw_order_accounts?: string[];
 }
 
 export const fetchFxPlan = (months: number, portfolioId?: string | null) => {

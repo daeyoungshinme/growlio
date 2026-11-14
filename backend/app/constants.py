@@ -27,6 +27,17 @@ BROKER_API_DATA_SOURCES: frozenset[str] = frozenset({"KIS_API", "KIWOOM_API", "T
 ORDER_EXECUTABLE_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIS", "STOCK_KIWOOM"})
 """주문 실행·취소 게이트 — 토스는 주문 API 미구현이라 제외. 읽기 경로(BROKER_API_ASSET_TYPES)와 의도적으로 다르다."""
 
+KRW_OVERSEAS_ORDER_ASSET_TYPES: frozenset[str] = frozenset({"STOCK_KIWOOM"})
+"""해외 매수를 원화 예수금으로 결제(자동 환전)하는 서비스를 표시할 수 있는 계좌 — 키움 "원화주문"."""
+
+
+def uses_krw_overseas_order(account: object) -> bool:
+    """해외 매수가 원화로 결제되는 계좌인지 — 키움 계좌 + 사용자가 원화주문 신청을 표시(`krw_overseas_order`)."""
+    return getattr(account, "asset_type", None) in KRW_OVERSEAS_ORDER_ASSET_TYPES and bool(
+        getattr(account, "krw_overseas_order", False)
+    )
+
+
 MAX_GOAL_CANDIDATE_TICKERS = 20
 # 주가 알림은 10분 잡의 조회 종목 수를 늘린다 — 평범한 사용을 넉넉히 넘는 값으로 비용 상한만 건다
 MAX_STOCK_PRICE_ALERTS_PER_USER = 100

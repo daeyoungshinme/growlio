@@ -349,6 +349,58 @@ class TestUsdBuyingPower:
             assert await ubp.fetch_usd_buying_power(uuid.uuid4(), uuid.uuid4(), mock_db, None) == 123.45
             mock_db.commit.assert_not_awaited()  # 호출자 세션을 건드리지 않는다
 
+    def _kiwoom_patches(self, account, *, usd=100.0, orderable_krw=1_030_000.0, rate=(1000.0, True)):
+        return (
+            patch(
+                "app.services.rebalancing.execution_service.load_executable_account",
+                new=AsyncMock(return_value=account),
+            ),
+            patch("app.services.rebalancing.execution_service.load_kiwoom_credentials", return_value=("k", "s")),
+            patch("app.kiwoom.auth.get_access_token", new=AsyncMock(return_value="tok")),
+            patch("app.kiwoom.balance.get_overseas_deposit_usd", new=AsyncMock(return_value=usd)),
+            patch("app.kiwoom.balance.get_orderable_krw", new=AsyncMock(return_value=orderable_krw)),
+            patch("app.utils.currency.get_live_or_cached_usd_krw", new=AsyncMock(return_value=rate)),
+        )
+
+    @pytest.mark.asyncio
+    async def test_fetch_kiwoom_krw_order_adds_krw_buying_power(self, mock_db):
+        """원화주문 계좌는 원화 매수여력을 (환율 × 여유)로 달러 환산해 더한다 — 달러만 보면 환전 대기로 잘못 막는다."""
+        from contextlib import ExitStack
+
+        from app.services.rebalancing import usd_buying_power as ubp
+
+        account = SimpleNamespace(is_mock_mode=False, asset_type="STOCK_KIWOOM", krw_overseas_order=True)
+        with ExitStack() as stack:
+            for p in self._kiwoom_patches(account):
+                stack.enter_context(p)
+            value = await ubp.fetch_usd_buying_power(uuid.uuid4(), uuid.uuid4(), mock_db, None)
+        assert value == pytest.approx(100.0 + 1_030_000.0 / (1000.0 * ubp.KRW_ORDER_FX_MARGIN))
+
+    @pytest.mark.asyncio
+    async def test_fetch_kiwoom_krw_order_unknown_without_live_rate(self, mock_db):
+        """실환율이 없으면 fallback 환율로 환산하지 않고 미확인(None) — 실행 경로는 증권사 판정에 맡긴다."""
+        from contextlib import ExitStack
+
+        from app.services.rebalancing import usd_buying_power as ubp
+
+        account = SimpleNamespace(is_mock_mode=False, asset_type="STOCK_KIWOOM", krw_overseas_order=True)
+        with ExitStack() as stack:
+            for p in self._kiwoom_patches(account, rate=(1300.0, False)):
+                stack.enter_context(p)
+            assert await ubp.fetch_usd_buying_power(uuid.uuid4(), uuid.uuid4(), mock_db, None) is None
+
+    @pytest.mark.asyncio
+    async def test_fetch_kiwoom_without_krw_order_ignores_krw(self, mock_db):
+        from contextlib import ExitStack
+
+        from app.services.rebalancing import usd_buying_power as ubp
+
+        account = SimpleNamespace(is_mock_mode=False, asset_type="STOCK_KIWOOM", krw_overseas_order=False)
+        with ExitStack() as stack:
+            mocks = [stack.enter_context(p) for p in self._kiwoom_patches(account)]
+            assert await ubp.fetch_usd_buying_power(uuid.uuid4(), uuid.uuid4(), mock_db, None) == 100.0
+        mocks[4].assert_not_awaited()  # 원화 매수여력은 조회하지 않는다
+
 
 # ── 실행 경로 ─────────────────────────────────────────────
 

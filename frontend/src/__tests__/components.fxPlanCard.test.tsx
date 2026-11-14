@@ -449,6 +449,28 @@ describe("FxPlanCard", () => {
     expect(await screen.findByText(/해외 종목이 들어 있는 포트폴리오가 없어/)).toBeInTheDocument();
   });
 
+  it("정액 적립 계좌가 모두 원화주문이면 환전 없이 안내한다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      status: "KRW_ORDER",
+      krw_order_accounts: ["키움 원화"],
+      need_usd: 0,
+      tranches: [],
+    });
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByText(/\(키움 원화\)가 키움 원화주문 계좌라/)).toBeInTheDocument();
+  });
+
+  it("일부 계좌가 원화주문이면 산식에 제외를 표시한다", async () => {
+    vi.mocked(fetchFxPlan).mockResolvedValue({
+      ...plan,
+      deposit_source: "DCA_AMOUNT",
+      krw_order_accounts: ["키움 원화"],
+    });
+    renderWithProviders(<FxPlanCard />);
+    expect(await screen.findByText(/원화주문 계좌 키움 원화 제외/)).toBeInTheDocument();
+  });
+
   it("이미 충분하면 구간 없이 안내한다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue({
       ...plan,
