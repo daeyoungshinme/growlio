@@ -27,7 +27,7 @@ from app.services.rebalancing.plan_notifications import (
     _notify_leg_execution_failed,
     _send_leg_execution_email,
 )
-from app.services.rebalancing.usd_buying_power import USD_UNKNOWN, UsdCheck, UsdShortfall, UsdUnknown
+from app.services.rebalancing.usd_buying_power import USD_UNKNOWN, UsdCheck, UsdLedger, UsdShortfall, UsdUnknown
 from app.utils.numbers import opt_float
 
 logger = structlog.get_logger()
@@ -376,10 +376,12 @@ async def execute_due_buy_legs(db: AsyncSession, cache) -> int:
     composite_level, data_freshness = await get_confirmed_composite_level(cache, db)
 
     processed = 0
+    # 같은 계좌의 정액 해외 leg 둘이 같은 달러로 둘 다 통과하면 두 번째가 증권사 거부로 FAILED가 된다(plans/129 B1)
+    usd_ledger: UsdLedger = {}
     for leg_id in due_leg_ids:
         # leg마다 격리 — 한 건의 예외(DB 오류 등)가 같은 tick의 나머지 leg를 막지 않게
         try:
-            if await _run_due_buy_leg(leg_id, now, composite_level, data_freshness, db, cache):
+            if await _run_due_buy_leg(leg_id, now, composite_level, data_freshness, db, cache, usd_ledger):
                 processed += 1
         except Exception as e:
             report_handled_failure("rebalancing_plan_buy_leg_tick_failed", e, leg_id=str(leg_id))
@@ -389,7 +391,13 @@ async def execute_due_buy_legs(db: AsyncSession, cache) -> int:
 
 
 async def _run_due_buy_leg(
-    leg_id: uuid.UUID, now: datetime, composite_level, data_freshness, db: AsyncSession, cache
+    leg_id: uuid.UUID,
+    now: datetime,
+    composite_level,
+    data_freshness,
+    db: AsyncSession,
+    cache,
+    usd_ledger: UsdLedger | None = None,
 ) -> bool:
     """대기시간이 지난 BUY leg 1건을 만료·보류·실행한다. 처리(만료 또는 실행)했으면 True."""
     from app.models.alert import RebalancingAlert
@@ -438,7 +446,7 @@ async def _run_due_buy_leg(
 
     if _needs_usd_check(locked, alert):
         # 잔고 조회의 토큰 발급이 DB commit을 해 FOR UPDATE 락이 풀린다 — 조회 뒤 다시 잠그고 상태를 재확인한다
-        shortfall = await _usd_shortfall_for_leg(locked, plan, db, cache)
+        shortfall = await _usd_shortfall_for_leg(locked, plan, db, cache, usd_ledger)
         relocked = await _lock_leg(leg_id, db)
         if relocked is None or relocked.status != "PENDING" or relocked.token_consumed_at is not None:
             return False
@@ -474,14 +482,18 @@ def _needs_usd_check(leg: RebalancingPlanLeg, alert) -> bool:
     return leg.side == "BUY" and leg.market == "US" and _alert_is_dca(alert)
 
 
-async def _usd_shortfall_for_leg(leg: RebalancingPlanLeg, plan: RebalancingPlan, db: AsyncSession, cache) -> UsdCheck:
-    """leg 매수에 달러가 모자라면 UsdShortfall, 확인 불가면 USD_UNKNOWN, 충분하면 None."""
+async def _usd_shortfall_for_leg(
+    leg: RebalancingPlanLeg, plan: RebalancingPlan, db: AsyncSession, cache, ledger: UsdLedger | None = None
+) -> UsdCheck:
+    """leg 매수에 달러가 모자라면 UsdShortfall, 확인 불가면 USD_UNKNOWN, 충분하면 None.
+
+    `ledger`는 한 잡 실행에서 계좌별로 앞서 통과한 몫(`usd_buying_power.UsdLedger`)."""
     from app.services.rebalancing.usd_buying_power import check_usd_shortfall
 
     if plan.account_id is None:
         return USD_UNKNOWN
     await db.refresh(leg, attribute_names=["items"])
-    return await check_usd_shortfall(list(leg.items), plan.account_id, plan.user_id, db, cache)
+    return await check_usd_shortfall(list(leg.items), plan.account_id, plan.user_id, db, cache, ledger)
 
 
 async def _enter_fx_wait(
@@ -602,6 +614,8 @@ async def recheck_fx_waiting_legs(db: AsyncSession, cache) -> int:
     leg_ids = [row[0] for row in result.all()]
     market_open = is_us_market_open()
     processed = 0
+    # 같은 계좌에서 기다리던 leg 둘을 같은 달러로 둘 다 재개하지 않는다(plans/129 B1)
+    usd_ledger: UsdLedger = {}
     for leg_id in leg_ids:
         try:
             leg = await db.get(RebalancingPlanLeg, leg_id)
@@ -615,7 +629,7 @@ async def recheck_fx_waiting_legs(db: AsyncSession, cache) -> int:
                 alert = await db.get(RebalancingAlert, plan.alert_id) if plan.alert_id else None
                 # 알림이 정액 모드가 아니게 바뀌었으면 확인 없이 되돌린다 — 실행 경로가 기존 방식(증권사 판정)으로 처리
                 if _alert_is_dca(alert):
-                    shortfall = await _usd_shortfall_for_leg(leg, plan, db, cache)
+                    shortfall = await _usd_shortfall_for_leg(leg, plan, db, cache, usd_ledger)
             locked = await _lock_leg(leg_id, db)
             if locked is None or locked.status != "WAITING_FX" or locked.token_consumed_at is not None:
                 await db.rollback()  # FOR UPDATE 락을 다음 leg까지 붙잡지 않게 바로 푼다

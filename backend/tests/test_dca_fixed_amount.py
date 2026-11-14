@@ -312,6 +312,27 @@ class TestUsdBuyingPower:
                 assert await ubp.check_usd_shortfall([], uuid.uuid4(), uuid.uuid4(), mock_db, None) is expected
 
     @pytest.mark.asyncio
+    async def test_ledger_stops_second_leg_on_same_account(self, mock_db):
+        """plans/129 B1 — 같은 계좌 $600, leg 둘이 각 ~$400이면 하나만 통과한다. 다른 계좌는 따로 센다."""
+        from app.services.rebalancing import usd_buying_power as ubp
+
+        order = SimpleNamespace(market="NASDAQ", quantity=4, limit_price=100.0)  # 400 × 1.003
+        account, other = uuid.uuid4(), uuid.uuid4()
+        ledger: dict = {}
+        with (
+            patch.object(svc_exec, "_rebuild_orders_from_items", new=AsyncMock(return_value=[order])),
+            patch.object(ubp, "fetch_usd_buying_power", new=AsyncMock(return_value=600.0)),
+        ):
+            first = await ubp.check_usd_shortfall([], account, uuid.uuid4(), mock_db, None, ledger)
+            second = await ubp.check_usd_shortfall([], account, uuid.uuid4(), mock_db, None, ledger)
+            elsewhere = await ubp.check_usd_shortfall([], other, uuid.uuid4(), mock_db, None, ledger)
+        assert first is None
+        assert isinstance(second, ubp.UsdShortfall)
+        assert second.available_usd == pytest.approx(600.0 - 401.2)
+        assert elsewhere is None
+        assert ledger[account] == pytest.approx(401.2)
+
+    @pytest.mark.asyncio
     async def test_check_unknown_when_price_or_limit_missing(self, mock_db):
         """시세 실패·지정가 없음은 "충분"이 아니라 미확인이다(plans/122 A2)."""
         from app.services.rebalancing import usd_buying_power as ubp
