@@ -56,12 +56,19 @@ export function AlertQuickDcaSection({
       </div>
 
       <div>
-        <label
-          htmlFor={`${uid}-account`}
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-        >
-          실행 계좌
-        </label>
+        {/* 선택 상자는 계좌 2개 이상일 때만 — 그 밖엔 가리킬 컨트롤이 없어 제목만 둔다 */}
+        {autoExecutionAccounts.length > 1 ? (
+          <label
+            htmlFor={`${uid}-account`}
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >
+            실행 계좌
+          </label>
+        ) : (
+          <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            실행 계좌
+          </p>
+        )}
         <AutoExecutionAccountPicker
           id={`${uid}-account`}
           accounts={autoExecutionAccounts}

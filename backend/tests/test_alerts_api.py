@@ -808,3 +808,20 @@ async def test_count_user_alerts_locks_user_row_before_counting():
     assert calls[0].startswith("lock:")
     assert "FOR UPDATE" in calls[0]
     assert calls[1] == "count"
+
+
+async def test_quota_lock_does_not_block_fk_inserts():
+    """plans/132 B2 — FOR UPDATE는 users를 참조하는 INSERT(FOR KEY SHARE)까지 막아 교착을 만든다. NO KEY UPDATE로."""
+    import uuid as _uuid
+    from unittest.mock import AsyncMock as _AsyncMock
+    from unittest.mock import MagicMock as _MagicMock
+
+    from sqlalchemy.dialects import postgresql
+
+    from app.utils.quota_lock import lock_user_for_quota
+
+    db = _MagicMock()
+    db.execute = _AsyncMock()
+    await lock_user_for_quota(db, _uuid.uuid4())
+    sql = str(db.execute.await_args.args[0].compile(dialect=postgresql.dialect()))
+    assert "FOR NO KEY UPDATE" in sql

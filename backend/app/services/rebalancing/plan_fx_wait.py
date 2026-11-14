@@ -89,7 +89,7 @@ async def recheck_fx_waiting_legs(db: AsyncSession, cache) -> int:
     market_open = is_us_market_open()
     processed = 0
     # 같은 계좌에서 기다리던 leg 둘을 같은 달러로 둘 다 재개하지 않는다(plans/129 B1)
-    usd_ledger: UsdLedger = {}
+    usd_ledger = UsdLedger()
     for leg_id in leg_ids:
         try:
             leg = await db.get(RebalancingPlanLeg, leg_id)
@@ -99,10 +99,12 @@ async def recheck_fx_waiting_legs(db: AsyncSession, cache) -> int:
             if not _pe._fx_wait_past_deadline(leg) and (not market_open or plan is None):
                 continue
             shortfall: UsdCheck = None
+            usd_checked = False
             if not _pe._fx_wait_past_deadline(leg) and plan is not None:
                 alert = await db.get(RebalancingAlert, plan.alert_id) if plan.alert_id else None
                 # 알림이 정액 모드가 아니게 바뀌었으면 확인 없이 되돌린다 — 실행 경로가 기존 방식(증권사 판정)으로 처리
                 if _pe._alert_is_dca(alert):
+                    usd_checked = True
                     shortfall = await _pe._usd_shortfall_for_leg(leg, plan, db, cache, usd_ledger)
             locked = await _pe._lock_leg(leg_id, db)
             if locked is None or locked.status != "WAITING_FX" or locked.token_consumed_at is not None:
@@ -127,6 +129,8 @@ async def recheck_fx_waiting_legs(db: AsyncSession, cache) -> int:
             _pe._resume_fx_waiting_leg(locked, datetime.now(tz=UTC))
             await _pe.save_alert_history(db, plan.user_id, "REBALANCING", "적립 해외 매수 재개 — 달러 확인됨")
             await db.commit()
+            if usd_checked:
+                usd_ledger.confirm(plan.account_id)
             processed += 1
         except Exception as e:
             report_handled_failure("dca_fx_wait_recheck_failed", e, leg_id=str(leg_id))

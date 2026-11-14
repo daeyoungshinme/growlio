@@ -10,6 +10,7 @@ import { fetchDCAAnalysis, fetchDividendPlan, fetchFxPlan } from "@/api/invest";
 import { fetchIsaStatus, fetchTaxSummary } from "@/api/tax";
 import { fetchActionItems, fetchDashboard } from "@/api/dashboard";
 import { fetchChallenges } from "@/api/challenges";
+import { fetchRecentPlanLegs } from "@/api/rebalancingPlan";
 import {
   fetchCompositeSignalStatus,
   fetchDriftSummary,
@@ -55,6 +56,13 @@ export const exchangeRateQuery = queryOptions({
 export const exchangeRateAlertsQuery = queryOptions({
   queryKey: QUERY_KEYS.exchangeRateAlerts,
   queryFn: () => fetchExchangeRateAlerts(),
+});
+
+/** 최근 대기 플랜 leg — 리밸런싱 이력 탭과 적립 계획 배너(환전 대기 안내)가 같은 캐시를 쓴다(plans/132 D3) */
+export const rebalancingPlansQuery = queryOptions({
+  queryKey: QUERY_KEYS.rebalancingPlans,
+  queryFn: () => fetchRecentPlanLegs(30),
+  staleTime: STALE_TIME.VERY_SHORT,
 });
 
 export const settingsQuery = queryOptions({

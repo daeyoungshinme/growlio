@@ -252,8 +252,12 @@ async def update_account(
         raise BadRequestError("계좌를 비활성화하려면 삭제 기능을 사용해주세요")
 
     update_fields = req.model_dump(exclude_none=True, exclude=CREDENTIAL_FIELDS | {"is_active"})
+    usd_before = account.deposit_usd
     for field, value in update_fields.items():
         setattr(account, field, value)
+    if "deposit_usd" in update_fields and update_fields["deposit_usd"] != usd_before:
+        # 사용자가 고친 달러도 그 시각에 확정된 값이다 — 옛 동기화 시각을 붙인 채 보이지 않게(plans/132 B4)
+        account.deposit_usd_synced_at = datetime.now(UTC)
     # 지울 수 있는 항목만 null을 반영한다 — 금액·이름 등은 null이어도 기존 값 유지
     for field in _CLEARABLE_ACCOUNT_FIELDS & req.model_fields_set:
         if getattr(req, field) is None:

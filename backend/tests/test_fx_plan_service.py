@@ -388,6 +388,24 @@ async def test_plan_excludes_krw_order_account_from_need():
     assert result["krw_order_accounts"] == ["키움 원화주문"]
 
 
+async def test_plan_krw_order_account_usd_not_offset_against_other_accounts_need():
+    """원화주문 계좌의 달러는 그 계좌 자신의 해외 매수가 먼저 쓴다 — 다른 계좌의 필요 달러를 상쇄하지 않는다."""
+    usd_acct = _acct(0.0)
+    krw_acct = _krw_order_acct()
+    krw_acct.deposit_usd = 500.0
+    db = _db(
+        [_portfolio()],
+        fixed=[(_fixed_alert(700_000), usd_acct), (_fixed_alert(700_000), krw_acct)],
+        accounts=[usd_acct, krw_acct],
+    )
+    result = await _plan(db)
+    monthly = 700_000 * 0.6 / 1400
+    assert result["monthly_need_usd"] == round(monthly, 2)
+    assert result["held_usd"] == 0.0
+    assert result["need_usd"] == round(monthly * 3, 2)
+    assert result["held_usd_accounts"] == []
+
+
 async def test_plan_krw_order_status_when_all_accounts_pay_in_krw():
     result = await _plan(_db([_portfolio()], fixed=[(_fixed_alert(1_000_000), _krw_order_acct())], accounts=[]))
     assert result["status"] == "KRW_ORDER"

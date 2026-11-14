@@ -234,7 +234,7 @@ def _sync_db(alerts, *, due=TODAY + timedelta(days=30)):
 
 
 async def _sync_need(db, need_id, targets):
-    with patch.object(fx_plan_service, "today_kst", return_value=TODAY):
+    with patch.object(fx_plan_alerts, "today_kst", return_value=TODAY):
         return await fx_plan_alerts.sync_fx_plan_alerts(
             db, CacheStore(), uuid.uuid4(), None, targets, fx_need_id=need_id
         )

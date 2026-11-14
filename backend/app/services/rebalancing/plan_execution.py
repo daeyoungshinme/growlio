@@ -377,7 +377,7 @@ async def execute_due_buy_legs(db: AsyncSession, cache) -> int:
 
     processed = 0
     # 같은 계좌의 정액 해외 leg 둘이 같은 달러로 둘 다 통과하면 두 번째가 증권사 거부로 FAILED가 된다(plans/129 B1)
-    usd_ledger: UsdLedger = {}
+    usd_ledger = UsdLedger()
     for leg_id in due_leg_ids:
         # leg마다 격리 — 한 건의 예외(DB 오류 등)가 같은 tick의 나머지 leg를 막지 않게
         try:
@@ -444,7 +444,8 @@ async def _run_due_buy_leg(
         )
         return False
 
-    if _needs_usd_check(locked, alert):
+    usd_checked = _needs_usd_check(locked, alert)
+    if usd_checked:
         # 잔고 조회의 토큰 발급이 DB commit을 해 FOR UPDATE 락이 풀린다 — 조회 뒤 다시 잠그고 상태를 재확인한다
         shortfall = await _usd_shortfall_for_leg(locked, plan, db, cache, usd_ledger)
         relocked = await _lock_leg(leg_id, db)
@@ -463,6 +464,9 @@ async def _run_due_buy_leg(
     await db.commit()
 
     execution_id = await _execute_leg(locked, plan, db, cache, "SYSTEM_AUTO")
+    if usd_ledger is not None and usd_checked and locked.status != "FAILED":
+        # 주문이 하나라도 나갔으면 그 달러는 썼다 — 전부 실패(FAILED)면 다음 leg가 같은 달러를 쓸 수 있다
+        usd_ledger.confirm(plan.account_id)
     if execution_id:
         await _send_leg_execution_email(plan, execution_id, db)
     return True

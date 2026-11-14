@@ -181,7 +181,7 @@ _기타_
 
 - 키 정의는 `constants/queryKeys.ts` 하나 — 문자열 하드코딩 금지, 전부 `QUERY_KEYS`에서 import.
 - 계좌·연도별로 분기되는 키는 무효화 전용 `xxxBase` 프리픽스 키(`portfolioOverviewBase`, `transactionsBase`, `taxSummaryBase` 등)가 따로 있다 — **무효화는 항상 Base 키로**(특정 accountId 키만 지우면 다른 조합이 stale).
-- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status·exchange-rate·exchange-rate-alerts·dashboard·tax-summary(`taxSummaryQuery(year, accountId)`)·dividend-plan(`dividendPlanQuery`)·action-items(`actionItemsQuery`)·challenges(`challengesQuery`))는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
+- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status·exchange-rate·exchange-rate-alerts·dashboard·tax-summary(`taxSummaryQuery(year, accountId)`)·dividend-plan(`dividendPlanQuery`)·action-items(`actionItemsQuery`)·challenges(`challengesQuery`)·rebalancing-plans(`rebalancingPlansQuery`))는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나.
 
 **캐시 무효화 (`src/utils/queryInvalidation.ts`)** — 컴포넌트·훅에서 `queryClient.invalidateQueries()` 직접 호출 금지. 새 함수는 `invalidate<Domain>Data(queryClient)` 형태로 여기에 추가. 각 함수의 정확한 대상은 소스 확인.
 
@@ -253,7 +253,7 @@ _기타_
 
 **차트 (`utils/chart.ts`)**: `chartTooltipStyle(isDark)`, `chartTickStyle(isDark)`/`CHART_TICK_FONT_SIZE`(12) — 인라인 스타일·`fontSize: 11` 금지. Recharts는 `dark:` 미지원이라 `isDark`로.
 
-**입력 스타일 (`constants/inputStyles.ts`)**: `INPUT_SM`/`INPUT_MD`, `LABEL_SM`/`LABEL_MD`, `FORM_LABEL`/`FORM_LABEL_XS`(폼 라벨), `SELECT_SM`, `TEXTAREA_SM` — 인라인 Tailwind 입력 스타일 금지. **`<label>`은 `htmlFor`(`useId()`)로 컨트롤과 연결하거나 컨트롤을 감싼다** — 여러 입력을 묶는 제목은 `<p id>` + `role="group" aria-labelledby`(`a11y.labels.test.ts`가 검사).
+**입력 스타일 (`constants/inputStyles.ts`)**: `INPUT_SM`/`INPUT_MD`, `LABEL_SM`/`LABEL_MD`, `FORM_LABEL`/`FORM_LABEL_XS`(폼 라벨), `FORM_INPUT_SM`, `SELECT_SM`, `TEXTAREA_SM` — 인라인 Tailwind 입력 스타일 금지. **`<label>`은 `htmlFor`(`useId()`)로 컨트롤과 연결하거나 컨트롤을 감싼다** — 여러 입력을 묶는 제목은 `<p id>` + `role="group" aria-labelledby`(`a11y.labels.test.ts`가 검사 — `htmlFor`가 같은 파일의 `id`를 가리키는지까지. 조건부로만 렌더되는 컨트롤은 그 조건에서만 label을 둘 것).
 
 **모바일 UI**
 

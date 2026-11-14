@@ -149,6 +149,9 @@ async def sync_fx_plan_alerts(
         if not acquired:
             raise ConflictError(detail="환전 계획 알림을 등록하는 중입니다. 잠시 후 다시 시도해 주세요")
 
+        # 읽고 분류하기 전에 잠근다 — 인스턴스가 둘이면(inproc_lock은 단일 프로세스) 두 동기화가 같은 알림 목록을 보고
+        # 같은 목표를 둘 다 만들 수 있다. 수동 알림 생성과 동시에 상한을 넘지 않게도 한다(plans/129 B3·132 B3)
+        await lock_user_for_quota(db, user_id)
         alerts = (
             (
                 await db.execute(
@@ -184,7 +187,6 @@ async def sync_fx_plan_alerts(
             else:
                 to_create.append((rate, usd))
 
-        await lock_user_for_quota(db, user_id)  # 수동 알림 생성과 동시에 상한을 넘지 않게(plans/129 B3)
         total = await db.scalar(
             select(func.count()).select_from(ExchangeRateAlert).where(ExchangeRateAlert.user_id == user_id)
         )

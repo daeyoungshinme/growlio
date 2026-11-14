@@ -11,15 +11,13 @@ import {
   describeDcaAutoBuy,
   isDcaAutoBuyPreset,
 } from "@/utils/dcaAutoBuy";
-import { fetchRecentPlanLegs } from "@/api/rebalancingPlan";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import {
   accountsQuery,
   portfoliosQuery,
   rebalancingAlertsQuery,
+  rebalancingPlansQuery,
   settingsQuery,
 } from "@/api/queryOptions";
 import EmptyState from "@/components/common/EmptyState";
@@ -39,11 +37,7 @@ export default function AutoInvestStatusBanner() {
   const { data: settings } = useQuery(settingsQuery);
   const usdRate = useExchangeRate();
   // 이력 탭과 같은 키 — 환전 대기(WAITING_FX) 해외 매수가 있으면 여기서도 알린다(plans/120)
-  const { data: planLegs } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingPlans,
-    queryFn: () => fetchRecentPlanLegs(30),
-    staleTime: STALE_TIME.VERY_SHORT,
-  });
+  const { data: planLegs } = useQuery(rebalancingPlansQuery);
   const fxWaitingCount = planLegs?.filter((leg) => leg.status === "WAITING_FX").length ?? 0;
 
   if (!portfolios || portfolios.length === 0) return null;
