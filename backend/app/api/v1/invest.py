@@ -24,7 +24,7 @@ from app.schemas.invest import (
     FxPlanResponse,
     GoalFeasibilityPreview,
 )
-from app.services import dca_service, fx_extra_need_service, fx_plan_service
+from app.services import dca_service, fx_extra_need_service, fx_plan_alerts, fx_plan_service
 from app.services.dividend import plan_service as dividend_plan_service
 from app.services.goal.goal_return_solver import build_feasibility_preview, months_until_year_end
 from app.services.portfolio.composition_calculator import build_asset_totals, exclude_real_estate
@@ -118,7 +118,7 @@ async def sync_fx_plan_alerts(
 ):
     """환전 계획 구간 목표로 환율 알림을 맞춘다 — 새 목표는 만들고, 빠진 미발동 계획 알림은 지운다(plans/121)."""
     cache = await get_cache_store()
-    result = await fx_plan_service.sync_fx_plan_alerts(
+    result = await fx_plan_alerts.sync_fx_plan_alerts(
         db,
         cache,
         current_user.id,
@@ -223,7 +223,7 @@ async def sync_fx_extra_need_alerts(
 ):
     """추가 환전 항목의 구간 목표로 환율 알림을 맞춘다 — 적립 계획 알림은 건드리지 않는다."""
     cache = await get_cache_store()
-    result = await fx_plan_service.sync_fx_plan_alerts(
+    result = await fx_plan_alerts.sync_fx_plan_alerts(
         db,
         cache,
         current_user.id,

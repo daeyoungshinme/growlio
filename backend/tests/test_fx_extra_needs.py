@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from app.core.cache_store import CacheStore
 from app.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.services import fx_extra_need_service as svc
-from app.services import fx_plan_service
+from app.services import fx_plan_alerts, fx_plan_service
 
 TODAY = date(2026, 11, 11)
 
@@ -235,7 +235,7 @@ def _sync_db(alerts, *, due=TODAY + timedelta(days=30)):
 
 async def _sync_need(db, need_id, targets):
     with patch.object(fx_plan_service, "today_kst", return_value=TODAY):
-        return await fx_plan_service.sync_fx_plan_alerts(
+        return await fx_plan_alerts.sync_fx_plan_alerts(
             db, CacheStore(), uuid.uuid4(), None, targets, fx_need_id=need_id
         )
 
@@ -279,7 +279,7 @@ async def test_portfolio_sync_leaves_need_alerts():
     db.delete = AsyncMock()
     db.commit = AsyncMock()
 
-    out = await fx_plan_service.sync_fx_plan_alerts(db, CacheStore(), uuid.uuid4(), pid, [])
+    out = await fx_plan_alerts.sync_fx_plan_alerts(db, CacheStore(), uuid.uuid4(), pid, [])
 
     assert out.removed == 1
     db.delete.assert_awaited_once_with(plan_alert)
@@ -302,7 +302,7 @@ async def test_need_sync_refuses_new_alerts_for_past_due_need_but_allows_release
 
 async def test_sync_requires_exactly_one_scope():
     with pytest.raises(ValueError, match="하나만"):
-        await fx_plan_service.sync_fx_plan_alerts(
+        await fx_plan_alerts.sync_fx_plan_alerts(
             MagicMock(), CacheStore(), uuid.uuid4(), uuid.uuid4(), [], fx_need_id=uuid.uuid4()
         )
 
@@ -521,8 +521,8 @@ async def test_list_releases_connection_before_rate_lookup():
 def test_api_alert_sync_uses_need_scope(api):
     client, user = api
     need_id = uuid.uuid4()
-    result = fx_plan_service.FxPlanAlertSyncResult(1, 0, 0, 0)
-    with patch.object(fx_plan_service, "sync_fx_plan_alerts", new=AsyncMock(return_value=result)) as sync:
+    result = fx_plan_alerts.FxPlanAlertSyncResult(1, 0, 0, 0)
+    with patch.object(fx_plan_alerts, "sync_fx_plan_alerts", new=AsyncMock(return_value=result)) as sync:
         res = client.put(
             f"/api/v1/invest/fx-extra-needs/{need_id}/alerts",
             json={"targets": [{"target_rate": 1350, "usd": 300}]},

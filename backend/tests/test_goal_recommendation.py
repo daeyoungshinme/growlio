@@ -11,11 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.constants import MAX_GOAL_CANDIDATE_TICKERS
-from app.services.goal._goal_recommendation_common import (
-    _fetch_candidate_returns,
-    _fetch_dividend_yields,
-    _suggest_for_dividend_goal,
-)
+from app.services.goal._goal_dividend_suggestions import _suggest_for_dividend_goal
+from app.services.goal._goal_recommendation_common import _fetch_candidate_returns, _fetch_dividend_yields
 from app.services.goal.goal_age_recommendation_service import (
     _AGE_GROUP_PROFILE,
     age_group_from_birth_year,
@@ -27,14 +24,14 @@ from app.services.goal.goal_candidate_service import (
     existing_items_from_positions,
 )
 from app.services.goal.goal_horizon_recommendation_service import get_horizon_recommendations
-from app.services.goal.goal_portfolio_optimizer import _optimize_goal_portfolio, compute_weighted_expected_metrics
+from app.services.goal.goal_portfolio_optimizer import _optimize_goal_portfolio
+from app.services.goal.goal_portfolio_weights import compute_weighted_expected_metrics
 from app.services.goal.goal_recommendation_service import (
     _apply_index_region_preference,
     _compute_overall_class_bounds,
     _matches_index_region_preference,
     _persist_added_candidates,
     compute_portfolio_expected_metrics,
-    compute_recommendation_drift,
     get_goal_recommendation,
 )
 from app.services.goal.goal_return_solver import (
@@ -42,6 +39,7 @@ from app.services.goal.goal_return_solver import (
     solve_required_annual_return_pct,
     solve_required_monthly_deposit,
 )
+from app.services.goal.recommendation_drift import compute_recommendation_drift
 from app.services.goal.recommendation_universe import (
     RECOMMENDATION_UNIVERSE,
     guess_asset_class,

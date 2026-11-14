@@ -52,15 +52,13 @@ from app.services.goal.goal_recommendation_service import (
     get_stale_goal_recommendation,
     refresh_goal_recommendation_in_background,
 )
+from app.services.rebalancing.analysis_items import _item_attr
 from app.services.rebalancing.broker_balance_service import fetch_broker_balance
 from app.services.rebalancing.diagnosis_service import (
     fetch_composite_signal,
 )
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
 from app.services.rebalancing.portfolio_analysis_service import analyze_portfolio_rebalancing
-from app.services.rebalancing.service import (
-    _item_attr,
-)
 from app.utils.cache_keys import (
     get_goal_recommendation_generation,
 )

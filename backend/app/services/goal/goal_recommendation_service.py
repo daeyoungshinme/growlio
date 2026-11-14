@@ -57,7 +57,6 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,6 +68,7 @@ from app.enums import AccountTaxType
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation, PortfolioExpectedMetrics
 from app.services._settings_queries import get_settings_row
+from app.services.goal import _goal_dividend_suggestions as _gds
 from app.services.goal import _goal_recommendation_common as _grc
 from app.services.goal.goal_candidate_service import (
     _active_account_tax_types,
@@ -81,14 +81,14 @@ from app.services.goal.goal_candidate_service import (
     pension_exclusion_note,
     pension_ineligibility_reason,
 )
-from app.services.goal.goal_portfolio_optimizer import _MIN_CANDIDATES, compute_weighted_expected_metrics
+from app.services.goal.goal_portfolio_optimizer import _MIN_CANDIDATES
+from app.services.goal.goal_portfolio_weights import compute_weighted_expected_metrics
 from app.services.goal.goal_return_solver import months_until_year_end, solve_required_annual_return_pct
 from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
 from app.services.market_data.price_service import get_historical_returns
 from app.services.market_data.yahoo_price import run_yf_bounded, to_yf_symbol
 from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.portfolio.position_aggregator import query_latest_position_map
-from app.services.rebalancing.group_expansion import group_owner_map
 from app.utils.cache_keys import (
     CacheStoreType,
     get_goal_recommendation_generation,
@@ -98,51 +98,6 @@ from app.utils.cache_keys import (
 from app.utils.inproc_lock import inproc_lock
 
 logger = structlog.get_logger()
-
-RECOMMENDATION_DRIFT_THRESHOLD_PCT = 3.0
-"""`frontend/src/utils/recommendationDrift.ts`의 RECOMMENDATION_DRIFT_THRESHOLD_PCT와 동일하게
-유지 — 프론트(화면을 열었을 때 배지)와 백엔드(주간 알림 job)가 같은 기준으로 "유의미한 변화"를
-판단하게 하기 위함. 한쪽만 바꾸면 배지와 알림의 민감도가 어긋나므로 항상 함께 바꿀 것."""
-
-
-def compute_recommendation_drift(
-    recommended: list[tuple[str, str, float]],  # (ticker, market, weight 0~100)
-    current: list[tuple[str, str, float]],
-) -> tuple[float, int]:
-    """`frontend/src/utils/recommendationDrift.ts`의 `computeRecommendationDrift()`와 동일한 로직을
-    백엔드에 포팅한 것 — ticker+market 키로 매칭해 (최대 비중차이%p, 신규후보개수)를 반환한다.
-    "유의미한 변화" 판정(`RECOMMENDATION_DRIFT_THRESHOLD_PCT` 이상 또는 신규후보 존재)은
-    호출측(`recommendation_drift_alert_service.py`)이 담당한다.
-    """
-    current_by_key = {(t, m): w for t, m, w in current}
-    max_delta_pct = 0.0
-    new_candidate_count = 0
-    for t, m, w in recommended:
-        current_weight = current_by_key.get((t, m))
-        if current_weight is None:
-            new_candidate_count += 1
-            continue
-        max_delta_pct = max(max_delta_pct, abs(w - current_weight))
-    return round(max_delta_pct, 1), new_candidate_count
-
-
-def fold_into_portfolio_groups(
-    recommended: list[tuple[str, str, float]], portfolio_items: list[Any]
-) -> list[tuple[str, str, float]]:
-    """추천 종목 중 포트폴리오 지수 그룹(plans/74)에 속한 종목은 그 그룹(대표 종목 키)으로 합산한다.
-
-    그룹 항목은 대표 종목 키 하나로 목표 비중을 가지므로, 추천이 같은 지수의 다른 종목(예: SPY ↔ 그룹 대표 VOO)을
-    내도 "신규 후보"로 세지 않는다. 프론트 `recommendationDrift.ts`의 `foldIntoPortfolioGroups()`와 같은 규칙.
-    """
-    # 추천·저장 비중은 투자금 기준이라 레버리지 배수는 곱하지 않는다(그룹 합산 키만 사용)
-    owner = group_owner_map(portfolio_items)
-    if not owner:
-        return recommended
-    folded: dict[tuple[str, str], float] = {}
-    for t, m, w in recommended:
-        key = owner[(t, m)][0] if (t, m) in owner else (t, m)
-        folded[key] = folded.get(key, 0.0) + w
-    return [(t, m, w) for (t, m), w in folded.items()]
 
 
 async def get_cached_goal_recommendation(
@@ -479,7 +434,7 @@ async def _compute_goal_recommendation(
     ) -> tuple[list[dict[str, object]], str | None, str | None]:
         if user_id is None:
             return [], None, None
-        return await _grc._suggest_for_dividend_goal(
+        return await _gds._suggest_for_dividend_goal(
             cache,
             computed_candidates,
             required_dividend_yield_pct,
@@ -503,7 +458,7 @@ async def _compute_goal_recommendation(
             required_dividend_yield_pct,
         )
         result.note = _grc._join_notes(preference_fallback_note, result.note)
-        return _grc._apply_dividend_suggestions(result, await _suggest_dividend_candidates(None))
+        return _gds._apply_dividend_suggestions(result, await _suggest_dividend_candidates(None))
 
     returns_map = await _grc._fetch_candidate_returns(
         fetch_yf_daily_returns, filtered, include_cash_equivalent=False, cache=cache
@@ -521,7 +476,7 @@ async def _compute_goal_recommendation(
         required_dividend_yield_pct=required_dividend_yield_pct,
     )
     _mark("optimizer")
-    expected_dividend_yield_pct = _grc._weighted_dividend_yield(items, dividend_map)
+    expected_dividend_yield_pct = _gds._weighted_dividend_yield(items, dividend_map)
 
     result = GoalRecommendation(
         generated_at=datetime.now(UTC).isoformat(),
@@ -529,7 +484,7 @@ async def _compute_goal_recommendation(
         is_configured=True,
         required_return_pct=required_return_pct,
         required_dividend_yield_pct=required_dividend_yield_pct,
-        recommended_items=_grc._attach_dividend_yield(items, dividend_map),
+        recommended_items=_gds._attach_dividend_yield(items, dividend_map),
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=expected_dividend_yield_pct,
         expected_volatility_pct=expected_volatility_pct,
@@ -544,7 +499,7 @@ async def _compute_goal_recommendation(
     logger.info(
         "goal_recommendation_timing", candidates=len(tickers_only), total_ms=sum(timings_ms.values()), **timings_ms
     )
-    return _grc._apply_dividend_suggestions(result, suggestion)
+    return _gds._apply_dividend_suggestions(result, suggestion)
 
 
 async def compute_portfolio_expected_metrics(
@@ -556,7 +511,7 @@ async def compute_portfolio_expected_metrics(
     """포트폴리오의 현재 목표 비중(`Portfolio.items`, CASH/부동산 등 시세 없는 항목은 호출측이 미리
     제외)에 대해 추천 비중과 동일한 지표(기대수익률/배당수익률/변동성)를 계산한다 — "적용 전 비교
     미리보기"에서 추천 비중의 같은 지표와 나란히 보여주기 위함. 최적화(SLSQP)하지 않고 주어진
-    비중 그대로 가중평균/공분산만 계산한다(`goal_portfolio_optimizer.compute_weighted_expected_metrics`).
+    비중 그대로 가중평균/공분산만 계산한다(`goal_portfolio_weights.compute_weighted_expected_metrics`).
     """
     if not items:
         return PortfolioExpectedMetrics()

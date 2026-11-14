@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.tax.tax_action_service import (
+from app.services.tax.tax_action_builders import (
     _DEDUCTION_RULES,
     _priority,
     _sort_actions,
@@ -18,9 +18,9 @@ from app.services.tax.tax_action_service import (
     build_loss_harvest_actions,
     build_overseas_gain_harvest_action,
     build_pension_action,
-    get_tax_action_plan,
     pension_credit_rate,
 )
+from app.services.tax.tax_action_service import get_tax_action_plan
 
 RULES = _DEDUCTION_RULES[2026]
 TODAY = date(2026, 10, 15)

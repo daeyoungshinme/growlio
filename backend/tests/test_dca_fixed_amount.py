@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from app.exceptions import AppError
 from app.schemas.rebalancing import RebalancingItem
 from app.services.rebalancing import plan_execution as svc_exec
+from app.services.rebalancing import plan_fx_wait
 from app.services.rebalancing import plan_generation as gen
 from app.services.rebalancing.dca_allocation import allocate_dca_amount, dca_buy_rows
 
@@ -616,7 +617,7 @@ class TestRetryFxWaitingLeg:
 
         leg = self._setup(mock_db)
         with patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(return_value=UsdShortfall(300.0, 80.0))):
-            outcome, execution_id, latest = await svc_exec.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
+            outcome, execution_id, latest = await plan_fx_wait.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
         assert outcome == "STILL_SHORT"
         assert execution_id is None
         assert latest.status == "WAITING_FX"
@@ -632,7 +633,7 @@ class TestRetryFxWaitingLeg:
             patch("app.utils.market_hours.is_us_market_open", return_value=False),
             patch("app.utils.market_hours.next_us_market_open", return_value=next_open),
         ):
-            outcome, _, latest = await svc_exec.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
+            outcome, _, latest = await plan_fx_wait.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
         assert outcome == "SCHEDULED"
         assert latest.status == "PENDING"
         assert latest.deadline_at == next_open.astimezone(UTC)
@@ -653,14 +654,14 @@ class TestRetryFxWaitingLeg:
             patch("app.utils.market_hours.is_us_market_open", return_value=True),
             patch.object(svc_exec, "_approve_leg_now", new=AsyncMock(side_effect=_approve)),
         ):
-            outcome, got_id, _ = await svc_exec.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
+            outcome, got_id, _ = await plan_fx_wait.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
         assert (outcome, got_id) == ("EXECUTED", execution_id)
 
     @pytest.mark.asyncio
     async def test_rejects_non_waiting_leg(self, mock_db):
         leg = _us_leg(status="PENDING")
         with pytest.raises(AppError):
-            await svc_exec.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
+            await plan_fx_wait.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
 
     @pytest.mark.asyncio
     async def test_expired_deadline_closes_leg(self, mock_db):
@@ -671,7 +672,7 @@ class TestRetryFxWaitingLeg:
             patch("app.services.rebalancing.plan_notifications.notify_dca_fx_wait_expired", new=AsyncMock()),
             pytest.raises(AppError),
         ):
-            await svc_exec.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
+            await plan_fx_wait.retry_fx_waiting_leg(leg, mock_db, None, "USER_APP")
         assert leg.status == "EXPIRED"
 
 
@@ -685,7 +686,7 @@ class TestRecheckFxWaitingLegs:
             patch("app.utils.market_hours.is_us_market_open", return_value=True),
             patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(return_value=None)),
         ):
-            assert await svc_exec.recheck_fx_waiting_legs(mock_db, None) == 1
+            assert await plan_fx_wait.recheck_fx_waiting_legs(mock_db, None) == 1
         assert leg.status == "PENDING"
 
     @pytest.mark.asyncio
@@ -697,7 +698,7 @@ class TestRecheckFxWaitingLegs:
             patch("app.utils.market_hours.is_us_market_open", return_value=False),
             patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock()) as check,
         ):
-            assert await svc_exec.recheck_fx_waiting_legs(mock_db, None) == 0
+            assert await plan_fx_wait.recheck_fx_waiting_legs(mock_db, None) == 0
         check.assert_not_awaited()
         assert leg.status == "WAITING_FX"
 
@@ -711,7 +712,7 @@ class TestRecheckFxWaitingLegs:
             patch("app.utils.market_hours.is_us_market_open", return_value=False),
             patch("app.services.rebalancing.plan_notifications.notify_dca_fx_wait_expired", new=notify),
         ):
-            assert await svc_exec.recheck_fx_waiting_legs(mock_db, None) == 1
+            assert await plan_fx_wait.recheck_fx_waiting_legs(mock_db, None) == 1
         assert leg.status == "EXPIRED"
         assert leg.error_message == svc_exec.FX_WAIT_EXPIRED_MESSAGE
         notify.assert_awaited_once()
@@ -728,7 +729,7 @@ class TestRecheckFxWaitingLegs:
             patch("app.utils.market_hours.is_us_market_open", return_value=True),
             patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(return_value=USD_UNKNOWN)),
         ):
-            assert await svc_exec.recheck_fx_waiting_legs(mock_db, None) == 0
+            assert await plan_fx_wait.recheck_fx_waiting_legs(mock_db, None) == 0
         assert leg.status == "WAITING_FX"
 
     @pytest.mark.asyncio
@@ -742,7 +743,7 @@ class TestRecheckFxWaitingLegs:
             patch("app.utils.market_hours.is_us_market_open", return_value=True),
             patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(return_value=UsdShortfall(300.0, 100.0))),
         ):
-            assert await svc_exec.recheck_fx_waiting_legs(mock_db, None) == 0
+            assert await plan_fx_wait.recheck_fx_waiting_legs(mock_db, None) == 0
         assert leg.status == "WAITING_FX"
         assert leg.available_usd == 100.0
 

@@ -47,6 +47,7 @@ _GRS = "app.services.goal.goal_recommendation_service"
 _AGE = "app.services.goal.goal_age_recommendation_service"
 _HOR = "app.services.goal.goal_horizon_recommendation_service"
 _GRC = "app.services.goal._goal_recommendation_common"
+_GDS = "app.services.goal._goal_dividend_suggestions"
 _GCS = "app.services.goal.goal_candidate_service"
 
 
@@ -230,7 +231,7 @@ def _fixed_environment(market_signal_level):
 
     with (
         patch(f"{_GCS}.RECOMMENDATION_UNIVERSE", _UNIVERSE),
-        patch(f"{_GRC}.RECOMMENDATION_UNIVERSE", _UNIVERSE),
+        patch(f"{_GDS}.RECOMMENDATION_UNIVERSE", _UNIVERSE),
         patch(f"{_GRC}.get_market_signal", AsyncMock(side_effect=_signal)),
         patch(f"{_GRC}._fetch_dividend_yields", AsyncMock(side_effect=_fake_dividend_yields)),
         patch(f"{_GRS}.months_until_year_end", side_effect=_months_until_year_end),

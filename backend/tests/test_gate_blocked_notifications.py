@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.services.rebalancing import plan_notifications as pn
-from app.services.rebalancing.plan_generation import DailyValueCapBlocked, MarketSignalGateBlocked, TaxGateBlocked
+from app.services.rebalancing.plan_gates import DailyValueCapBlocked, MarketSignalGateBlocked, TaxGateBlocked
 
 _CASES = [
     (pn.notify_tax_gate_blocked, TaxGateBlocked(estimated_tax_krw=200_000.0, max_tax_impact_krw=100_000.0)),

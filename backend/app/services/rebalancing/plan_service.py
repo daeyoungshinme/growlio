@@ -2,7 +2,10 @@
 
 책임별 서브모듈로 분리되어 있다(이 파일에는 조회·응답 요약 함수만 있다):
 - `plan_generation.py` — 드리프트 분석 → 게이트 판정 → BUY/SELL leg 생성
-- `plan_execution.py` — leg 잠금/실행/취소/만료 (앱 액션 + 스케줄러 job 진입점)
+- `plan_gates.py` — 생성 안 함 sentinel·세금영향·스냅샷 신선도 게이트
+- `plan_execution.py` — leg 잠금/실행/취소 (앱 액션 + 매수 job 진입점)
+- `plan_fx_wait.py` — 환전 대기 leg 재매수·자동 재확인
+- `plan_sweeps.py` — 실행 결과 유실 leg 마감·매도 승인 만료 job
 - `plan_notifications.py` — 플랜 생성/게이트 차단/leg 실행 결과 이메일·푸시·이력 알림
 
 이 파일은 하위 호환을 위해 전체 심볼을 이름으로 재노출한다 — 라우터/job/테스트의
@@ -30,15 +33,12 @@ from app.services.rebalancing.plan_execution import (
     approve_sell_leg,
     cancel_buy_leg,
     execute_due_buy_legs,
-    expire_due_sell_legs,
-    fail_stuck_consumed_legs,
     get_plan_leg_by_token,
     is_leg_past_deadline,
-    recheck_fx_waiting_legs,
     reject_sell_leg,
-    retry_fx_waiting_leg,
 )
-from app.services.rebalancing.plan_generation import (
+from app.services.rebalancing.plan_fx_wait import recheck_fx_waiting_legs, retry_fx_waiting_leg
+from app.services.rebalancing.plan_gates import (
     DailyValueCapBlocked,
     MarketSignalGateBlocked,
     PlanGenerationInProgress,
@@ -46,6 +46,8 @@ from app.services.rebalancing.plan_generation import (
     SyncRequiredAfterExecution,
     TaxGateBlocked,
     UsdRateUnavailable,
+)
+from app.services.rebalancing.plan_generation import (
     build_pending_plan_for_alert,
     generate_pending_plan_for_alert,
     get_alert_ids_with_pending_plan,
@@ -59,6 +61,7 @@ from app.services.rebalancing.plan_notifications import (
     notify_stale_snapshot_blocked,
     notify_tax_gate_blocked,
 )
+from app.services.rebalancing.plan_sweeps import expire_due_sell_legs, fail_stuck_consumed_legs
 from app.utils.numbers import opt_float
 
 __all__ = [

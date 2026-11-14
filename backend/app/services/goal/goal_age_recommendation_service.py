@@ -24,6 +24,7 @@ from app.enums import AgeGroup
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation
 from app.services._settings_queries import get_settings_row
+from app.services.goal import _goal_dividend_suggestions as _gds
 from app.services.goal import _goal_recommendation_common as _grc
 from app.services.goal.goal_candidate_service import (
     _get_or_seed_candidates,
@@ -192,7 +193,7 @@ async def _compute_age_based_recommendation(
         """배당 제안 판정은 최적화 결과(`expected_dividend_yield_pct`)가 필요하므로 각 반환 지점에서
         호출한다 — 조기 반환 지점은 `None`(미최적화)을 넘긴다."""
         res.age_bracket = age_bracket
-        suggestion = await _grc._suggest_for_dividend_goal(
+        suggestion = await _gds._suggest_for_dividend_goal(
             cache,
             candidate_dicts,
             required_dividend_yield_pct,
@@ -200,7 +201,7 @@ async def _compute_age_based_recommendation(
             max_weight,
             capacity_remaining=dividend_capacity_remaining,
         )
-        return _grc._apply_dividend_suggestions(res, suggestion)
+        return _gds._apply_dividend_suggestions(res, suggestion)
 
     if not candidate_dicts:
         return await _with_bracket(
@@ -250,7 +251,7 @@ async def _compute_age_based_recommendation(
         market_signal_level=market_signal_level,
         required_dividend_yield_pct=required_dividend_yield_pct,
     )
-    expected_dividend_yield_pct = _grc._weighted_dividend_yield(items, dividend_map)
+    expected_dividend_yield_pct = _gds._weighted_dividend_yield(items, dividend_map)
 
     return await _with_bracket(
         GoalRecommendation(
@@ -258,7 +259,7 @@ async def _compute_age_based_recommendation(
             data_incomplete=missing_count > 0,
             is_configured=True,
             required_dividend_yield_pct=required_dividend_yield_pct,
-            recommended_items=_grc._attach_dividend_yield(items, dividend_map),
+            recommended_items=_gds._attach_dividend_yield(items, dividend_map),
             expected_return_pct=expected_return_pct,
             expected_dividend_yield_pct=expected_dividend_yield_pct,
             expected_volatility_pct=expected_volatility_pct,
