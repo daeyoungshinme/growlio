@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { toast } from "@/utils/toast";
-import { INPUT_SM } from "@/constants/inputStyles";
+import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 import AuthLayout from "@/components/layout/AuthLayout";
@@ -95,10 +95,7 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label
-              htmlFor="register-email"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
+            <label htmlFor="register-email" className={FORM_LABEL}>
               이메일
             </label>
             <input
@@ -113,10 +110,7 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label
-              htmlFor="register-password"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
+            <label htmlFor="register-password" className={FORM_LABEL}>
               비밀번호
             </label>
             <input
@@ -138,10 +132,7 @@ export default function RegisterPage() {
             )}
           </div>
           <div>
-            <label
-              htmlFor="register-password-confirm"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
+            <label htmlFor="register-password-confirm" className={FORM_LABEL}>
               비밀번호 확인
             </label>
             <input

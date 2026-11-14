@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { BacktestResult, runBacktest } from "@/api/backtest";
 import BacktestResultChart from "@/components/backtest/BacktestResultChart";
@@ -20,6 +20,7 @@ interface Props {
 }
 
 export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
+  const uid = useId();
   const { data: portfoliosRaw, isLoading } = useQuery(portfoliosQuery);
   const portfolios = useMemo(
     () => (Array.isArray(portfoliosRaw) ? portfoliosRaw : []),
@@ -149,10 +150,14 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
           </div>
           <div className="flex flex-wrap gap-3">
             <div>
-              <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">
+              <label
+                htmlFor={`${uid}-start`}
+                className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1"
+              >
                 시작일
               </label>
               <input
+                id={`${uid}-start`}
                 type="date"
                 value={startDate}
                 max={endDate}
@@ -161,10 +166,14 @@ export default function BacktestTab({ defaultPortfolioIds }: Props = {}) {
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">
+              <label
+                htmlFor={`${uid}-end`}
+                className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1"
+              >
                 종료일
               </label>
               <input
+                id={`${uid}-end`}
                 type="date"
                 value={endDate}
                 min={startDate}

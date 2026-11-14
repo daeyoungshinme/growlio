@@ -1,6 +1,7 @@
+import { useId } from "react";
 import type { AssetAccount } from "@/api/assets";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
-import { INPUT_SM } from "@/constants/inputStyles";
+import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { MODE_OPTIONS, NOTIFY_TIME_OPTIONS } from "@/constants/rebalancingConfig";
 
 const inputClass = `w-full ${INPUT_SM}`;
@@ -18,6 +19,7 @@ export function AlertModeSection({
   targetAccountIsAutoEligible,
   autoExecutionAccounts,
 }: Props) {
+  const uid = useId();
   return (
     <>
       {/* ── 실행 모드 ── */}
@@ -72,10 +74,11 @@ export function AlertModeSection({
       {/* ── 알림(리포트) 시각 — AUTO도 이 시각에 이탈 리포트를 받는다. 예전엔 AUTO에서 숨겨져 기본 08:30으로
           저장된 채 리포트가 발송돼, 사용자가 모르는 시각에 메일·푸시를 받았다(plans/63 P4-1) ── */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label htmlFor={`${uid}-notify-time`} className={FORM_LABEL}>
           {form.mode === "AUTO" ? "이탈 리포트 시각 (KST)" : "알림 시각 (KST)"}
         </label>
         <select
+          id={`${uid}-notify-time`}
           value={form.notifyTime}
           onChange={(e) => form.setNotifyTime(e.target.value)}
           className={inputClass}

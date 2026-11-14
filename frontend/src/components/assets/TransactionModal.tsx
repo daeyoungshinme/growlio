@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import Modal, { ModalBody } from "@/components/common/Modal";
@@ -39,6 +40,7 @@ export default function TransactionModal({
   onDepositUpdate,
   onClose,
 }: Props) {
+  const uid = useId();
   const qc = useQueryClient();
   const {
     form,
@@ -201,7 +203,14 @@ export default function TransactionModal({
             <div>
               {/* 모바일 통화 토글(36px)이 h-5에 갇혀 아래 입력칸을 덮지 않게 최소 높이만 둔다 (plans/99 C) */}
               <div className="flex items-center justify-between min-h-5">
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                <label
+                  htmlFor={
+                    currency === "USD" && form.transaction_type === "DIVIDEND"
+                      ? `${uid}-amount-usd`
+                      : `${uid}-amount`
+                  }
+                  className="text-xs font-medium text-gray-600 dark:text-gray-400"
+                >
                   금액 *
                 </label>
                 {form.transaction_type === "DIVIDEND" && (
@@ -221,6 +230,7 @@ export default function TransactionModal({
                       type="number"
                       inputMode="decimal"
                       className={`w-full ${INPUT_SM}`}
+                      id={`${uid}-amount-usd`}
                       aria-label="금액 (USD)"
                       value={amountUsd || ""}
                       onChange={(e) => handleUsdAmountChange(parseFloat(e.target.value) || 0)}
@@ -238,6 +248,7 @@ export default function TransactionModal({
               ) : (
                 <div>
                   <input
+                    id={`${uid}-amount`}
                     type="number"
                     inputMode="decimal"
                     className={`mt-1 w-full ${INPUT_SM}`}

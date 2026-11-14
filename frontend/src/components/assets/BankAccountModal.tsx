@@ -7,7 +7,7 @@ import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
 import { fmtKrw, fmtKrwPreview } from "@/utils/format";
-import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
+import { FORM_LABEL, INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 
 interface Props {
   initialAccount?: AssetAccount;
@@ -71,10 +71,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
       <ModalBody>
         <form id={formId} onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label
-              htmlFor="bank-name"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
+            <label htmlFor="bank-name" className={FORM_LABEL}>
               계좌 별칭 *
             </label>
             <input
@@ -88,10 +85,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
             />
           </div>
           <div>
-            <label
-              htmlFor="bank-institution"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
+            <label htmlFor="bank-institution" className={FORM_LABEL}>
               은행명
             </label>
             <input
@@ -105,10 +99,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
           </div>
           {!isEdit && (
             <div>
-              <label
-                htmlFor="bank-asset-type"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
+              <label htmlFor="bank-asset-type" className={FORM_LABEL}>
                 계좌 종류
               </label>
               <select
@@ -125,10 +116,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label
-                htmlFor="bank-tax-type"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
+              <label htmlFor="bank-tax-type" className={FORM_LABEL}>
                 세제 유형
               </label>
               <select
@@ -145,10 +133,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
               </select>
             </div>
             <div>
-              <label
-                htmlFor="bank-horizon"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
+              <label htmlFor="bank-horizon" className={FORM_LABEL}>
                 투자 기간
               </label>
               <select
@@ -171,15 +156,19 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
               </select>
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="space-y-2" role="group" aria-labelledby={`${formId}-balance`}>
+            <p
+              id={`${formId}-balance`}
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
               잔액
-            </label>
+            </p>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-500 dark:text-gray-400 w-8 shrink-0">₩</span>
               <input
                 type="number"
                 inputMode="decimal"
+                aria-label="잔액 (원)"
                 value={depositKrw ?? ""}
                 onChange={(e) =>
                   setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))
@@ -203,6 +192,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
               <input
                 type="number"
                 inputMode="decimal"
+                aria-label="잔액 (USD)"
                 value={depositUsd ?? ""}
                 onChange={(e) =>
                   setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))
@@ -227,10 +217,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
             )}
           </div>
           <div>
-            <label
-              htmlFor="bank-notes"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
+            <label htmlFor="bank-notes" className={FORM_LABEL}>
               메모
             </label>
             <textarea

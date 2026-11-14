@@ -2,7 +2,7 @@ import { ChartLine } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-import { INPUT_SM } from "@/constants/inputStyles";
+import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 import AuthLayout from "@/components/layout/AuthLayout";
@@ -53,10 +53,11 @@ export default function ForgotPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="forgot-email" className={FORM_LABEL}>
                 이메일
               </label>
               <input
+                id="forgot-email"
                 type="email"
                 autoComplete="email"
                 value={email}

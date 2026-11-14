@@ -194,7 +194,7 @@ export default function SettingsPage() {
       {/* 계정 정보 */}
       <SectionCard title="계정 정보">
         <div>
-          <label className={labelClass}>로그인 이메일</label>
+          <p className={labelClass}>로그인 이메일</p>
           <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{authEmail ?? "—"}</p>
         </div>
         <button

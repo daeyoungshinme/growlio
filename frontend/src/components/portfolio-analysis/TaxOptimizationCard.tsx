@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { TriangleAlert, ChevronDown, ChevronUp, Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchOverseasPositionsTax, fetchOverseasRealized, type TaxSummary } from "@/api/tax";
@@ -24,6 +24,7 @@ const HEALTH_INSURANCE_NEAR_THRESHOLD_KRW = 5_000_000;
 
 export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardProps = {}) {
   const currentYear = new Date().getFullYear();
+  const taxYearId = useId();
   const [taxYear, setTaxYear] = useState(currentYear);
   // 플래너는 기본 접힘 — 손실수확 후보가 있으면 토글 옆 "손실수확 가능" 배지로 알린다. 예전처럼 자동으로
   // 펼치면 절세 탭이 표·입력폼까지 한 번에 길어졌다 (docs/plans/67 Phase 3)
@@ -75,8 +76,14 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
           <span className="text-xs text-gray-500 dark:text-gray-400">배당세·해외 양도세</span>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">기준 연도</label>
+          <label
+            htmlFor={taxYearId}
+            className="text-xs text-gray-500 dark:text-gray-400 font-medium"
+          >
+            기준 연도
+          </label>
           <select
+            id={taxYearId}
             value={taxYear}
             onChange={(e) => setTaxYear(Number(e.target.value))}
             className={SELECT_SM}

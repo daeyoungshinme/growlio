@@ -285,6 +285,13 @@ async def get_overseas_balance(
         ),
     )
 
+    # 키움이 해외 소수 수량을 주는지 문서로 확인하지 못했다(plans/116 B5) — 수량은 정수로 다루되,
+    # 소수가 오면 잘리거나(1.5→1) 1주 미만 보유가 통째로 빠지므로(0.5→0) 실계좌에서 드러나게 남긴다.
+    for item in items:
+        raw_qty = _parse_required_num(item.get("poss_qty"))
+        if raw_qty != int(raw_qty):
+            logger.warning("kiwoom_overseas_fractional_qty", ticker=item.get("stk_cd"), qty=raw_qty)
+
     held_items = [item for item in items if int(_parse_required_num(item.get("poss_qty"))) > 0]
 
     positions = []

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { AssetAccount } from "@/api/assets";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { INPUT_SM } from "@/constants/inputStyles";
@@ -21,6 +22,7 @@ export function AlertQuickDcaSection({
   autoExecutionAccounts,
   onSwitchToAdvanced,
 }: Props) {
+  const uid = useId();
   return (
     <div className="space-y-4">
       <p className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2 leading-relaxed">
@@ -30,11 +32,15 @@ export function AlertQuickDcaSection({
       </p>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label
+          htmlFor={`${uid}-day`}
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        >
           매수 일자
         </label>
         <div className="flex items-center gap-2">
           <select
+            id={`${uid}-day`}
             value={form.dayOfMonth}
             onChange={(e) => form.setDayOfMonth(Number(e.target.value))}
             className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -50,10 +56,14 @@ export function AlertQuickDcaSection({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label
+          htmlFor={`${uid}-account`}
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        >
           실행 계좌
         </label>
         <AutoExecutionAccountPicker
+          id={`${uid}-account`}
           accounts={autoExecutionAccounts}
           value={form.accountId}
           onChange={form.setAccountId}

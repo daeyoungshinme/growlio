@@ -253,7 +253,7 @@ _기타_
 
 **차트 (`utils/chart.ts`)**: `chartTooltipStyle(isDark)`, `chartTickStyle(isDark)`/`CHART_TICK_FONT_SIZE`(12) — 인라인 스타일·`fontSize: 11` 금지. Recharts는 `dark:` 미지원이라 `isDark`로.
 
-**입력 스타일 (`constants/inputStyles.ts`)**: `INPUT_SM`/`INPUT_MD`, `LABEL_SM`/`LABEL_MD`, `SELECT_SM`, `TEXTAREA_SM` — 인라인 Tailwind 입력 스타일 금지.
+**입력 스타일 (`constants/inputStyles.ts`)**: `INPUT_SM`/`INPUT_MD`, `LABEL_SM`/`LABEL_MD`, `FORM_LABEL`/`FORM_LABEL_XS`(폼 라벨), `SELECT_SM`, `TEXTAREA_SM` — 인라인 Tailwind 입력 스타일 금지. **`<label>`은 `htmlFor`(`useId()`)로 컨트롤과 연결하거나 컨트롤을 감싼다** — 여러 입력을 묶는 제목은 `<p id>` + `role="group" aria-labelledby`(`a11y.labels.test.ts`가 검사).
 
 **모바일 UI**
 
