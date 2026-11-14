@@ -674,3 +674,16 @@ class TestSyncSnapshotConsistency:
 
         assert account.deposit_usd == 100.0
         assert upsert.await_args.kwargs["amount_krw"] == 1_140_000.0
+
+    @pytest.mark.asyncio
+    async def test_manual_usd_deposit_is_not_added_twice(self, mock_db, override_settings, make_account):
+        """수기 provider 합계엔 달러 예수금이 이미 들어 있다 — deposit_foreign=None이어도 다시 더하지 않는다."""
+        from app.providers.base import BalanceResult
+
+        account = make_account(data_source="MANUAL")
+        account.deposit_usd = 100.0
+        balance = BalanceResult(total_value_krw=1_140_000.0, positions=[], deposit_foreign=None, overseas_known=True)
+        upsert, _sync_positions = await self._sync(account, balance, mock_db)
+
+        assert account.deposit_usd == 100.0
+        assert upsert.await_args.kwargs["amount_krw"] == 1_140_000.0
