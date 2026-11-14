@@ -490,9 +490,13 @@ async def _build_fx_plan(
         return result
     live_rate = ctx.rate
 
+    # 상쇄에 쓰는 보유 달러 — 정액 원화주문 계좌의 달러는 그 계좌 자신의 해외 매수가 먼저 쓰므로 뺀다(plans/132 A1)
+    pool = held
     if fixed:
         # 키움 원화주문 계좌는 증권사가 원화로 결제(자동 환전)하므로 미리 바꿀 달러가 아니다
         krw_order_names = sorted({account.name for _, account in fixed if uses_krw_overseas_order(account)})
+        krw_order_ids = {account.id for _, account in fixed if uses_krw_overseas_order(account)}
+        pool = [h for h in held if h.account.id not in krw_order_ids]
         result["krw_order_accounts"] = krw_order_names
         # ISA·연금 계좌는 해외 종목 대신 다른 종목을 사므로(`dca_allocation`) 계좌별로 해외 몫을 나눈다
         monthly_need_usd = sum(
@@ -511,7 +515,7 @@ async def _build_fx_plan(
         monthly_need_usd = monthly_deposit * overseas_pct / 100 / live_rate
 
     # 추가 환전 항목이 둔 달러는 이미 뺀 값이다(`_held_usd`) — WAITING_FX 상쇄도 여행 달러를 쓰지 않는다
-    held_usd = sum(h.usd for h in held)
+    held_usd = sum(h.usd for h in pool)
     # 대기 중인 매수는 그 실행 계좌의 달러로 먼저 채운다 — 남는 부족분만 "지금" 환전해야 매수가 다시 진행된다
     waiting_fx_usd = _waiting_fx_shortfall(waiting_required, held)
     need_usd = max(0.0, monthly_need_usd * months - held_usd, waiting_fx_usd)
@@ -520,7 +524,7 @@ async def _build_fx_plan(
         monthly_deposit_krw=monthly_deposit,
         monthly_need_usd=round(monthly_need_usd, 2),
         held_usd=round(held_usd, 2),
-        held_usd_synced_at=_held_synced_at(held),
+        held_usd_synced_at=_held_synced_at(pool),
         held_usd_accounts=[
             {
                 "account_id": h.account.id,
@@ -530,11 +534,11 @@ async def _build_fx_plan(
                 "synced_at": h.synced_at,
                 "reserved_usd": h.reserved_usd,
             }
-            for h in sorted(held, key=lambda h: h.usd, reverse=True)
+            for h in sorted(pool, key=lambda h: h.usd, reverse=True)
             # 다 빼서 0이 된 계좌도 보여 준다 — 왜 보유 달러가 0인지 알 수 있게
             if h.usd > 0 or h.reserved_usd > 0
         ],
-        reserved_usd=round(sum(h.reserved_usd for h in held), 2),
+        reserved_usd=round(sum(h.reserved_usd for h in pool), 2),
         waiting_fx_usd=round(waiting_fx_usd, 2),
         need_usd=round(need_usd, 2),
         tranches=[asdict(t) for t in compute_fx_plan(ctx.position, need_usd, live_rate, waiting_fx_usd)],

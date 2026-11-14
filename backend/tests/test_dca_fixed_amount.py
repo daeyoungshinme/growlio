@@ -319,19 +319,23 @@ class TestUsdBuyingPower:
 
         order = SimpleNamespace(market="NASDAQ", quantity=4, limit_price=100.0)  # 400 × 1.003
         account, other = uuid.uuid4(), uuid.uuid4()
-        ledger: dict = {}
+        ledger = ubp.UsdLedger()
         with (
             patch.object(svc_exec, "_rebuild_orders_from_items", new=AsyncMock(return_value=[order])),
             patch.object(ubp, "fetch_usd_buying_power", new=AsyncMock(return_value=600.0)),
         ):
             first = await ubp.check_usd_shortfall([], account, uuid.uuid4(), mock_db, None, ledger)
+            # 가예약만으로는 빼지 않는다 — 주문이 나가지 않은 leg 몫으로 다음 leg를 막지 않게(plans/132 A2)
+            unconfirmed = await ubp.check_usd_shortfall([], account, uuid.uuid4(), mock_db, None, ledger)
+            ledger.confirm(account)
             second = await ubp.check_usd_shortfall([], account, uuid.uuid4(), mock_db, None, ledger)
             elsewhere = await ubp.check_usd_shortfall([], other, uuid.uuid4(), mock_db, None, ledger)
         assert first is None
+        assert unconfirmed is None
         assert isinstance(second, ubp.UsdShortfall)
         assert second.available_usd == pytest.approx(600.0 - 401.2)
         assert elsewhere is None
-        assert ledger[account] == pytest.approx(401.2)
+        assert ledger.spent(account) == pytest.approx(401.2)
 
     @pytest.mark.asyncio
     async def test_check_unknown_when_price_or_limit_missing(self, mock_db):
@@ -520,6 +524,60 @@ class TestRunDueBuyLegFx:
             await svc_exec.execute_due_buy_legs(mock_db, MagicMock())
         execute.assert_awaited_once()
         assert leg.token_consumed_at is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("final_status", "spent"), [("FAILED", 0.0), ("EXECUTED", 401.2)])
+    async def test_ledger_confirms_only_when_order_went_out(self, mock_db, final_status, spent):
+        """plans/132 A2 — 판정을 통과해도 주문이 전부 실패하면 그 달러를 다음 leg 몫에서 빼지 않는다."""
+        from app.services.rebalancing.usd_buying_power import UsdLedger
+
+        alert = _dca_alert()
+        leg = _us_leg()
+        plan = _plan(alert)
+        _wire_db(mock_db, leg, plan, alert)
+        ledger = UsdLedger()
+
+        async def _check(_leg, _plan, _db, _cache, led):
+            led.hold(plan.account_id, 401.2)
+
+        async def _execute(locked, *_args):
+            locked.status = final_status
+
+        with (
+            patch("app.utils.market_hours.is_us_market_open", return_value=True),
+            patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(side_effect=_check)),
+            patch.object(svc_exec, "_execute_leg", new=AsyncMock(side_effect=_execute)),
+        ):
+            await svc_exec._run_due_buy_leg(leg.id, datetime.now(tz=UTC), "GREEN", "FRESH", mock_db, None, ledger)
+        assert ledger.spent(plan.account_id) == pytest.approx(spent)
+
+    @pytest.mark.asyncio
+    async def test_ledger_not_confirmed_when_relock_loses_leg(self, mock_db):
+        """판정 뒤 다시 잠갔더니 다른 요청이 가져간 leg — 가예약을 확정하지 않는다(plans/132 A2)."""
+        from app.services.rebalancing.usd_buying_power import UsdLedger
+
+        alert = _dca_alert()
+        leg = _us_leg()
+        plan = _plan(alert)
+        _wire_db(mock_db, leg, plan, alert)
+        ledger = UsdLedger()
+        taken = SimpleNamespace(**{**vars(leg), "status": "EXECUTING"})
+
+        async def _check(_leg, _plan, _db, _cache, led):
+            led.hold(plan.account_id, 401.2)
+
+        with (
+            patch("app.utils.market_hours.is_us_market_open", return_value=True),
+            patch.object(svc_exec, "_lock_leg", new=AsyncMock(side_effect=[leg, taken])),
+            patch.object(svc_exec, "_usd_shortfall_for_leg", new=AsyncMock(side_effect=_check)),
+            patch.object(svc_exec, "_execute_leg", new=AsyncMock()) as execute,
+        ):
+            processed = await svc_exec._run_due_buy_leg(
+                leg.id, datetime.now(tz=UTC), "GREEN", "FRESH", mock_db, None, ledger
+            )
+        assert processed is False
+        execute.assert_not_awaited()
+        assert ledger.spent(plan.account_id) == 0.0
 
     @pytest.mark.asyncio
     async def test_reentering_wait_does_not_notify_again(self, mock_db):

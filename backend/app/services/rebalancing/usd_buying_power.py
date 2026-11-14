@@ -49,11 +49,35 @@ USD_UNKNOWN = UsdUnknown()
 UsdCheck = UsdShortfall | UsdUnknown | None
 """`check_usd_shortfall` 결과 — 부족(UsdShortfall)·미확인(USD_UNKNOWN)·충분(None)."""
 
-UsdLedger = dict[uuid.UUID, float]
-"""한 잡 실행 안에서 계좌별로 이미 통과시킨 필요 달러 — 같은 계좌의 두 leg가 같은 잔고로 둘 다 통과하지 않게 한다.
 
-증권사 달러 예수금은 방금 낸 주문을 곧바로 빼지 않을 수 있어(결제 전) 앞 leg 몫을 직접 뺀다(plans/129 B1).
-잡 실행 하나에서만 쓴다 — 실행 간에는 잔고 반영 여부를 몰라 이중 차감으로 거짓 대기를 만들 수 있다."""
+class UsdLedger:
+    """한 잡 실행 안에서 계좌별로 이미 쓴 필요 달러 — 같은 계좌의 두 leg가 같은 잔고로 둘 다 통과하지 않게 한다.
+
+    증권사 달러 예수금은 방금 낸 주문을 곧바로 빼지 않을 수 있어(결제 전) 앞 leg 몫을 직접 뺀다(plans/129 B1).
+    잡 실행 하나에서만 쓴다 — 실행 간에는 잔고 반영 여부를 몰라 이중 차감으로 거짓 대기를 만들 수 있다.
+
+    판정 통과는 가예약(`hold`)일 뿐이고, 실제로 주문이 나갔거나 재개됐을 때만 `confirm`으로 확정한다. 통과 뒤
+    재잠금 실패·주문 전부 실패로 빠진 leg 몫을 확정하면 다음 leg가 거짓 환전 대기에 들어간다(plans/132 A2).
+    """
+
+    def __init__(self) -> None:
+        self._spent: dict[uuid.UUID, float] = {}
+        self._held: dict[uuid.UUID, float] = {}
+
+    def spent(self, account_id: uuid.UUID) -> float:
+        return self._spent.get(account_id, 0.0)
+
+    def hold(self, account_id: uuid.UUID, usd: float) -> None:
+        """판정을 통과한 leg 몫을 가예약한다 — 같은 계좌의 다음 판정이 덮어쓴다."""
+        self._held[account_id] = usd
+
+    def confirm(self, account_id: uuid.UUID | None) -> None:
+        """가예약한 몫을 쓴 것으로 확정한다. 가예약이 없으면(달러 확인 없이 지나간 leg) 아무것도 하지 않는다."""
+        if account_id is None:
+            return
+        usd = self._held.pop(account_id, None)
+        if usd is not None:
+            self._spent[account_id] = self.spent(account_id) + usd
 
 
 async def fetch_usd_buying_power(account_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession, cache) -> float | None:
@@ -139,7 +163,8 @@ async def check_usd_shortfall(
 ) -> UsdCheck:
     """이 leg를 사려면 달러가 부족한지. 부족하면 UsdShortfall, 판정 불가면 USD_UNKNOWN, 충분하면 None.
 
-    `ledger`가 있으면 같은 계좌에서 앞서 통과한 몫을 잔고에서 빼고 비교하며, 통과하면 이 leg 몫을 더한다.
+    `ledger`가 있으면 같은 계좌에서 앞서 확정된 몫을 잔고에서 빼고 비교하며, 통과하면 이 leg 몫을 가예약한다
+    (호출측이 주문·재개 뒤 `ledger.confirm`).
     """
     from app.services.rebalancing.plan_execution import _rebuild_orders_from_items
 
@@ -157,11 +182,11 @@ async def check_usd_shortfall(
     if available is None:
         logger.info("dca_usd_buying_power_unknown", account_id=str(account_id))
         return USD_UNKNOWN
-    committed = ledger.get(account_id, 0.0) if ledger is not None else 0.0
+    committed = ledger.spent(account_id) if ledger is not None else 0.0
     available = max(0.0, available - committed)
     if available + 1e-6 >= required:
         if ledger is not None:
-            ledger[account_id] = committed + required
+            ledger.hold(account_id, required)
         return None
     logger.info(
         "dca_usd_shortfall",

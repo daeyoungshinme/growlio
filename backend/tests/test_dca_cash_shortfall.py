@@ -253,9 +253,16 @@ def test_krw_order_account_uses_held_usd_first():
     assert sf is None  # 해외 몫 50만 = $400 → 달러로 전부, 원화는 국내 몫 50만만
 
 
-def test_krw_order_account_without_live_rate_is_unknown():
-    account = _krw_order_account(deposit_krw=0.0)
+def test_krw_order_account_without_live_rate_skips_only_overseas_share():
+    """실환율이 없으면 해외 몫 원화 환산만 모른다 — 국내 몫(50만)을 못 덮는 원화 부족은 그대로 알린다(plans/132 A3)."""
+    covered = _krw_order_account(deposit_krw=500_000.0)
     sf = svc._fixed_amount_shortfall(
-        _fixed_alert(), _weighted_portfolio(), account, _user(), None, date(2026, 11, 25), date(2026, 11, 23), None
+        _fixed_alert(), _weighted_portfolio(), covered, _user(), None, date(2026, 11, 25), date(2026, 11, 23), None
     )
     assert sf is None
+
+    short = _krw_order_account(deposit_krw=0.0)
+    sf = svc._fixed_amount_shortfall(
+        _fixed_alert(), _weighted_portfolio(), short, _user(), None, date(2026, 11, 25), date(2026, 11, 23), None
+    )
+    assert sf is not None
