@@ -5,6 +5,7 @@ import { RISK_TOLERANCE_OPTIONS } from "@/constants/goalRiskTolerance";
 import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import type { GoalForm } from "@/hooks/useGoalSettings";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { FORM_LABEL_XS } from "@/constants/inputStyles";
 
 export interface StepFormProps {
   form: GoalForm;
@@ -102,10 +103,7 @@ export function InvestorProfileStep({ form, setForm }: StepFormProps) {
         hint="연령대에 맞는 주식비중 상/하한을 함께 고려합니다"
       />
       <div>
-        <label
-          htmlFor="goal-wizard-risk-tolerance"
-          className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1"
-        >
+        <label htmlFor="goal-wizard-risk-tolerance" className={FORM_LABEL_XS}>
           투자성향
         </label>
         <select

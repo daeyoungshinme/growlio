@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAccountPositions } from "@/hooks/useAccountPositions";
 import type { AssetAccount } from "@/api/assets";
@@ -43,6 +43,7 @@ interface Props {
 }
 
 export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Props) {
+  const uid = useId();
   const qc = useQueryClient();
 
   const initial: TransactionCreate = editingTx
@@ -210,7 +211,16 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="flex items-center justify-between">
-              <label className={labelCls}>금액 *</label>
+              <label
+                htmlFor={
+                  currency === "USD" && form.transaction_type === "DIVIDEND"
+                    ? `${uid}-amount-usd`
+                    : `${uid}-amount`
+                }
+                className={labelCls}
+              >
+                금액 *
+              </label>
               {form.transaction_type === "DIVIDEND" && (
                 <SegmentedControl
                   options={CURRENCY_OPTIONS}
@@ -227,6 +237,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                   <input
                     type="number"
                     inputMode="decimal"
+                    id={`${uid}-amount-usd`}
                     aria-label="금액 (USD)"
                     value={amountUsd || ""}
                     onChange={(e) => changeUsd(parseFloat(e.target.value) || 0)}
@@ -248,6 +259,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
             ) : (
               <>
                 <input
+                  id={`${uid}-amount`}
                   type="number"
                   inputMode="decimal"
                   required

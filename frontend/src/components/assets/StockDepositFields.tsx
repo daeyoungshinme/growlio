@@ -27,8 +27,13 @@ export default function StockDepositFields({
 }: Props) {
   if (mode === "create") {
     return (
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">예수금</label>
+      <div className="space-y-2" role="group" aria-labelledby="stock-deposit-heading">
+        <p
+          id="stock-deposit-heading"
+          className="text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          예수금
+        </p>
         <div>
           <label htmlFor="stock-deposit-krw" className="text-xs text-gray-500 dark:text-gray-400">
             원화 예수금

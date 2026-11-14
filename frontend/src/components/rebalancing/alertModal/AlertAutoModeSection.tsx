@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { MarketConditionMode } from "@/api/alerts";
@@ -6,7 +6,7 @@ import type { AssetAccount } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { useTimeout } from "@/hooks/useTimeout";
-import { INPUT_SM } from "@/constants/inputStyles";
+import { FORM_LABEL_XS, INPUT_SM } from "@/constants/inputStyles";
 import AutoExecutionAccountPicker from "./AutoExecutionAccountPicker";
 import {
   STRATEGY_OPTIONS,
@@ -54,6 +54,7 @@ export function AlertAutoModeSection({
     }
   };
   const { data: settingsData } = useQuery(settingsQuery);
+  const uid = useId();
 
   return (
     <div className="space-y-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
@@ -94,7 +95,7 @@ export function AlertAutoModeSection({
       )}
 
       <div>
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label htmlFor={`${uid}-account`} className={FORM_LABEL_XS}>
           실행 계좌
         </label>
         {targetAccountId ? (
@@ -106,6 +107,7 @@ export function AlertAutoModeSection({
           </div>
         ) : (
           <AutoExecutionAccountPicker
+            id={`${uid}-account`}
             accounts={autoExecutionAccounts}
             value={form.accountId}
             onChange={form.setAccountId}
@@ -159,10 +161,11 @@ export function AlertAutoModeSection({
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label htmlFor={`${uid}-time`} className={FORM_LABEL_XS}>
           자동 실행 시각 (KST)
         </label>
         <input
+          id={`${uid}-time`}
           type="time"
           step={300}
           value={form.autoExecutionTime}
@@ -178,10 +181,11 @@ export function AlertAutoModeSection({
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label htmlFor={`${uid}-buy-wait`} className={FORM_LABEL_XS}>
           매수 대기시간
         </label>
         <select
+          id={`${uid}-buy-wait`}
           className={inputClass}
           value={form.buyWaitMinutes}
           onChange={(e) => form.setBuyWaitMinutes(Number(e.target.value))}
@@ -199,10 +203,11 @@ export function AlertAutoModeSection({
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label htmlFor={`${uid}-order-type`} className={FORM_LABEL_XS}>
           주문 유형
         </label>
         <select
+          id={`${uid}-order-type`}
           className={inputClass}
           value={form.orderType}
           onChange={(e) => form.setOrderType(e.target.value as "MARKET" | "LIMIT")}
@@ -257,7 +262,7 @@ export function AlertAutoModeSection({
         </select>
         {form.taxImpactGateMode === "ENABLED" && (
           <div className="mt-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor={`${uid}-max-tax`} className={FORM_LABEL_XS}>
               추정 양도세 상한 (원)
             </label>
             <input
@@ -265,6 +270,7 @@ export function AlertAutoModeSection({
               inputMode="numeric"
               min={1}
               step={10000}
+              id={`${uid}-max-tax`}
               placeholder="예: 500000"
               value={form.maxTaxImpactKrw ?? ""}
               onChange={(e) =>

@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { getSupabase, consumePasswordRecovery } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
-import { INPUT_SM } from "@/constants/inputStyles";
+import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { REDIRECT_DELAY_MS } from "@/constants/timers";
 import { toast } from "@/utils/toast";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
@@ -142,10 +142,7 @@ export default function ResetPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label
-                htmlFor="reset-new-password"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
+              <label htmlFor="reset-new-password" className={FORM_LABEL}>
                 새 비밀번호
               </label>
               <input
@@ -167,10 +164,7 @@ export default function ResetPasswordPage() {
               )}
             </div>
             <div>
-              <label
-                htmlFor="reset-confirm-password"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
+              <label htmlFor="reset-confirm-password" className={FORM_LABEL}>
                 비밀번호 확인
               </label>
               <input

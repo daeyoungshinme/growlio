@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
@@ -23,6 +23,7 @@ export function TickerSearchField({
   initialQuery = "",
   onTickerChange,
 }: Props) {
+  const uid = useId();
   const [directInput, setDirectInput] = useState(!accountPositions.length || !!initialQuery);
   const [query, setQuery] = useState(initialQuery);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -46,9 +47,12 @@ export function TickerSearchField({
 
   return (
     <div>
-      <label className={LABEL_MD}>종목 (선택)</label>
+      <label htmlFor={`${uid}-ticker`} className={LABEL_MD}>
+        종목 (선택)
+      </label>
       {accountPositions.length > 0 && !directInput ? (
         <select
+          id={`${uid}-ticker`}
           value={ticker || ""}
           onChange={(e) => {
             if (e.target.value === "__direct__") {
@@ -72,6 +76,7 @@ export function TickerSearchField({
         <div className="flex gap-1 mt-1">
           <div className="relative w-full">
             <input
+              id={`${uid}-ticker`}
               value={query}
               onChange={(e) => {
                 const v = e.target.value;

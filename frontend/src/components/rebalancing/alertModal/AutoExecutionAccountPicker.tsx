@@ -6,10 +6,12 @@ interface Props {
   accounts: AssetAccount[];
   value: string;
   onChange: (accountId: string) => void;
+  /** 바깥 label의 htmlFor와 짝 — 선택 상자가 렌더될 때만 붙는다 */
+  id?: string;
 }
 
 /** AUTO 실행 계좌 선택 — 없으면 안내, 1개면 자동 선택 표시(값은 모달 effect가 채움), 2개 이상이면 선택. */
-export default function AutoExecutionAccountPicker({ accounts, value, onChange }: Props) {
+export default function AutoExecutionAccountPicker({ accounts, value, onChange, id }: Props) {
   if (accounts.length === 0) return <NoTradableAccountNotice />;
   if (accounts.length === 1) {
     return (
@@ -21,6 +23,7 @@ export default function AutoExecutionAccountPicker({ accounts, value, onChange }
   }
   return (
     <select
+      id={id}
       className={`w-full ${INPUT_SM}`}
       value={value}
       onChange={(e) => onChange(e.target.value)}

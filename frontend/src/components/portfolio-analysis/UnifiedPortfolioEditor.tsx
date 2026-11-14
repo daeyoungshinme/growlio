@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useId, useMemo, useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Layers, Plus, WandSparkles, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ import {
 } from "@/constants/assets";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import { ModalBody } from "@/components/common/Modal";
-import { INPUT_SM } from "@/constants/inputStyles";
+import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { CASH_TICKER } from "@/constants/assets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -67,6 +67,7 @@ export default function UnifiedPortfolioEditor({
   saving,
 }: Props) {
   const qc = useQueryClient();
+  const uid = useId();
   const [name, setName] = useState(initial?.name ?? initialName ?? "");
   const [baseType, setBaseType] = useState(initial?.base_type ?? BASE_TYPE_STOCK_ONLY);
   // 신규 생성 모드에서 추천 비중 카드가 넘긴 initialAccountIds의 태그가 전부 동일하면 계좌
@@ -197,10 +198,11 @@ export default function UnifiedPortfolioEditor({
           <ModalBody padding="px-4 py-4 sm:px-6" className="space-y-5">
             {/* 이름 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor={`${uid}-name`} className={FORM_LABEL}>
                 포트폴리오 이름
               </label>
               <input
+                id={`${uid}-name`}
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg px-3 py-2.5 sm:py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 placeholder="예: 성장형 포트폴리오"
                 value={name}
@@ -210,10 +212,13 @@ export default function UnifiedPortfolioEditor({
 
             {/* 기준 자산 (리밸런싱용) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <p
+                id={`${uid}-base-type`}
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
                 리밸런싱 기준 자산
-              </label>
-              <div className="flex gap-4">
+              </p>
+              <div className="flex gap-4" role="radiogroup" aria-labelledby={`${uid}-base-type`}>
                 {[
                   { value: BASE_TYPE_STOCK_ONLY, label: "주식 자산만" },
                   { value: BASE_TYPE_TOTAL_ASSETS, label: "전체 자산" },
@@ -281,9 +286,9 @@ export default function UnifiedPortfolioEditor({
             {/* 종목 목록 */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   종목 및 비중
-                </label>
+                </h3>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <button
                     type="button"

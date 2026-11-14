@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -12,6 +12,7 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { FORM_LABEL_XS } from "@/constants/inputStyles";
 import { settingsQuery } from "@/api/queryOptions";
 
 const CAGR_LOOKBACK_OPTIONS = [3, 5, 10];
@@ -32,6 +33,7 @@ interface Props {
  * 별도 모달로 분리해 각 모달의 책임을 단순하게 유지한다. */
 export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   const queryClient = useQueryClient();
+  const uid = useId();
 
   const { data: settingsData } = useQuery(settingsQuery);
 
@@ -132,10 +134,11 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
         </p>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor={`${uid}-risk`} className={FORM_LABEL_XS}>
             투자성향
           </label>
           <select
+            id={`${uid}-risk`}
             value={currentRiskTolerance}
             onChange={(e) => setRiskTolerance(e.target.value as GoalRiskTolerance)}
             className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
@@ -152,11 +155,12 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor={`${uid}-max-weight`} className={FORM_LABEL_XS}>
             종목당 최대 비중
           </label>
           <div className="flex items-center gap-2">
             <input
+              id={`${uid}-max-weight`}
               type="number"
               inputMode="numeric"
               min={10}
@@ -174,10 +178,11 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor={`${uid}-cagr`} className={FORM_LABEL_XS}>
             기대수익률(CAGR) 산출 기간
           </label>
           <select
+            id={`${uid}-cagr`}
             value={currentCagrLookbackYears}
             onChange={(e) => setCagrLookbackYears(Number(e.target.value))}
             className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
@@ -195,7 +200,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor={`${uid}-short-floor`} className={FORM_LABEL_XS}>
             단기(최대 3년) 목표 최소 주식 비중
           </label>
           <div className="flex items-center gap-2">
@@ -205,6 +210,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
               min={0}
               max={100}
               step={5}
+              id={`${uid}-short-floor`}
               value={currentShortTermEquityFloorPctStr}
               onChange={(e) => setShortTermEquityFloorPctInput(e.target.value)}
               className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
@@ -218,7 +224,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor={`${uid}-bond-ceiling`} className={FORM_LABEL_XS}>
             채권 비중 상한 (전체 자산 기준 추천)
           </label>
           <div className="flex items-center gap-2">
@@ -229,6 +235,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
               max={100}
               step={5}
               placeholder="상한 없음"
+              id={`${uid}-bond-ceiling`}
               value={currentBondCeilingPctStr}
               onChange={(e) => setBondCeilingPctInput(e.target.value)}
               className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
@@ -240,7 +247,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor={`${uid}-cash-ceiling`} className={FORM_LABEL_XS}>
             현금성 비중 상한 (전체 자산 기준 추천)
           </label>
           <div className="flex items-center gap-2">
@@ -251,6 +258,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
               max={100}
               step={5}
               placeholder="상한 없음"
+              id={`${uid}-cash-ceiling`}
               value={currentCashCeilingPctStr}
               onChange={(e) => setCashCeilingPctInput(e.target.value)}
               className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"
@@ -266,9 +274,13 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            연령대 (연령대별 추천)
-          </label>
+          {birthYear != null ? (
+            <p className={FORM_LABEL_XS}>연령대 (연령대별 추천)</p>
+          ) : (
+            <label htmlFor={`${uid}-age`} className={FORM_LABEL_XS}>
+              연령대 (연령대별 추천)
+            </label>
+          )}
           {/* 출생연도가 있으면 서버가 연령대를 파생 저장하므로(PUT /settings/goal) 여기서 따로 고르면
               다음 목표 저장 때 덮어써진다 — 입력을 한 곳(적립 계획 목표 설정)으로 모은다(U12). */}
           {birthYear != null ? (
@@ -281,6 +293,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
             </p>
           ) : (
             <select
+              id={`${uid}-age`}
               value={currentAgeGroup ?? ""}
               onChange={(e) => setAgeGroupInput((e.target.value || "") as AgeGroup | "")}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500"

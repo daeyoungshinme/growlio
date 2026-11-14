@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
-import { INPUT_SM } from "@/constants/inputStyles";
+import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { prefetchDashboardData } from "@/api/prefetch";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
@@ -54,10 +54,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label
-              htmlFor="login-email"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
+            <label htmlFor="login-email" className={FORM_LABEL}>
               이메일
             </label>
             <input
@@ -72,10 +69,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label
-              htmlFor="login-password"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
+            <label htmlFor="login-password" className={FORM_LABEL}>
               비밀번호
             </label>
             <input

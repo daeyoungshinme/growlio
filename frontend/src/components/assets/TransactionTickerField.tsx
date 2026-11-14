@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { StockSuggestion } from "@/api/assets";
 import type { TransactionCreate } from "@/api/transactions";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
@@ -42,13 +43,20 @@ export default function TransactionTickerField({
   clearTickerSuggestions,
   onTickerQueryChange,
 }: Props) {
+  const uid = useId();
   const scheduleTimeout = useTimeout();
   return (
     <>
       <div>
-        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">종목 (선택)</label>
+        <label
+          htmlFor={`${uid}-ticker`}
+          className="text-xs font-medium text-gray-600 dark:text-gray-400"
+        >
+          종목 (선택)
+        </label>
         {accountPositions.length > 0 && !tickerDirect ? (
           <select
+            id={`${uid}-ticker`}
             className={`mt-1 w-full ${INPUT_SM}`}
             value={ticker || ""}
             onChange={(e) => {
@@ -72,6 +80,7 @@ export default function TransactionTickerField({
           <div className="flex gap-1 mt-1">
             <div className="relative w-full">
               <input
+                id={`${uid}-ticker`}
                 value={tickerQuery}
                 onChange={(e) => onTickerQueryChange(e.target.value)}
                 onFocus={() => tickerSuggestions.length > 0 && setShowTickerSuggestions(true)}

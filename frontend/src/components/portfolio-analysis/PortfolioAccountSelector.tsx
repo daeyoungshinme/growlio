@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { AssetAccount, INVESTMENT_HORIZON_LABELS, InvestmentHorizon } from "@/api/assets";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
@@ -21,6 +21,7 @@ export default function PortfolioAccountSelector({
   onToggleAccount,
   onSelectAll,
 }: Props) {
+  const headingId = useId();
   // 계좌에 지정된 투자기간(단기/중기/장기) 태그별로 묶어서 표시 — 계좌군 단위로 포트폴리오를
   // 구성하려는 사용자가 한눈에 그룹을 파악할 수 있게 한다. 태그가 없으면 그룹 헤더 없이 평탄하게 표시.
   const groups = useMemo(() => {
@@ -39,9 +40,9 @@ export default function PortfolioAccountSelector({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <p id={headingId} className="text-sm font-medium text-gray-700 dark:text-gray-300">
           분석 대상 계좌
-        </label>
+        </p>
         {!isAllSelected && (
           <button
             type="button"
@@ -52,7 +53,11 @@ export default function PortfolioAccountSelector({
           </button>
         )}
       </div>
-      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 space-y-3">
+      <div
+        role="group"
+        aria-labelledby={headingId}
+        className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 space-y-3"
+      >
         {groups.map((group) => (
           <div key={group.key}>
             {showGroupHeaders && (

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { TRIGGER_CONDITION_OPTIONS } from "@/constants/rebalancingConfig";
 
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export function AlertTriggerSection({ form }: Props) {
+  const uid = useId();
   return (
     <>
       {/* ── 알림 조건 ── */}
@@ -39,11 +41,15 @@ export function AlertTriggerSection({ form }: Props) {
       {/* ── 임계값 슬라이더 ── */}
       {(form.triggerCondition === "DRIFT_ONLY" || form.triggerCondition === "BOTH") && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label
+            htmlFor={`${uid}-threshold`}
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >
             이탈 임계값
           </label>
           <div className="flex items-center gap-3">
             <input
+              id={`${uid}-threshold`}
               type="range"
               min={1}
               max={20}

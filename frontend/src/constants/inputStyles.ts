@@ -14,4 +14,7 @@ export const FORM_INPUT_SM = `mt-1 w-full ${INPUT_SM}`;
 export const SELECT_SM = INPUT_SM;
 export const TEXTAREA_SM = INPUT_SM + " resize-none";
 
+/** 폼 라벨(라벨 위·입력 아래 배치). 직접 className 문자열로 다시 쓰지 말 것 */
 export const FORM_LABEL = `block ${LABEL_MD} mb-1`;
+/** 작은 설정 모달용 폼 라벨 */
+export const FORM_LABEL_XS = "block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1";
