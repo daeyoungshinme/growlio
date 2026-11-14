@@ -82,7 +82,7 @@ growlio/
 - Render는 `autoDeployTrigger: checksPass` — main의 CI가 통과해야 배포된다(대시보드가 Blueprint 동기화 상태여야 반영).
 - **마이그레이션은 자동 실행되지 않는다**(Render 무료 플랜은 pre-deploy 미지원). 스키마 변경이 있으면 **코드 배포 전에** `backend/.env`의 `MIGRATION_DATABASE_URL`을 운영 DB로 지정하고 `cd backend && uv run python scripts/bootstrap_alembic.py && uv run alembic upgrade head`.
 - `/metrics`는 `METRICS_TOKEN`으로 보호된 채 유지되지만 저장소에 수집 구성은 없다.
-- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build + 이미지 빌드 스모크 `docker-build` + 보안 스캔(TruffleHog·bandit·pip-audit·npm audit), push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`/`VITE_REDIRECT_URL` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (cron 10분이지만 GitHub 스로틀로 실측 2~9시간 간격 — 슬립은 못 막고 잠든 서버를 가끔 깨워 `periodic_catchup`을 돌리는 정도. 외부 핑 등록 후 제거 예정).
+- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build + 이미지 빌드 스모크 `docker-build` + 보안 스캔(TruffleHog·bandit·pip-audit·npm audit) + 네이티브 변경 시 `android` assembleDebug + PR `coverage-comment`, push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행 — 웹 빌드·`cap sync`·Gradle을 한 잡에서 실행, 저장소 Variables `VITE_API_DOMAIN`/`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`/`VITE_REDIRECT_URL` 필수, release는 키스토어 Secrets 필요), `keep-alive.yml` (cron 10분이지만 GitHub 스로틀로 실측 2~9시간 간격 — 슬립은 못 막고 잠든 서버를 가끔 깨워 `periodic_catchup`을 돌리는 정도. 외부 핑 등록 후 제거 예정).
 - **Render 무료 플랜은 15분 무요청 시 잠들고 스케줄러도 함께 멈춘다** — `backend/CLAUDE.md` "스케줄러 실행 제약".
 
 ---
@@ -119,6 +119,7 @@ cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy
 cd frontend && npm run lint -- --max-warnings 0 && npm run format:check && npm run typecheck && npm run test
 ```
 
+- 모델을 바꿨으면 `cd backend && uv run alembic check`도 — 마이그레이션 누락은 위 단계를 모두 통과하고 CI에서만 실패한다(로컬 DB 필요).
 - Windows pytest 종료 코드 `-1073741819`는 실패가 아님 (`backend/CLAUDE.md` Tests).
 - 파일 추가·삭제·이동 시 `backend/CLAUDE.md`·`frontend/CLAUDE.md`의 해당 목록(라우터·서비스·훅·유틸 등)도 함께 갱신 — 각 목록이 "추가/삭제 시 갱신"을 전제로 유지됨.
 - CLAUDE.md 항목은 **한 줄 요약 + 코드만 봐선 모르는 함정**까지만. 구현 세부·설계 경위·`plans/NN` 이력은 계획서와 커밋 메시지에 남기고 여기엔 쓰지 않는다(하위 CLAUDE.md는 해당 디렉토리 작업 때마다 통째로 컨텍스트에 로드됨).

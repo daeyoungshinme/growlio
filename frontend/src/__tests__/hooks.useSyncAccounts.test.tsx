@@ -61,4 +61,27 @@ describe("useSyncAccounts (plans/63 P2-3)", () => {
     expect(result.current.state).toBe("idle");
     expect(syncAccount).not.toHaveBeenCalled();
   });
+
+  it("한 번에 3개까지만 동기화하고 실패 수를 돌려준다 — plans/128 A2", async () => {
+    vi.mocked(syncAccount).mockReset();
+    let inFlight = 0;
+    let peak = 0;
+    vi.mocked(syncAccount).mockImplementation(async (id: string) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      if (id === "c") throw new Error("fail");
+      return {} as never;
+    });
+    const result = render();
+    let outcome = { total: 0, failed: 0 };
+    await act(async () => {
+      outcome = await result.current.runWithResult(["a", "b", "c", "d", "e", "f", "g"]);
+    });
+    expect(outcome).toEqual({ total: 7, failed: 1 });
+    expect(syncAccount).toHaveBeenCalledTimes(7);
+    expect(peak).toBe(3);
+    expect(result.current.state).toBe("error");
+  });
 });

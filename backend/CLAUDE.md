@@ -42,7 +42,7 @@ cd backend && uv run mypy app/
 - 실제 DB 없이 mocked `AsyncSession`(`tests/conftest.py`). 환경변수(`KIS_CRED_ENCRYPTION_KEY` 등)도 conftest가 override — `.env` 없이 실행 가능.
 - `conftest.py`가 외부 DNS 조회를 막고 시도한 테스트를 실패시킨다 → 해당 호출을 mock. `settings.fred_api_key`도 비운다. `curl_cffi`(yfinance)는 안 걸리니 직접 mock.
 - 예외: `@pytest.mark.db`(`tests/test_real_db_upserts.py`)는 `GROWLIO_TEST_DATABASE_URL`이 있을 때만 실 Postgres에 붙는다(CI는 서비스 컨테이너, 로컬은 skip). `DATABASE_URL`로 바꾸지 말 것 — 로컬 `.env`가 공유 Supabase를 가리킬 수 있다. ON CONFLICT·제약 이름·타입 캐스트처럼 mock으로 못 잡는 SQL은 여기에 추가.
-- 주요 fixtures: `mock_db`, `mock_cache`(in-memory get/set/setex), `make_account`, `make_snapshot`, `make_user_settings`.
+- 주요 fixtures: `mock_db`, `mock_cache`(in-memory get/set/setex), `make_account`, `make_user_settings`.
 - API 라우트 테스트 공용 헬퍼: `tests/api_helpers.py`(`make_user`·`make_mock_db`·`setup_app`). 구성이 다르면 로컬 헬퍼를 둔다.
 - **Windows**: 전체 실행이 `N passed` 후 exit `-1073741819`(0xC0000005)로 끝나는 건 네이티브 확장 teardown 이슈 — 테스트 실패 아님. 판정은 `N passed` 출력과 CI 기준.
 - 테스트 목록: `uv run pytest --collect-only -q`.
@@ -112,7 +112,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 
 **계좌·동기화 (`accounts/`)**
 - `credential_service.py` — AES-256 암복호화
-- `asset_service.py` — 계좌별 sync + `sync_account_now`(assets `/sync` 전용)
+- `asset_service.py` — 계좌별 sync + `sync_account_now`(assets `/sync` 전용 — 사용자가 누른 동기화라 "해외 없음" 표식 `has_overseas_key`를 지우고 다시 조회한다. 정기 잡·전체 갱신은 표식을 쓴다)
 - `asset_credential_service.py` — 브로커 자격증명 검증·삭제
 - `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). `sync_accounts`(세마포어 3)는 `jobs/asset_sync`도 재사용. 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 풀 고갈 방지. 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
 - `snapshot_service.py` — 스냅샷 upsert·포지션 sync 헬퍼. 수동 계좌 예수금 변경 → 오늘 스냅샷 재작성은 `write_manual_deposit_snapshot`(포지션 복사 포함 — 빠뜨리면 오늘 스냅샷에서 보유종목이 사라진다)
@@ -181,7 +181,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `pension_contribution_service.py` · `isa_service.py`
 
 **알림 (`alerts/`)**
-- `alert_service.py` — 공통 저장·조회·격리 루프(rollback 뒤 행 객체는 refresh 후 사용), 오늘(KST) 발송 여부 `already_sent_alert_today`. 환율·주가 알림 `notify_and_record_trigger`는 메일 결과(`email_sent`)를 받아 푸시를 따로 시도하고 한 채널이라도 성공해야 발동 기록. 주가 알림 목표가는 **원화** — 해외는 `fetch_prices_batch_krw`로 비교. 체크 함수 re-export 없음 — 구현 모듈에서 직접 import
+- `alert_service.py` — 공통 저장·조회·격리 루프(rollback 뒤 행 객체는 refresh 후 사용), 오늘(KST) 발송 여부 `already_sent_alert_today`. 환율·주가 알림 `notify_and_record_trigger`는 메일 결과(`email_sent`)를 받아 푸시를 따로 시도하고 한 채널이라도 성공해야 발동 기록. 주가 알림 목표가는 **원화** — 해외는 `fetch_prices_batch_krw(require_live_rate=True)`로 비교(실환율 없으면 판정 건너뜀). 체크 함수 re-export 없음 — 구현 모듈에서 직접 import
 - `exchange_rate_service.py` · `stock_price_service.py` · `calculator.py`(조건 판단)
 - `market_signal_alert_service.py` — 등급 전환 즉시 알림 + 08:30 요약. `check_composite_signal`을 alert_check·diagnosis와 공유
 - `_dispatch.py` — 이메일+푸시 2채널, 하나라도 성공하면 AlertHistory 저장. 단독 푸시는 `send_push_safely`(예외 로깅 후 삼킴)
@@ -190,7 +190,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 **시장 신호 (`market_signal/`)**
 - `market_signal_service.py` — 8종 지표 복합 점수. `get_confirmed_composite_level()`(hysteresis 2회)은 AUTO 게이트·알림 전용, raw는 배너용. 지표 조회는 `market_signal_indicators.py`, 점수는 `market_signal_scoring.py` — 외부는 `market_signal_service`에서 import. **지표끼리 내부 호출하므로 patch는 `market_signal_indicators.*` 경로**
 - `economic_indicator_service.py`(CPI)
-- `technical_indicators.py`(순수, pandas는 함수 내부 import — 기동 시 로드 방지) · `technical_signal_service.py`(QQQ/SPY/DIA 6h 캐시)
+- `technical_indicators.py`(순수, pandas는 함수 내부 import — 기동 시 로드 방지) · `technical_signal_service.py`(QQQ/SPY/DIA 6h 캐시. **정규장이 끝난 거래일 종가만** — `fetch_close_history`가 장중 일봉을 버리고, 캐시 키에 `last_completed_us_session`이 들어간다)
 
 **기타**
 - `factor_service.py` · `insight_service.py` · `risk_service.py` · `portfolio_optimizer.py`(효율적 프론티어)
@@ -198,7 +198,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음(세금 소스만 2분 캐시 — 세금 입력이 바뀌는 새 경로는 `invalidate_tax_action_items_cache`도 부를 것)
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)
 - `dca_service.py` · `dca_cash_shortfall_service.py`(적립 자동매수 전 예수금 부족 판정, 잡·action-items 공유. 정액 알림은 사용자 월 적립액 합산과 섞지 않고 원화·달러를 따로 비교) · `backtest/`(`backtest_service.py` + `backtest_metrics.py`) · `dart_service.py`
-- `fx_plan_service.py` — 환율 1년 위치(백분위·이평 이격·1개월 ±1σ)와 해외 적립 필요 달러의 분할 환전 구간. **예측 아님**. 현재값은 실시간 캐시(없으면 1년 일봉 마지막 종가, `rate_is_live`), Yahoo `USDKRW=X` 1년 일봉은 통계용(6h 캐시). 구간 알림은 `sync_fx_plan_alerts`가 `ExchangeRateAlert.source=FX_PLAN`(+`planned_usd`·`portfolio_id`)으로 맞춘다 — 같은 포트폴리오의 미발동 계획 알림만 교체·삭제하고 **MANUAL 알림은 건드리지 않는다**(같은 목표면 건너뜀). 발동 메일·푸시(`type=FX_PLAN`)에 구간 금액이 실린다. 필요 달러는 정액 적립 알림이 있으면 `fixed_amount_needs`의 해외 몫(없으면 월 적립액 × 해외 비중), 보유 달러는 포트폴리오 연결과 무관하게 **활성 증권 계좌 전체의 동기화 `deposit_usd`**(수기 `STOCK_OTHER` 포함) — 증권사 실시간 조회는 로딩 경로에서 하지 않는다(plans/127, 환전 직후 반영은 카드의 계좌 동기화 버튼). 기준 시각 `held_usd_synced_at`, 계좌별 내역 `held_usd_accounts`. 환율 컨텍스트는 task로 먼저 출발시켜 DB 읽기와 겹친다. `WAITING_FX` 부족분은 **주문 실행 계좌 달러로만** 상쇄해 "지금" 구간에 강제(수기 계좌 달러로는 KIS·키움 주문 불가). 실제 재매수 판정은 실행 경로가 `usd_buying_power`로 실시간 확인한다. 앱 링크는 `#fx-plan` 해시(카드 펼침) — 메일·푸시·`action_items_service._LINK_FX_PLAN`이 프론트 `FX_PLAN_ANCHOR`와 같아야 함. 알림 맞추기 범위는 `portfolio_id` 또는 `fx_need_id` 하나 — 한 범위가 다른 범위의 계획 알림을 건드리지 않는다(`_in_scope`, 프론트 `utils/fxPlanAlerts`와 같은 규칙). 단 포트폴리오 계획끼리 목표 환율이 같으면 알림은 하나 — 다른 포트폴리오의 활성·미발동 알림이 있으면 만들지 않고 자기 알림은 지운다(`skipped_shared`, 추가 환전 항목은 제외). 금액은 먼저 맞춘 계획 몫만 실리고, 그 계획이 목표를 빼거나 해제·삭제되면 다른 쪽 카드가 "등록"으로 돌아간다
+- `fx_plan_service.py` — 환율 1년 위치(백분위·이평 이격·1개월 ±1σ)와 해외 적립 필요 달러의 분할 환전 구간. **예측 아님**. 현재값은 실시간 캐시(없으면 1년 일봉 마지막 종가, `rate_is_live`), Yahoo `USDKRW=X` 1년 일봉은 통계용(6h 캐시). 구간 알림은 `sync_fx_plan_alerts`가 `ExchangeRateAlert.source=FX_PLAN`(+`planned_usd`·`portfolio_id`)으로 맞춘다 — 같은 포트폴리오의 미발동 계획 알림만 교체·삭제하고 **MANUAL 알림은 건드리지 않는다**(같은 목표면 건너뜀). 발동 메일·푸시(`type=FX_PLAN`)에 구간 금액이 실린다. 필요 달러는 정액 적립 알림이 있으면 `fixed_amount_needs`의 해외 몫(없으면 월 적립액 × 해외 비중), 보유 달러는 포트폴리오 연결과 무관하게 **활성 증권 계좌 전체의 동기화 `deposit_usd`**(수기 `STOCK_OTHER` 포함) — 증권사 실시간 조회는 로딩 경로에서 하지 않는다(plans/127, 환전 직후 반영은 카드의 계좌 동기화 버튼). 기준 시각 `held_usd_synced_at`, 계좌별 내역 `held_usd_accounts`. 환율 컨텍스트는 task로 먼저 출발시켜 DB 읽기와 겹친다. `WAITING_FX` 부족분은 **그 leg 실행 계좌의 달러로만** 상쇄해 "지금" 구간에 강제(다른 계좌·수기 계좌 달러로는 그 주문이 진행되지 않는다). 실제 재매수 판정은 실행 경로가 `usd_buying_power`로 실시간 확인한다. 앱 링크는 `#fx-plan` 해시(카드 펼침) — 메일·푸시·`action_items_service._LINK_FX_PLAN`이 프론트 `FX_PLAN_ANCHOR`와 같아야 함. 알림 맞추기 범위는 `portfolio_id` 또는 `fx_need_id` 하나 — 한 범위가 다른 범위의 계획 알림을 건드리지 않는다(`_in_scope`, 프론트 `utils/fxPlanAlerts`와 같은 규칙). 단 포트폴리오 계획끼리 목표 환율이 같으면 알림은 하나 — 다른 포트폴리오의 활성·미발동 알림이 있으면 만들지 않고 자기 알림은 지운다(`skipped_shared`, 추가 환전 항목은 제외). 금액은 먼저 맞춘 계획 몫만 실리고, 그 계획이 목표를 빼거나 해제·삭제되면 다른 쪽 카드가 "등록"으로 돌아간다
 - `fx_extra_need_service.py` — 추가 환전 항목(여행 등, `FxExtraNeed`)과 항목별 구간. **증권 계좌 달러로 상쇄하지 않는다**(적립 계획과 별개), 필요일 14일 이하면 전액 "지금". 항목 알림은 `ExchangeRateAlert.fx_need_id`(**CASCADE** — 항목 삭제 시 알림도 삭제), 필요일 지난 항목의 알림은 `exchange_rate_service` 조회가 거른다(발송 안 함). `reserved_account_id`(보관 증권 계좌, 선택 — **계좌는 소프트 삭제라 FK SET NULL이 안 걸려 계좌 삭제 라우트가 직접 해제**)를 지정하면 `fx_plan_service._held_usd`가 필요일 전까지 그 계좌 보유 달러에서 `exchanged_usd`를 뺀다(계좌별 0 하한, WAITING_FX 상쇄도 뺀 값) — **적립 환전 계획만**이고 총자산·리밸런싱·자동매수 가용 현금은 그대로
 - `dividend/` — `fetcher.py`(폴백 체인 Naver → yfinance → KIS ETF → FDR(+pykrx 펀더멘털) → KIS → DART → 정적), `sync_sources.py`, `orchestrator.py`(`get_ticker_dividend_summary`), `aggregator.py`, `calculator.py`(순수), `plan_service.py`, `drip_service.py`, `constants.py`, `_dividend_queries.py`
 - `auth_service.py` — Supabase JWT 검증(JWKS, aud=authenticated) + 탈퇴 재인증. 자체 JWT 발급 없음
@@ -232,12 +232,12 @@ utils/
   cache_keys.py       캐시 키 + TTL (휘발성)
   cache_invalidation.py  invalidate_* — SCAN 패턴이 cache_keys 빌더 포맷과 맞아야 함(드리프트 테스트가 검사)
   durable_state.py    Postgres AppState KV — 재시작에도 유지할 상태. 다중 프로세스 선점은 claim_durable()(get→set은 경합에 안전하지 않음)
-  circuit_breaker.py  KIS/키움/토스 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s (재시작 시 초기화)
+  circuit_breaker.py  KIS/키움/토스 5회→60s, Yahoo/Naver/FDR 5회→120s, FRED 4회→300s (재시작 시 초기화)
   kst.py              today_kst()/now_kst()/kst_day_start() — "오늘 보냈나" 비교는 kst_day_start
   pykrx_util.py       **pykrx 호출은 반드시 `with quiet_pykrx() as stock:` 안에서** — 동시 호출 시 프로세스 크래시(락 직렬화)
   naver_retry.py      Naver 모바일 API는 `naver_get_json` + `except NAVER_FAILURES` → `log_naver_failure`
-  currency.py · masking.py · inproc_lock.py(단일 프로세스 전제) · market_hours.py(KRX·NYSE 휴장일 — `holidays` 패키지, 반일장 미반영) · metrics.py · pnl.py · numbers.py(opt_float — Numeric→float|None)
-limiter.py      slowapi. 키는 rate_limit_key(JWT sub / X-Forwarded-For 첫 hop — Vercel→Render 프록시라 client.host는 공용).
+  currency.py · masking.py · inproc_lock.py(단일 프로세스 전제) · market_hours.py(KRX·NYSE 휴장일 — `holidays` 패키지. NYSE 조기 폐장·KRX 연초 개장일은 규칙, **수능일은 `_KRX_CSAT_DAYS`에 해마다 추가**) · metrics.py · pnl.py · numbers.py(opt_float — Numeric→float|None)
+limiter.py      slowapi. 키는 rate_limit_key(JWT sub / X-Forwarded-For 첫 hop — Vercel→Render 프록시라 client.host는 공용). 계좌마다 따로 세는 라우트(계좌 동기화)는 account_rate_limit_key + 사용자 상한을 겹친다.
                 **인증 없이 상태를 바꾸거나 토큰을 받는 라우트는 ip_rate_limit_key + peer_rate_limit_key 두 데코레이터를 겹친다**(tests/test_rate_limit_key.py가 검사)
 enums.py        도메인 StrEnum — 매직 스트링 대신
 constants.py    DOMESTIC/OVERSEAS_MARKETS, POSITION_STOCK_ASSET_TYPES, BROKER_API_ASSET_TYPES·BROKER_API_DATA_SOURCES(잔고 조회), ORDER_EXECUTABLE_ASSET_TYPES(주문·취소, 토스 제외), is_non_tradable(). **새 브로커는 여기에만 추가**(서비스별 로컬 집합 금지)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from datetime import date
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -107,7 +108,7 @@ TTL_TECHNICAL_SIGNAL_DEGRADED = 600  # 일부 종목 종가 조회 실패 결과
 # 키 빌더 함수의 f-string 포맷은 그대로 유지할 것 — 무단으로 포맷을 바꾸면 캐시 미스가 폭증한다.**
 _ALLOC_HISTORY_VERSION = "v3"  # v3: 증권계좌 예수금(스냅샷−포지션 차액)을 CASH_STOCK으로 보존
 _ETF_PROFILE_VERSION = "v1"  # v1: 첫 버전 태깅 — EtfProfile TypedDict 필드가 바뀌면 올릴 것
-_TECHNICAL_SIGNAL_VERSION = "v4"  # 버전 이력은 technical_signal_key docstring
+_TECHNICAL_SIGNAL_VERSION = "v5"  # 버전 이력은 technical_signal_key docstring
 _TACTICAL_BACKTEST_VERSION = "v4"  # 버전 이력은 tactical_backtest_key docstring
 _USD_KRW_HISTORY_VERSION = "v1"
 _TACTICAL_TILT_VERSION = "v1"
@@ -205,10 +206,12 @@ def overseas_stock_meta_key(ticker: str) -> str:
     return f"{_env_prefix()}overseas_stock_meta:{ticker}"
 
 
-def technical_signal_key(tickers: tuple[str, ...]) -> str:
+def technical_signal_key(tickers: tuple[str, ...], session: date) -> str:
     """차트 기술적 지표 스냅샷(일봉) 캐시 키 — 유저 무관 전역 공유. v2: 추세 히스테리시스 밴드 도입.
-    v3: 20/60/120일선·웅덩이 단계 추가(스냅샷 모양 변경). v4: 추세 밴드 1%→2%(같은 모양, 추세 값이 달라짐)."""
-    return f"{_env_prefix()}technical_signal:{_TECHNICAL_SIGNAL_VERSION}:{','.join(sorted(tickers))}"
+    v3: 20/60/120일선·웅덩이 단계 추가(스냅샷 모양 변경). v4: 추세 밴드 1%→2%(같은 모양, 추세 값이 달라짐).
+    v5: 마지막으로 끝난 미국 거래일(`session`)을 키에 넣는다 — 장 마감 뒤 첫 조회가 새 종가로 다시 계산한다."""
+    tickers_part = ",".join(sorted(tickers))
+    return f"{_env_prefix()}technical_signal:{_TECHNICAL_SIGNAL_VERSION}:{session.isoformat()}:{tickers_part}"
 
 
 def usd_krw_history_key() -> str:

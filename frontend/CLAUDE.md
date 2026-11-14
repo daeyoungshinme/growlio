@@ -127,7 +127,7 @@ _리밸런싱/추천_
 - `useAnalysisState` — 분석(기본은 동기화 기준 예수금, 결과 5분 재사용). 실시간 예수금은 "실시간 잔고로 다시 분석"(`live: true`)에서만
 - `useRebalancingBalances` · `useRebalancingPrices` · `useAllocationHistory` · `useOptimizationSuggestions` · `useBacktestDateRange` · `useGoalSettings`
 - `useAlertCrud` · `useRebalancingAlertForm`(`useRebalancingAlertQueries`·`useRebalancingAlertFormState`)
-- `useSyncAccounts` — 여러 계좌 동기화 + 무효화(`run`이 전부 성공 여부 반환)
+- `useSyncAccounts` — 여러 계좌 동기화(동시 3개) + 무효화(`run`이 전부 성공 여부, `runWithResult`가 실패 수 반환)
 - `useDcaTacticalLink` — 적립식 자동매수의 전술 연동 여부 `{dcaAuto, linked}`. 계좌별 알림이 여럿일 수 있어 `mergeAlertsByPortfolio` 대신 행 단위 판정. `linked`는 적립식 알림이 **모두** TACTICAL일 때만 참 — 안내 문구용이지 캐시 무효화 판정에 쓰면 안 됨
 - `useAutoExecutionNotice` — 켜진 AUTO가 있으면 "다음 자동 실행부터 새 목표로 주문" 문구
 - `useAddSuggestedCandidates` · `useCandidateOverlap`(디바운스 포함)
@@ -188,11 +188,11 @@ _기타_
 | 상황 | 함수 |
 | --- | --- |
 | 계좌 sync | `invalidateSyncData` |
-| 계좌 CUD | `invalidateAccountData` (동기화할 계좌 생성 직후엔 `invalidateAccountListData`, 전체는 첫 sync 뒤 1회) |
+| 계좌 CUD | `invalidateAccountData` (동기화할 계좌 생성 직후엔 `invalidateAccountListData`, 전체는 첫 sync 뒤 1회. **삭제는 `invalidateBrokerCredentialData`** — 서버가 자동 실행 알림을 끄고 대기 매수를 취소) |
 | 브로커 연동 해제 | `invalidateBrokerCredentialData` |
 | 거래내역 CUD | `invalidateTransactionData` |
 | 수기 매매 기록 CUD | `invalidateTradeData` (해외 SELL이 양도세 실현손익이 되므로 세금·지금 할 일 포함) |
-| 포트폴리오/리밸런싱 CUD | `invalidatePortfolioData` |
+| 포트폴리오/리밸런싱 CUD | `invalidatePortfolioData` (삭제는 `{ deleted: true }` — 환율 알림·대기 플랜 포함) |
 | 전술 설정 / 제안 비중 적용 / 전술 끄기(서버가 TACTICAL 알림 해제) | `invalidateTacticalData` / `{ portfolioChanged: true }` / `{ alertsReset: true }`(끌 때 항상) |
 | DCA·배당 목표 변경 | `invalidateDcaData` (목표 금액·연도 변경은 `{ goalRecommendation: true }`, 배당 목표는 + `invalidateGoalRecommendationData`) |
 | 소득 구간 변경 | `invalidateIncomeBracketData` |

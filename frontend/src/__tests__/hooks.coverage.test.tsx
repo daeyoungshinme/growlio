@@ -45,6 +45,7 @@ vi.mock("@/api/rebalancing", () => ({
 vi.mock("@/utils/queryInvalidation", () => ({
   invalidateAccountData: vi.fn().mockResolvedValue(undefined),
   invalidateAccountListData: vi.fn().mockResolvedValue(undefined),
+  invalidateBrokerCredentialData: vi.fn().mockResolvedValue(undefined),
   invalidateSyncData: vi.fn().mockResolvedValue(undefined),
   invalidateRebalancingHistoryData: vi.fn().mockResolvedValue(undefined),
   invalidatePortfolioData: vi.fn().mockResolvedValue(undefined),
@@ -58,6 +59,7 @@ vi.mock("@/utils/queryInvalidation", () => ({
 
 import { api } from "@/api/client";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { invalidateBrokerCredentialData } from "@/utils/queryInvalidation";
 import { executionReducer } from "@/hooks/rebalancingExecution/reducer";
 import { useAccountMutations } from "@/hooks/useAccountMutations";
 import type { ExecutionState } from "@/hooks/rebalancingExecution/types";
@@ -845,6 +847,8 @@ describe("useAccountMutations", () => {
     });
 
     expect(toast).toHaveBeenCalledWith("계좌가 삭제되었습니다", "success");
+    // plans/128 C5 — 삭제는 자동 실행 알림·대기 매수도 바꾸므로 알림·플랜까지 다시 받는다
+    expect(invalidateBrokerCredentialData).toHaveBeenCalled();
   });
 
   it("createMutation 성공 시 (MANUAL) toast와 onBankModalClose를 호출한다", async () => {

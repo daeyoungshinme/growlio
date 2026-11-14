@@ -103,21 +103,6 @@ def _sync_usdkrw() -> float:
     return 0.0
 
 
-def _sync_yahoo_price(ticker: str, market: str) -> float | None:
-    """동기 함수 — run_in_executor로 호출."""
-    import yfinance as yf
-
-    sym = to_yf_symbol(ticker, market)
-    try:
-        hist = yf.Ticker(sym).history(period="5d")
-        if not hist.empty:
-            price = float(hist["Close"].iloc[-1])
-            return price if price > 0 else None
-    except Exception as e:
-        logger.warning("yahoo_price_failed", ticker=ticker, symbol=sym, error=str(e))
-    return None
-
-
 def _sync_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
     """여러 종목을 한 번의 download 호출로 조회. {ticker: price}"""
 
@@ -191,12 +176,6 @@ async def fetch_usdkrw() -> float:
     """USD/KRW 환율. 실패·서킷 열림이면 0.0."""
     rate: float = await _run_guarded(_sync_usdkrw, fallback=0.0)
     return rate
-
-
-async def fetch_yahoo_price(ticker: str, market: str) -> float | None:
-    """단일 종목 현재가(현지 통화). 실패·서킷 열림이면 None."""
-    price: float | None = await _run_guarded(_sync_yahoo_price, ticker, market, fallback=None)
-    return price
 
 
 async def fetch_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:

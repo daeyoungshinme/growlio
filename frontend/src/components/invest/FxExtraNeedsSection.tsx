@@ -26,7 +26,7 @@ import { toast } from "@/utils/toast";
 const FxExtraNeedModal = lazy(() => import("@/components/invest/FxExtraNeedModal"));
 
 /** 백엔드 `MAX_FX_EXTRA_NEEDS_PER_USER`와 같은 값 */
-export const MAX_FX_EXTRA_NEEDS = 10;
+const MAX_FX_EXTRA_NEEDS = 10;
 /** 필요일까지 이 일수 이하면 남은 금액 전액을 "지금"으로 — 백엔드 `FX_EXTRA_URGENT_DAYS`와 같은 값 */
 const FX_EXTRA_URGENT_DAYS = 14;
 
@@ -220,7 +220,7 @@ export default function FxExtraNeedsSection() {
 
       {isLoading ? (
         <SkeletonCard rows={2} />
-      ) : isError ? (
+      ) : isError && !data ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           추가 환전 항목을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
         </p>

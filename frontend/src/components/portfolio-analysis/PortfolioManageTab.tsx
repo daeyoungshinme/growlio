@@ -229,7 +229,7 @@ export default function PortfolioManageTab({
   const deleteMut = useMutation({
     mutationFn: deletePortfolio,
     onSuccess: () => {
-      void invalidatePortfolioData(qc);
+      void invalidatePortfolioData(qc, { deleted: true });
     },
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 삭제에 실패했습니다"), "error"),
   });

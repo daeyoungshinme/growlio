@@ -5,6 +5,7 @@ import { createAccount, updateAccount, deleteAccount, syncAccount } from "@/api/
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import {
   invalidateAccountData,
+  invalidateBrokerCredentialData,
   invalidateAccountListData,
   invalidateSyncData,
 } from "@/utils/queryInvalidation";
@@ -69,7 +70,8 @@ export function useAccountMutations({
   const deleteMutation = useMutation({
     mutationFn: deleteAccount,
     onSuccess: () => {
-      void invalidateAll();
+      // 삭제는 서버가 그 계좌의 자동 실행 알림을 끄고 대기 매수를 취소한다 — 알림·대기 플랜도 다시 받는다
+      void invalidateBrokerCredentialData(queryClient);
       setDeletingId(null);
       toast("계좌가 삭제되었습니다", "success");
     },

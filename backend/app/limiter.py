@@ -45,6 +45,15 @@ def rate_limit_key(request: Request) -> str:
     return ip_rate_limit_key(request)
 
 
+def account_rate_limit_key(request: Request) -> str:
+    """사용자 + 경로의 `account_id` 버킷 — 계좌마다 따로 세야 하는 라우트용(계좌 동기화).
+
+    사용자 단위 한도(5/분)면 계좌 여러 개를 한 번에 동기화하는 화면(환전 계획 "새로 받기"·리밸런싱 계좌 갱신)이
+    계좌 6개째부터 429였다(plans/128 A2). 사용자 전체 상한은 `rate_limit_key` 데코레이터를 겹쳐 건다.
+    """
+    return f"{rate_limit_key(request)}:account:{request.path_params.get('account_id', '')}"
+
+
 def ip_rate_limit_key(request: Request) -> str:
     """클라이언트 IP 버킷 — 인증 없는 라우트용. 위조 JWT `sub`로 버킷을 바꿔 한도를 우회하지 못하게 한다.
 

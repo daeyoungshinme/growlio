@@ -62,7 +62,7 @@ function heldUsdLabel(data: FxPlanData) {
  */
 function RefreshHeldUsdButton() {
   const { data: accounts } = useQuery(accountsQuery);
-  const { state, run } = useSyncAccounts();
+  const { state, runWithResult } = useSyncAccounts();
   const ids = (accounts ?? [])
     .filter((a) => isStockAccount(a.asset_type) && isSyncableAccount(a.data_source))
     .map((a) => a.id);
@@ -73,8 +73,14 @@ function RefreshHeldUsdButton() {
       <span>증권사 앱에서 환전했다면 새로 받아 주세요.</span>
       <button
         onClick={() => {
-          void run(ids).then((ok) => {
-            if (!ok) toast("일부 계좌의 달러 예수금을 받지 못했습니다", "error");
+          void runWithResult(ids).then(({ total, failed }) => {
+            if (failed === 0) return;
+            toast(
+              failed === total
+                ? "달러 예수금을 받지 못했습니다. 잠시 후 다시 시도해 주세요"
+                : `계좌 ${total}개 중 ${failed}개의 달러 예수금을 받지 못했습니다`,
+              "error",
+            );
           });
         }}
         disabled={syncing}
@@ -166,14 +172,15 @@ function FxPlanBody({ onEditGoal }: Props) {
   const [portfolioId, setPortfolioId] = useState<string | null>(null);
   const months = MONTHS[monthOption];
 
-  const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
+  const { data, isLoading, isError, error, isPlaceholderData, dataUpdatedAt } = useQuery({
     ...fxPlanQuery(months, portfolioId),
     // 월 탭·포트폴리오를 바꿀 때 카드 전체가 스켈레톤으로 바뀌며 탭 포커스가 사라지지 않게 (plans/99 B1)
     placeholderData: keepPreviousData,
   });
 
   // 기간 탭은 계획이 나온 상태(OK·SUFFICIENT)에서만 보인다 — 그때 나머지 기간을 미리 받아 탭 전환을 즉시로.
-  // 서버는 증권사를 부르지 않는다(동기화 값, plans/127)
+  // 서버는 증권사를 부르지 않는다(동기화 값, plans/127). `dataUpdatedAt`이 바뀌면(동기화·무효화 뒤 재조회) 다시 받는다 —
+  // 무효화는 화면에 붙은 기간만 다시 받아 다른 기간 탭이 옛 보유 달러로 남았다(plans/128 A4). 신선한 캐시는 건너뛴다
   const prefetchOtherMonths =
     !!data && !isPlaceholderData && (data.status === "OK" || data.status === "SUFFICIENT");
   useEffect(() => {
@@ -182,7 +189,7 @@ function FxPlanBody({ onEditGoal }: Props) {
       if (MONTHS[option] !== months)
         void qc.prefetchQuery(fxPlanQuery(MONTHS[option], portfolioId));
     }
-  }, [prefetchOtherMonths, months, portfolioId, qc]);
+  }, [prefetchOtherMonths, months, portfolioId, qc, dataUpdatedAt]);
   const { data: alerts } = useQuery(exchangeRateAlertsQuery);
 
   const plan = planAlertState(alerts, data?.tranches, { portfolioId: data?.portfolio_id ?? null });
@@ -219,7 +226,9 @@ function FxPlanBody({ onEditGoal }: Props) {
   );
 
   if (isLoading) return <SkeletonCard rows={4} height="h-5" />;
-  if (isError || !data) {
+  // 재조회만 실패했으면(v5는 옛 data를 남긴다) 받아 둔 계획을 계속 보여 준다 — 동기화 직후 서버가 깨어나는 중이면
+  // 카드 전체가 오류 문구로 바뀌었다(plans/128 A3)
+  if (!data) {
     return (
       <p className="text-sm text-gray-500 dark:text-gray-400">
         환전 계획을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.

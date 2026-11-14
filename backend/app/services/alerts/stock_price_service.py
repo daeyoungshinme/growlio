@@ -50,7 +50,10 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, cache) -> None:
     price_maps: dict[str, dict[str, float]] = {}
     for market in {a.market for a, _, _, _ in rows}:
         tickers = list({(a.ticker, a.market) for a, _, _, _ in rows if a.market == market})
-        price_maps[market] = await fetch_prices_batch_krw(sample_user_id, tickers, db, cache, kis_accounts={})
+        # 실환율이 없으면 해외 종목은 이번 회차 판정에서 빠진다(fallback 1300 환산은 BELOW 거짓 발동)
+        price_maps[market] = await fetch_prices_batch_krw(
+            sample_user_id, tickers, db, cache, kis_accounts={}, require_live_rate=True
+        )
 
     async def _handle(row) -> bool:
         alert, user_email, notification_email, fcm_token = row

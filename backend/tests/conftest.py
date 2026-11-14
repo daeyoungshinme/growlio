@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import engine
-from app.utils.kst import today_kst
 
 # 실제 DB 접속 차단 가드 — 각 모듈이 AsyncSessionLocal을 import 시점에 바인딩하므로 patch를 빠뜨린 테스트는
 # 로컬 .env의 DB(개발자에 따라 Supabase 운영 풀러)에 그대로 붙는다(계획 40 N3-b). 엔진 레벨에서 막는다.
@@ -260,25 +259,6 @@ def make_account(make_user_id):
         )
 
     return _factory
-
-
-@pytest.fixture
-def make_snapshot(make_user_id):
-    """AssetSnapshot 유사 객체."""
-    from types import SimpleNamespace
-
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        user_id=make_user_id,
-        account_id=uuid.uuid4(),
-        snapshot_date=today_kst(),
-        amount_krw=10_000_000.0,
-        invested_amount=9_000_000.0,
-        unrealized_pnl=1_000_000.0,
-        positions=[],
-        source="MANUAL",
-        created_at=datetime.now(UTC),
-    )
 
 
 @pytest.fixture

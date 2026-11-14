@@ -18,6 +18,7 @@ from app.services.alerts.alert_service import (
     run_isolated_alert_loop,
 )
 from app.services.alerts.calculator import should_trigger_exchange_rate
+from app.utils.cache_invalidation import invalidate_exchange_rate_alert_caches
 from app.utils.currency import fetch_usd_krw
 from app.utils.kst import today_kst
 
@@ -99,7 +100,7 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
             plan_note = ""
             push_title = "환율 알림"
             push_data = None
-        return await notify_and_record_trigger(
+        triggered = await notify_and_record_trigger(
             db,
             alert,
             "EXCHANGE_RATE",
@@ -111,6 +112,10 @@ async def check_and_trigger_alerts(db: AsyncSession, cache: CacheStore | None = 
             email_sent=email_sent,
             push_data=push_data,
         )
+        if triggered:
+            # 발동(triggered_at·비활성)이 목록 캐시(5분)에 안 보이면 환전 계획 카드가 발동한 알림을 등록된 것으로 센다
+            await invalidate_exchange_rate_alert_caches(cache, alert.user_id)
+        return triggered
 
     triggered_count = await run_isolated_alert_loop(db, rows, _handle, "exchange_rate_alert_item_failed")
     await finalize_alert_batch(db, "exchange_rate", triggered_count, current_rate=current_rate)

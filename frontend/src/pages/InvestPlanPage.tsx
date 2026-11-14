@@ -111,13 +111,6 @@ export default function InvestPlanPage() {
     if (isFxPlanOpen) setFxPlanOpen(false);
   }, [fxPlanForcedOpen, isFxPlanOpen, location.key, setFxPlanOpen, toggleFxPlanOpen]);
 
-  // 카드 본문은 lazy 청크라 열린 뒤 청크를 받고 나서야 요청이 나간다 — 펼쳐지는 순간 요청을 함께 출발시킨다(plans/127)
-  const queryClient = useQueryClient();
-  const fxPlanVisible = activeTab === "적립 계획" && (isFxPlanOpen || fxPlanForcedOpen);
-  useEffect(() => {
-    if (fxPlanVisible) void queryClient.prefetchQuery(fxPlanQuery(FX_PLAN_DEFAULT_MONTHS, null));
-  }, [fxPlanVisible, queryClient]);
-
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, activeTab, setActiveTab);
 
@@ -183,6 +176,15 @@ export default function InvestPlanPage() {
   // 기다렸다(plans/125 E7). 로딩·실패 표시는 그 탭 안에서만 한다.
   const dcaPending = isLoading;
   const dcaFailed = isError && !data;
+
+  // 카드 본문은 lazy 청크라 열린 뒤 청크를 받고 나서야 요청이 나간다 — 펼쳐지는 순간 요청을 함께 출발시킨다(plans/127).
+  // 적립 분석이 실패하면 카드를 그리지 않으므로 받지 않는다(plans/128 A4)
+  const queryClient = useQueryClient();
+  const fxPlanVisible =
+    activeTab === "적립 계획" && !dcaFailed && (isFxPlanOpen || fxPlanForcedOpen);
+  useEffect(() => {
+    if (fxPlanVisible) void queryClient.prefetchQuery(fxPlanQuery(FX_PLAN_DEFAULT_MONTHS, null));
+  }, [fxPlanVisible, queryClient]);
 
   return (
     <div className="space-y-6">

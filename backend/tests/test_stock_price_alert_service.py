@@ -108,9 +108,9 @@ class TestCheckAndTriggerStockPriceAlerts:
                 return_value={"AAPL": 205.0},
             ),
             patch(
-                "app.services.market_data.price_service.get_usd_krw_rate",
+                "app.services.market_data.price_service.get_live_or_cached_usd_krw",
                 new_callable=AsyncMock,
-                return_value=1400.0,
+                return_value=(1400.0, True),
             ),
             patch("app.services.notifications.email_service.send_stock_price_alert", new_callable=AsyncMock),
             patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock),
@@ -132,9 +132,9 @@ class TestCheckAndTriggerStockPriceAlerts:
         with (
             patch("app.services.market_data.price_service.fetch_prices_batch", new=fetch),
             patch(
-                "app.services.market_data.price_service.get_usd_krw_rate",
+                "app.services.market_data.price_service.get_live_or_cached_usd_krw",
                 new_callable=AsyncMock,
-                return_value=1400.0,
+                return_value=(1400.0, True),
             ),
             patch("app.services.notifications.email_service.send_stock_price_alert", new_callable=AsyncMock),
             patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock),
@@ -241,3 +241,27 @@ class TestCheckAndTriggerStockPriceAlerts:
 
         mock_db.commit.assert_not_called()
         assert alert.trigger_count == 0
+
+
+@pytest.mark.asyncio
+async def test_overseas_alert_skipped_without_live_rate(mock_db, mock_cache):
+    """plans/128 C3 — 실환율이 없으면 fallback 1300으로 환산하지 않고 해외 알림 판정을 건너뛴다."""
+    # 실제 약 1450원이면 28달러 = 40,600원 > 목표 38,000원(미발동). 1300으로 환산하면 36,400원이라 거짓 발동한다
+    alert = _make_alert(ticker="SCHD", market="NYSE", target_price=38000.0, direction="BELOW")
+    mock_db.execute.return_value.all.return_value = [_make_row(alert)]
+
+    with (
+        patch("app.services.market_data.price_service.fetch_prices_batch", new=AsyncMock(return_value={"SCHD": 28.0})),
+        patch(
+            "app.services.market_data.price_service.get_live_or_cached_usd_krw",
+            new=AsyncMock(return_value=(1300.0, False)),
+        ),
+        patch("app.services.notifications.email_service.send_stock_price_alert", new_callable=AsyncMock) as email,
+        patch("app.services.notifications.push_service.send_push_to_user", new_callable=AsyncMock),
+    ):
+        from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
+
+        await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
+
+    assert alert.trigger_count == 0
+    email.assert_not_called()

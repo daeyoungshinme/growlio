@@ -917,6 +917,42 @@ class TestFetchWrappers:
         fetch.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_close_history_drops_unfinished_bar_during_us_session(self):
+        """plans/128 C1 — 미국 장중에 받은 당일 일봉(현재가)은 종가가 아니라 버린다."""
+        from datetime import date
+
+        from app.services.market_signal import technical_signal_service as svc
+
+        idx = pd.to_datetime(["2026-11-06", "2026-11-09", "2026-11-10"])
+        raw = {"QQQ": pd.Series([100.0, 101.0, 90.0], index=idx), "SPY": pd.Series([50.0], index=idx[-1:])}
+        with (
+            patch.object(svc, "run_yf_bounded", AsyncMock(return_value=raw)),
+            patch.object(svc, "last_completed_us_session", return_value=date(2026, 11, 9)),
+        ):
+            closes = await svc.fetch_close_history(["QQQ", "SPY"], 30)
+        assert list(closes["QQQ"]) == [100.0, 101.0]
+        assert "SPY" not in closes  # 확정 종가가 하나도 없으면 없는 종목으로
+
+    @pytest.mark.asyncio
+    async def test_technical_signals_recomputed_after_session_closes(self):
+        """6시간 캐시가 장 마감을 넘겨 살아남지 않는다 — 마감 뒤 첫 조회는 새 종가로 계산."""
+        from datetime import date
+
+        from app.core.cache_store import CacheStore
+        from app.services.market_signal import technical_signal_service as svc
+
+        fetch = AsyncMock(return_value=_trend_closes())
+        cache = CacheStore()
+        with patch.object(svc, "fetch_close_history", fetch):
+            with patch.object(svc, "last_completed_us_session", return_value=date(2026, 11, 9)):
+                await svc.get_technical_signals(cache)
+                await svc.get_technical_signals(cache)
+            assert fetch.await_count == 1
+            with patch.object(svc, "last_completed_us_session", return_value=date(2026, 11, 10)):
+                await svc.get_technical_signals(cache)
+        assert fetch.await_count == 2
+
+    @pytest.mark.asyncio
     async def test_technical_signals_dia_failure_keeps_normal_ttl(self):
         from app.services.market_signal import technical_signal_service as svc
 

@@ -204,8 +204,9 @@ def _db(
     waiting_usd=0.0,
     reserved=(),
 ):
-    """execute 순서: 포트폴리오 목록 → 정액 적립 알림 → (필요 시) 브로커 계좌 → 추가 환전 보관 달러(계좌별 합).
-    scalar 순서: 적립 자동매수 포트폴리오 → (정액이 없을 때) 월 적립액 → 환전 대기 필요 달러."""
+    """execute 순서: 포트폴리오 목록 → 정액 적립 알림 → (필요 시) 브로커 계좌 → 추가 환전 보관 달러(계좌별 합)
+    → 환전 대기 필요 달러(실행 계좌별 합). scalar 순서: 적립 자동매수 포트폴리오 → (정액이 없을 때) 월 적립액.
+    `waiting_usd`가 숫자면 계좌를 모르는 플랜 한 줄, 목록이면 [(account_id, usd)]."""
     db = MagicMock()
     portfolios_result = MagicMock()
     portfolios_result.scalars.return_value.all.return_value = portfolios
@@ -215,8 +216,14 @@ def _db(
     accounts_result.scalars.return_value.all.return_value = list(accounts)
     reserved_result = MagicMock()
     reserved_result.all.return_value = list(reserved)
-    db.execute = AsyncMock(side_effect=[portfolios_result, fixed_result, accounts_result, reserved_result])
-    scalars = [dca_portfolio_id] + ([] if fixed else [monthly]) + [waiting_usd]
+    waiting_result = MagicMock()
+    waiting_result.all.return_value = (
+        list(waiting_usd) if isinstance(waiting_usd, list) else ([(None, waiting_usd)] if waiting_usd else [])
+    )
+    db.execute = AsyncMock(
+        side_effect=[portfolios_result, fixed_result, accounts_result, reserved_result, waiting_result]
+    )
+    scalars = [dca_portfolio_id] + ([] if fixed else [monthly])
     db.scalar = AsyncMock(side_effect=scalars)
     db.commit = AsyncMock()
     return db
@@ -345,8 +352,8 @@ async def test_plan_uses_fixed_dca_amount_over_monthly_goal():
     assert result["monthly_deposit_krw"] == 1_000_000
     # 100만 × 60% / 1400 = 428.57달러 — 월 적립액(140만)이 아니라 정액 금액 기준
     assert result["monthly_need_usd"] == round(1_000_000 * 0.6 / 1400, 2)
-    # 월 적립액은 조회하지 않는다(scalar: 적립 포트폴리오 → 환전 대기)
-    assert db.scalar.await_count == 2
+    # 월 적립액은 조회하지 않는다(scalar: 적립 포트폴리오뿐)
+    assert db.scalar.await_count == 1
 
 
 async def test_plan_fixed_amount_in_tax_deferred_account_has_no_overseas_share():
@@ -505,6 +512,24 @@ async def test_plan_waiting_fx_offset_only_by_executable_account_usd():
     assert result["waiting_fx_usd"] == 350.0
     # 전체 필요(600 − 1100 < 0)보다 대기 부족분이 크다 — 지금 350달러는 환전해야 한다
     assert result["need_usd"] == 350.0
+
+
+async def test_plan_waiting_fx_not_offset_by_other_executable_account():
+    """plans/128 C2 — leg는 KIS 계좌(0달러)에서 기다리는데 키움 계좌 달러로 상쇄하면 "지금" 구간이 사라진다."""
+    kis = _acct(0.0, asset_type="STOCK_KIS", kis_account_no="1")
+    kiwoom = _acct(1000.0, asset_type="STOCK_KIWOOM", kiwoom_account_no="2")
+    db = _db([_portfolio()], accounts=[kis, kiwoom], waiting_usd=[(kis.id, 450.0)])
+    result = await _plan(db, months=1, closes=_closes())
+    assert result["waiting_fx_usd"] == 450.0
+    assert result["need_usd"] == 450.0
+
+
+async def test_plan_waiting_fx_offset_per_account():
+    kis = _acct(500.0, asset_type="STOCK_KIS", kis_account_no="1")
+    kiwoom = _acct(100.0, asset_type="STOCK_KIWOOM", kiwoom_account_no="2")
+    db = _db([_portfolio()], accounts=[kis, kiwoom], waiting_usd=[(kis.id, 450.0), (kiwoom.id, 300.0)])
+    result = await _plan(db, months=1, closes=_closes())
+    assert result["waiting_fx_usd"] == 200.0  # KIS는 충분, 키움만 300 − 100
 
 
 async def test_plan_waiting_fx_forces_now_tranche():

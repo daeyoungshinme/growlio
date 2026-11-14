@@ -244,15 +244,10 @@ class TestDeletePortfolio:
         db.delete = AsyncMock()
 
         app = setup_app(user, db)
+        cache = AsyncMock(delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock())
         try:
             with (
-                patch(
-                    "app.api.v1.portfolios.get_cache_store",
-                    new_callable=AsyncMock,
-                    return_value=AsyncMock(
-                        delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
-                    ),
-                ),
+                patch("app.api.v1.portfolios.get_cache_store", new_callable=AsyncMock, return_value=cache),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.delete(
@@ -260,6 +255,11 @@ class TestDeletePortfolio:
                     headers={"Authorization": "Bearer fake"},
                 )
             assert resp.status_code in (204, 200)
+            # plans/128 C4 — 삭제가 환전 계획 알림도 지우므로 알림 목록 캐시를 함께 비운다
+            from app.utils.cache_keys import exchange_rate_alerts_key
+
+            deleted = {key for call in cache.delete.await_args_list for key in call.args}
+            assert exchange_rate_alerts_key(user.id) in deleted
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db
