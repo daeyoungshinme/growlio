@@ -95,9 +95,14 @@ export function AlertAutoModeSection({
       )}
 
       <div>
-        <label htmlFor={`${uid}-account`} className={FORM_LABEL_XS}>
-          실행 계좌
-        </label>
+        {/* 선택 상자는 계좌 2개 이상일 때만 — 그 밖엔 가리킬 컨트롤이 없어 제목만 둔다 */}
+        {!targetAccountId && autoExecutionAccounts.length > 1 ? (
+          <label htmlFor={`${uid}-account`} className={FORM_LABEL_XS}>
+            실행 계좌
+          </label>
+        ) : (
+          <p className={FORM_LABEL_XS}>실행 계좌</p>
+        )}
         {targetAccountId ? (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
             <span>{targetAccountName ?? "이 계좌"}</span>

@@ -18,5 +18,3 @@ export const fxExtraNeedSchema = z
     message: "이미 환전한 금액이 필요한 금액보다 클 수 없습니다",
     path: ["exchanged_usd"],
   });
-
-export type FxExtraNeedForm = z.infer<typeof fxExtraNeedSchema>;

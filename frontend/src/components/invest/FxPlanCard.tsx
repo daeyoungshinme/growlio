@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { syncFxPlanAlerts, type FxHeldUsdSource, type FxPlanData, type FxZone } from "@/api/invest";
-import { accountsQuery, exchangeRateAlertsQuery, fxPlanQuery } from "@/api/queryOptions";
+import {
+  accountsQuery,
+  exchangeRateAlertsQuery,
+  FX_PLAN_DEFAULT_MONTHS,
+  fxPlanQuery,
+} from "@/api/queryOptions";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { SELECT_SM } from "@/constants/inputStyles";
 import { ALERT_TABS } from "@/constants/tabs";
@@ -20,10 +25,12 @@ import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { notificationSettingsUrl } from "@/utils/tabUrl";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 
-// 기본 "3개월"은 `FX_PLAN_DEFAULT_MONTHS`(페이지 프리페치 키)와 같아야 한다
 const MONTH_OPTIONS = ["1개월", "3개월", "6개월"] as const;
 type MonthOption = (typeof MONTH_OPTIONS)[number];
 const MONTHS: Record<MonthOption, number> = { "1개월": 1, "3개월": 3, "6개월": 6 };
+// 기본 탭은 페이지 프리페치 키(`FX_PLAN_DEFAULT_MONTHS`)에서 고른다 — 따로 적으면 프리페치가 헛돈다(plans/132 D4)
+const DEFAULT_MONTH_OPTION: MonthOption =
+  MONTH_OPTIONS.find((option) => MONTHS[option] === FX_PLAN_DEFAULT_MONTHS) ?? "3개월";
 
 const ZONE_LABEL: Record<FxZone, { text: string; className: string }> = {
   CHEAP: {
@@ -168,7 +175,7 @@ export default function FxPlanCard({ onEditGoal }: Props) {
 
 function FxPlanBody({ onEditGoal }: Props) {
   const qc = useQueryClient();
-  const [monthOption, setMonthOption] = useState<MonthOption>("3개월");
+  const [monthOption, setMonthOption] = useState<MonthOption>(DEFAULT_MONTH_OPTION);
   const [portfolioId, setPortfolioId] = useState<string | null>(null);
   const months = MONTHS[monthOption];
 

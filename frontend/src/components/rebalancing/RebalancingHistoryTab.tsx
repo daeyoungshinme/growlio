@@ -11,7 +11,6 @@ import {
   approvePlanLeg,
   cancelPlanLeg,
   retryFxPlanLeg,
-  fetchRecentPlanLegs,
   type RebalancingPlanLegSummary,
 } from "@/api/rebalancingPlan";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -19,6 +18,7 @@ import { OrderResultList } from "./OrderResultList";
 import PendingPlanRow from "./PendingPlanRow";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { rebalancingPlansQuery } from "@/api/queryOptions";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
@@ -149,9 +149,7 @@ export default function RebalancingHistoryTab() {
     isError: legsFailed,
     refetch: refetchLegs,
   } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingPlans,
-    queryFn: () => fetchRecentPlanLegs(30),
-    staleTime: STALE_TIME.VERY_SHORT,
+    ...rebalancingPlansQuery,
     // 대기 중(PENDING)인 leg가 있을 때만 30초마다 폴링 — 전부 확정된 상태면 서버 상태가 바뀔 일이
     // 없으므로 탭이 열려 있는 동안 계속 폴링할 필요가 없다. 환전 대기(WAITING_FX)는 30분 자동 재확인이
     // 매수 대기로 되돌리므로 느리게 따라간다(plans/122 C4)
