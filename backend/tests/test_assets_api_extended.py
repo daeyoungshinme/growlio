@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.utils.kst import today_kst
@@ -355,6 +356,31 @@ class TestUpdateAccountManualStockSnapshotConsistency:
         assert upsert_calls[0]["amount_krw"] == 150_000.0 + 1_000_000.0 + 0.0
         mock_sync_pos.assert_called_once()
         assert mock_sync_pos.call_args.kwargs["positions"] == [position]
+
+    @pytest.mark.parametrize(("new_usd", "stamped"), [(250.0, True), (0.0, False)])
+    def test_edited_deposit_usd_stamps_synced_at(self, override_settings, new_usd, stamped):
+        """plans/132 B4 — 사용자가 고친 달러는 그 시각에 확정된 값. 그대로면 기준 시각을 바꾸지 않는다."""
+        user = make_user()
+        account = _make_account(user.id)
+        account.deposit_krw = 1_000_000.0
+        account.deposit_usd = 0.0
+        account.deposit_usd_synced_at = None
+        account.manual_amount = 1_000_000.0
+        db = make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = setup_app(user, db)
+        with (
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
+            patch("app.api.v1.assets.require_live_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch("app.api.v1.assets.get_latest_snapshot_with_positions", AsyncMock(return_value=(None, []))),
+            patch("app.services.accounts.snapshot_service.upsert_snapshot", AsyncMock()),
+            patch("app.services.accounts.snapshot_service.sync_snapshot_positions", AsyncMock()),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put(f"/api/v1/assets/{account.id}", json={"deposit_usd": new_usd})
+        assert resp.status_code == 200
+        assert (account.deposit_usd_synced_at is not None) is stamped
 
     def test_real_estate_snapshot_still_written_without_deposit_fields(self, override_settings):
         """REAL_ESTATE 편집(deposit_krw/usd 미전송)은 블록 1(모기지 차감 경로)이 그대로 실행돼야 한다."""
