@@ -6,7 +6,7 @@
 - 증권 계좌 달러 예수금으로 바꿔 둔 항목은 `reserved_account_id`로 그 계좌를 지정한다 — 적립 환전 계획이
   그 계좌 보유 달러에서 `exchanged_usd`만큼 뺀다(`fx_plan_service.reserved_usd_by_account`, 필요일 전까지).
   총자산·리밸런싱·자동매수 가용 현금은 바꾸지 않는다.
-- 구간 알림은 `fx_plan_service.sync_fx_plan_alerts(..., fx_need_id=)`가 맞춘다. 항목을 지우면 알림도 CASCADE로 지워지고,
+- 구간 알림은 `fx_plan_alerts.sync_fx_plan_alerts(..., fx_need_id=)`가 맞춘다. 항목을 지우면 알림도 CASCADE로 지워지고,
   필요일이 지난 항목의 알림은 환율 알림 잡이 보내지 않는다.
 """
 

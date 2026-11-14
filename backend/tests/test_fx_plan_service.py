@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.exceptions import NotFoundError
+from app.services import fx_plan_alerts
 from app.services import fx_plan_service as svc
 
 
@@ -723,7 +724,7 @@ def _sync_db(alerts, *, owned=True, total=None):
 async def _sync(db, portfolio_id, targets):
     from app.core.cache_store import CacheStore
 
-    return await svc.sync_fx_plan_alerts(db, CacheStore(), uuid.uuid4(), portfolio_id, targets)
+    return await fx_plan_alerts.sync_fx_plan_alerts(db, CacheStore(), uuid.uuid4(), portfolio_id, targets)
 
 
 async def test_sync_creates_updates_and_removes_plan_alerts():
@@ -734,7 +735,7 @@ async def test_sync_creates_updates_and_removes_plan_alerts():
 
     result = await _sync(db, pid, [(1320.0, 120.0), (1300.0, 130.0)])
 
-    assert result == svc.FxPlanAlertSyncResult(created=1, updated=1, removed=1, skipped_manual=0)
+    assert result == fx_plan_alerts.FxPlanAlertSyncResult(created=1, updated=1, removed=1, skipped_manual=0)
     assert keep.planned_usd == 120.0
     db.delete.assert_awaited_once_with(old)
     created = db.add.call_args.args[0]
@@ -828,7 +829,9 @@ async def test_need_sync_ignores_portfolio_plan_with_same_target():
     db = _sync_db([_alert(1300.0, portfolio_id=uuid.uuid4())])
     db.scalar = AsyncMock(side_effect=[date(2999, 1, 1), 1])
 
-    result = await svc.sync_fx_plan_alerts(db, CacheStore(), uuid.uuid4(), None, [(1300.0, 100.0)], fx_need_id=need_id)
+    result = await fx_plan_alerts.sync_fx_plan_alerts(
+        db, CacheStore(), uuid.uuid4(), None, [(1300.0, 100.0)], fx_need_id=need_id
+    )
 
     assert (result.created, result.skipped_shared) == (1, 0)
 
@@ -897,12 +900,12 @@ async def test_sync_conflict_when_lock_held():
     user_id = uuid.uuid4()
     await cache.set(f"lock:fx_plan_alerts:{user_id}", "other", nx=True, ex=30)
     with pytest.raises(ConflictError):
-        await svc.sync_fx_plan_alerts(_sync_db([]), cache, user_id, uuid.uuid4(), [])
+        await fx_plan_alerts.sync_fx_plan_alerts(_sync_db([]), cache, user_id, uuid.uuid4(), [])
 
 
 def test_api_sync_alerts_returns_counts(api):
-    result = svc.FxPlanAlertSyncResult(created=2, updated=0, removed=1, skipped_manual=0)
-    with patch.object(svc, "sync_fx_plan_alerts", new=AsyncMock(return_value=result)) as mocked:
+    result = fx_plan_alerts.FxPlanAlertSyncResult(created=2, updated=0, removed=1, skipped_manual=0)
+    with patch.object(fx_plan_alerts, "sync_fx_plan_alerts", new=AsyncMock(return_value=result)) as mocked:
         res = api.put(
             "/api/v1/invest/fx-plan/alerts",
             json={"portfolio_id": str(uuid.uuid4()), "targets": [{"target_rate": 1320, "usd": 100.5}]},
