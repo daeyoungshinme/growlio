@@ -65,7 +65,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - `lib/storedSession.ts` — 저장된 `sb-*-auth-token`을 SDK 없이 동기로 읽어 부팅 시 토큰 시드.
 - `lib/sentry.ts` — 지연 초기화. **앱 코드는 `@sentry/react`를 직접 import 금지**(엔트리 청크로 다시 끌려옴).
 - `lib/serviceWorker.ts` — 웹에서만 SW 등록, Capacitor에선 해제.
-- `context/ExchangeRateContext.tsx` — 환율을 컨텍스트로 공유. 컴포넌트는 컨텍스트 훅을 직접 쓰지 말고 `useExchangeRate()`로 읽는다.
+- `context/ExchangeRateContext.tsx` — 환율을 컨텍스트로 공유. 컴포넌트는 컨텍스트 훅을 직접 쓰지 말고 `useExchangeRate()`로 읽는다. 환율을 함께 받는 다른 응답(환전 계획 등)은 `utils/sharedUsdRate.syncSharedUsdRate`로 전역 환율을 맞춘다(실환율·더 새로운 값만).
 - `asset_type_allocation`은 백엔드가 전 유형을 주고 PortfolioPage가 STOCK만 필터 — 의도된 동작.
 - 대시보드와 자산탭이 `portfolio-overview` queryKey를 공유 — sync 후 양쪽 자동 갱신.
 
@@ -211,11 +211,11 @@ _기타_
 **쿼리 설정 상수 (`constants/queryConfig.ts`)** — staleTime/refetchInterval 매직 넘버 금지.
 
 - `STALE_TIME`: `NONE`(0) · `VERY_SHORT`(15s) · `SHORT`(30s, 기본) · `MEDIUM`(60s) · `FIVE_MINUTES`/`EXCHANGE_RATE`(5m) · `LONG`(1h) · `DAY`(24h, 무거운 계산의 `gcTime`)
-- `REFETCH_INTERVAL.DASHBOARD` / `.PORTFOLIO` (5분)
+- `REFETCH_INTERVAL.DASHBOARD` / `.PORTFOLIO` / `.EXCHANGE_RATE` (5분)
 
 **포맷 (`utils/format.ts`)** — 로컬 재정의 금지.
 
-- `fmtKrw`(억/만/원) · `fmtKrwPreview`(입력 중 "5,000,000원 (500만원)") · `fmtKrwShort`(차트 레이블) · `fmtKrwPrice` · `fmtUsd`/`fmtUsdPrice` · `fmtNativePrice`(주문가 — 국내 원·해외 $, 주가에 `fmtKrw` 쓰면 만원 축약됨) · `fmtMonth` · `fmtPct`(null → "—") · `fmtDateTime` · `relativeTime` · `fmtSigned(n, format)`(금액에 부호, 퍼센트는 `fmtPct`) · `convertUsdToKrw`/`formatUsdAsKrw`
+- `fmtKrw`(억/만/원) · `fmtKrwPreview`(입력 중 "5,000,000원 (500만원)") · `fmtKrwShort`(차트 레이블) · `fmtKrwPrice` · `fmtUsd`/`fmtUsdPrice` · `fmtFxRate`(USD/KRW 환율, 소수 1자리 — 화면마다 자릿수가 달라 같은 환율이 달라 보였다) · `fmtNativePrice`(주문가 — 국내 원·해외 $, 주가에 `fmtKrw` 쓰면 만원 축약됨) · `fmtMonth` · `fmtPct`(null → "—") · `fmtDateTime` · `relativeTime` · `fmtSigned(n, format)`(금액에 부호, 퍼센트는 `fmtPct`) · `convertUsdToKrw`/`formatUsdAsKrw`
 - `pctOf(part, total)` — 인라인 `total > 0 ? v / total * 100 : 0` 대신. `clampPct(pct)` — 진행률 바 width에 그대로 넣지 말 것
 - **날짜**: `localToday()`/`localMonth()` 사용 — `new Date().toISOString().slice(...)`는 UTC라 KST 09시 전엔 전날/전월. 모듈 최상위 상수로 고정하지 말고 폼을 열 때 호출. `parseYmd`/`daysUntilYmd`
 - 차트 X축은 `"YY.M"` — 직접 문자열 파싱(타임존 이슈 방지)

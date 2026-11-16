@@ -62,4 +62,6 @@ export const FOCUS_REFETCH_MIN_AGE = 5 * 60 * 1000;
 export const REFETCH_INTERVAL = {
   DASHBOARD: 300_000,
   PORTFOLIO: 300_000,
+  /** 서버 환율 캐시가 5분마다 갱신된다 — 앱 전역 환율 구독은 다시 마운트되지 않아 이게 없으면 부팅 값에 머문다(plans/134) */
+  EXCHANGE_RATE: 300_000,
 } as const;

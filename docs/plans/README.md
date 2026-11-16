@@ -149,6 +149,7 @@
 | [131](131-a11y-labels-2026-11-14.md) | 119 이관 접근성: 컨트롤과 연결 안 된 label 31개(htmlFor·useId, 묶음 제목은 role=group+aria-labelledby, 표시용은 p), `FORM_LABEL_XS` 추가·하드코딩 라벨 클래스 29곳 상수화, AST 기반 회귀 테스트 `a11y.labels.test.ts`. 추가: Dependabot `pre-commit` 생태계(119 D4), 키움 해외 소수 수량 경고 로그(116 B5) | 완료(B5는 실계좌 경고 관찰) |
 | [132](132-technical-debt-2026-11-15.md) | 129~131·Dependabot 이후 감사. 실버그: 환전 계획이 원화주문 계좌 달러로 다른 계좌 필요 달러를 상쇄, `UsdLedger`가 주문 안 나간 leg 몫을 남겨 거짓 환전 대기, 원화주문 계좌 실환율 없으면 원화 부족 판정 누락. 2026-12-12에 깨질 무효 patch, 상한 잠금 FK 교착(NO KEY UPDATE), CI uv 버전 불일치·비교 step, 낡은 npm overrides, 대상 없는 label·a11y 테스트 id 대조 | 완료 |
 | [133](133-manual-usd-deposit-double-count-2026-11-15.md) | 수기 계좌 달러 예수금이 스냅샷에 × fallback 1,300으로 이중 합산(계획 109 보정이 MANUAL에도 적용) → 홈 현금·총자산 과다. MANUAL 제외 + 회귀 테스트 | 완료 |
+| [134](134-fx-rate-display-mismatch-2026-11-16.md) | 홈 환율과 환전 계획 환율 불일치 — 전역 환율 쿼리가 세션 내내 갱신되지 않음(5분 주기 추가)·계획 응답 실환율로 전역 캐시 맞춤·표시 자릿수 통일(`fmtFxRate`) | 완료 |
 
 ## 파일 없는 계획 기록
 

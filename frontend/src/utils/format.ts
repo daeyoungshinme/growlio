@@ -40,6 +40,11 @@ export function fmtUsd(n: number, maxFractionDigits = 2): string {
   return `$${n.toLocaleString("en-US", { maximumFractionDigits: maxFractionDigits })}`;
 }
 
+/** USD/KRW 환율 — 홈·환전 계획이 같은 자릿수로 보이게 소수 1자리. 예: 1385.64 → "1,385.6원" */
+export function fmtFxRate(n: number): string {
+  return `${n.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}원`;
+}
+
 /** 달러 주가 — 센트까지 고정 2자리. 예: 512.3 → "$512.30" */
 export function fmtUsdPrice(n: number): string {
   return `$${n.toFixed(2)}`;
