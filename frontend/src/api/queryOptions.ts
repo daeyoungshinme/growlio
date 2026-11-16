@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import { REFETCH_INTERVAL, STALE_TIME } from "@/constants/queryConfig";
 import { fetchAccounts, fetchExchangeRate } from "@/api/assets";
 import { fetchExchangeRateAlerts, fetchRebalancingAlerts } from "@/api/alerts";
 import { fetchPortfolioOverviewLite, fetchPortfolios } from "@/api/portfolios";
@@ -50,6 +50,7 @@ export const exchangeRateQuery = queryOptions({
   queryKey: QUERY_KEYS.exchangeRate,
   queryFn: () => fetchExchangeRate(),
   staleTime: STALE_TIME.EXCHANGE_RATE,
+  refetchInterval: REFETCH_INTERVAL.EXCHANGE_RATE,
 });
 
 /** 환율 알림 목록 — 설정 화면과 환전 계획 카드(등록 여부 표시)가 함께 쓴다 */

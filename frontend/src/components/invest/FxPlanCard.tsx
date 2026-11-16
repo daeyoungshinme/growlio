@@ -13,7 +13,8 @@ import { SELECT_SM } from "@/constants/inputStyles";
 import { ALERT_TABS } from "@/constants/tabs";
 import Tabs from "@/components/common/Tabs";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { fmtKrw, fmtPct, clampPct, fmtUsd, relativeTime } from "@/utils/format";
+import { fmtKrw, fmtPct, clampPct, fmtFxRate, fmtUsd, relativeTime } from "@/utils/format";
+import { syncSharedUsdRate } from "@/utils/sharedUsdRate";
 import { isStockAccount, isSyncableAccount } from "@/utils/accounts";
 import { useSyncAccounts } from "@/hooks/useSyncAccounts";
 import { planAlertState, syncButtonLabel, syncToastMessage } from "@/utils/fxPlanAlerts";
@@ -47,7 +48,6 @@ const ZONE_LABEL: Record<FxZone, { text: string; className: string }> = {
   },
 };
 
-const fmtRate = (n: number) => `${n.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}원`;
 const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
 
 const HELD_SOURCE_LABEL: Record<FxHeldUsdSource, string> = {
@@ -112,7 +112,7 @@ function PositionBlock({ position }: { position: NonNullable<FxPlanData["positio
     <div className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-          {fmtRate(position.rate)}
+          {fmtFxRate(position.rate)}
         </p>
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${zone.className}`}>
           {zone.text} · 하위 {position.percentile_1y.toFixed(0)}%
@@ -130,8 +130,8 @@ function PositionBlock({ position }: { position: NonNullable<FxPlanData["positio
           />
         </div>
         <div className="mt-1 flex justify-between text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-          <span>1년 최저 {fmtRate(position.low_1y)}</span>
-          <span>최고 {fmtRate(position.high_1y)}</span>
+          <span>1년 최저 {fmtFxRate(position.low_1y)}</span>
+          <span>최고 {fmtFxRate(position.high_1y)}</span>
         </div>
       </div>
       <dl className="grid grid-cols-3 gap-2 text-center">
@@ -153,8 +153,8 @@ function PositionBlock({ position }: { position: NonNullable<FxPlanData["positio
         </div>
       </dl>
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        1개월 예상 범위 {fmtRate(position.range_1m_low)} ~ {fmtRate(position.range_1m_high)} — 과거
-        1년 변동성으로 계산한 범위이며 환율 예측이 아닙니다.
+        1개월 예상 범위 {fmtFxRate(position.range_1m_low)} ~ {fmtFxRate(position.range_1m_high)} —
+        과거 1년 변동성으로 계산한 범위이며 환율 예측이 아닙니다.
       </p>
     </div>
   );
@@ -197,6 +197,12 @@ function FxPlanBody({ onEditGoal }: Props) {
         void qc.prefetchQuery(fxPlanQuery(MONTHS[option], portfolioId));
     }
   }, [prefetchOtherMonths, months, portfolioId, qc, dataUpdatedAt]);
+
+  // 카드가 받은 실환율이 홈 환율보다 새로우면 앱 전역 환율도 맞춘다 — 두 화면 값이 어긋나지 않게(plans/134)
+  const liveRate = !isPlaceholderData && data?.rate_is_live ? data.position?.rate : undefined;
+  useEffect(() => {
+    syncSharedUsdRate(qc, liveRate, true, dataUpdatedAt);
+  }, [qc, liveRate, dataUpdatedAt]);
   const { data: alerts } = useQuery(exchangeRateAlertsQuery);
 
   const plan = planAlertState(alerts, data?.tranches, { portfolioId: data?.portfolio_id ?? null });

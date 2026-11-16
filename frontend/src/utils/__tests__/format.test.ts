@@ -17,6 +17,7 @@ import {
   fmtPct,
   fmtUsd,
   fmtUsdPrice,
+  fmtFxRate,
   fmtDateTime,
   localMonth,
   localToday,
@@ -305,5 +306,12 @@ describe("plans/116 C6·C3·C4 포맷", () => {
   it("fmtKrwOrDash", () => {
     expect(fmtKrwOrDash(null)).toBe("—");
     expect(fmtKrwOrDash(3000)).toBe("3,000원");
+  });
+});
+
+describe("fmtFxRate (plans/134)", () => {
+  it("환율은 소수 1자리까지 — 홈과 환전 계획이 같은 자릿수", () => {
+    expect(fmtFxRate(1385.64)).toBe("1,385.6원");
+    expect(fmtFxRate(1350)).toBe("1,350원");
   });
 });

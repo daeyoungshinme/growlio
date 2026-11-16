@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCheck, Pencil, Plus, Trash2 } from "lucide-react";
 import {
@@ -20,6 +20,7 @@ import FxTrancheList from "@/components/invest/FxTrancheList";
 import { clampPct, fmtUsd, pctOf } from "@/utils/format";
 import { planAlertState, syncButtonLabel, syncToastMessage } from "@/utils/fxPlanAlerts";
 import { invalidateFxExtraNeedData } from "@/utils/queryInvalidation";
+import { syncSharedUsdRate } from "@/utils/sharedUsdRate";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 
@@ -166,11 +167,16 @@ function NeedRow({ need, alerts, onEdit, onDelete, onDone }: RowProps) {
  */
 export default function FxExtraNeedsSection() {
   const qc = useQueryClient();
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, dataUpdatedAt } = useQuery({
     queryKey: QUERY_KEYS.fxExtraNeeds,
     queryFn: fetchFxExtraNeeds,
     staleTime: STALE_TIME.FIVE_MINUTES,
   });
+  // 환전 계획 카드와 같이 — 받은 실환율이 더 새로우면 앱 전역 환율도 맞춘다(plans/134)
+  const liveRate = data?.rate_is_live ? data.rate : undefined;
+  useEffect(() => {
+    syncSharedUsdRate(qc, liveRate, true, dataUpdatedAt);
+  }, [qc, liveRate, dataUpdatedAt]);
   const { data: alerts } = useQuery(exchangeRateAlertsQuery);
   const [editing, setEditing] = useState<FxExtraNeed | "new" | null>(null);
   const [pendingDelete, setPendingDelete] = useState<FxExtraNeed | null>(null);

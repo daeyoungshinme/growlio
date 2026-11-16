@@ -132,6 +132,11 @@ describe("HeroSummaryCard", () => {
     expect(screen.getByText(/주식 67%/)).toBeInTheDocument();
   });
 
+  it("환율은 소수 1자리까지 표시한다 — 환전 계획 카드와 같은 형식(plans/134)", () => {
+    renderWithProviders(<HeroSummaryCard data={baseDashboard} exchangeRate={1385.64} />);
+    expect(screen.getByText("1,385.6원")).toBeInTheDocument();
+  });
+
   it("환율이 있으면 1,350원 형식으로 표시된다", () => {
     renderWithProviders(<HeroSummaryCard data={baseDashboard} exchangeRate={1350} />);
     expect(screen.getByText("1,350원")).toBeInTheDocument();

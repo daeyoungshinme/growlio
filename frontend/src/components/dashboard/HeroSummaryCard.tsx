@@ -1,7 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
-import { fmtKrw, fmtKrwShort, fmtPct, fmtSigned, relativeTime } from "@/utils/format";
+import { fmtFxRate, fmtKrw, fmtKrwShort, fmtPct, fmtSigned, relativeTime } from "@/utils/format";
 import { pnlColor, PIE_COLORS } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -142,7 +142,7 @@ export default memo(function HeroSummaryCard({
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">환율(USD/KRW)</p>
               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
+                {exchangeRate ? fmtFxRate(exchangeRate) : "—"}
               </p>
             </div>
           </div>
