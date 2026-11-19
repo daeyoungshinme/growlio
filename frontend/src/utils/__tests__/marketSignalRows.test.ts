@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { dotColorForSubScore, buildSignalRows } from "../marketSignalRows";
+import {
+  dotColorForSubScore,
+  buildSignalRows,
+  monthAgoText,
+  monthBasisText,
+} from "../marketSignalRows";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 
 describe("dotColorForSubScore", () => {
@@ -123,5 +128,24 @@ describe("buildSignalRows", () => {
       hintText: "모니터링",
       subScore: 1,
     });
+  });
+});
+
+describe("monthAgoText / monthBasisText (plans/137 B5)", () => {
+  it("1개월 전 값과 방향 화살표", () => {
+    expect(monthAgoText(18.2, 22.1, 1)).toBe(" · 1개월 전 22.1↓");
+    expect(monthAgoText(4.1, 3.5, 2, "%")).toBe(" · 1개월 전 3.50%↑");
+    expect(monthAgoText(3, 3, 0)).toBe(" · 1개월 전 3→");
+  });
+
+  it("이전 값이 없으면 빈 문자열", () => {
+    expect(monthAgoText(18, null, 1)).toBe("");
+    expect(monthAgoText(18, undefined, 1)).toBe("");
+  });
+
+  it("월간 지표 기준월", () => {
+    expect(monthBasisText("2026-09-01")).toBe(" · 9월 기준");
+    expect(monthBasisText("")).toBe("");
+    expect(monthBasisText(null)).toBe("");
   });
 });

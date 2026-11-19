@@ -29,7 +29,7 @@ logger = structlog.get_logger()
 
 async def fetch_vix_signal() -> dict[str, Any] | None:
     """FRED VIXCLS 시리즈에서 VIX 최신값을 가져와 위험 레벨을 판단한다."""
-    obs = await _fred_obs("VIXCLS", 5, signal="vix")
+    obs = await _fred_obs("VIXCLS", _MONTH_BACK_LIMIT, signal="vix")
     if obs is None:
         return None
     value = _latest_value(obs)
@@ -54,6 +54,8 @@ async def fetch_vix_signal() -> dict[str, Any] | None:
         "level": level,
         "date": _latest_date(obs),
         "sub_score": sub_score,
+        # 약 1개월(20거래일) 전 값 — 화면 방향 표시용, 점수에는 쓰지 않는다(plans/137 B5)
+        "prev_value": _value_n_back(obs, _MONTH_BACK_OBS),
     }
 
 
@@ -89,7 +91,7 @@ async def fetch_yield_curve_signal() -> dict[str, Any] | None:
 
 async def fetch_high_yield_spread_signal() -> dict[str, Any] | None:
     """FRED BAMLH0A0HYM2(하이일드 채권 스프레드) 최신값으로 신용 경색 위험도를 판단한다."""
-    obs = await _fred_obs("BAMLH0A0HYM2", 5, signal="high_yield_spread")
+    obs = await _fred_obs("BAMLH0A0HYM2", _MONTH_BACK_LIMIT, signal="high_yield_spread")
     if obs is None:
         return None
     value = _latest_value(obs)
@@ -114,6 +116,8 @@ async def fetch_high_yield_spread_signal() -> dict[str, Any] | None:
         "level": level,
         "date": _latest_date(obs),
         "sub_score": sub_score,
+        # 약 1개월(20거래일) 전 값 — 화면 방향 표시용, 점수에는 쓰지 않는다(plans/137 B5)
+        "prev_value": _value_n_back(obs, _MONTH_BACK_OBS),
     }
 
 
@@ -483,6 +487,25 @@ async def _yoy_inflation_signal(indicator: str) -> dict[str, Any] | None:
         "date": points[-1]["date"],
         "sub_score": sub_score,
     }
+
+
+_MONTH_BACK_OBS = 20  # 일간 시리즈의 약 1개월
+_MONTH_BACK_LIMIT = 30  # 결측('.')을 감안한 조회 개수
+
+
+def _value_n_back(obs: list[dict[str, Any]], n: int) -> float | None:
+    """최신순 관측치에서 결측을 건너뛰고 n번째 이전 값. 관측치가 모자라면 None."""
+    seen = 0
+    for o in obs:
+        raw = o.get("value", ".")
+        if raw == ".":
+            continue
+        if seen == n:
+            with contextlib.suppress(ValueError):
+                return float(raw)
+            return None
+        seen += 1
+    return None
 
 
 def _latest_value(obs: list[dict[str, Any]]) -> float | None:

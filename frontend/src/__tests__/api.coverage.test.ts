@@ -133,12 +133,14 @@ describe("api/risk", () => {
   beforeEach(() => vi.clearAllMocks());
 
   const mockRisk = {
-    var_95_pct: -5.2,
-    var_99_pct: -8.1,
+    var_95_pct: 1.8,
+    var_95_krw: 180_000,
     annualized_volatility_pct: 15.3,
+    max_drawdown_pct: 12,
     beta_sp500: 1.1,
-    diversification_score: 0.75,
+    vol_ratio_vs_sp500: 1.05,
     top_holding_weight_pct: 25,
+    top_index_exposures: [],
     position_count: 10,
     data_available: true,
     note: "",

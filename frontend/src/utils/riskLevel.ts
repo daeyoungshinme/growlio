@@ -1,8 +1,13 @@
 import type { PortfolioRiskMetrics } from "@/api/risk";
+import { fmtKrw } from "@/utils/format";
+
+/** 진단 탭 "내 포트폴리오 위험" 카드 행 — 원화 손실액·낙폭·시장 대비·쏠림(plans/137 C). 등급은 절대값이
+ * 아니라 시장(S&P500) 수준을 기준으로 잡는다 — 예전 변동성 10/20% 절대 기준은 주식형이면 늘 "보통/높음"이었다. */
 
 export type RiskLevel = "low" | "medium" | "high";
 
 export interface MetricConfig {
+  key: "var" | "mdd" | "market" | "concentration";
   label: string;
   value: string;
   level: RiskLevel;
@@ -36,68 +41,100 @@ export const SUMMARY_CONFIG = {
   },
 };
 
-function varLevel(pct: number, confidence: 95 | 99): RiskLevel {
-  if (confidence === 95) return pct < 2 ? "low" : pct < 5 ? "medium" : "high";
-  return pct < 3 ? "low" : pct < 8 ? "medium" : "high";
+/** 하루 VaR 95% — S&P500이 대략 1.5~2% */
+function varLevel(pct: number): RiskLevel {
+  return pct < 1.5 ? "low" : pct < 2.5 ? "medium" : "high";
 }
 
-function volatilityLevel(pct: number): RiskLevel {
+/** 1년 최대 낙폭 — S&P500 평년 조정이 10% 안팎 */
+function drawdownLevel(pct: number): RiskLevel {
   return pct < 10 ? "low" : pct < 20 ? "medium" : "high";
 }
 
-function betaLevel(beta: number): RiskLevel {
-  return beta < 0.8 ? "low" : beta < 1.2 ? "medium" : "high";
+/** S&P500(원화) 대비 변동성 배율 */
+function marketRatioLevel(ratio: number): RiskLevel {
+  return ratio < 0.8 ? "low" : ratio <= 1.2 ? "medium" : "high";
 }
 
-function diversificationLevel(score: number): RiskLevel {
-  // 분산도는 높을수록 좋음 — 낮은 점수가 HIGH 위험
-  return score >= 70 ? "low" : score >= 40 ? "medium" : "high";
+/** 한 지수(또는 한 종목)에 몰린 비중 */
+function concentrationLevel(pct: number): RiskLevel {
+  return pct < 40 ? "low" : pct < 60 ? "medium" : "high";
 }
 
-function concentrationLevel(topPct: number): RiskLevel {
-  return topPct < 20 ? "low" : topPct < 40 ? "medium" : "high";
+/** 가장 큰 쏠림 — 지수 기준 상위 노출이 있으면 그것, 없으면 단일 종목 */
+export function topConcentration(m: PortfolioRiskMetrics): { name: string; pct: number } | null {
+  const topIndex = m.top_index_exposures[0];
+  if (topIndex && topIndex.pct_of_stock >= m.top_holding_weight_pct) {
+    return { name: topIndex.label, pct: topIndex.pct_of_stock };
+  }
+  if (m.top_holding_name && m.top_holding_weight_pct > 0) {
+    return { name: m.top_holding_name, pct: m.top_holding_weight_pct };
+  }
+  return topIndex ? { name: topIndex.label, pct: topIndex.pct_of_stock } : null;
+}
+
+function marketDescription(m: PortfolioRiskMetrics): string {
+  const parts = ["S&P500(원화 환산)과 비교한 흔들림이에요. 1.0배면 시장과 같아요."];
+  if (m.sp500_10pct_drop_krw != null && m.beta_sp500 != null) {
+    parts.push(
+      `S&P500이 10% 빠지면 내 주식은 약 ${fmtKrw(m.sp500_10pct_drop_krw)} 영향을 받아요(베타 ${m.beta_sp500.toFixed(2)}, 주간 기준).`,
+    );
+  }
+  return parts.join(" ");
+}
+
+function concentrationDescription(m: PortfolioRiskMetrics): string {
+  const parts: string[] = [];
+  if (m.top_index_exposures.length > 0) {
+    parts.push(
+      `지수별: ${m.top_index_exposures.map((e) => `${e.label} ${e.pct_of_stock.toFixed(0)}%`).join(" · ")}`,
+    );
+  }
+  if (m.top_holding_name) {
+    parts.push(`가장 큰 종목: ${m.top_holding_name} ${m.top_holding_weight_pct.toFixed(0)}%`);
+  }
+  parts.push("같은 지수를 따르는 ETF는 국내·해외 상장을 합쳐 셉니다(주식 평가액 대비).");
+  return parts.join(" / ");
 }
 
 export function buildMetrics(m: PortfolioRiskMetrics): MetricConfig[] {
-  return [
+  const rows: MetricConfig[] = [
     {
-      label: "VaR (95%)",
-      value: `${m.var_95_pct.toFixed(2)}%`,
-      level: varLevel(m.var_95_pct, 95),
-      description: "하루 5% 확률로 이 수치 이상의 손실이 발생할 수 있어요 (역사적 시뮬레이션 기준)",
+      key: "var",
+      label: "나쁜 날 예상 손실",
+      value: `-${fmtKrw(m.var_95_krw)}`,
+      level: varLevel(m.var_95_pct),
+      description: `20거래일 중 하루는 이보다 더 잃을 수 있어요(하루 VaR 95%, 총자산의 ${m.var_95_pct.toFixed(1)}%).`,
     },
     {
-      label: "VaR (99%)",
-      value: `${m.var_99_pct.toFixed(2)}%`,
-      level: varLevel(m.var_99_pct, 99),
-      description: "극단적 시장 충격(1% 확률) 상황에서 예상되는 최대 일별 손실",
-    },
-    {
-      label: "연간 변동성",
-      value: `${m.annualized_volatility_pct.toFixed(1)}%`,
-      level: volatilityLevel(m.annualized_volatility_pct),
-      description: "1년간 수익률의 평균 등락 폭 — 낮을수록 안정적이며 예측 가능한 수익",
-    },
-    {
-      label: "S&P500 베타",
-      value: m.beta_sp500.toFixed(2),
-      level: betaLevel(m.beta_sp500),
-      description: `S&P500이 1% 오를 때 포트폴리오가 ${m.beta_sp500.toFixed(2)}% 움직임 — 1보다 크면 시장보다 더 큰 폭으로 등락`,
-    },
-    {
-      label: "분산도 점수",
-      value: `${m.diversification_score}/100`,
-      level: diversificationLevel(m.diversification_score),
+      key: "mdd",
+      label: "1년 최대 낙폭",
+      value: `-${m.max_drawdown_pct.toFixed(1)}%`,
+      level: drawdownLevel(m.max_drawdown_pct),
       description:
-        "종목 간 상관관계가 낮을수록 점수 높음 — 높을수록 시장 충격이 특정 종목에 집중되지 않음",
-    },
-    {
-      label: "최대 종목 비중",
-      value: `${m.top_holding_weight_pct.toFixed(1)}%`,
-      level: concentrationLevel(m.top_holding_weight_pct),
-      description: "단일 종목의 최대 비중 — 낮을수록 특정 종목 악재에 덜 취약한 포트폴리오",
+        "최근 1년 동안 고점에서 가장 많이 떨어졌던 폭이에요 — 다시 겪을 수 있는 하락의 크기예요.",
     },
   ];
+  if (m.vol_ratio_vs_sp500 != null) {
+    rows.push({
+      key: "market",
+      label: "시장 대비 흔들림",
+      value: `${m.vol_ratio_vs_sp500.toFixed(2)}배`,
+      level: marketRatioLevel(m.vol_ratio_vs_sp500),
+      description: marketDescription(m),
+    });
+  }
+  const top = topConcentration(m);
+  if (top) {
+    rows.push({
+      key: "concentration",
+      label: "쏠림",
+      value: `${top.name} ${top.pct.toFixed(0)}%`,
+      level: concentrationLevel(top.pct),
+      description: concentrationDescription(m),
+    });
+  }
+  return rows;
 }
 
 export function summarizeRiskLevel(
@@ -105,6 +142,15 @@ export function summarizeRiskLevel(
 ): { highCount: number; level: keyof typeof SUMMARY_CONFIG } | null {
   if (!m.data_available) return null;
   const highCount = buildMetrics(m).filter((metric) => metric.level === "high").length;
-  const level = highCount >= 3 ? "risk" : highCount >= 1 ? "caution" : "safe";
+  const level = highCount >= 2 ? "risk" : highCount >= 1 ? "caution" : "safe";
   return { highCount, level };
+}
+
+/** 접힌 카드·요약 칩 한 줄 — 등급 대신 금액과 쏠림을 바로 보여 준다 */
+export function riskHeadline(m: PortfolioRiskMetrics): string | null {
+  if (!m.data_available) return null;
+  const parts = [`나쁜 날 -${fmtKrw(m.var_95_krw)}`];
+  const top = topConcentration(m);
+  if (top) parts.push(`${top.name} ${top.pct.toFixed(0)}%`);
+  return parts.join(" · ");
 }

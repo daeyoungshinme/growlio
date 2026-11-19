@@ -26,8 +26,9 @@ from app.utils.cache_keys import CacheStoreType
 
 logger = structlog.get_logger()
 
-# 리스크 이상 판단 임계값 — rebalancing/alert_check._evaluate_composite_trigger와 동일 기준 공유(단일 소스)
-RISK_DIVERSIFICATION_MIN = 40
+# 리스크 이상 판단 임계값 — rebalancing/alert_check._evaluate_composite_trigger와 동일 기준 공유(단일 소스).
+# 분산도 점수는 계산 오류로 폐기했다(plans/137 A5). 지수 쏠림은 의도한 인덱스 투자와 구분이 안 돼
+# 알림 사유로 쓰지 않는다.
 RISK_TOP_HOLDING_MAX_PCT = 40.0
 RISK_VOLATILITY_MAX_PCT = 20.0
 
@@ -242,7 +243,6 @@ def _build_tax_preview(
 def check_composite_signal(
     market_level: str | None,
     risk_available: bool,
-    diversification_score: int | None,
     top_holding_weight_pct: float | None,
     annualized_volatility_pct: float | None,
 ) -> tuple[bool, str | None]:
@@ -257,8 +257,6 @@ def check_composite_signal(
         reasons.append("시장 위험 신호가 RED 단계입니다")
 
     if risk_available:
-        if diversification_score is not None and diversification_score < RISK_DIVERSIFICATION_MIN:
-            reasons.append(f"분산도 점수가 낮습니다 ({diversification_score}점)")
         if top_holding_weight_pct is not None and top_holding_weight_pct >= RISK_TOP_HOLDING_MAX_PCT:
             reasons.append(f"특정 종목 비중이 {top_holding_weight_pct:.0f}%로 과집중되어 있습니다")
         if annualized_volatility_pct is not None and annualized_volatility_pct >= RISK_VOLATILITY_MAX_PCT:
@@ -270,14 +268,11 @@ def check_composite_signal(
 
 
 def _risk_note(risk: dict) -> str | None:
-    """분산도/변동성/최대비중 중 이상 신호가 있을 때만 문구를 생성한다. 전부 정상이면 None."""
+    """변동성/최대비중 중 이상 신호가 있을 때만 문구를 생성한다. 전부 정상이면 None."""
     notes: list[str] = []
-    diversification_score = risk.get("diversification_score", 100)
     top_holding_weight_pct = risk.get("top_holding_weight_pct", 0.0)
     annualized_volatility_pct = risk.get("annualized_volatility_pct", 0.0)
 
-    if diversification_score < RISK_DIVERSIFICATION_MIN:
-        notes.append(f"분산도 점수가 낮습니다 ({diversification_score}점)")
     if top_holding_weight_pct >= RISK_TOP_HOLDING_MAX_PCT:
         notes.append(f"특정 종목 비중이 {top_holding_weight_pct:.0f}%로 과집중되어 있습니다")
     if annualized_volatility_pct >= RISK_VOLATILITY_MAX_PCT:
@@ -328,7 +323,6 @@ async def fetch_composite_signal(
     return check_composite_signal(
         market_level,
         bool(risk.get("data_available")),
-        risk.get("diversification_score"),
         risk.get("top_holding_weight_pct"),
         risk.get("annualized_volatility_pct"),
     )
@@ -358,19 +352,17 @@ async def build_diagnosis_context(
     risk_available = bool(risk.get("data_available"))
     annualized_volatility_pct: float | None = None
     beta_sp500: float | None = None
-    diversification_score: int | None = None
     top_holding_weight_pct: float | None = None
     if risk_available:
         annualized_volatility_pct = risk.get("annualized_volatility_pct")
         beta_sp500 = risk.get("beta_sp500")
-        diversification_score = risk.get("diversification_score")
         top_holding_weight_pct = risk.get("top_holding_weight_pct")
 
     composite_triggered = False
     composite_reason: str | None = None
     if enable_composite_signals:
         composite_triggered, composite_reason = check_composite_signal(
-            market_level, risk_available, diversification_score, top_holding_weight_pct, annualized_volatility_pct
+            market_level, risk_available, top_holding_weight_pct, annualized_volatility_pct
         )
 
     if composite_triggered:
@@ -389,7 +381,6 @@ async def build_diagnosis_context(
         risk_available=risk_available,
         annualized_volatility_pct=annualized_volatility_pct,
         beta_sp500=beta_sp500,
-        diversification_score=diversification_score,
         risk_note=risk_note,
         composite_signal_triggered=composite_triggered,
         composite_signal_reason=composite_reason,

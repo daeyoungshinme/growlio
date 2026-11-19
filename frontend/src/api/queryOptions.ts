@@ -5,7 +5,7 @@ import { fetchAccounts, fetchExchangeRate } from "@/api/assets";
 import { fetchExchangeRateAlerts, fetchRebalancingAlerts } from "@/api/alerts";
 import { fetchPortfolioOverviewLite, fetchPortfolios } from "@/api/portfolios";
 import { fetchSettings } from "@/api/settings";
-import { fetchMarketSignal } from "@/api/marketSignals";
+import { fetchMarketOutlook, fetchMarketSignal } from "@/api/marketSignals";
 import { fetchDCAAnalysis, fetchDividendPlan, fetchFxPlan } from "@/api/invest";
 import { fetchIsaStatus, fetchTaxSummary } from "@/api/tax";
 import { fetchActionItems, fetchDashboard } from "@/api/dashboard";
@@ -76,6 +76,13 @@ export const marketSignalQuery = queryOptions({
   queryKey: QUERY_KEYS.marketSignal,
   queryFn: () => fetchMarketSignal(),
   staleTime: STALE_TIME.MEDIUM,
+});
+
+/** 시장 종합 판단 — 진단 탭 배너 헤더·요약 칩이 공유. 서버 입력(매크로·차트)이 캐시라 1시간 */
+export const marketOutlookQuery = queryOptions({
+  queryKey: QUERY_KEYS.marketOutlook,
+  queryFn: () => fetchMarketOutlook(),
+  staleTime: STALE_TIME.LONG,
 });
 
 /** 홈 "지금 할 일" — 카드·하단 내비 배지·부팅 프리페치가 공유. 백엔드는 결과 캐시가 없는 무거운 집계라 5분 —

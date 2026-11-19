@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Bell, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { MarketSignalResponse, MarketRiskLevel } from "@/api/marketSignals";
+import type { MarketOutlook, MarketSignalResponse, MarketRiskLevel } from "@/api/marketSignals";
 import type { InflationIndicatorSummary } from "@/api/economicIndicators";
 import type { TacticalMarket } from "@/api/tactical";
 import { buildSignalRows } from "@/utils/marketSignalRows";
@@ -13,6 +13,7 @@ import ChartTrendList from "./ChartTrendList";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { notificationSettingsUrl } from "@/utils/tabUrl";
 import { MARKET_ALERT_SECTION } from "@/constants/tabs";
+import { VERDICT_BADGE_CLASS } from "@/utils/marketOutlook";
 
 interface Props {
   signal: MarketSignalResponse;
@@ -20,6 +21,8 @@ interface Props {
   inflation?: InflationIndicatorSummary[];
   /** QQQ·SPY(·DIA) 차트 지표 — 지정 시 상세 영역에 "차트 추세" 섹션(전술 국면의 차트 입력, plans/82) */
   technicals?: TacticalMarket["technicals"];
+  /** 매크로 × 3대 지수 추세 종합 판단 — 헤더 한 줄 요약과 차트 추세 근거(표시 전용, plans/137 B). 없으면 등급 문구 */
+  outlook?: MarketOutlook;
   /** 지정 시 상세 영역 하단에 "목표 조정 › 전술" 이동 안내 — 이 신호로 목표 비중 자체를 바꾸는 곳 */
   onOpenTactical?: () => void;
 }
@@ -46,6 +49,7 @@ export default function MarketSignalBanner({
   signal,
   inflation,
   technicals,
+  outlook,
   onOpenTactical,
 }: Props) {
   const {
@@ -68,6 +72,8 @@ export default function MarketSignalBanner({
   const [macroOpen, setMacroOpen] = useState(tierRest.some((r) => (r.content?.subScore ?? 0) > 0));
 
   const { status: compositeStatus } = useCompositeSignalToggle();
+  // 판단 보류(입력 전부 실패)면 매크로 등급 문구로 대신한다
+  const shown = outlook && outlook.verdict !== "UNKNOWN" ? outlook : null;
 
   return (
     <div className={`rounded-xl border ${BANNER_BG[composite_level]}`}>
@@ -77,8 +83,15 @@ export default function MarketSignalBanner({
           시장 상황
         </span>
         <MarketSignalLevelBadge level={composite_level} />
+        {shown && (
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${VERDICT_BADGE_CLASS[shown.verdict]}`}
+          >
+            종합 {shown.label}
+          </span>
+        )}
         <span className="text-xs text-gray-500 dark:text-gray-400 order-last basis-full sm:order-0 sm:basis-auto sm:flex-1 sm:min-w-0 sm:truncate">
-          {SHORT_IMPLICATION[composite_level]}
+          {shown ? shown.action : SHORT_IMPLICATION[composite_level]}
           {data_freshness === "STALE" && " · 데이터 조회 불가"}
           {data_freshness === "PARTIAL" && " · 일부 데이터 없음"}
         </span>
@@ -153,8 +166,24 @@ export default function MarketSignalBanner({
           {technicals && (technicals.QQQ || technicals.SPY) && (
             <div className="pt-2.5 border-t border-inherit">
               <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-                차트 추세 (나스닥·S&P500)
+                차트 추세 (나스닥·S&P500·다우)
               </h3>
+              {shown && (
+                <div className="mt-1.5 space-y-0.5 text-xs text-gray-600 dark:text-gray-300">
+                  <p>
+                    <span className="font-semibold">종합 {shown.label}</span> — {shown.action}
+                  </p>
+                  <ul className="list-disc pl-4 text-gray-500 dark:text-gray-400">
+                    {shown.reasons.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                  <p className="text-gray-400 dark:text-gray-500">
+                    종합 판단은 참고용이에요 — 자동 실행·전술 국면은 확정 등급과 나스닥·S&P500
+                    추세로 따로 판단해요.
+                  </p>
+                </div>
+              )}
               <ChartTrendList technicals={technicals} />
             </div>
           )}

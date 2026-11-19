@@ -76,7 +76,6 @@ class DiagnosisContext(BaseModel):
     risk_available: bool = False
     annualized_volatility_pct: float | None = None
     beta_sp500: float | None = None
-    diversification_score: int | None = None
     risk_note: str | None = None  # 특이사항 없으면 None (조용히 생략)
 
     # 복합신호(시장 RED 또는 리스크 이상) — 진단탭 상단 배너와 동일 판정 함수(check_composite_signal) 결과.

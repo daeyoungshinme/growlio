@@ -298,23 +298,17 @@ class TestBuildTaxPreview:
 
 class TestRiskNote:
     def test_all_normal_returns_none(self):
-        risk = {"diversification_score": 80, "top_holding_weight_pct": 20.0, "annualized_volatility_pct": 10.0}
+        risk = {"top_holding_weight_pct": 20.0, "annualized_volatility_pct": 10.0}
         assert _risk_note(risk) is None
 
-    def test_low_diversification_flagged(self):
-        risk = {"diversification_score": 30, "top_holding_weight_pct": 20.0, "annualized_volatility_pct": 10.0}
-        note = _risk_note(risk)
-        assert note is not None
-        assert "분산도" in note
-
     def test_high_concentration_flagged(self):
-        risk = {"diversification_score": 80, "top_holding_weight_pct": 45.0, "annualized_volatility_pct": 10.0}
+        risk = {"top_holding_weight_pct": 45.0, "annualized_volatility_pct": 10.0}
         note = _risk_note(risk)
         assert note is not None
         assert "과집중" in note
 
     def test_high_volatility_flagged(self):
-        risk = {"diversification_score": 80, "top_holding_weight_pct": 20.0, "annualized_volatility_pct": 25.0}
+        risk = {"top_holding_weight_pct": 20.0, "annualized_volatility_pct": 25.0}
         note = _risk_note(risk)
         assert note is not None
         assert "변동성" in note
@@ -322,31 +316,31 @@ class TestRiskNote:
 
 class TestCheckCompositeSignal:
     def test_all_normal_returns_false(self):
-        triggered, reason = check_composite_signal("GREEN", True, 80, 20.0, 10.0)
+        triggered, reason = check_composite_signal("GREEN", True, 20.0, 10.0)
         assert triggered is False
         assert reason is None
 
     def test_market_red_triggers(self):
-        triggered, reason = check_composite_signal("RED", False, None, None, None)
+        triggered, reason = check_composite_signal("RED", False, None, None)
         assert triggered is True
         assert "시장" in reason
 
     def test_risk_unavailable_ignored(self):
         # risk_available=False면 리스크 수치가 임계값을 넘어도 무시됨
-        triggered, reason = check_composite_signal("GREEN", False, 10, 90.0, 50.0)
+        triggered, reason = check_composite_signal("GREEN", False, 90.0, 50.0)
         assert triggered is False
         assert reason is None
 
-    def test_low_diversification_triggers(self):
-        triggered, reason = check_composite_signal("GREEN", True, 30, 20.0, 10.0)
+    def test_high_concentration_triggers(self):
+        triggered, reason = check_composite_signal("GREEN", True, 45.0, 10.0)
         assert triggered is True
-        assert "분산도" in reason
+        assert "과집중" in reason
 
     def test_market_and_risk_combined_reason(self):
-        triggered, reason = check_composite_signal("RED", True, 30, 20.0, 10.0)
+        triggered, reason = check_composite_signal("RED", True, 20.0, 25.0)
         assert triggered is True
         assert "시장" in reason
-        assert "분산도" in reason
+        assert "변동성" in reason
 
 
 class TestFetchMarketAndRiskSignal:
@@ -359,13 +353,13 @@ class TestFetchMarketAndRiskSignal:
             ),
             patch(
                 "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
-                new=AsyncMock(return_value={"data_available": True, "diversification_score": 50}),
+                new=AsyncMock(return_value={"data_available": True, "top_holding_weight_pct": 50.0}),
             ),
         ):
             market_level, risk = await fetch_market_and_risk_signal(uuid.uuid4(), mock_db, mock_cache)
 
         assert market_level == "RED"
-        assert risk["diversification_score"] == 50
+        assert risk["top_holding_weight_pct"] == 50.0
 
     @pytest.mark.asyncio
     async def test_both_failures_return_safe_defaults(self, mock_db, mock_cache):
@@ -404,7 +398,6 @@ class TestBuildDiagnosisContext:
                         "data_available": True,
                         "annualized_volatility_pct": 10.0,
                         "beta_sp500": 1.1,
-                        "diversification_score": 80,
                         "top_holding_weight_pct": 20.0,
                     }
                 ),
@@ -415,7 +408,6 @@ class TestBuildDiagnosisContext:
         assert ctx.market_level == "YELLOW"
         assert ctx.market_note is not None
         assert ctx.risk_available is True
-        assert ctx.diversification_score == 80
         assert ctx.risk_note is None
         assert ctx.composite_signal_triggered is False
         assert ctx.composite_signal_reason is None
@@ -439,7 +431,6 @@ class TestBuildDiagnosisContext:
                         "data_available": True,
                         "annualized_volatility_pct": 25.0,
                         "beta_sp500": 1.1,
-                        "diversification_score": 30,
                         "top_holding_weight_pct": 20.0,
                     }
                 ),
@@ -451,7 +442,7 @@ class TestBuildDiagnosisContext:
         assert ctx.risk_note is None
         assert ctx.composite_signal_triggered is True
         assert ctx.composite_signal_reason is not None
-        assert "분산도" in ctx.composite_signal_reason
+        assert "변동성" in ctx.composite_signal_reason
 
     @pytest.mark.asyncio
     async def test_enable_composite_signals_false_keeps_granular_notes(self, mock_db, mock_cache):
@@ -472,7 +463,6 @@ class TestBuildDiagnosisContext:
                         "data_available": True,
                         "annualized_volatility_pct": 25.0,
                         "beta_sp500": 1.1,
-                        "diversification_score": 30,
                         "top_holding_weight_pct": 20.0,
                     }
                 ),
@@ -528,7 +518,6 @@ class TestBuildDiagnosisContext:
             ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_cache, analysis, overview)
 
         assert ctx.risk_available is False
-        assert ctx.diversification_score is None
         # 세금 미리보기는 리스크 실패와 무관하게 정상 계산됨
         assert ctx.estimated_sell_realized_gain_krw == pytest.approx(50_000.0)
 

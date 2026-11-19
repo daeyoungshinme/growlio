@@ -171,3 +171,30 @@ class IndexGroupSuggestion(BaseModel):
 class IndexGroupSuggestionResponse(BaseModel):
     groups: list[IndexGroupSuggestion] = []
     profiles_complete: bool = True
+
+
+class RiskIndexExposure(BaseModel):
+    key: str
+    label: str
+    pct_of_stock: float
+
+
+class PortfolioRiskMetrics(BaseModel):
+    """전체 계좌 위험 지표 — 원화 기준 최근 1년, 예수금 포함(plans/137 A)."""
+
+    data_available: bool
+    total_value_krw: float = 0.0
+    cash_weight_pct: float = 0.0
+    coverage_pct: float = 0.0  # 계산에 반영된 종목 평가액 비중(%)
+    var_95_pct: float = 0.0
+    var_95_krw: float = 0.0
+    annualized_volatility_pct: float = 0.0
+    max_drawdown_pct: float = 0.0
+    beta_sp500: float | None = None  # 주간 수익률 기준, 표본 부족 시 None
+    vol_ratio_vs_sp500: float | None = None
+    sp500_10pct_drop_krw: float | None = None
+    top_holding_weight_pct: float = 0.0
+    top_holding_name: str | None = None
+    top_index_exposures: list[RiskIndexExposure] = []
+    position_count: int = 0
+    note: str | None = None

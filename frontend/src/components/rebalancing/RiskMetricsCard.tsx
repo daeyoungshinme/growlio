@@ -1,15 +1,22 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { ChevronDown, ShieldAlert } from "lucide-react";
 import type { PortfolioRiskMetrics } from "@/api/risk";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import {
   buildMetrics,
   LEVEL_BADGE,
+  riskHeadline,
   SUMMARY_CONFIG,
   summarizeRiskLevel,
   type MetricConfig,
 } from "@/utils/riskLevel";
-import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
+import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+import { portfolioUrl } from "@/utils/tabUrl";
+import { DIAGNOSIS_ANCHORS } from "@/constants/rebalancingConfig";
+
+/** 커버리지가 이보다 낮으면 "일부 종목 제외" 안내 */
+const COVERAGE_NOTICE_PCT = 90;
 
 function RiskMetricRow({
   metric,
@@ -62,29 +69,21 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
 
   const metricList = buildMetrics(metrics);
 
-  const [expandedLabel, setExpandedLabel] = useState<string | null>(
-    () => metricList.find((m) => m.level === "high")?.label ?? null,
+  const [expandedKey, setExpandedKey] = useState<MetricConfig["key"] | null>(
+    () => metricList.find((m) => m.level === "high")?.key ?? null,
   );
 
   const risk = summarizeRiskLevel(metrics); // data_available이 아니면 null
   if (!risk) return null;
 
-  const { highCount, level } = risk;
-  const summary = SUMMARY_CONFIG[level];
+  const summary = SUMMARY_CONFIG[risk.level];
+  const headline = riskHeadline(metrics);
 
-  const summaryText =
-    highCount === 0
-      ? "전반적으로 안정적인 위험 수준입니다."
-      : highCount === 1
-        ? "일부 지표에서 주의가 필요합니다."
-        : highCount === 2
-          ? "여러 지표에서 위험 신호가 감지됩니다."
-          : "다수 지표가 높은 위험을 나타내고 있습니다.";
-
-  const toggle = (label: string) => setExpandedLabel((prev) => (prev === label ? null : label));
+  const toggle = (key: MetricConfig["key"]) =>
+    setExpandedKey((prev) => (prev === key ? null : key));
 
   return (
-    <div className="card">
+    <div id={DIAGNOSIS_ANCHORS.risk} className="card scroll-mt-4">
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={toggleOpen}
@@ -95,7 +94,7 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
             <ShieldAlert size={16} className="text-orange-600 dark:text-orange-400" />
           </div>
           <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-            내 포트폴리오 위험 지표
+            내 포트폴리오 위험
           </h2>
           <ChevronDown
             size={14}
@@ -103,7 +102,7 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
           />
         </button>
         <span className="text-xs text-gray-400 dark:text-gray-500">
-          {metrics.position_count}개 종목 · 전체 계좌 합산
+          {metrics.position_count}개 종목 · 예수금 포함
         </span>
       </div>
 
@@ -111,8 +110,8 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
       <div
         className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium mb-3 ${summary.cls}`}
       >
-        <span className="font-bold">{summary.label}</span>
-        <span className="opacity-80">— {summaryText}</span>
+        <span className="font-bold shrink-0">{summary.label}</span>
+        {headline && <span className="opacity-80 min-w-0">— {headline}</span>}
       </div>
 
       {isOpen && (
@@ -121,24 +120,27 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
           <div>
             {metricList.map((m) => (
               <RiskMetricRow
-                key={m.label}
+                key={m.key}
                 metric={m}
-                isExpanded={expandedLabel === m.label}
-                onToggle={() => toggle(m.label)}
+                isExpanded={expandedKey === m.key}
+                onToggle={() => toggle(m.key)}
               />
             ))}
           </div>
 
-          {/* 참고 기준 */}
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 leading-relaxed">
-            참고 기준 (S&P500): 연간 변동성 약 15~18% · VaR(95%) 약 1.5~2% · 베타 1.0
-          </p>
+          <Link
+            to={portfolioUrl("종목 현황")}
+            className={`${TOUCH_TARGET_ROW} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
+          >
+            지수·종목 비중 자세히 보기 →
+          </Link>
 
-          {metrics.note && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 leading-relaxed">
-              {metrics.note}
-            </p>
-          )}
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 leading-relaxed">
+            {metrics.note ?? "최근 1년 원화 기준 추정값"} · 예수금{" "}
+            {metrics.cash_weight_pct.toFixed(0)}%
+            {metrics.coverage_pct < COVERAGE_NOTICE_PCT &&
+              ` · 가격 이력이 없는 종목(평가액의 ${(100 - metrics.coverage_pct).toFixed(0)}%)은 계산에서 뺐어요`}
+          </p>
         </>
       )}
     </div>

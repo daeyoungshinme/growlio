@@ -37,10 +37,14 @@ describe("ChartTrendList", () => {
     // QQQ 종가 716.19 / 20일선 730 → -1.9%
     expect(screen.getByText("-1.9%")).toBeDefined();
     expect(screen.getAllByText("60일선 웅덩이")).toHaveLength(1);
-    expect(screen.queryByText("참고 · 국면 판단 미반영")).toBeNull();
+    expect(screen.queryByText("전술 국면 미반영")).toBeNull();
+    // 추세 판정에 쓰는 50일선 이격도 보인다(QQQ·SPY 두 행)
+    expect(screen.getAllByText("50일선 대비")).toHaveLength(2);
+    expect(screen.getByText("나스닥100 상승")).toBeDefined();
+    expect(screen.getByText("S&P500 상승")).toBeDefined();
   });
 
-  it("DIA가 조회되면 참고 지표로 함께 보여준다", () => {
+  it("DIA가 조회되면 다우로 함께 보여주고 전술 국면 미반영을 알린다", () => {
     render(
       <ChartTrendList
         technicals={{
@@ -58,7 +62,8 @@ describe("ChartTrendList", () => {
       />,
     );
 
-    expect(screen.getByText("참고 · 국면 판단 미반영")).toBeDefined();
+    expect(screen.getByText("전술 국면 미반영")).toBeDefined();
     expect(screen.getByText("추세 혼조")).toBeDefined();
+    expect(screen.getByText("다우 혼조")).toBeDefined();
   });
 });

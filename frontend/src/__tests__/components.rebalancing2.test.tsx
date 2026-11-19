@@ -253,7 +253,7 @@ describe("MarketSignalBanner", () => {
   it("technicals가 있으면 상세 영역에 차트 추세 섹션을 보여준다 (plans/82)", () => {
     const { unmount } = renderBanner();
     openDetail();
-    expect(screen.queryByText("차트 추세 (나스닥·S&P500)")).toBeNull();
+    expect(screen.queryByText("차트 추세 (나스닥·S&P500·다우)")).toBeNull();
     unmount();
     renderWithProviders(
       <MemoryRouter>
@@ -274,8 +274,58 @@ describe("MarketSignalBanner", () => {
       </MemoryRouter>,
     );
     openDetail();
-    expect(screen.getByText("차트 추세 (나스닥·S&P500)")).toBeDefined();
-    expect(screen.getByText("QQQ")).toBeDefined();
+    expect(screen.getByText("차트 추세 (나스닥·S&P500·다우)")).toBeDefined();
+    expect(screen.getByText("(QQQ)")).toBeDefined();
+  });
+
+  it("종합 판단이 있으면 헤더 문구를 바꾸고 상세에 근거를 보여준다 (plans/137)", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <MarketSignalBanner
+          signal={mockSignal}
+          technicals={{ QQQ: { close: 700, sma50: 690, sma200: 650, trend: "UP" } as never }}
+          outlook={{
+            verdict: "CAUTION",
+            label: "경계",
+            action: "매수 속도를 늦추고 나눠서 진행하세요",
+            macro_level: "YELLOW",
+            trend_breadth: "MIXED",
+            trend_up_count: 1,
+            trend_known_count: 3,
+            trends: { QQQ: "UP", SPY: "NEUTRAL", DIA: "DOWN" },
+            deepest_drawdown_pct: -8,
+            reasons: ["매크로 위험 주의 (9/27)", "추세 상승 1/3"],
+          }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getAllByText("종합 경계").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("매수 속도를 늦추고 나눠서 진행하세요").length).toBeGreaterThan(0);
+    openDetail();
+    expect(screen.getByText("추세 상승 1/3")).toBeDefined();
+  });
+
+  it("판단 보류면 기존 등급 문구를 쓴다 (plans/137)", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <MarketSignalBanner
+          signal={mockSignal}
+          outlook={{
+            verdict: "UNKNOWN",
+            label: "판단 보류",
+            action: "시장 데이터를 받지 못했어요",
+            macro_level: null,
+            trend_breadth: null,
+            trend_up_count: 0,
+            trend_known_count: 0,
+            trends: {},
+            deepest_drawdown_pct: null,
+            reasons: [],
+          }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("종합 판단 보류")).toBeNull();
   });
 
   it("상세 영역에 자동 실행·전술 판단 기준(확정) 등급을 항상 보여준다 (plans/82)", () => {
