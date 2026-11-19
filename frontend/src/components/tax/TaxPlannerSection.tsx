@@ -50,8 +50,10 @@ export default function TaxPlannerSection({ positions, realized, realizedFailed,
     simTax,
     simTaxDiff,
     recommendations,
+    lossHarvestRecommendations,
     handleQtyChange,
   } = useTaxSimulation(positions, autoRealized, taxRule);
+  const hasAnyRecommendation = recommendations.length > 0 || lossHarvestRecommendations.length > 0;
 
   // 숫자 키패드(inputMode=numeric)엔 마이너스 키가 없어 손실을 입력할 수 없다 — 부호는 토글로 받고 칸엔 절댓값만
   const [realizedSign, setRealizedSign] = useState<"GAIN" | "LOSS">(() =>
@@ -249,7 +251,7 @@ export default function TaxPlannerSection({ positions, realized, realizedFailed,
             kind="profit"
             positions={profitPositions}
             sellQtyMap={sellQtyMap}
-            maxTaxFreeProfit={maxTaxFreeProfit}
+            remainingDeduction={remainingDeduction}
             totalLoss={totalLoss}
             hasAnyQtyInput={hasAnyQtyInput}
             handleQtyChange={handleQtyChange}
@@ -276,7 +278,7 @@ export default function TaxPlannerSection({ positions, realized, realizedFailed,
             kind="loss"
             positions={lossPositions}
             sellQtyMap={sellQtyMap}
-            maxTaxFreeProfit={maxTaxFreeProfit}
+            remainingDeduction={remainingDeduction}
             totalLoss={totalLoss}
             hasAnyQtyInput={hasAnyQtyInput}
             handleQtyChange={handleQtyChange}
@@ -297,8 +299,24 @@ export default function TaxPlannerSection({ positions, realized, realizedFailed,
         />
       )}
 
-      {!hasAnyQtyInput && recommendations.length > 0 && (
-        <TaxRecommendationList recommendations={recommendations} />
+      {!hasAnyQtyInput && hasAnyRecommendation && (
+        <TaxRecommendationList
+          recommendations={recommendations}
+          lossHarvestRecommendations={lossHarvestRecommendations}
+          alreadyRealized={alreadyRealized}
+          remainingDeduction={remainingDeduction}
+        />
+      )}
+
+      {!hasAnyQtyInput && !hasAnyRecommendation && profitPositions.length > 0 && (
+        <div
+          className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3 text-xs text-gray-500 dark:text-gray-400"
+          data-testid="rec-empty"
+        >
+          올해 실현 {fmtKrw(alreadyRealized)} 반영 · 공제 잔여 {fmtKrw(remainingDeduction)} — 세금
+          없이 실현할 수 있는 매도가 없어요(1주 수익이 잔여보다 크거나 통산할 손실 종목이 없음).
+          추가 실현분은 {Math.round(taxRate * 100)}% 과세돼요.
+        </div>
       )}
 
       {profitPositions.length === 0 && lossPositions.length === 0 && (

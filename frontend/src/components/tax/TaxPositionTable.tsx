@@ -9,7 +9,7 @@ interface Props {
   kind: "profit" | "loss";
   positions: OverseasPositionDetail[];
   sellQtyMap: Record<string, number>;
-  maxTaxFreeProfit: number;
+  remainingDeduction: number;
   totalLoss: number;
   hasAnyQtyInput: boolean;
   handleQtyChange: (pos: OverseasPositionDetail, val: string) => void;
@@ -50,7 +50,7 @@ export function TaxPositionTable({
   kind,
   positions,
   sellQtyMap,
-  maxTaxFreeProfit,
+  remainingDeduction,
   totalLoss,
   hasAnyQtyInput,
   handleQtyChange,
@@ -67,7 +67,7 @@ export function TaxPositionTable({
           const pnlPs = pos.qty > 0 ? pos.unrealized_pnl_krw / pos.qty : 0;
           const rowSimPnl = pnlPs * qty;
           const taxSaved = isLoss ? Math.round(Math.abs(rowSimPnl) * taxRate) : 0;
-          const isWithinBudget = !isLoss && pos.unrealized_pnl_krw <= maxTaxFreeProfit;
+          const isWithinBudget = !isLoss && pos.unrealized_pnl_krw <= remainingDeduction;
 
           return (
             <div key={posKey(pos)} className="px-4 py-2 space-y-1.5">
@@ -151,7 +151,7 @@ export function TaxPositionTable({
               const pnlPs = pos.qty > 0 ? pos.unrealized_pnl_krw / pos.qty : 0;
               const rowSimPnl = pnlPs * qty;
               const taxSaved = isLoss ? Math.round(Math.abs(rowSimPnl) * taxRate) : 0;
-              const isWithinBudget = !isLoss && pos.unrealized_pnl_krw <= maxTaxFreeProfit;
+              const isWithinBudget = !isLoss && pos.unrealized_pnl_krw <= remainingDeduction;
 
               return (
                 <tr key={posKey(pos)} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">

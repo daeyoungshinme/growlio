@@ -524,21 +524,125 @@ describe("TaxRecommendationList", () => {
   };
 
   it("renders recommendations list", () => {
-    const recommendations = [{ pos: mockPos, label: "전량 매도 권장", taxSaved: 55000 }];
+    const recommendations = [
+      {
+        pos: mockPos,
+        kind: "PROFIT" as const,
+        shares: 10,
+        realizedKrw: 2000000,
+        label: "전량 매도 권장",
+        taxSaved: 55000,
+      },
+    ];
     renderWithProviders(
       <MemoryRouter>
-        <TaxRecommendationList recommendations={recommendations} />
+        <TaxRecommendationList
+          recommendations={recommendations}
+          alreadyRealized={0}
+          remainingDeduction={2500000}
+        />
       </MemoryRouter>,
     );
     expect(screen.getByText(/절세 추천/)).toBeDefined();
     expect(screen.getByText("AAPL")).toBeDefined();
   });
 
-  it("renders a deep link to the account's securities tab", () => {
-    const recommendations = [{ pos: mockPos, label: "전량 매도 권장", taxSaved: 55000 }];
+  it("shows partial-sale realized amount and toggles to loss-harvest recommendations (plans/139)", () => {
+    const profitOnly = [
+      {
+        pos: mockPos,
+        kind: "PROFIT" as const,
+        shares: 3,
+        realizedKrw: 150000,
+        label: "3주 매도",
+        taxSaved: 33000,
+      },
+    ];
+    const withLoss = [
+      { ...profitOnly[0]!, shares: 10, realizedKrw: 2000000, label: "전량(10주) 매도" },
+      {
+        pos: { ...mockPos, ticker: "MSFT", unrealized_pnl_krw: -5000000 },
+        kind: "LOSS" as const,
+        shares: 4,
+        realizedKrw: -1850000,
+        label: "4주 매도",
+        taxSaved: 0,
+      },
+    ];
     renderWithProviders(
       <MemoryRouter>
-        <TaxRecommendationList recommendations={recommendations} />
+        <TaxRecommendationList
+          recommendations={profitOnly}
+          lossHarvestRecommendations={withLoss}
+          alreadyRealized={2350000}
+          remainingDeduction={150000}
+        />
+      </MemoryRouter>,
+    );
+    // 기본은 손실 매도 없는 추천
+    expect(screen.getByTestId("rec-basis").textContent).toContain("235만원");
+    expect(screen.getByText("15만원")).toBeDefined();
+    expect(screen.queryByText("200만원")).toBeNull();
+    expect(screen.queryByText("손익 통산용")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "손실 통산 포함" }));
+    expect(screen.getByTestId("rec-basis").textContent).toContain("손익 통산");
+    expect(screen.getByText("200만원")).toBeDefined();
+    expect(screen.getByText("손익 통산용")).toBeDefined();
+  });
+
+  it("starts on loss-harvest view when no profit-only recommendation exists", () => {
+    const withLoss = [
+      {
+        pos: mockPos,
+        kind: "PROFIT" as const,
+        shares: 10,
+        realizedKrw: 2000000,
+        label: "전량(10주) 매도",
+        taxSaved: 440000,
+      },
+      {
+        pos: { ...mockPos, ticker: "MSFT" },
+        kind: "LOSS" as const,
+        shares: 4,
+        realizedKrw: -2000000,
+        label: "4주 매도",
+        taxSaved: 0,
+      },
+    ];
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxRecommendationList
+          recommendations={[]}
+          lossHarvestRecommendations={withLoss}
+          alreadyRealized={2500000}
+          remainingDeduction={0}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("손익 통산용")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "수익만 매도" }));
+    expect(screen.getByTestId("rec-profit-only-empty")).toBeDefined();
+  });
+
+  it("renders a deep link to the account's securities tab", () => {
+    const recommendations = [
+      {
+        pos: mockPos,
+        kind: "PROFIT" as const,
+        shares: 10,
+        realizedKrw: 2000000,
+        label: "전량 매도 권장",
+        taxSaved: 55000,
+      },
+    ];
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxRecommendationList
+          recommendations={recommendations}
+          alreadyRealized={0}
+          remainingDeduction={2500000}
+        />
       </MemoryRouter>,
     );
     const link = screen.getByText(/테스트계좌에서 매도/);
@@ -580,7 +684,7 @@ describe("TaxPositionTable", () => {
         kind="profit"
         positions={[mockPos]}
         sellQtyMap={{}}
-        maxTaxFreeProfit={2500000}
+        remainingDeduction={2500000}
         totalLoss={0}
         hasAnyQtyInput={false}
         handleQtyChange={vi.fn()}
@@ -596,7 +700,7 @@ describe("TaxPositionTable", () => {
         kind="loss"
         positions={[lossPos]}
         sellQtyMap={{}}
-        maxTaxFreeProfit={2500000}
+        remainingDeduction={2500000}
         totalLoss={-1000000}
         hasAnyQtyInput={false}
         handleQtyChange={vi.fn()}
@@ -613,7 +717,7 @@ describe("TaxPositionTable", () => {
         kind="profit"
         positions={[mockPos]}
         sellQtyMap={{ "AAPL-NASDAQ": 5 }}
-        maxTaxFreeProfit={2500000}
+        remainingDeduction={2500000}
         totalLoss={0}
         hasAnyQtyInput={true}
         handleQtyChange={handleQtyChange}
