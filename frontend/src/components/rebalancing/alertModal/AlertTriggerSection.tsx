@@ -1,17 +1,8 @@
 import { useId } from "react";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
-import {
-  RELATIVE_THRESHOLD_OPTIONS,
-  TRIGGER_CONDITION_OPTIONS,
-  type RelativeThresholdOption,
-} from "@/constants/rebalancingConfig";
+import { relativeThresholdOptions, TRIGGER_CONDITION_OPTIONS } from "@/constants/rebalancingConfig";
 import InfoTip from "@/components/common/InfoTip";
 import SegmentedControl from "@/components/common/SegmentedControl";
-
-function toOption(value: number | null): RelativeThresholdOption {
-  const match = RELATIVE_THRESHOLD_OPTIONS.find((o) => o.value === String(value));
-  return match ? match.value : "off";
-}
 
 interface Props {
   form: RebalancingAlertFormState;
@@ -95,8 +86,8 @@ export function AlertTriggerSection({ form }: Props) {
               />
             </p>
             <SegmentedControl
-              options={RELATIVE_THRESHOLD_OPTIONS}
-              value={toOption(form.relativeThreshold)}
+              options={relativeThresholdOptions(form.relativeThreshold)}
+              value={form.relativeThreshold == null ? "off" : String(form.relativeThreshold)}
               onChange={(v) => form.setRelativeThreshold(v === "off" ? null : Number(v))}
               ariaLabel="작은 비중 종목 상대 이탈 기준"
             />

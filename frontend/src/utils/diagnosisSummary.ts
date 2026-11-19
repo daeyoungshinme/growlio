@@ -33,7 +33,7 @@ export function buildDiagnosisChips({
     const needs = driftSummaries.filter((s) => s.needs_rebalancing).length;
     chips.push({
       key: "drift",
-      label: needs > 0 ? `이탈 ${needs}개` : "이탈 없음",
+      label: needs > 0 ? `이탈 포트폴리오 ${needs}개` : "이탈 없음",
       cls: needs > 0 ? ALERT_CHIP : NEUTRAL_CHIP,
       target: DIAGNOSIS_ANCHORS.drift,
     });

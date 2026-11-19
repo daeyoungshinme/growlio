@@ -26,7 +26,11 @@ describe("buildDiagnosisChips", () => {
       outlook,
       risk,
     });
-    expect(chips.map((c) => c.label)).toEqual(["이탈 1개", "시장 신중", "쏠림 나스닥100 65%"]);
+    expect(chips.map((c) => c.label)).toEqual([
+      "이탈 포트폴리오 1개",
+      "시장 신중",
+      "쏠림 나스닥100 65%",
+    ]);
   });
 
   it("데이터 없는 칩은 뺀다", () => {
