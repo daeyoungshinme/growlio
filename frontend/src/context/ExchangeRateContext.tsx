@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { exchangeRateQuery } from "@/api/queryOptions";
 import { toast } from "@/utils/toast";
@@ -22,12 +22,20 @@ export function ExchangeRateProvider({ children }: { children: React.ReactNode }
   const isFallback = data?.is_fallback === true;
   const rate = isFallback ? null : (data?.usd_krw ?? null);
 
-  // 실패 토스트는 여기서 한 번만 — 소비 훅마다 띄우면 마운트된 화면 수(최대 13곳)만큼 같은 토스트가 쌓였다(plans/95 G)
+  // 실패 토스트는 여기서 한 번만 — 소비 훅마다 띄우면 마운트된 화면 수(최대 13곳)만큼 같은 토스트가 쌓였다(plans/95 G).
+  // 5분 주기 재조회(plans/134)는 실패할 때마다 새 error를 만든다 — 보여 줄 환율이 없을 때만, 연속 실패 중 한 번만 띄운다.
+  // 이전 값이 남아 있는 재조회 실패는 화면 값이 그대로라 알리지 않는다(plans/135 A1).
+  const hasData = data != null;
+  const errorToastShown = useRef(false);
   useEffect(() => {
-    if (error) {
-      toast("환율 데이터를 불러오지 못했습니다. 해외 주식 금액이 부정확할 수 있습니다.", "error");
+    if (!error) {
+      errorToastShown.current = false;
+      return;
     }
-  }, [error]);
+    if (hasData || errorToastShown.current) return;
+    errorToastShown.current = true;
+    toast("환율 데이터를 불러오지 못했습니다. 해외 주식 금액이 부정확할 수 있습니다.", "error");
+  }, [error, hasData]);
   useEffect(() => {
     if (isFallback) {
       toast("환율을 확인할 수 없어요. 해외 주식 금액이 부정확할 수 있습니다.", "error");

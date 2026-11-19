@@ -10,7 +10,7 @@ import {
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { usePositionsEditor } from "@/hooks/usePositionsEditor";
 import { extractErrorMessage } from "@/utils/error";
-import { fmtKrwShort, fmtSigned, fmtPct } from "@/utils/format";
+import { fmtFxRate, fmtKrwShort, fmtSigned, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
@@ -149,9 +149,7 @@ export default function StockPositionsModal({
           {usdRate && (
             <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5">
               USD/KRW{" "}
-              <strong className="text-gray-600 dark:text-gray-300">
-                {usdRate.toLocaleString(undefined, { maximumFractionDigits: 0 })}원
-              </strong>
+              <strong className="text-gray-600 dark:text-gray-300">{fmtFxRate(usdRate)}</strong>
             </span>
           )}
           <button

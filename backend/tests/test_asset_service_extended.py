@@ -682,8 +682,30 @@ class TestSyncSnapshotConsistency:
 
         account = make_account(data_source="MANUAL")
         account.deposit_usd = 100.0
-        balance = BalanceResult(total_value_krw=1_140_000.0, positions=[], deposit_foreign=None, overseas_known=True)
+        balance = BalanceResult(
+            total_value_krw=1_140_000.0,
+            positions=[],
+            deposit_foreign=None,
+            overseas_known=True,
+            usd_deposit_in_total=True,
+        )
         upsert, _sync_positions = await self._sync(account, balance, mock_db)
 
         assert account.deposit_usd == 100.0
+        assert upsert.await_args.kwargs["amount_krw"] == 1_140_000.0
+
+    @pytest.mark.asyncio
+    async def test_usd_deposit_correction_follows_balance_flag_not_data_source(
+        self, mock_db, override_settings, make_account
+    ):
+        """보정 여부는 provider 계약(usd_deposit_in_total)으로 정한다 — 계좌 출처로 막지 않는다(plans/135 B1)."""
+        from app.providers.base import BalanceResult
+
+        account = make_account(data_source="MANUAL")
+        account.deposit_usd = 100.0
+        balance = BalanceResult(
+            total_value_krw=1_000_000.0, positions=[], deposit_foreign=None, overseas_known=True, usd_krw_rate=1400.0
+        )
+        upsert, _sync_positions = await self._sync(account, balance, mock_db)
+
         assert upsert.await_args.kwargs["amount_krw"] == 1_140_000.0
