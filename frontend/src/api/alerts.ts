@@ -53,6 +53,8 @@ export interface RebalancingAlert {
   portfolio_id: string;
   is_active: boolean;
   threshold_pct: number;
+  /** 상대 이탈 기준(목표 대비 %, plans/136) — null이면 끔. 판정은 `utils/portfolio.isDriftingItem` */
+  relative_threshold_pct?: number | null;
   schedule_type: ScheduleType;
   schedule_day_of_week: number | null;
   schedule_day_of_month: number | null;
@@ -77,6 +79,7 @@ export interface RebalancingAlert {
 export interface RebalancingAlertUpsert {
   portfolio_id: string;
   threshold_pct: number;
+  relative_threshold_pct?: number | null;
   schedule_type: ScheduleType;
   schedule_day_of_week: number | null;
   schedule_day_of_month: number | null;

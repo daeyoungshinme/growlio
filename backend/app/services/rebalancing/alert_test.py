@@ -12,6 +12,7 @@ from app.models.alert import RebalancingAlert
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing._alert_queries import alert_scope_filter, alert_with_recipient_stmt
 from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
+from app.services.rebalancing.drift_rule import alert_relative_threshold
 from app.services.rebalancing.order_builder import build_alert_order_preview
 from app.services.rebalancing.service import filter_drifting_items
 
@@ -58,7 +59,7 @@ async def send_test_rebalancing_alert(
     try:
         overview = await load_alert_overview(alert, portfolio, db, cache)
         analysis = analyze_alert_overview(portfolio, overview)
-        drifting = filter_drifting_items(analysis.items, threshold)
+        drifting = filter_drifting_items(analysis.items, threshold, alert_relative_threshold(alert))
         items_to_show = analysis.items
         ticker_account_map = analysis.ticker_account_map
     except Exception as exc:
@@ -72,6 +73,7 @@ async def send_test_rebalancing_alert(
             to_email=email,
             portfolio_name=portfolio.name,
             threshold_pct=threshold,
+            relative_threshold_pct=alert_relative_threshold(alert),
             items_to_show=items_to_show,
             drifting_count=len(drifting),
             is_scheduled_report=False,

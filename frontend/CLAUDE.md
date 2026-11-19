@@ -242,6 +242,8 @@ _기타_
 - `dcaScenarioProjection.ts` — 백엔드 `dca_service._build_projection_curve()` 포팅
 - `legacyTabRedirect.ts` — 이메일·푸시에 저장된 옛 딥링크 호환 — **지우지 말 것**
 - `fxPlanAlerts.ts` — 환전 계획·추가 환전 항목의 알림 등록 상태(`planAlertState`). 범위 규칙은 백엔드 `fx_plan_service._in_scope`와 같게
+- `portfolio.ts` `isDriftingItem`/`driftProgress`/`getItemsDriftStatus` — 이탈 판정(상대 기준 포함). 백엔드 `drift_rule`과 **같은 규칙 — 함께 수정**. 항목 이탈 비교를 인라인(`Math.abs(diff) > threshold`)으로 쓰지 말 것
+- `rebalancingTiming.ts` — 진단 행 시점 판정(`timing`) 라벨·색·보조 정보·해외 양도세 공제 여유 문구. 판정 자체는 서버(`timing_verdict`)
 - 그 외: `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `riskLevel`, `dividendUtils`(`weightBarColor` — 비중 막대 색 인라인 금지), `savingsProjection`, `goalFeasibility`, `dcaAutoBuy`(정액 분할·사전 부족 판정은 백엔드 `dca_allocation`·`dca_cash_shortfall_service`와 같은 규칙 — 함께 맞출 것), `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
 
 **마켓 (`constants/markets.ts`)** — 인라인 문자열 비교 금지.

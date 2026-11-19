@@ -29,6 +29,7 @@ from app.services.alerts.calculator import (
 from app.services.rebalancing._alert_queries import alert_with_recipient_stmt
 from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
 from app.services.rebalancing.diagnosis_service import fetch_composite_signal
+from app.services.rebalancing.drift_rule import alert_relative_threshold
 from app.services.rebalancing.order_builder import (
     build_alert_order_preview,
     is_alert_blocked_by_market_gate,
@@ -151,6 +152,7 @@ async def _process_rebalancing_alert(
             to_email=email,
             portfolio_name=portfolio.name,
             threshold_pct=threshold,
+            relative_threshold_pct=alert_relative_threshold(alert),
             items_to_show=items_to_show,
             drifting_count=drift_count,
             is_scheduled_report=is_scheduled_report,
@@ -297,7 +299,8 @@ async def _check_one_rebalancing_alert(row, composite_level, market_data_freshne
         return False
 
     threshold = float(alert.threshold_pct)
-    drifting = filter_drifting_items(analysis.items, threshold)
+    relative_threshold = alert_relative_threshold(alert)
+    drifting = filter_drifting_items(analysis.items, threshold, relative_threshold)
 
     # UserSettings 행이 없으면(outerjoin NULL) 기본값 True로 폴백 — 신규 유저 기본 동작 유지
     effective_composite_enabled = (

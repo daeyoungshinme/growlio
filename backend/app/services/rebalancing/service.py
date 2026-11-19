@@ -26,6 +26,7 @@ from app.services.rebalancing.analysis_items import (
     _item_attr,
     _item_get,
 )
+from app.services.rebalancing.drift_rule import is_drifting
 from app.utils.numbers import opt_float
 
 logger = structlog.get_logger()
@@ -423,20 +424,32 @@ def analyze_rebalancing(
 _DEFAULT_DRIFT_THRESHOLD = 5.0
 
 
-def filter_drifting_items(items: list[Any], threshold_pct: float) -> list[Any]:
-    """threshold_pct(%)를 **초과**하는 드리프트 항목만 반환한다 — 이탈 판정의 단일 기준.
+def filter_drifting_items(
+    items: list[Any], threshold_pct: float, relative_threshold_pct: float | None = None
+) -> list[Any]:
+    """이탈 항목만 반환한다 — 이탈 판정의 단일 기준(규칙 본체는 `drift_rule.is_drifting`).
 
+    절대 threshold_pct(%p)를 **초과**하거나, 상대 기준이 있으면 목표 대비 상대 이탈이 그것을 **초과**한 항목.
     알림 발송(alert_check)·대기 계획 생성(plan_generation)·진단 요약(drift-summary)·수동 분석 화면이
     모두 이 규칙을 따른다. 예전엔 진단 요약만 자체 기준(별도 base·`>=`·예수금/미포함 종목 제외)이라
     "N개 종목 이탈" 푸시를 열면 다른 종목 목록이 보였다(plans/63 P1-3).
     """
-    return [item for item in items if abs(item.weight_diff_pct) > threshold_pct]
+    if relative_threshold_pct is None:
+        return [item for item in items if abs(item.weight_diff_pct) > threshold_pct]
+    return [
+        item
+        for item in items
+        if is_drifting(
+            float(item.weight_diff_pct), float(item.target_weight_pct), threshold_pct, relative_threshold_pct
+        )
+    ]
 
 
 def compute_portfolio_drift_summary(
     portfolio: Portfolio,
     overview: dict,
     threshold_pct: float = _DEFAULT_DRIFT_THRESHOLD,
+    relative_threshold_pct: float | None = None,
 ) -> PortfolioDriftSummary:
     """DB 포지션 데이터만으로 포트폴리오 비중 이탈 현황을 계산한다.
 
@@ -445,6 +458,16 @@ def compute_portfolio_drift_summary(
     TOTAL_ASSETS면 암묵 예수금 항목 포함, 목표에 없는 보유 종목 포함)과 같은 판정(`filter_drifting_items`)을 쓴다.
     """
     analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+    return summarize_drift(portfolio, analysis, threshold_pct, relative_threshold_pct)
+
+
+def summarize_drift(
+    portfolio: Portfolio,
+    analysis: RebalancingAnalysis,
+    threshold_pct: float = _DEFAULT_DRIFT_THRESHOLD,
+    relative_threshold_pct: float | None = None,
+) -> PortfolioDriftSummary:
+    """이미 계산한 분석으로 이탈 요약을 만든다 — 같은 분석으로 비용도 추정하는 진단 요약(drift-summary)용."""
     items = analysis.items
     if analysis.base_value_krw <= 0 or not items:
         return PortfolioDriftSummary(
@@ -452,11 +475,12 @@ def compute_portfolio_drift_summary(
             portfolio_name=portfolio.name,
             needs_rebalancing=False,
             threshold_pct=threshold_pct,
+            relative_threshold_pct=relative_threshold_pct,
             max_drift_pct=0.0,
             drifted_items_count=0,
         )
 
-    drifting = filter_drifting_items(items, threshold_pct)
+    drifting = filter_drifting_items(items, threshold_pct, relative_threshold_pct)
     max_drift = max(abs(i.weight_diff_pct) for i in items)
 
     return PortfolioDriftSummary(
@@ -464,6 +488,7 @@ def compute_portfolio_drift_summary(
         portfolio_name=portfolio.name,
         needs_rebalancing=bool(drifting),
         threshold_pct=threshold_pct,
+        relative_threshold_pct=relative_threshold_pct,
         max_drift_pct=round(max_drift, 2),
         drifted_items_count=len(drifting),
     )

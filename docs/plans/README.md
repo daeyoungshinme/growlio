@@ -151,6 +151,7 @@
 | [133](133-manual-usd-deposit-double-count-2026-11-15.md) | 수기 계좌 달러 예수금이 스냅샷에 × fallback 1,300으로 이중 합산(계획 109 보정이 MANUAL에도 적용) → 홈 현금·총자산 과다. MANUAL 제외 + 회귀 테스트 | 완료 |
 | [134](134-fx-rate-display-mismatch-2026-11-16.md) | 홈 환율과 환전 계획 환율 불일치 — 전역 환율 쿼리가 세션 내내 갱신되지 않음(5분 주기 추가)·계획 응답 실환율로 전역 캐시 맞춤·표시 자릿수 통일(`fmtFxRate`) | 완료 |
 | [135](135-technical-debt-2026-11-19.md) | 133·134·Dependabot 이후 감사. 실버그: 134 환율 5분 재조회가 서버 장애 중 실패 토스트를 5분마다 반복(데이터 없을 때·연속 실패 1회만). 133 기간(11-02~11-15) 수기 계좌 일별 스냅샷 과다분 보정 스크립트(dry-run·id 지정 적용). 133 보정 조건을 출처(MANUAL) 대신 `BalanceResult.usd_deposit_in_total` 계약으로, 수기 provider 환율 기록. `fmtFxRate` 잔여 4곳 | 완료(보정 스크립트 운영 실행 대기) |
+| [136](136-rebalancing-timing-diagnosis-2026-11-19.md) | 진단 탭으로 리밸런싱 **시점** 판단. A 상대 이탈 밴드 옵션(5/25 규칙, 알림·자동실행·진단 공통 `filter_drifting_items`, 기본 끔, 마이그레이션 1개) · B drift-summary에 마지막 리밸런싱·다음 예정일·예상 비용·시점 판정(NOW/SPLIT/HOLD/WATCH/OK — 자동실행 게이트 함수 재사용) · C 진단 행 시점 칩·`composite_reason` 반복·`buildCombinedStatusNote` 중복 제거·해외 양도세 공제 여유 힌트. 이탈 추이 기록은 제외 | 완료(rb1 운영 적용 대기) |
 
 ## 파일 없는 계획 기록
 

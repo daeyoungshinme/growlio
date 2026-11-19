@@ -27,6 +27,18 @@ export const SCHEDULE_LABEL: Record<ScheduleType, string> = {
 
 export const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
+/**
+ * 상대 이탈 기준 선택지(목표 대비 %, plans/136) — "off"는 끔. 백엔드 허용 범위 10~100과 맞춘다.
+ * 25%면 목표 10% 종목은 7.5% 미만·12.5% 초과에서 이탈("5/25 규칙").
+ */
+export const RELATIVE_THRESHOLD_OPTIONS = [
+  { value: "off", label: "끔" },
+  { value: "20", label: "20%" },
+  { value: "25", label: "25%" },
+  { value: "50", label: "50%" },
+] as const;
+export type RelativeThresholdOption = (typeof RELATIVE_THRESHOLD_OPTIONS)[number]["value"];
+
 export const TRIGGER_CONDITION_OPTIONS: { value: TriggerCondition; label: string; desc: string }[] =
   [
     { value: "DRIFT_ONLY", label: "비중 이탈 시에만", desc: "이탈 종목이 있을 때만 동작합니다" },

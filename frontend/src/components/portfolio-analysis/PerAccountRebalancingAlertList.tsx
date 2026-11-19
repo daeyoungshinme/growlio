@@ -117,6 +117,7 @@ export default function PerAccountRebalancingAlertList({
                               alert.mode,
                               alert.auto_execution_time ?? undefined,
                               alert.notify_time,
+                              alert.relative_threshold_pct,
                             )}
                           </p>
                           {alert.mode === "AUTO" && (

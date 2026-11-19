@@ -799,24 +799,33 @@ describe("RebalancingStatusCard", () => {
     expect(onCreate).toHaveBeenCalled();
   });
 
-  it("기본(진단탭)이면 결합 안내 문구를 표시한다", async () => {
+  it("포트폴리오 행에 시점 판정·사유·마지막/다음 시점을 표시한다 (plans/136)", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
-      { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
+      {
+        portfolio_id: "p1",
+        portfolio_name: "테스트",
+        max_drift_pct: 10,
+        threshold_pct: 5,
+        needs_rebalancing: true,
+        has_alert_configured: true,
+        timing: "SPLIT",
+        timing_reason: "최대 10.0%p 이탈 — 시장 주의(YELLOW) 단계라 나눠서 실행하길 권해요.",
+        last_rebalanced_at: null,
+        next_scheduled_date: null,
+        estimated_cost_krw: 120000,
+      },
     ] as never);
     renderWithProviders(
       <MemoryRouter>
-        <RebalancingStatusCard
-          emptyStateCta={vi.fn()}
-          marketSignal={{ composite_level: "RED" } as never}
-        />
+        <RebalancingStatusCard emptyStateCta={vi.fn()} />
       </MemoryRouter>,
     );
-    await waitFor(() => {
-      expect(
-        screen.getByText(/시장 위험 신호가 높은 국면에서 이탈 종목이 발견되었습니다/),
-      ).toBeInTheDocument();
-    });
+    expect(await screen.findAllByText("분할 실행")).not.toHaveLength(0);
+    expect(screen.getByText(/나눠서 실행하길 권해요/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/실행 기록 없음 · 이탈 시 알림 · 예상 비용 12만원/),
+    ).toBeInTheDocument();
   });
 
   it("포트폴리오 행은 Space로 페이지를 스크롤하지 않고, 안쪽 버튼의 키 입력은 행이 가로채지 않는다", async () => {

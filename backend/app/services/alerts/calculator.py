@@ -93,6 +93,23 @@ def next_auto_schedule_date(alert: RebalancingAlert, today: date | None = None, 
     return None
 
 
+def upcoming_schedule_date(alert: RebalancingAlert, today: date | None = None, horizon_days: int = 400) -> date | None:
+    """다음 스케줄 실행·발송일 — 오늘이 스케줄일이고 아직 안 돌았으면 오늘.
+
+    AUTO는 거래일로 미룬 날(`is_auto_schedule_day`), NOTIFY는 지정일 그대로(`should_fire_today`와 같은 규칙).
+    적립 예수금 부족 판정과 진단 탭 "다음 예정일"(plans/136)이 공유한다.
+    """
+    today = today or today_kst()
+    roll = _roll_to_trading_day if alert.mode == "AUTO" else _same_day
+    if _is_schedule_day(alert, today, roll=roll) and not already_fired_today(alert):
+        return today
+    for offset in range(1, horizon_days + 1):
+        d = today + timedelta(days=offset)
+        if _is_schedule_day(alert, d, roll=roll):
+            return d
+    return None
+
+
 def already_fired_today(alert: RebalancingAlert) -> bool:
     """오늘 이미 발송됐는지 확인 (중복 방지)."""
     if not alert.last_triggered_at:

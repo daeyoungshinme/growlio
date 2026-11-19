@@ -11,10 +11,16 @@ from app.schemas._validators import validate_positive_amount
 DCA_AMOUNT_MIN_KRW = 10_000
 """정액 적립 최소 금액(원) — 프론트 `AlertQuickDcaSection`의 입력 하한과 같다."""
 
+RELATIVE_THRESHOLD_MIN_PCT = 10.0
+RELATIVE_THRESHOLD_MAX_PCT = 100.0
+"""상대 이탈 기준 허용 범위(%) — 프론트 알림 폼 입력 범위와 같다."""
+
 
 class RebalancingAlertCreate(BaseModel):
     portfolio_id: uuid.UUID
     threshold_pct: float = 5.0
+    # 상대 이탈 기준(목표 비중 대비 %, plans/136) — None이면 끔. 25면 목표 10% 종목이 ±2.5%p 넘게 벗어나도 이탈
+    relative_threshold_pct: float | None = None
     schedule_type: Literal["DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"] = "DAILY"
     schedule_day_of_week: int | None = None  # WEEKLY 전용: 0=월...6=일
     schedule_day_of_month: int | None = None  # MONTHLY/QUARTERLY/SEMIANNUAL/ANNUAL: 1~28
@@ -45,6 +51,17 @@ class RebalancingAlertCreate(BaseModel):
     def validate_threshold(cls, v: float) -> float:
         if not (0.1 <= v <= 50.0):
             raise ValueError("임계값은 0.1%에서 50% 사이여야 합니다")
+        return round(v, 2)
+
+    @field_validator("relative_threshold_pct")
+    @classmethod
+    def validate_relative_threshold(cls, v: float | None) -> float | None:
+        if v is None:
+            return v
+        if not (RELATIVE_THRESHOLD_MIN_PCT <= v <= RELATIVE_THRESHOLD_MAX_PCT):
+            raise ValueError(
+                f"상대 이탈 기준은 {RELATIVE_THRESHOLD_MIN_PCT:g}%에서 {RELATIVE_THRESHOLD_MAX_PCT:g}% 사이여야 합니다"
+            )
         return round(v, 2)
 
     @field_validator("schedule_day_of_week")
@@ -137,6 +154,7 @@ class RebalancingAlertResponse(BaseModel):
     portfolio_id: uuid.UUID
     is_active: bool
     threshold_pct: float
+    relative_threshold_pct: float | None = None
     schedule_type: str
     schedule_day_of_week: int | None
     schedule_day_of_month: int | None

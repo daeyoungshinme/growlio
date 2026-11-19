@@ -208,7 +208,6 @@ export default function RebalancingPage() {
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RebalancingStatusCard
-                  marketSignal={signal ?? undefined}
                   onPortfolioSelect={handlePortfolioSelectFromDiagnosis}
                   emptyStateCta={openNewPortfolioEditor}
                 />

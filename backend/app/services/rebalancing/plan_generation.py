@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
+from app.services.rebalancing.drift_rule import alert_relative_threshold
 from app.services.rebalancing.group_expansion import expand_group_items
 from app.services.rebalancing.order_builder import (
     _flatten_account_tax_types,
@@ -316,8 +317,10 @@ async def _drifting_items_for_alert(
     # SCHEDULE_ONLY("스케줄일에 무조건")는 임계값과 무관하게 목표 비중 대비 차이가 있는 종목을 전부
     # 대상으로 한다 — 정기 적립식 자동매수가 스케줄일에 쌓인 예수금을 목표 비중대로 매수하는 동작.
     # (호출 시점이 스케줄일인지는 AUTO 잡이 is_auto_schedule_day로 이미 걸렀다)
-    threshold = 0.0 if alert.trigger_condition == "SCHEDULE_ONLY" else float(alert.threshold_pct)
-    drifting = filter_drifting_items(analysis.items, threshold)
+    schedule_only = alert.trigger_condition == "SCHEDULE_ONLY"
+    threshold = 0.0 if schedule_only else float(alert.threshold_pct)
+    relative_threshold = None if schedule_only else alert_relative_threshold(alert)
+    drifting = filter_drifting_items(analysis.items, threshold, relative_threshold)
 
     if not drifting:
         logger.info("rebalancing_plan_no_drift", alert_id=str(alert.id))

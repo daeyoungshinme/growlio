@@ -161,6 +161,7 @@ async def send_rebalancing_alert(
     order_preview_items: list | None = None,
     automation_note: str | None = None,
     portfolio_id: str | None = None,
+    relative_threshold_pct: float | None = None,
 ) -> bool:
     """리밸런싱 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환.
 
@@ -183,6 +184,7 @@ async def send_rebalancing_alert(
             order_preview_items=order_preview_items,
             app_link=app_link,
             automation_note=automation_note,
+            relative_threshold_pct=relative_threshold_pct,
         ),
         event="rebalancing_alert",
         portfolio=portfolio_name,

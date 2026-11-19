@@ -18,6 +18,7 @@ from app.services.notifications.email_templates._shared import (
     _name_ticker_cell,
     _notice_banner,
 )
+from app.services.rebalancing.drift_rule import is_drifting
 from app.utils.kst import KST, today_kst
 
 
@@ -93,6 +94,7 @@ def rebalancing_alert_template(
     order_preview_items: list | None = None,
     app_link: str | None = None,
     automation_note: str | None = None,
+    relative_threshold_pct: float | None = None,
 ) -> tuple[str, str]:
     _SCHEDULE_LABEL: dict[str, str] = {
         "DAILY": "매일",
@@ -103,6 +105,10 @@ def rebalancing_alert_template(
         "ANNUAL": "매년",
     }
     schedule_label = _SCHEDULE_LABEL.get(schedule_type, "주기")
+    # 상대 기준이 켜져 있으면 "±5.0%(또는 목표 대비 25%)"처럼 두 기준을 함께 적는다(plans/136)
+    rule_label = f"±{threshold_pct:.1f}%"
+    if relative_threshold_pct:
+        rule_label += f"(또는 목표 대비 {relative_threshold_pct:g}%)"
 
     test_prefix = "[테스트] " if is_test else ""
     test_banner = (
@@ -122,25 +128,25 @@ def rebalancing_alert_template(
         if drifting_count:
             subheading += (
                 f" 현재 <strong style='color:#f59e0b;'>{drifting_count}개 종목</strong>이 "
-                f"목표 비중에서 ±{threshold_pct:.1f}% 이상 이탈했습니다."
+                f"목표 비중에서 {rule_label} 이상 이탈했습니다."
             )
     else:
         subject = f"{test_prefix}[Growlio] 리밸런싱 알림 — {portfolio_name} (비중 이탈 감지)"
         heading = "비중 이탈 감지"
         subheading = (
             f"포트폴리오 <strong>{escape(portfolio_name)}</strong>의 {len(items_to_show)}개 종목이 "
-            f"목표 비중에서 ±{threshold_pct:.1f}% 이상 벗어났습니다."
+            f"목표 비중에서 {rule_label} 이상 벗어났습니다."
         )
 
     rows_html = ""
     for item in items_to_show:
         diff = float(item.weight_diff_pct)
-        is_drifting = abs(diff) > threshold_pct
+        is_drifting_row = is_drifting(diff, float(item.target_weight_pct), threshold_pct, relative_threshold_pct)
         direction = "매수 필요" if diff > 0 else ("매도 필요" if diff < 0 else "—")
         action_color = "#ef4444" if diff > 0 else ("#3b82f6" if diff < 0 else "#6b7280")
         diff_krw = float(item.diff_krw) if item.diff_krw is not None else 0.0
-        row_bg = "background:#fffbeb;" if is_drifting else ""
-        bold = "font-weight:bold;" if is_drifting else ""
+        row_bg = "background:#fffbeb;" if is_drifting_row else ""
+        bold = "font-weight:bold;" if is_drifting_row else ""
         td = "padding:8px;border-bottom:1px solid #e2e8f0;"
         rows_html += (
             f"<tr style='{row_bg}'>"

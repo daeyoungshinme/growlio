@@ -76,6 +76,22 @@ class TestRebalancingAlertTemplate:
         )
         assert "내포트폴리오" in html
 
+    def test_relative_threshold_rule_and_row_highlight(self):
+        """상대 기준(plans/136)이 켜지면 문구에 함께 적고, 상대 기준으로만 이탈한 행도 강조한다."""
+        small = SimpleNamespace(
+            ticker="AAA",
+            name="작은 종목",
+            target_weight_pct=5.0,
+            current_weight_pct=2.0,
+            weight_diff_pct=3.0,
+            diff_krw=30000.0,
+        )
+        _, html_on = rebalancing_alert_template("P", 5.0, [small], 1, relative_threshold_pct=25.0)
+        _, html_off = rebalancing_alert_template("P", 5.0, [small], 1)
+        assert "목표 대비 25%" in html_on
+        assert "background:#fffbeb;" in html_on
+        assert "background:#fffbeb;" not in html_off
+
     def test_html_is_nonempty(self):
         _, html = rebalancing_alert_template("P", 5.0, [], 0)
         assert len(html) > 100

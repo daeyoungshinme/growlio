@@ -148,7 +148,9 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `krx_tick.py` — 국내 지정가 호가단위 보정(ETF·ETN 5원, 매수 내림·매도 올림)
 - `alert_check.py` — 드리프트 알림(10분 job). 복합신호 on/off는 **유저 단위**
 - `portfolio_analysis_service.py` — analyze 파이프라인(overview→배당·수익률→현재가 보강→분석→진단, 계좌범위·예수금별 캐시). 라우터는 소유 확인만
-- `drift_summary_service.py` — 이탈 요약(drift-summary·action-items 공유, 같은 세션이라 순차)
+- `drift_summary_service.py` — 이탈 요약(drift-summary·action-items 공유, 같은 세션이라 순차) + 시점 필드(마지막 실행·다음 예정일·매도 비용·`timing`). 확정 등급은 `get_last_composite_level`로 **읽기만** — `get_confirmed_composite_level`은 확정 후보를 기록하므로 조회 경로에서 부르지 않는다
+- `drift_rule.py` — 이탈 판정 단일 규칙(절대 %p 초과 **또는** 알림 `relative_threshold_pct`의 목표 대비 상대 초과, 목표 0은 절대만). `filter_drifting_items`·이메일 강조가 이것을 쓰고 프론트 `utils/portfolio.isDriftingItem`과 같아야 함. 알림 행의 상대 기준은 `alert_relative_threshold`로 읽는다(MagicMock 속성이 `float()`로 1.0이 되는 것 방지)
+- `timing_verdict.py` — 진단 행 시점 판정(순수). 보류(HOLD)는 호출부가 `is_market_signal_blocking_auto_mode` 결과를 넘긴다 — 자동 실행과 같은 판정이어야 화면과 동작이 어긋나지 않는다
 - `strategy_service.py` · `alert_scope.py`(계좌 범위 + 알림용 overview·분석 `load_alert_overview`·`analyze_alert_overview`) · `alert_test.py` · `diagnosis_service.py`(설명 전용, alert 아님) · `overview_enrichment.py` · `_alert_queries.py`
 - `broker_balance_service.py` — 3사 실시간 잔고. **주문 실행은 KIS/키움만**(토스 주문 API 미구현)
 

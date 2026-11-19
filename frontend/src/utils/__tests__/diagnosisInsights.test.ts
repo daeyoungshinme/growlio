@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildDiagnosisNotes, buildCombinedStatusNote } from "../diagnosisInsights";
+import { buildDiagnosisNotes } from "../diagnosisInsights";
 import type { DiagnosisContext } from "../../api/rebalancing";
 
 function makeContext(overrides: Partial<DiagnosisContext> = {}): DiagnosisContext {
@@ -102,30 +102,5 @@ describe("buildDiagnosisNotes", () => {
     );
     expect(notes).toHaveLength(3);
     expect(notes.map((n) => n.icon)).toEqual(["market", "risk", "tax"]);
-  });
-});
-
-describe("buildCombinedStatusNote", () => {
-  it("이탈 종목이 없으면 null을 반환한다", () => {
-    expect(buildCombinedStatusNote(0, "RED")).toBeNull();
-  });
-
-  it("시장상황이 없으면 null을 반환한다", () => {
-    expect(buildCombinedStatusNote(2, null)).toBeNull();
-    expect(buildCombinedStatusNote(2, undefined)).toBeNull();
-  });
-
-  it("GREEN이면 null을 반환한다", () => {
-    expect(buildCombinedStatusNote(2, "GREEN")).toBeNull();
-  });
-
-  it("YELLOW + 이탈 종목 있으면 분할 실행 문구를 반환한다", () => {
-    const note = buildCombinedStatusNote(1, "YELLOW");
-    expect(note).toContain("분할 실행");
-  });
-
-  it("RED + 이탈 종목 있으면 신중 검토 문구를 반환한다", () => {
-    const note = buildCombinedStatusNote(1, "RED");
-    expect(note).toContain("신중하게 검토");
   });
 });
