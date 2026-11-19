@@ -73,6 +73,53 @@ describe("ExchangeRateProvider", () => {
   });
 });
 
+describe("ExchangeRateProvider — 실패 토스트 (plans/135 A1)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function setup() {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>
+        <ExchangeRateProvider>{children}</ExchangeRateProvider>
+      </QueryClientProvider>
+    );
+    return { qc, wrapper };
+  }
+
+  it("이전 환율이 남아 있는 재조회 실패는 토스트를 띄우지 않는다", async () => {
+    const { fetchExchangeRate } = await import("@/api/assets");
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(fetchExchangeRate).mockResolvedValueOnce({ usd_krw: 1350 });
+    const { qc, wrapper } = setup();
+    const { result } = renderHook(() => useExchangeRateContext(), { wrapper });
+    await waitFor(() => expect(result.current.rate).toBe(1350));
+
+    vi.mocked(fetchExchangeRate).mockRejectedValueOnce(new Error("down"));
+    await qc.refetchQueries();
+    await waitFor(() => expect(result.current.error).toBeInstanceOf(Error));
+
+    expect(result.current.rate).toBe(1350);
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("환율이 없을 때 연속 실패해도 토스트는 한 번만", async () => {
+    const { fetchExchangeRate } = await import("@/api/assets");
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(fetchExchangeRate).mockImplementation(() => Promise.reject(new Error("down")));
+    const { qc, wrapper } = setup();
+    const { result } = renderHook(() => useExchangeRateContext(), { wrapper });
+    await waitFor(() => expect(toast).toHaveBeenCalledTimes(1));
+
+    const firstError = result.current.error;
+    await qc.refetchQueries();
+    // 실패할 때마다 새 error 객체 — 예전엔 이 변화마다 토스트가 다시 떴다
+    await waitFor(() => expect(result.current.error).not.toBe(firstError));
+
+    expect(toast).toHaveBeenCalledTimes(1);
+    vi.mocked(fetchExchangeRate).mockReset().mockResolvedValue({ usd_krw: 1350 });
+  });
+});
+
 describe("useExchangeRateContext — Provider 없는 기본값", () => {
   it("Provider 없이 호출하면 기본값(null, false, null)을 반환한다", () => {
     const { result } = renderHook(() => useExchangeRateContext());

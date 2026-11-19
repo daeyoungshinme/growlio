@@ -1,5 +1,5 @@
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
-import { fmtKrw, fmtKrwPreview } from "@/utils/format";
+import { fmtFxRate, fmtKrw, fmtKrwPreview } from "@/utils/format";
 
 interface Props {
   mode: "create" | "edit";
@@ -85,7 +85,7 @@ export default function StockDepositFields({
             <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
               {usdRate == null
                 ? "환율 정보를 불러오는 중..."
-                : `≈ ${fmtKrw(usdAsKrw)} (환율 ${usdRate.toLocaleString()}원/USD)`}
+                : `≈ ${fmtKrw(usdAsKrw)} (환율 ${fmtFxRate(usdRate)}/USD)`}
             </p>
           )}
         </div>
@@ -149,7 +149,7 @@ export default function StockDepositFields({
       </div>
       {(depositUsd ?? 0) > 0 && usdRate != null && (
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          ≈ {fmtKrw(usdAsKrw)} (환율 {usdRate.toLocaleString()}원/USD)
+          ≈ {fmtKrw(usdAsKrw)} (환율 {fmtFxRate(usdRate)}/USD)
         </p>
       )}
     </div>

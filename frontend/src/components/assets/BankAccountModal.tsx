@@ -6,7 +6,7 @@ import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
-import { fmtKrw, fmtKrwPreview } from "@/utils/format";
+import { fmtFxRate, fmtKrw, fmtKrwPreview } from "@/utils/format";
 import { FORM_LABEL, INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 
 interface Props {
@@ -207,7 +207,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
               <p className="text-xs text-gray-500 dark:text-gray-400 pl-10">
                 {usdRate == null
                   ? "환율 정보를 불러오는 중..."
-                  : `≈ ${fmtKrw(usdAsKrw)} (환율 ${usdRate.toLocaleString()}원/USD)`}
+                  : `≈ ${fmtKrw(usdAsKrw)} (환율 ${fmtFxRate(usdRate)}/USD)`}
               </p>
             )}
             {((depositKrw ?? 0) > 0 || (depositUsd ?? 0) > 0) && (
