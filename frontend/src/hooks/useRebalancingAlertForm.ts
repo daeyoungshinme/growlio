@@ -124,6 +124,9 @@ export function useRebalancingAlertFormState({
     alert?.trigger_condition ?? "DRIFT_ONLY",
   );
   const [threshold, setThreshold] = useState(alert?.threshold_pct ?? recommendedThreshold);
+  const [relativeThreshold, setRelativeThreshold] = useState<number | null>(
+    alert?.relative_threshold_pct ?? null,
+  );
   const [mode, setMode] = useState<"NOTIFY" | "AUTO">(alert?.mode ?? "NOTIFY");
   const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY" | "TWO_PHASE">(
     alert?.strategy ?? "BUY_ONLY",
@@ -158,6 +161,7 @@ export function useRebalancingAlertFormState({
   const isDirty =
     !!alert &&
     (threshold !== alert.threshold_pct ||
+      relativeThreshold !== (alert.relative_threshold_pct ?? null) ||
       scheduleType !== alert.schedule_type ||
       triggerCondition !== (alert.trigger_condition ?? "DRIFT_ONLY") ||
       mode !== alert.mode ||
@@ -188,6 +192,8 @@ export function useRebalancingAlertFormState({
 
       const body = {
         threshold_pct: threshold,
+        // 상대 기준은 이탈 판정에만 쓰인다 — 스케줄만이면 저장하지 않는다(서버 판정도 무시)
+        relative_threshold_pct: triggerCondition === "SCHEDULE_ONLY" ? null : relativeThreshold,
         schedule_type: scheduleType,
         schedule_day_of_week: scheduleType === "WEEKLY" ? dayOfWeek : null,
         schedule_day_of_month: NEEDS_DAY_OF_MONTH.includes(scheduleType) ? dayOfMonth : null,
@@ -242,6 +248,8 @@ export function useRebalancingAlertFormState({
     setTriggerCondition,
     threshold,
     setThreshold,
+    relativeThreshold,
+    setRelativeThreshold,
     recommendedThreshold,
     isNewAlert: !alert,
     isDirty,

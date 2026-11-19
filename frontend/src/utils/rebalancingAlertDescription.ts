@@ -10,7 +10,12 @@ export function buildAlertDescription(
   mode: "NOTIFY" | "AUTO",
   autoExecutionTime?: string,
   notifyTime?: string,
+  relativeThreshold?: number | null,
 ): string {
+  // 상대 기준(plans/136)이 켜져 있으면 두 기준을 함께 — "±5.0%(또는 목표 대비 25%)"
+  const rule = relativeThreshold
+    ? `±${threshold.toFixed(1)}%(또는 목표 대비 ${relativeThreshold}%)`
+    : `±${threshold.toFixed(1)}%`;
   const timeLabel = mode === "AUTO" ? (autoExecutionTime ?? "09:00") : (notifyTime ?? "08:30");
   const when =
     scheduleType === "DAILY"
@@ -28,10 +33,10 @@ export function buildAlertDescription(
   const action = mode === "AUTO" ? "자동으로 리밸런싱을 실행합니다." : "알림을 받습니다.";
 
   if (triggerCondition === "DRIFT_ONLY") {
-    return `비중이 ±${threshold.toFixed(1)}% 이상 이탈 시 ${when} ${action}`;
+    return `비중이 ${rule} 이상 이탈 시 ${when} ${action}`;
   }
   if (triggerCondition === "SCHEDULE_ONLY") {
     return mode === "AUTO" ? `${when} ${action}` : `${when} 리밸런싱 현황 리포트를 받습니다.`;
   }
-  return `${when} 정기 리포트를 받으며, 비중이 ±${threshold.toFixed(1)}% 이탈 시 즉시 ${action}`;
+  return `${when} 정기 리포트를 받으며, 비중이 ${rule} 이탈 시 즉시 ${action}`;
 }

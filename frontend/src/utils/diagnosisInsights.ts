@@ -1,5 +1,4 @@
 import type { DiagnosisContext } from "../api/rebalancing";
-import type { MarketRiskLevel } from "../api/marketSignals";
 import { fmtKrw } from "./format";
 
 const FEE_NOTE_THRESHOLD_KRW = 10_000;
@@ -44,17 +43,4 @@ export function buildDiagnosisNotes(ctx: DiagnosisContext): DiagnosisNote[] {
   }
 
   return notes;
-}
-
-/** 대시보드 등에서 "이탈 종목 발견 + 시장상황"을 결합한 한 줄 설명을 만든다. */
-export function buildCombinedStatusNote(
-  needsCount: number,
-  marketLevel: MarketRiskLevel | null | undefined,
-): string | null {
-  if (needsCount === 0 || !marketLevel || marketLevel === "GREEN") {
-    return null;
-  }
-  return marketLevel === "RED"
-    ? "시장 위험 신호가 높은 국면에서 이탈 종목이 발견되었습니다 — 신중하게 검토하세요."
-    : "시장 변동성이 확대되는 국면에서 이탈 종목이 발견되었습니다 — 분할 실행을 고려해보세요.";
 }

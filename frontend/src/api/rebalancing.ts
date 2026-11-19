@@ -279,12 +279,28 @@ export interface PortfolioDriftSummary {
   portfolio_name: string;
   needs_rebalancing: boolean;
   threshold_pct: number;
+  /** 상대 이탈 기준(목표 대비 %) — null이면 끔(plans/136) */
+  relative_threshold_pct?: number | null;
   max_drift_pct: number;
   drifted_items_count: number;
   has_composite_signal?: boolean;
   composite_reason?: string | null;
   has_alert_configured?: boolean;
+  // ── 시점 판단(plans/136) — 구버전 응답엔 없음 ──
+  timing?: RebalancingTiming | null;
+  timing_reason?: string | null;
+  /** 주문이 한 건이라도 성공한 마지막 리밸런싱(ISO) */
+  last_rebalanced_at?: string | null;
+  /** 스케줄 알림의 다음 실행·발송일(YYYY-MM-DD, KST) */
+  next_scheduled_date?: string | null;
+  schedule_type?: string | null;
+  estimated_trade_krw?: number;
+  estimated_cost_krw?: number;
+  estimated_overseas_gain_krw?: number;
 }
+
+/** 진단 행 시점 판정 — 백엔드 `timing_verdict.decide_timing` */
+export type RebalancingTiming = "NOW" | "SPLIT" | "HOLD" | "WATCH" | "OK";
 
 export const fetchDriftSummary = (): Promise<PortfolioDriftSummary[]> =>
   apiGet<PortfolioDriftSummary[]>(`/rebalancing/drift-summary`);

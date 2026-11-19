@@ -47,10 +47,15 @@ const PortfolioCard = memo(function PortfolioCard({
   onConfirmDelete,
   onToggleTarget,
 }: PortfolioCardProps) {
+  // 서버 시점 판정(plans/136)이 있으면 그 "지켜보기"가 주의 — 상대 이탈 기준까지 반영된 값이다
   const driftStatus = drift
     ? drift.needs_rebalancing
       ? "critical"
-      : getDriftStatus(drift.max_drift_pct, drift.threshold_pct)
+      : drift.timing
+        ? drift.timing === "WATCH"
+          ? "caution"
+          : "stable"
+        : getDriftStatus(drift.max_drift_pct, drift.threshold_pct)
     : null;
   const isNeeded = driftStatus === "critical";
   const isCaution = driftStatus === "caution";

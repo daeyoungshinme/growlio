@@ -7,13 +7,19 @@ import type { PortfolioDriftSummary } from "@/api/rebalancing";
 import { useInsights } from "@/hooks/useInsights";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import type { Insight, InsightType, InsightSeverity } from "@/api/insights";
-import type { MarketSignalResponse } from "@/api/marketSignals";
-import { buildCombinedStatusNote } from "@/utils/diagnosisInsights";
-import { DRIFT_STATUS_LABEL, getDriftStatus } from "@/utils/portfolio";
+import {
+  TIMING_BADGE,
+  TIMING_DOT,
+  TIMING_LABEL,
+  overseasDeductionRoomNote,
+  summaryTiming,
+  timingHeadline,
+  timingMetaParts,
+} from "@/utils/rebalancingTiming";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
-import { driftSummaryQuery, portfoliosQuery } from "@/api/queryOptions";
+import { driftSummaryQuery, portfoliosQuery, taxSummaryQuery } from "@/api/queryOptions";
 
 const OTHER_INSIGHTS_VISIBLE_LIMIT = 3;
 
@@ -24,13 +30,12 @@ function PortfolioDriftRow({
   summary: PortfolioDriftSummary;
   onClick?: (id: string, openAlert?: boolean) => void;
 }) {
-  const isAlert = summary.needs_rebalancing;
-  // 포트폴리오 카드·분석 진단 카드와 같은 3단계 — 절반 이상 이탈이면 "주의"(plans/63 P1-2)
-  const isCaution =
-    !isAlert && getDriftStatus(summary.max_drift_pct, summary.threshold_pct) === "caution";
-  const showCompositeBadge = !isAlert && summary.has_composite_signal;
+  // 시점 판정(plans/136) — 이탈 × 확정 시장 등급 × 자동 실행 게이트. 구버전 응답은 이탈 여부로 대신
+  const timing = summaryTiming(summary);
+  const urgent = timing === "NOW" || timing === "SPLIT";
   // 구버전 API 응답(필드 없음) 호환을 위해 명시적으로 false일 때만 미설정으로 간주
   const alertNotConfigured = summary.has_alert_configured === false;
+  const meta = timingMetaParts(summary);
   return (
     <div
       role="button"
@@ -47,27 +52,20 @@ function PortfolioDriftRow({
       className="w-full flex flex-col py-2.5 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40 text-left transition-colors cursor-pointer"
     >
       <div className="flex items-center gap-2 w-full">
-        <span
-          className={`w-2 h-2 rounded-full shrink-0 ${isAlert ? "bg-red-500" : isCaution ? "bg-amber-500" : "bg-green-500"}`}
-        />
+        <span className={`w-2 h-2 rounded-full shrink-0 ${TIMING_DOT[timing]}`} />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1 truncate min-w-0">
           {summary.portfolio_name}
         </span>
         <span
-          className={`text-xs font-semibold shrink-0 ${isAlert ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"}`}
+          className={`text-xs font-semibold shrink-0 ${urgent ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"}`}
         >
           최대 {summary.max_drift_pct.toFixed(1)}%
         </span>
-        {isAlert && (
-          <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-1.5 py-0.5 shrink-0">
-            {DRIFT_STATUS_LABEL.critical}
-          </span>
-        )}
-        {showCompositeBadge && (
-          <span className="text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full px-1.5 py-0.5 shrink-0">
-            점검 권장
-          </span>
-        )}
+        <span
+          className={`text-xs font-semibold rounded-full px-1.5 py-0.5 shrink-0 ${TIMING_BADGE[timing]}`}
+        >
+          {TIMING_LABEL[timing]}
+        </span>
         {alertNotConfigured && (
           <button
             onClick={(e) => {
@@ -82,12 +80,13 @@ function PortfolioDriftRow({
           </button>
         )}
       </div>
-      {/* 점검 권장 사유 — title은 터치에서 안 보이므로 화면에 표시 (docs/plans/67) */}
-      {showCompositeBadge && summary.composite_reason && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 pl-4">
-          {summary.composite_reason}
+      {/* 판정 사유는 안정(OK)이면 생략 — 할 일 없는 행까지 문장을 달면 정작 필요한 행이 묻힌다 */}
+      {summary.timing_reason && timing !== "OK" && (
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 pl-4">
+          {summary.timing_reason}
         </p>
       )}
+      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 pl-4">{meta.join(" · ")}</p>
     </div>
   );
 }
@@ -146,10 +145,9 @@ function InsightRow({ insight }: { insight: Insight }) {
   );
 }
 
-/** 리밸런싱 › 진단 탭 상단 카드 — 포트폴리오별 이탈 현황 + 전체 자산 진단. 시장 신호 표시는 탭의
- * MarketSignalBanner가 맡고, 여기서는 이탈과 결합한 안내 문구에만 쓴다. */
+/** 리밸런싱 › 진단 탭 상단 카드 — 포트폴리오별 이탈·시점 판정 + 전체 자산 진단. 시장 신호 자체는 탭의
+ * MarketSignalBanner가 보여 주고, 이탈과 시장을 겹친 판단은 서버 시점 판정(timing)이 행마다 담는다. */
 interface Props {
-  marketSignal?: MarketSignalResponse | null;
   onPortfolioSelect?: (id: string, openAlert?: boolean) => void;
   /** 포트폴리오가 하나도 없을 때 보여 주는 "포트폴리오 만들기" CTA */
   emptyStateCta: () => void;
@@ -159,11 +157,7 @@ interface Props {
 const ALL_INSIGHT_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
 const SEVERITY_ORDER: Record<InsightSeverity, number> = { ALERT: 0, WARNING: 1, INFO: 2 };
 
-export default function RebalancingStatusCard({
-  marketSignal,
-  onPortfolioSelect,
-  emptyStateCta,
-}: Props) {
+export default function RebalancingStatusCard({ onPortfolioSelect, emptyStateCta }: Props) {
   const [isOpen, toggleOpen] = useCollapsible(true);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
   const {
@@ -198,10 +192,20 @@ export default function RebalancingStatusCard({
     return driftSummaries.filter((s) => s.needs_rebalancing).length;
   }, [driftSummaries]);
 
-  const combinedStatusNote = useMemo(
-    () => buildCombinedStatusNote(needsCount, marketSignal?.composite_level),
-    [needsCount, marketSignal?.composite_level],
+  const headline = useMemo(() => timingHeadline(driftSummaries ?? []), [driftSummaries]);
+
+  // 복합신호(시장 RED·리스크 과다)는 유저 단위라 모든 행에 같은 문장이 붙던 것을 카드 위 한 줄로(plans/136)
+  const compositeReason = driftSummaries?.find((s) => s.has_composite_signal)?.composite_reason;
+
+  // 해외 매도 이익이 예상되는 포트폴리오가 있으면 올해 양도세 기본공제 여유를 알려 준다(시점 판단 보조)
+  const hasOverseasGain = (driftSummaries ?? []).some(
+    (s) => s.needs_rebalancing && (s.estimated_overseas_gain_krw ?? 0) > 0,
   );
+  const { data: taxSummary } = useQuery({
+    ...taxSummaryQuery(new Date().getFullYear()),
+    enabled: hasOverseasGain,
+  });
+  const deductionNote = hasOverseasGain ? overseasDeductionRoomNote(taxSummary) : null;
 
   if (portfoliosLoading) {
     return <SkeletonCard />;
@@ -258,9 +262,9 @@ export default function RebalancingStatusCard({
       iconColorClassName="text-blue-600 dark:text-blue-400"
       title="리밸런싱 점검"
       titleBadge={
-        needsCount > 0 ? (
+        headline ? (
           <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
-            {needsCount}개 필요
+            {headline}
           </span>
         ) : undefined
       }
@@ -268,10 +272,10 @@ export default function RebalancingStatusCard({
       onToggle={toggleOpen}
       cardClassName={cardClass}
     >
-      {/* 이탈 종목 + 시장상황 결합 안내 */}
-      {combinedStatusNote && (
+      {/* 점검 권장 사유(유저 단위 복합신호) — 행마다 반복하지 않고 한 번만 */}
+      {compositeReason && (
         <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
-          {combinedStatusNote}
+          점검 권장: {compositeReason}
         </p>
       )}
 
@@ -284,6 +288,9 @@ export default function RebalancingStatusCard({
           {sortedDriftSummaries.map((s) => (
             <PortfolioDriftRow key={s.portfolio_id} summary={s} onClick={onPortfolioSelect} />
           ))}
+          {deductionNote && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 px-3 pt-1">{deductionNote}</p>
+          )}
         </div>
       )}
 

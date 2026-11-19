@@ -1,6 +1,17 @@
 import { useId } from "react";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
-import { TRIGGER_CONDITION_OPTIONS } from "@/constants/rebalancingConfig";
+import {
+  RELATIVE_THRESHOLD_OPTIONS,
+  TRIGGER_CONDITION_OPTIONS,
+  type RelativeThresholdOption,
+} from "@/constants/rebalancingConfig";
+import InfoTip from "@/components/common/InfoTip";
+import SegmentedControl from "@/components/common/SegmentedControl";
+
+function toOption(value: number | null): RelativeThresholdOption {
+  const match = RELATIVE_THRESHOLD_OPTIONS.find((o) => o.value === String(value));
+  return match ? match.value : "off";
+}
 
 interface Props {
   form: RebalancingAlertFormState;
@@ -67,6 +78,29 @@ export function AlertTriggerSection({ form }: Props) {
               계좌 유형 기반 추천값: {form.recommendedThreshold.toFixed(1)}% · 직접 조정 가능
             </p>
           )}
+
+          {/* 상대 이탈 기준(plans/136) — 비중이 작은 종목은 절대 %p로는 거의 안 잡힌다 */}
+          <div className="mt-3">
+            <p className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              작은 비중 종목 상대 이탈
+              <InfoTip
+                label="상대 이탈 기준 설명"
+                content={
+                  <>
+                    목표 비중 대비 몇 % 벗어나면 이탈로 볼지 정해요. 25%면 목표 10% 종목은 7.5%
+                    미만이나 12.5% 초과에서 이탈로 봐요. 목표 5% 종목이 0%가 돼도 ±5%만으로는 잡히지
+                    않는 문제를 보완해요. 위 임계값과 둘 중 하나만 넘어도 이탈이에요.
+                  </>
+                }
+              />
+            </p>
+            <SegmentedControl
+              options={RELATIVE_THRESHOLD_OPTIONS}
+              value={toOption(form.relativeThreshold)}
+              onChange={(v) => form.setRelativeThreshold(v === "off" ? null : Number(v))}
+              ariaLabel="작은 비중 종목 상대 이탈 기준"
+            />
+          </div>
         </div>
       )}
     </>

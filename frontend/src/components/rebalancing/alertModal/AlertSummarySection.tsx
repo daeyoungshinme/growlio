@@ -22,6 +22,7 @@ export function AlertSummarySection({ form, alert }: Props) {
           form.mode,
           form.autoExecutionTime,
           form.notifyTime,
+          form.relativeThreshold,
         )}
       </p>
 

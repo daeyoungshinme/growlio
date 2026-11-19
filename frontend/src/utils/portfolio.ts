@@ -166,6 +166,55 @@ export function getDriftStatus(maxDriftPct: number, thresholdPct: number): Drift
   return "stable";
 }
 
+/** 이탈 판정에 쓰는 항목 필드 — 분석 결과 `RebalancingItem`이 그대로 들어간다 */
+interface DriftItem {
+  target_weight_pct: number;
+  weight_diff_pct: number;
+}
+
+/**
+ * 항목 이탈 판정 — 백엔드 `drift_rule.is_drifting`과 같은 규칙(바꿀 땐 양쪽 함께, plans/136).
+ * 절대 기준(%p)을 **초과**하거나, 상대 기준이 있으면 목표 대비 상대 이탈이 그것을 **초과**하면 이탈.
+ * 목표 0(목표 밖 보유·예수금)은 절대 기준만.
+ */
+export function isDriftingItem(
+  item: DriftItem,
+  thresholdPct: number,
+  relativeThresholdPct?: number | null,
+): boolean {
+  const diff = Math.abs(item.weight_diff_pct);
+  if (diff > thresholdPct) return true;
+  if (!relativeThresholdPct || item.target_weight_pct <= 0) return false;
+  return (diff / item.target_weight_pct) * 100 > relativeThresholdPct;
+}
+
+/** 기준선에 가장 많이 다가간 항목의 비율(1 = 기준선) — 백엔드 `drift_rule.drift_progress` */
+export function driftProgress(
+  items: readonly DriftItem[],
+  thresholdPct: number,
+  relativeThresholdPct?: number | null,
+): number {
+  let best = 0;
+  for (const item of items) {
+    const diff = Math.abs(item.weight_diff_pct);
+    if (thresholdPct > 0) best = Math.max(best, diff / thresholdPct);
+    if (relativeThresholdPct && item.target_weight_pct > 0) {
+      best = Math.max(best, ((diff / item.target_weight_pct) * 100) / relativeThresholdPct);
+    }
+  }
+  return best;
+}
+
+/** 항목 목록으로 이탈 상태 3단계 — 상대 기준까지 반영한 `getDriftStatus` */
+export function getItemsDriftStatus(
+  items: readonly DriftItem[],
+  thresholdPct: number,
+  relativeThresholdPct?: number | null,
+): DriftStatus {
+  if (items.some((i) => isDriftingItem(i, thresholdPct, relativeThresholdPct))) return "critical";
+  return driftProgress(items, thresholdPct, relativeThresholdPct) >= 0.5 ? "caution" : "stable";
+}
+
 export const DRIFT_STATUS_LABEL: Record<DriftStatus, string> = {
   critical: "리밸런싱 필요",
   caution: "주의",
