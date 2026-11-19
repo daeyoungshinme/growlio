@@ -10,7 +10,10 @@ from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
+from app.schemas.market_signal import MarketOutlook
+from app.services.market_signal.market_outlook import build_market_outlook
 from app.services.market_signal.market_signal_service import get_last_composite_level, get_market_signal
+from app.services.market_signal.technical_signal_service import get_technical_signals
 
 router = APIRouter(prefix="/market-signals", tags=["market_signals"])
 logger = structlog.get_logger()
@@ -42,3 +45,28 @@ async def get_market_signal_endpoint(
     signal = await get_market_signal(cache)
     # 캐시된 dict는 사용자 간 공유되므로 복사본에 덧붙인다
     return {**signal, "confirmed_level": await get_last_composite_level(db)}
+
+
+@router.get("/outlook", response_model=MarketOutlook)
+@limiter.limit("30/minute")
+async def get_market_outlook_endpoint(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """시장 종합 판단 — 즉시 매크로 등급 × 나스닥100·S&P500·다우 추세(plans/137 B).
+
+    **표시 전용** — 자동 실행 게이트·전술 국면은 이 판단을 쓰지 않는다. 두 입력 모두 서버 캐시를 공유하므로
+    배너·전술 탭과 같은 값을 본다. 한쪽 조회가 실패하면 나머지만으로 판단한다.
+    """
+    cache = await get_cache_store()
+    signal: dict = {}
+    technicals: dict = {}
+    try:
+        signal = await get_market_signal(cache)
+    except Exception as e:
+        logger.warning("market_outlook_signal_failed", error=str(e))
+    try:
+        technicals = dict(await get_technical_signals(cache))
+    except Exception as e:
+        logger.warning("market_outlook_technicals_failed", error=str(e))
+    return build_market_outlook(signal, technicals)
