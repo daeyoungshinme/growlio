@@ -183,3 +183,66 @@ async def test_release_read_connection_returns_connection_to_pool():
             assert (await session.execute(text("SELECT 2"))).scalar() == 2
     finally:
         await engine.dispose()
+
+
+def _load_fix_script():
+    """scripts/는 패키지가 아니라 파일 경로로 불러온다."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "fix_manual_usd_double_count_133.py"
+    spec = importlib.util.spec_from_file_location("fix_manual_usd_double_count_133", path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestManualUsdDoubleCountFix:
+    """plans/135 A2 — 계획 133 기간의 수기 계좌 일별 스냅샷 과다분 보정 스크립트."""
+
+    async def _snap(self, db: AsyncSession, account: AssetAccount, day: date, amount: float, source: str = "MANUAL"):
+        snap = AssetSnapshot(
+            user_id=account.user_id, account_id=account.id, snapshot_date=day, amount_krw=amount, source=source
+        )
+        db.add(snap)
+        await db.flush()
+        return snap
+
+    async def test_candidates_and_apply_only_selected_ids(self, pg: AsyncSession):
+        from decimal import Decimal
+
+        fix = _load_fix_script()
+        user, manual = await _user_and_account(pg)
+        manual.deposit_usd = 100.0
+        no_usd = AssetAccount(user_id=user.id, name="달러없음", asset_type="STOCK_OTHER", data_source="MANUAL")
+        kis = AssetAccount(user_id=user.id, name="KIS", asset_type="STOCK_KIS", data_source="KIS_API")
+        kis.deposit_usd = 100.0
+        pg.add_all([no_usd, kis])
+        await pg.flush()
+
+        await self._snap(pg, manual, date(2026, 11, 1), 1_000_000)  # 기간 밖 — 비교 기준
+        bad = await self._snap(pg, manual, date(2026, 11, 5), 1_130_000)  # 과다(+100×1300)
+        ok = await self._snap(pg, manual, date(2026, 11, 6), 1_000_000)  # 그날 마지막 쓰기가 정상 합계
+        await self._snap(pg, manual, date(2026, 11, 16), 1_130_000)  # 기간 밖
+        await self._snap(pg, no_usd, date(2026, 11, 5), 500_000)
+        await self._snap(pg, kis, date(2026, 11, 5), 2_000_000, source="KIS_API")
+
+        mine = {manual.id, no_usd.id, kis.id}
+        cands = {c.snapshot_id: c for c in await fix.find_candidates(pg) if c.account_id in mine}
+
+        assert set(cands) == {bad.id, ok.id}
+        assert cands[bad.id].corrected_krw == Decimal("1000000.00")
+        assert cands[bad.id].check == "OK"
+        assert cands[ok.id].check == "ALREADY_OK?"
+
+        changed = await fix.apply_fix(pg, {bad.id, uuid.uuid4()})
+        assert changed == 1
+        pg.expire_all()
+        assert await pg.scalar(select(AssetSnapshot.amount_krw).where(AssetSnapshot.id == bad.id)) == Decimal(
+            "1000000.00"
+        )
+        assert await pg.scalar(select(AssetSnapshot.amount_krw).where(AssetSnapshot.id == ok.id)) == Decimal(
+            "1000000.00"
+        )
