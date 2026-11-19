@@ -4,7 +4,7 @@
 
 **진행 순서**: P1 확인(사용자) → 결과에 따라 P3 코드 작업. P2는 외부 트리거, P4는 사용자 결정이 나오면 각각 별도 계획서로 진행한다. 확인 결과는 해당 줄에 날짜와 함께 적는다.
 
-완료: PR #268 머지(계획 130, 66f5d358), Dependabot `pre-commit` 생태계·접근성 label 31개(계획 131, PR #269). 계획 132(129~131 이후 감사) 처리.
+완료: PR #268 머지(계획 130, 66f5d358), Dependabot `pre-commit` 생태계·접근성 label 31개(계획 131, PR #269). 계획 132(129~131 이후 감사) 처리. 계획 133·134·135 처리(PR 참고).
 
 ## P1. 실계좌·실기기·운영 확인 (사용자)
 
@@ -27,6 +27,7 @@
 
 ### 운영
 
+- [ ] **계획 133 기간 일별 스냅샷 보정** — 운영 DB로 `cd backend && uv run python scripts/fix_manual_usd_double_count_133.py` dry-run → `check=OK` 행만 `--apply --ids` (135 A2)
 - [ ] 로그 `fx_plan_timing ms` 전후 비교 (124·127), `http_request duration_ms`로 action-items·analyze·tactical 전후 비교 (125) → 개선이 없으면 125 B3·B4 재검토
 - [ ] 로그 `kiwoom_overseas_fractional_qty` 발생 여부 (131) → 발생하면 P3-B
 - [ ] GitHub 저장소에서 Dependabot alerts가 꺼져 있는지 확인 (109) → 꺼져 있으면 켠다
