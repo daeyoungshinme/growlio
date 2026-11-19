@@ -204,3 +204,81 @@ describe("useTaxSimulation — 백엔드 세금 요약의 공제·세율 사용 
     expect(result.current.currentTax).toBe(200_000); // (600만 − 500만) × 20%
   });
 });
+
+describe("useTaxSimulation — 절세 추천이 올해 실현손익을 반영 (plans/139)", () => {
+  // 주당 수익 5만원 × 10주 = 50만원
+  const profit = makePos({ ticker: "AAPL", qty: 10, unrealized_pnl_krw: 500_000 });
+
+  it("공제 잔여 15만원이면 3주만 추천하고 실현액도 3주 기준이다", () => {
+    const { result } = renderHook(() => useTaxSimulation([profit], 2_350_000));
+    const recs = result.current.recommendations;
+    expect(recs).toHaveLength(1);
+    expect(recs[0]!.kind).toBe("PROFIT");
+    expect(recs[0]!.shares).toBe(3);
+    expect(recs[0]!.realizedKrw).toBe(150_000);
+    expect(recs[0]!.label).toBe("3주 매도");
+    expect(result.current.lossHarvestRecommendations).toEqual([]);
+  });
+
+  it("손실 종목이 있어도 손실 매도 없는 수익 매도 추천을 따로 준다", () => {
+    // 주당 손실 10만원 × 10주
+    const loss = makePos({ ticker: "MSFT", qty: 10, unrealized_pnl_krw: -1_000_000 });
+    const { result } = renderHook(() => useTaxSimulation([profit, loss], 2_350_000));
+    const profitOnly = result.current.recommendations;
+    expect(profitOnly.every((r) => r.kind === "PROFIT")).toBe(true);
+    expect(profitOnly[0]!.shares).toBe(3);
+    expect(profitOnly[0]!.realizedKrw).toBe(150_000);
+  });
+
+  it("손실 통산 추천은 필요한 손실 매도를 함께 넣고, 수익 실현은 잔여+손실 매도분 이내다", () => {
+    const loss = makePos({ ticker: "MSFT", qty: 10, unrealized_pnl_krw: -1_000_000 });
+    const { result } = renderHook(() => useTaxSimulation([profit, loss], 2_350_000));
+    const recs = result.current.lossHarvestRecommendations;
+    const profitSum = recs
+      .filter((r) => r.kind === "PROFIT")
+      .reduce((s, r) => s + r.realizedKrw, 0);
+    const lossRec = recs.find((r) => r.kind === "LOSS");
+    expect(lossRec).toBeDefined();
+    // 50만 전량 실현에 35만 부족 → 손실 4주(40만) 매도
+    expect(lossRec!.shares).toBe(4);
+    expect(profitSum).toBe(500_000);
+    expect(profitSum).toBeLessThanOrEqual(150_000 + Math.abs(lossRec!.realizedKrw));
+  });
+
+  it("공제 잔여로 이미 전량 무세 실현이 되면 손실 통산 추천은 비어 있다(같은 목록 중복 방지)", () => {
+    const loss = makePos({ ticker: "MSFT", qty: 10, unrealized_pnl_krw: -1_000_000 });
+    const { result } = renderHook(() => useTaxSimulation([profit, loss], 0));
+    expect(result.current.recommendations[0]!.label).toContain("전량");
+    expect(result.current.lossHarvestRecommendations).toEqual([]);
+  });
+
+  it("공제를 넘겨 실현했고 손실 종목이 없으면 추천이 없다", () => {
+    const { result } = renderHook(() => useTaxSimulation([profit], 3_000_000));
+    expect(result.current.recommendations).toEqual([]);
+  });
+
+  it("손실이 미실현 손실 전체를 무조건 예산에 더하지 않는다 — 수익이 없으면 손실 매도도 추천하지 않는다", () => {
+    const loss = makePos({ ticker: "MSFT", qty: 10, unrealized_pnl_krw: -1_000_000 });
+    const { result } = renderHook(() => useTaxSimulation([loss], 3_000_000));
+    expect(result.current.recommendations).toEqual([]);
+    expect(result.current.lossHarvestRecommendations).toEqual([]);
+  });
+
+  it("올해 실현 손실은 공제 잔여를 늘린다", () => {
+    const big = makePos({ ticker: "NVDA", qty: 10, unrealized_pnl_krw: 3_000_000 });
+    const { result } = renderHook(() => useTaxSimulation([big], -500_000));
+    expect(result.current.remainingDeduction).toBe(TAX_DEDUCTION + 500_000);
+    expect(result.current.recommendations[0]!.label).toContain("전량");
+  });
+
+  it("주당 수익이 잔여보다 큰 종목은 건너뛰고 주당 수익이 작은 종목을 추천한다", () => {
+    // 총수익은 작지만 1주 수익 10만원
+    const pricey = makePos({ ticker: "AAA", qty: 1, unrealized_pnl_krw: 100_000 });
+    // 총수익은 크지만 1주 수익 1만원
+    const cheap = makePos({ ticker: "BBB", qty: 100, unrealized_pnl_krw: 1_000_000 });
+    const { result } = renderHook(() => useTaxSimulation([pricey, cheap], 2_450_000));
+    const recs = result.current.recommendations;
+    expect(recs.map((r) => r.pos.ticker)).toEqual(["BBB"]);
+    expect(recs[0]!.shares).toBe(5);
+  });
+});
