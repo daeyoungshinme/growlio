@@ -517,9 +517,19 @@ class TestDriftSummary:
                     return_value=[portfolio],
                 ),
                 patch(
-                    "app.services.rebalancing.drift_summary_service.get_active_alert_thresholds",
+                    "app.services.rebalancing.drift_summary_service.get_active_alerts_by_portfolio",
                     new_callable=AsyncMock,
                     return_value={},
+                ),
+                patch(
+                    "app.services.rebalancing.drift_summary_service.get_last_rebalanced_at",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ),
+                patch(
+                    "app.services.rebalancing.drift_summary_service._market_levels",
+                    new_callable=AsyncMock,
+                    return_value=("GREEN", False),
                 ),
                 patch(
                     "app.services.rebalancing.drift_summary_service.build_portfolio_overview",

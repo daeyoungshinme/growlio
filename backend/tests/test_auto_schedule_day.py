@@ -133,3 +133,32 @@ def test_notify_and_auto_share_rules(alert):
         if is_auto_schedule_day(alert, d) and not notify:
             assert is_krx_trading_day(d), d
             assert not is_krx_trading_day(d - timedelta(days=1)), d  # 휴장 지정일이 다음 거래일로 밀린 경우만
+
+
+# ── upcoming_schedule_date (진단 "다음 예정일", plans/136) ─────────────────────
+
+
+def _mode_alert(mode, **kwargs):
+    alert = _alert(**kwargs)
+    alert.mode = mode
+    return alert
+
+
+def test_upcoming_includes_today_until_fired():
+    from app.services.alerts.calculator import upcoming_schedule_date
+
+    alert = _mode_alert("NOTIFY", day_of_month=19)
+    assert upcoming_schedule_date(alert, date(2026, 11, 19)) == date(2026, 11, 19)
+
+    fired = _mode_alert("NOTIFY", day_of_month=19, last_triggered_at=datetime(2026, 11, 19, 0, 0, tzinfo=UTC))
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("app.services.alerts.calculator.already_fired_today", lambda _a: True)
+        assert upcoming_schedule_date(fired, date(2026, 11, 19)) == date(2026, 12, 19)
+
+
+def test_upcoming_auto_rolls_to_trading_day_but_notify_does_not():
+    from app.services.alerts.calculator import upcoming_schedule_date
+
+    # 2026-12-25 성탄절(금) — AUTO는 다음 거래일 12-28(월), NOTIFY는 지정일 그대로
+    assert upcoming_schedule_date(_mode_alert("AUTO", day_of_month=25), date(2026, 12, 1)) == date(2026, 12, 28)
+    assert upcoming_schedule_date(_mode_alert("NOTIFY", day_of_month=25), date(2026, 12, 1)) == date(2026, 12, 25)

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -95,18 +96,29 @@ def _consume_lots(lots: list[dict[str, Any]], sell_qty: float) -> tuple[float, f
     return realized_gain, sell_notional, deferred_qty
 
 
-def _build_tax_preview(
-    analysis: RebalancingAnalysis, overview: dict
-) -> tuple[float, float, float, list[str], list[TaxImpactItem]]:
+@dataclass(frozen=True)
+class SellCostEstimate:
+    """매도 항목의 실현손익·수수료·해외 양도세 추정(참고용) — 진단 미리보기·세금 게이트·진단 요약 시점 판정 공용."""
+
+    total_gain: float
+    overseas_gain: float
+    overseas_tax: float
+    fee: float
+    sell_notional: float
+    items: list[TaxImpactItem]
+
+
+def estimate_sell_costs(analysis: RebalancingAnalysis, overview: dict) -> SellCostEstimate:
     """diff_krw < 0 항목(CASH·KR_PROPERTY 제외)에 대해 대략적 실현손익/세금/수수료를 추정한다.
 
-    참고용 근사치 — 정확한 세액은 /tax/summary의 연간 집계를 따른다.
+    참고용 근사치 — 정확한 세액은 /tax/summary의 연간 집계를 따른다(올해 이미 실현한 손익·기본공제 사용분 미반영).
     """
     cost_map = _aggregate_position_costs(overview)
 
     total_gain = 0.0
     overseas_gain_sum = 0.0
     total_fee = 0.0
+    total_notional = 0.0
     tax_items: list[TaxImpactItem] = []
 
     # 지수 그룹 행은 수량이 없어 아래 "보유수량 전체 매도" 폴백에 걸린다 — 종목 단위 멤버 행으로 평탄화
@@ -158,6 +170,7 @@ def _build_tax_preview(
         realized_gain, sell_notional, deferred_qty = _consume_lots(lots, sell_qty)
 
         total_gain += realized_gain
+        total_notional += sell_notional
         if is_overseas:
             overseas_gain_sum += realized_gain
             total_fee += sell_notional * _ASSUMED_FEE_RATE_OVERSEAS
@@ -176,11 +189,30 @@ def _build_tax_preview(
             )
         )
 
-    tax_notes: list[str] = []
     overseas_tax = 0.0
     if overseas_gain_sum > 0:
-        estimate = estimate_overseas_transfer_tax(overseas_gain_sum)
-        overseas_tax = estimate["estimated_tax_krw"]
+        overseas_tax = float(estimate_overseas_transfer_tax(overseas_gain_sum)["estimated_tax_krw"])
+    return SellCostEstimate(
+        total_gain=total_gain,
+        overseas_gain=overseas_gain_sum,
+        overseas_tax=overseas_tax,
+        fee=total_fee,
+        sell_notional=total_notional,
+        items=tax_items,
+    )
+
+
+def _build_tax_preview(
+    analysis: RebalancingAnalysis, overview: dict
+) -> tuple[float, float, float, list[str], list[TaxImpactItem]]:
+    """`estimate_sell_costs` + 진단 카드 문구·상위 항목. (실현손익, 해외 양도세, 수수료, 문구, 상위 항목)"""
+    est = estimate_sell_costs(analysis, overview)
+    overseas_gain_sum = est.overseas_gain
+    overseas_tax = est.overseas_tax
+    tax_items = list(est.items)
+
+    tax_notes: list[str] = []
+    if overseas_gain_sum > 0:
         if overseas_tax > 0:
             tax_notes.append(
                 f"해외 매도 실현손익 추정 {round(overseas_gain_sum):,.0f}원, "
@@ -204,7 +236,7 @@ def _build_tax_preview(
         )
 
     tax_items.sort(key=lambda t: abs(t.estimated_realized_gain_krw), reverse=True)
-    return total_gain, overseas_tax, total_fee, tax_notes, tax_items[:_TAX_DETAIL_LIMIT]
+    return est.total_gain, overseas_tax, est.fee, tax_notes, tax_items[:_TAX_DETAIL_LIMIT]
 
 
 def check_composite_signal(

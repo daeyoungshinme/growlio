@@ -76,6 +76,8 @@ class RebalancingAlert(_AlertMixin, Base):
         UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
     )
     threshold_pct: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    # 상대 이탈 기준(목표 비중 대비 %, plans/136) — None이면 절대 %p 기준만. 판정은 filter_drifting_items
+    relative_threshold_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     schedule_type: Mapped[str] = mapped_column(String(12), nullable=False, default="DAILY")
     schedule_day_of_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     schedule_day_of_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -97,6 +99,7 @@ class RebalancingAlert(_AlertMixin, Base):
     # 주문 유형: MARKET | LIMIT
     order_type: Mapped[str] = mapped_column(String(10), nullable=False, default="MARKET")
     # 시장 신호 연동 모드: DISABLED | CAUTIOUS(RED 시 건너뜀) | STRICT(YELLOW|RED 시 건너뜀)
+    # | TACTICAL(같은 포트폴리오 전술 확정 국면이 RISK_OFF면 매수 보류)
     market_condition_mode: Mapped[str] = mapped_column(String(10), nullable=False, default="DISABLED")
     # AUTO 모드 실행 시각 (HH:MM KST, 예: "09:30"), None이면 장 중 최초 5분 tick에 실행
     auto_execution_time: Mapped[str | None] = mapped_column(String(5), nullable=True)

@@ -93,6 +93,7 @@ async def _validate_tactical_gate(db: AsyncSession, body: RebalancingAlertCreate
 
 _ALERT_BODY_FIELDS = (
     "threshold_pct",
+    "relative_threshold_pct",
     "schedule_type",
     "schedule_day_of_week",
     "schedule_day_of_month",
