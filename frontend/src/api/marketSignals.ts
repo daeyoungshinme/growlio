@@ -11,6 +11,8 @@ export interface VixSignal {
   level: VixLevel;
   date: string;
   sub_score: number;
+  /** 약 1개월(20거래일) 전 값 — 방향 표시용(점수 무관) */
+  prev_value?: number | null;
 }
 
 /** 장단기금리차(T10Y2Y)+금리인하기대(DGS2-FEDFUNDS) 병합 신호 — 둘 다 "Fed 정책금리 경로 기대"를
@@ -34,6 +36,8 @@ export interface HighYieldSpreadSignal {
   level: HighYieldSpreadLevel;
   date: string;
   sub_score: number;
+  /** 약 1개월(20거래일) 전 값 — 방향 표시용(점수 무관) */
+  prev_value?: number | null;
 }
 
 export interface DollarIndexSignal {
@@ -109,3 +113,22 @@ export interface MarketSignalResponse {
 }
 
 export const fetchMarketSignal = () => apiGet<MarketSignalResponse>("/market-signals");
+
+export type MarketOutlookVerdict = "FAVORABLE" | "STEADY" | "CAUTION" | "DEFENSIVE" | "UNKNOWN";
+export type IndexTrend = "UP" | "NEUTRAL" | "DOWN" | "UNKNOWN";
+
+/** 매크로 위험 등급 × 3대 지수 추세 종합 판단 — 표시 전용(자동 실행 게이트·전술 국면은 쓰지 않음, plans/137 B) */
+export interface MarketOutlook {
+  verdict: MarketOutlookVerdict;
+  label: string;
+  action: string;
+  macro_level: MarketRiskLevel | null;
+  trend_breadth: "UP" | "MIXED" | "DOWN" | null;
+  trend_up_count: number;
+  trend_known_count: number;
+  trends: Partial<Record<"QQQ" | "SPY" | "DIA", IndexTrend>>;
+  deepest_drawdown_pct: number | null;
+  reasons: string[];
+}
+
+export const fetchMarketOutlook = () => apiGet<MarketOutlook>("/market-signals/outlook");

@@ -63,7 +63,6 @@ export interface DiagnosisContext {
   risk_available: boolean;
   annualized_volatility_pct: number | null;
   beta_sp500: number | null;
-  diversification_score: number | null;
   risk_note: string | null;
   composite_signal_triggered: boolean;
   composite_signal_reason: string | null;

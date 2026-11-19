@@ -194,10 +194,12 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 **시장 신호 (`market_signal/`)**
 - `market_signal_service.py` — 8종 지표 복합 점수. `get_confirmed_composite_level()`(hysteresis 2회)은 AUTO 게이트·알림 전용, raw는 배너용. 지표 조회는 `market_signal_indicators.py`, 점수는 `market_signal_scoring.py` — 외부는 `market_signal_service`에서 import. **지표끼리 내부 호출하므로 patch는 `market_signal_indicators.*` 경로**
 - `economic_indicator_service.py`(CPI)
+- `market_outlook.py` — 즉시 매크로 등급 × QQQ·SPY·DIA 추세 폭 종합 판단(`GET /market-signals/outlook`). **표시 전용** — 자동 실행 게이트·전술 국면은 쓰지 않는다
 - `technical_indicators.py`(순수, pandas는 함수 내부 import — 기동 시 로드 방지) · `technical_signal_service.py`(QQQ/SPY/DIA 6h 캐시. **정규장이 끝난 거래일 종가만** — `fetch_close_history`가 장중 일봉을 버리고, 캐시 키에 `last_completed_us_session`이 들어간다)
 
 **기타**
-- `factor_service.py` · `insight_service.py` · `risk_service.py` · `portfolio_optimizer.py`(효율적 프론티어)
+- `factor_service.py` · `insight_service.py` · `portfolio_optimizer.py`(효율적 프론티어)
+- `risk_service.py` — 진단 위험 지표. 종가를 **날짜로** 맞추고(국내·미국 휴장일 차이) 미국 상장은 `USDKRW=X`로 원화 환산, 증권 계좌 예수금은 수익률 0 자산, 베타는 주간 수익률. `fetch_yf_daily_returns`(날짜 없는 list)를 다시 쓰면 순번 정렬 버그가 돌아온다
 - `estimation.py` — Ledoit-Wolf 공분산·James-Stein 기대수익률 축소(고정 노이즈분산 사용 — 표본분산 재사용 시 축소 상쇄 버그). `goal/goal_portfolio_optimizer`·`portfolio_optimizer` 공용이라 평면
 - `action_items_service.py` — 홈 "지금 할 일" 최대 5건. 이탈 포트폴리오 2개↑면 `REBALANCE_GROUP_ID`("rebalance:all", 프론트 `api/dashboard.ts`와 같은 값) 1행. 소스별 실패 격리, 결과 캐시 없음(세금 소스만 2분 캐시 — 세금 입력이 바뀌는 새 경로는 `invalidate_tax_action_items_cache`도 부를 것)
 - `challenge_service.py` — 스트릭 단위는 "월 순입금>0"(목표액 수정해도 과거 스트릭 불변)

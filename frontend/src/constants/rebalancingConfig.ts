@@ -132,3 +132,10 @@ export const PLAN_LEG_STATUS_LABEL: Record<string, string> = {
   EXPIRED: "만료됨",
   FAILED: "실패",
 };
+
+/** 진단 탭 카드 앵커 — 요약 칩(`DiagnosisSummaryStrip`)이 스크롤해 가는 곳(plans/137 C3) */
+export const DIAGNOSIS_ANCHORS = {
+  drift: "diagnosis-drift",
+  market: "diagnosis-market",
+  risk: "diagnosis-risk",
+} as const;

@@ -93,6 +93,7 @@ export const QUERY_KEYS = {
   /** 유저 단위(전체 보유) 리스크 지표 — 포트폴리오별 조회는 없다 */
   portfolioRisk: ["portfolio-risk"] as const,
   marketSignal: ["market-signal"] as const,
+  marketOutlook: ["market-outlook"] as const,
   rebalancingStrategy: (portfolioId: string) => ["rebalancing-strategy", portfolioId] as const,
   rebalancingStrategyBase: ["rebalancing-strategy"] as const,
   driftSummary: ["drift-summary"] as const,

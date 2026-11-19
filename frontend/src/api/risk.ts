@@ -1,19 +1,36 @@
 import { apiGet } from "./client";
 
 // ---------------------------------------------------------------------------
-// 위험 지표 (기존)
+// 위험 지표 — 원화 기준 최근 1년, 예수금 포함(plans/137 A)
 // ---------------------------------------------------------------------------
 
+export interface RiskIndexExposure {
+  key: string;
+  label: string;
+  /** 주식 평가액 대비 % */
+  pct_of_stock: number;
+}
+
 export interface PortfolioRiskMetrics {
-  var_95_pct: number;
-  var_99_pct: number;
-  annualized_volatility_pct: number;
-  beta_sp500: number;
-  diversification_score: number;
-  top_holding_weight_pct: number;
-  position_count: number;
   data_available: boolean;
-  note: string;
+  total_value_krw: number;
+  cash_weight_pct: number;
+  /** 가격 이력이 있어 계산에 반영된 종목 평가액 비중(%) */
+  coverage_pct: number;
+  var_95_pct: number;
+  var_95_krw: number;
+  annualized_volatility_pct: number;
+  max_drawdown_pct: number;
+  /** 주간 수익률 기준, 표본 부족이면 null */
+  beta_sp500: number | null;
+  /** S&P500(원화) 대비 연간 변동성 배율 — 1.0이면 시장과 같음 */
+  vol_ratio_vs_sp500: number | null;
+  sp500_10pct_drop_krw: number | null;
+  top_holding_weight_pct: number;
+  top_holding_name: string | null;
+  top_index_exposures: RiskIndexExposure[];
+  position_count: number;
+  note: string | null;
 }
 
 // ---------------------------------------------------------------------------

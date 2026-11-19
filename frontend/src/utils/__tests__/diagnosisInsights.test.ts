@@ -10,7 +10,6 @@ function makeContext(overrides: Partial<DiagnosisContext> = {}): DiagnosisContex
     risk_available: true,
     annualized_volatility_pct: 10,
     beta_sp500: 1.0,
-    diversification_score: 80,
     risk_note: null,
     composite_signal_triggered: false,
     composite_signal_reason: null,

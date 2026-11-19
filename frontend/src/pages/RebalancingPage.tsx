@@ -9,6 +9,7 @@ import Tabs from "@/components/common/Tabs";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { DIAGNOSIS_ANCHORS } from "@/constants/rebalancingConfig";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useRebalancingUrlState } from "@/hooks/useRebalancingUrlState";
 import { useSelectedPortfolio } from "@/hooks/useSelectedPortfolio";
@@ -17,6 +18,7 @@ import {
   compositeSignalStatusQuery,
   driftSummaryQuery,
   goalRecommendationOverallQuery,
+  marketOutlookQuery,
   marketSignalQuery,
   portfoliosQuery,
   settingsQuery,
@@ -25,6 +27,7 @@ import {
 const RebalancingStatusCard = lazy(() => import("../components/rebalancing/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
 const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSignalBanner"));
+const DiagnosisSummaryStrip = lazy(() => import("../components/rebalancing/DiagnosisSummaryStrip"));
 const InflationIndicatorList = lazy(
   () => import("../components/rebalancing/InflationIndicatorList"),
 );
@@ -128,6 +131,12 @@ export default function RebalancingPage() {
 
   const { data: signal, isError: signalError } = useQuery(marketSignalQuery);
 
+  // 시장 종합 판단(매크로 × 3대 지수 추세) — 배너 헤더·요약 칩 공유, 표시 전용(plans/137 B)
+  const { data: marketOutlook } = useQuery({
+    ...marketOutlookQuery,
+    enabled: localTab === "진단",
+  });
+
   const { data: riskMetrics } = useQuery({
     queryKey: QUERY_KEYS.portfolioRisk,
     queryFn: () => fetchPortfolioRisk(),
@@ -168,7 +177,7 @@ export default function RebalancingPage() {
   // RebalancingStatusCard도 동일 queryKey로 driftSummary를 조회한다 — 여기서 다른 쿼리들과 같은
   // 렌더 틱에 미리 발화해두면(React Query 캐시 dedup) 콜드 캐시에서도 스태거링 없이 동시에 조회되어
   // 콜드 캐시 경쟁 창을 줄인다.
-  useQuery({
+  const { data: driftSummaries } = useQuery({
     ...driftSummaryQuery,
     enabled: localTab === "진단",
   });
@@ -205,25 +214,37 @@ export default function RebalancingPage() {
             <TabIntro>
               목표 비중 이탈·시장 상황·내 포트폴리오 위험을 점검해요. 목표 비중은 바꾸지 않아요.
             </TabIntro>
-            <ErrorBoundary variant="section">
-              <Suspense fallback={<SkeletonCard />}>
-                <RebalancingStatusCard
-                  onPortfolioSelect={handlePortfolioSelectFromDiagnosis}
-                  emptyStateCta={openNewPortfolioEditor}
-                />
-              </Suspense>
-            </ErrorBoundary>
-            {signal && (
+            <Suspense fallback={null}>
+              <DiagnosisSummaryStrip
+                driftSummaries={driftSummaries}
+                outlook={marketOutlook}
+                risk={riskMetrics}
+              />
+            </Suspense>
+            <div id={DIAGNOSIS_ANCHORS.drift} className="scroll-mt-4">
               <ErrorBoundary variant="section">
-                <Suspense fallback={<SkeletonCard rows={1} />}>
-                  <MarketSignalBanner
-                    signal={signal}
-                    inflation={inflationSummary}
-                    technicals={tacticalMarket?.technicals}
-                    onOpenTactical={() => handleGoalModeChange("전술")}
+                <Suspense fallback={<SkeletonCard />}>
+                  <RebalancingStatusCard
+                    onPortfolioSelect={handlePortfolioSelectFromDiagnosis}
+                    emptyStateCta={openNewPortfolioEditor}
                   />
                 </Suspense>
               </ErrorBoundary>
+            </div>
+            {signal && (
+              <div id={DIAGNOSIS_ANCHORS.market} className="scroll-mt-4">
+                <ErrorBoundary variant="section">
+                  <Suspense fallback={<SkeletonCard rows={1} />}>
+                    <MarketSignalBanner
+                      signal={signal}
+                      inflation={inflationSummary}
+                      technicals={tacticalMarket?.technicals}
+                      outlook={marketOutlook}
+                      onOpenTactical={() => handleGoalModeChange("전술")}
+                    />
+                  </Suspense>
+                </ErrorBoundary>
+              </div>
             )}
             {/* 물가 지표는 별도 조회라 시장신호 조회가 실패해도 단독 카드로 보여준다(plans/39 N7) */}
             {!signal && signalError && inflationSummary && inflationSummary.length > 0 && (

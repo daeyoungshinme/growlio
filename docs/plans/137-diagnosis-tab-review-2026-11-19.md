@@ -132,3 +132,21 @@
 - 프론트: `D:\project\growlio\frontend`(대문자 드라이브)에서 `npm run lint -- --max-warnings 0 && npm run format:check && npm run typecheck && npm run test`.
 - 실화면: `bash dev.sh --keep-port` → `/rebalancing?rtab=진단`(390px 뷰포트)에서 배너 헤더 종합 판단, 3지수 칩·50일선, 위험 카드 4행·원화 금액·쏠림 딥링크, 요약 칩 스크롤.
 - 실제 계정에서 A 전후 값(VaR·변동성·베타)을 비교해 이 계획서 하단 "구현 결과"에 기록한다.
+
+---
+
+## 구현 결과 (2026-11-19)
+
+커밋: 계획 `6775b1c7` · A `eaacaee4` · B(백엔드) `c171450b` · B(프론트)·C는 이 문서와 같은 커밋.
+
+계획과 달라진 점:
+- **A3 예수금**: 새 쿼리 대신 `latest_snapshot_rows(with_positions=True)` 한 번으로 종목 평가액과 예수금(증권 계좌 `amount_krw` − 종목 합)을 같이 뽑는다. 예수금 티커 같은 합성 항목(`is_non_tradable`)은 종목에서 뺀다 — 예전엔 가격이 없어 가중치만 차지했다.
+- **A5 집중도 알림**: 계획은 "지수 노출 60% 초과"를 진단·복합신호 사유로 쓰는 것이었지만 **넣지 않았다**. S&P500 한 지수에 60% 넣는 건 대개 의도된 인덱스 투자라, 복합신호 알림이 거의 모두에게 울린다. 분산도 사유만 지우고 단일 종목 40%·변동성 20% 기준은 그대로 뒀다. 쏠림은 위험 카드와 요약 칩에만 표시된다.
+- **A7 캐시**: 위험 캐시는 프로세스 메모리(`cache_store`)라 배포 재시작 때 비워진다 — `risk_key` 버전은 올리지 않았다. `portfolio-risk` 쿼리는 persist 대상이 아니라 `PERSIST_CACHE_BUSTER`도 그대로다.
+- **B5**: 1개월 전 값은 VIX·하이일드 스프레드(일간 시리즈)만 붙였다. 월간 지표(인플레이션·고용)는 방향 대신 "n월 기준"을 붙였다.
+- **C3 앵커**: 요약 칩 앵커는 lazy 컴포넌트 밖에서도 쓰도록 `constants/rebalancingConfig.DIAGNOSIS_ANCHORS`에 뒀다. 위험 카드는 접혀 있어도 헤드라인(나쁜 날 손실액·쏠림)이 보이므로 칩은 스크롤만 하고 펼치지 않는다.
+
+검증:
+- 백엔드: `ruff check`·`ruff format`·`mypy app/` 통과, `pytest` 4015 passed(이후 B 테스트 22개 추가).
+- 프론트: `lint --max-warnings 0`·`format:check`·`typecheck`·`vitest` 통과(2165개 중 실패 0 — 관련 파일 재실행 포함).
+- **실화면·실계정 수치 비교는 하지 않았다** — 배포 후 진단 탭에서 위험 카드 값(특히 예수금 포함 후 VaR·변동성)과 종합 판단 문구를 확인해야 한다.

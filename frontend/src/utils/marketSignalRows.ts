@@ -192,6 +192,24 @@ const EMPLOYMENT_HINT: Record<EmploymentLevel, string> = {
 
 /** 신호 8개를 고정 순서로 표시용 데이터로 변환한다. tier는 백엔드 market_signal_service.py의
  * Tier A(핵심 3개: VIX/하이일드/고용)/B+C(매크로 5개) 분류를 그대로 따른다. */
+/** 약 1개월 전 대비 방향 — " · 1개월 전 22.1↓". 이전 값이 없으면 빈 문자열(점수와 무관한 표시용, plans/137 B5) */
+export function monthAgoText(
+  value: number,
+  prev: number | null | undefined,
+  digits: number,
+  unit = "",
+): string {
+  if (prev == null) return "";
+  const arrow = value > prev ? "↑" : value < prev ? "↓" : "→";
+  return ` · 1개월 전 ${prev.toFixed(digits)}${unit}${arrow}`;
+}
+
+/** 월간 지표 기준월 — FRED 날짜("2026-09-01") → " · 9월 기준". 파싱 불가면 빈 문자열 */
+export function monthBasisText(date: string | null | undefined): string {
+  const m = date ? /^\d{4}-(\d{2})/.exec(date) : null;
+  return m?.[1] ? ` · ${Number(m[1])}월 기준` : "";
+}
+
 export function buildSignalRows(signals: MarketSignalResponse["signals"]): SignalRowDisplay[] {
   const rows: SignalRowDisplay[] = [];
 
@@ -202,7 +220,7 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
     content: signals.vix
       ? {
           dotColor: dotColorForSubScore(signals.vix.sub_score),
-          valueText: `${signals.vix.value.toFixed(1)} · ${VIX_LABEL[signals.vix.level]}`,
+          valueText: `${signals.vix.value.toFixed(1)} · ${VIX_LABEL[signals.vix.level]}${monthAgoText(signals.vix.value, signals.vix.prev_value, 1)}`,
           hintText: VIX_HINT[signals.vix.level],
           subScore: signals.vix.sub_score,
         }
@@ -244,7 +262,7 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
     content: signals.high_yield_spread
       ? {
           dotColor: dotColorForSubScore(signals.high_yield_spread.sub_score),
-          valueText: `${signals.high_yield_spread.value.toFixed(2)}% · ${HIGH_YIELD_LABEL[signals.high_yield_spread.level]}`,
+          valueText: `${signals.high_yield_spread.value.toFixed(2)}% · ${HIGH_YIELD_LABEL[signals.high_yield_spread.level]}${monthAgoText(signals.high_yield_spread.value, signals.high_yield_spread.prev_value, 2, "%")}`,
           hintText: HIGH_YIELD_HINT[signals.high_yield_spread.level],
           subScore: signals.high_yield_spread.sub_score,
         }
@@ -312,7 +330,7 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
           if (s.pce_level) parts.push(INFLATION_LABEL[s.pce_level]);
           return {
             dotColor: dotColorForSubScore(s.sub_score),
-            valueText: parts.join(" · "),
+            valueText: parts.join(" · ") + monthBasisText(s.date),
             hintText: pickWorstHint(cpiRank, cpiHint, pceRank, pceHint),
             subScore: s.sub_score,
           };
@@ -327,7 +345,7 @@ export function buildSignalRows(signals: MarketSignalResponse["signals"]): Signa
     content: signals.employment
       ? {
           dotColor: dotColorForSubScore(signals.employment.sub_score),
-          valueText: `실업률 ${signals.employment.value.toFixed(1)}% · ${EMPLOYMENT_LABEL[signals.employment.level]}`,
+          valueText: `실업률 ${signals.employment.value.toFixed(1)}% · ${EMPLOYMENT_LABEL[signals.employment.level]}${monthBasisText(signals.employment.date)}`,
           hintText: EMPLOYMENT_HINT[signals.employment.level],
           subScore: signals.employment.sub_score,
         }
