@@ -240,12 +240,10 @@ class TestManualUsdDoubleCountFix:
         assert cands[bad.id].check == "OK"
         assert cands[ok.id].check == "ALREADY_OK?"
 
-        changed = await fix.apply_fix(pg, {bad.id, uuid.uuid4()})
+        bad_id, ok_id = bad.id, ok.id  # expire_all 뒤 속성 접근은 동기 lazy load라 async 세션에서 실패한다
+        changed = await fix.apply_fix(pg, {bad_id, uuid.uuid4()})
         assert changed == 1
         pg.expire_all()
-        assert await pg.scalar(select(AssetSnapshot.amount_krw).where(AssetSnapshot.id == bad.id)) == Decimal(
-            "1000000.00"
-        )
-        assert await pg.scalar(select(AssetSnapshot.amount_krw).where(AssetSnapshot.id == ok.id)) == Decimal(
-            "1000000.00"
-        )
+        amount = select(AssetSnapshot.amount_krw).where
+        assert await pg.scalar(amount(AssetSnapshot.id == bad_id)) == Decimal("1000000.00")
+        assert await pg.scalar(amount(AssetSnapshot.id == ok_id)) == Decimal("1000000.00")
