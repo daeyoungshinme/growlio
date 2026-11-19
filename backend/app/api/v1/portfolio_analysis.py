@@ -12,7 +12,7 @@ from app.api.v1._account_deps import get_owned_account
 from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
-from app.schemas.portfolio import IndexExposureResponse
+from app.schemas.portfolio import IndexExposureResponse, PortfolioRiskMetrics
 from app.services.etf.index_exposure_service import get_index_exposure
 from app.services.portfolio.portfolio_history_service import get_allocation_history
 from app.services.portfolio.portfolio_service import build_portfolio_overview
@@ -78,14 +78,14 @@ async def portfolio_index_exposure(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/risk")
+@router.get("/risk", response_model=PortfolioRiskMetrics)
 @limiter.limit("5/minute")
 async def portfolio_risk(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """전체 계좌 통합 위험 지표 — VaR, 베타, 변동성, 분산도.
+    """전체 계좌 통합 위험 지표 — 원화 기준 VaR·최대 낙폭·S&P500 대비 변동성·베타·지수 쏠림.
 
     예전 `portfolio_id` 파라미터는 캐시 키에만 쓰이고 계산엔 반영되지 않아(임의 문자열로 캐시 키 무한 생성)
     제거했다(계획 57 C7). 쓰던 호출부도 없었다.

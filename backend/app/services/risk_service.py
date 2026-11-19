@@ -1,7 +1,13 @@
-"""포트폴리오 위험 분석 서비스.
+"""포트폴리오 위험 분석 서비스 (plans/137 A).
 
-VaR, 베타, 연율화 변동성, 분산도 점수를 계산한다.
-yfinance 1년 일별 수익률 데이터를 기반으로 하며 1시간 캐시를 사용한다.
+원화 기준 1년 일별 수익률로 하락 위험(VaR·최대 낙폭)·시장 대비 변동성·베타를 계산하고,
+지수 기준 쏠림(`etf/index_exposure_service`)을 함께 돌려준다. 결과는 1시간 캐시.
+
+함정:
+- 종목별 종가는 **날짜로 맞춘다** — 한국·미국 휴장일이 달라 순번으로 짝지으면 다른 날 수익률이 섞인다.
+- 미국 상장 종목·S&P500은 `USDKRW=X`를 곱해 원화로 본다(원화 투자자가 실제로 겪는 변동).
+- 증권 계좌 예수금은 수익률 0 자산으로 넣는다 — 빼면 VaR·변동성이 과대.
+- 베타는 주간 수익률 — 한국·미국 장 시간차 때문에 같은 날 일간 상관은 과소 추정된다.
 """
 
 from __future__ import annotations
@@ -9,99 +15,265 @@ from __future__ import annotations
 import asyncio
 import math
 import uuid
+from datetime import timedelta
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import is_non_tradable
 from app.core.database import release_read_connection
-from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
+from app.services.accounts._snapshot_queries import latest_snapshot_rows
+from app.services.etf.index_exposure_service import get_index_exposure
+from app.services.market_data.market_data_fetcher import fetch_yf_close_series
 from app.services.market_data.yahoo_price import run_yf_bounded
 from app.services.market_data.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.services.portfolio.position_aggregator import query_latest_position_map
+from app.services.portfolio.portfolio_service import STOCK_TYPES
 from app.utils.cache_keys import TTL_RISK_ANALYSIS, CacheStoreType, get_cached_json, risk_key, set_cached_json
 from app.utils.inproc_lock import single_flight_fetch
+from app.utils.kst import today_kst
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 logger = structlog.get_logger()
-_SP500_SYMBOL = "^GSPC"
-_MIN_RETURN_POINTS_FOR_CORRELATION = 20  # 상관계수 계산에 필요한 최소 수익률 데이터 포인트
+
+SP500_SYMBOL = "^GSPC"
+USDKRW_SYMBOL = "USDKRW=X"
+# 달러로 거래되는 시장 — 원화 환산 대상(토스 해외 포지션 market은 "US")
+_USD_MARKETS = frozenset({"NYSE", "NASDAQ", "AMEX", "US"})
+
+_LOOKBACK_ROWS = 252  # 최근 1년 거래일
+_FFILL_LIMIT = 3  # 휴장일 메우기 상한(연휴 포함)
+_MIN_SYMBOL_COVERAGE = 0.6  # 이보다 짧은 이력의 종목은 계산에서 뺀다
+_MIN_RETURN_POINTS = 20  # 이보다 적으면 data_available=False
+_MIN_WEEKLY_POINTS = 20  # 주간 베타 최소 표본
+_TOP_INDEX_COUNT = 3
+_SP500_DROP_SCENARIO = 0.10
 
 
-def _sync_fetch_risk_data(
-    symbols: list[str],
-    extra_symbols: list[str],
-) -> dict[str, list[float]]:
-    """1년치 일별 수익률(소수, e.g. 0.01=1%) 반환. 동기 함수."""
-    return fetch_yf_daily_returns(symbols, extra_symbols=extra_symbols)
+# ── 순수 계산 ──────────────────────────────────────────────────
 
 
 def _calc_var(returns: list[float], confidence: float) -> float:
-    """Historical VaR (%)."""
+    """역사적 VaR(%) — 손실 쪽 분위수의 절댓값."""
     if not returns:
         return 0.0
     sorted_r = sorted(returns)
     idx = max(0, int((1 - confidence) * len(sorted_r)) - 1)
-    return abs(sorted_r[idx]) * 100
+    return abs(min(sorted_r[idx], 0.0)) * 100
 
 
-def _calc_beta(portfolio_rets: list[float], bench_rets: list[float]) -> float:
+def _calc_max_drawdown(returns: list[float]) -> float:
+    """누적 수익 곡선의 고점 대비 최대 하락(%) — 양수로 돌려준다."""
+    peak = 1.0
+    level = 1.0
+    worst = 0.0
+    for r in returns:
+        level *= 1 + r
+        peak = max(peak, level)
+        worst = min(worst, level / peak - 1)
+    return abs(worst) * 100
+
+
+def _calc_beta(portfolio_rets: list[float], bench_rets: list[float]) -> float | None:
+    """같은 길이로 맞춘 두 수익률 시계열의 베타. 표본이 부족하거나 벤치마크 분산이 0이면 None."""
     n = min(len(portfolio_rets), len(bench_rets))
-    if n < 10:
-        return 1.0
-    # 시계열은 오래된 날짜부터 — 최근 구간끼리 짝짓는다(plans/116 A2)
+    if n < _MIN_WEEKLY_POINTS:
+        return None
     p = portfolio_rets[-n:]
     b = bench_rets[-n:]
     mean_p = sum(p) / n
     mean_b = sum(b) / n
     cov = sum((p[i] - mean_p) * (b[i] - mean_b) for i in range(n)) / (n - 1)
-    var_b = sum((b[i] - mean_b) ** 2 for i in range(n)) / (n - 1)
-    return cov / var_b if var_b > 0 else 1.0
+    var_b = sum((x - mean_b) ** 2 for x in b) / (n - 1)
+    return cov / var_b if var_b > 0 else None
 
 
-def _calc_diversification_score(
-    symbols: list[str],
-    weights: list[float],
-    returns_map: dict[str, list[float]],
-) -> int:
-    """0-100 분산도 점수 (낮은 상관계수 = 높은 점수)."""
-    if len(symbols) < 2:
-        return 20  # 단일 종목 = 낮은 분산
+def _annualized_vol_pct(returns: list[float]) -> float:
+    n = len(returns)
+    if n < 2:
+        return 0.0
+    mean = sum(returns) / n
+    std = math.sqrt(sum((r - mean) ** 2 for r in returns) / (n - 1))
+    return std * math.sqrt(252) * 100
 
-    # 가중 평균 쌍별 상관계수 계산
-    n = len(symbols)
-    total_weight = sum(weights)
-    if total_weight <= 0:
-        return 50
 
-    corr_sum = 0.0
-    pair_count = 0
-    for i in range(n):
-        for j in range(i + 1, n):
-            s1, s2 = symbols[i], symbols[j]
-            r1 = returns_map.get(s1, [])
-            r2 = returns_map.get(s2, [])
-            k = min(len(r1), len(r2))
-            if k < _MIN_RETURN_POINTS_FOR_CORRELATION:
+def _normalize_index(series: pd.Series) -> pd.Series:
+    """Yahoo(시간대 포함)·pykrx(날짜) 인덱스를 시간대 없는 자정 날짜로 맞춘다."""
+    import pandas as pd
+
+    idx = pd.DatetimeIndex(pd.to_datetime(series.index))
+    if idx.tz is not None:
+        idx = idx.tz_localize(None)
+    out = series.copy()
+    out.index = idx.normalize()
+    return out[~out.index.duplicated(keep="last")]
+
+
+def _to_krw(series: pd.Series, fx: pd.Series | None) -> pd.Series | None:
+    """달러 종가 × 같은 날(없으면 직전) 환율. 환율이 없으면 None — 원화 기준을 지킬 수 없다."""
+    if fx is None or fx.empty:
+        return None
+    rate = fx.reindex(fx.index.union(series.index)).ffill().reindex(series.index)
+    return (series * rate).dropna()
+
+
+def build_krw_close_frame(
+    closes: dict[str, pd.Series], usd_symbols: set[str], symbols: list[str]
+) -> tuple[pd.DataFrame, list[str]]:
+    """종목별 종가 → 원화 종가 DataFrame(날짜 정렬·휴장일 메움·최근 1년).
+
+    Returns: (frame, 환율이 없어 원화로 못 바꾼 달러 종목)
+    """
+    import pandas as pd
+
+    fx_raw = closes.get(USDKRW_SYMBOL)
+    fx = _normalize_index(fx_raw) if fx_raw is not None else None
+    columns: dict[str, pd.Series] = {}
+    no_fx: list[str] = []
+    for sym in symbols:
+        raw = closes.get(sym)
+        if raw is None or raw.empty:
+            continue
+        s = _normalize_index(raw)
+        if sym in usd_symbols:
+            converted = _to_krw(s, fx)
+            if converted is None:
+                no_fx.append(sym)
                 continue
-            r1 = r1[-k:]  # 최근 구간끼리 짝짓는다(plans/116 A2)
-            r2 = r2[-k:]
-            mean1 = sum(r1) / k
-            mean2 = sum(r2) / k
-            cov = sum((r1[i2] - mean1) * (r2[i2] - mean2) for i2 in range(k)) / (k - 1)
-            std1 = math.sqrt(sum((r - mean1) ** 2 for r in r1) / (k - 1)) if k > 1 else 0
-            std2 = math.sqrt(sum((r - mean2) ** 2 for r in r2) / (k - 1)) if k > 1 else 0
-            if std1 > 0 and std2 > 0:
-                corr = cov / (std1 * std2)
-                w = (weights[i] + weights[j]) / (2 * total_weight)
-                corr_sum += corr * w
-                pair_count += 1
+            s = converted
+        columns[sym] = s
+    if not columns:
+        return pd.DataFrame(), no_fx
+    frame = pd.concat(columns, axis=1).sort_index()
+    frame = frame.ffill(limit=_FFILL_LIMIT)
+    return frame.tail(_LOOKBACK_ROWS + 1), no_fx
 
-    if pair_count == 0:
-        return 50
 
-    avg_corr = corr_sum / pair_count  # -1 ~ 1
-    # corr -1 → 100점, corr +1 → 0점
-    score = int((1 - avg_corr) / 2 * 100)
-    return max(0, min(100, score))
+def _weekly_returns(daily: pd.Series) -> list[float]:
+    level = (1 + daily).cumprod()
+    # resample은 pandas 내부 numpy 경고를 내서(테스트 경고 게이트) 주 단위 groupby로 같은 값을 만든다
+    weekly = level.groupby(level.index.to_period("W-FRI")).last().pct_change().dropna()
+    return [float(x) for x in weekly if math.isfinite(x)]
+
+
+def compute_risk_result(
+    holdings: list[dict[str, Any]],
+    cash_krw: float,
+    closes: dict[str, pd.Series],
+) -> dict[str, Any]:
+    """원화 기준 위험 지표(순수 CPU 계산, 스레드에서 실행).
+
+    holdings: [{"symbol": yf 심볼, "value_krw": 평가액, "usd": 달러 거래 여부}]
+    """
+    stock_value = sum(h["value_krw"] for h in holdings)
+    usd_symbols = {h["symbol"] for h in holdings if h["usd"]} | {SP500_SYMBOL}
+    symbols = [h["symbol"] for h in holdings]
+    frame, no_fx = build_krw_close_frame(closes, usd_symbols, [*symbols, SP500_SYMBOL])
+    if no_fx:
+        logger.warning("risk_fx_missing", symbols=no_fx[:5])
+
+    returns = frame.pct_change().iloc[1:] if not frame.empty else frame
+    covered = {c for c in returns.columns if returns[c].notna().mean() >= _MIN_SYMBOL_COVERAGE}
+    included = [h for h in holdings if h["symbol"] in covered]
+    included_value = sum(h["value_krw"] for h in included)
+    # 같은 심볼이 여러 시장 키로 들어와도 가중치는 합산
+    weight_by_symbol: dict[str, float] = {}
+    total_for_weights = included_value + max(cash_krw, 0.0)
+    for h in included:
+        weight_by_symbol[h["symbol"]] = weight_by_symbol.get(h["symbol"], 0.0) + h["value_krw"] / total_for_weights
+
+    port: list[float] = []
+    daily_port = None
+    if weight_by_symbol and len(returns) >= _MIN_RETURN_POINTS:
+        cols = list(weight_by_symbol)
+        # 상장 전 구간 등 남은 결측은 그 종목을 현금처럼(수익률 0) 본다 — 커버리지 60% 이상만 들어온다
+        daily_port = returns[cols].fillna(0.0).mul([weight_by_symbol[c] for c in cols], axis=1).sum(axis=1)
+        port = [float(x) for x in daily_port if math.isfinite(x)]
+
+    data_available = len(port) >= _MIN_RETURN_POINTS
+    total_value = stock_value + max(cash_krw, 0.0)
+    vol = _annualized_vol_pct(port)
+    var_95 = _calc_var(port, 0.95)
+
+    beta: float | None = None
+    vol_ratio: float | None = None
+    if daily_port is not None and SP500_SYMBOL in returns.columns:
+        bench = returns[SP500_SYMBOL].dropna()
+        joined_idx = daily_port.index.intersection(bench.index)
+        if len(joined_idx) >= _MIN_RETURN_POINTS:
+            beta = _calc_beta(_weekly_returns(daily_port.loc[joined_idx]), _weekly_returns(bench.loc[joined_idx]))
+            bench_vol = _annualized_vol_pct([float(x) for x in bench.loc[joined_idx]])
+            vol_ratio = round(vol / bench_vol, 2) if bench_vol > 0 else None
+
+    coverage_pct = included_value / stock_value * 100 if stock_value > 0 else 0.0
+    return {
+        "data_available": data_available,
+        "total_value_krw": round(total_value, 0),
+        "cash_weight_pct": round(max(cash_krw, 0.0) / total_value * 100, 2) if total_value > 0 else 0.0,
+        "coverage_pct": round(coverage_pct, 1),
+        "var_95_pct": round(var_95, 2),
+        "var_95_krw": round(var_95 / 100 * total_for_weights, 0),
+        "annualized_volatility_pct": round(vol, 2),
+        "max_drawdown_pct": round(_calc_max_drawdown(port), 2),
+        "beta_sp500": round(beta, 3) if beta is not None else None,
+        "vol_ratio_vs_sp500": vol_ratio if data_available else None,
+        "sp500_10pct_drop_krw": (
+            round(beta * _SP500_DROP_SCENARIO * stock_value, 0) if beta is not None and data_available else None
+        ),
+        "note": "최근 1년 원화 기준 추정값(예수금 포함)" if data_available else "가격 데이터가 부족해요",
+    }
+
+
+def _concentration(pos_map: dict[str, dict], exposure: Any) -> dict[str, Any]:
+    """종목(티커) 최대 비중과 지수 기준 상위 노출 — 주식 평가액 대비 %."""
+    stock_value = sum(p["value_krw"] for p in pos_map.values())
+    top = max(pos_map.values(), key=lambda p: p["value_krw"], default=None)
+    top_indexes: list[dict[str, Any]] = []
+    if exposure is not None:
+        top_indexes = [
+            {"key": g.key, "label": g.label, "pct_of_stock": g.pct_of_stock}
+            for g in sorted((g for g in exposure.groups if g.kind == "INDEX"), key=lambda g: -g.value_krw)[
+                :_TOP_INDEX_COUNT
+            ]
+        ]
+    return {
+        "top_holding_weight_pct": round(top["value_krw"] / stock_value * 100, 2) if top and stock_value > 0 else 0.0,
+        "top_holding_name": (top.get("name") or top["ticker"]) if top else None,
+        "top_index_exposures": top_indexes,
+    }
+
+
+# ── 조회 ──────────────────────────────────────────────────────
+
+
+async def _load_positions_and_cash(user_id: uuid.UUID, db: AsyncSession) -> tuple[dict[str, dict], float]:
+    """최신 스냅샷의 종목별 평가액과 증권 계좌 예수금(평가액 − 종목 합)."""
+    rows = await latest_snapshot_rows(db, user_id, with_positions=True)
+    pos_map: dict[str, dict] = {}
+    cash = 0.0
+    for snap, acc in rows:
+        positions_value = 0.0
+        for pos in snap.position_items or []:
+            value = float(pos.value_krw or 0)
+            positions_value += value
+            if value <= 0 or is_non_tradable(pos.ticker, pos.market):
+                continue
+            key = f"{pos.ticker}-{pos.market}"
+            entry = pos_map.setdefault(
+                key, {"ticker": pos.ticker, "market": pos.market, "name": pos.name or pos.ticker, "value_krw": 0.0}
+            )
+            entry["value_krw"] += value
+        if acc.asset_type in STOCK_TYPES:
+            cash += max(float(snap.amount_krw or 0) - positions_value, 0.0)
+    return pos_map, cash
+
+
+def _sync_fetch_closes(symbols: list[str]) -> dict[str, pd.Series]:
+    end = today_kst()
+    # 252거래일 + 연휴·주간 리샘플 여유
+    return fetch_yf_close_series(symbols, end - timedelta(days=400), end)
 
 
 async def get_portfolio_risk_metrics(
@@ -118,30 +290,36 @@ async def get_portfolio_risk_metrics(
     if cached is not None:
         return cached
 
-    # 최신 스냅샷 포지션 조회
-    pos_map = await query_latest_position_map(user_id, db)
-
+    pos_map, cash_krw = await _load_positions_and_cash(user_id, db)
     if not pos_map:
         return _empty_risk_result()
 
-    total_value = sum(p["value_krw"] for p in pos_map.values())
-    if total_value <= 0:
-        return _empty_risk_result()
-
-    # 1년 일봉 다운로드 동안 커넥션을 쥐지 않게(plans/125 A4) — 위치 맵은 이미 dict로 꺼냈다
-    await release_read_connection(db)
-
     async def _fetch_and_cache() -> dict:
-        positions = list(pos_map.values())
-        yf_symbols = [_to_yf_symbol(p["ticker"], p["market"]) for p in positions]
-        weights = [p["value_krw"] / total_value for p in positions]
+        try:
+            # 지수 분류는 대시보드 overview(DB)를 읽은 뒤 커넥션을 반납한다
+            exposure = await get_index_exposure(cache, db, user_id)
+        except Exception as e:
+            logger.warning("risk_index_exposure_failed", error=str(e))
+            exposure = None
+        # 1년 일봉 다운로드 동안 커넥션을 쥐지 않게(plans/125 A4)
+        await release_read_connection(db)
 
-        returns_map = await run_yf_bounded(_sync_fetch_risk_data, yf_symbols, [_SP500_SYMBOL])
-        # 종목 쌍 × 252일 상관 루프는 0.1 CPU에서 수 초 — 이벤트 루프를 막지 않게 스레드에서
-        result_data = await asyncio.to_thread(_compute_risk_result, yf_symbols, weights, returns_map)
+        holdings = [
+            {
+                "symbol": _to_yf_symbol(p["ticker"], p["market"]),
+                "value_krw": p["value_krw"],
+                "usd": (p["market"] or "").upper() in _USD_MARKETS,
+            }
+            for p in pos_map.values()
+        ]
+        symbols = sorted({h["symbol"] for h in holdings} | {SP500_SYMBOL, USDKRW_SYMBOL})
+        closes = await run_yf_bounded(_sync_fetch_closes, symbols)
+        result = await asyncio.to_thread(compute_risk_result, holdings, cash_krw, closes)
+        result.update(_concentration(pos_map, exposure))
+        result["position_count"] = len(pos_map)
 
-        await set_cached_json(cache, cache_key, result_data, TTL_RISK_ANALYSIS)
-        return result_data
+        await set_cached_json(cache, cache_key, result, TTL_RISK_ANALYSIS)
+        return result
 
     if cache is None:
         return await _fetch_and_cache()
@@ -149,71 +327,22 @@ async def get_portfolio_risk_metrics(
     return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
 
 
-def _compute_risk_result(yf_symbols: list[str], weights: list[float], returns_map: dict[str, list[float]]) -> dict:
-    """수익률 시계열 → 위험 지표(순수 CPU 계산, 스레드에서 실행)."""
-
-    # 포트폴리오 가중 수익률 시계열 구성 — 시계열은 오래된 날짜부터라 **최근** min_len일로 맞춘다.
-    # 앞에서 자르면 신규 상장 종목의 최근 구간과 다른 종목의 옛 구간이 같은 날로 합쳐진다(plans/116 A2).
-    min_len = min(
-        (len(returns_map[s]) for s in yf_symbols if s in returns_map),
-        default=0,
-    )
-    portfolio_rets: list[float] = []
-    if min_len >= 10:
-        recent = {s: returns_map[s][-min_len:] for s in yf_symbols if s in returns_map}
-        for i in range(min_len):
-            r = 0.0
-            for sym, w in zip(yf_symbols, weights, strict=False):
-                if sym in recent:
-                    r += recent[sym][i] * w
-            portfolio_rets.append(r)
-
-    # 지표 계산
-    var_95 = _calc_var(portfolio_rets, 0.95) if portfolio_rets else 0.0
-    var_99 = _calc_var(portfolio_rets, 0.99) if portfolio_rets else 0.0
-
-    n = len(portfolio_rets)
-    if n >= 2:
-        mean = sum(portfolio_rets) / n
-        std = math.sqrt(sum((r - mean) ** 2 for r in portfolio_rets) / (n - 1))
-        volatility_pct = std * math.sqrt(252) * 100
-    else:
-        volatility_pct = 0.0
-
-    beta_sp500 = _calc_beta(portfolio_rets, returns_map.get(_SP500_SYMBOL, []))
-
-    diversification_score = _calc_diversification_score(
-        [s for s in yf_symbols if s in returns_map],
-        [w for s, w in zip(yf_symbols, weights, strict=False) if s in returns_map],
-        returns_map,
-    )
-
-    # 집중도 계산 (top 1 비중)
-    top_weight_pct = max(weights) * 100 if weights else 0.0
-
-    result_data = {
-        "var_95_pct": round(var_95, 2),
-        "var_99_pct": round(var_99, 2),
-        "annualized_volatility_pct": round(volatility_pct, 2),
-        "beta_sp500": round(beta_sp500, 3),
-        "diversification_score": diversification_score,
-        "top_holding_weight_pct": round(top_weight_pct, 2),
-        "position_count": len(yf_symbols),
-        "data_available": len(portfolio_rets) >= 10,
-        "note": "1년 일별 수익률 기반 추정값 (yfinance)" if len(portfolio_rets) >= 10 else "데이터 불충분",
-    }
-    return result_data
-
-
 def _empty_risk_result() -> dict:
     return {
-        "var_95_pct": 0.0,
-        "var_99_pct": 0.0,
-        "annualized_volatility_pct": 0.0,
-        "beta_sp500": 1.0,
-        "diversification_score": 0,
-        "top_holding_weight_pct": 0.0,
-        "position_count": 0,
         "data_available": False,
-        "note": "포지션 데이터 없음",
+        "total_value_krw": 0.0,
+        "cash_weight_pct": 0.0,
+        "coverage_pct": 0.0,
+        "var_95_pct": 0.0,
+        "var_95_krw": 0.0,
+        "annualized_volatility_pct": 0.0,
+        "max_drawdown_pct": 0.0,
+        "beta_sp500": None,
+        "vol_ratio_vs_sp500": None,
+        "sp500_10pct_drop_krw": None,
+        "top_holding_weight_pct": 0.0,
+        "top_holding_name": None,
+        "top_index_exposures": [],
+        "position_count": 0,
+        "note": "보유 종목이 없어요",
     }

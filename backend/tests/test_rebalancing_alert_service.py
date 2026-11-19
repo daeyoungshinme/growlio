@@ -347,7 +347,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
             ) as mock_email,
             patch(
                 "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
-                new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
+                new=AsyncMock(return_value=("GREEN", {"data_available": True, "top_holding_weight_pct": 55.0})),
             ),
             patch(
                 "app.services.market_signal.market_signal_service.get_market_signal",
@@ -360,7 +360,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
 
         mock_email.assert_called_once()
         assert mock_email.call_args.kwargs["is_composite_triggered"] is True
-        assert "분산도" in mock_email.call_args.kwargs["composite_reason"]
+        assert "과집중" in mock_email.call_args.kwargs["composite_reason"]
         # commit 3회: (1) get_confirmed_composite_level() 부트스트랩 저장 (2) 복합신호 dedup 플래그 저장
         # (set_durable 내부) (3) 알림 루프의 last_triggered_at 저장
         assert mock_db.commit.call_count == 3
@@ -526,7 +526,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
             ) as mock_email,
             patch(
                 "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
-                new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
+                new=AsyncMock(return_value=("GREEN", {"data_available": True, "top_holding_weight_pct": 55.0})),
             ),
             patch("app.services.rebalancing.alert_check.get_durable", side_effect=fake_get_durable),
             patch("app.services.rebalancing.alert_check.set_durable", side_effect=fake_set_durable),
@@ -667,7 +667,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
             ) as mock_email,
             patch(
                 "app.services.rebalancing.diagnosis_service.fetch_market_and_risk_signal",
-                new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
+                new=AsyncMock(return_value=("GREEN", {"data_available": True, "top_holding_weight_pct": 55.0})),
             ),
             patch(
                 "app.services.market_signal.market_signal_service.get_market_signal",
