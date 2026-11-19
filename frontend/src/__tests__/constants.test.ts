@@ -10,6 +10,7 @@ import {
 import { backtestDefaultEndDate, backtestDefaultStartDate } from "@/constants/defaults";
 import { STALE_TIME, REFETCH_INTERVAL, PERSIST_CACHE_KEY } from "@/constants/queryConfig";
 import { ASSET_MANAGEMENT_TABS, PORTFOLIO_TABS } from "@/constants/tabs";
+import { relativeThresholdOptions } from "@/constants/rebalancingConfig";
 import { NAV_ITEMS, NAV_ORDER } from "@/constants/nav";
 
 // ────────────────────────────────────────────
@@ -202,5 +203,16 @@ describe("nav constants", () => {
       "/invest-plan",
       "/settings",
     ]);
+  });
+});
+
+describe("relativeThresholdOptions", () => {
+  it("기본 선택지만 — 끔·목록 안의 값", () => {
+    expect(relativeThresholdOptions(null).map((o) => o.value)).toEqual(["off", "20", "25", "50"]);
+    expect(relativeThresholdOptions(25)).toHaveLength(4);
+  });
+
+  it("목록에 없는 저장값은 그 값을 선택지로 보탠다 — '끔'으로 보이지 않게", () => {
+    expect(relativeThresholdOptions(30)[4]).toEqual({ value: "30", label: "30%" });
   });
 });

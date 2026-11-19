@@ -128,7 +128,9 @@ async def _process_rebalancing_alert(
     drift_count = len(drifting)
     if drift_count:
         push_title = f"리밸런싱 알림 — {portfolio.name}"
-        push_body = f"{drift_count}개 종목이 ±{threshold:.1f}% 이상 이탈했습니다."
+        relative = alert_relative_threshold(alert)
+        rule = f"±{threshold:.1f}%" + (f"(또는 목표 대비 {relative:g}%)" if relative is not None else "")
+        push_body = f"{drift_count}개 종목이 {rule} 이상 이탈했습니다."
     elif is_composite_triggered:
         # 복합신호는 특정 포트폴리오가 아닌 계정 전체 기준 신호이므로 포트폴리오명을 노출하지 않는다.
         push_title = "시장/리스크 신호 감지"

@@ -12,6 +12,7 @@ from datetime import date
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import release_read_connection
 from app.models.alert import RebalancingAlert
 from app.schemas.rebalancing import PortfolioDriftSummary
 from app.services._settings_queries import get_settings_row
@@ -27,7 +28,7 @@ from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.rebalancing.diagnosis_service import estimate_sell_costs, fetch_composite_signal
 from app.services.rebalancing.drift_rule import drift_progress
 from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode, tactical_regime_for_gate
-from app.services.rebalancing.service import analyze_rebalancing, summarize_drift
+from app.services.rebalancing.service import analyze_rebalancing, filter_drifting_items, summarize_drift
 from app.services.rebalancing.timing_verdict import decide_timing
 from app.utils.cache_keys import CacheStoreType
 from app.utils.kst import today_kst
@@ -114,6 +115,9 @@ async def get_drift_summaries(
     except Exception as e:
         logger.warning("drift_summary_composite_signal_failed", error=str(e))
 
+    # 복합 신호 알림을 끈 사용자는 시장 신호 캐시가 비어 있으면 여기서 처음 외부(FRED·Yahoo)를 조회한다 — 그동안
+    # 읽기 트랜잭션 커넥션을 쥐지 않게 반납한다(이미 읽은 알림·포트폴리오 행은 expire_on_commit=False라 그대로)
+    await release_read_connection(db)
     confirmed_level, market_stale = await _market_levels(db, cache)
     today = today_kst()
 
@@ -146,7 +150,8 @@ async def get_drift_summaries(
 
             overseas_tax = 0.0
             if summary.needs_rebalancing:
-                costs = estimate_sell_costs(analysis, overview)
+                # 자동 실행은 이탈 항목만 맞춘다(plan_generation) — 기준 안쪽 초과분은 매도로 세지 않는다
+                costs = estimate_sell_costs(filter_drifting_items(analysis.items, threshold, relative), overview)
                 overseas_tax = costs.overseas_tax
                 summary.estimated_trade_krw = round(costs.sell_notional, 0)
                 summary.estimated_cost_krw = round(costs.fee + costs.overseas_tax, 0)

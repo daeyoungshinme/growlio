@@ -109,8 +109,8 @@ class SellCostEstimate:
     items: list[TaxImpactItem]
 
 
-def estimate_sell_costs(analysis: RebalancingAnalysis, overview: dict) -> SellCostEstimate:
-    """diff_krw < 0 항목(CASH·KR_PROPERTY 제외)에 대해 대략적 실현손익/세금/수수료를 추정한다.
+def estimate_sell_costs(items: list[Any], overview: dict) -> SellCostEstimate:
+    """`items` 중 diff_krw < 0 항목(CASH·KR_PROPERTY 제외)에 대해 대략적 실현손익/세금/수수료를 추정한다.
 
     참고용 근사치 — 정확한 세액은 /tax/summary의 연간 집계를 따른다(올해 이미 실현한 손익·기본공제 사용분 미반영).
     """
@@ -123,7 +123,7 @@ def estimate_sell_costs(analysis: RebalancingAnalysis, overview: dict) -> SellCo
     tax_items: list[TaxImpactItem] = []
 
     # 지수 그룹 행은 수량이 없어 아래 "보유수량 전체 매도" 폴백에 걸린다 — 종목 단위 멤버 행으로 평탄화
-    for item in iter_trade_items(analysis.items):
+    for item in iter_trade_items(items):
         if item.diff_krw >= 0:
             continue
         if is_non_tradable(item.ticker, item.market):
@@ -207,7 +207,7 @@ def _build_tax_preview(
     analysis: RebalancingAnalysis, overview: dict
 ) -> tuple[float, float, float, list[str], list[TaxImpactItem]]:
     """`estimate_sell_costs` + 진단 카드 문구·상위 항목. (실현손익, 해외 양도세, 수수료, 문구, 상위 항목)"""
-    est = estimate_sell_costs(analysis, overview)
+    est = estimate_sell_costs(analysis.items, overview)
     overseas_gain_sum = est.overseas_gain
     overseas_tax = est.overseas_tax
     tax_items = list(est.items)

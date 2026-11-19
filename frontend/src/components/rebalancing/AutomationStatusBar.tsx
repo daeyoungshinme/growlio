@@ -8,6 +8,7 @@ type ExistingAlertLike = Partial<
     RebalancingAlert,
     | "mode"
     | "threshold_pct"
+    | "relative_threshold_pct"
     | "schedule_type"
     | "trigger_condition"
     | "strategy"
@@ -15,6 +16,12 @@ type ExistingAlertLike = Partial<
     | "is_active"
   >
 >;
+
+/** "±5%" 또는 상대 기준이 켜져 있으면 "±5%(또는 목표 대비 25%)" — 알림 목록·모달 요약과 같은 표기 */
+function driftRuleLabel(alert: ExistingAlertLike): string {
+  const rel = alert.relative_threshold_pct;
+  return `±${alert.threshold_pct}%${rel ? `(또는 목표 대비 ${rel}%)` : ""}`;
+}
 
 interface Props {
   existingAlert?: ExistingAlertLike;
@@ -86,8 +93,8 @@ export default function AutomationStatusBar({ existingAlert, onOpenAlertModal, c
           {isDcaAutoBuy
             ? `정기 적립식 ${describeDcaAutoBuy(existingAlert as RebalancingAlert)}`
             : isAuto
-              ? `자동 실행 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`
-              : `알림 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`}
+              ? `자동 실행 설정됨 (${driftRuleLabel(existingAlert)} 이탈 시)`
+              : `알림 설정됨 (${driftRuleLabel(existingAlert)} 이탈 시)`}
         </span>
       ) : (
         <span className="text-xs text-gray-500 dark:text-gray-400">

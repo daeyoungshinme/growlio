@@ -38,6 +38,7 @@ from app.models.fx_extra_need import FxExtraNeed
 from app.models.portfolio import Portfolio
 from app.models.tactical import TacticalStrategy
 from app.schemas.action_items import ActionItem
+from app.schemas.rebalancing import PortfolioDriftSummary
 from app.services.challenge_service import get_challenge_summary
 from app.services.dca_cash_shortfall_service import NOTICE_WINDOW_DAYS, find_dca_cash_shortfalls, shortfall_detail
 from app.services.rebalancing.drift_summary_service import get_drift_summaries
@@ -73,6 +74,14 @@ _LINK_REBALANCING_HISTORY = "/rebalancing?rtab=이력"  # 프론트 rebalancingU
 
 def _portfolio_link(portfolio_id: uuid.UUID | str) -> str:
     return f"/rebalancing?rtab=포트폴리오&portfolioId={portfolio_id}"
+
+
+def _drift_rule_text(s: PortfolioDriftSummary) -> str:
+    """이탈 판정 기준 문구 — 상대 기준(plans/136)으로 걸린 종목도 있으니 함께 적는다."""
+    rule = f"기준 {s.threshold_pct:g}%p"
+    if s.relative_threshold_pct is not None:
+        rule += f"(또는 목표 대비 {s.relative_threshold_pct:g}%)"
+    return rule
 
 
 def _tactical_link(portfolio_id: uuid.UUID | str) -> str:
@@ -172,9 +181,7 @@ async def _rebalance_items(
                 kind="REBALANCE",
                 priority="HIGH",
                 title=f"{s.portfolio_name} 리밸런싱 필요",
-                detail=(
-                    f"최대 {s.max_drift_pct:.1f}%p 이탈 · {s.drifted_items_count}종목이 기준 {s.threshold_pct:g}%p 초과"
-                ),
+                detail=f"최대 {s.max_drift_pct:.1f}%p 이탈 · {s.drifted_items_count}종목이 {_drift_rule_text(s)} 초과",
                 cta_label="점검하기",
                 link=_portfolio_link(s.portfolio_id),
             )

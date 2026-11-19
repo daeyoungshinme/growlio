@@ -37,7 +37,15 @@ export const RELATIVE_THRESHOLD_OPTIONS = [
   { value: "25", label: "25%" },
   { value: "50", label: "50%" },
 ] as const;
-export type RelativeThresholdOption = (typeof RELATIVE_THRESHOLD_OPTIONS)[number]["value"];
+
+/** 선택지 + 목록에 없는 저장값(API로 30 등)은 그 값을 그대로 보탠다 — "끔"으로 보이면 화면과 저장값이 어긋난다 */
+export function relativeThresholdOptions(value: number | null): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = [...RELATIVE_THRESHOLD_OPTIONS];
+  if (value != null && !options.some((o) => o.value === String(value))) {
+    options.push({ value: String(value), label: `${value}%` });
+  }
+  return options;
+}
 
 export const TRIGGER_CONDITION_OPTIONS: { value: TriggerCondition; label: string; desc: string }[] =
   [

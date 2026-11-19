@@ -154,7 +154,7 @@ def build_krw_close_frame(
 def _weekly_returns(daily: pd.Series) -> list[float]:
     level = (1 + daily).cumprod()
     # resample은 pandas 내부 numpy 경고를 내서(테스트 경고 게이트) 주 단위 groupby로 같은 값을 만든다
-    weekly = level.groupby(level.index.to_period("W-FRI")).last().pct_change().dropna()
+    weekly = level.groupby(level.index.to_period("W-FRI")).last().pct_change(fill_method=None).dropna()
     return [float(x) for x in weekly if math.isfinite(x)]
 
 
@@ -174,7 +174,9 @@ def compute_risk_result(
     if no_fx:
         logger.warning("risk_fx_missing", symbols=no_fx[:5])
 
-    returns = frame.pct_change().iloc[1:] if not frame.empty else frame
+    # 상한(_FFILL_LIMIT)보다 긴 휴장(추석 등)도 마지막 종가 기준 수익률로 — pct_change 기본 pad(폐기 예정)와 같은 값을
+    # 명시적으로 만든다. pandas 3에서 기본 fill이 사라져도 연휴 뒤 첫 수익률이 NaN→0으로 빠지지 않는다
+    returns = frame.ffill().pct_change(fill_method=None).iloc[1:] if not frame.empty else frame
     covered = {c for c in returns.columns if returns[c].notna().mean() >= _MIN_SYMBOL_COVERAGE}
     included = [h for h in holdings if h["symbol"] in covered]
     included_value = sum(h["value_krw"] for h in included)
@@ -220,7 +222,7 @@ def compute_risk_result(
         "beta_sp500": round(beta, 3) if beta is not None else None,
         "vol_ratio_vs_sp500": vol_ratio if data_available else None,
         "sp500_10pct_drop_krw": (
-            round(beta * _SP500_DROP_SCENARIO * stock_value, 0) if beta is not None and data_available else None
+            round(beta * _SP500_DROP_SCENARIO * total_for_weights, 0) if beta is not None and data_available else None
         ),
         "note": "최근 1년 원화 기준 추정값(예수금 포함)" if data_available else "가격 데이터가 부족해요",
     }
@@ -229,7 +231,13 @@ def compute_risk_result(
 def _concentration(pos_map: dict[str, dict], exposure: Any) -> dict[str, Any]:
     """종목(티커) 최대 비중과 지수 기준 상위 노출 — 주식 평가액 대비 %."""
     stock_value = sum(p["value_krw"] for p in pos_map.values())
-    top = max(pos_map.values(), key=lambda p: p["value_krw"], default=None)
+    # 같은 종목이 증권사마다 다른 시장 코드(토스 US·KIS NASDAQ)로 들어와도 한 종목으로 합친다
+    by_symbol: dict[str, dict] = {}
+    for p in pos_map.values():
+        sym = _to_yf_symbol(p["ticker"], p["market"])
+        entry = by_symbol.setdefault(sym, {"ticker": p["ticker"], "name": p.get("name"), "value_krw": 0.0})
+        entry["value_krw"] += p["value_krw"]
+    top = max(by_symbol.values(), key=lambda p: p["value_krw"], default=None)
     top_indexes: list[dict[str, Any]] = []
     if exposure is not None:
         top_indexes = [

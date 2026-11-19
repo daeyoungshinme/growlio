@@ -184,6 +184,13 @@ class TestComputeRiskResult:
         assert result["vol_ratio_vs_sp500"] == pytest.approx(1.0, abs=0.01)
         assert result["sp500_10pct_drop_krw"] == pytest.approx(100_000, rel=1e-3)
 
+    def test_drop_scenario_counts_cash_once(self):
+        # 베타가 이미 현금 비중(50%)을 반영하므로 손실액은 전체 평가액 기준 — 주식 10% 하락 = 주식 평가액의 10%
+        closes, _ = self._closes()
+        result = compute_risk_result([{"symbol": "A.KS", "value_krw": 1_000_000, "usd": False}], 1_000_000, closes)
+        assert result["beta_sp500"] == pytest.approx(0.5, abs=0.01)
+        assert result["sp500_10pct_drop_krw"] == pytest.approx(100_000, rel=0.02)
+
     def test_var_krw_matches_pct(self):
         closes, _ = self._closes()
         result = compute_risk_result([{"symbol": "A.KS", "value_krw": 1_000_000, "usd": False}], 0.0, closes)
@@ -210,6 +217,17 @@ class TestConcentration:
         assert result["top_holding_weight_pct"] == pytest.approx(60.0)
         assert result["top_holding_name"] == "QQQ"
         assert result["top_index_exposures"] == [{"key": "NASDAQ100", "label": "나스닥100", "pct_of_stock": 100.0}]
+
+    def test_same_ticker_across_markets_merged(self):
+        # 토스(US)와 KIS(NASDAQ)의 같은 종목은 한 종목 — 30%+30%를 60%로 본다
+        pos_map = {
+            "AAPL-US": {"ticker": "AAPL", "market": "US", "name": "Apple", "value_krw": 300.0},
+            "AAPL-NASDAQ": {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple", "value_krw": 300.0},
+            "MSFT-NASDAQ": {"ticker": "MSFT", "market": "NASDAQ", "name": "Microsoft", "value_krw": 400.0},
+        }
+        result = _concentration(pos_map, None)
+        assert result["top_holding_weight_pct"] == pytest.approx(60.0)
+        assert result["top_holding_name"] == "Apple"
 
     def test_no_exposure(self):
         pos_map = {"A-KOSPI": {"ticker": "A", "market": "KOSPI", "name": "A", "value_krw": 1.0}}

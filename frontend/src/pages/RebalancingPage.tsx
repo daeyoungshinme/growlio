@@ -214,13 +214,16 @@ export default function RebalancingPage() {
             <TabIntro>
               목표 비중 이탈·시장 상황·내 포트폴리오 위험을 점검해요. 목표 비중은 바꾸지 않아요.
             </TabIntro>
-            <Suspense fallback={null}>
-              <DiagnosisSummaryStrip
-                driftSummaries={driftSummaries}
-                outlook={marketOutlook}
-                risk={riskMetrics}
-              />
-            </Suspense>
+            {/* 칩 하나가 깨져도 진단 탭 전체가 아니라 칩 줄만 숨긴다. 시장 칩은 이동할 배너(signal)가 있을 때만 */}
+            <ErrorBoundary variant="section">
+              <Suspense fallback={null}>
+                <DiagnosisSummaryStrip
+                  driftSummaries={driftSummaries}
+                  outlook={signal ? marketOutlook : undefined}
+                  risk={riskMetrics}
+                />
+              </Suspense>
+            </ErrorBoundary>
             <div id={DIAGNOSIS_ANCHORS.drift} className="scroll-mt-4">
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard />}>

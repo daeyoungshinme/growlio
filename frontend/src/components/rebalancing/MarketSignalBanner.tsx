@@ -174,8 +174,8 @@ export default function MarketSignalBanner({
                     <span className="font-semibold">종합 {shown.label}</span> — {shown.action}
                   </p>
                   <ul className="list-disc pl-4 text-gray-500 dark:text-gray-400">
-                    {shown.reasons.map((r) => (
-                      <li key={r}>{r}</li>
+                    {shown.reasons.map((r, i) => (
+                      <li key={`${i}-${r}`}>{r}</li>
                     ))}
                   </ul>
                   <p className="text-gray-400 dark:text-gray-500">

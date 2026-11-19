@@ -82,7 +82,7 @@ export default function RebalancingDiagnosisCard({
 
   const subText =
     status === "stable"
-      ? `모든 종목이 ±${threshold}% 이내 비중을 유지하고 있습니다`
+      ? `모든 종목이 ±${threshold}%${relativeThreshold ? `(목표 대비 ${relativeThreshold}%)` : ""} 이내 비중을 유지하고 있습니다`
       : status === "caution"
         ? `최대 ${maxDrift.toFixed(1)}% 이탈 — 모니터링이 필요합니다`
         : `${driftedCount}개 항목이 목표 비중에서 ±${threshold}%${relativeThreshold ? `(또는 목표 대비 ${relativeThreshold}%)` : ""}를 넘게 벗어났습니다`;

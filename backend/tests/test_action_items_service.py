@@ -14,7 +14,7 @@ from app.schemas.challenge import ChallengeSummary
 from app.services import action_items_service as svc
 
 
-def _drift(needs=True, name="성장형", max_drift=7.4):
+def _drift(needs=True, name="성장형", max_drift=7.4, relative=None):
     return SimpleNamespace(
         portfolio_id=uuid.uuid4(),
         portfolio_name=name,
@@ -22,7 +22,13 @@ def _drift(needs=True, name="성장형", max_drift=7.4):
         max_drift_pct=max_drift,
         drifted_items_count=2,
         threshold_pct=5.0,
+        relative_threshold_pct=relative,
     )
+
+
+def test_drift_rule_text_includes_relative_band():
+    assert svc._drift_rule_text(_drift()) == "기준 5%p"
+    assert svc._drift_rule_text(_drift(relative=25.0)) == "기준 5%p(또는 목표 대비 25%)"
 
 
 def _tactical(

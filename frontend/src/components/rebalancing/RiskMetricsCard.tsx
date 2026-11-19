@@ -42,10 +42,17 @@ function RiskMetricRow({
       aria-expanded={isExpanded}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{metric.label}</span>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-sm font-bold ${valueColor}`}>{metric.value}</span>
-          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
+        <span className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
+          {metric.label}
+        </span>
+        {/* 쏠림 값은 긴 ETF 이름이 들어가 390px에서 넘친다 — 값만 줄이고 배지·화살표는 유지 */}
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`min-w-0 truncate text-sm font-bold ${valueColor}`} title={metric.value}>
+            {metric.value}
+          </span>
+          <span
+            className={`shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}
+          >
             {badge.label}
           </span>
           <ChevronDown
