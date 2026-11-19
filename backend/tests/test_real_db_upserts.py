@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime, timedelta
@@ -195,6 +196,8 @@ def _load_fix_script():
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    # @dataclass가 sys.modules[cls.__module__]를 찾으므로 실행 전에 등록해야 한다
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
