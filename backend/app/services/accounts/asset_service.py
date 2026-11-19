@@ -22,7 +22,6 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.logging import format_sync_error
-from app.enums import DataSource
 from app.exceptions import ProviderNetworkError
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.providers.base import BalanceResult, BrokerProvider
@@ -219,11 +218,10 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
         balance.overseas_known
         and balance.deposit_foreign is None
         and account.deposit_usd
-        and account.data_source != DataSource.MANUAL
+        and not balance.usd_deposit_in_total
     ):
         # 해외 조회는 됐지만 달러 예수금만 미확인 — 유지한 예수금을 합계에도 넣어야 그날 스냅샷이 그만큼 빠지지 않는다.
-        # 수기 계좌는 provider 합계에 이미 달러 예수금이 들어 있고 deposit_foreign을 일부러 비워 두므로 제외
-        # (더하면 달러 예수금 × fallback 환율이 이중으로 잡힌다)
+        # 합계에 이미 달러 예수금이 든 provider(수기 계좌)는 usd_deposit_in_total로 제외(plans/133·135)
         amount_krw += float(account.deposit_usd) * balance.usd_krw_rate
     if replace_positions and not balance.overseas_known:
         # 해외 조회 실패 — balance 합계엔 해외 종목·외화예수금이 빠져 있다. 보존된 해외 포지션과 기존

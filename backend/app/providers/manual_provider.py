@@ -59,9 +59,12 @@ class ManualProvider(BrokerProvider):
         invested = sum(p.avg_price * p.qty for p in positions)
         value = sum((p.current_price or p.avg_price) * p.qty for p in positions)
         pnl = value - invested if positions else 0.0
+        # 합계에 실제로 쓴 환율 — 채우지 않으면 BalanceResult 기본값(fallback 1300)이 남는다(plans/133·135)
+        used_usd_rate: float | None = None
 
         if positions:
             usd_rate_val = await sync_usd_krw_rate(cache, needs_usd=bool(account.deposit_usd))
+            used_usd_rate = usd_rate_val
             deposit = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate_val
             amount_krw = (value if value else invested) + deposit
             account.manual_amount = amount_krw
@@ -71,6 +74,7 @@ class ManualProvider(BrokerProvider):
             amount_krw = _calc_net_asset_amount(account.manual_amount, account.asset_type, account.real_estate_details)
         elif account.deposit_krw is not None or account.deposit_usd is not None:
             usd_rate2 = await sync_usd_krw_rate(cache, needs_usd=bool(account.deposit_usd))
+            used_usd_rate = usd_rate2
             amount_krw = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate2
         else:
             # 미설정(None)만 거부한다 — 입력 스키마는 0을 받지 않지만 nestlio 출금이 잔액을 정확히 0으로
@@ -79,16 +83,20 @@ class ManualProvider(BrokerProvider):
                 raise BadRequestError("수동 금액이 설정되지 않았습니다")
             amount_krw = float(account.manual_amount)
 
-        return BalanceResult(
+        result = BalanceResult(
             positions=positions,
             total_value_krw=amount_krw,
             deposit_krw=float(account.deposit_krw or 0),
             # deposit_foreign은 세팅하지 않음(기본 None) — 수동계좌의 USD 예수금은 사용자가
-            # 직접 입력한 account.deposit_usd이므로 sync가 덮어쓰면 안 된다.
+            # 직접 입력한 account.deposit_usd이므로 sync가 덮어쓰면 안 된다. 합계엔 이미 들어 있다.
+            usd_deposit_in_total=True,
             invested_krw=invested if positions else 0.0,
             pnl_krw=pnl,
             extra={"source": "MANUAL", "snapshot_date": today_kst()},
         )
+        if used_usd_rate:
+            result.usd_krw_rate = used_usd_rate
+        return result
 
 
 def _db_to_provider_position(p: DBPosition) -> ProviderPosition:

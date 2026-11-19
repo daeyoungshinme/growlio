@@ -233,6 +233,21 @@ class TestManualProviderSync:
         assert result.deposit_foreign is None
 
     @pytest.mark.asyncio
+    async def test_sync_marks_usd_deposit_in_total_and_reports_used_rate(self, override_settings, make_account):
+        """합계에 달러 예수금이 이미 들어 있음을 플래그로 알리고, 실제 쓴 환율을 넘긴다 —
+        fallback 1300 기본값이 남으면 asset_service 보정이 그 값으로 한 번 더 더했다(plans/133·135)."""
+        account = make_account(asset_type="STOCK_OTHER", deposit_krw=1_000_000.0, deposit_usd=100.0)
+        db = _make_mock_db(positions=[])
+
+        provider = ManualProvider()
+        with patch("app.providers.manual_provider.sync_usd_krw_rate", AsyncMock(return_value=1400.0)):
+            result = await provider.sync(account, db, AsyncMock())
+
+        assert result.usd_deposit_in_total is True
+        assert result.usd_krw_rate == pytest.approx(1400.0)
+        assert result.total_value_krw == pytest.approx(1_140_000.0)
+
+    @pytest.mark.asyncio
     async def test_sync_price_not_in_map_uses_fallback(self, override_settings, make_account):
         """가격 맵에 없는 종목은 기존 current_price 유지 (line 50 — else branch)."""
         account = make_account(asset_type="STOCK_OTHER")

@@ -50,6 +50,9 @@ class BalanceResult:
     # False = 해외 잔고 조회 실패(미확인). positions에 해외 종목이 빠져 있으므로 asset_service가
     # 기존 해외(비KRW) 포지션을 지우지 않고 보존한다. 해외 조회가 없는 소스는 기본 True.
     overseas_known: bool = True
+    # True = total_value_krw에 account.deposit_usd 환산분이 이미 들어 있다(수기 계좌 — deposit_foreign을 일부러
+    # None으로 두지만 미확인이 아니다). False면 deposit_foreign=None일 때 asset_service가 유지한 달러 예수금을 더한다
+    usd_deposit_in_total: bool = False
     invested_krw: float = 0.0  # 매입금액
     pnl_krw: float = 0.0  # 평가손익
     usd_krw_rate: float = field(default_factory=lambda: settings.usd_krw_fallback_rate)
