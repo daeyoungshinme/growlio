@@ -27,6 +27,21 @@ def test_validate_dom_valid_value():
     assert model.schedule_day_of_month == 15
 
 
+def test_relative_threshold_bounds_and_schedule_only_drop():
+    from pydantic import ValidationError
+
+    from app.schemas.rebalancing import RebalancingAlertCreate
+
+    assert RebalancingAlertCreate(**_make_base(), relative_threshold_pct=10).relative_threshold_pct == 10
+    assert RebalancingAlertCreate(**_make_base(), relative_threshold_pct=100).relative_threshold_pct == 100
+    assert RebalancingAlertCreate(**_make_base()).relative_threshold_pct is None
+    with pytest.raises(ValidationError, match="relative_threshold_pct"):
+        RebalancingAlertCreate(**_make_base(), relative_threshold_pct=9.9)
+    # 정기 실행만 하는 알림은 이탈 판정을 쓰지 않으므로 상대 기준을 저장하지 않는다
+    model = RebalancingAlertCreate(**_make_base(), trigger_condition="SCHEDULE_ONLY", relative_threshold_pct=25)
+    assert model.relative_threshold_pct is None
+
+
 def test_validate_dom_out_of_range_raises():
     from pydantic import ValidationError
 

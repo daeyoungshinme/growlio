@@ -138,6 +138,14 @@ class RebalancingAlertCreate(BaseModel):
             raise ValueError("적립 금액은 매월 정기 자동매수(매수만)에서만 설정할 수 있습니다")
         return self
 
+    @model_validator(mode="after")
+    def drop_relative_for_schedule_only(self) -> "RebalancingAlertCreate":
+        # SCHEDULE_ONLY는 이탈과 무관하게 실행된다 — 상대 기준이 남으면 포트폴리오 이탈 판정
+        # (`alert_drift_thresholds`의 최솟값)만 엄격해져 진단·알림이 어긋난다
+        if self.trigger_condition == "SCHEDULE_ONLY":
+            self.relative_threshold_pct = None
+        return self
+
 
 class AlertScopeUpdate(BaseModel):
     alert_scope: Literal["AGGREGATE", "PER_ACCOUNT"]

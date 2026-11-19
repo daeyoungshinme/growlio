@@ -67,6 +67,7 @@ async def test_db_error_on_first_portfolio_does_not_drop_the_rest():
         patch.object(svc, "get_linked_portfolios", new=linked),
         patch.object(svc, "get_active_alerts_by_portfolio", new=AsyncMock(return_value={})),
         patch.object(svc, "get_last_rebalanced_at", new=AsyncMock(return_value={})),
+        patch.object(svc, "release_read_connection", new=AsyncMock()),
         patch.object(svc, "_market_levels", new=AsyncMock(return_value=("GREEN", False))),
         patch.object(
             svc, "get_settings_row", new=AsyncMock(return_value=SimpleNamespace(composite_signal_alerts_enabled=False))
@@ -171,6 +172,17 @@ async def test_summary_fills_timing_fields():
     costs = SellCostEstimate(
         total_gain=0, overseas_gain=3_000_000, overseas_tax=110_000, fee=2_500, sell_notional=1_000_000, items=[]
     )
+    seen_items: list = []
+
+    items = [
+        SimpleNamespace(ticker="BIG", weight_diff_pct=6.0, target_weight_pct=30.0, diff_krw=-1_000_000),
+        SimpleNamespace(ticker="SMALL", weight_diff_pct=2.0, target_weight_pct=30.0, diff_krw=-300_000),
+    ]
+
+    def fake_costs(items, _overview):
+        seen_items.extend(items)
+        return costs
+
     with (
         patch.object(svc, "get_linked_portfolios", new=AsyncMock(return_value=[pf])),
         patch.object(svc, "get_active_alerts_by_portfolio", new=AsyncMock(return_value={str(pid): [alert]})),
@@ -178,11 +190,12 @@ async def test_summary_fills_timing_fields():
         patch.object(
             svc, "get_settings_row", new=AsyncMock(return_value=SimpleNamespace(composite_signal_alerts_enabled=False))
         ),
+        patch.object(svc, "release_read_connection", new=AsyncMock()),
         patch.object(svc, "_market_levels", new=AsyncMock(return_value=("YELLOW", False))),
         patch.object(svc, "build_portfolio_overview", new=AsyncMock(return_value={})),
-        patch.object(svc, "analyze_rebalancing", new=lambda *_a, **_k: SimpleNamespace(items=[])),
+        patch.object(svc, "analyze_rebalancing", new=lambda *_a, **_k: SimpleNamespace(items=items)),
         patch.object(svc, "summarize_drift", new=summarize),
-        patch.object(svc, "estimate_sell_costs", new=lambda *_a: costs),
+        patch.object(svc, "estimate_sell_costs", new=fake_costs),
     ):
         [summary] = await svc.get_drift_summaries(uuid.uuid4(), SimpleNamespace())
 
@@ -196,3 +209,5 @@ async def test_summary_fills_timing_fields():
     assert summary.estimated_overseas_gain_krw == 3_000_000
     assert summary.timing == "SPLIT"
     assert "110,000원" in (summary.timing_reason or "")
+    # 매도 비용은 이탈 항목(±4%p 초과)만으로 추정한다 — 2%p 초과분은 자동 실행이 건드리지 않는다
+    assert [i.ticker for i in seen_items] == ["BIG"]
