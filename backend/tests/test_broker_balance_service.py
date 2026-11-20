@@ -215,15 +215,14 @@ class TestFetchBrokerBalance:
         assert result.deposit_usd is None
 
     @pytest.mark.asyncio
-    async def test_returns_usd_deposit_and_krw_order_flag(self, make_account, mock_db, mock_cache):
-        """plans/140: 리밸런싱 확인 화면이 원화와 함께 달러 예수금·원화주문 여부를 보인다."""
+    async def test_returns_usd_deposit(self, make_account, mock_db, mock_cache):
+        """plans/140: 확인 화면이 원화와 함께 달러 예수금을 보인다(원화주문 여부는 계좌 목록 값 — plans/141 B1)."""
         account = make_account(
             asset_type="STOCK_KIWOOM",
             data_source="KIWOOM_API",
             kiwoom_app_key=b"enc_key",
             kiwoom_app_secret=b"enc_secret",
         )
-        account.krw_overseas_order = True
         balance = BalanceResult(positions=[], deposit_krw=10_000.0, deposit_foreign=123.45)
 
         with (
@@ -234,20 +233,4 @@ class TestFetchBrokerBalance:
             result = await fetch_broker_balance(account, mock_cache)
 
         assert result.deposit_usd == 123.45
-        assert result.krw_overseas_order is True
-
-    @pytest.mark.asyncio
-    async def test_krw_order_flag_ignored_for_non_kiwoom(self, make_account, mock_db, mock_cache):
-        account = make_account(asset_type="STOCK_TOSS", data_source="TOSS_API")
-        account.krw_overseas_order = True
-        balance = BalanceResult(positions=[], deposit_krw=0.0, deposit_foreign=5.0)
-
-        with (
-            _patch_session(mock_db),
-            patch("app.services.rebalancing.broker_balance_service.TossProvider") as mock_provider_cls,
-        ):
-            mock_provider_cls.return_value.sync = AsyncMock(return_value=balance)
-            result = await fetch_broker_balance(account, mock_cache)
-
-        assert result.deposit_usd == 5.0
-        assert result.krw_overseas_order is False
+        assert "krw_overseas_order" not in result.model_dump()

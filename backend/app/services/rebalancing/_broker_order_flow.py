@@ -177,6 +177,22 @@ def overseas_required_usd(order: ExecutionOrderItem) -> float | None:
     return order.quantity * price * FX_FEE_BUFFER
 
 
+def overseas_sell_proceeds_usd(sell_results: list[OrderResult]) -> float:
+    """같은 실행에서 접수된 해외 매도의 예상 대금(달러, 여유 없이) — 매수 결제 여력에 더한다(plans/141 A1).
+
+    미국 주식 매도 대금은 결제(T+1) 전이라 외화예수금(`fc_entra`)에 아직 안 잡힐 수 있다. 빼면 매도→매수 리밸런싱의
+    매수가 거짓 '달러 부족'으로 SKIPPED된다. 예수금에 이미 반영됐다면 과대 계상이지만, 그때는 발주가 나가 증권사가
+    최종 판정한다(기존 원칙). 접수 실패·가격 모름은 더하지 않는다.
+    """
+    total = 0.0
+    for r in sell_results:
+        if r.status != "SUCCESS" or r.side != "SELL" or not is_overseas_market(r.market):
+            continue
+        if r.price and r.price > 0 and r.quantity > 0:
+            total += r.quantity * r.price
+    return total
+
+
 async def execute_overseas_buys_with_funding(ops: BrokerOrderOps, buys: list[ExecutionOrderItem]) -> list[OrderResult]:
     """해외 매수를 주문 순서대로 결제 여력에 맞춰 판정·발주한다(plans/140).
 

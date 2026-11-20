@@ -23,7 +23,7 @@ from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExec
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
 from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.accounts.credential_service import decrypt_kis_credentials, decrypt_kiwoom_credentials
-from app.services.rebalancing._broker_order_flow import execute_sell_then_buy
+from app.services.rebalancing._broker_order_flow import execute_sell_then_buy, overseas_sell_proceeds_usd
 from app.services.rebalancing._kis_order_executor import (
     _execute_buys_with_cash_check,
     _execute_sells_with_clamp,
@@ -323,9 +323,17 @@ async def _execute_kiwoom_account_orders(
         account_id=str(acc_uuid),
     )
 
+    # 매도 결과를 매수 판정에 넘긴다 — 결제 전 해외 매도 대금이 달러 예수금에 없어
+    # 매수가 거짓 SKIPPED되지 않게(plans/141 A1)
+    sell_results: list[OrderResult] = []
+
+    async def _sells(sells: list[ExecutionOrderItem]) -> list[OrderResult]:
+        sell_results.extend(await _execute_kiwoom_sells_with_clamp(sells, access_token, account_no, is_mock))
+        return sell_results
+
     return await execute_sell_then_buy(
         group_orders,
-        lambda sells: _execute_kiwoom_sells_with_clamp(sells, access_token, account_no, is_mock),
+        _sells,
         lambda buys: _execute_kiwoom_buys_with_cash_check(
             buys,
             access_token,
@@ -333,6 +341,7 @@ async def _execute_kiwoom_account_orders(
             is_mock,
             krw_order=uses_krw_overseas_order(account),
             cache=cache,
+            pending_sell_usd=overseas_sell_proceeds_usd(sell_results),
         ),
     )
 
