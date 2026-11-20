@@ -132,6 +132,16 @@ def last_completed_us_session(now: datetime | None = None) -> date:
     return d
 
 
+def last_us_session_close_datetime(now: datetime | None = None) -> datetime:
+    """정규장이 끝난 가장 최근 NYSE 거래일의 마감 시각(ET aware, 조기 폐장 반영).
+
+    이 시각 뒤에 나간 해외 매도는 지금 세션(또는 장 마감 후 아직 결제 전) 매도다 — 키움 해외 매수 여력에
+    결제 전 매도 대금을 더할 범위로 쓴다(plans/142 A1).
+    """
+    d = last_completed_us_session(now)
+    return datetime.combine(d, nyse_close_time(d), tzinfo=_EST)
+
+
 def next_us_market_open(now: datetime | None = None) -> datetime:
     """다음 NYSE 정규장 개장 시각(09:30 ET, 거래일) — 지금 장중이면 오늘 개장 시각이 아니라 다음 거래일 개장."""
     t = (now or datetime.now(_EST)).astimezone(_EST)

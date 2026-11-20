@@ -267,3 +267,34 @@ class TestLastCompletedUsSession:
         # 추수감사절(휴장) 낮 → 수요일, 조기 폐장일 13:30 → 그날
         assert last_completed_us_session(datetime(2026, 11, 26, 12, 0, tzinfo=_EST)) == datetime(2026, 11, 25).date()
         assert last_completed_us_session(datetime(2026, 11, 27, 13, 30, tzinfo=_EST)) == datetime(2026, 11, 27).date()
+
+
+class TestLastUsSessionCloseDatetime:
+    """plans/142 A1 — 이 시각 뒤의 해외 매도 대금은 아직 결제 전으로 보고 키움 매수 여력에 더한다."""
+
+    def test_during_session_is_previous_close(self):
+        from app.utils.market_hours import last_us_session_close_datetime
+
+        # 화요일 장중 → 월요일 16:00 ET, 월요일 개장 전 → 지난 금요일 16:00 ET
+        assert last_us_session_close_datetime(datetime(2026, 11, 10, 14, 0, tzinfo=_EST)) == datetime(
+            2026, 11, 9, 16, 0, tzinfo=_EST
+        )
+        assert last_us_session_close_datetime(datetime(2026, 11, 9, 8, 0, tzinfo=_EST)) == datetime(
+            2026, 11, 6, 16, 0, tzinfo=_EST
+        )
+
+    def test_after_close_is_today_close_and_kst_input(self):
+        from app.utils.market_hours import last_us_session_close_datetime
+
+        # 07:40 KST 수요일 = 화요일 17:40 ET → 화요일 마감
+        assert last_us_session_close_datetime(datetime(2026, 11, 11, 7, 40, tzinfo=_KST)) == datetime(
+            2026, 11, 10, 16, 0, tzinfo=_EST
+        )
+
+    def test_early_close_day_uses_13h(self):
+        from app.utils.market_hours import last_us_session_close_datetime
+
+        # 추수감사절 다음 날(조기 폐장) 이후 → 13:00 ET
+        assert last_us_session_close_datetime(datetime(2026, 11, 27, 14, 0, tzinfo=_EST)) == datetime(
+            2026, 11, 27, 13, 0, tzinfo=_EST
+        )

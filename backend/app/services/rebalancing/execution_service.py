@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import UTC, datetime
 
 import structlog
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import (
@@ -18,6 +19,7 @@ from app.core.logging import public_error_message, redact_secrets
 from app.exceptions import AppError, BadRequestError, NotFoundError, SyncError
 from app.kis.auth import get_access_token
 from app.kis.exchange_master import resolve_kis_overseas_market
+from app.kis.order import is_overseas_market
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
@@ -35,6 +37,7 @@ from app.services.rebalancing._kiwoom_order_executor import (
 )
 from app.services.rebalancing.order_cancel_rules import active_account_asset_types, cancel_block_reason
 from app.utils.cache_invalidation import invalidate_rebalancing_analysis_cache
+from app.utils.market_hours import last_us_session_close_datetime
 from app.utils.metrics import rebalancing_execution_count
 
 logger = structlog.get_logger()
@@ -298,6 +301,40 @@ def _split_tax_deferred_overseas_buys(
     return executable, skipped
 
 
+async def _prior_overseas_sell_proceeds_usd(db: AsyncSession, user_id: uuid.UUID, account_id: uuid.UUID) -> float:
+    """현재 미국 세션(직전 정규장 마감 이후)의 이전 실행에서 접수된 해외 매도 대금(달러) — 아직 결제 전일 수 있다.
+
+    AUTO 2단계 플랜은 매도 leg와 매수 leg가 따로 실행되고, 사용자가 매도·매수를 나눠 실행할 수도 있다. 같은 실행의
+    매도만 더하면 이 경우 매수가 거짓 '달러 부족'으로 SKIPPED(전부면 leg FAILED)된다(plans/142 A1).
+    규칙은 `overseas_sell_proceeds_usd`와 같다 — 접수 성공·가격 있는 해외 매도만, 취소된 주문은 뺀다.
+    """
+    rows = (
+        await db.execute(
+            select(
+                RebalancingExecutionResult.market,
+                RebalancingExecutionResult.quantity,
+                RebalancingExecutionResult.price,
+                RebalancingExecutionResult.cancel_status,
+            )
+            .join(RebalancingExecution, RebalancingExecution.id == RebalancingExecutionResult.execution_id)
+            .where(
+                RebalancingExecution.user_id == user_id,
+                RebalancingExecution.executed_at > last_us_session_close_datetime(),
+                RebalancingExecutionResult.account_id == str(account_id),
+                RebalancingExecutionResult.action == "SELL",
+                RebalancingExecutionResult.status == "SUCCESS",
+            )
+        )
+    ).all()
+    total = 0.0
+    for market, quantity, price, cancel_status in rows:
+        if cancel_status == "CANCELED" or not is_overseas_market(market or ""):
+            continue
+        if price and price > 0 and quantity and quantity > 0:
+            total += float(quantity) * float(price)
+    return total
+
+
 async def _execute_kiwoom_account_orders(
     account: AssetAccount,
     group_orders: list[ExecutionOrderItem],
@@ -326,6 +363,14 @@ async def _execute_kiwoom_account_orders(
     # 매도 결과를 매수 판정에 넘긴다 — 결제 전 해외 매도 대금이 달러 예수금에 없어
     # 매수가 거짓 SKIPPED되지 않게(plans/141 A1)
     sell_results: list[OrderResult] = []
+    # 이전 실행(AUTO 매도 leg·분리 실행)의 결제 전 해외 매도 대금 —
+    # 이번 실행 결과는 아직 저장 전이라 겹치지 않는다(plans/142 A1)
+    prior_sell_usd = 0.0
+    if any(o.side == "BUY" and is_overseas_market(o.market) for o in group_orders):
+        try:
+            prior_sell_usd = await _prior_overseas_sell_proceeds_usd(db, user_id, acc_uuid)
+        except Exception as exc:
+            report_handled_failure("kiwoom_prior_overseas_sell_lookup_failed", exc, account_id=str(acc_uuid))
 
     async def _sells(sells: list[ExecutionOrderItem]) -> list[OrderResult]:
         sell_results.extend(await _execute_kiwoom_sells_with_clamp(sells, access_token, account_no, is_mock))
@@ -341,7 +386,7 @@ async def _execute_kiwoom_account_orders(
             is_mock,
             krw_order=uses_krw_overseas_order(account),
             cache=cache,
-            pending_sell_usd=overseas_sell_proceeds_usd(sell_results),
+            pending_sell_usd=prior_sell_usd + overseas_sell_proceeds_usd(sell_results),
         ),
     )
 
