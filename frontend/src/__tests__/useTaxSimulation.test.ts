@@ -281,4 +281,35 @@ describe("useTaxSimulation — 절세 추천이 올해 실현손익을 반영 (p
     expect(recs.map((r) => r.pos.ticker)).toEqual(["BBB"]);
     expect(recs[0]!.shares).toBe(5);
   });
+
+  it("건너뛴 수익 종목 몫으로 끌어온 손실은 추천에서 덜어낸다(plans/141 A2)", () => {
+    // 공제 잔여 0: A(2주·주당 +20,000)는 손실 4주로 덮이고, B(1주 +100,000)는 남은 손실 1주로 못 덮어 건너뛴다
+    const a = makePos({ ticker: "AAA", qty: 2, unrealized_pnl_krw: 40_000 });
+    const b = makePos({ ticker: "BBB", qty: 1, unrealized_pnl_krw: 100_000 });
+    const loss = makePos({ ticker: "LLL", qty: 5, unrealized_pnl_krw: -50_000 });
+    const { result } = renderHook(() =>
+      useTaxSimulation([a, b, loss], 0, { deduction: 0, rate: TAX_RATE }),
+    );
+    const recs = result.current.lossHarvestRecommendations;
+    expect(recs.filter((r) => r.kind === "PROFIT").map((r) => r.pos.ticker)).toEqual(["AAA"]);
+    const lossRec = recs.find((r) => r.kind === "LOSS");
+    expect(lossRec!.shares).toBe(4);
+    // 무세 불변식: 손실 통산 + 공제 잔여 ≥ 수익 실현
+    const profitSum = recs
+      .filter((r) => r.kind === "PROFIT")
+      .reduce((s, r) => s + r.realizedKrw, 0);
+    expect(Math.abs(lossRec!.realizedKrw)).toBeGreaterThanOrEqual(profitSum);
+  });
+
+  it("손실이 모자라 일부만 무세로 팔면 끌어온 손실 중 남는 몫을 덜어낸다", () => {
+    // 공제 잔여 0, A(3주·주당 +30,000=90,000), 손실 5주·주당 −10,000 → 5주 끌어와 예산 50,000 → A 1주(30,000)만 → 손실 3주면 충분
+    const a = makePos({ ticker: "AAA", qty: 3, unrealized_pnl_krw: 90_000 });
+    const loss = makePos({ ticker: "LLL", qty: 5, unrealized_pnl_krw: -50_000 });
+    const { result } = renderHook(() =>
+      useTaxSimulation([a, loss], 0, { deduction: 0, rate: TAX_RATE }),
+    );
+    const recs = result.current.lossHarvestRecommendations;
+    expect(recs.find((r) => r.kind === "PROFIT")!.shares).toBe(1);
+    expect(recs.find((r) => r.kind === "LOSS")!.shares).toBe(3);
+  });
 });

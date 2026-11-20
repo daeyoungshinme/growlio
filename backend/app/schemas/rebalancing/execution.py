@@ -97,8 +97,6 @@ class KisBalanceResponse(BaseModel):
     overseas_known: bool = True
     # 달러 예수금(원화 환산 전). None = 해외 조회 실패·미지원(미확인)
     deposit_usd: float | None = None
-    # 키움 원화주문 계좌 — 달러가 모자란 해외 매수를 증권사가 원화로 결제한다(plans/140)
-    krw_overseas_order: bool = False
     error: str | None = None  # 일괄 조회 시 계좌별 오류 메시지
 
 

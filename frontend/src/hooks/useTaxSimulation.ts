@@ -97,6 +97,25 @@ export function buildTaxRecommendations(
 
   // 수익 실현이 하나도 없으면 손실만 파는 추천은 의미가 없다
   if (profitRecs.length === 0) return [];
+
+  // 종목 전량을 덮으려고 끌어온 손실이 그 종목을 건너뛰거나 일부만 팔아 남을 수 있다 — 실제 필요한 통산액만 남긴다.
+  // 해외 양도 손실은 이월공제가 없어 남는 손실 실현은 버려진다(plans/141 A2). 마지막에 끌어온 손실부터 덜어낸다.
+  const needed = Math.max(
+    0,
+    profitRecs.reduce((s, r) => s + r.realizedKrw, 0) - Math.max(0, remainingDeduction),
+  );
+  let excess =
+    lossQueue.reduce(
+      (s, loss, i) => s + lossSharesUsed[i]! * (Math.abs(loss.unrealized_pnl_krw) / loss.qty),
+      0,
+    ) - needed;
+  for (let i = lossQueue.length - 1; i >= 0 && excess > 1e-6; i--) {
+    const loss = lossQueue[i]!;
+    const lossPerShare = Math.abs(loss.unrealized_pnl_krw) / loss.qty;
+    const drop = Math.min(lossSharesUsed[i]!, Math.floor((excess + 1e-6) / lossPerShare));
+    lossSharesUsed[i] = lossSharesUsed[i]! - drop;
+    excess -= drop * lossPerShare;
+  }
   const lossRecs: TaxRecommendation[] = lossQueue.flatMap((loss, i) => {
     const shares = lossSharesUsed[i]!;
     if (shares <= 0) return [];

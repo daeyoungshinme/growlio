@@ -204,8 +204,6 @@ export interface KisBalanceResponse {
   overseas_known?: boolean;
   /** 달러 예수금(원화 환산 전). null = 해외 조회 실패·미지원 */
   deposit_usd?: number | null;
-  /** 키움 원화주문 계좌 — 달러가 모자란 해외 매수를 증권사가 원화로 결제한다 */
-  krw_overseas_order?: boolean;
   error?: string | null;
 }
 

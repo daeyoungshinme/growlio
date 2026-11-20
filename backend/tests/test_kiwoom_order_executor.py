@@ -565,3 +565,110 @@ class TestKiwoomDomesticLimitTickRounding:
         with patch.object(_kiwoom_order_executor, "place_domestic_order", place):
             await _kiwoom_order_executor._execute_kiwoom_single_order(order, "t", "1234567890", True)
         assert place.call_args.kwargs["limit_price"] == 38_230.0
+
+
+class TestKiwoomSellProceedsFunding:
+    """plans/141 A1: 같은 실행의 해외 매도 대금을 달러 여력에 더한다(결제 전이라 예수금에 없어 거짓 SKIPPED 방지)."""
+
+    def test_overseas_sell_proceeds_counts_only_successful_overseas_sells(self):
+        from app.schemas.rebalancing import OrderResult
+        from app.services.rebalancing._broker_order_flow import overseas_sell_proceeds_usd
+
+        us_sell = _make_order(ticker="QQQ", market="NASDAQ", side="SELL", quantity=2, reference_price=250.0)
+        kr_sell = _make_order(ticker="005930", market="KOSPI", side="SELL", quantity=1, reference_price=70_000.0)
+        failed = _make_order(ticker="SPY", market="NYSE", side="SELL", quantity=1, reference_price=500.0)
+        results = [
+            OrderResult.for_order(us_sell, "SUCCESS"),
+            OrderResult.for_order(kr_sell, "SUCCESS"),
+            OrderResult.for_order(failed, "FAILED"),
+        ]
+
+        assert overseas_sell_proceeds_usd(results) == pytest.approx(500.0)
+
+    @pytest.mark.asyncio
+    async def test_regular_account_buy_uses_pending_sell_proceeds(self, override_settings):
+        usd, krw, rate = _patch_funding(usd=0.0)
+        with (
+            usd,
+            krw,
+            rate,
+            patch.object(
+                _kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})
+            ) as place_fn,
+        ):
+            results = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
+                [_us_buy(quantity=4, limit_price=100.0)],
+                "token",
+                "1234567890",
+                True,
+                krw_order=False,
+                cache=None,
+                pending_sell_usd=500.0,
+            )
+
+        place_fn.assert_awaited_once()
+        assert results[0].status == "SUCCESS"
+        assert results[0].settlement_currency == "USD"
+
+    @pytest.mark.asyncio
+    async def test_krw_order_account_uses_sell_proceeds_before_krw(self, override_settings):
+        # 매도 대금 $50 + 원화 환산 $1000 → $100.3 주문은 달러 부족분만 원화로
+        usd, krw, rate = _patch_funding(usd=0.0, orderable_krw=1_030_000.0)
+        with (
+            usd,
+            krw,
+            rate,
+            patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})),
+        ):
+            enough = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
+                [_us_buy(quantity=1, limit_price=100.0)],
+                "token",
+                "1234567890",
+                True,
+                krw_order=True,
+                cache=None,
+                pending_sell_usd=200.0,
+            )
+            partial = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
+                [_us_buy(quantity=1, limit_price=100.0)],
+                "token",
+                "1234567890",
+                True,
+                krw_order=True,
+                cache=None,
+                pending_sell_usd=50.0,
+            )
+
+        assert enough[0].settlement_currency == "USD"
+        assert partial[0].settlement_currency == "KRW"
+
+    @pytest.mark.asyncio
+    async def test_account_orders_pass_successful_sell_proceeds_to_buys(self, make_account, mock_db, mock_cache):
+        from app.schemas.rebalancing import OrderResult
+        from app.services.rebalancing import execution_service
+
+        account = make_account(asset_type="STOCK_KIWOOM", data_source="KIWOOM_API")
+        account.kiwoom_account_no = "1234567890"
+        account.krw_overseas_order = False
+        sell = _make_order(
+            ticker="QQQ", market="NASDAQ", side="SELL", quantity=2, limit_price=250.0, order_type="LIMIT"
+        )
+        failed_sell = _make_order(ticker="SPY", market="NYSE", side="SELL", quantity=1, reference_price=500.0)
+        buy = _us_buy(ticker="VOO", quantity=1, limit_price=400.0)
+        sells_fn = AsyncMock(
+            return_value=[OrderResult.for_order(sell, "SUCCESS"), OrderResult.for_order(failed_sell, "FAILED")]
+        )
+        buys_fn = AsyncMock(return_value=[OrderResult.for_order(buy, "SUCCESS")])
+
+        with (
+            patch.object(execution_service, "load_kiwoom_credentials", return_value=("k", "s")),
+            patch.object(execution_service, "kiwoom_get_access_token", AsyncMock(return_value="token")),
+            patch.object(execution_service, "_execute_kiwoom_sells_with_clamp", sells_fn),
+            patch.object(execution_service, "_execute_kiwoom_buys_with_cash_check", buys_fn),
+        ):
+            results = await execution_service._execute_kiwoom_account_orders(
+                account, [sell, failed_sell, buy], account.user_id, account.id, mock_db, mock_cache, True
+            )
+
+        assert [r.ticker for r in results] == ["QQQ", "SPY", "VOO"]
+        assert buys_fn.await_args.kwargs["pending_sell_usd"] == pytest.approx(500.0)

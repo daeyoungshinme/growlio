@@ -64,10 +64,12 @@ def _kiwoom_ops(
     *,
     krw_order: bool = False,
     cache=None,
+    pending_sell_usd: float = 0.0,
 ) -> BrokerOrderOps:
     async def _overseas_funding() -> OverseasFunding:
         # 해외 주문 API엔 결제통화 필드가 없다 — 원화 결제는 계좌의 원화주문 신청(`krw_order`)이 정한다(plans/140)
-        usd = float(await kiwoom_get_overseas_deposit_usd(access_token, is_mock=is_mock))
+        # 같은 실행에서 접수된 해외 매도 대금은 결제 전이라 예수금에 없을 수 있어 더한다(plans/141 A1)
+        usd = float(await kiwoom_get_overseas_deposit_usd(access_token, is_mock=is_mock)) + max(0.0, pending_sell_usd)
         if not krw_order:
             return OverseasFunding(usd=usd, krw_order=False)
         rate, is_live = await get_live_or_cached_usd_krw(cache)
@@ -114,8 +116,11 @@ async def _execute_kiwoom_buys_with_cash_check(
     *,
     krw_order: bool = False,
     cache=None,
+    pending_sell_usd: float = 0.0,
 ) -> list[OrderResult]:
     """키움 매수 — 국내는 원화 매수여력으로 clamp, 해외는 달러 우선·원화주문 계좌만 원화로 판정한다
-    (`execute_buys_with_cash_check`, plans/140)."""
-    ops = _kiwoom_ops(access_token, account_no, is_mock, krw_order=krw_order, cache=cache)
+    (`execute_buys_with_cash_check`, plans/140). `pending_sell_usd`는 같은 실행의 해외 매도 대금(plans/141 A1)."""
+    ops = _kiwoom_ops(
+        access_token, account_no, is_mock, krw_order=krw_order, cache=cache, pending_sell_usd=pending_sell_usd
+    )
     return await execute_buys_with_cash_check(ops, buys)
