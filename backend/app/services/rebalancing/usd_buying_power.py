@@ -138,6 +138,14 @@ async def _krw_order_usd(token: str, is_mock: bool, cache) -> float | None:
     if not is_live or rate <= 0:
         return None
     orderable_krw = await get_orderable_krw(token, is_mock=is_mock)
+    return krw_order_usd_capacity(orderable_krw, rate)
+
+
+def krw_order_usd_capacity(orderable_krw: float, rate: float) -> float:
+    """원화 매수여력이 원화주문으로 덮을 수 있는 달러 — 실환율에 `KRW_ORDER_FX_MARGIN` 여유를 둔다.
+
+    적립 실행 판정(`_krw_order_usd`)과 수동 실행 결제 판정(`_kiwoom_order_executor`)이 같은 식을 쓴다.
+    """
     return max(0.0, float(orderable_krw)) / (rate * KRW_ORDER_FX_MARGIN)
 
 

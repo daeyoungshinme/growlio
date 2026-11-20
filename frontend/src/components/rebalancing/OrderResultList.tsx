@@ -89,6 +89,7 @@ export function OrderResultList({ results }: { results: ExecutionResult[] }) {
                     {o.order_type === "LIMIT" ? "지정가" : "시장가"}
                   </span>
                   <span>{fmtOrderPrice(o.price, o.market)}</span>
+                  {o.settlement_currency === "KRW" && <KrwSettlementBadge />}
                 </div>
                 {/* 실패 사유는 잘리지 않게 전폭 줄로, 주문번호는 증권사 문의용이라 생략 (docs/plans/67 P2-1) */}
                 {o.error_msg && (
@@ -141,6 +142,11 @@ export function OrderResultList({ results }: { results: ExecutionResult[] }) {
                   </td>
                   <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">
                     {fmtOrderPrice(o.price, o.market)}
+                    {o.settlement_currency === "KRW" && (
+                      <div className="mt-0.5">
+                        <KrwSettlementBadge />
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-right">{o.quantity}주</td>
                   <td className="px-3 py-2 text-center">
@@ -168,5 +174,14 @@ export function OrderResultList({ results }: { results: ExecutionResult[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/** 키움 원화주문 — 달러가 모자라 부족분을 원화로 결제한 해외 매수(plans/140) */
+function KrwSettlementBadge() {
+  return (
+    <span className="text-xs px-1.5 py-0.5 rounded-sm bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700/40">
+      원화 결제
+    </span>
   );
 }

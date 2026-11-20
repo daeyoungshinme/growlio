@@ -4,15 +4,20 @@ from __future__ import annotations
 
 from app.kis.order import is_overseas_market
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
+from app.kiwoom.balance import get_orderable_krw as kiwoom_get_orderable_krw
 from app.kiwoom.balance import get_overseas_balance as kiwoom_get_overseas_balance
+from app.kiwoom.balance import get_overseas_deposit_usd as kiwoom_get_overseas_deposit_usd
 from app.kiwoom.order import place_domestic_order, place_overseas_order
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
 from app.services.rebalancing._broker_order_flow import (
     BrokerOrderOps,
+    OverseasFunding,
     execute_buys_with_cash_check,
     execute_sells_with_clamp,
 )
 from app.services.rebalancing._order_executor_common import execute_single_order, snap_domestic_limit_price
+from app.services.rebalancing.usd_buying_power import krw_order_usd_capacity
+from app.utils.currency import get_live_or_cached_usd_krw
 
 
 async def _execute_kiwoom_single_order(
@@ -52,7 +57,25 @@ async def _execute_kiwoom_single_order(
     return await execute_single_order(order, _place, is_mock, log_prefix="kiwoom_order")
 
 
-def _kiwoom_ops(access_token: str, account_no: str, is_mock: bool) -> BrokerOrderOps:
+def _kiwoom_ops(
+    access_token: str,
+    account_no: str,
+    is_mock: bool,
+    *,
+    krw_order: bool = False,
+    cache=None,
+) -> BrokerOrderOps:
+    async def _overseas_funding() -> OverseasFunding:
+        # 해외 주문 API엔 결제통화 필드가 없다 — 원화 결제는 계좌의 원화주문 신청(`krw_order`)이 정한다(plans/140)
+        usd = float(await kiwoom_get_overseas_deposit_usd(access_token, is_mock=is_mock))
+        if not krw_order:
+            return OverseasFunding(usd=usd, krw_order=False)
+        rate, is_live = await get_live_or_cached_usd_krw(cache)
+        if not is_live or rate <= 0:
+            return OverseasFunding(usd=usd, krw_order=True, krw_as_usd=None)
+        orderable_krw = await kiwoom_get_orderable_krw(access_token, is_mock=is_mock)
+        return OverseasFunding(usd=usd, krw_order=True, krw_as_usd=krw_order_usd_capacity(orderable_krw, rate))
+
     async def _budget() -> float:
         # kt00001의 orderable_krw(100stk_ord_alow_amt = 미수 없는 현금 매수여력)는 KIS `get_orderable_cash()`의
         # nrcvb_buy_amt와 대칭이며 매도예정금(D+2)을 포함한다. 없으면 deposit_krw(D+2 추정예수금)로 폴백한다.
@@ -69,6 +92,7 @@ def _kiwoom_ops(access_token: str, account_no: str, is_mock: bool) -> BrokerOrde
         overseas_position_key=lambda p: p["ticker"],
         overseas_order_key=lambda o: o.ticker,
         log_prefix="kiwoom_",
+        overseas_buy_funding=_overseas_funding,
     )
 
 
@@ -87,6 +111,11 @@ async def _execute_kiwoom_buys_with_cash_check(
     access_token: str,
     account_no: str,
     is_mock: bool,
+    *,
+    krw_order: bool = False,
+    cache=None,
 ) -> list[OrderResult]:
-    """키움 FULL 전략 매수 — 현금 매수여력으로 clamp한다(`execute_buys_with_cash_check`)."""
-    return await execute_buys_with_cash_check(_kiwoom_ops(access_token, account_no, is_mock), buys)
+    """키움 매수 — 국내는 원화 매수여력으로 clamp, 해외는 달러 우선·원화주문 계좌만 원화로 판정한다
+    (`execute_buys_with_cash_check`, plans/140)."""
+    ops = _kiwoom_ops(access_token, account_no, is_mock, krw_order=krw_order, cache=cache)
+    return await execute_buys_with_cash_check(ops, buys)

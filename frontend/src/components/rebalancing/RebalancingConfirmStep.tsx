@@ -1,5 +1,5 @@
 import { useRebalancingExecutionContext } from "@/hooks/useRebalancingExecution";
-import { fmtKrw, fmtKrwPrice } from "@/utils/format";
+import { fmtKrw, fmtKrwPrice, fmtUsd } from "@/utils/format";
 import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 import { STRATEGY_OPTIONS } from "@/constants/rebalancingConfig";
 import { CashSummaryBar } from "./CashSummaryBar";
@@ -112,6 +112,9 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
               <span className="text-gray-800 dark:text-gray-200 font-medium">
                 {fmtKrw(globalCashSummary.totalDeposit ?? 0)}
               </span>
+              {Object.values(state.depositUsd).some((v) => v > 0) && (
+                <span className="ml-1 text-gray-500 dark:text-gray-500">(달러 환산 포함)</span>
+              )}
             </span>
             {(globalCashSummary.totalSellProceeds ?? 0) > 0 && (
               <span>
@@ -234,6 +237,19 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                         <span className="text-gray-700 dark:text-gray-300">
                           {fmtKrwPrice(state.orderableKrw[acc.id] ?? depositKrw[acc.id] ?? 0)}
                         </span>
+                        {state.depositUsd[acc.id] != null && (
+                          <>
+                            {" · "}
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {fmtUsd(state.depositUsd[acc.id] ?? 0)}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    )}
+                    {cashAnalysis.krwOverseasOrder && (
+                      <span className="text-xs px-1.5 py-0.5 rounded-sm bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700/40">
+                        원화주문
                       </span>
                     )}
                     <button

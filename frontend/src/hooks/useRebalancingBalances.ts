@@ -30,6 +30,7 @@ export function useRebalancingBalances(
         positions: res.positions,
         deposit: res.deposit_krw,
         orderable: res.orderable_krw,
+        depositUsd: res.deposit_usd ?? null,
         overseasUnknown: res.overseas_known === false,
       });
       if (res.overseas_known === false) toast(OVERSEAS_UNKNOWN_MSG, "info");
@@ -53,6 +54,7 @@ export function useRebalancingBalances(
       const balances: Record<string, KisBalancePosition[]> = {};
       const deposits: Record<string, number> = {};
       const orderables: Record<string, number> = {};
+      const depositsUsd: Record<string, number> = {};
       const overseasUnknown: Record<string, boolean> = {};
       const states: Record<string, BalanceLoadState> = {};
       responses.forEach((res) => {
@@ -64,6 +66,7 @@ export function useRebalancingBalances(
           if (res.orderable_krw !== null && res.orderable_krw !== undefined) {
             orderables[res.account_id] = res.orderable_krw;
           }
+          if (res.deposit_usd != null) depositsUsd[res.account_id] = res.deposit_usd;
           overseasUnknown[res.account_id] = res.overseas_known === false;
           states[res.account_id] = "loaded";
         }
@@ -73,6 +76,7 @@ export function useRebalancingBalances(
         balances,
         deposits,
         orderables,
+        depositsUsd,
         overseasUnknown,
         states,
       });

@@ -5,6 +5,7 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 
 vi.mock("@/utils/format", () => ({
   fmtKrwPrice: vi.fn((n: number) => `${n.toLocaleString()}원`),
+  fmtUsd: vi.fn((n: number) => `$${n.toLocaleString("en-US")}`),
 }));
 
 vi.mock("@/components/rebalancing/RebalancingBadges", () => ({
@@ -26,6 +27,9 @@ describe("CashSummaryBar", () => {
     totalAvailable: null,
     buyCost: null,
     surplus: null,
+    depositUsd: null,
+    krwOverseasOrder: false,
+    usd: null,
   };
 
   it("deposit이 null이면 아무것도 렌더링하지 않는다", () => {
@@ -175,5 +179,49 @@ describe("RebalancingResultSection", () => {
     };
     renderWithProviders(<RebalancingResultSection results={[failedResult]} />);
     expect(screen.getAllByText("잔고 부족").length).toBeGreaterThan(0);
+  });
+});
+
+describe("CashSummaryBar — 달러 예수금(plans/140)", () => {
+  const base: CashAnalysis = {
+    deposit: 1_000_000,
+    isOrderableKnown: true,
+    sellProceeds: 0,
+    totalAvailable: 1_000_000,
+    buyCost: 0,
+    surplus: 1_000_000,
+    depositUsd: 50,
+    krwOverseasOrder: false,
+    usd: { available: 50, required: 200, shortfall: 150, krwForUsdShortfall: 0 },
+  };
+
+  it("달러 예수금과 해외 매수필요를 표시한다", () => {
+    render(<CashSummaryBar analysis={base} />);
+    expect(screen.getByText(/달러 예수금/)).toBeDefined();
+    expect(screen.getByText("$50")).toBeDefined();
+    expect(screen.getByText("$200")).toBeDefined();
+  });
+
+  it("일반 계좌의 달러 부족은 건너뜀과 원화주문 안내를 보인다", () => {
+    render(<CashSummaryBar analysis={base} />);
+    expect(screen.getByText(/건너뜁니다/)).toBeDefined();
+  });
+
+  it("원화주문 계좌는 부족분을 원화로 결제한다고 보인다", () => {
+    render(
+      <CashSummaryBar
+        analysis={{
+          ...base,
+          krwOverseasOrder: true,
+          usd: { ...base.usd!, krwForUsdShortfall: 154_500 },
+        }}
+      />,
+    );
+    expect(screen.getByText(/원화\(약 .*\)로 결제됩니다/)).toBeDefined();
+  });
+
+  it("달러를 모르면 달러 줄을 그리지 않는다", () => {
+    render(<CashSummaryBar analysis={{ ...base, depositUsd: null, usd: null }} />);
+    expect(screen.queryByText(/달러 예수금/)).toBeNull();
   });
 });

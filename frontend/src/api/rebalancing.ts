@@ -148,6 +148,8 @@ export interface OrderResult {
   cancel_message?: string | null;
   /** 서버 판정: 접수된 당일 주문 등 취소 요청이 가능한 주문. 체결 여부는 증권사 응답으로만 확정된다 */
   cancelable?: boolean;
+  /** 키움 해외 매수의 예상 결제 통화 — KRW면 원화주문으로 달러 부족분을 원화로 냈다(응답 전용, 이력엔 없음) */
+  settlement_currency?: "USD" | "KRW" | null;
 }
 
 export interface OrderCancelResponse {
@@ -200,6 +202,10 @@ export interface KisBalanceResponse {
   orderable_krw: number | null;
   /** false면 해외 잔고 조회 실패로 positions에 해외 보유분이 빠져 있다 */
   overseas_known?: boolean;
+  /** 달러 예수금(원화 환산 전). null = 해외 조회 실패·미지원 */
+  deposit_usd?: number | null;
+  /** 키움 원화주문 계좌 — 달러가 모자란 해외 매수를 증권사가 원화로 결제한다 */
+  krw_overseas_order?: boolean;
   error?: string | null;
 }
 

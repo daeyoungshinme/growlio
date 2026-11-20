@@ -7,7 +7,12 @@ from datetime import UTC, datetime
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import ORDER_EXECUTABLE_ASSET_TYPES, OVERSEAS_MARKETS, TAX_DEFERRED_TAX_TYPES
+from app.constants import (
+    ORDER_EXECUTABLE_ASSET_TYPES,
+    OVERSEAS_MARKETS,
+    TAX_DEFERRED_TAX_TYPES,
+    uses_krw_overseas_order,
+)
 from app.core.job_runner import report_handled_failure
 from app.core.logging import public_error_message, redact_secrets
 from app.exceptions import AppError, BadRequestError, NotFoundError, SyncError
@@ -321,7 +326,14 @@ async def _execute_kiwoom_account_orders(
     return await execute_sell_then_buy(
         group_orders,
         lambda sells: _execute_kiwoom_sells_with_clamp(sells, access_token, account_no, is_mock),
-        lambda buys: _execute_kiwoom_buys_with_cash_check(buys, access_token, account_no, is_mock),
+        lambda buys: _execute_kiwoom_buys_with_cash_check(
+            buys,
+            access_token,
+            account_no,
+            is_mock,
+            krw_order=uses_krw_overseas_order(account),
+            cache=cache,
+        ),
     )
 
 
