@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import structlog
 
+from app.constants import uses_krw_overseas_order
 from app.core.database import AsyncSessionLocal
 from app.kis.auth import get_access_token
 from app.kis.balance import get_orderable_cash
@@ -103,4 +104,6 @@ async def fetch_broker_balance(
         deposit_krw=result.deposit_krw,
         orderable_krw=orderable_krw,
         overseas_known=result.overseas_known,
+        deposit_usd=result.deposit_foreign,
+        krw_overseas_order=uses_krw_overseas_order(account),
     )

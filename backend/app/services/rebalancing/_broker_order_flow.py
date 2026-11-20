@@ -17,9 +17,28 @@ import structlog
 from app.core.job_runner import report_handled_failure
 from app.kis.order import is_overseas_market
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
-from app.services.rebalancing._order_quantity_guard import clamp_buy_orders_to_budget, clamp_sell_orders
+from app.services.rebalancing._order_quantity_guard import (
+    budget_unit_price,
+    clamp_buy_orders_to_budget,
+    clamp_sell_orders,
+)
+from app.services.rebalancing.usd_buying_power import FX_FEE_BUFFER
 
 logger = structlog.get_logger()
+
+
+@dataclass(frozen=True)
+class OverseasFunding:
+    """해외 매수 직전 결제 여력(plans/140).
+
+    `krw_as_usd`는 원화주문 계좌의 원화 매수여력을 달러로 환산한 값 — 일반 계좌는 0, 실환율이 없어 판정할 수
+    없으면 None. 키움 REST 해외 주문엔 결제통화 필드가 없어 원화 결제 여부는 계좌의 원화주문 신청이 정하고,
+    신청 계좌는 증권사가 보유 달러를 먼저 쓰고 부족분만 원화로 결제한다.
+    """
+
+    usd: float
+    krw_order: bool
+    krw_as_usd: float | None = 0.0
 
 
 @dataclass(frozen=True)
@@ -34,6 +53,9 @@ class BrokerOrderOps:
     overseas_position_key: Callable[[dict], str]
     overseas_order_key: Callable[[ExecutionOrderItem], str]
     log_prefix: str = ""
+    # 해외 매수 결제 여력(달러·원화주문) — 있으면 해외 매수를 주문마다 판정한다(키움, plans/140).
+    # None이면 판정 없이 발주
+    overseas_buy_funding: Callable[[], Awaitable[OverseasFunding]] | None = None
 
 
 def _held_qty(positions: list[dict], key: Callable[[dict], str]) -> dict[str, int]:
@@ -102,9 +124,24 @@ async def execute_buys_with_cash_check(ops: BrokerOrderOps, buys: list[Execution
     if not buys:
         return []
 
+    if ops.overseas_buy_funding is not None:
+        domestic_buys = [o for o in buys if not is_overseas_market(o.market)]
+        overseas_buys = [o for o in buys if is_overseas_market(o.market)]
+        results = await _execute_domestic_buys_within_budget(ops, domestic_buys) if domestic_buys else []
+        # 국내 매수 뒤에 조회해야 원화주문 계좌의 원화 여력이 방금 쓴 몫만큼 줄어 있다
+        results.extend(await execute_overseas_buys_with_funding(ops, overseas_buys))
+        return results
+
     if any(is_overseas_market(o.market) for o in buys):
         return [await ops.place(order) for order in buys]
 
+    return await _execute_domestic_buys_within_budget(ops, buys)
+
+
+async def _execute_domestic_buys_within_budget(
+    ops: BrokerOrderOps, buys: list[ExecutionOrderItem]
+) -> list[OrderResult]:
+    """국내 매수를 원화 매수여력(`domestic_buy_budget`)으로 clamp해 발주한다. 조회 실패면 예산 0."""
     try:
         budget = await ops.domestic_buy_budget()
     except Exception as exc:
@@ -115,6 +152,97 @@ async def execute_buys_with_cash_check(ops: BrokerOrderOps, buys: list[Execution
     results: list[OrderResult] = list(skipped)
     for order in adjusted:
         results.append(await ops.place(order))
+    return results
+
+
+def usd_short_message(required: float, available: float) -> str:
+    return (
+        f"달러 예수금이 부족해 매수를 건너뜁니다(필요 약 ${required:,.2f}, 남은 ${available:,.2f}). "
+        "환전하거나, 키움 원화주문을 신청했다면 계좌관리에서 '원화주문'을 켜세요."
+    )
+
+
+def krw_order_short_message(required: float, available: float) -> str:
+    return (
+        f"달러·원화 매수여력이 모두 부족해 매수를 건너뜁니다"
+        f"(필요 약 ${required:,.2f}, 원화 포함 여력 약 ${available:,.2f})."
+    )
+
+
+def overseas_required_usd(order: ExecutionOrderItem) -> float | None:
+    """해외 매수 주문 하나에 필요한 달러(지정가, 시장가면 참고 시세+여유 × 수수료 여유). 가격을 모르면 None."""
+    price = budget_unit_price(order)
+    if price is None:
+        return None
+    return order.quantity * price * FX_FEE_BUFFER
+
+
+async def execute_overseas_buys_with_funding(ops: BrokerOrderOps, buys: list[ExecutionOrderItem]) -> list[OrderResult]:
+    """해외 매수를 주문 순서대로 결제 여력에 맞춰 판정·발주한다(plans/140).
+
+    - 남은 달러로 충분 → 발주(USD 결제)
+    - 달러 부족 + 원화주문 계좌 → 남은 달러 + 원화 환산 여력으로 충분하면 발주(부족분 원화 결제), 아니면 SKIPPED
+    - 달러 부족 + 일반 계좌 → SKIPPED(API로 원화 결제를 고를 수 없다)
+    - 가격 모름·여력 조회 실패·원화 환산 불가(실환율 없음) → 판정 없이 발주(증권사가 최종 판정 — 기존 원칙)
+    여력은 성공한 주문 몫만 뺀다(실패한 주문이 다음 주문을 거짓으로 막지 않게).
+    """
+    if not buys:
+        return []
+    funding_fn = ops.overseas_buy_funding
+    if funding_fn is None or all(overseas_required_usd(o) is None for o in buys):
+        return [await ops.place(order) for order in buys]
+    try:
+        funding = await funding_fn()
+    except Exception as exc:
+        report_handled_failure(f"{ops.log_prefix}overseas_buy_funding_failed", exc)
+        return [await ops.place(order) for order in buys]
+
+    usd_left = max(0.0, funding.usd)
+    krw_left = funding.krw_as_usd if funding.krw_order else 0.0
+    results: list[OrderResult] = []
+    for order in buys:
+        required = overseas_required_usd(order)
+        if required is None:
+            results.append(await ops.place(order))
+            continue
+        if required <= usd_left + 1e-6:
+            result = await ops.place(order)
+            if result.status == "SUCCESS":
+                usd_left = max(0.0, usd_left - required)
+                result = result.model_copy(update={"settlement_currency": "USD"})
+            results.append(result)
+            continue
+        if not funding.krw_order:
+            logger.info(
+                f"{ops.log_prefix}overseas_buy_usd_short",
+                ticker=order.ticker,
+                required_usd=round(required, 2),
+                available_usd=round(usd_left, 2),
+            )
+            results.append(OrderResult.for_order(order, "SKIPPED", error_msg=usd_short_message(required, usd_left)))
+            continue
+        if krw_left is None:
+            # 실환율이 없어 원화 여력을 달러로 못 바꾼다 — 판정 없이 보내 증권사에 맡긴다
+            logger.info(f"{ops.log_prefix}overseas_buy_krw_capacity_unknown", ticker=order.ticker)
+            results.append(await ops.place(order))
+            continue
+        if required <= usd_left + krw_left + 1e-6:
+            result = await ops.place(order)
+            if result.status == "SUCCESS":
+                krw_left = max(0.0, krw_left - (required - usd_left))
+                usd_left = 0.0
+                result = result.model_copy(update={"settlement_currency": "KRW"})
+            results.append(result)
+            continue
+        logger.info(
+            f"{ops.log_prefix}overseas_buy_krw_order_short",
+            ticker=order.ticker,
+            required_usd=round(required, 2),
+            available_usd=round(usd_left + krw_left, 2),
+        )
+        results.append(
+            OrderResult.for_order(order, "SKIPPED", error_msg=krw_order_short_message(required, usd_left + krw_left))
+        )
     return results
 
 

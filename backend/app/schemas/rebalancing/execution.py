@@ -95,6 +95,10 @@ class KisBalanceResponse(BaseModel):
     orderable_krw: float | None = None  # KIS만 지원 (nrcvb_buy_amt), 키움=None
     # False면 해외 잔고 조회가 실패해 positions에 해외 보유분이 빠져 있다 — 해외 매도 수량을 0으로 오인하지 않게
     overseas_known: bool = True
+    # 달러 예수금(원화 환산 전). None = 해외 조회 실패·미지원(미확인)
+    deposit_usd: float | None = None
+    # 키움 원화주문 계좌 — 달러가 모자란 해외 매수를 증권사가 원화로 결제한다(plans/140)
+    krw_overseas_order: bool = False
     error: str | None = None  # 일괄 조회 시 계좌별 오류 메시지
 
 
@@ -116,6 +120,9 @@ class OrderResult(BaseModel):
     cancel_status: str | None = None  # "CANCELED" | "CANCEL_FAILED"
     cancel_message: str | None = None
     cancelable: bool = False
+    # 키움 해외 매수의 예상 결제 통화(plans/140) — 달러로 충분하면 USD, 원화주문 계좌가 부족분을 원화로 내면 KRW.
+    # 응답 전용(이력에 저장하지 않음). 판정하지 않은 주문은 None
+    settlement_currency: Literal["USD", "KRW"] | None = None
 
     @classmethod
     def for_order(cls, order: ExecutionOrderItem, status: str, **fields: Any) -> "OrderResult":

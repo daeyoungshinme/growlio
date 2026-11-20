@@ -376,6 +376,177 @@ class TestExecuteKiwoomBuysWithCashCheck:
         assert results == []
 
 
+def _us_buy(ticker: str = "AAPL", quantity: int = 1, limit_price: float = 100.0) -> ExecutionOrderItem:
+    return _make_order(
+        ticker=ticker, market="NASDAQ", side="BUY", quantity=quantity, order_type="LIMIT", limit_price=limit_price
+    )
+
+
+def _patch_funding(usd: float, orderable_krw: float = 0.0, rate: float = 1000.0, is_live: bool = True):
+    return (
+        patch.object(_kiwoom_order_executor, "kiwoom_get_overseas_deposit_usd", AsyncMock(return_value=usd)),
+        patch.object(_kiwoom_order_executor, "kiwoom_get_orderable_krw", AsyncMock(return_value=orderable_krw)),
+        patch.object(_kiwoom_order_executor, "get_live_or_cached_usd_krw", AsyncMock(return_value=(rate, is_live))),
+    )
+
+
+async def _run_buys(buys, *, krw_order: bool):
+    return await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
+        buys, "token", "1234567890", True, krw_order=krw_order, cache=None
+    )
+
+
+class TestKiwoomOverseasBuyFunding:
+    """plans/140: 해외 매수는 달러 우선 → 원화주문 계좌만 원화, 일반 계좌 달러 부족은 건너뛴다."""
+
+    @pytest.mark.asyncio
+    async def test_enough_usd_places_as_usd(self, override_settings):
+        usd, krw, rate = _patch_funding(usd=500.0)
+        with (
+            usd,
+            krw as krw_fn,
+            rate,
+            patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})),
+        ):
+            results = await _run_buys([_us_buy(quantity=2, limit_price=100.0)], krw_order=True)
+
+        assert results[0].status == "SUCCESS"
+        assert results[0].settlement_currency == "USD"
+        krw_fn.assert_awaited_once()  # 원화주문 계좌는 원화 여력도 미리 받는다
+
+    @pytest.mark.asyncio
+    async def test_usd_short_regular_account_skips(self, override_settings):
+        usd, krw, rate = _patch_funding(usd=50.0, orderable_krw=10_000_000.0)
+        with (
+            usd,
+            krw as krw_fn,
+            rate,
+            patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock()) as place_fn,
+        ):
+            results = await _run_buys([_us_buy(quantity=1, limit_price=100.0)], krw_order=False)
+
+        place_fn.assert_not_called()
+        krw_fn.assert_not_called()
+        assert results[0].status == "SKIPPED"
+        assert "달러 예수금이 부족" in (results[0].error_msg or "")
+        assert "원화주문" in (results[0].error_msg or "")
+
+    @pytest.mark.asyncio
+    async def test_usd_short_krw_order_account_places_as_krw(self, override_settings):
+        # 달러 $50 + 원화 1,030,000 ÷ (1000 × 1.03) = $1000 여력 → $100.3 주문은 부족분을 원화로
+        usd, krw, rate = _patch_funding(usd=50.0, orderable_krw=1_030_000.0)
+        with (
+            usd,
+            krw,
+            rate,
+            patch.object(
+                _kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})
+            ) as place_fn,
+        ):
+            results = await _run_buys([_us_buy(quantity=1, limit_price=100.0)], krw_order=True)
+
+        place_fn.assert_awaited_once()
+        assert results[0].status == "SUCCESS"
+        assert results[0].settlement_currency == "KRW"
+
+    @pytest.mark.asyncio
+    async def test_krw_order_account_short_on_both_skips(self, override_settings):
+        usd, krw, rate = _patch_funding(usd=10.0, orderable_krw=10_300.0)  # 원화 환산 $10
+        with (
+            usd,
+            krw,
+            rate,
+            patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock()) as place_fn,
+        ):
+            results = await _run_buys([_us_buy(quantity=1, limit_price=100.0)], krw_order=True)
+
+        place_fn.assert_not_called()
+        assert results[0].status == "SKIPPED"
+        assert "달러·원화" in (results[0].error_msg or "")
+
+    @pytest.mark.asyncio
+    async def test_usd_consumed_in_order_then_krw(self, override_settings):
+        # 첫 주문이 달러 $150 중 $100.3을 쓰고, 둘째 주문은 남은 달러 + 원화로
+        usd, krw, rate = _patch_funding(usd=150.0, orderable_krw=1_030_000.0)
+        with (
+            usd,
+            krw,
+            rate,
+            patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})),
+        ):
+            results = await _run_buys([_us_buy("AAPL"), _us_buy("MSFT")], krw_order=True)
+
+        assert [r.settlement_currency for r in results] == ["USD", "KRW"]
+
+    @pytest.mark.asyncio
+    async def test_failed_order_does_not_consume_usd(self, override_settings):
+        usd, krw, rate = _patch_funding(usd=150.0)
+        place = AsyncMock(side_effect=[RuntimeError("rejected"), {"order_no": "2"}])
+        with usd, krw, rate, patch.object(_kiwoom_order_executor, "place_overseas_order", place):
+            results = await _run_buys([_us_buy("AAPL"), _us_buy("MSFT")], krw_order=False)
+
+        assert results[0].status == "FAILED"
+        assert results[1].status == "SUCCESS"
+        assert results[1].settlement_currency == "USD"
+
+    @pytest.mark.asyncio
+    async def test_no_live_rate_krw_order_places_unchecked(self, override_settings):
+        usd, krw, rate = _patch_funding(usd=0.0, is_live=False)
+        with (
+            usd,
+            krw as krw_fn,
+            rate,
+            patch.object(
+                _kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})
+            ) as place_fn,
+        ):
+            results = await _run_buys([_us_buy()], krw_order=True)
+
+        krw_fn.assert_not_called()
+        place_fn.assert_awaited_once()
+        assert results[0].settlement_currency is None
+
+    @pytest.mark.asyncio
+    async def test_funding_lookup_failure_places_unchecked(self, override_settings):
+        with (
+            patch.object(
+                _kiwoom_order_executor,
+                "kiwoom_get_overseas_deposit_usd",
+                AsyncMock(side_effect=RuntimeError("network")),
+            ),
+            patch.object(
+                _kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})
+            ) as place_fn,
+        ):
+            results = await _run_buys([_us_buy()], krw_order=False)
+
+        place_fn.assert_awaited_once()
+        assert results[0].status == "SUCCESS"
+
+    @pytest.mark.asyncio
+    async def test_mixed_buys_clamp_domestic_and_judge_overseas(self, override_settings):
+        domestic = _make_order(ticker="005930", side="BUY", quantity=10, order_type="LIMIT", limit_price=1000.0)
+        usd, krw, rate = _patch_funding(usd=0.0)
+        with (
+            patch.object(
+                _kiwoom_order_executor,
+                "kiwoom_get_domestic_balance",
+                AsyncMock(return_value={"positions": [], "deposit_krw": 3000.0}),
+            ),
+            patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "1"})),
+            usd,
+            krw,
+            rate,
+            patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock()) as place_overseas,
+        ):
+            results = await _run_buys([_us_buy(), domestic], krw_order=False)
+
+        assert results[0].ticker == "005930"
+        assert results[0].quantity == 3  # 해외가 섞여도 국내는 원화 매수여력으로 clamp
+        assert results[1].status == "SKIPPED"
+        place_overseas.assert_not_called()
+
+
 class TestKiwoomDomesticLimitTickRounding:
     """키움 경로도 같은 호가 보정을 거친다 (plans/61 C2)."""
 
