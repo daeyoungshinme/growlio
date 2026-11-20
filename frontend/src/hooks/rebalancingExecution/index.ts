@@ -4,6 +4,7 @@ import type { AssetAccount } from "@/api/assets";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { invalidateRebalancingHistoryData, invalidateSyncData } from "@/utils/queryInvalidation";
 import { isOrderExecutableAccount } from "@/utils/accounts";
+import { isOverseasMarket } from "@/constants/markets";
 import { toast } from "@/utils/toast";
 import { triggerHaptic } from "../useHaptic";
 import {
@@ -40,8 +41,10 @@ import {
   getEstimateKrw as getEstimateKrwOf,
   getLimitPriceNative as getLimitPriceNativeOf,
   getSellRows,
+  KRW_ORDER_FX_MARGIN,
   referencePriceNative,
   sumSelectedEstimates,
+  sumSelectedOverseasBuyUsd,
   type PriceInput,
   type TradeRow,
   type TradeRowsInput,
@@ -105,6 +108,7 @@ export function useRebalancingExecution({
         balanceState: {},
         depositKrw: {},
         orderableKrw: {},
+        depositUsd: {},
         priceState: "idle" as PriceLoadState,
         priceLoadProgress: { loaded: 0, total: 0 },
         livePricesKrw: {},
@@ -255,29 +259,82 @@ export function useRebalancingExecution({
 
   function getCashAnalysis(accountId: string): CashAnalysis {
     const isOrderableKnown = accountId in state.orderableKrw;
-    const deposit = isOrderableKnown
+    const krwCash = isOrderableKnown
       ? (state.orderableKrw[accountId] ?? null)
       : (state.depositKrw[accountId] ?? null);
-    const sellProceeds = sumSelectedEstimates(
-      prices,
-      sellRowsByAccount[accountId] ?? [],
-      "sell",
-      accountId,
-      selected,
-      qtyOverrides,
-    );
-    const buyCost = sumSelectedEstimates(
+    const account = tradableAccounts.find((a) => a.id === accountId);
+    const krwOverseasOrder =
+      account?.asset_type === "STOCK_KIWOOM" && account.krw_overseas_order === true;
+    const depositUsd = state.depositUsd[accountId] ?? null;
+    const sum = (side: "sell" | "buy", filter?: (market: string) => boolean) =>
+      sumSelectedEstimates(
+        prices,
+        (side === "sell" ? sellRowsByAccount : buyRowsByAccount)[accountId] ?? [],
+        side,
+        accountId,
+        selected,
+        qtyOverrides,
+        filter,
+      );
+    const isDomestic = (m: string) => !isOverseasMarket(m);
+
+    // 키움은 해외 주문 결제통화를 API로 고를 수 없어 실행기가 달러 우선 → 원화주문 계좌만 원화로 판정한다(plans/140).
+    // 화면도 같은 기준으로 원화·달러를 따로 본다. 달러·환율·시세 중 하나라도 모르면 예전처럼 원화 환산 합계로.
+    const overseasBuyUsd = sumSelectedOverseasBuyUsd(
       prices,
       buyRowsByAccount[accountId] ?? [],
-      "buy",
       accountId,
       selected,
       qtyOverrides,
     );
+    const overseasSellKrw = sum("sell", isOverseasMarket);
+    const rate = globalUsdRate;
+    if (
+      account?.asset_type === "STOCK_KIWOOM" &&
+      depositUsd !== null &&
+      rate != null &&
+      rate > 0 &&
+      overseasBuyUsd !== null &&
+      overseasSellKrw !== null
+    ) {
+      const usdAvailable = depositUsd + overseasSellKrw / rate;
+      const shortfall = Math.max(0, overseasBuyUsd - usdAvailable);
+      const krwForUsdShortfall = krwOverseasOrder ? shortfall * rate * KRW_ORDER_FX_MARGIN : 0;
+      const sellProceeds = sum("sell", isDomestic);
+      const domesticBuy = sum("buy", isDomestic);
+      const buyCost = domesticBuy !== null ? domesticBuy + krwForUsdShortfall : null;
+      const totalAvailable =
+        krwCash !== null && sellProceeds !== null ? krwCash + sellProceeds : null;
+      const surplus = totalAvailable !== null && buyCost !== null ? totalAvailable - buyCost : null;
+      return {
+        deposit: krwCash,
+        isOrderableKnown,
+        sellProceeds,
+        totalAvailable,
+        buyCost,
+        surplus,
+        depositUsd,
+        krwOverseasOrder,
+        usd: { available: usdAvailable, required: overseasBuyUsd, shortfall, krwForUsdShortfall },
+      };
+    }
+
+    const sellProceeds = sum("sell");
+    const buyCost = sum("buy");
     const totalAvailable =
-      deposit !== null && sellProceeds !== null ? deposit + sellProceeds : null;
+      krwCash !== null && sellProceeds !== null ? krwCash + sellProceeds : null;
     const surplus = totalAvailable !== null && buyCost !== null ? totalAvailable - buyCost : null;
-    return { deposit, isOrderableKnown, sellProceeds, totalAvailable, buyCost, surplus };
+    return {
+      deposit: krwCash,
+      isOrderableKnown,
+      sellProceeds,
+      totalAvailable,
+      buyCost,
+      surplus,
+      depositUsd,
+      krwOverseasOrder,
+      usd: null,
+    };
   }
 
   const globalCashSummary = useMemo((): GlobalCashSummary => {
@@ -300,6 +357,11 @@ export function useRebalancingExecution({
       totalDeposit += useOrderable
         ? (state.orderableKrw[acc.id] ?? 0)
         : (state.depositKrw[acc.id] ?? 0);
+      // 달러 예수금도 매수에 쓰는 현금이다 — 빼면 해외 매수가 원화 예수금과만 비교돼 거짓 "부족"이 뜬다(plans/140)
+      const usd = state.depositUsd[acc.id];
+      if (usd != null && globalUsdRate != null && globalUsdRate > 0) {
+        totalDeposit += usd * globalUsdRate;
+      }
     }
 
     // 계좌별 합 — 한 계좌라도 시세를 모르면 전체도 모름(null)
@@ -339,6 +401,8 @@ export function useRebalancingExecution({
     state.balanceState,
     state.depositKrw,
     state.orderableKrw,
+    state.depositUsd,
+    globalUsdRate,
     sellRowsByAccount,
     buyRowsByAccount,
     selected,

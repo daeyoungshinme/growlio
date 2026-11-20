@@ -145,6 +145,7 @@ const baseState: ExecutionState = {
   balanceState: {},
   depositKrw: {},
   orderableKrw: {},
+  depositUsd: {},
   priceState: "idle",
   priceLoadProgress: { loaded: 0, total: 0 },
   livePricesKrw: {},
@@ -192,6 +193,7 @@ describe("executionReducer", () => {
       },
       deposits: { acc1: 1000000 },
       orderables: { acc1: 800000 },
+      depositsUsd: { acc1: 12.5 },
       overseasUnknown: { acc1: false },
       states: { acc1: "loaded" },
     };
@@ -199,6 +201,7 @@ describe("executionReducer", () => {
     expect(result.liveBalances["acc1"]).toHaveLength(1);
     expect(result.depositKrw["acc1"]).toBe(1000000);
     expect(result.orderableKrw["acc1"]).toBe(800000);
+    expect(result.depositUsd["acc1"]).toBe(12.5);
     expect(result.balanceState["acc1"]).toBe("loaded");
   });
 
@@ -221,6 +224,7 @@ describe("executionReducer", () => {
       positions: [],
       deposit: 2000000,
       orderable: 1500000,
+      depositUsd: null,
       overseasUnknown: true,
     };
     const result = executionReducer(baseState, action);
@@ -1086,6 +1090,7 @@ describe("useRebalancingExecution — 해외 잔고 조회 실패 (계획 57 B5)
         ],
         deposit: 5000000,
         orderable: null,
+        depositUsd: null,
         overseasUnknown,
       });
     });
@@ -1160,5 +1165,115 @@ describe("useRebalancingExecution — 매도 수량은 실행 계좌 보유량�
       result.current.dispatch({ type: "SET_QTY_AND_SELECT", key: "sell_AAPL_acc1", qty: 100 });
     });
     expect(result.current.getCashAnalysis("acc1").sellProceeds).toBe(5 * 200000);
+  });
+});
+
+// plans/140: 키움 계좌는 원화·달러를 따로 보고, 달러 부족분은 원화주문 계좌만 원화로 메운다
+describe("useRebalancingExecution — 키움 통화별 현금 분석", () => {
+  const usAnalysis: RebalancingAnalysis = {
+    ...mockAnalysis,
+    items: [
+      {
+        ticker: "AAPL",
+        name: "Apple Inc.",
+        market: "NASDAQ",
+        target_weight_pct: 100,
+        current_weight_pct: 90,
+        weight_diff_pct: 10,
+        current_value_krw: 900000,
+        target_value_krw: 1000000,
+        diff_krw: 100000,
+        shares_to_trade: 2,
+        current_price_krw: 100000,
+      },
+    ],
+    ticker_account_map: {},
+  };
+
+  function kiwoomAccount(krwOrder: boolean): AssetAccount {
+    return {
+      id: "kw1",
+      name: "키움 계좌",
+      asset_type: "STOCK_KIWOOM",
+      data_source: "KIWOOM_API",
+      deposit_krw: 0,
+      deposit_usd: null,
+      is_mock_mode: true,
+      krw_overseas_order: krwOrder,
+      target_portfolio_id: null,
+    } as unknown as AssetAccount;
+  }
+
+  async function setup(krwOrder: boolean, depositUsd: number | null) {
+    const { result } = renderHook(
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: usAnalysis,
+          accounts: [kiwoomAccount(krwOrder)],
+        }),
+      { wrapper: createWrapper() },
+    );
+    await waitFor(() => expect(result.current.state.priceState).not.toBe("loading"));
+    act(() => {
+      result.current.dispatch({
+        type: "BALANCE_LOADED",
+        accountId: "kw1",
+        positions: [],
+        deposit: 500000,
+        orderable: 500000,
+        depositUsd,
+        overseasUnknown: depositUsd === null,
+      });
+      result.current.dispatch({
+        type: "PRICES_DONE",
+        krw: { AAPL: 100000 },
+        usd: { AAPL: 100 },
+        usdRate: 1000,
+      });
+      result.current.dispatch({ type: "SET_ORDER_TYPE", orderType: "LIMIT" });
+      if (!result.current.state.selected.has("buy_AAPL_kw1")) {
+        result.current.dispatch({ type: "SET_QTY_AND_SELECT", key: "buy_AAPL_kw1", qty: 2 });
+      }
+    });
+    return result;
+  }
+
+  it("달러로 충분하면 원화 매수필요에 해외 몫을 넣지 않는다", async () => {
+    const result = await setup(false, 1000);
+    const cash = result.current.getCashAnalysis("kw1");
+    expect(cash.usd?.required).toBeCloseTo(2 * 100 * 1.003);
+    expect(cash.usd?.shortfall).toBe(0);
+    expect(cash.buyCost).toBe(0);
+    expect(cash.surplus).toBe(500000);
+  });
+
+  it("일반 계좌의 달러 부족은 원화로 메우지 않는다(건너뜀 예정)", async () => {
+    const result = await setup(false, 50);
+    const cash = result.current.getCashAnalysis("kw1");
+    expect(cash.usd?.shortfall).toBeCloseTo(200.6 - 50);
+    expect(cash.usd?.krwForUsdShortfall).toBe(0);
+    expect(cash.buyCost).toBe(0);
+  });
+
+  it("원화주문 계좌는 달러 부족분의 원화 환산을 원화 매수필요에 더한다", async () => {
+    const result = await setup(true, 50);
+    const cash = result.current.getCashAnalysis("kw1");
+    expect(cash.krwOverseasOrder).toBe(true);
+    const expectedKrw = (200.6 - 50) * 1000 * 1.03;
+    expect(cash.usd?.krwForUsdShortfall).toBeCloseTo(expectedKrw);
+    expect(cash.buyCost).toBeCloseTo(expectedKrw);
+  });
+
+  it("달러를 모르면 예전처럼 원화 환산 합계로 본다", async () => {
+    const result = await setup(true, null);
+    const cash = result.current.getCashAnalysis("kw1");
+    expect(cash.usd).toBeNull();
+    expect(cash.buyCost).toBeCloseTo(2 * 100 * 1000);
+  });
+
+  it("전체 예수금에 달러 예수금의 원화 환산을 더한다", async () => {
+    const result = await setup(false, 100);
+    expect(result.current.globalCashSummary.totalDeposit).toBe(500000 + 100 * 1000);
   });
 });

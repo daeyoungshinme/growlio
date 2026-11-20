@@ -13,6 +13,25 @@ export interface CashAnalysis {
   totalAvailable: number | null;
   buyCost: number | null;
   surplus: number | null;
+  /** 달러 예수금(실시간 잔고). null = 모름(조회 전·해외 조회 실패) */
+  depositUsd: number | null;
+  /** 키움 원화주문 계좌 — 달러가 모자란 해외 매수를 증권사가 원화로 결제한다 */
+  krwOverseasOrder: boolean;
+  /**
+   * 키움 계좌의 통화별 판정(plans/140). null이면 판정하지 않음(키움 외·달러/환율/시세 모름) — 그때
+   * deposit·buyCost는 예전처럼 원화 환산 합계다. 값이 있으면 deposit·sellProceeds·buyCost는 국내(원화) 몫이고
+   * 원화주문 계좌는 buyCost에 달러 부족분의 원화 환산(`krwForUsdShortfall`)이 더해진다.
+   */
+  usd: {
+    /** 달러 예수금 + 해외 매도 예상 대금(달러) */
+    available: number;
+    /** 선택한 해외 매수에 필요한 달러 */
+    required: number;
+    /** 모자란 달러(0 이상) */
+    shortfall: number;
+    /** 원화주문 계좌가 부족분을 원화로 낼 때 드는 원화(일반 계좌는 0 — 그 주문은 건너뛴다) */
+    krwForUsdShortfall: number;
+  } | null;
 }
 
 export interface GlobalCashSummary {
@@ -32,6 +51,8 @@ export interface ExecutionState {
   balanceState: Record<string, BalanceLoadState>;
   depositKrw: Record<string, number>;
   orderableKrw: Record<string, number>;
+  /** 실시간 잔고의 달러 예수금 — 해외 조회가 실패한 계좌는 없다 */
+  depositUsd: Record<string, number>;
   priceState: PriceLoadState;
   priceLoadProgress: { loaded: number; total: number };
   livePricesKrw: Record<string, number>;
@@ -59,6 +80,7 @@ export type ExecutionAction =
       balances: Record<string, KisBalancePosition[]>;
       deposits: Record<string, number>;
       orderables: Record<string, number>;
+      depositsUsd: Record<string, number>;
       overseasUnknown: Record<string, boolean>;
       states: Record<string, BalanceLoadState>;
     }
@@ -70,6 +92,7 @@ export type ExecutionAction =
       positions: KisBalancePosition[];
       deposit: number;
       orderable: number | null;
+      depositUsd: number | null;
       overseasUnknown: boolean;
     }
   | { type: "BALANCE_ERROR"; accountId: string; is404: boolean }

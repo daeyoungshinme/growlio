@@ -16,6 +16,7 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
         liveBalances: action.balances,
         depositKrw: action.deposits,
         orderableKrw: action.orderables,
+        depositUsd: action.depositsUsd,
         overseasUnknown: action.overseasUnknown,
         balanceState: { ...state.balanceState, ...action.states },
       };
@@ -31,11 +32,16 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
     case "BALANCE_LOADED": {
       const nextOrderable = { ...state.orderableKrw };
       if (action.orderable !== null) nextOrderable[action.accountId] = action.orderable;
+      // 해외 조회가 실패하면 달러를 모른다 — 이전 값을 남기지 않는다
+      const nextUsd = { ...state.depositUsd };
+      if (action.depositUsd !== null) nextUsd[action.accountId] = action.depositUsd;
+      else delete nextUsd[action.accountId];
       return {
         ...state,
         liveBalances: { ...state.liveBalances, [action.accountId]: action.positions },
         depositKrw: { ...state.depositKrw, [action.accountId]: action.deposit },
         orderableKrw: nextOrderable,
+        depositUsd: nextUsd,
         overseasUnknown: { ...state.overseasUnknown, [action.accountId]: action.overseasUnknown },
         balanceState: { ...state.balanceState, [action.accountId]: "loaded" },
       };

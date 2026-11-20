@@ -172,15 +172,52 @@ export function sumSelectedEstimates(
   accountId: string,
   selected: Set<string>,
   qtyOverrides: Record<string, number>,
+  /** 있으면 이 시장 조건을 만족하는 행만 더한다(국내/해외 분리 — plans/140) */
+  marketFilter?: (market: string) => boolean,
 ): number | null {
   let total = 0;
   for (const row of rows) {
+    if (marketFilter && !marketFilter(row.item.market)) continue;
     const key = orderKey(side, row.item.ticker, accountId);
     if (!selected.has(key)) continue;
     const qty = effectiveQty(side, row, qtyOverrides[key]);
     const est = getEstimateKrw(p, key, row.item.ticker, row.item.market, qty);
     if (est === null) return null;
     total += est;
+  }
+  return total;
+}
+
+// 백엔드 `_order_quantity_guard.MARKET_BUY_PRICE_BUFFER`·`usd_buying_power.FX_FEE_BUFFER`와 같은 값 —
+// 키움 해외 매수 결제 판정(`_broker_order_flow.overseas_required_usd`)과 같은 식으로 필요 달러를 잡는다
+const MARKET_BUY_PRICE_BUFFER = 1.02;
+const FX_FEE_BUFFER = 1.003;
+/** 백엔드 `constants.KRW_ORDER_FX_MARGIN` — 원화주문이 달러 부족분을 원화로 낼 때의 환율 여유 */
+export const KRW_ORDER_FX_MARGIN = 1.03;
+
+/**
+ * 한 계좌의 선택된 해외 매수 행에 필요한 달러(수수료·시장가 여유 포함). 시세를 모르는 행이 있으면 null.
+ * 키움 실행기가 같은 식으로 달러 충분/원화 대체/건너뜀을 판정한다(plans/140).
+ */
+export function sumSelectedOverseasBuyUsd(
+  p: PriceInput,
+  rows: TradeRow[],
+  accountId: string,
+  selected: Set<string>,
+  qtyOverrides: Record<string, number>,
+): number | null {
+  let total = 0;
+  for (const row of rows) {
+    if (!isOverseasMarket(row.item.market)) continue;
+    const key = orderKey("buy", row.item.ticker, accountId);
+    if (!selected.has(key)) continue;
+    const qty = effectiveQty("buy", row, qtyOverrides[key]);
+    const price =
+      p.orderType === "LIMIT"
+        ? getLimitPriceNative(p, key, row.item.ticker, row.item.market)
+        : (p.livePricesUsd[row.item.ticker] ?? 0) * MARKET_BUY_PRICE_BUFFER;
+    if (!(price > 0)) return null;
+    total += qty * price * FX_FEE_BUFFER;
   }
   return total;
 }

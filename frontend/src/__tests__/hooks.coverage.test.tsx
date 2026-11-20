@@ -730,6 +730,7 @@ const baseReducerState: ExecutionState = {
   balanceState: {},
   depositKrw: {},
   orderableKrw: {},
+  depositUsd: {},
   priceState: "idle",
   priceLoadProgress: { loaded: 0, total: 0 },
   livePricesKrw: {},
