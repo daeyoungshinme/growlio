@@ -665,6 +665,7 @@ class TestKiwoomSellProceedsFunding:
             patch.object(execution_service, "kiwoom_get_access_token", AsyncMock(return_value="token")),
             patch.object(execution_service, "_execute_kiwoom_sells_with_clamp", sells_fn),
             patch.object(execution_service, "_execute_kiwoom_buys_with_cash_check", buys_fn),
+            patch.object(execution_service, "_prior_overseas_sell_proceeds_usd", AsyncMock(return_value=0.0)),
         ):
             results = await execution_service._execute_kiwoom_account_orders(
                 account, [sell, failed_sell, buy], account.user_id, account.id, mock_db, mock_cache, True
@@ -672,3 +673,111 @@ class TestKiwoomSellProceedsFunding:
 
         assert [r.ticker for r in results] == ["QQQ", "SPY", "VOO"]
         assert buys_fn.await_args.kwargs["pending_sell_usd"] == pytest.approx(500.0)
+
+
+class TestKiwoomPriorSellProceeds:
+    """plans/142 A1: AUTO 매도 leg·분리 실행처럼 이전 실행의 결제 전 해외 매도 대금도 매수 여력에 더한다."""
+
+    @staticmethod
+    def _kiwoom_account(make_account):
+        account = make_account(asset_type="STOCK_KIWOOM", data_source="KIWOOM_API")
+        account.kiwoom_account_no = "1234567890"
+        account.krw_overseas_order = False
+        return account
+
+    @pytest.mark.asyncio
+    async def test_buy_only_execution_adds_prior_sell_proceeds(self, make_account, mock_db, mock_cache):
+        from app.schemas.rebalancing import OrderResult
+        from app.services.rebalancing import execution_service
+
+        account = self._kiwoom_account(make_account)
+        buy = _us_buy(ticker="VOO", quantity=1, limit_price=400.0)
+        buys_fn = AsyncMock(return_value=[OrderResult.for_order(buy, "SUCCESS")])
+        prior = AsyncMock(return_value=300.0)
+
+        with (
+            patch.object(execution_service, "load_kiwoom_credentials", return_value=("k", "s")),
+            patch.object(execution_service, "kiwoom_get_access_token", AsyncMock(return_value="token")),
+            patch.object(execution_service, "_execute_kiwoom_buys_with_cash_check", buys_fn),
+            patch.object(execution_service, "_prior_overseas_sell_proceeds_usd", prior),
+        ):
+            await execution_service._execute_kiwoom_account_orders(
+                account, [buy], account.user_id, account.id, mock_db, mock_cache, True
+            )
+
+        prior.assert_awaited_once_with(mock_db, account.user_id, account.id)
+        assert buys_fn.await_args.kwargs["pending_sell_usd"] == pytest.approx(300.0)
+
+    @pytest.mark.asyncio
+    async def test_no_lookup_without_overseas_buys(self, make_account, mock_db, mock_cache):
+        from app.schemas.rebalancing import OrderResult
+        from app.services.rebalancing import execution_service
+
+        account = self._kiwoom_account(make_account)
+        kr_buy = _make_order(ticker="005930", market="KOSPI", side="BUY", quantity=1, reference_price=70_000.0)
+        buys_fn = AsyncMock(return_value=[OrderResult.for_order(kr_buy, "SUCCESS")])
+        prior = AsyncMock(return_value=300.0)
+
+        with (
+            patch.object(execution_service, "load_kiwoom_credentials", return_value=("k", "s")),
+            patch.object(execution_service, "kiwoom_get_access_token", AsyncMock(return_value="token")),
+            patch.object(execution_service, "_execute_kiwoom_buys_with_cash_check", buys_fn),
+            patch.object(execution_service, "_prior_overseas_sell_proceeds_usd", prior),
+        ):
+            await execution_service._execute_kiwoom_account_orders(
+                account, [kr_buy], account.user_id, account.id, mock_db, mock_cache, True
+            )
+
+        prior.assert_not_awaited()
+        assert buys_fn.await_args.kwargs["pending_sell_usd"] == pytest.approx(0.0)
+
+    @pytest.mark.asyncio
+    async def test_lookup_failure_falls_back_to_zero(self, make_account, mock_db, mock_cache):
+        from app.schemas.rebalancing import OrderResult
+        from app.services.rebalancing import execution_service
+
+        account = self._kiwoom_account(make_account)
+        buy = _us_buy(ticker="VOO", quantity=1, limit_price=400.0)
+        buys_fn = AsyncMock(return_value=[OrderResult.for_order(buy, "SUCCESS")])
+
+        with (
+            patch.object(execution_service, "load_kiwoom_credentials", return_value=("k", "s")),
+            patch.object(execution_service, "kiwoom_get_access_token", AsyncMock(return_value="token")),
+            patch.object(execution_service, "_execute_kiwoom_buys_with_cash_check", buys_fn),
+            patch.object(
+                execution_service, "_prior_overseas_sell_proceeds_usd", AsyncMock(side_effect=RuntimeError("db"))
+            ),
+            patch.object(execution_service, "report_handled_failure") as reported,
+        ):
+            await execution_service._execute_kiwoom_account_orders(
+                account, [buy], account.user_id, account.id, mock_db, mock_cache, True
+            )
+
+        assert reported.call_args.args[0] == "kiwoom_prior_overseas_sell_lookup_failed"
+        assert buys_fn.await_args.kwargs["pending_sell_usd"] == pytest.approx(0.0)
+
+    @pytest.mark.asyncio
+    async def test_prior_proceeds_count_only_live_overseas_sells(self, mock_db):
+        import uuid
+        from unittest.mock import MagicMock
+
+        from app.services.rebalancing import execution_service
+
+        rows = [
+            ("NASDAQ", 2, 250.0, None),  # 포함: $500
+            ("NYSE", 1, 100.0, "CANCEL_FAILED"),  # 취소 실패 = 주문 살아 있음 → 포함: $100
+            ("NASDAQ", 3, 200.0, "CANCELED"),  # 취소됨 → 제외
+            ("KOSPI", 1, 70_000.0, None),  # 국내 → 제외
+            ("NYSE", 1, None, None),  # 가격 모름 → 제외
+        ]
+        result = MagicMock()
+        result.all.return_value = rows
+        mock_db.execute = AsyncMock(return_value=result)
+
+        total = await execution_service._prior_overseas_sell_proceeds_usd(mock_db, uuid.uuid4(), uuid.uuid4())
+
+        assert total == pytest.approx(600.0)
+        sql = str(mock_db.execute.await_args.args[0])
+        assert "rebalancing_executions.executed_at >" in sql
+        assert "rebalancing_execution_results.action =" in sql
+        assert "rebalancing_execution_results.status =" in sql
