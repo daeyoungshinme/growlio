@@ -8,6 +8,9 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
+DEFAULT_DRIFT_THRESHOLD_PCT = 5.0
+"""알림이 없는 포트폴리오의 이탈 기준(%p) — 진단·인사이트·지금 할 일이 같은 값을 쓴다."""
+
 
 def is_drifting(
     weight_diff_pct: float,

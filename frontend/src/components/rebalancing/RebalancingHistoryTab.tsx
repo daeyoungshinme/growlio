@@ -47,7 +47,12 @@ const STRATEGY_LABEL: Record<string, string> = {
 function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
   const [open, setOpen] = useState(false);
 
-  const { data: detail, isLoading: loadingDetail } = useQuery({
+  const {
+    data: detail,
+    isLoading: loadingDetail,
+    isError: detailFailed,
+    refetch: refetchDetail,
+  } = useQuery({
     queryKey: QUERY_KEYS.rebalancingExecutionDetail(item.id),
     queryFn: () => fetchRebalancingExecutionDetail(item.id),
     enabled: open,
@@ -105,10 +110,14 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
             <div className="mt-3">
               <OrderResultList results={detail.results} />
             </div>
+          ) : detailFailed ? (
+            <EmptyState
+              compact
+              title="상세 정보를 불러오지 못했습니다."
+              action={{ label: "다시 시도", onClick: () => void refetchDetail() }}
+            />
           ) : (
-            <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">
-              상세 정보를 불러올 수 없습니다.
-            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">주문 결과가 없습니다.</p>
           )}
         </div>
       )}
@@ -146,6 +155,7 @@ export default function RebalancingHistoryTab() {
 
   const {
     data: planLegs = [],
+    isLoading: legsLoading,
     isError: legsFailed,
     refetch: refetchLegs,
   } = useQuery({
@@ -213,7 +223,8 @@ export default function RebalancingHistoryTab() {
     </Link>
   );
 
-  if (isLoading) {
+  // 대기 플랜까지 기다린다 — 이력만 먼저 오면 잠깐 "실행 이력 없음"이 보였다가 대기 매수가 튀어나온다
+  if (isLoading || legsLoading) {
     return <SkeletonCard rows={4} />;
   }
 
@@ -245,11 +256,10 @@ export default function RebalancingHistoryTab() {
     return (
       <div className="space-y-4">
         {alertHistoryLink}
-        <div className="flex flex-col items-center justify-center py-20 text-gray-500 dark:text-gray-500">
-          <div className="text-4xl mb-3">📋</div>
-          <p className="text-sm">아직 실행 이력이 없습니다.</p>
-          <p className="text-xs mt-1">리밸런싱을 실행하면 여기에 기록됩니다.</p>
-        </div>
+        <EmptyState
+          title="아직 실행 이력이 없습니다."
+          description="리밸런싱을 실행하면 여기에 기록됩니다."
+        />
       </div>
     );
   }
@@ -270,7 +280,9 @@ export default function RebalancingHistoryTab() {
               onCancel={() => cancelMut.mutate(leg)}
               onApprove={() => approveMut.mutate(leg)}
               onRetryFx={() => retryFxMut.mutate(leg)}
-              isPending={cancelMut.isPending || approveMut.isPending || retryFxMut.isPending}
+              isPending={[cancelMut, approveMut, retryFxMut].some(
+                (m) => m.isPending && m.variables?.leg_id === leg.leg_id,
+              )}
             />
           ))}
           {hiddenLegCount > 0 && (

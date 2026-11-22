@@ -86,15 +86,21 @@ class PlanGenerationInProgress:
     """
 
 
-def _check_tax_gate(alert: RebalancingAlert, analysis: Any, overview: Any) -> TaxGateBlocked | None:
-    """세금영향 게이트 — 켜져 있고 추정 양도세가 상한을 넘으면 TaxGateBlocked."""
+def _check_tax_gate(
+    alert: RebalancingAlert, overview: Any, trade_items: list, *, sells_allowed: bool
+) -> TaxGateBlocked | None:
+    """세금영향 게이트 — 켜져 있고 이번 플랜의 매도 추정 양도세가 상한을 넘으면 TaxGateBlocked.
+
+    `trade_items`는 실제로 주문이 될 행(이탈 항목 펼친 목록)이다. 분석 전체(`analysis.items`)로 세면
+    기준 안쪽 초과분까지 매도로 잡히고, 매도가 없는 BUY_ONLY·정액 적립(`sells_allowed=False`)까지 막힌다.
+    """
     tax_gate_mode = alert.tax_impact_gate_mode
     max_tax_impact_krw = alert.max_tax_impact_krw
-    if tax_gate_mode != "ENABLED" or max_tax_impact_krw is None:
+    if tax_gate_mode != "ENABLED" or max_tax_impact_krw is None or not sells_allowed:
         return None
-    from app.services.rebalancing.diagnosis_service import _build_tax_preview
+    from app.services.rebalancing.diagnosis_service import estimate_sell_costs
 
-    _total_gain, estimated_tax_krw, _fee, _notes, _items = _build_tax_preview(analysis, overview)
+    estimated_tax_krw = estimate_sell_costs(trade_items, overview).overseas_tax
     if not is_tax_impact_blocking_auto_mode(tax_gate_mode, estimated_tax_krw, max_tax_impact_krw):
         return None
     logger.info(

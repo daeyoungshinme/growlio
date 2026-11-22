@@ -4,6 +4,7 @@ import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
 import { fetchTacticalMarket } from "@/api/tactical";
 import type { PortfolioItem } from "@/api/portfolios";
+import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -137,7 +138,11 @@ export default function RebalancingPage() {
     enabled: localTab === "진단",
   });
 
-  const { data: riskMetrics } = useQuery({
+  const {
+    data: riskMetrics,
+    isError: riskError,
+    refetch: refetchRisk,
+  } = useQuery({
     queryKey: QUERY_KEYS.portfolioRisk,
     queryFn: () => fetchPortfolioRisk(),
     staleTime: STALE_TIME.LONG,
@@ -259,12 +264,23 @@ export default function RebalancingPage() {
                 </Suspense>
               </ErrorBoundary>
             )}
-            {riskMetrics && (
+            {riskMetrics ? (
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard />}>
                   <RiskMetricsCard metrics={riskMetrics} />
                 </Suspense>
               </ErrorBoundary>
+            ) : (
+              riskError && (
+                // 실패해도 카드 자리를 남긴다 — 사라지면 요약 칩의 쏠림 항목까지 조용히 빠진다
+                <div className="card scroll-mt-4" id={DIAGNOSIS_ANCHORS.risk}>
+                  <EmptyState
+                    compact
+                    title="위험 지표를 불러오지 못했습니다."
+                    action={{ label: "다시 시도", onClick: () => void refetchRisk() }}
+                  />
+                </div>
+              )
             )}
           </>
         )}

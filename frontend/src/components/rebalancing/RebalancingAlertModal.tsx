@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Modal, { ModalBody } from "@/components/common/Modal";
@@ -71,8 +70,8 @@ export default function RebalancingAlertModal({
     <Modal title={title} onClose={onClose} size="md">
       <ModalBody padding="">
         {isLoading ? (
-          <div className="flex justify-center py-4">
-            <Loader2 size={20} className="animate-spin text-gray-400" />
+          <div className="p-5">
+            <SkeletonCard rows={4} />
           </div>
         ) : loadFailed ? (
           <EmptyState
@@ -107,6 +106,7 @@ import type { RebalancingAlert } from "@/api/alerts";
 import type { AccountTaxType, AssetAccount, InvestmentHorizon } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 import EmptyState from "@/components/common/EmptyState";
+import SkeletonCard from "@/components/common/SkeletonCard";
 
 function AlertFormBody({
   alert,

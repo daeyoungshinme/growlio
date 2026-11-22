@@ -331,8 +331,7 @@ async def _drifting_items_for_alert(
     buy_tax_type = _flatten_account_tax_types(analysis.ticker_account_map).get(str(buy_account_id), "GENERAL")
     drifting = expand_group_items(drifting, buy_tax_type)
 
-    # 게이트 판정(세금영향·하루합산한도) 이전에 라이브 시세로 갱신 — analysis.items와 drifting은
-    # 같은 객체를 참조하므로 여기서 갱신하면 세금영향 미리보기(_build_tax_preview(analysis, ...))에도 반영된다.
+    # 게이트 판정(세금영향·하루합산한도) 이전에 라이브 시세로 갱신 — 두 게이트 모두 drifting으로 계산한다.
     await refresh_live_prices(drifting, alert.user_id, db, cache)
     return analysis, overview, drifting
 
@@ -360,8 +359,8 @@ async def _dca_items_for_alert(
 ) -> tuple[Any, Any, list] | None:
     """정액 모드 — 금액을 목표 비중대로 나눈 매수 행. 살 게 없으면 None.
 
-    반환 모양은 `_drifting_items_for_alert`와 같다(analysis, overview, items). items는 분석 행의 사본이라
-    세금 게이트(매수만이라 매도 없음)에 영향을 주지 않는다.
+    반환 모양은 `_drifting_items_for_alert`와 같다(analysis, overview, items). items는 분석 행의 사본이다.
+    매수만이라 세금 게이트는 건너뛴다(호출부 `sells_allowed`).
     """
     from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
     from app.services.rebalancing.dca_allocation import allocate_dca_amount, dca_buy_rows
@@ -480,7 +479,10 @@ async def build_pending_plan_for_alert(
         return None
     analysis, overview, drifting = prepared
 
-    if blocked := _check_tax_gate(alert, analysis, overview):
+    strategy = strategy_override or alert.strategy
+    # 정액 적립은 매수 행만 만든다 — 매도가 없는 플랜은 세금 게이트 대상이 아니다
+    sells_allowed = strategy != "BUY_ONLY" and not is_dca_amount_mode(alert)
+    if blocked := _check_tax_gate(alert, overview, drifting, sells_allowed=sells_allowed):
         return blocked
 
     from app.core.cache_store import get_cache_store
@@ -500,7 +502,6 @@ async def build_pending_plan_for_alert(
             logger.info("rebalancing_plan_generation_already_pending", alert_id=str(alert.id))
             return PlanGenerationInProgress()
 
-        strategy = strategy_override or alert.strategy
         order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], alert.order_type)
         orders = _build_plan_orders(alert, drifting, analysis.ticker_account_map, strategy, order_type, buy_account_id)
 

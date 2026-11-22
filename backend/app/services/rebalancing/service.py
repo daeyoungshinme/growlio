@@ -26,7 +26,7 @@ from app.services.rebalancing.analysis_items import (
     _item_attr,
     _item_get,
 )
-from app.services.rebalancing.drift_rule import is_drifting
+from app.services.rebalancing.drift_rule import DEFAULT_DRIFT_THRESHOLD_PCT, is_drifting
 from app.utils.numbers import opt_float
 
 logger = structlog.get_logger()
@@ -421,9 +421,6 @@ def analyze_rebalancing(
     )
 
 
-_DEFAULT_DRIFT_THRESHOLD = 5.0
-
-
 def filter_drifting_items(
     items: list[Any], threshold_pct: float, relative_threshold_pct: float | None = None
 ) -> list[Any]:
@@ -448,7 +445,7 @@ def filter_drifting_items(
 def compute_portfolio_drift_summary(
     portfolio: Portfolio,
     overview: dict,
-    threshold_pct: float = _DEFAULT_DRIFT_THRESHOLD,
+    threshold_pct: float = DEFAULT_DRIFT_THRESHOLD_PCT,
     relative_threshold_pct: float | None = None,
 ) -> PortfolioDriftSummary:
     """DB 포지션 데이터만으로 포트폴리오 비중 이탈 현황을 계산한다.
@@ -464,7 +461,7 @@ def compute_portfolio_drift_summary(
 def summarize_drift(
     portfolio: Portfolio,
     analysis: RebalancingAnalysis,
-    threshold_pct: float = _DEFAULT_DRIFT_THRESHOLD,
+    threshold_pct: float = DEFAULT_DRIFT_THRESHOLD_PCT,
     relative_threshold_pct: float | None = None,
 ) -> PortfolioDriftSummary:
     """이미 계산한 분석으로 이탈 요약을 만든다 — 같은 분석으로 비용도 추정하는 진단 요약(drift-summary)용."""

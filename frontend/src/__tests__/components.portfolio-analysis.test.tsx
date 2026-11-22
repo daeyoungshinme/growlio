@@ -239,6 +239,37 @@ describe("PortfolioListSection - 기준 지정 재지정", () => {
   });
 });
 
+// ------- PortfolioListSection: 조회 실패 (plans/145 A3) -------
+describe("PortfolioListSection - 조회 실패", () => {
+  it("실패하면 '첫 포트폴리오를 만들어 보세요' 대신 재시도를 보여준다", () => {
+    const onRetry = vi.fn();
+    renderWithProviders(
+      <PortfolioListSection
+        portfolios={[]}
+        isLoading={false}
+        isError
+        onRetry={onRetry}
+        selectedIds={new Set()}
+        stockAccounts={[]}
+        alertPortfolioIds={new Set()}
+        autoAlertCount={0}
+        alertByPortfolioId={{}}
+        isTargetPending={false}
+        onDragEnd={vi.fn()}
+        onToggleSelect={vi.fn()}
+        onOpenEditor={vi.fn()}
+        onOpenAlertModal={vi.fn()}
+        onConfirmDelete={vi.fn()}
+        onBatchSetTarget={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("포트폴리오를 불러오지 못했습니다.")).toBeDefined();
+    expect(screen.queryByText("첫 포트폴리오를 만들어 보세요")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+});
+
 // ------- PortfolioListSection: 모바일 선택 1장 + 시트 (plans/102 D1) -------
 describe("PortfolioListSection - 모바일 바텀시트", () => {
   const mk = (id: string, name: string, sort_order: number): Portfolio => ({

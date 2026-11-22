@@ -55,7 +55,12 @@ export default function PortfolioManageTab({
 }: Props) {
   const qc = useQueryClient();
 
-  const { data: portfoliosRaw, isLoading, refetch: refetchPortfolios } = useQuery(portfoliosQuery);
+  const {
+    data: portfoliosRaw,
+    isLoading,
+    isError: portfoliosError,
+    refetch: refetchPortfolios,
+  } = useQuery(portfoliosQuery);
 
   const handleRefresh = useCallback(async () => {
     await refetchPortfolios();
@@ -289,6 +294,8 @@ export default function PortfolioManageTab({
       <PortfolioListSection
         portfolios={sortedPortfolios}
         isLoading={isLoading}
+        isError={portfoliosError}
+        onRetry={() => void refetchPortfolios()}
         selectedIds={selectedIds}
         stockAccounts={stockAccounts}
         alertPortfolioIds={alertPortfolioIds}

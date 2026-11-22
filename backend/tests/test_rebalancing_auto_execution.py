@@ -972,7 +972,9 @@ class TestBuildPendingPlanForAlert:
     async def test_tax_gate_blocks_when_estimated_tax_exceeds_max(self):
         from app.services.rebalancing.plan_service import TaxGateBlocked, build_pending_plan_for_alert
 
-        alert = _make_alert(threshold_pct=5.0, tax_impact_gate_mode="ENABLED", max_tax_impact_krw=100_000.0)
+        alert = _make_alert(
+            threshold_pct=5.0, strategy="FULL", tax_impact_gate_mode="ENABLED", max_tax_impact_krw=100_000.0
+        )
         portfolio = _make_portfolio()
         analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)], ticker_account_map={})
         mock_db = _make_mock_db()
@@ -985,8 +987,8 @@ class TestBuildPendingPlanForAlert:
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.rebalancing.plan_generation.refresh_live_prices", new=AsyncMock()),
             patch(
-                "app.services.rebalancing.diagnosis_service._build_tax_preview",
-                return_value=(500_000.0, 200_000.0, 0.0, [], []),
+                "app.services.rebalancing.diagnosis_service.estimate_sell_costs",
+                return_value=SimpleNamespace(overseas_tax=200_000.0),
             ),
             patch(
                 "app.services.rebalancing.plan_generation.generate_pending_plan_for_alert", new=AsyncMock()
@@ -1001,7 +1003,9 @@ class TestBuildPendingPlanForAlert:
 
     @pytest.mark.asyncio
     async def test_tax_gate_enabled_but_under_threshold_still_generates_plan(self):
-        alert = _make_alert(threshold_pct=5.0, tax_impact_gate_mode="ENABLED", max_tax_impact_krw=1_000_000.0)
+        alert = _make_alert(
+            threshold_pct=5.0, strategy="FULL", tax_impact_gate_mode="ENABLED", max_tax_impact_krw=1_000_000.0
+        )
         portfolio = _make_portfolio()
         analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)], ticker_account_map={})
         mock_db = _make_mock_db()
@@ -1015,8 +1019,8 @@ class TestBuildPendingPlanForAlert:
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.rebalancing.plan_generation.refresh_live_prices", new=AsyncMock()),
             patch(
-                "app.services.rebalancing.diagnosis_service._build_tax_preview",
-                return_value=(500_000.0, 200_000.0, 0.0, [], []),
+                "app.services.rebalancing.diagnosis_service.estimate_sell_costs",
+                return_value=SimpleNamespace(overseas_tax=200_000.0),
             ),
             patch(
                 "app.services.rebalancing.plan_generation.generate_pending_plan_for_alert",
@@ -1032,7 +1036,7 @@ class TestBuildPendingPlanForAlert:
 
     @pytest.mark.asyncio
     async def test_tax_gate_disabled_skips_tax_preview_entirely(self):
-        """DISABLED(기본값)면 _build_tax_preview 자체를 호출하지 않는다 — 불필요한 계산 스킵."""
+        """DISABLED(기본값)면 매도 비용 추정 자체를 호출하지 않는다 — 불필요한 계산 스킵."""
         alert = _make_alert(threshold_pct=5.0)  # tax_impact_gate_mode 기본 DISABLED
         portfolio = _make_portfolio()
         analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)], ticker_account_map={})
@@ -1046,7 +1050,7 @@ class TestBuildPendingPlanForAlert:
             ),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.rebalancing.plan_generation.refresh_live_prices", new=AsyncMock()),
-            patch("app.services.rebalancing.diagnosis_service._build_tax_preview") as mock_tax_preview,
+            patch("app.services.rebalancing.diagnosis_service.estimate_sell_costs") as mock_tax_preview,
             patch(
                 "app.services.rebalancing.plan_generation.generate_pending_plan_for_alert",
                 new=AsyncMock(return_value=(plan, "buy-token", None)),
@@ -1057,6 +1061,73 @@ class TestBuildPendingPlanForAlert:
             await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
 
         mock_tax_preview.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tax_gate_skipped_for_buy_only_strategy(self):
+        """매도가 없는 BUY_ONLY는 해외 이익 종목이 과대해도 세금 게이트에 막히지 않는다(plans/145 A1)."""
+        alert = _make_alert(threshold_pct=5.0, tax_impact_gate_mode="ENABLED", max_tax_impact_krw=1.0)
+        portfolio = _make_portfolio()
+        analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)], ticker_account_map={})
+        mock_db = _make_mock_db()
+        plan = _make_plan()
+
+        with (
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=MagicMock()),
+            ),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_generation.refresh_live_prices", new=AsyncMock()),
+            patch("app.services.rebalancing.diagnosis_service.estimate_sell_costs") as mock_costs,
+            patch(
+                "app.services.rebalancing.plan_generation.generate_pending_plan_for_alert",
+                new=AsyncMock(return_value=(plan, "buy-token", None)),
+            ),
+        ):
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
+
+            result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        assert result == (plan, "buy-token", None)
+        mock_costs.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tax_gate_counts_only_drifting_items(self):
+        """FULL은 이탈 항목만 매도로 센다 — 기준 안쪽 초과 종목의 매도분은 게이트 계산에서 빠진다."""
+        alert = _make_alert(
+            threshold_pct=5.0, strategy="FULL", tax_impact_gate_mode="ENABLED", max_tax_impact_krw=1_000_000.0
+        )
+        portfolio = _make_portfolio()
+        drifting_item = SimpleNamespace(weight_diff_pct=-10.0, target_weight_pct=30.0)
+        inside_item = SimpleNamespace(weight_diff_pct=-2.0, target_weight_pct=30.0)
+        analysis = SimpleNamespace(items=[drifting_item, inside_item], ticker_account_map={})
+        mock_db = _make_mock_db()
+        plan = _make_plan()
+
+        with (
+            patch(
+                "app.services.portfolio.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(return_value=MagicMock()),
+            ),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_generation.refresh_live_prices", new=AsyncMock()),
+            patch("app.services.rebalancing.plan_generation.expand_group_items", side_effect=lambda items, _t: items),
+            patch(
+                "app.services.rebalancing.diagnosis_service.estimate_sell_costs",
+                return_value=SimpleNamespace(overseas_tax=0.0),
+            ) as mock_costs,
+            patch(
+                "app.services.rebalancing.plan_generation.generate_pending_plan_for_alert",
+                new=AsyncMock(return_value=(plan, "buy-token", None)),
+            ),
+        ):
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
+
+            await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        counted = mock_costs.call_args.args[0]
+        assert drifting_item in counted
+        assert inside_item not in counted
 
     @pytest.mark.asyncio
     async def test_daily_value_cap_blocks_when_total_exceeds_cap(self):

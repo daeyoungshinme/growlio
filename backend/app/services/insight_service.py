@@ -172,11 +172,12 @@ async def _check_rebalancing_opportunity(
     *,
     on_partial_failure: Callable[[], None] | None = None,
 ) -> list[Insight]:
-    """저장된 포트폴리오 중 드리프트 > 5%인 항목이 있을 때 알림.
+    """저장된 포트폴리오가 알림 이탈 기준(절대·상대, 없으면 5%p)을 넘었을 때 알림 — 기준의 2배 이상이면 ALERT.
 
     포트폴리오 하나가 실패하면 건너뛰고 `on_partial_failure`를 부른다 — 호출자가 불완전한 목록을 짧게만 캐싱한다.
     """
     from app.models.portfolio import Portfolio
+    from app.services.portfolio._portfolio_queries import alert_drift_thresholds, get_active_alerts_by_portfolio
     from app.services.portfolio.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.service import compute_portfolio_drift_summary
 
@@ -194,6 +195,11 @@ async def _check_rebalancing_opportunity(
     by_id = await _load_portfolios()
     if not by_id:
         return []
+    # 기준은 루프 전에 float로 뽑아 둔다 — 아래 rollback이 알림 ORM 행을 expire시키면 속성 접근이 lazy load로 실패한다
+    thresholds = {
+        pid: alert_drift_thresholds(alerts)
+        for pid, alerts in (await get_active_alerts_by_portfolio(db, user_id)).items()
+    }
 
     insights: list[Insight] = []
     for pf_id in list(by_id):
@@ -224,10 +230,15 @@ async def _check_rebalancing_opportunity(
             continue
 
         # 드리프트는 알림·진단과 같은 단일 판정(기준 자산·지수 그룹 합산 포함)으로 구한다 — 예전엔 여기서
-        # 티커 단위로 따로 계산해 지수 그룹(VOO+SPY)의 멤버 보유분이 빠져 거짓 "리밸런싱 필요"가 떴다(plans/77 B1)
-        max_drift = compute_portfolio_drift_summary(pf, overview).max_drift_pct
+        # 티커 단위로 따로 계산해 지수 그룹(VOO+SPY)의 멤버 보유분이 빠져 거짓 "리밸런싱 필요"가 떴다(plans/77 B1).
+        # 기준도 알림 설정(상대 밴드 포함)을 따른다 — 고정 5/10이면 진단 행과 다른 판정이 나왔다(plans/145 A4)
+        threshold, relative = thresholds.get(str(pf_id)) or alert_drift_thresholds([])
+        summary = compute_portfolio_drift_summary(pf, overview, threshold, relative)
+        if not summary.needs_rebalancing:
+            continue
+        max_drift = summary.max_drift_pct
 
-        if max_drift >= 10:
+        if max_drift >= threshold * 2:
             insights.append(
                 Insight(
                     type=InsightType.REBALANCING_OPPORTUNITY,
@@ -239,7 +250,7 @@ async def _check_rebalancing_opportunity(
                     metric_value=round(max_drift, 1),
                 )
             )
-        elif max_drift >= 5:
+        else:
             insights.append(
                 Insight(
                     type=InsightType.REBALANCING_OPPORTUNITY,
