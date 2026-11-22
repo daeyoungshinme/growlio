@@ -208,7 +208,13 @@ export default function PortfolioPage() {
   if (error || !data)
     return <PageLoadError message="데이터를 불러오지 못했습니다" onRetry={() => void refetch()} />;
 
-  const hasHorizonTags = horizonTaggedAccounts(data.accounts).length > 0;
+  const hasHorizonTags = horizonTaggedAccounts(data.accounts).some(
+    (a) => a.include_in_total !== false,
+  );
+  // 전체 보기에선 서버가 합산 제외 계좌를 합계·보유종목에서 뺀다(plans/144 A2) — 빠진 사실을 알린다
+  const excludedCount = selectedAccountId
+    ? 0
+    : stockAccounts.filter((a) => a.include_in_total === false).length;
   const stockSharePct =
     data.total_assets_krw > 0 ? (data.total_stock_krw / data.total_assets_krw) * 100 : null;
 
@@ -283,12 +289,13 @@ export default function PortfolioPage() {
           평가손익 <span>{fmtSigned(data.unrealized_pnl_krw, fmtKrw)}</span> (
           <span>{fmtPct(data.stock_return_pct)}</span>)
         </p>
-        {(stockSharePct !== null || data.total_non_stock_krw > 0) && (
+        {(stockSharePct !== null || data.total_non_stock_krw > 0 || excludedCount > 0) && (
           <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
             {[
               stockSharePct !== null && `전체 자산 중 ${stockSharePct.toFixed(1)}%`,
               data.total_non_stock_krw > 0 &&
                 `현금·부동산 등 ${fmtKrw(data.total_non_stock_krw)} 별도`,
+              excludedCount > 0 && `합산 제외 계좌 ${excludedCount}개는 빠짐`,
             ]
               .filter(Boolean)
               .join(" · ")}

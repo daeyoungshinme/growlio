@@ -541,3 +541,76 @@ class TestBuildPortfolioOverviewWithAccounts:
         result = await build_portfolio_overview(uuid.uuid4(), db)
 
         assert result["total_assets_krw"] > 0
+
+
+class TestExcludeOutOfTotal:
+    """plans/144 A2: 자산탭 경로는 합산 제외 계좌를 주식 합계·손익·보유종목에서도 뺀다."""
+
+    @staticmethod
+    def _two_account_db(account_ids_filter: bool = False):
+        included_id, excluded_id = uuid.uuid4(), uuid.uuid4()
+        snap_in, snap_ex = uuid.uuid4(), uuid.uuid4()
+        included = _make_account(acc_id=included_id)
+        excluded = _make_account(acc_id=excluded_id, include_in_total=False)
+        db = AsyncMock()
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([excluded] if account_ids_filter else [included, excluded]),
+                _exec_result(
+                    [_make_snapshot(snap_ex, excluded_id)]
+                    if account_ids_filter
+                    else [_make_snapshot(snap_in, included_id), _make_snapshot(snap_ex, excluded_id)]
+                ),
+                _exec_result(
+                    [_make_position(snap_ex, excluded_id)]
+                    if account_ids_filter
+                    else [_make_position(snap_in, included_id), _make_position(snap_ex, excluded_id)]
+                ),
+                _exec_result([]),
+            ]
+        )
+        return db, excluded_id
+
+    @pytest.mark.asyncio
+    async def test_default_keeps_legacy_behavior(self, override_settings):
+        db, _ = self._two_account_db()
+        result = await build_portfolio_overview(uuid.uuid4(), db)
+        # 기존 동작: 총자산은 빼지만 주식 합계·손익·보유종목엔 섞인다(다른 소비자 기준 유지)
+        assert result["total_assets_krw"] == pytest.approx(10_000_000)
+        assert result["total_invested_krw"] == pytest.approx(18_000_000)
+        assert len(result["all_positions"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_flag_drops_excluded_from_stock_totals(self, override_settings):
+        db, excluded_id = self._two_account_db()
+        result = await build_portfolio_overview(uuid.uuid4(), db, exclude_out_of_total=True)
+
+        assert result["total_assets_krw"] == pytest.approx(10_000_000)
+        assert result["total_invested_krw"] == pytest.approx(9_000_000)
+        assert result["unrealized_pnl_krw"] == pytest.approx(1_000_000)
+        assert result["total_stock_krw"] <= result["total_assets_krw"]
+        assert result["total_non_stock_krw"] >= 0
+        assert len(result["all_positions"]) == 1
+        assert sum(a["value_krw"] for a in result["stock_allocation"]) == pytest.approx(800_000)
+        # 계좌 행은 남아 화면이 "합산 제외 N개"를 알릴 수 있다
+        rows = {r["id"]: r for r in result["accounts"]}
+        assert rows[str(excluded_id)]["include_in_total"] is False
+        assert len(rows) == 2
+
+    @pytest.mark.asyncio
+    async def test_flag_keeps_explicitly_selected_account(self, override_settings):
+        db, excluded_id = self._two_account_db(account_ids_filter=True)
+        result = await build_portfolio_overview(uuid.uuid4(), db, account_ids=[excluded_id], exclude_out_of_total=True)
+        assert result["total_invested_krw"] == pytest.approx(9_000_000)
+        assert len(result["all_positions"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_flag_uses_separate_cache_key(self, override_settings):
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
+        db, _ = self._two_account_db()
+        await build_portfolio_overview(uuid.uuid4(), db, cache=cache, exclude_out_of_total=True)
+        key = cache.setex.call_args.args[0]
+        assert key.endswith(":in_total")
+        assert "portfolio_overview:" in key  # 무효화 SCAN `portfolio_overview:{user}:*`에 걸리는 모양

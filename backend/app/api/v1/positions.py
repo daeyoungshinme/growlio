@@ -184,6 +184,12 @@ async def sync_position_prices(
 ):
     """현재가를 조회해 positions를 갱신하고 스냅샷을 저장한다."""
     account = await get_owned_account(account_id, current_user.id, db)
+    if account.data_source != DataSource.MANUAL:
+        # 연동 계좌도 현재 포지션(snapshot_id IS NULL)이 있어 그대로 진행하면 오늘 스냅샷이 MANUAL로 덮인다
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="연동 계좌는 계좌 동기화로 현재가를 갱신하세요",
+        )
     cache = await get_cache_store()
 
     lock_key = sync_lock_key(account_id)

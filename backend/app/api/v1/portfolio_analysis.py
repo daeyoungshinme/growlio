@@ -54,7 +54,9 @@ async def portfolio_overview(
     """계좌 자산을 통합해 포트폴리오 현황을 반환한다. account_id 미지정 시 전체 계좌 통합 기준."""
     cache = await get_cache_store()
     account_ids = [account_id] if account_id else None
-    return await build_portfolio_overview(current_user.id, db, account_ids=account_ids, cache=cache, lite=lite)
+    return await build_portfolio_overview(
+        current_user.id, db, account_ids=account_ids, cache=cache, lite=lite, exclude_out_of_total=True
+    )
 
 
 @router.get("/index-exposure", response_model=IndexExposureResponse)
@@ -70,7 +72,7 @@ async def portfolio_index_exposure(
         await get_owned_account(account_id, current_user.id, db)
     cache = await get_cache_store()
     account_ids = [account_id] if account_id else None
-    return await get_index_exposure(cache, db, current_user.id, account_ids)
+    return await get_index_exposure(cache, db, current_user.id, account_ids, exclude_out_of_total=True)
 
 
 # ---------------------------------------------------------------------------
