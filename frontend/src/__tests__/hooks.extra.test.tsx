@@ -470,6 +470,39 @@ describe("useGoalSettings", () => {
     localStorage.removeItem("growlio:goal-wizard-auto-shown:user-1");
   });
 
+  it("autoOpenWizard=false(적립 계획 외 탭)면 미설정이어도 마법사를 띄우지 않는다(계획 143 B5)", async () => {
+    localStorage.removeItem("growlio:goal-wizard-auto-shown:user-1");
+    const { fetchDCAAnalysis } = await import("@/api/invest");
+    vi.mocked(fetchDCAAnalysis).mockResolvedValueOnce({
+      is_configured: false,
+      settings: {
+        monthly_deposit_amount: null,
+        goal_annual_return_pct: null,
+        goal_amount: null,
+        goal_start_date: null,
+        goal_initial_amount: null,
+      },
+      projection_months: [],
+      yearly_achievements: [],
+      goal_timeline: {
+        months_to_goal: null,
+        expected_goal_date: null,
+        actual_expected_goal_date: null,
+        current_progress_pct: null,
+        on_track: null,
+        lead_lag_months: null,
+        acceleration_scenarios: [],
+      },
+    });
+    const { useGoalSettings } = await import("@/hooks/useGoalSettings");
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useGoalSettings({ autoOpenWizard: false }), { wrapper });
+    await vi.waitFor(() => expect(result.current.data?.is_configured).toBe(false));
+    expect(result.current.editing).toBe(false);
+    // 본 적 없으므로 적립 계획 탭에 들어가면 그때 뜬다
+    expect(localStorage.getItem("growlio:goal-wizard-auto-shown:user-1")).toBeNull();
+  });
+
   it("다른 계정이 이 기기에서 이미 본 마법사 기록은 무시한다(plans/117 C5)", async () => {
     localStorage.setItem("growlio:goal-wizard-auto-shown:other-user", "true");
     const { fetchDCAAnalysis } = await import("@/api/invest");

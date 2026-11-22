@@ -16,6 +16,7 @@ import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
 import { buildScenarioCurve } from "@/utils/dcaScenarioProjection";
 import { SAVINGS_RETURN_PRESETS } from "@/constants/savingsPresets";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import { useIsSmUp } from "@/hooks/useMediaQuery";
 
 const CONSERVATIVE_RETURN_PCT = Math.min(...SAVINGS_RETURN_PRESETS.map((p) => p.pct));
 const AGGRESSIVE_RETURN_PCT = Math.max(...SAVINGS_RETURN_PRESETS.map((p) => p.pct));
@@ -27,11 +28,8 @@ interface Props {
 
 function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
-  // 첫 렌더 시점의 뷰포트만 본다 — 회전 등으로 바뀌어도 높이만 다를 뿐이라 리스너는 두지 않음
-  const [isMobile] = useState(
-    () =>
-      typeof window.matchMedia === "function" && window.matchMedia("(max-width: 639px)").matches,
-  );
+  // 공용 미디어 쿼리 훅 — 회전·창 크기 변경도 따라간다(계획 143 C6)
+  const isMobile = useIsSmUp() === false;
   const [showScenarios, setShowScenarios] = useState(false);
   const canShowScenarios = monthlyDepositAmount != null && monthlyDepositAmount > 0;
   const today = localMonth();

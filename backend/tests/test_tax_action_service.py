@@ -15,10 +15,12 @@ from app.services.tax.tax_action_builders import (
     build_financial_income_action,
     build_isa_contribution_actions,
     build_isa_transfer_actions,
-    build_loss_harvest_actions,
-    build_overseas_gain_harvest_action,
     build_pension_action,
     pension_credit_rate,
+)
+from app.services.tax.tax_action_overseas import (
+    build_loss_harvest_actions,
+    build_overseas_gain_harvest_action,
 )
 from app.services.tax.tax_action_service import get_tax_action_plan
 

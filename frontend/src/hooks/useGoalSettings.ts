@@ -7,7 +7,7 @@ import {
   updateGoalSettings,
   type GoalRiskTolerance,
 } from "@/api/settings";
-import { dcaAnalysisQuery } from "@/api/queryOptions";
+import { dcaAnalysisQuery, settingsQuery } from "@/api/queryOptions";
 import { toast } from "@/utils/toast";
 import { localToday } from "@/utils/format";
 import { invalidateDcaData } from "@/utils/queryInvalidation";
@@ -48,7 +48,12 @@ const EMPTY_FORM: GoalForm = {
   goal_risk_tolerance: "CONSERVATIVE",
 };
 
-export function useGoalSettings() {
+interface Options {
+  /** 미설정 사용자에게 목표 마법사를 자동으로 띄울지 — 적립 계획 탭에서만 참(다른 탭 딥링크를 가리지 않게) */
+  autoOpenWizard?: boolean;
+}
+
+export function useGoalSettings({ autoOpenWizard = true }: Options = {}) {
   const queryClient = useQueryClient();
   const location = useLocation();
   const userId = useAuthStore((s) => s.userId);
@@ -81,7 +86,8 @@ export function useGoalSettings() {
     let annual_dividend_goal = "";
     let goal_risk_tolerance: GoalRiskTolerance = "CONSERVATIVE";
     if (data) {
-      const settingsData = await fetchSettings();
+      // 페이지가 이미 받아 둔 설정 캐시를 쓴다 — 모달을 열 때마다 네트워크를 거쳐 늦게 열렸다(계획 143 C3)
+      const settingsData = await queryClient.fetchQuery(settingsQuery);
       annual_deposit_goal = settingsData.annual_deposit_goal
         ? String(settingsData.annual_deposit_goal)
         : "";
@@ -106,7 +112,7 @@ export function useGoalSettings() {
       annual_dividend_goal,
       goal_risk_tolerance,
     };
-  }, [data]);
+  }, [data, queryClient]);
 
   // buildCurrentForm은 설정을 다시 조회하므로 실패할 수 있다 — 호출부가 `void`로 부르므로
   // 여기서 잡지 않으면 unhandled rejection이 되고 모달이 아무 안내 없이 열리지 않는다.
@@ -137,7 +143,7 @@ export function useGoalSettings() {
   }, [location.state, isLoading, data, openEdit]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !autoOpenWizard) return;
     const shownKey = goalWizardShownKey(userId);
     const alreadyShown = storageGet(shownKey) === "true";
     if (
@@ -151,7 +157,7 @@ export function useGoalSettings() {
       storageSet(shownKey, "true");
       void openWizard();
     }
-  }, [userId, isLoading, data, openWizard]);
+  }, [userId, autoOpenWizard, isLoading, data, openWizard]);
 
   /** wizardMode에서는 5단계(투자성향·배당목표) 저장 후 6단계(추천 포트폴리오)로 넘어가므로
    * 모달을 닫지 않는다 — 플랫 편집 모달(!wizardMode)만 저장 즉시 닫힌다.

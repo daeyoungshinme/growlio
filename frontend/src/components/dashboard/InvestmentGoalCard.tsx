@@ -8,6 +8,7 @@ import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import GoalChipGrid from "./investmentGoal/GoalChipGrid";
 import { DcaOutlook } from "./investmentGoal/DcaOutlook";
 import { buildGoalChips } from "./investmentGoal/goalChips";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 interface Props {
   data: DashboardData | undefined;
@@ -25,7 +26,7 @@ function CardHeader({ linkLabel, className }: { linkLabel: string; className: st
         투자 목표 달성 현황
       </h2>
       <Link
-        to="/invest-plan"
+        to={investPlanUrl("적립 계획")}
         className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
       >
         {linkLabel}

@@ -11,7 +11,10 @@ import {
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { SELECT_SM } from "@/constants/inputStyles";
 import { ALERT_TABS } from "@/constants/tabs";
-import Tabs from "@/components/common/Tabs";
+import SegmentedControl from "@/components/common/SegmentedControl";
+import CollapsibleSection from "@/components/common/CollapsibleSection";
+import EmptyState from "@/components/common/EmptyState";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { fmtKrw, fmtPct, clampPct, fmtFxRate, fmtUsd, relativeTime } from "@/utils/format";
 import { syncSharedUsdRate } from "@/utils/sharedUsdRate";
@@ -29,6 +32,7 @@ import { rebalancingUrl } from "@/utils/rebalancingUrl";
 const MONTH_OPTIONS = ["1개월", "3개월", "6개월"] as const;
 type MonthOption = (typeof MONTH_OPTIONS)[number];
 const MONTHS: Record<MonthOption, number> = { "1개월": 1, "3개월": 3, "6개월": 6 };
+const MONTH_SEGMENTS = MONTH_OPTIONS.map((o) => ({ value: o, label: o }));
 // 기본 탭은 페이지 프리페치 키(`FX_PLAN_DEFAULT_MONTHS`)에서 고른다 — 따로 적으면 프리페치가 헛돈다(plans/132 D4)
 const DEFAULT_MONTH_OPTION: MonthOption =
   MONTH_OPTIONS.find((option) => MONTHS[option] === FX_PLAN_DEFAULT_MONTHS) ?? "3개월";
@@ -179,7 +183,8 @@ function FxPlanBody({ onEditGoal }: Props) {
   const [portfolioId, setPortfolioId] = useState<string | null>(null);
   const months = MONTHS[monthOption];
 
-  const { data, isLoading, isError, error, isPlaceholderData, dataUpdatedAt } = useQuery({
+  const [basisOpen, toggleBasis] = useCollapsible(false, "growlio:fxPlan:basisOpen");
+  const { data, isLoading, isError, error, isPlaceholderData, dataUpdatedAt, refetch } = useQuery({
     ...fxPlanQuery(months, portfolioId),
     // 월 탭·포트폴리오를 바꿀 때 카드 전체가 스켈레톤으로 바뀌며 탭 포커스가 사라지지 않게 (plans/99 B1)
     placeholderData: keepPreviousData,
@@ -243,9 +248,11 @@ function FxPlanBody({ onEditGoal }: Props) {
   // 카드 전체가 오류 문구로 바뀌었다(plans/128 A3)
   if (!data) {
     return (
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        환전 계획을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </p>
+      <EmptyState
+        title="환전 계획을 불러오지 못했습니다."
+        action={{ label: "다시 시도", onClick: () => void refetch() }}
+        compact
+      />
     );
   }
 
@@ -333,57 +340,70 @@ function FxPlanBody({ onEditGoal }: Props) {
       ) : (
         <div className="space-y-4 border-t border-gray-100 dark:border-gray-800 pt-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Tabs
-              tabs={MONTH_OPTIONS}
-              activeTab={monthOption}
+            <SegmentedControl
+              options={MONTH_SEGMENTS}
+              value={monthOption}
               onChange={setMonthOption}
-              variant="pill"
-              fullWidth
+              ariaLabel="환전 기간"
+              stretch
             />
             {portfolioPicker}
           </div>
 
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            {data.deposit_source === "DCA_AMOUNT" ? (
-              <>
-                {data.portfolio_name} 정액 적립 월 {fmtKrw(data.monthly_deposit_krw ?? 0)}의 해외 몫
-                {(data.krw_order_accounts?.length ?? 0) > 0 && (
-                  <> (원화주문 계좌 {data.krw_order_accounts?.join(", ")} 제외)</>
-                )}
-              </>
-            ) : (
-              <>
-                {data.portfolio_name} 해외 비중 {data.overseas_weight_pct.toFixed(0)}% × 월{" "}
-                {fmtKrw(data.monthly_deposit_krw ?? 0)}
-              </>
-            )}{" "}
-            → 월 {fmtUsdWhole(data.monthly_need_usd)} × {data.months}개월 − 보유{" "}
-            {fmtUsdWhole(data.held_usd)}
-            {heldUsdLabel(data)}
-            {(data.reserved_usd ?? 0) > 0 && (
-              <> (추가 환전 {fmtUsdWhole(data.reserved_usd ?? 0)} 제외)</>
-            )}{" "}
-            ={" "}
+            {data.months}개월 적립에{" "}
             <span className="font-semibold text-gray-900 dark:text-gray-100">
               {fmtUsdWhole(data.need_usd)} 필요
             </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {" "}
+              · 보유 {fmtUsdWhole(data.held_usd)} {heldUsdLabel(data)}
+            </span>
           </p>
 
-          {(data.held_usd_accounts?.length ?? 0) > 0 && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              보유 달러:{" "}
-              {data.held_usd_accounts
-                ?.map(
-                  (a) =>
-                    `${a.name} ${fmtUsdWhole(a.usd)}(${HELD_SOURCE_LABEL[a.source]}${
-                      (a.reserved_usd ?? 0) > 0
-                        ? `, 추가 환전 ${fmtUsdWhole(a.reserved_usd ?? 0)} 제외`
-                        : ""
-                    })`,
-                )
-                .join(" · ")}
-            </p>
-          )}
+          {/* 산식·계좌별 보유 달러는 길어서 모바일에서 여러 줄로 꺾인다 — 근거로 접어 둔다(계획 143 B6) */}
+          <CollapsibleSection isOpen={basisOpen} onToggle={toggleBasis} label="계산 근거">
+            <div className="space-y-2 px-3">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {data.deposit_source === "DCA_AMOUNT" ? (
+                  <>
+                    {data.portfolio_name} 정액 적립 월 {fmtKrw(data.monthly_deposit_krw ?? 0)}의
+                    해외 몫
+                    {(data.krw_order_accounts?.length ?? 0) > 0 && (
+                      <> (원화주문 계좌 {data.krw_order_accounts?.join(", ")} 제외)</>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {data.portfolio_name} 해외 비중 {data.overseas_weight_pct.toFixed(0)}% × 월{" "}
+                    {fmtKrw(data.monthly_deposit_krw ?? 0)}
+                  </>
+                )}{" "}
+                → 월 {fmtUsdWhole(data.monthly_need_usd)} × {data.months}개월 − 보유{" "}
+                {fmtUsdWhole(data.held_usd)}
+                {(data.reserved_usd ?? 0) > 0 && (
+                  <> (추가 환전 {fmtUsdWhole(data.reserved_usd ?? 0)} 제외)</>
+                )}{" "}
+                = {fmtUsdWhole(data.need_usd)}
+              </p>
+
+              {(data.held_usd_accounts?.length ?? 0) > 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  보유 달러:{" "}
+                  {data.held_usd_accounts
+                    ?.map(
+                      (a) =>
+                        `${a.name} ${fmtUsdWhole(a.usd)}(${HELD_SOURCE_LABEL[a.source]}${
+                          (a.reserved_usd ?? 0) > 0
+                            ? `, 추가 환전 ${fmtUsdWhole(a.reserved_usd ?? 0)} 제외`
+                            : ""
+                        })`,
+                    )
+                    .join(" · ")}
+                </p>
+              )}
+            </div>
+          </CollapsibleSection>
 
           <RefreshHeldUsdButton />
 

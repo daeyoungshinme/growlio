@@ -124,4 +124,15 @@ describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
     await screen.findByText("배당 목표 달성 현황");
     expect(screen.queryByText("배당 목표를 더 빨리 달성하려면?")).toBeNull();
   });
+
+  it("불러오기에 실패하면 다시 시도할 수 있다", async () => {
+    fetchDividendPlan
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValue(makeDividendPlan());
+    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
+    renderWithProviders(<DividendPlanSection onOpenSettings={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "다시 시도" }));
+    expect((await screen.findAllByText(/달성률/)).length).toBeGreaterThan(0);
+    expect(fetchDividendPlan).toHaveBeenCalledTimes(2);
+  });
 });

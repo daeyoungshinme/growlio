@@ -4,6 +4,7 @@ import { fmtKrw, fmtMonth } from "@/utils/format";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import type { DCAAnalysisData } from "@/api/invest";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 type GoalTimeline = DCAAnalysisData["goal_timeline"] | undefined;
 
@@ -121,7 +122,7 @@ export function DcaOutlook({
         </>
       ) : (
         <Link
-          to="/invest-plan"
+          to={investPlanUrl("적립 계획")}
           className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
         >
           DCA 투자 계획 설정하기 →

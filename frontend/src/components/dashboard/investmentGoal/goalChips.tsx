@@ -159,7 +159,7 @@ export function buildGoalChips({ data, expectedGoalYear }: GoalChipsInput): Goal
       label: "연간 입금",
       shortLabel: "입금",
       isSet: hasDepositGoal,
-      setupHref: "/invest-plan",
+      setupHref: investPlanUrl("적립 계획"),
       content: (
         <>
           <span
@@ -203,7 +203,7 @@ export function buildGoalChips({ data, expectedGoalYear }: GoalChipsInput): Goal
       label: "연수익률 목표",
       shortLabel: "연수익률",
       isSet: hasReturnGoal,
-      setupHref: "/invest-plan",
+      setupHref: investPlanUrl("적립 계획"),
       content: returnGap ? (
         <>
           {gapBadge(returnGap.gapPct, {
@@ -229,7 +229,7 @@ export function buildGoalChips({ data, expectedGoalYear }: GoalChipsInput): Goal
       label: "은퇴 목표",
       shortLabel: "은퇴",
       isSet: hasRetirementGoal,
-      setupHref: "/invest-plan",
+      setupHref: investPlanUrl("적립 계획"),
       content: retirementContent(
         data?.retirement_target_year,
         retirementGapYears,

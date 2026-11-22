@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { TriangleAlert, ChevronDown, ChevronUp, Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { fetchOverseasPositionsTax, fetchOverseasRealized, type TaxSummary } from "@/api/tax";
 import TaxPlannerSection from "@/components/tax/TaxPlannerSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -11,6 +12,8 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { SELECT_SM } from "@/constants/inputStyles";
 import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 import EmptyState from "@/components/common/EmptyState";
+import SkeletonCard from "@/components/common/SkeletonCard";
+import { investPlanUrl } from "@/utils/tabUrl";
 
 interface TaxOptimizationCardProps {
   /** 특정 계좌만 필터링해 조회 (미지정 시 전체 계좌 통합) */
@@ -97,7 +100,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
         </div>
       </div>
 
-      {taxLoading && <p className="text-sm text-gray-400 dark:text-gray-500">계산 중...</p>}
+      {taxLoading && <SkeletonCard rows={3} height="h-4" />}
 
       {taxFailed && !taxData && (
         <EmptyState
@@ -183,7 +186,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
 
           {plannerOpen &&
             (posLoading || realizedLoading ? (
-              <p className="text-sm text-gray-400 dark:text-gray-500">불러오는 중...</p>
+              <SkeletonCard rows={3} height="h-4" />
             ) : positionsData ? (
               <ErrorBoundary variant="section">
                 <TaxPlannerSection
@@ -210,7 +213,8 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
 }
 
 /** 금융소득 2,000만원 경고 — 종합과세와 건보 피부양자 자격상실은 같은 기준선이라 박스 하나로 묶는다.
- * 예전엔 최대 3개의 색 박스가 쌓였다 (docs/plans/67 P1-16). */
+ * 예전엔 최대 3개의 색 박스가 쌓였다 (docs/plans/67 P1-16). 건보 상세(예상 보험료·안내)는 한도 현황의
+ * `HealthInsuranceRiskCard`에 있어 여기선 한 줄과 링크만 둔다(계획 143 B1). */
 function FinancialIncomeThresholdNotice({ taxData }: { taxData: TaxSummary }) {
   const hi = taxData.health_insurance_estimate;
   const comprehensiveNear =
@@ -227,10 +231,8 @@ function FinancialIncomeThresholdNotice({ taxData }: { taxData: TaxSummary }) {
   if (taxData.comprehensive_tax_warning) lines.push("금융소득 종합과세 대상이 될 수 있어요.");
   else if (comprehensiveNear)
     lines.push(`종합과세 기준까지 ${fmtKrw(taxData.comprehensive_tax_remaining_krw)} 남았어요.`);
-  if (hi.dependent_risk_warning)
-    lines.push(
-      `건강보험 피부양자 자격을 잃을 수 있어요 — 지역가입자 전환 시 월 약 ${fmtKrw(hi.estimated_monthly_premium_krw ?? 0)}.`,
-    );
+  const healthAffected = hi.dependent_risk_warning || healthNear;
+  if (hi.dependent_risk_warning) lines.push("건강보험 피부양자 자격을 잃을 수 있어요.");
   else if (healthNear)
     lines.push(
       `건강보험 피부양자 기준까지 ${fmtKrw(hi.income_remaining_until_risk_krw)} 남았어요.`,
@@ -261,8 +263,13 @@ function FinancialIncomeThresholdNotice({ taxData }: { taxData: TaxSummary }) {
           ))}
         </div>
       </div>
-      {(hi.dependent_risk_warning || healthNear) && hi.note && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 pl-1">{hi.note}</p>
+      {healthAffected && (
+        <Link
+          to={investPlanUrl("절세", { taxTab: "한도 현황" })}
+          className={`inline-flex items-center ${TOUCH_HEIGHT_MIN} pl-1 text-xs text-blue-600 dark:text-blue-400 hover:underline`}
+        >
+          건강보험 예상 보험료는 한도 현황에서 보기 →
+        </Link>
       )}
     </div>
   );

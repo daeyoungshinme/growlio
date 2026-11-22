@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, CalendarRange, Settings2, TrendingUp } from "lucide-react";
 import { fmtKrw, fmtPct } from "@/utils/format";
 import SkeletonCard from "@/components/common/SkeletonCard";
+import EmptyState from "@/components/common/EmptyState";
 import { MONTH_LABELS } from "@/utils/dividendUtils";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
@@ -37,7 +38,7 @@ function AchievementValue({ pct, sizeClass }: { pct: number | null; sizeClass: s
 }
 
 export default function DividendPlanSection({ onOpenSettings }: Props) {
-  const { data, isLoading, isError } = useQuery(dividendPlanQuery);
+  const { data, isLoading, isError, refetch } = useQuery(dividendPlanQuery);
 
   // GoalTimelineCard(적립 계획 탭)와 동일한 queryKey를 써서 캐시를 공유한다 — 중복 호출 없음.
   // 배당 목표가 있을 때만 그리므로 그때만 조회한다 — 콜드 계산이 수십 초인 무거운 추천이다(plans/125 E10)
@@ -58,8 +59,12 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
 
   if (isError || !data) {
     return (
-      <div className="card text-sm text-red-600 dark:text-red-400">
-        배당 계획 데이터를 불러오지 못했습니다.
+      <div className="card">
+        <EmptyState
+          title="배당 계획을 불러오지 못했습니다."
+          action={{ label: "다시 시도", onClick: () => void refetch() }}
+          compact
+        />
       </div>
     );
   }

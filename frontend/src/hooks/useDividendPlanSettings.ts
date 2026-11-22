@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { fetchSettings, updateGoalSettings } from "@/api/settings";
+import { updateGoalSettings, type SettingsData } from "@/api/settings";
+import { settingsQuery } from "@/api/queryOptions";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidateDcaData, invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
@@ -31,9 +32,10 @@ export function useDividendPlanSettings() {
   } = useEditableSettingsForm<DividendPlanForm>(EMPTY_FORM);
 
   const openEdit = async () => {
-    let settingsData: Awaited<ReturnType<typeof fetchSettings>>;
+    let settingsData: SettingsData;
     try {
-      settingsData = await fetchSettings();
+      // 받아 둔 설정 캐시 우선 — 모달이 네트워크를 기다리지 않게(계획 143 C3)
+      settingsData = await queryClient.fetchQuery(settingsQuery);
     } catch (e) {
       // onClick에 직접 묶인 async라 실패하면 탭이 아무 반응 없이 끝나고 rejection이 처리되지 않았다
       toast(extractErrorMessage(e), "error");

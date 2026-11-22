@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import { useDividendPlanSettings } from "@/hooks/useDividendPlanSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
@@ -24,12 +23,11 @@ import AutoInvestStatusBanner from "@/components/invest/AutoInvestStatusBanner";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import DcaSettingsSummaryCard from "@/components/invest/DcaSettingsSummaryCard";
 import GoalSettingsEditModal from "@/components/invest/GoalSettingsEditModal";
+import DividendSettingsModal from "@/components/invest/DividendSettingsModal";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
-import { fmtKrwPreview, localMonth } from "@/utils/format";
+import { localMonth } from "@/utils/format";
 import PageLoadError from "@/components/common/PageLoadError";
-import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import Modal, { ModalBody, ModalFooter } from "@/components/common/Modal";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -126,7 +124,7 @@ export default function InvestPlanPage() {
     wizardStep,
     setWizardStep,
     openWizard,
-  } = useGoalSettings();
+  } = useGoalSettings({ autoOpenWizard: activeTab === "적립 계획" });
 
   const {
     editing: dividendEditing,
@@ -374,41 +372,13 @@ export default function InvestPlanPage() {
 
       {/* 배당 계획 설정 편집 모달 */}
       {dividendEditing && (
-        <Modal title="배당 계획 설정" onClose={handleDividendCloseModal} size="md">
-          <ModalBody padding="px-6 pb-6 pt-2" className="space-y-4">
-            <FormInput
-              label="목표 연간 배당금 (원)"
-              type="number"
-              inputMode="numeric"
-              value={dividendForm.annual_dividend_goal}
-              onChange={(e) =>
-                setDividendForm((f) => ({ ...f, annual_dividend_goal: e.target.value }))
-              }
-              placeholder="10000000"
-              preview={
-                dividendForm.annual_dividend_goal
-                  ? fmtKrwPreview(Number(dividendForm.annual_dividend_goal))
-                  : undefined
-              }
-              hint="예상 연배당이 이 금액을 넘으면 목표 달성"
-            />
-          </ModalBody>
-          <ModalFooter>
-            <button
-              onClick={handleDividendCloseModal}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
-            >
-              취소
-            </button>
-            <button
-              onClick={saveDividendSettings}
-              disabled={dividendSaving}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
-            >
-              {dividendSaving ? "저장 중..." : "저장"}
-            </button>
-          </ModalFooter>
-        </Modal>
+        <DividendSettingsModal
+          form={dividendForm}
+          setForm={setDividendForm}
+          saving={dividendSaving}
+          onSave={saveDividendSettings}
+          onClose={handleDividendCloseModal}
+        />
       )}
 
       {dividendShowCloseConfirm && (

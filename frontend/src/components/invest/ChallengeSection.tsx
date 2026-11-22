@@ -20,7 +20,7 @@ interface Props {
 }
 
 export default function ChallengeSection({ settings }: Props) {
-  const { data: challenges, isLoading, isError } = useChallenges();
+  const { data: challenges, isLoading, isError, refetch } = useChallenges();
   const { data: accounts } = useQuery(accountsQuery);
   const { create, update, remove } = useChallengeMutations();
 
@@ -68,9 +68,11 @@ export default function ChallengeSection({ settings }: Props) {
   if (isError)
     return (
       <div className="card">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          챌린지를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
-        </p>
+        <EmptyState
+          title="챌린지를 불러오지 못했어요."
+          action={{ label: "다시 시도", onClick: () => void refetch() }}
+          compact
+        />
       </div>
     );
 

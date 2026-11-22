@@ -95,6 +95,13 @@ const alert = (target_rate: number, over: Partial<ExchangeRateAlert> = {}): Exch
 const planAlert = (target_rate: number, planned_usd = 561, over: Partial<ExchangeRateAlert> = {}) =>
   alert(target_rate, { source: "FX_PLAN", planned_usd, portfolio_id: "p1", ...over });
 
+/** 산식·계좌별 보유 달러는 "계산 근거" 접힘 안에 있다(계획 143 B6) */
+async function openBasis() {
+  const toggle = await screen.findByRole("button", { name: /계산 근거/ });
+  // 접힘 상태는 localStorage에 남아 앞 테스트에서 연 채일 수 있다
+  if (toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
+}
+
 describe("FxPlanCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -125,6 +132,7 @@ describe("FxPlanCard", () => {
       monthly_deposit_krw: 1_000_000,
     });
     renderWithProviders(<FxPlanCard />);
+    await openBasis();
     expect(await screen.findByText(/정액 적립 월 100만원의 해외 몫/)).toBeInTheDocument();
   });
 
@@ -133,6 +141,7 @@ describe("FxPlanCard", () => {
     vi.mocked(fetchFxPlan).mockResolvedValue({ ...plan, held_usd_synced_at: twoHoursAgo });
     renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/\(동기화 기준 · 2시간 전\)/)).toBeInTheDocument();
+    await openBasis();
     expect(screen.getByText(/해외 비중 60%/)).toBeInTheDocument();
   });
 
@@ -230,6 +239,7 @@ describe("FxPlanCard", () => {
     });
     renderWithProviders(<FxPlanCard />);
     expect(await screen.findByText(/\(직접 입력 포함\)/)).toBeInTheDocument();
+    await openBasis();
     expect(
       screen.getByText("보유 달러: 메리츠 $1,200(직접 입력) · 한국투자 $333(동기화 기준)"),
     ).toBeInTheDocument();
@@ -274,7 +284,7 @@ describe("FxPlanCard", () => {
   it("기간을 바꾸면 그 기간으로 다시 조회한다", async () => {
     vi.mocked(fetchFxPlan).mockResolvedValue(plan);
     renderWithProviders(<FxPlanCard />);
-    fireEvent.click(await screen.findByRole("tab", { name: "6개월" }));
+    fireEvent.click(await screen.findByRole("button", { name: "6개월" }));
     await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(6, null));
   });
 
@@ -284,7 +294,7 @@ describe("FxPlanCard", () => {
       .mockReturnValue(new Promise(() => {}));
     renderWithProviders(<FxPlanCard />);
     expect(await screen.findByRole("button", { name: "목표 환율 알림 등록" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("tab", { name: "6개월" }));
+    fireEvent.click(screen.getByRole("button", { name: "6개월" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "목표 환율 알림 등록" })).toBeDisabled(),
     );
@@ -468,6 +478,7 @@ describe("FxPlanCard", () => {
       krw_order_accounts: ["키움 원화"],
     });
     renderWithProviders(<FxPlanCard />);
+    await openBasis();
     expect(await screen.findByText(/원화주문 계좌 키움 원화 제외/)).toBeInTheDocument();
   });
 
@@ -594,6 +605,7 @@ describe("FxPlanCard — 추가 환전 보관 달러 제외(plans/123 후속)", 
       ],
     });
     renderWithProviders(<FxPlanCard />);
+    await openBasis();
     // 산식과 계좌별 내역 두 곳에 보인다
     const shown = await screen.findAllByText(/추가 환전 \$500 제외/);
     expect(shown).toHaveLength(2);

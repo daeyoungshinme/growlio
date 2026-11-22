@@ -14,9 +14,11 @@ from app.services.tax.tax_action_builders import (
     _get_rules,
     build_financial_income_action,
     build_isa_transfer_actions,
+    build_pension_action,
+)
+from app.services.tax.tax_action_overseas import (
     build_loss_harvest_actions,
     build_overseas_gain_harvest_action,
-    build_pension_action,
     overseas_sell_deadline,
 )
 from app.services.tax.tax_service import (
