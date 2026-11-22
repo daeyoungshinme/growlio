@@ -48,6 +48,8 @@ export type MarketConditionMode = "DISABLED" | "CAUTIOUS" | "STRICT" | "TACTICAL
 export type TriggerCondition = "DRIFT_ONLY" | "SCHEDULE_ONLY" | "BOTH";
 export type TaxImpactGateMode = "DISABLED" | "ENABLED";
 
+export type DcaAllocationMode = "TARGET" | "GAP_FIRST";
+
 export interface RebalancingAlert {
   id: string;
   portfolio_id: string;
@@ -71,6 +73,12 @@ export interface RebalancingAlert {
   max_tax_impact_krw: number | null;
   /** 정기 적립 정액(원, plans/120) — 있으면 매회 이 금액만 목표 비중대로 나눠 매수. 없으면 예수금 전체로 비중 채우기 */
   dca_amount_krw?: number | null;
+  /** 정액 분할 방식(plans/145) — GAP_FIRST면 목표에 모자란 종목부터 채운다 */
+  dca_allocation_mode?: DcaAllocationMode;
+  /** 허용 범위 경계까지만 거래(plans/145) — 목표까지 다 맞추지 않는다 */
+  trade_to_band?: boolean;
+  /** 최소 거래 금액(원, plans/145) — 이보다 작은 주문은 건너뛴다 */
+  min_trade_krw?: number | null;
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
@@ -95,6 +103,9 @@ export interface RebalancingAlertUpsert {
   tax_impact_gate_mode: TaxImpactGateMode;
   max_tax_impact_krw: number | null;
   dca_amount_krw?: number | null;
+  dca_allocation_mode?: DcaAllocationMode;
+  trade_to_band?: boolean;
+  min_trade_krw?: number | null;
 }
 
 export const fetchRebalancingAlerts = () => apiGet<RebalancingAlert[]>("/alerts/rebalancing");

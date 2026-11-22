@@ -23,6 +23,7 @@ def _make_alert(**kwargs) -> SimpleNamespace:
         "strategy": "FULL",
         "order_type": "MARKET",
         "buy_wait_minutes": 10,
+        "min_trade_krw": None,
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)

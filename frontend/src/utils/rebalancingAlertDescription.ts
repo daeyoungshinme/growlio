@@ -40,3 +40,26 @@ export function buildAlertDescription(
   }
   return `${when} 정기 리포트를 받으며, 비중이 ${rule} 이탈 시 즉시 ${action}`;
 }
+
+/** 자동 실행 거래 방식(plans/145) 한 줄 — 기본값(목표까지·제한 없음·목표 비중 분할)이면 null. */
+export function describeTradeOptions(opts: {
+  mode: "NOTIFY" | "AUTO";
+  triggerCondition: TriggerCondition;
+  tradeToBand: boolean;
+  minTradeKrw: number | null;
+  isDcaAmount: boolean;
+  dcaAllocationMode: "TARGET" | "GAP_FIRST";
+}): string | null {
+  if (opts.mode !== "AUTO") return null;
+  const parts: string[] = [];
+  if (opts.isDcaAmount && opts.dcaAllocationMode === "GAP_FIRST") {
+    parts.push("적립 금액은 목표보다 모자란 종목부터 채웁니다");
+  }
+  if (opts.tradeToBand && opts.triggerCondition !== "SCHEDULE_ONLY") {
+    parts.push("이탈 종목은 허용 범위 경계까지만 거래합니다");
+  }
+  if (opts.minTradeKrw && opts.minTradeKrw > 0) {
+    parts.push(`${opts.minTradeKrw.toLocaleString()}원 미만 주문은 건너뜁니다`);
+  }
+  return parts.length ? `${parts.join(" · ")}.` : null;
+}

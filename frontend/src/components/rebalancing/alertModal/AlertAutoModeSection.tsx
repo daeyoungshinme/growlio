@@ -18,6 +18,12 @@ import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 import { AutoDailyCapEditor } from "./AutoDailyCapEditor";
 import { settingsQuery } from "@/api/queryOptions";
+import SegmentedControl from "@/components/common/SegmentedControl";
+
+const TRADE_TARGET_OPTIONS = [
+  { value: "TARGET", label: "목표 비중까지" },
+  { value: "BAND", label: "허용 범위 경계까지" },
+] as const;
 
 const inputClass = `w-full ${INPUT_SM}`;
 
@@ -294,6 +300,57 @@ export function AlertAutoModeSection({
             </p>
           </div>
         )}
+      </div>
+
+      {/* ── 거래 방식(plans/145) ── */}
+      <div className="pt-1 border-t border-orange-200/30 dark:border-orange-800/30 space-y-3">
+        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">거래 방식</p>
+        {form.triggerCondition !== "SCHEDULE_ONLY" && (
+          <div>
+            <SegmentedControl
+              ariaLabel="이탈 종목을 어디까지 되돌릴지"
+              options={TRADE_TARGET_OPTIONS}
+              value={form.tradeToBand ? "BAND" : "TARGET"}
+              onChange={(v) => form.setTradeToBand(v === "BAND")}
+              stretch
+            />
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
+              {form.tradeToBand
+                ? "이탈한 종목을 허용 범위 경계까지만 사고팔아 거래량·수수료·세금이 줄어듭니다. 대신 목표 비중과의 차이가 조금 남습니다."
+                : "이탈한 종목을 목표 비중까지 한 번에 맞춥니다."}
+            </p>
+          </div>
+        )}
+        <div>
+          <label htmlFor={`${uid}-min-trade`} className={FORM_LABEL_XS}>
+            최소 거래 금액 (원, 선택)
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={10000}
+            id={`${uid}-min-trade`}
+            placeholder="예: 100000 (비우면 제한 없음)"
+            value={form.minTradeKrw ?? ""}
+            onChange={(e) =>
+              form.setMinTradeKrw(
+                e.target.value === ""
+                  ? null
+                  : Math.max(0, Math.floor(Number(e.target.value))) || null,
+              )
+            }
+            className={inputClass}
+          />
+          {form.minTradeKrw != null && form.minTradeKrw > 0 && (
+            <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+              {fmtKrwPreview(form.minTradeKrw)}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+            이보다 작은 주문은 계획에서 빼서 자잘한 매매를 막습니다.
+          </p>
+        </div>
       </div>
     </div>
   );

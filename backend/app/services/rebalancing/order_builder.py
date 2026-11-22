@@ -124,6 +124,33 @@ async def refresh_live_prices(
                 item.diff_krw = item.target_value_krw - current_qty * price
 
 
+def drop_orders_below_min_value(
+    orders: list[Any], min_trade_krw: float | None, alert_id: str | None = None
+) -> list[Any]:
+    """주문 1건 거래대금(수량 × 참조가)이 `min_trade_krw`보다 작은 주문을 뺀다(plans/145 B3).
+
+    자잘한 주문은 수수료·호가 비용만 들고 비중은 거의 안 바뀐다. 참조가를 모르는 주문은 판정할 수 없어 그대로 둔다.
+    """
+    if not min_trade_krw or min_trade_krw <= 0:
+        return orders
+    kept: list[Any] = []
+    for order in orders:
+        price = getattr(order, "reference_price", None)
+        if price and price > 0 and order.quantity * price < float(min_trade_krw):
+            logger.info(
+                "rebalancing_auto_item_skipped",
+                alert_id=alert_id,
+                ticker=order.ticker,
+                side=order.side,
+                reason="below_min_trade",
+                value_krw=round(order.quantity * price, 0),
+                min_trade_krw=float(min_trade_krw),
+            )
+            continue
+        kept.append(order)
+    return kept
+
+
 def clamp_orders_to_max_value(orders: list[Any], max_order_value_krw: float) -> list[Any]:
     """주문 1건당 거래대금(수량 × 참조가)이 max_order_value_krw를 넘지 않도록 수량을 축소한다.
 

@@ -66,3 +66,41 @@ def alert_relative_threshold(alert: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float | Decimal):
         return None
     return float(value)
+
+
+def band_width_pct(target_weight_pct: float, threshold_pct: float, relative_threshold_pct: float | None) -> float:
+    """이탈 기준선까지의 폭(%p) — `is_drifting`이 먼저 걸리는 쪽(절대·상대 중 좁은 것)."""
+    if relative_threshold_pct and target_weight_pct > 0:
+        return min(threshold_pct, target_weight_pct * relative_threshold_pct / 100)
+    return threshold_pct
+
+
+def shrink_to_band(item: Any, threshold_pct: float, relative_threshold_pct: float | None = None) -> None:
+    """이탈 항목의 목표 금액을 목표 비중이 아니라 **허용 범위 경계**까지로 줄인다(plans/145 B3, 제자리 수정).
+
+    경계는 `목표 ± band_width_pct` — 모자라면 하단, 넘치면 상단까지만 사고판다. 수량·차이는 모두 `target_value_krw`에서
+    파생되므로(`refresh_live_prices`·`expand_group_items`가 이 값으로 다시 계산) 그 값을 기준으로 맞춘다.
+    지수 그룹 행은 수량이 없어 목표 금액만 바꾼다. 경계 안쪽 항목은 바꾸지 않는다.
+    """
+    target_w = float(item.target_weight_pct or 0)
+    diff_w = float(item.weight_diff_pct or 0)
+    band = band_width_pct(target_w, threshold_pct, relative_threshold_pct)
+    if abs(diff_w) <= band:
+        return
+    if target_w > 0:
+        base = float(item.target_value_krw) * 100 / target_w
+    elif float(item.current_weight_pct or 0) > 0:
+        base = float(item.current_value_krw) * 100 / float(item.current_weight_pct)
+    else:
+        return
+    edge_w = target_w - band if diff_w > 0 else target_w + band
+    edge_value = round(base * edge_w / 100, 0)
+    item.target_value_krw = edge_value
+    item.diff_krw = round(edge_value - float(item.current_value_krw), 0)
+    price = getattr(item, "current_price_krw", None)
+    if getattr(item, "shares_to_trade", None) is not None and price and price > 0:
+        from app.services.rebalancing._order_quantity_guard import floor_shares
+
+        current_qty = float(item.current_qty or 0)
+        item.target_qty = float(floor_shares(edge_value / float(price)))
+        item.shares_to_trade = item.target_qty - current_qty

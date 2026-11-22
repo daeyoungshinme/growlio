@@ -115,6 +115,12 @@ class RebalancingAlert(_AlertMixin, Base):
     # 정기 적립식 정액 모드(plans/120) — 값이 있으면 스케줄일에 이 금액(원)만 목표 비중대로 나눠 매수한다.
     # 예수금이 더 많아도 이 금액까지만. None이면 기존 동작(예수금 전체로 목표 비중 채우기).
     dca_amount_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    # 정액 분할 방식(plans/145 B2): TARGET(목표 비중대로) | GAP_FIRST(목표에 모자란 종목부터 부족액 비례)
+    dca_allocation_mode: Mapped[str] = mapped_column(String(16), nullable=False, server_default="TARGET")
+    # 허용 범위 경계까지만 거래(plans/145 B3) — 켜면 이탈 항목을 목표가 아니라 이탈 기준선까지만 되돌린다
+    trade_to_band: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    # 최소 거래 금액(원, plans/145 B3) — 이보다 작은 주문은 플랜에 담지 않는다. None이면 제한 없음
+    min_trade_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

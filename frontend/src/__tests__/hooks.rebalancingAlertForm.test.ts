@@ -329,6 +329,52 @@ describe("useRebalancingAlertFormState", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("거래 방식 옵션은 AUTO에서만 저장하고 NOTIFY면 기본값으로 보낸다 (plans/145)", async () => {
+    vi.mocked(upsertRebalancingAlert).mockResolvedValue(mockAlert);
+    const { result } = renderHook(
+      () => useRebalancingAlertFormState({ alert: null, portfolioId: "port-1", onClose }),
+      { wrapper: createWrapper() },
+    );
+    act(() => {
+      result.current.setTradeToBand(true);
+      result.current.setMinTradeKrw(100_000);
+    });
+    await act(async () => {
+      await result.current.upsertMut.mutateAsync();
+    });
+    expect(vi.mocked(upsertRebalancingAlert).mock.calls[0]![1]).toMatchObject({
+      trade_to_band: false,
+      min_trade_krw: null,
+      dca_allocation_mode: "TARGET",
+    });
+  });
+
+  it("AUTO 이탈 실행이면 경계 거래·최소 거래액을 보낸다", async () => {
+    vi.mocked(upsertRebalancingAlert).mockResolvedValue(mockAlert);
+    const { result } = renderHook(
+      () =>
+        useRebalancingAlertFormState({
+          alert: { ...mockAlert, mode: "AUTO", account_id: "acc-1" },
+          portfolioId: "port-1",
+          onClose,
+        }),
+      { wrapper: createWrapper() },
+    );
+    expect(result.current.isDirty).toBe(false);
+    act(() => {
+      result.current.setTradeToBand(true);
+      result.current.setMinTradeKrw(100_000);
+    });
+    expect(result.current.isDirty).toBe(true);
+    await act(async () => {
+      await result.current.upsertMut.mutateAsync();
+    });
+    expect(vi.mocked(upsertRebalancingAlert).mock.calls[0]![1]).toMatchObject({
+      trade_to_band: true,
+      min_trade_krw: 100_000,
+    });
+  });
+
   it("taxImpactGateMode 기본값은 DISABLED이고 alert 값으로 초기화된다", () => {
     const { result: withoutAlert } = renderHook(
       () => useRebalancingAlertFormState({ alert: null, portfolioId: "port-1", onClose }),

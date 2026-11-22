@@ -10,6 +10,7 @@ import {
   type MarketConditionMode,
   type RebalancingAlert,
   type ScheduleType,
+  type DcaAllocationMode,
   type TaxImpactGateMode,
   type TriggerCondition,
 } from "@/api/alerts";
@@ -148,6 +149,11 @@ export function useRebalancingAlertFormState({
     alert?.max_tax_impact_krw ?? null,
   );
   const [dcaAmountKrw, setDcaAmountKrw] = useState<number | null>(alert?.dca_amount_krw ?? null);
+  const [dcaAllocationMode, setDcaAllocationMode] = useState<DcaAllocationMode>(
+    alert?.dca_allocation_mode ?? "TARGET",
+  );
+  const [tradeToBand, setTradeToBand] = useState<boolean>(alert?.trade_to_band ?? false);
+  const [minTradeKrw, setMinTradeKrw] = useState<number | null>(alert?.min_trade_krw ?? null);
   // 정액은 적립식 프리셋 조합에서만 저장된다(백엔드가 다른 조합이면 422) — 화면 값도 같은 규칙으로 판정
   const isDcaPreset = isDcaAutoBuyPreset({
     schedule_type: scheduleType,
@@ -172,7 +178,10 @@ export function useRebalancingAlertFormState({
       buyWaitMinutes !== (alert.buy_wait_minutes ?? 10) ||
       taxImpactGateMode !== (alert.tax_impact_gate_mode ?? "DISABLED") ||
       maxTaxImpactKrw !== (alert.max_tax_impact_krw ?? null) ||
-      (isDcaPreset ? dcaAmountKrw : null) !== (alert.dca_amount_krw ?? null));
+      (isDcaPreset ? dcaAmountKrw : null) !== (alert.dca_amount_krw ?? null) ||
+      dcaAllocationMode !== (alert.dca_allocation_mode ?? "TARGET") ||
+      tradeToBand !== (alert.trade_to_band ?? false) ||
+      minTradeKrw !== (alert.min_trade_krw ?? null));
 
   const upsertMut = useMutation({
     mutationFn: () => {
@@ -210,6 +219,11 @@ export function useRebalancingAlertFormState({
         max_tax_impact_krw:
           mode === "AUTO" && taxImpactGateMode === "ENABLED" ? maxTaxImpactKrw : null,
         dca_amount_krw: isDcaPreset ? dcaAmountKrw : null,
+        // 분할 방식은 정액일 때만, 경계 거래는 이탈 기준으로 주문하는 자동 실행에서만 의미가 있다
+        dca_allocation_mode: isDcaPreset && dcaAmountKrw ? dcaAllocationMode : "TARGET",
+        trade_to_band:
+          mode === "AUTO" && triggerCondition !== "SCHEDULE_ONLY" ? tradeToBand : false,
+        min_trade_krw: mode === "AUTO" ? minTradeKrw : null,
       };
       return targetAccountId
         ? upsertAccountRebalancingAlert(portfolioId, targetAccountId, body)
@@ -275,6 +289,12 @@ export function useRebalancingAlertFormState({
     setMaxTaxImpactKrw,
     dcaAmountKrw,
     setDcaAmountKrw,
+    dcaAllocationMode,
+    setDcaAllocationMode,
+    tradeToBand,
+    setTradeToBand,
+    minTradeKrw,
+    setMinTradeKrw,
     isDcaPreset,
     // mutations
     upsertMut,

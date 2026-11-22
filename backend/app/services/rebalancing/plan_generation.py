@@ -19,12 +19,13 @@ from app.core.config import settings
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
-from app.services.rebalancing.drift_rule import alert_relative_threshold
+from app.services.rebalancing.drift_rule import alert_relative_threshold, shrink_to_band
 from app.services.rebalancing.group_expansion import expand_group_items
 from app.services.rebalancing.order_builder import (
     _flatten_account_tax_types,
     build_rebalancing_orders,
     clamp_orders_to_max_value,
+    drop_orders_below_min_value,
     is_daily_value_cap_blocking_auto_mode,
     market_group,
     refresh_live_prices,
@@ -182,6 +183,7 @@ def _build_plan_orders(
         drifting, ticker_account_map or {}, strategy, order_type, str(account_id), alert_id=str(alert.id)
     )
     orders = clamp_orders_to_max_value(orders, settings.auto_rebalancing_max_order_value_krw)
+    orders = drop_orders_below_min_value(orders, alert.min_trade_krw, alert_id=str(alert.id))
     return _coerce_overseas_market_orders_to_limit(orders, alert_id=str(alert.id))
 
 
@@ -326,6 +328,11 @@ async def _drifting_items_for_alert(
         logger.info("rebalancing_plan_no_drift", alert_id=str(alert.id))
         return None
 
+    # 허용 범위 경계까지만(plans/145 B3) — 그룹 펼침·시세 갱신이 목표 금액에서 수량을 다시 계산하므로 그 전에 줄인다
+    if alert.trade_to_band and not schedule_only:
+        for item in drifting:
+            shrink_to_band(item, threshold, relative_threshold)
+
     # 지수 그룹 행(plans/74)은 매수 계좌의 세제유형에 맞춰 종목 단위 멤버 행으로 펼친다(ISA·연금이면 국내 대체 종목).
     # 펼친 멤버 행은 analysis.items 그룹 행의 members와 같은 객체라 아래 시세 갱신이 세금영향 미리보기에도 반영된다
     buy_tax_type = _flatten_account_tax_types(analysis.ticker_account_map).get(str(buy_account_id), "GENERAL")
@@ -363,7 +370,7 @@ async def _dca_items_for_alert(
     매수만이라 세금 게이트는 건너뛴다(호출부 `sells_allowed`).
     """
     from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
-    from app.services.rebalancing.dca_allocation import allocate_dca_amount, dca_buy_rows
+    from app.services.rebalancing.dca_allocation import allocate_dca_amount, dca_buy_rows, dca_row_current_values
 
     overview = await load_alert_overview(alert, portfolio, db, cache)
     analysis = analyze_alert_overview(portfolio, overview)
@@ -374,11 +381,16 @@ async def _dca_items_for_alert(
         return None
     # refresh_live_prices는 시세와 함께 shares_to_trade를 목표금액 기준으로 다시 계산한다 — 분할은 반드시 그 뒤에
     await refresh_live_prices([item for item, _ in rows], alert.user_id, db, cache)
-    allocation = allocate_dca_amount(rows, float(alert.dca_amount_krw or 0))
+    # 부족분 우선(plans/145 B2)은 현재 평가액 기준이라 시세 갱신 전 분석값을 쓴다(목표 비중 분할과 같은 시점의 비중)
+    current_values = (
+        dca_row_current_values(analysis.items, buy_tax_type) if alert.dca_allocation_mode == "GAP_FIRST" else None
+    )
+    allocation = allocate_dca_amount(rows, float(alert.dca_amount_krw or 0), current_values)
     logger.info(
         "dca_plan_allocated",
         alert_id=str(alert.id),
         amount_krw=float(alert.dca_amount_krw or 0),
+        allocation_mode=alert.dca_allocation_mode,
         spent_krw=allocation.spent_krw,
         items=len(allocation.items),
         unaffordable=allocation.unaffordable,

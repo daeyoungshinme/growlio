@@ -1,6 +1,6 @@
 import type { RebalancingAlert } from "@/api/alerts";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
-import { buildAlertDescription } from "@/utils/rebalancingAlertDescription";
+import { buildAlertDescription, describeTradeOptions } from "@/utils/rebalancingAlertDescription";
 import { fmtDateTime } from "@/utils/format";
 
 interface Props {
@@ -9,6 +9,14 @@ interface Props {
 }
 
 export function AlertSummarySection({ form, alert }: Props) {
+  const tradeOptions = describeTradeOptions({
+    mode: form.mode,
+    triggerCondition: form.triggerCondition,
+    tradeToBand: form.tradeToBand,
+    minTradeKrw: form.minTradeKrw,
+    isDcaAmount: form.isDcaPreset && !!form.dcaAmountKrw,
+    dcaAllocationMode: form.dcaAllocationMode,
+  });
   return (
     <>
       {/* ── 설명 텍스트 ── */}
@@ -24,6 +32,7 @@ export function AlertSummarySection({ form, alert }: Props) {
           form.notifyTime,
           form.relativeThreshold,
         )}
+        {tradeOptions && <span className="block mt-0.5">{tradeOptions}</span>}
       </p>
 
       {/* ── 현재 설정 표시 ── */}

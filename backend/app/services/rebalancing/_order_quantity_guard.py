@@ -110,6 +110,32 @@ def fit_buy_to_budget(order: ExecutionOrderItem, budget: float) -> tuple[Executi
     return order.model_copy(update={"quantity": execute_qty}), order.quantity - execute_qty
 
 
+def fill_leftover_shares(
+    budgets: list[float],
+    prices: list[float],
+    qtys: list[int],
+    leftover: float,
+    caps: list[int] | None = None,
+) -> float:
+    """남은 돈으로 1주씩 보충한다 — 매번 "배분액 대비 덜 산 금액"이 가장 큰 종목(살 수 있고 상한 미만)을 고른다.
+
+    `qtys`를 제자리에서 늘리고 남은 돈을 돌려준다. 정액 적립 분할(`dca_allocation`)과 예산 비례 clamp가 같이 쓴다.
+    """
+    while True:
+        best = -1
+        best_unmet = float("-inf")
+        for i, price in enumerate(prices):
+            if price > leftover + 1e-6 or (caps is not None and qtys[i] >= caps[i]):
+                continue
+            unmet = budgets[i] - qtys[i] * price
+            if unmet > best_unmet:
+                best, best_unmet = i, unmet
+        if best < 0:
+            return leftover
+        qtys[best] += 1
+        leftover -= prices[best]
+
+
 def clamp_buy_orders_to_budget(
     buy_orders: list[ExecutionOrderItem],
     budget: float,
@@ -118,32 +144,49 @@ def clamp_buy_orders_to_budget(
 
     포트폴리오 합산 계획 수량을 그대로 실행하면, 같은 실행 묶음의 매도 leg가 예상보다
     적게 체결됐거나(AUTO 2단계 플랜처럼 매도·매수가 분리 실행되는 경우 포함) 아예
-    실패·만료됐을 때 매수가 실제 가용 현금을 초과할 수 있다. 예산 초과분만큼 수량을 줄이고
-    예산이 아예 없으면 SKIPPED 처리한다. 시장가는 참고 시세+여유로 계산하며, 참고 시세가 없는 주문만
-    clamp에서 빠진다 — 최종 안전장치는 브로커의 주문 거부에 있다.
-    예산은 계획 금액으로 바로 차감한다(체결 여부와 무관).
+    실패·만료됐을 때 매수가 실제 가용 현금을 초과할 수 있다.
+
+    예산이 모자라면 **계획 금액에 비례해** 모든 주문을 함께 줄이고, 남는 돈은 덜 산 종목부터 1주씩 채운다
+    (plans/145 B1). 예전엔 목록 순서대로 예산을 소진해 앞 종목만 사고 뒤의 더 부족한 종목이 통째로 빠졌다.
+    1주도 못 산 주문은 SKIPPED. 예산 단가(지정가, 시장가는 참고 시세+여유)를 모르는 주문은 예산에서 빼고
+    그대로 통과시킨다 — 최종 안전장치는 브로커의 주문 거부다. 예산은 계획 금액으로 차감한다(체결 여부와 무관).
 
     Returns: (실행 가능한 조정된 주문 목록, SKIPPED 처리된 결과 목록)
     """
+    prices = [budget_unit_price(o) for o in buy_orders]
+    priced = [i for i, p in enumerate(prices) if p is not None]
+    planned = [buy_orders[i].quantity * float(prices[i] or 0) for i in priced]
+    total = sum(planned)
+    if total <= budget:
+        return list(buy_orders), []
+
+    unit = [float(prices[i] or 0) for i in priced]
+    caps = [buy_orders[i].quantity for i in priced]
+    factor = max(budget, 0.0) / total
+    shares = [plan * factor for plan in planned]
+    qtys = [min(cap, floor_shares(b / p)) for b, p, cap in zip(shares, unit, caps, strict=True)]
+    leftover = max(budget, 0.0) - sum(q * p for q, p in zip(qtys, unit, strict=True))
+    fill_leftover_shares(shares, unit, qtys, leftover, caps)
+
+    fitted_qty = dict(zip(priced, qtys, strict=True))
     adjusted: list[ExecutionOrderItem] = []
     skipped: list[OrderResult] = []
-    remaining_budget = budget
-
-    for order in buy_orders:
-        fitted, leftover_qty = fit_buy_to_budget(order, remaining_budget)
-        if fitted is None:
+    for i, order in enumerate(buy_orders):
+        if i not in fitted_qty:
+            adjusted.append(order)
+            continue
+        qty = fitted_qty[i]
+        if qty <= 0:
             skipped.append(budget_skipped_result(order))
             continue
-        if leftover_qty > 0:
+        if qty < order.quantity:
             logger.warning(
                 "buy_quantity_clamped_to_budget",
                 ticker=order.ticker,
                 market=order.market,
                 requested_qty=order.quantity,
-                clamped_qty=fitted.quantity,
+                clamped_qty=qty,
             )
-        adjusted.append(fitted)
-        if (price := budget_unit_price(fitted)) is not None:
-            remaining_budget -= fitted.quantity * price
-
+            order = order.model_copy(update={"quantity": qty})
+        adjusted.append(order)
     return adjusted, skipped

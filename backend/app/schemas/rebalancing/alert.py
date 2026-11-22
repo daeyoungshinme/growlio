@@ -45,6 +45,12 @@ class RebalancingAlertCreate(BaseModel):
     # 정기 적립 정액 모드(plans/120): 스케줄일에 이 금액(원)만 목표 비중대로 나눠 매수. None이면 목표 비중 채우기.
     # 적립식 자동매수 프리셋(MONTHLY·SCHEDULE_ONLY·AUTO·BUY_ONLY)에서만 허용한다.
     dca_amount_krw: float | None = None
+    # 정액 분할 방식(plans/145 B2) — GAP_FIRST는 목표에 모자란 종목부터 채운다. 정액 모드에서만 의미가 있다
+    dca_allocation_mode: Literal["TARGET", "GAP_FIRST"] = "TARGET"
+    # 허용 범위 경계까지만 거래(plans/145 B3) — 목표까지 다 맞추지 않아 거래 횟수·수수료가 준다
+    trade_to_band: bool = False
+    # 최소 거래 금액(원, plans/145 B3) — 이보다 작은 주문은 건너뛴다. None이면 제한 없음
+    min_trade_krw: float | None = None
 
     @field_validator("threshold_pct")
     @classmethod
@@ -126,6 +132,12 @@ class RebalancingAlertCreate(BaseModel):
             raise ValueError(f"적립 금액은 {DCA_AMOUNT_MIN_KRW:,}원 이상이어야 합니다")
         return round(v, 0) if v is not None else None
 
+    @field_validator("min_trade_krw")
+    @classmethod
+    def validate_min_trade_krw(cls, v: float | None) -> float | None:
+        v = validate_positive_amount(v)
+        return round(v, 0) if v is not None else None
+
     @model_validator(mode="after")
     def validate_dca_amount_preset(self) -> "RebalancingAlertCreate":
         # 정액은 '스케줄일에 매수만' 하는 적립식에서만 의미가 있다 — 드리프트·매도 전략에 붙으면 조용히 무시된다
@@ -178,6 +190,9 @@ class RebalancingAlertResponse(BaseModel):
     tax_impact_gate_mode: str
     max_tax_impact_krw: float | None
     dca_amount_krw: float | None = None
+    dca_allocation_mode: str = "TARGET"
+    trade_to_band: bool = False
+    min_trade_krw: float | None = None
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime

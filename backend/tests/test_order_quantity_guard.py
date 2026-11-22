@@ -117,16 +117,39 @@ class TestClampBuyOrdersToBudget:
         assert len(adjusted) == 1
         assert adjusted[0].quantity == 10
 
-    def test_multiple_orders_share_budget_sequentially(self):
+    def test_multiple_orders_share_budget_proportionally(self):
+        """plans/145 B1 — 예산이 모자라면 계획 금액에 비례해 함께 줄인다(예전엔 A가 다 쓰고 B는 SKIPPED)."""
         orders = [
             _make_buy_order(ticker="A", quantity=5, limit_price=1000.0),
             _make_buy_order(ticker="B", quantity=5, limit_price=1000.0),
         ]
-        # A가 5000 전부 소모 → B는 예산 0으로 SKIPPED
+        # 각 2.5주 몫 → 2주씩(4000) 사고 남은 1000원으로 1주 보충
         adjusted, skipped = clamp_buy_orders_to_budget(orders, budget=5000.0)
 
-        assert {o.ticker: o.quantity for o in adjusted} == {"A": 5}
-        assert [s.ticker for s in skipped] == ["B"]
+        assert sorted(o.quantity for o in adjusted) == [2, 3]
+        assert skipped == []
+        assert sum(o.quantity * 1000.0 for o in adjusted) <= 5000.0
+
+    def test_proportional_follows_planned_amount(self):
+        """계획 금액이 큰 주문(더 부족한 종목)이 예산을 더 받는다 — 목록 뒤에 있어도."""
+        orders = [
+            _make_buy_order(ticker="SMALL", quantity=2, limit_price=1000.0),
+            _make_buy_order(ticker="BIG", quantity=8, limit_price=1000.0),
+        ]
+        adjusted, _ = clamp_buy_orders_to_budget(orders, budget=5000.0)
+
+        assert {o.ticker: o.quantity for o in adjusted} == {"SMALL": 1, "BIG": 4}
+
+    def test_unaffordable_share_is_skipped(self):
+        """비례 몫으로 1주도 못 사는 비싼 종목은 SKIPPED — 남는 돈은 살 수 있는 종목에 보충."""
+        orders = [
+            _make_buy_order(ticker="CHEAP", quantity=10, limit_price=100.0),
+            _make_buy_order(ticker="PRICEY", quantity=1, limit_price=5000.0),
+        ]
+        adjusted, skipped = clamp_buy_orders_to_budget(orders, budget=1500.0)
+
+        assert [s.ticker for s in skipped] == ["PRICEY"]
+        assert {o.ticker: o.quantity for o in adjusted} == {"CHEAP": 10}
 
 
 class TestFloorShares:
