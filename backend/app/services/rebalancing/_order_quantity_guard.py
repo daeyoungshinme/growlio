@@ -136,6 +136,36 @@ def fill_leftover_shares(
         leftover -= prices[best]
 
 
+def _spent(qtys: list[int], unit: list[float]) -> float:
+    return sum(q * p for q, p in zip(qtys, unit, strict=True))
+
+
+def _fit_proportional(
+    planned: list[float],
+    shares: list[float],
+    unit: list[float],
+    caps: list[int],
+    cash: float,
+    forced: dict[int, int],
+) -> list[int] | None:
+    """`forced` 수량을 먼저 확보하고 남은 돈을 계획 금액 비례로 나눈 뒤 1주씩 보충한 수량.
+
+    확보분이 예산을 넘으면 None.
+    """
+    qtys = [forced.get(k, 0) for k in range(len(unit))]
+    remaining = cash - _spent(qtys, unit)
+    if remaining < -1e-6:
+        return None
+    rest = [max(plan - q * p, 0.0) for plan, q, p in zip(planned, qtys, unit, strict=True)]
+    rest_total = sum(rest)
+    factor = min(1.0, remaining / rest_total) if rest_total > 0 else 0.0
+    for k, p in enumerate(unit):
+        if p > 0:
+            qtys[k] += max(0, min(caps[k] - qtys[k], floor_shares(rest[k] * factor / p)))
+    fill_leftover_shares(shares, unit, qtys, cash - _spent(qtys, unit), caps)
+    return qtys
+
+
 def clamp_buy_orders_to_budget(
     buy_orders: list[ExecutionOrderItem],
     budget: float,
@@ -162,11 +192,19 @@ def clamp_buy_orders_to_budget(
 
     unit = [float(prices[i] or 0) for i in priced]
     caps = [buy_orders[i].quantity for i in priced]
-    factor = max(budget, 0.0) / total
-    shares = [plan * factor for plan in planned]
-    qtys = [min(cap, floor_shares(b / p)) for b, p, cap in zip(shares, unit, caps, strict=True)]
-    leftover = max(budget, 0.0) - sum(q * p for q, p in zip(qtys, unit, strict=True))
-    fill_leftover_shares(shares, unit, qtys, leftover, caps)
+    cash = max(budget, 0.0)
+    shares = [plan * cash / total for plan in planned]
+    # 확보분이 없으면 예산 초과가 없어 None이 나오지 않는다(assert는 bandit B101·-O 제거 대상이라 쓰지 않음)
+    qtys = _fit_proportional(planned, shares, unit, caps, cash, {}) or [0] * len(priced)
+    # 비례로 줄이면 1주 단가가 큰 주문이 0주가 되고 그 돈이 남을 수 있다(예산 95만, 90만×1 + 1만×10 → 85만 방치).
+    # 0주가 된 주문을 1주 먼저 확보한 배분안이 더 많이 쓰면 그쪽을 택한다(plans/146 A2)
+    forced: dict[int, int] = {}
+    for k in sorted(range(len(priced)), key=lambda j: planned[j], reverse=True):
+        if qtys[k] > 0 or unit[k] > cash:
+            continue
+        trial = _fit_proportional(planned, shares, unit, caps, cash, {**forced, k: 1})
+        if trial is not None and _spent(trial, unit) > _spent(qtys, unit) + 1e-6:
+            qtys, forced = trial, {**forced, k: 1}
 
     fitted_qty = dict(zip(priced, qtys, strict=True))
     adjusted: list[ExecutionOrderItem] = []

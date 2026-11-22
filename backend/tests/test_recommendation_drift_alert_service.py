@@ -62,11 +62,59 @@ class TestPeekDriftedPortfolios:
             patch(f"{_MODULE}.get_stale_goal_recommendation", new=AsyncMock(return_value=None)),
             patch(f"{_MODULE}.get_cached_horizon_recommendations", new=AsyncMock(return_value=None)),
             patch(f"{_MODULE}.get_stale_horizon_recommendations", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_cached_age_based_recommendation", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_stale_age_based_recommendation", new=AsyncMock(return_value=None)),
             patch(f"{_MODULE}.get_goal_recommendation") as compute,
         ):
             assert await peek_drifted_portfolios(uuid.uuid4(), db, None) == []
         compute.assert_not_called()
         db.execute.assert_not_called()
+
+    @staticmethod
+    def _rec(*items: tuple[str, str, float]) -> GoalRecommendation:
+        return GoalRecommendation(
+            generated_at="2026-01-01T00:00:00Z",
+            is_configured=True,
+            recommended_items=[GoalRecommendationItem(ticker=t, name=t, market=m, weight=w) for t, m, w in items],
+        )
+
+    async def _peek(self, portfolios, overall=None, age=None):
+        from app.services.alerts.recommendation_drift_alert_service import peek_drifted_portfolios
+
+        with (
+            patch(f"{_MODULE}.get_goal_recommendation_generation", new=AsyncMock(return_value="g")),
+            patch(f"{_MODULE}.get_cached_goal_recommendation", new=AsyncMock(return_value=overall)),
+            patch(f"{_MODULE}.get_stale_goal_recommendation", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_cached_horizon_recommendations", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_stale_horizon_recommendations", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_cached_age_based_recommendation", new=AsyncMock(return_value=age)),
+            patch(f"{_MODULE}.get_stale_age_based_recommendation", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_linked_portfolios", new=AsyncMock(return_value=portfolios)),
+        ):
+            return await peek_drifted_portfolios(uuid.uuid4(), AsyncMock(), None)
+
+    @pytest.mark.asyncio
+    async def test_age_applied_portfolio_is_not_flagged_against_overall(self):
+        """plans/146 A7 — 연령대 추천을 적용한 포트폴리오를 전체 추천과 견줘 '추천이 바뀜'으로 띄우지 않는다."""
+        portfolio = _portfolio(uuid.uuid4(), "연령대", [("QQQ", "NASDAQ", 100.0)])
+        portfolio.target_source = "RECOMMENDATION"
+        result = await self._peek(
+            [portfolio], overall=self._rec(("SPY", "NYSE", 100.0)), age=self._rec(("QQQ", "NASDAQ", 100.0))
+        )
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_flagged_when_far_from_every_recommendation(self):
+        portfolio = _portfolio(uuid.uuid4(), "옛 추천", [("QQQ", "NASDAQ", 100.0)])
+        portfolio.target_source = "RECOMMENDATION"
+        result = await self._peek([portfolio], overall=self._rec(("SPY", "NYSE", 100.0)))
+        assert result == [portfolio]
+
+    @pytest.mark.asyncio
+    async def test_manual_portfolio_is_ignored(self):
+        portfolio = _portfolio(uuid.uuid4(), "직접", [("QQQ", "NASDAQ", 100.0)])
+        portfolio.target_source = "MANUAL"
+        assert await self._peek([portfolio], overall=self._rec(("SPY", "NYSE", 100.0))) == []
 
 
 class TestIsFullTarget:

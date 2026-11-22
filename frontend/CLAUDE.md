@@ -249,7 +249,7 @@ _기타_
 - `rebalancingTiming.ts` — 진단 행 시점 판정(`timing`) 라벨·색·보조 정보·해외 양도세 공제 여유 문구. 판정 자체는 서버(`timing_verdict`). `TIMING_LABEL`은 백엔드 `action_items_service.TIMING_LABEL`과 같게
 - `portfolioTargetSource.ts` — 카드의 목표 비중 출처 한 줄. 추천을 적용·생성하는 경로는 `target_source: "RECOMMENDATION"`을 보내야 홈 "추천이 바뀜"이 뜬다
 - `accountReturn.ts` — 증권계좌 입금 대비 수익(평가액 vs 순입금 입금−출금). 배당은 평가액에 이미 있어 더하지 않고, 순입금 0 이하면 null(기록 이전 자금 계좌 부풀림 방지)
-- 그 외: `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `dividendUtils`(`weightBarColor` — 비중 막대 색 인라인 금지), `savingsProjection`, `goalFeasibility`, `dcaAutoBuy`(정액 분할·사전 부족 판정은 백엔드 `dca_allocation`·`dca_cash_shortfall_service`와 같은 규칙 — 함께 맞출 것), `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
+- 그 외: `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `dividendUtils`(`weightBarColor` — 비중 막대 색 인라인 금지), `savingsProjection`, `goalFeasibility`, `dcaAutoBuy`(정액 목표 비중 분할 미리보기는 백엔드 `dca_allocation` TARGET과 같은 규칙 — GAP_FIRST는 서버만 구현, 함께 맞출 것), `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
 
 **마켓 (`constants/markets.ts`)** — 인라인 문자열 비교 금지.
 

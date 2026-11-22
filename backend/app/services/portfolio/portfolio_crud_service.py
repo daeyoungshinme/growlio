@@ -8,6 +8,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import case, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,6 +76,41 @@ def build_portfolio_item(portfolio_id: uuid.UUID, idx: int, item: PortfolioItemS
         for i, (m, role) in enumerate(members)
     ]
     return row
+
+
+_ItemSignature = frozenset[tuple[object, ...]]
+
+
+def _weight_key(weight: float | Decimal | None) -> float:
+    return round(float(weight or 0), 4)
+
+
+def _items_signature_from_rows(rows: Sequence[PortfolioItem]) -> _ItemSignature:
+    """저장된 항목의 비교 키 — 순서·이름은 무시하고 종목(또는 그룹 구성)과 비중만 본다."""
+    return frozenset(
+        (
+            r.group_key,
+            r.ticker,
+            r.market,
+            _weight_key(r.weight),
+            frozenset((m.ticker, m.market, m.role, _weight_key(m.leverage or 1)) for m in (r.members or [])),
+        )
+        for r in rows
+    )
+
+
+def _items_signature_from_schema(items: Sequence[PortfolioItemSchema]) -> _ItemSignature:
+    sig: set[tuple[object, ...]] = set()
+    for item in items:
+        group = item.group
+        members: frozenset[tuple[object, ...]] = frozenset()
+        if group is not None:
+            pairs = [(m, GROUP_ROLE_MEMBER) for m in group.members]
+            if group.domestic_alt is not None:
+                pairs.append((group.domestic_alt, GROUP_ROLE_DOMESTIC_ALT))
+            members = frozenset((m.ticker, m.market, role, _weight_key(m.leverage)) for m, role in pairs)
+        sig.add((group.key if group else None, item.ticker, item.market, _weight_key(item.weight), members))
+    return frozenset(sig)
 
 
 def _add_items(db: AsyncSession, portfolio_id: uuid.UUID, items: Sequence[PortfolioItemSchema]) -> None:
@@ -178,10 +214,15 @@ async def update_portfolio(
         portfolio.tax_type = body.tax_type
 
     if body.items is not None:
+        # 출처는 비중이 실제로 바뀌었거나 호출부가 출처를 명시했을 때만 기록한다 — 편집기는 이름·계좌만 고쳐도
+        # items를 보내므로, 그때마다 MANUAL로 덮으면 추천 출처가 사라져 "추천이 바뀜"이 영영 안 뜬다(plans/146 A1)
+        explicit_source = "target_source" in fields_set
+        changed = _items_signature_from_rows(portfolio.items) != _items_signature_from_schema(body.items)
         await db.execute(delete(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio_id))
         _add_items(db, portfolio.id, body.items)
-        portfolio.target_source = body.target_source
-        portfolio.target_source_at = datetime.now(UTC)
+        if explicit_source or changed:
+            portfolio.target_source = body.target_source
+            portfolio.target_source_at = datetime.now(UTC)
 
     if body.account_ids is not None:
         old_ids = {str(la.account_id) for la in portfolio.linked_accounts}

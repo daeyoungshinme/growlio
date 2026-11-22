@@ -33,10 +33,11 @@ from app.constants import (
 )
 from app.core.job_runner import report_handled_failure
 from app.models.alert import RebalancingAlert
-from app.models.asset import AssetAccount
+from app.models.asset import AssetAccount, Position
 from app.models.portfolio import GROUP_ROLE_DOMESTIC_ALT, Portfolio
 from app.models.user import User, UserSettings
 from app.services.alerts.calculator import already_fired_today, is_auto_schedule_day, next_auto_schedule_date
+from app.services.rebalancing.dca_allocation import gap_first_budgets
 from app.utils.cache_keys import CacheStoreType
 from app.utils.currency import fetch_usd_krw
 from app.utils.kst import today_kst
@@ -90,29 +91,74 @@ def account_cash_krw(account: AssetAccount, portfolio: Portfolio, usd_krw: float
 
 
 def fixed_amount_needs(
-    amount_krw: float, account: AssetAccount, portfolio: Portfolio, usd_krw: float | None
+    amount_krw: float,
+    account: AssetAccount,
+    portfolio: Portfolio,
+    usd_krw: float | None,
+    held_values: dict[str, float] | None = None,
 ) -> tuple[float, float, bool]:
     """정액 적립 금액의 (원화 필요액, 달러 필요액, 해외 몫 존재). 달러 필요액은 실환율이 없으면 0으로 둔다(판정 보류).
 
     과세이연 계좌의 해외 종목은 살 수 없어 다른 종목에 재배분되므로(`dca_allocation`) 몫에서 뺀다.
+    `held_values`(티커 → 보유 평가액)를 주면 실행과 같은 부족분 우선 분할(`gap_first_budgets`)로 나눈다 —
+    GAP_FIRST 알림의 사전 부족 판정용. 없으면 목표 비중대로 나눈다(환전 계획처럼 여러 달 평균을 볼 때).
     """
     tax_type = getattr(account, "tax_type", None)
-    kr_weight = us_weight = 0.0
+    weights: list[float] = []
+    domestic: list[bool] = []
+    current: list[float] = []
     for item in portfolio.items:
         weight = float(item.weight or 0)
         market = buy_market(item, tax_type)
         if weight <= 0 or market == CASH_EQUIVALENT_MARKET or is_non_tradable(item.ticker, market):
             continue
-        if (market or "").upper() in DOMESTIC_MARKETS:
-            kr_weight += weight
-        elif tax_type not in TAX_DEFERRED_TAX_TYPES:
-            us_weight += weight
-    total = kr_weight + us_weight
-    if total <= 0:
+        is_domestic = (market or "").upper() in DOMESTIC_MARKETS
+        if not is_domestic and tax_type in TAX_DEFERRED_TAX_TYPES:
+            continue
+        weights.append(weight)
+        domestic.append(is_domestic)
+        if held_values is not None:
+            # 지수 그룹은 멤버 합계가 부족분 판정 단위다(`dca_row_current_values`와 같음)
+            tickers = {item.ticker.upper(), *(m.ticker.upper() for m in getattr(item, "members", None) or [])}
+            current.append(sum(held_values.get(t, 0.0) for t in tickers))
+    if sum(weights) <= 0:
         return 0.0, 0.0, False
-    krw_needed = amount_krw * kr_weight / total
-    usd_needed = amount_krw * us_weight / total / usd_krw if us_weight > 0 and usd_krw else 0.0
-    return krw_needed, usd_needed, us_weight > 0
+    if held_values is not None:
+        budgets = gap_first_budgets(weights, current, amount_krw)
+    else:
+        budgets = [amount_krw * w / sum(weights) for w in weights]
+    krw_needed = sum(b for b, d in zip(budgets, domestic, strict=True) if d)
+    us_amount = sum(b for b, d in zip(budgets, domestic, strict=True) if not d)
+    has_us = not all(domestic)
+    usd_needed = us_amount / usd_krw if us_amount > 0 and usd_krw else 0.0
+    return krw_needed, usd_needed, has_us
+
+
+async def _held_values_by_account(db: AsyncSession, account_ids: set[uuid.UUID]) -> dict[uuid.UUID, dict[str, float]]:
+    """계좌별 현재 포지션의 티커 → 평가액(원). GAP_FIRST 사전 판정용 — 동기화로 저장된 값만 쓴다."""
+    if not account_ids:
+        return {}
+    rows = (
+        await db.execute(
+            select(
+                Position.account_id, Position.ticker, Position.value_krw, Position.qty, Position.current_price
+            ).where(Position.account_id.in_(list(account_ids)), Position.snapshot_id.is_(None))
+        )
+    ).all()
+    out: dict[uuid.UUID, dict[str, float]] = {}
+    for account_id, ticker, value_krw, qty, price in rows:
+        value = float(value_krw) if value_krw is not None else float(qty or 0) * float(price or 0)
+        bucket = out.setdefault(account_id, {})
+        bucket[ticker.upper()] = bucket.get(ticker.upper(), 0.0) + value
+    return out
+
+
+def _gap_first_scope(alert: RebalancingAlert, portfolio: Portfolio, account: AssetAccount) -> set[uuid.UUID] | None:
+    """GAP_FIRST 정액 알림이면 보유 평가액을 볼 계좌(포트폴리오 연결 계좌, 없으면 실행 계좌). 아니면 None."""
+    if getattr(alert, "dca_allocation_mode", None) != "GAP_FIRST" or not getattr(alert, "dca_amount_krw", None):
+        return None
+    linked = {pa.account_id for pa in getattr(portfolio, "linked_accounts", None) or []}
+    return linked or {account.id}
 
 
 def _cash_is_unknown(account: AssetAccount, portfolio: Portfolio, usd_krw: float | None) -> bool:
@@ -169,11 +215,14 @@ def _fixed_amount_shortfall(
     run_date: date,
     today: date,
     usd_krw: float | None,
+    held_values: dict[str, float] | None = None,
 ) -> DcaShortfall | None:
     """정액 모드 1건 판정 — 원화 예수금 vs 국내 몫, 달러 예수금 vs 해외 몫. 둘 다 충분하면 None.
 
     원화주문 계좌는 달러 부족분을 원화 몫에 더해 원화 하나로 판정한다(실환율 없으면 국내 몫만)."""
-    krw_needed, usd_needed, has_us = fixed_amount_needs(float(alert.dca_amount_krw or 0), account, portfolio, usd_krw)
+    krw_needed, usd_needed, has_us = fixed_amount_needs(
+        float(alert.dca_amount_krw or 0), account, portfolio, usd_krw, held_values
+    )
     cash_krw = float(account.deposit_krw or 0)
     deposit_usd = float(account.deposit_usd or 0)
     if uses_krw_overseas_order(account) and has_us:
@@ -220,7 +269,7 @@ async def find_dca_cash_shortfalls(
         .join(AssetAccount, AssetAccount.id == RebalancingAlert.account_id)
         .join(User, User.id == RebalancingAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
-        .options(selectinload(Portfolio.items))
+        .options(selectinload(Portfolio.items), selectinload(Portfolio.linked_accounts))
         .where(
             RebalancingAlert.is_active == True,
             *(getattr(RebalancingAlert, field) == value for field, value in DCA_AUTO_BUY_PRESET.items()),
@@ -233,6 +282,11 @@ async def find_dca_cash_shortfalls(
     rows = (await db.execute(stmt)).all()
     if not rows:
         return []
+
+    # GAP_FIRST 정액 알림은 실행처럼 부족한 종목부터 나눠야 원화·달러 몫이 맞는다(plans/146 A6).
+    # 보유 평가액은 한 번에 읽는다
+    scopes = {alert.id: _gap_first_scope(alert, portfolio, account) for alert, portfolio, account, _, _ in rows}
+    held_by_account = await _held_values_by_account(db, set().union(*(sc for sc in scopes.values() if sc)))
 
     today = today_kst()
     usd_krw: float | None = None
@@ -253,7 +307,16 @@ async def find_dca_cash_shortfalls(
                 # 정액은 알림마다 금액이 있어 사용자 합산 판정(월 적립액)과 섞지 않는다
                 if account.deposit_krw is None and account.deposit_usd is None:
                     continue
-                sf = _fixed_amount_shortfall(alert, portfolio, account, user, settings_row, run_date, today, usd_krw)
+                scope = scopes.get(alert.id)
+                held_values: dict[str, float] | None = None
+                if scope:
+                    held_values = {}
+                    for aid in scope:
+                        for ticker, value in held_by_account.get(aid, {}).items():
+                            held_values[ticker] = held_values.get(ticker, 0.0) + value
+                sf = _fixed_amount_shortfall(
+                    alert, portfolio, account, user, settings_row, run_date, today, usd_krw, held_values
+                )
                 if sf is not None and (notice_window is None or notice_window[0] <= sf.days_until <= notice_window[1]):
                     fixed.append(sf)
                 continue

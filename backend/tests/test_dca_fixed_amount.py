@@ -1030,3 +1030,30 @@ async def test_fx_wait_retry_job_runs_recheck():
     ):
         await job.run_dca_fx_wait_retry()
     recheck.assert_awaited_once()
+
+
+class TestFixedAmountNeedsGapFirst:
+    """plans/146 A6 — GAP_FIRST 알림의 사전 부족 판정은 실행처럼 부족한 종목부터 나눈 몫으로 본다."""
+
+    @staticmethod
+    def _portfolio():
+        kr = SimpleNamespace(ticker="069500", market="KOSPI", weight=50, group_key=None, members=[])
+        us = SimpleNamespace(ticker="VOO", market="NYSE", weight=50, group_key=None, members=[])
+        return SimpleNamespace(items=[kr, us])
+
+    def test_target_split_without_holdings(self):
+        from app.services.dca_cash_shortfall_service import fixed_amount_needs
+
+        account = SimpleNamespace(tax_type="GENERAL")
+        krw, usd, has_us = fixed_amount_needs(1_000_000.0, account, self._portfolio(), 1_000.0)
+        assert (krw, usd, has_us) == (500_000.0, 500.0, True)
+
+    def test_gap_first_sends_whole_amount_to_underweight_overseas(self):
+        from app.services.dca_cash_shortfall_service import fixed_amount_needs
+
+        account = SimpleNamespace(tax_type="GENERAL")
+        held = {"069500": 6_000_000.0, "VOO": 4_000_000.0}
+        krw, usd, has_us = fixed_amount_needs(1_000_000.0, account, self._portfolio(), 1_000.0, held)
+        assert krw == 0.0
+        assert usd == pytest.approx(1_000.0)
+        assert has_us is True

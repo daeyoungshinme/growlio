@@ -342,7 +342,9 @@ class TestPortfolioTargetSource:
         from app.schemas.portfolio import PortfolioUpdate
         from app.services.portfolio import portfolio_crud_service as crud
 
-        portfolio = SimpleNamespace(id=uuid.uuid4(), linked_accounts=[], target_source=None, target_source_at=None)
+        portfolio = SimpleNamespace(
+            id=uuid.uuid4(), linked_accounts=[], items=[], target_source=None, target_source_at=None
+        )
         body = PortfolioUpdate(
             items=[{"ticker": "VOO", "market": "NYSE", "name": "VOO", "weight": 100}],
             target_source="RECOMMENDATION",
@@ -365,6 +367,51 @@ class TestPortfolioTargetSource:
             )
         assert portfolio.target_source == "TACTICAL"
         assert portfolio.target_source_at is None
+
+    @staticmethod
+    def _voo_row(weight: float = 100):
+        return SimpleNamespace(group_key=None, ticker="VOO", market="NYSE", weight=weight, members=[])
+
+    async def test_same_items_without_source_keeps_source(self):
+        """plans/146 A1 — 편집기가 이름만 고치며 같은 항목을 다시 보내도 추천 출처를 MANUAL로 덮지 않는다."""
+        from app.schemas.portfolio import PortfolioUpdate
+        from app.services.portfolio import portfolio_crud_service as crud
+
+        portfolio = SimpleNamespace(
+            id=uuid.uuid4(),
+            linked_accounts=[],
+            items=[self._voo_row()],
+            name="옛 이름",
+            target_source="RECOMMENDATION",
+            target_source_at=None,
+        )
+        body = PortfolioUpdate(
+            name="새 이름", items=[{"ticker": "VOO", "market": "NYSE", "name": "Vanguard", "weight": 100}]
+        )
+        with patch.object(crud, "load_portfolio_with_relations", new=AsyncMock(return_value=portfolio)):
+            await crud.update_portfolio(self._db_with(portfolio), uuid.uuid4(), portfolio.id, body)
+        assert portfolio.target_source == "RECOMMENDATION"
+        assert portfolio.target_source_at is None
+
+    async def test_changed_weights_without_source_become_manual(self):
+        from app.schemas.portfolio import PortfolioUpdate
+        from app.services.portfolio import portfolio_crud_service as crud
+
+        portfolio = SimpleNamespace(
+            id=uuid.uuid4(),
+            linked_accounts=[],
+            items=[
+                self._voo_row(60),
+                SimpleNamespace(group_key=None, ticker="QQQ", market="NASDAQ", weight=40, members=[]),
+            ],
+            target_source="RECOMMENDATION",
+            target_source_at=None,
+        )
+        body = PortfolioUpdate(items=[{"ticker": "VOO", "market": "NYSE", "name": "VOO", "weight": 100}])
+        with patch.object(crud, "load_portfolio_with_relations", new=AsyncMock(return_value=portfolio)):
+            await crud.update_portfolio(self._db_with(portfolio), uuid.uuid4(), portfolio.id, body)
+        assert portfolio.target_source == "MANUAL"
+        assert portfolio.target_source_at is not None
 
     def test_client_cannot_claim_tactical(self):
         from pydantic import ValidationError

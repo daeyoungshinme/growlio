@@ -34,6 +34,10 @@ from app.schemas.rebalancing import GoalRecommendation, HorizonRecommendationRes
 from app.services._settings_queries import get_settings_row
 from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.alerts.alert_service import already_sent_alert_today
+from app.services.goal.goal_age_recommendation_service import (
+    get_cached_age_based_recommendation,
+    get_stale_age_based_recommendation,
+)
 from app.services.goal.goal_horizon_recommendation_service import (
     get_cached_horizon_recommendations,
     get_horizon_recommendations,
@@ -148,9 +152,13 @@ async def _find_drifted_portfolios(
 
 
 async def peek_drifted_portfolios(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[Portfolio]:
-    """캐시에 남은 추천(1시간·stale)만으로 판정한다 — 콜드 계산이 수십 초라 홈 조회 경로에선 계산하지 않는다.
+    """홈 "지금 할 일"용 — 추천을 적용해 쓰는(`target_source=RECOMMENDATION`) 포트폴리오 중 추천이 바뀐 것.
 
-    캐시가 비었으면 빈 목록(추천 탭을 한 번 열면 채워진다)."""
+    캐시에 남은 추천(1시간·stale)만 본다 — 콜드 계산이 수십 초라 홈 조회 경로에선 계산하지 않는다(캐시가 비면 빈 목록).
+    어떤 추천(전체·기간별·연령대)을 적용했는지는 저장하지 않고, 전체·연령대 추천은 아무 포트폴리오에나 적용할 수 있다.
+    그래서 주간 알림의 짝짓기 규칙(`find_drifted_targets`)으로 비교하면 다른 종류의 추천과 견줘 거짓으로 뜬다 —
+    적용 시점엔 어느 한 추천과 같았으므로 **캐시된 모든 추천과 3%p 넘게 다를 때만** 바뀐 것으로 본다(plans/146 A7).
+    """
     gen = await get_goal_recommendation_generation(cache, user_id)
     overall_rec = await get_cached_goal_recommendation(cache, user_id, gen) or await get_stale_goal_recommendation(
         cache, user_id, gen
@@ -158,12 +166,19 @@ async def peek_drifted_portfolios(user_id: uuid.UUID, db: AsyncSession, cache: C
     horizon_resp = await get_cached_horizon_recommendations(
         cache, user_id, gen
     ) or await get_stale_horizon_recommendations(cache, user_id, gen)
-    if overall_rec is None and horizon_resp is None:
+    age_rec = await get_cached_age_based_recommendation(
+        cache, user_id, gen
+    ) or await get_stale_age_based_recommendation(cache, user_id, gen)
+    candidates = [rec.recommended_items for rec in (overall_rec, age_rec) if rec is not None and rec.recommended_items]
+    candidates += [
+        rec.recommended_items
+        for rec in (horizon_resp.recommendations if horizon_resp is not None else [])
+        if rec.recommended_items and not rec.includes_cash_equivalent
+    ]
+    if not candidates:
         return []
-    portfolios = await get_linked_portfolios(db, user_id)
-    if not portfolios:
-        return []
-    return find_drifted_targets(portfolios, await _stock_accounts(db, user_id), overall_rec, horizon_resp)
+    portfolios = [p for p in await get_linked_portfolios(db, user_id) if p.target_source == "RECOMMENDATION"]
+    return [p for p in portfolios if p.items and all(_drifted_from(items, p) for items in candidates)]
 
 
 async def _send_alert_to_user(user: User, user_settings: UserSettings, to_email: str) -> None:

@@ -7,7 +7,9 @@ AUTO 자동실행(`rebalancing_auto_execution` job)·원클릭 실행(`create_re
 
 from __future__ import annotations
 
+import copy
 import uuid
+from decimal import Decimal
 from typing import Any, Literal
 
 import structlog
@@ -312,10 +314,23 @@ def _flatten_account_tax_types(ticker_account_map: dict[str, list]) -> dict[str,
 
 
 def build_alert_order_preview(alert: Any, drifting: list, ticker_account_map: dict[str, list] | None) -> list[Any]:
-    """알림 이메일의 매수/매도 수량 미리보기 — 알림 설정(전략·주문유형·매수 계좌)으로 주문을 만든다. 실행·저장 안 함."""
+    """알림 이메일의 매수/매도 수량 미리보기 — 알림 설정(전략·주문유형·매수 계좌)으로 주문을 만든다. 실행·저장 안 함.
+
+    경계 거래·최소 거래액도 AUTO 플랜 생성(`plan_generation`)과 같은 순서로 반영한다 — 빼면 메일 수량이 실제 플랜과
+    다르다(plans/146 A8). 경계 축소는 사본에만 한다(호출부의 분석 행은 메일 본문에도 쓰인다).
+    """
+    from app.services.rebalancing.drift_rule import alert_relative_threshold, shrink_to_band
+
     if not drifting:
         return []
-    return build_rebalancing_orders(
+    schedule_only = getattr(alert, "trigger_condition", None) == "SCHEDULE_ONLY"
+    if getattr(alert, "trade_to_band", False) is True and not schedule_only:
+        drifting = [item.model_copy(deep=True) if hasattr(item, "model_copy") else copy.copy(item) for item in drifting]
+        threshold = float(alert.threshold_pct)
+        relative = alert_relative_threshold(alert)
+        for item in drifting:
+            shrink_to_band(item, threshold, relative)
+    orders = build_rebalancing_orders(
         drifting,
         ticker_account_map or {},
         getattr(alert, "strategy", "BUY_ONLY"),
@@ -323,6 +338,13 @@ def build_alert_order_preview(alert: Any, drifting: list, ticker_account_map: di
         str(alert.account_id) if alert.account_id else "",
         alert_id=str(alert.id),
     )
+    min_trade = getattr(alert, "min_trade_krw", None)
+    if isinstance(min_trade, int | float | Decimal) and not isinstance(min_trade, bool):
+        from app.services.rebalancing.plan_generation import is_dca_amount_mode
+
+        if not is_dca_amount_mode(alert):
+            orders = drop_orders_below_min_value(orders, float(min_trade), alert_id=str(alert.id))
+    return orders
 
 
 def build_rebalancing_orders(

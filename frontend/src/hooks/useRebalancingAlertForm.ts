@@ -223,7 +223,8 @@ export function useRebalancingAlertFormState({
         dca_allocation_mode: isDcaPreset && dcaAmountKrw ? dcaAllocationMode : "TARGET",
         trade_to_band:
           mode === "AUTO" && triggerCondition !== "SCHEDULE_ONLY" ? tradeToBand : false,
-        min_trade_krw: mode === "AUTO" ? minTradeKrw : null,
+        // 정액 적립은 금액을 나눠 사는 것이라 최소 거래액으로 지우면 그 종목 몫이 조용히 사라진다(plans/146 A5)
+        min_trade_krw: mode === "AUTO" && !(isDcaPreset && dcaAmountKrw) ? minTradeKrw : null,
       };
       return targetAccountId
         ? upsertAccountRebalancingAlert(portfolioId, targetAccountId, body)

@@ -145,6 +145,16 @@ async def test_recommendation_drift_only_for_recommendation_sourced():
 
 
 @pytest.mark.asyncio
+async def test_recommendation_drift_group_links_to_tab_without_portfolio():
+    """plans/146 A7 — 여러 개면 첫 포트폴리오로 보내지 않고 목표 조정 탭으로."""
+    a = SimpleNamespace(id=uuid.uuid4(), name="연금", target_source="RECOMMENDATION")
+    b = SimpleNamespace(id=uuid.uuid4(), name="ISA", target_source="RECOMMENDATION")
+    items, _ = await _run(rec_drift=AsyncMock(return_value=[a, b]))
+    assert items[0].id == "recommendation-drift:all"
+    assert items[0].link == "/rebalancing?rtab=목표 조정"
+
+
+@pytest.mark.asyncio
 async def test_recommendation_drift_skips_manual_only():
     manual = SimpleNamespace(id=uuid.uuid4(), name="직접", target_source=None)
     items, _ = await _run(rec_drift=AsyncMock(return_value=[manual]))

@@ -183,7 +183,10 @@ def _build_plan_orders(
         drifting, ticker_account_map or {}, strategy, order_type, str(account_id), alert_id=str(alert.id)
     )
     orders = clamp_orders_to_max_value(orders, settings.auto_rebalancing_max_order_value_krw)
-    orders = drop_orders_below_min_value(orders, alert.min_trade_krw, alert_id=str(alert.id))
+    if not is_dca_amount_mode(alert):
+        # 정액 적립은 금액을 목표 비중대로 나눠 사는 것 — 최소 거래액으로 지우면 작은 비중 종목이 매달 빠지고,
+        # 전부 지워지면 알림 없이 "주문 없음"으로 끝난다(plans/146 A5)
+        orders = drop_orders_below_min_value(orders, alert.min_trade_krw, alert_id=str(alert.id))
     return _coerce_overseas_market_orders_to_limit(orders, alert_id=str(alert.id))
 
 
