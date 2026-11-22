@@ -85,6 +85,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - `dashboard/ActionItemsCard` — 홈 "지금 할 일"(`GET /dashboard/action-items`). **홈에서 리밸런싱을 다루는 유일한 카드**(REBALANCE 행 + 시장 신호 배지). 배지 상수 `utils/marketSignalBadge.ts`, 우선순위·마감 라벨 `utils/actionPriority.ts`(둘 다 공용).
 - `tax/{IsaMaturityCard,PensionContributionCard,HealthInsuranceRiskCard}` — 계획탭 › 절세의 `TaxLimitsSection`이 렌더(건보 카드는 항상). ISA 카드 앵커 `#isa-status`는 백엔드 절세 CTA 링크와 같아야 함.
 - `portfolio-analysis/TaxTabContainer` — 계획탭 "절세"(`?taxTab=`, `?taxAccount=`). 옛 `/assets?portfolioTab=세금` 링크는 `utils/legacyTabRedirect.ts`가 옮김.
+- `dashboard/AllocationHistoryCard` — 홈 "자산 추이" + 자산탭 투자현황(계좌를 고른 경우만, `accountId`·별도 storageKey·기본 접힘). 접힌 동안 차트 청크·이력을 받지 않는다
 - `portfolio/AllocationCard` — 자산탭 비중 분석(국내/해외·종목·지수). 하위 뷰 `portfolio/allocation/`. "종목" 보기는 상위 5 + 기타만.
 - `assets/AccountHistoryTab` — 계좌관리 "내역"(`?history=` 현금 흐름/매수 내역).
 - `rebalancing/GoalAdjustTab` — 목표 조정(추천·전술 서브탭). 상단 포트폴리오 선택기는 **전술 모드만**, 추천은 `RecommendationCard` 적용 영역 select에서 고름 — 선택은 둘 다 URL `portfolioId` 공유. 콘텐츠 ErrorBoundary/Suspense는 **`key={mode}`로 모드마다 새 경계** — React Router v7이 URL 변경을 `startTransition`으로 감싸 공유 경계면 이전 모드 화면이 남는다.
@@ -113,6 +114,7 @@ _공통/입력_
 _자산관리/대시보드_
 
 - `useAssetManagementData` · `useAssetModals` · `useDashboardData` · `useAccountMutations` · `useAccountPositions` · `useStockAccountStats` · `usePositionsEditor` · `usePortfolioItemsEditor`
+- `useAccountSortMode` — 계좌관리 목록 정렬(기본/금액순/이름순, localStorage). 정렬·은행 잔액은 `utils/accountSort.ts`(`bankBalanceKrw` — 은행 카드·합계·정렬이 같은 함수, 환율 없으면 달러 빼고 `usdPending`)
 - `createCredentialVerify` — 자격증명 확인 상태 머신 팩토리. `useKisCredentialVerify`/`useKiwoomCredentialVerify`/`useTossCredentialVerify`는 얇은 래퍼, `useBrokerCredentialVerify`가 브로커별로 묶음(필드 정의 `constants/brokerCredentials.ts`)
 
 _세금·배당_
@@ -245,6 +247,7 @@ _기타_
 - `portfolio.ts` `isDriftingItem`/`driftProgress`/`getItemsDriftStatus` — 이탈 판정(상대 기준 포함). 백엔드 `drift_rule`과 **같은 규칙 — 함께 수정**. 항목 이탈 비교를 인라인(`Math.abs(diff) > threshold`)으로 쓰지 말 것
 - `riskLevel.ts` — 진단 위험 카드 4행(원화 손실액·낙폭·S&P500 대비·쏠림) 등급, 기준은 시장 대비. `diagnosisSummary.ts` — 진단 탭 요약 칩(`DiagnosisSummaryStrip`, 앵커 `constants/rebalancingConfig.DIAGNOSIS_ANCHORS`). `marketOutlook.ts` — 시장 종합 판단 배지·지수명(판정은 서버 `market_outlook`, **표시 전용**)
 - `rebalancingTiming.ts` — 진단 행 시점 판정(`timing`) 라벨·색·보조 정보·해외 양도세 공제 여유 문구. 판정 자체는 서버(`timing_verdict`)
+- `accountReturn.ts` — 증권계좌 입금 대비 수익(평가액 vs 순입금 입금−출금). 배당은 평가액에 이미 있어 더하지 않고, 순입금 0 이하면 null(기록 이전 자금 계좌 부풀림 방지)
 - 그 외: `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `dividendUtils`(`weightBarColor` — 비중 막대 색 인라인 금지), `savingsProjection`, `goalFeasibility`, `dcaAutoBuy`(정액 분할·사전 부족 판정은 백엔드 `dca_allocation`·`dca_cash_shortfall_service`와 같은 규칙 — 함께 맞출 것), `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
 
 **마켓 (`constants/markets.ts`)** — 인라인 문자열 비교 금지.

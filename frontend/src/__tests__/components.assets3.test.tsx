@@ -11,6 +11,7 @@ vi.mock("@/context/ExchangeRateContext", () => ({
 
 import StockAccountSummaryCard from "@/components/assets/StockAccountSummaryCard";
 import BankAccountCard from "@/components/assets/BankAccountCard";
+import BankAccountSummaryCard from "@/components/assets/BankAccountSummaryCard";
 import {
   RealEstateAccountCard,
   RealEstateAccountModal,
@@ -126,6 +127,65 @@ describe("StockAccountSummaryCard", () => {
   it("renders with no accounts", () => {
     renderWithProviders(<StockAccountSummaryCard perAccountStats={[]} usdRate={null} />);
     expect(screen.getByText("증권계좌 합계")).toBeDefined();
+    expect(screen.queryByText(/입금 대비 수익/)).toBeNull();
+  });
+
+  it("입금 대비 수익은 입금 기록이 있는 계좌만 합산하고 그 사실을 알린다", () => {
+    const base = { invested_krw: 0, unrealized_pnl: 0, dividend_total: 0 };
+    renderWithProviders(
+      <StockAccountSummaryCard
+        perAccountStats={[
+          {
+            account: mockStockAccount,
+            stats: { ...base, amount_krw: 11_000_000, deposit_total: 10_000_000 },
+          },
+          {
+            account: { ...mockStockAccount, id: "s2" },
+            stats: { ...base, amount_krw: 50_000_000, deposit_total: 0 },
+          },
+        ]}
+        usdRate={1350}
+      />,
+    );
+    expect(screen.getByText(/입금 기록 있는 1개 계좌/)).toBeInTheDocument();
+    expect(screen.getByText("+100만원 (+10.00%)")).toBeInTheDocument();
+  });
+});
+
+// ------- BankAccountSummaryCard -------
+describe("BankAccountSummaryCard", () => {
+  it("총 잔액과 유형별 소계를 보인다(유형이 둘 이상일 때만)", () => {
+    renderWithProviders(
+      <BankAccountSummaryCard
+        accounts={[
+          mockBankAccount,
+          {
+            ...mockBankAccount,
+            id: "bank2",
+            asset_type: "DEPOSIT",
+            deposit_krw: null,
+            manual_amount: 10_000_000,
+          },
+        ]}
+        usdRate={1350}
+      />,
+    );
+    expect(screen.getByText("은행계좌 합계")).toBeInTheDocument();
+    expect(screen.getByText("1,500만원")).toBeInTheDocument();
+    expect(screen.getByText("입출금")).toBeInTheDocument();
+    expect(screen.getByText("예·적금")).toBeInTheDocument();
+  });
+
+  it("환율이 없으면 달러를 빼고 그 사실을 알린다", () => {
+    renderWithProviders(
+      <BankAccountSummaryCard
+        accounts={[{ ...mockBankAccount, deposit_usd: 100 }]}
+        usdRate={null}
+      />,
+    );
+    expect(screen.getByText("500만원")).toBeInTheDocument();
+    expect(screen.getByText("달러 제외 · 환율 조회 중")).toBeInTheDocument();
+    expect(screen.queryByText("입출금")).toBeNull();
   });
 });
 

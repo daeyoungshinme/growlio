@@ -1,7 +1,10 @@
 import { useMemo } from "react";
-import { depositTotalKrw, fmtKrw } from "@/utils/format";
+import { depositTotalKrw, fmtKrw, fmtPct, fmtSigned } from "@/utils/format";
+import { pnlColor } from "@/utils/colors";
+import { sumDepositReturn } from "@/utils/accountReturn";
+import InfoTip from "@/components/common/InfoTip";
 import type { AssetAccount } from "@/api/assets";
-import type { AccountStats } from "./StockAccountCard";
+import { DEPOSIT_RETURN_TIP, type AccountStats } from "./StockAccountCard";
 
 interface Props {
   perAccountStats: { account: AssetAccount; stats: AccountStats }[];
@@ -10,7 +13,7 @@ interface Props {
 
 // 평가금액·평가손익은 자산 › 투자현황 요약 카드가 권위 표면이라 여기서는 계좌 합계성 값만 보여준다.
 export default function StockAccountSummaryCard({ perAccountStats, usdRate }: Props) {
-  const { totalDeposit, totalDividend, totalDepositKrw, rateMissing } = useMemo(() => {
+  const { totalDeposit, totalDividend, totalDepositKrw, rateMissing, vsDeposit } = useMemo(() => {
     const deposit = perAccountStats.reduce((s, { stats }) => s + stats.deposit_total, 0);
     const dividend = perAccountStats.reduce((s, { stats }) => s + stats.dividend_total, 0);
     // 환율이 없으면 달러 예수금은 빼고 원화만 합친다 — 1:1로 더하면 $가 원으로 보였다(plans/116 C3)
@@ -26,6 +29,13 @@ export default function StockAccountSummaryCard({ perAccountStats, usdRate }: Pr
       totalDividend: dividend,
       totalDepositKrw: depositKrw,
       rateMissing: missing,
+      vsDeposit: sumDepositReturn(
+        perAccountStats.map(({ stats }) => ({
+          amountKrw: stats.amount_krw,
+          depositTotal: stats.deposit_total,
+          withdrawalTotal: stats.withdrawal_total ?? 0,
+        })),
+      ),
     };
   }, [perAccountStats, usdRate]);
 
@@ -55,6 +65,19 @@ export default function StockAccountSummaryCard({ perAccountStats, usdRate }: Pr
           )}
         </div>
       </div>
+      {vsDeposit && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2">
+          <p className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+            입금 대비 수익
+            {vsDeposit.accountCount < perAccountStats.length &&
+              ` (입금 기록 있는 ${vsDeposit.accountCount}개 계좌)`}
+            <InfoTip label="입금 대비 수익 설명" content={DEPOSIT_RETURN_TIP} />
+          </p>
+          <p className={`text-sm font-semibold tabular-nums ${pnlColor(vsDeposit.gain)}`}>
+            {fmtSigned(vsDeposit.gain, fmtKrw)} ({fmtPct(vsDeposit.pct)})
+          </p>
+        </div>
+      )}
     </div>
   );
 }

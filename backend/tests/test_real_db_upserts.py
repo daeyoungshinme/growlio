@@ -273,3 +273,29 @@ class TestDcaInitialValue:
         await pg.flush()
 
         assert await _get_initial_value(user.id, start, pg) == 3_000_000
+
+
+class TestAllocationHistoryExcludedAccount:
+    async def test_selected_excluded_account_has_history(self, pg: AsyncSession):
+        """합산 제외 계좌도 계좌를 지정하면 추이를 보이고, 전체 집계에는 빠진다(계획 144 C1)."""
+        from app.services.portfolio.portfolio_history_service import _fetch_monthly_by_asset_type
+
+        user, included = await _user_and_account(pg)
+        excluded = AssetAccount(
+            user_id=user.id, name="합산 제외", asset_type="STOCK_OTHER", data_source="MANUAL", include_in_total=False
+        )
+        pg.add(excluded)
+        await pg.flush()
+        day = date.today().replace(day=1)
+        pg.add_all(
+            [
+                AssetSnapshot(account_id=included.id, user_id=user.id, snapshot_date=day, amount_krw=1_000_000),
+                AssetSnapshot(account_id=excluded.id, user_id=user.id, snapshot_date=day, amount_krw=7_000_000),
+            ]
+        )
+        await pg.flush()
+
+        overall = await _fetch_monthly_by_asset_type(pg, user.id, day)
+        assert sum(sum(v.values()) for v in overall.values()) == 1_000_000
+        selected = await _fetch_monthly_by_asset_type(pg, user.id, day, excluded.id)
+        assert sum(sum(v.values()) for v in selected.values()) == 7_000_000

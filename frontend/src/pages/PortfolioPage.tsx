@@ -10,6 +10,7 @@ import StockHoldingsTable, {
   type HoldingsSortRequest,
 } from "@/components/assets/StockHoldingsTable";
 import HorizonSummaryCard from "@/components/portfolio/HorizonSummaryCard";
+import AllocationHistoryCard from "@/components/dashboard/AllocationHistoryCard";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { fmtKrw, fmtPct, fmtSigned } from "@/utils/format";
 import { invalidateSyncData, refetchActiveData } from "@/utils/queryInvalidation";
@@ -44,6 +45,8 @@ import PageLoadError from "@/components/common/PageLoadError";
 const AllocationCard = lazy(() => import("../components/portfolio/AllocationCard"));
 
 const SYNC_BUTTON_CLASS = `${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors`;
+/** 자산탭 계좌별 추이 카드 접힘 상태 — 홈 카드와 따로(기본 접힘) */
+const ASSETS_HISTORY_OPEN_KEY = "growlio:assets:allocationHistoryOpen";
 const TABS = PORTFOLIO_TABS;
 type Tab = (typeof TABS)[number];
 
@@ -379,6 +382,17 @@ export default function PortfolioPage() {
                   sortRequest={holdingsSortRequest}
                 />
               </div>
+              {/* 계좌를 골랐을 때만 — 전체 합산 추이는 홈 카드와 같아 두지 않는다(plans/144 C1).
+                  접힌 동안은 차트 청크·이력을 받지 않는다 */}
+              {selectedAccount && (
+                <AllocationHistoryCard
+                  key={selectedAccount.id}
+                  accountId={selectedAccount.id}
+                  title={`${selectedAccount.name} 추이`}
+                  storageKey={ASSETS_HISTORY_OPEN_KEY}
+                  defaultOpen={() => false}
+                />
+              )}
             </div>
           </ErrorBoundary>
         )}

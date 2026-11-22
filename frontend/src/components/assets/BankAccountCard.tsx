@@ -2,6 +2,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
 import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS } from "@/api/assets";
 import { fmtFxRate, fmtKrw, fmtUsd } from "@/utils/format";
+import { bankBalanceKrw } from "@/utils/accountSort";
 import EditableNameField from "@/components/common/EditableNameField";
 import { BANK_TYPE_LABELS } from "@/constants";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -26,13 +27,9 @@ export default function BankAccountCard({
 }: Props) {
   const typeLabel = BANK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
 
-  const hasDepositFields = account.deposit_krw != null || account.deposit_usd != null;
-  const usd = account.deposit_usd ?? 0;
-  // 환율 없이 달러를 0원으로 더하면 합계가 조용히 줄어든다 — 증권 카드처럼 "환율 조회 중"으로 알린다(plans/144 B5)
-  const usdPending = hasDepositFields && usd > 0 && !usdRate;
-  const displayTotal = hasDepositFields
-    ? (account.deposit_krw ?? 0) + (usdRate ? usd * usdRate : 0)
-    : (account.manual_amount ?? 0);
+  // 환율 없이 달러를 0원으로 더하면 합계가 조용히 줄어든다 — 증권 카드처럼 "환율 조회 중"으로 알린다(plans/144 B5).
+  // 은행 요약 카드·금액순 정렬과 같은 함수로 계산한다
+  const { krw: displayTotal, usd, usdPending, hasDepositFields } = bankBalanceKrw(account, usdRate);
 
   const showAmount = hasDepositFields ? displayTotal > 0 || usd > 0 : account.manual_amount != null;
 

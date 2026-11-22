@@ -49,12 +49,14 @@ interface AllocationHistoryChartProps {
   storageKey?: string;
   /** 접힘 상태를 바깥(AllocationHistoryCard)이 관리할 때 — 펼쳐진 뒤에만 이 청크(recharts)가 로드된다 */
   onCollapse?: () => void;
+  title?: string;
 }
 
 function AllocationHistoryChart({
   accountId,
   storageKey = "growlio:dashboard:allocationHistoryOpen",
   onCollapse,
+  title = "자산 추이",
 }: AllocationHistoryChartProps) {
   const isDark = useThemeStore((s) => s.isDark);
   const [ownOpen, toggleOwnOpen] = useCollapsible(() => window.innerWidth >= 1024, storageKey);
@@ -84,7 +86,7 @@ function AllocationHistoryChart({
     // 사용자가 직접 펼친 경우엔 카드가 사라지지 않게 빈 상태를 보여준다
     if (!controlled) return null;
     return (
-      <CollapsibleCard icon={ChartNoAxesColumn} title="자산 추이" isOpen onToggle={toggleOpen}>
+      <CollapsibleCard icon={ChartNoAxesColumn} title={title} isOpen onToggle={toggleOpen}>
         <p className="py-6 text-center text-xs text-gray-400 dark:text-gray-500">
           아직 자산 추이 데이터가 없습니다
         </p>
@@ -95,7 +97,7 @@ function AllocationHistoryChart({
   return (
     <CollapsibleCard
       icon={ChartNoAxesColumn}
-      title="자산 추이"
+      title={title}
       isOpen={isOpen}
       onToggle={toggleOpen}
       collapsedHint={`탭하여 ${months}개월 추이 보기`}

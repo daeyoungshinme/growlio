@@ -23,14 +23,21 @@ import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSi
 import EditableNameField from "@/components/common/EditableNameField";
 import AccountActionsMenu from "@/components/common/AccountActionsMenu";
 import SkeletonStatBox from "@/components/common/SkeletonStatBox";
+import InfoTip from "@/components/common/InfoTip";
+import { depositReturn } from "@/utils/accountReturn";
 
 export interface AccountStats {
   amount_krw: number;
   invested_krw: number;
   unrealized_pnl: number;
   deposit_total: number;
+  /** 없으면 0 — 순입금 = 입금 − 출금 */
+  withdrawal_total?: number;
   dividend_total: number;
 }
+
+export const DEPOSIT_RETURN_TIP =
+  "기록된 입금에서 출금을 뺀 순입금과 지금 평가액(예수금·배당 포함)을 비교한 값이에요. 입금 시점을 반영한 기간 수익률은 아니고, 기록 이전에 넣은 돈이 있으면 실제보다 커 보여요.";
 
 /** 평가 통계(overview·입출금 합계) 조회 상태 — 로딩·실패가 0원으로 보이지 않게 구분한다(plans/144 B2) */
 export type AccountStatsStatus = "loading" | "error" | "ready";
@@ -76,6 +83,13 @@ export default function StockAccountCard({
     stats && (stats.amount_krw > 0 || stats.deposit_total > 0 || stats.dividend_total > 0);
   const pnl = stats?.unrealized_pnl ?? 0;
   const ret = stats?.invested_krw ? (pnl / stats.invested_krw) * 100 : 0;
+  const vsDeposit = stats
+    ? depositReturn({
+        amountKrw: stats.amount_krw,
+        depositTotal: stats.deposit_total,
+        withdrawalTotal: stats.withdrawal_total ?? 0,
+      })
+    : null;
   const { impact } = useHaptic();
 
   return (
@@ -283,6 +297,17 @@ export default function StockAccountCard({
                   {fmtKrw(stats.dividend_total)}
                 </p>
               </div>
+              {vsDeposit && (
+                <div className="col-span-2 sm:col-span-1">
+                  <p className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                    입금 대비
+                    <InfoTip label="입금 대비 수익 설명" content={DEPOSIT_RETURN_TIP} />
+                  </p>
+                  <p className={`text-xs font-semibold mt-0.5 ${pnlColor(vsDeposit.gain)}`}>
+                    {fmtSigned(vsDeposit.gain, fmtKrw)} ({fmtPct(vsDeposit.pct)})
+                  </p>
+                </div>
+              )}
             </>
           )}
           <button
@@ -291,7 +316,11 @@ export default function StockAccountCard({
             aria-expanded={showMoreStats}
             className={`col-span-2 sm:col-span-3 flex items-center justify-center gap-1 ${TOUCH_HEIGHT_MIN} text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300`}
           >
-            {showMoreStats ? "접기" : "누적 입금·배당 보기"}
+            {showMoreStats
+              ? "접기"
+              : vsDeposit
+                ? "입금 대비 수익·누적 입금 보기"
+                : "누적 입금·배당 보기"}
             <ChevronDown
               size={12}
               className={`transition-transform ${showMoreStats ? "rotate-180" : ""}`}

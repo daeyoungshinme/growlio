@@ -69,7 +69,8 @@ async def _fetch_monthly_by_asset_type(
                 JOIN asset_accounts a ON a.id = s.account_id
                 WHERE s.user_id = :uid
                     AND a.is_active = TRUE
-                    AND a.include_in_total = TRUE
+                    -- 계좌를 지정하면 합산 제외 계좌도 그 계좌 추이를 보여준다(plans/144 C1, overview와 같은 원칙)
+                    AND (a.include_in_total = TRUE OR CAST(:account_id AS uuid) IS NOT NULL)
                     AND s.snapshot_date >= :start_date
                     AND (CAST(:account_id AS uuid) IS NULL OR a.id = CAST(:account_id AS uuid))
             )
@@ -107,7 +108,8 @@ async def _fetch_stock_breakdown_by_market(
                 JOIN asset_accounts a ON a.id = s.account_id
                 WHERE s.user_id = :uid
                     AND a.is_active = TRUE
-                    AND a.include_in_total = TRUE
+                    -- 계좌를 지정하면 합산 제외 계좌도 그 계좌 추이를 보여준다(plans/144 C1, overview와 같은 원칙)
+                    AND (a.include_in_total = TRUE OR CAST(:account_id AS uuid) IS NOT NULL)
                     AND a.asset_type IN :stock_types
                     AND s.snapshot_date >= :start_date
                     AND (CAST(:account_id AS uuid) IS NULL OR a.id = CAST(:account_id AS uuid))

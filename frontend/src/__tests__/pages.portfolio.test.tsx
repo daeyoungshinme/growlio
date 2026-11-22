@@ -493,6 +493,29 @@ describe("PortfolioPage", () => {
     expect(toast).toHaveBeenCalledWith("동기화 완료", "success");
   });
 
+  it("계좌를 고르면 그 계좌 추이 카드가 접힌 채 나오고, 전체 보기에선 두지 않는다", async () => {
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "acc-1", asset_type: "STOCK_KIS", name: "KIS 계좌", data_source: "KIS_API" },
+    ] as never);
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    const { unmount } = renderPortfolio("?account=acc-1");
+    expect(await screen.findByText("KIS 계좌 추이")).toBeInTheDocument();
+    // 접힌 동안은 배분 이력을 조회하지 않는다
+    expect(
+      vi.mocked(api.get).mock.calls.some(([u]) => String(u).includes("allocation-history")),
+    ).toBe(false);
+    unmount();
+
+    renderPortfolio();
+    await screen.findByText("주식 총평가액");
+    expect(screen.queryByText(/추이$/)).not.toBeInTheDocument();
+    vi.mocked(fetchAccounts).mockResolvedValue([]);
+  });
+
   it("수동(비연동) 계좌를 선택하면 갱신 버튼은 비활성 표시되고, 누르면 사유를 토스트로 알린다", async () => {
     vi.mocked(fetchAccounts).mockResolvedValueOnce([
       { id: "acc-3", asset_type: "STOCK_OTHER", name: "타증권사 계좌", data_source: "MANUAL" },

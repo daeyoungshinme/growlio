@@ -11,16 +11,18 @@ export function useStockAccountStats(
 ): { account: AssetAccount; stats: AccountStats }[] {
   return useMemo(() => {
     const portfolioAccMap = Object.fromEntries((overview?.accounts ?? []).map((a) => [a.id, a]));
-    const txByAcc: Record<string, { deposit: number; dividend: number }> = {};
+    const txByAcc: Record<string, { deposit: number; withdrawal: number; dividend: number }> = {};
     for (const t of txTotals) {
       if (!t.account_id) continue;
-      const acc = (txByAcc[t.account_id] ??= { deposit: 0, dividend: 0 });
+      const acc = (txByAcc[t.account_id] ??= { deposit: 0, withdrawal: 0, dividend: 0 });
       if (t.transaction_type === "DEPOSIT") acc.deposit += t.total_amount;
+      // 입금 대비 수익의 순입금(입금 − 출금)용(plans/144 C2)
+      if (t.transaction_type === "WITHDRAWAL") acc.withdrawal += t.total_amount;
       if (t.transaction_type === "DIVIDEND") acc.dividend += t.total_amount;
     }
     return stockAccounts.map((account) => {
       const pa = portfolioAccMap[account.id];
-      const tx = txByAcc[account.id] ?? { deposit: 0, dividend: 0 };
+      const tx = txByAcc[account.id] ?? { deposit: 0, withdrawal: 0, dividend: 0 };
       return {
         account,
         stats: {
@@ -28,6 +30,7 @@ export function useStockAccountStats(
           invested_krw: pa?.invested_krw ?? 0,
           unrealized_pnl: pa?.unrealized_pnl ?? 0,
           deposit_total: tx.deposit,
+          withdrawal_total: tx.withdrawal,
           dividend_total: tx.dividend,
         } as AccountStats,
       };
