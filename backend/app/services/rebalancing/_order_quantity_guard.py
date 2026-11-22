@@ -194,9 +194,8 @@ def clamp_buy_orders_to_budget(
     caps = [buy_orders[i].quantity for i in priced]
     cash = max(budget, 0.0)
     shares = [plan * cash / total for plan in planned]
-    first = _fit_proportional(planned, shares, unit, caps, cash, {})
-    assert first is not None  # 확보분이 없으면 예산 초과가 없다
-    qtys = first
+    # 확보분이 없으면 예산 초과가 없어 None이 나오지 않는다(assert는 bandit B101·-O 제거 대상이라 쓰지 않음)
+    qtys = _fit_proportional(planned, shares, unit, caps, cash, {}) or [0] * len(priced)
     # 비례로 줄이면 1주 단가가 큰 주문이 0주가 되고 그 돈이 남을 수 있다(예산 95만, 90만×1 + 1만×10 → 85만 방치).
     # 0주가 된 주문을 1주 먼저 확보한 배분안이 더 많이 쓰면 그쪽을 택한다(plans/146 A2)
     forced: dict[int, int] = {}
