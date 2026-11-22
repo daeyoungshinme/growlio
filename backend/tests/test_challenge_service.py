@@ -213,6 +213,20 @@ class TestDeadlineMonth:
         assert progress.is_expired is False
         assert progress.months_left is None
 
+    @pytest.mark.asyncio
+    async def test_expired_target_value_skips_progress(self):
+        """plans/146 B5 — 마감 지난 목표 금액 챌린지는 지금 자산으로 진행률을 다시 계산하지 않는다."""
+        challenge = _ns(challenge_type="TARGET_VALUE", target_amount=100_000_000, deadline_month="2026-03")
+        totals = AsyncMock()
+        with (
+            patch.object(cs, "today_kst", return_value=date(2026, 4, 15)),
+            patch.object(cs, "build_asset_totals", totals),
+        ):
+            progress = await cs.compute_progress(challenge, challenge.user_id, AsyncMock())
+        assert progress.is_expired is True
+        assert progress.progress_pct is None
+        totals.assert_not_called()
+
     def test_not_expired_clause_sql(self):
         sql = str(cs.not_expired_clause("2026-04").compile(compile_kwargs={"literal_binds": True}))
         assert "deadline_month IS NULL" in sql

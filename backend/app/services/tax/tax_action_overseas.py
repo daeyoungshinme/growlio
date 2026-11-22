@@ -5,7 +5,8 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from app.services.tax.tax_action_builders import (
     _HARVESTING_TOP_N,
@@ -21,6 +22,24 @@ from app.utils.market_hours import us_year_end_trade_deadline
 def overseas_sell_deadline(year: int) -> date:
     """올해 귀속 해외주식 매도 마감일(결제일 기준 — 12월 마지막 NYSE 거래일에서 2거래일 전)."""
     return us_year_end_trade_deadline(year)
+
+
+_ET = ZoneInfo("America/New_York")
+_US_CLOSE_HOUR_ET = 16
+
+
+def deadline_passed(today: date, deadline: date, now: datetime | None = None) -> bool:
+    """올해 귀속 매도 마감(`deadline`, 미국 날짜)이 지났는지 — `today`는 KST 날짜.
+
+    마감일 장 마감(ET 16시)은 KST로 다음 날 새벽(06시, 서머타임 05시)이라 KST 날짜끼리 비교하면 그 새벽 동안
+    아직 주문할 수 있는데 액션이 사라진다(plans/146 B4). KST 마감 다음 날에만 실제 시각(ET)으로 판정한다.
+    """
+    if today <= deadline:
+        return False
+    if today > deadline + timedelta(days=1):
+        return True
+    now_et = (now or datetime.now(UTC)).astimezone(_ET)
+    return now_et.date() > deadline or now_et.hour >= _US_CLOSE_HOUR_ET
 
 
 def _deadline_note(deadline: date) -> str:
@@ -54,6 +73,7 @@ def build_overseas_gain_harvest_action(
     realized_from_records: bool = False,
     realized_estimated: bool = False,
     realized_lookup_failed: bool = False,
+    now: datetime | None = None,
 ) -> TaxAction | None:
     """A4 — 해외주식 250만원 기본공제 범위 내 이익실현(취득가 상향).
 
@@ -64,7 +84,7 @@ def build_overseas_gain_harvest_action(
     """
     gains = sum(p["unrealized_pnl_krw"] for p in positions if p["unrealized_pnl_krw"] > 0)
     deadline = overseas_sell_deadline(today.year)
-    if gains <= 0 or today > deadline:
+    if gains <= 0 or deadline_passed(today, deadline, now):
         return None
     if realized_lookup_failed:
         return _make_action(
@@ -111,6 +131,7 @@ def build_loss_harvest_actions(
     realized_krw: float | None = None,
     deduction_krw: float = 0.0,
     gain_tax_rate: float = 0.0,
+    now: datetime | None = None,
 ) -> list[TaxAction]:
     """A5 — 기존 손실수확 추천(tax_service._build_harvesting_recommendations) 상위 N개를 액션화.
 
@@ -118,7 +139,7 @@ def build_loss_harvest_actions(
     이미 실현한 과세 이익만큼뿐이므로 절감액은 그 기준으로 다시 계산하고, 없으면 금액을 내지 않는다.
     """
     deadline = overseas_sell_deadline(today.year)
-    if today > deadline:
+    if deadline_passed(today, deadline, now):
         return []
     remaining_gain = max(0.0, (realized_krw or 0.0) - deduction_krw)
     actions: list[TaxAction] = []

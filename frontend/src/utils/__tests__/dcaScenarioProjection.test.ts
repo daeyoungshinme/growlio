@@ -66,6 +66,12 @@ describe("scenarioReturns", () => {
     expect(scenarioReturns(2)).toEqual({ conservative: 0, base: 2, aggressive: 5 });
     expect(scenarioReturns(null)).toBeNull();
   });
+
+  it("소수 목표 수익률에 부동소수 오차를 남기지 않는다(plans/146 B2)", () => {
+    expect(scenarioReturns(8.3)).toEqual({ conservative: 5.3, base: 8.3, aggressive: 11.3 });
+    expect(scenarioReturns(6.6)?.conservative).toBe(3.6);
+    expect(scenarioReturns(5.1)?.conservative).toBe(2.1);
+  });
 });
 
 describe("monthsToReachGoal", () => {

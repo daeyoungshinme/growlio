@@ -10,7 +10,8 @@ export interface DividendGoalProjection {
 
 /**
  * 배당 목표 달성 예상 — 현재 배당수익률이 그대로이고, 매달 적립액을 넣고 받은 배당을 재투자한다고 가정한다.
- * 주가 상승은 넣지 않는다(보수적). 투자자산이나 배당수익률이 0이면 계산하지 않는다(null).
+ * 주가 상승은 넣지 않지만(보수적) 배당은 세전 전액 재투자라 그만큼은 낙관적이다 — 화면 문구에 둘 다 밝힌다.
+ * 투자자산이나 배당수익률이 0이면 계산하지 않는다(null).
  */
 export function projectDividendGoal(
   investableAssetsKrw: number,

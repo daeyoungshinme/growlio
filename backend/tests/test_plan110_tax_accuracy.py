@@ -217,10 +217,33 @@ class TestSellDeadline:
         assert action["deadline"] == "2026-12-29"
 
     def test_actions_disappear_after_deadline(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        kst = ZoneInfo("Asia/Seoul")
+        # KST 12/30 07시 = ET 12/29 17시(장 마감 뒤)
+        after_close = datetime(2026, 12, 30, 7, tzinfo=kst)
         late = date(2026, 12, 30)
-        assert build_overseas_gain_harvest_action([{"unrealized_pnl_krw": 1_000_000}], DEDUCTION, 0.22, late) is None
+        assert (
+            build_overseas_gain_harvest_action(
+                [{"unrealized_pnl_krw": 1_000_000}], DEDUCTION, 0.22, late, now=after_close
+            )
+            is None
+        )
         item = {"ticker": "A", "name": "A", "unrealized_loss_krw": -1, "tax_saved_krw": 0}
-        assert build_loss_harvest_actions([item], late) == []
+        assert build_loss_harvest_actions([item], late, now=after_close) == []
+        assert build_loss_harvest_actions([item], date(2026, 12, 31)) == []
+
+    def test_actions_stay_until_us_close_on_kst_next_day(self):
+        """plans/146 B4 — KST 12/30 새벽은 아직 ET 12/29 장중이라 주문할 수 있다."""
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        before_close = datetime(2026, 12, 30, 3, tzinfo=ZoneInfo("Asia/Seoul"))  # ET 12/29 13시
+        action = build_overseas_gain_harvest_action(
+            [{"unrealized_pnl_krw": 1_000_000}], DEDUCTION, 0.22, date(2026, 12, 30), now=before_close
+        )
+        assert action is not None
 
     def test_action_available_on_deadline_day(self):
         action = build_overseas_gain_harvest_action(
@@ -306,3 +329,19 @@ class TestComprehensiveThreshold:
         )
         assert action is not None
         assert action["title"] == "금융소득 종합과세 대상 가능성"
+
+
+class TestYearRuleFallbackWarning:
+    """plans/146 B6 — 세율 표에 없는 연도는 가장 가까운 연도로 폴백하되 경고를 남긴다(프로세스당 1회)."""
+
+    def test_warns_once_per_table_year(self):
+        from unittest.mock import patch
+
+        from app.services.tax import tax_service
+
+        table = {2025: "a", 2026: "b"}
+        with patch.object(tax_service, "logger") as log:
+            assert tax_service.pick_year_rule(table, 2031) == "b"
+            assert tax_service.pick_year_rule(table, 2031) == "b"
+            assert tax_service.pick_year_rule(table, 2026) == "b"
+        assert log.warning.call_count == 1

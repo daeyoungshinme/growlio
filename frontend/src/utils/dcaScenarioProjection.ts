@@ -51,10 +51,12 @@ export function scenarioReturns(
   goalAnnualReturnPct: number | null | undefined,
 ): { conservative: number; base: number; aggressive: number } | null {
   if (goalAnnualReturnPct == null) return null;
+  // ±3을 그대로 더하면 8.3 → 5.300000000000001처럼 부동소수 오차가 화면에 찍힌다(plans/146 B2)
+  const round2 = (v: number) => Math.round(v * 100) / 100;
   return {
-    conservative: Math.max(0, goalAnnualReturnPct - SCENARIO_SPREAD_PCT),
+    conservative: round2(Math.max(0, goalAnnualReturnPct - SCENARIO_SPREAD_PCT)),
     base: goalAnnualReturnPct,
-    aggressive: goalAnnualReturnPct + SCENARIO_SPREAD_PCT,
+    aggressive: round2(goalAnnualReturnPct + SCENARIO_SPREAD_PCT),
   };
 }
 

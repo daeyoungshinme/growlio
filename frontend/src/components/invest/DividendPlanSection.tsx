@@ -259,7 +259,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                       {settings?.monthly_deposit_amount
                         ? `, 월 ${fmtKrw(settings.monthly_deposit_amount)} 적립`
                         : ""}
-                      , 배당 재투자 · 주가 상승 미반영
+                      , 세전 배당 재투자 · 주가 상승 미반영
                     </span>
                   </p>
                 )}
