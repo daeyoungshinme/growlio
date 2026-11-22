@@ -1,15 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ArrowRight, CalendarRange, Settings2, TrendingUp } from "lucide-react";
-import { fmtKrw, fmtPct } from "@/utils/format";
+import { fmtKrw, fmtMonth, fmtPct, localMonth } from "@/utils/format";
+import { projectDividendGoal } from "@/utils/dividendGoalTimeline";
+import { monthAfter } from "@/utils/dcaScenarioProjection";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import EmptyState from "@/components/common/EmptyState";
+import InfoTip from "@/components/common/InfoTip";
 import { MONTH_LABELS } from "@/utils/dividendUtils";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
-import { dividendPlanQuery, goalRecommendationOverallQuery } from "@/api/queryOptions";
+import {
+  dividendPlanQuery,
+  goalRecommendationOverallQuery,
+  settingsQuery,
+} from "@/api/queryOptions";
 import { TOUCH_HEIGHT_MIN, TOUCH_HEIGHT_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { portfolioUrl } from "@/utils/tabUrl";
 
@@ -39,6 +46,8 @@ function AchievementValue({ pct, sizeClass }: { pct: number | null; sizeClass: s
 
 export default function DividendPlanSection({ onOpenSettings }: Props) {
   const { data, isLoading, isError, refetch } = useQuery(dividendPlanQuery);
+  // 달성 시점 계산에 월 적립액만 쓴다 — 계획 페이지가 이미 받아 둔 설정 캐시
+  const { data: settings } = useQuery(settingsQuery);
 
   // GoalTimelineCard(적립 계획 탭)와 동일한 queryKey를 써서 캐시를 공유한다 — 중복 호출 없음.
   // 배당 목표가 있을 때만 그리므로 그때만 조회한다 — 콜드 계산이 수십 초인 무거운 추천이다(plans/125 E10)
@@ -78,7 +87,21 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
     required_dividend_yield_pct,
     current_dividend_yield_pct,
     monthly_projected,
+    estimated_annual_after_tax_krw,
+    estimated_monthly_after_tax_krw,
+    after_tax_note,
+    total_assets_krw,
   } = data;
+
+  const goalProjection =
+    annual_dividend_goal && (goal_achievement_pct ?? 0) < 100
+      ? projectDividendGoal(
+          total_assets_krw,
+          estimated_annual_krw,
+          annual_dividend_goal,
+          settings?.monthly_deposit_amount,
+        )
+      : null;
 
   // 평균 예상 배당금 (약한 달 판정용)
   const avgProjected = monthly_projected.reduce((s, p) => s + p.amount_krw, 0) / 12;
@@ -224,6 +247,22 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   목표까지 {fmtKrw(Math.max(0, annual_dividend_goal - estimated_annual_krw))} 부족
                 </p>
+                {/* 달성률만으로는 "언제"가 안 보인다 — 지금 배당수익률·월 적립 기준 예상 시점(계획 143 E3) */}
+                {goalProjection && (
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    {goalProjection.months === null
+                      ? "지금 배당수익률로는 50년 안에 목표에 닿지 않아요"
+                      : `${fmtMonth(monthAfter(localMonth(), goalProjection.months))} 달성 예상`}
+                    <span className="text-gray-400 dark:text-gray-500">
+                      {" "}
+                      · 배당수익률 {goalProjection.yieldPct}%
+                      {settings?.monthly_deposit_amount
+                        ? `, 월 ${fmtKrw(settings.monthly_deposit_amount)} 적립`
+                        : ""}
+                      , 배당 재투자 · 주가 상승 미반영
+                    </span>
+                  </p>
+                )}
               </div>
             )}
           </>
@@ -259,6 +298,14 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               </div>
             </div>
           </div>
+        )}
+        {/* 세전 예상만 보면 실제 들어오는 돈보다 15% 가까이 크게 보인다 — 실수령 기준 한 줄(계획 143 E2) */}
+        {estimated_annual_after_tax_krw != null && estimated_annual_krw > 0 && (
+          <p className="mt-3 flex flex-wrap items-center gap-x-1 text-xs text-gray-500 dark:text-gray-400">
+            세후 예상 연 {fmtKrw(estimated_annual_after_tax_krw)} · 월{" "}
+            {fmtKrw(estimated_monthly_after_tax_krw ?? estimated_annual_after_tax_krw / 12)}
+            {after_tax_note && <InfoTip label="세후 예상 배당 설명" content={after_tax_note} />}
+          </p>
         )}
       </div>
 

@@ -75,7 +75,7 @@ class TestCollectPositions:
             avg_price=95_000.0,
         )
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos1])
-        acc = SimpleNamespace(id=uuid.uuid4(), include_in_total=True)
+        acc = SimpleNamespace(id=uuid.uuid4(), include_in_total=True, tax_type=None)
 
         exec_result = MagicMock()
         exec_result.all.return_value = [(snap, acc)]
@@ -87,6 +87,39 @@ class TestCollectPositions:
         assert result[("AAPL", "NASDAQ")]["value_krw"] == pytest.approx(1_000_000.0)
 
     @pytest.mark.asyncio
+    async def test_tracks_isa_pension_value_for_after_tax(self, mock_db, override_settings):
+        """ISA·연금 계좌 보유분은 sheltered_value_krw로 따로 센다(계획 143 E2)."""
+        from app.services.dividend.orchestrator import _collect_positions, _tax_sheltered_ratio
+
+        def pos(value):
+            return SimpleNamespace(
+                ticker="069500",
+                market="KOSPI",
+                name="KODEX 200",
+                value_krw=value,
+                qty=1.0,
+                current_price=value,
+                avg_price=value,
+            )
+
+        general = (
+            SimpleNamespace(id=uuid.uuid4(), position_items=[pos(300_000.0)]),
+            SimpleNamespace(id=uuid.uuid4(), include_in_total=True, tax_type="GENERAL"),
+        )
+        isa = (
+            SimpleNamespace(id=uuid.uuid4(), position_items=[pos(700_000.0)]),
+            SimpleNamespace(id=uuid.uuid4(), include_in_total=True, tax_type="ISA"),
+        )
+        exec_result = MagicMock()
+        exec_result.all.return_value = [general, isa]
+        mock_db.execute = AsyncMock(return_value=exec_result)
+
+        result = await _collect_positions(uuid.uuid4(), mock_db)
+
+        assert result[("069500", "KOSPI")]["sheltered_value_krw"] == pytest.approx(700_000.0)
+        assert _tax_sheltered_ratio("069500", result) == pytest.approx(0.7)
+
+    @pytest.mark.asyncio
     async def test_excludes_non_total_accounts_unless_selected(self, mock_db, override_settings):
         """plans/116 B3: 전체 통합은 총자산 합산 제외 계좌를 빼고, 계좌를 지정하면 그대로 본다."""
         from app.services.dividend.orchestrator import _collect_positions
@@ -94,7 +127,7 @@ class TestCollectPositions:
         pos = SimpleNamespace(
             ticker="AAPL", market="NASDAQ", name="Apple", value_krw=1.0, qty=1.0, current_price=1.0, avg_price=1.0
         )
-        acc = SimpleNamespace(id=uuid.uuid4(), include_in_total=False)
+        acc = SimpleNamespace(id=uuid.uuid4(), include_in_total=False, tax_type=None)
         exec_result = MagicMock()
         exec_result.all.return_value = [(SimpleNamespace(id=uuid.uuid4(), position_items=[pos]), acc)]
         mock_db.execute = AsyncMock(return_value=exec_result)
@@ -116,7 +149,7 @@ class TestCollectPositions:
             avg_price=0.0,
         )
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos_zero])
-        acc = SimpleNamespace(id=uuid.uuid4(), include_in_total=True)
+        acc = SimpleNamespace(id=uuid.uuid4(), include_in_total=True, tax_type=None)
 
         exec_result = MagicMock()
         exec_result.all.return_value = [(snap, acc)]

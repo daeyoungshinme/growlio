@@ -103,6 +103,22 @@ describe("DCAProjectionChart", () => {
     renderWithProviders(<DCAProjectionChart data={noActualData} />);
     expect(screen.getByText(/실제 자산 데이터가 없습니다/)).toBeDefined();
   });
+
+  it("시나리오는 목표 수익률 ±3%p이고 시나리오별 달성 예상 월을 보여 준다(계획 143 E1)", () => {
+    renderWithProviders(
+      <DCAProjectionChart
+        data={mockData}
+        monthlyDepositAmount={1_000_000}
+        goalAnnualReturnPct={0}
+        goalAmount={13_000_000}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "보수·공격 시나리오 비교" }));
+    expect(screen.getByText("공격적 가정 (연 3%)")).toBeInTheDocument();
+    // 시작 100만 + 월 100만, 수익률 0% → 12개월 뒤(2025-01) 1,300만 도달
+    expect(screen.getByText("목표 연 0%")).toBeInTheDocument();
+    expect(screen.getAllByText("2025년 1월 달성").length).toBeGreaterThan(0);
+  });
 });
 
 // ------- GoalTimelineCard -------

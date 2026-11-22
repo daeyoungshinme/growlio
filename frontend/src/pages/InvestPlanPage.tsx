@@ -234,6 +234,8 @@ export default function InvestPlanPage() {
                           <DCAProjectionChart
                             data={data.projection_months}
                             monthlyDepositAmount={s?.monthly_deposit_amount}
+                            goalAnnualReturnPct={s?.goal_annual_return_pct}
+                            goalAmount={s?.goal_amount}
                           />
                         </Suspense>
                       ) : (

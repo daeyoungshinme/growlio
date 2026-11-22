@@ -15,7 +15,7 @@ import structlog
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import POSITION_STOCK_ASSET_TYPES
+from app.constants import POSITION_STOCK_ASSET_TYPES, TAX_DEFERRED_TAX_TYPES
 from app.core.cache_store import get_cache_store
 from app.core.config import settings
 from app.core.database import release_read_connection
@@ -80,8 +80,12 @@ async def _collect_positions(
                         "name": name,
                         "invested_krw": 0.0,
                         "qty": 0.0,
+                        "sheltered_value_krw": 0.0,
                     }
                 positions_map[key]["value_krw"] += value
+                # ISA·연금 계좌 보유분 — 배당이 원천징수되지 않는다(세후 예상 배당, 계획 143 E2)
+                if acc.tax_type in TAX_DEFERRED_TAX_TYPES:
+                    positions_map[key]["sheltered_value_krw"] += value
                 positions_map[key]["invested_krw"] += invested
                 positions_map[key]["qty"] += float(p.qty or 0)
 
@@ -95,6 +99,7 @@ def _build_ticker_output_entry(
     estimated_map: dict[tuple[str, str], dict],
     received_map: dict[str, float],
     pos_name: str,
+    tax_sheltered_ratio: float = 0.0,
 ) -> dict:
     """종목별 예상 배당금 집계 결과를 output dict으로 조립한다."""
     if est_keys:
@@ -133,7 +138,18 @@ def _build_ticker_output_entry(
         "investment_yield": investment_yield,
         "currency": currency,
         "estimated_monthly_usd": combined_monthly_usd,
+        "tax_sheltered_ratio": round(tax_sheltered_ratio, 4),
     }
+
+
+def _tax_sheltered_ratio(ticker: str, positions: dict[tuple[str, str], dict]) -> float:
+    """종목 평가액 중 ISA·연금 계좌 보유 비율(여러 계좌·시장 코드 합산)."""
+    total = sheltered = 0.0
+    for (t, _m), v in positions.items():
+        if t == ticker:
+            total += float(v.get("value_krw") or 0)
+            sheltered += float(v.get("sheltered_value_krw") or 0)
+    return sheltered / total if total > 0 else 0.0
 
 
 async def _fetch_received_dividends_by_ticker(
@@ -296,6 +312,7 @@ def _assemble_ticker_dividend_output(
                     "investment_yield": 0.0,
                     "currency": "KRW",
                     "estimated_monthly_usd": None,
+                    "tax_sheltered_ratio": 0.0,
                 }
             )
             continue
@@ -310,6 +327,7 @@ def _assemble_ticker_dividend_output(
             estimated_map=estimated_map,
             received_map=received_map,
             pos_name=pos_entry.get("name", ticker_key),
+            tax_sheltered_ratio=_tax_sheltered_ratio(ticker_key, positions),
         )
         output.append(entry)
 

@@ -11,9 +11,14 @@ import {
 import { summarizeProjection } from "@/utils/chartSummary";
 import type { DCAProjectionPoint } from "@/api/invest";
 import { useThemeStore } from "@/stores/themeStore";
-import { fmtKrw, fmtKrwShort, localMonth } from "@/utils/format";
+import { fmtKrw, fmtKrwShort, fmtMonth, localMonth } from "@/utils/format";
 import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
-import { buildScenarioCurve } from "@/utils/dcaScenarioProjection";
+import {
+  buildScenarioCurve,
+  monthAfter,
+  monthsToReachGoal,
+  scenarioReturns,
+} from "@/utils/dcaScenarioProjection";
 import { SAVINGS_RETURN_PRESETS } from "@/constants/savingsPresets";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useIsSmUp } from "@/hooks/useMediaQuery";
@@ -24,14 +29,27 @@ const AGGRESSIVE_RETURN_PCT = Math.max(...SAVINGS_RETURN_PRESETS.map((p) => p.pc
 interface Props {
   data: DCAProjectionPoint[];
   monthlyDepositAmount?: number | null;
+  /** 목표 연수익률 — 시나리오는 이 값 ±3%p(없으면 보수 4·공격 10% 프리셋) */
+  goalAnnualReturnPct?: number | null;
+  /** 목표 금액 — 있으면 시나리오별 달성 예상 시점을 함께 보여 준다 */
+  goalAmount?: number | null;
 }
 
-function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
+function DCAProjectionChart({
+  data,
+  monthlyDepositAmount,
+  goalAnnualReturnPct,
+  goalAmount,
+}: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   // 공용 미디어 쿼리 훅 — 회전·창 크기 변경도 따라간다(계획 143 C6)
   const isMobile = useIsSmUp() === false;
   const [showScenarios, setShowScenarios] = useState(false);
   const canShowScenarios = monthlyDepositAmount != null && monthlyDepositAmount > 0;
+  // 고정 프리셋(4·10%)은 목표 수익률이 4% 미만·10% 초과면 기준선을 감싸지 못했다 — 목표 기준 ±3%p(계획 143 E1)
+  const returns = scenarioReturns(goalAnnualReturnPct);
+  const conservativePct = returns?.conservative ?? CONSERVATIVE_RETURN_PCT;
+  const aggressivePct = returns?.aggressive ?? AGGRESSIVE_RETURN_PCT;
   const today = localMonth();
   const pastPoints = data.filter((d) => d.month <= today);
   const futurePoints = data.filter((d) => d.month > today);
@@ -43,11 +61,11 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
   const boundaryPoint = recentPast.length > 0 ? recentPast[recentPast.length - 1] : null;
   const conservativeCurve =
     showScenarios && canShowScenarios
-      ? buildScenarioCurve(data, monthlyDepositAmount, CONSERVATIVE_RETURN_PCT)
+      ? buildScenarioCurve(data, monthlyDepositAmount, conservativePct)
       : {};
   const aggressiveCurve =
     showScenarios && canShowScenarios
-      ? buildScenarioCurve(data, monthlyDepositAmount, AGGRESSIVE_RETURN_PCT)
+      ? buildScenarioCurve(data, monthlyDepositAmount, aggressivePct)
       : {};
 
   const chartData = [
@@ -137,11 +155,11 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
           <>
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-5 border-t-2 border-gray-400 border-dashed" />
-              보수적 가정 (연 {CONSERVATIVE_RETURN_PCT}%)
+              보수적 가정 (연 {conservativePct}%)
             </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-5 border-t-2 border-violet-500 border-dashed" />
-              공격적 가정 (연 {AGGRESSIVE_RETURN_PCT}%)
+              공격적 가정 (연 {aggressivePct}%)
             </span>
           </>
         )}
@@ -167,9 +185,9 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
               formatter={(value: number, name: string) => {
                 const label =
                   name === "conservative_krw"
-                    ? `보수적 가정(연 ${CONSERVATIVE_RETURN_PCT}%)`
+                    ? `보수적 가정(연 ${conservativePct}%)`
                     : name === "aggressive_krw"
-                      ? `공격적 가정(연 ${AGGRESSIVE_RETURN_PCT}%)`
+                      ? `공격적 가정(연 ${aggressivePct}%)`
                       : name === "projected_krw" || name === "projected_future_krw"
                         ? "이론값"
                         : "실제값";
@@ -224,12 +242,58 @@ function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
           </LineChart>
         </ResponsiveContainer>
       </div>
+      {showScenarios && canShowScenarios && goalAmount != null && goalAmount > 0 && data[0] && (
+        <ScenarioGoalDates
+          startMonth={data[0].month}
+          initial={data[0].projected_krw}
+          monthlyDeposit={monthlyDepositAmount}
+          goalAmount={goalAmount}
+          rows={[
+            { label: "보수적", pct: conservativePct },
+            ...(returns ? [{ label: "목표", pct: returns.base }] : []),
+            { label: "공격적", pct: aggressivePct },
+          ]}
+        />
+      )}
       {!hasActualData && (
         <p className="text-xs text-yellow-500 mt-2">
           실제 자산 데이터가 없습니다. 계좌를 동기화하면 표시됩니다.
         </p>
       )}
     </div>
+  );
+}
+
+/** 시나리오별 목표 금액 도달 예상 월 — 곡선만으로는 "언제"가 안 읽힌다 */
+function ScenarioGoalDates({
+  startMonth,
+  initial,
+  monthlyDeposit,
+  goalAmount,
+  rows,
+}: {
+  startMonth: string;
+  initial: number;
+  monthlyDeposit: number;
+  goalAmount: number;
+  rows: { label: string; pct: number }[];
+}) {
+  return (
+    <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+      {rows.map((row) => {
+        const n = monthsToReachGoal(initial, monthlyDeposit, row.pct, goalAmount);
+        return (
+          <div key={row.label} className="rounded-lg bg-gray-50 dark:bg-gray-800/60 px-2 py-2">
+            <dt className="text-xs text-gray-500 dark:text-gray-400">
+              {row.label} 연 {row.pct}%
+            </dt>
+            <dd className="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-50">
+              {n === null ? "50년 넘음" : `${fmtMonth(monthAfter(startMonth, n))} 달성`}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
   );
 }
 

@@ -40,3 +40,43 @@ export function buildScenarioCurve(
   });
   return result;
 }
+
+/** 시나리오 비교 폭 — 목표 수익률 ±3%p(보수 4·중립 7·공격 10% 프리셋과 같은 간격) */
+export const SCENARIO_SPREAD_PCT = 3;
+/** 목표 도달 탐색 상한(50년) — 백엔드 `dca_service`의 600개월과 같다 */
+const MAX_GOAL_MONTHS = 600;
+
+/** 목표 수익률 기준 보수·공격 가정 수익률(보수는 0% 하한). 목표 수익률이 없으면 null. */
+export function scenarioReturns(
+  goalAnnualReturnPct: number | null | undefined,
+): { conservative: number; base: number; aggressive: number } | null {
+  if (goalAnnualReturnPct == null) return null;
+  return {
+    conservative: Math.max(0, goalAnnualReturnPct - SCENARIO_SPREAD_PCT),
+    base: goalAnnualReturnPct,
+    aggressive: goalAnnualReturnPct + SCENARIO_SPREAD_PCT,
+  };
+}
+
+/**
+ * 시작값·월 적립·연 수익률로 목표 금액에 처음 닿는 개월 수(시작 시점 0). 600개월 안에 못 닿으면 null.
+ */
+export function monthsToReachGoal(
+  initial: number,
+  monthlyDepositAmount: number,
+  annualReturnPct: number,
+  goalAmount: number,
+): number | null {
+  for (let n = 0; n <= MAX_GOAL_MONTHS; n++) {
+    if (projectedValueAtMonth(initial, monthlyDepositAmount, annualReturnPct, n) >= goalAmount)
+      return n;
+  }
+  return null;
+}
+
+/** "YYYY-MM"에서 n개월 뒤 "YYYY-MM" — 타임존 영향 없이 문자열로 계산 */
+export function monthAfter(startMonth: string, n: number): string {
+  const [y, m] = startMonth.split("-").map(Number) as [number, number];
+  const idx = y * 12 + (m - 1) + n;
+  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
+}

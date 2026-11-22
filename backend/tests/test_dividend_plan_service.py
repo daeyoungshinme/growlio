@@ -352,3 +352,25 @@ async def test_yearly_received_excludes_soft_deleted_accounts(user_id, mock_db):
     sql = str(mock_db.execute.call_args[0][0])
     assert "LEFT JOIN asset_accounts a ON a.id = t.account_id" in sql
     assert "t.account_id IS NULL OR a.is_active = TRUE" in sql
+
+
+class TestAfterTaxAnnual:
+    """세후 예상 배당 — 일반계좌 몫만 원천징수(국내 15.4%, 해외 15%), ISA·연금 비율은 세전 그대로(계획 143 E2)."""
+
+    def test_domestic_overseas_and_sheltered(self):
+        from app.services.dividend.plan_service import _after_tax_annual
+
+        items = [
+            {"market": "KOSPI", "estimated_annual_krw": 1_000_000, "tax_sheltered_ratio": 0.0},
+            {"market": "NASDAQ", "estimated_annual_krw": 1_000_000, "tax_sheltered_ratio": 0.0},
+            {"market": "KOSPI", "estimated_annual_krw": 1_000_000, "tax_sheltered_ratio": 1.0},
+            {"market": "KOSPI", "estimated_annual_krw": 1_000_000, "tax_sheltered_ratio": 0.5},
+        ]
+        result = _after_tax_annual(items, 0.154)
+        assert result == pytest.approx(846_000 + 850_000 + 1_000_000 + 923_000)
+
+    def test_missing_ratio_treated_as_taxable(self):
+        """옛 캐시(비율 필드 없음)는 전부 일반계좌로 본다 — 세후를 부풀리지 않게."""
+        from app.services.dividend.plan_service import _after_tax_annual
+
+        assert _after_tax_annual([{"market": "KOSPI", "estimated_annual_krw": 100}], 0.154) == pytest.approx(84.6)
