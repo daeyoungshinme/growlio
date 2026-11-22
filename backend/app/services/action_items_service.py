@@ -417,8 +417,10 @@ _Source = Callable[[uuid.UUID, AsyncSession, CacheStoreType], Awaitable[list[Act
 
 
 # 전술·리밸런싱은 get_action_items가 앞에 붙인다(전술 항목이 난 포트폴리오를 리밸런싱에서 빼야 해서)
-def _goal_adjust_link(portfolio_id: uuid.UUID | str) -> str:
+def _goal_adjust_link(portfolio_id: uuid.UUID | str | None) -> str:
     # 프론트 rebalancingUrl({ tab: "목표 조정", portfolioId })와 같은 값(추천 모드는 기본값이라 gmode 생략)
+    if portfolio_id is None:
+        return "/rebalancing?rtab=목표 조정"
     return f"/rebalancing?rtab=목표 조정&portfolioId={portfolio_id}"
 
 
@@ -444,7 +446,8 @@ async def _recommendation_drift_items(user_id: uuid.UUID, db: AsyncSession, cach
             title=title,
             detail="적용한 추천과 지금 추천이 3%p 넘게 달라졌어요 — 다시 적용할지 비교해 보세요",
             cta_label="비교하기",
-            link=_goal_adjust_link(first.id),
+            # 여러 개면 첫 포트폴리오로 보내지 않는다 — 목표 조정 탭에서 고르게 한다(plans/146 A7)
+            link=_goal_adjust_link(first.id if len(drifted) == 1 else None),
         )
     ]
 

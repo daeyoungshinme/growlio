@@ -321,36 +321,38 @@ export function AlertAutoModeSection({
             </p>
           </div>
         )}
-        <div>
-          <label htmlFor={`${uid}-min-trade`} className={FORM_LABEL_XS}>
-            최소 거래 금액 (원, 선택)
-          </label>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            step={10000}
-            id={`${uid}-min-trade`}
-            placeholder="예: 100000 (비우면 제한 없음)"
-            value={form.minTradeKrw ?? ""}
-            onChange={(e) =>
-              form.setMinTradeKrw(
-                e.target.value === ""
-                  ? null
-                  : Math.max(0, Math.floor(Number(e.target.value))) || null,
-              )
-            }
-            className={inputClass}
-          />
-          {form.minTradeKrw != null && form.minTradeKrw > 0 && (
-            <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-              {fmtKrwPreview(form.minTradeKrw)}
+        {!(form.isDcaPreset && form.dcaAmountKrw) && (
+          <div>
+            <label htmlFor={`${uid}-min-trade`} className={FORM_LABEL_XS}>
+              최소 거래 금액 (원, 선택)
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={10000}
+              id={`${uid}-min-trade`}
+              placeholder="예: 100000 (비우면 제한 없음)"
+              value={form.minTradeKrw ?? ""}
+              onChange={(e) =>
+                form.setMinTradeKrw(
+                  e.target.value === ""
+                    ? null
+                    : Math.max(0, Math.floor(Number(e.target.value))) || null,
+                )
+              }
+              className={inputClass}
+            />
+            {form.minTradeKrw != null && form.minTradeKrw > 0 && (
+              <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                {fmtKrwPreview(form.minTradeKrw)}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              이보다 작은 주문은 계획에서 빼서 자잘한 매매를 막습니다.
             </p>
-          )}
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-            이보다 작은 주문은 계획에서 빼서 자잘한 매매를 막습니다.
-          </p>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

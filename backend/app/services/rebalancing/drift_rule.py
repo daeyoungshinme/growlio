@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import math
 from decimal import Decimal
 from typing import Any
 
@@ -87,20 +88,28 @@ def shrink_to_band(item: Any, threshold_pct: float, relative_threshold_pct: floa
     band = band_width_pct(target_w, threshold_pct, relative_threshold_pct)
     if abs(diff_w) <= band:
         return
-    if target_w > 0:
-        base = float(item.target_value_krw) * 100 / target_w
-    elif float(item.current_weight_pct or 0) > 0:
-        base = float(item.current_value_krw) * 100 / float(item.current_weight_pct)
-    else:
+    if target_w <= 0:
+        # 목표 0%는 "보유하지 않음" — 경계(기준 %p)에서 멈추면 그 뒤로는 이탈이 아니라서
+        # 끝내 정리되지 않는다(plans/146 A4)
         return
+    full_target_value = float(item.target_value_krw)
+    base = full_target_value * 100 / target_w
     edge_w = target_w - band if diff_w > 0 else target_w + band
     edge_value = round(base * edge_w / 100, 0)
+    raw_price = getattr(item, "current_price_krw", None)
+    price = float(raw_price) if raw_price and raw_price > 0 else None
+    has_qty = getattr(item, "shares_to_trade", None) is not None and price is not None
+    if diff_w > 0 and has_qty and price is not None:
+        # 매수를 경계 금액으로 내림하면 체결 뒤에도 경계 밖(1주 미만 모자람)이라 다음 실행에 또 걸린다 —
+        # 경계 안쪽 정수 주까지 사되 원래 목표 금액은 넘지 않는다. 수량은 뒤에서 `floor(target_value / 실시간가)`로
+        # 다시 계산되므로 반 주 여유를 둬 시세가 조금 움직여도 같은 수량이 나오게 한다(plans/146 A3)
+        inside_qty = math.ceil(edge_value / price - 1e-9)
+        edge_value = min(full_target_value, round((inside_qty + 0.5) * price, 0))
     item.target_value_krw = edge_value
     item.diff_krw = round(edge_value - float(item.current_value_krw), 0)
-    price = getattr(item, "current_price_krw", None)
-    if getattr(item, "shares_to_trade", None) is not None and price and price > 0:
+    if has_qty and price is not None:
         from app.services.rebalancing._order_quantity_guard import floor_shares
 
         current_qty = float(item.current_qty or 0)
-        item.target_qty = float(floor_shares(edge_value / float(price)))
+        item.target_qty = float(floor_shares(edge_value / price))
         item.shares_to_trade = item.target_qty - current_qty

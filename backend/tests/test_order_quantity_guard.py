@@ -151,6 +151,18 @@ class TestClampBuyOrdersToBudget:
         assert [s.ticker for s in skipped] == ["PRICEY"]
         assert {o.ticker: o.quantity for o in adjusted} == {"CHEAP": 10}
 
+    def test_pricey_share_kept_when_it_uses_more_budget(self):
+        """plans/146 A2 — 비례로 0주가 된 비싼 주문을 1주 먼저 사는 쪽이 예산을 더 쓰면 그쪽을 택한다."""
+        orders = [
+            _make_buy_order(ticker="A", quantity=1, limit_price=900_000.0),
+            _make_buy_order(ticker="B", quantity=10, limit_price=10_000.0),
+        ]
+        adjusted, skipped = clamp_buy_orders_to_budget(orders, budget=950_000.0)
+
+        assert skipped == []
+        assert {o.ticker: o.quantity for o in adjusted} == {"A": 1, "B": 5}
+        assert sum(o.quantity * float(o.limit_price or 0) for o in adjusted) <= 950_000.0
+
 
 class TestFloorShares:
     """목표금액 ÷ 가격의 부동소수 경계 오차 보정 (계획 59 A5)."""

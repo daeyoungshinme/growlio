@@ -78,10 +78,12 @@ def _set_trade(member: RebalancingItem, target_value: float, base_krw: float) ->
 
 
 def _base_krw(group: RebalancingItem) -> float:
-    if group.target_weight_pct > 0:
-        return group.target_value_krw * 100 / group.target_weight_pct
+    """포트폴리오 기준 총액. 현재 비중을 먼저 본다 — 경계 거래(`shrink_to_band`)는 목표 금액만 줄이고 목표 비중은
+    그대로 두므로, 목표 쪽으로 구하면 총액이 작아져 멤버 목표 비중이 틀린다(plans/146 A8)."""
     if group.current_weight_pct > 0:
         return group.current_value_krw * 100 / group.current_weight_pct
+    if group.target_weight_pct > 0:
+        return group.target_value_krw * 100 / group.target_weight_pct
     return 0.0
 
 

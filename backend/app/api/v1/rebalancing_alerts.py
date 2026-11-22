@@ -31,6 +31,8 @@ from app.services.rebalancing._alert_queries import (
     list_alerts_by_portfolio_accounts,
 )
 from app.services.rebalancing.plan_execution import cancel_pending_buy_legs
+from app.utils.cache_invalidation import invalidate_user_caches
+from app.utils.cache_keys import insights_key
 
 router = APIRouter()
 
@@ -121,6 +123,11 @@ async def _cancel_pending_buys_if_auto_turned_off(
     """AUTO에서 다른 모드로 바꾸면 이미 대기 중인 매수도 함께 멈춘다 — commit은 호출자의 저장과 같이 한다."""
     if alert.mode == "AUTO" and body.mode != "AUTO":
         await cancel_pending_buy_legs(db, alert_id=alert.id)
+
+
+async def _invalidate_insights(user_id: uuid.UUID) -> None:
+    """인사이트는 알림의 이탈 기준을 따른다(plans/145 A4) — 기준을 바꾸면 1시간 캐시가 옛 판정을 보이지 않게 지운다."""
+    await invalidate_user_caches(await get_cache_store(), insights_key(user_id))
 
 
 def _apply_alert_fields(alert: RebalancingAlert, body: RebalancingAlertCreate) -> None:
@@ -222,6 +229,7 @@ async def upsert_rebalancing_alert(
     alert.account_id = body.account_id
 
     await db.commit()
+    await _invalidate_insights(current_user.id)
     await db.refresh(alert)
     return _build_response(alert)
 
@@ -275,6 +283,7 @@ async def delete_rebalancing_alert(
     await cancel_pending_buy_legs(db, alert_id=alert.id)
     await db.delete(alert)
     await db.commit()
+    await _invalidate_insights(current_user.id)
 
 
 # ── 계좌별 독립 설정 (PER_ACCOUNT 스코프) ──────────────────────
@@ -351,6 +360,7 @@ async def upsert_account_rebalancing_alert(
     alert.alert_scope = "PER_ACCOUNT"
 
     await db.commit()
+    await _invalidate_insights(current_user.id)
     await db.refresh(alert)
     return _build_response(alert)
 
@@ -372,6 +382,7 @@ async def delete_account_rebalancing_alert(
     await cancel_pending_buy_legs(db, alert_id=alert.id)
     await db.delete(alert)
     await db.commit()
+    await _invalidate_insights(current_user.id)
 
 
 @router.post("/rebalancing/{portfolio_id}/accounts/{account_id}/test", response_model=TestAlertResponse)

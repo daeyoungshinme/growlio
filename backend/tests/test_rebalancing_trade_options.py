@@ -63,9 +63,46 @@ class TestShrinkToBand:
             diff_krw=400_000.0,
         )
         shrink_to_band(row, 5.0, 25.0)
-        # 목표 10% − 2.5%p = 7.5% → 75만원까지만 매수
-        assert row.target_value_krw == 750_000.0
+        # 목표 10% − 2.5%p = 7.5% → 75만원(75주)까지만 매수. 실시간가 재계산용 반 주 여유가 목표 금액에 붙는다
+        assert row.target_value_krw == 755_000.0
         assert row.shares_to_trade == 15.0
+
+    def test_underweight_buy_rounds_up_to_get_inside_band(self):
+        """plans/146 A3 — 경계까지 내림하면 1주 미만 모자라 다음 실행에 또 이탈 — 경계 안쪽 정수 주까지 산다."""
+        row = _row(
+            target_weight_pct=30.0,
+            current_weight_pct=20.0,
+            weight_diff_pct=10.0,
+            target_value_krw=3_000_000.0,
+            current_value_krw=2_000_000.0,
+            current_price_krw=300_000.0,
+            current_qty=6.666,
+            target_qty=10.0,
+            shares_to_trade=3.0,
+            diff_krw=1_000_000.0,
+        )
+        shrink_to_band(row, 5.0)
+        # 하단 경계 25% = 250만원 → 8.33주. 내림(8주=240만)은 24%로 경계 밖, 9주(270만)는 안쪽이고 목표 300만 이하
+        assert row.target_qty == 9.0
+        assert row.target_value_krw <= 3_000_000.0
+        assert 9 * 300_000 / 10_000_000 * 100 > 25.0
+
+    def test_buy_never_exceeds_full_target_value(self):
+        row = _row(
+            target_weight_pct=30.0,
+            current_weight_pct=20.0,
+            weight_diff_pct=10.0,
+            target_value_krw=3_000_000.0,
+            current_value_krw=2_000_000.0,
+            current_price_krw=2_900_000.0,
+            current_qty=0.0,
+            target_qty=1.0,
+            shares_to_trade=1.0,
+            diff_krw=1_000_000.0,
+        )
+        shrink_to_band(row, 5.0)
+        assert row.target_value_krw == 3_000_000.0
+        assert row.target_qty == 1.0
 
     def test_inside_band_is_untouched(self):
         row = _row(weight_diff_pct=-3.0)
@@ -80,8 +117,8 @@ class TestShrinkToBand:
         assert row.target_value_krw == 3_500_000.0
         assert row.shares_to_trade is None
 
-    def test_untargeted_holding_keeps_band_weight(self):
-        """목표 밖 보유(목표 0%)는 현재 비중에서 기준 자산을 구해 기준선(5%)까지만 판다."""
+    def test_untargeted_holding_is_fully_sold(self):
+        """plans/146 A4 — 목표 0%는 경계에서 멈추지 않고 전량 정리한다(멈추면 그 뒤로는 이탈이 아니라 남는다)."""
         row = _row(
             target_weight_pct=0.0,
             current_weight_pct=8.0,
@@ -94,8 +131,8 @@ class TestShrinkToBand:
             diff_krw=-800_000.0,
         )
         shrink_to_band(row, 5.0)
-        assert row.target_value_krw == 500_000.0
-        assert row.shares_to_trade == -30.0
+        assert row.target_value_krw == 0.0
+        assert row.shares_to_trade == -80.0
 
 
 def _order(qty: int, price: float | None, ticker: str = "A") -> SimpleNamespace:
@@ -186,3 +223,86 @@ class TestAlertSchema:
         with pytest.raises(ValidationError):
             RebalancingAlertCreate(portfolio_id=uuid.uuid4(), min_trade_krw=0)
         assert RebalancingAlertCreate(portfolio_id=uuid.uuid4(), min_trade_krw=50_000.4).min_trade_krw == 50_000
+
+
+class TestMinTradeSkipsFixedDca:
+    """plans/146 A5 — 최소 거래액은 정액 적립 매수를 지우지 않는다(일반 AUTO에는 그대로 적용)."""
+
+    @staticmethod
+    def _build(alert):
+        from unittest.mock import patch
+
+        from app.services.rebalancing import plan_generation as pg
+
+        orders = [_order(1, 50_000.0, "SMALL"), _order(10, 50_000.0, "BIG")]
+        with (
+            patch.object(pg, "build_rebalancing_orders", return_value=orders),
+            patch.object(pg, "clamp_orders_to_max_value", side_effect=lambda o, _cap: o),
+            patch.object(pg, "_coerce_overseas_market_orders_to_limit", side_effect=lambda o, **_kw: o),
+        ):
+            return pg._build_plan_orders(alert, [], {}, "BUY_ONLY", "MARKET", None)
+
+    @staticmethod
+    def _alert(**kwargs):
+        import uuid
+
+        defaults = {
+            "id": uuid.uuid4(),
+            "strategy": "BUY_ONLY",
+            "trigger_condition": "SCHEDULE_ONLY",
+            "schedule_type": "MONTHLY",
+            "mode": "AUTO",
+            "dca_amount_krw": 300_000.0,
+            "min_trade_krw": 100_000.0,
+        }
+        defaults.update(kwargs)
+        return SimpleNamespace(**defaults)
+
+    def test_fixed_dca_keeps_small_orders(self):
+        assert [o.ticker for o in self._build(self._alert())] == ["SMALL", "BIG"]
+
+    def test_regular_auto_still_drops_small_orders(self):
+        assert [o.ticker for o in self._build(self._alert(dca_amount_krw=None))] == ["BIG"]
+
+
+class TestAlertOrderPreviewMatchesPlan:
+    """plans/146 A8 — 알림 메일 수량 미리보기도 경계 거래·최소 거래액을 실제 플랜과 같게 반영한다."""
+
+    @staticmethod
+    def _alert(**kwargs):
+        import uuid
+
+        defaults = {
+            "id": uuid.uuid4(),
+            "account_id": None,
+            "strategy": "FULL",
+            "order_type": "MARKET",
+            "trigger_condition": "DRIFT_ONLY",
+            "schedule_type": "DAILY",
+            "mode": "AUTO",
+            "threshold_pct": 5.0,
+            "relative_threshold_pct": None,
+            "trade_to_band": True,
+            "min_trade_krw": 100_000.0,
+            "dca_amount_krw": None,
+        }
+        defaults.update(kwargs)
+        return SimpleNamespace(**defaults)
+
+    def test_shrinks_copy_and_drops_small_orders(self):
+        from unittest.mock import patch
+
+        from app.services.rebalancing import order_builder as ob
+
+        row = _row()
+        captured: list = []
+
+        def fake_build(drifting, *_args, **_kw):
+            captured.extend(drifting)
+            return [_order(1, 50_000.0, "SMALL"), _order(10, 50_000.0, "BIG")]
+
+        with patch.object(ob, "build_rebalancing_orders", side_effect=fake_build):
+            orders = ob.build_alert_order_preview(self._alert(), [row], {})
+        assert [o.ticker for o in orders] == ["BIG"]
+        assert captured[0].target_value_krw == 3_500_000.0  # 상단 경계까지만
+        assert row.target_value_krw == 3_000_000.0  # 원본 분석 행은 그대로
