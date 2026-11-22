@@ -136,6 +136,7 @@ export default function PortfolioPage() {
     dividendByTicker,
     isLoading: divLoading,
     isError: divError,
+    retry: retryDividends,
   } = useDividendData(true, selectedAccountId, tab === "배당");
 
   const handleSyncAll = async () => {
@@ -386,7 +387,10 @@ export default function PortfolioPage() {
           <ErrorBoundary variant="section">
             <DividendTab
               dividendData={dividendData}
+              dividendMap={dividendMap}
               divLoading={divLoading}
+              divError={divError}
+              onRetry={retryDividends}
               divSummary={divSummary}
               dividendByTicker={dividendByTicker}
               totalInvestedKrw={data?.total_invested_krw}

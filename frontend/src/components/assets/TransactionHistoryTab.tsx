@@ -278,7 +278,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
 
       <div className="card-overflow">
         {isLoading ? (
-          <EmptyState title="불러오는 중..." compact />
+          <SkeletonCard rows={4} height="h-4" />
         ) : isError ? (
           // 실패를 "내역 없음"으로 보이면 기록이 사라진 것처럼 오해한다
           <EmptyState

@@ -47,6 +47,7 @@ const defaultProps = {
   onSync: vi.fn(),
   isSyncing: false,
   isDeleting: false,
+  usdRate: 1350,
 };
 
 describe("StockAccountCard", () => {
@@ -176,5 +177,35 @@ describe("StockAccountCard", () => {
     renderWithProviders(<StockAccountCard {...defaultProps} account={account} />);
     expect(screen.queryByText("동기화 실패")).not.toBeInTheDocument();
     expect(screen.queryByText(/동기화$/)).not.toBeInTheDocument();
+  });
+
+  it("평가 통계를 불러오는 중이면 0원 대신 스켈레톤을 보인다", () => {
+    renderWithProviders(<StockAccountCard {...defaultProps} statsStatus="loading" />);
+    expect(screen.getByRole("status", { name: "평가 정보 불러오는 중" })).toBeInTheDocument();
+    expect(screen.queryByText("평가금액")).toBeNull();
+  });
+
+  it("평가 통계 조회가 실패하면 실패 문구와 다시 시도를 보인다", () => {
+    const onRetryStats = vi.fn();
+    renderWithProviders(
+      <StockAccountCard {...defaultProps} statsStatus="error" onRetryStats={onRetryStats} />,
+    );
+    expect(screen.getByText("평가액을 불러오지 못했어요")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onRetryStats).toHaveBeenCalled();
+  });
+
+  it("펼침 버튼은 모바일 2열 그리드를 넘지 않는다", () => {
+    const stats = {
+      amount_krw: 5000000,
+      invested_krw: 4000000,
+      unrealized_pnl: 1000000,
+      deposit_total: 4000000,
+      dividend_total: 100000,
+    };
+    renderWithProviders(<StockAccountCard {...defaultProps} stats={stats} />);
+    const toggle = screen.getByRole("button", { name: /누적 입금·배당 보기/ });
+    expect(toggle).toHaveClass("col-span-2");
+    expect(toggle).toHaveClass("sm:col-span-3");
   });
 });

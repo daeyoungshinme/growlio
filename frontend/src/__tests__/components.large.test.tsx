@@ -284,6 +284,7 @@ describe("StockAccountCard", () => {
     onSync: vi.fn(),
     isSyncing: false,
     isDeleting: false,
+    usdRate: 1350,
   };
 
   it("renders account card", () => {
@@ -573,6 +574,7 @@ describe("StockHoldingsTable", () => {
 describe("DividendTab", () => {
   const defaultProps = {
     dividendData: [],
+    dividendMap: {},
     divLoading: false,
     divSummary: undefined,
     dividendByTicker: [],
@@ -606,6 +608,44 @@ describe("DividendTab", () => {
     );
     fireEvent.click(screen.getByText("월별 배당"));
     expect(document.body).toBeDefined();
+  });
+
+  it("조회 실패면 빈 상태 대신 실패 화면과 다시 시도를 보인다", () => {
+    const onRetry = vi.fn();
+    renderWithProviders(
+      <MemoryRouter>
+        <DividendTab {...defaultProps} divError onRetry={onRetry} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("배당 정보를 불러오지 못했습니다")).toBeInTheDocument();
+    expect(screen.queryByText(/배당 데이터가 없습니다/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /다시 시도/ }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it("일부만 실패하면 받은 데이터와 함께 경고 배너를 보인다", () => {
+    const divSummary = {
+      annual_received: 120000,
+      monthly_breakdown: [],
+      monthly_ticker_breakdown: [],
+    } as never; // 테스트에 필요한 필드만
+    renderWithProviders(
+      <MemoryRouter>
+        <DividendTab {...defaultProps} divError divSummary={divSummary} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(/일부 배당 정보를 불러오지 못해/);
+    expect(screen.getByText("12만원")).toBeInTheDocument();
+  });
+
+  it("월별 보기에선 상단 배당 계획 링크를 숨기고 하단 링크 하나만 둔다", () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={["/?divTab=월별 배당"]}>
+        <DividendTab {...defaultProps} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("배당 목표 달성 현황 보기")).not.toBeInTheDocument();
+    expect(screen.getByText(/월별 균등화 추천/)).toBeInTheDocument();
   });
 
   it("shows empty state when no dividend data", () => {

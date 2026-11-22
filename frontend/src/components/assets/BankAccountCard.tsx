@@ -1,8 +1,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
 import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS } from "@/api/assets";
-import { fmtFxRate, fmtKrw, fmtKrwPrice, fmtUsd } from "@/utils/format";
-import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { fmtFxRate, fmtKrw, fmtUsd } from "@/utils/format";
 import EditableNameField from "@/components/common/EditableNameField";
 import { BANK_TYPE_LABELS } from "@/constants";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -13,6 +12,8 @@ interface Props {
   onEditModal: (id: string) => void;
   onEditName: (id: string, name: string) => void;
   isDeleting: boolean;
+  /** 부모가 한 번 읽어 내려준다 — 카드마다 컨텍스트를 다시 구독하지 않는다 */
+  usdRate: number | null;
 }
 
 export default function BankAccountCard({
@@ -21,38 +22,41 @@ export default function BankAccountCard({
   onEditModal,
   onEditName,
   isDeleting,
+  usdRate,
 }: Props) {
-  const usdRate = useExchangeRate();
   const typeLabel = BANK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
 
   const hasDepositFields = account.deposit_krw != null || account.deposit_usd != null;
+  const usd = account.deposit_usd ?? 0;
+  // 환율 없이 달러를 0원으로 더하면 합계가 조용히 줄어든다 — 증권 카드처럼 "환율 조회 중"으로 알린다(plans/144 B5)
+  const usdPending = hasDepositFields && usd > 0 && !usdRate;
   const displayTotal = hasDepositFields
-    ? (account.deposit_krw ?? 0) +
-      (account.deposit_usd && usdRate ? account.deposit_usd * usdRate : 0)
+    ? (account.deposit_krw ?? 0) + (usdRate ? usd * usdRate : 0)
     : (account.manual_amount ?? 0);
 
-  const showAmount = hasDepositFields ? displayTotal > 0 : account.manual_amount != null;
+  const showAmount = hasDepositFields ? displayTotal > 0 || usd > 0 : account.manual_amount != null;
 
   return (
     <div className="card flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <EditableNameField
-            name={account.name}
-            onSave={(name) => onEditName(account.id, name)}
-            textClassName="text-sm font-semibold text-gray-900 dark:text-gray-50 truncate"
-            pencilSize={16}
-          />
-          <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">
+        <EditableNameField
+          name={account.name}
+          onSave={(name) => onEditName(account.id, name)}
+          className="min-w-0"
+          textClassName="text-base font-semibold text-gray-900 dark:text-gray-50 truncate"
+          pencilSize={16}
+        />
+        <div className="flex flex-wrap items-center gap-1.5 gap-y-1 mt-1 mb-1 min-w-0">
+          <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">
             {typeLabel}
           </span>
           {account.tax_type && account.tax_type !== "GENERAL" && (
-            <span className="px-2 py-0.5 border border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 text-xs rounded-full shrink-0">
+            <span className="px-1.5 py-px border border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 text-xs rounded-full shrink-0">
               {ACCOUNT_TAX_TYPE_LABELS[account.tax_type]}
             </span>
           )}
           {account.investment_horizon && (
-            <span className="px-2 py-0.5 border border-teal-300 dark:border-teal-700 text-teal-600 dark:text-teal-400 text-xs rounded-full shrink-0">
+            <span className="px-1.5 py-px border border-teal-300 dark:border-teal-700 text-teal-600 dark:text-teal-400 text-xs rounded-full shrink-0">
               {INVESTMENT_HORIZON_LABELS[account.investment_horizon]}
             </span>
           )}
@@ -65,10 +69,14 @@ export default function BankAccountCard({
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {fmtKrw(displayTotal)}
             </p>
-            {hasDepositFields && account.deposit_usd != null && account.deposit_usd > 0 && (
+            {hasDepositFields && usd > 0 && (
               <p className="text-xs text-gray-400 dark:text-gray-500">
-                {fmtKrwPrice(account.deposit_krw ?? 0)} + {fmtUsd(account.deposit_usd)}
-                {usdRate ? ` (환율 ${fmtFxRate(usdRate)}/USD)` : ""}
+                {fmtKrw(account.deposit_krw ?? 0)} + {fmtUsd(usd)}
+                {usdPending
+                  ? " (환율 조회 중)"
+                  : usdRate
+                    ? ` (환율 ${fmtFxRate(usdRate)}/USD)`
+                    : ""}
               </p>
             )}
           </div>

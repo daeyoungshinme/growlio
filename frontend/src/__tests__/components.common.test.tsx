@@ -64,7 +64,21 @@ describe("BankAccountCard", () => {
     onEditModal: vi.fn(),
     onEditName: vi.fn(),
     isDeleting: false,
+    usdRate: 1350,
   };
+
+  it("환율이 없으면 달러 예수금을 말없이 빼지 않고 환율 조회 중으로 알린다", () => {
+    renderWithProviders(
+      <BankAccountCard
+        account={makeAccount({ deposit_krw: 100000, deposit_usd: 50 }) as unknown as AssetAccount}
+        {...defaultProps}
+        usdRate={null}
+      />,
+    );
+    expect(screen.getByText(/\(환율 조회 중\)/)).toBeInTheDocument();
+    // 원화 부분만 합계로 — 달러를 0원으로 더한 값이 아니라 원화 10만원 그대로
+    expect(screen.getAllByText(/10만원/).length).toBeGreaterThan(0);
+  });
 
   it("계좌명과 기관명을 표시한다", () => {
     renderWithProviders(

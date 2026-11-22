@@ -13,7 +13,6 @@ import {
   ACCOUNT_TAX_TYPE_LABELS,
   INVESTMENT_HORIZON_LABELS,
 } from "@/api/assets";
-import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useHaptic } from "@/hooks/useHaptic";
 import { depositTotalKrw, fmtKrw, fmtPct, relativeTime, fmtUsd, fmtSigned } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
@@ -23,6 +22,7 @@ import { toast } from "@/utils/toast";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import EditableNameField from "@/components/common/EditableNameField";
 import AccountActionsMenu from "@/components/common/AccountActionsMenu";
+import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 
 export interface AccountStats {
   amount_krw: number;
@@ -32,9 +32,16 @@ export interface AccountStats {
   dividend_total: number;
 }
 
+/** 평가 통계(overview·입출금 합계) 조회 상태 — 로딩·실패가 0원으로 보이지 않게 구분한다(plans/144 B2) */
+export type AccountStatsStatus = "loading" | "error" | "ready";
+
 interface Props {
   account: AssetAccount;
   stats?: AccountStats;
+  statsStatus?: AccountStatsStatus;
+  onRetryStats?: () => void;
+  /** 부모가 한 번 읽어 내려준다 — 카드마다 컨텍스트를 다시 구독하지 않는다 */
+  usdRate: number | null;
   onDelete: (id: string) => void;
   onManagePositions: (account: { id: string; name: string; dataSource: string }) => void;
   onTransactions: (account: { id: string; name: string }) => void;
@@ -48,6 +55,9 @@ interface Props {
 export default function StockAccountCard({
   account,
   stats,
+  statsStatus = "ready",
+  onRetryStats,
+  usdRate,
   onDelete,
   onManagePositions,
   onTransactions,
@@ -66,7 +76,6 @@ export default function StockAccountCard({
     stats && (stats.amount_krw > 0 || stats.deposit_total > 0 || stats.dividend_total > 0);
   const pnl = stats?.unrealized_pnl ?? 0;
   const ret = stats?.invested_krw ? (pnl / stats.invested_krw) * 100 : 0;
-  const usdRate = useExchangeRate();
   const { impact } = useHaptic();
 
   return (
@@ -191,7 +200,31 @@ export default function StockAccountCard({
           />
         </div>
       </div>
-      {hasStats && (
+      {statsStatus === "loading" && (
+        <div
+          role="status"
+          aria-label="평가 정보 불러오는 중"
+          className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 sm:grid-cols-3 gap-px"
+        >
+          <SkeletonStatBox />
+          <SkeletonStatBox />
+        </div>
+      )}
+      {statsStatus === "error" && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2">
+          <p className="text-xs text-red-500 dark:text-red-400">평가액을 불러오지 못했어요</p>
+          {onRetryStats && (
+            <button
+              type="button"
+              onClick={onRetryStats}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 px-2 text-xs text-blue-600 dark:text-blue-400 hover:underline`}
+            >
+              다시 시도
+            </button>
+          )}
+        </div>
+      )}
+      {statsStatus === "ready" && hasStats && (
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
@@ -256,7 +289,7 @@ export default function StockAccountCard({
             type="button"
             onClick={() => setShowMoreStats((v) => !v)}
             aria-expanded={showMoreStats}
-            className={`col-span-3 flex items-center justify-center gap-1 ${TOUCH_HEIGHT_MIN} text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300`}
+            className={`col-span-2 sm:col-span-3 flex items-center justify-center gap-1 ${TOUCH_HEIGHT_MIN} text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300`}
           >
             {showMoreStats ? "접기" : "누적 입금·배당 보기"}
             <ChevronDown

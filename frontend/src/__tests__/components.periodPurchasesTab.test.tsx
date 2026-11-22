@@ -100,6 +100,15 @@ describe("PeriodPurchasesTab", () => {
     expect(await screen.findByText(/매수한 종목이 없습니다/)).toBeInTheDocument();
   });
 
+  it("조회 실패 시 다시 시도로 재조회한다", async () => {
+    vi.mocked(fetchPeriodPurchases)
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValue(summary([]));
+    renderWithProviders(<PeriodPurchasesTab accounts={[account]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByText(/매수한 종목이 없습니다/)).toBeInTheDocument();
+  });
+
   it("연간 전환 시 period=year로 조회", async () => {
     vi.mocked(fetchPeriodPurchases).mockResolvedValue(summary([]));
     renderWithProviders(<PeriodPurchasesTab accounts={[account]} />);

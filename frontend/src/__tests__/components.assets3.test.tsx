@@ -139,6 +139,7 @@ describe("BankAccountCard", () => {
         onEditModal={vi.fn()}
         onEditName={vi.fn()}
         isDeleting={false}
+        usdRate={1350}
       />,
     );
     expect(screen.getByText("국민은행 입출금")).toBeDefined();
@@ -154,6 +155,7 @@ describe("BankAccountCard", () => {
         onEditModal={vi.fn()}
         onEditName={vi.fn()}
         isDeleting={false}
+        usdRate={1350}
       />,
     );
     fireEvent.click(screen.getByLabelText("계좌명 수정"));
@@ -169,6 +171,7 @@ describe("BankAccountCard", () => {
         onEditModal={vi.fn()}
         onEditName={vi.fn()}
         isDeleting={false}
+        usdRate={1350}
       />,
     );
     fireEvent.click(screen.getByLabelText("계좌 삭제"));
@@ -183,6 +186,7 @@ describe("BankAccountCard", () => {
         onEditModal={vi.fn()}
         onEditName={vi.fn()}
         isDeleting={false}
+        usdRate={1350}
       />,
     );
     expect(screen.getByLabelText("금액 수정")).toBeDefined();

@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Info, Plus } from "lucide-react";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
+import SegmentedControl from "@/components/common/SegmentedControl";
 import type { AssetAccount } from "@/api/assets";
 import {
   fetchPeriodPurchases,
@@ -53,7 +54,7 @@ export default function PeriodPurchasesTab({ accounts }: Props) {
   );
 
   const monthParam = period === "month" ? month : null;
-  const { data, isLoading, isError, isPlaceholderData } = useQuery<PeriodPurchaseSummary>({
+  const { data, isLoading, isError, isPlaceholderData, refetch } = useQuery<PeriodPurchaseSummary>({
     queryKey: QUERY_KEYS.periodPurchases(period, year, monthParam, accountId || null),
     queryFn: () =>
       fetchPeriodPurchases({
@@ -91,23 +92,13 @@ export default function PeriodPurchasesTab({ accounts }: Props) {
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex items-center gap-2">
-          <div className="flex gap-1.5" role="group" aria-label="기간 단위">
-            {PERIOD_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                aria-pressed={period === o.value}
-                onClick={() => changePeriod(o.value)}
-                className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  period === o.value
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
+          {/* 칩 버튼을 직접 만들지 않고 공용 택일 컨트롤로(plans/144 B8) */}
+          <SegmentedControl
+            ariaLabel="기간 단위"
+            options={PERIOD_OPTIONS}
+            value={period}
+            onChange={changePeriod}
+          />
           <div className="flex items-center ml-auto sm:ml-2">
             <button
               type="button"
@@ -159,7 +150,11 @@ export default function PeriodPurchasesTab({ accounts }: Props) {
         <SkeletonCard rows={3} />
       ) : isError || !data || !summary ? (
         <div className="card">
-          <EmptyState title="기간별 매수 현황을 불러오지 못했습니다." compact />
+          <EmptyState
+            title="기간별 매수 현황을 불러오지 못했습니다."
+            action={{ label: "다시 시도", onClick: () => void refetch() }}
+            compact
+          />
         </div>
       ) : (
         <>
