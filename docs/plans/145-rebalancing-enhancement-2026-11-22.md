@@ -57,7 +57,18 @@
 
 ---
 
-## PR2 — 화면 정리 (refactor/rebalancing-145-ui)
+## PR2 — 화면 정리 (refactor/rebalancing-145-ui) — 구현 완료
+
+> 실제 반영:
+> - 자동화 합계: 지우지 않고 **모바일 선택 1장 보기에서만** 표시한다. 그 화면에선 다른 포트폴리오 칩이 안 보여 유일한 정보다.
+> - 배너: 확정 등급 안내는 접혀 있을 때만 헤더에 보이고, 펼치면 상세 한 곳에만 둔다. 차트 영역은 종합 문구 반복을 빼고 "종합 판단 근거"만 남겼다.
+> - 에디터: `title` 2개를 정리했다(문구로 충분한 것은 삭제, 지수로 묶기는 `InfoTip`).
+> - `RecommendationCard`: 적용 대상 파생을 `useRecommendationTargets.ts`로 분리했다(445→364줄).
+>
+> 보류:
+> - `UnifiedPortfolioEditor` 힌트 중복 — 접힘 힌트와 펼친 본문이라 동시에 보이지 않는다.
+> - `RebalancingOrderTable` 768px — 넓은 주문 표의 `md:` 마크업과 짝이라 의도된 값이다.
+> - `RecommendationApplySection` — 이미 분리돼 있다.
 
 동작 변경 없이 중복과 규칙 위반만 정리한다.
 - **자동화 상태 3중 노출 해소** (포트폴리오 탭):

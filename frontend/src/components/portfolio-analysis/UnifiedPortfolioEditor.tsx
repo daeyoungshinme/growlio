@@ -16,6 +16,7 @@ import {
   CASH_EQUIVALENT_TICKER,
 } from "@/constants/assets";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
+import InfoTip from "@/components/common/InfoTip";
 import { ModalBody } from "@/components/common/Modal";
 import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { CASH_TICKER } from "@/constants/assets";
@@ -298,7 +299,6 @@ export default function UnifiedPortfolioEditor({
                       )
                     }
                     className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-2 py-1 rounded-lg transition-colors`}
-                    title="현재 보유 종목을 현재 비중으로 자동 채웁니다"
                   >
                     <WandSparkles size={12} /> 현재 보유 종목으로 채우기
                   </button>
@@ -311,10 +311,13 @@ export default function UnifiedPortfolioEditor({
                     }}
                     aria-expanded={groupPickerOpen}
                     className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-2 py-1 rounded-lg transition-colors`}
-                    title="같은 지수를 추종하는 종목을 한 항목으로 묶습니다"
                   >
                     <Layers size={12} /> 지수로 묶기
                   </button>
+                  <InfoTip
+                    label="지수로 묶기 설명"
+                    content="같은 지수를 추종하는 종목(예: VOO·SPY·국내 S&P500 ETF)을 한 항목으로 묶어 합계 비중으로 리밸런싱합니다."
+                  />
                   <span
                     className={`text-xs font-medium ${weightOk ? "text-green-600" : "text-orange-500"}`}
                   >

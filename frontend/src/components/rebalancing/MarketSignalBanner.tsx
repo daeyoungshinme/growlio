@@ -112,7 +112,8 @@ export default function MarketSignalBanner({
         </button>
       </div>
 
-      {gateLagging && confirmed_level && (
+      {/* 펼치면 상세 첫 줄이 같은 확정 등급을 설명하므로 접혀 있을 때만(plans/145 PR2) */}
+      {gateLagging && confirmed_level && !isOpen && (
         <div className="px-4 pb-2.5 -mt-1 flex items-center gap-1.5 flex-wrap text-xs text-gray-500 dark:text-gray-400">
           <span>자동 실행 판단 기준은 아직</span>
           <MarketSignalLevelBadge level={confirmed_level} />
@@ -168,11 +169,10 @@ export default function MarketSignalBanner({
               <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-300">
                 차트 추세 (나스닥·S&P500·다우)
               </h3>
+              {/* 종합 등급·행동 문구는 헤더 배지와 한 줄 요약에 이미 있다 — 여기엔 근거만 */}
               {shown && (
                 <div className="mt-1.5 space-y-0.5 text-xs text-gray-600 dark:text-gray-300">
-                  <p>
-                    <span className="font-semibold">종합 {shown.label}</span> — {shown.action}
-                  </p>
+                  <p className="font-semibold">종합 판단 근거</p>
                   <ul className="list-disc pl-4 text-gray-500 dark:text-gray-400">
                     {shown.reasons.map((r, i) => (
                       <li key={`${i}-${r}`}>{r}</li>

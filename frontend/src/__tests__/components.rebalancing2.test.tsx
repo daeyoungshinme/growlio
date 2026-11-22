@@ -202,6 +202,13 @@ describe("MarketSignalBanner", () => {
     expect(screen.queryByText(/자동 실행 판단 기준은 아직/)).toBeNull();
   });
 
+  it("펼치면 확정 등급 안내를 상세 한 곳에서만 보여준다 (plans/145 PR2)", () => {
+    renderBanner({ ...mockSignal, confirmed_level: "GREEN" });
+    openDetail();
+    expect(screen.queryByText(/자동 실행 판단 기준은 아직/)).toBeNull();
+    expect(screen.getByText("자동 실행·전술 판단 기준(확정)")).toBeDefined();
+  });
+
   it("shows short implication text for YELLOW", () => {
     renderBanner();
     expect(screen.getByText(/분할 집행 권장/)).toBeDefined();
@@ -299,10 +306,13 @@ describe("MarketSignalBanner", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getAllByText("종합 경계").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("매수 속도를 늦추고 나눠서 진행하세요").length).toBeGreaterThan(0);
+    expect(screen.getByText("종합 경계")).toBeDefined();
+    expect(screen.getByText("매수 속도를 늦추고 나눠서 진행하세요")).toBeDefined();
     openDetail();
     expect(screen.getByText("추세 상승 1/3")).toBeDefined();
+    // 펼쳐도 종합 등급·행동 문구를 근거 영역에서 반복하지 않는다(plans/145 PR2)
+    expect(screen.getAllByText("종합 경계")).toHaveLength(1);
+    expect(screen.getAllByText("매수 속도를 늦추고 나눠서 진행하세요")).toHaveLength(1);
   });
 
   it("판단 보류면 기존 등급 문구를 쓴다 (plans/137)", () => {
