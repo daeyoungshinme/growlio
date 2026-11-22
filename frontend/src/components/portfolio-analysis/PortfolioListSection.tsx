@@ -206,8 +206,9 @@ export default function PortfolioListSection({
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">포트폴리오</h3>
-          {/* 자동화 합계 — 카드마다 칩이 있어 박스 배너 대신 헤더 부제 한 줄(plans/64 S3) */}
-          {!isLoading && portfolios.length > 0 && (
+          {/* 자동화 합계 — 카드가 모두 보이면 카드 칩과 중복이라 숨기고, 모바일 선택 1장 보기에서만
+              다른 포트폴리오 상태를 알려 준다(plans/145 PR2) */}
+          {!isLoading && compactSelected && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {alertPortfolioIds.size > 0
                 ? [

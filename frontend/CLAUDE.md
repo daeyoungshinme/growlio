@@ -90,7 +90,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - `assets/AccountHistoryTab` — 계좌관리 "내역"(`?history=` 현금 흐름/매수 내역).
 - `rebalancing/GoalAdjustTab` — 목표 조정(추천·전술 서브탭). 상단 포트폴리오 선택기는 **전술 모드만**, 추천은 `RecommendationCard` 적용 영역 select에서 고름 — 선택은 둘 다 URL `portfolioId` 공유. 콘텐츠 ErrorBoundary/Suspense는 **`key={mode}`로 모드마다 새 경계** — React Router v7이 URL 변경을 `startTransition`으로 감싸 공유 경계면 이전 모드 화면이 남는다.
 - `rebalancing/TacticalAllocationTab` — 전술 배분(국면·제안 비중·적용). 적용은 `POST /tactical/{id}/apply`(**주문 없음**) 후 포트폴리오 탭 실행 흐름으로 넘김. 표시 조각 `TacticalStatusParts.tsx`, 확인창 `TacticalApplyConfirmModal.tsx`, 백테스트 `TacticalBacktestSection.tsx`, 비중표 편집 `TacticalWeightsEditor.tsx`, 문구·색상 `tacticalLabels.ts`. 차트 지표는 이 탭이 아니라 진단 탭 `MarketSignalBanner` + `ChartTrendList`. **설정 upsert는 항상 현재 `tilt_shift_pct`·`dip_shift_pct`·`use_macro`를 함께 보낸다**(생략 시 서버 기본값으로 덮임).
-- `rebalancing/RecommendationCard` — 목표 역산 추천(목표 조정 › 추천 전용). 결과 렌더는 `RecommendationResultPanel.tsx`. 전체 추천은 콜드 계산이 수십 초라 **카드 전체를 막지 않고 결과 영역만 로딩**. `gcTime: STALE_TIME.DAY`, `RebalancingPage`가 같은 queryKey로 미리 발화.
+- `rebalancing/RecommendationCard` — 목표 역산 추천(목표 조정 › 추천 전용). 결과 렌더는 `RecommendationResultPanel.tsx`. 탭·적용 대상 파생은 `useRecommendationTargets.ts`. 전체 추천은 콜드 계산이 수십 초라 **카드 전체를 막지 않고 결과 영역만 로딩**. `gcTime: STALE_TIME.DAY`, `RebalancingPage`가 같은 queryKey로 미리 발화.
 - **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 진입점은 `portfolioId=<id>&openAlert=1`(`openAlert=dca`는 적립식 자동매수 프리셋) URL 파라미터로 요청. 모달을 직접 마운트하지 말 것.
 - `invest/ChallengeSection` — 챌린지 탭. 홈 요약 `dashboard/ChallengeProgressCard`, 네비 빨간 점 `useChallengeNudge`.
 - `invest/GoalSettingWizard` — 목표 최초 설정 6단계 마법사(`InvestPlanPage`의 재설정 모달과 별개).
