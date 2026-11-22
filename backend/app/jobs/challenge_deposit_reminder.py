@@ -59,6 +59,7 @@ async def _check_user(user: User, settings_row: UserSettings, to_email: str, cac
                         InvestmentChallenge.status == CHALLENGE_ACTIVE,
                         InvestmentChallenge.challenge_type == CHALLENGE_DEPOSIT,
                         InvestmentChallenge.reminder_enabled == True,
+                        challenge_service.not_expired_clause(month),
                     )
                 )
             )

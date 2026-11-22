@@ -105,7 +105,7 @@ async def create_transaction(
     db.add(tx)
     await db.commit()
     await db.refresh(tx)
-    await _invalidate_tx_caches(current_user.id)
+    await _invalidate_tx_caches(current_user.id, _tx_year(tx))
     return tx
 
 
@@ -119,6 +119,7 @@ async def update_transaction(
     db: AsyncSession = Depends(get_db),
 ):
     tx = await _get_owned_tx(tx_id, current_user.id, db)
+    old_year = _tx_year(tx)
     if req.transaction_type is not None:
         tx.transaction_type = req.transaction_type
     if req.amount is not None:
@@ -131,7 +132,7 @@ async def update_transaction(
             setattr(tx, field, getattr(req, field))
     await db.commit()
     await db.refresh(tx)
-    await _invalidate_tx_caches(current_user.id)
+    await _invalidate_tx_caches(current_user.id, old_year, _tx_year(tx))
     return tx
 
 
@@ -144,12 +145,18 @@ async def delete_transaction(
     db: AsyncSession = Depends(get_db),
 ):
     tx = await _get_owned_tx(tx_id, current_user.id, db)
+    tx_year = _tx_year(tx)
     await db.delete(tx)
     await db.commit()
-    await _invalidate_tx_caches(current_user.id)
+    await _invalidate_tx_caches(current_user.id, tx_year)
 
 
-async def _invalidate_tx_caches(user_id: UUID) -> None:
+def _tx_year(tx: Transaction) -> int | None:
+    return tx.transaction_date.year if tx.transaction_date else None
+
+
+async def _invalidate_tx_caches(user_id: UUID, *tx_years: int | None) -> None:
+    """거래 변경 캐시 무효화 — 배당 종목별 캐시는 연도 키라 올해와 거래 연도(수정이면 옛·새 연도) 모두 지운다."""
     cache = await get_cache_store()
     await invalidate_user_caches(
         cache,
@@ -157,7 +164,8 @@ async def _invalidate_tx_caches(user_id: UUID) -> None:
         monthly_trend_key(user_id),
         challenge_progress_key(user_id),
     )
-    await invalidate_dividend_caches(cache, user_id, today_kst().year)
+    for year in {today_kst().year, *(y for y in tx_years if y is not None)}:
+        await invalidate_dividend_caches(cache, user_id, year)
     # 입금·배당은 연금/ISA 납입·금융소득 판정에 들어간다
     await invalidate_tax_action_items_cache(cache, user_id)
 

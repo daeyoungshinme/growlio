@@ -51,6 +51,22 @@ def is_nyse_trading_day(d: date) -> bool:
     return d.weekday() < 5 and d not in _nyse_holidays(d.year)
 
 
+def us_year_end_trade_deadline(year: int) -> date:
+    """그해 결제가 끝나는 미국 주식 마지막 매매일(ET) — 12월 마지막 NYSE 거래일에서 2거래일 전.
+
+    미국 T+1 결제에 국내 증권사 결제가 하루 더 걸려, 증권사들이 공지하는 연말 귀속 마감일과 같다
+    (2024: 12/27, 2025: 12/29). 해외주식 양도세는 결제일 기준이라 이후 매도는 다음 해 귀속이다.
+    """
+    d = date(year, 12, 31)
+    while not is_nyse_trading_day(d):
+        d -= timedelta(days=1)
+    for _ in range(2):
+        d -= timedelta(days=1)
+        while not is_nyse_trading_day(d):
+            d -= timedelta(days=1)
+    return d
+
+
 @lru_cache(maxsize=8)
 def _first_krx_trading_day(year: int) -> date:
     d = date(year, 1, 1)

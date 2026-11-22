@@ -81,14 +81,16 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
         ticker = yf.Ticker(yahoo_symbol)
         info = ticker.info
         trailing_yld = float(info.get("trailingAnnualDividendYield") or 0)
-        forward_yld = float(info.get("dividendYield") or 0)
-        yld = trailing_yld if trailing_yld > 0 else forward_yld
+        # Yahoo는 forward dividendYield를 퍼센트(0.44 = 0.44%)로 준다(trailing은 소수).
+        # 0.3 휴리스틱에 맡기면 0.3% 미만 종목이 100배로 부풀므로 항상 /100.
+        forward_yld = float(info.get("dividendYield") or 0) / 100
 
-        # yfinance가 한국 종목에서 decimal(0.027) 대신 percentage(2.7)로 반환하는 사례 보정
+        # trailing이 한국 종목에서 decimal(0.027) 대신 percentage(2.7)로 오는 사례 보정
         # 현실적인 배당수익률 상한을 30%로 설정 (0.3 초과 = 단위 오류로 판단)
-        if yld > 0.3:
-            logger.warning("yahoo_yield_percentage_corrected", symbol=yahoo_symbol, raw_yld=yld)
-            yld = yld / 100
+        if trailing_yld > 0.3:
+            logger.warning("yahoo_yield_percentage_corrected", symbol=yahoo_symbol, raw_yld=trailing_yld)
+            trailing_yld = trailing_yld / 100
+        yld = trailing_yld if trailing_yld > 0 else forward_yld
 
         trailing_dps = float(info.get("trailingAnnualDividendRate") or 0)
         last_price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0)

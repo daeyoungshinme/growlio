@@ -80,7 +80,7 @@ class TestSyncYahooDividendInfo:
         """trailing yield 없으면 forward yield 사용."""
         mock_info = {
             "trailingAnnualDividendYield": 0.0,
-            "dividendYield": 0.03,
+            "dividendYield": 3.0,  # forward는 퍼센트 단위
             "trailingAnnualDividendRate": 2000.0,
             "currentPrice": 70000.0,
             "regularMarketPrice": None,
@@ -94,6 +94,26 @@ class TestSyncYahooDividendInfo:
             result = sync_yahoo_dividend_info("AAPL")
 
         assert result["dividend_yield"] == pytest.approx(0.03)
+
+    def test_forward_yield_below_threshold_is_percent(self, override_settings):
+        """forward 0.25(=0.25%)가 0.3 휴리스틱을 피해 25%로 부풀지 않는다."""
+        mock_info = {
+            "trailingAnnualDividendYield": 0.0,
+            "dividendYield": 0.25,
+            "trailingAnnualDividendRate": 0.0,
+            "currentPrice": 400.0,
+            "regularMarketPrice": None,
+        }
+        mock_ticker = MagicMock()
+        mock_ticker.info = mock_info
+
+        with patch("yfinance.Ticker", return_value=mock_ticker):
+            from app.services.dividend.sync_sources import sync_yahoo_dividend_info
+
+            result = sync_yahoo_dividend_info("QQQ")
+
+        assert result["dividend_yield"] == pytest.approx(0.0025)
+        assert result["dps"] == pytest.approx(1.0)
 
 
 class TestSyncYahooDividendInfoOutlierExclusion:

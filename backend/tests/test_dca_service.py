@@ -159,6 +159,51 @@ class TestBuildProjectionCurve:
         # projected=10_000_000, actual=10_500_000 → 105.0%
         assert curve[0]["achievement_pct"] == 105.0
 
+    def test_zero_actual_is_zero_pct_not_none(self, override_settings):
+        curve = _build_projection_curve(
+            initial_value=10_000_000.0,
+            pmt=0.0,
+            r=0.0,
+            start_date=date(2024, 1, 1),
+            total_months=1,
+            monthly_actuals={"2024-01": 0.0},
+        )
+        assert curve[0]["achievement_pct"] == 0.0
+        assert curve[0]["has_data"] is True
+
+
+class TestGetInitialValue:
+    @pytest.mark.asyncio
+    async def test_per_account_sum_used_when_available(self, mock_db, override_settings):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        from app.services.dca_service import _get_initial_value
+
+        res = MagicMock()
+        res.first.return_value = SimpleNamespace(total=7_000_000.0)
+        mock_db.execute = AsyncMock(return_value=res)
+
+        assert await _get_initial_value(uuid.uuid4(), date(2026, 1, 1), mock_db) == 7_000_000.0
+        assert mock_db.execute.await_count == 1
+        params = mock_db.execute.await_args.args[1]
+        assert params["window_end"] == date(2026, 2, 1)
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_first_snapshot_date_when_none_near_start(self, mock_db, override_settings):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        from app.services.dca_service import _get_initial_value
+
+        empty = MagicMock()
+        empty.first.return_value = SimpleNamespace(total=None)
+        later = MagicMock()
+        later.first.return_value = SimpleNamespace(total=3_000_000.0)
+        mock_db.execute = AsyncMock(side_effect=[empty, later])
+
+        assert await _get_initial_value(uuid.uuid4(), date(2020, 1, 1), mock_db) == 3_000_000.0
+
 
 # ── _build_yearly_achievements ───────────────────────────────
 

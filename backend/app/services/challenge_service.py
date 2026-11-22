@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import select, text
+from sqlalchemy import ColumnElement, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import release_read_connection
@@ -46,6 +46,17 @@ from app.utils.kst import today_kst
 from app.utils.numbers import opt_float
 
 _NUDGE_DAY_OF_MONTH = 20  # 이 날짜 이후부터 "이번 달 아직 적립 안 함"을 네비 배지로 노출
+
+
+def not_expired_clause(month: str) -> ColumnElement[bool]:
+    """마감월이 없거나 `month` 이후인 챌린지 — 마감 지난 챌린지에 독려·결산·배지를 내지 않는다."""
+    return or_(InvestmentChallenge.deadline_month.is_(None), InvestmentChallenge.deadline_month >= month)
+
+
+def _months_between(from_month: str, to_month: str) -> int:
+    fy, fm = (int(x) for x in from_month.split("-"))
+    ty, tm = (int(x) for x in to_month.split("-"))
+    return (ty - fy) * 12 + (tm - fm)
 
 
 def _add_months(month_str: str, delta: int) -> str:
@@ -94,13 +105,17 @@ async def _monthly_net_deposits(
     return {row.month: float(row.net) for row in result.all()}
 
 
-def _compute_streaks(monthly_net: dict[str, float], start_month: str, current_month: str) -> tuple[int, int]:
+def _compute_streaks(
+    monthly_net: dict[str, float], start_month: str, current_month: str, end_month: str | None = None
+) -> tuple[int, int]:
     """(current_streak, longest_streak) 반환.
 
     current_streak: 가장 최근 월부터 연속으로 순입금>0인 개월수(이번 달이 아직 미입금이면 이번 달은 건너뜀).
     longest_streak: start_month..current_month 전체에서 순입금>0의 최장 연속 구간.
+    end_month(마감월)가 current_month보다 이르면 그 달까지만 센다 — 마감 뒤 입금은 챌린지와 무관하다.
     """
-    months = _iter_months(start_month, current_month)
+    last = min(current_month, end_month) if end_month else current_month
+    months = _iter_months(start_month, last)
     if not months:
         return 0, 0
 
@@ -128,10 +143,15 @@ def _compute_streaks(monthly_net: dict[str, float], start_month: str, current_mo
 
 
 def _build_months(
-    monthly_net: dict[str, float], start_month: str, current_month: str, target_amount: float | None
+    monthly_net: dict[str, float],
+    start_month: str,
+    current_month: str,
+    target_amount: float | None,
+    end_month: str | None = None,
 ) -> list[ChallengeMonth]:
     out = []
-    for m in _iter_months(start_month, current_month):
+    last = min(current_month, end_month) if end_month else current_month
+    for m in _iter_months(start_month, last):
         net = monthly_net.get(m, 0.0)
         satisfied = net > 0
         target_met = (net >= target_amount) if target_amount else satisfied
@@ -157,12 +177,19 @@ async def compute_progress(
     cache: CacheStoreType = None,
 ) -> ChallengeProgress:
     current_month = _month_key(today_kst())
+    deadline = challenge.deadline_month
+    deadline_fields: dict[str, Any] = {}
+    if deadline:
+        deadline_fields = {
+            "is_expired": deadline < current_month,
+            "months_left": max(0, _months_between(current_month, deadline)),
+        }
 
     if challenge.challenge_type == CHALLENGE_DEPOSIT:
         target_amount = float(challenge.target_amount) if challenge.target_amount else None
         monthly_net = await _monthly_net_deposits(user_id, db, challenge.start_month, challenge.account_id)
-        current_streak, longest_streak = _compute_streaks(monthly_net, challenge.start_month, current_month)
-        months = _build_months(monthly_net, challenge.start_month, current_month, target_amount)
+        current_streak, longest_streak = _compute_streaks(monthly_net, challenge.start_month, current_month, deadline)
+        months = _build_months(monthly_net, challenge.start_month, current_month, target_amount, deadline)
         this_month = next((mo for mo in months if mo.month == current_month), None)
         progress_pct: float | None = None
         if challenge.target_months:
@@ -175,6 +202,7 @@ async def compute_progress(
             this_month_satisfied=this_month.satisfied if this_month else False,
             this_month_target_met=this_month.target_met if this_month else False,
             months=months,
+            **deadline_fields,
         )
 
     if challenge.challenge_type == CHALLENGE_RETURN_PCT:
@@ -186,16 +214,16 @@ async def compute_progress(
         progress_pct = None
         if target_pct and target_pct > 0 and cur is not None:
             progress_pct = round(cur / target_pct * 100, 1)
-        return ChallengeProgress(progress_pct=progress_pct, current_return_pct=cur)
+        return ChallengeProgress(progress_pct=progress_pct, current_return_pct=cur, **deadline_fields)
 
     if challenge.challenge_type == CHALLENGE_TARGET_VALUE:
         total, _, _, by_type = await build_asset_totals(user_id, db, cache)
         cur_val = exclude_real_estate(total, by_type)
         target_amount = float(challenge.target_amount) if challenge.target_amount else None
         progress_pct = round(cur_val / target_amount * 100, 1) if target_amount else None
-        return ChallengeProgress(progress_pct=progress_pct, current_value_krw=cur_val)
+        return ChallengeProgress(progress_pct=progress_pct, current_value_krw=cur_val, **deadline_fields)
 
-    return ChallengeProgress()
+    return ChallengeProgress(**deadline_fields)
 
 
 def _serialize(challenge: InvestmentChallenge, progress: ChallengeProgress) -> ChallengeResponse:
@@ -327,6 +355,7 @@ async def get_challenge_summary(user_id: uuid.UUID, db: AsyncSession, cache: Cac
             InvestmentChallenge.status == CHALLENGE_ACTIVE,
             InvestmentChallenge.challenge_type == CHALLENGE_DEPOSIT,
             InvestmentChallenge.reminder_enabled == True,
+            not_expired_clause(current_month),
         )
     )
     challenges = list(result.scalars().all())

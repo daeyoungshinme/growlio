@@ -57,6 +57,11 @@ export default function ChallengeCard({ challenge, onEdit, onArchive, onDelete }
             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
               {TYPE_LABEL[challenge.challenge_type]}
             </span>
+            {challenge.status === "ACTIVE" && progress.is_expired && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                기한 종료
+              </span>
+            )}
             {challenge.status !== "ACTIVE" && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
                 {STATUS_LABEL[challenge.status]}
@@ -67,6 +72,9 @@ export default function ChallengeCard({ challenge, onEdit, onArchive, onDelete }
             {targetText}
             {currentText && ` · ${currentText}`}
             {challenge.deadline_month && ` · ${fmtMonth(challenge.deadline_month)}까지`}
+            {!progress.is_expired &&
+              progress.months_left != null &&
+              ` (${progress.months_left === 0 ? "이번 달 마감" : `${progress.months_left}개월 남음`})`}
           </p>
         </div>
         <AccountActionsMenu
@@ -90,15 +98,17 @@ export default function ChallengeCard({ challenge, onEdit, onArchive, onDelete }
           <span className="text-xs text-gray-500 dark:text-gray-400">
             최장 {progress.longest_streak}개월
           </span>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full ${
-              progress.this_month_satisfied
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-            }`}
-          >
-            이번 달 {progress.this_month_satisfied ? "완료" : "미완료"}
-          </span>
+          {!progress.is_expired && (
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full ${
+                progress.this_month_satisfied
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+              }`}
+            >
+              이번 달 {progress.this_month_satisfied ? "완료" : "미완료"}
+            </span>
+          )}
         </div>
       )}
 

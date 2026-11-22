@@ -183,6 +183,8 @@ class ChallengeProgress(BaseModel):
     current_value_krw: float | None = None
     current_return_pct: float | None = None
     months: list[ChallengeMonth] = []
+    is_expired: bool = False  # 마감월(deadline_month)이 지났다 — 표시 전용, status는 바꾸지 않는다
+    months_left: int | None = None  # 이번 달부터 마감월까지 남은 개월 수(마감월 없으면 None)
 
 
 class ChallengeResponse(BaseModel):
