@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { projectedValueAtMonth, buildScenarioCurve } from "../dcaScenarioProjection";
+import {
+  projectedValueAtMonth,
+  buildScenarioCurve,
+  monthAfter,
+  monthsToReachGoal,
+  scenarioReturns,
+} from "../dcaScenarioProjection";
 import type { DCAProjectionPoint } from "@/api/invest";
 
 describe("projectedValueAtMonth", () => {
@@ -51,5 +57,41 @@ describe("buildScenarioCurve", () => {
     expect(Object.keys(curve)).toEqual(["2026-01", "2026-02", "2026-03"]);
     expect(curve["2026-01"]).toBe(10_000_000);
     expect(curve["2026-03"]).toBe(projectedValueAtMonth(10_000_000, 500_000, 7, 2));
+  });
+});
+
+describe("scenarioReturns", () => {
+  it("목표 수익률 ±3%p, 보수는 0% 하한", () => {
+    expect(scenarioReturns(7)).toEqual({ conservative: 4, base: 7, aggressive: 10 });
+    expect(scenarioReturns(2)).toEqual({ conservative: 0, base: 2, aggressive: 5 });
+    expect(scenarioReturns(null)).toBeNull();
+  });
+});
+
+describe("monthsToReachGoal", () => {
+  it("수익률 0%면 원금 합산으로 닿는 달", () => {
+    expect(monthsToReachGoal(0, 1_000_000, 0, 12_000_000)).toBe(12);
+  });
+
+  it("이미 목표 이상이면 0개월", () => {
+    expect(monthsToReachGoal(20_000_000, 0, 5, 10_000_000)).toBe(0);
+  });
+
+  it("수익률이 높을수록 일찍 닿는다", () => {
+    const low = monthsToReachGoal(10_000_000, 500_000, 4, 100_000_000)!;
+    const high = monthsToReachGoal(10_000_000, 500_000, 10, 100_000_000)!;
+    expect(high).toBeLessThan(low);
+  });
+
+  it("50년 안에 못 닿으면 null", () => {
+    expect(monthsToReachGoal(0, 1, 0, 1_000_000_000)).toBeNull();
+  });
+});
+
+describe("monthAfter", () => {
+  it("연도를 넘긴다", () => {
+    expect(monthAfter("2026-11", 0)).toBe("2026-11");
+    expect(monthAfter("2026-11", 2)).toBe("2027-01");
+    expect(monthAfter("2026-01", 25)).toBe("2028-02");
   });
 });

@@ -15,6 +15,10 @@ vi.mock("@/api/invest", () => ({
 vi.mock("@/api/rebalancing", () => ({
   fetchOverallGoalRecommendation: (...args: unknown[]) => fetchOverallGoalRecommendation(...args),
 }));
+const fetchSettings = vi.fn();
+vi.mock("@/api/settings", () => ({
+  fetchSettings: (...args: unknown[]) => fetchSettings(...args),
+}));
 vi.mock("@/utils/toast", () => ({ toast: (...args: unknown[]) => toastMock(...args) }));
 vi.mock("@/stores/themeStore", () => ({
   useThemeStore: (sel?: (s: { isDark: boolean; toggle: () => void }) => unknown) => {
@@ -134,5 +138,40 @@ describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
     fireEvent.click(await screen.findByRole("button", { name: "다시 시도" }));
     expect((await screen.findAllByText(/달성률/)).length).toBeGreaterThan(0);
     expect(fetchDividendPlan).toHaveBeenCalledTimes(2);
+  });
+
+  it("세후 예상 배당을 한 줄로 보여 준다(계획 143 E2)", async () => {
+    fetchDividendPlan.mockResolvedValue(
+      makeDividendPlan({
+        estimated_annual_after_tax_krw: 1_692_000,
+        estimated_monthly_after_tax_krw: 141_000,
+        after_tax_note: "세후는 일반계좌 원천징수를 뺀 추정",
+      }),
+    );
+    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
+    renderWithProviders(<DividendPlanSection onOpenSettings={vi.fn()} />);
+    expect(await screen.findByText(/세후 예상 연 169만원/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "세후 예상 배당 설명" })).toBeInTheDocument();
+  });
+
+  it("옛 응답(세후 필드 없음)이면 세후 줄을 숨긴다", async () => {
+    fetchDividendPlan.mockResolvedValue(makeDividendPlan());
+    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
+    renderWithProviders(<DividendPlanSection onOpenSettings={vi.fn()} />);
+    expect((await screen.findAllByText(/달성률/)).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/세후 예상/)).toBeNull();
+  });
+
+  it("배당 목표 달성 예상 시점을 보여 준다(계획 143 E3)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 15));
+    // 7,500만원·연 200만원(2.67%) → 목표 300만원, 월 적립 100만원
+    fetchSettings.mockResolvedValue({ monthly_deposit_amount: 1_000_000 });
+    fetchDividendPlan.mockResolvedValue(makeDividendPlan());
+    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
+    renderWithProviders(<DividendPlanSection onOpenSettings={vi.fn()} />);
+    expect(await screen.findByText(/달성 예상/)).toBeInTheDocument();
+    expect(screen.getByText(/월 100만원 적립/)).toBeInTheDocument();
+    vi.useRealTimers();
   });
 });

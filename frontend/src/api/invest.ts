@@ -68,6 +68,10 @@ export interface DividendPlanData {
   annual_dividend_goal: number | null;
   estimated_annual_krw: number;
   estimated_monthly_krw: number;
+  /** 일반계좌 원천징수(국내 15.4%·해외 15%)를 뺀 예상 — ISA·연금 보유분은 세전 그대로(계획 143 E2) */
+  estimated_annual_after_tax_krw?: number;
+  estimated_monthly_after_tax_krw?: number;
+  after_tax_note?: string;
   actual_annual_received_krw: number;
   goal_achievement_pct: number | null;
   required_dividend_yield_pct: number | null;

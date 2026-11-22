@@ -1,6 +1,6 @@
 # 계획 143 — 계획탭(/invest-plan) 전체 감사·고도화 (2026-11-22)
 
-> 상태: PR1(A·E4)·PR2(B·C·D) 구현 완료, PR3(E1~E3) 남음. 착수 전 `git status`로 다른 세션 변경을 확인하고, 아래 파일:라인이 현재 코드와 다르면 코드를 우선한다.
+> 상태: 완료 — PR1(A·E4) #292, PR2(B·C·D) #293, PR3(E1~E3). 착수 전 `git status`로 다른 세션 변경을 확인하고, 아래 파일:라인이 현재 코드와 다르면 코드를 우선한다.
 
 ## Context
 계획탭(적립 계획·배당 계획·절세·챌린지)은 계획 8(2026-07) 이후로 탭 단위 감사를 받은 적이 없다. 그사이 50·67·106·110·113·139에서 부분 수정만 쌓였다. 이번 조사에서 확인한 문제는 세 종류다.
@@ -139,3 +139,9 @@
   - D2: D1로 400줄 아래가 돼 탭 본문 분리는 보류.
   - `TaxActionPlanCard` 로딩 pulse는 헤더가 있는 섹션 안이라 `SkeletonCard`(카드 안 카드) 대신 유지.
 - PR3 참고: `DCAProjectionChart`에 이미 보수/공격 수익률 시나리오 토글(`showScenarios`, `SAVINGS_RETURN_PRESETS`)이 있다 — E1은 새로 만들기보다 이것을 기준으로 확인할 것.
+
+## PR3 결과 (2026-11-22)
+
+- **E1** 이미 있던 "보수·공격 시나리오 비교"를 고정 프리셋(4·10%)에서 **목표 수익률 ±3%p**(보수 0% 하한)로 바꿨다 — 목표가 4% 미만·10% 초과면 기준선을 감싸지 못했다. 켜면 시나리오별(보수·목표·공격) 목표 금액 달성 예상 월을 함께 보인다(`dcaScenarioProjection.scenarioReturns`·`monthsToReachGoal`·`monthAfter`). 목표 수익률이 없으면 기존 프리셋.
+- **E2** 배당 계획에 "세후 예상 연 X · 월 Y" 한 줄(ⓘ 설명). 백엔드 `get_dividend_plan`이 `estimated_annual_after_tax_krw`·`estimated_monthly_after_tax_krw`·`after_tax_note`를 낸다 — 일반계좌 몫만 원천징수(국내 15.4%·해외 15% 미국 기준), ISA·연금 보유 비율(`get_ticker_dividend_summary`의 `tax_sheltered_ratio`)은 세전 그대로, 종합과세 미반영. 옛 캐시(비율 없음)는 전부 과세로 본다. 스키마 변경 없음.
+- **E3** 배당 목표 달성 예상 월(`utils/dividendGoalTimeline.projectDividendGoal`): 현재 배당수익률 유지 + 월 적립액(설정) + 배당 재투자, 주가 상승 미반영(보수적). 진행 막대 아래 한 줄로 가정과 함께 표시.

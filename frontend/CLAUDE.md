@@ -239,7 +239,7 @@ _기타_
 - `rebalancingUrl.ts` — `REBALANCING_TABS`·`GOAL_MODES`가 탭 이름 단일 정의(**백엔드 `email_service`·`insight_service`·`action_items_service`의 탭 문자열과 같아야 함**), `parseRebalancingTab`(옛 `rtab=추천/전술` 호환), `rebalancingUrl()`
 - `recommendationDrift.ts` — `RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3%p) — 백엔드 `compute_recommendation_drift`와 동일 로직. `foldIntoPortfolioGroups`는 백엔드 `fold_into_portfolio_groups`와 같은 규칙
 - `marketSignalRows.ts` — 매크로 8지표 행 변환(Tier 분류는 백엔드 `market_signal_service` 재사용)
-- `dcaScenarioProjection.ts` — 백엔드 `dca_service._build_projection_curve()` 포팅
+- `dcaScenarioProjection.ts` — 백엔드 `dca_service._build_projection_curve()` 포팅. 시나리오는 목표 수익률 ±3%p(`scenarioReturns`). 배당 목표 달성 예상은 `dividendGoalTimeline.ts`(주가 상승 미반영 — 문구에 가정을 함께 표시)
 - `legacyTabRedirect.ts` — 이메일·푸시에 저장된 옛 딥링크 호환 — **지우지 말 것**
 - `fxPlanAlerts.ts` — 환전 계획·추가 환전 항목의 알림 등록 상태(`planAlertState`). 범위 규칙은 백엔드 `fx_plan_service._in_scope`와 같게
 - `portfolio.ts` `isDriftingItem`/`driftProgress`/`getItemsDriftStatus` — 이탈 판정(상대 기준 포함). 백엔드 `drift_rule`과 **같은 규칙 — 함께 수정**. 항목 이탈 비교를 인라인(`Math.abs(diff) > threshold`)으로 쓰지 말 것
