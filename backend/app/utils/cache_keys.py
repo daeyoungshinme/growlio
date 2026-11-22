@@ -108,7 +108,7 @@ TTL_TECHNICAL_SIGNAL_DEGRADED = 600  # 일부 종목 종가 조회 실패 결과
 # 아래처럼 `_XXX_VERSION` 상수를 올려 키를 분리한다(구버전 캐시가 TTL 만료 전까지
 # 잘못된 값을 계속 서빙하는 것을 방지). **값 자체(문자열)는 여기서만 바꾸고,
 # 키 빌더 함수의 f-string 포맷은 그대로 유지할 것 — 무단으로 포맷을 바꾸면 캐시 미스가 폭증한다.**
-_ALLOC_HISTORY_VERSION = "v3"  # v3: 증권계좌 예수금(스냅샷−포지션 차액)을 CASH_STOCK으로 보존
+_ALLOC_HISTORY_VERSION = "v4"  # v4: 전체 보기에서 합산 제외 계좌 제외(plans/144), v3: 예수금을 CASH_STOCK으로 보존
 _ETF_PROFILE_VERSION = "v1"  # v1: 첫 버전 태깅 — EtfProfile TypedDict 필드가 바뀌면 올릴 것
 _TECHNICAL_SIGNAL_VERSION = "v5"  # 버전 이력은 technical_signal_key docstring
 _TACTICAL_BACKTEST_VERSION = "v4"  # 버전 이력은 tactical_backtest_key docstring

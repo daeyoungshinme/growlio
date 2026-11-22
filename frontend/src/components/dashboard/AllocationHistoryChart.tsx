@@ -19,6 +19,7 @@ import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 import { useAllocationHistory } from "@/hooks/useAllocationHistory";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
+import EmptyState from "@/components/common/EmptyState";
 import {
   TOUCH_HEIGHT_MIN,
   TOUCH_TARGET_COMPACT_MOBILE_ONLY,
@@ -66,10 +67,8 @@ function AllocationHistoryChart({
   const [showDetail, setShowDetail] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [months, setMonths] = useState(12);
-  const { isLoading, chartData, allTypes, labelMap, reversedMonthly } = useAllocationHistory(
-    months,
-    accountId,
-  );
+  const { isLoading, isError, refetch, chartData, allTypes, labelMap, reversedMonthly } =
+    useAllocationHistory(months, accountId);
 
   const { contentStyle, labelStyle, itemStyle } = chartTooltipStyle(isDark);
 
@@ -79,6 +78,19 @@ function AllocationHistoryChart({
         <div className="h-4 w-40 bg-gray-100 dark:bg-gray-800 rounded-sm animate-pulse mb-4" />
         <div className="h-52 bg-gray-50 dark:bg-gray-800 rounded-sm animate-pulse" />
       </div>
+    );
+  }
+
+  if (isError && !chartData.length) {
+    // 조회 실패를 "데이터 없음"으로 보이지 않게 한다(plans/146 C4)
+    return (
+      <CollapsibleCard icon={ChartNoAxesColumn} title={title} isOpen onToggle={toggleOpen}>
+        <EmptyState
+          title="자산 추이를 불러오지 못했습니다."
+          action={{ label: "다시 시도", onClick: () => void refetch() }}
+          compact
+        />
+      </CollapsibleCard>
     );
   }
 

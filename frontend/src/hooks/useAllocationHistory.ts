@@ -5,7 +5,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 
 export function useAllocationHistory(months = 12, accountId?: string | null) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: QUERY_KEYS.allocationHistory(months, accountId),
     queryFn: () => fetchAllocationHistory(months, accountId),
     staleTime: STALE_TIME.LONG,
@@ -41,5 +41,5 @@ export function useAllocationHistory(months = 12, accountId?: string | null) {
 
   const reversedMonthly = useMemo(() => (data ? [...data].reverse() : []), [data]);
 
-  return { isLoading, chartData, allTypes, labelMap, reversedMonthly };
+  return { isLoading, isError, refetch, chartData, allTypes, labelMap, reversedMonthly };
 }

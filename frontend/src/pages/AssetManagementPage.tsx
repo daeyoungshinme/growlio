@@ -182,11 +182,12 @@ export default function AssetManagementPage() {
     () =>
       sortAccounts(
         stockAccountStats,
-        sortMode,
+        // 평가액을 받기 전엔 금액이 전부 0이라 금액순이 의미 없다 — 기본 순서로 둔다(plans/146 C1)
+        sortMode === "amount" && statsStatus !== "ready" ? "default" : sortMode,
         ({ stats }) => stats.amount_krw,
         ({ account }) => account.name,
       ),
-    [stockAccountStats, sortMode],
+    [stockAccountStats, sortMode, statsStatus],
   );
   // 계좌가 2개 이상일 때만 — 하나면 정렬할 것이 없다
   const sortControl =
@@ -322,7 +323,11 @@ export default function AssetManagementPage() {
             ) : (
               <div className="space-y-3">
                 {/* 증권계좌 합계(누적 입금·배당·예수금) — 평가액은 투자현황이 권위 표면 */}
-                <StockAccountSummaryCard perAccountStats={stockAccountStats} usdRate={usdRate} />
+                <StockAccountSummaryCard
+                  perAccountStats={stockAccountStats}
+                  usdRate={usdRate}
+                  statsStatus={statsStatus}
+                />
                 {sortControl}
                 {/* 계좌별 카드 */}
                 {sortedStockStats.map(({ account, stats }) => (

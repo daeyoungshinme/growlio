@@ -213,7 +213,7 @@ export default function PortfolioPage() {
     return <PageLoadError message="데이터를 불러오지 못했습니다" onRetry={() => void refetch()} />;
 
   const hasHorizonTags = horizonTaggedAccounts(data.accounts).some(
-    (a) => a.include_in_total !== false,
+    (a) => !!selectedAccountId || a.include_in_total !== false,
   );
   // 전체 보기에선 서버가 합산 제외 계좌를 합계·보유종목에서 뺀다(plans/144 A2) — 빠진 사실을 알린다
   const excludedCount = selectedAccountId
@@ -309,7 +309,7 @@ export default function PortfolioPage() {
             상단 "주식 총평가액"과 동일한 값만 나오므로 전체 계좌 뷰에서만 표시 */}
         {!selectedAccountId && hasHorizonTags && (
           <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-            <HorizonSummaryCard overview={data} />
+            <HorizonSummaryCard overview={data} accountSelected={!!selectedAccountId} />
           </div>
         )}
         {failedAccounts.length > 0 && !isSyncingAll && (
