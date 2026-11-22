@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
@@ -127,9 +127,50 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
     return result
 
 
+_INITIAL_SNAPSHOT_WINDOW_DAYS = 31
+
+
 async def _get_initial_value(user_id: uuid.UUID, start_date: date, db: AsyncSession) -> float:
-    """goal_start_date 기준 전후로 가장 가까운 스냅샷 날짜의 전체 계좌 합계 반환."""
-    # start_date 이후 첫 번째 유효 날짜 탐색 (없으면 이전 날짜 중 가장 최근)
+    """목표 시작 시점의 투자자산 합계(부동산·비활성·합산 제외 계좌 제외).
+
+    계좌마다 시작일 이후 31일 안의 첫 스냅샷, 없으면 시작일 전 마지막 스냅샷을 골라 더한다 — 계좌별 동기화
+    날짜가 달라도 "그날 스냅샷이 있는 계좌만" 더해 과소 추정되지 않게. 시작 무렵 스냅샷이 하나도 없으면
+    (앱 사용 전 시작일) 시작일 이후 첫 스냅샷 날짜의 합계를 쓴다.
+    """
+    sql = text("""
+        WITH eligible AS (
+            SELECT s.account_id, s.snapshot_date, s.amount_krw
+            FROM asset_snapshots s
+            JOIN asset_accounts a ON a.id = s.account_id
+            WHERE s.user_id = :user_id
+              AND a.is_active = true
+              AND a.include_in_total = true
+              AND a.asset_type != 'REAL_ESTATE'
+        ),
+        after_start AS (
+            SELECT account_id, min(snapshot_date) AS d FROM eligible
+            WHERE snapshot_date >= :start_date AND snapshot_date <= :window_end
+            GROUP BY account_id
+        ),
+        before_start AS (
+            SELECT account_id, max(snapshot_date) AS d FROM eligible
+            WHERE snapshot_date < :start_date
+            GROUP BY account_id
+        ),
+        chosen AS (
+            SELECT coalesce(a.account_id, b.account_id) AS account_id, coalesce(a.d, b.d) AS d
+            FROM after_start a FULL OUTER JOIN before_start b ON a.account_id = b.account_id
+        )
+        SELECT sum(e.amount_krw) AS total
+        FROM eligible e
+        JOIN chosen c ON e.account_id = c.account_id AND e.snapshot_date = c.d
+    """)
+    window_end = start_date + timedelta(days=_INITIAL_SNAPSHOT_WINDOW_DAYS)
+    result = await db.execute(sql, {"user_id": str(user_id), "start_date": start_date, "window_end": window_end})
+    row = result.first()
+    if row is not None and row.total is not None:
+        return float(row.total)
+
     result_after = await db.execute(
         select(AssetSnapshot.snapshot_date, func.sum(AssetSnapshot.amount_krw).label("total"))
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
@@ -145,24 +186,6 @@ async def _get_initial_value(user_id: uuid.UUID, start_date: date, db: AsyncSess
         .limit(1)
     )
     row = result_after.first()
-    if row:
-        return float(row.total)
-
-    result_before = await db.execute(
-        select(AssetSnapshot.snapshot_date, func.sum(AssetSnapshot.amount_krw).label("total"))
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(
-            AssetSnapshot.user_id == user_id,
-            AssetSnapshot.snapshot_date < start_date,
-            AssetAccount.is_active == True,
-            AssetAccount.include_in_total == True,
-            AssetAccount.asset_type != AssetType.REAL_ESTATE,
-        )
-        .group_by(AssetSnapshot.snapshot_date)
-        .order_by(AssetSnapshot.snapshot_date.desc())
-        .limit(1)
-    )
-    row = result_before.first()
     return float(row.total) if row else 0.0
 
 
@@ -222,7 +245,8 @@ def _build_projection_curve(
         projected = future_value_monthly(initial_value, pmt, r, n)
 
         actual = monthly_actuals.get(month_key)
-        achievement_pct = round((actual / projected) * 100, 1) if actual and projected > 0 else None
+        # 실적 0원도 0% 달성으로 보인다(None이면 데이터 없음과 구분되지 않는다)
+        achievement_pct = round((actual / projected) * 100, 1) if actual is not None and projected > 0 else None
 
         result.append(
             {
@@ -248,7 +272,8 @@ def _build_yearly_achievements(projection_months: list[dict]) -> list[dict[str, 
         point = by_year[year]
         projected = point["projected_krw"]
         actual = point["actual_krw"]
-        achievement_pct = round((actual / projected) * 100, 1) if actual and projected > 0 else None
+        # 실적 0원도 0% 달성으로 보인다(None이면 데이터 없음과 구분되지 않는다)
+        achievement_pct = round((actual / projected) * 100, 1) if actual is not None and projected > 0 else None
         result.append(
             {
                 "year": year,

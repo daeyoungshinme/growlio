@@ -193,19 +193,29 @@ class TestSellDeadline:
     """B6 — 양도세는 결제일 기준이라 12/31에 팔면 내년 귀속이다."""
 
     @pytest.mark.parametrize(
-        ("year", "expected"), [(2026, date(2026, 12, 28)), (2027, date(2027, 12, 27)), (2028, date(2028, 12, 25))]
+        ("year", "expected"),
+        [
+            (2024, date(2024, 12, 27)),  # 증권사 공지와 같음
+            (2025, date(2025, 12, 29)),  # 증권사 공지와 같음
+            (2026, date(2026, 12, 29)),
+            (2028, date(2028, 12, 27)),  # 12/31 일요일 → 마지막 거래일 12/29(금)
+            (2029, date(2029, 12, 27)),  # 12/31 월요일 — 예전 계산은 12/31 자체(다음 해 귀속)
+            (2035, date(2035, 12, 27)),  # 12/31 월요일
+        ],
     )
-    def test_last_monday_of_december(self, year, expected):
-        assert overseas_sell_deadline(year) == expected
-        assert overseas_sell_deadline(year).weekday() == 0
+    def test_settles_within_year(self, year, expected):
+        deadline = overseas_sell_deadline(year)
+        assert deadline == expected
+        assert deadline.year == year
+        assert deadline < date(year, 12, 31)
 
     def test_actions_use_deadline(self):
         action = build_overseas_gain_harvest_action([{"unrealized_pnl_krw": 1_000_000}], DEDUCTION, 0.22, TODAY)
         assert action is not None
-        assert action["deadline"] == "2026-12-28"
+        assert action["deadline"] == "2026-12-29"
 
     def test_actions_disappear_after_deadline(self):
-        late = date(2026, 12, 29)
+        late = date(2026, 12, 30)
         assert build_overseas_gain_harvest_action([{"unrealized_pnl_krw": 1_000_000}], DEDUCTION, 0.22, late) is None
         item = {"ticker": "A", "name": "A", "unrealized_loss_krw": -1, "tax_saved_krw": 0}
         assert build_loss_harvest_actions([item], late) == []

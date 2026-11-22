@@ -20,6 +20,10 @@ export interface ChallengeProgress {
   current_value_krw: number | null;
   current_return_pct: number | null;
   months: ChallengeMonth[];
+  /** 마감월이 지났다 — 표시 전용(status는 그대로) */
+  is_expired?: boolean;
+  /** 이번 달부터 마감월까지 남은 개월 수(마감월 없으면 null) */
+  months_left?: number | null;
 }
 
 export interface Challenge {

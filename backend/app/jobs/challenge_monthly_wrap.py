@@ -81,6 +81,8 @@ async def _wrap_user(user: User, settings_row: UserSettings, to_email: str, cach
                     select(InvestmentChallenge).where(
                         InvestmentChallenge.user_id == user.id,
                         InvestmentChallenge.reminder_enabled == True,
+                        # 마감월 결산(전월 == 마감월)까지만 — 그 뒤 달은 결산하지 않는다
+                        challenge_service.not_expired_clause(prev_month),
                         or_(
                             InvestmentChallenge.status == CHALLENGE_ACTIVE,
                             and_(

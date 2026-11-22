@@ -42,14 +42,17 @@ async def get_dividend_plan(
     if annual_dividend_goal and annual_dividend_goal > 0:
         goal_achievement_pct = round(estimated_annual_krw / annual_dividend_goal * 100, 1)
 
-    # 목표 달성에 필요한 배당수익률 (목표 연배당 ÷ 현재 평가금액) — goal_recommendation_service.py의
-    # required_dividend_yield_pct와 동일한 분모(total_assets_krw)를 재사용해 두 화면의 수치를 일치시킨다.
+    # 목표 달성에 필요한 배당수익률 (목표 연배당 ÷ 부동산 뺀 투자자산) — 목표 역산 추천의
+    # required_dividend_yield_pct와 같은 분모(`investable_assets_krw`)라 두 화면의 수치가 일치한다.
     required_dividend_yield_pct: float | None = None
     current_dividend_yield_pct: float | None = None
     total_assets_krw = 0.0
     if annual_dividend_goal and annual_dividend_goal > 0:
+        # 지연 import — goal 패키지는 무거운 추천 모듈을 끌어온다
+        from app.services.goal._goal_recommendation_common import investable_assets_krw
+
         overview = await build_portfolio_overview(user_id, db, account_ids=None, cache=cache)
-        total_assets_krw = float(overview.get("total_assets_krw") or 0)
+        total_assets_krw = max(0.0, investable_assets_krw(overview))
         if total_assets_krw > 0:
             required_dividend_yield_pct = round(annual_dividend_goal / total_assets_krw * 100, 2)
             current_dividend_yield_pct = round(estimated_annual_krw / total_assets_krw * 100, 2)

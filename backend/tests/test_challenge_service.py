@@ -177,6 +177,48 @@ class TestComputeProgressDeposit:
         assert progress.current_streak == 1
 
 
+class TestDeadlineMonth:
+    def test_streak_stops_at_deadline(self):
+        net = {"2026-01": 1.0, "2026-02": 1.0, "2026-04": 1.0, "2026-05": 1.0}
+        # 마감 2026-02 — 마감 뒤 입금(4·5월)은 세지 않는다
+        assert cs._compute_streaks(net, "2026-01", "2026-05", "2026-02") == (2, 2)
+
+    @pytest.mark.asyncio
+    async def test_expired_deposit_challenge(self):
+        challenge = _ns(challenge_type="DEPOSIT", target_months=3, start_month="2026-01", deadline_month="2026-02")
+        db = _mock_db_with_net({"2026-01": 1.0, "2026-02": 1.0, "2026-03": 1.0, "2026-04": 1.0})
+        with patch.object(cs, "today_kst", return_value=date(2026, 4, 15)):
+            progress = await cs.compute_progress(challenge, challenge.user_id, db)
+        assert progress.is_expired is True
+        assert progress.months_left == 0
+        assert progress.current_streak == 2
+        assert [m.month for m in progress.months] == ["2026-01", "2026-02"]
+        assert progress.this_month_net_krw == 0.0
+
+    @pytest.mark.asyncio
+    async def test_months_left_before_deadline(self):
+        challenge = _ns(challenge_type="DEPOSIT", start_month="2026-01", deadline_month="2026-06")
+        db = _mock_db_with_net({})
+        with patch.object(cs, "today_kst", return_value=date(2026, 4, 1)):
+            progress = await cs.compute_progress(challenge, challenge.user_id, db)
+        assert progress.is_expired is False
+        assert progress.months_left == 2
+
+    @pytest.mark.asyncio
+    async def test_no_deadline_has_no_months_left(self):
+        challenge = _ns(challenge_type="DEPOSIT", start_month="2026-01")
+        db = _mock_db_with_net({})
+        with patch.object(cs, "today_kst", return_value=date(2026, 4, 1)):
+            progress = await cs.compute_progress(challenge, challenge.user_id, db)
+        assert progress.is_expired is False
+        assert progress.months_left is None
+
+    def test_not_expired_clause_sql(self):
+        sql = str(cs.not_expired_clause("2026-04").compile(compile_kwargs={"literal_binds": True}))
+        assert "deadline_month IS NULL" in sql
+        assert "deadline_month >= '2026-04'" in sql
+
+
 class TestComputeProgressOther:
     @pytest.mark.asyncio
     async def test_return_pct_progress(self):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -88,6 +89,23 @@ class TestCacheKeyBuilders:
         uid = uuid.uuid4()
         key = dividend_summary_key(uid)
         assert str(uid) in key
+
+    def test_dividend_summary_key_includes_year(self, override_settings):
+        uid = uuid.uuid4()
+        assert dividend_summary_key(uid, "all", 2026) != dividend_summary_key(uid, "all", 2027)
+        with patch("app.utils.cache_keys.today_kst", return_value=date(2027, 1, 1)):
+            assert dividend_summary_key(uid).endswith(":2027")
+
+    def test_challenge_progress_key_includes_month(self, override_settings):
+        from app.utils.cache_keys import challenge_progress_key
+
+        uid = uuid.uuid4()
+        with patch("app.utils.cache_keys.today_kst", return_value=date(2026, 3, 31)):
+            march = challenge_progress_key(uid)
+        with patch("app.utils.cache_keys.today_kst", return_value=date(2026, 4, 1)):
+            april = challenge_progress_key(uid)
+        assert march != april
+        assert april.endswith(":2026-04")
 
     def test_portfolio_overview_key(self, override_settings):
         uid = uuid.uuid4()
@@ -731,3 +749,26 @@ class TestSyncKeepsHeavyCachesWhenPositionsUnchanged:
         assert await cache.get(risk_key(uid)) is None
         assert await cache.get(tax_overseas_realized_key(uid, 2026, "all")) is None
         assert await get_goal_recommendation_generation(cache, uid) == gen
+
+
+class TestTransactionCacheYears:
+    """거래 연도가 올해와 다르면 그 연도의 배당 종목별 캐시도 지운다(계획 143 A5)."""
+
+    async def test_invalidates_current_and_transaction_years(self):
+        from app.api.v1 import transactions as api
+
+        calls: list[int] = []
+
+        async def _record(_cache, _uid, year, **_kw):
+            calls.append(year)
+
+        with (
+            patch.object(api, "get_cache_store", new=AsyncMock(return_value=None)),
+            patch.object(api, "invalidate_user_caches", new=AsyncMock()),
+            patch.object(api, "invalidate_tax_action_items_cache", new=AsyncMock()),
+            patch.object(api, "invalidate_dividend_caches", side_effect=_record),
+            patch.object(api, "today_kst", return_value=date(2026, 1, 5)),
+        ):
+            await api._invalidate_tx_caches(uuid.uuid4(), 2025, None, 2026)
+
+        assert sorted(calls) == [2025, 2026]

@@ -7,6 +7,8 @@ from collections.abc import Iterable
 from datetime import date
 from typing import TYPE_CHECKING, Any
 
+from app.utils.kst import today_kst
+
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
 
@@ -173,8 +175,11 @@ def dca_analysis_key(user_id: uuid.UUID) -> str:
 
 
 def challenge_progress_key(user_id: uuid.UUID) -> str:
-    """적립 챌린지 목록+진행률 응답(JSON) 캐시 키."""
-    return f"{_env_prefix()}challenge_progress:{user_id}"
+    """적립 챌린지 목록+진행률 응답(JSON) 캐시 키 — 이번 달(KST)을 넣어 월이 바뀌면 지난달 진행률을 내지 않는다.
+
+    무효화는 이번 달 키만 지우면 된다(지난달 키는 다시 읽히지 않고 TTL로 사라진다).
+    """
+    return f"{_env_prefix()}challenge_progress:{user_id}:{today_kst().strftime('%Y-%m')}"
 
 
 def dividend_ticker_summary_key(user_id: uuid.UUID, year: int, acct_suffix: str = "all") -> str:
@@ -238,8 +243,9 @@ def kis_amex_master_key() -> str:
     return f"{_env_prefix()}kis_amex_master"
 
 
-def dividend_summary_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
-    return f"{_env_prefix()}dividend_summary:{user_id}:{acct_suffix}"
+def dividend_summary_key(user_id: uuid.UUID, acct_suffix: str = "all", year: int | None = None) -> str:
+    """연간 배당 요약 — 연도(KST)를 키에 넣어 새해 첫 조회가 작년 집계 캐시를 받지 않게 한다."""
+    return f"{_env_prefix()}dividend_summary:{user_id}:{acct_suffix}:{year or today_kst().year}"
 
 
 def portfolio_overview_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:

@@ -19,6 +19,7 @@ from app.services.tax.isa_service import (
 )
 from app.services.tax.pension_contribution_service import PensionContributionStatus
 from app.services.tax.tax_service import OVERSEAS_FX_BASIS_NOTE, pick_year_rule
+from app.utils.market_hours import us_year_end_trade_deadline
 
 ActionCategory = Literal[
     "PENSION_DEDUCTION",
@@ -163,9 +164,12 @@ def _fmt_limit(amount: int) -> str:
 
 
 def overseas_sell_deadline(year: int) -> date:
-    """올해 귀속 해외주식 매도의 보수적 마감일(12월 마지막 주 월요일). 결제일 기준이라 12/31에 팔면 내년 귀속이다."""
-    last_day = date(year, 12, 31)
-    return last_day - timedelta(days=last_day.weekday())
+    """올해 귀속 해외주식 매도 마감일(결제일 기준 — 12월 마지막 NYSE 거래일에서 2거래일 전)."""
+    return us_year_end_trade_deadline(year)
+
+
+def _deadline_note(deadline: date) -> str:
+    return f"결제일 기준이라 {deadline.month}월 {deadline.day}일(미국 거래일)까지 매도해야 올해 귀속돼요."
 
 
 def build_pension_action(
@@ -378,8 +382,7 @@ def build_overseas_gain_harvest_action(
             f"해외주식 양도차익은 연 {_fmt_won(deduction_krw)}까지 공제돼요. 공제 범위만큼 이익을 실현하고 "
             "다시 사면 취득가가 올라가 나중에 낼 양도세가 줄어요(아래 절감액은 향후 매도 시 기준). "
             f"{_realized_note(realized_krw, realized_partial, realized_from_records, realized_estimated)}"
-            f"{OVERSEAS_FX_BASIS_NOTE} 결제일 기준이라 12월 마지막 주 "
-            "초까지 매도해야 올해 귀속돼요. 정보 제공 목적이며 매매 권유가 아닙니다."
+            f"{OVERSEAS_FX_BASIS_NOTE} {_deadline_note(deadline)} 정보 제공 목적이며 매매 권유가 아닙니다."
         ),
         amount=amount,
         benefit=amount * gain_tax_rate,
@@ -430,8 +433,8 @@ def build_loss_harvest_actions(
                 category="TAX_LOSS_HARVEST",
                 title=f"{item['name']} 손실 {_fmt_won(loss)} 실현 검토",
                 detail=(
-                    f"{reason} {OVERSEAS_FX_BASIS_NOTE} 결제일 기준이라 12월 마지막 주 "
-                    "초까지 매도해야 올해 귀속돼요. 정보 제공 목적이며 매매 권유가 아닙니다."
+                    f"{reason} {OVERSEAS_FX_BASIS_NOTE} {_deadline_note(deadline)} "
+                    "정보 제공 목적이며 매매 권유가 아닙니다."
                 ),
                 amount=loss,
                 benefit=offset * gain_tax_rate if offset > 0 else None,

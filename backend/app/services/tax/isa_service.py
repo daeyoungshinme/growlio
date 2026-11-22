@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import date
 from typing import TypedDict
@@ -13,6 +14,7 @@ from app.constants import OVERSEAS_MARKETS
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services.accounts._account_queries import active_accounts_stmt
 from app.services.accounts._snapshot_queries import latest_snapshot_subquery
+from app.services.etf.etf_index_classifier import classify_holding, exposure_region
 from app.services.tax.tax_service import get_tax_rates
 from app.utils.kst import today_kst
 
@@ -27,10 +29,34 @@ _ISA_EXCESS_TAX_RATE = 0.099  # 비과세 한도 초과분 9.9% 분리과세 (�
 _ISA_STATUS_NOTE = (
     "ISA 손익은 최신 스냅샷 기준 미실현손익과 배당/이자 내역(수기 입력분 포함) 합산 추정치입니다. "
     "계좌 내 실현 매매차익(매도 이력)은 반영되지 않으므로, 정확한 손익은 직접 입력으로 보정할 수 있습니다. "
-    "절세액은 동일 손익을 일반계좌로 보유했을 경우의 예상세금(배당/이자소득 15.4%, 국내주식 매매손익 비과세, "
-    "해외주식 매매손익 22%-250만원 공제)과 ISA 저율과세(9.9%)의 차액입니다. 손익을 직접 입력한 계좌는 구성요소가 "
+    "절세액은 동일 손익을 일반계좌로 보유했을 경우의 예상세금(배당/이자소득 15.4%, 국내주식·국내주식형 ETF "
+    "매매손익 비과세, 국내상장 해외·채권형 ETF 매매손익 15.4%, 해외주식 매매손익 22%-250만원 공제)과 "
+    "ISA 저율과세(9.9%)의 차액입니다. 손익을 직접 입력한 계좌는 구성요소가 "
     "분리되지 않아 전체를 배당소득으로 가정한 근사치입니다."
 )
+
+
+# 국내상장 ETF 중 매매차익이 배당소득(15.4%)으로 과세되는 비주식형 — 이름·기초지수 키워드로 판별
+_NON_EQUITY_ETF_RE = re.compile(
+    r"국고채|국채|통안|CD금리|KOFR|단기채|머니마켓|채권|회사채|금융채|금리|골드|금현물|원유|달러|원자재|리츠",
+    re.IGNORECASE,
+)
+_NON_EQUITY_INDEX_KEYS = frozenset({"KR_TREASURY_3Y", "KR_CD_RATE", "KR_SHORT_BOND"})
+
+
+def is_taxable_domestic_listed_etf(ticker: str, market: str, name: str) -> bool:
+    """일반계좌에서 매매차익이 과세(배당소득 15.4%)되는 국내상장 ETF인지 — 해외지수·채권·원자재형.
+
+    국내주식형 ETF만 매매차익 비과세다. 지역·유형을 판별 못 하면 기존처럼 비과세(국내)로 둔다.
+    """
+    if market.upper() in OVERSEAS_MARKETS:
+        return False
+    cls = classify_holding(ticker, market, name, None)
+    if cls.kind == "STOCK":
+        return False
+    if exposure_region(market, name, cls) == "OVERSEAS":
+        return True
+    return cls.index_key in _NON_EQUITY_INDEX_KEYS or bool(_NON_EQUITY_ETF_RE.search(name))
 
 
 class IsaAccountStatus(TypedDict):
@@ -53,6 +79,9 @@ class IsaAccountStatus(TypedDict):
     tax_calculation_basis: str
 
 
+_EMPTY_UNREALIZED: dict[str, float] = {"domestic": 0.0, "overseas": 0.0, "domestic_taxed_etf": 0.0}
+
+
 class IsaStatusSummary(TypedDict):
     accounts: list[IsaAccountStatus]
     note: str
@@ -73,7 +102,7 @@ async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> IsaSta
     rates = get_tax_rates(today.year)
     statuses: list[IsaAccountStatus] = []
     for acc in accounts:
-        unrealized = unrealized_by_account.get(acc.id, {"domestic": 0.0, "overseas": 0.0})
+        unrealized = unrealized_by_account.get(acc.id, _EMPTY_UNREALIZED)
         dividend = dividend_by_account.get(acc.id, 0.0)
         auto_pnl = unrealized["domestic"] + unrealized["overseas"] + dividend
         manual_pnl = acc.isa_manual_cumulative_pnl_krw
@@ -106,10 +135,11 @@ async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> IsaSta
             general_account_tax = max(0.0, effective_pnl) * rates["dividend"]
             calculation_basis = "MANUAL_OVERRIDE_APPROX"
         else:
-            dividend_tax = max(0.0, dividend) * rates["dividend"]
+            # 국내상장 해외·채권형 ETF 매매차익은 일반계좌에서 배당소득으로 과세된다
+            dividend_tax = (max(0.0, dividend) + max(0.0, unrealized["domestic_taxed_etf"])) * rates["dividend"]
             overseas_taxable = max(0.0, unrealized["overseas"] - rates["overseas_deduction"])
             overseas_tax = overseas_taxable * rates["overseas_gain"]
-            # 국내주식 매매손익은 일반계좌에서도 비과세이므로 세금 기여분 없음
+            # 국내주식·국내주식형 ETF 매매손익은 일반계좌에서도 비과세이므로 세금 기여분 없음
             general_account_tax = dividend_tax + overseas_tax
             calculation_basis = "AUTO_SPLIT"
         tax_saved = max(0.0, general_account_tax - estimated_tax)
@@ -148,14 +178,17 @@ async def calc_account_auto_pnl(user_id: uuid.UUID, account_id: uuid.UUID, db: A
     """
     unrealized = await _calc_unrealized_by_account_and_market([account_id], db)
     dividend = await _calc_dividend_total_by_account(user_id, [account_id], db)
-    u = unrealized.get(account_id, {"domestic": 0.0, "overseas": 0.0})
+    u = unrealized.get(account_id, _EMPTY_UNREALIZED)
     return u["domestic"] + u["overseas"] + dividend.get(account_id, 0.0)
 
 
 async def _calc_unrealized_by_account_and_market(
     account_ids: list[uuid.UUID], db: AsyncSession
 ) -> dict[uuid.UUID, dict[str, float]]:
-    """계좌별 국내/해외 미실현손익을 분리 집계한다 (일반계좌 대비 절세액 비교용)."""
+    """계좌별 국내/해외 미실현손익을 분리 집계한다 (일반계좌 대비 절세액 비교용).
+
+    `domestic_taxed_etf`는 `domestic`에 포함된 부분집합 — 일반계좌라면 과세되는 국내상장 해외·채권형 ETF 몫.
+    """
     subq = latest_snapshot_subquery(account_ids=account_ids)
     result = await db.execute(
         select(AssetSnapshot)
@@ -173,6 +206,7 @@ async def _calc_unrealized_by_account_and_market(
             continue
         domestic = 0.0
         overseas = 0.0
+        taxed_etf = 0.0
         for pos in snap.position_items:
             qty = float(pos.qty or 0)
             avg = float(pos.avg_price or 0)
@@ -182,7 +216,14 @@ async def _calc_unrealized_by_account_and_market(
                 overseas += gain
             else:
                 domestic += gain
-        unrealized_by_account[snap.account_id] = {"domestic": domestic, "overseas": overseas}
+                ticker = getattr(pos, "ticker", None) or ""
+                if ticker and is_taxable_domestic_listed_etf(ticker, pos.market or "", getattr(pos, "name", "") or ""):
+                    taxed_etf += gain
+        unrealized_by_account[snap.account_id] = {
+            "domestic": domestic,
+            "overseas": overseas,
+            "domestic_taxed_etf": taxed_etf,
+        }
     return unrealized_by_account
 
 

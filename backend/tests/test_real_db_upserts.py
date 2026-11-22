@@ -247,3 +247,29 @@ class TestManualUsdDoubleCountFix:
         amount = select(AssetSnapshot.amount_krw).where
         assert await pg.scalar(amount(AssetSnapshot.id == bad_id)) == Decimal("1000000.00")
         assert await pg.scalar(amount(AssetSnapshot.id == ok_id)) == Decimal("1000000.00")
+
+
+class TestDcaInitialValue:
+    async def test_sums_each_accounts_snapshot_near_start(self, pg: AsyncSession):
+        """계좌별 동기화 날짜가 달라도 시작 무렵 스냅샷을 계좌마다 하나씩 더한다(계획 143 A6)."""
+        from app.services.dca_service import _get_initial_value
+
+        user, a1 = await _user_and_account(pg)
+        a2 = AssetAccount(user_id=user.id, name="두번째", asset_type="STOCK_OTHER", data_source="MANUAL")
+        a3 = AssetAccount(user_id=user.id, name="나중 개설", asset_type="STOCK_OTHER", data_source="MANUAL")
+        pg.add_all([a2, a3])
+        await pg.flush()
+        start = date(2026, 3, 1)
+        pg.add_all(
+            [
+                AssetSnapshot(account_id=a1.id, user_id=user.id, snapshot_date=date(2026, 3, 2), amount_krw=1_000_000),
+                AssetSnapshot(account_id=a1.id, user_id=user.id, snapshot_date=date(2026, 3, 9), amount_krw=9_000_000),
+                # a2는 시작 직전 스냅샷만 있다
+                AssetSnapshot(account_id=a2.id, user_id=user.id, snapshot_date=date(2026, 2, 20), amount_krw=2_000_000),
+                # a3는 시작 31일 뒤에 처음 생겼다 — 시작 금액이 아니라 이후 적립
+                AssetSnapshot(account_id=a3.id, user_id=user.id, snapshot_date=date(2026, 5, 1), amount_krw=5_000_000),
+            ]
+        )
+        await pg.flush()
+
+        assert await _get_initial_value(user.id, start, pg) == 3_000_000

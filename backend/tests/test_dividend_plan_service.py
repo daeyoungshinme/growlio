@@ -183,6 +183,34 @@ class TestGetDividendPlan:
         assert result["total_assets_krw"] == 90_000_000
 
     @pytest.mark.asyncio
+    async def test_required_yield_excludes_real_estate(self, user_id, mock_db, mock_cache):
+        """분모는 추천과 같은 투자자산(부동산 제외) — 부동산을 넣으면 필요 배당수익률이 낮게 보인다(계획 143 A7)."""
+        mock_db.scalar.return_value = SimpleNamespace(annual_dividend_goal=3_600_000)
+        execute_result = MagicMock()
+        execute_result.fetchall.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+        overview = {
+            "total_assets_krw": 390_000_000,
+            "asset_type_allocation": [{"type": "REAL_ESTATE", "amount_krw": 300_000_000}],
+        }
+
+        with (
+            patch(
+                "app.services.dividend.plan_service.get_ticker_dividend_summary",
+                AsyncMock(return_value=TICKER_SUMMARIES),
+            ),
+            patch(
+                "app.services.dividend.plan_service.get_dividend_summary",
+                AsyncMock(return_value=DIVIDEND_SUMMARY),
+            ),
+            patch("app.services.dividend.plan_service.build_portfolio_overview", AsyncMock(return_value=overview)),
+        ):
+            result = await get_dividend_plan(user_id, mock_db, mock_cache)
+
+        assert result["required_dividend_yield_pct"] == 4.0
+        assert result["total_assets_krw"] == 90_000_000
+
+    @pytest.mark.asyncio
     async def test_no_goal_yields_none_required_yield(self, user_id, mock_db, mock_cache):
         mock_db.scalar.return_value = SimpleNamespace(annual_dividend_goal=None)
         execute_result = MagicMock()

@@ -31,8 +31,17 @@ def _dividend_rows_result(rows: list) -> MagicMock:
     return result
 
 
-def _position(qty: float, avg_price: float, current_price: float | None, market: str | None = None) -> SimpleNamespace:
-    return SimpleNamespace(qty=qty, avg_price=avg_price, current_price=current_price, market=market)
+def _position(
+    qty: float,
+    avg_price: float,
+    current_price: float | None,
+    market: str | None = None,
+    ticker: str = "",
+    name: str = "",
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        qty=qty, avg_price=avg_price, current_price=current_price, market=market, ticker=ticker, name=name
+    )
 
 
 def _snapshot(account_id: uuid.UUID, positions: list) -> SimpleNamespace:
@@ -384,6 +393,43 @@ class TestGetIsaStatusSummary:
         assert status["estimated_tax_krw"] == pytest.approx(198_000.0)
         assert status["general_account_tax_krw"] == pytest.approx(0.0)
         assert status["tax_saved_krw"] == pytest.approx(0.0)
+
+    @pytest.mark.asyncio
+    async def test_domestic_listed_overseas_etf_gain_taxed_as_dividend(
+        self, mock_db, make_account, make_user_id, override_settings
+    ):
+        """국내상장 해외지수 ETF 매매차익은 일반계좌에서 배당소득 15.4% — 국내주식형(KODEX 200)은 비과세."""
+        account_id = uuid.uuid4()
+        account = make_account(
+            account_id=account_id,
+            user_id=make_user_id,
+            tax_type="ISA",
+            isa_type="GENERAL",
+            isa_open_date=None,
+            isa_manual_cumulative_pnl_krw=None,
+        )
+        snap = _snapshot(
+            account_id,
+            [
+                _position(100, 10_000, 20_000, market="KOSPI", ticker="360750", name="TIGER 미국S&P500"),
+                _position(100, 10_000, 20_000, market="KOSPI", ticker="069500", name="KODEX 200"),
+            ],
+        )
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _accounts_result([account]),
+                _snapshots_result([snap]),
+                _dividend_rows_result([]),
+            ]
+        )
+
+        result = await get_isa_status_summary(make_user_id, mock_db)
+
+        status = result["accounts"][0]
+        # 각 평가익 1,000,000 — 해외지수 ETF 몫만 15.4% 과세
+        assert status["estimated_cumulative_pnl_krw"] == pytest.approx(2_000_000.0)
+        assert status["general_account_tax_krw"] == pytest.approx(154_000.0)
+        assert status["tax_saved_krw"] == pytest.approx(154_000.0)
 
     @pytest.mark.asyncio
     async def test_manual_override_uses_simple_approx_fallback(
