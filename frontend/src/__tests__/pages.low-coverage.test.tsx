@@ -154,6 +154,8 @@ vi.mock("@/hooks/useAssetManagementData", () => ({
     isLoading: false,
     overview: null,
     txTotals: [],
+    statsStatus: "ready",
+    retryStats: vi.fn(),
     usdRate: 1350,
   })),
 }));
@@ -349,6 +351,8 @@ describe("AssetManagementPage", () => {
         accounts: [],
       },
       txTotals: [],
+      statsStatus: "ready",
+      retryStats: vi.fn(),
       usdRate: 1350,
     });
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Building2, TrendingUp, Home } from "lucide-react";
@@ -104,8 +104,17 @@ export default function AssetManagementPage() {
     await refetchActiveData(queryClient);
   }, [queryClient]);
   useRegisterRefresh(handleRefresh);
-  const { accounts, isLoading, error, refetchAccounts, overview, txTotals, usdRate } =
-    useAssetManagementData(tab);
+  const {
+    accounts,
+    isLoading,
+    error,
+    refetchAccounts,
+    overview,
+    txTotals,
+    statsStatus,
+    retryStats,
+    usdRate,
+  } = useAssetManagementData(tab);
 
   const {
     createMutation,
@@ -141,9 +150,15 @@ export default function AssetManagementPage() {
     setConfirmDeleteId(null);
   }, [confirmDeleteId, deleteMutation, setDeletingId, setConfirmDeleteId]);
 
-  const bankAccounts = accounts.filter((a) => BANK_TYPES.includes(a.asset_type));
-  const stockAccounts = accounts.filter((a) => STOCK_TYPES.includes(a.asset_type));
-  const realEstateAccounts = accounts.filter((a) => REAL_ESTATE_TYPES.includes(a.asset_type));
+  // 렌더마다 새 배열이면 useStockAccountStats·요약 카드 memo가 매번 다시 계산된다(plans/144 B7)
+  const { bankAccounts, stockAccounts, realEstateAccounts } = useMemo(
+    () => ({
+      bankAccounts: accounts.filter((a) => BANK_TYPES.includes(a.asset_type)),
+      stockAccounts: accounts.filter((a) => STOCK_TYPES.includes(a.asset_type)),
+      realEstateAccounts: accounts.filter((a) => REAL_ESTATE_TYPES.includes(a.asset_type)),
+    }),
+    [accounts],
+  );
   const currentBankOrStock = tab === "은행계좌" ? bankAccounts : stockAccounts;
 
   const stockAccountStats = useStockAccountStats(stockAccounts, overview, txTotals);
@@ -260,6 +275,7 @@ export default function AssetManagementPage() {
                     }}
                     onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
                     isDeleting={deletingId === account.id && deleteMutation.isPending}
+                    usdRate={usdRate}
                   />
                 ))}
               </div>
@@ -273,6 +289,9 @@ export default function AssetManagementPage() {
                     key={account.id}
                     account={account}
                     stats={stats}
+                    statsStatus={statsStatus}
+                    onRetryStats={retryStats}
+                    usdRate={usdRate}
                     onDelete={handleDelete}
                     onManagePositions={setPositionsAccount}
                     onTransactions={(a) =>

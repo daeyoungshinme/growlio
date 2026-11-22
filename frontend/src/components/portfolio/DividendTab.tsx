@@ -1,8 +1,9 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useThemeStore } from "@/stores/themeStore";
-import { fmtKrwShort } from "@/utils/format";
+import { fmtKrw } from "@/utils/format";
 import SkeletonCard from "@/components/common/SkeletonCard";
+import PageLoadError from "@/components/common/PageLoadError";
 import SegmentedControl from "@/components/common/SegmentedControl";
 
 const TreemapChart = lazy(() => import("./TreemapChart"));
@@ -24,7 +25,12 @@ import { investPlanUrl } from "@/utils/tabUrl";
 
 interface Props {
   dividendData: DividendYield[];
+  /** 부모(PortfolioPage)가 보유 종목 표용으로 만든 `${ticker}-${market}` 맵 — 같은 맵을 다시 만들지 않는다 */
+  dividendMap: Record<string, DividendYield>;
   divLoading: boolean;
+  /** 배당 조회 실패 — 없으면 실패가 "배당 데이터가 없습니다"로 보였다(plans/144 B1) */
+  divError?: boolean;
+  onRetry?: () => void;
   divSummary: DividendSummary | undefined;
   dividendByTicker: DividendByTicker[];
   totalInvestedKrw?: number;
@@ -72,7 +78,10 @@ function FreqBadges({ months, className = "" }: { months: number[]; className?: 
 
 export default function DividendTab({
   dividendData,
+  dividendMap: positionsDivMap,
   divLoading,
+  divError = false,
+  onRetry,
   divSummary,
   dividendByTicker,
   totalInvestedKrw,
@@ -100,11 +109,6 @@ export default function DividendTab({
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
-
-  const positionsDivMap = useMemo(
-    () => Object.fromEntries(dividendData.map((d) => [`${d.ticker}-${d.market}`, d])),
-    [dividendData],
-  );
 
   const tickerOnlyDivMap = useMemo(() => {
     const map: Record<string, DividendYield> = {};
@@ -220,9 +224,31 @@ export default function DividendTab({
   if (divLoading) {
     return <SkeletonCard rows={4} />;
   }
+  const retry = onRetry ?? (() => {});
+  // 아무것도 못 받았으면 빈 상태 대신 실패 화면 — 일부만 실패했으면 아래 배너로 알린다
+  if (divError && dividendByTicker.length === 0 && !divSummary) {
+    return <PageLoadError message="배당 정보를 불러오지 못했습니다" onRetry={retry} />;
+  }
 
   return (
     <div className="space-y-6">
+      {divError && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-2 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 px-3 py-2"
+        >
+          <p className="text-xs text-red-700 dark:text-red-400">
+            일부 배당 정보를 불러오지 못해 합계가 실제보다 적을 수 있어요
+          </p>
+          <button
+            type="button"
+            onClick={retry}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 px-2 text-xs text-red-600 dark:text-red-400 hover:underline`}
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
         <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
           <div className="px-2 py-3 sm:px-4 sm:py-4">
@@ -230,7 +256,7 @@ export default function DividendTab({
               예상 연간 배당금
             </p>
             <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600 break-keep">
-              {totalEstimated > 0 ? `${fmtKrwShort(totalEstimated)}원` : "—"}
+              {totalEstimated > 0 ? fmtKrw(totalEstimated) : "—"}
             </p>
             {totalEstimated > 0 && overallDividendYield != null ? (
               <p className="text-xs font-semibold text-green-500 mt-0.5 leading-tight">
@@ -247,7 +273,7 @@ export default function DividendTab({
               올해 수령 배당금
             </p>
             <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50 break-keep">
-              {received > 0 ? `${fmtKrwShort(received)}원` : "—"}
+              {received > 0 ? fmtKrw(received) : "—"}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {received > 0 ? "실제 수령 합계" : "배당 내역을 입력해주세요"}
@@ -258,7 +284,7 @@ export default function DividendTab({
               월평균 예상 배당금
             </p>
             <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600 break-keep">
-              {estimatedMonthly > 0 ? `${fmtKrwShort(estimatedMonthly)}원` : "—"}
+              {estimatedMonthly > 0 ? fmtKrw(estimatedMonthly) : "—"}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">연간 예상 배당금 ÷ 12</p>
           </div>
@@ -273,12 +299,15 @@ export default function DividendTab({
           value={divSubTab}
           onChange={setDivSubTab}
         />
-        <Link
-          to={investPlanUrl("배당 계획")}
-          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
-        >
-          배당 목표 달성 현황 보기
-        </Link>
+        {/* 월별 보기는 아래에 균등화 추천 링크가 있어 같은 목적지 링크를 한 화면에 두 번 두지 않는다 */}
+        {divSubTab === "종목별 배당" && (
+          <Link
+            to={investPlanUrl("배당 계획")}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} text-xs text-blue-600 dark:text-blue-400 hover:underline`}
+          >
+            배당 목표 달성 현황 보기
+          </Link>
+        )}
       </div>
 
       {divSubTab === "종목별 배당" && dividendChartData.length > 0 && (
@@ -301,7 +330,7 @@ export default function DividendTab({
                         {d.name}
                       </p>
                       <span className="text-sm font-semibold text-gray-900 dark:text-gray-50 shrink-0 whitespace-nowrap">
-                        {fmtKrwShort(d.estimated_annual_krw)}원
+                        {fmtKrw(d.estimated_annual_krw)}
                       </span>
                     </div>
                     {/* Row 2: 티커·마켓 + 배당율 배지 | 비중 바 + % */}
@@ -365,7 +394,7 @@ export default function DividendTab({
                           {investmentYield > 0 ? `${investmentYield.toFixed(2)}%` : "—"}
                         </td>
                         <td className="py-2 px-4 text-right font-semibold text-gray-900 dark:text-gray-50">
-                          {fmtKrwShort(d.estimated_annual_krw)}원
+                          {fmtKrw(d.estimated_annual_krw)}
                         </td>
                         <td className="py-2 px-3">
                           <WeightBar pct={pct} className="justify-end" />
@@ -382,7 +411,7 @@ export default function DividendTab({
           </div>
         </div>
       )}
-      {divSubTab === "종목별 배당" && dividendChartData.length === 0 && (
+      {divSubTab === "종목별 배당" && dividendChartData.length === 0 && !divError && (
         <EmptyState title="배당 데이터가 없습니다." compact />
       )}
 

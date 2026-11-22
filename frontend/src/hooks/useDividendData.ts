@@ -21,6 +21,7 @@ export function useDividendData(
     data: dividendPositions = [],
     isLoading: positionsLoading,
     isError: positionsError,
+    refetch: refetchPositions,
   } = useQuery({
     queryKey: QUERY_KEYS.dividendPositions(accountId),
     queryFn: () => fetchDividendPositions(accountId),
@@ -32,6 +33,7 @@ export function useDividendData(
     data: dividendSummary,
     isLoading: summaryLoading,
     isError: summaryError,
+    refetch: refetchSummary,
   } = useQuery({
     queryKey: QUERY_KEYS.dividendSummary(accountId),
     queryFn: () => fetchDividendSummary(accountId),
@@ -43,6 +45,7 @@ export function useDividendData(
     data: dividendByTicker = [],
     isLoading: byTickerLoading,
     isError: byTickerError,
+    refetch: refetchByTicker,
   } = useQuery({
     queryKey: QUERY_KEYS.dividendByTicker(accountId),
     queryFn: () => fetchDividendByTicker(accountId),
@@ -60,5 +63,11 @@ export function useDividendData(
     // 실제 데이터로 바뀌는 깜빡임이 발생했었다.
     isLoading: positionsLoading || summaryLoading || byTickerLoading,
     isError: positionsError || summaryError || byTickerError,
+    /** 실패한 쿼리만 다시 받는다(꺼진 쿼리는 건드리지 않음) */
+    retry: () => {
+      if (positionsError) void refetchPositions();
+      if (summaryError) void refetchSummary();
+      if (byTickerError) void refetchByTicker();
+    },
   };
 }
