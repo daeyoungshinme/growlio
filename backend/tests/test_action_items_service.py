@@ -14,8 +14,9 @@ from app.schemas.challenge import ChallengeSummary
 from app.services import action_items_service as svc
 
 
-def _drift(needs=True, name="성장형", max_drift=7.4, relative=None):
+def _drift(needs=True, name="성장형", max_drift=7.4, relative=None, timing=None):
     return SimpleNamespace(
+        timing=timing,
         portfolio_id=uuid.uuid4(),
         portfolio_name=name,
         needs_rebalancing=needs,
@@ -96,6 +97,7 @@ async def _run(
     today=date(2026, 11, 23),
     fx_waiting=None,
     fx_plan_alerts=(),
+    rec_drift=None,
 ):
     db = MagicMock()
     db.rollback = AsyncMock()
@@ -121,9 +123,32 @@ async def _run(
             new=challenge or AsyncMock(return_value=ChallengeSummary(needs_attention=False, count=0)),
         ),
         patch.object(svc, "today_kst", return_value=today),
+        patch(
+            "app.services.alerts.recommendation_drift_alert_service.peek_drifted_portfolios",
+            new=rec_drift or AsyncMock(return_value=[]),
+        ),
     ):
         items = await svc.get_action_items(uuid.uuid4(), db, None)
     return items, db
+
+
+@pytest.mark.asyncio
+async def test_recommendation_drift_only_for_recommendation_sourced():
+    """plans/145 C3 — 추천을 적용해 쓰는 포트폴리오만. 직접 짠·전술 비중엔 '추천이 바뀜'을 띄우지 않는다."""
+    rec = SimpleNamespace(id=uuid.uuid4(), name="연금", target_source="RECOMMENDATION")
+    manual = SimpleNamespace(id=uuid.uuid4(), name="직접", target_source="MANUAL")
+    items, _ = await _run(rec_drift=AsyncMock(return_value=[manual, rec]))
+    assert [i.kind for i in items] == ["RECOMMENDATION_DRIFT"]
+    assert items[0].title == "연금 추천 비중이 바뀌었어요"
+    assert items[0].priority == "LOW"
+    assert items[0].link == f"/rebalancing?rtab=목표 조정&portfolioId={rec.id}"
+
+
+@pytest.mark.asyncio
+async def test_recommendation_drift_skips_manual_only():
+    manual = SimpleNamespace(id=uuid.uuid4(), name="직접", target_source=None)
+    items, _ = await _run(rec_drift=AsyncMock(return_value=[manual]))
+    assert items == []
 
 
 @pytest.mark.asyncio
@@ -141,6 +166,30 @@ async def test_rebalance_only_for_portfolios_needing_it():
     assert item.title == "성장형 리밸런싱 필요"
     assert "7.4%p" in item.detail
     assert item.link == f"/rebalancing?rtab=포트폴리오&portfolioId={drifts[0].portfolio_id}"
+
+
+@pytest.mark.asyncio
+async def test_rebalance_shows_timing_verdict():
+    """plans/145 C2 — 진단 행과 같은 시점 판정을 홈 행에도 붙인다."""
+    items, _ = await _run(drift=AsyncMock(return_value=[_drift(True, "성장형", timing="SPLIT")]))
+    assert items[0].detail.startswith("분할 실행 · 최대 7.4%p")
+    assert items[0].priority == "HIGH"
+
+
+@pytest.mark.asyncio
+async def test_rebalance_on_hold_is_lower_priority():
+    """전부 보류(시장 게이트)면 지금 할 일이 아니라 MEDIUM으로 내린다."""
+    items, _ = await _run(drift=AsyncMock(return_value=[_drift(True, timing="HOLD")]))
+    assert items[0].detail.startswith("보류 · ")
+    assert items[0].priority == "MEDIUM"
+
+
+@pytest.mark.asyncio
+async def test_rebalance_group_counts_now():
+    drifts = [_drift(True, "A", timing="NOW"), _drift(True, "B", 9.0, timing="HOLD")]
+    items, _ = await _run(drift=AsyncMock(return_value=drifts))
+    assert items[0].detail.startswith("지금 실행 1개 · B 최대 9.0%p")
+    assert items[0].priority == "HIGH"
 
 
 @pytest.mark.parametrize(("days_until", "priority"), [(2, "HIGH"), (3, "HIGH"), (10, "MEDIUM")])

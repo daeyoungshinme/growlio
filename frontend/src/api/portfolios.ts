@@ -104,9 +104,17 @@ export interface Portfolio {
   investment_horizon?: InvestmentHorizon | null;
   tax_type?: AccountTaxType | null;
   sort_order: number;
+  /** 목표 비중 출처(plans/145) — 직접 입력/추천 적용/전술 적용. null이면 기록 이전 */
+  target_source?: PortfolioTargetSource | null;
+  /** 목표 비중을 마지막으로 바꾼 시각(비중만 바꾸면 updated_at은 그대로라 따로 둔다) */
+  target_source_at?: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export type PortfolioTargetSource = "MANUAL" | "RECOMMENDATION" | "TACTICAL";
+/** 화면이 보낼 수 있는 출처 — TACTICAL은 전술 적용이 서버에서만 기록한다 */
+type ClientTargetSource = Exclude<PortfolioTargetSource, "TACTICAL">;
 
 export const fetchPortfolios = () => apiGet<Portfolio[]>("/portfolios");
 
@@ -117,6 +125,7 @@ export const createPortfolio = (body: {
   account_ids?: string[] | null;
   investment_horizon?: InvestmentHorizon | null;
   tax_type?: AccountTaxType | null;
+  target_source?: ClientTargetSource;
 }) => apiPost<Portfolio>("/portfolios", body);
 
 export const updatePortfolio = (
@@ -128,6 +137,8 @@ export const updatePortfolio = (
     account_ids?: string[] | null;
     investment_horizon?: InvestmentHorizon | null;
     tax_type?: AccountTaxType | null;
+    /** items를 보낼 때만 기록된다. 기본 MANUAL */
+    target_source?: ClientTargetSource;
   },
 ) => apiPut<Portfolio>(`/portfolios/${id}`, body);
 

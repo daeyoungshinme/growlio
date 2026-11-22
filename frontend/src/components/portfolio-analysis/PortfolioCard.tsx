@@ -11,6 +11,7 @@ import {
   TOUCH_TARGET_MIN_MOBILE_ONLY,
 } from "@/constants/uiSizes";
 import { PIE_COLORS } from "@/utils/colors";
+import { targetSourceLabel } from "@/utils/portfolioTargetSource";
 
 interface PortfolioCardProps {
   portfolio: Portfolio;
@@ -47,6 +48,7 @@ const PortfolioCard = memo(function PortfolioCard({
   onConfirmDelete,
   onToggleTarget,
 }: PortfolioCardProps) {
+  const sourceLabel = targetSourceLabel(p);
   // 서버 시점 판정(plans/136)이 있으면 그 "지켜보기"가 주의 — 상대 이탈 기준까지 반영된 값이다
   const driftStatus = drift
     ? drift.needs_rebalancing
@@ -197,6 +199,9 @@ const PortfolioCard = memo(function PortfolioCard({
           compact
         />
       </div>
+      {sourceLabel && (
+        <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">{sourceLabel}</p>
+      )}
     </div>
   );
 });

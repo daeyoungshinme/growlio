@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection, Sequence
+from datetime import UTC, datetime
 
 from sqlalchemy import case, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -132,6 +133,8 @@ async def create_portfolio(db: AsyncSession, user_id: uuid.UUID, body: Portfolio
         base_type=body.base_type,
         investment_horizon=body.investment_horizon,
         tax_type=body.tax_type,
+        target_source=body.target_source,
+        target_source_at=datetime.now(UTC),
     )
     db.add(portfolio)
     await db.flush()  # id 생성
@@ -177,6 +180,8 @@ async def update_portfolio(
     if body.items is not None:
         await db.execute(delete(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio_id))
         _add_items(db, portfolio.id, body.items)
+        portfolio.target_source = body.target_source
+        portfolio.target_source_at = datetime.now(UTC)
 
     if body.account_ids is not None:
         old_ids = {str(la.account_id) for la in portfolio.linked_accounts}

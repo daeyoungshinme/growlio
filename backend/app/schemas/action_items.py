@@ -12,6 +12,7 @@ ActionItemKind = Literal[
     "TAX_ACTION",
     "CHALLENGE",
     "PARTIAL_FAILURE",
+    "RECOMMENDATION_DRIFT",
 ]
 ActionItemPriority = Literal["HIGH", "MEDIUM", "LOW"]
 

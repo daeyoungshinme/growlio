@@ -133,6 +133,10 @@ class Portfolio(Base):
     investment_horizon: Mapped[str | None] = mapped_column(String(20))
     tax_type: Mapped[str | None] = mapped_column(String(30))
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # 목표 비중 출처(plans/145 C1) — MANUAL(직접) | RECOMMENDATION(추천) | TACTICAL(전술). null=기록 이전.
+    # 비중만 바뀐 저장에선 updated_at이 갱신되지 않아(항목 행만 바뀜) 시각을 따로 둔다
+    target_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    target_source_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

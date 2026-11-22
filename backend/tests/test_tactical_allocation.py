@@ -525,6 +525,16 @@ class TestIndexGroups:
         assert _keys_unique(added)
 
     @pytest.mark.asyncio
+    async def test_apply_records_tactical_target_source(self):
+        """plans/145 C1 — 전술 적용은 목표 비중 출처를 TACTICAL로 남긴다(홈 '추천이 바뀜' 대상에서 빠진다)."""
+        db = AsyncMock()
+        db.add = MagicMock()
+        portfolio = SimpleNamespace(id=uuid.uuid4(), items=[], target_source="RECOMMENDATION", target_source_at=None)
+        await tactical.apply_regime_to_portfolio(portfolio, _strategy(last_regime="RISK_OFF"), "RISK_OFF", db)
+        assert portfolio.target_source == "TACTICAL"
+        assert portfolio.target_source_at is not None
+
+    @pytest.mark.asyncio
     async def test_apply_without_suggestions_creates_primary_only_group(self):
         added = await self._apply([], _strategy(last_regime="RISK_OFF"), "RISK_OFF")
         nq = next(i for i in added if i.ticker == "QQQ")

@@ -24,7 +24,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Collection
 from datetime import timedelta
 from functools import partial
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from sqlalchemy import select
@@ -74,6 +74,15 @@ _LINK_REBALANCING_HISTORY = "/rebalancing?rtab=이력"  # 프론트 rebalancingU
 
 def _portfolio_link(portfolio_id: uuid.UUID | str) -> str:
     return f"/rebalancing?rtab=포트폴리오&portfolioId={portfolio_id}"
+
+
+# 프론트 `utils/rebalancingTiming.TIMING_LABEL`과 같은 문구 — 진단 행의 시점 칩과 홈이 같은 말을 쓴다(plans/145 C2)
+TIMING_LABEL = {"NOW": "지금 실행", "SPLIT": "분할 실행", "HOLD": "보류", "WATCH": "지켜보기", "OK": "안정"}
+
+
+def _rebalance_priority(summaries: list[PortfolioDriftSummary]) -> Literal["HIGH", "MEDIUM"]:
+    """전부 보류(시장 게이트·RED)면 지금 할 일이 아니므로 한 단계 낮춘다 — 자동 실행도 같은 판정으로 멈춘다."""
+    return "MEDIUM" if all(s.timing == "HOLD" for s in summaries) else "HIGH"
 
 
 def _drift_rule_text(s: PortfolioDriftSummary) -> str:
@@ -175,25 +184,31 @@ async def _rebalance_items(
         return []
     if len(drifted) == 1:
         s = drifted[0]
+        timing = f"{TIMING_LABEL[s.timing]} · " if s.timing else ""
         return [
             ActionItem(
                 id=f"rebalance:{s.portfolio_id}",
                 kind="REBALANCE",
-                priority="HIGH",
+                priority=_rebalance_priority(drifted),
                 title=f"{s.portfolio_name} 리밸런싱 필요",
-                detail=f"최대 {s.max_drift_pct:.1f}%p 이탈 · {s.drifted_items_count}종목이 {_drift_rule_text(s)} 초과",
+                detail=(
+                    f"{timing}최대 {s.max_drift_pct:.1f}%p 이탈 · "
+                    f"{s.drifted_items_count}종목이 {_drift_rule_text(s)} 초과"
+                ),
                 cta_label="점검하기",
                 link=_portfolio_link(s.portfolio_id),
             )
         ]
     worst = max(drifted, key=lambda s: s.max_drift_pct)
+    now_count = sum(1 for s in drifted if s.timing == "NOW")
+    now_text = f"{TIMING_LABEL['NOW']} {now_count}개 · " if now_count else ""
     return [
         ActionItem(
             id=REBALANCE_GROUP_ID,
             kind="REBALANCE",
-            priority="HIGH",
+            priority=_rebalance_priority(drifted),
             title=f"리밸런싱 필요 · 포트폴리오 {len(drifted)}개",
-            detail=f"{worst.portfolio_name} 최대 {worst.max_drift_pct:.1f}%p 이탈 외 {len(drifted) - 1}개",
+            detail=f"{now_text}{worst.portfolio_name} 최대 {worst.max_drift_pct:.1f}%p 이탈 외 {len(drifted) - 1}개",
             cta_label="자세히 보기",
             # 펼침 목록을 못 그릴 때의 대체 경로 — 진단 탭(기본 탭)이 포트폴리오별 이탈 현황을 보여 준다
             link=_LINK_REBALANCING,
@@ -400,18 +415,53 @@ async def _challenge_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
 
 _Source = Callable[[uuid.UUID, AsyncSession, CacheStoreType], Awaitable[list[ActionItem]]]
 
+
 # 전술·리밸런싱은 get_action_items가 앞에 붙인다(전술 항목이 난 포트폴리오를 리밸런싱에서 빼야 해서)
+def _goal_adjust_link(portfolio_id: uuid.UUID | str) -> str:
+    # 프론트 rebalancingUrl({ tab: "목표 조정", portfolioId })와 같은 값(추천 모드는 기본값이라 gmode 생략)
+    return f"/rebalancing?rtab=목표 조정&portfolioId={portfolio_id}"
+
+
+async def _recommendation_drift_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
+    """추천 비중이 바뀐 포트폴리오(plans/145 C3) — 추천을 적용해 쓰는(`target_source=RECOMMENDATION`) 것만.
+
+    직접 짠 비중이나 전술 비중에 "추천이 바뀌었다"고 하면 따를 이유가 없는 잔소리가 된다. 캐시에 있는 추천만 본다.
+    """
+    from app.services.alerts.recommendation_drift_alert_service import peek_drifted_portfolios
+
+    drifted = [p for p in await peek_drifted_portfolios(user_id, db, cache) if p.target_source == "RECOMMENDATION"]
+    if not drifted:
+        return []
+    first = drifted[0]
+    title = (
+        f"{first.name} 추천 비중이 바뀌었어요" if len(drifted) == 1 else f"추천 비중이 바뀐 포트폴리오 {len(drifted)}개"
+    )
+    return [
+        ActionItem(
+            id=f"recommendation-drift:{first.id}" if len(drifted) == 1 else "recommendation-drift:all",
+            kind="RECOMMENDATION_DRIFT",
+            priority="LOW",
+            title=title,
+            detail="적용한 추천과 지금 추천이 3%p 넘게 달라졌어요 — 다시 적용할지 비교해 보세요",
+            cta_label="비교하기",
+            link=_goal_adjust_link(first.id),
+        )
+    ]
+
+
 _SOURCES: list[tuple[str, _Source]] = [
     ("dca", _dca_items),
     ("fx_plan", _fx_plan_items),
     ("tax", _tax_items),
     ("challenge", _challenge_items),
+    ("recommendation", _recommendation_drift_items),
 ]
 
 
 _SOURCE_LABELS = {
     "tactical": "전술 배분",
     "rebalance": "리밸런싱",
+    "recommendation": "추천 변화",
     "dca": "적립",
     "fx_plan": "환전 계획",
     "tax": "세금",
