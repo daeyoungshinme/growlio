@@ -41,6 +41,7 @@ _NON_EQUITY_ETF_RE = re.compile(
     r"국고채|국채|통안|CD금리|KOFR|단기채|머니마켓|채권|회사채|금융채|금리|골드|금현물|원유|달러|원자재|리츠",
     re.IGNORECASE,
 )
+_DERIVATIVE_ETF_RE = re.compile(r"레버리지|인버스|선물|2X|X2", re.IGNORECASE)
 _NON_EQUITY_INDEX_KEYS = frozenset({"KR_TREASURY_3Y", "KR_CD_RATE", "KR_SHORT_BOND"})
 
 
@@ -55,6 +56,9 @@ def is_taxable_domestic_listed_etf(ticker: str, market: str, name: str) -> bool:
     if cls.kind == "STOCK":
         return False
     if exposure_region(market, name, cls) == "OVERSEAS":
+        return True
+    if cls.kind == "LEVERAGED" or _DERIVATIVE_ETF_RE.search(name):
+        # 국내지수라도 레버리지·인버스(파생형)는 매매차익이 배당소득 과세다(plans/146 B3)
         return True
     return cls.index_key in _NON_EQUITY_INDEX_KEYS or bool(_NON_EQUITY_ETF_RE.search(name))
 

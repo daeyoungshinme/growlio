@@ -208,6 +208,11 @@ async def compute_progress(
             **deadline_fields,
         )
 
+    if deadline_fields.get("is_expired") and challenge.challenge_type in (CHALLENGE_RETURN_PCT, CHALLENGE_TARGET_VALUE):
+        # 마감이 지난 수익률·목표 금액 챌린지는 지금 자산으로 진행률을 다시 계산하지 않는다 — 마감 뒤 상승분으로
+        # "기한 종료"와 "100%"가 함께 보였다. 마감 당시 값은 저장하지 않는 설계라 진행률을 비운다(plans/146 B5)
+        return ChallengeProgress(**deadline_fields)
+
     if challenge.challenge_type == CHALLENGE_RETURN_PCT:
         from app.services.portfolio.asset_aggregator import get_dashboard_summary
 

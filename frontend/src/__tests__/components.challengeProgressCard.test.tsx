@@ -47,6 +47,13 @@ describe("ChallengeProgressCard", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("마감이 지난 챌린지는 빼고, 남은 게 없으면 렌더하지 않는다(plans/146 B1)", () => {
+    const expired = makeChallenge({ deadline_month: "2026-02" });
+    expired.progress = { ...expired.progress, is_expired: true, this_month_satisfied: false };
+    const { container } = render(<ChallengeProgressCard challenges={[expired]} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("shows streak and this-month status for deposit challenge", () => {
     render(<ChallengeProgressCard challenges={[makeChallenge()]} />);
     expect(screen.getByText("3")).toBeInTheDocument();

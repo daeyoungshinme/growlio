@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders as renderWithProvidersBase } from "@/test/renderWithProviders";
@@ -28,6 +28,14 @@ vi.mock("@/stores/themeStore", () => ({
 }));
 
 import DividendPlanSection from "@/components/invest/DividendPlanSection";
+import { projectDividendGoal } from "@/utils/dividendGoalTimeline";
+import { monthAfter } from "@/utils/dcaScenarioProjection";
+import { fmtMonth } from "@/utils/format";
+
+// 가짜 타이머가 실패한 테스트에서 다음 테스트로 새지 않게 항상 되돌린다(plans/146 B7)
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function renderWithProviders(ui: React.ReactElement) {
   return renderWithProvidersBase(<MemoryRouter>{ui}</MemoryRouter>);
@@ -170,8 +178,10 @@ describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
     fetchDividendPlan.mockResolvedValue(makeDividendPlan());
     fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
     renderWithProviders(<DividendPlanSection onOpenSettings={vi.fn()} />);
-    expect(await screen.findByText(/달성 예상/)).toBeInTheDocument();
+    const months = projectDividendGoal(75_000_000, 2_000_000, 3_000_000, 1_000_000)?.months;
+    expect(months).toBeGreaterThan(0);
+    const expected = `${fmtMonth(monthAfter("2026-11", months ?? 0))} 달성 예상`;
+    expect(await screen.findByText(new RegExp(expected))).toBeInTheDocument();
     expect(screen.getByText(/월 100만원 적립/)).toBeInTheDocument();
-    vi.useRealTimers();
   });
 });

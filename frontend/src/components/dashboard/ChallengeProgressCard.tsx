@@ -11,7 +11,8 @@ interface Props {
 
 /** 홈 대시보드 — 진행 중인 적립 챌린지 요약(입금 스트릭 우선). ACTIVE 챌린지가 있을 때만 렌더. */
 export default function ChallengeProgressCard({ challenges }: Props) {
-  const active = challenges.filter((c) => c.status === "ACTIVE");
+  // 마감이 지난 챌린지는 "기한 종료" — 이번 달 미완료로 보이지 않게 뺀다(계획탭·배지와 같은 기준, plans/146 B1)
+  const active = challenges.filter((c) => c.status === "ACTIVE" && !c.progress.is_expired);
   if (active.length === 0) return null;
 
   // 입금 챌린지를 우선 노출 (스트릭이 습관 지표로 가장 직관적)

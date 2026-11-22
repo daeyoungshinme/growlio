@@ -4,6 +4,7 @@ import uuid
 from datetime import date
 from typing import Any, TypedDict
 
+import structlog
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +19,9 @@ from app.constants import (
 from app.models.asset import AssetAccount, Transaction
 from app.services.accounts._snapshot_queries import latest_snapshot_rows
 from app.utils.kst import today_kst
+
+logger = structlog.get_logger()
+_warned_year_fallbacks: set[tuple[int, int]] = set()
 
 _DOMESTIC_LARGE_HOLDER_THRESHOLD = 5_000_000_000  # 대주주 시가총액 기준 — 종목당 50억원(2025년 말 기준 판정부터)
 
@@ -58,7 +62,13 @@ def pick_year_rule[T](table: dict[int, T], year: int) -> T:
     """연도별 세법 테이블에서 해당 연도 값을, 없으면 가장 가까운 연도 값을 반환한다."""
     if year in table:
         return table[year]
-    return table[min(table, key=lambda y: abs(y - year))]
+    nearest = min(table, key=lambda y: abs(y - year))
+    # 새해 세율 표를 넣지 않으면 조용히 옛 세율로 계산된다 — 경고로 남겨 표 갱신을 놓치지 않게 한다(plans/146 B6)
+    key = (id(table), year)
+    if key not in _warned_year_fallbacks:  # 계산마다 부르므로 프로세스당 표·연도별 1회만
+        _warned_year_fallbacks.add(key)
+        logger.warning("tax_year_rule_fallback", requested_year=year, used_year=nearest)
+    return table[nearest]
 
 
 def get_tax_rates(year: int) -> _TaxRates:

@@ -59,8 +59,7 @@ export default function InvestPlanPage() {
       { replace: true },
     );
 
-  // 리밸런싱 추천 탭 "목표 설정하러 가기"에서 왔는지(U16) — 진입 시 한 번만 읽고 URL에서는 지운다.
-  // 파라미터가 남아 있으면 새로고침·뒤로가기로 다시 들어와도 "추천 보러 가기" 배너가 계속 떴다(plans/39 N7).
+  // 추천 탭 "목표 설정하러 가기"에서 왔는지(U16) — 한 번만 읽고 URL에서 지운다(남기면 배너가 계속 뜸, plans/39 N7)
   const [fromRecommendation] = useState(() => searchParams.get("from") === "recommendation");
   useEffect(() => {
     if (!searchParams.has("from")) return;
@@ -139,8 +138,7 @@ export default function InvestPlanPage() {
     saveSettings: saveDividendSettings,
   } = useDividendPlanSettings();
 
-  // `#fx-plan`으로 들어왔으면 페이지 로딩이 끝나 카드가 그려진 뒤 그 위치로 스크롤한다. 위쪽 배너·차트가
-  // 늦게 그려져 카드를 밀어내므로 잠시 뒤 한 번 더 맞춘다. 같은 링크 재진입(새 key)에도 다시 돈다
+  // `#fx-plan` 진입: 카드가 그려진 뒤 스크롤, 위쪽이 늦게 그려져 밀리므로 잠시 뒤 한 번 더(새 key 재진입에도)
   const linkKey = location.key;
   useEffect(() => {
     if (!fxPlanLinked || isLoading) return;

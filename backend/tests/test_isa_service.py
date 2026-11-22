@@ -557,3 +557,21 @@ class TestCalcIsaContributionStatus:
         assert by_name["ISA 총한도"]["remaining_krw"] == 5_000_000
         assert by_name["ISA 가입일없음"]["remaining_krw"] == 8_000_000  # 2,000만 - 올해 1,200만
         assert by_name["ISA 가입일없음"]["carryover_applied"] is False
+
+
+class TestDerivativeDomesticEtfTaxable:
+    """plans/146 B3 — 국내지수라도 레버리지·인버스(파생형) ETF 매매차익은 일반계좌에서 배당소득 과세."""
+
+    @pytest.mark.parametrize(
+        ("ticker", "name"),
+        [("122630", "KODEX 레버리지"), ("114800", "KODEX 인버스"), ("252670", "KODEX 200선물인버스2X")],
+    )
+    def test_leveraged_and_inverse_taxable(self, ticker, name):
+        from app.services.tax.isa_service import is_taxable_domestic_listed_etf
+
+        assert is_taxable_domestic_listed_etf(ticker, "KOSPI", name) is True
+
+    def test_plain_domestic_equity_etf_stays_tax_free(self):
+        from app.services.tax.isa_service import is_taxable_domestic_listed_etf
+
+        assert is_taxable_domestic_listed_etf("069500", "KOSPI", "KODEX 200") is False
