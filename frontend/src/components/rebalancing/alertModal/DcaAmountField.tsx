@@ -4,6 +4,12 @@ import { exchangeRateQuery, portfoliosQuery } from "@/api/queryOptions";
 import { INPUT_SM } from "@/constants/inputStyles";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { DCA_AMOUNT_MIN_KRW, splitDcaAmount } from "@/utils/dcaAutoBuy";
+import SegmentedControl from "@/components/common/SegmentedControl";
+
+const DCA_ALLOCATION_OPTIONS = [
+  { value: "TARGET", label: "목표 비중대로" },
+  { value: "GAP_FIRST", label: "모자란 종목 먼저" },
+] as const;
 
 interface Props {
   form: RebalancingAlertFormState;
@@ -60,6 +66,22 @@ export function DcaAmountField({ form, portfolioId, autoExecutionAccounts }: Pro
           ? "예수금이 더 많아도 이 금액까지만 목표 비중대로 나눠 매수합니다. 해외 종목은 환전해 둔 달러로 사고, 달러가 모자라면 환전 안내 후 기다렸다가 다시 매수합니다."
           : "비워 두면 지정일에 계좌 예수금 전체로 목표 비중을 채웁니다."}
       </p>
+      {amount ? (
+        <div className="mt-2">
+          <SegmentedControl
+            ariaLabel="적립 금액 나누는 방식"
+            options={DCA_ALLOCATION_OPTIONS}
+            value={form.dcaAllocationMode}
+            onChange={form.setDcaAllocationMode}
+            stretch
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            {form.dcaAllocationMode === "GAP_FIRST"
+              ? "매수일 보유 비중을 보고 목표보다 모자란 종목부터 채웁니다. 모자란 만큼을 다 채우고 남으면 목표 비중대로 나눕니다 — 아래 금액은 목표 비중 기준 예시라 실제와 다를 수 있어요."
+              : "보유 비중과 상관없이 매번 목표 비중대로 나눠 삽니다."}
+          </p>
+        </div>
+      ) : null}
       {rows.length > 0 && (
         <ul className="mt-2 divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-xs">
           {rows.map((r) => (

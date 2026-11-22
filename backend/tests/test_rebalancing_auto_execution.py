@@ -63,6 +63,9 @@ def _make_alert(**kwargs) -> SimpleNamespace:
         "notify_time": "08:30",
         "tax_impact_gate_mode": "DISABLED",
         "max_tax_impact_krw": None,
+        "dca_allocation_mode": "TARGET",
+        "trade_to_band": False,
+        "min_trade_krw": None,
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)

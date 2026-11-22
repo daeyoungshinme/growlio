@@ -230,14 +230,15 @@ class TestMarketBuyBudget:
         assert fit_buy_to_budget(order, 0.0) == (order, 0)
 
     def test_full_strategy_spends_budget_on_market_orders(self):
-        """두 번째 주문은 첫 주문이 쓴 예산을 빼고 계산한다."""
+        """시장가도 참고 시세+여유(2%)로 예산을 계산한다 — 합계가 예산을 넘지 않게 비례로 나눈다(plans/145 B1)."""
         adjusted, skipped = clamp_buy_orders_to_budget(
             [_buy(ticker="A", reference_price=10_000.0, quantity=5), _buy(ticker="B", reference_price=10_000.0)],
             60_000.0,
         )
-        # A 5주가 51,000원(여유 2%)을 쓰고 남은 9,000원으로는 B 1주도 못 산다
-        assert [(o.ticker, o.quantity) for o in adjusted] == [("A", 5)]
-        assert [r.ticker for r in skipped] == ["B"]
+        # 1주 예산 단가 10,200원 → 60,000원으로 5주. 계획 금액(A 5주·B 10주) 비례로 나눠 둘 다 산다
+        assert [(o.ticker, o.quantity) for o in adjusted] == [("A", 2), ("B", 3)]
+        assert sum(o.quantity for o in adjusted) * 10_200.0 <= 60_000.0
+        assert skipped == []
 
     async def test_two_phase_defers_buys_cash_cannot_cover(self):
         """매도 대금이 필요한 시장가 매수가 1단계에서 나가 거부되고 재시도에서도 빠지던 버그."""

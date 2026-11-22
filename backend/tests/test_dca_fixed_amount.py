@@ -52,6 +52,9 @@ def _dca_alert(**kwargs) -> SimpleNamespace:
         "mode": "AUTO",
         "buy_wait_minutes": 10,
         "dca_amount_krw": 500_000.0,
+        "dca_allocation_mode": "TARGET",
+        "trade_to_band": False,
+        "min_trade_krw": None,
         "market_condition_mode": "DISABLED",
     }
     defaults.update(kwargs)
@@ -59,6 +62,46 @@ def _dca_alert(**kwargs) -> SimpleNamespace:
 
 
 # ── 정액 분할 ─────────────────────────────────────────────
+
+
+class TestGapFirstAllocation:
+    """plans/145 B2 — 정액을 목표에 모자란 종목부터 채운다."""
+
+    def test_budgets_fill_gaps_first(self):
+        from app.services.rebalancing.dca_allocation import gap_first_budgets
+
+        # 목표 50/50, 현재 A 600만·B 400만, 100만 투입 → 총 1,100만 목표 550만씩. A는 초과라 0, B 부족 150만 > 100만
+        budgets = gap_first_budgets([50, 50], [6_000_000.0, 4_000_000.0], 1_000_000.0)
+        assert budgets == [0.0, 1_000_000.0]
+
+    def test_budgets_rest_by_weight_after_gaps(self):
+        from app.services.rebalancing.dca_allocation import gap_first_budgets
+
+        # 부족 합(B 50만)보다 금액(150만)이 크면 남는 100만은 목표 비중대로
+        budgets = gap_first_budgets([50, 50], [5_500_000.0, 4_500_000.0], 1_500_000.0)
+        assert budgets == pytest.approx([250_000.0, 1_250_000.0])
+        assert sum(budgets) == pytest.approx(1_500_000.0)
+
+    def test_allocate_with_current_values_buys_underweight(self):
+        from app.services.rebalancing.dca_allocation import dca_row_current_values
+
+        items = [
+            _item("A", "KOSPI", 50, 10_000.0, current_value_krw=6_000_000.0),
+            _item("B", "KOSPI", 50, 10_000.0, current_value_krw=4_000_000.0),
+        ]
+        rows = dca_buy_rows(items, "GENERAL")
+        result = allocate_dca_amount(rows, 1_000_000.0, dca_row_current_values(items, "GENERAL"))
+
+        assert {i.ticker: i.shares_to_trade for i in result.items} == {"B": 100.0}
+        assert result.unaffordable == ["A"]
+
+    def test_group_current_value_is_group_total(self):
+        """지수 그룹은 멤버 하나가 아니라 그룹 합계로 부족분을 판정한다."""
+        from app.services.rebalancing.dca_allocation import dca_row_current_values
+
+        member = _item("VOO", "NYSE", 0, 700_000.0, current_value_krw=1_000_000.0, group_role="PRIMARY")
+        group = _item("VOO", "NYSE", 60, 700_000.0, current_value_krw=5_000_000.0, group_key="SP500", members=[member])
+        assert dca_row_current_values([group], "GENERAL") == [5_000_000.0]
 
 
 class TestAllocateDcaAmount:

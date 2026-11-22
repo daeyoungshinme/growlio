@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAlertDescription } from "@/utils/rebalancingAlertDescription";
+import { buildAlertDescription, describeTradeOptions } from "@/utils/rebalancingAlertDescription";
 
 describe("buildAlertDescription", () => {
   it("DRIFT_ONLY + NOTIFY: 이탈 임계값과 알림 시각을 포함한다", () => {
@@ -79,5 +79,39 @@ describe("buildAlertDescription", () => {
       "08:30",
     );
     expect(text).toBe("매년 1일 08:30에 리밸런싱 현황 리포트를 받습니다.");
+  });
+});
+
+describe("describeTradeOptions (plans/145)", () => {
+  const base = {
+    mode: "AUTO" as const,
+    triggerCondition: "DRIFT_ONLY" as const,
+    tradeToBand: false,
+    minTradeKrw: null,
+    isDcaAmount: false,
+    dcaAllocationMode: "TARGET" as const,
+  };
+
+  it("기본값이면 문구 없음", () => {
+    expect(describeTradeOptions(base)).toBeNull();
+  });
+
+  it("경계 거래·최소 거래액을 한 줄로", () => {
+    expect(describeTradeOptions({ ...base, tradeToBand: true, minTradeKrw: 100_000 })).toBe(
+      "이탈 종목은 허용 범위 경계까지만 거래합니다 · 100,000원 미만 주문은 건너뜁니다.",
+    );
+  });
+
+  it("정액 적립 부족분 우선", () => {
+    expect(
+      describeTradeOptions({ ...base, isDcaAmount: true, dcaAllocationMode: "GAP_FIRST" }),
+    ).toBe("적립 금액은 목표보다 모자란 종목부터 채웁니다.");
+  });
+
+  it("NOTIFY·스케줄만이면 경계 거래 문구를 넣지 않는다", () => {
+    expect(describeTradeOptions({ ...base, mode: "NOTIFY", tradeToBand: true })).toBeNull();
+    expect(
+      describeTradeOptions({ ...base, triggerCondition: "SCHEDULE_ONLY", tradeToBand: true }),
+    ).toBeNull();
   });
 });

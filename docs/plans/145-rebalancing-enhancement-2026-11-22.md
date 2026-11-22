@@ -86,7 +86,15 @@
 
 ---
 
-## PR3 — 거래 방식 고도화 (feat/rebalancing-145-trade)
+## PR3 — 거래 방식 고도화 (feat/rebalancing-145-trade) — 구현 완료
+
+> 실제 반영:
+> - B1 비례 배분은 FULL·BUY_ONLY 국내 매수 clamp에만 적용했다. TWO_PHASE 1단계는 "기존 현금으로 먼저, 나머지는 매도 후"라는 순서 자체가 설계라 그대로 둔다.
+> - B2 정액 미리보기(`DcaAmountField`)는 매수일 보유 비중을 몰라 목표 비중 예시로 두고 그 사실을 문구로 알린다.
+> - B3 수동 분석 `band_edge` 토글은 **보류**했다. 분석 응답의 그룹 멤버 배분·합계 필드를 모두 다시 계산해야 하고, 수동 실행 화면에서는 수량을 직접 고칠 수 있기 때문이다. 자동 실행과 "지금 계획 생성"에는 적용된다.
+> - 최소 거래액은 플랜 주문 단계(`drop_orders_below_min_value`, 건당 상한 clamp 뒤)에서 뺀다.
+> - 기존 테스트 2건이 순차 소진(앞 종목만 사고 뒤는 SKIPPED)을 고정하고 있어 비례 배분 기대값으로 바꿨다.
+> - 로컬 `.env`가 공유 Supabase를 가리키고 Docker가 없어 `alembic check`는 CI에 맡긴다. 운영 적용은 `rb2` 수동이다.
 
 **마이그레이션 1개** (`rb2`, `rebalancing_alerts` 컬럼 추가)
 - `trade_to_band: bool = False`
