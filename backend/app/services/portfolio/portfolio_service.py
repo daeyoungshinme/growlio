@@ -237,14 +237,21 @@ async def build_portfolio_overview(
     account_ids: list[uuid.UUID] | None = None,
     cache: CacheStoreType = None,
     lite: bool = False,
+    exclude_out_of_total: bool = False,
 ) -> dict[str, Any]:
     """포트폴리오 전체 현황 집계 (라우터 및 분석 엔드포인트에서 공용).
 
     lite=True 시 all_positions / accounts[].positions 를 생략해 응답 크기를 대폭 줄인다.
     대시보드에서 사용하며, 전체 종목 목록이 필요한 포트폴리오 페이지는 lite=False(기본값) 사용.
+
+    exclude_out_of_total=True + 전체 조회(account_ids 없음)면 합산 제외(`include_in_total=False`) 계좌를
+    주식 합계·손익·all_positions·stock_allocation에서 뺀다(accounts 행은 유지). 총자산은 원래 빼고 있어
+    끄면 주식 합계가 총자산보다 커질 수 있다(plans/144 A2). 계좌를 지정한 조회는 지정 계좌를 항상 포함한다.
+    자산탭 화면 경로만 켠다 — 추천·배당 계획 등 다른 소비자의 기준은 그대로.
     """
     cache_key_fn = portfolio_overview_lite_key if lite else portfolio_overview_key
-    acct_suffix = portfolio_overview_acct_suffix(account_ids)
+    drop_excluded = exclude_out_of_total and not account_ids
+    acct_suffix = "in_total" if drop_excluded else portfolio_overview_acct_suffix(account_ids)
     cached = await get_cached_json(cache, cache_key_fn(user_id, acct_suffix))
     if cached is not None:
         return cached
@@ -276,18 +283,21 @@ async def build_portfolio_overview(
         snap = snap_by_acc.get(str(acc.id))
         pos_list_db: list[Position] = (snap_pos_map.get(snap.id, []) if snap else []) or cur_pos_map.get(acc.id, [])
         amount_krw, invested, pnl, raw_positions = _calc_account_amounts(acc, snap, pos_list_db)
+        # 합산 제외 계좌는 총자산에 원래 안 들어가므로 누적 자체를 건너뛰면 주식 합계·손익만 빠진다
+        skip_totals = drop_excluded and not acc.include_in_total
 
-        total_assets_krw, total_invested_krw, unrealized_pnl_krw = _accumulate_account_totals(
-            acc,
-            amount_krw,
-            invested,
-            pnl,
-            total_assets_krw,
-            total_invested_krw,
-            unrealized_pnl_krw,
-            asset_type_totals,
-            raw_positions,
-        )
+        if not skip_totals:
+            total_assets_krw, total_invested_krw, unrealized_pnl_krw = _accumulate_account_totals(
+                acc,
+                amount_krw,
+                invested,
+                pnl,
+                total_assets_krw,
+                total_invested_krw,
+                unrealized_pnl_krw,
+                asset_type_totals,
+                raw_positions,
+            )
 
         account_row = _build_account_row(
             acc,
@@ -297,8 +307,8 @@ async def build_portfolio_overview(
             invested,
             pnl,
             lite,
-            all_positions,
-            lite_stock_items,
+            [] if skip_totals else all_positions,
+            [] if skip_totals else lite_stock_items,
         )
         account_rows.append(account_row)
 

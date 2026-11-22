@@ -61,6 +61,10 @@ export interface AccountRow {
   positions: PortfolioPosition[];
   tax_type?: string;
   investment_horizon?: string | null;
+  /** false면 총자산에서 빠지는 계좌 — 전체 보기의 합계·보유종목에서도 빠진다(plans/144 A2) */
+  include_in_total?: boolean;
+  /** 부동산만 — 담보대출 차감 전 시세(`amount_krw`는 순액) */
+  market_value_krw?: number;
 }
 
 // 포트폴리오 전체 overview (API: /portfolio/overview)

@@ -133,8 +133,12 @@ async def get_index_exposure(
     db: AsyncSession,
     user_id: uuid.UUID,
     account_ids: list[uuid.UUID] | None = None,
+    exclude_out_of_total: bool = False,
 ) -> IndexExposureResponse:
-    overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, cache=cache)
+    # 자산탭 비중 분석은 투자현황과 같은 기준(합산 제외 계좌 빼기, plans/144 A2) — 그룹 제안은 기존 기준 유지
+    overview = await build_portfolio_overview(
+        user_id, db, account_ids=account_ids, cache=cache, exclude_out_of_total=exclude_out_of_total
+    )
     holdings = merge_holdings(overview.get("all_positions") or [])
     if not holdings:
         return IndexExposureResponse()

@@ -343,6 +343,27 @@ class TestSyncPositionPrices:
                 resp = client.post(f"/api/v1/assets/{account.id}/positions/sync-prices")
         assert resp.status_code == 400
 
+    def test_sync_prices_rejects_synced_account(self, override_settings):
+        """plans/144 A1: 연동 계좌의 오늘 스냅샷을 MANUAL로 덮지 않는다(포지션 조회 전에 거부)."""
+        user = make_user()
+        db = _make_mock_db()
+        account = _make_account(user.id)
+        account.data_source = "KIWOOM_API"
+        db.scalar = AsyncMock(return_value=account)
+        app = setup_app(user, db)
+
+        with (
+            patch("app.api.v1.positions.upsert_snapshot", new_callable=AsyncMock) as mock_upsert,
+            patch("app.api.v1.positions.fetch_prices_batch", new_callable=AsyncMock) as mock_prices,
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(f"/api/v1/assets/{account.id}/positions/sync-prices")
+        assert resp.status_code == 400
+        mock_upsert.assert_not_called()
+        mock_prices.assert_not_called()
+        db.commit.assert_not_called()
+        assert account.manual_amount == 0.0
+
     def test_sync_prices_lock_conflict_returns_409(self, override_settings):
         """sync-prices 락 획득 실패 시 409 (line 161)."""
         user = make_user()

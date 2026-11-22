@@ -236,15 +236,18 @@ export default function StockPositionsModal({
 
       {/* 하단 버튼 */}
       <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-6 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sm:rounded-b-2xl">
-        <button
-          onClick={handleSyncAll}
-          disabled={syncing || editor.rows.every((r) => !r.ticker)}
-          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-2 text-sm text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 transition-colors w-full sm:w-auto`}
-        >
-          <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-          전체 현재가 갱신
-        </button>
-        <div className="flex gap-3 sm:justify-end">
+        {/* 연동 계좌는 서버가 거부한다 — 현재가는 계좌 동기화로 갱신(plans/144 A1) */}
+        {!readonly && (
+          <button
+            onClick={handleSyncAll}
+            disabled={syncing || editor.rows.every((r) => !r.ticker)}
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-2 text-sm text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 transition-colors w-full sm:w-auto`}
+          >
+            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+            전체 현재가 갱신
+          </button>
+        )}
+        <div className="flex gap-3 sm:justify-end sm:ml-auto">
           <button
             onClick={onClose}
             className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 sm:flex-none px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-white dark:hover:bg-gray-700`}

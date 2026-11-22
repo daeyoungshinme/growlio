@@ -113,4 +113,14 @@ describe("StockPositionsModal", () => {
     await screen.findAllByDisplayValue("삼성전자우");
     expect(syncAccountPositionPrices).toHaveBeenCalledWith("acc-1");
   });
+
+  it("연동 계좌(readonly)에는 현재가 갱신·저장 버튼이 없다", async () => {
+    renderWithProviders(
+      <StockPositionsModal accountId="acc-1" accountName="연동 계좌" onClose={vi.fn()} readonly />,
+    );
+
+    await screen.findAllByText("삼성전자");
+    expect(screen.queryByRole("button", { name: /현재가/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("저장")).not.toBeInTheDocument();
+  });
 });

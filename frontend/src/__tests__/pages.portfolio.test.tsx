@@ -203,6 +203,32 @@ describe("PortfolioPage", () => {
     expect(screen.queryByText("투자원금")).not.toBeInTheDocument();
   });
 
+  it("합산 제외 계좌가 있으면 전체 보기 요약에 빠졌다고 알린다", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview")
+        return Promise.resolve({
+          data: {
+            ...mockPortfolioData,
+            total_assets_krw: 100_000_000,
+            total_non_stock_krw: 50_000_000,
+            accounts: [
+              { id: "acc-1", asset_type: "STOCK_KIS", name: "KIS 계좌", include_in_total: true },
+              {
+                id: "acc-2",
+                asset_type: "STOCK_KIWOOM",
+                name: "키움 계좌",
+                include_in_total: false,
+              },
+            ],
+          },
+        });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio();
+    expect(await screen.findByText(/합산 제외 계좌 1개는 빠짐/)).toBeInTheDocument();
+  });
+
   it("unrealized_pnl_krw가 음수일 때 - 기호를 표시한다", async () => {
     const negativeData = {
       ...mockPortfolioData,
