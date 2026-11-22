@@ -40,7 +40,8 @@ export type ActionItemKind =
   | "TAX_WARNING"
   | "TAX_ACTION"
   | "CHALLENGE"
-  | "PARTIAL_FAILURE";
+  | "PARTIAL_FAILURE"
+  | "RECOMMENDATION_DRIFT";
 
 /** 홈 "지금 할 일" 1행 — 백엔드 `action_items_service`가 우선순위·마감 순으로 최대 5건 반환 */
 export interface ActionItem {

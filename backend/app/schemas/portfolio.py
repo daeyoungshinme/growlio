@@ -40,6 +40,10 @@ class PortfolioItem(BaseModel):
     group: PortfolioItemGroup | None = None
 
 
+# 화면이 보낼 수 있는 목표 비중 출처 — TACTICAL은 전술 적용(`apply_tactical_weights`)이 서버에서만 기록한다
+ClientTargetSource = Literal["MANUAL", "RECOMMENDATION"]
+
+
 class PortfolioCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     items: list[PortfolioItem] = Field(max_length=100)
@@ -48,6 +52,8 @@ class PortfolioCreate(BaseModel):
     # 명시적 기간/세제유형 태그 — 미지정이면 기준 포트폴리오 지정 계좌들의 태그로부터 추론
     investment_horizon: InvestmentHorizon | None = None
     tax_type: AccountTaxType | None = None
+    # 목표 비중 출처(plans/145 C1) — 추천에서 "이 비중으로 만들기"면 RECOMMENDATION
+    target_source: ClientTargetSource = "MANUAL"
 
     @field_validator("items")
     @classmethod
@@ -63,6 +69,8 @@ class PortfolioUpdate(BaseModel):
     # None/미전송 구분은 model_fields_set으로 판별 — 명시적으로 null을 보내면 태그 해제(추론으로 복귀)
     investment_horizon: InvestmentHorizon | None = None
     tax_type: AccountTaxType | None = None
+    # 목표 비중 출처(plans/145 C1) — items를 보낼 때만 기록한다. 추천 적용 경로만 RECOMMENDATION을 보낸다
+    target_source: ClientTargetSource = "MANUAL"
 
     @field_validator("items")
     @classmethod
@@ -97,6 +105,8 @@ class PortfolioResponse(BaseModel):
     investment_horizon: InvestmentHorizon | None = None
     tax_type: AccountTaxType | None = None
     sort_order: int = 0
+    target_source: Literal["MANUAL", "RECOMMENDATION", "TACTICAL"] | None = None
+    target_source_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

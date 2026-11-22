@@ -45,6 +45,7 @@ export default function GoalWizardRecommendationStep({
         name: "추천 포트폴리오",
         // 반올림 합계가 100±0.01을 벗어나면 백엔드 검증에 걸리므로 추천 카드와 같은 정규화를 거친다
         items: normalizeWeights(recommendation?.recommended_items ?? []),
+        target_source: "RECOMMENDATION",
       }),
     // 생성만 하고 계획탭에 머물면 계좌 미연결 고아 포트폴리오로 남기 쉬움 — 바로 해당 포트폴리오로
     // 이동시켜 계좌 연결·드리프트 진단으로 이어지게 한다.

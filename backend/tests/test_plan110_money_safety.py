@@ -326,6 +326,55 @@ class TestPortfolioRowLock:
         assert stmt.get_execution_options().get("populate_existing") is True
 
 
+class TestPortfolioTargetSource:
+    """plans/145 C1 — 항목을 바꿀 때만 목표 비중 출처·시각을 남긴다."""
+
+    @staticmethod
+    def _db_with(portfolio):
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = portfolio
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=result)
+        db.add = MagicMock()
+        return db
+
+    async def test_items_update_records_source(self):
+        from app.schemas.portfolio import PortfolioUpdate
+        from app.services.portfolio import portfolio_crud_service as crud
+
+        portfolio = SimpleNamespace(id=uuid.uuid4(), linked_accounts=[], target_source=None, target_source_at=None)
+        body = PortfolioUpdate(
+            items=[{"ticker": "VOO", "market": "NYSE", "name": "VOO", "weight": 100}],
+            target_source="RECOMMENDATION",
+        )
+        with patch.object(crud, "load_portfolio_with_relations", new=AsyncMock(return_value=portfolio)):
+            await crud.update_portfolio(self._db_with(portfolio), uuid.uuid4(), portfolio.id, body)
+        assert portfolio.target_source == "RECOMMENDATION"
+        assert portfolio.target_source_at is not None
+
+    async def test_rename_keeps_source(self):
+        from app.schemas.portfolio import PortfolioUpdate
+        from app.services.portfolio import portfolio_crud_service as crud
+
+        portfolio = SimpleNamespace(
+            id=uuid.uuid4(), linked_accounts=[], name="옛 이름", target_source="TACTICAL", target_source_at=None
+        )
+        with patch.object(crud, "load_portfolio_with_relations", new=AsyncMock(return_value=portfolio)):
+            await crud.update_portfolio(
+                self._db_with(portfolio), uuid.uuid4(), portfolio.id, PortfolioUpdate(name="새 이름")
+            )
+        assert portfolio.target_source == "TACTICAL"
+        assert portfolio.target_source_at is None
+
+    def test_client_cannot_claim_tactical(self):
+        from pydantic import ValidationError
+
+        from app.schemas.portfolio import PortfolioUpdate
+
+        with pytest.raises(ValidationError):
+            PortfolioUpdate(target_source="TACTICAL")
+
+
 class TestInterpolateWeights:
     """A5 — 분할 적용 합계가 100을 벗어나면 이후 PUT 검증에 걸린다."""
 

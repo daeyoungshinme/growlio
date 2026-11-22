@@ -487,6 +487,7 @@ describe("RecommendationCard", () => {
 
       await waitFor(() => expect(updatePortfolio).toHaveBeenCalled());
       expect(updatePortfolio).toHaveBeenCalledWith("target-1", {
+        target_source: "RECOMMENDATION",
         items: [
           { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 33.3 },
           { ticker: "SCHD", name: "Schwab US Dividend Equity ETF", market: "NYSE", weight: 33.3 },
@@ -1424,6 +1425,7 @@ describe("RecommendationCard", () => {
 
       await waitFor(() => expect(updatePortfolio).toHaveBeenCalled());
       expect(updatePortfolio).toHaveBeenCalledWith("target-1", {
+        target_source: "RECOMMENDATION",
         items: [
           {
             ticker: "CASH_EQUIVALENT",
@@ -1484,6 +1486,7 @@ describe("RecommendationCard", () => {
 
       await waitFor(() => expect(updatePortfolio).toHaveBeenCalled());
       expect(updatePortfolio).toHaveBeenCalledWith("target-1", {
+        target_source: "RECOMMENDATION",
         items: [
           {
             ticker: "CASH_EQUIVALENT",
@@ -1514,6 +1517,7 @@ describe("RecommendationCard", () => {
 
       await waitFor(() => expect(updatePortfolio).toHaveBeenCalled());
       expect(updatePortfolio).toHaveBeenCalledWith("target-1", {
+        target_source: "RECOMMENDATION",
         items: [
           { ticker: "153130", name: "KODEX 단기채권", market: "KOSPI", weight: 60 },
           { ticker: "114260", name: "KODEX 국고채3년", market: "KOSPI", weight: 40 },

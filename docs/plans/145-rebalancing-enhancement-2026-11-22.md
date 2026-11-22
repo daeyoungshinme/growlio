@@ -137,7 +137,14 @@
 
 ---
 
-## PR4 — 목표 비중 출처·홈 연동 (feat/rebalancing-145-source)
+## PR4 — 목표 비중 출처·홈 연동 (feat/rebalancing-145-source) — 구현 완료
+
+> 실제 반영:
+> - 마이그레이션은 `rb3_portfolio_target_source`로 따로 냈다(rb2는 이미 운영 적용).
+> - 출처는 화면이 MANUAL/RECOMMENDATION만 보낼 수 있고, TACTICAL은 전술 적용(`apply_regime_to_portfolio`)만 기록한다.
+> - 추천에서 "이 비중으로 새 포트폴리오 만들기"와 목표 설정 마법사의 생성도 RECOMMENDATION으로 기록한다.
+> - 판정 로직을 `find_drifted_targets`(순수)로 분리해 주간 알림과 홈이 같이 쓴다. 홈은 `peek_drifted_portfolios`로 캐시(1시간·stale)만 읽어서, 추천 탭을 연 적이 없으면 뜨지 않는다.
+> - 출처 표시는 포트폴리오 카드 한 곳만 둔다(`AnalysisPanel`에는 넣지 않음 — PR2의 중복 정리와 같은 이유).
 
 **C1. 목표 비중 출처 기록**
 - `Portfolio`에 `target_source: String(16) | None`(MANUAL/RECOMMENDATION/TACTICAL)과 `target_source_at: DateTime | None`을 추가한다. 마이그레이션은 PR3의 `rb2`에 합치거나 `rb3`로 만든다.

@@ -195,6 +195,7 @@ export default function PortfolioManageTab({
       account_ids: string[] | null;
       investment_horizon: InvestmentHorizon | null;
       tax_type: AccountTaxType | null;
+      target_source: "MANUAL" | "RECOMMENDATION";
     }) => createPortfolio(args),
     onSuccess: (created) => {
       void invalidatePortfolioData(qc);
@@ -285,6 +286,8 @@ export default function PortfolioManageTab({
         account_ids: accountIds,
         investment_horizon: investmentHorizon,
         tax_type: taxType,
+        // 추천 카드의 "이 비중으로 새 포트폴리오 만들기"로 열렸으면(빈 prefill은 그냥 새로 만들기) 추천 출처
+        target_source: prefillItems?.length ? "RECOMMENDATION" : "MANUAL",
       });
     }
   }

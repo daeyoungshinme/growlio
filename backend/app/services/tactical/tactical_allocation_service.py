@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -347,6 +348,8 @@ async def apply_regime_to_portfolio(
     await db.execute(delete(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio.id))
     for idx, asset in enumerate(a for a in TACTICAL_ASSETS if weights.get(a, 0) > 0):
         db.add(_new_item(portfolio, asset, weights[asset], idx, groups.get(asset)))
+    portfolio.target_source = "TACTICAL"
+    portfolio.target_source_at = datetime.now(UTC)
     if fraction >= 1:
         strategy.applied_regime = regime
         strategy.notified_dip_level = strategy.dip_level or 0

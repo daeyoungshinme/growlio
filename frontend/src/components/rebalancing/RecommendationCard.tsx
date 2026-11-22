@@ -6,7 +6,7 @@ import {
   fetchHorizonGoalRecommendations,
   type GoalRecommendationItem,
 } from "@/api/rebalancing";
-import { updatePortfolio, type PortfolioItem } from "@/api/portfolios";
+import { updatePortfolio } from "@/api/portfolios";
 import {
   ACCOUNT_TAX_TYPE_LABELS,
   INVESTMENT_HORIZON_LABELS,
@@ -149,8 +149,10 @@ export default function RecommendationCard({
     }) => {
       // 대상 포트폴리오의 지수 그룹(plans/74)은 유지 — 추천이 그룹 멤버를 내면 그룹 비중으로 합산한다
       const current = portfolios.find((p) => p.id === portfolioId)?.items ?? [];
-      const body: { items: PortfolioItem[]; account_ids?: string[] } = {
+      const body: Parameters<typeof updatePortfolio>[1] = {
         items: toPortfolioItemsPreservingGroups(items, current),
+        // 홈 "추천이 바뀜"은 이 출처의 포트폴리오만 알린다(plans/145 C3)
+        target_source: "RECOMMENDATION",
       };
       if (accountIds?.length) body.account_ids = accountIds;
       await updatePortfolio(portfolioId, body);

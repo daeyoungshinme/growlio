@@ -48,6 +48,27 @@ def _portfolio(
     )
 
 
+class TestPeekDriftedPortfolios:
+    """plans/145 C3 — 홈 조회 경로는 캐시에 있는 추천만 본다(계산하지 않는다)."""
+
+    @pytest.mark.asyncio
+    async def test_empty_cache_returns_nothing_without_db(self):
+        from app.services.alerts.recommendation_drift_alert_service import peek_drifted_portfolios
+
+        db = AsyncMock()
+        with (
+            patch(f"{_MODULE}.get_goal_recommendation_generation", new=AsyncMock(return_value="g")),
+            patch(f"{_MODULE}.get_cached_goal_recommendation", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_stale_goal_recommendation", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_cached_horizon_recommendations", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_stale_horizon_recommendations", new=AsyncMock(return_value=None)),
+            patch(f"{_MODULE}.get_goal_recommendation") as compute,
+        ):
+            assert await peek_drifted_portfolios(uuid.uuid4(), db, None) == []
+        compute.assert_not_called()
+        db.execute.assert_not_called()
+
+
 class TestIsFullTarget:
     def test_true_when_all_relevant_accounts_target_this_portfolio(self):
         pid = uuid.uuid4()
