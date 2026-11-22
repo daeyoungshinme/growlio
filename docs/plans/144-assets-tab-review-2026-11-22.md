@@ -132,3 +132,17 @@
   - 계좌 select 변경 시 추이 차트가 따라가는지
   - 은행 정렬이 새로고침 후에도 유지되는지
 - 마이그레이션 없음. 모델 변경이 없다.
+
+---
+
+## 결과 (2026-11-22)
+
+- PR1·PR2·PR3 모두 구현함. 브랜치는 `fix/assets-tab-144`(커밋 3개)이고 아직 푸시하지 않았다.
+- **C1 변경**: 계획 50 M3에서 계좌관리 "전체 자산 구성" 카드를 일부러 지웠고, 이를 고정하는 테스트(`pages.low-coverage.test.tsx`)가 있다.
+  - 그래서 사용자 결정으로 `NetWorthSummaryCard`는 **만들지 않았다**.
+  - 투자현황에는 **계좌를 고른 경우에만** 그 계좌의 추이 카드(`AllocationHistoryCard` 재사용, 기본 접힘)를 둔다. 전체 합산 추이는 홈 카드와 같아서 두지 않는다.
+- B7의 `RealEstateSummaryCard`·`HorizonSummaryCard` reduce memo는 하지 않았다. 계좌 몇 개짜리 합산이라 측정할 만한 이득이 없다.
+- 확인 대기
+  - 실 DB 테스트 `TestAllocationHistoryExcludedAccount`는 로컬에 Docker가 없어 CI에서만 돈다.
+  - 390px 실기기 확인
+  - 합산 제외 계좌가 있는 운영 계정에서 투자현황 %가 100% 이하인지 확인

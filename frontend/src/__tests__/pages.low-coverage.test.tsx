@@ -312,6 +312,41 @@ describe("AssetManagementPage", () => {
     expect(screen.getByText("계좌 추가")).toBeInTheDocument();
   });
 
+  it("은행계좌 탭: 합계 카드와 정렬 — 금액순을 고르면 큰 잔액부터, 선택은 저장된다", () => {
+    const bank = (id: string, name: string, amount: number) => ({
+      id,
+      name,
+      asset_type: "BANK_ACCOUNT",
+      data_source: "MANUAL",
+      institution: null,
+      deposit_krw: null,
+      deposit_usd: null,
+      manual_amount: amount,
+      notes: null,
+    });
+    vi.mocked(useAssetManagementData).mockReturnValue({
+      accounts: [bank("b1", "작은 통장", 1_000_000), bank("b2", "큰 통장", 9_000_000)],
+      isLoading: false,
+      error: null,
+      refetchAccounts: vi.fn(),
+      overview: undefined,
+      txTotals: [],
+      statsStatus: "ready",
+      retryStats: vi.fn(),
+      usdRate: 1350,
+    } as never);
+    renderPage(<AssetManagementPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "은행계좌" }));
+
+    expect(screen.getByText("은행계좌 합계")).toBeInTheDocument();
+    const names = () => screen.getAllByText(/통장$/).map((el) => el.textContent);
+    expect(names()).toEqual(["작은 통장", "큰 통장"]);
+    fireEvent.click(screen.getByRole("button", { name: "금액순" }));
+    expect(names()).toEqual(["큰 통장", "작은 통장"]);
+    expect(localStorage.getItem("growlio:assets:accountSort")).toBe("amount");
+    localStorage.removeItem("growlio:assets:accountSort");
+  });
+
   it("계좌가 없을 때 빈 상태 메시지를 표시한다", () => {
     renderPage(<AssetManagementPage />);
     expect(screen.getByText("등록된 증권계좌가 없습니다.")).toBeInTheDocument();

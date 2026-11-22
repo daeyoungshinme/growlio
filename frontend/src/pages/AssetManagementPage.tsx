@@ -9,6 +9,10 @@ import {
   RealEstateSummaryCard,
 } from "@/components/assets/RealEstateSection";
 import BankAccountCard from "@/components/assets/BankAccountCard";
+import BankAccountSummaryCard from "@/components/assets/BankAccountSummaryCard";
+import SegmentedControl from "@/components/common/SegmentedControl";
+import { useAccountSortMode } from "@/hooks/useAccountSortMode";
+import { ACCOUNT_SORT_OPTIONS, bankBalanceKrw, sortAccounts } from "@/utils/accountSort";
 
 const StockPositionsModal = lazy(() => import("@/components/assets/StockPositionsModal"));
 const TransactionModal = lazy(() => import("@/components/assets/TransactionModal"));
@@ -163,6 +167,40 @@ export default function AssetManagementPage() {
 
   const stockAccountStats = useStockAccountStats(stockAccounts, overview, txTotals);
 
+  const [sortMode, setSortMode] = useAccountSortMode();
+  const sortedBankAccounts = useMemo(
+    () =>
+      sortAccounts(
+        bankAccounts,
+        sortMode,
+        (a) => bankBalanceKrw(a, usdRate).krw,
+        (a) => a.name,
+      ),
+    [bankAccounts, sortMode, usdRate],
+  );
+  const sortedStockStats = useMemo(
+    () =>
+      sortAccounts(
+        stockAccountStats,
+        sortMode,
+        ({ stats }) => stats.amount_krw,
+        ({ account }) => account.name,
+      ),
+    [stockAccountStats, sortMode],
+  );
+  // 계좌가 2개 이상일 때만 — 하나면 정렬할 것이 없다
+  const sortControl =
+    currentBankOrStock.length >= 2 ? (
+      <div className="flex justify-end">
+        <SegmentedControl
+          ariaLabel="계좌 정렬"
+          options={ACCOUNT_SORT_OPTIONS}
+          value={sortMode}
+          onChange={setSortMode}
+        />
+      </div>
+    ) : null;
+
   if (error)
     return (
       <PageLoadError
@@ -264,7 +302,9 @@ export default function AssetManagementPage() {
               </div>
             ) : tab === "은행계좌" ? (
               <div className="space-y-3">
-                {bankAccounts.map((account) => (
+                <BankAccountSummaryCard accounts={bankAccounts} usdRate={usdRate} />
+                {sortControl}
+                {sortedBankAccounts.map((account) => (
                   <BankAccountCard
                     key={account.id}
                     account={account}
@@ -283,8 +323,9 @@ export default function AssetManagementPage() {
               <div className="space-y-3">
                 {/* 증권계좌 합계(누적 입금·배당·예수금) — 평가액은 투자현황이 권위 표면 */}
                 <StockAccountSummaryCard perAccountStats={stockAccountStats} usdRate={usdRate} />
+                {sortControl}
                 {/* 계좌별 카드 */}
-                {stockAccountStats.map(({ account, stats }) => (
+                {sortedStockStats.map(({ account, stats }) => (
                   <StockAccountCard
                     key={account.id}
                     account={account}

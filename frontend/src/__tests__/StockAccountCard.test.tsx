@@ -204,8 +204,36 @@ describe("StockAccountCard", () => {
       dividend_total: 100000,
     };
     renderWithProviders(<StockAccountCard {...defaultProps} stats={stats} />);
-    const toggle = screen.getByRole("button", { name: /누적 입금·배당 보기/ });
+    const toggle = screen.getByRole("button", { name: /누적 입금/ });
     expect(toggle).toHaveClass("col-span-2");
     expect(toggle).toHaveClass("sm:col-span-3");
+  });
+
+  it("펼치면 순입금(입금 − 출금) 대비 수익을 보인다", () => {
+    const stats = {
+      amount_krw: 12_000_000,
+      invested_krw: 9_000_000,
+      unrealized_pnl: 3_000_000,
+      deposit_total: 11_000_000,
+      withdrawal_total: 1_000_000,
+      dividend_total: 100000,
+    };
+    renderWithProviders(<StockAccountCard {...defaultProps} stats={stats} />);
+    fireEvent.click(screen.getByRole("button", { name: "입금 대비 수익·누적 입금 보기" }));
+    // 순입금 1,000만원 대비 평가액 1,200만원 — 배당은 평가액에 이미 들어 있어 다시 더하지 않는다
+    expect(screen.getByText("+200만원 (+20.00%)")).toBeInTheDocument();
+  });
+
+  it("입금 기록이 없으면 입금 대비 수익을 보이지 않는다", () => {
+    const stats = {
+      amount_krw: 5_000_000,
+      invested_krw: 4_000_000,
+      unrealized_pnl: 1_000_000,
+      deposit_total: 0,
+      dividend_total: 100000,
+    };
+    renderWithProviders(<StockAccountCard {...defaultProps} stats={stats} />);
+    fireEvent.click(screen.getByRole("button", { name: "누적 입금·배당 보기" }));
+    expect(screen.queryByText("입금 대비")).toBeNull();
   });
 });
