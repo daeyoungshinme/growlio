@@ -115,6 +115,7 @@ describe("StockAccountSummaryCard", () => {
           },
         ]}
         usdRate={1350}
+        statsStatus="ready"
       />,
     );
     expect(screen.getByText("증권계좌 합계")).toBeDefined();
@@ -125,7 +126,9 @@ describe("StockAccountSummaryCard", () => {
   });
 
   it("renders with no accounts", () => {
-    renderWithProviders(<StockAccountSummaryCard perAccountStats={[]} usdRate={null} />);
+    renderWithProviders(
+      <StockAccountSummaryCard perAccountStats={[]} usdRate={null} statsStatus="ready" />,
+    );
     expect(screen.getByText("증권계좌 합계")).toBeDefined();
     expect(screen.queryByText(/입금 대비 수익/)).toBeNull();
   });
@@ -145,10 +148,47 @@ describe("StockAccountSummaryCard", () => {
           },
         ]}
         usdRate={1350}
+        statsStatus="ready"
       />,
     );
     expect(screen.getByText(/입금 기록 있는 1개 계좌/)).toBeInTheDocument();
     expect(screen.getByText("+100만원 (+10.00%)")).toBeInTheDocument();
+  });
+
+  it("평가액을 아직 못 받았으면 입금 대비 수익(−100%)을 내지 않는다(plans/146 C1)", () => {
+    const base = { invested_krw: 0, unrealized_pnl: 0, dividend_total: 0 };
+    renderWithProviders(
+      <StockAccountSummaryCard
+        perAccountStats={[
+          {
+            account: mockStockAccount,
+            stats: { ...base, amount_krw: 0, deposit_total: 10_000_000 },
+          },
+        ]}
+        usdRate={1350}
+        statsStatus="error"
+      />,
+    );
+    expect(screen.queryByText(/입금 대비 수익/)).toBeNull();
+  });
+
+  it("합산 제외 계좌는 합계에서 빼고 그 사실을 알린다(plans/146 C2)", () => {
+    const base = { invested_krw: 0, unrealized_pnl: 0, dividend_total: 0, amount_krw: 0 };
+    renderWithProviders(
+      <StockAccountSummaryCard
+        perAccountStats={[
+          { account: mockStockAccount, stats: { ...base, deposit_total: 3_000_000 } },
+          {
+            account: { ...mockStockAccount, id: "s2", include_in_total: false },
+            stats: { ...base, deposit_total: 50_000_000 },
+          },
+        ]}
+        usdRate={1350}
+        statsStatus="ready"
+      />,
+    );
+    expect(screen.getByText("300만원")).toBeInTheDocument();
+    expect(screen.getByText("합산 제외 계좌 1개는 빠짐")).toBeInTheDocument();
   });
 });
 
@@ -174,6 +214,17 @@ describe("BankAccountSummaryCard", () => {
     expect(screen.getByText("1,500만원")).toBeInTheDocument();
     expect(screen.getByText("입출금")).toBeInTheDocument();
     expect(screen.getByText("예·적금")).toBeInTheDocument();
+  });
+
+  it("합산 제외 계좌는 총 잔액에서 뺀다(plans/146 C2)", () => {
+    renderWithProviders(
+      <BankAccountSummaryCard
+        accounts={[mockBankAccount, { ...mockBankAccount, id: "bank2", include_in_total: false }]}
+        usdRate={1350}
+      />,
+    );
+    expect(screen.getByText("500만원")).toBeInTheDocument();
+    expect(screen.getByText("합산 제외 계좌 1개는 빠짐")).toBeInTheDocument();
   });
 
   it("환율이 없으면 달러를 빼고 그 사실을 알린다", () => {

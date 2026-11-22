@@ -5,6 +5,8 @@ import { clampPct, fmtKrw, fmtKrwShort, pctOf } from "@/utils/format";
 
 interface Props {
   overview: PortfolioOverview | undefined;
+  /** 계좌를 직접 골랐다 — 지정한 계좌는 합산 제외여도 항상 포함한다(plans/144 A2 원칙, plans/146 C3) */
+  accountSelected?: boolean;
 }
 
 const HORIZON_ORDER: InvestmentHorizon[] = ["SHORT_TERM", "MID_TERM", "LONG_TERM"];
@@ -28,10 +30,10 @@ function stockValue(a: AccountRow): number {
 
 /** 계좌에 태그된 투자기간(단기/중기/장기)별 주식 평가액 합계를 보여준다. 태그된 증권 계좌가 하나도 없으면
  * 표시하지 않는다. 항상 상위 섹션(자산 › 투자현황) 내부에 임베드되는 형태로만 렌더된다. */
-export default function HorizonSummaryCard({ overview }: Props) {
-  // 상단 주식 총평가액과 같은 기준 — 합산 제외 계좌는 뺀다(plans/144 A2)
+export default function HorizonSummaryCard({ overview, accountSelected = false }: Props) {
+  // 상단 주식 총평가액과 같은 기준 — 전체 보기에선 합산 제외 계좌를 뺀다(plans/144 A2)
   const tagged = horizonTaggedAccounts(overview?.accounts ?? []).filter(
-    (a) => a.include_in_total !== false,
+    (a) => accountSelected || a.include_in_total !== false,
   );
   if (tagged.length === 0) return null;
 

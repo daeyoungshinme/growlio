@@ -23,6 +23,7 @@ from sqlalchemy.pool import NullPool
 from app.models.app_state import AppState
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.models.user import User
+from app.utils.kst import today_kst
 
 pytestmark = pytest.mark.db
 
@@ -286,7 +287,7 @@ class TestAllocationHistoryExcludedAccount:
         )
         pg.add(excluded)
         await pg.flush()
-        day = date.today().replace(day=1)
+        day = today_kst().replace(day=1)
         pg.add_all(
             [
                 AssetSnapshot(account_id=included.id, user_id=user.id, snapshot_date=day, amount_krw=1_000_000),

@@ -11,17 +11,24 @@ interface Props {
 
 /** 은행계좌 탭 합계(plans/144 C3) — 증권·부동산 요약 카드와 같은 모양. 잔액 계산은 `BankAccountCard`와 같은 함수. */
 export default function BankAccountSummaryCard({ accounts, usdRate }: Props) {
-  const { total, byType, usdPending } = useMemo(() => {
+  const { total, byType, usdPending, excludedCount } = useMemo(() => {
     let sum = 0;
     let pending = false;
     const types = new Map<string, number>();
-    for (const account of accounts) {
+    // 합산 제외 계좌는 합계에서 뺀다 — 투자현황·홈 총자산과 같은 기준(plans/146 C2)
+    const included = accounts.filter((a) => a.include_in_total !== false);
+    for (const account of included) {
       const b = bankBalanceKrw(account, usdRate);
       sum += b.krw;
       pending ||= b.usdPending;
       types.set(account.asset_type, (types.get(account.asset_type) ?? 0) + b.krw);
     }
-    return { total: sum, byType: [...types.entries()], usdPending: pending };
+    return {
+      total: sum,
+      byType: [...types.entries()],
+      usdPending: pending,
+      excludedCount: accounts.length - included.length,
+    };
   }, [accounts, usdRate]);
 
   return (
@@ -50,6 +57,11 @@ export default function BankAccountSummaryCard({ accounts, usdRate }: Props) {
             </div>
           ))}
       </div>
+      {excludedCount > 0 && (
+        <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+          합산 제외 계좌 {excludedCount}개는 빠짐
+        </p>
+      )}
     </div>
   );
 }
