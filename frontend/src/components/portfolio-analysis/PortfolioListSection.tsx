@@ -9,13 +9,15 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeftRight, CircleAlert, Loader2, Plus, Target } from "lucide-react";
+import { ArrowLeftRight, CircleAlert, Plus, Target } from "lucide-react";
 import { Portfolio } from "@/api/portfolios";
 import { RebalancingAlert } from "@/api/alerts";
 import { AssetAccount } from "@/api/assets";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
 import { getPortfolioTargetState } from "@/utils/portfolio";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import EmptyState from "@/components/common/EmptyState";
+import SkeletonCard from "@/components/common/SkeletonCard";
 import Modal, { ModalBody } from "@/components/common/Modal";
 import { useIsSmUp } from "@/hooks/useMediaQuery";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
@@ -50,6 +52,9 @@ function SortablePortfolioItem({
 interface PortfolioListSectionProps {
   portfolios: Portfolio[];
   isLoading: boolean;
+  /** 조회 실패 — "첫 포트폴리오를 만들어 보세요"로 보이면 안 된다 */
+  isError?: boolean;
+  onRetry?: () => void;
   selectedIds: Set<string>;
   stockAccounts: AssetAccount[];
   alertPortfolioIds: Set<string>;
@@ -68,6 +73,8 @@ interface PortfolioListSectionProps {
 export default function PortfolioListSection({
   portfolios,
   isLoading,
+  isError = false,
+  onRetry,
   selectedIds,
   stockAccounts,
   alertPortfolioIds,
@@ -161,8 +168,7 @@ export default function PortfolioListSection({
         accountLabel={getAccountLabel(p)}
         showAccountLabel={stockAccounts.length > 1}
         drift={driftByPortfolioId?.[p.id]}
-        alertMode={alertByPortfolioId[p.id]?.mode}
-        hasAlert={alertPortfolioIds.has(p.id)}
+        alert={alertByPortfolioId[p.id]}
         isTargetPending={isTargetPending}
         dragHandleListeners={dragHandleListeners}
         onToggleSelect={inSheet(onToggleSelect)}
@@ -248,9 +254,12 @@ export default function PortfolioListSection({
       )}
 
       {isLoading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 size={20} className="animate-spin text-gray-400 dark:text-gray-500" />
-        </div>
+        <SkeletonCard rows={2} />
+      ) : isError && portfolios.length === 0 ? (
+        <EmptyState
+          title="포트폴리오를 불러오지 못했습니다."
+          action={onRetry ? { label: "다시 시도", onClick: onRetry } : undefined}
+        />
       ) : portfolios.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-5 text-center space-y-4">
           <Target size={28} className="mx-auto text-gray-400 dark:text-gray-500" />

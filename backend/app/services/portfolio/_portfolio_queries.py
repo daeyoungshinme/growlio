@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.models.alert import RebalancingAlert
 from app.models.asset import RebalancingExecution
 from app.models.portfolio import Portfolio, PortfolioAccount
+from app.services.rebalancing.drift_rule import DEFAULT_DRIFT_THRESHOLD_PCT
 
 
 async def get_linked_portfolios(db: AsyncSession, user_id: uuid.UUID) -> list[Portfolio]:
@@ -58,9 +59,6 @@ async def get_active_alerts_by_portfolio(db: AsyncSession, user_id: uuid.UUID) -
     for alert in rows:
         grouped.setdefault(str(alert.portfolio_id), []).append(alert)
     return grouped
-
-
-DEFAULT_DRIFT_THRESHOLD_PCT = 5.0
 
 
 def alert_drift_thresholds(alerts: list[RebalancingAlert]) -> tuple[float, float | None]:

@@ -157,6 +157,21 @@ interface Props {
 const ALL_INSIGHT_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
 const SEVERITY_ORDER: Record<InsightSeverity, number> = { ALERT: 0, WARNING: 1, INFO: 2 };
 
+/** 카드 안 한 영역의 조회 실패 — 영역을 통째로 숨기면 "이탈 없음"·"진단 없음"으로 읽힌다 */
+function SectionLoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-3 py-2 my-2">
+      <span>{message}</span>
+      <button
+        onClick={onRetry}
+        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-none gap-1 font-medium hover:text-red-600 dark:hover:text-red-300 transition-colors`}
+      >
+        다시 시도
+      </button>
+    </div>
+  );
+}
+
 export default function RebalancingStatusCard({ onPortfolioSelect, emptyStateCta }: Props) {
   const [isOpen, toggleOpen] = useCollapsible(true);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
@@ -170,9 +185,13 @@ export default function RebalancingStatusCard({ onPortfolioSelect, emptyStateCta
 
   // /drift-summary는 백엔드에서 자체적으로 포트폴리오 목록을 조회하므로(빈 목록이면 [] 반환),
   // 프론트의 portfolios 쿼리 완료를 기다릴 필요 없이 독립적으로 즉시 발화한다.
-  const { data: driftSummaries } = useQuery(driftSummaryQuery);
+  const {
+    data: driftSummaries,
+    isError: driftError,
+    refetch: refetchDrift,
+  } = useQuery(driftSummaryQuery);
 
-  const { data: allInsights } = useInsights();
+  const { data: allInsights, isError: insightsError, refetch: refetchInsights } = useInsights();
   const diagInsights = useMemo(() => {
     return [...(allInsights ?? [])]
       .filter((i) => ALL_INSIGHT_TYPES.includes(i.type))
@@ -214,15 +233,10 @@ export default function RebalancingStatusCard({ onPortfolioSelect, emptyStateCta
   if (portfoliosError) {
     return (
       <div className="card">
-        <div className="flex items-center justify-between gap-2 text-xs text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-3 py-2">
-          <span>포트폴리오 현황을 불러오지 못했습니다.</span>
-          <button
-            onClick={() => refetchPortfolios()}
-            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-none gap-1 font-medium hover:text-red-600 dark:hover:text-red-300 transition-colors`}
-          >
-            다시 시도
-          </button>
-        </div>
+        <SectionLoadError
+          message="포트폴리오 현황을 불러오지 못했습니다."
+          onRetry={() => void refetchPortfolios()}
+        />
       </div>
     );
   }
@@ -279,6 +293,13 @@ export default function RebalancingStatusCard({ onPortfolioSelect, emptyStateCta
         </p>
       )}
 
+      {driftError && !driftSummaries && (
+        <SectionLoadError
+          message="이탈 현황을 불러오지 못했습니다."
+          onRetry={() => void refetchDrift()}
+        />
+      )}
+
       {/* 포트폴리오별 드리프트 현황 */}
       {driftSummaries && driftSummaries.length > 0 && (
         <div className="space-y-0.5 mt-1 mb-2">
@@ -292,6 +313,13 @@ export default function RebalancingStatusCard({ onPortfolioSelect, emptyStateCta
             <p className="text-xs text-gray-500 dark:text-gray-400 px-3 pt-1">{deductionNote}</p>
           )}
         </div>
+      )}
+
+      {insightsError && !allInsights && (
+        <SectionLoadError
+          message="전체 자산 진단을 불러오지 못했습니다."
+          onRetry={() => void refetchInsights()}
+        />
       )}
 
       {/* 진단 결과 섹션 */}

@@ -3,6 +3,7 @@ import { memo } from "react";
 import { TriangleAlert, Anchor, CircleCheck, Pen, GripVertical, Trash2 } from "lucide-react";
 import { Portfolio } from "@/api/portfolios";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
+import type { RebalancingAlert } from "@/api/alerts";
 import { DRIFT_STATUS_LABEL, getDriftStatus } from "@/utils/portfolio";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 import {
@@ -18,8 +19,8 @@ interface PortfolioCardProps {
   accountLabel: string;
   showAccountLabel: boolean;
   drift?: PortfolioDriftSummary;
-  alertMode?: "NOTIFY" | "AUTO";
-  hasAlert: boolean;
+  /** 꺼진 알림 포함 — 칩이 "꺼짐"·"적립매수"를 가리려면 is_active·스케줄·전략까지 필요하다 */
+  alert?: RebalancingAlert;
   isTargetPending: boolean;
   /** 없으면 순서 변경 핸들을 그리지 않는다(모바일 선택 카드 — 순서는 시트 목록에서) */
   dragHandleListeners?: React.HTMLAttributes<HTMLElement>;
@@ -37,8 +38,7 @@ const PortfolioCard = memo(function PortfolioCard({
   accountLabel,
   showAccountLabel,
   drift,
-  alertMode,
-  hasAlert,
+  alert,
   isTargetPending,
   dragHandleListeners,
   onToggleSelect,
@@ -192,7 +192,7 @@ const PortfolioCard = memo(function PortfolioCard({
           <span>{tState === "full" ? "기준" : tState === "partial" ? "일부" : "기준 지정"}</span>
         </button>
         <AutomationStatusBar
-          existingAlert={hasAlert ? { mode: alertMode } : undefined}
+          existingAlert={alert}
           onOpenAlertModal={() => onOpenAlertModal(p.id)}
           compact
         />

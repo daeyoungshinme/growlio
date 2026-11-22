@@ -17,16 +17,19 @@ vi.mock("@/api/alerts", async (importOriginal) => ({
 vi.mock("@/api/rebalancingPlan", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/api/rebalancingPlan")>()),
   fetchRecentPlanLegs: vi.fn(),
+  cancelPlanLeg: vi.fn(),
 }));
 
 vi.mock("@/api/rebalancing", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/api/rebalancing")>()),
   fetchRebalancingHistory: vi.fn(),
+  fetchRebalancingExecutionDetail: vi.fn(),
 }));
 
 import { fetchRebalancingAlert } from "@/api/alerts";
-import { fetchRecentPlanLegs } from "@/api/rebalancingPlan";
-import { fetchRebalancingHistory } from "@/api/rebalancing";
+import { cancelPlanLeg, fetchRecentPlanLegs } from "@/api/rebalancingPlan";
+import { fetchRebalancingExecutionDetail, fetchRebalancingHistory } from "@/api/rebalancing";
+import { fireEvent, within } from "@testing-library/react";
 import { useRebalancingAlertQueries } from "@/hooks/useRebalancingAlertForm";
 import RebalancingHistoryTab from "@/components/rebalancing/RebalancingHistoryTab";
 
@@ -85,6 +88,88 @@ describe("조회 실패를 '없음'으로 보이지 않는다 (plans/109 D)", ()
       );
 
       expect(await screen.findByText("아직 실행 이력이 없습니다.")).toBeInTheDocument();
+    });
+
+    it("대기 플랜을 받는 중엔 '이력 없음'을 먼저 보이지 않는다 (plans/145 A3)", async () => {
+      vi.mocked(fetchRebalancingHistory).mockResolvedValue([]);
+      vi.mocked(fetchRecentPlanLegs).mockReturnValue(new Promise(() => {}));
+      renderWithProviders(
+        <MemoryRouter>
+          <RebalancingHistoryTab />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => expect(fetchRebalancingHistory).toHaveBeenCalled());
+      expect(screen.getByRole("status")).toBeInTheDocument();
+      expect(screen.queryByText("아직 실행 이력이 없습니다.")).toBeNull();
+    });
+
+    it("펼친 실행의 상세 조회가 실패하면 재시도를 보여준다", async () => {
+      vi.mocked(fetchRecentPlanLegs).mockResolvedValue([]);
+      vi.mocked(fetchRebalancingHistory).mockResolvedValue([
+        {
+          id: "exec-1",
+          triggered_by: "MANUAL",
+          strategy: "FULL",
+          total_success: 1,
+          total_fail: 0,
+          total_skipped: 0,
+          executed_at: "2026-11-01T00:00:00Z",
+        },
+      ] as never);
+      vi.mocked(fetchRebalancingExecutionDetail).mockRejectedValue(new Error("400"));
+      renderWithProviders(
+        <MemoryRouter>
+          <RebalancingHistoryTab />
+        </MemoryRouter>,
+      );
+
+      fireEvent.click(await screen.findByText("수동"));
+      expect(await screen.findByText("상세 정보를 불러오지 못했습니다.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
+    });
+
+    it("한 플랜을 처리하는 동안 다른 플랜의 버튼은 막지 않는다", async () => {
+      const leg = (id: string, name: string) => ({
+        plan_id: `plan-${id}`,
+        leg_id: id,
+        portfolio_id: "p1",
+        portfolio_name: name,
+        account_id: null,
+        account_name: null,
+        side: "BUY",
+        status: "PENDING",
+        deadline_at: "2099-01-01T00:00:00Z",
+        decided_at: null,
+        execution_id: null,
+        error_message: null,
+        actionable: true,
+        partially_executed: false,
+        items: [{ ticker: "AAA", name: "에이", quantity: 1 }],
+      });
+      vi.mocked(fetchRebalancingHistory).mockResolvedValue([]);
+      vi.mocked(fetchRecentPlanLegs).mockResolvedValue([
+        leg("a", "첫째"),
+        leg("b", "둘째"),
+      ] as never);
+      vi.mocked(cancelPlanLeg).mockReturnValue(new Promise(() => {}));
+      renderWithProviders(
+        <MemoryRouter>
+          <RebalancingHistoryTab />
+        </MemoryRouter>,
+      );
+
+      const cancels = await screen.findAllByRole("button", { name: "매수 취소" });
+      fireEvent.click(cancels[0]!);
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "매수 취소" }));
+
+      await waitFor(() => expect(cancelPlanLeg).toHaveBeenCalledWith("plan-a", "a"));
+      await waitFor(() => {
+        const [first, second] = screen.getAllByRole("button", { name: "매수 취소" });
+        expect(first).toBeDisabled();
+        expect(second).toBeEnabled();
+      });
     });
   });
 });

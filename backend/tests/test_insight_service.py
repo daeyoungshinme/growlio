@@ -67,6 +67,72 @@ class TestCheckConcentration:
 
 
 class TestCheckRebalancingOpportunity:
+    @pytest.fixture(autouse=True)
+    def _alerts(self):
+        """기본은 알림 없음(기준 5%p). 알림 기준을 쓰는 테스트는 `self.alerts`를 채운다."""
+        self.alerts: dict = {}
+        with patch(
+            "app.services.portfolio._portfolio_queries.get_active_alerts_by_portfolio",
+            new=AsyncMock(side_effect=lambda *_a: self.alerts),
+        ):
+            yield
+
+    @staticmethod
+    def _two_item_case(mock_db):
+        """목표 50/50, 보유 54/46 → 최대 이탈 4%p."""
+        portfolio = SimpleNamespace(
+            id=uuid.uuid4(),
+            name="둘",
+            base_type="STOCK_ONLY",
+            items=[
+                SimpleNamespace(ticker="AAPL", market="NASDAQ", name="애플", weight=50.0),
+                SimpleNamespace(ticker="MSFT", market="NASDAQ", name="MS", weight=50.0),
+            ],
+            account_ids=None,
+        )
+        exec_result = MagicMock()
+        exec_result.scalars.return_value.all.return_value = [portfolio]
+        mock_db.execute = AsyncMock(return_value=exec_result)
+        overview = {
+            "total_assets_krw": 1_000_000,
+            "total_stock_krw": 1_000_000,
+            "all_positions": [
+                {"ticker": "AAPL", "market": "NASDAQ", "value_krw": 540_000},
+                {"ticker": "MSFT", "market": "NASDAQ", "value_krw": 460_000},
+            ],
+        }
+        return portfolio, overview
+
+    @pytest.mark.asyncio
+    async def test_uses_alert_threshold_instead_of_fixed_five(self, mock_db, override_settings):
+        """plans/145 A4 — 4%p 이탈은 기본 5%p에선 조용하지만, 알림 기준 3%p면 '권장'이 뜬다(진단 행과 같은 판정)."""
+        from app.services.insight_service import InsightSeverity, _check_rebalancing_opportunity
+
+        portfolio, overview = self._two_item_case(mock_db)
+        with patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ):
+            assert await _check_rebalancing_opportunity(uuid.uuid4(), mock_db) == []
+            self.alerts = {str(portfolio.id): [SimpleNamespace(threshold_pct=3.0, relative_threshold_pct=None)]}
+            result = await _check_rebalancing_opportunity(uuid.uuid4(), mock_db)
+
+        assert len(result) == 1
+        assert result[0].severity == InsightSeverity.WARNING
+
+    @pytest.mark.asyncio
+    async def test_alert_severity_at_twice_threshold(self, mock_db, override_settings):
+        """기준의 2배 이상이면 ALERT — 기준 2%p에 4%p 이탈."""
+        from app.services.insight_service import InsightSeverity, _check_rebalancing_opportunity
+
+        portfolio, overview = self._two_item_case(mock_db)
+        self.alerts = {str(portfolio.id): [SimpleNamespace(threshold_pct=2.0, relative_threshold_pct=None)]}
+        with patch(
+            "app.services.portfolio.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)
+        ):
+            result = await _check_rebalancing_opportunity(uuid.uuid4(), mock_db)
+
+        assert result[0].severity == InsightSeverity.ALERT
+
     @pytest.mark.asyncio
     async def test_no_portfolios_returns_empty(self, mock_db, override_settings):
         from app.services.insight_service import _check_rebalancing_opportunity
@@ -463,7 +529,13 @@ class TestRebalancingOpportunityIsolation:
             # AAPL 0% → 목표 100%와 드리프트 100%p
             return {"total_assets_krw": 1_000_000, "total_stock_krw": 0, "all_positions": []}
 
-        with patch("app.services.portfolio.portfolio_service.build_portfolio_overview", new=overview):
+        with (
+            patch("app.services.portfolio.portfolio_service.build_portfolio_overview", new=overview),
+            patch(
+                "app.services.portfolio._portfolio_queries.get_active_alerts_by_portfolio",
+                new=AsyncMock(return_value={}),
+            ),
+        ):
             result = await _check_rebalancing_opportunity(uuid.uuid4(), session)
 
         assert len(result) == 1
