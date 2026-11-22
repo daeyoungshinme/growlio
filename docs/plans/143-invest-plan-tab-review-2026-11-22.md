@@ -1,6 +1,6 @@
 # 계획 143 — 계획탭(/invest-plan) 전체 감사·고도화 (2026-11-22)
 
-> 상태: PR1(A·E4) 구현 완료, PR2(B·C·D)·PR3(E1~E3) 남음. 착수 전 `git status`로 다른 세션 변경을 확인하고, 아래 파일:라인이 현재 코드와 다르면 코드를 우선한다.
+> 상태: PR1(A·E4)·PR2(B·C·D) 구현 완료, PR3(E1~E3) 남음. 착수 전 `git status`로 다른 세션 변경을 확인하고, 아래 파일:라인이 현재 코드와 다르면 코드를 우선한다.
 
 ## Context
 계획탭(적립 계획·배당 계획·절세·챌린지)은 계획 8(2026-07) 이후로 탭 단위 감사를 받은 적이 없다. 그사이 50·67·106·110·113·139에서 부분 수정만 쌓였다. 이번 조사에서 확인한 문제는 세 종류다.
@@ -116,3 +116,26 @@
 - **A7** 배당 계획 필요 배당수익률 분모에 부동산이 들어가던 실버그 → 추천과 같은 `investable_assets_krw`. 모의 계좌 배당·이자: 브로커 동기화가 거래내역을 만들지 않아 사용자가 직접 넣은 경우만 해당 → 변경 안 함.
 - **E4** remaining-tasks P4 "대주주 50억·금투세" 줄 삭제.
 - 미반영: D4 `tax_action_builders.py` 504줄(PR2에서 분리).
+
+## PR2 결과 (2026-11-22)
+
+- **B1** 세금 추정의 금융소득 경고에서 건보 상세(예상 보험료·안내)를 빼고 한 줄 + "한도 현황에서 보기" 링크.
+- **B4** 환전 계획 1/3/6개월을 pill `Tabs` → `SegmentedControl`(탭 계층 규칙).
+- **B5** 목표 마법사 자동 오픈은 적립 계획 탭에서만(`useGoalSettings({ autoOpenWizard })`) — 다른 탭으로 딥링크하면 본 것으로 기록하지도 않는다.
+- **B6** 환전 계획: "N개월 적립에 $X 필요 · 보유 $Y (기준 시각)" 한 줄만 보이고 산식·계좌별 보유 달러는 "계산 근거" 접힘(`growlio:fxPlan:basisOpen`).
+- **C1** 배당 계획·챌린지·환전 계획 조회 실패에 "다시 시도".
+- **C2** 세금 추정 "계산 중..."·플래너 "불러오는 중..." → `SkeletonCard`, 한도 현황 ISA·연금 자리 스켈레톤.
+- **C3** 목표·배당 설정 모달은 `queryClient.fetchQuery(settingsQuery)`(캐시 우선). 마법사 저장 직전 최신값 조회(`fetchSettings`)는 의도라 유지.
+- **C6** `DCAProjectionChart` 직접 `matchMedia` → `useIsSmUp`.
+- **D1** 배당 설정 모달을 `DividendSettingsModal`로 분리(`<form id>` + `form=`, Enter 저장). `InvestPlanPage` 429 → 399줄.
+- **D3** 홈 `/invest-plan` 하드코딩 5곳 → `investPlanUrl("적립 계획")`.
+- **D4** `tax_action_builders.py` 504 → 362줄, 해외 이익실현·손실수확·마감일은 `tax_action_overseas.py`.
+- **D5** 챌린지 목록: 입금 챌린지를 계좌별로 가장 이른 시작월부터 한 번만 조회(`compute_progress(monthly_net=)`).
+- **하지 않음**
+  - B2: 배너(항상 보임, 알림)와 접힌 환전 카드(환전할 금액 제공)는 역할이 달라 유지.
+  - B3: 두 "더 빨리 달성하려면?"은 비교 지표(수익률/배당수익률)가 달라 공용화 이득이 작다. 배당 쪽은 67 P1-13에서 이미 한 줄 비교.
+  - C4: 연금 카드가 기다리는 overview-lite는 홈·부팅 프리페치로 대부분 캐시됨.
+  - C5: 인라인 쿼리 3곳은 한 화면 전용이라 CLAUDE.md 규칙(공용 쿼리만 `queryOptions`) 대상 아님.
+  - D2: D1로 400줄 아래가 돼 탭 본문 분리는 보류.
+  - `TaxActionPlanCard` 로딩 pulse는 헤더가 있는 섹션 안이라 `SkeletonCard`(카드 안 카드) 대신 유지.
+- PR3 참고: `DCAProjectionChart`에 이미 보수/공격 수익률 시나리오 토글(`showScenarios`, `SAVINGS_RETURN_PRESETS`)이 있다 — E1은 새로 만들기보다 이것을 기준으로 확인할 것.

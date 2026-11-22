@@ -15,7 +15,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { portfoliosQuery } from "@/api/queryOptions";
-import { assetManagementUrl } from "@/utils/tabUrl";
+import { assetManagementUrl, investPlanUrl } from "@/utils/tabUrl";
 import PageLoadError from "@/components/common/PageLoadError";
 
 const ActionItemsCard = lazy(() => import("../components/dashboard/ActionItemsCard"));
@@ -38,7 +38,7 @@ const ONBOARDING_STEPS = [
   {
     title: "3단계: 투자 목표 설정",
     description: "자산·배당·입금 목표를 입력하세요.",
-    to: "/invest-plan",
+    to: investPlanUrl("적립 계획"),
     cta: "설정하기 →",
   },
 ];

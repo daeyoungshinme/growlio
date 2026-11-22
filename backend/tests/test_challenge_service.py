@@ -299,6 +299,30 @@ class TestListAndSerialize:
         mock_cache.setex.assert_awaited()
 
     @pytest.mark.asyncio
+    async def test_same_account_deposit_challenges_share_one_query(self, mock_cache):
+        """같은 계좌 입금 챌린지 여러 개는 가장 이른 시작월부터 한 번만 조회한다(계획 143 D5)."""
+        import datetime as _dt
+
+        early = _ns(challenge_type="DEPOSIT", start_month="2026-01", created_at=_dt.datetime.now(_dt.UTC))
+        late = _ns(challenge_type="DEPOSIT", start_month="2026-03", created_at=_dt.datetime.now(_dt.UTC))
+        db = AsyncMock()
+        list_result = MagicMock()
+        list_result.scalars.return_value.all.return_value = [early, late]
+        net_result = MagicMock()
+        net_result.all.return_value = [
+            SimpleNamespace(month=m, net=1.0) for m in ("2026-01", "2026-02", "2026-03", "2026-04")
+        ]
+        db.execute = AsyncMock(side_effect=[list_result, net_result])
+        mock_cache.get = AsyncMock(return_value=None)
+        with patch.object(cs, "today_kst", return_value=_dt.date(2026, 4, 10)):
+            out = await cs.list_challenges_with_progress(early.user_id, db, mock_cache)
+        assert db.execute.await_count == 2
+        assert db.execute.await_args_list[1].args[1]["start_date"] == _dt.date(2026, 1, 1)
+        # 늦게 시작한 챌린지는 시작월 이전 입금을 세지 않는다
+        assert out[0].progress.current_streak == 4
+        assert out[1].progress.current_streak == 2
+
+    @pytest.mark.asyncio
     async def test_list_returns_cached(self, mock_cache):
         cached = [
             {

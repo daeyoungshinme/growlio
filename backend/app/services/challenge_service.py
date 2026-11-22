@@ -175,7 +175,9 @@ async def compute_progress(
     user_id: uuid.UUID,
     db: AsyncSession,
     cache: CacheStoreType = None,
+    monthly_net: dict[str, float] | None = None,
 ) -> ChallengeProgress:
+    """`monthly_net`(계좌별 월 순입금, 시작월 이전 키가 섞여도 무방)을 넘기면 입금 챌린지 조회를 건너뛴다."""
     current_month = _month_key(today_kst())
     deadline = challenge.deadline_month
     deadline_fields: dict[str, Any] = {}
@@ -187,7 +189,8 @@ async def compute_progress(
 
     if challenge.challenge_type == CHALLENGE_DEPOSIT:
         target_amount = float(challenge.target_amount) if challenge.target_amount else None
-        monthly_net = await _monthly_net_deposits(user_id, db, challenge.start_month, challenge.account_id)
+        if monthly_net is None:
+            monthly_net = await _monthly_net_deposits(user_id, db, challenge.start_month, challenge.account_id)
         current_streak, longest_streak = _compute_streaks(monthly_net, challenge.start_month, current_month, deadline)
         months = _build_months(monthly_net, challenge.start_month, current_month, target_amount, deadline)
         this_month = next((mo for mo in months if mo.month == current_month), None)
@@ -265,9 +268,20 @@ async def list_challenges_with_progress(
     # RETURN_PCT는 대시보드 single-flight(최대 15초)를 기다린다 — 앱 시작 때 대시보드와 겹치므로 그동안
     # 커넥션을 쥐지 않게 먼저 반납한다(plans/125 A6). 이후 쿼리는 새 트랜잭션을 연다
     await release_read_connection(db)
+    # 입금 챌린지는 계좌(또는 전체)마다 가장 이른 시작월부터 한 번만 조회해 나눠 쓴다 — 챌린지마다 SQL 1회였다
+    earliest_start: dict[uuid.UUID | None, str] = {}
+    for ch in challenges:
+        if ch.challenge_type == CHALLENGE_DEPOSIT:
+            prev = earliest_start.get(ch.account_id)
+            earliest_start[ch.account_id] = min(prev, ch.start_month) if prev else ch.start_month
+    net_by_account = {
+        account_id: await _monthly_net_deposits(user_id, db, start, account_id)
+        for account_id, start in earliest_start.items()
+    }
     responses = []
     for ch in challenges:
-        progress = await compute_progress(ch, user_id, db, cache)
+        net = net_by_account.get(ch.account_id) if ch.challenge_type == CHALLENGE_DEPOSIT else None
+        progress = await compute_progress(ch, user_id, db, cache, monthly_net=net)
         responses.append(_serialize(ch, progress))
 
     await set_cached_json(

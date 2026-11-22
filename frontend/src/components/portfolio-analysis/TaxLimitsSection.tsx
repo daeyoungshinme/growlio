@@ -7,6 +7,7 @@ import HealthInsuranceRiskCard from "@/components/tax/HealthInsuranceRiskCard";
 import TaxActionPlanCard from "@/components/tax/TaxActionPlanCard";
 import { isaStatusQuery, portfolioOverviewLiteQuery } from "@/api/queryOptions";
 import EmptyState from "@/components/common/EmptyState";
+import SkeletonCard from "@/components/common/SkeletonCard";
 
 /** 절세 액션 플랜(최상단) + ISA 만기·연금저축/IRP 납입 한도·건강보험 피부양자 기준 현황. 계좌 필터와 무관하게 항상 전체
  * 계좌 기준으로 표시한다(ISA 비과세한도·연금 공제한도·배당소득은 계좌 단위로 축소해 볼 개념이 아님).
@@ -21,13 +22,19 @@ export default function TaxLimitsSection() {
   const {
     data: overview,
     isError: overviewFailed,
+    isLoading: overviewLoading,
     refetch: refetchOverview,
   } = useQuery(portfolioOverviewLiteQuery);
 
   const accounts = overview?.accounts ?? [];
   const hasPension = accounts.some((a) => a.tax_type === "PENSION_SAVINGS" || a.tax_type === "IRP");
 
-  const { data: isaData, isError: isaFailed, refetch: refetchIsa } = useQuery(isaStatusQuery);
+  const {
+    data: isaData,
+    isError: isaFailed,
+    isLoading: isaLoading,
+    refetch: refetchIsa,
+  } = useQuery(isaStatusQuery);
   const hasIsa = (isaData?.accounts.length ?? 0) > 0;
 
   // 절세 액션 "ISA 현황 보기"(`#isa-status`)로 들어오면 ISA 카드로 스크롤 — 카드는 조회 뒤에야 렌더되므로 hasIsa도 의존
@@ -55,6 +62,8 @@ export default function TaxLimitsSection() {
           compact
         />
       )}
+      {/* ISA·연금 카드는 조회 뒤에 나타난다 — 자리를 잡아 두지 않으면 건보 카드가 아래로 밀린다(계획 143 C2) */}
+      {(overviewLoading || isaLoading) && <SkeletonCard rows={3} height="h-4" />}
       {hasIsa && (
         <div id={ISA_STATUS_ANCHOR} className="scroll-mt-4">
           <IsaMaturityCard />

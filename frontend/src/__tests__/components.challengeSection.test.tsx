@@ -116,4 +116,11 @@ describe("ChallengeSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "보관" }));
     await waitFor(() => expect(updateChallenge).toHaveBeenCalledWith("c1", { status: "ARCHIVED" }));
   });
+
+  it("불러오기에 실패하면 다시 시도할 수 있다", async () => {
+    fetchChallenges.mockRejectedValueOnce(new Error("boom")).mockResolvedValue([makeChallenge()]);
+    render(<ChallengeSection />);
+    fireEvent.click(await screen.findByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByText("매달 50만원 적립")).toBeInTheDocument();
+  });
 });

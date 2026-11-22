@@ -181,7 +181,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - **세금 집계 함정**: 삭제 계좌도 포함한다(실제 소득·납입). 모의 계좌 판정은 `is_paper_account` — `is_mock_mode` 컬럼 기본값이 True라 토스·수기 계좌를 그 값만으로 빼면 안 된다. 취득가는 현재 환율 환산이라 환차익이 빠진 추정이다(`OVERSEAS_FX_BASIS_NOTE`).
 - `tax_service.py` — 연도별 세금 추정·종합과세·건보 피부양자. 해외 실현손익은 직접 조회하지 않고 `overseas_realized_krw` 인자로 받음
 - `overseas_realized_service.py` — 해외 실현손익. KIS 실전은 브로커(TTTS3039R), 그 외는 해외 SELL `TradeRecord`(KIS 실전 계좌 기록은 이중 집계 방지로 무시). 성공 시만 1h 캐시 — sync 무효화는 종목 **또는 수량**이 바뀌었을 때(`holdings_changed`, 일부 매도). KIS 계좌는 **계좌별 짧은 세션으로 동시 조회**(토큰 발급이 commit하므로 요청 세션 공유 금지, 동시 3개) + single-flight
-- `tax_action_service.py` — 절세 액션 플랜(조회·조합). 세법 수치 `_DEDUCTION_RULES` 연도별 테이블과 액션 빌더(순수)는 `tax_action_builders.py`
+- `tax_action_service.py` — 절세 액션 플랜(조회·조합). 세법 수치 `_DEDUCTION_RULES` 연도별 테이블과 액션 빌더(순수)는 `tax_action_builders.py`, 해외 이익실현·손실수확·연말 귀속 마감일(12월 마지막 NYSE 거래일 − 2거래일)은 `tax_action_overseas.py`
 - `pension_contribution_service.py` · `isa_service.py`(일반계좌 대비 절세액 — 국내상장 해외·채권형 ETF 평가이익은 과세(`is_taxable_domestic_listed_etf`), 시장 코드만 보면 KOSPI라 비과세로 샌다)
 
 **알림 (`alerts/`)**
