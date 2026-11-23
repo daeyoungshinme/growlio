@@ -338,9 +338,6 @@ export default function InvestPlanPage() {
                 달러 환전 계획
               </h2>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 ml-0.5">
-              지금 환율이 1년 중 어디쯤인지 보고 해외 적립용 달러를 나눠 환전
-            </p>
             <div className="mt-3">
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>

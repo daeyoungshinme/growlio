@@ -438,8 +438,8 @@ function FxPlanBody({ onEditGoal }: Props) {
                 sharedRates={plan.sharedRates}
               />
               <p className="text-xs text-gray-400 dark:text-gray-500">
-                {data.months}개월 안에 목표 환율에 닿지 않으면 남은 금액은 적립일에 환전하세요.
-                환전은 증권사 앱에서 직접 진행합니다.
+                {data.months}개월 안에 목표 환율에 닿지 않으면 남은 금액은 적립일에 증권사 앱에서
+                환전하세요.
               </p>
               {/* 목표 구간이 없어도(1년 시세 실패·환전 대기가 전액 등) 옛 계획 알림은 지울 수 있어야 한다(plans/122 C2) */}
               {(plan.targets.length > 0 || plan.planAlertCount > 0) && (

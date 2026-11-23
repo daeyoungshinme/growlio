@@ -13,8 +13,9 @@ const RecommendationCard = lazy(loadRecommendationCard);
 const TacticalAllocationTab = lazy(loadTacticalAllocationTab);
 
 const MODE_INTRO: Record<GoalMode, string> = {
-  추천: "목표 수익률·연령대·투자 기간에 맞춘 추천 비중을 포트폴리오 목표로 적용해요.",
-  전술: "시장 국면(진단 탭 시장 상황의 매크로·차트 추세)에 따라 나스닥·S&P500 목표 비중을 조정하자고 제안해요.",
+  // 한 문장씩 — 국면 근거(매크로·차트 추세)는 전술 카드의 "판정 근거"가 설명한다(plans/150 C1)
+  추천: "목표·연령대·투자 기간에 맞춘 추천 비중을 포트폴리오 목표로 적용해요.",
+  전술: "시장 국면에 따라 나스닥·S&P500 목표 비중 조정을 제안해요.",
 };
 const ORDER_NOTICE = "실제 주문은 포트폴리오 탭에서 해요.";
 

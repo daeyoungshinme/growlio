@@ -93,6 +93,10 @@ export const DEFAULT_DIP_BUY_TIERS: DipBuyTierInput[] = [
   { drawdown_pct: 30, ratio_pct: 50 },
 ];
 
+/** 낙폭 추매 ↔ 전술 웅덩이 매수 역할 구분 — 두 화면(적립 계획 낙폭 추매·전술 탭)이 같은 문장을 쓴다(plans/150 C3) */
+export const DIP_BUY_VS_TACTICAL_NOTE =
+  "낙폭 추매는 계좌 밖 여윳돈으로 더 사는 안내, 웅덩이 매수는 포트폴리오 안 현금 비중을 옮기는 전술이에요.";
+
 export const DIP_BUY_INDEX_LABEL: Record<DipBuyIndex, string> = {
   QQQ: "나스닥100 (QQQ)",
   SPY: "S&P500 (SPY)",

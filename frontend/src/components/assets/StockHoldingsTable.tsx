@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useIsSmUp } from "@/hooks/useMediaQuery";
 import { Search, X } from "lucide-react";
@@ -14,18 +14,11 @@ import { holdingKey, type AggSortKey, type SortState } from "./stockHoldings/hol
 const MOBILE_CARD_VIRTUALIZE_THRESHOLD = 10;
 const MOBILE_CARD_HEIGHT = 64; // 접힌 카드(2줄) 추정 높이 (px) — 실제 높이는 measureElement로 실측
 
-/** 바깥(비중 분석 카드 "전체 비중순 보기")에서 정렬을 바꿔 달라는 요청 — nonce가 바뀔 때마다 적용 */
-export interface HoldingsSortRequest {
-  key: AggSortKey;
-  nonce: number;
-}
-
 interface Props {
   positions: PortfolioPosition[];
   dividendMap: Record<string, DividendYield>;
   divLoading: boolean;
   divError: boolean;
-  sortRequest?: HoldingsSortRequest | null;
 }
 
 const MOBILE_SORT_OPTIONS: { key: AggSortKey; label: string }[] = [
@@ -36,23 +29,12 @@ const MOBILE_SORT_OPTIONS: { key: AggSortKey; label: string }[] = [
   { key: "weight_in_stock", label: "비중순" },
 ];
 
-function StockHoldingsTable({ positions, dividendMap, divLoading, divError, sortRequest }: Props) {
+function StockHoldingsTable({ positions, dividendMap, divLoading, divError }: Props) {
   const [sort, setSort] = useState<SortState>({ key: "total_value_krw", dir: "desc" });
   // 데스크톱 표는 여러 행을 펼치고, 모바일 카드는 한 장만 펼친다 — 상태를 나눠 뷰포트 전환 시 규칙이 섞이지 않게 한다
   const [expandedSet, setExpandedSet] = useState<Set<string>>(new Set());
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-
-  // 요청은 페이지 상태라 탭을 오가며 재마운트되면 같은 요청이 다시 들어온다 — 마운트 시점 nonce는 이미 적용된 것으로 본다
-  const appliedNonceRef = useRef(sortRequest?.nonce);
-  useEffect(() => {
-    if (!sortRequest || sortRequest.nonce === appliedNonceRef.current) return;
-    appliedNonceRef.current = sortRequest.nonce;
-    setSort({ key: sortRequest.key, dir: "desc" });
-    setQuery("");
-    setExpandedSet(new Set());
-    setExpandedCard(null);
-  }, [sortRequest]);
 
   const handleSort = useCallback((k: AggSortKey) => {
     setSort((prev) =>

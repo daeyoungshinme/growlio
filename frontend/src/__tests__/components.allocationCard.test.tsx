@@ -173,98 +173,16 @@ describe("AllocationCard", () => {
     });
   });
 
-  describe("종목", () => {
-    it("순위·상장 배지·집중도 요약을 보여주고 지수 조회는 하지 않는다", () => {
-      localStorage.setItem("growlio:portfolio:allocationView", "stock");
-      renderCard();
-      expect(screen.getByText("최대 종목")).toBeInTheDocument();
-      expect(screen.getByText("상위 3종목 합계")).toBeInTheDocument();
-      expect(screen.getByText("80.0%")).toBeInTheDocument();
-      expect(screen.getAllByText("국내상장")).toHaveLength(2);
-      expect(screen.getAllByText("해외상장")).toHaveLength(1);
-      expect(screen.getByText("기타 3종목")).toBeInTheDocument();
-      expect(screen.getByText("아래 보유 종목 목록에서 확인")).toBeInTheDocument();
-      expect(fetchIndexExposure).not.toHaveBeenCalled();
-    });
-
-    it("상위 5종목만 그리고 6위 이하는 백엔드 기타와 합쳐 한 행으로 보여준다", () => {
-      localStorage.setItem("growlio:portfolio:allocationView", "stock");
-      const ranked = Array.from({ length: 7 }, (_, i) => ({
-        ticker: `T${i + 1}`,
-        name: `종목${i + 1}`,
-        market: "KOSPI",
-        value_krw: 1_000_000,
-        pct: 10,
-      }));
-      renderCard({
-        overview: {
-          ...OVERVIEW,
-          stock_allocation: [
-            ...ranked,
-            {
-              ticker: "ETC",
-              name: "기타 4종목",
-              market: null,
-              etc_count: 4,
-              value_krw: 3_000_000,
-              pct: 30,
-            },
-          ],
-        },
-      });
-      expect(screen.getByText("종목5")).toBeInTheDocument();
-      expect(screen.queryByText("종목6")).not.toBeInTheDocument();
-      expect(screen.getByText("상위 5종목 합계")).toBeInTheDocument();
-      // 6·7위(20%) + 기타 4종목(30%) = 6종목 50%
-      expect(screen.getByText("기타 6종목")).toBeInTheDocument();
-      expect(screen.getAllByText("50.0%").length).toBeGreaterThan(0);
-    });
-
-    it("기타 개수는 표시 이름이 아니라 etc_count로 세고, 0.0%로 반올림돼도 행을 보인다", () => {
-      localStorage.setItem("growlio:portfolio:allocationView", "stock");
-      const ranked = Array.from({ length: 5 }, (_, i) => ({
-        ticker: `T${i + 1}`,
-        name: `종목${i + 1}`,
-        market: "KOSPI",
-        value_krw: 1_000_000,
-        pct: 20,
-      }));
-      renderCard({
-        overview: {
-          ...OVERVIEW,
-          stock_allocation: [
-            ...ranked,
-            { ticker: "ETC", name: "Others", market: null, etc_count: 2, value_krw: 10, pct: 0 },
-          ],
-        },
-      });
-      expect(screen.getByText("기타 2종목")).toBeInTheDocument();
-    });
-
-    it("전체 비중순 보기 버튼은 콜백이 있을 때만 보이고 누르면 호출된다", () => {
-      localStorage.setItem("growlio:portfolio:allocationView", "stock");
-      const onShowAllStocks = vi.fn();
-      vi.mocked(fetchIndexExposure).mockResolvedValue(EXPOSURE);
-      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-      const { unmount } = render(
-        <QueryClientProvider client={qc}>
-          <AllocationCard overview={OVERVIEW} onShowAllStocks={onShowAllStocks} />
-        </QueryClientProvider>,
-      );
-      fireEvent.click(screen.getByRole("button", { name: "보유 종목 전체 비중순 보기" }));
-      expect(onShowAllStocks).toHaveBeenCalledTimes(1);
-      unmount();
-      renderCard();
-      expect(
-        screen.queryByRole("button", { name: "보유 종목 전체 비중순 보기" }),
-      ).not.toBeInTheDocument();
-    });
-
-    it("보유 종목이 없으면 빈 상태 문구", () => {
-      localStorage.setItem("growlio:portfolio:allocationView", "stock");
-      renderCard({ overview: { ...OVERVIEW, stock_allocation: [] } });
-      expect(screen.getByText("보유 종목이 없어요.")).toBeInTheDocument();
-    });
+  it("종목 보기는 없다 — 보유 종목 목록의 비중 열과 겹쳐 뺐다, 예전 저장값은 국내/해외로 (plans/150 E1)", () => {
+    localStorage.setItem("growlio:portfolio:allocationView", "stock");
+    renderCard();
+    expect(
+      within(screen.getByRole("group", { name: "비중 보기" })).queryByRole("button", {
+        name: "종목",
+      }),
+    ).toBeNull();
+    expect(screen.queryByText("상위 3종목 합계")).toBeNull();
+    expect(fetchIndexExposure).toHaveBeenCalled(); // 국내/해외 기본 기준(실제 투자지역)
   });
 
   describe("지수", () => {
@@ -326,8 +244,8 @@ describe("AllocationCard", () => {
 
   it("선택한 탭을 기억한다", () => {
     renderCard();
-    clickView("종목");
-    expect(localStorage.getItem("growlio:portfolio:allocationView")).toBe("stock");
+    clickView("지수");
+    expect(localStorage.getItem("growlio:portfolio:allocationView")).toBe("index");
   });
 
   it("접으면 최대 종목과 해외상장 비중 요약을 보여준다", () => {
