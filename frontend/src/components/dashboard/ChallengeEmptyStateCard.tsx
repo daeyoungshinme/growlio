@@ -6,7 +6,7 @@ import { challengeEmptyStateDismissedKey } from "@/constants/storageKeys";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { investPlanUrl } from "@/utils/tabUrl";
 
-/** 홈 대시보드 — 적립 챌린지가 하나도 없을 때 만들기를 유도하는 카드. X로 닫으면 다시 안 뜸. */
+/** 홈 대시보드 — 진행 중(기한 남은) 적립 챌린지가 없을 때 만들기를 유도하는 카드. X로 닫으면 다시 안 뜸. */
 export default function ChallengeEmptyStateCard() {
   const userId = useAuthStore((s) => s.userId);
   // 사용자별 키 — 기기 단위면 한 계정이 닫은 배너가 같은 기기의 다른 계정에서도 안 떴다(plans/118 C7)

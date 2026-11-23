@@ -281,6 +281,31 @@ describe("DashboardPage", () => {
     },
   );
 
+  it("진행 중 챌린지가 모두 기한 종료면 '만들기' 카드를 보인다 — plans/150 A1", () => {
+    vi.mocked(useDashboardData).mockReturnValue({
+      data: mockDashboardData as never,
+      isLoading: false,
+      error: null,
+      dataUpdatedAt: Date.now(),
+      refetch: vi.fn(),
+      overview: mockOverview as never,
+      dcaData: undefined,
+      dcaLoading: false,
+      accounts: [{ id: "acc-1", name: "KB증권", asset_type: "STOCK_KIS" }] as never,
+      accountsLoading: false,
+      accountsFailed: false,
+      exchangeRate: 1350,
+      marketSignal: undefined,
+      challenges: [
+        { id: "c1", status: "ACTIVE", title: "지난 챌린지", progress: { is_expired: true } },
+      ] as never,
+      challengesLoading: false,
+      challengesError: false,
+    });
+    renderDashboard();
+    expect(screen.getByText("적립 습관을 챌린지로 만들어보세요")).toBeInTheDocument();
+  });
+
   it("estimated_annual_dividends가 있을 때 섹션이 정상 렌더링된다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: { ...mockDashboardData, estimated_annual_dividends: 2_000_000 } as never,

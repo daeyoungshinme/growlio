@@ -175,14 +175,17 @@ export default function DashboardPage() {
           <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading || dcaLoading} />
         </ErrorBoundary>
 
-        {/* 적립 챌린지 진행 현황 — ACTIVE 챌린지가 있으면 진행률, 없으면 만들기 유도(닫기 가능) */}
+        {/* 적립 챌린지 진행 현황 — 기한이 남은 ACTIVE 챌린지가 있으면 진행률, 없으면 만들기 유도(닫기 가능).
+            카드와 같은 기준(기한 종료 제외)이어야 한다 — ACTIVE만 보면 전부 기한 종료일 때 카드가 null이라 둘 다 안 보였다(plans/150 A1) */}
         <ErrorBoundary variant="section">
           {/* 목록이 오기 전엔 빈 상태 카드 대신 자리만 — 진행 중 챌린지가 있는 사용자에게 "만들기" 카드가 먼저
               떴다가 바뀌던 깜빡임 방지(plans/125 C6). 목록을 못 받았으면 "만들기" 카드로 오해시키지 않고
               숨긴다(plans/126 C4) */}
           {challengesLoading ? (
             <SkeletonCard rows={2} />
-          ) : challengesUnavailable ? null : challenges.some((c) => c.status === "ACTIVE") ? (
+          ) : challengesUnavailable ? null : challenges.some(
+              (c) => c.status === "ACTIVE" && !c.progress.is_expired,
+            ) ? (
             <ChallengeProgressCard challenges={challenges} />
           ) : (
             <ChallengeEmptyStateCard />

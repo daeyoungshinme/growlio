@@ -302,6 +302,27 @@ describe("NotificationSettingsPage", () => {
     });
   });
 
+  it("적립 화면에서 켜는 알림(낙폭 추매)의 설정 위치를 안내한다 — plans/150 A3", () => {
+    renderNotificationSettings();
+    const link = screen.getByRole("link", { name: /낙폭 추매에서 설정/ });
+    expect(decodeURI(link.getAttribute("href") ?? "")).toBe("/invest-plan?tab=적립 계획#dip-buy");
+  });
+
+  it("낙폭 추매(DCA_DIP_BUY) 알림도 영문 코드 대신 한국어 라벨로 표시한다 — plans/150 A2", async () => {
+    vi.mocked(fetchAlertHistory).mockResolvedValue([
+      {
+        id: "h-1",
+        alert_type: "DCA_DIP_BUY",
+        message: "QQQ 낙폭 -10% 구간",
+        created_at: "2026-11-01T10:00:00Z",
+      },
+    ] as never);
+    renderNotificationSettings();
+    fireEvent.click(screen.getByRole("tab", { name: "발송 이력" }));
+    await waitFor(() => expect(screen.getByText("낙폭 추매 안내")).toBeInTheDocument());
+    expect(screen.queryByText("DCA_DIP_BUY")).toBeNull();
+  });
+
   it("'더 보기'는 skip으로 다음 페이지를 이어 붙이고, 마지막 페이지면 버튼을 숨긴다 (plans/90 B1)", async () => {
     const page = (start: number, n: number) =>
       Array.from({ length: n }, (_, i) => ({

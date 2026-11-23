@@ -26,6 +26,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_HEIGHT_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import { invalidateSettingsData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { investPlanUrl } from "@/utils/tabUrl";
 import { settingsQuery } from "@/api/queryOptions";
 import { ALERT_TABS, MARKET_ALERT_SECTION, type AlertTab } from "@/constants/tabs";
 
@@ -43,6 +44,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   CHALLENGE_REMINDER: "적립 챌린지 독려 알림",
   CHALLENGE_WRAPUP: "적립 챌린지 월간 결산",
   DCA_CASH_SHORTFALL: "적립매수 예수금 부족",
+  DCA_DIP_BUY: "낙폭 추매 안내",
   YEAR_END_TAX_REMINDER: "연말 절세 리마인더",
   TACTICAL_REGIME: "전술 배분 국면 전환",
   TACTICAL_DIP: "전술 배분 웅덩이 매수",
@@ -284,6 +286,35 @@ export default function NotificationSettingsPage() {
           onChange={toggleGoalAlerts}
         />
       </div>
+
+      {/* 적립 화면에서 켜고 끄는 알림 — 설정에 없어 "어디서 끄나"를 찾을 수 없던 것을 위치만 안내(plans/150 A3) */}
+      <SectionCard title="적립 관련 알림">
+        <div>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">낙폭 추매 안내</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            나스닥·S&P500이 고점 대비 정한 구간까지 내려오면 여윳돈 추매 금액을 알려드려요.
+          </p>
+          <Link
+            to={`${investPlanUrl("적립 계획")}#dip-buy`}
+            className={`${TOUCH_TARGET_ROW} text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline`}
+          >
+            계획 › 적립 계획 › 낙폭 추매에서 설정 →
+          </Link>
+        </div>
+        <div className="mt-3 border-t border-gray-100 dark:border-gray-700 pt-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">적립 예수금 부족 알림</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            정기 적립식 자동매수를 켠 포트폴리오는 실행 1~3일 전 예수금이 월 적립액보다 적으면
+            자동으로 알려드려요.
+          </p>
+          <Link
+            to={rebalancingUrl({ tab: "포트폴리오" })}
+            className={`${TOUCH_TARGET_ROW} text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline`}
+          >
+            리밸런싱 › 포트폴리오에서 자동화 보기 →
+          </Link>
+        </div>
+      </SectionCard>
 
       <CollapsibleCard
         icon={Activity}

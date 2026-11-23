@@ -136,6 +136,7 @@ _리밸런싱/추천_
 - `useAddSuggestedCandidates` · `useCandidateOverlap`(디바운스 포함)
 - `useTacticalAllocation` — `useTacticalStatus`/`useTacticalBacktest`/`useTacticalMutations`(적용은 `invalidateTacticalData(qc, { portfolioChanged: true })`)
 - `useChallenges` · `useChallengeMutations` · `useChallengeNudge`
+- `useNavBadges` — 하단 내비·사이드바 공용 빨간 점(리밸런싱·챌린지). drift-summary를 직접 부르지 않고 받아 둔 캐시로만 판정
 - `usePortfolioTabFetching`(`useMainPageFetching`) — 새로고침 인디케이터용
 
 _알림 토글_ (`["settings"]` boolean 필드 조회/PUT)
