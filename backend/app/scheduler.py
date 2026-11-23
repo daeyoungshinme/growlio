@@ -54,6 +54,7 @@ def init_scheduler() -> None:
     from app.jobs.challenge_deposit_reminder import run_challenge_deposit_reminder
     from app.jobs.challenge_monthly_wrap import run_challenge_monthly_wrap
     from app.jobs.dca_cash_shortfall import run_dca_cash_shortfall_check
+    from app.jobs.dca_dip_buy_notice import run_dip_buy_day_notice, run_dip_buy_pre_notice
     from app.jobs.dca_fx_wait_retry import run_dca_fx_wait_retry
     from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
     from app.jobs.goal_achievement import run_goal_achievement_check
@@ -104,6 +105,9 @@ def init_scheduler() -> None:
         (run_challenge_deposit_reminder, kst(day=25, hour=9, minute=0), "challenge_deposit_reminder"),
         (run_challenge_monthly_wrap, kst(day=1, hour=9, minute=30), "challenge_monthly_wrap"),
         (run_dca_cash_shortfall_check, kst(hour=18, minute=30), "dca_cash_shortfall_check"),
+        # 낙폭 추매 안내(plans/147, 주문 없음) — 적립일 1~3일 전 저녁 + 당일 아침(미국장 마감 종가 확정 후)
+        (run_dip_buy_pre_notice, kst(hour=18, minute=40), "dca_dip_buy_pre_notice"),
+        (run_dip_buy_day_notice, kst(hour=8, minute=10), "dca_dip_buy_day_notice"),
         (run_cache_sweep, IntervalTrigger(minutes=15), "cache_sweep"),
         (run_app_state_sweep, kst(hour=4, minute=10), "app_state_sweep"),
         (refresh_kosdaq_tickers, kst(hour=7, minute=0), "kosdaq_tickers_refresh"),

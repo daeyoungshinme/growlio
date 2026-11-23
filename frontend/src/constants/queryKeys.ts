@@ -49,6 +49,8 @@ export const QUERY_KEYS = {
     ["fx-plan", months, portfolioId ?? "auto"] as const,
   /** 추가 환전 항목(여행 등, plans/123) */
   fxExtraNeeds: ["fx-extra-needs"] as const,
+  /** 낙폭 추매 안내(plans/147) */
+  dipBuy: ["dip-buy"] as const,
   challenges: ["challenges"] as const,
   challengeSummary: ["challenges", "summary"] as const,
   settings: ["settings"] as const,

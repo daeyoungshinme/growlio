@@ -1,6 +1,6 @@
 """AUTO 리밸런싱이 주문을 내지 않을 때의 안내 메일.
 
-게이트 차단(세금·시장신호·하루 한도·스냅샷)과 정기 적립 자금 부족(원화·달러).
+게이트 차단(세금·시장신호·하루 한도·스냅샷)과 정기 적립 자금 부족(원화·달러), 낙폭 추매 안내(plans/147, 주문 없음).
 
 드리프트 알림·실행 결과·플랜 승인 메일은 `rebalancing.py`.
 """
@@ -218,4 +218,57 @@ def dca_cash_shortfall_template(
         "입금하지 않으면 이번 달 매수가 적거나 실행되지 않습니다. 월 적립액은 계획 &gt; 적립 계획에서 바꿀 수 "
         "있습니다. 이 알림은 예정일마다 1회만 발송됩니다.",
     )
+    return subject, html
+
+
+def dip_buy_template(
+    portfolio_name: str,
+    phase: str,
+    run_date_label: str,
+    index_ticker: str,
+    drawdown_pct: float | None,
+    amount_krw: float,
+    items: list[tuple[str, float, float, float | None]],
+    reserve_krw: float,
+    app_link: str,
+) -> tuple[str, str]:
+    """낙폭 추매 안내(plans/147). `phase`: PRE(적립일 1~3일 전) / DAY(적립일 당일) / CANCELLED(회복으로 취소).
+
+    `items`는 (종목명, 수량, 원화 금액, 필요 달러|None). 주문은 하지 않는다 — 사용자가 직접 산다.
+    """
+    dd_text = f"{drawdown_pct:.1f}%" if drawdown_pct is not None else "확인 불가"
+    if phase == "CANCELLED":
+        subject = f"[Growlio] {run_date_label} 추매 안내 취소 — {index_ticker} 회복"
+        html = _email_div(
+            "이번 적립일엔 추매하지 않아요",
+            "#2563eb",
+            _kv_table(
+                [
+                    ("포트폴리오", escape(portfolio_name)),
+                    ("적립일", run_date_label),
+                    (f"{index_ticker} 52주 고점 대비", dd_text),
+                ]
+            ),
+            "지난번 안내 뒤 지수가 회복해 추매 구간을 벗어났어요. 정기 적립은 평소대로 진행돼요.",
+        )
+        return subject, html
+    title = "오늘 추매할 금액이에요" if phase == "DAY" else f"{run_date_label} 적립일에 추매할 예정이에요"
+    subject = f"[Growlio] {run_date_label} 추매 {amount_krw:,.0f}원 — {index_ticker} {dd_text}"
+    rows: list[tuple[str, str]] = [
+        ("포트폴리오", escape(portfolio_name)),
+        ("적립일", run_date_label),
+        (f"{index_ticker} 52주 고점 대비", dd_text),
+        ("추매 금액", f"<span style='font-weight:bold;color:#dc2626;'>{amount_krw:,.0f} 원</span>"),
+        ("남은 여윳돈", f"{reserve_krw:,.0f} 원"),
+    ]
+    for name, shares, value, usd in items:
+        usd_text = f" (약 ${usd:,.2f})" if usd else ""
+        rows.append((escape(name), f"{shares:g}주 · {value:,.0f} 원{usd_text}"))
+    note = (
+        "적립과 별도로 정해 둔 여윳돈의 구간별 추매 안내예요. 주문은 자동으로 나가지 않아요 — 직접 매수한 뒤 "
+        f"<a href='{app_link}'>앱</a>에서 '추매했어요'를 누르면 여윳돈에서 빠져요."
+    )
+    if phase == "PRE":
+        note += " 적립일 전날 종가로 금액이 확정되며, 당일 아침에 다시 알려드려요."
+    html = _email_div(title, "#d97706", _kv_table(rows), note)
     return subject, html

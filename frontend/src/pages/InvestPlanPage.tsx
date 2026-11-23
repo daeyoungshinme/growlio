@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, DollarSign, PiggyBank } from "lucide-react";
+import { ArrowRight, DollarSign, PiggyBank, TrendingDown } from "lucide-react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
@@ -13,10 +13,13 @@ const ChallengeSection = lazy(() => import("../components/invest/ChallengeSectio
 const TaxTabContainer = lazy(() => import("../components/portfolio-analysis/TaxTabContainer"));
 const SavingsSimulatorCard = lazy(() => import("../components/invest/SavingsSimulatorCard"));
 const FxPlanCard = lazy(() => import("../components/invest/FxPlanCard"));
+const DipBuyCard = lazy(() => import("../components/invest/DipBuyCard"));
 /** 환전 계획 카드 앵커 — 백엔드 `action_items_service._LINK_FX_PLAN`·`email_service.fx_plan_link`·푸시 딥링크와 같은 해시 */
 const FX_PLAN_ANCHOR = "fx-plan";
+/** 낙폭 추매 카드 앵커 — 백엔드 `action_items_service._LINK_DIP_BUY`·`email_service.dip_buy_link`·푸시 `DCA_DIP_BUY`와 같은 해시 */
+const DIP_BUY_ANCHOR = "dip-buy";
 /** 해시 진입 스크롤을 한 번 더 맞추는 시점 — 지연 로드 차트·배너가 카드 위에서 높이를 바꾸는 시간 */
-const FX_PLAN_SCROLL_SETTLE_MS = 600;
+const ANCHOR_SCROLL_SETTLE_MS = 600;
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
 import AutoInvestStatusBanner from "@/components/invest/AutoInvestStatusBanner";
@@ -42,6 +45,42 @@ import { INVEST_PLAN_TABS, type InvestPlanTab } from "@/constants/tabs";
 // 절세는 자산 › 투자현황 › 세금에서 이동(plans/50 M1) — 목표·배당·절세 "계획"을 한 탭에 모은다
 const TABS = INVEST_PLAN_TABS;
 type Tab = InvestPlanTab;
+
+/**
+ * 알림(메일·푸시·홈 "지금 할 일")의 `#anchor`로 들어오면 접어 둔 카드도 펼친다(plans/121 C).
+ * 펼침은 이번 진입(location.key)에만 적용하고 저장하지 않는다 — 링크 한 번에 사용자가 접어 둔 선택이 영구히
+ * 바뀌지 않게, 같은 링크를 다시 눌러도(새 key) 다시 펼치게(plans/122 C1·C6)
+ */
+function useAnchoredCollapsible(anchor: string, storageKey: string, onDcaTab: boolean) {
+  const [isOpen, toggle, setOpen] = useCollapsible(false, storageKey);
+  const location = useLocation();
+  const linked = location.hash === `#${anchor}` && onDcaTab;
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+  const forcedOpen = linked && dismissedKey !== location.key;
+  const handleToggle = useCallback(() => {
+    if (!forcedOpen) {
+      toggle();
+      return;
+    }
+    setDismissedKey(location.key);
+    if (isOpen) setOpen(false);
+  }, [forcedOpen, isOpen, location.key, setOpen, toggle]);
+  return { open: isOpen || forcedOpen, linked, linkKey: location.key, handleToggle };
+}
+
+/** 해시 진입: 카드가 그려진 뒤 스크롤, 위쪽이 늦게 그려져 밀리므로 잠시 뒤 한 번 더(새 key 재진입에도) */
+function useScrollToAnchor(anchor: string, linked: boolean, ready: boolean, linkKey: string) {
+  useEffect(() => {
+    if (!linked || !ready) return;
+    const scroll = () => document.getElementById(anchor)?.scrollIntoView({ block: "start" });
+    const frame = requestAnimationFrame(scroll);
+    const settle = window.setTimeout(scroll, ANCHOR_SCROLL_SETTLE_MS);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(settle);
+    };
+  }, [anchor, linked, ready, linkKey]);
+}
 
 export default function InvestPlanPage() {
   const [monthlyOpen, setMonthlyOpen] = useState(false);
@@ -78,28 +117,19 @@ export default function InvestPlanPage() {
     "growlio:invest:savingsSimulatorOpen",
   );
   // 달러 환전 계획 — 해외 적립 보조 도구라 기본 접힘(plans/96)
-  const [isFxPlanOpen, toggleFxPlanOpen, setFxPlanOpen] = useCollapsible(
-    false,
+  const fxPlan = useAnchoredCollapsible(
+    FX_PLAN_ANCHOR,
     "growlio:invest:fxPlanOpen",
+    activeTab === "적립 계획",
+  );
+  // 낙폭 추매 안내 — 여윳돈을 쓰는 보조 도구라 기본 접힘(plans/147)
+  const dipBuy = useAnchoredCollapsible(
+    DIP_BUY_ANCHOR,
+    "growlio:invest:dipBuyOpen",
+    activeTab === "적립 계획",
   );
 
   const { data: settingsData } = useQuery(settingsQuery);
-
-  // 환전 계획 알림(메일·푸시·홈 "지금 할 일")의 `#fx-plan`으로 들어오면 접어 둔 카드도 펼치고 스크롤한다(plans/121 C).
-  // 펼침은 이번 진입(location.key)에만 적용하고 저장하지 않는다 — 링크 한 번에 사용자가 접어 둔 선택이 영구히
-  // 바뀌지 않게, 같은 링크를 다시 눌러도(새 key) 다시 펼치게(plans/122 C1·C6)
-  const location = useLocation();
-  const fxPlanLinked = location.hash === `#${FX_PLAN_ANCHOR}` && activeTab === "적립 계획";
-  const [fxPlanDismissedKey, setFxPlanDismissedKey] = useState<string | null>(null);
-  const fxPlanForcedOpen = fxPlanLinked && fxPlanDismissedKey !== location.key;
-  const handleFxPlanToggle = useCallback(() => {
-    if (!fxPlanForcedOpen) {
-      toggleFxPlanOpen();
-      return;
-    }
-    setFxPlanDismissedKey(location.key);
-    if (isFxPlanOpen) setFxPlanOpen(false);
-  }, [fxPlanForcedOpen, isFxPlanOpen, location.key, setFxPlanOpen, toggleFxPlanOpen]);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, activeTab, setActiveTab);
@@ -138,19 +168,8 @@ export default function InvestPlanPage() {
     saveSettings: saveDividendSettings,
   } = useDividendPlanSettings();
 
-  // `#fx-plan` 진입: 카드가 그려진 뒤 스크롤, 위쪽이 늦게 그려져 밀리므로 잠시 뒤 한 번 더(새 key 재진입에도)
-  const linkKey = location.key;
-  useEffect(() => {
-    if (!fxPlanLinked || isLoading) return;
-    const scroll = () =>
-      document.getElementById(FX_PLAN_ANCHOR)?.scrollIntoView({ block: "start" });
-    const frame = requestAnimationFrame(scroll);
-    const settle = window.setTimeout(scroll, FX_PLAN_SCROLL_SETTLE_MS);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.clearTimeout(settle);
-    };
-  }, [fxPlanLinked, isLoading, linkKey]);
+  useScrollToAnchor(FX_PLAN_ANCHOR, fxPlan.linked, !isLoading, fxPlan.linkKey);
+  useScrollToAnchor(DIP_BUY_ANCHOR, dipBuy.linked, !isLoading, dipBuy.linkKey);
 
   const s = data?.settings;
   const isConfigured = data?.is_configured;
@@ -169,8 +188,7 @@ export default function InvestPlanPage() {
   // 카드 본문은 lazy 청크라 열린 뒤 청크를 받고 나서야 요청이 나간다 — 펼쳐지는 순간 요청을 함께 출발시킨다(plans/127).
   // 적립 분석이 실패하면 카드를 그리지 않으므로 받지 않는다(plans/128 A4)
   const queryClient = useQueryClient();
-  const fxPlanVisible =
-    activeTab === "적립 계획" && !dcaFailed && (isFxPlanOpen || fxPlanForcedOpen);
+  const fxPlanVisible = activeTab === "적립 계획" && !dcaFailed && fxPlan.open;
   useEffect(() => {
     if (fxPlanVisible) void queryClient.prefetchQuery(fxPlanQuery(FX_PLAN_DEFAULT_MONTHS, null));
   }, [fxPlanVisible, queryClient]);
@@ -273,13 +291,31 @@ export default function InvestPlanPage() {
                 iconWrapClassName="bg-sky-50 dark:bg-sky-950"
                 iconColorClassName="text-sky-600 dark:text-sky-400"
                 title="달러 환전 계획"
-                isOpen={isFxPlanOpen || fxPlanForcedOpen}
-                onToggle={handleFxPlanToggle}
+                isOpen={fxPlan.open}
+                onToggle={fxPlan.handleToggle}
                 collapsedHint="지금 환율이 1년 중 어디쯤인지 보고 해외 적립용 달러를 나눠 환전"
               >
                 <ErrorBoundary variant="section">
                   <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
                     <FxPlanCard onEditGoal={openEdit} />
+                  </Suspense>
+                </ErrorBoundary>
+              </CollapsibleCard>
+            </div>
+
+            <div id={DIP_BUY_ANCHOR} className="scroll-mt-4">
+              <CollapsibleCard
+                icon={TrendingDown}
+                iconWrapClassName="bg-amber-50 dark:bg-amber-950"
+                iconColorClassName="text-amber-600 dark:text-amber-400"
+                title="낙폭 추매 안내"
+                isOpen={dipBuy.open}
+                onToggle={dipBuy.handleToggle}
+                collapsedHint="지수가 고점 대비 내려가면 여윳돈을 구간별로 나눠 추매할 금액·종목 안내"
+              >
+                <ErrorBoundary variant="section">
+                  <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+                    <DipBuyCard />
                   </Suspense>
                 </ErrorBoundary>
               </CollapsibleCard>

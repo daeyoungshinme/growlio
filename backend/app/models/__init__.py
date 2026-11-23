@@ -14,6 +14,7 @@ from app.models.asset import (
     Transaction,
 )
 from app.models.challenge import InvestmentChallenge
+from app.models.dip_buy import DipBuyPlan
 from app.models.fx_extra_need import FxExtraNeed
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem, PortfolioItemMember
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
@@ -38,6 +39,7 @@ __all__ = [
     "TossToken",
     "InvestmentChallenge",
     "FxExtraNeed",
+    "DipBuyPlan",
     "Portfolio",
     "PortfolioItem",
     "PortfolioItemMember",

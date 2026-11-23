@@ -112,6 +112,9 @@ export function resolvePushDeepLink(
     // 환전 계획 구간 환율 알림(plans/121) — 카드를 펼치고 스크롤(InvestPlanPage `FX_PLAN_ANCHOR`)
     case "FX_PLAN":
       return `${investPlanUrl("적립 계획")}#fx-plan`;
+    // 낙폭 추매 안내(plans/147) — 추매 카드를 펼치고 스크롤(InvestPlanPage `DIP_BUY_ANCHOR`)
+    case "DCA_DIP_BUY":
+      return `${investPlanUrl("적립 계획")}#dip-buy`;
     // 예전엔 매핑이 없어 눌러도 첫 화면에 머물렀다(plans/90 B5)
     case "CHALLENGE_REMINDER":
     case "CHALLENGE_WRAPUP":
