@@ -33,6 +33,8 @@ export interface DipBuyEtf {
   amount_krw: number;
   /** 해외 종목이면 필요 달러(실환율일 때만) */
   amount_usd: number | null;
+  /** 해외 종목 1주 달러가(실환율일 때만). 저장된 옛 응답엔 없을 수 있다 */
+  price_usd?: number | null;
 }
 
 export interface DipBuySettings {

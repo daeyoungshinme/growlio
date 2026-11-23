@@ -62,6 +62,7 @@ class EtfOption:
     shares: int
     amount_krw: float
     amount_usd: float | None = None
+    price_usd: float | None = None  # 해외 종목 1주 달러가(환율 실값일 때만)
 
 
 @dataclass
@@ -231,6 +232,7 @@ async def attach_etfs(
             shares = math.floor(summary.due_amount_krw / price)
             value = round(shares * price, 0)
             overseas = c["market"] in OVERSEAS_MARKETS
+            usd_live = overseas and rate_is_live and rate > 0
             summary.etfs.append(
                 EtfOption(
                     ticker=c["ticker"],
@@ -239,7 +241,8 @@ async def attach_etfs(
                     price_krw=round(price, 2),
                     shares=shares,
                     amount_krw=value,
-                    amount_usd=round(value / rate, 2) if overseas and rate_is_live and rate > 0 else None,
+                    amount_usd=round(value / rate, 2) if usd_live else None,
+                    price_usd=round(price / rate, 2) if usd_live else None,
                 )
             )
 

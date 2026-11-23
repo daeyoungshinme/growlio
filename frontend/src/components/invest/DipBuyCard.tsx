@@ -23,7 +23,7 @@ import { TOUCH_TARGET_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSi
 import { isOverseasMarket } from "@/constants/markets";
 import { invalidateDipBuyData } from "@/utils/queryInvalidation";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
-import { fmtKrw, fmtKrwPreview, fmtUsdPrice, parseYmd } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview, fmtKrwPrice, fmtUsdPrice, parseYmd } from "@/utils/format";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 
@@ -317,20 +317,31 @@ function DipBuyRuleView({
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 계좌에 맞는 ETF 하나로 사세요
               </p>
-              <ul className="space-y-1 text-xs text-gray-700 dark:text-gray-300">
-                {rule.etfs.map((etf) => (
-                  <li key={`${etf.ticker}:${etf.market}`} className="flex justify-between gap-2">
-                    <span className="min-w-0 truncate">
-                      {etf.name} {etf.shares.toLocaleString()}주
-                    </span>
-                    <span className="shrink-0">
-                      {fmtKrw(etf.amount_krw)}
-                      {isOverseasMarket(etf.market) && etf.amount_usd != null && (
-                        <> (약 {fmtUsdPrice(etf.amount_usd)})</>
-                      )}
-                    </span>
-                  </li>
-                ))}
+              <ul className="space-y-2 text-xs text-gray-700 dark:text-gray-300">
+                {rule.etfs.map((etf) => {
+                  const overseas = isOverseasMarket(etf.market);
+                  return (
+                    <li key={`${etf.ticker}:${etf.market}`}>
+                      <div className="flex justify-between gap-2">
+                        <span className="min-w-0 truncate">
+                          {etf.name} {etf.shares.toLocaleString()}주
+                        </span>
+                        <span className="shrink-0">
+                          {fmtKrw(etf.amount_krw)}
+                          {overseas && etf.amount_usd != null && (
+                            <> (약 {fmtUsdPrice(etf.amount_usd)})</>
+                          )}
+                        </span>
+                      </div>
+                      <p className="text-gray-500 dark:text-gray-400">
+                        1주{" "}
+                        {overseas && etf.price_usd != null
+                          ? `${fmtUsdPrice(etf.price_usd)} · ${fmtKrwPrice(etf.price_krw)}`
+                          : fmtKrwPrice(etf.price_krw)}
+                      </p>
+                    </li>
+                  );
+                })}
               </ul>
             </>
           ) : (
