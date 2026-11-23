@@ -115,6 +115,16 @@ describe("DividendPlanSection — 배당 목표 추천 ETF 섹션", () => {
     );
   });
 
+  it("올해 실수령(실적)은 자산 › 배당이 주인이라 계획에선 반복하지 않는다 — plans/150 B2", async () => {
+    fetchDividendPlan.mockResolvedValue(makeDividendPlan());
+    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
+
+    renderWithProviders(<DividendPlanSection onOpenSettings={vi.fn()} />);
+
+    await screen.findByText("배당 목표 달성 현황");
+    expect(screen.queryByText("올해 실수령")).toBeNull();
+  });
+
   it("배당목표를 설정하지 않았으면 추천 섹션을 숨긴다", async () => {
     fetchDividendPlan.mockResolvedValue(makeDividendPlan({ annual_dividend_goal: null }));
     fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());

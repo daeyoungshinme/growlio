@@ -233,12 +233,11 @@ describe("InvestmentGoalCard", () => {
     expect(screen.getAllByText("목표 13%")[0]).toBeInTheDocument();
   });
 
-  it("DCA 상세는 기본 접힘이고 헤드라인만 한 번 보이며, 토글 클릭 시 펼쳐진다", () => {
+  it("자산 목표는 진행률·남은 금액·예상월 한 줄만 보이고 상세(앞섬/지연·막대)는 계획 탭에 맡긴다 — plans/150 B1", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} dcaData={makeDcaData("2045-03")} />);
     expect(screen.getAllByText("15.0%")).toHaveLength(1);
-    expect(screen.queryByText("실제 기준 달성 예상")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByText("달성 예상일 · 진행 상세"));
-    expect(screen.getByText("실제 기준 달성 예상")).toBeInTheDocument();
+    expect(screen.getByText(/달성 예상/)).toBeInTheDocument();
+    expect(screen.queryByText("달성 예상일 · 진행 상세")).not.toBeInTheDocument();
+    expect(screen.queryByText(/개월 (앞서|지연)/)).not.toBeInTheDocument();
   });
 });

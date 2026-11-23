@@ -141,26 +141,18 @@ export default function GoalTimelineCard({ timeline }: Props) {
             collapsedHint="적립액·수익률을 얼마나 늘리면 몇 년 앞당길 수 있는지"
             buttonClassName={`w-full flex items-center justify-between ${TOUCH_HEIGHT_MIN} text-sm font-semibold text-gray-900 dark:text-gray-50`}
           >
+            {/* 추천 탭 수치를 칸으로 반복하지 않고 한 줄 비교 — 배당 계획의 같은 블록과 같은 모양(plans/150 B6) */}
             {recommendation?.is_configured && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-3 p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950">
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">목표 달성 필요 수익률</p>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">
-                    {fmtPct(recommendation.required_return_pct)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    추천 포트폴리오 기대수익률
-                  </p>
-                  <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-                    {fmtPct(recommendation.expected_return_pct)}
-                  </p>
-                </div>
-                <p className="col-span-2 text-xs text-gray-400 dark:text-gray-500">
-                  추천 종목 {recommendation.recommended_items.length}개
-                </p>
-              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">
+                추천 비중의 기대수익률{" "}
+                <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                  {fmtPct(recommendation.expected_return_pct)}
+                </span>{" "}
+                · 목표 달성 필요{" "}
+                <span className="font-semibold text-gray-900 dark:text-gray-50">
+                  {fmtPct(recommendation.required_return_pct)}
+                </span>
+              </p>
             )}
 
             {acceleration_scenarios.length > 0 && (

@@ -268,10 +268,9 @@ describe("GoalTimelineCard", () => {
     });
     renderCard(mockTimeline);
     fireEvent.click(await screen.findByText("더 빨리 달성하려면?"));
-    expect(await screen.findByText("목표 달성 필요 수익률")).toBeDefined();
+    expect(await screen.findByText(/목표 달성 필요/)).toBeDefined();
     expect(screen.getByText("+7.20%")).toBeDefined();
     expect(screen.getByText("+8.50%")).toBeDefined();
-    expect(screen.getByText("추천 종목 1개")).toBeDefined();
   });
 
   it("marks a scenario achievable when the recommended portfolio's expected return covers it", async () => {

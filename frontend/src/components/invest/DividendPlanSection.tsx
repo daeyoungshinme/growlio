@@ -82,7 +82,6 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
     annual_dividend_goal,
     estimated_annual_krw,
     estimated_monthly_krw,
-    actual_annual_received_krw,
     goal_achievement_pct,
     required_dividend_yield_pct,
     current_dividend_yield_pct,
@@ -141,7 +140,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
 
         {annual_dividend_goal ? (
           <>
-            {/* 모바일: 달성률 히어로 + 보조 3열 */}
+            {/* 모바일: 달성률 히어로 + 보조 2열(예상 연배당·월 평균) */}
             <div className="sm:hidden mb-4">
               <div className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl mb-3">
                 <div>
@@ -158,7 +157,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">
                     예상 연배당
@@ -173,19 +172,11 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                     {fmtKrw(estimated_monthly_krw)}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">
-                    올해 실수령
-                  </p>
-                  <p className="text-sm font-bold text-gray-900 dark:text-gray-50">
-                    {fmtKrw(actual_annual_received_krw)}
-                  </p>
-                </div>
               </div>
             </div>
 
-            {/* 데스크탑: 기존 4열 */}
-            <div className="hidden sm:grid sm:grid-cols-4 gap-4 mb-4">
+            {/* 데스크탑: 목표 대비 3열 — 올해 실수령(실적)은 자산 › 배당이 주인(plans/150 B2) */}
+            <div className="hidden sm:grid sm:grid-cols-3 gap-4 mb-4">
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">목표 연배당</p>
                 <p className="text-xl font-bold text-gray-900 dark:text-gray-50">
@@ -200,12 +191,6 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                 <p className="text-xl font-bold text-red-500">{fmtKrw(estimated_annual_krw)}</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                   월 평균 {fmtKrw(estimated_monthly_krw)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">올해 실수령</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-gray-50">
-                  {fmtKrw(actual_annual_received_krw)}
                 </p>
               </div>
               <div>
@@ -277,7 +262,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                 지금 설정하기
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">예상 연배당</p>
                 <p className="text-base sm:text-xl font-bold text-gray-900 dark:text-gray-50">
@@ -288,12 +273,6 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">예상 월평균</p>
                 <p className="text-base sm:text-xl font-bold text-gray-900 dark:text-gray-50">
                   {fmtKrw(estimated_monthly_krw)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">올해 실수령</p>
-                <p className="text-base sm:text-xl font-bold text-gray-900 dark:text-gray-50">
-                  {fmtKrw(actual_annual_received_krw)}
                 </p>
               </div>
             </div>

@@ -36,7 +36,6 @@ function CardHeader({ linkLabel, className }: { linkLabel: string; className: st
 }
 
 export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) {
-  const [dcaDetailOpen, toggleDcaDetail] = useCollapsible(false, "growlio:goalCard:dcaDetailOpen");
   const [showAllGoals, toggleShowAllGoals] = useCollapsible(
     false,
     "growlio:goalCard:showAllGoalsMobile",
@@ -97,7 +96,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           showAll={showAllGoals}
           onToggleShowAll={toggleShowAllGoals}
         />
-        <DcaOutlook {...outlook} detailOpen={dcaDetailOpen} onToggleDetail={toggleDcaDetail} />
+        <DcaOutlook {...outlook} />
       </div>
     </div>
   );
