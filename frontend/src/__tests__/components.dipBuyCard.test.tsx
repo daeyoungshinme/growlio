@@ -90,6 +90,7 @@ const status = (over: Partial<DipBuyStatus> = {}): DipBuyStatus => ({
   due_amount_krw: 1_200_000,
   dca_held_portfolios: [],
   has_candidates: true,
+  index_drawdowns: { QQQ: -12.3, SPY: -8.4 },
   reset_drawdown_pct: 3,
   ...over,
 });
@@ -197,43 +198,75 @@ describe("DipBuyCard", () => {
     );
   });
 
-  it("다른 지수 규칙 추가는 남은 지수·배분으로 기본 구간을 저장한다", async () => {
+  const TIERS = [
+    { drawdown_pct: 10, ratio_pct: 20 },
+    { drawdown_pct: 20, ratio_pct: 30 },
+    { drawdown_pct: 30, ratio_pct: 50 },
+  ];
+
+  it("규칙이 없는 지수도 낙폭과 함께 칸을 보여주고 남은 배분으로 추가한다", async () => {
     vi.mocked(fetchDipBuyStatus).mockResolvedValue(status());
     renderCard();
-    fireEvent.click(await screen.findByRole("button", { name: "다른 지수 규칙 추가" }));
-    expect(screen.getByText("S&P500 (SPY)")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "S&P500 (SPY) 규칙 추가" }));
+    expect(screen.getByText("-8.4%")).toBeInTheDocument();
     expect(screen.getByLabelText("여윳돈 배분 (%)")).toHaveValue("40");
-    expect(screen.getByText(/다른 규칙이 60%를 써서 40%까지/)).toBeInTheDocument();
+    expect(screen.queryByText(/다른 규칙 배분이 줄어요/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() =>
       expect(createDipBuyRule).toHaveBeenCalledWith({
         index_ticker: "SPY",
         allocation_pct: 40,
-        tiers: [
-          { drawdown_pct: 10, ratio_pct: 20 },
-          { drawdown_pct: 20, ratio_pct: 30 },
-          { drawdown_pct: 30, ratio_pct: 50 },
-        ],
+        tiers: TIERS,
         is_active: true,
+        shrink_others: false,
       }),
     );
   });
 
-  it("배분이 남은 몫을 넘거나 구간 비율 합계가 100%를 넘으면 저장하지 않는다", async () => {
-    vi.mocked(fetchDipBuyStatus).mockResolvedValue(status());
+  it("SPY가 100%여도 QQQ 칸이 보이고, 추가하면 SPY 배분을 비율대로 줄인다", async () => {
+    vi.mocked(fetchDipBuyStatus).mockResolvedValue(
+      status({
+        rules: [rule({ id: "rule-spy", index_ticker: "SPY", allocation_pct: 100 })],
+      }),
+    );
     renderCard();
-    fireEvent.click(await screen.findByRole("button", { name: "다른 지수 규칙 추가" }));
-    fireEvent.change(screen.getByLabelText("여윳돈 배분 (%)"), { target: { value: "50" } });
+    expect(await screen.findByText("나스닥100 (QQQ)")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "나스닥100 (QQQ) 규칙 추가" }));
+    expect(screen.getByLabelText("여윳돈 배분 (%)")).toHaveValue("50");
+    expect(
+      screen.getByText("다른 규칙 배분이 줄어요: S&P500 (SPY) 100% → 50%"),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("40%까지 정할 수 있어요");
-    fireEvent.change(screen.getByLabelText("여윳돈 배분 (%)"), { target: { value: "40" } });
+    await waitFor(() =>
+      expect(createDipBuyRule).toHaveBeenCalledWith({
+        index_ticker: "QQQ",
+        allocation_pct: 50,
+        tiers: TIERS,
+        is_active: true,
+        shrink_others: true,
+      }),
+    );
+  });
+
+  it("다른 규칙을 1% 이상 남길 수 없거나 구간 비율 합계가 100%를 넘으면 저장하지 않는다", async () => {
+    vi.mocked(fetchDipBuyStatus).mockResolvedValue(
+      status({
+        rules: [rule({ id: "rule-spy", index_ticker: "SPY", allocation_pct: 100 })],
+      }),
+    );
+    renderCard();
+    fireEvent.click(await screen.findByRole("button", { name: "나스닥100 (QQQ) 규칙 추가" }));
+    fireEvent.change(screen.getByLabelText("여윳돈 배분 (%)"), { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("1% 이상 남겨야 해요");
+    fireEvent.change(screen.getByLabelText("여윳돈 배분 (%)"), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText("3구간 비율(%)"), { target: { value: "60" } });
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("100%를 넘을 수 없어요");
     expect(createDipBuyRule).not.toHaveBeenCalled();
   });
 
-  it("두 지수 규칙을 다 쓰면 추가 버튼을 숨긴다", async () => {
+  it("두 지수 규칙이 다 있으면 빈 칸이 없다", async () => {
     vi.mocked(fetchDipBuyStatus).mockResolvedValue(
       status({
         rules: [rule(), rule({ id: "rule-spy", index_ticker: "SPY", allocation_pct: 40 })],
@@ -241,6 +274,17 @@ describe("DipBuyCard", () => {
     );
     renderCard();
     expect(await screen.findByText("S&P500 (SPY)")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "다른 지수 규칙 추가" })).not.toBeInTheDocument();
+    expect(screen.queryByText("규칙 없음")).not.toBeInTheDocument();
+  });
+
+  it("여윳돈이 없으면 지수 칸에 여윳돈부터 정하라고 안내한다", async () => {
+    vi.mocked(fetchDipBuyStatus).mockResolvedValue(
+      status({ settings: null, rules: [], due_amount_krw: 0 }),
+    );
+    renderCard();
+    expect(
+      await screen.findAllByText("여윳돈을 먼저 정하면 규칙을 추가할 수 있어요."),
+    ).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /규칙 추가/ })).not.toBeInTheDocument();
   });
 });

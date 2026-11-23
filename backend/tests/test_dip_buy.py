@@ -145,6 +145,21 @@ def test_validate_allocations(allocations, ok):
 
 
 @pytest.mark.parametrize(
+    ("others", "new", "expected"),
+    [
+        ([60], 40, [60]),  # 남은 몫이 충분하면 그대로
+        ([100], 50, [50]),
+        ([60, 40], 50, [30, 20]),
+        ([100], 99, [1]),
+        ([100], 100, None),  # 다른 규칙을 1% 이상 남길 수 없다
+        ([50, 50], 99, None),
+    ],
+)
+def test_shrink_allocations(others, new, expected):
+    assert calc.shrink_allocations(others, new) == expected
+
+
+@pytest.mark.parametrize(
     ("day", "today", "expected"),
     [
         (25, date(2026, 11, 23), date(2026, 11, 25)),
@@ -317,6 +332,46 @@ async def test_create_rule_rejects_duplicate_index_and_over_allocation(mock_db):
     mock_db.add.assert_called_once()
 
 
+async def test_create_rule_shrink_others_fits_full_allocation(mock_db):
+    """SPY 100% 하나뿐이어도 QQQ를 추가할 수 있다 — SPY를 비율대로 줄이고 사이클 기준액도 새 배분으로."""
+    spy = _rule("SPY", 100, cycle_base_krw=1e7, completed=[{"tier": 0, "amount_krw": 2e6}])
+    _db_with(mock_db, _settings(reserve_krw=8e6), [spy])
+    await svc.create_rule(
+        mock_db, USER, index_ticker="QQQ", allocation_pct=50, tiers=TIERS, is_active=True, shrink_others=True
+    )
+    assert spy.allocation_pct == 50
+    assert spy.cycle_base_krw == 5e6  # (8 + 2) × 50%
+    added = mock_db.add.call_args.args[0]
+    assert (added.index_ticker, added.allocation_pct) == ("QQQ", 50)
+
+
+async def test_create_rule_without_shrink_keeps_400(mock_db):
+    spy = _rule("SPY", 100)
+    _db_with(mock_db, _settings(), [spy])
+    with pytest.raises(BadRequestError):
+        await svc.create_rule(mock_db, USER, index_ticker="QQQ", allocation_pct=50, tiers=TIERS, is_active=True)
+    assert spy.allocation_pct == 100
+
+
+async def test_create_rule_shrink_impossible_is_400(mock_db):
+    spy = _rule("SPY", 100)
+    _db_with(mock_db, _settings(), [spy])
+    with pytest.raises(BadRequestError):
+        await svc.create_rule(
+            mock_db, USER, index_ticker="QQQ", allocation_pct=100, tiers=TIERS, is_active=True, shrink_others=True
+        )
+    assert spy.allocation_pct == 100
+
+
+async def test_update_rule_shrink_others(mock_db):
+    qqq, spy = _rule("QQQ", 50), _rule("SPY", 50)
+    _db_with(mock_db, _settings(), [qqq, spy])
+    await svc.update_rule(
+        mock_db, USER, qqq.id, index_ticker="QQQ", allocation_pct=70, tiers=TIERS, is_active=True, shrink_others=True
+    )
+    assert (qqq.allocation_pct, spy.allocation_pct) == (70, 30)
+
+
 async def test_update_rule_index_change_clears_cycle(mock_db):
     rule = _rule(cycle_base_krw=1e7, completed=[{"tier": 0, "amount_krw": 2e6}], notified_tiers=[0])
     _db_with(mock_db, _settings(), [rule])
@@ -361,6 +416,20 @@ async def test_summarize_user_resets_recovered_and_flags_tactical_hold(mock_db):
     assert out.next_notify_date == date(2026, 11, 25)
     assert out.due_amount_krw == 1_000_000  # QQQ 회복으로 초기화 → SPY 몫 1,000만 × 50% × 20%
     assert out.dca_held_portfolios == ["나스닥 적립"]
+
+
+async def test_summarize_user_reports_index_drawdowns_without_rules(mock_db):
+    """규칙이 없는 지수 카드도 낙폭을 보여주도록 조회 경로(with_etfs)에선 규칙 없이도 낙폭을 싣는다."""
+    with (
+        patch.object(svc, "get_settings", AsyncMock(return_value=_settings())),
+        patch.object(svc, "list_rules", AsyncMock(return_value=[])),
+        patch.object(svc, "index_drawdowns", AsyncMock(return_value={"QQQ": -7.0, "SPY": -4.0})) as dd,
+    ):
+        out = await svc.summarize_user(mock_db, None, USER, with_etfs=True)
+        assert out.index_drawdowns == {"QQQ": -7.0, "SPY": -4.0}
+        # 알림 잡·홈 할 일 경로(with_etfs=False)는 규칙이 없으면 시세를 보지 않는다
+        await svc.summarize_user(mock_db, None, USER, with_etfs=False)
+    assert dd.await_count == 1
 
 
 async def test_dca_held_portfolios_uses_tactical_gate(mock_db):
@@ -449,6 +518,7 @@ def test_rule_routes_call_service(client):
         settings_body = {"reserve_krw": 1e6, "notify_mode": "MONTHLY_DAY", "notify_day": 25}
         assert client.put("/api/v1/invest/dip-buy/settings", json=settings_body).status_code == 204
     assert create.await_args.kwargs["allocation_pct"] == 40
+    assert create.await_args.kwargs["shrink_others"] is False
     assert update.await_args.args[2] == rule_id
     assert complete.await_args.args[3] == rule_id
     assert delete.await_args.args[2] == rule_id
@@ -463,6 +533,7 @@ def test_get_status_serializes_summary(client):
         next_notify_date=None,
         dca_held_portfolios=["나스닥 적립"],
         has_candidates=True,
+        index_drawdowns={"QQQ": -12.0, "SPY": -8.5},
     )
     summary.rules[0].etfs = [svc.EtfOption("QQQ", "Invesco QQQ", "NASDAQ", 750_000, 1, 750_000, 500.0)]
     with patch.object(svc, "summarize_user", AsyncMock(return_value=summary)):
@@ -472,6 +543,7 @@ def test_get_status_serializes_summary(client):
     assert data["settings"]["notify_mode"] == "ON_REACH"
     assert data["due_amount_krw"] == 1_200_000
     assert data["dca_held_portfolios"] == ["나스닥 적립"]
+    assert data["index_drawdowns"] == {"QQQ": -12.0, "SPY": -8.5}
     row = data["rules"][0]
     assert row["allocation_pct"] == 60
     assert row["base_krw"] == 6_000_000

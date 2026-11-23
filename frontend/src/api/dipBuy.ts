@@ -69,6 +69,8 @@ export interface DipBuyStatus {
   dca_held_portfolios: string[];
   /** 추천 후보 ETF 중 QQQ·SPY 지수 추종 ETF가 있는지 */
   has_candidates: boolean;
+  /** 지수별 52주 고점 대비 낙폭(규칙이 없는 지수도) — null = 확인 불가 */
+  index_drawdowns: Partial<Record<DipBuyIndex, number | null>>;
   /** 고점 대비 이 % 이내로 회복하면 완료 기록을 지우고 다음 하락을 기다린다 */
   reset_drawdown_pct: number;
 }
@@ -80,6 +82,8 @@ export interface DipBuyRuleInput {
   allocation_pct: number;
   tiers: DipBuyTierInput[];
   is_active: boolean;
+  /** 배분 합계가 100%를 넘으면 다른 규칙 배분을 비율대로 줄여 맞춘다 */
+  shrink_others?: boolean;
 }
 
 /** 백엔드 `dip_buy_calculator.DEFAULT_TIERS`와 같은 기본 구간 */

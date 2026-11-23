@@ -18,16 +18,18 @@ import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { invalidateDipBuyData } from "@/utils/queryInvalidation";
 import { fmtKrw } from "@/utils/format";
+import { shrinkAllocations } from "@/utils/dipBuyAllocation";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 
 interface Props {
-  /** null = 새 규칙 — `availableIndexes`에서 지수를 고른다 */
+  /** null = 새 규칙 — 지수는 `initialIndex`(누른 지수 카드)로 고정 */
   rule: DipBuyRule | null;
-  /** 새 규칙에서 고를 수 있는 지수(아직 규칙이 없는 지수) */
+  initialIndex?: DipBuyIndex;
+  /** 기존 규칙을 다른 지수로 바꿀 때 고를 수 있는 지수(아직 규칙이 없는 지수) */
   availableIndexes: readonly DipBuyIndex[];
-  /** 다른 규칙들이 이미 가져간 배분 합계(%) */
-  otherAllocationPct: number;
+  /** 이 규칙을 뺀 다른 규칙들 — 배분이 넘치면 비율대로 줄어드는 몫을 미리 보여준다 */
+  otherRules: readonly { index_ticker: DipBuyIndex; allocation_pct: number }[];
   /** 배분 % → 금액 미리보기용 여윳돈 풀(남은 여윳돈 + 진행 중 사이클 추매액) */
   poolKrw: number;
   onClose: () => void;
@@ -48,8 +50,9 @@ const toDraft = (t: { drawdown_pct: number; ratio_pct: number }): TierDraft => (
 /** 지수별 추매 규칙 — 기준 지수·여윳돈 배분 %·구간(낙폭 %·몫 비율 %), plans/148 */
 export default function DipBuyRuleModal({
   rule,
+  initialIndex,
   availableIndexes,
-  otherAllocationPct,
+  otherRules,
   poolKrw,
   onClose,
 }: Props) {
@@ -59,12 +62,16 @@ export default function DipBuyRuleModal({
   const qc = useQueryClient();
   const indexChoices = rule
     ? Array.from(new Set<DipBuyIndex>([rule.index_ticker, ...availableIndexes]))
-    : [...availableIndexes];
+    : [initialIndex ?? availableIndexes[0] ?? "QQQ"];
   const [indexTicker, setIndexTicker] = useState<DipBuyIndex>(
     rule?.index_ticker ?? indexChoices[0] ?? "QQQ",
   );
+  const otherAllocationPct = otherRules.reduce((sum, r) => sum + r.allocation_pct, 0);
   const leftPct = Math.max(0, 100 - otherAllocationPct);
-  const [allocation, setAllocation] = useState(String(rule?.allocation_pct ?? leftPct));
+  // 남은 배분이 없으면(예: SPY 100%) 반씩 나누는 걸 기본으로 — 저장하면 다른 규칙이 비율대로 줄어든다
+  const [allocation, setAllocation] = useState(
+    String(rule?.allocation_pct ?? (leftPct >= 1 ? leftPct : 50)),
+  );
   const [tiers, setTiers] = useState<TierDraft[]>(
     (rule?.tiers ?? DEFAULT_DIP_BUY_TIERS).map(toDraft),
   );
@@ -91,6 +98,22 @@ export default function DipBuyRuleModal({
 
   const allocationValue = toNumber(allocation);
   const shareKrw = allocationValue ? (poolKrw * allocationValue) / 100 : 0;
+  const needsShrink = allocationValue != null && allocationValue > leftPct + 1e-9;
+  const shrunk = needsShrink
+    ? shrinkAllocations(
+        otherRules.map((r) => r.allocation_pct),
+        allocationValue ?? 0,
+      )
+    : null;
+  const shrinkPreview =
+    needsShrink && shrunk
+      ? otherRules
+          .map(
+            (r, i) =>
+              `${DIP_BUY_INDEX_LABEL[r.index_ticker]} ${r.allocation_pct}% → ${shrunk[i] ?? r.allocation_pct}%`,
+          )
+          .join(", ")
+      : null;
   const ratioTotal = tiers.reduce((sum, t) => sum + (toNumber(t.ratio) ?? 0), 0);
 
   const updateTier = (i: number, patch: Partial<TierDraft>) =>
@@ -112,11 +135,11 @@ export default function DipBuyRuleModal({
       setError(parsed.error.issues[0]?.message ?? "입력값을 확인해주세요");
       return;
     }
-    if (parsed.data.allocation_pct > leftPct) {
-      setError(`다른 규칙이 ${otherAllocationPct}%를 쓰고 있어 ${leftPct}%까지 정할 수 있어요`);
+    if (needsShrink && !shrunk) {
+      setError("다른 규칙 배분을 1% 이상 남겨야 해요. 배분을 더 낮춰주세요");
       return;
     }
-    saveMutation.mutate(parsed.data);
+    saveMutation.mutate({ ...parsed.data, shrink_others: needsShrink });
   };
 
   return (
@@ -151,11 +174,13 @@ export default function DipBuyRuleModal({
               className={`${INPUT_SM} w-full`}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 break-keep">
-              {otherAllocationPct > 0
-                ? `다른 규칙이 ${otherAllocationPct}%를 써서 ${leftPct}%까지 정할 수 있어요. `
-                : ""}
               {shareKrw > 0 ? `이 규칙 몫 약 ${fmtKrw(shareKrw)}` : ""}
             </p>
+            {shrinkPreview && (
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300 break-keep">
+                다른 규칙 배분이 줄어요: {shrinkPreview}
+              </p>
+            )}
           </div>
           <div role="group" aria-labelledby={tiersTitleId} className="space-y-2">
             <p id={tiersTitleId} className={FORM_LABEL}>

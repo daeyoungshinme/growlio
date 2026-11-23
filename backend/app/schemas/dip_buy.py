@@ -38,6 +38,8 @@ class DipBuyRuleUpsert(BaseModel):
     allocation_pct: float = Field(..., ge=1, le=100)
     tiers: list[DipBuyTier]
     is_active: bool = True
+    # 배분 합계가 100을 넘으면 다른 규칙 배분을 비율대로 줄여 맞춘다(끄면 400)
+    shrink_others: bool = False
 
     @field_validator("tiers")
     @classmethod
@@ -106,4 +108,6 @@ class DipBuyStatusResponse(BaseModel):
     dca_held_portfolios: list[str]
     # 등록 후보 ETF 중 QQQ·SPY 지수를 추종하는 ETF가 하나라도 있는지(없으면 금액만 안내)
     has_candidates: bool
+    # 지수별 52주 고점 대비 낙폭(규칙이 없는 지수도) — None = 확인 불가
+    index_drawdowns: dict[str, float | None]
     reset_drawdown_pct: float

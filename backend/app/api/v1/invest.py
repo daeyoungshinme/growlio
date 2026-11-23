@@ -289,6 +289,7 @@ async def get_dip_buy_status(
         due_amount_krw=summary.due_amount_krw,
         dca_held_portfolios=summary.dca_held_portfolios,
         has_candidates=summary.has_candidates,
+        index_drawdowns=summary.index_drawdowns,
         reset_drawdown_pct=RESET_DRAWDOWN_PCT,
     )
 
@@ -328,6 +329,7 @@ async def create_dip_buy_rule(
         allocation_pct=req.allocation_pct,
         tiers=[t.model_dump() for t in req.tiers],
         is_active=req.is_active,
+        shrink_others=req.shrink_others,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -349,6 +351,7 @@ async def update_dip_buy_rule(
         allocation_pct=req.allocation_pct,
         tiers=[t.model_dump() for t in req.tiers],
         is_active=req.is_active,
+        shrink_others=req.shrink_others,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
