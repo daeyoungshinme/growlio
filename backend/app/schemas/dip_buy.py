@@ -76,6 +76,8 @@ class DipBuyEtf(BaseModel):
     amount_krw: float
     amount_usd: float | None = None  # 해외 종목이면 필요 달러(환율 실값일 때만)
     price_usd: float | None = None  # 해외 종목 1주 달러가(환율 실값일 때만)
+    tier_price_krw: list[float] = []  # 규칙 구간 순서대로 도달 시 1주가 추정(낙폭 모르면 빈 목록)
+    tier_price_usd: list[float] | None = None  # 해외 종목·환율 실값일 때만
 
 
 class DipBuySettingsOut(BaseModel):

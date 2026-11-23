@@ -45,6 +45,17 @@ class TierStatus(TypedDict):
     done_amount_krw: float | None
 
 
+def tier_price(price: float, drawdown_pct: float | None, tier_drawdown_pct: float) -> float | None:
+    """그 구간(고점 대비 −tier%)에 닿을 때의 1주 가격 추정 — 지금 가격을 지금 낙폭으로 고점까지 되돌린 뒤 구간만큼 뺀다.
+
+    같은 지수를 추종하는 ETF는 지수와 같은 비율로 움직인다고 본다(국내 상장 ETF의 환율 변동은 반영 안 됨).
+    낙폭을 모르면 None.
+    """
+    if drawdown_pct is None or drawdown_pct <= -100 or price <= 0:
+        return None
+    return price * (1 - float(tier_drawdown_pct) / 100) / (1 + drawdown_pct / 100)
+
+
 def completed_tiers(completed: Sequence[dict] | None) -> set[int]:
     return {int(c["tier"]) for c in completed or [] if "tier" in c}
 
