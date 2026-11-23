@@ -107,7 +107,8 @@ async def _notify_user(
 
 
 async def _send(db: AsyncSession, s: DipBuySummary, phase: Phase, key: str) -> None:
-    assert s.next_run_date is not None
+    if s.next_run_date is None:  # 호출부가 거르지만 타입 좁히기 겸 방어 — assert는 -O에서 사라진다(bandit B101)
+        return
     row = (
         await db.execute(
             select(User.email, UserSettings.notification_email, UserSettings.fcm_token)
