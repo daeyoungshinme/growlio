@@ -210,53 +210,29 @@ describe("InvestPlanPage", () => {
     expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
   });
 
-  it("#fx-plan으로 들어오면 접어 둔 환전 계획 카드를 펼치고 스크롤한다(plans/121 C)", async () => {
-    window.localStorage.setItem("growlio:invest:fxPlanOpen", "false");
-    const scrollIntoView = vi.fn();
-    const original = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = scrollIntoView;
-    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
-    renderPage("/invest-plan?tab=적립 계획#fx-plan");
+  it("환전 탭은 적립 분석이 실패해도 환전 계획을 그리고 기본 계획 요청을 바로 보낸다(plans/149)", async () => {
+    vi.mocked(fetchDCAAnalysis).mockRejectedValue(new Error("failed"));
+    renderPage("/invest-plan?tab=환전");
     expect(await screen.findByTestId("fx-plan")).toBeInTheDocument();
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
-    // 링크로 펼친 것은 이번 진입에만 — 사용자가 접어 둔 저장값은 그대로(plans/122 C1)
-    expect(window.localStorage.getItem("growlio:invest:fxPlanOpen")).toBe("false");
-    Element.prototype.scrollIntoView = original;
-    window.localStorage.removeItem("growlio:invest:fxPlanOpen");
-  });
-
-  it("#fx-plan으로 펼친 카드도 접을 수 있고, 접어도 저장값은 바꾸지 않는다", async () => {
-    window.localStorage.setItem("growlio:invest:fxPlanOpen", "false");
-    const original = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = vi.fn();
-    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
-    renderPage("/invest-plan?tab=적립 계획#fx-plan");
-    expect(await screen.findByTestId("fx-plan")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("달러 환전 계획"));
-    await waitFor(() => expect(screen.queryByTestId("fx-plan")).toBeNull());
-    expect(window.localStorage.getItem("growlio:invest:fxPlanOpen")).toBe("false");
-    Element.prototype.scrollIntoView = original;
-    window.localStorage.removeItem("growlio:invest:fxPlanOpen");
-  });
-
-  it("해시 없이 들어오면 접어 둔 환전 계획 카드는 접힌 채로 둔다", async () => {
-    window.localStorage.setItem("growlio:invest:fxPlanOpen", "false");
-    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
-    renderPage("/invest-plan?tab=적립 계획");
-    expect(await screen.findByText("달러 환전 계획")).toBeInTheDocument();
-    expect(screen.queryByTestId("fx-plan")).toBeNull();
-    // 접힌 카드는 환전 계획을 미리 받지 않는다
-    expect(fetchFxPlan).not.toHaveBeenCalled();
-    window.localStorage.removeItem("growlio:invest:fxPlanOpen");
-  });
-
-  it("환전 계획 카드를 펼치면 lazy 청크와 함께 기본 계획 요청을 바로 보낸다(plans/127)", async () => {
-    window.localStorage.setItem("growlio:invest:fxPlanOpen", "false");
-    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
-    renderPage("/invest-plan?tab=적립 계획");
-    fireEvent.click(await screen.findByText("달러 환전 계획"));
+    expect(screen.getByText("달러 환전 계획")).toBeInTheDocument();
+    expect(screen.queryByText("데이터를 불러오지 못했습니다.")).toBeNull();
     await waitFor(() => expect(fetchFxPlan).toHaveBeenCalledWith(3, null));
-    window.localStorage.removeItem("growlio:invest:fxPlanOpen");
+  });
+
+  it("적립 계획 탭에는 환전 계획이 없다", async () => {
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage("/invest-plan?tab=적립 계획");
+    expect(await screen.findByText("낙폭 추매 안내")).toBeInTheDocument();
+    expect(screen.queryByText("달러 환전 계획")).toBeNull();
+    expect(screen.queryByTestId("fx-plan")).toBeNull();
+    expect(fetchFxPlan).not.toHaveBeenCalled();
+  });
+
+  it("옛 환전 계획 링크(?tab=적립 계획#fx-plan)는 환전 탭으로 연다(plans/149)", async () => {
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage("/invest-plan?tab=적립 계획#fx-plan");
+    expect(await screen.findByTestId("fx-plan")).toBeInTheDocument();
+    expect(screen.queryByText("낙폭 추매 안내")).toBeNull();
   });
 
   it("renders main page when data is configured", async () => {

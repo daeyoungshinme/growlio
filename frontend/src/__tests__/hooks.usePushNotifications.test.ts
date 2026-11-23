@@ -41,8 +41,8 @@ describe("resolvePushDeepLink", () => {
     expect(resolvePushDeepLink({ type: "DCA_CASH_SHORTFALL" })).toBe("/invest-plan?tab=적립 계획");
   });
 
-  it("routes FX_PLAN (환전 계획 구간 알림) to the savings plan tab", () => {
-    expect(resolvePushDeepLink({ type: "FX_PLAN" })).toBe("/invest-plan?tab=적립 계획#fx-plan");
+  it("routes FX_PLAN (환전 계획 구간 알림) to the FX tab", () => {
+    expect(resolvePushDeepLink({ type: "FX_PLAN" })).toBe("/invest-plan?tab=환전");
   });
 
   it("routes RECOMMENDATION_DRIFT to the recommendation tab", () => {

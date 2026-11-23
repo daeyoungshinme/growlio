@@ -394,7 +394,7 @@ async def test_fx_plan_triggered_tranches_merge_into_one_row():
     assert item.priority == "HIGH"
     assert item.title == "목표 환율 도달 — $550 환전"
     assert "1,320원 · 1,300원 이하" in item.detail
-    assert item.link == "/invest-plan?tab=적립 계획#fx-plan"
+    assert item.link == "/invest-plan?tab=환전"
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { legacyAssetsTaxRedirect, legacyHistorySegment } from "@/utils/legacyTabRedirect";
+import {
+  legacyAssetsTaxRedirect,
+  legacyHistorySegment,
+  legacyInvestPlanTab,
+} from "@/utils/legacyTabRedirect";
 
 describe("legacyAssetsTaxRedirect", () => {
   it("세금 탭이 아니면 리다이렉트하지 않는다", () => {
@@ -32,5 +36,18 @@ describe("legacyHistorySegment (계좌관리 내역 통합)", () => {
     expect(legacyHistorySegment("기간별 매수")).toBe("매수 내역");
     expect(legacyHistorySegment("증권계좌")).toBeNull();
     expect(legacyHistorySegment(null)).toBeNull();
+  });
+});
+
+describe("legacyInvestPlanTab", () => {
+  it("옛 환전 계획 링크(적립 계획 + #fx-plan)는 환전 탭", () => {
+    expect(legacyInvestPlanTab("적립 계획", "#fx-plan")).toBe("환전");
+  });
+
+  it("해시가 다르거나 다른 탭이면 null", () => {
+    expect(legacyInvestPlanTab("적립 계획", "")).toBeNull();
+    expect(legacyInvestPlanTab("적립 계획", "#dip-buy")).toBeNull();
+    expect(legacyInvestPlanTab("환전", "#fx-plan")).toBeNull();
+    expect(legacyInvestPlanTab(null, "#fx-plan")).toBeNull();
   });
 });

@@ -62,8 +62,8 @@ _LINK_TAX_ESTIMATE = "/invest-plan?tab=절세&taxTab=세금 추정"
 _LINK_CHALLENGE = "/invest-plan?tab=챌린지"
 # 예수금 부족 푸시(DCA_CASH_SHORTFALL)와 같은 목적지 — 적립 계획의 자동매수 배너가 부족액과 설정 링크를 함께 보여 준다
 _LINK_DCA_PLAN = "/invest-plan?tab=적립 계획"
-# 환전 계획 카드를 펼치고 스크롤한다 — 프론트 `FX_PLAN_ANCHOR`(InvestPlanPage)와 같은 해시
-_LINK_FX_PLAN = "/invest-plan?tab=적립 계획#fx-plan"
+# 계획 › 환전 탭 — 프론트 INVEST_PLAN_TABS와 같은 이름(plans/149)
+_LINK_FX_PLAN = "/invest-plan?tab=환전"
 # 낙폭 추매 카드를 펼치고 스크롤한다 — 프론트 `DIP_BUY_ANCHOR`(InvestPlanPage)·`email_service.dip_buy_link`와 같은 해시
 _LINK_DIP_BUY = "/invest-plan?tab=적립 계획#dip-buy"
 DIP_BUY_ACTION_DAYS = 3

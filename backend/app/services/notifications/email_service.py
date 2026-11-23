@@ -115,10 +115,9 @@ async def _send_templated(
 
 
 def fx_plan_link() -> str:
-    """앱 계획 › 적립 계획 링크(환전 계획 카드가 있는 탭). 탭 이름은 frontend `constants/tabs.ts`의
-    INVEST_PLAN_TABS와 같아야 한다. 메일 href라 공백·한글을 인코딩한다(`_rebalancing_link`와 같은 방식).
-    `#fx-plan`은 카드를 펼치고 스크롤하는 해시(프론트 InvestPlanPage `FX_PLAN_ANCHOR`)."""
-    return f"{settings.frontend_url}/invest-plan?{urlencode({'tab': '적립 계획'})}#fx-plan"
+    """앱 계획 › 환전 탭 링크(plans/149). 탭 이름은 frontend `constants/tabs.ts`의
+    INVEST_PLAN_TABS와 같아야 한다. 메일 href라 한글을 인코딩한다(`_rebalancing_link`와 같은 방식)."""
+    return f"{settings.frontend_url}/invest-plan?{urlencode({'tab': '환전'})}"
 
 
 def dip_buy_link() -> str:
