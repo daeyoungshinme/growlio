@@ -275,12 +275,13 @@ describe("invalidateRebalancingHistoryData", () => {
 });
 
 describe("invalidateGoalRecommendationData", () => {
-  it("goal-recommendation(접두사 매칭), settings 무효화", async () => {
+  it("goal-recommendation(접두사 매칭), settings, 낙폭 추매(후보 ETF) 무효화", async () => {
     const qc = makeQueryClient();
     await invalidateGoalRecommendationData(qc as any);
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
     expect(keys).toContain("goal-recommendation");
     expect(keys).toContain("settings");
+    expect(keys).toContain("dip-buy");
   });
 });
 

@@ -1,13 +1,29 @@
 import { z } from "zod";
 
-/** 낙폭 추매 안내 설정 — 백엔드 `DipBuyPlanUpsert`·`dip_buy_calculator.validate_tiers`와 같은 규칙(plans/147) */
-export const dipBuyPlanSchema = z
+/** 낙폭 추매 여윳돈·알림 방식 — 백엔드 `DipBuySettingsUpsert`와 같은 규칙(plans/148) */
+export const dipBuySettingsSchema = z
   .object({
-    index_ticker: z.enum(["QQQ", "SPY"]),
     reserve_krw: z
       .number({ error: "여윳돈을 입력해주세요" })
       .min(0, "여윳돈은 0 이상이어야 합니다")
       .max(100_000_000_000, "금액이 너무 큽니다"),
+    notify_mode: z.enum(["ON_REACH", "MONTHLY_DAY"]),
+    notify_day: z.number().int().min(1).max(28).nullable(),
+    is_active: z.boolean(),
+  })
+  .refine((v) => v.notify_mode !== "MONTHLY_DAY" || v.notify_day != null, {
+    message: "매달 알림 받을 날짜를 정해주세요",
+    path: ["notify_day"],
+  });
+
+/** 지수별 추매 규칙 — 백엔드 `DipBuyRuleUpsert`·`dip_buy_calculator.validate_tiers`와 같은 규칙(plans/147·148) */
+export const dipBuyRuleSchema = z
+  .object({
+    index_ticker: z.enum(["QQQ", "SPY"]),
+    allocation_pct: z
+      .number({ error: "여윳돈 배분을 입력해주세요" })
+      .min(1, "여윳돈 배분은 1~100% 사이로 정해주세요")
+      .max(100, "여윳돈 배분은 1~100% 사이로 정해주세요"),
     tiers: z
       .array(
         z.object({

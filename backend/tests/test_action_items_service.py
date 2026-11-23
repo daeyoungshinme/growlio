@@ -128,7 +128,10 @@ async def _run(
             "app.services.alerts.recommendation_drift_alert_service.peek_drifted_portfolios",
             new=rec_drift or AsyncMock(return_value=[]),
         ),
-        patch("app.services.dip_buy_service.summarize_user_plans", new=dip_buy or AsyncMock(return_value=[])),
+        patch(
+            "app.services.dip_buy_service.summarize_user",
+            new=dip_buy or AsyncMock(return_value=_dip_summary(due=0.0)),
+        ),
     ):
         items = await svc.get_action_items(uuid.uuid4(), db, None)
     return items, db
@@ -438,32 +441,53 @@ async def test_tax_source_cached_between_calls():
         assert tax.await_count == 2
 
 
-def _dip_summary(*, due=3_000_000.0, run=date(2026, 11, 25), dd=-21.4):
-    return SimpleNamespace(
-        plan=SimpleNamespace(id=uuid.uuid4(), index_ticker="QQQ"),
-        portfolio=SimpleNamespace(name="나스닥 적립"),
-        due_amount_krw=due,
-        next_run_date=run,
+def _dip_summary(*, due=3_000_000.0, run=date(2026, 11, 25), dd=-21.4, mode="MONTHLY_DAY", held=(), active=True):
+    from app.services.dip_buy_service import RuleSummary, UserDipBuySummary
+
+    rule = RuleSummary(
+        rule=SimpleNamespace(id=uuid.uuid4(), index_ticker="QQQ", notified_tiers=[]),
         drawdown_pct=dd,
+        statuses=[],
+        base_krw=10_000_000.0,
+        spent_krw=0.0,
+        due_amount_krw=due,
+        due_tiers=[0] if due else [],
+    )
+    return UserDipBuySummary(
+        settings=SimpleNamespace(is_active=active, notify_mode=mode, reserve_krw=10_000_000.0),
+        rules=[rule],
+        next_notify_date=run if mode == "MONTHLY_DAY" else None,
+        dca_held_portfolios=list(held),
     )
 
 
 @pytest.mark.asyncio
 async def test_dip_buy_row_within_three_days():
-    """plans/147 — 적립일 3일 안 추매 금액이 있으면 1행(카드 해시 링크)."""
-    items, _ = await _run(dip_buy=AsyncMock(return_value=[_dip_summary()]))
+    """plans/148 — 매달 정한 날 방식은 알림일 3일 안 추매 금액이 있으면 1행(카드 해시 링크)."""
+    items, _ = await _run(dip_buy=AsyncMock(return_value=_dip_summary()))
     assert [i.kind for i in items] == ["DIP_BUY"]
-    assert items[0].title == "11월 25일 적립일 추매 3,000,000원"
+    assert items[0].title == "11월 25일 추매 3,000,000원"
     assert items[0].priority == "MEDIUM"
     assert items[0].link == "/invest-plan?tab=적립 계획#dip-buy"
-    assert "-21.4%" in items[0].detail
+    assert "QQQ -21.4%" in items[0].detail
+    assert items[0].deadline == "2026-11-25"
 
 
 @pytest.mark.asyncio
 async def test_dip_buy_row_today_is_high():
-    items, _ = await _run(dip_buy=AsyncMock(return_value=[_dip_summary(run=date(2026, 11, 23))]))
-    assert items[0].title.startswith("오늘 적립일 추매")
+    items, _ = await _run(dip_buy=AsyncMock(return_value=_dip_summary(run=date(2026, 11, 23))))
+    assert items[0].title.startswith("오늘 추매")
     assert items[0].priority == "HIGH"
+
+
+@pytest.mark.asyncio
+async def test_dip_buy_row_on_reach_mode_and_tactical_hold():
+    """구간 도달 방식은 알림일 없이 바로 1행, 전술 방어 국면 보류 포트폴리오가 있으면 함께 표시."""
+    items, _ = await _run(dip_buy=AsyncMock(return_value=_dip_summary(mode="ON_REACH", held=["나스닥 적립"])))
+    assert items[0].title == "추매 구간 도달 3,000,000원"
+    assert items[0].priority == "HIGH"
+    assert items[0].deadline is None
+    assert "전술 방어 국면" in items[0].detail
 
 
 @pytest.mark.asyncio
@@ -472,9 +496,9 @@ async def test_dip_buy_row_today_is_high():
     [
         _dip_summary(due=0.0),
         _dip_summary(run=date(2026, 11, 27)),
-        _dip_summary(run=None),
+        _dip_summary(active=False),
     ],
 )
 async def test_dip_buy_no_row(summary):
-    items, _ = await _run(dip_buy=AsyncMock(return_value=[summary]))
+    items, _ = await _run(dip_buy=AsyncMock(return_value=summary))
     assert items == []
