@@ -70,6 +70,8 @@ const rule = (over: Partial<DipBuyRule> = {}): DipBuyRule => ({
       amount_krw: 750_000,
       amount_usd: 500,
       price_usd: 500,
+      tier_price_krw: [770_000, 684_000, 599_000],
+      tier_price_usd: [513.33, 456.0, 399.33],
     },
     {
       ticker: "133690",
@@ -79,6 +81,8 @@ const rule = (over: Partial<DipBuyRule> = {}): DipBuyRule => ({
       shares: 9,
       amount_krw: 1_170_000,
       amount_usd: null,
+      tier_price_krw: [133_400, 118_600, 103_800],
+      tier_price_usd: null,
     },
   ],
   ...over,
@@ -130,11 +134,44 @@ describe("DipBuyCard", () => {
 
   it("해외 ETF 달러 1주가가 없으면(실환율 없음·옛 응답) 원화 1주가만 보여준다", async () => {
     const base = rule();
-    const etfs = base.etfs.map((e) => ({ ...e, amount_usd: null, price_usd: undefined }));
+    const etfs = base.etfs.map((e) => ({
+      ...e,
+      amount_usd: null,
+      price_usd: undefined,
+      tier_price_usd: undefined,
+    }));
     vi.mocked(fetchDipBuyStatus).mockResolvedValue(status({ rules: [{ ...base, etfs }] }));
     renderCard();
     expect(await screen.findByText("1주 750,000원")).toBeInTheDocument();
     expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText("1주 Invesco QQQ 약 770,000원 · TIGER 미국나스닥100 약 133,400원"),
+    ).toBeInTheDocument();
+  });
+
+  it("구간 행마다 도달 시 예상 1주가를 보여준다 — 해외는 달러, 국내는 원화", async () => {
+    vi.mocked(fetchDipBuyStatus).mockResolvedValue(status());
+    renderCard();
+    expect(
+      await screen.findByText("1주 Invesco QQQ 약 $513.33 · TIGER 미국나스닥100 약 133,400원"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("1주 Invesco QQQ 약 $456.00 · TIGER 미국나스닥100 약 118,600원"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("1주 Invesco QQQ 약 $399.33 · TIGER 미국나스닥100 약 103,800원"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/계산한 추정이에요/)).toBeInTheDocument();
+  });
+
+  it("옛 응답처럼 구간별 1주가가 없으면 구간 행에 가격 줄을 그리지 않는다", async () => {
+    const base = rule();
+    const etfs = base.etfs.map(({ tier_price_krw: _k, tier_price_usd: _u, ...e }) => e);
+    vi.mocked(fetchDipBuyStatus).mockResolvedValue(status({ rules: [{ ...base, etfs }] }));
+    renderCard();
+    expect(await screen.findByText("추매 120만원")).toBeInTheDocument();
+    expect(screen.queryByText(/계산한 추정이에요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^1주 Invesco/)).not.toBeInTheDocument();
   });
 
   it("매달 정한 날 방식이면 다음 알림일을 보여준다", async () => {

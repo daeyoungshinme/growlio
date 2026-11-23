@@ -6,6 +6,7 @@ import {
   DIP_BUY_INDEX_LABEL,
   DIP_BUY_INDEXES,
   DIP_BUY_VS_TACTICAL_NOTE,
+  type DipBuyEtf,
   type DipBuyIndex,
   type DipBuyRule,
   type DipBuyStatus,
@@ -51,6 +52,16 @@ function dateLabel(ymd: string): string {
 }
 
 const fmtDrawdown = (pct: number | null) => (pct == null ? "확인 불가" : `${pct.toFixed(1)}%`);
+
+/** 그 구간에 닿을 때 ETF별 예상 1주가 — 해외는 달러(실환율일 때), 국내·환율 없음은 원화 */
+function tierSharePrices(etfs: readonly DipBuyEtf[], tier: number): string[] {
+  return etfs.flatMap((etf) => {
+    const krw = etf.tier_price_krw?.[tier];
+    if (krw == null) return [];
+    const usd = isOverseasMarket(etf.market) ? etf.tier_price_usd?.[tier] : undefined;
+    return [`${etf.name} 약 ${usd != null ? fmtUsdPrice(usd) : fmtKrwPrice(krw)}`];
+  });
+}
 
 function notifyLabel(data: DipBuyStatus): string {
   const s = data.settings;
@@ -289,23 +300,37 @@ function DipBuyRuleView({
       <ul className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
         {rule.tiers.map((t) => {
           const badge = STATE_LABEL[t.state];
+          const prices = tierSharePrices(rule.etfs, t.tier);
           return (
-            <li key={t.tier} className="flex items-center justify-between gap-2 py-2">
-              <span className="text-gray-700 dark:text-gray-300">
-                −{t.drawdown_pct}% · 몫의 {t.ratio_pct}%
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="text-gray-800 dark:text-gray-200">
-                  {fmtKrw(t.done_amount_krw ?? t.amount_krw)}
+            <li key={t.tier} className="py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-gray-700 dark:text-gray-300">
+                  −{t.drawdown_pct}% · 몫의 {t.ratio_pct}%
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-xs ${badge.className}`}>
-                  {badge.text}
+                <span className="flex items-center gap-2">
+                  <span className="text-gray-800 dark:text-gray-200">
+                    {fmtKrw(t.done_amount_krw ?? t.amount_krw)}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${badge.className}`}>
+                    {badge.text}
+                  </span>
                 </span>
-              </span>
+              </div>
+              {prices.length > 0 && (
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 break-keep">
+                  1주 {prices.join(" · ")}
+                </p>
+              )}
             </li>
           );
         })}
       </ul>
+      {rule.etfs.some((e) => (e.tier_price_krw?.length ?? 0) > 0) && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 break-keep">
+          구간별 1주 가격은 지금 낙폭과 현재가로 계산한 추정이에요(국내 상장 ETF는 환율 변동
+          미반영).
+        </p>
+      )}
 
       {due ? (
         <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">

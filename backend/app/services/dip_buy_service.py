@@ -41,6 +41,7 @@ from app.services.dip_buy_calculator import (
     rule_base,
     should_reset,
     shrink_allocations,
+    tier_price,
     tier_statuses,
     validate_allocations,
     validate_tiers,
@@ -63,6 +64,9 @@ class EtfOption:
     amount_krw: float
     amount_usd: float | None = None
     price_usd: float | None = None  # 해외 종목 1주 달러가(환율 실값일 때만)
+    # 규칙 구간 순서대로 그 구간 도달 시 1주 가격 추정(`tier_price`) — 낙폭을 모르면 빈 목록
+    tier_price_krw: list[float] = field(default_factory=list)
+    tier_price_usd: list[float] | None = None  # 해외 종목·환율 실값일 때만
 
 
 @dataclass
@@ -208,13 +212,27 @@ async def load_goal_candidates(db: AsyncSession, user_id: uuid.UUID) -> list[dic
 
 
 async def attach_etfs(
-    db: AsyncSession, cache: Any, user_id: uuid.UUID, rules: list[RuleSummary], candidates: list[dict] | None
+    db: AsyncSession,
+    cache: Any,
+    user_id: uuid.UUID,
+    rules: list[RuleSummary],
+    candidates: list[dict] | None,
+    *,
+    include_waiting: bool = False,
 ) -> None:
-    """안내 금액이 있는 규칙에 ETF별 매수 가능 수량을 붙인다(시세 조회 포함). 실패하면 금액만 남긴다."""
+    """안내 금액이 있는 규칙에 ETF별 매수 가능 수량·구간별 예상 1주가를 붙인다(시세 조회 포함). 실패하면 금액만 남긴다.
+
+    `include_waiting`이면 추매할 구간이 없는 규칙에도 붙인다(수량 0) — 화면이 대기 구간의 예상 1주가를 보여주려고.
+    알림 잡은 안내할 규칙만 넘기므로 기본값을 쓴다.
+    """
     from app.services.market_data.price_service import fetch_prices_batch_krw
     from app.utils.currency import get_live_or_cached_usd_krw
 
-    targets = [(r, candidate_etfs_for_index(candidates, r.rule.index_ticker)) for r in rules if r.due_amount_krw > 0]
+    targets = [
+        (r, candidate_etfs_for_index(candidates, r.rule.index_ticker))
+        for r in rules
+        if include_waiting or r.due_amount_krw > 0
+    ]
     tickers = sorted({(c["ticker"], c["market"]) for _, cands in targets for c in cands})
     if not tickers:
         return
@@ -233,6 +251,8 @@ async def attach_etfs(
             value = round(shares * price, 0)
             overseas = c["market"] in OVERSEAS_MARKETS
             usd_live = overseas and rate_is_live and rate > 0
+            at_tiers = [tier_price(price, summary.drawdown_pct, t["drawdown_pct"]) for t in summary.rule.tiers or []]
+            tier_krw = [round(p, 0) for p in at_tiers if p is not None]
             summary.etfs.append(
                 EtfOption(
                     ticker=c["ticker"],
@@ -243,6 +263,8 @@ async def attach_etfs(
                     amount_krw=value,
                     amount_usd=round(value / rate, 2) if usd_live else None,
                     price_usd=round(price / rate, 2) if usd_live else None,
+                    tier_price_krw=tier_krw,
+                    tier_price_usd=[round(p / rate, 2) for p in tier_krw] if usd_live and tier_krw else None,
                 )
             )
 
@@ -304,7 +326,7 @@ async def summarize_user(
     if with_etfs:
         candidates = await load_goal_candidates(db, user_id)
         out.has_candidates = any(candidate_etfs_for_index(candidates, t) for t in DIP_BUY_INDEX_TICKERS)
-        await attach_etfs(db, cache, user_id, summaries, candidates)
+        await attach_etfs(db, cache, user_id, summaries, candidates, include_waiting=True)
     if out.due_amount_krw > 0:
         out.dca_held_portfolios = await dca_held_portfolios(db, user_id)
     return out

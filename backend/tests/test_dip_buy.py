@@ -250,6 +250,52 @@ async def test_attach_etfs_skips_without_due_or_candidates(mock_db):
     prices.assert_not_awaited()
 
 
+@pytest.mark.parametrize(
+    ("price", "dd", "tier", "expected"),
+    [
+        (100.0, -20.0, 30.0, 87.5),  # 고점 125 → −30%면 87.5
+        (100.0, 0.0, 10.0, 90.0),  # 지금이 고점
+        (100.0, -25.0, 10.0, 120.0),  # 이미 지난 구간은 지금보다 높은 값
+        (100.0, None, 10.0, None),  # 낙폭 모르면 추정 안 함
+        (0.0, -5.0, 10.0, None),
+    ],
+)
+def test_tier_price(price, dd, tier, expected):
+    got = calc.tier_price(price, dd, tier)
+    assert got == (pytest.approx(expected) if expected is not None else None)
+
+
+async def test_attach_etfs_include_waiting_adds_tier_prices(mock_db):
+    s = svc.summarize_rules(_settings(), [_rule()], {"QQQ": -5.0})[0]  # 대기 — 안내 금액 0
+    with (
+        patch(
+            "app.services.market_data.price_service.fetch_prices_batch_krw",
+            AsyncMock(return_value={"QQQ": 750_000.0, "133690": 130_000.0}),
+        ),
+        patch("app.utils.currency.get_live_or_cached_usd_krw", AsyncMock(return_value=(1500.0, True))),
+    ):
+        await svc.attach_etfs(mock_db, None, USER, [s], CANDIDATES, include_waiting=True)
+    qqq, tiger = s.etfs
+    assert (qqq.shares, qqq.amount_krw) == (0, 0)
+    assert qqq.tier_price_krw == [710_526, 631_579, 552_632]
+    assert qqq.tier_price_usd == [473.68, 421.05, 368.42]
+    assert tiger.tier_price_krw == [123_158, 109_474, 95_789]
+    assert tiger.tier_price_usd is None  # 국내 상장은 원화만
+
+
+async def test_attach_etfs_unknown_drawdown_has_no_tier_prices(mock_db):
+    s = svc.summarize_rules(_settings(), [_rule()], {"QQQ": None})[0]
+    with (
+        patch(
+            "app.services.market_data.price_service.fetch_prices_batch_krw",
+            AsyncMock(return_value={"QQQ": 750_000.0}),
+        ),
+        patch("app.utils.currency.get_live_or_cached_usd_krw", AsyncMock(return_value=(1500.0, True))),
+    ):
+        await svc.attach_etfs(mock_db, None, USER, [s], CANDIDATES, include_waiting=True)
+    assert [(e.tier_price_krw, e.tier_price_usd) for e in s.etfs] == [([], None)]
+
+
 # ── 서비스 ──────────────────────────────────────────────────
 
 
@@ -548,7 +594,9 @@ def test_get_status_serializes_summary(client):
         has_candidates=True,
         index_drawdowns={"QQQ": -12.0, "SPY": -8.5},
     )
-    summary.rules[0].etfs = [svc.EtfOption("QQQ", "Invesco QQQ", "NASDAQ", 750_000, 1, 750_000, 500.0, 500.0)]
+    summary.rules[0].etfs = [
+        svc.EtfOption("QQQ", "Invesco QQQ", "NASDAQ", 750_000, 1, 750_000, 500.0, 500.0, [767_000.0], [511.33])
+    ]
     with patch.object(svc, "summarize_user", AsyncMock(return_value=summary)):
         resp = client.get("/api/v1/invest/dip-buy")
     assert resp.status_code == 200
@@ -564,6 +612,8 @@ def test_get_status_serializes_summary(client):
     assert row["etfs"][0]["amount_usd"] == 500.0
     assert row["etfs"][0]["price_krw"] == 750_000
     assert row["etfs"][0]["price_usd"] == 500.0
+    assert row["etfs"][0]["tier_price_krw"] == [767_000.0]
+    assert row["etfs"][0]["tier_price_usd"] == [511.33]
 
 
 def test_get_status_without_settings(client):
