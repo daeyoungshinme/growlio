@@ -27,6 +27,7 @@ from app.services.notifications.email_templates.rebalancing import (
     rebalancing_plan_pending_template,
 )
 from app.services.notifications.email_templates.rebalancing_blocked import (
+    DipBuyMailRule,
     daily_value_cap_gate_blocked_template,
     dca_cash_shortfall_template,
     dca_fx_required_template,
@@ -52,6 +53,7 @@ __all__ = [
     "daily_value_cap_gate_blocked_template",
     "dca_cash_shortfall_template",
     "dca_fx_required_template",
+    "DipBuyMailRule",
     "dip_buy_template",
     "exchange_rate_alert_template",
     "goal_achievement_template",

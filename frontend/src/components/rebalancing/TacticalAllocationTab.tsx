@@ -75,7 +75,7 @@ function TacticalStatusView({
 
   return (
     <>
-      <TacticalRegimeCard status={status} nextAction={nextAction} />
+      <TacticalRegimeCard status={status} nextAction={nextAction} dcaAuto={dcaAuto} />
 
       <section className="card flex flex-col gap-3">
         <h2 className="text-base font-semibold">

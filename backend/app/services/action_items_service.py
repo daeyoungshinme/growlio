@@ -8,7 +8,7 @@
 - REBALANCE: 비중 이탈이 임계값을 넘은 포트폴리오 (`get_drift_summaries` — `/rebalancing/drift-summary`와 같은 판정).
   2개 이상이면 1행으로 묶는다 — 포트폴리오별 행이 상한 5건을 차지해 다른 할 일을 밀어내지 않게(docs/plans/73).
 - DCA_SHORTFALL: 정기 적립식 자동매수 다음 실행일 기준 예수금 부족 (`find_dca_cash_shortfalls` — 18:30 잡과 같은 판정)
-- DIP_BUY: 낙폭 추매 안내(plans/147) — 적립일 3일 안이고 여윳돈 추매 금액이 있는 포트폴리오(18:40·08:10 잡과 같은 판정)
+- DIP_BUY: 낙폭 추매 안내(plans/147·148) — 여윳돈 추매 금액이 있으면 1행(매달 정한 날 방식은 알림일 3일 안일 때만)
 - FX_PLAN: 최근 발동한 달러 환전 계획 구간 알림(plans/121) — 환전할 금액. 발동 후 `FX_PLAN_ACTION_DAYS`일 동안 보인다
 - TAX_WARNING: 건보 피부양자·금융소득 종합과세·국내 대주주 경고 (세금 추정 요약)
 - TAX_ACTION: 절세 액션 플랜 1순위 (손실수확도 이 플랜의 한 카테고리라 별도 항목을 만들지 않는다)
@@ -245,31 +245,38 @@ async def _dca_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
 
 
 async def _dip_buy_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
-    from app.services.dip_buy_service import summarize_user_plans
+    from app.services.dip_buy_service import summarize_user
 
     today = today_kst()
-    items: list[ActionItem] = []
-    for s in await summarize_user_plans(db, cache, user_id, allocate=False, active_only=True, today=today):
-        if s.due_amount_krw <= 0 or s.next_run_date is None:
-            continue
-        days = (s.next_run_date - today).days
-        if days > DIP_BUY_ACTION_DAYS:
-            continue
-        dd = f"{s.drawdown_pct:.1f}%" if s.drawdown_pct is not None else ""
-        when = "오늘" if days == 0 else f"{s.next_run_date.month}월 {s.next_run_date.day}일"
-        items.append(
-            ActionItem(
-                id=f"dip-buy:{s.plan.id}",
-                kind="DIP_BUY",
-                priority="HIGH" if days <= 1 else "MEDIUM",
-                title=f"{when} 적립일 추매 {s.due_amount_krw:,.0f}원",
-                detail=f"{s.portfolio.name} · {s.plan.index_ticker} 52주 고점 대비 {dd} · 여윳돈에서",
-                cta_label="종목 보기",
-                link=_LINK_DIP_BUY,
-                deadline=s.next_run_date.isoformat(),
-            )
+    s = await summarize_user(db, cache, user_id, with_etfs=False, today=today)
+    if not s.active or s.due_amount_krw <= 0 or s.settings is None:
+        return []
+    run = s.next_notify_date if s.settings.notify_mode == "MONTHLY_DAY" else None
+    days = (run - today).days if run else 0
+    if run is not None and days > DIP_BUY_ACTION_DAYS:
+        return []
+    dd = ", ".join(
+        f"{r.rule.index_ticker} {r.drawdown_pct:.1f}%" if r.drawdown_pct is not None else r.rule.index_ticker
+        for r in s.due_rules
+    )
+    if run is None:
+        title = f"추매 구간 도달 {s.due_amount_krw:,.0f}원"
+    else:
+        when = "오늘" if days == 0 else f"{run.month}월 {run.day}일"
+        title = f"{when} 추매 {s.due_amount_krw:,.0f}원"
+    held = " · 적립 자동매수는 전술 방어 국면이라 보류 중" if s.dca_held_portfolios else ""
+    return [
+        ActionItem(
+            id="dip-buy",
+            kind="DIP_BUY",
+            priority="HIGH" if days <= 1 else "MEDIUM",
+            title=title,
+            detail=f"52주 고점 대비 {dd} · 여윳돈에서{held}",
+            cta_label="종목 보기",
+            link=_LINK_DIP_BUY,
+            deadline=run.isoformat() if run else None,
         )
-    return items
+    ]
 
 
 async def _recent_fx_plan_alerts(user_id: uuid.UUID, db: AsyncSession) -> list[tuple[ExchangeRateAlert, str | None]]:

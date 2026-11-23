@@ -4,6 +4,7 @@ import type { TacticalAsset, TacticalStatus } from "@/api/tactical";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
+import { investPlanUrl } from "@/utils/tabUrl";
 import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 import {
@@ -190,9 +191,12 @@ export function WeightsCompare({ status }: { status: TacticalStatus }) {
 export function TacticalRegimeCard({
   status,
   nextAction,
+  dcaAuto = false,
 }: {
   status: TacticalStatus;
   nextAction: { tone: NextActionTone; text: string };
+  /** 정기 적립식 자동매수 포트폴리오 — 웅덩이는 제안 비중을 적용할 때만 실행되므로 낙폭 추매 안내로 안내 */
+  dcaAuto?: boolean;
 }) {
   const regime = status.confirmed_regime ?? status.observed_regime;
   const days = status.enabled ? regimeDayCount(status.regime_changed_at) : null;
@@ -237,6 +241,16 @@ export function TacticalRegimeCard({
       <div className="border-t border-gray-100 dark:border-gray-700 pt-2 flex flex-col gap-1">
         <SummaryLine title="나스닥·S&P 비중" value={tiltValue(status)} />
         <SummaryLine title="웅덩이 매수(눌림목)" value={dipValue(status)} />
+        {dcaAuto && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 break-keep">
+            웅덩이 매수는 제안 비중을 적용할 때만 포트폴리오 안 현금으로 실행돼요. 적립 중이라면
+            계좌 밖 여윳돈 추매는{" "}
+            <Link to={`${investPlanUrl("적립 계획")}#dip-buy`} className="underline">
+              낙폭 추매 안내
+            </Link>
+            에서 정하세요.
+          </p>
+        )}
       </div>
 
       <TacticalDetails status={status} />

@@ -23,6 +23,7 @@ from tenacity import (
 from app.core.config import settings
 from app.core.job_runner import report_handled_failure
 from app.services.notifications.email_templates import (
+    DipBuyMailRule,
     account_deletion_template,
     challenge_reminder_template,
     challenge_wrap_template,
@@ -585,29 +586,16 @@ async def send_dca_cash_shortfall_email(
 
 async def send_dip_buy_email(
     to_email: str,
-    portfolio_name: str,
     phase: str,
-    run_date_label: str,
-    index_ticker: str,
-    drawdown_pct: float | None,
-    amount_krw: float,
-    items: list[tuple[str, float, float, float | None]],
+    run_date_label: str | None,
+    rules: list[DipBuyMailRule],
     reserve_krw: float,
+    held_portfolios: list[str],
 ) -> bool:
-    """낙폭 추매 안내 이메일(plans/147). 발송 성공 시 True, 미설정/실패 시 False."""
+    """낙폭 추매 안내 이메일(plans/147·148). 발송 성공 시 True, 미설정/실패 시 False."""
     return await _send_templated(
         to_email,
-        lambda: dip_buy_template(
-            portfolio_name,
-            phase,
-            run_date_label,
-            index_ticker,
-            drawdown_pct,
-            amount_krw,
-            items,
-            reserve_krw,
-            dip_buy_link(),
-        ),
+        lambda: dip_buy_template(phase, run_date_label, rules, reserve_krw, held_portfolios, dip_buy_link()),
         event="dip_buy",
         phase=phase,
     )

@@ -1,14 +1,18 @@
-"""낙폭 추매 안내(plans/147) — 여윳돈을 지수 낙폭 구간별로 나눠 이번 적립일의 추매 금액·종목을 산정한다.
+"""낙폭 추매 안내(plans/147·148) — 여윳돈을 지수별 규칙 몫·낙폭 구간으로 나눠 추매 금액과 살 ETF를 안내한다.
 
 - **주문하지 않는다.** 자동 적립 금액·경로도 바꾸지 않는다. 사용자가 직접 사고 "추매했어요"로 기록한다.
+- 여윳돈은 사용자당 하나(`DipBuySettings`), 포트폴리오와 무관하다. 규칙(`DipBuyRule`)은 지수(QQQ·SPY)마다 하나.
 - 낙폭: `technical_signal_service.get_technical_signals`의 52주 고점 대비(마감 종가, 전술과 같은 캐시).
-- 종목 분할: 그 포트폴리오 정기 적립식 알림의 계좌 범위·분할 규칙(`plan_generation.dca_items_for_amount`) —
-  자동 적립과 같은 규칙이라 "평소 사던 비율대로" 더 산다. 적립식 알림이 없으면 금액만 안내한다.
+- 살 종목: 목표 조정 › 추천의 등록 후보 ETF(`UserSettings.goal_candidate_tickers`) 중 그 지수를 추종하는 ETF
+  (레버리지·커버드콜 제외). 같은 지수 ETF끼리는 **대안 목록**(계좌에 맞는 것 하나를 고른다) — 나눠 사는 분할이
+  아니다. 후보 목록이 아직 시딩 전이어도 여기서 시딩하지 않는다(조회 경로에서 쓰기 금지).
 - 사이클 초기화(고점 근처 회복)는 조회·알림 잡에서 낙폭을 볼 때마다 반영한다.
+- 전술 연동 적립 자동매수가 방어 국면이라 보류 중이면 그 포트폴리오를 함께 알린다(추매는 그대로 안내).
 """
 
 from __future__ import annotations
 
+import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -17,56 +21,93 @@ from typing import Any
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.constants import OVERSEAS_MARKETS
-from app.exceptions import BadRequestError, NotFoundError
+from app.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.models.alert import RebalancingAlert
-from app.models.dip_buy import DipBuyPlan
+from app.models.dip_buy import DipBuyRule, DipBuySettings
 from app.models.portfolio import Portfolio
-from app.services.alerts.calculator import is_auto_schedule_day, next_auto_schedule_date
+from app.models.user import UserSettings
 from app.services.dca_cash_shortfall_service import DCA_AUTO_BUY_PRESET
 from app.services.dip_buy_calculator import (
     DIP_BUY_INDEX_TICKERS,
+    INDEX_KEY_BY_TICKER,
     TierStatus,
-    base_amount,
+    cycle_spent,
     due_amount,
     due_tiers,
+    next_notify_date,
+    reserve_pool,
+    rule_base,
     should_reset,
     tier_statuses,
+    validate_allocations,
     validate_tiers,
 )
 from app.utils.kst import today_kst
+from app.utils.market_hours import is_krx_trading_day
 
 logger = structlog.get_logger()
 
 
 @dataclass
-class DipBuyItemRow:
+class EtfOption:
+    """안내 금액으로 이 ETF만 산다면 — 같은 지수 ETF끼리는 대안이다."""
+
     ticker: str
     name: str
     market: str
-    shares: float
-    amount_krw: float
     price_krw: float
+    shares: int
+    amount_krw: float
     amount_usd: float | None = None
 
 
 @dataclass
-class DipBuySummary:
-    """한 플랜의 현재 판정 — 종목 분할(`items`)은 `allocate=True`로 만들 때만 채운다."""
-
-    plan: DipBuyPlan
-    portfolio: Portfolio
-    alert: RebalancingAlert | None
+class RuleSummary:
+    rule: DipBuyRule
     drawdown_pct: float | None
     statuses: list[TierStatus]
+    base_krw: float  # 이 규칙 몫(사이클 중이면 고정 기준액)
+    spent_krw: float  # 이번 사이클 추매액
     due_amount_krw: float
     due_tiers: list[int]
-    next_run_date: date | None
-    is_run_day: bool
-    items: list[DipBuyItemRow] = field(default_factory=list)
-    leftover_krw: float = 0.0
+    etfs: list[EtfOption] = field(default_factory=list)
+
+    @property
+    def remaining_krw(self) -> float:
+        return max(0.0, self.base_krw - self.spent_krw)
+
+    @property
+    def new_due_tiers(self) -> list[int]:
+        """아직 구간 도달 알림을 보내지 않은 DUE 구간(ON_REACH)."""
+        sent = {int(t) for t in self.rule.notified_tiers or []}
+        return [t for t in self.due_tiers if t not in sent]
+
+
+@dataclass
+class UserDipBuySummary:
+    settings: DipBuySettings | None
+    rules: list[RuleSummary]
+    next_notify_date: date | None  # MONTHLY_DAY일 때만
+    dca_held_portfolios: list[str] = field(default_factory=list)
+    has_candidates: bool = False
+
+    @property
+    def active(self) -> bool:
+        return self.settings is not None and bool(self.settings.is_active)
+
+    @property
+    def due_amount_krw(self) -> float:
+        return sum(r.due_amount_krw for r in self.rules)
+
+    @property
+    def due_rules(self) -> list[RuleSummary]:
+        return [r for r in self.rules if r.due_amount_krw > 0]
+
+    @property
+    def reserve_krw(self) -> float:
+        return float(self.settings.reserve_krw or 0) if self.settings else 0.0
 
 
 async def index_drawdowns(cache: Any) -> dict[str, float | None]:
@@ -86,226 +127,307 @@ async def index_drawdowns(cache: Any) -> dict[str, float | None]:
     return out
 
 
-async def dca_alert_for_portfolio(
-    db: AsyncSession, user_id: uuid.UUID, portfolio_id: uuid.UUID
-) -> RebalancingAlert | None:
-    """이 포트폴리오의 활성 정기 적립식 자동매수 알림(실행 계좌가 있는 첫 행)."""
-    return await db.scalar(
-        select(RebalancingAlert)
-        .where(
-            RebalancingAlert.user_id == user_id,
-            RebalancingAlert.portfolio_id == portfolio_id,
-            RebalancingAlert.is_active == True,
-            RebalancingAlert.account_id.is_not(None),
-            *(getattr(RebalancingAlert, f) == v for f, v in DCA_AUTO_BUY_PRESET.items()),
-        )
-        .order_by(RebalancingAlert.created_at)
-        .limit(1)
-    )
-
-
-def reset_if_recovered(plan: DipBuyPlan, drawdown_pct: float | None) -> bool:
-    """고점 근처로 회복했으면 완료 기록·기준액을 지운다(다음 하락 사이클). 바뀌었으면 True — 커밋은 호출부."""
-    if not should_reset(drawdown_pct, plan.completed, _opt(plan.cycle_base_krw)):
-        return False
-    plan.completed = []
-    plan.cycle_base_krw = None
-    logger.info("dip_buy_cycle_reset", plan_id=str(plan.id), drawdown_pct=drawdown_pct)
-    return True
-
-
 def _opt(v: Any) -> float | None:
     return float(v) if v is not None else None
 
 
-def _run_dates(alert: RebalancingAlert | None, today: date) -> tuple[date | None, bool]:
-    if alert is None:
-        return None, False
-    if is_auto_schedule_day(alert, today):
-        return today, True
-    return next_auto_schedule_date(alert, today), False
+def reset_if_recovered(rule: DipBuyRule, drawdown_pct: float | None) -> bool:
+    """고점 근처로 회복했으면 완료·알림 기록과 기준액을 지운다(다음 하락 사이클). 바뀌었으면 True — 커밋은 호출부."""
+    if not should_reset(drawdown_pct, rule.completed, _opt(rule.cycle_base_krw)):
+        return False
+    rule.completed = []
+    rule.cycle_base_krw = None
+    rule.notified_tiers = []
+    logger.info("dip_buy_cycle_reset", rule_id=str(rule.id), drawdown_pct=drawdown_pct)
+    return True
 
 
-async def summarize_plan(
-    db: AsyncSession,
-    plan: DipBuyPlan,
-    portfolio: Portfolio,
-    drawdown_pct: float | None,
-    *,
-    today: date | None = None,
-) -> DipBuySummary:
-    """종목 분할 없이 구간·금액·적립일만 판정한다(DB 조회 1회 — 홈 할 일·잡 사전 판정용)."""
-    today = today or today_kst()
-    alert = await dca_alert_for_portfolio(db, plan.user_id, plan.portfolio_id)
-    reserve = float(plan.reserve_krw or 0)
-    statuses = tier_statuses(plan.tiers, plan.completed, drawdown_pct, reserve, _opt(plan.cycle_base_krw))
-    amount = due_amount(statuses, reserve) if plan.is_active else 0.0
-    next_run, is_run_day = _run_dates(alert, today)
-    return DipBuySummary(
-        plan=plan,
-        portfolio=portfolio,
-        alert=alert,
-        drawdown_pct=drawdown_pct,
-        statuses=statuses,
-        due_amount_krw=amount,
-        due_tiers=due_tiers(statuses) if amount > 0 else [],
-        next_run_date=next_run,
-        is_run_day=is_run_day,
-    )
+async def get_settings(db: AsyncSession, user_id: uuid.UUID) -> DipBuySettings | None:
+    return await db.scalar(select(DipBuySettings).where(DipBuySettings.user_id == user_id))
 
 
-async def allocate_items(db: AsyncSession, cache: Any, summary: DipBuySummary) -> None:
-    """추매 금액을 정기 적립식과 같은 규칙으로 종목별 수량으로 나눈다(시세 조회 포함). 실패하면 금액만 남긴다."""
-    from app.services.rebalancing.plan_generation import dca_items_for_amount
+async def list_rules(db: AsyncSession, user_id: uuid.UUID) -> list[DipBuyRule]:
+    stmt = select(DipBuyRule).where(DipBuyRule.user_id == user_id).order_by(DipBuyRule.created_at)
+    return list((await db.execute(stmt)).scalars().all())
+
+
+def summarize_rules(
+    settings: DipBuySettings | None, rules: list[DipBuyRule], drawdowns: dict[str, float | None]
+) -> list[RuleSummary]:
+    """규칙별 몫·구간·안내 금액(순수, DB 없음). 동시 발동이면 규칙 순서대로 남은 여윳돈을 차감한다."""
+    reserve = float(settings.reserve_krw or 0) if settings else 0.0
+    paused = settings is None or not settings.is_active
+    pool = reserve_pool(reserve, [r.completed for r in rules])
+    left = reserve
+    out: list[RuleSummary] = []
+    for rule in rules:
+        dd = drawdowns.get(rule.index_ticker)
+        base = rule_base(pool, float(rule.allocation_pct), _opt(rule.cycle_base_krw))
+        spent = cycle_spent(rule.completed)
+        statuses = tier_statuses(rule.tiers, rule.completed, dd, base)
+        amount = 0.0 if paused or not rule.is_active else due_amount(statuses, min(max(0.0, base - spent), left))
+        left -= amount
+        out.append(
+            RuleSummary(
+                rule=rule,
+                drawdown_pct=dd,
+                statuses=statuses,
+                base_krw=base,
+                spent_krw=spent,
+                due_amount_krw=amount,
+                due_tiers=due_tiers(statuses) if amount > 0 else [],
+            )
+        )
+    return out
+
+
+def candidate_etfs_for_index(candidates: list[dict] | None, index_ticker: str) -> list[dict]:
+    """등록 후보 중 그 지수를 그대로 추종하는 ETF(레버리지·커버드콜 제외, 네트워크 없음)."""
+    from app.services.etf.etf_index_classifier import classify_holding
+
+    key = INDEX_KEY_BY_TICKER.get(index_ticker)
+    out: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for c in candidates or []:
+        ticker, market, name = str(c.get("ticker") or ""), str(c.get("market") or ""), str(c.get("name") or "")
+        if not ticker or (ticker, market) in seen:
+            continue
+        cls = classify_holding(ticker, market, name, None)
+        if cls.kind == "INDEX" and cls.index_key == key:
+            seen.add((ticker, market))
+            out.append({"ticker": ticker, "market": market, "name": name or ticker})
+    return out
+
+
+async def load_goal_candidates(db: AsyncSession, user_id: uuid.UUID) -> list[dict] | None:
+    return await db.scalar(select(UserSettings.goal_candidate_tickers).where(UserSettings.user_id == user_id))
+
+
+async def attach_etfs(
+    db: AsyncSession, cache: Any, user_id: uuid.UUID, rules: list[RuleSummary], candidates: list[dict] | None
+) -> None:
+    """안내 금액이 있는 규칙에 ETF별 매수 가능 수량을 붙인다(시세 조회 포함). 실패하면 금액만 남긴다."""
+    from app.services.market_data.price_service import fetch_prices_batch_krw
     from app.utils.currency import get_live_or_cached_usd_krw
 
-    alert = summary.alert
-    if alert is None or summary.due_amount_krw <= 0:
+    targets = [(r, candidate_etfs_for_index(candidates, r.rule.index_ticker)) for r in rules if r.due_amount_krw > 0]
+    tickers = sorted({(c["ticker"], c["market"]) for _, cands in targets for c in cands})
+    if not tickers:
         return
     try:
-        prepared = await dca_items_for_amount(
-            alert, summary.portfolio, db, alert.account_id, cache, summary.due_amount_krw
-        )
+        prices = await fetch_prices_batch_krw(user_id, tickers, db, cache)
+        rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
     except Exception as exc:
-        logger.warning("dip_buy_allocate_failed", plan_id=str(summary.plan.id), error=str(exc))
-        summary.leftover_krw = summary.due_amount_krw
+        logger.warning("dip_buy_etf_price_failed", user_id=str(user_id), error=str(exc))
         return
-    rows = prepared[2] if prepared else []
-    rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
-    spent = 0.0
-    for item in rows:
-        shares = float(item.shares_to_trade or 0)
-        price = float(item.current_price_krw or 0)
-        value = round(shares * price, 0)
-        spent += value
-        overseas = item.market in OVERSEAS_MARKETS
-        summary.items.append(
-            DipBuyItemRow(
-                ticker=item.ticker,
-                name=item.name,
-                market=item.market,
-                shares=shares,
-                amount_krw=value,
-                price_krw=price,
-                amount_usd=round(value / rate, 2) if overseas and rate_is_live and rate > 0 else None,
+    for summary, cands in targets:
+        for c in cands:
+            price = float(prices.get(c["ticker"]) or 0)
+            if price <= 0:
+                continue
+            shares = math.floor(summary.due_amount_krw / price)
+            value = round(shares * price, 0)
+            overseas = c["market"] in OVERSEAS_MARKETS
+            summary.etfs.append(
+                EtfOption(
+                    ticker=c["ticker"],
+                    name=c["name"],
+                    market=c["market"],
+                    price_krw=round(price, 2),
+                    shares=shares,
+                    amount_krw=value,
+                    amount_usd=round(value / rate, 2) if overseas and rate_is_live and rate > 0 else None,
+                )
             )
-        )
-    summary.leftover_krw = round(max(0.0, summary.due_amount_krw - spent), 0)
 
 
-async def _load_portfolios(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, Portfolio]:
-    if not ids:
-        return {}
+async def dca_held_portfolios(db: AsyncSession, user_id: uuid.UUID) -> list[str]:
+    """전술 연동 정기 적립식 자동매수 중 지금 방어 국면이라 매수가 보류되는 포트폴리오 이름."""
+    from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode, tactical_regime_for_gate
+
     rows = (
-        (
-            await db.execute(
-                select(Portfolio)
-                .where(Portfolio.id.in_(ids))
-                .options(selectinload(Portfolio.items), selectinload(Portfolio.linked_accounts))
+        await db.execute(
+            select(RebalancingAlert, Portfolio.name)
+            .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
+            .where(
+                RebalancingAlert.user_id == user_id,
+                RebalancingAlert.is_active == True,
+                RebalancingAlert.account_id.is_not(None),
+                RebalancingAlert.market_condition_mode == "TACTICAL",
+                *(getattr(RebalancingAlert, f) == v for f, v in DCA_AUTO_BUY_PRESET.items()),
             )
+            .order_by(Portfolio.name)
         )
-        .scalars()
-        .all()
-    )
-    return {p.id: p for p in rows}
+    ).all()
+    names: list[str] = []
+    for alert, name in rows:
+        if name in names:
+            continue
+        regime = await tactical_regime_for_gate(alert, db)
+        if is_market_signal_blocking_auto_mode("TACTICAL", "GREEN", tactical_regime=regime):
+            names.append(name)
+    return names
 
 
-async def list_plans(db: AsyncSession, user_id: uuid.UUID, *, active_only: bool = False) -> list[DipBuyPlan]:
-    stmt = select(DipBuyPlan).where(DipBuyPlan.user_id == user_id)
-    if active_only:
-        stmt = stmt.where(DipBuyPlan.is_active == True)
-    return list((await db.execute(stmt.order_by(DipBuyPlan.created_at))).scalars().all())
-
-
-async def summarize_user_plans(
+async def summarize_user(
     db: AsyncSession,
     cache: Any,
     user_id: uuid.UUID,
     *,
-    allocate: bool,
-    active_only: bool = False,
+    with_etfs: bool,
     today: date | None = None,
-) -> list[DipBuySummary]:
-    """사용자 플랜 전부의 판정. 회복한 플랜은 사이클을 초기화해 저장한다."""
-    plans = await list_plans(db, user_id, active_only=active_only)
-    if not plans:
-        return []
-    drawdowns = await index_drawdowns(cache)
-    if any([reset_if_recovered(p, drawdowns.get(p.index_ticker)) for p in plans]):
+) -> UserDipBuySummary:
+    """사용자 추매 안내 판정. 회복한 규칙은 사이클을 초기화해 저장한다."""
+    today = today or today_kst()
+    settings = await get_settings(db, user_id)
+    rules = await list_rules(db, user_id)
+    drawdowns = await index_drawdowns(cache) if rules else {}
+    if any([reset_if_recovered(r, drawdowns.get(r.index_ticker)) for r in rules]):
         await db.commit()
-    portfolios = await _load_portfolios(db, [p.portfolio_id for p in plans])
-    out: list[DipBuySummary] = []
-    for plan in plans:
-        portfolio = portfolios.get(plan.portfolio_id)
-        if portfolio is None:
-            continue
-        summary = await summarize_plan(db, plan, portfolio, drawdowns.get(plan.index_ticker), today=today)
-        if allocate:
-            await allocate_items(db, cache, summary)
-        out.append(summary)
+    summaries = summarize_rules(settings, rules, drawdowns)
+    notify_day = (
+        next_notify_date(int(settings.notify_day), today, is_krx_trading_day)
+        if settings is not None and settings.notify_mode == "MONTHLY_DAY" and settings.notify_day
+        else None
+    )
+    out = UserDipBuySummary(settings=settings, rules=summaries, next_notify_date=notify_day)
+    if not rules:
+        return out
+    if with_etfs:
+        candidates = await load_goal_candidates(db, user_id)
+        out.has_candidates = any(candidate_etfs_for_index(candidates, t) for t in DIP_BUY_INDEX_TICKERS)
+        await attach_etfs(db, cache, user_id, summaries, candidates)
+    if out.due_amount_krw > 0:
+        out.dca_held_portfolios = await dca_held_portfolios(db, user_id)
     return out
 
 
-async def _owned_portfolio(db: AsyncSession, user_id: uuid.UUID, portfolio_id: uuid.UUID) -> Portfolio:
-    portfolio = await db.scalar(select(Portfolio).where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id))
-    if portfolio is None:
-        raise NotFoundError("포트폴리오를 찾을 수 없습니다")
-    return portfolio
+# ── 설정·규칙 CRUD ─────────────────────────────────────────
 
 
-async def _get_plan(db: AsyncSession, user_id: uuid.UUID, portfolio_id: uuid.UUID) -> DipBuyPlan | None:
-    return await db.scalar(
-        select(DipBuyPlan).where(DipBuyPlan.user_id == user_id, DipBuyPlan.portfolio_id == portfolio_id)
-    )
+def _rebase_cycles(rules: list[DipBuyRule], reserve_krw: float) -> None:
+    """여윳돈을 고치면 사이클 중 규칙의 기준액 = (새 여윳돈 + 진행 중 사이클 추매 합) × 배분%."""
+    pool = reserve_pool(reserve_krw, [r.completed for r in rules])
+    for rule in rules:
+        if rule.cycle_base_krw is not None:
+            rule.cycle_base_krw = round(pool * float(rule.allocation_pct) / 100, 2)
 
 
-def _completed_total(completed: list | None) -> float:
-    return sum(float(c.get("amount_krw") or 0) for c in completed or [])
-
-
-async def upsert_plan(
+async def upsert_settings(
     db: AsyncSession,
     user_id: uuid.UUID,
-    portfolio_id: uuid.UUID,
     *,
-    index_ticker: str,
     reserve_krw: float,
-    tiers: list[dict],
+    notify_mode: str,
+    notify_day: int | None,
     is_active: bool,
-) -> DipBuyPlan:
-    error = validate_tiers(tiers)
+) -> DipBuySettings:
+    if notify_mode == "MONTHLY_DAY" and notify_day is None:
+        raise BadRequestError("매달 알림 받을 날짜를 정해주세요.")
+    settings = await get_settings(db, user_id)
+    if settings is None:
+        settings = DipBuySettings(user_id=user_id)
+        db.add(settings)
+    elif float(reserve_krw) != float(settings.reserve_krw or 0):
+        _rebase_cycles(await list_rules(db, user_id), float(reserve_krw))
+    settings.reserve_krw = float(reserve_krw)
+    settings.notify_mode = notify_mode
+    settings.notify_day = notify_day if notify_mode == "MONTHLY_DAY" else None
+    settings.is_active = is_active
+    await db.commit()
+    await db.refresh(settings)
+    return settings
+
+
+def _check_rule_input(tiers: list[dict], allocations: list[float]) -> None:
+    error = validate_tiers(tiers) or validate_allocations(allocations)
     if error:
         raise BadRequestError(error)
-    await _owned_portfolio(db, user_id, portfolio_id)
-    plan = await _get_plan(db, user_id, portfolio_id)
-    if plan is None:
-        plan = DipBuyPlan(user_id=user_id, portfolio_id=portfolio_id, completed=[])
-        db.add(plan)
-    else:
-        if index_ticker != plan.index_ticker:
-            # 기준 지수를 바꾸면 이전 지수 기준의 완료 기록은 의미가 없다
-            plan.completed = []
-            plan.cycle_base_krw = None
-        else:
-            # 구간 수가 줄면 사라진 구간의 완료 기록을 버린다
-            plan.completed = [c for c in plan.completed or [] if int(c.get("tier", -1)) < len(tiers)]
-            if plan.cycle_base_krw is not None and float(reserve_krw) != float(plan.reserve_krw or 0):
-                # 사이클 중 여윳돈을 고치면 기준액 = 새 잔액 + 이번 사이클에 이미 추매한 금액
-                plan.cycle_base_krw = round(float(reserve_krw) + _completed_total(plan.completed), 2)
-    plan.index_ticker = index_ticker
-    plan.reserve_krw = float(reserve_krw)
-    plan.tiers = [{"drawdown_pct": float(t["drawdown_pct"]), "ratio_pct": float(t["ratio_pct"])} for t in tiers]
-    plan.is_active = is_active
+
+
+def _clean_tiers(tiers: list[dict]) -> list[dict]:
+    return [{"drawdown_pct": float(t["drawdown_pct"]), "ratio_pct": float(t["ratio_pct"])} for t in tiers]
+
+
+async def create_rule(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    index_ticker: str,
+    allocation_pct: float,
+    tiers: list[dict],
+    is_active: bool,
+) -> DipBuyRule:
+    if await get_settings(db, user_id) is None:
+        raise BadRequestError("여윳돈을 먼저 정해주세요.")
+    rules = await list_rules(db, user_id)
+    if any(r.index_ticker == index_ticker for r in rules):
+        raise ConflictError("이 지수의 추매 규칙이 이미 있어요.")
+    _check_rule_input(tiers, [float(r.allocation_pct) for r in rules] + [float(allocation_pct)])
+    rule = DipBuyRule(
+        user_id=user_id,
+        index_ticker=index_ticker,
+        allocation_pct=float(allocation_pct),
+        tiers=_clean_tiers(tiers),
+        completed=[],
+        notified_tiers=[],
+        is_active=is_active,
+    )
+    db.add(rule)
     await db.commit()
-    await db.refresh(plan)
-    return plan
+    await db.refresh(rule)
+    return rule
 
 
-async def delete_plan(db: AsyncSession, user_id: uuid.UUID, portfolio_id: uuid.UUID) -> None:
-    plan = await _get_plan(db, user_id, portfolio_id)
-    if plan is None:
-        raise NotFoundError("추매 안내 설정을 찾을 수 없습니다")
-    await db.delete(plan)
+async def _owned_rule(db: AsyncSession, user_id: uuid.UUID, rule_id: uuid.UUID) -> DipBuyRule:
+    rule = await db.scalar(select(DipBuyRule).where(DipBuyRule.id == rule_id, DipBuyRule.user_id == user_id))
+    if rule is None:
+        raise NotFoundError("추매 규칙을 찾을 수 없습니다")
+    return rule
+
+
+async def update_rule(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    rule_id: uuid.UUID,
+    *,
+    index_ticker: str,
+    allocation_pct: float,
+    tiers: list[dict],
+    is_active: bool,
+) -> DipBuyRule:
+    rules = await list_rules(db, user_id)
+    rule = next((r for r in rules if r.id == rule_id), None)
+    if rule is None:
+        raise NotFoundError("추매 규칙을 찾을 수 없습니다")
+    if any(r.index_ticker == index_ticker and r.id != rule_id for r in rules):
+        raise ConflictError("이 지수의 추매 규칙이 이미 있어요.")
+    _check_rule_input(tiers, [float(r.allocation_pct) for r in rules if r.id != rule_id] + [float(allocation_pct)])
+    if index_ticker != rule.index_ticker:
+        # 기준 지수를 바꾸면 이전 지수 기준의 사이클 기록은 의미가 없다
+        rule.completed = []
+        rule.cycle_base_krw = None
+        rule.notified_tiers = []
+    else:
+        # 구간 수가 줄면 사라진 구간의 기록을 버린다
+        rule.completed = [c for c in rule.completed or [] if int(c.get("tier", -1)) < len(tiers)]
+        rule.notified_tiers = [t for t in rule.notified_tiers or [] if int(t) < len(tiers)]
+        if rule.cycle_base_krw is not None and float(allocation_pct) != float(rule.allocation_pct):
+            settings = await get_settings(db, user_id)
+            pool = reserve_pool(float(settings.reserve_krw or 0) if settings else 0.0, [r.completed for r in rules])
+            rule.cycle_base_krw = round(pool * float(allocation_pct) / 100, 2)
+    rule.index_ticker = index_ticker
+    rule.allocation_pct = float(allocation_pct)
+    rule.tiers = _clean_tiers(tiers)
+    rule.is_active = is_active
+    await db.commit()
+    await db.refresh(rule)
+    return rule
+
+
+async def delete_rule(db: AsyncSession, user_id: uuid.UUID, rule_id: uuid.UUID) -> None:
+    rule = await _owned_rule(db, user_id, rule_id)
+    await db.delete(rule)
     await db.commit()
 
 
@@ -313,35 +435,41 @@ async def mark_completed(
     db: AsyncSession,
     cache: Any,
     user_id: uuid.UUID,
-    portfolio_id: uuid.UUID,
+    rule_id: uuid.UUID,
     amount_krw: float | None,
-) -> DipBuyPlan:
-    """지금 도달한 미완료 구간을 완료로 기록하고 여윳돈에서 뺀다. 구간이 여럿이면 안내 금액 비율로 나눠 적는다."""
-    plan = await _get_plan(db, user_id, portfolio_id)
-    if plan is None:
-        raise NotFoundError("추매 안내 설정을 찾을 수 없습니다")
-    drawdown = (await index_drawdowns(cache)).get(plan.index_ticker)
-    reset_if_recovered(plan, drawdown)
-    reserve = float(plan.reserve_krw or 0)
-    statuses = tier_statuses(plan.tiers, plan.completed, drawdown, reserve, _opt(plan.cycle_base_krw))
-    due = [s for s in statuses if s["state"] == "DUE"]
-    if not due:
+) -> DipBuyRule:
+    """그 규칙의 지금 도달한 미완료 구간을 완료로 기록하고 여윳돈에서 뺀다.
+
+    구간이 여럿이면 안내 금액 비율로 나눠 적는다.
+    """
+    settings = await get_settings(db, user_id)
+    rules = await list_rules(db, user_id)
+    rule = next((r for r in rules if r.id == rule_id), None)
+    if rule is None or settings is None:
+        raise NotFoundError("추매 규칙을 찾을 수 없습니다")
+    drawdowns = await index_drawdowns(cache)
+    reset_if_recovered(rule, drawdowns.get(rule.index_ticker))
+    if not settings.is_active or not rule.is_active:
+        raise BadRequestError("꺼 둔 추매 안내는 기록할 수 없어요.")
+    summary = next(s for s in summarize_rules(settings, rules, drawdowns) if s.rule is rule)
+    due = [s for s in summary.statuses if s["state"] == "DUE"]
+    if not due or summary.due_amount_krw <= 0:
         raise BadRequestError("지금 추매할 구간이 없어요.")
-    planned = due_amount(statuses, reserve)
-    spent = float(amount_krw) if amount_krw is not None else planned
-    if plan.cycle_base_krw is None:
-        plan.cycle_base_krw = base_amount(reserve, None)
+    spent = float(amount_krw) if amount_krw is not None else summary.due_amount_krw
+    if rule.cycle_base_krw is None:
+        rule.cycle_base_krw = summary.base_krw
     weight_total = sum(s["amount_krw"] for s in due) or 1.0
     now = datetime.now(UTC).isoformat()
-    plan.completed = [
-        *(plan.completed or []),
+    rule.completed = [
+        *(rule.completed or []),
         *(
             {"tier": s["tier"], "amount_krw": round(spent * s["amount_krw"] / weight_total, 0), "done_at": now}
             for s in due
         ),
     ]
-    plan.reserve_krw = round(max(0.0, reserve - spent), 2)
+    reserve = float(settings.reserve_krw or 0)
+    settings.reserve_krw = round(max(0.0, reserve - spent), 2)
     await db.commit()
-    await db.refresh(plan)
-    logger.info("dip_buy_completed", plan_id=str(plan.id), tiers=[s["tier"] for s in due], amount_krw=spent)
-    return plan
+    await db.refresh(rule)
+    logger.info("dip_buy_completed", rule_id=str(rule.id), tiers=[s["tier"] for s in due], amount_krw=spent)
+    return rule

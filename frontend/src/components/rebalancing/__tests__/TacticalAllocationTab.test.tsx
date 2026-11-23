@@ -515,6 +515,9 @@ describe("TacticalAllocationTab", () => {
     expect(await screen.findByText("적립 자동매수 중인 포트폴리오예요")).toBeDefined();
     const link = screen.getByText("자동매수 설정 열기").closest("a");
     expect(link?.getAttribute("href")).toContain("openAlert=1");
+    // 웅덩이 매수는 비중 적용 때만 실행 — 적립 포트폴리오의 여윳돈 추매는 계획 탭 낙폭 추매 안내로 (plans/148)
+    const dipLink = screen.getByText("낙폭 추매 안내").closest("a");
+    expect(dipLink?.getAttribute("href")).toMatch(/^\/invest-plan\?tab=.+#dip-buy$/);
   });
 
   it("전술 연동 중이면 적립 보조 모드 문구를 보여주고 방어 국면엔 매수 보류를 알린다", async () => {

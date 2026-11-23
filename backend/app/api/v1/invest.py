@@ -14,9 +14,11 @@ from app.models.fx_extra_need import FxExtraNeed
 from app.models.user import User
 from app.schemas.dip_buy import (
     DipBuyComplete,
-    DipBuyItem,
-    DipBuyPlanStatus,
-    DipBuyPlanUpsert,
+    DipBuyEtf,
+    DipBuyRuleStatus,
+    DipBuyRuleUpsert,
+    DipBuySettingsOut,
+    DipBuySettingsUpsert,
     DipBuyStatusResponse,
     DipBuyTierStatus,
 )
@@ -244,25 +246,21 @@ async def sync_fx_extra_need_alerts(
     return FxPlanAlertSyncResponse(**asdict(result))
 
 
-def _dip_buy_row(s: dip_buy_service.DipBuySummary) -> DipBuyPlanStatus:
-    plan = s.plan
-    return DipBuyPlanStatus(
-        id=plan.id,
-        portfolio_id=plan.portfolio_id,
-        portfolio_name=s.portfolio.name,
-        is_active=plan.is_active,
-        index_ticker=plan.index_ticker,
-        reserve_krw=float(plan.reserve_krw or 0),
-        cycle_base_krw=float(plan.cycle_base_krw) if plan.cycle_base_krw is not None else None,
+def _dip_buy_rule_row(s: dip_buy_service.RuleSummary) -> DipBuyRuleStatus:
+    rule = s.rule
+    return DipBuyRuleStatus(
+        id=rule.id,
+        index_ticker=rule.index_ticker,
+        allocation_pct=float(rule.allocation_pct),
+        is_active=rule.is_active,
+        base_krw=s.base_krw,
+        spent_krw=s.spent_krw,
+        remaining_krw=s.remaining_krw,
         tiers=[DipBuyTierStatus(**t) for t in s.statuses],
         drawdown_pct=s.drawdown_pct,
-        has_dca_schedule=s.alert is not None,
-        next_run_date=s.next_run_date,
-        is_run_day=s.is_run_day,
         due_amount_krw=s.due_amount_krw,
         due_tiers=s.due_tiers,
-        items=[DipBuyItem(**asdict(i)) for i in s.items],
-        leftover_krw=s.leftover_krw,
+        etfs=[DipBuyEtf(**asdict(e)) for e in s.etfs],
     )
 
 
@@ -273,55 +271,110 @@ async def get_dip_buy_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """낙폭 추매 안내 — 포트폴리오별 지수 낙폭·구간 상태·이번 추매 금액과 종목(주문 없음, plans/147)."""
+    """낙폭 추매 안내 — 여윳돈·지수별 규칙의 구간 상태·이번 추매 금액과 살 ETF(주문 없음, plans/147·148)."""
     cache = await get_cache_store()
-    summaries = await dip_buy_service.summarize_user_plans(db, cache, current_user.id, allocate=True)
-    return DipBuyStatusResponse(plans=[_dip_buy_row(s) for s in summaries], reset_drawdown_pct=RESET_DRAWDOWN_PCT)
+    summary = await dip_buy_service.summarize_user(db, cache, current_user.id, with_etfs=True)
+    settings_row = summary.settings
+    return DipBuyStatusResponse(
+        settings=DipBuySettingsOut(
+            reserve_krw=float(settings_row.reserve_krw or 0),
+            notify_mode=settings_row.notify_mode,
+            notify_day=settings_row.notify_day,
+            is_active=settings_row.is_active,
+        )
+        if settings_row is not None
+        else None,
+        rules=[_dip_buy_rule_row(r) for r in summary.rules],
+        next_notify_date=summary.next_notify_date,
+        due_amount_krw=summary.due_amount_krw,
+        dca_held_portfolios=summary.dca_held_portfolios,
+        has_candidates=summary.has_candidates,
+        reset_drawdown_pct=RESET_DRAWDOWN_PCT,
+    )
 
 
-@router.put("/dip-buy/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.put("/dip-buy/settings", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("20/minute")
-async def upsert_dip_buy_plan(
+async def upsert_dip_buy_settings(
     request: Request,
-    portfolio_id: uuid.UUID,
-    req: DipBuyPlanUpsert,
+    req: DipBuySettingsUpsert,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await dip_buy_service.upsert_plan(
+    """여윳돈·알림 방식(사용자당 하나, 포트폴리오와 무관)."""
+    await dip_buy_service.upsert_settings(
         db,
         current_user.id,
-        portfolio_id,
-        index_ticker=req.index_ticker,
         reserve_krw=req.reserve_krw,
+        notify_mode=req.notify_mode,
+        notify_day=req.notify_day,
+        is_active=req.is_active,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/dip-buy/rules", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("20/minute")
+async def create_dip_buy_rule(
+    request: Request,
+    req: DipBuyRuleUpsert,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await dip_buy_service.create_rule(
+        db,
+        current_user.id,
+        index_ticker=req.index_ticker,
+        allocation_pct=req.allocation_pct,
         tiers=[t.model_dump() for t in req.tiers],
         is_active=req.is_active,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/dip-buy/{portfolio_id}/complete", status_code=status.HTTP_204_NO_CONTENT)
+@router.put("/dip-buy/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("20/minute")
+async def update_dip_buy_rule(
+    request: Request,
+    rule_id: uuid.UUID,
+    req: DipBuyRuleUpsert,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await dip_buy_service.update_rule(
+        db,
+        current_user.id,
+        rule_id,
+        index_ticker=req.index_ticker,
+        allocation_pct=req.allocation_pct,
+        tiers=[t.model_dump() for t in req.tiers],
+        is_active=req.is_active,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/dip-buy/rules/{rule_id}/complete", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("20/minute")
 async def complete_dip_buy(
     request: Request,
-    portfolio_id: uuid.UUID,
+    rule_id: uuid.UUID,
     req: DipBuyComplete,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """지금 도달한 구간의 추매를 완료로 기록하고 여윳돈에서 뺀다(주문은 사용자가 직접)."""
+    """그 규칙의 지금 도달한 구간 추매를 완료로 기록하고 여윳돈에서 뺀다(주문은 사용자가 직접)."""
     cache = await get_cache_store()
-    await dip_buy_service.mark_completed(db, cache, current_user.id, portfolio_id, req.amount_krw)
+    await dip_buy_service.mark_completed(db, cache, current_user.id, rule_id, req.amount_krw)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.delete("/dip-buy/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/dip-buy/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("20/minute")
-async def delete_dip_buy_plan(
+async def delete_dip_buy_rule(
     request: Request,
-    portfolio_id: uuid.UUID,
+    rule_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await dip_buy_service.delete_plan(db, current_user.id, portfolio_id)
+    await dip_buy_service.delete_rule(db, current_user.id, rule_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

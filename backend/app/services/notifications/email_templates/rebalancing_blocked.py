@@ -221,54 +221,73 @@ def dca_cash_shortfall_template(
     return subject, html
 
 
+# (지수 라벨, 52주 고점 대비 낙폭, 추매 금액, [(ETF 이름, 수량, 원화 금액, 필요 달러|None)])
+DipBuyMailRule = tuple[str, float | None, float, list[tuple[str, float, float, float | None]]]
+
+
+def _dd_text(drawdown_pct: float | None) -> str:
+    return f"{drawdown_pct:.1f}%" if drawdown_pct is not None else "확인 불가"
+
+
 def dip_buy_template(
-    portfolio_name: str,
     phase: str,
-    run_date_label: str,
-    index_ticker: str,
-    drawdown_pct: float | None,
-    amount_krw: float,
-    items: list[tuple[str, float, float, float | None]],
+    run_date_label: str | None,
+    rules: list[DipBuyMailRule],
     reserve_krw: float,
+    held_portfolios: list[str],
     app_link: str,
 ) -> tuple[str, str]:
-    """낙폭 추매 안내(plans/147). `phase`: PRE(적립일 1~3일 전) / DAY(적립일 당일) / CANCELLED(회복으로 취소).
+    """낙폭 추매 안내(plans/147·148). 주문은 하지 않는다 — 사용자가 직접 산다.
 
-    `items`는 (종목명, 수량, 원화 금액, 필요 달러|None). 주문은 하지 않는다 — 사용자가 직접 산다.
+    `phase`: REACHED(구간 도달 다음 날) / PRE(알림일 1~3일 전) / DAY(알림일 당일) / CANCELLED(회복으로 취소).
+    규칙마다 살 수 있는 ETF는 같은 지수 대안 목록이다(이 중 하나로).
     """
-    dd_text = f"{drawdown_pct:.1f}%" if drawdown_pct is not None else "확인 불가"
     if phase == "CANCELLED":
-        subject = f"[Growlio] {run_date_label} 추매 안내 취소 — {index_ticker} 회복"
+        subject = f"[Growlio] {run_date_label} 추매 안내 취소 — 지수 회복"
         html = _email_div(
-            "이번 적립일엔 추매하지 않아요",
+            "이번 알림일엔 추매하지 않아요",
             "#2563eb",
             _kv_table(
-                [
-                    ("포트폴리오", escape(portfolio_name)),
-                    ("적립일", run_date_label),
-                    (f"{index_ticker} 52주 고점 대비", dd_text),
-                ]
+                [("알림일", run_date_label or "")]
+                + [(f"{escape(label)} 52주 고점 대비", _dd_text(dd)) for label, dd, _, _ in rules]
             ),
             "지난번 안내 뒤 지수가 회복해 추매 구간을 벗어났어요. 정기 적립은 평소대로 진행돼요.",
         )
         return subject, html
-    title = "오늘 추매할 금액이에요" if phase == "DAY" else f"{run_date_label} 적립일에 추매할 예정이에요"
-    subject = f"[Growlio] {run_date_label} 추매 {amount_krw:,.0f}원 — {index_ticker} {dd_text}"
-    rows: list[tuple[str, str]] = [
-        ("포트폴리오", escape(portfolio_name)),
-        ("적립일", run_date_label),
-        (f"{index_ticker} 52주 고점 대비", dd_text),
-        ("추매 금액", f"<span style='font-weight:bold;color:#dc2626;'>{amount_krw:,.0f} 원</span>"),
-        ("남은 여윳돈", f"{reserve_krw:,.0f} 원"),
-    ]
-    for name, shares, value, usd in items:
-        usd_text = f" (약 ${usd:,.2f})" if usd else ""
-        rows.append((escape(name), f"{shares:g}주 · {value:,.0f} 원{usd_text}"))
+    total = sum(amount for _, _, amount, _ in rules)
+    if phase == "REACHED":
+        title = "추매 구간에 들어왔어요"
+        dds = ", ".join(f"{label} {_dd_text(dd)}" for label, dd, _, _ in rules)
+        subject = f"[Growlio] 추매 {total:,.0f}원 — {dds}"
+    else:
+        title = "오늘 추매할 금액이에요" if phase == "DAY" else f"{run_date_label} 추매할 예정이에요"
+        subject = f"[Growlio] {run_date_label} 추매 {total:,.0f}원"
+    rows: list[tuple[str, str]] = []
+    if run_date_label and phase != "REACHED":
+        rows.append(("알림일", run_date_label))
+    for label, dd, amount, etfs in rules:
+        rows.append(
+            (
+                f"{escape(label)} ({_dd_text(dd)})",
+                f"<span style='font-weight:bold;color:#dc2626;'>{amount:,.0f} 원</span>",
+            )
+        )
+        for i, (name, shares, value, usd) in enumerate(etfs):
+            usd_text = f" (약 ${usd:,.2f})" if usd else ""
+            prefix = "&nbsp;&nbsp;또는 " if i else "&nbsp;&nbsp;"
+            rows.append((f"{prefix}{escape(name)}", f"{shares:g}주 · {value:,.0f} 원{usd_text}"))
+    rows.append(("남은 여윳돈", f"{reserve_krw:,.0f} 원"))
     note = (
-        "적립과 별도로 정해 둔 여윳돈의 구간별 추매 안내예요. 주문은 자동으로 나가지 않아요 — 직접 매수한 뒤 "
+        "적립과 별도로 정해 둔 여윳돈의 구간별 추매 안내예요. 같은 지수 ETF는 계좌에 맞는 것 하나를 고르세요. "
+        "주문은 자동으로 나가지 않아요 — 직접 매수한 뒤 "
         f"<a href='{app_link}'>앱</a>에서 '추매했어요'를 누르면 여윳돈에서 빠져요."
     )
+    if held_portfolios:
+        note += (
+            f" {escape(', '.join(held_portfolios))} 적립 자동매수는 전술 방어 국면이라 보류 중이에요 — "
+            "추매는 적립과 별개인 여윳돈 안내예요."
+        )
     if phase == "PRE":
-        note += " 적립일 전날 종가로 금액이 확정되며, 당일 아침에 다시 알려드려요."
+        note += " 알림일 전날 종가로 금액이 확정되며, 당일 아침에 다시 알려드려요."
     html = _email_div(title, "#d97706", _kv_table(rows), note)
     return subject, html

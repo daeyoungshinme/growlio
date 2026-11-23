@@ -33,8 +33,6 @@ const HOLDINGS_QUERY_KEYS = [
   QUERY_KEYS.goalRecommendationBase,
   // 환전 계획의 보유 달러는 계좌 deposit_usd 합 (plans/97 B2)
   QUERY_KEYS.fxPlanBase,
-  // 낙폭 추매 종목 분할은 보유 평가액(부족분 우선)·시세를 쓴다 (plans/147)
-  QUERY_KEYS.dipBuy,
   QUERY_KEYS.actionItems,
   // 자산 합계 기준 카드 — 백엔드 sync도 같은 캐시를 지운다 (plans/110 D4)
   QUERY_KEYS.dcaAnalysis,
@@ -218,7 +216,7 @@ export function invalidatePortfolioData(qc: QueryClient, opts: { deleted?: boole
     invalidateKeys(qc, [QUERY_KEYS.rebalancingStrategyBase]),
     // 환전 계획은 목표 비중의 해외 몫·연결 계좌를 읽는다 (plans/97 B2)
     invalidateKeys(qc, [QUERY_KEYS.fxPlanBase]),
-    // 낙폭 추매 종목 분할은 목표 비중을 따른다(포트폴리오 삭제 시 서버가 추매 설정도 지운다)
+    // 낙폭 추매의 "적립 자동매수 보류 중" 안내가 포트폴리오 이름을 담는다 (plans/148)
     invalidateKeys(qc, [QUERY_KEYS.dipBuy]),
     invalidateKeys(qc, [QUERY_KEYS.actionItems]),
     // 알림 목록은 포트폴리오 이름을, 기대지표 미리보기는 목표 비중을 담는다 (plans/62 C2·77 C2).
@@ -307,7 +305,7 @@ export function invalidateRebalancingAlertData(qc: QueryClient, portfolioId: str
     invalidateKeys(qc, [QUERY_KEYS.actionItems]),
     // 환전 계획의 기본 포트폴리오는 적립 자동매수 알림을 따른다 (plans/97 B2)
     invalidateKeys(qc, [QUERY_KEYS.fxPlanBase]),
-    // 낙폭 추매의 적립일·계좌 범위는 정기 적립식 알림을 따른다 (plans/147)
+    // 낙폭 추매의 "적립 자동매수 보류 중" 안내는 정기 적립식 알림의 전술 연동을 따른다 (plans/148)
     invalidateKeys(qc, [QUERY_KEYS.dipBuy]),
     // drift-summary의 "알림 설정됨"·이탈 기준이 알림 설정을 따른다 — 저장 후 "알림 미설정"이 남던 문제 (plans/62 C1)
     invalidateKeys(qc, [QUERY_KEYS.driftSummary]),
@@ -347,6 +345,8 @@ export function invalidateGoalRecommendationData(qc: QueryClient) {
   return Promise.all([
     invalidateKeys(qc, [QUERY_KEYS.goalRecommendationBase]),
     invalidateKeys(qc, [QUERY_KEYS.settings]),
+    // 낙폭 추매의 살 ETF는 추천 후보 중 그 지수 추종 ETF다 (plans/148)
+    invalidateKeys(qc, [QUERY_KEYS.dipBuy]),
   ]);
 }
 
