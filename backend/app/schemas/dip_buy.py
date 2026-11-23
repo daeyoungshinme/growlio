@@ -75,6 +75,7 @@ class DipBuyEtf(BaseModel):
     shares: int
     amount_krw: float
     amount_usd: float | None = None  # 해외 종목이면 필요 달러(환율 실값일 때만)
+    price_usd: float | None = None  # 해외 종목 1주 달러가(환율 실값일 때만)
 
 
 class DipBuySettingsOut(BaseModel):

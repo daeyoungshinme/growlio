@@ -214,10 +214,23 @@ async def test_attach_etfs_floor_shares_and_usd(mock_db):
         patch("app.utils.currency.get_live_or_cached_usd_krw", AsyncMock(return_value=(1500.0, True))),
     ):
         await svc.attach_etfs(mock_db, None, USER, [s], CANDIDATES)
-    assert [(e.ticker, e.shares, e.amount_krw, e.amount_usd) for e in s.etfs] == [
-        ("QQQ", 2, 1_500_000, 1000.0),
-        ("133690", 15, 1_950_000, None),
+    assert [(e.ticker, e.shares, e.amount_krw, e.amount_usd, e.price_krw, e.price_usd) for e in s.etfs] == [
+        ("QQQ", 2, 1_500_000, 1000.0, 750_000.0, 500.0),
+        ("133690", 15, 1_950_000, None, 130_000.0, None),
     ]
+
+
+async def test_attach_etfs_fallback_rate_hides_usd_price(mock_db):
+    s = svc.summarize_rules(_settings(), [_rule()], {"QQQ": -12.0})[0]
+    with (
+        patch(
+            "app.services.market_data.price_service.fetch_prices_batch_krw",
+            AsyncMock(return_value={"QQQ": 750_000.0}),
+        ),
+        patch("app.utils.currency.get_live_or_cached_usd_krw", AsyncMock(return_value=(1300.0, False))),
+    ):
+        await svc.attach_etfs(mock_db, None, USER, [s], CANDIDATES)
+    assert [(e.ticker, e.price_krw, e.amount_usd, e.price_usd) for e in s.etfs] == [("QQQ", 750_000.0, None, None)]
 
 
 async def test_attach_etfs_price_failure_keeps_amount_only(mock_db):
@@ -535,7 +548,7 @@ def test_get_status_serializes_summary(client):
         has_candidates=True,
         index_drawdowns={"QQQ": -12.0, "SPY": -8.5},
     )
-    summary.rules[0].etfs = [svc.EtfOption("QQQ", "Invesco QQQ", "NASDAQ", 750_000, 1, 750_000, 500.0)]
+    summary.rules[0].etfs = [svc.EtfOption("QQQ", "Invesco QQQ", "NASDAQ", 750_000, 1, 750_000, 500.0, 500.0)]
     with patch.object(svc, "summarize_user", AsyncMock(return_value=summary)):
         resp = client.get("/api/v1/invest/dip-buy")
     assert resp.status_code == 200
@@ -549,6 +562,8 @@ def test_get_status_serializes_summary(client):
     assert row["base_krw"] == 6_000_000
     assert [t["state"] for t in row["tiers"]] == ["DUE", "WAITING", "WAITING"]
     assert row["etfs"][0]["amount_usd"] == 500.0
+    assert row["etfs"][0]["price_krw"] == 750_000
+    assert row["etfs"][0]["price_usd"] == 500.0
 
 
 def test_get_status_without_settings(client):

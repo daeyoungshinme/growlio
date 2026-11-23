@@ -69,6 +69,7 @@ const rule = (over: Partial<DipBuyRule> = {}): DipBuyRule => ({
       shares: 1,
       amount_krw: 750_000,
       amount_usd: 500,
+      price_usd: 500,
     },
     {
       ticker: "133690",
@@ -118,6 +119,22 @@ describe("DipBuyCard", () => {
     expect(screen.getByText("Invesco QQQ 1주")).toBeInTheDocument();
     expect(screen.getByText("TIGER 미국나스닥100 9주")).toBeInTheDocument();
     expect(screen.getByText(/약 \$500/)).toBeInTheDocument();
+  });
+
+  it("ETF마다 1주당 가격을 보여준다 — 해외는 달러와 원화, 국내는 원화(만원 축약 없이)", async () => {
+    vi.mocked(fetchDipBuyStatus).mockResolvedValue(status());
+    renderCard();
+    expect(await screen.findByText("1주 $500.00 · 750,000원")).toBeInTheDocument();
+    expect(screen.getByText("1주 130,000원")).toBeInTheDocument();
+  });
+
+  it("해외 ETF 달러 1주가가 없으면(실환율 없음·옛 응답) 원화 1주가만 보여준다", async () => {
+    const base = rule();
+    const etfs = base.etfs.map((e) => ({ ...e, amount_usd: null, price_usd: undefined }));
+    vi.mocked(fetchDipBuyStatus).mockResolvedValue(status({ rules: [{ ...base, etfs }] }));
+    renderCard();
+    expect(await screen.findByText("1주 750,000원")).toBeInTheDocument();
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
   });
 
   it("매달 정한 날 방식이면 다음 알림일을 보여준다", async () => {
