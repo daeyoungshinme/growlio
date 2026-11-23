@@ -1,23 +1,16 @@
 import type { MarketRiskLevel } from "@/api/marketSignals";
+import { MARKET_SIGNAL_BADGE_CLASS, MARKET_SIGNAL_LABEL } from "@/utils/marketSignalBadge";
 
 interface Props {
   level: MarketRiskLevel;
   size?: "xs" | "sm";
 }
 
-const LEVEL_CONFIG: Record<MarketRiskLevel, { label: string; cls: string }> = {
-  GREEN: {
-    label: "안정", // 홈 카드·이메일·전술 탭과 같은 표기
-    cls: "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700/30",
-  },
-  YELLOW: {
-    label: "주의",
-    cls: "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700/30",
-  },
-  RED: {
-    label: "위험",
-    cls: "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700/30",
-  },
+// 라벨·색은 홈 "지금 할 일" 알약과 같은 정의(`utils/marketSignalBadge`)를 쓴다 — 예전엔 두 곳이 각자 들고 있었다(plans/150 B3)
+const BORDER_CLASS: Record<MarketRiskLevel, string> = {
+  GREEN: "border-green-300 dark:border-green-700/30",
+  YELLOW: "border-yellow-300 dark:border-yellow-700/30",
+  RED: "border-red-300 dark:border-red-700/30",
 };
 
 const ICON: Record<MarketRiskLevel, string> = {
@@ -27,7 +20,8 @@ const ICON: Record<MarketRiskLevel, string> = {
 };
 
 export default function MarketSignalLevelBadge({ level, size = "xs" }: Props) {
-  const { label, cls } = LEVEL_CONFIG[level];
+  const label = MARKET_SIGNAL_LABEL[level];
+  const cls = `${MARKET_SIGNAL_BADGE_CLASS[level]} ${BORDER_CLASS[level]}`;
   const textSize = size === "xs" ? "text-xs" : "text-sm";
   return (
     <span

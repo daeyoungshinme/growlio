@@ -1,6 +1,6 @@
 import type { MarketRiskLevel } from "@/api/marketSignals";
 
-/** 시장 신호 알약 배지 — 홈 "지금 할 일" 리밸런싱 행과 진단 탭 `RebalancingStatusCard` 공용 */
+/** 시장 신호 등급 라벨·색 단일 정의 — 홈 "지금 할 일" 알약과 `components/rebalancing/MarketSignalLevelBadge`가 공유 */
 export const MARKET_SIGNAL_LABEL: Record<MarketRiskLevel, string> = {
   GREEN: "안정",
   YELLOW: "주의",

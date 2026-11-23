@@ -120,7 +120,6 @@ export default function DividendTab({
   }, [dividendData]);
 
   const totalEstimated = dividendByTicker.reduce((s, d) => s + d.estimated_annual_krw, 0);
-  const estimatedMonthly = dividendByTicker.reduce((s, d) => s + d.estimated_monthly_krw, 0);
   const received = divSummary?.annual_received ?? 0;
 
   const overallDividendYield =
@@ -250,7 +249,8 @@ export default function DividendTab({
         </div>
       )}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
+        {/* 받은·받을 배당 실적만 — 월평균(연간÷12)·목표 대비는 계획 › 배당 계획이 주인(plans/150 B2) */}
+        <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-800">
           <div className="px-2 py-3 sm:px-4 sm:py-4">
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-tight break-keep">
               예상 연간 배당금
@@ -278,15 +278,6 @@ export default function DividendTab({
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {received > 0 ? "실제 수령 합계" : "배당 내역을 입력해주세요"}
             </p>
-          </div>
-          <div className="px-2 py-3 sm:px-4 sm:py-4">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-tight break-keep">
-              월평균 예상 배당금
-            </p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600 break-keep">
-              {estimatedMonthly > 0 ? fmtKrw(estimatedMonthly) : "—"}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">연간 예상 배당금 ÷ 12</p>
           </div>
         </div>
       </div>
