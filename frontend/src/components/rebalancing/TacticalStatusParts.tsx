@@ -1,6 +1,8 @@
 import { ListChecks } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { TacticalAsset, TacticalStatus } from "@/api/tactical";
+import { DIP_BUY_VS_TACTICAL_NOTE } from "@/api/dipBuy";
+import InfoTip from "@/components/common/InfoTip";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
@@ -243,8 +245,7 @@ export function TacticalRegimeCard({
         <SummaryLine title="웅덩이 매수(눌림목)" value={dipValue(status)} />
         {dcaAuto && (
           <p className="text-xs text-gray-500 dark:text-gray-400 break-keep">
-            웅덩이 매수는 제안 비중을 적용할 때만 포트폴리오 안 현금으로 실행돼요. 적립 중이라면
-            계좌 밖 여윳돈 추매는{" "}
+            {DIP_BUY_VS_TACTICAL_NOTE} 여윳돈 추매는{" "}
             <Link to={`${investPlanUrl("적립 계획")}#dip-buy`} className="underline">
               낙폭 추매 안내
             </Link>
@@ -280,10 +281,14 @@ export function DcaTacticalNotice({
   return (
     <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-xs text-blue-900 dark:text-blue-100 flex flex-col gap-1">
       <p className="font-semibold">적립 자동매수 중인 포트폴리오예요</p>
+      {/* 결론 한 문장 + 근거는 탭해서(plans/150 C2) */}
       <p>
-        제안 비중 적용은 매도·양도세가 생기고, 과거 20년 적립식에선 수익률을 연 2~4%p 낮췄어요.
-        자동매수 설정의 &lsquo;전술 연동&rsquo;을 켜면 방어 국면에만 매수를 보류해요 (수익은 비슷,
-        금융위기 때 낙폭 절반).
+        비중 적용 대신 자동매수 설정의 &lsquo;전술 연동&rsquo;을 켜면 방어 국면에만 매수를 보류해요.
+        <InfoTip
+          label="전술 연동 권장 근거"
+          className="ml-0.5 align-middle"
+          content="제안 비중 적용은 매도·양도세가 생기고, 과거 20년 적립식에선 수익률을 연 2~4%p 낮췄어요. 전술 연동은 수익은 비슷하고 금융위기 때 낙폭이 절반이었어요."
+        />
       </p>
       <Link
         to={rebalancingUrl({

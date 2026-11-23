@@ -6,9 +6,7 @@ import Tabs from "@/components/common/Tabs";
 import { syncAccount, syncAllAccounts } from "@/api/assets";
 import { useSyncStore } from "@/stores/syncStore";
 import { useDividendData } from "@/hooks/useDividendData";
-import StockHoldingsTable, {
-  type HoldingsSortRequest,
-} from "@/components/assets/StockHoldingsTable";
+import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import HorizonSummaryCard from "@/components/portfolio/HorizonSummaryCard";
 import AllocationHistoryCard from "@/components/dashboard/AllocationHistoryCard";
 import DividendTab from "@/components/portfolio/DividendTab";
@@ -106,13 +104,6 @@ export default function PortfolioPage() {
   useSwipeTabs(tabContentRef, TABS, tab, handleTabChange);
 
   // 비중 분석 "전체 비중순 보기" → 보유 종목 목록을 비중순으로 정렬하고 그 위치로 스크롤
-  const holdingsRef = useRef<HTMLDivElement>(null);
-  const [holdingsSortRequest, setHoldingsSortRequest] = useState<HoldingsSortRequest | null>(null);
-  const handleShowAllStocks = useCallback(() => {
-    setHoldingsSortRequest((prev) => ({ key: "weight_in_stock", nonce: (prev?.nonce ?? 0) + 1 }));
-    holdingsRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-  }, []);
-
   const { data: accountsList } = useQuery(accountsQuery);
   const accountOptions = useMemo(
     () => (accountsList ?? []).filter((a) => isStockAccount(a.asset_type)),
@@ -367,21 +358,14 @@ export default function PortfolioPage() {
           <ErrorBoundary variant="section">
             <div className="space-y-4">
               <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
-                <AllocationCard
-                  overview={data}
-                  accountId={selectedAccountId}
-                  onShowAllStocks={handleShowAllStocks}
-                />
+                <AllocationCard overview={data} accountId={selectedAccountId} />
               </Suspense>
-              <div ref={holdingsRef} className="scroll-mt-2">
-                <StockHoldingsTable
-                  positions={data.all_positions}
-                  dividendMap={dividendMap}
-                  divLoading={divLoading}
-                  divError={divError}
-                  sortRequest={holdingsSortRequest}
-                />
-              </div>
+              <StockHoldingsTable
+                positions={data.all_positions}
+                dividendMap={dividendMap}
+                divLoading={divLoading}
+                divError={divError}
+              />
               {/* 계좌를 골랐을 때만 — 전체 합산 추이는 홈 카드와 같아 두지 않는다(plans/144 C1).
                   접힌 동안은 차트 청크·이력을 받지 않는다 */}
               {selectedAccount && (

@@ -5,11 +5,13 @@ import {
   completeDipBuy,
   DIP_BUY_INDEX_LABEL,
   DIP_BUY_INDEXES,
+  DIP_BUY_VS_TACTICAL_NOTE,
   type DipBuyIndex,
   type DipBuyRule,
   type DipBuyStatus,
   type DipBuyTierState,
 } from "@/api/dipBuy";
+import InfoTip from "@/components/common/InfoTip";
 import { dipBuyQuery } from "@/api/queryOptions";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -92,11 +94,20 @@ export default function DipBuyCard() {
 
   return (
     <div className="space-y-4">
+      {/* 첫 문장만 — 쓰는 법·전술 웅덩이와의 구분은 탭해서 보기(plans/150 C2·C3) */}
       <p className="text-xs text-gray-500 dark:text-gray-400 break-keep">
-        매달 적립은 그대로 두고, 따로 모아 둔 여윳돈을 지수가 52주 고점 대비 내려간 구간마다 나눠
-        사도록 알려드려요. 적립금을 줄여 모은 돈이 아니라 원래 투자하지 않던 여윳돈일 때 쓰세요.
-        주문은 직접 넣고 &lsquo;추매했어요&rsquo;로 기록하면 여윳돈에서 빠져요. 전술 배분의 웅덩이
-        매수(포트폴리오 안 현금 비중 조정)와는 별개예요.
+        매달 적립은 그대로 두고, 모아 둔 여윳돈을 지수가 52주 고점 대비 내려간 구간마다 나눠 사도록
+        알려드려요.
+        <InfoTip
+          label="낙폭 추매 안내 설명"
+          className="ml-0.5 align-middle"
+          content={
+            <>
+              적립금을 줄여 모은 돈이 아니라 원래 투자하지 않던 여윳돈일 때 쓰세요. 주문은 직접 넣고
+              &lsquo;추매했어요&rsquo;로 기록하면 여윳돈에서 빠져요. {DIP_BUY_VS_TACTICAL_NOTE}
+            </>
+          }
+        />
       </p>
 
       {settings ? (

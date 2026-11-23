@@ -23,6 +23,7 @@ import { invalidateFxExtraNeedData } from "@/utils/queryInvalidation";
 import { syncSharedUsdRate } from "@/utils/sharedUsdRate";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
+import InfoTip from "@/components/common/InfoTip";
 
 const FxExtraNeedModal = lazy(() => import("@/components/invest/FxExtraNeedModal"));
 
@@ -255,10 +256,14 @@ export default function FxExtraNeedsSection() {
               />
             ))}
           </ul>
+          {/* 한 문장 + 계산 규칙은 탭해서(plans/150 C2) */}
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            증권 계좌에 이미 있는 달러로 채우지 않고 따로 계산합니다. 필요일이 2주 안이면 남은
-            금액을 지금 바꾸도록 제안합니다. 환전한 뒤 항목의 &lsquo;이미 환전한 금액&rsquo;을 고쳐
-            주세요.
+            환전한 뒤 항목의 &lsquo;이미 환전한 금액&rsquo;을 고쳐 주세요.
+            <InfoTip
+              label="추가 환전 계산 방식"
+              className="ml-0.5 align-middle"
+              content="증권 계좌에 이미 있는 달러로 채우지 않고 따로 계산해요. 필요일이 2주 안이면 남은 금액을 지금 바꾸도록 제안해요."
+            />
           </p>
         </>
       )}

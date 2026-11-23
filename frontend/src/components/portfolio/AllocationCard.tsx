@@ -11,16 +11,16 @@ import { useCollapsible } from "@/hooks/useCollapsible";
 import type { PortfolioOverview } from "@/types";
 import SegmentedControl from "@/components/common/SegmentedControl";
 import RegionAllocationView, { type RegionBasis } from "./allocation/RegionAllocationView";
-import StockAllocationView from "./allocation/StockAllocationView";
 import IndexAllocationView from "./allocation/IndexAllocationView";
 import { storageGet, storageSet } from "@/utils/safeStorage";
 import { pctOf } from "@/utils/format";
 
-type View = "region" | "stock" | "index";
+// "종목"(상위 5) 보기는 아래 보유 종목 목록의 비중 열·비중순 정렬과 겹쳐 뺐다(plans/150 E1) —
+// 예전에 저장된 "stock"은 readStoredView가 국내/해외로 되돌린다
+type View = "region" | "index";
 
 const VIEW_OPTIONS = [
   { value: "region", label: "국내/해외" },
-  { value: "stock", label: "종목" },
   { value: "index", label: "지수" },
 ] as const;
 
@@ -40,12 +40,10 @@ function readStoredView(): View {
 interface Props {
   overview: PortfolioOverview;
   accountId?: string | null;
-  /** "종목" 보기의 "전체 비중순 보기" — 아래 보유 종목 목록을 비중순으로 정렬하고 그리로 이동 */
-  onShowAllStocks?: () => void;
 }
 
-/** 자산탭 "비중 분석" — 국내/해외 · 종목 · 지수 비중을 한 카드에서 같은 막대 형식으로 전환해 본다. */
-export default function AllocationCard({ overview, accountId, onShowAllStocks }: Props) {
+/** 자산탭 "비중 분석" — 국내/해외 · 지수 비중을 한 카드에서 같은 막대 형식으로 전환해 본다. */
+export default function AllocationCard({ overview, accountId }: Props) {
   const [isOpen, toggleOpen] = useCollapsible(isDesktopViewport, OPEN_KEY);
   const [view, setViewState] = useState<View>(readStoredView);
   const [regionBasis, setRegionBasis] = useState<RegionBasis>("exposure");
@@ -127,9 +125,6 @@ export default function AllocationCard({ overview, accountId, onShowAllStocks }:
             amounts={regionAmounts}
             fallback={exposureFallback}
           />
-        )}
-        {view === "stock" && (
-          <StockAllocationView items={overview.stock_allocation} onShowAll={onShowAllStocks} />
         )}
         {view === "index" &&
           (exposure.data ? <IndexAllocationView data={exposure.data} /> : exposureFallback)}

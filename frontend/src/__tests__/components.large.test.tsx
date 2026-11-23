@@ -488,41 +488,6 @@ describe("StockHoldingsTable", () => {
     expect(cardFor("Apple Inc.")).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("바깥 정렬 요청(sortRequest)이 오면 정렬을 바꾸고 검색어를 비운다", () => {
-    const props = {
-      positions: [mockPosition],
-      dividendMap: {},
-      divLoading: false,
-      divError: false,
-    };
-    // StockHoldingsTable은 쿼리를 쓰지 않는다 — rerender가 같은 트리를 유지하도록 provider 없이 렌더
-    const { rerender } = render(<StockHoldingsTable {...props} />);
-    fireEvent.change(screen.getByLabelText("종목명 또는 티커 검색"), {
-      target: { value: "zzz" },
-    });
-    rerender(<StockHoldingsTable {...props} sortRequest={{ key: "weight_in_stock", nonce: 1 }} />);
-    expect(screen.getByLabelText("보유 종목 정렬")).toHaveValue("weight_in_stock");
-    expect(screen.getByLabelText("종목명 또는 티커 검색")).toHaveValue("");
-  });
-
-  it("이미 적용된 정렬 요청은 탭 전환으로 재마운트돼도 사용자 정렬을 덮어쓰지 않는다", () => {
-    const props = {
-      positions: [mockPosition],
-      dividendMap: {},
-      divLoading: false,
-      divError: false,
-    };
-    const request = { key: "weight_in_stock" as const, nonce: 1 };
-    const { unmount } = render(<StockHoldingsTable {...props} />);
-    unmount();
-    // 페이지가 요청을 들고 있는 채로 다시 마운트 → 사용자가 고른 기본 정렬이 유지돼야 한다
-    const { rerender } = render(<StockHoldingsTable {...props} sortRequest={request} />);
-    expect(screen.getByLabelText("보유 종목 정렬")).not.toHaveValue("weight_in_stock");
-    // 새 요청(nonce 증가)은 적용
-    rerender(<StockHoldingsTable {...props} sortRequest={{ ...request, nonce: 2 }} />);
-    expect(screen.getByLabelText("보유 종목 정렬")).toHaveValue("weight_in_stock");
-  });
-
   it("데스크톱 계좌별 하위 행은 헤더와 같은 열에 맞춰진다 (계좌명=종목 열, 수량=수량 열)", () => {
     const otherAccount: PortfolioPosition = {
       ...mockPosition,

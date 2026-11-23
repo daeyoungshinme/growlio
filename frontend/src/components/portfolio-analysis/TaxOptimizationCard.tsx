@@ -14,6 +14,7 @@ import { TOUCH_HEIGHT_MIN } from "@/constants/uiSizes";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { investPlanUrl } from "@/utils/tabUrl";
+import InfoTip from "@/components/common/InfoTip";
 
 interface TaxOptimizationCardProps {
   /** 특정 계좌만 필터링해 조회 (미지정 시 전체 계좌 통합) */
@@ -117,9 +118,13 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
               <TriangleAlert size={14} className="text-orange-500 mt-0.5 shrink-0" />
               <p className="text-xs text-orange-700 dark:text-orange-400">
                 {taxData.domestic_large_holder_name ?? "보유 종목"} 보유액이 대주주 기준(
-                {fmtKrw(taxData.domestic_large_holder_threshold_krw)}) 이상이에요. 판정은
-                종목별·직전 연도 말 기준이고 지분율 요건도 함께 봐요. 대주주에 해당하면 양도소득세가
-                부과될 수 있으니 세무 전문가와 확인해 보세요.
+                {fmtKrw(taxData.domestic_large_holder_threshold_krw)}) 이상이에요. 양도소득세가
+                부과될 수 있어요.
+                <InfoTip
+                  label="대주주 판정 기준"
+                  className="ml-0.5 align-middle"
+                  content="판정은 종목별·직전 연도 말 기준이고 지분율 요건도 함께 봐요. 해당 여부는 세무 전문가와 확인해 보세요."
+                />
               </p>
             </div>
           )}

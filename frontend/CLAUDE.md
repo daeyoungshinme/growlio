@@ -86,7 +86,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - `tax/{IsaMaturityCard,PensionContributionCard,HealthInsuranceRiskCard}` — 계획탭 › 절세의 `TaxLimitsSection`이 렌더(건보 카드는 항상). ISA 카드 앵커 `#isa-status`는 백엔드 절세 CTA 링크와 같아야 함.
 - `portfolio-analysis/TaxTabContainer` — 계획탭 "절세"(`?taxTab=`, `?taxAccount=`). 옛 `/assets?portfolioTab=세금` 링크는 `utils/legacyTabRedirect.ts`가 옮김.
 - `dashboard/AllocationHistoryCard` — 홈 "자산 추이" + 자산탭 투자현황(계좌를 고른 경우만, `accountId`·별도 storageKey·기본 접힘). 접힌 동안 차트 청크·이력을 받지 않는다
-- `portfolio/AllocationCard` — 자산탭 비중 분석(국내/해외·종목·지수). 하위 뷰 `portfolio/allocation/`. "종목" 보기는 상위 5 + 기타만.
+- `portfolio/AllocationCard` — 자산탭 비중 분석(국내/해외·지수). 하위 뷰 `portfolio/allocation/`. 종목별 비중은 아래 보유 종목 목록(비중 열·비중순)이 담당 — "종목" 보기를 다시 만들지 말 것.
 - `assets/AccountHistoryTab` — 계좌관리 "내역"(`?history=` 현금 흐름/매수 내역).
 - `rebalancing/GoalAdjustTab` — 목표 조정(추천·전술 서브탭). 상단 포트폴리오 선택기는 **전술 모드만**, 추천은 `RecommendationCard` 적용 영역 select에서 고름 — 선택은 둘 다 URL `portfolioId` 공유. 콘텐츠 ErrorBoundary/Suspense는 **`key={mode}`로 모드마다 새 경계** — React Router v7이 URL 변경을 `startTransition`으로 감싸 공유 경계면 이전 모드 화면이 남는다.
 - `rebalancing/TacticalAllocationTab` — 전술 배분(국면·제안 비중·적용). 적용은 `POST /tactical/{id}/apply`(**주문 없음**) 후 포트폴리오 탭 실행 흐름으로 넘김. 표시 조각 `TacticalStatusParts.tsx`, 확인창 `TacticalApplyConfirmModal.tsx`, 백테스트 `TacticalBacktestSection.tsx`, 비중표 편집 `TacticalWeightsEditor.tsx`, 문구·색상 `tacticalLabels.ts`. 차트 지표는 이 탭이 아니라 진단 탭 `MarketSignalBanner` + `ChartTrendList`. **설정 upsert는 항상 현재 `tilt_shift_pct`·`dip_shift_pct`·`use_macro`를 함께 보낸다**(생략 시 서버 기본값으로 덮임).
