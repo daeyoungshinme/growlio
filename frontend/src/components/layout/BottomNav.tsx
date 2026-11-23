@@ -1,43 +1,9 @@
-import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { NavLink } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NAV_ITEMS } from "@/constants/nav";
-import { useChallenges } from "@/hooks/useChallenges";
-import { useChallengeNudge } from "@/hooks/useChallengeNudge";
-import { actionItemsQuery, driftSummaryQuery } from "@/api/queryOptions";
-
-/**
- * 리밸런싱 배지 — 직접 drift-summary를 부르지 않는다. 이 내비는 모든 화면에 떠 있어 예전엔 부팅마다(포트폴리오 조회를
- * 기다린 뒤) 백엔드의 무거운 이탈 계산을 홈의 지금 할 일과 동시에 한 번 더 돌렸고, 관련 무효화마다 어느 화면에서든
- * 즉시 재조회했다(plans/125 C4). 리밸런싱 탭·홈 펼침이 받아 둔 drift-summary 캐시가 있으면 그 판정을 쓰고,
- * 없으면 지금 할 일(같은 판정 `get_drift_summaries`)의 REBALANCE 행으로 대신한다.
- */
-function useRebalancingNeedsCount(): number {
-  const qc = useQueryClient();
-  const { data: driftSummaries } = useQuery({ ...driftSummaryQuery, enabled: false });
-  const { data: actionItems } = useQuery({ ...actionItemsQuery, enabled: false });
-  // enabled:false 관찰자는 무효화돼도 다시 받지 않는다(v5는 isStale도 항상 false) — 무효화된 drift 캐시는
-  // 리밸런싱 탭을 다시 열 때까지 옛 판정이라, 그동안은 지금 할 일(홈이 다시 받음)로 대신한다(plans/126 A2)
-  const driftInvalidated = useSyncExternalStore(
-    useCallback((onChange) => qc.getQueryCache().subscribe(onChange), [qc]),
-    () => qc.getQueryState(driftSummaryQuery.queryKey)?.isInvalidated ?? false,
-  );
-  return useMemo(() => {
-    if (driftSummaries && !driftInvalidated)
-      return driftSummaries.filter((s) => s.needs_rebalancing).length;
-    return (actionItems ?? []).filter((item) => item.kind === "REBALANCE").length;
-  }, [driftSummaries, driftInvalidated, actionItems]);
-}
+import { navBadgeLabel, useNavBadges } from "@/hooks/useNavBadges";
 
 export default function BottomNav() {
-  const needsCount = useRebalancingNeedsCount();
-  const showRebalancingBadge = needsCount > 0;
-
-  const { data: challenges } = useChallenges();
-  const hasChallenges = (challenges?.length ?? 0) > 0;
-
-  const { data: challengeNudge } = useChallengeNudge(hasChallenges);
-  const showChallengeBadge = challengeNudge?.needs_attention ?? false;
+  const badges = useNavBadges();
 
   return (
     <nav
@@ -58,16 +24,10 @@ export default function BottomNav() {
         >
           <div className="relative">
             <Icon size={22} aria-hidden="true" />
-            {to === "/rebalancing" && showRebalancingBadge && (
+            {navBadgeLabel(to, badges) && (
               <span
                 className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"
-                aria-label={`리밸런싱 필요 ${needsCount}개`}
-              />
-            )}
-            {to === "/invest-plan" && showChallengeBadge && (
-              <span
-                className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"
-                aria-label="이번 달 적립 챌린지 미완료"
+                aria-label={navBadgeLabel(to, badges) ?? undefined}
               />
             )}
           </div>

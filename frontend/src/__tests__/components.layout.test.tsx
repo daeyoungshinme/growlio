@@ -254,6 +254,20 @@ describe("Sidebar", () => {
     );
     expect(screen.getByLabelText(/다크 모드로 전환/)).toBeDefined();
   });
+
+  it("하단 내비와 같은 리밸런싱 배지를 표시한다 — plans/150 A4", async () => {
+    fetchChallengesMock.mockReset().mockResolvedValue([]);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(QUERY_KEYS.actionItems, [{ id: "rebalance:all", kind: "REBALANCE" }]);
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <Sidebar />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByLabelText("리밸런싱 필요 1개")).toBeDefined();
+  });
 });
 
 // ------- AppLayout -------

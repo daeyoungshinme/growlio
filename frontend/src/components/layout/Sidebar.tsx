@@ -3,11 +3,14 @@ import { NavLink } from "react-router-dom";
 import { NAV_ITEMS } from "@/constants/nav";
 import { useThemeStore } from "@/stores/themeStore";
 import { useLogout } from "@/hooks/useLogout";
+import { navBadgeLabel, useNavBadges } from "@/hooks/useNavBadges";
 
 export default function Sidebar() {
   const logout = useLogout();
   const isDark = useThemeStore((s) => s.isDark);
   const toggle = useThemeStore((s) => s.toggle);
+  // 하단 내비(모바일)와 같은 빨간 점 — 데스크톱만 리밸런싱·챌린지 신호가 없던 차이 해소(plans/150 A4)
+  const badges = useNavBadges();
 
   return (
     <aside
@@ -22,22 +25,28 @@ export default function Sidebar() {
       </div>
 
       <nav aria-label="메인 메뉴" className="flex-1 space-y-1">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-50"
-              }`
-            }
-          >
-            <Icon size={18} aria-hidden="true" />
-            {label}
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
+          const badgeLabel = navBadgeLabel(to, badges);
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-50"
+                }`
+              }
+            >
+              <Icon size={18} aria-hidden="true" />
+              <span className="flex-1">{label}</span>
+              {badgeLabel && (
+                <span className="w-2 h-2 bg-red-500 rounded-full" aria-label={badgeLabel} />
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="space-y-1">
