@@ -109,9 +109,9 @@ export function resolvePushDeepLink(
       return investPlanUrl("배당 계획");
     case "DCA_CASH_SHORTFALL":
       return investPlanUrl("적립 계획");
-    // 환전 계획 구간 환율 알림(plans/121) — 카드를 펼치고 스크롤(InvestPlanPage `FX_PLAN_ANCHOR`)
+    // 환전 계획 구간 환율 알림(plans/121) — 계획 › 환전 탭(plans/149)
     case "FX_PLAN":
-      return `${investPlanUrl("적립 계획")}#fx-plan`;
+      return investPlanUrl("환전");
     // 낙폭 추매 안내(plans/147) — 추매 카드를 펼치고 스크롤(InvestPlanPage `DIP_BUY_ANCHOR`)
     case "DCA_DIP_BUY":
       return `${investPlanUrl("적립 계획")}#dip-buy`;

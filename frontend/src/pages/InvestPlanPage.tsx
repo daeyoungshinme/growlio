@@ -14,8 +14,6 @@ const TaxTabContainer = lazy(() => import("../components/portfolio-analysis/TaxT
 const SavingsSimulatorCard = lazy(() => import("../components/invest/SavingsSimulatorCard"));
 const FxPlanCard = lazy(() => import("../components/invest/FxPlanCard"));
 const DipBuyCard = lazy(() => import("../components/invest/DipBuyCard"));
-/** 환전 계획 카드 앵커 — 백엔드 `action_items_service._LINK_FX_PLAN`·`email_service.fx_plan_link`·푸시 딥링크와 같은 해시 */
-const FX_PLAN_ANCHOR = "fx-plan";
 /** 낙폭 추매 카드 앵커 — 백엔드 `action_items_service._LINK_DIP_BUY`·`email_service.dip_buy_link`·푸시 `DCA_DIP_BUY`와 같은 해시 */
 const DIP_BUY_ANCHOR = "dip-buy";
 /** 해시 진입 스크롤을 한 번 더 맞추는 시점 — 지연 로드 차트·배너가 카드 위에서 높이를 바꾸는 시간 */
@@ -41,6 +39,7 @@ import Tabs from "@/components/common/Tabs";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { FX_PLAN_DEFAULT_MONTHS, fxPlanQuery, settingsQuery } from "@/api/queryOptions";
 import { INVEST_PLAN_TABS, type InvestPlanTab } from "@/constants/tabs";
+import { legacyInvestPlanTab } from "@/utils/legacyTabRedirect";
 
 // 절세는 자산 › 투자현황 › 세금에서 이동(plans/50 M1) — 목표·배당·절세 "계획"을 한 탭에 모은다
 const TABS = INVEST_PLAN_TABS;
@@ -85,10 +84,12 @@ function useScrollToAnchor(anchor: string, linked: boolean, ready: boolean, link
 export default function InvestPlanPage() {
   const [monthlyOpen, setMonthlyOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hash } = useLocation();
   const rawTab = searchParams.get("tab");
-  const activeTab: Tab = (TABS as readonly string[]).includes(rawTab ?? "")
-    ? (rawTab as Tab)
-    : TABS[0];
+  // 옛 환전 계획 링크(`?tab=적립 계획#fx-plan`, 발송된 메일·푸시)는 환전 탭으로(plans/149)
+  const legacyTab = legacyInvestPlanTab(rawTab, hash);
+  const activeTab: Tab =
+    legacyTab ?? ((TABS as readonly string[]).includes(rawTab ?? "") ? (rawTab as Tab) : TABS[0]);
   const setActiveTab = (tab: Tab) =>
     setSearchParams(
       (prev) => {
@@ -111,16 +112,22 @@ export default function InvestPlanPage() {
     );
   }, [searchParams, setSearchParams]);
 
+  // 옛 링크는 URL도 새 탭으로 바꾼다(해시 제거) — 탭을 옮겨도 다시 환전 탭으로 끌려가지 않게
+  useEffect(() => {
+    if (!legacyTab) return;
+    setSearchParams(
+      (prev) => {
+        prev.set("tab", legacyTab);
+        return prev;
+      },
+      { replace: true },
+    );
+  }, [legacyTab, setSearchParams]);
+
   // 저축 시뮬레이터는 목표와 무관한 보조 도구라 2단 탭 대신 최하단 접힘 카드로 둔다(U11)
   const [isSimulatorOpen, toggleSimulatorOpen] = useCollapsible(
     false,
     "growlio:invest:savingsSimulatorOpen",
-  );
-  // 달러 환전 계획 — 해외 적립 보조 도구라 기본 접힘(plans/96)
-  const fxPlan = useAnchoredCollapsible(
-    FX_PLAN_ANCHOR,
-    "growlio:invest:fxPlanOpen",
-    activeTab === "적립 계획",
   );
   // 낙폭 추매 안내 — 여윳돈을 쓰는 보조 도구라 기본 접힘(plans/147)
   const dipBuy = useAnchoredCollapsible(
@@ -168,7 +175,6 @@ export default function InvestPlanPage() {
     saveSettings: saveDividendSettings,
   } = useDividendPlanSettings();
 
-  useScrollToAnchor(FX_PLAN_ANCHOR, fxPlan.linked, !isLoading, fxPlan.linkKey);
   useScrollToAnchor(DIP_BUY_ANCHOR, dipBuy.linked, !isLoading, dipBuy.linkKey);
 
   const s = data?.settings;
@@ -185,10 +191,10 @@ export default function InvestPlanPage() {
   const dcaPending = isLoading;
   const dcaFailed = isError && !data;
 
-  // 카드 본문은 lazy 청크라 열린 뒤 청크를 받고 나서야 요청이 나간다 — 펼쳐지는 순간 요청을 함께 출발시킨다(plans/127).
-  // 적립 분석이 실패하면 카드를 그리지 않으므로 받지 않는다(plans/128 A4)
+  // 환전 카드 본문은 lazy 청크라 청크를 받고 나서야 요청이 나간다 — 탭에 들어오는 순간 요청을 함께 출발시킨다(plans/127).
+  // 환전 탭은 적립 분석(dca-analysis)과 무관하게 그린다(plans/149)
   const queryClient = useQueryClient();
-  const fxPlanVisible = activeTab === "적립 계획" && !dcaFailed && fxPlan.open;
+  const fxPlanVisible = activeTab === "환전";
   useEffect(() => {
     if (fxPlanVisible) void queryClient.prefetchQuery(fxPlanQuery(FX_PLAN_DEFAULT_MONTHS, null));
   }, [fxPlanVisible, queryClient]);
@@ -285,24 +291,6 @@ export default function InvestPlanPage() {
               )}
             </div>
 
-            <div id={FX_PLAN_ANCHOR} className="scroll-mt-4">
-              <CollapsibleCard
-                icon={DollarSign}
-                iconWrapClassName="bg-sky-50 dark:bg-sky-950"
-                iconColorClassName="text-sky-600 dark:text-sky-400"
-                title="달러 환전 계획"
-                isOpen={fxPlan.open}
-                onToggle={fxPlan.handleToggle}
-                collapsedHint="지금 환율이 1년 중 어디쯤인지 보고 해외 적립용 달러를 나눠 환전"
-              >
-                <ErrorBoundary variant="section">
-                  <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-                    <FxPlanCard onEditGoal={openEdit} />
-                  </Suspense>
-                </ErrorBoundary>
-              </CollapsibleCard>
-            </div>
-
             <div id={DIP_BUY_ANCHOR} className="scroll-mt-4">
               <CollapsibleCard
                 icon={TrendingDown}
@@ -337,6 +325,30 @@ export default function InvestPlanPage() {
               </ErrorBoundary>
             </CollapsibleCard>
           </div>
+        )}
+
+        {/* 환전 탭 — 적립 계획의 해외 몫 달러 + 추가 환전(여행 등). 월 필요 달러는 서버가 적립 설정에서 계산 */}
+        {activeTab === "환전" && (
+          <section className="card">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg shrink-0 bg-sky-50 dark:bg-sky-950">
+                <DollarSign size={16} className="text-sky-600 dark:text-sky-400" />
+              </div>
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                달러 환전 계획
+              </h2>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 ml-0.5">
+              지금 환율이 1년 중 어디쯤인지 보고 해외 적립용 달러를 나눠 환전
+            </p>
+            <div className="mt-3">
+              <ErrorBoundary variant="section">
+                <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+                  <FxPlanCard onEditGoal={openEdit} />
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+          </section>
         )}
 
         {/* 챌린지 탭 */}

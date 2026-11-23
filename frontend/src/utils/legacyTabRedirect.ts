@@ -5,6 +5,7 @@
  * - `/assets?portfolioTab=세금[&taxTab=..][&account=..]` → `/invest-plan?tab=절세[&taxTab=..][&taxAccount=..]`
  * - `/assets?tab=계좌관리&atab=입출금·배당` → `atab=내역&history=현금 흐름`
  * - `/assets?tab=계좌관리&atab=기간별 매수` → `atab=내역&history=매수 내역`
+ * - `/invest-plan?tab=적립 계획#fx-plan` → `tab=환전`(환전 계획이 적립 탭 카드에서 별도 탭으로, plans/149)
  */
 import type { AccountHistorySegment, InvestPlanTab } from "@/constants/tabs";
 
@@ -27,4 +28,9 @@ const LEGACY_HISTORY_ATABS: Record<string, AccountHistorySegment> = {
 /** 옛 계좌관리 하위탭(atab)이면 새 "내역" 탭의 세그먼트 이름을, 아니면 null을 돌려준다. */
 export function legacyHistorySegment(atab: string | null): AccountHistorySegment | null {
   return atab ? (LEGACY_HISTORY_ATABS[atab] ?? null) : null;
+}
+
+/** 옛 환전 계획 링크(적립 계획 탭 + `#fx-plan` 해시)면 "환전" 탭을, 아니면 null을 돌려준다. */
+export function legacyInvestPlanTab(tab: string | null, hash: string): InvestPlanTab | null {
+  return tab === ("적립 계획" satisfies InvestPlanTab) && hash === "#fx-plan" ? "환전" : null;
 }

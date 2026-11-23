@@ -17,7 +17,7 @@ export const ASSETS_TOP_TABS = ["투자현황", "계좌관리"] as const;
 export type AssetsTopTab = (typeof ASSETS_TOP_TABS)[number];
 
 /** 계획(`/invest-plan?tab=`) */
-export const INVEST_PLAN_TABS = ["적립 계획", "배당 계획", "절세", "챌린지"] as const;
+export const INVEST_PLAN_TABS = ["적립 계획", "환전", "배당 계획", "절세", "챌린지"] as const;
 export type InvestPlanTab = (typeof INVEST_PLAN_TABS)[number];
 
 /** 계획 › 절세(`?taxTab=`) */

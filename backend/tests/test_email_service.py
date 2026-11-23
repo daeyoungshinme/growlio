@@ -114,7 +114,7 @@ async def test_send_exchange_rate_alert_plan_tranche_has_amount_and_link(monkeyp
 
     assert "$500" in captured["subject"]
     assert "645,000원" in captured["html"]
-    assert "https://app.test/invest-plan?tab=%EC%A0%81%EB%A6%BD+%EA%B3%84%ED%9A%8D#fx-plan" in captured["html"]
+    assert "https://app.test/invest-plan?tab=%ED%99%98%EC%A0%84" in captured["html"]
 
 
 @pytest.mark.asyncio
