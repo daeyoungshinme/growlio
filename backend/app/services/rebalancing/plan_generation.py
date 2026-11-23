@@ -372,6 +372,21 @@ async def _dca_items_for_alert(
     반환 모양은 `_drifting_items_for_alert`와 같다(analysis, overview, items). items는 분석 행의 사본이다.
     매수만이라 세금 게이트는 건너뛴다(호출부 `sells_allowed`).
     """
+    return await dca_items_for_amount(alert, portfolio, db, buy_account_id, cache, float(alert.dca_amount_krw or 0))
+
+
+async def dca_items_for_amount(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    db: AsyncSession,
+    buy_account_id: uuid.UUID | None,
+    cache: Any,
+    amount_krw: float,
+) -> tuple[Any, Any, list] | None:
+    """`amount_krw`를 이 알림의 계좌 범위·분할 규칙(목표 비중/GAP_FIRST)대로 종목별 매수 행으로 나눈다.
+
+    정액 적립(`_dca_items_for_alert`)과 낙폭 추매 안내(`dip_buy_service`, 주문 없음)가 같이 쓴다.
+    """
     from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
     from app.services.rebalancing.dca_allocation import allocate_dca_amount, dca_buy_rows, dca_row_current_values
 
@@ -388,11 +403,11 @@ async def _dca_items_for_alert(
     current_values = (
         dca_row_current_values(analysis.items, buy_tax_type) if alert.dca_allocation_mode == "GAP_FIRST" else None
     )
-    allocation = allocate_dca_amount(rows, float(alert.dca_amount_krw or 0), current_values)
+    allocation = allocate_dca_amount(rows, amount_krw, current_values)
     logger.info(
         "dca_plan_allocated",
         alert_id=str(alert.id),
-        amount_krw=float(alert.dca_amount_krw or 0),
+        amount_krw=amount_krw,
         allocation_mode=alert.dca_allocation_mode,
         spent_krw=allocation.spent_krw,
         items=len(allocation.items),

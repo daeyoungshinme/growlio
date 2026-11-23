@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { REFETCH_INTERVAL, STALE_TIME } from "@/constants/queryConfig";
 import { fetchAccounts, fetchExchangeRate } from "@/api/assets";
+import { fetchDipBuyStatus } from "@/api/dipBuy";
 import { fetchExchangeRateAlerts, fetchRebalancingAlerts } from "@/api/alerts";
 import { fetchPortfolioOverviewLite, fetchPortfolios } from "@/api/portfolios";
 import { fetchSettings } from "@/api/settings";
@@ -171,3 +172,10 @@ export const fxPlanQuery = (months: number, portfolioId: string | null) =>
     queryFn: () => fetchFxPlan(months, portfolioId),
     staleTime: STALE_TIME.FIVE_MINUTES,
   });
+
+/** 낙폭 추매 안내 — 지수 낙폭·구간 상태·이번 추매 금액과 종목(plans/147). 시세 조회가 있어 5분 */
+export const dipBuyQuery = queryOptions({
+  queryKey: QUERY_KEYS.dipBuy,
+  queryFn: fetchDipBuyStatus,
+  staleTime: STALE_TIME.FIVE_MINUTES,
+});

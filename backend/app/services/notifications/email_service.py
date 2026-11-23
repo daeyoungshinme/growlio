@@ -29,6 +29,7 @@ from app.services.notifications.email_templates import (
     daily_value_cap_gate_blocked_template,
     dca_cash_shortfall_template,
     dca_fx_required_template,
+    dip_buy_template,
     exchange_rate_alert_template,
     goal_achievement_template,
     market_signal_change_template,
@@ -117,6 +118,11 @@ def fx_plan_link() -> str:
     INVEST_PLAN_TABS와 같아야 한다. 메일 href라 공백·한글을 인코딩한다(`_rebalancing_link`와 같은 방식).
     `#fx-plan`은 카드를 펼치고 스크롤하는 해시(프론트 InvestPlanPage `FX_PLAN_ANCHOR`)."""
     return f"{settings.frontend_url}/invest-plan?{urlencode({'tab': '적립 계획'})}#fx-plan"
+
+
+def dip_buy_link() -> str:
+    """앱 계획 › 적립 계획의 낙폭 추매 카드 링크. `#dip-buy`는 프론트 InvestPlanPage `DIP_BUY_ANCHOR`와 같아야 한다."""
+    return f"{settings.frontend_url}/invest-plan?{urlencode({'tab': '적립 계획'})}#dip-buy"
 
 
 def _rebalancing_link(tab: str, **params: str) -> str:
@@ -574,4 +580,34 @@ async def send_dca_cash_shortfall_email(
         ),
         event="dca_cash_shortfall",
         portfolio_name=portfolio_name,
+    )
+
+
+async def send_dip_buy_email(
+    to_email: str,
+    portfolio_name: str,
+    phase: str,
+    run_date_label: str,
+    index_ticker: str,
+    drawdown_pct: float | None,
+    amount_krw: float,
+    items: list[tuple[str, float, float, float | None]],
+    reserve_krw: float,
+) -> bool:
+    """낙폭 추매 안내 이메일(plans/147). 발송 성공 시 True, 미설정/실패 시 False."""
+    return await _send_templated(
+        to_email,
+        lambda: dip_buy_template(
+            portfolio_name,
+            phase,
+            run_date_label,
+            index_ticker,
+            drawdown_pct,
+            amount_krw,
+            items,
+            reserve_krw,
+            dip_buy_link(),
+        ),
+        event="dip_buy",
+        phase=phase,
     )

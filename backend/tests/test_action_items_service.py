@@ -98,6 +98,7 @@ async def _run(
     fx_waiting=None,
     fx_plan_alerts=(),
     rec_drift=None,
+    dip_buy=None,
 ):
     db = MagicMock()
     db.rollback = AsyncMock()
@@ -127,6 +128,7 @@ async def _run(
             "app.services.alerts.recommendation_drift_alert_service.peek_drifted_portfolios",
             new=rec_drift or AsyncMock(return_value=[]),
         ),
+        patch("app.services.dip_buy_service.summarize_user_plans", new=dip_buy or AsyncMock(return_value=[])),
     ):
         items = await svc.get_action_items(uuid.uuid4(), db, None)
     return items, db
@@ -434,3 +436,45 @@ async def test_tax_source_cached_between_calls():
         await invalidate_tax_action_items_cache(cache, user_id)
         await svc._tax_items(user_id, MagicMock(), cache)
         assert tax.await_count == 2
+
+
+def _dip_summary(*, due=3_000_000.0, run=date(2026, 11, 25), dd=-21.4):
+    return SimpleNamespace(
+        plan=SimpleNamespace(id=uuid.uuid4(), index_ticker="QQQ"),
+        portfolio=SimpleNamespace(name="나스닥 적립"),
+        due_amount_krw=due,
+        next_run_date=run,
+        drawdown_pct=dd,
+    )
+
+
+@pytest.mark.asyncio
+async def test_dip_buy_row_within_three_days():
+    """plans/147 — 적립일 3일 안 추매 금액이 있으면 1행(카드 해시 링크)."""
+    items, _ = await _run(dip_buy=AsyncMock(return_value=[_dip_summary()]))
+    assert [i.kind for i in items] == ["DIP_BUY"]
+    assert items[0].title == "11월 25일 적립일 추매 3,000,000원"
+    assert items[0].priority == "MEDIUM"
+    assert items[0].link == "/invest-plan?tab=적립 계획#dip-buy"
+    assert "-21.4%" in items[0].detail
+
+
+@pytest.mark.asyncio
+async def test_dip_buy_row_today_is_high():
+    items, _ = await _run(dip_buy=AsyncMock(return_value=[_dip_summary(run=date(2026, 11, 23))]))
+    assert items[0].title.startswith("오늘 적립일 추매")
+    assert items[0].priority == "HIGH"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "summary",
+    [
+        _dip_summary(due=0.0),
+        _dip_summary(run=date(2026, 11, 27)),
+        _dip_summary(run=None),
+    ],
+)
+async def test_dip_buy_no_row(summary):
+    items, _ = await _run(dip_buy=AsyncMock(return_value=[summary]))
+    assert items == []

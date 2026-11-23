@@ -8,6 +8,7 @@
 - REBALANCE: 비중 이탈이 임계값을 넘은 포트폴리오 (`get_drift_summaries` — `/rebalancing/drift-summary`와 같은 판정).
   2개 이상이면 1행으로 묶는다 — 포트폴리오별 행이 상한 5건을 차지해 다른 할 일을 밀어내지 않게(docs/plans/73).
 - DCA_SHORTFALL: 정기 적립식 자동매수 다음 실행일 기준 예수금 부족 (`find_dca_cash_shortfalls` — 18:30 잡과 같은 판정)
+- DIP_BUY: 낙폭 추매 안내(plans/147) — 적립일 3일 안이고 여윳돈 추매 금액이 있는 포트폴리오(18:40·08:10 잡과 같은 판정)
 - FX_PLAN: 최근 발동한 달러 환전 계획 구간 알림(plans/121) — 환전할 금액. 발동 후 `FX_PLAN_ACTION_DAYS`일 동안 보인다
 - TAX_WARNING: 건보 피부양자·금융소득 종합과세·국내 대주주 경고 (세금 추정 요약)
 - TAX_ACTION: 절세 액션 플랜 1순위 (손실수확도 이 플랜의 한 카테고리라 별도 항목을 만들지 않는다)
@@ -63,6 +64,10 @@ _LINK_CHALLENGE = "/invest-plan?tab=챌린지"
 _LINK_DCA_PLAN = "/invest-plan?tab=적립 계획"
 # 환전 계획 카드를 펼치고 스크롤한다 — 프론트 `FX_PLAN_ANCHOR`(InvestPlanPage)와 같은 해시
 _LINK_FX_PLAN = "/invest-plan?tab=적립 계획#fx-plan"
+# 낙폭 추매 카드를 펼치고 스크롤한다 — 프론트 `DIP_BUY_ANCHOR`(InvestPlanPage)·`email_service.dip_buy_link`와 같은 해시
+_LINK_DIP_BUY = "/invest-plan?tab=적립 계획#dip-buy"
+DIP_BUY_ACTION_DAYS = 3
+"""적립일까지 남은 일수가 이 값 이하(당일 포함)일 때만 추매 행을 띄운다 — 사전 알림 창(1~3일)과 같다."""
 """환전 계획 구간 알림이 발동한 뒤 "지금 할 일"에 남는 일수(오늘 포함) — 환전했는지는 알 수 없어 기간으로 끈다."""
 
 
@@ -237,6 +242,34 @@ async def _dca_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
             )
         )
     return items + await _fx_waiting_items(user_id, db)
+
+
+async def _dip_buy_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType) -> list[ActionItem]:
+    from app.services.dip_buy_service import summarize_user_plans
+
+    today = today_kst()
+    items: list[ActionItem] = []
+    for s in await summarize_user_plans(db, cache, user_id, allocate=False, active_only=True, today=today):
+        if s.due_amount_krw <= 0 or s.next_run_date is None:
+            continue
+        days = (s.next_run_date - today).days
+        if days > DIP_BUY_ACTION_DAYS:
+            continue
+        dd = f"{s.drawdown_pct:.1f}%" if s.drawdown_pct is not None else ""
+        when = "오늘" if days == 0 else f"{s.next_run_date.month}월 {s.next_run_date.day}일"
+        items.append(
+            ActionItem(
+                id=f"dip-buy:{s.plan.id}",
+                kind="DIP_BUY",
+                priority="HIGH" if days <= 1 else "MEDIUM",
+                title=f"{when} 적립일 추매 {s.due_amount_krw:,.0f}원",
+                detail=f"{s.portfolio.name} · {s.plan.index_ticker} 52주 고점 대비 {dd} · 여윳돈에서",
+                cta_label="종목 보기",
+                link=_LINK_DIP_BUY,
+                deadline=s.next_run_date.isoformat(),
+            )
+        )
+    return items
 
 
 async def _recent_fx_plan_alerts(user_id: uuid.UUID, db: AsyncSession) -> list[tuple[ExchangeRateAlert, str | None]]:
@@ -454,6 +487,7 @@ async def _recommendation_drift_items(user_id: uuid.UUID, db: AsyncSession, cach
 
 _SOURCES: list[tuple[str, _Source]] = [
     ("dca", _dca_items),
+    ("dip_buy", _dip_buy_items),
     ("fx_plan", _fx_plan_items),
     ("tax", _tax_items),
     ("challenge", _challenge_items),
@@ -466,6 +500,7 @@ _SOURCE_LABELS = {
     "rebalance": "리밸런싱",
     "recommendation": "추천 변화",
     "dca": "적립",
+    "dip_buy": "낙폭 추매",
     "fx_plan": "환전 계획",
     "tax": "세금",
     "challenge": "챌린지",
