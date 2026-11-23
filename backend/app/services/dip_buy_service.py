@@ -40,6 +40,7 @@ from app.services.dip_buy_calculator import (
     reserve_pool,
     rule_base,
     should_reset,
+    shrink_allocations,
     tier_statuses,
     validate_allocations,
     validate_tiers,
@@ -92,6 +93,8 @@ class UserDipBuySummary:
     next_notify_date: date | None  # MONTHLY_DAY일 때만
     dca_held_portfolios: list[str] = field(default_factory=list)
     has_candidates: bool = False
+    # 지수별 52주 고점 대비 낙폭 — 규칙이 없는 지수 카드도 낙폭을 보여주려고(조회 경로에서만 채움)
+    index_drawdowns: dict[str, float | None] = field(default_factory=dict)
 
     @property
     def active(self) -> bool:
@@ -281,7 +284,7 @@ async def summarize_user(
     today = today or today_kst()
     settings = await get_settings(db, user_id)
     rules = await list_rules(db, user_id)
-    drawdowns = await index_drawdowns(cache) if rules else {}
+    drawdowns = await index_drawdowns(cache) if rules or with_etfs else {}
     if any([reset_if_recovered(r, drawdowns.get(r.index_ticker)) for r in rules]):
         await db.commit()
     summaries = summarize_rules(settings, rules, drawdowns)
@@ -290,7 +293,9 @@ async def summarize_user(
         if settings is not None and settings.notify_mode == "MONTHLY_DAY" and settings.notify_day
         else None
     )
-    out = UserDipBuySummary(settings=settings, rules=summaries, next_notify_date=notify_day)
+    out = UserDipBuySummary(
+        settings=settings, rules=summaries, next_notify_date=notify_day, index_drawdowns=dict(drawdowns)
+    )
     if not rules:
         return out
     if with_etfs:
@@ -345,6 +350,22 @@ def _check_rule_input(tiers: list[dict], allocations: list[float]) -> None:
         raise BadRequestError(error)
 
 
+def _shrink_others(
+    others: list[DipBuyRule], allocation_pct: float, settings: DipBuySettings | None, all_rules: list[DipBuyRule]
+) -> None:
+    """새 배분이 들어가도록 다른 규칙 배분을 비율대로 줄인다. 사이클 중인 규칙은 기준액도 새 배분으로 다시 잡는다."""
+    shrunk = shrink_allocations([float(r.allocation_pct) for r in others], float(allocation_pct))
+    if shrunk is None:
+        raise BadRequestError("다른 규칙 배분을 1% 이상 남길 수 없어요. 배분을 더 낮춰주세요.")
+    pool = reserve_pool(float(settings.reserve_krw or 0) if settings else 0.0, [r.completed for r in all_rules])
+    for rule, pct in zip(others, shrunk, strict=True):
+        if pct == float(rule.allocation_pct):
+            continue
+        rule.allocation_pct = pct
+        if rule.cycle_base_krw is not None:
+            rule.cycle_base_krw = round(pool * pct / 100, 2)
+
+
 def _clean_tiers(tiers: list[dict]) -> list[dict]:
     return [{"drawdown_pct": float(t["drawdown_pct"]), "ratio_pct": float(t["ratio_pct"])} for t in tiers]
 
@@ -357,12 +378,17 @@ async def create_rule(
     allocation_pct: float,
     tiers: list[dict],
     is_active: bool,
+    shrink_others: bool = False,
 ) -> DipBuyRule:
-    if await get_settings(db, user_id) is None:
+    """`shrink_others`면 배분 합계가 100을 넘을 때 다른 규칙 배분을 비율대로 줄여 맞춘다(아니면 400)."""
+    settings = await get_settings(db, user_id)
+    if settings is None:
         raise BadRequestError("여윳돈을 먼저 정해주세요.")
     rules = await list_rules(db, user_id)
     if any(r.index_ticker == index_ticker for r in rules):
         raise ConflictError("이 지수의 추매 규칙이 이미 있어요.")
+    if shrink_others:
+        _shrink_others(rules, allocation_pct, settings, rules)
     _check_rule_input(tiers, [float(r.allocation_pct) for r in rules] + [float(allocation_pct)])
     rule = DipBuyRule(
         user_id=user_id,
@@ -395,6 +421,7 @@ async def update_rule(
     allocation_pct: float,
     tiers: list[dict],
     is_active: bool,
+    shrink_others: bool = False,
 ) -> DipBuyRule:
     rules = await list_rules(db, user_id)
     rule = next((r for r in rules if r.id == rule_id), None)
@@ -402,6 +429,8 @@ async def update_rule(
         raise NotFoundError("추매 규칙을 찾을 수 없습니다")
     if any(r.index_ticker == index_ticker and r.id != rule_id for r in rules):
         raise ConflictError("이 지수의 추매 규칙이 이미 있어요.")
+    if shrink_others:
+        _shrink_others([r for r in rules if r.id != rule_id], allocation_pct, await get_settings(db, user_id), rules)
     _check_rule_input(tiers, [float(r.allocation_pct) for r in rules if r.id != rule_id] + [float(allocation_pct)])
     if index_ticker != rule.index_ticker:
         # 기준 지수를 바꾸면 이전 지수 기준의 사이클 기록은 의미가 없다

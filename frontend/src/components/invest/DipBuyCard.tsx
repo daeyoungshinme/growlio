@@ -5,6 +5,7 @@ import {
   completeDipBuy,
   DIP_BUY_INDEX_LABEL,
   DIP_BUY_INDEXES,
+  type DipBuyIndex,
   type DipBuyRule,
   type DipBuyStatus,
   type DipBuyTierState,
@@ -65,7 +66,8 @@ function notifyLabel(data: DipBuyStatus): string {
 export default function DipBuyCard() {
   const { data, isLoading, isError, refetch } = useQuery(dipBuyQuery);
   const [editingSettings, setEditingSettings] = useState(false);
-  const [editingRule, setEditingRule] = useState<DipBuyRule | "new" | null>(null);
+  // 기존 규칙 편집 또는 { index } = 그 지수 규칙 새로 추가
+  const [editingRule, setEditingRule] = useState<DipBuyRule | { index: DipBuyIndex } | null>(null);
 
   if (isLoading) return <SkeletonCard rows={4} height="h-5" />;
   if (isError && !data) {
@@ -85,8 +87,8 @@ export default function DipBuyCard() {
   const availableIndexes = DIP_BUY_INDEXES.filter((i) => !usedIndexes.has(i));
   const allocationTotal = rules.reduce((sum, r) => sum + r.allocation_pct, 0);
   const poolKrw = (settings?.reserve_krw ?? 0) + rules.reduce((sum, r) => sum + r.spent_krw, 0);
-  const otherAllocation = (rule: DipBuyRule | null) =>
-    rules.reduce((sum, r) => (r.id === rule?.id ? sum : sum + r.allocation_pct), 0);
+  const ruleByIndex = new Map(rules.map((r) => [r.index_ticker, r]));
+  const editing = editingRule && "id" in editingRule ? editingRule : null;
 
   return (
     <div className="space-y-4">
@@ -135,39 +137,85 @@ export default function DipBuyCard() {
         </p>
       )}
 
-      {rules.map((rule) => (
-        <DipBuyRuleView
-          key={rule.id}
-          rule={rule}
-          resetPct={resetPct}
-          hasCandidates={data?.has_candidates ?? false}
-          onEdit={() => setEditingRule(rule)}
-        />
-      ))}
-
-      {settings && availableIndexes.length > 0 && allocationTotal < 100 && (
-        <button
-          type="button"
-          onClick={() => setEditingRule("new")}
-          className={`${TOUCH_TARGET_MIN} w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800`}
-        >
-          {rules.length === 0 ? "추매 규칙 추가" : "다른 지수 규칙 추가"}
-        </button>
-      )}
+      {/* 지수마다 항상 한 칸 — 규칙이 없는 지수도 낙폭과 추가 버튼을 보여준다 */}
+      {DIP_BUY_INDEXES.map((index) => {
+        const rule = ruleByIndex.get(index);
+        return rule ? (
+          <DipBuyRuleView
+            key={index}
+            rule={rule}
+            resetPct={resetPct}
+            hasCandidates={data?.has_candidates ?? false}
+            onEdit={() => setEditingRule(rule)}
+          />
+        ) : (
+          <DipBuyEmptyIndex
+            key={index}
+            index={index}
+            drawdownPct={data?.index_drawdowns?.[index] ?? null}
+            canAdd={settings != null}
+            onAdd={() => setEditingRule({ index })}
+          />
+        );
+      })}
 
       {editingSettings && (
         <DipBuySettingsModal settings={settings} onClose={() => setEditingSettings(false)} />
       )}
       {editingRule && (
         <DipBuyRuleModal
-          rule={editingRule === "new" ? null : editingRule}
+          rule={editing}
+          initialIndex={"index" in editingRule ? editingRule.index : undefined}
           availableIndexes={availableIndexes}
-          otherAllocationPct={otherAllocation(editingRule === "new" ? null : editingRule)}
+          otherRules={rules.filter((r) => r.id !== editing?.id)}
           poolKrw={poolKrw}
           onClose={() => setEditingRule(null)}
         />
       )}
     </div>
+  );
+}
+
+function DipBuyEmptyIndex({
+  index,
+  drawdownPct,
+  canAdd,
+  onAdd,
+}: {
+  index: DipBuyIndex;
+  drawdownPct: number | null;
+  canAdd: boolean;
+  onAdd: () => void;
+}) {
+  return (
+    <section className="rounded-xl border border-dashed border-gray-300 dark:border-gray-600 p-4 space-y-2">
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 break-keep">
+          {DIP_BUY_INDEX_LABEL[index]}
+          <span className="ml-2 text-xs font-normal text-gray-400">규칙 없음</span>
+        </h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          52주 고점 대비{" "}
+          <span className="font-medium text-blue-600 dark:text-blue-400">
+            {fmtDrawdown(drawdownPct)}
+          </span>
+        </p>
+      </div>
+      {canAdd ? (
+        <button
+          type="button"
+          onClick={onAdd}
+          aria-label={`${DIP_BUY_INDEX_LABEL[index]} 규칙 추가`}
+          className={`${TOUCH_TARGET_MIN} w-full rounded-lg text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800`}
+        >
+          규칙 추가
+        </button>
+      ) : (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          여윳돈을 먼저 정하면 규칙을 추가할 수 있어요.
+        </p>
+      )}
+    </section>
   );
 }
 

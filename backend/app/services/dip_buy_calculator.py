@@ -15,6 +15,7 @@ plans/147 백테스트: 적립금을 줄여 모은 돈으로 추매하면 매달
 from __future__ import annotations
 
 import calendar
+import math
 from collections.abc import Callable, Iterable, Sequence
 from datetime import date, timedelta
 from typing import Literal, TypedDict
@@ -140,6 +141,25 @@ def validate_allocations(allocations: Sequence[float]) -> str | None:
     if sum(float(a) for a in allocations) > 100 + 1e-9:
         return "지수별 여윳돈 배분 합계는 100%를 넘을 수 없어요."
     return None
+
+
+def shrink_allocations(others: Sequence[float], new_pct: float) -> list[float] | None:
+    """새 규칙 배분(`new_pct`)을 넣으려고 다른 규칙들의 배분을 비율대로 줄인다 — 합계가 100을 넘을 때만.
+
+    소수 둘째 자리 내림이라 합계가 100을 넘지 않는다. 각 규칙은 1% 이상 남아야 하며, 그럴 수 없으면 None.
+    프론트 `utils/dipBuyAllocation.shrinkAllocations`와 같은 규칙.
+    """
+    current = [float(a) for a in others]
+    if sum(current) + float(new_pct) <= 100 + 1e-9:
+        return current
+    available = 100.0 - float(new_pct)
+    if available < len(current):
+        return None
+    total = sum(current)
+    shrunk = [math.floor(a * available / total * 100) / 100 for a in current]
+    if any(a < 1 for a in shrunk):
+        return None
+    return shrunk
 
 
 def next_notify_date(day: int, today: date, is_trading_day: Callable[[date], bool]) -> date:
