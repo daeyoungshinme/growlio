@@ -25,6 +25,7 @@ from app.core.cache_store import close_cache_store
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.logging import configure_logging, redact_secrets
+from app.core.request_metrics import reset_request_metrics, start_request_metrics
 from app.exceptions import (
     AppError,
     ProviderApiError,
@@ -105,6 +106,9 @@ app.include_router(router)
 async def add_request_id(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
     request.state.request_id = request_id
+    # 서비스 단계 로그(`*_timing`)를 같은 요청의 http_request 줄과 이어 보려고 묶는다
+    # — 요청마다 별도 task 컨텍스트라 다음 요청으로 새지 않는다
+    structlog.contextvars.bind_contextvars(request_id=request_id)
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     return response
@@ -144,7 +148,11 @@ def _route_label(request: Request) -> str:
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = time.monotonic()
-    response = await call_next(request)
+    metrics, token = start_request_metrics()
+    try:
+        response = await call_next(request)
+    finally:
+        reset_request_metrics(token)
     elapsed = time.monotonic() - start
     duration_ms = round(elapsed * 1000)
     request_id = getattr(request.state, "request_id", "-")
@@ -155,6 +163,8 @@ async def log_requests(request: Request, call_next):
         path=request.url.path,
         status=response.status_code,
         duration_ms=duration_ms,
+        db_queries=metrics.db_queries,
+        db_ms=round(metrics.db_ms),
         request_id=request_id,
     )
     http_request_duration.labels(

@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import DOMESTIC_MARKETS, POSITION_STOCK_ASSET_TYPES
+from app.core.timing import StepTimer
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services.accounts._account_queries import active_accounts_stmt
@@ -255,6 +256,7 @@ async def build_portfolio_overview(
     cached = await get_cached_json(cache, cache_key_fn(user_id, acct_suffix))
     if cached is not None:
         return cached
+    timer = StepTimer("portfolio_overview_timing", lite=lite, scope=acct_suffix)
 
     query = active_accounts_stmt(user_id).order_by(AssetAccount.sort_order, AssetAccount.created_at)
     if account_ids:
@@ -355,6 +357,7 @@ async def build_portfolio_overview(
     }
 
     await set_cached_json(cache, cache_key_fn(user_id, acct_suffix), overview, TTL_PORTFOLIO_OVERVIEW)
+    timer.log(accounts=len(accounts))
     return overview
 
 

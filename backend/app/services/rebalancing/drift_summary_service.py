@@ -13,6 +13,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import release_read_connection
+from app.core.timing import StepTimer
 from app.models.alert import RebalancingAlert
 from app.schemas.rebalancing import PortfolioDriftSummary
 from app.services._settings_queries import get_settings_row
@@ -93,6 +94,7 @@ async def get_drift_summaries(
     user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None
 ) -> list[PortfolioDriftSummary]:
     """모든 포트폴리오의 비중 이탈 현황 (배당·수익률 외부 API 미사용)."""
+    timer = StepTimer("drift_summary_timing")
     portfolios = await get_linked_portfolios(db, user_id)
     if not portfolios:
         return []
@@ -117,8 +119,10 @@ async def get_drift_summaries(
 
     # 복합 신호 알림을 끈 사용자는 시장 신호 캐시가 비어 있으면 여기서 처음 외부(FRED·Yahoo)를 조회한다 — 그동안
     # 읽기 트랜잭션 커넥션을 쥐지 않게 반납한다(이미 읽은 알림·포트폴리오 행은 expire_on_commit=False라 그대로)
+    timer.mark("prelude")
     await release_read_connection(db)
     confirmed_level, market_stale = await _market_levels(db, cache)
+    timer.mark("market")
     today = today_kst()
 
     # NOTE: build_portfolio_overview는 요청-스코프 AsyncSession(db)으로 DB를 조회하므로
@@ -192,4 +196,6 @@ async def get_drift_summaries(
                 logger.warning("drift_summary_recover_failed", user_id=str(user_id))
                 break
 
+    timer.mark("portfolios")
+    timer.log(portfolios=len(pending_ids), summaries=len(summaries))
     return summaries

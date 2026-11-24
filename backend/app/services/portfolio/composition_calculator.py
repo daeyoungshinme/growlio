@@ -8,6 +8,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import POSITION_STOCK_ASSET_TYPES
+from app.core.timing import StepTimer
 from app.enums import AssetType
 from app.models.asset import AssetAccount, Position
 from app.services.accounts._account_queries import active_accounts_stmt
@@ -86,6 +87,8 @@ async def build_asset_totals(
     """최신 스냅샷 기준 총자산·투자금·주식평가액·유형별 금액을 집계한다.
     Returns: (total_assets_krw, total_invested, stock_value, by_type)
     """
+    # 대시보드·DCA·챌린지가 각자 부른다(무캐시) — 한 요청·한 화면에서 몇 번 도는지 세려는 로그(plans/151)
+    timer = StepTimer("asset_totals_timing")
     usd_rate = await fetch_usd_krw(cache)
     rows, snapped_ids = await get_latest_snapshot_rows(user_id, db)  # Q1
 
@@ -154,6 +157,7 @@ async def build_asset_totals(
             by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
         total_assets_krw += amount
 
+    timer.log(accounts=len(rows) + len(no_snap_accounts))
     return total_assets_krw, total_invested, stock_value, by_type
 
 

@@ -53,7 +53,6 @@ MVO 최적화 엔진은 `goal_portfolio_optimizer.py`, 후보 종목 관리/영�
 from __future__ import annotations
 
 import asyncio
-import time
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -64,6 +63,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import MAX_GOAL_CANDIDATE_TICKERS
 from app.core.database import AsyncSessionLocal
 from app.core.job_runner import report_handled_failure
+from app.core.timing import StepTimer
 from app.enums import AccountTaxType
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation, PortfolioExpectedMetrics
@@ -395,14 +395,7 @@ async def _compute_goal_recommendation(
         return early_result
 
     # 단계별 소요 시간 — 어느 구간이 콜드 지연을 지배하는지 운영 로그로 확인하기 위함(plans/66)
-    started = time.perf_counter()
-    timings_ms: dict[str, int] = {}
-
-    def _mark(stage: str) -> None:
-        nonlocal started
-        now = time.perf_counter()
-        timings_ms[f"{stage}_ms"] = round((now - started) * 1000)
-        started = now
+    timer = StepTimer("goal_recommendation_timing")
 
     candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
     if not candidate_dicts:
@@ -445,11 +438,11 @@ async def _compute_goal_recommendation(
         )
 
     tickers_only = [(c["ticker"], c["market"]) for c in computed_candidates]
-    _mark("candidates")
+    timer.mark("candidates")
     cagr_map, dividend_map, market_signal_level = await _fetch_overall_candidate_data(
         cache, tickers_only, cagr_lookback_years
     )
-    _mark("cagr_dividend_signal")
+    timer.mark("cagr_dividend_signal")
     filtered = _grc._candidates_with_cagr(computed_candidates, cagr_map, dividend_map, equity_vs_other=False)
     if len(filtered) < _MIN_CANDIDATES:
         result = _grc._no_recommendation(
@@ -463,7 +456,7 @@ async def _compute_goal_recommendation(
     returns_map = await _grc._fetch_candidate_returns(
         fetch_yf_daily_returns, filtered, include_cash_equivalent=False, cache=cache
     )
-    _mark("daily_returns")
+    timer.mark("daily_returns")
     missing_count = _grc._missing_candidate_count(len(computed_candidates), filtered, returns_map)
     items, expected_return_pct, expected_volatility_pct, opt_note = await _grc._run_goal_optimizer(
         filtered,
@@ -475,7 +468,7 @@ async def _compute_goal_recommendation(
         market_signal_level=market_signal_level,
         required_dividend_yield_pct=required_dividend_yield_pct,
     )
-    _mark("optimizer")
+    timer.mark("optimizer")
     expected_dividend_yield_pct = _gds._weighted_dividend_yield(items, dividend_map)
 
     result = GoalRecommendation(
@@ -495,10 +488,8 @@ async def _compute_goal_recommendation(
         market_signal_level=market_signal_level,
     )
     suggestion = await _suggest_dividend_candidates(expected_dividend_yield_pct)
-    _mark("dividend_suggest")
-    logger.info(
-        "goal_recommendation_timing", candidates=len(tickers_only), total_ms=sum(timings_ms.values()), **timings_ms
-    )
+    timer.mark("dividend_suggest")
+    timer.log(candidates=len(tickers_only))
     return _gds._apply_dividend_suggestions(result, suggestion)
 
 

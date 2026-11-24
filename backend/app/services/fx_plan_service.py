@@ -34,6 +34,7 @@ from app.constants import (
     uses_krw_overseas_order,
 )
 from app.core.database import release_read_connection
+from app.core.timing import elapsed_ms
 from app.exceptions import NotFoundError
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
@@ -419,7 +420,7 @@ async def get_fx_plan(
         "fx_plan_timing",
         status=result["status"],
         accounts=result.pop("_accounts", 0),
-        ms=_elapsed_ms(started),
+        ms=elapsed_ms(started),
     )
     return result
 
@@ -546,7 +547,3 @@ async def _build_fx_plan(
         _accounts=len(held),
     )
     return result
-
-
-def _elapsed_ms(started: float) -> int:
-    return round((time.perf_counter() - started) * 1000)
