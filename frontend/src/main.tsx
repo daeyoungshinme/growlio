@@ -14,7 +14,7 @@ import {
   PERSIST_CACHE_BUSTER,
   PERSIST_CACHE_KEY,
   FOCUS_REFETCH_MIN_AGE,
-  PERSIST_QUERY_KEYS,
+  persistQueryPrefixes,
   shouldPersistQuery,
 } from "./constants/queryConfig";
 import { getLocalStorageOrUndefined } from "./utils/safeStorage";
@@ -49,10 +49,9 @@ const queryClient = new QueryClient({
 
 // persist 대상은 gcTime을 maxAge(24h)와 맞춘다 — 기본 30분이면 다른 탭에 머무는 동안(또는 WebView가 백그라운드에
 // 살아 있는 동안) 관찰자 없는 홈 쿼리가 지워지고, persister가 그 상태를 저장해 다음 콜드 스타트가 빈 화면이 됐다
-// setQueryDefaults는 프리픽스로 맞추므로 goal-recommendation은 persist하는 overall만 — 기간별·연령대·중복 분석
-// 변형까지 하루 동안 메모리에 남기지 않는다(shouldPersistQuery와 같은 범위, plans/126 C5)
-for (const key of PERSIST_QUERY_KEYS) {
-  const prefix = key === "goal-recommendation" ? [key, "overall"] : [key];
+// setQueryDefaults는 프리픽스로 맞추므로 저장하는 변형만 — 기간별 추천·계좌별 overview까지 하루 동안 메모리에
+// 남기지 않는다(shouldPersistQuery와 같은 범위, plans/126 C5·151 A10)
+for (const prefix of persistQueryPrefixes()) {
   queryClient.setQueryDefaults(prefix, { gcTime: STALE_TIME.DAY });
 }
 

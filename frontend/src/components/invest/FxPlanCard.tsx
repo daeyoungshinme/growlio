@@ -16,7 +16,7 @@ import CollapsibleSection from "@/components/common/CollapsibleSection";
 import EmptyState from "@/components/common/EmptyState";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { fmtKrw, fmtPct, clampPct, fmtFxRate, fmtUsd, relativeTime } from "@/utils/format";
+import { fmtKrw, fmtPct, clampPct, fmtFxRate, fmtUsdWhole, relativeTime } from "@/utils/format";
 import { syncSharedUsdRate } from "@/utils/sharedUsdRate";
 import { isStockAccount, isSyncableAccount } from "@/utils/accounts";
 import { useSyncAccounts } from "@/hooks/useSyncAccounts";
@@ -51,8 +51,6 @@ const ZONE_LABEL: Record<FxZone, { text: string; className: string }> = {
     className: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
   },
 };
-
-const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
 
 const HELD_SOURCE_LABEL: Record<FxHeldUsdSource, string> = {
   SYNCED: "동기화 기준",

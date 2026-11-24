@@ -6,7 +6,6 @@ yfinance .info에서 P/E, P/B, 시가총액을 가져와 종목별·포트폴리
 
 from __future__ import annotations
 
-import asyncio
 import math
 import uuid
 from typing import Any
@@ -18,6 +17,7 @@ from sqlalchemy.orm import selectinload
 
 from app.schemas.service_dtypes import FactorData
 from app.services.market_data.market_data_fetcher import fetch_yf_close_series, fetch_yf_info
+from app.services.market_data.yahoo_price import run_yf_bounded
 from app.services.market_data.yahoo_price import to_yf_symbol as _to_yf_symbol
 from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import (
@@ -205,8 +205,7 @@ async def get_factor_analysis_for_portfolio(
 
     yf_symbols = [_to_yf_symbol(p["ticker"], p["market"]) for p in positions]
 
-    loop = asyncio.get_running_loop()
-    factor_data = await loop.run_in_executor(None, _sync_fetch_factor_data, yf_symbols)
+    factor_data = await run_yf_bounded(_sync_fetch_factor_data, yf_symbols)
 
     holdings = _build_holdings(positions, yf_symbols, weights, factor_data)
     result_data: dict = {
@@ -248,8 +247,7 @@ async def get_factor_analysis(
     yf_symbols = [_to_yf_symbol(p["ticker"], p["market"]) for p in positions]
     weights = [p["value_krw"] / total_value for p in positions]
 
-    loop = asyncio.get_running_loop()
-    factor_data = await loop.run_in_executor(None, _sync_fetch_factor_data, yf_symbols)
+    factor_data = await run_yf_bounded(_sync_fetch_factor_data, yf_symbols)
 
     holdings = _build_holdings(positions, yf_symbols, weights, factor_data)
     result_data: dict = {

@@ -390,7 +390,7 @@ async def _tax_plan_and_summary(
     user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
 ) -> tuple[TaxActionPlan, dict[str, Any]]:
     """세금 소스는 action-items에서 DB 왕복이 가장 많다 — 앱 시작 때 프리페치·카드·재진입이 겹쳐도 한 번만 계산하게
-    2분 캐시한다(plans/125 B1). 무효화는 `invalidate_tax_action_items_cache`."""
+    15분 캐시한다(plans/125 B1·151 A3). 무효화는 `invalidate_tax_action_items_cache`."""
     year = today_kst().year
     key = tax_action_items_key(user_id, year)
     cached = await get_cached_json(cache, key)

@@ -14,7 +14,7 @@ vi.mock("@/hooks/useRegisterRefresh", () => ({
 }));
 
 vi.mock("@/utils/queryInvalidation", () => ({
-  invalidateSyncData: vi.fn().mockResolvedValue(undefined),
+  refetchActiveData: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Lazy-loaded components

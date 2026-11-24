@@ -1,6 +1,6 @@
 # 계획 151 — 전체 속도 개선 (중복 계산·중복 호출·불필요 정보 정리)
 
-> 작성 2026-11-24. 상태: 배치 0 구현(운영 기준선 수집 대기). 배치 0 → A → B → C → D 순서, 배치별 PR.
+> 작성 2026-11-24. 상태: 배치 0 완료(PR #321), 배치 A 구현. 운영 기준선 수집 대기. 배치 0 → A → B → C → D 순서, 배치별 PR.
 
 ## Context
 
@@ -46,23 +46,23 @@
 | `asset_totals_timing` 요청당 횟수 | | | | |
 | `portfolio_overview_timing` 미스 횟수/요청 | | | | |
 
-## 배치 A — 빠른 개선 (리스크 낮음, 1 PR)
-백엔드
-1. `/stocks/price`·`/stocks/prices-batch`(`api/v1/stocks.py:95,135`)와 `positions.py:214`의 `refresh_usd_krw`(매번 Yahoo) → `get_live_or_cached_usd_krw`(미스일 때만).
-2. 시세 실패 음성 캐시: `price_service.py:149` 성공만 캐시 → 짧은 음성 TTL(10분, 배당 음성 캐시 패턴 재사용). `get_historical_returns`(`price_service.py:217-240`, 125 B6 잔여)도 동일.
-3. TTL 상향(무효화 훅이 이미 있는 것만): `TTL_TAX_ACTION_ITEMS` 120→900, `TTL_MONTHLY_TREND` 300→900 (`utils/cache_keys.py`). 동기화 시 무효화 경로 존재 재확인.
-4. 국내 시세 per-ticker gather 동시성 제한(`price_service.py:107-110`, `asyncio.Semaphore`) — 기본 스레드풀 포화로 인증(`deps.py:30` to_thread)까지 줄 서는 것 방지.
-5. `portfolio_optimizer.py:249`·`factor_service.py:209,252`가 `_yfinance_sem`을 우회 → 기존 세마포어 경유로 통일.
-6. 죽은 코드: `dip_buy_calculator.completed_tiers`, `insight_service.py:72` 잘못된 "병렬" docstring.
+## 배치 A — 빠른 개선 — 구현 2026-11-24
 
-프론트
-7. 환율 5분 폴링을 네이티브에서 끔(`api/queryOptions.ts:54`, 다른 폴링과 같은 조건 재사용).
-8. 홈 `ActionItemsCard.tsx:20-22,47` drift-summary를 그룹 행 **펼칠 때**만 조회.
-9. `PortfolioManageTab.tsx:111-114` drift-summary의 `/portfolios` 대기 게이트 제거(빈 배열 반환 확인됨).
-10. 영속화 범위 축소: `shouldPersistQuery`(`constants/queryConfig.ts:39`)가 `["portfolio-overview", accountId]` 전체 응답까지 24h 저장 → `lite`·`all`만.
-11. 데스크톱 "데이터 갱신" 버튼(`DashboardPage.tsx:89-96`)이 실제 동기화를 안 한다면 `invalidateSyncData`(27종) → `refetchActiveData`(125 D2와 동일). 동기화 버튼이면 유지.
-12. `FxPlanCard.tsx:197-204` 다른 기간 프리페치를 `dataUpdatedAt` 변화마다가 아니라 마운트당 1회/세그먼트 hover·focus 시로.
-13. 중복 포매터 정리: `PendingPlanRow.tsx:95` 로컬 `fmtUsd`→`fmtUsdPrice`, `fmtUsdWhole` 2중 정의(`FxPlanCard.tsx:55`·`FxExtraNeedsSection.tsx:35`)→`utils/format.ts`, `ExchangeRateAlertSection.tsx` `toLocaleString`→`fmtFxRate`, `ChartTrendList.tsx:13` `fmtNum`. `ExchangeRateAlertSection.tsx:41-48` 쿼리 재정의→`exchangeRateAlertsQuery`. 미사용 `isRetryableError`(`api/retryPolicy.ts`) 삭제.
+| # | 내용 | 결과 |
+|---|---|---|
+| 1 | `/stocks/price`·`prices-batch`(`_price_entries`)가 해외 종목마다 `refresh_usd_krw`(매번 Yahoo) | `get_live_or_cached_usd_krw`(캐시 우선). `/stocks/exchange-rate`는 원래 캐시 우선. `positions.py` 수동 현재가 동기화는 **유지** — 사용자가 누르는 쓰기 경로이고 스냅샷에 남길 환율이라 실시간이 맞다 |
+| 2 | 시세 실패 음성 캐시 | 현재가: 별도 키 `price_miss_key`(10분, `TTL_PRICE_MISS`) — 표식이 있으면 Naver·pykrx·Yahoo를 건너뛰고 **KIS는 계속 시도**(계좌마다 결과가 다름). 기간 수익률: 같은 키에 `PRICE_RETURN_MISS`("null", 10분) |
+| 3 | TTL | `TTL_TAX_ACTION_ITEMS` 120→900(입력 변경 무효화 전부 확인). `TTL_MONTHLY_TREND`는 **변경 안 함** — 호출부가 대시보드 계산(자체 15분 캐시)과 nestlio뿐이라 늘려도 효과 없음 |
+| 4 | 국내 시세 per-ticker 스레드 무제한 | `_domestic_price_sem`(4) — Yahoo 슬롯과 분리(긴 yf 다운로드 뒤에 줄 서지 않게) |
+| 5 | 팩터·프론티어가 `_yfinance_sem` 우회 | 조회만 `run_yf_bounded`로. 순수 계산 executor는 그대로 |
+| 6 | 죽은 코드 | `dip_buy_calculator.completed_tiers` 삭제, `insight_service` "병렬" docstring 수정. 감사가 지목한 `isRetryableError`는 `shouldRetryQuery`가 쓰므로 **유지** |
+| 7 | 네이티브 환율 5분 폴링 | **하지 않음** — 계획134가 "전역 환율 미갱신"을 고치려고 넣은 폴링이고, 백엔드는 캐시 우선이라 요청 비용이 거의 없다 |
+| 8 | 홈 묶음 행이 마운트 시 drift-summary | 펼칠 때만 조회(로딩 중 `SkeletonCard`) |
+| 9 | `PortfolioManageTab` drift-summary가 `/portfolios` 대기 | 대기 제거(서버가 빈 목록이면 `[]`) |
+| 10 | 계좌별 전체 overview까지 24h persist | `PERSIST_SUBKEYS`로 overview는 `lite`·`all`만, gcTime 프리픽스는 `persistQueryPrefixes()`로 같은 범위 |
+| 11 | 홈 "데이터 갱신"이 `invalidateSyncData`(27종) | 증권사 동기화가 아니라 다시 받기라 `refetchActiveData` |
+| 12 | 환전 계획 다른 기간 프리페치 | **하지 않음** — 프리페치는 124의 즉시 전환, `dataUpdatedAt` 재프리페치는 128 A4(동기화 뒤 다른 기간 탭 옛 달러) 수정이고 신선 캐시는 이미 건너뛴다 |
+| 13 | 중복 포매터 | `fmtUsdWhole` 2중 정의 → `utils/format.ts`, 환율 알림 화면 `toLocaleString` → `fmtFxRate`. `PendingPlanRow` 로컬 `fmtUsd`(쉼표+센트 고정)·`ChartTrendList` `fmtNum`은 같은 출력의 공용 함수가 없어 유지, `ExchangeRateAlertSection`의 쿼리는 `useAlertCrud`가 같은 키·함수로 받아 캐시 공유라 유지 |
 
 ## 배치 B — 홈 요청 통합 (중간, 1 PR)
 1. `/dashboard` 응답에 홈 히어로용 `total_stock_krw`·`unrealized_pnl_krw`(+기존 `stock_return_pct`)와 목표 진행 `goal_progress_pct`(dca `goal_timeline.current_progress_pct`와 같은 정의) 추가 → `HeroSummaryCard.tsx:149-162`·`InvestmentGoalCard.tsx:48-50`이 `/dashboard`만 사용. 홈에서 `/portfolio/overview?lite`·`/invest/dca-analysis` 조회 제거(계좌관리 탭의 lite 사용은 유지), `prefetch.ts`에서도 제거(7→5).

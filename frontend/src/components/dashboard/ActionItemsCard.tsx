@@ -16,9 +16,10 @@ const VISIBLE_LIMIT = 3;
 
 type MarketSignal = MarketSignalResponse | null | undefined;
 
-// 리밸런싱 탭과 같은 queryKey — 캐시 공유. 묶음 행이 있을 때만 조회한다
-function useDriftSummaries() {
-  return useQuery(driftSummaryQuery).data;
+// 리밸런싱 탭과 같은 queryKey — 캐시 공유. 묶음 행을 펼쳤을 때만 조회한다: 이탈 요약은 포트폴리오마다
+// overview를 다시 계산하는 무거운 요청이라, 펼치지도 않을 홈 진입마다 보내지 않는다(plans/151 A8)
+function useDriftSummaries(enabled: boolean) {
+  return useQuery({ ...driftSummaryQuery, enabled });
 }
 
 /** 리밸런싱 행 제목 옆 시장 신호 — 이탈을 지금 처리할지 판단할 때 함께 보는 정보라 리밸런싱 행에만 둔다(docs/plans/73) */
@@ -44,7 +45,7 @@ function RebalanceGroupRow({
   marketSignal: MarketSignal;
 }) {
   const [expanded, toggleExpanded] = useCollapsible(false);
-  const driftSummaries = useDriftSummaries();
+  const { data: driftSummaries, isLoading: driftLoading } = useDriftSummaries(expanded);
   const drifted = (driftSummaries ?? [])
     .filter((s) => s.needs_rebalancing)
     .sort((a, b) => b.max_drift_pct - a.max_drift_pct);
@@ -81,7 +82,11 @@ function RebalanceGroupRow({
       </button>
       {expanded && (
         <ul className="-mt-1 mb-2 ml-3 pl-3 border-l-2 border-red-100 dark:border-red-900/40">
-          {drifted.length === 0 ? (
+          {driftLoading ? (
+            <li className="py-1.5">
+              <SkeletonCard rows={1} height="h-3" />
+            </li>
+          ) : drifted.length === 0 ? (
             <li>
               <Link
                 to={item.link}

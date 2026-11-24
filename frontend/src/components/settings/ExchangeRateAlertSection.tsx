@@ -8,7 +8,7 @@ import {
   isFxPlanAlert,
   type ExchangeRateAlert,
 } from "@/api/alerts";
-import { fmtUsd } from "@/utils/format";
+import { fmtFxRate, fmtUsd } from "@/utils/format";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
 import {
@@ -68,7 +68,7 @@ export function ExchangeRateAlertSection() {
         <p className="text-sm text-gray-500 dark:text-gray-400">
           현재 환율:{" "}
           <span className="font-semibold text-gray-800 dark:text-gray-100">
-            {usdKrw.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} 원
+            {fmtFxRate(usdKrw)}
           </span>
         </p>
       )}
@@ -142,7 +142,7 @@ export function ExchangeRateAlertSection() {
             >
               <div className="text-sm min-w-0">
                 <span className="font-medium text-gray-800 dark:text-gray-100">
-                  {Number(alert.target_rate).toLocaleString("ko-KR")}원{" "}
+                  {fmtFxRate(Number(alert.target_rate))}{" "}
                   {alert.direction === "BELOW" ? "이하" : "이상"}
                 </span>
                 <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
@@ -190,7 +190,7 @@ export function ExchangeRateAlertSection() {
       )}
       {pendingDelete && (
         <ConfirmModal
-          message={`환율 ${Number(pendingDelete.target_rate).toLocaleString("ko-KR")}원 ${pendingDelete.direction === "BELOW" ? "이하" : "이상"} 알림을 삭제할까요?`}
+          message={`환율 ${fmtFxRate(Number(pendingDelete.target_rate))} ${pendingDelete.direction === "BELOW" ? "이하" : "이상"} 알림을 삭제할까요?`}
           confirmLabel="삭제"
           onConfirm={() => {
             deleteAlertMutation.mutate(pendingDelete.id);

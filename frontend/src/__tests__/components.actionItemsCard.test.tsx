@@ -207,6 +207,8 @@ describe("ActionItemsCard — 홈 지금 할 일 (docs/plans/50 M5)", () => {
       const toggle = await screen.findByRole("button", { name: /리밸런싱 필요 · 포트폴리오 2개/ });
       expect(toggle).toHaveAttribute("aria-expanded", "false");
       expect(screen.queryByText("성장형")).not.toBeInTheDocument();
+      // 접힌 동안은 무거운 이탈 요약을 받지 않는다(plans/151 A8)
+      expect(fetchDriftSummary).not.toHaveBeenCalled();
 
       fireEvent.click(toggle);
       expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -227,7 +229,7 @@ describe("ActionItemsCard — 홈 지금 할 일 (docs/plans/50 M5)", () => {
       fetchActionItems.mockResolvedValue([rebalanceGroup]);
       renderCard();
       fireEvent.click(await screen.findByRole("button", { name: /리밸런싱 필요/ }));
-      expect(screen.getByRole("link", { name: /리밸런싱 탭에서 보기/ })).toHaveAttribute(
+      expect(await screen.findByRole("link", { name: /리밸런싱 탭에서 보기/ })).toHaveAttribute(
         "href",
         "/rebalancing",
       );

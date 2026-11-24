@@ -31,7 +31,7 @@ from app.utils.cache_keys import (
 from app.utils.cache_keys import (
     USD_KRW_RATE as _USD_KRW_KEY,
 )
-from app.utils.currency import refresh_usd_krw
+from app.utils.currency import get_live_or_cached_usd_krw, refresh_usd_krw
 
 logger = structlog.get_logger()
 
@@ -132,7 +132,8 @@ async def _price_entries(
 
     usd_rate = 0.0
     if any(m in OVERSEAS_MARKETS and price_map.get(t) for t, m in tickers):
-        usd_rate, _is_live = await refresh_usd_krw(cache)
+        # 환율 캐시(5분 알림 잡·홈 조회가 갱신)가 있으면 그대로 — 매 요청 Yahoo 왕복을 하지 않는다(plans/151 A1)
+        usd_rate, _is_live = await get_live_or_cached_usd_krw(cache)
 
     result: dict[str, dict] = {}
     for ticker, market in tickers:

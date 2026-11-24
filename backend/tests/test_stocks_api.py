@@ -584,6 +584,27 @@ class TestStockPricesBatch:
         assert body["price_usd"] == 200.0
         assert body["price_krw"] == 280_000
 
+    def test_cached_rate_skips_yahoo_fx_call(self, override_settings, auth_app):
+        """환율 캐시가 있으면 매 요청 Yahoo 환율을 다시 받지 않는다(plans/151 A1)."""
+        from app.core.cache_store import get_cache_store
+        from app.utils.currency import cache_usd_krw_rate
+
+        app, _, _ = auth_app
+
+        async def _seed() -> None:
+            await cache_usd_krw_rate(await get_cache_store(), 1390.0)
+
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch(_YAHOO_BATCH, return_value={"AAPL": 200.0}),
+            patch(_USDKRW, return_value=1400.0) as mock_fx,
+        ):
+            client.portal.call(_seed)  # 앱과 같은 이벤트 루프에서 전역 캐시를 채운다
+            resp = client.post("/api/v1/stocks/prices-batch", json={"items": [{"ticker": "AAPL", "market": "NASDAQ"}]})
+        assert resp.status_code == 200
+        assert resp.json()["AAPL"]["price_krw"] == 278_000
+        mock_fx.assert_not_called()
+
     def test_kis_fallback_only_for_ticker_with_account_id(self, override_settings, auth_app):
         app, user, db = auth_app
         account = _make_kis_account(user.id)

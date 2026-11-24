@@ -56,10 +56,6 @@ def tier_price(price: float, drawdown_pct: float | None, tier_drawdown_pct: floa
     return price * (1 - float(tier_drawdown_pct) / 100) / (1 + drawdown_pct / 100)
 
 
-def completed_tiers(completed: Sequence[dict] | None) -> set[int]:
-    return {int(c["tier"]) for c in completed or [] if "tier" in c}
-
-
 def cycle_spent(completed: Sequence[dict] | None) -> float:
     """이번 사이클에 이미 추매한 금액."""
     return sum(float(c.get("amount_krw") or 0) for c in completed or [])

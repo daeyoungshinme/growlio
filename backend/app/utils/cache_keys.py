@@ -26,6 +26,8 @@ def _env_prefix() -> str:
 # TTL 상수 (초)
 # ---------------------------------------------------------------------------
 TTL_PRICE_CURRENT = 900  # 현재가 15분
+# 공개 소스가 전부 실패한 현재가·기간 수익률 10분 — 상장폐지·비상장 코드가 매 요청 폴백 체인을 다시 돌지 않게
+TTL_PRICE_MISS = 600
 TTL_MONTHLY_TREND = 300  # 월별 추이 5분
 TTL_DASHBOARD_SUMMARY = 900  # 대시보드 전체 응답 15분 (sync 후 수동 무효화가 primary)
 TTL_DCA_ANALYSIS = 900  # DCA 분석 응답 15분 (대시보드와 동일 무효화 트리거 공유)
@@ -63,9 +65,9 @@ TTL_REBALANCING_AUTO_CLAIM = 2 * 86400  # AUTO 플랜 생성 claim — 일자 �
 TTL_JOB_LOCK_REBALANCING_PLAN_BUY = 300  # 리밸런싱 매수 대기 플랜 실행 분산 락 (1분 간격 job, 중복 실행 방지)
 TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
 TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
-# 홈 "지금 할 일"의 세금 소스(액션 플랜 + 세금 요약) — DB 왕복 수십 번이라 앱 시작 버스트만 흡수할 만큼 짧게.
-# 거래·매매기록·sync·계좌·소득 구간 변경은 무효화가 primary(plans/125 B1)
-TTL_TAX_ACTION_ITEMS = 120
+# 홈 "지금 할 일"의 세금 소스(액션 플랜 + 세금 요약) — DB 왕복 수십 번. 입력(거래·매매기록·sync·계좌·소득 구간)
+# 변경은 모두 무효화가 걸려 있어 TTL은 안전망이다 — 2분이면 홈 재진입마다 다시 계산했다(plans/125 B1, 151 A3)
+TTL_TAX_ACTION_ITEMS = 900
 TTL_TAX_OVERSEAS_REALIZED = 3600  # 해외 실현손익(KIS 기간손익 API) 1시간 — sync 시 무효화가 primary
 TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감지 마지막 값 (job이 계속 갱신, 만료는 안전망)
 TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저당 1일 1회 제한 플래그
@@ -139,8 +141,19 @@ def current_price_key(ticker: str, market: str) -> str:
     return f"{_env_prefix()}price:current:{ticker}:{market}"
 
 
+def price_miss_key(ticker: str, market: str) -> str:
+    """Naver·pykrx·Yahoo가 모두 실패한 현재가 표식(값 무관).
+
+    현재가 키와 분리해 그 키를 읽는 쪽이 표식을 가격으로 오해하지 않게 한다."""
+    return f"{_env_prefix()}price:miss:{ticker}:{market}"
+
+
 def price_return_key(years: int, ticker: str, market: str) -> str:
+    """값이 `PRICE_RETURN_MISS`면 조회 실패 표식(TTL_PRICE_MISS) — `get_historical_returns`만 읽는다."""
     return f"{_env_prefix()}return:{years}y:{ticker}:{market}"
+
+
+PRICE_RETURN_MISS = "null"
 
 
 def daily_returns_key(symbol: str, period_days: int = 365) -> str:
