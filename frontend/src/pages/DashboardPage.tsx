@@ -103,9 +103,6 @@ export default function DashboardPage() {
     isLoading,
     dataUpdatedAt,
     refetch,
-    overview,
-    dcaData,
-    dcaLoading,
     accounts,
     accountsLoading,
     accountsFailed,
@@ -154,7 +151,6 @@ export default function DashboardPage() {
         {/* Hero: 자산 현황 */}
         <ErrorBoundary variant="section">
           <HeroSummaryCard
-            overview={overview}
             data={data}
             exchangeRate={exchangeRate}
             dataUpdatedAt={dataUpdatedAt}
@@ -174,7 +170,7 @@ export default function DashboardPage() {
 
         {/* 투자 목표 달성 현황 */}
         <ErrorBoundary variant="section">
-          <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading || dcaLoading} />
+          <InvestmentGoalCard data={data} isLoading={isLoading} />
         </ErrorBoundary>
 
         {/* 적립 챌린지 진행 현황 — 기한이 남은 ACTIVE 챌린지가 있으면 진행률, 없으면 만들기 유도(닫기 가능).

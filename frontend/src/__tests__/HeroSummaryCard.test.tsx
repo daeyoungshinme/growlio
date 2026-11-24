@@ -2,9 +2,8 @@ import { describe, it, expect } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import type { DashboardData } from "@/api/dashboard";
+import type { DashboardData, DashboardStockPnl } from "@/api/dashboard";
 import { MemoryRouter } from "react-router-dom";
-import type { PortfolioOverview } from "@/types";
 import { portfolioUrl } from "@/utils/tabUrl";
 
 const baseDashboard: DashboardData = {
@@ -40,17 +39,17 @@ describe("HeroSummaryCard", () => {
     expect(screen.queryByText(/· 1.0억/)).toBeNull();
   });
 
-  describe("주식 평가손익", () => {
-    const overview = {
+  describe("주식 평가손익 — 대시보드 응답 stock_pnl(plans/151 B1)", () => {
+    const overview: DashboardStockPnl = {
       total_stock_krw: 80_000_000,
       unrealized_pnl_krw: 10_000_000,
-      stock_return_pct: 14.3,
-    } as PortfolioOverview;
+      return_pct: 14.3,
+    };
 
-    function renderHero(value: PortfolioOverview) {
+    function renderHero(value: DashboardStockPnl | null) {
       renderWithProviders(
         <MemoryRouter>
-          <HeroSummaryCard data={baseDashboard} overview={value} exchangeRate={1350} />
+          <HeroSummaryCard data={{ ...baseDashboard, stock_pnl: value }} exchangeRate={1350} />
         </MemoryRouter>,
       );
     }
@@ -73,6 +72,11 @@ describe("HeroSummaryCard", () => {
 
     it("보유 주식이 없으면 표시하지 않는다", () => {
       renderHero({ ...overview, total_stock_krw: 0 });
+      expect(screen.queryByText(/주식 평가손익/)).toBeNull();
+    });
+
+    it("옛 persist 캐시처럼 필드가 없으면 표시하지 않는다", () => {
+      renderHero(null);
       expect(screen.queryByText(/주식 평가손익/)).toBeNull();
     });
   });

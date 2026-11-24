@@ -13,7 +13,7 @@ import { useSyncAllWatcher } from "./hooks/useSyncAllWatcher";
 import { useWidget } from "./hooks/useWidget";
 import { useMainPageFetching } from "./hooks/usePortfolioTabFetching";
 import BiometricGuard from "./components/common/BiometricGuard";
-import { prefetchDashboardData as prefetchQueries } from "./api/prefetch";
+import { isHomeEntryPath, prefetchDashboardData as prefetchQueries } from "./api/prefetch";
 import { storageRemove } from "./utils/safeStorage";
 import { CACHE_OWNER_CHANGED_EVENT } from "./utils/cacheOwner";
 
@@ -115,6 +115,8 @@ export default function App() {
   }, [isDark]);
 
   const prefetchDashboardData = useCallback(() => {
+    // 딥링크로 다른 화면에 들어온 부팅이면 홈 데이터·청크를 받지 않는다(plans/151 B3)
+    if (!isHomeEntryPath(window.location.pathname)) return;
     prefetchQueries(queryClient);
     import("./pages/DashboardPage").catch(() => {});
   }, [queryClient]);

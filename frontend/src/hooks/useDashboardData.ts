@@ -3,16 +3,10 @@ import { useExchangeRate } from "./useExchangeRate";
 import { useChallenges } from "./useChallenges";
 import { REFETCH_INTERVAL } from "@/constants/queryConfig";
 import { isNativePlatform } from "@/utils/platform";
-import {
-  accountsQuery,
-  dashboardQuery,
-  dcaAnalysisQuery,
-  marketSignalQuery,
-  portfolioOverviewLiteQuery,
-} from "@/api/queryOptions";
+import { accountsQuery, dashboardQuery, marketSignalQuery } from "@/api/queryOptions";
 
 // 네이티브 앱은 포그라운드에 있는 동안만 쓰이고 복귀 시 갱신되므로 주기 폴링을 끈다(PortfolioPage와 동일) —
-// 화면을 켜 둔 채 두면 5분마다 대시보드·overview 재계산 요청이 이어졌다
+// 화면을 켜 둔 채 두면 5분마다 대시보드 재계산 요청이 이어졌다
 const DASHBOARD_POLL = isNativePlatform() ? false : REFETCH_INTERVAL.DASHBOARD;
 
 export function useDashboardData() {
@@ -22,13 +16,7 @@ export function useDashboardData() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: overview } = useQuery({
-    ...portfolioOverviewLiteQuery,
-    refetchInterval: DASHBOARD_POLL,
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: dcaData, isLoading: dcaLoading } = useQuery(dcaAnalysisQuery);
+  // 주식 평가손익(lite overview)·목표 달성 예상월(적립 분석)은 대시보드 응답에 함께 온다(plans/151 B1)
 
   const {
     data: accounts = [],
@@ -55,9 +43,6 @@ export function useDashboardData() {
     error,
     dataUpdatedAt,
     refetch,
-    overview,
-    dcaData,
-    dcaLoading,
     accounts,
     accountsLoading,
     accountsFailed,

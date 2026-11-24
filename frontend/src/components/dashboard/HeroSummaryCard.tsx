@@ -6,14 +6,12 @@ import { pnlColor, PIE_COLORS } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
 import { TOUCH_HEIGHT_MIN_MOBILE_ONLY, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { DashboardData } from "@/api/dashboard";
-import type { PortfolioOverview } from "@/types";
 import { portfolioUrl } from "@/utils/tabUrl";
 import MiniDonut from "@/components/common/MiniDonut";
 
 const CASH_TYPES = new Set(["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"]);
 interface Props {
   data: DashboardData | undefined;
-  overview?: PortfolioOverview | undefined;
   exchangeRate: number | null;
   dataUpdatedAt?: number;
   isLoading?: boolean;
@@ -23,7 +21,6 @@ interface Props {
 
 export default memo(function HeroSummaryCard({
   data,
-  overview,
   exchangeRate,
   dataUpdatedAt,
   isLoading,
@@ -33,6 +30,7 @@ export default memo(function HeroSummaryCard({
   // 금액은 기본 숨김, 탭하면 표시 — 남이 화면을 볼 수 있는 상황 대비. 저장하지 않아 홈에 올 때마다 다시 숨김
   const [amountVisible, setAmountVisible] = useState(false);
   const updatedLabel = dataUpdatedAt ? `${relativeTime(dataUpdatedAt)} 업데이트` : null;
+  const stockPnl = data?.stock_pnl;
 
   const allocationChartData = useMemo(() => {
     if (!data) return [];
@@ -146,20 +144,20 @@ export default memo(function HeroSummaryCard({
               </p>
             </div>
           </div>
-          {overview && overview.total_stock_krw > 0 && (
+          {stockPnl && stockPnl.total_stock_krw > 0 && (
             <Link to={portfolioUrl()} className={`block ${TOUCH_HEIGHT_MIN_MOBILE_ONLY} pt-1.5`}>
               <span className="block text-xs text-gray-500 dark:text-gray-400 font-medium">
                 주식 평가손익 <span className="font-normal">(매입원가 대비)</span>
               </span>
               <span
                 className={`block text-sm font-semibold tabular-nums ${
-                  overview.unrealized_pnl_krw === 0
+                  stockPnl.unrealized_pnl_krw === 0
                     ? "text-gray-400 dark:text-gray-500"
-                    : pnlColor(overview.unrealized_pnl_krw)
+                    : pnlColor(stockPnl.unrealized_pnl_krw)
                 }`}
               >
-                {amountVisible ? `${fmtSigned(overview.unrealized_pnl_krw, fmtKrw)}` : "••••••"} (
-                {fmtPct(overview.stock_return_pct, 1)})
+                {amountVisible ? `${fmtSigned(stockPnl.unrealized_pnl_krw, fmtKrw)}` : "••••••"} (
+                {fmtPct(stockPnl.return_pct, 1)})
               </span>
             </Link>
           )}

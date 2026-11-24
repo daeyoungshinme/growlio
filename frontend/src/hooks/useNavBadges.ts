@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeNudge } from "@/hooks/useChallengeNudge";
 import { actionItemsQuery, driftSummaryQuery } from "@/api/queryOptions";
 
@@ -37,13 +36,8 @@ export interface NavBadges {
 /** 하단 내비(모바일)·사이드바(데스크톱) 공용 빨간 점 판정 — 두 내비가 같은 기준을 쓰도록 한곳에서(plans/150 A4) */
 export function useNavBadges(): NavBadges {
   const rebalancingNeedsCount = useRebalancingNeedsCount();
-  const { data: challenges } = useChallenges();
-  const hasChallenges = (challenges?.length ?? 0) > 0;
-  const { data: challengeNudge } = useChallengeNudge(hasChallenges);
-  return {
-    rebalancingNeedsCount,
-    challengeNeedsAttention: challengeNudge?.needs_attention ?? false,
-  };
+  const challengeNeedsAttention = useChallengeNudge();
+  return { rebalancingNeedsCount, challengeNeedsAttention };
 }
 
 /** 배지 접근성 라벨 — 내비 항목 경로별. 배지가 없으면 null */

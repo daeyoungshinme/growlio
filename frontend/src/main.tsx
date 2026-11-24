@@ -22,7 +22,7 @@ import { removeLegacyDeviceKeys } from "./constants/storageKeys";
 import { setupPreloadErrorReload, setupServiceWorker } from "./lib/serviceWorker";
 import { initSentryDeferred } from "./lib/sentry";
 import { readValidStoredToken } from "./lib/storedSession";
-import { prefetchDashboardData } from "./api/prefetch";
+import { isHomeEntryPath, prefetchDashboardData } from "./api/prefetch";
 import { shouldRetryQuery, retryDelayMs } from "./api/retryPolicy";
 
 setupServiceWorker();
@@ -80,7 +80,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       // 복원 직후 저장 토큰이 유효하면 바로 홈 데이터를 받기 시작한다 — 예전엔 Supabase SDK(약 200KB) 로드와 getSession을
       // 기다린 뒤에야 시작했다(plans/125 C3). 복원된 신선한 쿼리는 prefetch가 건너뛰고, checkAuth의 같은 호출은 dedupe된다
       onSuccess={() => {
-        if (readValidStoredToken()) prefetchDashboardData(queryClient);
+        if (readValidStoredToken() && isHomeEntryPath(window.location.pathname))
+          prefetchDashboardData(queryClient);
       }}
     >
       <App />

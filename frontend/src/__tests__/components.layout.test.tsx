@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import type { Challenge, ChallengeSummary } from "@/api/challenges";
+import type { Challenge } from "@/api/challenges";
 
 // Mock all heavy hooks/dependencies
 vi.mock("@/hooks/usePullToRefresh", () => ({
@@ -40,10 +40,8 @@ vi.mock("@/stores/themeStore", () => ({
 }));
 
 const fetchChallengesMock = vi.fn();
-const fetchChallengeSummaryMock = vi.fn();
 vi.mock("@/api/challenges", () => ({
   fetchChallenges: (...args: unknown[]) => fetchChallengesMock(...args),
-  fetchChallengeSummary: (...args: unknown[]) => fetchChallengeSummaryMock(...args),
 }));
 
 const fetchDriftSummaryMock = vi.fn();
@@ -92,10 +90,9 @@ describe("BottomNav", () => {
 });
 
 // ------- BottomNav 챌린지 배지 게이팅 -------
-// 챌린지를 만든 적 없는 사용자가 앱을 켤 때마다 /challenges/summary를 불필요하게 호출하던
-// 문제 수정 검증 — 챌린지 목록이 비어있으면 summary 조회 자체를 건너뛰어야 한다.
-describe("BottomNav 챌린지 배지 게이팅", () => {
-  const makeChallenge = (): Challenge => ({
+// 배지는 /challenges/summary를 따로 부르지 않고 받아 둔 챌린지 목록으로 판정한다(plans/151 B4)
+describe("BottomNav 챌린지 배지", () => {
+  const makeChallenge = (satisfied: boolean): Challenge => ({
     id: "c1",
     title: "매달 50만원 적립",
     challenge_type: "DEPOSIT",
@@ -113,8 +110,8 @@ describe("BottomNav 챌린지 배지 게이팅", () => {
       progress_pct: 50,
       current_streak: 3,
       longest_streak: 3,
-      this_month_net_krw: 250_000,
-      this_month_satisfied: true,
+      this_month_net_krw: satisfied ? 250_000 : 0,
+      this_month_satisfied: satisfied,
       this_month_target_met: false,
       current_value_krw: null,
       current_return_pct: null,
@@ -124,41 +121,33 @@ describe("BottomNav 챌린지 배지 게이팅", () => {
 
   beforeEach(() => {
     fetchChallengesMock.mockReset();
-    fetchChallengeSummaryMock.mockReset();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 24, 12)); // 20일 이후
   });
 
-  it("챌린지가 없으면 summary 엔드포인트를 호출하지 않는다", async () => {
-    fetchChallengesMock.mockResolvedValue([]);
-    fetchChallengeSummaryMock.mockResolvedValue({
-      needs_attention: true,
-      count: 0,
-    } as ChallengeSummary);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
+  it("이번 달 순입금이 없는 입금 챌린지가 있으면 배지를 표시한다", async () => {
+    fetchChallengesMock.mockResolvedValue([makeChallenge(false)]);
     renderWithProviders(
       <MemoryRouter>
         <BottomNav />
       </MemoryRouter>,
     );
+    expect(await screen.findByLabelText("이번 달 적립 챌린지 미완료")).toBeDefined();
+  });
 
+  it("이번 달 입금했으면 배지가 없다", async () => {
+    fetchChallengesMock.mockResolvedValue([makeChallenge(true)]);
+    renderWithProviders(
+      <MemoryRouter>
+        <BottomNav />
+      </MemoryRouter>,
+    );
     await waitFor(() => expect(fetchChallengesMock).toHaveBeenCalled());
-    expect(fetchChallengeSummaryMock).not.toHaveBeenCalled();
-  });
-
-  it("챌린지가 있으면 summary 엔드포인트를 호출해 배지를 표시한다", async () => {
-    fetchChallengesMock.mockResolvedValue([makeChallenge()]);
-    fetchChallengeSummaryMock.mockResolvedValue({
-      needs_attention: true,
-      count: 1,
-    } as ChallengeSummary);
-
-    renderWithProviders(
-      <MemoryRouter>
-        <BottomNav />
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => expect(fetchChallengeSummaryMock).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByLabelText("이번 달 적립 챌린지 미완료")).toBeDefined());
+    expect(screen.queryByLabelText("이번 달 적립 챌린지 미완료")).toBeNull();
   });
 });
 

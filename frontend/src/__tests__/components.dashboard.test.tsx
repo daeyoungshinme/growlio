@@ -4,7 +4,6 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import type { DashboardData } from "@/api/dashboard";
-import type { DCAAnalysisData } from "@/api/invest";
 
 function renderGoalCard(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -36,28 +35,9 @@ const baseDashboard: DashboardData = {
   dividend_goal_achievement_pct: null,
 };
 
-function makeDcaData(expectedGoalDate: string | null): DCAAnalysisData {
-  return {
-    settings: {
-      monthly_deposit_amount: 500_000,
-      goal_annual_return_pct: 8,
-      goal_amount: 1_000_000_000,
-      goal_start_date: "2024-01-01",
-      goal_initial_amount: null,
-    },
-    projection_months: [],
-    yearly_achievements: [],
-    goal_timeline: {
-      months_to_goal: 120,
-      expected_goal_date: expectedGoalDate,
-      actual_expected_goal_date: expectedGoalDate,
-      current_progress_pct: 15.0,
-      on_track: true,
-      lead_lag_months: 0,
-      acceleration_scenarios: [],
-    },
-    is_configured: true,
-  };
+/** 달성 예상월은 대시보드 응답에 함께 온다(plans/151 B1) */
+function withExpectedMonth(month: string | null): DashboardData {
+  return { ...baseDashboard, goal_expected_month: month };
 }
 
 describe("InvestmentGoalCard", () => {
@@ -148,12 +128,12 @@ describe("InvestmentGoalCard", () => {
   });
 
   it("목표금액 도달 예상 시점이 은퇴 목표보다 빠르면 앞서 달성 배지를 표시한다", () => {
-    renderGoalCard(<InvestmentGoalCard data={baseDashboard} dcaData={makeDcaData("2045-03")} />);
+    renderGoalCard(<InvestmentGoalCard data={withExpectedMonth("2045-03")} />);
     expect(screen.getAllByText("5년 앞서 달성")[0]).toBeInTheDocument();
   });
 
   it("목표금액 도달 예상 시점이 은퇴 목표보다 늦으면 지연 예상 배지를 표시한다", () => {
-    renderGoalCard(<InvestmentGoalCard data={baseDashboard} dcaData={makeDcaData("2055-03")} />);
+    renderGoalCard(<InvestmentGoalCard data={withExpectedMonth("2055-03")} />);
     expect(screen.getAllByText("5년 지연 예상")[0]).toBeInTheDocument();
   });
 
@@ -234,7 +214,7 @@ describe("InvestmentGoalCard", () => {
   });
 
   it("자산 목표는 진행률·남은 금액·예상월 한 줄만 보이고 상세(앞섬/지연·막대)는 계획 탭에 맡긴다 — plans/150 B1", () => {
-    renderGoalCard(<InvestmentGoalCard data={baseDashboard} dcaData={makeDcaData("2045-03")} />);
+    renderGoalCard(<InvestmentGoalCard data={withExpectedMonth("2045-03")} />);
     expect(screen.getAllByText("15.0%")).toHaveLength(1);
     expect(screen.getByText(/달성 예상/)).toBeInTheDocument();
     expect(screen.queryByText("달성 예상일 · 진행 상세")).not.toBeInTheDocument();

@@ -8,16 +8,21 @@ from typing import Any
 
 import structlog
 from sqlalchemy import bindparam, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import POSITION_STOCK_ASSET_TYPES
+from app.core.job_runner import report_handled_failure
 from app.core.timing import StepTimer
+from app.models.user import UserSettings
 from app.services._settings_queries import get_settings_row
+from app.services.dca_service import compute_goal_expected_month
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.portfolio.composition_calculator import (
     build_asset_totals,
     exclude_real_estate,
 )
+from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.portfolio.returns_calculator import calc_returns
 from app.services.portfolio.returns_calculator import calc_xirr as _calc_xirr
 from app.utils.cache_keys import (
@@ -216,8 +221,7 @@ async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache
     ) = await _get_scalar_init_data(user_id, db)
     settings_row = await get_settings_row(db, user_id)
     timer.mark("init")
-    monthly_trend = await get_monthly_trend(user_id, db, cache)
-    timer.mark("monthly_trend")
+    # 월별 추이는 응답 스키마에 없다 — 월간 리포트 잡이 get_monthly_trend로 직접 읽는다(plans/151 B1)
     div_summary = await get_dividend_summary(user_id, db, cache)
     timer.mark("dividends")
 
@@ -296,7 +300,6 @@ async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache
         "goal_annual_return_pct": goal_annual_return_pct,
         "return_goal_gap_pct": return_goal_gap_pct,
         "retirement_target_year": retirement_target_year,
-        "monthly_trend": monthly_trend,
         "annual_deposit_goal": annual_deposit_goal,
         "annual_deposit_current": net_deposits_ytd,
         "deposit_achievement_pct": deposit_achievement_pct,
@@ -306,6 +309,40 @@ async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache
         "annual_dividend_goal": annual_dividend_goal,
         "dividend_goal_achievement_pct": dividend_goal_achievement_pct,
     }
+    result.update(await _home_extras(user_id, db, cache, settings_row if goal else None, investable_assets_krw))
+    timer.mark("home_extras")
     await set_cached_json(cache, dashboard_summary_key(user_id), result, TTL_DASHBOARD_SUMMARY)
     timer.log()
     return result
+
+
+async def _home_extras(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    cache: CacheStoreType,
+    goal_settings: UserSettings | None,
+    investable_assets_krw: float,
+) -> dict[str, Any]:
+    """홈이 따로 받던 두 응답(lite overview의 주식 평가손익, 적립 분석의 달성 예상월)을 대시보드에 싣는다 —
+    홈·부팅 요청을 둘 줄인다(plans/151 B1). 주식 평가손익은 자산 탭과 같은 overview 기준(스냅샷의 매입원가·평가손익)이라
+    `stock_return_pct`(포지션 현재가 재평가)와 따로 둔다. 실패해도 대시보드 본체는 그대로 내보낸다."""
+    extras: dict[str, Any] = {"stock_pnl": None, "goal_expected_month": None}
+    try:
+        overview = await build_portfolio_overview(user_id, db, cache=cache, lite=True, exclude_out_of_total=True)
+        if overview["total_stock_krw"] > 0:
+            extras["stock_pnl"] = {
+                "total_stock_krw": overview["total_stock_krw"],
+                "unrealized_pnl_krw": overview["unrealized_pnl_krw"],
+                "return_pct": overview["stock_return_pct"],
+            }
+        if goal_settings is not None:
+            extras["goal_expected_month"] = await compute_goal_expected_month(
+                user_id, db, goal_settings, investable_assets_krw
+            )
+    except SQLAlchemyError:
+        # 다른 집계 쿼리와 같게 올린다 — 여기서 rollback하면 같은 세션을 이어 쓰는 호출부(챌린지 루프 등)의
+        # ORM 객체가 만료돼 그쪽이 깨진다
+        raise
+    except Exception as e:
+        report_handled_failure("dashboard_home_extras_failed", e, user_id=str(user_id))
+    return extras

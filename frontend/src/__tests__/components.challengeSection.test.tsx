@@ -13,7 +13,6 @@ const toastMock = vi.fn();
 
 vi.mock("@/api/challenges", () => ({
   fetchChallenges: (...a: unknown[]) => fetchChallenges(...a),
-  fetchChallengeSummary: vi.fn(),
   createChallenge: (...a: unknown[]) => createChallenge(...a),
   updateChallenge: (...a: unknown[]) => updateChallenge(...a),
   deleteChallenge: (...a: unknown[]) => deleteChallenge(...a),

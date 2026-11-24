@@ -23,12 +23,13 @@ def _make_settings(enabled=True, notification_email=None):
     )
 
 
+_MOCK_TREND = [
+    {"month": "2026-05-01", "total_krw": 48_000_000},
+    {"month": "2026-06-01", "total_krw": 50_000_000},
+]
+
 _MOCK_SUMMARY = {
     "total_assets_krw": 50_000_000.0,
-    "monthly_trend": [
-        {"month": "2026-05-01", "total_krw": 48_000_000},
-        {"month": "2026-06-01", "total_krw": 50_000_000},
-    ],
     "annual_return_pct": 5.0,
     "xirr_pct": 4.8,
     "goal_amount": 100_000_000,
@@ -45,6 +46,13 @@ def _email_configured():
     """발송 경로 테스트는 메일이 설정된 상태를 전제로 한다(미설정 조기 종료는 별도 테스트)."""
     with patch("app.jobs.monthly_report.email_configured", return_value=True):
         yield
+
+
+@pytest.fixture(autouse=True)
+def monthly_trend_mock():
+    """월별 추이는 대시보드 요약이 아니라 잡이 직접 읽는다(plans/151 B1)."""
+    with patch("app.jobs.monthly_report.get_monthly_trend", new_callable=AsyncMock, return_value=_MOCK_TREND) as m:
+        yield m
 
 
 class TestRunMonthlyReport:
@@ -111,7 +119,7 @@ class TestRunMonthlyReport:
         mock_email.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_sends_report_to_enabled_user(self):
+    async def test_sends_report_to_enabled_user(self, monthly_trend_mock):
         """enabled=True 유저에게 이메일 발송."""
         user = _make_user()
         settings = _make_settings(enabled=True, notification_email="notify@test.com")
@@ -141,6 +149,7 @@ class TestRunMonthlyReport:
         call_kwargs = mock_email.call_args.kwargs
         assert call_kwargs["to_email"] == "notify@test.com"
         assert call_kwargs["total_assets_krw"] == 50_000_000.0
+        monthly_trend_mock.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_uses_user_email_as_fallback(self):

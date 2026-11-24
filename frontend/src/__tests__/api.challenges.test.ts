@@ -27,7 +27,6 @@ import { api } from "@/api/client";
 import {
   createChallenge,
   deleteChallenge,
-  fetchChallengeSummary,
   fetchChallenges,
   updateChallenge,
 } from "@/api/challenges";
@@ -41,13 +40,6 @@ describe("challenges API", () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });
     await fetchChallenges();
     expect(api.get).toHaveBeenCalledWith("/challenges");
-  });
-
-  it("fetchChallengeSummary hits GET /challenges/summary", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: { needs_attention: false, count: 0 } });
-    const res = await fetchChallengeSummary();
-    expect(api.get).toHaveBeenCalledWith("/challenges/summary");
-    expect(res.count).toBe(0);
   });
 
   it("createChallenge posts payload", async () => {
