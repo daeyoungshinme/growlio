@@ -4,7 +4,7 @@ import { Circle, RefreshCw, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
-import { invalidateSyncData, refetchActiveData } from "@/utils/queryInvalidation";
+import { refetchActiveData } from "@/utils/queryInvalidation";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import ChallengeProgressCard from "@/components/dashboard/ChallengeProgressCard";
@@ -87,10 +87,12 @@ export default function DashboardPage() {
   }, [qc]);
   useRegisterRefresh(handleRefresh);
 
+  // 증권사 동기화가 아니라 화면 데이터 다시 받기 — 당겨서 새로고침과 같게 화면에 붙은 쿼리만. sync 무효화를 쓰면
+  // 목표 추천·환전 계획·세금처럼 화면 밖 무거운 쿼리까지 stale이 돼 다음 방문에 다시 계산했다(plans/151 A11)
   const handleSync = useCallback(async () => {
     setSyncing(true);
     try {
-      await invalidateSyncData(qc);
+      await refetchActiveData(qc);
     } finally {
       setSyncing(false);
     }

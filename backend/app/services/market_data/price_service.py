@@ -32,16 +32,29 @@ from app.services.market_data.yahoo_price import (
     run_yf_bounded,
 )
 from app.utils.cache_keys import (
+    PRICE_RETURN_MISS,
     TTL_PRICE_CURRENT,
+    TTL_PRICE_MISS,
     TTL_PRICE_RETURN,
     CacheStoreType,
     current_price_key,
+    price_miss_key,
     price_return_key,
 )
 from app.utils.circuit_breaker import CircuitOpenError, kis_circuit, naver_circuit
 from app.utils.currency import get_live_or_cached_usd_krw, get_usd_krw_rate
 
 logger = structlog.get_logger()
+
+# 국내 시세는 종목마다 스레드(Naver → pykrx)를 하나씩 쓴다 — 보유 종목이 많은 콜드 조회가 기본 스레드풀을 채우면
+# 인증(JWT 검증도 to_thread)까지 줄을 선다(plans/151 A4). Yahoo 슬롯(_yfinance_sem)과는 따로 둔다
+_DOMESTIC_PRICE_CONCURRENCY = 4
+_domestic_price_sem = asyncio.Semaphore(_DOMESTIC_PRICE_CONCURRENCY)
+
+
+async def _bounded_domestic_price(ticker: str, loop: asyncio.AbstractEventLoop) -> float | None:
+    async with _domestic_price_sem:
+        return await domestic_price_fallback(ticker, loop)
 
 
 async def domestic_price_fallback(ticker: str, loop: asyncio.AbstractEventLoop) -> float | None:
@@ -72,6 +85,20 @@ async def _read_cached_prices(cache: CacheStoreType, tickers: list[tuple[str, st
             except (ValueError, TypeError):
                 logger.warning("price_cache_malformed", ticker=ticker, cached=cached)
     return price_map
+
+
+async def _read_known_misses(cache: CacheStoreType, tickers: list[tuple[str, str]]) -> set[str]:
+    """최근 공개 소스(Naver·pykrx·Yahoo)가 모두 실패한 티커 — 그 단계를 건너뛴다(plans/151 A2)."""
+    if not cache or not tickers:
+        return set()
+    flags = await cache.mget([price_miss_key(t, m) for t, m in tickers])
+    return {t for (t, _), flag in zip(tickers, flags, strict=False) if flag}
+
+
+async def _write_known_misses(cache: CacheStoreType, misses: list[tuple[str, str]]) -> None:
+    if not cache or not misses:
+        return
+    await asyncio.gather(*(cache.set(price_miss_key(t, m), "1", ex=TTL_PRICE_MISS) for t, m in misses))
 
 
 async def _write_cached_prices(
@@ -112,18 +139,22 @@ async def fetch_prices_batch(
     loop = asyncio.get_running_loop()
     price_map: dict[str, float] = await _read_cached_prices(cache, tickers)
     remaining = [(t, m) for t, m in tickers if t not in price_map]
+    # 상장폐지·비상장 코드는 공개 소스 체인을 매 요청 다시 돌지 않는다. KIS는 계좌마다 결과가 달라 그대로 시도한다
+    known_misses = await _read_known_misses(cache, remaining)
+    public_targets = [(t, m) for t, m in remaining if t not in known_misses]
 
-    domestic = [(t, m) for t, m in remaining if m.upper() in DOMESTIC_MARKETS]
+    domestic = [(t, m) for t, m in public_targets if m.upper() in DOMESTIC_MARKETS]
     if domestic:
         domestic_results = await asyncio.gather(
-            *(domestic_price_fallback(t, loop) for t, _ in domestic), return_exceptions=True
+            *(_bounded_domestic_price(t, loop) for t, _ in domestic), return_exceptions=True
         )
         for (ticker, _), result in zip(domestic, domestic_results, strict=False):
             if isinstance(result, (int, float)) and result > 0:
                 price_map[ticker] = float(result)
 
-    yahoo_targets = [(t, m) for t, m in remaining if t not in price_map]
+    yahoo_targets = [(t, m) for t, m in public_targets if t not in price_map]
     price_map.update(await fetch_yahoo_batch(yahoo_targets))
+    await _write_known_misses(cache, [(t, m) for t, m in public_targets if not price_map.get(t)])
 
     missing = [(t, m) for t, m in remaining if t not in price_map or price_map[t] == 0]
     if missing:
@@ -208,10 +239,13 @@ async def get_historical_returns(
         cached_values = await cache.mget([price_return_key(years, t, m) for t, m in tickers])
 
     for (ticker, market), cached in zip(tickers, cached_values, strict=False):
-        if cached:
-            return_map[(ticker, market)] = json.loads(cached)
-        else:
+        if not cached:
             missing.append((ticker, market))
+            continue
+        parsed = json.loads(cached)
+        # PRICE_RETURN_MISS("null") — 최근 Yahoo·pykrx 모두 실패, 결과에서 빠지는 건 조회 실패와 같다(plans/151 A2)
+        if parsed is not None:
+            return_map[(ticker, market)] = parsed
 
     newly_fetched: dict[tuple[str, str], dict] = {}
 
@@ -236,6 +270,11 @@ async def get_historical_returns(
                 cache.setex(price_return_key(years, t, m), TTL_PRICE_RETURN, json.dumps(result))
                 for (t, m), result in newly_fetched.items()
             )
+        )
+    still_missing = [(t, m) for t, m in missing if (t, m) not in newly_fetched]
+    if still_missing and cache:
+        await asyncio.gather(
+            *(cache.setex(price_return_key(years, t, m), TTL_PRICE_MISS, PRICE_RETURN_MISS) for t, m in still_missing)
         )
 
     return return_map

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.services.market_data.market_data_fetcher import fetch_yf_daily_returns
+from app.services.market_data.yahoo_price import run_yf_bounded
 from app.services.market_data.yahoo_price import to_yf_symbol as _to_yf_symbol
 from app.services.portfolio.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import TTL_PORTFOLIO_OPTIMIZER, CacheStoreType, account_ids_suffix, efficient_frontier_key
@@ -246,7 +247,7 @@ async def get_efficient_frontier(
     all_symbols = list(dict.fromkeys(yf_symbols + compare_symbols))  # 중복 제거, 순서 유지
 
     loop = asyncio.get_running_loop()
-    returns_map = await loop.run_in_executor(None, _sync_fetch_returns, all_symbols)
+    returns_map = await run_yf_bounded(_sync_fetch_returns, all_symbols)
     result_data = await loop.run_in_executor(None, _compute_frontier, yf_symbols, weights, returns_map)
 
     # 비교 포트폴리오 위치 계산

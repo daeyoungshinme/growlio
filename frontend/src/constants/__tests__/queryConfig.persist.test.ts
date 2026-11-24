@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import { shouldPersistQuery } from "@/constants/queryConfig";
+import { persistQueryPrefixes, shouldPersistQuery } from "@/constants/queryConfig";
 
 function queryWith(key: string | readonly string[], state: "success" | "error") {
   const client = new QueryClient();
@@ -43,5 +43,19 @@ describe("shouldPersistQuery (plans/61 B4)", () => {
     expect(shouldPersistQuery(queryWith(["goal-recommendation", "by-horizon"], "success"))).toBe(
       false,
     );
+  });
+
+  it("overview는 홈 lite와 전체 계좌(all)만 — 계좌별 전체 응답은 저장하지 않는다 (plans/151 A10)", () => {
+    expect(shouldPersistQuery(queryWith(["portfolio-overview", "lite"], "success"))).toBe(true);
+    expect(shouldPersistQuery(queryWith(["portfolio-overview", "all"], "success"))).toBe(true);
+    expect(shouldPersistQuery(queryWith(["portfolio-overview", "acc-123"], "success"))).toBe(false);
+  });
+
+  it("gcTime 프리픽스가 저장 범위와 같다", () => {
+    const prefixes = persistQueryPrefixes();
+    expect(prefixes).toContainEqual(["portfolio-overview", "lite"]);
+    expect(prefixes).toContainEqual(["goal-recommendation", "overall"]);
+    expect(prefixes).not.toContainEqual(["portfolio-overview"]);
+    expect(prefixes).toContainEqual(["dashboard"]);
   });
 });

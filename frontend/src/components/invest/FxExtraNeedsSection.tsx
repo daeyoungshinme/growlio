@@ -17,7 +17,7 @@ import AccountActionsMenu from "@/components/common/AccountActionsMenu";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import FxTrancheList from "@/components/invest/FxTrancheList";
-import { clampPct, fmtUsd, pctOf } from "@/utils/format";
+import { clampPct, fmtUsdWhole, pctOf } from "@/utils/format";
 import { planAlertState, syncButtonLabel, syncToastMessage } from "@/utils/fxPlanAlerts";
 import { invalidateFxExtraNeedData } from "@/utils/queryInvalidation";
 import { syncSharedUsdRate } from "@/utils/sharedUsdRate";
@@ -31,8 +31,6 @@ const FxExtraNeedModal = lazy(() => import("@/components/invest/FxExtraNeedModal
 const MAX_FX_EXTRA_NEEDS = 10;
 /** 필요일까지 이 일수 이하면 남은 금액 전액을 "지금"으로 — 백엔드 `FX_EXTRA_URGENT_DAYS`와 같은 값 */
 const FX_EXTRA_URGENT_DAYS = 14;
-
-const fmtUsdWhole = (n: number) => fmtUsd(n, 0);
 
 function dueLabel(need: FxExtraNeed) {
   const [, m, d] = need.due_date.split("-").map(Number);

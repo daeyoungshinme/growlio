@@ -108,10 +108,9 @@ export default function PortfolioManageTab({
     [activeAlertByPortfolioId],
   );
 
-  const { data: driftSummaryRaw } = useQuery({
-    ...driftSummaryQuery,
-    enabled: portfolios.length > 0,
-  });
+  // 서버가 포트폴리오 목록을 스스로 읽어 없으면 []를 준다 — 목록 응답을 기다리지 않고 함께 보낸다(plans/151 A9,
+  // RebalancingStatusCard와 같음)
+  const { data: driftSummaryRaw } = useQuery(driftSummaryQuery);
   const driftByPortfolioId = useMemo<Record<string, PortfolioDriftSummary>>(() => {
     const list = Array.isArray(driftSummaryRaw) ? driftSummaryRaw : [];
     return Object.fromEntries(list.map((s) => [s.portfolio_id, s]));

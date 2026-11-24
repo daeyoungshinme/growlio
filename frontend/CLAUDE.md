@@ -220,7 +220,7 @@ _기타_
 
 **포맷 (`utils/format.ts`)** — 로컬 재정의 금지.
 
-- `fmtKrw`(억/만/원) · `fmtKrwPreview`(입력 중 "5,000,000원 (500만원)") · `fmtKrwShort`(차트 레이블) · `fmtKrwPrice` · `fmtUsd`/`fmtUsdPrice` · `fmtFxRate`(USD/KRW 환율, 소수 1자리 — 화면마다 자릿수가 달라 같은 환율이 달라 보였다) · `fmtNativePrice`(주문가 — 국내 원·해외 $, 주가에 `fmtKrw` 쓰면 만원 축약됨) · `fmtMonth` · `fmtPct`(null → "—") · `fmtDateTime` · `relativeTime` · `fmtSigned(n, format)`(금액에 부호, 퍼센트는 `fmtPct`) · `convertUsdToKrw`/`formatUsdAsKrw`
+- `fmtKrw`(억/만/원) · `fmtKrwPreview`(입력 중 "5,000,000원 (500만원)") · `fmtKrwShort`(차트 레이블) · `fmtKrwPrice` · `fmtUsd`/`fmtUsdPrice`/`fmtUsdWhole`(정수 달러) · `fmtFxRate`(USD/KRW 환율, 소수 1자리 — 화면마다 자릿수가 달라 같은 환율이 달라 보였다) · `fmtNativePrice`(주문가 — 국내 원·해외 $, 주가에 `fmtKrw` 쓰면 만원 축약됨) · `fmtMonth` · `fmtPct`(null → "—") · `fmtDateTime` · `relativeTime` · `fmtSigned(n, format)`(금액에 부호, 퍼센트는 `fmtPct`) · `convertUsdToKrw`/`formatUsdAsKrw`
 - `pctOf(part, total)` — 인라인 `total > 0 ? v / total * 100 : 0` 대신. `clampPct(pct)` — 진행률 바 width에 그대로 넣지 말 것
 - **날짜**: `localToday()`/`localMonth()` 사용 — `new Date().toISOString().slice(...)`는 UTC라 KST 09시 전엔 전날/전월. 모듈 최상위 상수로 고정하지 말고 폼을 열 때 호출. `parseYmd`/`daysUntilYmd`
 - 차트 X축은 `"YY.M"` — 직접 문자열 파싱(타임존 이슈 방지)

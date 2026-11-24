@@ -31,16 +31,31 @@ export const PERSIST_QUERY_KEYS: readonly string[] = [
 const PERSIST_QUERY_KEY_SET = new Set(PERSIST_QUERY_KEYS);
 
 /**
+ * 변형이 많은 키는 첫 화면에 쓰는 두 번째 키만 저장한다 — 기간별·연령대 추천, 계좌별 전체 overview(`all_positions`
+ * 포함 큰 응답)까지 저장하면 매 저장(2초 throttle)마다 메인 스레드 직렬화와 localStorage 용량이 커진다(plans/151 A10).
+ */
+const PERSIST_SUBKEYS: Readonly<Record<string, readonly string[]>> = {
+  "goal-recommendation": ["overall"],
+  "portfolio-overview": ["lite", "all"],
+};
+
+/** gcTime을 maxAge에 맞출 프리픽스 목록(main.tsx) — `shouldPersistQuery`와 같은 범위 */
+export function persistQueryPrefixes(): string[][] {
+  return PERSIST_QUERY_KEYS.flatMap((key) =>
+    PERSIST_SUBKEYS[key] ? PERSIST_SUBKEYS[key].map((sub) => [key, sub]) : [[key]],
+  );
+}
+
+/**
  * persist 대상 판정. 커스텀 필터는 라이브러리 기본값(성공한 쿼리만)을 대체하므로 반드시 합친다 —
  * 빠뜨리면 실패·진행 중 쿼리까지 저장돼 다음 부팅이 에러 화면으로 시작한다(plans/61 B4).
- * 목표 추천은 첫 화면에 쓰는 전체(overall)만 — 기간별·연령대·후보 중복 변형까지 저장하면 매 저장(2초 throttle)마다
- * 메인 스레드에서 직렬화하는 양이 커진다.
  */
 export function shouldPersistQuery(query: Query): boolean {
   const [head, second] = query.queryKey;
   if (!defaultShouldDehydrateQuery(query) || !PERSIST_QUERY_KEY_SET.has(head as string))
     return false;
-  return head !== "goal-recommendation" || second === "overall";
+  const subkeys = PERSIST_SUBKEYS[head as string];
+  return !subkeys || subkeys.includes(second as string);
 }
 
 export const STALE_TIME = {

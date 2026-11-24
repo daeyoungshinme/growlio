@@ -40,6 +40,11 @@ export function fmtUsd(n: number, maxFractionDigits = 2): string {
   return `$${n.toLocaleString("en-US", { maximumFractionDigits: maxFractionDigits })}`;
 }
 
+/** 달러 금액 정수 — 환전 필요·보유 달러처럼 센트가 의미 없는 금액. 예: 1234.6 → "$1,235" */
+export function fmtUsdWhole(n: number): string {
+  return fmtUsd(n, 0);
+}
+
 /** USD/KRW 환율 — 홈·환전 계획이 같은 자릿수로 보이게 소수 1자리. 예: 1385.64 → "1,385.6원" */
 export function fmtFxRate(n: number): string {
   return `${n.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}원`;

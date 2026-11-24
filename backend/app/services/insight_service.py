@@ -69,7 +69,7 @@ async def generate_insights(
     cache: CacheStoreType = None,
     force_refresh: bool = False,
 ) -> list[dict]:
-    """모든 체커를 병렬 실행하고 인사이트 목록을 반환한다 (1h 캐시)."""
+    """모든 체커를 순차 실행하고(같은 AsyncSession) 인사이트 목록을 반환한다 (1h 캐시)."""
     if not force_refresh:
         cached = await get_cached_json(cache, insights_key(user_id))
         if cached is not None:

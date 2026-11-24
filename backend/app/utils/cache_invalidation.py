@@ -239,5 +239,5 @@ async def invalidate_tax_overseas_caches(cache: CacheStoreType, user_id: uuid.UU
 
 
 async def invalidate_tax_action_items_cache(cache: CacheStoreType, user_id: uuid.UUID) -> None:
-    """홈 "지금 할 일" 세금 소스 캐시(2분) — 거래·매매기록·계좌 sync/CRUD·소득 구간 변경이 부른다."""
+    """홈 "지금 할 일" 세금 소스 캐시(15분) — 거래·매매기록·계좌 sync/CRUD·소득 구간 변경이 부른다."""
     await _scan_unlink(cache, f"{_env_prefix()}tax:action_items:{user_id}:*")
