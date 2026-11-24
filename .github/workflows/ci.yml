@@ -76,7 +76,7 @@ jobs:
         uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           # backend/Dockerfile의 uv 이미지 태그와 같게 — 미지정이면 최신 uv라 이미지와 lock 해석이 갈라질 수 있다
-          version: "0.13.8" # uv-version
+          version: "0.13.9" # uv-version
           enable-cache: true
           cache-dependency-glob: "backend/uv.lock"
 
