@@ -165,10 +165,10 @@ function AllocationHistoryChart({
                 labelStyle={labelStyle}
                 itemStyle={itemStyle}
                 cursor={{ fill: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }}
-                formatter={(value: number, key: string) => [
-                  fmtKrwShort(value),
-                  labelMap[key] ?? key,
-                ]}
+                formatter={(value, rawKey) => {
+                  const key = String(rawKey ?? "");
+                  return [fmtKrwShort(Number(value ?? 0)), labelMap[key] ?? key];
+                }}
               />
               <Legend
                 formatter={(value: string) => labelMap[value] ?? value}

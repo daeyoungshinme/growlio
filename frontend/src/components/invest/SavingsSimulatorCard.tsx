@@ -243,15 +243,15 @@ export default function SavingsSimulatorCard({ goalReturnPct }: Props) {
               width={48}
             />
             <Tooltip
-              formatter={(value: number, name: string) => [
-                fmtKrw(value),
+              formatter={(value, name) => [
+                fmtKrw(Number(value ?? 0)),
                 name === "value"
                   ? "투자 후 금액"
                   : isLumpSum
                     ? "원금(추가 납입 없음)"
                     : "단순 납입 누계",
               ]}
-              labelFormatter={(label: number) => `${label}년 후`}
+              labelFormatter={(label) => `${String(label)}년 후`}
               {...chartTooltipStyle(isDark)}
             />
             <Line

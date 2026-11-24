@@ -7,12 +7,12 @@ import { chartTooltipStyle } from "@/utils/chart";
 import TreemapCell from "@/components/common/TreemapCell";
 import SkeletonCard from "@/components/common/SkeletonCard";
 
-interface TreemapItem {
+type TreemapItem = {
   name: string;
   ticker?: string | null;
   value: number;
   pct: number;
-}
+};
 
 interface Props {
   data: TreemapItem[];
@@ -39,12 +39,13 @@ function TreemapChart({ data, title, height = 220, bare = false, isLoading }: Pr
       <ResponsiveContainer width="100%" height={height}>
         <Treemap data={data} dataKey="value" content={<TreemapCell />}>
           <Tooltip
-            formatter={(value: number, _name: string, props) => [
-              `${fmtKrwShort(value)}원 (${(props.payload?.pct ?? 0).toFixed(1)}%)`,
-              props.payload?.ticker
-                ? `${props.payload.name} (${props.payload.ticker})`
-                : props.payload?.name,
-            ]}
+            formatter={(value, _name, item) => {
+              const p = item.payload as TreemapItem | undefined;
+              return [
+                `${fmtKrwShort(Number(value ?? 0))}원 (${(p?.pct ?? 0).toFixed(1)}%)`,
+                p?.ticker ? `${p.name} (${p.ticker})` : (p?.name ?? ""),
+              ];
+            }}
             {...chartTooltipStyle(isDark)}
           />
         </Treemap>

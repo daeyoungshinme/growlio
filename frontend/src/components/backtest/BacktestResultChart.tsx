@@ -195,8 +195,9 @@ function BacktestResultChart({ dates, series }: Props) {
               <YAxis {...axisProps} tickFormatter={(v) => `${v.toFixed(0)}`} width={40} />
               <Tooltip
                 {...tooltipStyle}
-                formatter={(value: unknown, name: string) => {
-                  if (value == null || typeof value !== "number") return ["-", name];
+                formatter={(value, rawName) => {
+                  const name = String(rawName ?? "");
+                  if (typeof value !== "number") return ["-", name];
                   return [
                     `${value >= 100 ? "+" : ""}${(value - 100).toFixed(2)}% (${value.toFixed(1)})`,
                     name,
@@ -233,8 +234,9 @@ function BacktestResultChart({ dates, series }: Props) {
               <ReferenceLine y={0} stroke={isDark ? "#6B7280" : "#D1D5DB"} />
               <Tooltip
                 {...tooltipStyle}
-                formatter={(value: unknown, name: string) => {
-                  if (value == null || typeof value !== "number") return ["-", name];
+                formatter={(value, rawName) => {
+                  const name = String(rawName ?? "");
+                  if (typeof value !== "number") return ["-", name];
                   return [`${fmtPct(value, 2)}`, name];
                 }}
               />
@@ -261,8 +263,9 @@ function BacktestResultChart({ dates, series }: Props) {
               <ReferenceLine y={0} stroke={isDark ? "#6B7280" : "#D1D5DB"} />
               <Tooltip
                 {...tooltipStyle}
-                formatter={(value: unknown, name: string) => {
-                  if (value == null || typeof value !== "number") return ["-", name];
+                formatter={(value, rawName) => {
+                  const name = String(rawName ?? "");
+                  if (typeof value !== "number") return ["-", name];
                   return [`${value.toFixed(2)}%`, name];
                 }}
               />

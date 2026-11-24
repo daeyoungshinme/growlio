@@ -182,7 +182,7 @@ function DCAProjectionChart({
               domain={yDomain}
             />
             <Tooltip
-              formatter={(value: number, name: string) => {
+              formatter={(value, name) => {
                 const label =
                   name === "conservative_krw"
                     ? `보수적 가정(연 ${conservativePct}%)`
@@ -191,9 +191,9 @@ function DCAProjectionChart({
                       : name === "projected_krw" || name === "projected_future_krw"
                         ? "이론값"
                         : "실제값";
-                return [fmtKrw(value), label];
+                return [fmtKrw(Number(value ?? 0)), label];
               }}
-              labelFormatter={(label: string) => `${label}`}
+              labelFormatter={(label) => String(label)}
               {...chartTooltipStyle(isDark)}
             />
             <Line

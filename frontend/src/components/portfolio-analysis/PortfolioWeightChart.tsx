@@ -60,9 +60,10 @@ function PortfolioWeightChart({ items }: Props) {
               })}
             </Pie>
             <Tooltip
-              formatter={(value: unknown, name: string) =>
-                typeof value === "number" ? [`${value.toFixed(1)}%`, name] : ["-", name]
-              }
+              formatter={(value, rawName) => {
+                const name = String(rawName ?? "");
+                return typeof value === "number" ? [`${value.toFixed(1)}%`, name] : ["-", name];
+              }}
               contentStyle={{ fontSize: 12, padding: "4px 8px", borderRadius: 6 }}
             />
           </PieChart>
