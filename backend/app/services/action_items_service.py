@@ -34,6 +34,7 @@ from sqlalchemy.orm import selectinload
 
 from app.constants import FX_PLAN_ACTION_DAYS, FX_PLAN_ALERT_SOURCE
 from app.core.job_runner import report_handled_failure
+from app.core.timing import StepTimer
 from app.models.alert import ExchangeRateAlert, RebalancingAlert
 from app.models.fx_extra_need import FxExtraNeed
 from app.models.portfolio import Portfolio
@@ -540,6 +541,7 @@ async def get_action_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
         ("rebalance", partial(_rebalance_items, skip_portfolio_ids=tactical_portfolio_ids)),
         *_SOURCES,
     ]
+    timer = StepTimer("action_items_timing")
     for name, source in sources:
         try:
             collected.extend(await source(user_id, db, cache))
@@ -552,6 +554,8 @@ async def get_action_items(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
                 await db.rollback()
             except Exception:
                 logger.warning("action_items_rollback_failed", source=name)
+        timer.mark(name)
+    timer.log(items=len(collected), failed=len(failed))
     # 안정 정렬 — 같은 우선순위·마감이면 소스 순서(전술 → 리밸런싱 → 적립 → 세금 → 챌린지)를 유지한다
     collected.sort(key=lambda it: (_PRIORITY_ORDER[it.priority], it.deadline or "9999-12-31"))
     if failed:

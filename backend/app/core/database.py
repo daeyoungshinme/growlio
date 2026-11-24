@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
+from app.core.request_metrics import record_db_query
 from app.utils.metrics import slow_query_count
 
 logger = structlog.get_logger()
@@ -43,6 +44,7 @@ def _before_cursor_execute(conn, cursor, statement, parameters, context, execute
 @event.listens_for(engine.sync_engine, "after_cursor_execute")
 def _after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
     elapsed_ms = (time.monotonic() - conn.info.pop("_qstart", time.monotonic())) * 1000
+    record_db_query(elapsed_ms)
     if elapsed_ms > settings.slow_query_ms:
         slow_query_count.inc()
         logger.warning(

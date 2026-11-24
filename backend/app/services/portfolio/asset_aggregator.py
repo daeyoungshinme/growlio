@@ -11,6 +11,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import POSITION_STOCK_ASSET_TYPES
+from app.core.timing import StepTimer
 from app.services._settings_queries import get_settings_row
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.portfolio.composition_calculator import (
@@ -206,6 +207,7 @@ async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache
     # 1단계: 서로 논리적으로는 독립적이지만 같은 AsyncSession을 쓰므로 순차 실행
     # (asyncpg/SQLAlchemy AsyncSession은 하나의 커넥션에서 동시 쿼리 실행을 지원하지
     # 않음 — asyncio.gather로 묶으면 병렬화 이득 없이 간헐적 InterfaceError 위험만 생김)
+    timer = StepTimer("dashboard_summary_timing")
     (
         first_snap_date,
         net_deposits_ytd,
@@ -213,14 +215,19 @@ async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache
         non_stock_net_flows_after,
     ) = await _get_scalar_init_data(user_id, db)
     settings_row = await get_settings_row(db, user_id)
+    timer.mark("init")
     monthly_trend = await get_monthly_trend(user_id, db, cache)
+    timer.mark("monthly_trend")
     div_summary = await get_dividend_summary(user_id, db, cache)
+    timer.mark("dividends")
 
     # 2단계: 내부에서 4개 쿼리를 실행하므로 1단계와 분리해 session 충돌 방지
     total_assets_krw, total_invested, stock_value, by_type = await build_asset_totals(user_id, db, cache)
+    timer.mark("asset_totals")
 
     # 3단계: total_assets_krw에 의존
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
+    timer.mark("xirr")
 
     if (total_invested > 0 or non_stock_first_total > 0) and first_snap_date:
         # 혼합 수익률: 주식은 매입원가(avg_price 기반 total_invested) 기준 실제 손익을,
@@ -300,4 +307,5 @@ async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache
         "dividend_goal_achievement_pct": dividend_goal_achievement_pct,
     }
     await set_cached_json(cache, dashboard_summary_key(user_id), result, TTL_DASHBOARD_SUMMARY)
+    timer.log()
     return result

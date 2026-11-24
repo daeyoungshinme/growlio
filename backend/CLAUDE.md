@@ -221,6 +221,8 @@ schemas/        Pydantic(라우터 인라인 스키마 금지 — 알림은 sche
 core/
   config.py     Settings(pydantic-settings)
   database.py   async engine/session, Base. `release_read_connection(db)` — 외부 I/O(증권사·시세·배당) 직전에 읽기 트랜잭션을 끝내 커넥션 반납(풀 5+2 고갈 방지). 읽기 경로에서만(flush된 쓰기는 구분 못 함)
+  request_metrics.py 요청 단위 DB 쿼리 수·시간(ContextVar) — `http_request` 로그의 `db_queries`·`db_ms`. 요청 밖(잡)은 no-op
+  timing.py     `StepTimer`(단계별 `*_ms` + `total_ms` + 요청 안이면 `db_queries` 차이를 `*_timing` 한 줄로) · `elapsed_ms`. 단계 계측은 이것만 쓴다. 요약은 `scripts/summarize_timing_logs.py <로그파일> [--by-request]`(배치 전후 비교)
   job_runner.py report_job_failure(로그+Sentry 스택) · report_handled_failure(루프 안 삼키는 항목 실패 — 스택 없는 capture, 자격증명 지역변수 보호) · run_per_user(유저별 동시성·실패 격리) — jobs와 알림 서비스 공용. **`except`+`logger.error`만으로는 Sentry에 안 간다**(structlog는 stdlib logging 미경유)
   logging.py    structlog 시크릿 redact + yfinance 404 소음 필터. 계좌번호·이메일은 utils/masking.py.
                 **응답·DB·알림에 예외 사유는 str(e) 대신 public_error_message(e)** (SQL 파라미터·URL의 계좌번호 유출 방지)
