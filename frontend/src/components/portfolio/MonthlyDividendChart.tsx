@@ -44,10 +44,8 @@ function MonthlyDividendChart({
             data={barData}
             margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
             onClick={(e) => {
-              if (e?.activePayload?.[0]) {
-                const d = e.activePayload[0].payload as { month: number };
-                onMonthSelect(d.month);
-              }
+              const d = barData[Number(e?.activeTooltipIndex)];
+              if (d) onMonthSelect(d.month);
             }}
           >
             <XAxis dataKey="name" tick={chartTickStyle(isDark)} axisLine={false} tickLine={false} />
@@ -59,8 +57,8 @@ function MonthlyDividendChart({
               width={48}
             />
             <Tooltip
-              formatter={(value: number, name: string) => [
-                `${fmtKrwShort(value)}원`,
+              formatter={(value, name) => [
+                `${fmtKrwShort(Number(value ?? 0))}원`,
                 name === "actual" ? "실수령" : "예상",
               ]}
               cursor={{ fill: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)" }}

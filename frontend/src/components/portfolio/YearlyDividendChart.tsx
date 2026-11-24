@@ -56,7 +56,7 @@ export default function YearlyDividendChart() {
               width={50}
             />
             <Tooltip
-              formatter={(v: number) => [fmtKrw(v), "실수령 배당"]}
+              formatter={(v) => [fmtKrw(Number(v ?? 0)), "실수령 배당"]}
               contentStyle={tooltipStyle.contentStyle}
               labelStyle={tooltipStyle.labelStyle}
               itemStyle={tooltipStyle.itemStyle}
