@@ -447,8 +447,9 @@ class TestGetDashboardSummary:
             "annual_return_pct",
             "cumulative_return_pct",
             "xirr_pct",
-            "monthly_trend",
             "annual_dividends_received",
+            "stock_pnl",
+            "goal_expected_month",
             "estimated_annual_dividends",
         ]
         for key in required:

@@ -83,7 +83,7 @@ backtest.py              백테스트
 dashboard.py             대시보드 집계(구현은 asset_aggregator) + GET /dashboard/action-items
 dividends.py             배당 요약·예상·균등화 — ?account_id= 미지정 시 전체 통합
 invest.py                DCA 분석 + GET /invest/goal-feasibility(저장 없음) + GET /invest/fx-plan(환전 계획, 저장 없음) + PUT /invest/fx-plan/alerts(계획 구간 알림 맞추기) + /invest/fx-extra-needs CRUD·`/{id}/alerts`(추가 환전 항목, plans/123) + /invest/dip-buy GET·PUT `/settings`·`/rules` POST·PUT|DELETE `/rules/{id}`·POST `/rules/{id}/complete`(낙폭 추매 안내, 주문 없음)
-challenges.py            적립 챌린지 CRUD + 진행률 (/challenges/summary는 네비 배지용 경량)
+challenges.py            적립 챌린지 CRUD + 진행률 (/challenges/summary는 구버전 앱 배지 호환 — 현재 프론트는 목록으로 판정)
 portfolios.py            포트폴리오 CRUD — 항목은 단독 종목 또는 지수 그룹(group). index-group-suggestions는 **항상 전체 계좌 기준**, 범위 밖 종목은 in_scope=False
 portfolio_analysis.py    /portfolio/{overview,allocation-history,risk,rebalancing-strategy,index-exposure}
 rebalancing.py           리밸런싱 분석(portfolios/{id}/analyze) + 목표 역산 추천(goal-recommendation/{by-horizon,by-age}) + expected-metrics + candidates/overlap + broker-balance(/{id}, -all) + drift-summary + composite-signal
@@ -119,7 +119,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - 쿼리 헬퍼: `_snapshot_queries.py`(최신 스냅샷 서브쿼리), `_account_queries.py`(활성 계좌 — `active_accounts_stmt()`/`active_broker_accounts_stmt()`)
 
 **포트폴리오·자산 집계 (`portfolio/`)**
-- `asset_aggregator.py` — 대시보드 집계, XIRR·연환산·벤치마크, 월별 추이(`get_monthly_trend`)
+- `asset_aggregator.py` — 대시보드 집계, XIRR·연환산·벤치마크, 월별 추이(`get_monthly_trend`). 응답에 홈용 `stock_pnl`(lite overview `in_total` — 자산 탭과 같은 기준, `stock_return_pct`와 다른 엔진)·`goal_expected_month`(`dca_service.compute_goal_expected_month`)를 싣는다. **요약 dict에 월별 추이는 없다** — 월간 리포트는 `get_monthly_trend`를 직접 부른다
 - `portfolio_service.py` — overview 집계. 부분집합 총자산 반복 계산은 `prefetch_accounts_snapshot_positions()`/`compute_total_assets_krw()`로 1회 조회 재사용. **합산 제외 계좌는 기본값에선 총자산만 빠지고 주식 합계·손익·`all_positions`엔 섞인다** — 자산탭 경로(`/portfolio/overview`·index-exposure)만 `exclude_out_of_total=True`(전체 조회일 때만, 캐시 suffix `in_total`)
 - `portfolio_crud_service.py`(포트폴리오 CRUD·연동 계좌 target_portfolio_id 동기화, 캐시 무효화는 라우터. `target_source`·`target_source_at`은 항목 구성·비중이 실제로 바뀌었거나 요청이 출처를 명시했을 때만 기록 — 편집기는 이름만 고쳐도 items를 보낸다. TACTICAL은 전술 적용만 쓴다) · `portfolio_history_service.py` · `position_aggregator.py` · `returns_calculator.py`
 - `composition_calculator.py` — 자산 구성. `exclude_real_estate()`는 목표 진행률·필요수익률 등 "투자자산" 계산 전용(대시보드 총자산 표시엔 미적용)

@@ -3,7 +3,6 @@ import { Target } from "lucide-react";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import type { DashboardData } from "@/api/dashboard";
-import type { DCAAnalysisData } from "@/api/invest";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import GoalChipGrid from "./investmentGoal/GoalChipGrid";
 import { DcaOutlook } from "./investmentGoal/DcaOutlook";
@@ -12,7 +11,6 @@ import { investPlanUrl } from "@/utils/tabUrl";
 
 interface Props {
   data: DashboardData | undefined;
-  dcaData?: DCAAnalysisData | undefined;
   isLoading?: boolean;
 }
 
@@ -35,7 +33,7 @@ function CardHeader({ linkLabel, className }: { linkLabel: string; className: st
   );
 }
 
-export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) {
+export default function InvestmentGoalCard({ data, isLoading }: Props) {
   const [showAllGoals, toggleShowAllGoals] = useCollapsible(
     false,
     "growlio:goalCard:showAllGoalsMobile",
@@ -45,18 +43,18 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
     return <SkeletonCard rows={4} />;
   }
 
-  const timeline = dcaData?.goal_timeline;
-  const currentProgressPct = timeline?.current_progress_pct ?? data?.goal_achievement_pct;
-  const goalAmountDisplay = dcaData?.settings.goal_amount ?? data?.goal_amount;
+  // 진행률·달성 예상월은 대시보드 응답 하나로 — 적립 분석 전체를 따로 받지 않는다(plans/151 B1).
+  // 진행률은 적립 분석 goal_timeline과 같은 식(부동산 제외 투자자산 ÷ 목표)이다
+  const currentProgressPct = data?.goal_achievement_pct;
+  const goalAmountDisplay = data?.goal_amount;
+  const expectedGoalMonth = data?.goal_expected_month ?? null;
   // 진행률과 같은 기준(부동산 제외) — 총자산으로 빼면 진행률 60%인데 "달성"으로 보일 수 있다
   const investableAssets = data?.investable_assets_krw;
   const goalGapAmount =
     goalAmountDisplay != null && investableAssets != null
       ? goalAmountDisplay - investableAssets
       : null;
-  const expectedGoalDateStr =
-    timeline?.actual_expected_goal_date ?? timeline?.expected_goal_date ?? null;
-  const expectedGoalYear = expectedGoalDateStr ? Number(expectedGoalDateStr.slice(0, 4)) : null;
+  const expectedGoalYear = expectedGoalMonth ? Number(expectedGoalMonth.slice(0, 4)) : null;
 
   const goals = buildGoalChips({ data, expectedGoalYear });
 
@@ -78,7 +76,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
   }
 
   const outlook = {
-    timeline,
+    expectedGoalMonth,
     currentProgressPct,
     goalAmountDisplay,
     goalGapAmount,

@@ -52,7 +52,6 @@ export const QUERY_KEYS = {
   /** 낙폭 추매 안내(plans/147) */
   dipBuy: ["dip-buy"] as const,
   challenges: ["challenges"] as const,
-  challengeSummary: ["challenges", "summary"] as const,
   settings: ["settings"] as const,
   exchangeRate: ["exchange-rate"] as const,
   exchangeRateAlerts: ["exchange-rate-alerts"] as const,

@@ -27,6 +27,16 @@ export interface DashboardData {
   retirement_target_year: number | null;
   annual_dividend_goal: number | null;
   dividend_goal_achievement_pct: number | null;
+  /** 홈 히어로 주식 평가손익 — 자산 탭 overview와 같은 기준. 주식이 없으면 null, 옛 persist 캐시엔 없다(plans/151 B1) */
+  stock_pnl?: DashboardStockPnl | null;
+  /** 자산 목표 달성 예상월 "YYYY-MM"(실적 기준 우선) — 목표·적립 설정이 없으면 null */
+  goal_expected_month?: string | null;
+}
+
+export interface DashboardStockPnl {
+  total_stock_krw: number;
+  unrealized_pnl_krw: number;
+  return_pct: number;
 }
 
 export const fetchDashboard = () => apiGet<DashboardData>("/dashboard");

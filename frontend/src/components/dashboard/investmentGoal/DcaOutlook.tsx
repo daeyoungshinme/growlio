@@ -1,20 +1,12 @@
 import { fmtKrw, fmtMonth } from "@/utils/format";
-import type { DCAAnalysisData } from "@/api/invest";
-
-type GoalTimeline = DCAAnalysisData["goal_timeline"] | undefined;
 
 interface OutlookProps {
-  timeline: GoalTimeline;
+  /** "YYYY-MM" — 실적 기준 예상월 우선, 없으면 계획 기준(서버가 고른다) */
+  expectedGoalMonth: string | null;
   currentProgressPct: number | null | undefined;
   goalAmountDisplay: number | null | undefined;
   goalGapAmount: number | null;
   hasData: boolean;
-}
-
-/** 실적 기준 예상월 우선, 없으면 계획 기준 */
-function expectedMonth(timeline: GoalTimeline): string | null {
-  const ymd = timeline?.actual_expected_goal_date ?? timeline?.expected_goal_date;
-  return ymd ? fmtMonth(ymd) : null;
 }
 
 /**
@@ -23,20 +15,20 @@ function expectedMonth(timeline: GoalTimeline): string | null {
  * 이동은 카드 헤더 링크 하나로.
  */
 export function DcaOutlook({
-  timeline,
+  expectedGoalMonth,
   currentProgressPct,
   goalAmountDisplay,
   goalGapAmount,
   hasData,
 }: OutlookProps) {
-  if (currentProgressPct == null && timeline == null) {
+  if (currentProgressPct == null) {
     return (
       <p className="order-1 pb-1.5 mb-1.5 border-b border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
         자산 목표를 정하면 진행률과 달성 예상 시점이 보여요
       </p>
     );
   }
-  const month = expectedMonth(timeline);
+  const month = expectedGoalMonth ? fmtMonth(expectedGoalMonth) : null;
   const gapText =
     goalAmountDisplay != null && hasData && goalGapAmount != null
       ? goalGapAmount > 0

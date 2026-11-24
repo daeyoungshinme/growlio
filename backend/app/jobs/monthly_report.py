@@ -15,7 +15,7 @@ from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.dividend.aggregator import get_annual_dividends_received
 from app.services.notifications.email_service import email_configured, send_monthly_report_email
-from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_net_deposits_for_year
+from app.services.portfolio.asset_aggregator import get_dashboard_summary, get_monthly_trend, get_net_deposits_for_year
 from app.utils.cache_keys import TTL_MONTHLY_REPORT_SENT, CacheStoreType, monthly_report_sent_key
 from app.utils.durable_state import claim_durable, delete_durable, set_durable
 from app.utils.kst import today_kst
@@ -151,8 +151,9 @@ async def _build_and_send(user, to_email: str, report_month: str, month_key: str
     async with AsyncSessionLocal() as db:
         summary = await get_dashboard_summary(user.id, db, cache)
         year_figures = await _report_year_figures(user.id, db, summary, int(month_key[:4]))
+        # 대시보드 요약은 화면에 안 쓰는 월별 추이를 더 이상 담지 않는다(plans/151 B1)
+        monthly_trend: list[dict] = await get_monthly_trend(user.id, db, cache)
 
-    monthly_trend: list[dict] = summary.get("monthly_trend") or []
     mom_change_krw, mom_change_pct = _mom_change(monthly_trend, month_key)
 
     sent = await send_monthly_report_email(

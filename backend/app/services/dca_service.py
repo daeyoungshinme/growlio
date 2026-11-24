@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot
+from app.models.user import UserSettings
 from app.services._settings_queries import get_settings_row
 from app.services.goal.goal_return_solver import (
     future_value_monthly,
@@ -36,6 +37,46 @@ _DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50�
 _ACCELERATION_YEARS_PRESETS: tuple[int, ...] = (1, 2, 3)
 
 
+def _number(value: Any) -> float | None:
+    """0은 유효한 값이다(수익률 0%, 거치식 적립 0원, 시작 금액 0원) — 비운 값은 None으로 저장된다."""
+    return float(value) if value is not None else None
+
+
+def _dca_params(
+    settings_row: UserSettings | None,
+) -> tuple[float | None, float | None, float | None, date | None, float | None]:
+    """(월 적립액, 목표 연수익률%, 목표 금액, 시작일, 직접 입력한 시작 금액)."""
+    if settings_row is None:
+        return None, None, None, None, None
+    return (
+        _number(settings_row.monthly_deposit_amount),
+        _number(settings_row.goal_annual_return_pct),
+        _number(settings_row.goal_amount),
+        settings_row.goal_start_date,
+        _number(settings_row.goal_initial_amount),
+    )
+
+
+async def compute_goal_expected_month(
+    user_id: uuid.UUID, db: AsyncSession, settings_row: UserSettings | None, investable_assets_krw: float
+) -> str | None:
+    """홈 목표 카드의 "YYYY-MM 달성 예상"(실적 기준 우선, 없으면 계획 기준).
+
+    `get_dca_analysis`의 goal_timeline과 같은 계산을 투영 곡선·월별 실적 없이 한다 — 대시보드가 이 값만 받으려고
+    적립 분석 전체를 부르지 않게(plans/151 B1)."""
+    pmt, annual_return_pct, goal_amount, start_dt, manual_initial = _dca_params(settings_row)
+    if pmt is None or annual_return_pct is None or not goal_amount or start_dt is None:
+        return None
+    r = monthly_rate(annual_return_pct / 100)
+    initial_value = manual_initial if manual_initial is not None else await _get_initial_value(user_id, start_dt, db)
+    months_to_goal = _calc_months_to_goal(initial_value, pmt, r, goal_amount)
+    timeline = _calc_goal_timeline(
+        initial_value, pmt, r, goal_amount, investable_assets_krw, start_dt, months_to_goal, annual_return_pct
+    )
+    expected: str | None = timeline["actual_expected_goal_date"] or timeline["expected_goal_date"]
+    return expected
+
+
 async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> dict[str, Any]:
     """DCA 복리 이론 곡선과 실제 자산을 비교한 분석 결과 반환."""
     cached = await get_cached_json(cache, dca_analysis_key(user_id))
@@ -43,16 +84,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheSto
         return cached
 
     settings_row = await get_settings_row(db, user_id)
-
-    # 0은 유효한 값이다(수익률 0%, 거치식 적립 0원, 시작 금액 0원) — 비운 값은 None으로 저장된다
-    def _number(value: Any) -> float | None:
-        return float(value) if value is not None else None
-
-    pmt = _number(settings_row.monthly_deposit_amount) if settings_row else None
-    annual_return_pct = _number(settings_row.goal_annual_return_pct) if settings_row else None
-    goal_amount = _number(settings_row.goal_amount) if settings_row else None
-    start_dt = settings_row.goal_start_date if settings_row else None
-    manual_initial = _number(settings_row.goal_initial_amount) if settings_row else None
+    pmt, annual_return_pct, goal_amount, start_dt, manual_initial = _dca_params(settings_row)
 
     is_configured = pmt is not None and annual_return_pct is not None and bool(goal_amount) and bool(start_dt)
 

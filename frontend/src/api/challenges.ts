@@ -43,11 +43,6 @@ export interface Challenge {
   progress: ChallengeProgress;
 }
 
-export interface ChallengeSummary {
-  needs_attention: boolean;
-  count: number;
-}
-
 export interface ChallengeCreatePayload {
   title: string;
   challenge_type: ChallengeType;
@@ -71,9 +66,6 @@ export interface ChallengeUpdatePayload {
 }
 
 export const fetchChallenges = (): Promise<Challenge[]> => apiGet<Challenge[]>("/challenges");
-
-export const fetchChallengeSummary = (): Promise<ChallengeSummary> =>
-  apiGet<ChallengeSummary>("/challenges/summary");
 
 export const createChallenge = (payload: ChallengeCreatePayload): Promise<Challenge> =>
   apiPost<Challenge>("/challenges", payload);

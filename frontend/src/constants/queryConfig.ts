@@ -20,7 +20,7 @@ export const PERSIST_QUERY_KEYS: readonly string[] = [
   "dashboard",
   "portfolio-overview",
   "accounts",
-  "dca-analysis",
+  // dca-analysis는 홈이 더 이상 받지 않는다(목표 예상월은 대시보드 응답, plans/151 B1) — 월별 투영 배열이 커서 저장하지 않는다
   "goal-recommendation",
   "action-items",
   "challenges",

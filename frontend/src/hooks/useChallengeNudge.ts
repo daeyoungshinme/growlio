@@ -1,16 +1,36 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchChallengeSummary } from "@/api/challenges";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
+import { useMemo } from "react";
+import type { Challenge } from "@/api/challenges";
+import { useChallenges } from "@/hooks/useChallenges";
+import { localToday } from "@/utils/format";
 
-/** 하단 네비 배지용 — 이번 달 미충족 상태인 활성 입금 챌린지 유무(월 20일 이후).
- * `enabled`가 false면 조회 자체를 건너뛴다 — 챌린지를 만든 적 없는 사용자가 앱을 켤 때마다
- * 불필요하게 이 엔드포인트를 호출하는 것을 막기 위해 호출부(BottomNav)에서 챌린지 존재
- * 여부로 게이트한다. */
-export const useChallengeNudge = (enabled = true) =>
-  useQuery({
-    queryKey: QUERY_KEYS.challengeSummary,
-    queryFn: fetchChallengeSummary,
-    staleTime: STALE_TIME.MEDIUM,
-    enabled,
-  });
+/** 이 날짜부터 "이번 달 아직 적립 안 함"을 배지로 — 백엔드 `challenge_service._NUDGE_DAY_OF_MONTH`와 같게 */
+export const CHALLENGE_NUDGE_DAY_OF_MONTH = 20;
+
+/**
+ * 이번 달 순입금이 없는 알림 켠 활성 입금 챌린지가 있는지 — 백엔드 `get_challenge_summary`와 같은 판정을
+ * 이미 받아 둔 챌린지 목록(`progress.this_month_satisfied` = 순입금 > 0)으로 한다. 내비는 모든 화면에 떠 있어
+ * 예전엔 부팅마다 목록을 받은 뒤 `/challenges/summary`를 한 번 더 불렀다(plans/151 B4).
+ */
+export function challengeNeedsAttention(
+  challenges: readonly Challenge[],
+  dayOfMonth: number,
+): boolean {
+  if (dayOfMonth < CHALLENGE_NUDGE_DAY_OF_MONTH) return false;
+  return challenges.some(
+    (c) =>
+      c.status === "ACTIVE" &&
+      c.challenge_type === "DEPOSIT" &&
+      c.reminder_enabled &&
+      !c.progress.is_expired &&
+      !c.progress.this_month_satisfied,
+  );
+}
+
+/** 하단 내비·사이드바 배지용 — 추가 요청 없이 챌린지 목록 캐시로 판정 */
+export function useChallengeNudge(): boolean {
+  const { data: challenges } = useChallenges();
+  return useMemo(
+    () => challengeNeedsAttention(challenges ?? [], Number(localToday().slice(8, 10))),
+    [challenges],
+  );
+}

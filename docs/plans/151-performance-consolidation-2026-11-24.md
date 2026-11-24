@@ -1,6 +1,6 @@
 # 계획 151 — 전체 속도 개선 (중복 계산·중복 호출·불필요 정보 정리)
 
-> 작성 2026-11-24. 상태: 배치 0 완료(PR #321), 배치 A 구현. 운영 기준선 수집 대기. 배치 0 → A → B → C → D 순서, 배치별 PR.
+> 작성 2026-11-24. 상태: 배치 0(#321)·A(#322) 완료, 배치 B 구현. 운영 기준선 수집 대기. 배치 0 → A → B → C → D 순서, 배치별 PR.
 
 ## Context
 
@@ -64,12 +64,14 @@
 | 12 | 환전 계획 다른 기간 프리페치 | **하지 않음** — 프리페치는 124의 즉시 전환, `dataUpdatedAt` 재프리페치는 128 A4(동기화 뒤 다른 기간 탭 옛 달러) 수정이고 신선 캐시는 이미 건너뛴다 |
 | 13 | 중복 포매터 | `fmtUsdWhole` 2중 정의 → `utils/format.ts`, 환율 알림 화면 `toLocaleString` → `fmtFxRate`. `PendingPlanRow` 로컬 `fmtUsd`(쉼표+센트 고정)·`ChartTrendList` `fmtNum`은 같은 출력의 공용 함수가 없어 유지, `ExchangeRateAlertSection`의 쿼리는 `useAlertCrud`가 같은 키·함수로 받아 캐시 공유라 유지 |
 
-## 배치 B — 홈 요청 통합 (중간, 1 PR)
-1. `/dashboard` 응답에 홈 히어로용 `total_stock_krw`·`unrealized_pnl_krw`(+기존 `stock_return_pct`)와 목표 진행 `goal_progress_pct`(dca `goal_timeline.current_progress_pct`와 같은 정의) 추가 → `HeroSummaryCard.tsx:149-162`·`InvestmentGoalCard.tsx:48-50`이 `/dashboard`만 사용. 홈에서 `/portfolio/overview?lite`·`/invest/dca-analysis` 조회 제거(계좌관리 탭의 lite 사용은 유지), `prefetch.ts`에서도 제거(7→5).
-   - 주의: 두 엔진 총액 규칙 차이(스냅샷 없는 증권계좌) — 히어로 수치가 바뀌면 배치 C의 규칙 통일과 함께 판단. 값 차이 있으면 사용자 확인.
-2. `/dashboard` 크리티컬 패스에서 배당 분리: `asset_aggregator.py:217` `get_dividend_summary` 대기 제거 → 배당 캐시가 있으면 쓰고 없으면 `null`(목표 칩은 `/dividends/summary` 폴백 또는 다음 갱신). 응답이 버리는 `monthly_trend`·`dividend_monthly_breakdown`·`annual_dividends_received` 계산은 `jobs/monthly_report.py` 전용 함수로 분리.
-3. 부팅 프리페치는 진입 경로가 `/`·`/dashboard`일 때만(`main.tsx:83`, `App.tsx:118-121`) — 푸시·메일 딥링크 진입 시 홈 무거운 요청이 해당 페이지와 경쟁하지 않게.
-4. 챌린지 배지: `/challenges/summary` 추가 요청 대신 `/challenges` 목록의 `progress.this_month_satisfied`로 `needs_attention` 계산 가능한지 확인 후 전환(`useNavBadges.ts:47-50`, `useChallengeNudge.ts`).
+## 배치 B — 홈 요청 통합 — 구현 2026-11-24
+
+| # | 내용 | 결과 |
+|---|---|---|
+| 1 | 홈이 숫자 몇 개 때문에 lite overview·적립 분석을 따로 받음 | `/dashboard`에 `stock_pnl`·`goal_expected_month` 추가, 홈·부팅 프리페치 7→5. **주식 평가손익은 계획과 달리 `build_asset_totals`가 아니라 대시보드 계산 안에서 lite overview(`in_total`, 30분 캐시·계좌관리 탭과 공유)를 불러 쓴다** — 두 엔진이 스냅샷 계좌에서 다르게 계산해(overview는 스냅샷 `invested_amount`·`unrealized_pnl`, 총자산은 포지션 현재가 재평가) 바꾸면 히어로와 자산 탭 숫자가 어긋난다. 엔진 통일은 C. 목표 진행률은 원래 같은 식(`goal_achievement_pct`)이라 예상월만 `dca_service.compute_goal_expected_month`(goal_timeline과 같은 계산, 투영 곡선·월별 실적 없이 — 동등성 테스트)로. 부가 조회 실패는 격리하되 **DB 오류는 rollback 없이 올린다**(같은 세션을 쓰는 챌린지 루프 ORM 만료 방지). 대시보드 요약의 미사용 `monthly_trend` 계산 제거 — 월간 리포트가 직접 조회. `dca-analysis`는 persist 대상에서 제외(홈 미사용, 월별 투영 배열이 큼) |
+| 2 | `/dashboard`가 콜드 배당 체인 대기 | **보류** — 종목별 배당 캐시가 24h라 외부 체인은 하루 1회 수준. 분리하려면 백그라운드 계산 + 짧은 캐시가 필요해, 배치 0의 `dashboard_summary_timing.dividends_ms` 실측을 보고 결정 |
+| 3 | 딥링크 진입에도 홈 프리페치 | `isHomeEntryPath` — `/`·`/dashboard`·모르는 경로일 때만(부팅 2곳). 로그인 직후는 홈으로 가므로 그대로 |
+| 4 | 내비 배지가 목록 다음에 `/challenges/summary` 추가 요청 | `useChallengeNudge`가 목록(`this_month_satisfied` 등)으로 같은 판정. 백엔드 엔드포인트는 구버전 앱 호환으로 유지 |
 
 ## 배치 C — 백엔드 공용 계산 (큼, 1~2 PR, 동등성 테스트 선행)
 1. **원천 보유 데이터 1회 조회·캐시**: 사용자별 "활성 계좌 + 최신 스냅샷 + 스냅샷 포지션 + 현재 포지션" 로더를 하나로(기존 `prefetch_accounts_snapshot_positions` 확장), 대시보드 캐시와 같은 무효화 그룹(`cache_invalidation`)에 묶음.

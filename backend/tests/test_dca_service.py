@@ -663,3 +663,64 @@ class TestGetDcaAnalysisCache:
         assert result["is_configured"] is True
         mock_set.assert_awaited_once()
         assert mock_set.call_args.args[1] == dca_analysis_key(user_id)
+
+
+# ── compute_goal_expected_month (plans/151 B1) ───────────────
+
+
+class TestComputeGoalExpectedMonth:
+    """홈 목표 카드의 달성 예상월 — 적립 분석 goal_timeline과 같은 값이어야 한다."""
+
+    def _settings(self, **overrides):
+        from types import SimpleNamespace
+
+        base = {
+            "monthly_deposit_amount": 1_000_000,
+            "goal_annual_return_pct": 7.0,
+            "goal_amount": 300_000_000,
+            "goal_start_date": date(2023, 1, 1),
+            "goal_initial_amount": 20_000_000,
+        }
+        base.update(overrides)
+        return SimpleNamespace(**base)
+
+    @pytest.mark.asyncio
+    async def test_matches_dca_analysis_timeline(self, mock_db, override_settings):
+        from app.services.dca_service import compute_goal_expected_month
+
+        settings = self._settings()
+        mock_db.scalar = AsyncMock(return_value=settings)
+        investable = 60_000_000.0
+        with (
+            patch(
+                "app.services.dca_service.build_asset_totals",
+                new=AsyncMock(return_value=(investable, 0.0, 0.0, {})),
+            ),
+            patch("app.services.dca_service._get_monthly_actual_values", new=AsyncMock(return_value={})),
+        ):
+            analysis = await get_dca_analysis(uuid.uuid4(), mock_db)
+        timeline = analysis["goal_timeline"]
+        expected = timeline["actual_expected_goal_date"] or timeline["expected_goal_date"]
+
+        month = await compute_goal_expected_month(uuid.uuid4(), mock_db, settings, investable)
+
+        assert expected is not None
+        assert month == expected
+
+    @pytest.mark.asyncio
+    async def test_none_when_dca_not_configured(self, mock_db, override_settings):
+        from app.services.dca_service import compute_goal_expected_month
+
+        settings = self._settings(monthly_deposit_amount=None)
+        assert await compute_goal_expected_month(uuid.uuid4(), mock_db, settings, 1.0) is None
+        assert await compute_goal_expected_month(uuid.uuid4(), mock_db, None, 1.0) is None
+
+    @pytest.mark.asyncio
+    async def test_reads_initial_snapshot_when_not_entered(self, mock_db, override_settings):
+        from app.services.dca_service import compute_goal_expected_month
+
+        settings = self._settings(goal_initial_amount=None)
+        with patch("app.services.dca_service._get_initial_value", new=AsyncMock(return_value=20_000_000.0)) as initial:
+            month = await compute_goal_expected_month(uuid.uuid4(), mock_db, settings, 60_000_000.0)
+        initial.assert_awaited_once()
+        assert month is not None
