@@ -41,10 +41,14 @@ function MonthlyDividendChart({
       >
         <ResponsiveContainer width="100%" height={220}>
           <BarChart
+            accessibilityLayer={false}
             data={barData}
             margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
             onClick={(e) => {
-              const d = barData[Number(e?.activeTooltipIndex)];
+              // recharts 3은 막대 밖(축·여백)을 누르면 인덱스가 null — Number(null)은 0이라 1월이 골라졌다
+              const idx = e?.activeTooltipIndex;
+              if (idx == null) return;
+              const d = barData[Number(idx)];
               if (d) onMonthSelect(d.month);
             }}
           >

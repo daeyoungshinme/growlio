@@ -29,3 +29,14 @@ export const CHART_TICK_FONT_SIZE = 12;
 export function chartTickStyle(isDark: boolean) {
   return { fontSize: CHART_TICK_FONT_SIZE, fill: isDark ? "#9CA3AF" : "#6B7280" };
 }
+
+/**
+ * recharts 3 `Legend`는 기본으로 라벨 이름순 정렬(`itemSorter="value"`) — 시리즈를 그리는 순서(쌓기 순서)대로 두려면
+ * 이 정렬 함수를 넘긴다. `null`(정렬 안 함)은 렌더마다 순서가 바뀔 수 있다고 문서가 경고한다.
+ */
+export function legendOrder(keys: readonly string[]): (item: { dataKey?: unknown }) => number {
+  return (item) => {
+    const idx = keys.indexOf(String(item.dataKey));
+    return idx === -1 ? keys.length : idx;
+  };
+}

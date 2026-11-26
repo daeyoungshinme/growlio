@@ -70,6 +70,12 @@ describe("resolvePushDeepLink", () => {
     expect(link({ type: "REBALANCING_PLAN_EXECUTION_FAILED" })).toBe("/rebalancing?rtab=이력");
   });
 
+  it("동기화 끊김 보류 알림은 계좌관리로 연다 — 해결이 계좌 동기화라서", () => {
+    expect(link({ type: "REBALANCING_STALE_SNAPSHOT_BLOCKED", portfolio_id: "p1" })).toBe(
+      "/assets?tab=계좌관리",
+    );
+  });
+
   it("적립 해외 매수 환전 대기·매수 만료는 이력 탭으로 연다 (plans/120)", () => {
     expect(link({ type: "DCA_FX_REQUIRED" })).toBe("/rebalancing?rtab=이력");
     expect(link({ type: "REBALANCING_PLAN_EXPIRED" })).toBe("/rebalancing?rtab=이력");

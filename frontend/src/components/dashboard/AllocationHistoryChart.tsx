@@ -11,7 +11,12 @@ import {
 } from "recharts";
 import { ChevronDown, ChevronRight, ChartNoAxesColumn } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
-import { CHART_TICK_FONT_SIZE, chartTickStyle, chartTooltipStyle } from "@/utils/chart";
+import {
+  CHART_TICK_FONT_SIZE,
+  chartTickStyle,
+  chartTooltipStyle,
+  legendOrder,
+} from "@/utils/chart";
 import { fmtKrw, fmtKrwShort, fmtMonth, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { summarizeAllocationHistory } from "@/utils/chartSummary";
@@ -140,7 +145,11 @@ function AllocationHistoryChart({
           aria-label={summarizeAllocationHistory(reversedMonthly)}
         >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <BarChart
+              accessibilityLayer={false}
+              data={chartData}
+              margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+            >
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke={isDark ? "#374151" : "#F3F4F6"}
@@ -171,6 +180,7 @@ function AllocationHistoryChart({
                 }}
               />
               <Legend
+                itemSorter={legendOrder(allTypes)}
                 formatter={(value: string) => labelMap[value] ?? value}
                 wrapperStyle={{ fontSize: CHART_TICK_FONT_SIZE }}
               />

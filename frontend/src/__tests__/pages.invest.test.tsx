@@ -210,6 +210,13 @@ describe("InvestPlanPage", () => {
     expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
   });
 
+  it("적립 분석이 실패해도 낙폭 추매 카드는 보인다 — 알림 링크(#dip-buy) 진입이 실패 화면에 막히지 않게(plans/152 C2)", async () => {
+    vi.mocked(fetchDCAAnalysis).mockRejectedValue(new Error("failed"));
+    renderPage();
+    expect(await screen.findByText("데이터를 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("낙폭 추매 안내")).toBeInTheDocument();
+  });
+
   it("환전 탭은 적립 분석이 실패해도 환전 계획을 그리고 기본 계획 요청을 바로 보낸다(plans/149)", async () => {
     vi.mocked(fetchDCAAnalysis).mockRejectedValue(new Error("failed"));
     renderPage("/invest-plan?tab=환전");

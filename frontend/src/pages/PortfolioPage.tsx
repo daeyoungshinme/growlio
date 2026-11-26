@@ -103,7 +103,6 @@ export default function PortfolioPage() {
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, tab, handleTabChange);
 
-  // 비중 분석 "전체 비중순 보기" → 보유 종목 목록을 비중순으로 정렬하고 그 위치로 스크롤
   const { data: accountsList } = useQuery(accountsQuery);
   const accountOptions = useMemo(
     () => (accountsList ?? []).filter((a) => isStockAccount(a.asset_type)),

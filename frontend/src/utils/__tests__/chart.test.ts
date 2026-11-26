@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chartTooltipStyle } from "../chart";
+import { chartTooltipStyle, legendOrder } from "../chart";
 
 describe("chartTooltipStyle", () => {
   it("라이트 모드 스타일 반환", () => {
@@ -30,5 +30,18 @@ describe("chartTooltipStyle", () => {
     const light = chartTooltipStyle(false);
     const dark = chartTooltipStyle(true);
     expect(light.contentStyle.backgroundColor).not.toBe(dark.contentStyle.backgroundColor);
+  });
+});
+
+describe("legendOrder", () => {
+  it("recharts 3 기본(이름순) 대신 넘긴 시리즈 순서대로 정렬 값을 준다", () => {
+    const sorter = legendOrder(["STOCK", "BANK", "PENSION"]);
+    const items = [{ dataKey: "PENSION" }, { dataKey: "STOCK" }, { dataKey: "BANK" }];
+    expect([...items].sort((a, b) => sorter(a) - sorter(b)).map((i) => i.dataKey)).toEqual([
+      "STOCK",
+      "BANK",
+      "PENSION",
+    ]);
+    expect(sorter({ dataKey: "UNKNOWN" })).toBe(3); // 모르는 키는 맨 뒤
   });
 });

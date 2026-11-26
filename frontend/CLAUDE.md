@@ -261,7 +261,7 @@ _기타_
 
 **플랫폼 (`utils/platform.ts`)**: `isNativePlatform()`, `getApiBaseUrl()`(네이티브는 `VITE_API_DOMAIN` 절대 URL, 웹은 `""`) — 인라인 `window.Capacitor` 접근 금지. `randomId()` — `crypto.randomUUID` 직접 호출 금지(minSdk 24 구형 WebView엔 없음).
 
-**차트 (`utils/chart.ts`)**: `chartTooltipStyle(isDark)`, `chartTickStyle(isDark)`/`CHART_TICK_FONT_SIZE`(12) — 인라인 스타일·`fontSize: 11` 금지. Recharts는 `dark:` 미지원이라 `isDark`로.
+**차트 (`utils/chart.ts`)**: `chartTooltipStyle(isDark)`, `chartTickStyle(isDark)`/`CHART_TICK_FONT_SIZE`(12) — 인라인 스타일·`fontSize: 11` 금지. Recharts는 `dark:` 미지원이라 `isDark`로. **recharts 3 기본값 함정**: 차트 루트에 `accessibilityLayer={false}`(기본 켜짐 — `role="img"` 래퍼 안에 포커스 가능한 svg가 중첩), 여러 시리즈 `Legend`엔 `itemSorter={legendOrder(keys)}`(기본은 이름순), 클릭 핸들러의 `activeTooltipIndex`는 막대 밖이면 null(`Number(null)`=0).
 
 **입력 스타일 (`constants/inputStyles.ts`)**: `INPUT_SM`/`INPUT_MD`, `LABEL_SM`/`LABEL_MD`, `FORM_LABEL`/`FORM_LABEL_XS`(폼 라벨), `FORM_INPUT_SM`, `SELECT_SM`, `TEXTAREA_SM` — 인라인 Tailwind 입력 스타일 금지. **`<label>`은 `htmlFor`(`useId()`)로 컨트롤과 연결하거나 컨트롤을 감싼다** — 여러 입력을 묶는 제목은 `<p id>` + `role="group" aria-labelledby`(`a11y.labels.test.ts`가 검사 — `htmlFor`가 같은 파일의 `id`를 가리키는지까지. 조건부로만 렌더되는 컨트롤은 그 조건에서만 label을 둘 것).
 

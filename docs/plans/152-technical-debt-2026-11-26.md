@@ -1,6 +1,6 @@
 # 152. 기술부채 — 147~151 첫 감사 (2026-11-26)
 
-상태: 배치 A 구현(A8 보류·A10 확인 대기), 배치 B 구현(B5 시간대·B7 보류), C 미착수.
+상태: 배치 A 구현(A8 보류·A10 확인 대기), 배치 B 구현(B5 시간대·B7 보류), 배치 C 구현.
 
 ## Context
 마지막 기술부채 감사(146, 2026-11-22) 이후 낙폭 추매(147·148·#312·#313), 환전 탭(149), 메뉴 재점검(150), 속도 개선(151 배치 0·A·B), recharts 3 업그레이드가 머지됐지만 감사는 아직 없다.
@@ -103,21 +103,22 @@
 
 ## 배치 C — 프론트·recharts 3·문서 (PR 3)
 
-**C1 `REBALANCING_STALE_SNAPSHOT_BLOCKED` 푸시 딥링크 없음** — `usePushNotifications.ts:94-96`의 게이트 차단 case 그룹에 추가하고 테스트 목록도 보강한다.
+**C1 `REBALANCING_STALE_SNAPSHOT_BLOCKED` 푸시 딥링크 없음** — 해결이 계좌 동기화라 자동화 설정 모달이 아니라 계좌관리(`assetManagementUrl()`)로 연다. 테스트 추가.
 
-**C2 낙폭 추매 딥링크가 적립 분석 로딩·실패에 묶임** — `InvestPlanPage.tsx:212-310`에서 `#dip-buy` 카드를 `!dcaPending && !dcaFailed` 분기 밖으로 뺀다. `useScrollToAnchor`도 dca 로딩을 기다리지 않게 한다. 149에서 환전 카드에 적용한 방식과 같다.
+**C2 낙폭 추매 딥링크가 적립 분석 로딩·실패에 묶임** — `InvestPlanPage.tsx:212-310`에서 `#dip-buy` 카드를 `!dcaPending && !dcaFailed` 분기 밖으로 뺀다. 결과: 실패 화면 아래에도 같은 카드를 그린다. 로딩 중에는 위 내용 높이가 바뀌어 스크롤이 어긋나므로 `useScrollToAnchor`는 그대로 로딩 끝을 기다린다.
 
 **C3 recharts 3: 배당 차트 빈 곳 클릭 시 1월 선택** — `MonthlyDividendChart.tsx:46-49`. `activeTooltipIndex == null`이면 무시한다.
 
 **C4 recharts 3 기본값 변경 되돌리기**
 - 모든 차트에 `accessibilityLayer={false}`를 준다(8개 파일). `role="img"` 래퍼 안에 포커스 가능한 svg가 중첩되는 문제다.
 - `Legend`에 `itemSorter`를 지정해 v2의 렌더 순서를 유지한다(`AllocationHistoryChart`, `BacktestResultChart`).
-- `BacktestResultChart`의 y=0 `ReferenceLine`이 데이터 위에 그려지는지 화면에서 확인하고, 필요하면 조정한다.
+- `ReferenceLine`은 v3 기본 z-index 0이라 영역(100)·막대(300) 아래 — 조정 불필요(recharts `DefaultZIndexes` 확인).
+- 범례 정렬은 `utils/chart.legendOrder(keys)`(시리즈 순서) — `null`은 렌더마다 순서가 바뀔 수 있다는 문서 경고로 쓰지 않음.
 
 **C5 문서·잔재 정리**
 - `backend/CLAUDE.md:207`: `#fx-plan`·`FX_PLAN_ANCHOR` 설명을 `?tab=환전`으로 고친다.
 - `PortfolioPage.tsx:106`의 고아 주석을 삭제한다.
-- `types/index.ts`의 `stock_allocation` 전용 필드 주석을 정리한다. 백엔드 필드는 `topStock`이 쓰므로 유지한다.
+- `types/index.ts`의 `stock_allocation` 필드 주석은 필드가 아직 전송·사용(`topStock`)되므로 유지.
 
 ---
 

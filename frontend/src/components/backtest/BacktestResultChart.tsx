@@ -17,7 +17,7 @@ import {
 import { SeriesData } from "@/api/backtest";
 import { useThemeStore } from "@/stores/themeStore";
 import { useIsSmUp } from "@/hooks/useMediaQuery";
-import { chartTickStyle, chartTooltipStyle } from "@/utils/chart";
+import { chartTickStyle, chartTooltipStyle, legendOrder } from "@/utils/chart";
 import { PIE_COLORS } from "@/utils/colors";
 import {
   summarizeBacktestAnnual,
@@ -168,6 +168,8 @@ function BacktestResultChart({ dates, series }: Props) {
   const chartHeight = isMobile ? 240 : 280;
   const legendStyle = {
     wrapperStyle: { fontSize: 12, paddingTop: 12, color: isDark ? "#d1d5db" : undefined },
+    // recharts 3 기본은 이름순 — 포트폴리오·벤치마크를 그리는 순서(색 순서)대로 둔다
+    itemSorter: legendOrder(series.map((s) => s.name)),
   };
 
   return (
@@ -189,7 +191,11 @@ function BacktestResultChart({ dates, series }: Props) {
       <div role="img" aria-label={viewLabels[view]}>
         {view === "cumulative" && (
           <ResponsiveContainer width="100%" height={chartHeight}>
-            <LineChart data={cumulativeData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+            <LineChart
+              accessibilityLayer={false}
+              data={cumulativeData}
+              margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+            >
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="date" {...axisProps} interval={tickInterval} />
               <YAxis {...axisProps} tickFormatter={(v) => `${v.toFixed(0)}`} width={40} />
@@ -223,7 +229,11 @@ function BacktestResultChart({ dates, series }: Props) {
 
         {view === "annual" && (
           <ResponsiveContainer width="100%" height={chartHeight}>
-            <BarChart data={annualData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+            <BarChart
+              accessibilityLayer={false}
+              data={annualData}
+              margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+            >
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="year" {...axisProps} />
               <YAxis
@@ -256,7 +266,11 @@ function BacktestResultChart({ dates, series }: Props) {
 
         {view === "drawdown" && (
           <ResponsiveContainer width="100%" height={chartHeight}>
-            <AreaChart data={drawdownData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+            <AreaChart
+              accessibilityLayer={false}
+              data={drawdownData}
+              margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+            >
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="date" {...axisProps} interval={tickInterval} />
               <YAxis {...axisProps} tickFormatter={(v) => `${v.toFixed(0)}%`} width={45} />

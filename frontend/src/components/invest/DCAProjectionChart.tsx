@@ -167,7 +167,11 @@ function DCAProjectionChart({
       {/* 모바일은 240px — 적립 계획 탭 세로 길이 축소 (docs/plans/67 Phase 3) */}
       <div role="img" aria-label={summarizeProjection([...recentPast, ...visibleFuture])}>
         <ResponsiveContainer width="100%" height={isMobile ? 240 : 320}>
-          <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
+          <LineChart
+            accessibilityLayer={false}
+            data={chartData}
+            margin={{ top: 4, right: 12, left: 0, bottom: 4 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f0f0f0"} />
             <XAxis
               dataKey="month"

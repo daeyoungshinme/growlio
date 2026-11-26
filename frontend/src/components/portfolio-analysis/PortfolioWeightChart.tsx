@@ -36,7 +36,7 @@ function PortfolioWeightChart({ items }: Props) {
         )}
       >
         <ResponsiveContainer width="100%" aspect={1}>
-          <PieChart>
+          <PieChart accessibilityLayer={false}>
             <Pie
               data={pieData}
               cx="50%"
