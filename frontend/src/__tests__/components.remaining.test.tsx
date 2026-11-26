@@ -148,6 +148,7 @@ vi.mock("@/utils/chart", () => ({
   chartTooltipStyle: vi.fn(() => ({})),
   chartTickStyle: vi.fn(() => ({})),
   CHART_TICK_FONT_SIZE: 12,
+  legendOrder: vi.fn(() => () => 0),
 }));
 
 // ---- Imports ----

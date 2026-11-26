@@ -44,6 +44,7 @@ export default function YearlyDividendChart() {
       >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
+            accessibilityLayer={false}
             data={years.map((y) => ({ name: `${y.year}년`, 배당: y.amount_krw }))}
             margin={{ top: 0, right: 4, left: 0, bottom: 0 }}
           >

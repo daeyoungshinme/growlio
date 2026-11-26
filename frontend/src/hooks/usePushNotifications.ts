@@ -14,7 +14,7 @@ import { registerPushToken } from "@/api/settings";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import { useLatestRef } from "@/hooks/useLatestRef";
-import { investPlanUrl } from "@/utils/tabUrl";
+import { assetManagementUrl, investPlanUrl } from "@/utils/tabUrl";
 import { storageGet, storageRemove, storageSet } from "@/utils/safeStorage";
 import { pushOptOutKey } from "@/constants/storageKeys";
 
@@ -91,6 +91,9 @@ export function resolvePushDeepLink(
       return rebalancingUrl({ tab: "이력" });
     // 세금·시장·하루 한도 게이트로 자동 실행이 보류된 알림 — 해결은 자동화 설정 조정이라 설정 모달로 연다
     // (예전엔 매핑이 없어 알림을 눌러도 앱 첫 화면에 머물렀다, plans/63 P3-4)
+    // 동기화가 끊겨 자동 실행이 보류됨 — 해결은 계좌 다시 동기화라 계좌관리로 연다(메일엔 링크 없음)
+    case "REBALANCING_STALE_SNAPSHOT_BLOCKED":
+      return assetManagementUrl();
     case "REBALANCING_TAX_GATE_BLOCKED":
     case "REBALANCING_MARKET_GATE_BLOCKED":
     case "REBALANCING_DAILY_CAP_BLOCKED": {

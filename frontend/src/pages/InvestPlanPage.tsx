@@ -199,6 +199,28 @@ export default function InvestPlanPage() {
     if (fxPlanVisible) void queryClient.prefetchQuery(fxPlanQuery(FX_PLAN_DEFAULT_MONTHS, null));
   }, [fxPlanVisible, queryClient]);
 
+  // 낙폭 추매 카드는 적립 분석(dca-analysis)을 쓰지 않는다 — 분석이 실패해도 알림 링크(#dip-buy)로 들어온 사람이
+  // 카드를 볼 수 있게 실패 화면 아래에도 그린다(plans/152 C2). 로딩 중엔 위 내용 높이가 바뀌어 스크롤이 어긋나므로 기다린다
+  const dipBuySection = (
+    <div id={DIP_BUY_ANCHOR} className="scroll-mt-4">
+      <CollapsibleCard
+        icon={TrendingDown}
+        iconWrapClassName="bg-amber-50 dark:bg-amber-950"
+        iconColorClassName="text-amber-600 dark:text-amber-400"
+        title="낙폭 추매 안내"
+        isOpen={dipBuy.open}
+        onToggle={dipBuy.handleToggle}
+        collapsedHint="지수가 고점 대비 내려가면 여윳돈을 구간별로 나눠 추매할 금액·종목 안내"
+      >
+        <ErrorBoundary variant="section">
+          <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+            <DipBuyCard />
+          </Suspense>
+        </ErrorBoundary>
+      </CollapsibleCard>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <h1 className="sr-only">계획</h1>
@@ -218,7 +240,10 @@ export default function InvestPlanPage() {
         )}
         {activeTab === "적립 계획" && !dcaPending && dcaFailed && (
           // 실패한 적립 분석만 다시 조회한다 — invalidateDcaData는 설정·대시보드 등 8계열을 함께 지운다
-          <PageLoadError message="데이터를 불러오지 못했습니다." onRetry={() => void refetch()} />
+          <div className="space-y-6">
+            <PageLoadError message="데이터를 불러오지 못했습니다." onRetry={() => void refetch()} />
+            {dipBuySection}
+          </div>
         )}
         {activeTab === "적립 계획" && !dcaPending && !dcaFailed && (
           <div className="space-y-6">
@@ -291,23 +316,7 @@ export default function InvestPlanPage() {
               )}
             </div>
 
-            <div id={DIP_BUY_ANCHOR} className="scroll-mt-4">
-              <CollapsibleCard
-                icon={TrendingDown}
-                iconWrapClassName="bg-amber-50 dark:bg-amber-950"
-                iconColorClassName="text-amber-600 dark:text-amber-400"
-                title="낙폭 추매 안내"
-                isOpen={dipBuy.open}
-                onToggle={dipBuy.handleToggle}
-                collapsedHint="지수가 고점 대비 내려가면 여윳돈을 구간별로 나눠 추매할 금액·종목 안내"
-              >
-                <ErrorBoundary variant="section">
-                  <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-                    <DipBuyCard />
-                  </Suspense>
-                </ErrorBoundary>
-              </CollapsibleCard>
-            </div>
+            {dipBuySection}
 
             <CollapsibleCard
               icon={PiggyBank}
