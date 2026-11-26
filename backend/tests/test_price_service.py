@@ -401,17 +401,53 @@ class TestPriceMissCache:
         cache = CacheStore()
         mock_db.scalar = AsyncMock(return_value=None)  # KIS 계좌 없음
         ps = "app.services.market_data.price_service"
+        # 같은 국내 묶음의 다른 종목은 받았으니 소스는 살아 있다 → 이 종목만 미스로 기록
         with (
-            patch(f"{ps}.domestic_price_fallback", new_callable=AsyncMock, return_value=None) as domestic,
+            patch(
+                f"{ps}.domestic_price_fallback",
+                new_callable=AsyncMock,
+                side_effect=lambda t, _loop: 70000.0 if t == "005930" else None,
+            ) as domestic,
             patch(f"{ps}.fetch_yahoo_batch", new_callable=AsyncMock, return_value={}) as yahoo,
         ):
-            first = await fetch_prices_batch(uuid.uuid4(), [("999999", "KOSPI")], mock_db, cache)
+            first = await fetch_prices_batch(uuid.uuid4(), [("999999", "KOSPI"), ("005930", "KOSPI")], mock_db, cache)
             second = await fetch_prices_batch(uuid.uuid4(), [("999999", "KOSPI")], mock_db, cache)
 
-        assert first == {}
+        assert first == {"005930": 70000.0}
         assert second == {}
-        assert domestic.await_count == 1
+        assert domestic.await_count == 2  # 두 번째 호출은 국내 소스를 건너뛴다
         assert yahoo.await_args_list[1].args[0] == []  # 두 번째는 Yahoo 대상에서도 빠진다
+
+    @pytest.mark.asyncio
+    async def test_whole_batch_failure_is_not_cached_as_miss(self, mock_db, override_settings):
+        """묶음 전체가 비면 소스 장애(서킷 열림)일 수 있다 — 2분짜리 장애를 10분 미스로 늘리지 않는다."""
+        import uuid
+        from unittest.mock import AsyncMock, patch
+
+        from app.core.cache_store import CacheStore
+        from app.services.market_data.price_service import fetch_prices_batch
+
+        cache = CacheStore()
+        mock_db.scalar = AsyncMock(return_value=None)
+        ps = "app.services.market_data.price_service"
+        with (
+            patch(f"{ps}.domestic_price_fallback", new_callable=AsyncMock, return_value=None),
+            patch(f"{ps}.fetch_yahoo_batch", new_callable=AsyncMock, side_effect=[{}, {"QQQ": 500.0}]) as yahoo,
+        ):
+            first = await fetch_prices_batch(uuid.uuid4(), [("QQQ", "NASDAQ")], mock_db, cache)
+            second = await fetch_prices_batch(uuid.uuid4(), [("QQQ", "NASDAQ")], mock_db, cache)
+
+        assert first == {}
+        assert second == {"QQQ": 500.0}
+        assert yahoo.await_args_list[1].args[0] == [("QQQ", "NASDAQ")]
+
+    def test_confirmed_misses_per_source_group(self):
+        from app.services.market_data.price_service import confirmed_misses
+
+        targets = [("005930", "KOSPI"), ("999999", "KOSPI"), ("QQQ", "NASDAQ"), ("ZZZZ", "NASDAQ")]
+        found = {"005930"}
+        # 국내는 성공 종목이 있어 실패분 기록, 해외는 전부 실패(Yahoo 장애일 수 있음)라 기록 안 함
+        assert confirmed_misses(targets, lambda tm: tm[0] in found) == [("999999", "KOSPI")]
 
     @pytest.mark.asyncio
     async def test_current_price_miss_still_tries_kis(self, mock_db, override_settings):
@@ -434,7 +470,7 @@ class TestPriceMissCache:
             result = await fetch_prices_batch(uuid.uuid4(), [("999999", "KOSPI")], mock_db, cache, {"999999": account})
 
         assert result == {"999999": 1234.0}
-        assert domestic.await_count == 1
+        assert domestic.await_count == 2  # 묶음 전체 실패는 미스로 기록하지 않는다(소스 장애일 수 있음)
         assert kis.await_count == 2
 
     @pytest.mark.asyncio
@@ -446,10 +482,30 @@ class TestPriceMissCache:
 
         cache = CacheStore()
         ps = "app.services.market_data.price_service"
-        with patch(f"{ps}.fetch_yahoo_returns_batch", new_callable=AsyncMock, return_value={}) as yahoo:
-            first = await get_historical_returns([("ZZZZ", "NASDAQ")], cache=cache)
-            second = await get_historical_returns([("ZZZZ", "NASDAQ")], cache=cache)
+        qqq = {"cumulative_return_pct": 10.0}
+        with patch(
+            f"{ps}.fetch_yahoo_returns_batch",
+            new_callable=AsyncMock,
+            side_effect=[{("QQQ", "NASDAQ"): qqq}, {}],
+        ) as yahoo:
+            first = await get_historical_returns([("ZZZZ", "NASDAQ"), ("QQQ", "NASDAQ")], cache=cache)
+            second = await get_historical_returns([("ZZZZ", "NASDAQ"), ("QQQ", "NASDAQ")], cache=cache)
 
-        assert first == {}
-        assert second == {}
-        assert yahoo.await_count == 1
+        assert first == {("QQQ", "NASDAQ"): qqq}
+        assert second == {("QQQ", "NASDAQ"): qqq}
+        assert yahoo.await_count == 1  # ZZZZ는 미스, QQQ는 수익률 캐시
+
+    @pytest.mark.asyncio
+    async def test_historical_return_whole_batch_failure_not_cached(self, override_settings):
+        from unittest.mock import AsyncMock, patch
+
+        from app.core.cache_store import CacheStore
+        from app.services.market_data.price_service import get_historical_returns
+
+        cache = CacheStore()
+        ps = "app.services.market_data.price_service"
+        with patch(f"{ps}.fetch_yahoo_returns_batch", new_callable=AsyncMock, return_value={}) as yahoo:
+            await get_historical_returns([("ZZZZ", "NASDAQ")], cache=cache)
+            await get_historical_returns([("ZZZZ", "NASDAQ")], cache=cache)
+
+        assert yahoo.await_count == 2

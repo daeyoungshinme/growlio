@@ -179,6 +179,15 @@ describe("BottomNav 리밸런싱 배지", () => {
     expect(fetchDriftSummaryMock).not.toHaveBeenCalled();
   });
 
+  it("묶음 행(rebalance:all)은 서버가 실은 포트폴리오 수로 센다", async () => {
+    renderWithClient((qc) =>
+      qc.setQueryData(QUERY_KEYS.actionItems, [
+        { id: "rebalance:all", kind: "REBALANCE", count: 3 },
+      ]),
+    );
+    expect(await screen.findByLabelText("리밸런싱 필요 3개")).toBeDefined();
+  });
+
   it("drift 캐시가 있으면 그 판정을 쓴다", async () => {
     renderWithClient((qc) => {
       qc.setQueryData(QUERY_KEYS.actionItems, []);

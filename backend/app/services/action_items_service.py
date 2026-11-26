@@ -218,6 +218,7 @@ async def _rebalance_items(
             cta_label="자세히 보기",
             # 펼침 목록을 못 그릴 때의 대체 경로 — 진단 탭(기본 탭)이 포트폴리오별 이탈 현황을 보여 준다
             link=_LINK_REBALANCING,
+            count=len(drifted),
         )
     ]
 

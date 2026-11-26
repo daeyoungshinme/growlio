@@ -41,7 +41,12 @@ from app.utils.cache_invalidation import (
     invalidate_tax_action_items_cache,
     invalidate_user_caches,
 )
-from app.utils.cache_keys import challenge_progress_key, dashboard_summary_key, dca_analysis_key
+from app.utils.cache_keys import (
+    challenge_progress_key,
+    dashboard_home_extras_key,
+    dashboard_summary_key,
+    dca_analysis_key,
+)
 from app.utils.kst import today_kst
 from app.utils.numbers import opt_float
 
@@ -180,6 +185,7 @@ async def update_goal(
     await invalidate_user_caches(
         cache,
         dashboard_summary_key(current_user.id),
+        dashboard_home_extras_key(current_user.id),
         dca_analysis_key(current_user.id),
         challenge_progress_key(current_user.id),
     )

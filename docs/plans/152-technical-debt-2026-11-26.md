@@ -1,6 +1,6 @@
 # 152. 기술부채 — 147~151 첫 감사 (2026-11-26)
 
-상태: 배치 A 구현(A8 제외·A10 확인 대기), B·C 미착수.
+상태: 배치 A 구현(A8 보류·A10 확인 대기), 배치 B 구현(B5 시간대·B7 보류), C 미착수.
 
 ## Context
 마지막 기술부채 감사(146, 2026-11-22) 이후 낙폭 추매(147·148·#312·#313), 환전 탭(149), 메뉴 재점검(150), 속도 개선(151 배치 0·A·B), recharts 3 업그레이드가 머지됐지만 감사는 아직 없다.
@@ -80,7 +80,7 @@
   - `get_dashboard_summary`를 `/challenges`·`/insights`·`/external`·목표 달성 job·월간 리포트 job도 부른다. 이들은 `stock_pnl`·`goal_expected_month`를 쓰지 않는데도 콜드에서 overview와 목표 계산을 돌린다. DB 오류도 이 경로를 통해 500으로 번진다.
   - extras가 실패해 None이 된 결과도 15분 동안 캐시된다.
 - 수정:
-  - 부가 필드는 `/dashboard` 엔드포인트에서만 붙인다. 본 요약 캐시와 분리하거나 `include_home_extras` 플래그를 둔다.
+  - 부가 필드는 `/dashboard` 엔드포인트에서만 붙인다(`get_home_dashboard`, 별도 캐시 `dashboard_home_extras_key` — 요약 키를 지우는 3곳에서 함께 삭제).
   - extras가 실패하면 짧은 TTL(예: 60초)로 캐시하거나 extras만 캐시하지 않는다.
   - `compute_goal_expected_month`(`dca_service.py:61-77`)는 가속 시나리오 계산을 건너뛰는 경로를 쓴다.
 - 테스트: extras가 예외를 던져도 요약 캐시 TTL이 짧은지. `/challenges` 경로에서는 extras를 호출하지 않는지.
@@ -89,14 +89,16 @@
 - 위치: `frontend/src/hooks/useNavBadges.ts:22-26` — drift-summary를 펼칠 때만 받게 바뀌면서, 그 전에는 `rebalance:all` 행 하나만 센다.
 - 수정: 백엔드 action item의 묶음 행에 포트폴리오 수(`count`)를 싣고, 배지는 그 값을 쓴다. 이미 필드가 있으면 재사용한다.
 
-**B5 챌린지 넛지 날짜 기준**
+**B5 챌린지 넛지 날짜 기준 — memo만 수정**
+- 결과: 프론트는 기기 로컬 날짜를 KST로 보는 관례(`localToday`)라 시간대는 그대로 두고, 날짜를 memo 의존성에 넣어 자정을 넘겨도 배지가 갱신되게만 했다.
 - 위치: `frontend/src/hooks/useChallengeNudge.ts:32-34`
 - 수정: 기기 시간대 대신 KST 오늘 날짜를 쓴다. 기존 KST 날짜 유틸이 있으면 재사용한다. memo 의존성에 날짜를 넣는다.
 
 **B6 persist 버전 갱신**
 - `PERSIST_CACHE_BUSTER`(`constants/queryConfig.ts:11`)를 올린다. 새 필드를 읽기 시작했으니 문서 규칙대로 갱신한다.
 
-**B7 (기존 문제) `/stocks/price`가 폴백 환율로 `price_krw` 반환**
+**B7 (기존 문제) `/stocks/price`가 폴백 환율로 `price_krw` 반환 — 보류**
+- 판단: `useRebalancingPrices`가 해외 `price_krw` null을 원화가 없는 것으로 다뤄 리밸런싱 수량 회귀 위험. 원래부터 있던 동작이라 이득보다 위험이 크다.
 - 위치: `api/v1/stocks.py:136` — 실시간 환율이 아니면 `price_krw: None`을 반환한다. 프론트 소비처가 null을 처리하는지 확인한다.
 
 ## 배치 C — 프론트·recharts 3·문서 (PR 3)

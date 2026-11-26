@@ -11,6 +11,7 @@ from app.utils.cache_keys import (
     CacheStoreType,
     _env_prefix,
     challenge_progress_key,
+    dashboard_home_extras_key,
     dashboard_summary_key,
     dca_analysis_key,
     exchange_rate_alerts_key,
@@ -202,6 +203,7 @@ async def invalidate_asset_account_caches(
     keys = [
         monthly_trend_key(user_id),
         dashboard_summary_key(user_id),
+        dashboard_home_extras_key(user_id),
         dca_analysis_key(user_id),
         # 계좌 삭제·잔액 수정(입출금 거래 생성)·sync가 챌린지 진행률(순입금·평가액·수익률)과
         # 보유 포지션 기반 인사이트·리스크 지표를 바꾼다 — 빠지면 TTL 동안 삭제 계좌가 남는다

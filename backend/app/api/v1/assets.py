@@ -64,7 +64,7 @@ from app.services.accounts.snapshot_service import (
 )
 from app.services.accounts.sync_all_service import get_sync_all_status, is_sync_all_running, run_sync_all
 from app.services.tax.isa_service import calc_account_auto_pnl
-from app.utils.cache_invalidation import invalidate_asset_account_caches
+from app.utils.cache_invalidation import invalidate_asset_account_caches, invalidate_tax_action_items_cache
 from app.utils.cache_keys import sync_lock_key
 from app.utils.currency import require_live_usd_krw
 from app.utils.inproc_lock import inproc_lock
@@ -522,6 +522,7 @@ async def update_isa_pnl_override(
         account.isa_baseline_captured_at = None
     await db.commit()
     await db.refresh(account)
-    # 이 값은 ISA 현황·절세 액션(둘 다 캐시 없이 매번 계산)만 읽는다 — 계좌 캐시 전체 무효화는 목표 추천
-    # 세대 교체(콜드 MVO 재계산)까지 일으켜 불필요하다
+    # 이 값은 ISA 현황·절세 액션만 읽는다. ISA 현황·절세 액션 플랜은 캐시가 없지만 홈 "지금 할 일"의 세금 소스는
+    # 15분 캐시라 그것만 지운다 — 계좌 캐시 전체 무효화는 목표 추천 세대 교체(콜드 MVO 재계산)까지 일으켜 불필요하다
+    await invalidate_tax_action_items_cache(await get_cache_store(), current_user.id)
     return _account_response(account)

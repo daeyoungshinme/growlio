@@ -21,7 +21,12 @@ from app.utils.cache_invalidation import (
     invalidate_tax_action_items_cache,
     invalidate_user_caches,
 )
-from app.utils.cache_keys import challenge_progress_key, dashboard_summary_key, monthly_trend_key
+from app.utils.cache_keys import (
+    challenge_progress_key,
+    dashboard_home_extras_key,
+    dashboard_summary_key,
+    monthly_trend_key,
+)
 from app.utils.kst import today_kst
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -161,6 +166,7 @@ async def _invalidate_tx_caches(user_id: UUID, *tx_years: int | None) -> None:
     await invalidate_user_caches(
         cache,
         dashboard_summary_key(user_id),
+        dashboard_home_extras_key(user_id),
         monthly_trend_key(user_id),
         challenge_progress_key(user_id),
     )

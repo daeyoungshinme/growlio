@@ -84,7 +84,7 @@ class TestDashboardApi:
         try:
             with (
                 patch(
-                    "app.api.v1.dashboard.get_dashboard_summary",
+                    "app.api.v1.dashboard.get_home_dashboard",
                     new_callable=AsyncMock,
                     return_value=_MOCK_DASHBOARD,
                 ),
@@ -124,7 +124,7 @@ class TestDashboardApi:
             with (
                 patch("app.api.v1.dashboard.get_cache_store", new_callable=AsyncMock, return_value=mock_cache),
                 patch(
-                    "app.api.v1.dashboard.get_dashboard_summary",
+                    "app.api.v1.dashboard.get_home_dashboard",
                     new_callable=AsyncMock,
                     return_value=_MOCK_DASHBOARD,
                 ),

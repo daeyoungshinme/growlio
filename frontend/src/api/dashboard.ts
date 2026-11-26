@@ -64,6 +64,8 @@ export interface ActionItem {
   cta_label: string;
   link: string;
   deadline: string | null;
+  /** 여러 대상을 한 행으로 묶었을 때 대상 수(리밸런싱 묶음 행) — 내비 배지 개수 */
+  count?: number | null;
 }
 
 /** 이탈 포트폴리오 2개 이상을 묶은 REBALANCE 행의 id — 백엔드 `action_items_service.REBALANCE_GROUP_ID`와 같은 값.

@@ -30,6 +30,8 @@ TTL_PRICE_CURRENT = 900  # 현재가 15분
 TTL_PRICE_MISS = 600
 TTL_MONTHLY_TREND = 300  # 월별 추이 5분
 TTL_DASHBOARD_SUMMARY = 900  # 대시보드 전체 응답 15분 (sync 후 수동 무효화가 primary)
+TTL_DASHBOARD_HOME_EXTRAS = 900  # 홈 전용 부가 필드(주식 평가손익·달성 예상월) — 요약과 같은 수명·무효화
+TTL_DASHBOARD_HOME_EXTRAS_FAILED = 60  # 부가 필드 계산 실패 — 빈 값을 15분 굳히지 않게 짧게
 TTL_DCA_ANALYSIS = 900  # DCA 분석 응답 15분 (대시보드와 동일 무효화 트리거 공유)
 TTL_PRICE_RETURN = 86400  # 기간 수익률 1일
 TTL_DAILY_RETURNS = 86400  # 일별수익률(MVO 입력) 1일
@@ -177,6 +179,11 @@ def candidate_overlap_key(digest: str) -> str:
 
 def dashboard_summary_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}dashboard_summary:{user_id}"
+
+
+def dashboard_home_extras_key(user_id: uuid.UUID) -> str:
+    """`/dashboard` 전용 부가 필드 — 요약(`dashboard_summary_key`)을 지우는 곳은 이것도 함께 지운다."""
+    return f"{_env_prefix()}dashboard_home_extras:{user_id}"
 
 
 def monthly_trend_key(user_id: uuid.UUID) -> str:
