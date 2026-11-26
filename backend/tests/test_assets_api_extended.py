@@ -699,6 +699,28 @@ class TestUpdateIsaPnlOverride:
         assert resp.status_code == 200
         assert account.isa_manual_cumulative_pnl_krw == 2_500_000
 
+    def test_override_invalidates_home_tax_action_cache(self, override_settings):
+        """홈 "지금 할 일"의 ISA 이전 항목은 세금 소스 15분 캐시를 탄다 — 손익을 고치면 지워야 옛 값이 안 남는다."""
+        user = make_user()
+        account = _make_account(user.id)
+        account.tax_type = "ISA"
+        account.isa_manual_cumulative_pnl_krw = None
+        db = make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = setup_app(user, db)
+        with (
+            patch("app.api.v1.assets.invalidate_tax_action_items_cache", new_callable=AsyncMock) as invalidate,
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.patch(
+                f"/api/v1/assets/{account.id}/isa-pnl-override",
+                json={"cumulative_pnl_krw": 2_500_000},
+            )
+        assert resp.status_code == 200
+        invalidate.assert_awaited_once()
+        assert invalidate.await_args.args[1] == user.id
+
     def test_sets_override_captures_baseline_auto_pnl(self, override_settings):
         user = make_user()
         account = _make_account(user.id)

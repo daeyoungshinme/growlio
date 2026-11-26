@@ -8,7 +8,7 @@ from app.models.user import User
 from app.schemas.action_items import ActionItem
 from app.schemas.dashboard import DashboardResponse
 from app.services.action_items_service import get_action_items
-from app.services.portfolio.asset_aggregator import get_dashboard_summary
+from app.services.portfolio.asset_aggregator import get_home_dashboard
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -21,7 +21,7 @@ async def dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     cache = await get_cache_store()
-    return await get_dashboard_summary(current_user.id, db, cache)
+    return await get_home_dashboard(current_user.id, db, cache)
 
 
 @router.get("/action-items", response_model=list[ActionItem])

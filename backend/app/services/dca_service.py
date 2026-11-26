@@ -71,7 +71,15 @@ async def compute_goal_expected_month(
     initial_value = manual_initial if manual_initial is not None else await _get_initial_value(user_id, start_dt, db)
     months_to_goal = _calc_months_to_goal(initial_value, pmt, r, goal_amount)
     timeline = _calc_goal_timeline(
-        initial_value, pmt, r, goal_amount, investable_assets_krw, start_dt, months_to_goal, annual_return_pct
+        initial_value,
+        pmt,
+        r,
+        goal_amount,
+        investable_assets_krw,
+        start_dt,
+        months_to_goal,
+        annual_return_pct,
+        with_scenarios=False,
     )
     expected: str | None = timeline["actual_expected_goal_date"] or timeline["expected_goal_date"]
     return expected
@@ -340,7 +348,10 @@ def _calc_goal_timeline(
     start_date: date,
     months_to_goal: int | None,
     annual_return_pct: float,
+    *,
+    with_scenarios: bool = True,
 ) -> dict[str, Any]:
+    """`with_scenarios=False`면 "더 빨리 달성하려면?" 시나리오를 건너뛴다(달성 예상월만 필요한 홈)."""
     today = today_kst()
     elapsed = _elapsed_months(start_date, today)
 
@@ -370,7 +381,7 @@ def _calc_goal_timeline(
             actual_expected = today + relativedelta(months=actual_months_to_goal)
             actual_expected_goal_date = actual_expected.strftime("%Y-%m")
 
-            if current_actual < goal_amount:
+            if with_scenarios and current_actual < goal_amount:
                 acceleration_scenarios = _calc_acceleration_scenarios(
                     current_actual, pmt, annual_return_pct, goal_amount, actual_months_to_goal, today
                 )

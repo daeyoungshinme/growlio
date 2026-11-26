@@ -448,12 +448,13 @@ class TestGetDashboardSummary:
             "cumulative_return_pct",
             "xirr_pct",
             "annual_dividends_received",
-            "stock_pnl",
-            "goal_expected_month",
             "estimated_annual_dividends",
         ]
         for key in required:
             assert key in result, f"Missing: {key}"
+        # 홈 전용 필드는 공용 요약에 없다 — 챌린지·인사이트·잡이 콜드 계산을 떠안지 않게(plans/152 B3)
+        assert "stock_pnl" not in result
+        assert "goal_expected_month" not in result
 
     @pytest.mark.asyncio
     async def test_cache_cache_hit(self, mock_db, override_settings):

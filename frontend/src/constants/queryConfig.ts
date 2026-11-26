@@ -8,7 +8,7 @@ export const PERSIST_CACHE_KEY = "rq-persist-cache";
  * 배포마다 자동으로 바꾸지 않는 건 매 배포 첫 부팅이 콜드가 되어 persist의 목적(즉시 표시)이 사라지기 때문이다.
  * "v1"(2026-06-09)에서 한 번도 안 올라가 그 사이 dashboard·portfolios 응답 변경이 누적돼 있었다(plans/61 B4).
  */
-export const PERSIST_CACHE_BUSTER = "2026-11-11";
+export const PERSIST_CACHE_BUSTER = "2026-11-26";
 
 /**
  * 앱 재시작 시 즉시 표시할 쿼리(첫 키 기준) — 응답 형태를 바꾸면 PERSIST_CACHE_BUSTER를 올린다.

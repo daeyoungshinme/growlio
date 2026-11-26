@@ -272,6 +272,7 @@ async def test_rebalance_grouped_into_one_row_when_two_or_more():
     assert item.detail == "배당형 최대 9.3%p 이탈 외 1개"
     assert item.cta_label == "자세히 보기"
     assert item.link == "/rebalancing"
+    assert item.count == 2  # 내비 배지가 묶음 행 하나를 1개로 세지 않게
 
 
 @pytest.mark.asyncio

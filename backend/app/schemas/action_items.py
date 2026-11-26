@@ -29,3 +29,4 @@ class ActionItem(BaseModel):
     cta_label: str
     link: str
     deadline: str | None = None  # YYYY-MM-DD
+    count: int | None = None  # 여러 대상을 한 행으로 묶었을 때 대상 수(리밸런싱 묶음 행 — 내비 배지 개수)

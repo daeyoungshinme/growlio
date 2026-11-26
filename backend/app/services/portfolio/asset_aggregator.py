@@ -26,9 +26,12 @@ from app.services.portfolio.portfolio_service import build_portfolio_overview
 from app.services.portfolio.returns_calculator import calc_returns
 from app.services.portfolio.returns_calculator import calc_xirr as _calc_xirr
 from app.utils.cache_keys import (
+    TTL_DASHBOARD_HOME_EXTRAS,
+    TTL_DASHBOARD_HOME_EXTRAS_FAILED,
     TTL_DASHBOARD_SUMMARY,
     TTL_MONTHLY_TREND,
     CacheStoreType,
+    dashboard_home_extras_key,
     dashboard_summary_key,
     get_cached_json,
     monthly_trend_key,
@@ -309,11 +312,26 @@ async def _compute_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache
         "annual_dividend_goal": annual_dividend_goal,
         "dividend_goal_achievement_pct": dividend_goal_achievement_pct,
     }
-    result.update(await _home_extras(user_id, db, cache, settings_row if goal else None, investable_assets_krw))
-    timer.mark("home_extras")
     await set_cached_json(cache, dashboard_summary_key(user_id), result, TTL_DASHBOARD_SUMMARY)
     timer.log()
     return result
+
+
+async def get_home_dashboard(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> dict[str, Any]:
+    """`/dashboard` 응답 = 공용 요약 + 홈 전용 부가 필드(주식 평가손익·목표 달성 예상월).
+
+    부가 필드는 요약에 넣지 않는다 — 요약을 같이 쓰는 챌린지·인사이트·nestlio·잡은 이 값을 안 쓰는데 콜드 계산과
+    DB 오류 전파만 떠안았다(plans/152 B3). 부가 필드는 따로 캐시하고, 계산이 실패하면 짧게만 캐시한다.
+    """
+    summary = await get_dashboard_summary(user_id, db, cache)
+    key = dashboard_home_extras_key(user_id)
+    extras: dict[str, Any] | None = await get_cached_json(cache, key)
+    if extras is None:
+        goal_settings = await get_settings_row(db, user_id) if summary.get("goal_amount") else None
+        extras, ok = await _home_extras(user_id, db, cache, goal_settings, float(summary["investable_assets_krw"]))
+        ttl = TTL_DASHBOARD_HOME_EXTRAS if ok else TTL_DASHBOARD_HOME_EXTRAS_FAILED
+        await set_cached_json(cache, key, extras, ttl)
+    return {**summary, **extras}
 
 
 async def _home_extras(
@@ -322,10 +340,10 @@ async def _home_extras(
     cache: CacheStoreType,
     goal_settings: UserSettings | None,
     investable_assets_krw: float,
-) -> dict[str, Any]:
-    """홈이 따로 받던 두 응답(lite overview의 주식 평가손익, 적립 분석의 달성 예상월)을 대시보드에 싣는다 —
-    홈·부팅 요청을 둘 줄인다(plans/151 B1). 주식 평가손익은 자산 탭과 같은 overview 기준(스냅샷의 매입원가·평가손익)이라
-    `stock_return_pct`(포지션 현재가 재평가)와 따로 둔다. 실패해도 대시보드 본체는 그대로 내보낸다."""
+) -> tuple[dict[str, Any], bool]:
+    """홈이 따로 받던 두 응답(lite overview의 주식 평가손익, 적립 분석의 달성 예상월) — 홈·부팅 요청을 둘 줄인다
+    (plans/151 B1). 주식 평가손익은 자산 탭과 같은 overview 기준(스냅샷의 매입원가·평가손익)이라
+    `stock_return_pct`(포지션 현재가 재평가)와 따로 둔다. 실패해도 요약은 그대로 내보낸다 — (값, 성공 여부)."""
     extras: dict[str, Any] = {"stock_pnl": None, "goal_expected_month": None}
     try:
         overview = await build_portfolio_overview(user_id, db, cache=cache, lite=True, exclude_out_of_total=True)
@@ -345,4 +363,5 @@ async def _home_extras(
         raise
     except Exception as e:
         report_handled_failure("dashboard_home_extras_failed", e, user_id=str(user_id))
-    return extras
+        return extras, False
+    return extras, True

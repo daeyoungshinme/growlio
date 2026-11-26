@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from functools import partial
 
 import structlog
@@ -95,6 +95,20 @@ async def _read_known_misses(cache: CacheStoreType, tickers: list[tuple[str, str
     return {t for (t, _), flag in zip(tickers, flags, strict=False) if flag}
 
 
+def confirmed_misses(targets: list[tuple[str, str]], found: Callable[[tuple[str, str]], bool]) -> list[tuple[str, str]]:
+    """미스로 기록해도 되는 종목 — 같은 소스 묶음(국내·해외)에서 다른 종목은 받았는데 이 종목만 못 받은 경우.
+
+    묶음 전체가 비면 상장폐지가 아니라 소스 장애(서킷 열림·차단)일 수 있다 — 서킷은 2분이면 닫히는데 미스 표식은
+    10분이라, 기록하면 짧은 장애가 10분짜리 시세 공백이 된다. 그래서 그때는 기록하지 않는다.
+    """
+    out: list[tuple[str, str]] = []
+    for domestic in (True, False):
+        group = [tm for tm in targets if (tm[1].upper() in DOMESTIC_MARKETS) is domestic]
+        if any(found(tm) for tm in group):
+            out.extend(tm for tm in group if not found(tm))
+    return out
+
+
 async def _write_known_misses(cache: CacheStoreType, misses: list[tuple[str, str]]) -> None:
     if not cache or not misses:
         return
@@ -154,7 +168,7 @@ async def fetch_prices_batch(
 
     yahoo_targets = [(t, m) for t, m in public_targets if t not in price_map]
     price_map.update(await fetch_yahoo_batch(yahoo_targets))
-    await _write_known_misses(cache, [(t, m) for t, m in public_targets if not price_map.get(t)])
+    await _write_known_misses(cache, confirmed_misses(public_targets, lambda tm: bool(price_map.get(tm[0]))))
 
     missing = [(t, m) for t, m in remaining if t not in price_map or price_map[t] == 0]
     if missing:
@@ -271,7 +285,8 @@ async def get_historical_returns(
                 for (t, m), result in newly_fetched.items()
             )
         )
-    still_missing = [(t, m) for t, m in missing if (t, m) not in newly_fetched]
+    asked = list(newly_fetched) + missing
+    still_missing = confirmed_misses(asked, lambda tm: tm in newly_fetched)
     if still_missing and cache:
         await asyncio.gather(
             *(cache.setex(price_return_key(years, t, m), TTL_PRICE_MISS, PRICE_RETURN_MISS) for t, m in still_missing)

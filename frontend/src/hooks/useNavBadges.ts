@@ -22,7 +22,10 @@ function useRebalancingNeedsCount(): number {
   return useMemo(() => {
     if (driftSummaries && !driftInvalidated)
       return driftSummaries.filter((s) => s.needs_rebalancing).length;
-    return (actionItems ?? []).filter((item) => item.kind === "REBALANCE").length;
+    // 이탈 포트폴리오가 2개↑면 서버가 한 행(`rebalance:all`)으로 묶고 개수는 `count`에 싣는다
+    return (actionItems ?? [])
+      .filter((item) => item.kind === "REBALANCE")
+      .reduce((sum, item) => sum + (item.count ?? 1), 0);
   }, [driftSummaries, driftInvalidated, actionItems]);
 }
 

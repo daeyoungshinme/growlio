@@ -22,7 +22,7 @@ async def _extras(goal_settings=None, overview=None, month="2031-04", **patches)
         ) as ov,
         patch(f"{_AGG}.compute_goal_expected_month", new=AsyncMock(return_value=month)) as goal,
     ):
-        result = await _home_extras(uuid.uuid4(), AsyncMock(), None, goal_settings, 50_000_000.0)
+        result, _ok = await _home_extras(uuid.uuid4(), AsyncMock(), None, goal_settings, 50_000_000.0)
     return result, ov, goal
 
 
@@ -66,3 +66,52 @@ async def test_db_failure_propagates(override_settings):
     """rollback으로 삼키면 같은 세션을 이어 쓰는 호출부의 ORM 객체가 만료된다 — 다른 집계 쿼리처럼 올린다."""
     with pytest.raises(OperationalError):
         await _extras(overview_mock=AsyncMock(side_effect=OperationalError("select", {}, Exception("down"))))
+
+
+# ── get_home_dashboard — 공용 요약 + 홈 전용 필드(따로 캐시, plans/152 B3) ──
+
+_SUMMARY = {"total_assets_krw": 1.0, "investable_assets_krw": 50_000_000.0, "goal_amount": 100_000_000.0}
+
+
+async def _home(cache, extras_result):
+    from app.services.portfolio.asset_aggregator import get_home_dashboard
+
+    user_id = uuid.UUID(int=1)
+    with (
+        patch(f"{_AGG}.get_dashboard_summary", new=AsyncMock(return_value=dict(_SUMMARY))),
+        patch(f"{_AGG}.get_settings_row", new=AsyncMock(return_value=SimpleNamespace(goal_amount=1))),
+        patch(f"{_AGG}._home_extras", new=AsyncMock(return_value=extras_result)) as extras,
+    ):
+        result = await get_home_dashboard(user_id, AsyncMock(), cache)
+    return result, extras
+
+
+@pytest.mark.asyncio
+async def test_home_dashboard_merges_and_caches_extras(override_settings):
+    from app.core.cache_store import CacheStore
+    from app.utils.cache_keys import TTL_DASHBOARD_HOME_EXTRAS, dashboard_home_extras_key
+
+    cache = CacheStore()
+    ok = ({"stock_pnl": None, "goal_expected_month": "2031-04"}, True)
+    with patch.object(cache, "setex", wraps=cache.setex) as setex:
+        first, extras = await _home(cache, ok)
+    assert first["goal_expected_month"] == "2031-04"
+    assert first["total_assets_krw"] == 1.0
+    assert setex.call_args.args[:2] == (dashboard_home_extras_key(uuid.UUID(int=1)), TTL_DASHBOARD_HOME_EXTRAS)
+
+    second, extras2 = await _home(cache, ok)
+    assert second == first
+    extras2.assert_not_awaited()  # 캐시 재사용
+
+
+@pytest.mark.asyncio
+async def test_home_dashboard_failed_extras_cached_briefly(override_settings):
+    from app.core.cache_store import CacheStore
+    from app.utils.cache_keys import TTL_DASHBOARD_HOME_EXTRAS_FAILED
+
+    cache = CacheStore()
+    failed = ({"stock_pnl": None, "goal_expected_month": None}, False)
+    with patch.object(cache, "setex", wraps=cache.setex) as setex:
+        result, _ = await _home(cache, failed)
+    assert result["stock_pnl"] is None
+    assert setex.call_args.args[1] == TTL_DASHBOARD_HOME_EXTRAS_FAILED

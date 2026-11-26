@@ -29,8 +29,10 @@ export function challengeNeedsAttention(
 /** 하단 내비·사이드바 배지용 — 추가 요청 없이 챌린지 목록 캐시로 판정 */
 export function useChallengeNudge(): boolean {
   const { data: challenges } = useChallenges();
+  // 날짜는 렌더마다 읽어 deps에 넣는다 — 목록 참조만 보면 앱을 켜 둔 채 20일이 돼도 배지가 안 뜬다
+  const dayOfMonth = Number(localToday().slice(8, 10));
   return useMemo(
-    () => challengeNeedsAttention(challenges ?? [], Number(localToday().slice(8, 10))),
-    [challenges],
+    () => challengeNeedsAttention(challenges ?? [], dayOfMonth),
+    [challenges, dayOfMonth],
   );
 }
