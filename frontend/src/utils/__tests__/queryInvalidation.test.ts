@@ -186,6 +186,14 @@ describe("invalidateTacticalData", () => {
     expect(linkedKeys).toContainEqual(["rebalancing-alert"]);
     expect(linkedKeys).toContainEqual(["fx-plan"]);
   });
+
+  it("낙폭 추매 카드도 무효화 — 적립 자동매수 보류 안내가 전술 국면을 따른다", async () => {
+    const qc = makeQueryClient();
+    await invalidateTacticalData(qc as any);
+    expect(qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey)).toContainEqual(
+      QUERY_KEYS.dipBuy,
+    );
+  });
 });
 
 describe("invalidateAlertData", () => {

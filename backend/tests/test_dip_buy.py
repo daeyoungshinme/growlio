@@ -118,6 +118,21 @@ def test_should_reset(dd, completed, base, expected):
     assert calc.should_reset(dd, completed, base) is expected
 
 
+def test_should_reset_notified_only_cycle():
+    """알림만 받고 사지 않은 사이클도 회복하면 지운다 — 남기면 다음 하락에 그 구간을 다시 알리지 않는다."""
+    assert calc.should_reset(-1.0, [], None, [0]) is True
+    assert calc.should_reset(-5.0, [], None, [0]) is False
+
+
+@pytest.mark.parametrize(
+    ("dd", "expected"),
+    [(-9.9, True), (-10.0, False), (-25.0, False), (None, False)],
+)
+def test_recovered_above_tiers(dd, expected):
+    assert calc.recovered_above_tiers(TIERS, dd) is expected
+    assert calc.recovered_above_tiers([], -1.0) is False
+
+
 @pytest.mark.parametrize(
     "tiers",
     [
@@ -233,6 +248,27 @@ async def test_attach_etfs_fallback_rate_hides_usd_price(mock_db):
     assert [(e.ticker, e.price_krw, e.amount_usd, e.price_usd) for e in s.etfs] == [("QQQ", 750_000.0, None, None)]
 
 
+async def test_attach_etfs_reads_rate_before_prices(mock_db):
+    """환율을 먼저 받아야 캐시가 빈 아침에도 가격 환산과 달러 표시가 같은 환율을 쓴다."""
+    s = svc.summarize_rules(_settings(), [_rule()], {"QQQ": -12.0})[0]
+    order: list[str] = []
+
+    async def rate(_cache):
+        order.append("rate")
+        return 1500.0, True
+
+    async def prices(*_a, **_k):
+        order.append("prices")
+        return {"QQQ": 750_000.0}
+
+    with (
+        patch("app.services.market_data.price_service.fetch_prices_batch_krw", prices),
+        patch("app.utils.currency.get_live_or_cached_usd_krw", rate),
+    ):
+        await svc.attach_etfs(mock_db, None, USER, [s], CANDIDATES)
+    assert order == ["rate", "prices"]
+
+
 async def test_attach_etfs_price_failure_keeps_amount_only(mock_db):
     s = svc.summarize_rules(_settings(), [_rule()], {"QQQ": -12.0})[0]
     with patch(
@@ -346,8 +382,34 @@ async def test_mark_completed_without_due_tier_is_400(mock_db):
 
 async def test_mark_completed_other_users_rule_is_404(mock_db):
     _db_with(mock_db, _settings(), [_rule()])
-    with pytest.raises(NotFoundError):
+    with (
+        patch.object(svc, "index_drawdowns", AsyncMock(return_value={"QQQ": -12.0})),
+        pytest.raises(NotFoundError),
+    ):
         await svc.mark_completed(mock_db, None, USER, uuid.uuid4(), None)
+
+
+async def test_mark_completed_locks_settings_and_rules(mock_db):
+    """두 번 누른 요청이 같은 구간을 두 번 적지 않게 설정·규칙 행을 잠근다(시세 조회는 잠그기 전)."""
+    settings, rule = _settings(), _rule()
+    _db_with(mock_db, settings, [rule])
+    with patch.object(svc, "index_drawdowns", AsyncMock(return_value={"QQQ": -12.0})):
+        await svc.mark_completed(mock_db, None, USER, rule.id, None)
+    settings_stmt = mock_db.scalar.await_args_list[0].args[0]
+    rules_stmt = mock_db.execute.await_args_list[0].args[0]
+    assert settings_stmt._for_update_arg is not None
+    assert rules_stmt._for_update_arg is not None
+
+
+async def test_mark_completed_second_call_after_done_is_400(mock_db):
+    settings, rule = _settings(), _rule()
+    _db_with(mock_db, settings, [rule])
+    with patch.object(svc, "index_drawdowns", AsyncMock(return_value={"QQQ": -12.0})):
+        await svc.mark_completed(mock_db, None, USER, rule.id, None)
+        with pytest.raises(BadRequestError):
+            await svc.mark_completed(mock_db, None, USER, rule.id, None)
+    assert len(rule.completed) == 1
+    assert settings.reserve_krw == 8_000_000
 
 
 async def test_upsert_settings_mid_cycle_reserve_change_rebases(mock_db):
@@ -437,6 +499,25 @@ async def test_update_rule_index_change_clears_cycle(mock_db):
     await svc.update_rule(mock_db, USER, rule.id, index_ticker="SPY", allocation_pct=100, tiers=TIERS, is_active=True)
     assert (rule.completed, rule.cycle_base_krw, rule.notified_tiers) == ([], None, [])
     assert rule.index_ticker == "SPY"
+
+
+async def test_update_rule_tier_threshold_change_drops_that_tiers_records(mock_db):
+    """구간 낙폭을 바꾸면 그 구간의 옛 기준 기록은 버린다 — 비율만 바뀐 구간은 유지."""
+    rule = _rule(
+        cycle_base_krw=1e7,
+        completed=[{"tier": 0, "amount_krw": 2e6}, {"tier": 1, "amount_krw": 3e6}],
+        notified_tiers=[0, 1],
+    )
+    _db_with(mock_db, _settings(), [rule])
+    new_tiers = [
+        {"drawdown_pct": 5.0, "ratio_pct": 20.0},  # 낙폭 변경
+        {"drawdown_pct": 20.0, "ratio_pct": 40.0},  # 비율만 변경
+    ]
+    await svc.update_rule(
+        mock_db, USER, rule.id, index_ticker="QQQ", allocation_pct=100, tiers=new_tiers, is_active=True
+    )
+    assert [c["tier"] for c in rule.completed] == [1]
+    assert rule.notified_tiers == [1]
 
 
 async def test_update_rule_allocation_change_rebases_cycle(mock_db):
@@ -682,6 +763,29 @@ async def test_monthly_day_notice_cancels_when_recovered_after_pre_notice():
     attach.assert_not_awaited()
 
 
+async def test_monthly_day_notice_no_cancel_when_already_bought():
+    """사전 안내 뒤 "추매했어요"로 금액이 0이 된 경우 — 지수는 회복하지 않았으니 취소 안내를 보내지 않는다."""
+    settings = _settings(notify_mode="MONTHLY_DAY", notify_day=23)
+    rule = _rule(completed=[{"tier": 0, "amount_krw": 2_000_000}], cycle_base_krw=1e7)
+    s = svc.UserDipBuySummary(
+        settings=settings,
+        rules=svc.summarize_rules(settings, [rule], {"QQQ": -15.0}),
+        next_notify_date=date(2026, 11, 23),
+    )
+    assert s.due_amount_krw == 0
+    send, _ = await _run_notify("DAY", s, {job.dedup_key(USER, date(2026, 11, 23), "PRE"): "1"})
+    send.assert_not_awaited()
+
+
+def test_etf_push_text_zero_shares_shows_one_share_price():
+    assert job.etf_push_text(svc.EtfOption("QQQ", "Invesco QQQ", "NASDAQ", 870_000, 0, 0)) == (
+        "Invesco QQQ 1주 약 870,000원(금액 부족)"
+    )
+    assert job.etf_push_text(svc.EtfOption("QQQ", "Invesco QQQ", "NASDAQ", 870_000, 2, 1_740_000)) == (
+        "Invesco QQQ 2주"
+    )
+
+
 async def test_monthly_day_notice_silent_when_no_amount_and_no_pre_notice():
     send, _ = await _run_notify("DAY", _user_summary(run=date(2026, 11, 23), dd=-2.0))
     send.assert_not_awaited()
@@ -739,3 +843,12 @@ def test_email_template_phases():
     subject, html = dip_buy_template("CANCELLED", "11월 25일(화)", rules, 5e6, [], "L")
     assert "취소" in subject
     assert "추매하지 않아요" in html
+
+
+def test_email_template_zero_shares_row():
+    from app.services.notifications.email_templates import dip_buy_template
+
+    rules = [("나스닥100(QQQ)", -11.0, 500_000.0, [("Invesco QQQ", 0.0, 0.0, None)])]
+    _, html = dip_buy_template("DAY", "11월 25일(화)", rules, 5e6, [], "L")
+    assert "0주" not in html
+    assert "1주 값에 못 미쳐요" in html

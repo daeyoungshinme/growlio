@@ -196,6 +196,18 @@ describe("DipBuyCard", () => {
     await waitFor(() => expect(completeDipBuy).toHaveBeenCalledWith("rule-qqq", 1_170_000));
   });
 
+  it("기록 요청 중엔 '기록하기'를 다시 눌러도 한 번만 보낸다", async () => {
+    vi.mocked(fetchDipBuyStatus).mockResolvedValue(status());
+    vi.mocked(completeDipBuy).mockReturnValue(new Promise(() => {}) as never);
+    renderCard();
+    fireEvent.click(await screen.findByRole("button", { name: "추매했어요" }));
+    fireEvent.click(screen.getByRole("button", { name: "기록하기" }));
+    const pending = await screen.findByRole("button", { name: "기록 중..." });
+    expect(pending).toBeDisabled();
+    fireEvent.click(pending);
+    expect(completeDipBuy).toHaveBeenCalledTimes(1);
+  });
+
   it("추매 구간이 없으면 회복 기준을 안내한다", async () => {
     vi.mocked(fetchDipBuyStatus).mockResolvedValue(
       status({

@@ -28,8 +28,9 @@ from app.jobs.dca_cash_shortfall import run_date_label
 from app.models.dip_buy import DipBuySettings
 from app.models.user import User, UserSettings
 from app.services.alerts._dispatch import dispatch_dual_channel_alert
-from app.services.dip_buy_calculator import INDEX_LABEL
+from app.services.dip_buy_calculator import INDEX_LABEL, recovered_above_tiers
 from app.services.dip_buy_service import (
+    EtfOption,
     RuleSummary,
     UserDipBuySummary,
     attach_etfs,
@@ -65,6 +66,19 @@ def pre_notice_target(summary: UserDipBuySummary, today: date) -> bool:
     return PRE_NOTICE_DAYS[0] <= (run - today).days <= PRE_NOTICE_DAYS[1]
 
 
+def recovered_since_pre_notice(summary: UserDipBuySummary) -> bool:
+    """켜 둔 규칙 전부가 첫 구간 위로 회복했으면 True — 취소(CANCELLED) 안내는 이때만 보낸다."""
+    active = [r for r in summary.rules if r.rule.is_active]
+    return bool(active) and all(recovered_above_tiers(r.rule.tiers, r.drawdown_pct) for r in active)
+
+
+def etf_push_text(etf: EtfOption) -> str:
+    """푸시 한 줄 — 안내 금액이 1주 값에 못 미치면 "0주" 대신 1주 가격을 알린다."""
+    if etf.shares > 0:
+        return f"{etf.name} {etf.shares}주"
+    return f"{etf.name} 1주 약 {etf.price_krw:,.0f}원(금액 부족)"
+
+
 async def run_dip_buy_pre_notice() -> None:
     """매일 18:40 KST — 매달 정한 알림일 1~3일 전 추매 예정 안내."""
     await _run("PRE")
@@ -79,7 +93,11 @@ async def _run(slot: Literal["PRE", "DAY"]) -> None:
     cache = await get_cache_store()
     try:
         async with AsyncSessionLocal() as db:
-            stmt = select(DipBuySettings.user_id).where(DipBuySettings.is_active == True)
+            stmt = (
+                select(DipBuySettings.user_id)
+                .join(User, User.id == DipBuySettings.user_id)
+                .where(DipBuySettings.is_active == True, User.is_active == True)
+            )
             user_ids = list((await db.execute(stmt)).scalars().all())
     except Exception as e:
         report_job_failure(f"dip_buy_{slot.lower()}_notice_failed", e)
@@ -127,9 +145,10 @@ async def _notify_user(
             return
         if s.due_amount_krw > 0:
             phase = "DAY"
-        elif await get_durable(db, dedup_key(user_id, run, "PRE")) is not None:
+        elif recovered_since_pre_notice(s) and await get_durable(db, dedup_key(user_id, run, "PRE")) is not None:
             phase = "CANCELLED"
         else:
+            # 이미 추매했다고 기록했거나 여윳돈·규칙을 바꿔 금액이 0이면 "회복해 취소" 안내는 틀린 말이다
             return
     key = dedup_key(user_id, run, slot)
     if await get_durable(db, key) is not None:
@@ -173,7 +192,7 @@ async def _send(
     else:
         head = {"REACHED": "추매 구간 도달", "DAY": "오늘 추매", "PRE": f"{label} 추매 예정"}[phase]
         title = f"{head} {total:,.0f}원"
-        first_etfs = [f"{r.etfs[0].name} {r.etfs[0].shares}주" for r in targets if r.etfs]
+        first_etfs = [etf_push_text(r.etfs[0]) for r in targets if r.etfs]
         body = f"52주 고점 대비 {dd_parts}" + (" · " + ", ".join(first_etfs) if first_etfs else "")
         if s.dca_held_portfolios:
             body += " · 적립 자동매수는 전술 방어 국면이라 보류 중"

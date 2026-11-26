@@ -141,7 +141,7 @@ def _opt(v: Any) -> float | None:
 
 def reset_if_recovered(rule: DipBuyRule, drawdown_pct: float | None) -> bool:
     """고점 근처로 회복했으면 완료·알림 기록과 기준액을 지운다(다음 하락 사이클). 바뀌었으면 True — 커밋은 호출부."""
-    if not should_reset(drawdown_pct, rule.completed, _opt(rule.cycle_base_krw)):
+    if not should_reset(drawdown_pct, rule.completed, _opt(rule.cycle_base_krw), rule.notified_tiers):
         return False
     rule.completed = []
     rule.cycle_base_krw = None
@@ -150,12 +150,17 @@ def reset_if_recovered(rule: DipBuyRule, drawdown_pct: float | None) -> bool:
     return True
 
 
-async def get_settings(db: AsyncSession, user_id: uuid.UUID) -> DipBuySettings | None:
-    return await db.scalar(select(DipBuySettings).where(DipBuySettings.user_id == user_id))
+async def get_settings(db: AsyncSession, user_id: uuid.UUID, *, for_update: bool = False) -> DipBuySettings | None:
+    stmt = select(DipBuySettings).where(DipBuySettings.user_id == user_id)
+    if for_update:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    return await db.scalar(stmt)
 
 
-async def list_rules(db: AsyncSession, user_id: uuid.UUID) -> list[DipBuyRule]:
+async def list_rules(db: AsyncSession, user_id: uuid.UUID, *, for_update: bool = False) -> list[DipBuyRule]:
     stmt = select(DipBuyRule).where(DipBuyRule.user_id == user_id).order_by(DipBuyRule.created_at)
+    if for_update:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
     return list((await db.execute(stmt)).scalars().all())
 
 
@@ -237,8 +242,10 @@ async def attach_etfs(
     if not tickers:
         return
     try:
-        prices = await fetch_prices_batch_krw(user_id, tickers, db, cache)
+        # 환율을 먼저 — 캐시가 비었을 때 가격 환산이 fallback(1300)으로, 달러 표시는 방금 받은 실환율로 갈라지지 않게
+        # (실환율을 받으면 캐시에 남아 `fetch_prices_batch_krw`가 같은 값으로 환산한다)
         rate, rate_is_live = await get_live_or_cached_usd_krw(cache)
+        prices = await fetch_prices_batch_krw(user_id, tickers, db, cache)
     except Exception as exc:
         logger.warning("dip_buy_etf_price_failed", user_id=str(user_id), error=str(exc))
         return
@@ -391,6 +398,15 @@ def _shrink_others(
             rule.cycle_base_krw = round(pool * pct / 100, 2)
 
 
+def _unchanged_tier_indexes(old: list[dict], new: list[dict]) -> set[int]:
+    """같은 순번에 같은 낙폭 기준이 남은 구간 순번."""
+    return {
+        i
+        for i, (o, n) in enumerate(zip(old, new, strict=False))
+        if float(o["drawdown_pct"]) == float(n["drawdown_pct"])
+    }
+
+
 def _clean_tiers(tiers: list[dict]) -> list[dict]:
     return [{"drawdown_pct": float(t["drawdown_pct"]), "ratio_pct": float(t["ratio_pct"])} for t in tiers]
 
@@ -463,9 +479,10 @@ async def update_rule(
         rule.cycle_base_krw = None
         rule.notified_tiers = []
     else:
-        # 구간 수가 줄면 사라진 구간의 기록을 버린다
-        rule.completed = [c for c in rule.completed or [] if int(c.get("tier", -1)) < len(tiers)]
-        rule.notified_tiers = [t for t in rule.notified_tiers or [] if int(t) < len(tiers)]
+        # 기록은 구간 순번으로 남는다 — 사라졌거나 낙폭 기준이 바뀐 구간의 기록은 버린다(비율만 바뀐 구간은 유지)
+        kept = _unchanged_tier_indexes(rule.tiers or [], tiers)
+        rule.completed = [c for c in rule.completed or [] if int(c.get("tier", -1)) in kept]
+        rule.notified_tiers = [t for t in rule.notified_tiers or [] if int(t) in kept]
         if rule.cycle_base_krw is not None and float(allocation_pct) != float(rule.allocation_pct):
             settings = await get_settings(db, user_id)
             pool = reserve_pool(float(settings.reserve_krw or 0) if settings else 0.0, [r.completed for r in rules])
@@ -494,14 +511,15 @@ async def mark_completed(
 ) -> DipBuyRule:
     """그 규칙의 지금 도달한 미완료 구간을 완료로 기록하고 여윳돈에서 뺀다.
 
-    구간이 여럿이면 안내 금액 비율로 나눠 적는다.
+    구간이 여럿이면 안내 금액 비율로 나눠 적는다. 설정·규칙 행을 잠가 두 번 누른 요청이 같은 구간을 두 번 적고
+    여윳돈을 두 번 빼지 않게 한다 — 뒤 요청은 앞 요청이 끝난 뒤 DONE을 보고 400이 된다.
     """
-    settings = await get_settings(db, user_id)
-    rules = await list_rules(db, user_id)
+    drawdowns = await index_drawdowns(cache)  # 시세 조회는 잠그기 전에(락을 쥔 채 외부 I/O 금지)
+    settings = await get_settings(db, user_id, for_update=True)
+    rules = await list_rules(db, user_id, for_update=True)
     rule = next((r for r in rules if r.id == rule_id), None)
     if rule is None or settings is None:
         raise NotFoundError("추매 규칙을 찾을 수 없습니다")
-    drawdowns = await index_drawdowns(cache)
     reset_if_recovered(rule, drawdowns.get(rule.index_ticker))
     if not settings.is_active or not rule.is_active:
         raise BadRequestError("꺼 둔 추매 안내는 기록할 수 없어요.")
