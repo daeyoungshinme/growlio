@@ -110,13 +110,29 @@ def due_amount(statuses: Sequence[TierStatus], cap_krw: float) -> float:
     return round(max(0.0, min(total, float(cap_krw))), 0)
 
 
-def should_reset(drawdown_pct: float | None, completed: Sequence[dict] | None, cycle_base_krw: float | None) -> bool:
-    """고점 근처로 회복했고 지울 사이클 기록이 있으면 True. 낙폭을 모르면 건드리지 않는다."""
+def should_reset(
+    drawdown_pct: float | None,
+    completed: Sequence[dict] | None,
+    cycle_base_krw: float | None,
+    notified_tiers: Sequence[int] | None = None,
+) -> bool:
+    """고점 근처로 회복했고 지울 사이클 기록이 있으면 True. 낙폭을 모르면 건드리지 않는다.
+
+    알림만 받고 사지 않은 사이클(`notified_tiers`만 있음)도 지운다 —
+    남기면 다음 하락에서 그 구간을 영영 다시 알리지 않는다.
+    """
     if drawdown_pct is None:
         return False
-    if not completed and not cycle_base_krw:
+    if not completed and not cycle_base_krw and not notified_tiers:
         return False
     return drawdown_pct > -RESET_DRAWDOWN_PCT
+
+
+def recovered_above_tiers(tiers: Sequence[dict] | None, drawdown_pct: float | None) -> bool:
+    """첫 구간에도 닿지 않을 만큼 회복했으면 True(낙폭을 모르거나 구간이 없으면 False)."""
+    if drawdown_pct is None or not tiers:
+        return False
+    return not reached(tiers[0], drawdown_pct)
 
 
 def validate_tiers(tiers: Sequence[dict]) -> str | None:

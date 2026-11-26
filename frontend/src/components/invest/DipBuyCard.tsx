@@ -98,7 +98,9 @@ export default function DipBuyCard() {
   const resetPct = data?.reset_drawdown_pct ?? 3;
   const usedIndexes = new Set(rules.map((r) => r.index_ticker));
   const availableIndexes = DIP_BUY_INDEXES.filter((i) => !usedIndexes.has(i));
-  const allocationTotal = rules.reduce((sum, r) => sum + r.allocation_pct, 0);
+  // 서버가 배분을 소수 둘째 자리로 줄이므로 합이 99.99000000000001처럼 보이지 않게 반올림
+  const allocationTotal =
+    Math.round(rules.reduce((sum, r) => sum + r.allocation_pct, 0) * 100) / 100;
   const poolKrw = (settings?.reserve_krw ?? 0) + rules.reduce((sum, r) => sum + r.spent_krw, 0);
   const ruleByIndex = new Map(rules.map((r) => [r.index_ticker, r]));
   const editing = editingRule && "id" in editingRule ? editingRule : null;
@@ -405,8 +407,9 @@ function DipBuyRuleView({
           message="실제로 산 금액을 확인해주세요. 이번 구간을 완료로 기록하고 여윳돈에서 뺍니다."
           confirmLabel={completeMutation.isPending ? "기록 중..." : "기록하기"}
           danger={false}
+          confirmDisabled={completeMutation.isPending}
           onConfirm={() => {
-            if (amountInvalid) return;
+            if (amountInvalid || completeMutation.isPending) return;
             completeMutation.mutate(amountValue);
           }}
           onCancel={() => setConfirming(false)}

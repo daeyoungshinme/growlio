@@ -229,7 +229,7 @@ export function invalidatePortfolioData(qc: QueryClient, opts: { deleted?: boole
   ]);
 }
 
-/** 전술 배분 설정 변경 후 — 국면 상태 + 백테스트(비중표가 바뀌면 결과도 바뀜) + 홈 "지금 할 일"(전술 적용 항목).
+/** 전술 배분 설정 변경 후 — 국면 상태 + 백테스트(비중표가 바뀌면 결과도 바뀜) + 홈 "지금 할 일"(전술 적용 항목) + 낙폭 추매(보류 안내).
  * 제안 비중 적용 시엔 포트폴리오 목표가 바뀌므로 `invalidatePortfolioData`도 함께(포트폴리오 목록·드리프트·리밸런싱 전략). */
 export function invalidateTacticalData(
   qc: QueryClient,
@@ -239,6 +239,8 @@ export function invalidateTacticalData(
     invalidateKeys(qc, [QUERY_KEYS.tacticalStatusBase]),
     invalidateKeys(qc, [QUERY_KEYS.tacticalBacktestBase]),
     invalidateKeys(qc, [QUERY_KEYS.actionItems]),
+    // 낙폭 추매 카드의 "적립 자동매수 보류 중" 안내가 전술 국면을 따른다
+    invalidateKeys(qc, [QUERY_KEYS.dipBuy]),
     ...(opts.portfolioChanged ? [invalidatePortfolioData(qc)] : []),
     // 전술을 끄면 서버가 그 포트폴리오의 TACTICAL 알림을 모두 일반 모드로 되돌린다 — 포트폴리오·계좌별 알림 캐시까지
     // 비워야 모달이 옛 TACTICAL 값을 다시 저장하지 않는다 (plans/99 B2). 환전 계획 기본 포트폴리오도 이 알림을 따른다

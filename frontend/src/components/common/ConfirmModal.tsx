@@ -11,6 +11,8 @@ interface Props {
   onConfirm: () => void;
   onCancel: () => void;
   danger?: boolean;
+  /** 확인 버튼 비활성(요청 진행 중 등) — 두 번 눌러 같은 기록이 두 번 저장되지 않게 */
+  confirmDisabled?: boolean;
   /** 메시지 아래, 버튼 위에 추가로 렌더할 내용(비교 테이블 등) — 생략 시 기존과 동일. */
   children?: ReactNode;
 }
@@ -22,6 +24,7 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   danger = true,
+  confirmDisabled = false,
   children,
 }: Props) {
   const msgId = useId();
@@ -62,11 +65,13 @@ export default function ConfirmModal({
             {cancelLabel}
           </button>
           <button
+            disabled={confirmDisabled}
             onClick={() => {
+              if (confirmDisabled) return;
               void triggerHaptic(danger ? "heavy" : "medium");
               onConfirm();
             }}
-            className={`${TOUCH_TARGET_MIN} px-4 text-sm font-medium rounded-lg transition-colors ${
+            className={`${TOUCH_TARGET_MIN} px-4 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
               danger
                 ? "bg-red-600 text-white hover:bg-red-700"
                 : "bg-blue-600 text-white hover:bg-blue-700"

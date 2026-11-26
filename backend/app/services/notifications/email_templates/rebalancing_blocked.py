@@ -275,7 +275,8 @@ def dip_buy_template(
         for i, (name, shares, value, usd) in enumerate(etfs):
             usd_text = f" (약 ${usd:,.2f})" if usd else ""
             prefix = "&nbsp;&nbsp;또는 " if i else "&nbsp;&nbsp;"
-            rows.append((f"{prefix}{escape(name)}", f"{shares:g}주 · {value:,.0f} 원{usd_text}"))
+            text = f"{shares:g}주 · {value:,.0f} 원{usd_text}" if shares > 0 else "안내 금액이 1주 값에 못 미쳐요"
+            rows.append((f"{prefix}{escape(name)}", text))
     rows.append(("남은 여윳돈", f"{reserve_krw:,.0f} 원"))
     note = (
         "적립과 별도로 정해 둔 여윳돈의 구간별 추매 안내예요. 같은 지수 ETF는 계좌에 맞는 것 하나를 고르세요. "

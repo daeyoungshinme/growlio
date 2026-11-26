@@ -385,7 +385,7 @@ async def dca_items_for_amount(
 ) -> tuple[Any, Any, list] | None:
     """`amount_krw`를 이 알림의 계좌 범위·분할 규칙(목표 비중/GAP_FIRST)대로 종목별 매수 행으로 나눈다.
 
-    정액 적립(`_dca_items_for_alert`)과 낙폭 추매 안내(`dip_buy_service`, 주문 없음)가 같이 쓴다.
+    정액 적립(`_dca_items_for_alert`)이 쓴다.
     """
     from app.services.rebalancing.alert_scope import analyze_alert_overview, load_alert_overview
     from app.services.rebalancing.dca_allocation import allocate_dca_amount, dca_buy_rows, dca_row_current_values
