@@ -81,8 +81,13 @@ def _price_components(price: dict[str, Any] | None) -> dict[str, float]:
     return {"krw": float(price.get("krw") or 0), "usd": float(price.get("usd") or 0)}
 
 
-async def _get_buying_power(access_token: str, account_seq: str, currency: str) -> float:
-    """통화별 현금 매수가능금액(예수금). 해당 통화 계좌가 없어 실패하면 0으로 폴백한다."""
+async def _get_buying_power(access_token: str, account_seq: str, currency: str) -> float | None:
+    """통화별 현금 매수가능금액(예수금).
+
+    오류 봉투는 "그 통화 계좌 없음"만이 아니라 일시 오류도 같은 `TossApiError`로 온다 — 0으로 폴백하면
+    그날 스냅샷에서 현금이 통째로 빠진다(plans/156 A2). 원화는 실패를 그대로 올려 동기화 실패로 두고,
+    달러는 None(미확인 → 기존 `deposit_usd` 유지, `BalanceResult.deposit_foreign` 계약)으로 돌려준다.
+    """
     try:
         resp = await toss_request(
             "GET",
@@ -91,8 +96,10 @@ async def _get_buying_power(access_token: str, account_seq: str, currency: str) 
             params={"currency": currency},
         )
     except TossApiError as e:
-        logger.info("toss_buying_power_unavailable", currency=currency, code=e.code)
-        return 0.0
+        logger.warning("toss_buying_power_unavailable", currency=currency, code=e.code)
+        if currency == "KRW":
+            raise
+        return None
     result = resp.get("result") or {}
     return float(result.get("cashBuyingPower") or 0)
 
@@ -103,7 +110,7 @@ async def get_balance(access_token: str, *, account_id: str, account_no: str, ca
     반환 dict(통화 환산 전 — provider가 usd_krw_rate로 KRW 환산):
       positions: [{ticker, name, market, qty, avg_price, current_price, currency}]
       invested / market_value: {"krw": float, "usd": float}
-      deposit_krw / deposit_usd: float
+      deposit_krw: float / deposit_usd: float | None(달러 매수가능금액 미확인)
     """
     account_seq = await resolve_account_seq(access_token, account_id=account_id, account_no=account_no, cache=cache)
     headers = _auth_headers(access_token, account_seq)

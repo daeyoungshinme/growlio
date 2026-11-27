@@ -108,11 +108,12 @@ class TestUsMarketCloseDatetime:
         assert close_kst.hour == 5
 
     def test_defaults_to_current_time_when_now_omitted(self):
-        from app.utils.market_hours import us_market_close_datetime
+        from app.utils.market_hours import nyse_close_time, us_market_close_datetime
 
+        # 기대값도 오늘 날짜로 구한다 — 16시로 고정하면 조기 폐장일(블랙프라이데이 등 13시)에 깨진다
         close = us_market_close_datetime()
-        assert close.hour == 16
-        assert close.minute == 0
+        expected = nyse_close_time(close.date())
+        assert (close.hour, close.minute) == (expected.hour, expected.minute)
 
 
 class TestIsAlertExecutionTime:

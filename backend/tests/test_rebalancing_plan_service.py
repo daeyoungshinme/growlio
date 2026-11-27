@@ -1476,7 +1476,8 @@ class TestFailStuckConsumedLegs:
         assert locked_leg.status == "FAILED"
         assert "체결 내역을 확인" in locked_leg.error_message
         mock_save.assert_awaited_once()
-        notify.assert_awaited_once_with(plan, "BUY", locked_leg.error_message, mock_db)
+        # 실주문이 나갔을 수 있다 — "체결 안 됨" 대신 확인 요청 알림으로 보낸다 (plans/156 A3)
+        notify.assert_awaited_once_with(plan, "BUY", locked_leg.error_message, mock_db, outcome_unknown=True)
         mock_exec.assert_not_awaited()
 
     @pytest.mark.asyncio

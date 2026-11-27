@@ -361,3 +361,64 @@ async def test_dip_buy_mark_completed_serializes_double_submit():
             await cleanup.execute(delete(User).where(User.id == user_id))
             await cleanup.commit()
         await engine.dispose()
+
+
+async def test_batch_sync_does_not_revert_concurrent_account_edits():
+    """plans/156 A1 — 배치 동기화가 잡 시작 때 읽은 계좌를 merge하면 stale 컬럼이 커밋돼 대기 중 삭제·이름 수정을
+    되돌렸다. 새로 읽은 행은 sync가 바꾼 컬럼만 UPDATE하므로 수정은 남고, 삭제된 계좌는 건너뛴다."""
+    if not _TEST_DB_URL:
+        if os.environ.get("CI"):
+            pytest.fail("CI인데 GROWLIO_TEST_DATABASE_URL이 없다")
+        pytest.skip("GROWLIO_TEST_DATABASE_URL 미설정")
+    from unittest.mock import AsyncMock, patch
+
+    from sqlalchemy import delete
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.core.cache_store import CacheStore
+    from app.services.accounts import sync_all_service
+
+    engine = create_async_engine(_TEST_DB_URL, pool_size=3, max_overflow=0)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    user_id = uuid.uuid4()
+    try:
+        async with session_factory() as setup:
+            setup.add(User(id=user_id, email=f"{uuid.uuid4().hex}@test.local"))
+            await setup.flush()
+            renamed = AssetAccount(user_id=user_id, name="원래", asset_type="STOCK_OTHER", data_source="MANUAL")
+            deleted = AssetAccount(user_id=user_id, name="삭제", asset_type="STOCK_OTHER", data_source="MANUAL")
+            setup.add_all([renamed, deleted])
+            await setup.commit()
+        stale = [renamed, deleted]  # 잡이 시작할 때 읽은 detached 행(컬럼 전부 로드됨)
+
+        async with session_factory() as edit:  # 잡 대기 중 사용자 수정
+            (await edit.get(AssetAccount, renamed.id)).name = "수정"
+            (await edit.get(AssetAccount, deleted.id)).is_active = False
+            await edit.commit()
+
+        async def fake_sync(account, db, cache):
+            account.deposit_krw = 123
+            await db.commit()
+
+        with (
+            patch.object(sync_all_service, "AsyncSessionLocal", session_factory),
+            patch.object(sync_all_service, "get_cache_store", AsyncMock(return_value=CacheStore())),
+            patch.object(sync_all_service, "sync_account", side_effect=fake_sync) as mock_sync,
+        ):
+            failed = await sync_all_service.sync_accounts(stale, "test")
+
+        assert failed == []
+        assert mock_sync.call_count == 1
+        async with session_factory() as check:
+            saved_renamed = await check.get(AssetAccount, renamed.id)
+            saved_deleted = await check.get(AssetAccount, deleted.id)
+            assert saved_renamed is not None
+            assert saved_deleted is not None
+            assert saved_renamed.name == "수정"
+            assert float(saved_renamed.deposit_krw or 0) == 123
+            assert saved_deleted.is_active is False
+    finally:
+        async with session_factory() as cleanup:
+            await cleanup.execute(delete(User).where(User.id == user_id))
+            await cleanup.commit()
+        await engine.dispose()

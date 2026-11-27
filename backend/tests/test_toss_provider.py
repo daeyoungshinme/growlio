@@ -73,6 +73,25 @@ class TestTossProviderSync:
         assert result.extra["source"] == "TOSS_API"
 
     @pytest.mark.asyncio
+    async def test_unknown_usd_deposit_stays_none(self, override_settings, make_account, mock_cache):
+        """달러 매수가능금액 미확인(None)은 deposit_foreign=None으로 넘겨 기존 deposit_usd를 유지시킨다
+        (plans/156 A2 — 0으로 확정하면 달러 예수금이 지워진다). 합계 보정은 asset_service가 한다."""
+        account = _toss_account(make_account)
+        provider = TossProvider()
+
+        with (
+            patch("app.providers.toss_provider.decrypt", side_effect=["id", "secret"]),
+            patch("app.toss.auth.get_access_token", new=AsyncMock(return_value="tok-1")),
+            patch("app.toss.balance.get_balance", new=AsyncMock(return_value=_balance(deposit_usd=None))),
+            patch("app.providers.toss_provider.sync_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
+        ):
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
+
+        assert result.deposit_foreign is None
+        assert result.overseas_known is True
+        assert result.total_value_krw == 750_000.0 + 100_000.0
+
+    @pytest.mark.asyncio
     async def test_sync_retries_after_token_expired(self, override_settings, make_account, mock_cache):
         from app.toss.client import TossTokenExpiredError
 

@@ -114,7 +114,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `credential_service.py` — AES-256 암복호화
 - `asset_service.py` — 계좌별 sync + `sync_account_now`(assets `/sync` 전용 — 사용자가 누른 동기화라 "해외 없음" 표식 `has_overseas_key`를 지우고 다시 조회한다. 정기 잡·전체 갱신은 표식을 쓴다)
 - `asset_credential_service.py` — 브로커 자격증명 검증·삭제
-- `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). `sync_accounts`(세마포어 3)는 `jobs/asset_sync`도 재사용. 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 풀 고갈 방지. 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
+- `sync_all_service.py` — "전체 갱신" 백그라운드 배치(락·진행상태는 in-memory 캐시). `sync_accounts`(세마포어 3)는 `jobs/asset_sync`도 재사용. 계좌별로 **짧게 스코프된 `AsyncSessionLocal()`을 새로 연다** — 풀 고갈 방지. 넘겨받은 계좌는 `merge` 말고 `db.get`으로 다시 읽는다(merge는 stale 컬럼을 커밋해 대기 중 삭제·수정을 되돌림). 계좌 수만큼 동시 호출하는 새 엔드포인트도 이 패턴
 - `snapshot_service.py` — 스냅샷 upsert·포지션 sync 헬퍼. 수동 계좌 예수금 변경 → 오늘 스냅샷 재작성은 `write_manual_deposit_snapshot`(포지션 복사 포함 — 빠뜨리면 오늘 스냅샷에서 보유종목이 사라진다)
 - 쿼리 헬퍼: `_snapshot_queries.py`(최신 스냅샷 서브쿼리), `_account_queries.py`(활성 계좌 — `active_accounts_stmt()`/`active_broker_accounts_stmt()`)
 

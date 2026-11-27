@@ -99,6 +99,33 @@ class TestGetOrFetchTokenDecryption:
         query_token_row.assert_not_awaited()
 
 
+class TestGetOrFetchTokenSingleFlight:
+    @pytest.mark.asyncio
+    async def test_concurrent_cold_misses_issue_one_token(self):
+        """콜드 스타트 동시 미스는 한 번만 발급한다 — KIS 분당 1회 발급 제한 (plans/156 A7)."""
+        import asyncio
+
+        from app.core.cache_store import CacheStore
+        from app.providers._token_cache import get_or_fetch_token
+
+        cache = CacheStore()
+        calls = 0
+
+        async def fetch() -> str:
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0.05)
+            await cache.setex("tok:k", 600, "fresh")  # store_token처럼 캐시를 채운다
+            return "fresh"
+
+        results = await asyncio.gather(
+            *(get_or_fetch_token("tok:k", cache, False, 0, AsyncMock(return_value=None), fetch) for _ in range(4))
+        )
+
+        assert results == ["fresh"] * 4
+        assert calls == 1
+
+
 class TestKisFetchAndStoreTokenEncryption:
     @pytest.mark.asyncio
     async def test_stores_encrypted_token_but_returns_plaintext(self):

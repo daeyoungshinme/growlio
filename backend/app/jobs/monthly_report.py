@@ -127,7 +127,9 @@ async def _send_report_for_user(
         await _release_claim(dedup_key)
         return
 
-    # 이메일 발송 성공 후 인앱 AlertHistory 저장
+    # 발송 확정(선점 연장)을 인앱 기록과 분리해 먼저 커밋한다 — 둘을 한 커밋에 묶으면 그 커밋 실패 시 30분 선점만
+    # 남아 1~3일 시간별 catch-up이 같은 리포트를 다시 보낸다(plans/156 A6). 일시 오류에 대비해 한 번 더 시도한다.
+    await _confirm_claim(dedup_key)
     async with AsyncSessionLocal() as db:
         db.add(
             AlertHistory(
@@ -136,10 +138,21 @@ async def _send_report_for_user(
                 message=f"{report_month} 월간 포트폴리오 리포트가 발송되었습니다.",
             )
         )
-        await set_durable(db, dedup_key, "1", ttl=TTL_MONTHLY_REPORT_SENT, commit=False)
         await db.commit()
 
     logger.info("monthly_report_sent", user_id=str(user.id), to=mask_email(to_email), month=report_month)
+
+
+async def _confirm_claim(dedup_key: str, attempts: int = 2) -> None:
+    for attempt in range(attempts):
+        try:
+            async with AsyncSessionLocal() as db:
+                await set_durable(db, dedup_key, "1", ttl=TTL_MONTHLY_REPORT_SENT)
+            return
+        except Exception:
+            if attempt == attempts - 1:
+                raise
+            logger.warning("monthly_report_claim_confirm_retry", key=dedup_key)
 
 
 async def _release_claim(dedup_key: str) -> None:

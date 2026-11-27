@@ -53,6 +53,7 @@
   - 위험 계산마다 `get_index_exposure`를 조회한다(콜드 캐시면 최대 20초).
 - [ ] **P3-F 계획 151 배치 C·D** (151) — 조건: P1의 151 기준선 로그. C 공용 보유 로더·overview single-flight·drift 캐시·종가 캐시 공유, D 사용자 행 캐시·공용 HTTP 클라이언트·중복 인덱스, B2 `/dashboard` 배당 분리. 동등성 테스트 선행
 - [x] **P3-G 낙폭 추매 `mark_completed` 실 DB 동시성 테스트** (153) — 두 커넥션이 실제 commit해야 해 `pg` 픽스처(롤백)로는 안 된다. 정리 로직 있는 별도 픽스처로 Docker DB에서 확인 후 추가 → 154 B에서 추가(CI 실 DB)
+- [ ] **P3-H 챌린지 결산 발송 후 커밋 실패 시 재발송** (156 A6) — 조건: 운영에서 중복 결산 메일 신고·로그가 보일 때. `jobs/challenge_monthly_wrap.py`의 claim은 savepoint 안 미커밋 INSERT라 동시 실행 락 역할도 한다. 발송 뒤 커밋이 실패하면 claim이 사라져 catch-up이 다시 보낸다. 월간 리포트처럼 발송 확정을 따로 커밋하려면 락 방식부터 바꿔야 한다
 - [ ] **P3-D** dnd-kit 지연 로드, 읽기 전용 테이블 이중 DOM, persist 저장소 크기 — P1의 실기기·운영 로그 결과를 보고 판단한다 (125)
 
 ## P4. 결정이 필요한 것 (사용자)

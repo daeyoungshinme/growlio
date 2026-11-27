@@ -133,8 +133,9 @@ class TossProvider(BrokerProvider):
             stock_value_krw = sum(p.value_krw for p in positions)
 
         deposit_krw = float(bal["deposit_krw"])
-        deposit_usd = float(bal["deposit_usd"])
-        total_value_krw = stock_value_krw + deposit_krw + deposit_usd * usd_krw_rate
+        # None = 달러 매수가능금액 미확인 — asset_service가 기존 deposit_usd를 유지하고 합계에 더한다
+        deposit_usd = None if bal["deposit_usd"] is None else float(bal["deposit_usd"])
+        total_value_krw = stock_value_krw + deposit_krw + (deposit_usd or 0.0) * usd_krw_rate
 
         logger.info("toss_sync_done", account_id=str(account.id), total_krw=total_value_krw)
 
