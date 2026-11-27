@@ -45,7 +45,7 @@ describe("StockPriceAlertSection 목표가 단위(plans/118 C6)", () => {
     pick(/Schwab/);
 
     fireEvent.change(screen.getByLabelText("목표가 (USD)"), { target: { value: "27.5" } });
-    expect(screen.getByText(/≈ .*38,500/)).toBeInTheDocument();
+    expect(screen.getByText(/^\$27\.50 ≈ 38,500원 .* 현재 환율로 저장$/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "알림 추가" }));
 
     await waitFor(() => expect(createStockPriceAlert).toHaveBeenCalled());
@@ -61,6 +61,7 @@ describe("StockPriceAlertSection 목표가 단위(plans/118 C6)", () => {
     pick(/삼성전자/);
 
     fireEvent.change(screen.getByLabelText("목표가 (원)"), { target: { value: "70000" } });
+    expect(screen.getByText("70,000원 (7만원)")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "알림 추가" }));
 
     await waitFor(() => expect(createStockPriceAlert).toHaveBeenCalled());
@@ -93,6 +94,42 @@ describe("StockPriceAlertSection 목표가 단위(plans/118 C6)", () => {
     suggestions.list = [{ ticker: "005930", market: "KOSPI", name: "삼성전자", exchange: "KRX" }];
     pick(/삼성전자/);
     expect(screen.getByLabelText("목표가 (원)")).toHaveValue(null);
+  });
+
+  it("검색 결과에서 국내·미국 외 거래소 종목은 숨긴다", () => {
+    suggestions.list = [
+      { ticker: "SCHD", market: "NYSE", name: "Schwab US Dividend", exchange: "PCX" },
+      { ticker: "SCHD.MX", market: "MEX", name: "Schwab Mexico", exchange: "MEX" },
+      { ticker: "2788", market: "TOKYO", name: "애플인터내셔널", exchange: "TOKYO" },
+    ];
+    renderWithProviders(<StockPriceAlertSection />);
+    fireEvent.change(screen.getByLabelText("종목 검색"), { target: { value: "x" } });
+    expect(screen.getByRole("button", { name: /Schwab US Dividend/ })).toHaveTextContent(
+      "미국 NYSE",
+    );
+    expect(screen.queryByRole("button", { name: /Schwab Mexico/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /애플인터내셔널/ })).not.toBeInTheDocument();
+  });
+
+  it("미국 종목 알림은 목록에 현재 환율 기준 달러도 보인다", async () => {
+    vi.mocked(fetchStockPriceAlerts).mockResolvedValueOnce([
+      {
+        id: "a2",
+        ticker: "SCHD",
+        market: "NYSE",
+        name: "SCHD",
+        target_price: 38_500,
+        direction: "BELOW",
+        is_active: true,
+        max_trigger_count: 1,
+        trigger_count: 0,
+        triggered_at: null,
+        created_at: "2026-11-01T00:00:00Z",
+        needs_reentry: false,
+      },
+    ]);
+    renderWithProviders(<StockPriceAlertSection />);
+    expect(await screen.findByText(/38,500원 \(약 \$27\.50\) 이하/)).toBeInTheDocument();
   });
 
   it("단위가 의심되는 옛 알림에 다시 입력하라는 안내를 보인다(plans/119 C3)", async () => {

@@ -265,7 +265,8 @@ _기타_
 
 **마켓 (`constants/markets.ts`)** — 인라인 문자열 비교 금지.
 
-- `isOverseasMarket(market)`, `marketLabel(market)`(화면엔 원시 코드 대신), `POSITION_MARKETS`
+- `isOverseasMarket(market)`, `isUsMarket`/`isDomesticMarket`, `marketLabel(market)`(화면엔 원시 코드 대신), `POSITION_MARKETS`
+- 종목 검색 결과엔 SCHD.MX(`MEX`)·`TOKYO`처럼 해외 집합에 없는 시장이 섞여 원화로 판정된다 — 원/달러 입력을 가르는 화면은 국내·미국만 남긴다(주가 알림)
 - **토스 해외 포지션 market은 `"US"`라 `isOverseasMarket`이 못 잡는다** — 국내/해외 이분은 `DOMESTIC_MARKETS.includes(m.toUpperCase())`
 
 **플랫폼 (`utils/platform.ts`)**: `isNativePlatform()`, `getApiBaseUrl()`(네이티브는 `VITE_API_DOMAIN` 절대 URL, 웹은 `""`) — 인라인 `window.Capacitor` 접근 금지. `randomId()` — `crypto.randomUUID` 직접 호출 금지(minSdk 24 구형 WebView엔 없음).

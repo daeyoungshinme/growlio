@@ -11,8 +11,8 @@ import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { isOverseasMarket } from "@/constants/markets";
-import { convertUsdToKrw, fmtKrwPrice } from "@/utils/format";
+import { isDomesticMarket, isOverseasMarket, isUsMarket, marketLabel } from "@/constants/markets";
+import { convertUsdToKrw, fmtKrwPreview, fmtKrwPrice, fmtUsdPrice } from "@/utils/format";
 import {
   TOUCH_HEIGHT_MIN,
   TOUCH_TARGET_COMPACT_MOBILE_ONLY,
@@ -35,7 +35,17 @@ export function StockPriceAlertSection() {
     direction: "BELOW" as "BELOW" | "ABOVE",
     max_trigger_count: "1",
   });
-  const { suggestions, isSearching, search: runSearch, clearSuggestions } = useStockSearch();
+  const {
+    suggestions: rawSuggestions,
+    isSearching,
+    search: runSearch,
+    clearSuggestions,
+  } = useStockSearch();
+  // 국내·미국 상장만 — 검색엔 SCHD.MX(멕시코)·도쿄 종목도 섞이는데, 이들은 해외 시장 집합에 없어
+  // 원화 입력으로 판정되고 달러 숫자가 원으로 저장된다
+  const suggestions = rawSuggestions.filter(
+    (s) => isDomesticMarket(s.market) || isUsMarket(s.market),
+  );
   const [selectedStock, setSelectedStock] = useState<StockSuggestion | null>(null);
   const rate = useExchangeRate();
   const idBase = useId();
@@ -96,7 +106,8 @@ export function StockPriceAlertSection() {
   return (
     <SectionCard title="주가 목표 알림">
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        특정 종목이 목표가에 도달하면 이메일로 알림을 보내드립니다.
+        특정 종목이 목표가에 도달하면 이메일로 알림을 보내드립니다. 국내·미국 상장 종목 모두 설정할
+        수 있어요 — 미국 종목은 달러로 입력하면 현재 환율로 원화 환산해 저장합니다.
       </p>
       <div className="space-y-3">
         <div className="relative">
@@ -109,11 +120,13 @@ export function StockPriceAlertSection() {
             className={FORM_INPUT_SM}
             value={form.query}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder="종목명 또는 티커 (예: SCHD, 삼성전자)"
+            placeholder="종목명 또는 티커 (예: 삼성전자, 애플, SCHD)"
           />
           {selectedStock && (
             <div className="mt-1 text-xs text-green-600 dark:text-green-400 font-medium">
-              선택됨: {selectedStock.name} ({selectedStock.ticker} · {selectedStock.market})
+              선택됨: {selectedStock.name} ({selectedStock.ticker} ·{" "}
+              {isUsMarket(selectedStock.market) ? "미국 " : ""}
+              {marketLabel(selectedStock.market)})
             </div>
           )}
           {isSearching && (
@@ -140,7 +153,8 @@ export function StockPriceAlertSection() {
                 >
                   <span className="font-medium text-gray-800 dark:text-gray-200">{s.name}</span>
                   <span className="ml-2 text-xs text-gray-400">
-                    {s.ticker} · {s.market}
+                    {s.ticker} · {isUsMarket(s.market) ? "미국 " : ""}
+                    {marketLabel(s.market)}
                   </span>
                 </button>
               ))}
@@ -166,11 +180,18 @@ export function StockPriceAlertSection() {
               min="0"
               step={inUsd ? "0.01" : undefined}
             />
-            {inUsd && rate && form.target_price !== "" && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                ≈ {fmtKrwPrice(targetKrw)} (현재 환율로 저장)
-              </p>
-            )}
+            {Number(form.target_price) > 0 &&
+              (inUsd ? (
+                <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                  {rate
+                    ? `${fmtUsdPrice(Number(form.target_price))} ≈ ${fmtKrwPreview(targetKrw)} · 현재 환율로 저장`
+                    : "환율을 불러오는 중이에요"}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                  {fmtKrwPreview(targetKrw)}
+                </p>
+              ))}
           </div>
           <div>
             <label htmlFor={fieldId("direction")} className={LABEL_MD}>
@@ -225,7 +246,11 @@ export function StockPriceAlertSection() {
                   {alert.name} ({alert.ticker})
                 </span>
                 <span className="ml-2 text-xs text-gray-400">
-                  {fmtKrwPrice(Number(alert.target_price))}{" "}
+                  {fmtKrwPrice(Number(alert.target_price))}
+                  {isOverseasMarket(alert.market) &&
+                    !!rate &&
+                    !alert.needs_reentry &&
+                    ` (약 ${fmtUsdPrice(Number(alert.target_price) / rate)})`}{" "}
                   {alert.direction === "BELOW" ? "이하" : "이상"}
                 </span>
                 <span className="ml-2 text-xs text-gray-400">

@@ -219,6 +219,12 @@ describe("ExchangeRateAlertSection", () => {
     renderWithProviders(<ExchangeRateAlertSection />);
     expect(await screen.findByText("환전 계획 · $500")).toBeInTheDocument();
   });
+
+  it("목표환율을 입력하면 아래에 환율과 현재 대비 차이를 보인다", () => {
+    renderWithProviders(<ExchangeRateAlertSection />);
+    fireEvent.change(screen.getByLabelText("목표환율 (원)"), { target: { value: "1300" } });
+    expect(screen.getByText("1,300원 · 현재보다 50원 낮음")).toBeInTheDocument();
+  });
 });
 
 // =========================================
