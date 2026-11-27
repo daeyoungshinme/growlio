@@ -300,3 +300,64 @@ class TestAllocationHistoryExcludedAccount:
         assert sum(sum(v.values()) for v in overall.values()) == 1_000_000
         selected = await _fetch_monthly_by_asset_type(pg, user.id, day, excluded.id)
         assert sum(sum(v.values()) for v in selected.values()) == 7_000_000
+
+
+async def test_dip_buy_mark_completed_serializes_double_submit():
+    """plans/153 이관 — "추매했어요"를 두 번 눌러 동시에 온 두 요청: 설정·규칙 행 `FOR UPDATE`로 직렬화돼
+    하나만 기록되고 여윳돈도 한 번만 빠진다. 두 커넥션이 실제로 commit해야 해 롤백 픽스처(`pg`) 대신
+    직접 만들고 지운다(사용자 삭제 → CASCADE)."""
+    if not _TEST_DB_URL:
+        if os.environ.get("CI"):
+            pytest.fail("CI인데 GROWLIO_TEST_DATABASE_URL이 없다")
+        pytest.skip("GROWLIO_TEST_DATABASE_URL 미설정")
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    from sqlalchemy import delete
+
+    from app.exceptions import BadRequestError
+    from app.models.dip_buy import DipBuyRule, DipBuySettings
+    from app.services import dip_buy_service
+
+    engine = create_async_engine(_TEST_DB_URL, pool_size=3, max_overflow=0)
+    user_id = uuid.uuid4()
+    try:
+        async with AsyncSession(engine, expire_on_commit=False) as setup:
+            setup.add(User(id=user_id, email=f"{uuid.uuid4().hex}@test.local"))
+            await setup.flush()
+            setup.add(DipBuySettings(user_id=user_id, reserve_krw=10_000_000, notify_mode="ON_REACH"))
+            rule = DipBuyRule(
+                user_id=user_id,
+                index_ticker="QQQ",
+                allocation_pct=100,
+                tiers=[{"drawdown_pct": 10.0, "ratio_pct": 20.0}],
+                completed=[],
+                notified_tiers=[],
+            )
+            setup.add(rule)
+            await setup.commit()
+            rule_id = rule.id
+
+        async def submit() -> object:
+            async with AsyncSession(engine, expire_on_commit=False) as db:
+                try:
+                    return await dip_buy_service.mark_completed(db, None, user_id, rule_id, None)
+                except BadRequestError as e:
+                    return e
+
+        with patch.object(dip_buy_service, "index_drawdowns", AsyncMock(return_value={"QQQ": -12.0, "SPY": None})):
+            results = await asyncio.gather(submit(), submit())
+
+        assert sum(isinstance(r, BadRequestError) for r in results) == 1
+        async with AsyncSession(engine) as check:
+            saved_rule = await check.scalar(select(DipBuyRule).where(DipBuyRule.id == rule_id))
+            saved_settings = await check.scalar(select(DipBuySettings).where(DipBuySettings.user_id == user_id))
+            assert saved_rule is not None
+            assert saved_settings is not None
+            assert [c["tier"] for c in saved_rule.completed] == [0]
+            assert float(saved_settings.reserve_krw) == 8_000_000  # 1천만 × 20% 한 번만
+    finally:
+        async with AsyncSession(engine) as cleanup:
+            await cleanup.execute(delete(User).where(User.id == user_id))
+            await cleanup.commit()
+        await engine.dispose()
