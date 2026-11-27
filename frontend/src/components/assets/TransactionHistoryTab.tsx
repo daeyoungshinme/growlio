@@ -23,6 +23,7 @@ import {
   TX_LABELS,
   TX_COLORS,
   TX_TYPES,
+  isValidTxType,
   txDeleteConfirmMessage,
   type TxType,
 } from "@/constants/transaction";
@@ -88,13 +89,13 @@ export default function TransactionHistoryTab({ accounts }: Props) {
   });
 
   const triggerDepositPrompt = (accId: string, amt: number, txType: string) => {
-    if (!accId || amt <= 0) return;
+    if (!accId || amt <= 0 || !isValidTxType(txType)) return;
     const acc = accounts.find((a) => a.id === accId);
     if (!acc || !STOCK_TYPES.includes(acc.asset_type)) return;
     setDepositPrompt({
       accountId: accId,
       amount: amt,
-      txType: txType as TxType,
+      txType,
       currentDeposit: acc.deposit_krw ?? 0,
     });
   };

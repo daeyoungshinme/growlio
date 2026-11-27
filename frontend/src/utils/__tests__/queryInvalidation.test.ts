@@ -40,6 +40,8 @@ describe("invalidateSyncData", () => {
     expect(keys).toContain("dividend-by-ticker");
     expect(keys).toContain("insights");
     expect(keys).toContain("drift-summary");
+    // 효율성 분석 카드 — 보유가 바뀌면 매매안도 바뀐다 (plans/156 B1)
+    expect(keys).toContain("rebalancing-strategy");
   });
 });
 

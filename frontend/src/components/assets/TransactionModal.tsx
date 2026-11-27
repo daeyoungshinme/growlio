@@ -13,6 +13,7 @@ import {
 import { fmtKrwPreview, formatUsdAsKrw } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
 import { TX_LABELS, TX_TYPES, CURRENCY_OPTIONS } from "@/constants/transaction";
 import { TransactionList } from "./TransactionList";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -93,7 +94,7 @@ export default function TransactionModal({
       resetForm();
       triggerDepositPrompt(vars.amount ?? 0, vars.transaction_type);
     },
-    onError: () => toast("내역 저장에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "내역 저장에 실패했습니다")),
   });
 
   const updateMut = useMutation({
@@ -110,13 +111,13 @@ export default function TransactionModal({
       resetForm();
       triggerDepositPrompt(delta.amount, delta.txType);
     },
-    onError: () => toast("내역 수정에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "내역 수정에 실패했습니다")),
   });
 
   const deleteMut = useMutation({
     mutationFn: deleteTransaction,
     onSuccess: invalidate,
-    onError: () => toast("내역 삭제에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "내역 삭제에 실패했습니다")),
   });
 
   const handleSubmit = () => {

@@ -38,6 +38,18 @@ const initialTokenReady: Promise<void> = getSupabase()
     /* SDK 청크 로드 실패 — 위와 동일하게 401 경로로 폴백 */
   });
 let initialTokenSettled = false;
+
+/** 같은 서버 오류 토스트를 이 간격 안에 다시 띄우지 않는다 — 서버가 내려간 채 앱을 켜면 홈의 병렬 쿼리마다
+ * 한 장씩, 전역 재시도 때 또 한 장씩 같은 토스트·진동이 쏟아졌다(plans/156 B3) */
+export const SERVER_ERROR_TOAST_INTERVAL_MS = 5000;
+let lastServerErrorToastAt = -Infinity;
+
+function notifyServerError() {
+  const now = Date.now();
+  if (now - lastServerErrorToastAt < SERVER_ERROR_TOAST_INTERVAL_MS) return;
+  lastServerErrorToastAt = now;
+  toast("서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", "error");
+}
 void initialTokenReady.finally(() => {
   initialTokenSettled = true;
 });
@@ -114,7 +126,7 @@ api.interceptors.response.use(
         window.dispatchEvent(new CustomEvent("growlio:session-expired"));
       }
     } else if (status != null && status >= 500 && !isAuthEndpoint) {
-      toast("서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", "error");
+      notifyServerError();
     }
 
     return Promise.reject(error);

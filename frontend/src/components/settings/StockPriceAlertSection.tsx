@@ -206,7 +206,8 @@ export function StockPriceAlertSection() {
         </div>
         <button
           onClick={() => createMutation.mutate()}
-          disabled={!selectedStock || !form.target_price || createMutation.isPending}
+          // 해외는 환율이 아직 없으면 원화 환산값이 0 — 0 이하로 보내면 "0보다 커야" 오류만 보인다(plans/156 B7)
+          disabled={!selectedStock || !(targetKrw > 0) || createMutation.isPending}
           className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
         >
           {createMutation.isPending ? "등록 중..." : "알림 추가"}
