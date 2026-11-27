@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { fetchStockPrice } from "@/api/assets";
 import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "./useStockSearch";
+import { useTimeout } from "./useTimeout";
 import { extractErrorMessage } from "@/utils/error";
 import { randomId } from "@/utils/platform";
 import { toast } from "@/utils/toast";
@@ -59,6 +60,7 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
     search: runStockSearch,
     clearSuggestions,
   } = useStockSearch();
+  const scheduleHide = useTimeout();
 
   const setRow = (i: number, patch: Partial<Position>) =>
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -134,7 +136,7 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
   };
 
   const handleNameBlur = (i: number) => {
-    setTimeout(() => {
+    scheduleHide(() => {
       if (suggestIdxRef.current === i) {
         clearSuggestions();
         setSuggestIdx(null);

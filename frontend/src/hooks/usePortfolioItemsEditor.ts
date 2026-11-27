@@ -13,6 +13,7 @@ import {
 import { PORTFOLIO_WEIGHT_TOLERANCE } from "@/constants/validation";
 import { FOCUS_SETTLE_DELAY } from "@/constants/timers";
 import { useStockSearch } from "./useStockSearch";
+import { useTimeout } from "./useTimeout";
 import { toast } from "@/utils/toast";
 
 const EMPTY_ITEM: PortfolioItem = { ticker: "", name: "", market: "KOSPI", weight: 0 };
@@ -39,6 +40,7 @@ export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [editingRows, setEditingRows] = useState<Set<number>>(new Set());
   const searchInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+  const schedule = useTimeout();
 
   const totalWeight = items.reduce((s, i) => s + (Number(i.weight) || 0), 0);
   const weightOk = Math.abs(totalWeight - 100) < PORTFOLIO_WEIGHT_TOLERANCE;
@@ -54,6 +56,12 @@ export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
 
   function removeItem(idx: number) {
     setItems((prev) => prev.filter((_, i) => i !== idx));
+    // 편집·활성 상태도 행 인덱스로 들고 있다 — 같이 당기지 않으면 아래 행이 검색 모드로 바뀌고, 거기서 고른
+    // 티커가 옛 이름과 짝지어 저장된다(plans/156 B2)
+    const shift = (i: number) => (i > idx ? i - 1 : i);
+    setEditingRows((prev) => new Set([...prev].filter((i) => i !== idx).map(shift)));
+    if (activeRow === idx) clearSuggestions();
+    setActiveRow((prev) => (prev === null || prev === idx ? null : shift(prev)));
   }
 
   function addCash() {
@@ -155,7 +163,7 @@ export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
     updateItem(idx, { ticker: "", name: "" });
     setEditingRows((prev) => new Set(prev).add(idx));
     clearSuggestions();
-    setTimeout(() => searchInputRefs.current.get(idx)?.focus(), FOCUS_SETTLE_DELAY);
+    schedule(() => searchInputRefs.current.get(idx)?.focus(), FOCUS_SETTLE_DELAY);
   }
 
   function registerInputRef(idx: number, el: HTMLInputElement | null) {

@@ -5,6 +5,7 @@ import { type RebalancingPlanLegSummary } from "@/api/rebalancingPlan";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { PLAN_LEG_STATUS_LABEL } from "@/constants/rebalancingConfig";
+import { fmtKrwPrice, fmtUsd } from "@/utils/format";
 
 function useCountdownLabel(deadlineAt: string): string {
   const [now, setNow] = useState(() => Date.now());
@@ -22,10 +23,14 @@ function useCountdownLabel(deadlineAt: string): string {
 }
 
 function PendingPlanItemsDetail({ items }: { items: RebalancingPlanLegSummary["items"] }) {
-  const priceOf = (item: RebalancingPlanLegSummary["items"][number]) =>
-    item.order_type === "LIMIT" && item.limit_price != null
-      ? item.limit_price.toLocaleString()
-      : (item.reference_price?.toLocaleString() ?? "—");
+  // 플랜 항목 가격은 해외도 원화(`current_price_krw`) — 메일 확인 페이지와 같은 단위로 보인다(plans/156 B5)
+  const priceOf = (item: RebalancingPlanLegSummary["items"][number]) => {
+    const price =
+      item.order_type === "LIMIT" && item.limit_price != null
+        ? item.limit_price
+        : item.reference_price;
+    return price != null ? fmtKrwPrice(price) : "—";
+  };
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
@@ -92,17 +97,15 @@ const LEG_ERROR_LABEL: Record<string, string> = {
   fx_wait_expired: "환전 대기 기한이 지나 이번 회차 해외 매수는 진행되지 않았어요.",
 };
 
-function fmtUsd(v: number | null | undefined): string {
-  return `$${(v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const usdOrDash = (v: number | null | undefined) => (v == null ? "—" : fmtUsd(v));
 
 /** 환전 대기 leg 안내 — 필요/보유 달러와 자동 재확인 기한(plans/120) */
 function FxWaitNotice({ leg }: { leg: RebalancingPlanLegSummary }) {
   const until = leg.fx_retry_until ? new Date(leg.fx_retry_until) : null;
   return (
     <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 leading-relaxed">
-      달러가 부족해 해외 매수를 기다리고 있어요 (필요 {fmtUsd(leg.required_usd)} · 보유{" "}
-      {fmtUsd(leg.available_usd)}). 증권사 앱에서 환전한 뒤 다시 매수를 눌러주세요.
+      달러가 부족해 해외 매수를 기다리고 있어요 (필요 {usdOrDash(leg.required_usd)} · 보유{" "}
+      {usdOrDash(leg.available_usd)}). 증권사 앱에서 환전한 뒤 다시 매수를 눌러주세요.
       {until &&
         ` ${until.getMonth() + 1}/${until.getDate()}까지는 미국장 중에 자동으로 다시 확인합니다.`}
     </p>

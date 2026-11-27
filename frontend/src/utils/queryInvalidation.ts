@@ -29,6 +29,8 @@ const HOLDINGS_QUERY_KEYS = [
   QUERY_KEYS.insights,
   QUERY_KEYS.portfolioRisk,
   QUERY_KEYS.driftSummary,
+  // 효율성 분석 카드는 현재 보유로 매매안을 낸다 — 백엔드 sync는 이미 지우는데 화면만 1시간 옛 보유로 남았다(plans/156 B1)
+  QUERY_KEYS.rebalancingStrategyBase,
   // 목표 역산 추천·후보 중복 점검("보유 중" 표시)이 보유 포지션 기준 — 백엔드 sync도 같은 캐시를 지운다
   QUERY_KEYS.goalRecommendationBase,
   // 환전 계획의 보유 달러는 계좌 deposit_usd 합 (plans/97 B2)

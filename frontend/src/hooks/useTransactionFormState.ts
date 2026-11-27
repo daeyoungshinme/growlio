@@ -4,9 +4,7 @@ import { useStockSearch } from "@/hooks/useStockSearch";
 import { useUsdAmountInput } from "@/hooks/useUsdAmountInput";
 import type { Transaction, TransactionCreate } from "@/api/transactions";
 import { localToday } from "@/utils/format";
-import { TX_TYPES, type TxType } from "@/constants/transaction";
-
-const isValidTxType = (val: unknown): val is TxType => TX_TYPES.includes(val as TxType);
+import { isValidTxType, type TxType } from "@/constants/transaction";
 
 const makeEmptyForm = (accountId: string): TransactionCreate => ({
   account_id: accountId,

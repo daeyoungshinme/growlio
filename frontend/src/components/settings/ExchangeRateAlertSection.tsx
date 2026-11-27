@@ -127,7 +127,8 @@ export function ExchangeRateAlertSection() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => createAlertMutation.mutate()}
-          disabled={!alertForm.target_rate || createAlertMutation.isPending}
+          // 0·음수·NaN은 백엔드가 거부한다 — 누르기 전에 막는다(plans/156 B7)
+          disabled={!(Number(alertForm.target_rate) > 0) || createAlertMutation.isPending}
           className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
         >
           {createAlertMutation.isPending ? "등록 중..." : "알림 추가"}

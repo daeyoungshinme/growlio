@@ -759,12 +759,12 @@ describe("RebalancingHistoryTab", () => {
     );
 
     const toggle = await screen.findByText("매수 대기");
-    expect(screen.queryByText("70,000")).toBeNull();
+    expect(screen.queryByText("70,000원")).toBeNull();
 
     fireEvent.click(toggle);
 
     expect(await screen.findAllByText(/삼성전자/)).not.toHaveLength(0);
-    expect(await screen.findAllByText("70,000")).not.toHaveLength(0);
+    expect(await screen.findAllByText("70,000원")).not.toHaveLength(0);
   });
 
   it("shows a confirm modal before executing a pending buy leg, then calls approvePlanLeg", async () => {
@@ -815,8 +815,8 @@ describe("RebalancingHistoryTab", () => {
     );
 
     expect(await screen.findAllByText("환전 대기")).not.toHaveLength(0);
-    expect(screen.getByText(/필요 \$350\.00/)).toBeDefined();
-    expect(screen.getByText(/보유 \$12\.50/)).toBeDefined();
+    // 공용 fmtUsd 표기(plans/156 B5) — 다른 화면과 같은 "$350"·"$12.5"
+    expect(screen.getByText(/필요 \$350 · 보유 \$12\.5\)/)).toBeDefined();
     expect(screen.queryByText("지금 매수 실행")).toBeNull();
 
     fireEvent.click(screen.getByText("환전했어요, 다시 매수"));
