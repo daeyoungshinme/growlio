@@ -46,8 +46,7 @@ bash dev.sh         # (또는 make dev)
 
 전체 목록은 `Makefile`(`make up`/`down`/`migrate`/`install-*`/`dev`/`test-*`/`lint`/`typecheck`/`format`/`clean`). 주의점만:
 
-- `make migrate-down` — 1단계 롤백
-- `make db-reset` — **데이터 전체 삭제**(개발 환경 전용)
+- `make migrate-down` — 1단계 롤백, `make db-reset` — **데이터 전체 삭제**. 둘 다 `backend/.env`가 가리키는 DB에 실행되는데 그게 운영(공유 Supabase)인 경우가 흔하다 → `scripts/assert_local_db.py`가 로컬 호스트가 아니면 멈춘다(`ALLOW_REMOTE_DB=1`로 우회)
 - `make dev`·`make build-android-*` — Windows 전용(`bash dev.sh`, `gradlew.bat`). macOS/Linux는 `make dev-backend` + `make dev-frontend`
 - `make test-backend`는 커버리지 없이 빠르게, `make test-backend-cov`가 CI와 같은 91% 게이트
 - `make lint`·`make typecheck`는 CI와 같은 기준

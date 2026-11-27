@@ -12,8 +12,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN adduser --disabled-password --gecos '' appuser
 COPY --from=builder /venv /venv
-COPY --chown=appuser:appuser . .
+# 코드는 root 소유로 둔다 — 런타임 사용자가 앱 코드를 고칠 수 없게(plans/156 C6). 실행 중 쓰는 곳은 appuser 홈
+# (yfinance 캐시 등)뿐이다
+COPY . .
 USER appuser
 # 프로젝트를 설치하지 않으므로 scripts/*(bootstrap_alembic.py)의 `import app`이 이 경로에 의존한다
-ENV PATH="/venv/bin:$PATH" PYTHONPATH=/app
+ENV PATH="/venv/bin:$PATH" PYTHONPATH=/app PYTHONDONTWRITEBYTECODE=1
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

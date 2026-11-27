@@ -248,7 +248,13 @@ jobs:
           else
             echo "native=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          if git diff --name-only "$range" | grep -qE '^frontend/(android/|package(-lock)?\.json$|capacitor\.config\.)'; then
+          # 범위를 못 구하면(force-push로 BEFORE가 이력에 없음 등) diff가 실패해 grep이 아무것도 못 찾고 조용히
+          # 생략됐다 — 확인할 수 없으면 빌드한다(plans/156 C3)
+          if ! changed=$(git diff --name-only "$range" 2>/dev/null); then
+            echo "변경 범위($range)를 구하지 못해 빌드한다"
+            echo "native=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if echo "$changed" | grep -qE '^frontend/(android/|package(-lock)?\.json$|capacitor\.config\.)'; then
             echo "native=true" >> "$GITHUB_OUTPUT"
           else
             echo "native=false" >> "$GITHUB_OUTPUT"
@@ -322,3 +328,24 @@ jobs:
           docker run --rm -e KIS_CRED_ENCRYPTION_KEY -e DATABASE_URL -e APP_ENV \
             growlio-api:ci python -c "import app.main"
           docker run --rm growlio-api:ci alembic --help > /dev/null
+
+      # import만으로는 lifespan(스케줄러·Sentry 초기화)·uvicorn 기동 실패가 Render에서야 드러난다(plans/156 C4).
+      # DB가 없으니 /health는 503 — 앱이 떠서 응답하면(200·503) 통과, 컨테이너가 죽거나 무응답이면 실패
+      - name: Boot backend image
+        env:
+          KIS_CRED_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/none
+          APP_ENV: development
+        run: |
+          docker run -d --name api-smoke -p 8000:8000 -e KIS_CRED_ENCRYPTION_KEY -e DATABASE_URL -e APP_ENV growlio-api:ci
+          for _ in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/health || true)
+            if [ "$code" = "200" ] || [ "$code" = "503" ]; then
+              echo "기동 확인 (/health $code)"; docker rm -f api-smoke > /dev/null; exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' api-smoke)" != "true" ]; then break; fi
+            sleep 1
+          done
+          echo "::error::백엔드 이미지가 기동하지 않았다"
+          docker logs api-smoke
+          exit 1
