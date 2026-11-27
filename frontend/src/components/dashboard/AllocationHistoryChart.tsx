@@ -16,6 +16,7 @@ import {
   chartTickStyle,
   chartTooltipStyle,
   legendOrder,
+  stackedTotal,
 } from "@/utils/chart";
 import { fmtKrw, fmtKrwShort, fmtMonth, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
@@ -47,6 +48,16 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const DEFAULT_COLOR = "#94A3B8";
+
+/** 전월 대비 증감률(%) — 이전 달이 없거나 0이면 null. 요약 줄과 월별 상세 표가 같이 쓴다 */
+function monthOverMonthPct(
+  row: { total_krw: number },
+  prev: { total_krw: number } | undefined,
+): number | null {
+  return prev && prev.total_krw > 0
+    ? ((row.total_krw - prev.total_krw) / prev.total_krw) * 100
+    : null;
+}
 
 interface AllocationHistoryChartProps {
   /** 특정 계좌만 필터링해 조회 (미지정 시 전체 계좌 통합) */
@@ -174,6 +185,9 @@ function AllocationHistoryChart({
                 labelStyle={labelStyle}
                 itemStyle={itemStyle}
                 cursor={{ fill: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }}
+                labelFormatter={(label, payload) =>
+                  `${String(label)} · 합계 ${fmtKrwShort(stackedTotal(payload))}`
+                }
                 formatter={(value, rawKey) => {
                   const key = String(rawKey ?? "");
                   return [fmtKrwShort(Number(value ?? 0)), labelMap[key] ?? key];
@@ -239,10 +253,7 @@ function AllocationHistoryChart({
                 ) : (
                   reversedMonthly.map((row, i, arr) => {
                     const prev = arr[i + 1];
-                    const change =
-                      prev && prev.total_krw > 0
-                        ? ((row.total_krw - prev.total_krw) / prev.total_krw) * 100
-                        : null;
+                    const change = monthOverMonthPct(row, prev);
                     const isExpanded = expandedMonth === row.month;
                     const toggle = () => setExpandedMonth(isExpanded ? null : row.month);
                     return (
