@@ -23,6 +23,24 @@ export function isOverseasMarket(market: string): boolean {
   return OVERSEAS_MARKET_SET.has(market.toUpperCase());
 }
 
+/** 미국 상장 거래소(+ `_US` 변형) — 검색 결과에 섞이는 멕시코·도쿄 등 다른 해외 거래소를 거를 때 */
+const US_MARKET_SET = new Set<string>([
+  "NYSE",
+  "NASDAQ",
+  "AMEX",
+  "NYSE_US",
+  "NASDAQ_US",
+  "AMEX_US",
+]);
+
+export function isUsMarket(market: string): boolean {
+  return US_MARKET_SET.has(market.toUpperCase());
+}
+
+export function isDomesticMarket(market: string): boolean {
+  return DOMESTIC_MARKETS.includes(market.toUpperCase());
+}
+
 /** 화면 표시용 시장 라벨 — 내부 변형 코드(`_US` 접미사·"US" 센티널·KRX·CASH)가 그대로 보이지 않게 한다.
  * 사용자에게 익숙한 거래소명(KOSPI·NASDAQ 등)은 그대로 둔다 (docs/plans/67). */
 const MARKET_DISPLAY_LABEL: Record<string, string> = {

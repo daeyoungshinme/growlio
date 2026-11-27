@@ -34,6 +34,8 @@ export function ExchangeRateAlertSection() {
     max_trigger_count: "1",
   });
 
+  const targetRate = Number(alertForm.target_rate);
+
   const [pendingDelete, setPendingDelete] = useState<ExchangeRateAlert | null>(null);
   const {
     items: alerts,
@@ -91,6 +93,15 @@ export function ExchangeRateAlertSection() {
             placeholder="예: 1300"
             min="0"
           />
+          {targetRate > 0 && (
+            <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+              {fmtFxRate(targetRate)}
+              {usdKrw != null &&
+                usdKrw > 0 &&
+                targetRate !== usdKrw &&
+                ` · 현재보다 ${fmtFxRate(Math.abs(targetRate - usdKrw))} ${targetRate < usdKrw ? "낮음" : "높음"}`}
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="fx-alert-direction" className={LABEL_MD}>
@@ -128,7 +139,7 @@ export function ExchangeRateAlertSection() {
         <button
           onClick={() => createAlertMutation.mutate()}
           // 0·음수·NaN은 백엔드가 거부한다 — 누르기 전에 막는다(plans/156 B7)
-          disabled={!(Number(alertForm.target_rate) > 0) || createAlertMutation.isPending}
+          disabled={!(targetRate > 0) || createAlertMutation.isPending}
           className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} bg-blue-600 text-white px-5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
         >
           {createAlertMutation.isPending ? "등록 중..." : "알림 추가"}

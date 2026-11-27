@@ -5,7 +5,9 @@ import {
   OVERSEAS_MARKETS,
   OVERSEAS_MARKET_SET,
   POSITION_MARKETS,
+  isDomesticMarket,
   isOverseasMarket,
+  isUsMarket,
 } from "@/constants/markets";
 import { backtestDefaultEndDate, backtestDefaultStartDate } from "@/constants/defaults";
 import { STALE_TIME, REFETCH_INTERVAL, PERSIST_CACHE_KEY } from "@/constants/queryConfig";
@@ -109,6 +111,16 @@ describe("markets constants", () => {
     expect(isOverseasMarket("KOSPI")).toBe(false);
     expect(isOverseasMarket("KOSDAQ")).toBe(false);
     expect(isOverseasMarket("KRX")).toBe(false);
+  });
+
+  it("isUsMarket — 미국 거래소만 참이고 다른 해외·국내는 거짓", () => {
+    for (const m of ["NYSE", "NASDAQ", "AMEX", "nyse_us"]) expect(isUsMarket(m)).toBe(true);
+    for (const m of ["TSE", "MEX", "TOKYO", "KOSPI"]) expect(isUsMarket(m)).toBe(false);
+  });
+
+  it("isDomesticMarket — 국내 거래소만 참", () => {
+    for (const m of ["KOSPI", "kosdaq", "KRX"]) expect(isDomesticMarket(m)).toBe(true);
+    for (const m of ["NYSE", "MEX", "TOKYO"]) expect(isDomesticMarket(m)).toBe(false);
   });
 });
 
