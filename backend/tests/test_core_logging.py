@@ -27,6 +27,42 @@ class TestRedactSecrets:
         text = "account_synced positions=3"
         assert redact_secrets(text) == text
 
+    def test_redacts_kis_account_number_in_url(self):
+        """httpx 오류 문자열의 요청 URL에 실린 계좌번호를 가린다 (plans/156 A4)."""
+        text = (
+            "Client error '400 Bad Request' for url "
+            "'https://openapi.koreainvestment.com:9443/uapi/overseas-stock/v1/trading/inquire-balance"
+            "?CANO=12345678&ACNT_PRDT_CD=01&OVRS_EXCG_CD=NASD'"
+        )
+        redacted = redact_secrets(text)
+        assert "12345678" not in redacted
+        assert "CANO=[REDACTED]" in redacted
+        assert "OVRS_EXCG_CD=NASD" in redacted
+
+
+class TestFormatSyncError:
+    def test_unmapped_exception_hides_raw_text(self):
+        """매핑 안 된 예외(SQLAlchemy·httpx)의 원문은 last_sync_error로 나가지 않는다 (plans/156 A5)."""
+        from app.core.logging import format_sync_error
+
+        err = KeyError("SELECT * FROM users WHERE token = 'abc'")
+        assert format_sync_error(err) == "내부 오류가 발생했습니다(KeyError)"
+
+    def test_our_messages_pass_through(self):
+        from app.core.logging import format_sync_error
+        from app.exceptions import ProviderApiError
+        from app.utils.circuit_breaker import CircuitOpenError
+
+        assert format_sync_error(ProviderApiError("토스 계좌 조회 실패")) == "토스 계좌 조회 실패"
+        assert format_sync_error(CircuitOpenError("KIS API 일시 차단")) == "KIS API 일시 차단"
+
+    def test_string_is_redacted_and_truncated(self):
+        from app.core.logging import SYNC_ERROR_MESSAGE_MAX_LENGTH, format_sync_error
+
+        out = format_sync_error("appkey=PSxxxxxxxx " + "가" * 500)
+        assert "PSxxxxxxxx" not in out
+        assert len(out) == SYNC_ERROR_MESSAGE_MAX_LENGTH
+
 
 class TestRedactProcessor:
     def test_redacts_string_values_in_event_dict(self):

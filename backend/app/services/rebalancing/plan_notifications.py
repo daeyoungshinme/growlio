@@ -396,15 +396,27 @@ async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UU
     )
 
 
-async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_message: str, db: AsyncSession) -> None:
+async def _notify_leg_execution_failed(
+    plan: RebalancingPlan,
+    side: str,
+    error_message: str,
+    db: AsyncSession,
+    *,
+    outcome_unknown: bool | None = None,
+) -> None:
     """leg 실행 자체가 예외로 실패했을 때(개별 종목 실패가 아닌 전체 실패) 이메일/푸시로 알린다.
+
+    `outcome_unknown`(None이면 사유 문구의 `OUTCOME_UNKNOWN_MARKER`로 판정) — 접수 여부를 모르는 실패는
+    "체결 안 됨" 대신 체결 내역 확인을 먼저 요청한다. 그대로 다시 실행하면 중복 주문이 된다(plans/156 A3).
 
     개별 종목 주문 실패는 `_send_leg_execution_email`의 완료 리포트(total_fail)로 이미 안내되지만,
     leg 실행 자체가 예외를 던진 경우(자격증명 오류, 브로커 토큰 발급 실패 등)는 실행 리포트가
     아예 생성되지 않아 사용자가 이력 탭을 직접 열어보지 않으면 알 방법이 없었다 — 그 공백을 메운다.
     """
+    from app.providers.http_client import is_outcome_unknown_message
     from app.services.notifications.email_service import send_rebalancing_plan_execution_failed_email
 
+    unknown = is_outcome_unknown_message(error_message) if outcome_unknown is None else outcome_unknown
     recipient = await _plan_recipient(plan, db)
     if recipient is None:
         return
@@ -412,15 +424,25 @@ async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_m
 
     if email:
         try:
-            await send_rebalancing_plan_execution_failed_email(email, portfolio_name, side, error_message)
+            await send_rebalancing_plan_execution_failed_email(
+                email, portfolio_name, side, error_message, outcome_unknown=unknown
+            )
         except Exception as exc:
             report_handled_failure("rebalancing_plan_execution_failed_email_error", exc, plan_id=str(plan.id))
 
     side_label = "매수" if side == "BUY" else "매도"
     await send_push_safely(
         plan.user_id,
-        title=f"리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}",
-        body="이번 계획은 체결되지 않았습니다. 앱에서 확인해주세요.",
+        title=(
+            f"리밸런싱 자동화 {side_label} 결과 확인 필요 — {portfolio_name}"
+            if unknown
+            else f"리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}"
+        ),
+        body=(
+            "주문이 접수됐을 수 있어요. 다시 실행하기 전에 증권사 앱에서 체결 내역을 확인해주세요."
+            if unknown
+            else "이번 계획은 체결되지 않았습니다. 앱에서 확인해주세요."
+        ),
         fcm_token=fcm_token,
         data={"type": "REBALANCING_PLAN_EXECUTION_FAILED", "portfolio_id": str(plan.portfolio_id or "")},
         failure_event="rebalancing_plan_execution_failed_push_failed",

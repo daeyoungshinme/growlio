@@ -166,8 +166,8 @@ class TestGetBalance:
 
         assert result["positions"][0]["qty"] == 0.5
 
-    @pytest.mark.asyncio
-    async def test_buying_power_failure_falls_back_to_zero(self, cache):
+    @staticmethod
+    def _fake_request(failing_currency: str):
         from app.toss.client import TossApiError
 
         async def fake_request(method, path, **kwargs):
@@ -175,14 +175,32 @@ class TestGetBalance:
                 return {"result": [{"accountNo": "1", "accountSeq": 7, "accountType": "BROKERAGE"}]}
             if path == toss_balance.TOSS_HOLDINGS_PATH:
                 return {"result": {"items": []}}
-            raise TossApiError("account-restricted", "no usd")
+            cur = kwargs["params"]["currency"]
+            if cur == failing_currency:
+                raise TossApiError("internal-error", "temporary")
+            return {"result": {"currency": cur, "cashBuyingPower": 100}}
 
-        with patch("app.toss.balance.toss_request", side_effect=fake_request):
+        return fake_request
+
+    @pytest.mark.asyncio
+    async def test_usd_buying_power_failure_is_unknown_not_zero(self, cache):
+        """달러 조회 실패는 0이 아니라 None(미확인) — 기존 deposit_usd를 유지해야 한다 (plans/156 A2)."""
+        with patch("app.toss.balance.toss_request", side_effect=self._fake_request("USD")):
             result = await toss_balance.get_balance("t", account_id="a", account_no="1", cache=cache)
 
-        assert result["deposit_krw"] == 0.0
-        assert result["deposit_usd"] == 0.0
-        assert result["positions"] == []
+        assert result["deposit_krw"] == 100.0
+        assert result["deposit_usd"] is None
+
+    @pytest.mark.asyncio
+    async def test_krw_buying_power_failure_fails_sync(self, cache):
+        """원화 조회 실패를 0으로 저장하면 그날 스냅샷 현금이 통째로 빠진다 — 동기화 실패로 올린다."""
+        from app.toss.client import TossApiError
+
+        with (
+            patch("app.toss.balance.toss_request", side_effect=self._fake_request("KRW")),
+            pytest.raises(TossApiError),
+        ):
+            await toss_balance.get_balance("t", account_id="a", account_no="1", cache=cache)
 
 
 class TestRawPositionFractionalQty:

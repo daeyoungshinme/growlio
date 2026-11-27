@@ -13,7 +13,10 @@ import structlog
 
 _SECRET_PATTERN = re.compile(
     r"(appkey|appsecret|secretkey|access_token|refresh_token|Bearer|password|Authorization"
-    r"|api_key|apikey|dart_api_key|encryption_key|jwt_secret|supabase_key|database_url)"
+    r"|api_key|apikey|dart_api_key|encryption_key|jwt_secret|supabase_key|database_url"
+    # KIS 잔고·주문 GET은 계좌번호를 쿼리스트링(CANO·ACNT_PRDT_CD)에 싣는다 — httpx 오류 문자열(요청 URL)에
+    # 그대로 남아 로그로 샌다(plans/156 A4)
+    r"|CANO|ACNT_PRDT_CD|account_no|acnt_no)"
     # "Authorization: Bearer <토큰>"은 "Bearer"만 값으로 잡혀 토큰이 남았다 — Bearer 접두를 건너뛴다
     r"[=:\s\"']+(?:Bearer\s+)?[A-Za-z0-9+/=_\-\.]{4,}",
     re.IGNORECASE,
@@ -27,13 +30,18 @@ def redact_secrets(text: str) -> str:
 SYNC_ERROR_MESSAGE_MAX_LENGTH = 200
 
 
+def _redact_truncate(text: str) -> str:
+    return redact_secrets(text)[:SYNC_ERROR_MESSAGE_MAX_LENGTH]
+
+
 def format_sync_error(error: BaseException | str) -> str:
     """계좌 동기화 실패 사유를 사용자에게 노출 가능한 형태로 가공한다 (비밀정보 redact + 길이 제한).
 
-    asset_service.sync_account()/sync_all_service.run_sync_all() 양쪽에서 각자
-    `redact_secrets(str(e))[:200]`을 독립 구현하고 있던 것을 공용화한 것. 예외 객체와, 이미
-    str(e)로 변환되어 저장된 값(jobs/asset_sync.py의 failed 리스트) 양쪽을 모두 받는다."""
-    return redact_secrets(str(error))[:SYNC_ERROR_MESSAGE_MAX_LENGTH]
+    예외 객체는 `public_error_message`를 거친다 — provider가 매핑하지 않은 SQLAlchemy·httpx 예외 원문(SQL·요청
+    URL)이 `last_sync_error`와 동기화 상태 응답으로 나가지 않게(plans/156 A5). 이미 그렇게 만든 문자열도 받는다."""
+    if isinstance(error, BaseException):
+        return public_error_message(error)
+    return _redact_truncate(error)
 
 
 def public_error_message(error: BaseException) -> str:
@@ -49,9 +57,10 @@ def public_error_message(error: BaseException) -> str:
     from app.kis.client import KisApiError
     from app.kiwoom.client import KiwoomApiError, KiwoomTokenIssueError
     from app.providers.http_client import BrokerRequestError
+    from app.utils.circuit_breaker import CircuitOpenError
 
     if isinstance(error, HTTPException):
-        return format_sync_error(str(error.detail))
+        return _redact_truncate(str(error.detail))
     if isinstance(error, PydanticValidationError):
         # ValueError 하위 클래스지만 메시지에 검증 대상 입력값(브로커 응답 등)이 그대로 담긴다
         return f"내부 오류가 발생했습니다({type(error).__name__})"
@@ -65,9 +74,10 @@ def public_error_message(error: BaseException) -> str:
         | KisApiError
         | KiwoomApiError
         | KiwoomTokenIssueError
+        | CircuitOpenError
         | ValueError,
     ):
-        return format_sync_error(error)
+        return _redact_truncate(str(error))
     return f"내부 오류가 발생했습니다({type(error).__name__})"
 
 

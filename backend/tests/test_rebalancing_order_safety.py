@@ -84,6 +84,37 @@ class TestExecuteLegAllOrdersFailed:
         # 실행 기록은 남아 있으니 이력에서 종목별 실패를 볼 수 있어야 한다
         assert leg.execution_id == execution_id
         notify.assert_awaited_once()
+        assert notify.await_args.kwargs["outcome_unknown"] is False
+
+    @pytest.mark.asyncio
+    async def test_unknown_outcome_order_marks_leg_notice_as_unknown(self):
+        """응답 유실(접수 여부 불명) 주문이 하나라도 있으면 첫 사유가 거부여도 '확인 필요'로 알린다 —
+        '체결 안 됨'으로 알리면 사용자가 다시 실행해 중복 주문이 된다 (plans/156 A3)."""
+        db = MagicMock()
+        db.refresh = AsyncMock()
+        db.commit = AsyncMock()
+        db.add = MagicMock()
+        leg = SimpleNamespace(id=uuid.uuid4(), side="BUY", items=[], status="PENDING", execution_id=None)
+        plan = SimpleNamespace(
+            id=uuid.uuid4(), user_id=uuid.uuid4(), account_id=None, portfolio_id=uuid.uuid4(), strategy="FULL"
+        )
+        unknown = "KIS API 요청 실패(재시도 비활성화 — 응답 유실 시 실제 처리 여부 불명): ReadTimeout"
+        notify = AsyncMock()
+
+        with (
+            patch.object(svc_exec, "_rebuild_orders_from_items", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.rebalancing.execution_service.execute_rebalancing",
+                new=AsyncMock(
+                    return_value=([_result(_order("FAILED", "잔고 부족"), _order("FAILED", unknown))], uuid.uuid4())
+                ),
+            ),
+            patch.object(svc_exec, "_notify_leg_execution_failed", new=notify),
+        ):
+            await svc_exec._execute_leg(leg, plan, db, None, "SYSTEM_AUTO")
+
+        assert leg.status == "FAILED"
+        assert notify.await_args.kwargs["outcome_unknown"] is True
 
     @pytest.mark.asyncio
     async def test_partial_fill_stays_executed(self):
@@ -408,3 +439,38 @@ class TestPlanGenerationRequiresRealUsdRate:
 
         assert result is None
         rate.assert_not_awaited()
+
+
+class TestLegFailureNotice:
+    """leg 전체 실패 알림 — 접수 여부를 모르는 실패는 '체결 안 됨'으로 알리지 않는다 (plans/156 A3)."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("message", "explicit", "unknown"),
+        [
+            ("잔고 부족", None, False),
+            ("KIS API 서버 오류 502(재시도 비활성화 — 실제 접수 여부 불명)", None, True),
+            ("실행 결과를 확인하지 못했습니다.", True, True),
+        ],
+    )
+    async def test_wording_follows_outcome(self, message, explicit, unknown):
+        from app.services.rebalancing import plan_notifications as pn
+
+        plan = SimpleNamespace(id=uuid.uuid4(), user_id=uuid.uuid4(), portfolio_id=uuid.uuid4())
+        push = AsyncMock()
+        email = AsyncMock(return_value=True)
+        kwargs = {} if explicit is None else {"outcome_unknown": explicit}
+        with (
+            patch.object(pn, "_plan_recipient", new=AsyncMock(return_value=("코어", "a@b.c", "tok"))),
+            patch.object(pn, "send_push_safely", new=push),
+            patch("app.services.notifications.email_service.send_rebalancing_plan_execution_failed_email", new=email),
+        ):
+            await pn._notify_leg_execution_failed(plan, "BUY", message, MagicMock(), **kwargs)
+
+        assert email.await_args.kwargs["outcome_unknown"] is unknown
+        body = push.await_args.kwargs["body"]
+        if unknown:
+            assert "체결되지 않았습니다" not in body
+            assert "체결 내역을 확인" in body
+        else:
+            assert "체결되지 않았습니다" in body

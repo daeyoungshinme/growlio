@@ -316,3 +316,19 @@ class TestUserProvidedNamesAreEscaped:
 
         _, html = rebalancing_plan_execution_failed_template("A&B <코어>", "BUY", None)
         assert "A&amp;B &lt;코어&gt;" in html
+
+    def test_failure_reason_is_escaped(self):
+        from app.services.notifications.email_templates import rebalancing_plan_execution_failed_template
+
+        _, html = rebalancing_plan_execution_failed_template("코어", "BUY", "<script>x</script>")
+        assert "<script>" not in html
+
+    def test_outcome_unknown_asks_to_check_before_rerun(self):
+        """결과 유실 leg는 '체결 안 됨·직접 실행'이 아니라 체결 내역 확인을 먼저 요청한다 (plans/156 A3)."""
+        from app.services.notifications.email_templates import rebalancing_plan_execution_failed_template
+
+        subject, html = rebalancing_plan_execution_failed_template("코어", "SELL", "확인 못 함", outcome_unknown=True)
+        assert "결과 확인 필요" in subject
+        assert "체결되지 않았습니다" not in html
+        assert "직접 리밸런싱을 실행" not in html
+        assert "다시 실행하기 전에" in html

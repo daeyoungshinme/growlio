@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.constants import TOKEN_CACHE_TTL_BUFFER
 from app.services.accounts.credential_service import decrypt, encrypt
+from app.utils.inproc_lock import single_flight_fetch
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,7 +60,9 @@ async def get_or_fetch_token(
                 await cache.setex(cache_key, ttl, plaintext_token)
                 return plaintext_token
 
-    return await fetch()
+    # 콜드 스타트에 여러 요청이 동시에 미스하면 각자 발급한다 — KIS는 앱키당 분당 1회 발급 제한이라 늦게 온 요청이
+    # 실패한다(plans/156 A7). 하나만 발급하고 나머지는 발급자가 채운 캐시(store_token)를 기다린다.
+    return await single_flight_fetch(cache, cache_key, lambda: cache.get(cache_key), fetch)
 
 
 async def store_token(

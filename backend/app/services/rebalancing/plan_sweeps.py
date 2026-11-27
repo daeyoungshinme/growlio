@@ -51,7 +51,7 @@ async def fail_stuck_consumed_legs(db: AsyncSession) -> int:
                 await _pe.save_alert_history(db, plan.user_id, "REBALANCING", "리밸런싱 자동화 실행 결과 확인 필요")
             await db.commit()
             if plan:
-                await _pe._notify_leg_execution_failed(plan, side, STUCK_LEG_MESSAGE, db)
+                await _pe._notify_leg_execution_failed(plan, side, STUCK_LEG_MESSAGE, db, outcome_unknown=True)
             processed += 1
         except Exception as e:
             report_handled_failure("rebalancing_plan_stuck_leg_sweep_failed", e, leg_id=str(leg_id))

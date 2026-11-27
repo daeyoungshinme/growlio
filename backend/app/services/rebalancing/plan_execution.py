@@ -20,6 +20,7 @@ from app.core.job_runner import report_handled_failure
 from app.core.logging import public_error_message
 from app.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
+from app.providers.http_client import is_outcome_unknown_message
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.order_builder import market_group
 from app.services.rebalancing.plan_notifications import (
@@ -239,10 +240,10 @@ async def _fail_leg_without_fills(
     """전 주문 실패 leg를 FAILED로 마감한다 — EXECUTED로 두면 일일 거래한도에 합산돼 이후 플랜까지 막힌다."""
     if execution_id is None:
         await db.refresh(plan)
-    reason = next(
-        (order.error_msg for result in results for order in result.orders if order.error_msg),
-        NO_ORDER_SUCCEEDED_MESSAGE,
-    )
+    errors = [order.error_msg for result in results for order in result.orders if order.error_msg]
+    reason = errors[0] if errors else NO_ORDER_SUCCEEDED_MESSAGE
+    # 한 건이라도 응답 유실(접수 여부 불명)이면 leg 전체를 "확인 필요"로 알린다 — 첫 사유가 거부여도
+    outcome_unknown = any(is_outcome_unknown_message(msg) for msg in errors)
     _decide_leg(locked, "FAILED", decided_by)
     locked.execution_id = execution_id
     locked.error_message = reason
@@ -250,7 +251,7 @@ async def _fail_leg_without_fills(
         db, plan.user_id, "REBALANCING", f"리밸런싱 자동화 {'매수' if locked.side == 'BUY' else '매도'} 실행 실패"
     )
     await db.commit()
-    await _notify_leg_execution_failed(plan, locked.side, reason, db)
+    await _notify_leg_execution_failed(plan, locked.side, reason, db, outcome_unknown=outcome_unknown)
 
 
 async def _execute_leg(

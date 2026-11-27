@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 from app.providers.http_client import (
+    OUTCOME_UNKNOWN_MARKER,
     AsyncRateLimiter,
     MaxRetriesExceededError,
     _is_rate_limit_body,
@@ -187,10 +188,11 @@ class TestBrokerRequest:
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(side_effect=httpx.ConnectTimeout("timed out"))
 
+        # 표식이 빠지면 leg 실패 알림이 "체결 안 됨"으로 나가 재실행·중복 주문을 부른다 (plans/156 A3)
         with (
             patch("app.providers.http_client._get_client", return_value=mock_client),
             patch("asyncio.sleep", AsyncMock()) as mock_sleep,
-            pytest.raises(RuntimeError),
+            pytest.raises(RuntimeError, match=OUTCOME_UNKNOWN_MARKER),
         ):
             await broker_request(
                 "POST",
@@ -248,7 +250,7 @@ class TestBrokerRequest:
         with (
             patch("app.providers.http_client._get_client", return_value=mock_client),
             patch("asyncio.sleep", AsyncMock()) as mock_sleep,
-            pytest.raises(RuntimeError, match="접수 여부"),
+            pytest.raises(RuntimeError, match=OUTCOME_UNKNOWN_MARKER),
         ):
             await broker_request(
                 "POST",

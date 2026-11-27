@@ -2,6 +2,7 @@ from typing import Any
 
 import structlog
 
+from app.core.logging import redact_secrets
 from app.exceptions import BalancePaginationError, BalanceResponseError
 from app.kis.client import KisTokenExpiredError, auth_headers, kis_request, split_account_no
 from app.kis.constants import (
@@ -222,7 +223,7 @@ async def get_overseas_balance(
         except Exception as e:
             # 부분 결과를 정상값처럼 반환하면 호출부가 실패 거래소 종목을 "매도됨"으로 보고
             # 포지션을 지우고 "해외 없음"을 캐싱한다 — 실패 거래소를 기록해 뒀다가 루프 뒤 raise.
-            logger.warning("kis_overseas_exchange_fetch_failed", exchange=exchange_code, error=str(e))
+            logger.warning("kis_overseas_exchange_fetch_failed", exchange=exchange_code, error=redact_secrets(str(e)))
             failed_exchanges.append(exchange_code)
             continue
 

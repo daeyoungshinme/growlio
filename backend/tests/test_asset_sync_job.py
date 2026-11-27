@@ -146,7 +146,8 @@ class TestSyncAccountsLock:
         mock_session = AsyncMock()
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
-        mock_session.merge = AsyncMock(side_effect=lambda a: a)
+        by_id = {busy.id: busy, free.id: free}
+        mock_session.get = AsyncMock(side_effect=lambda _model, account_id: by_id[account_id])
 
         with (
             patch("app.services.accounts.sync_all_service.AsyncSessionLocal", return_value=mock_session),
@@ -159,3 +160,32 @@ class TestSyncAccountsLock:
         assert [c.args[0] for c in mock_sync.await_args_list] == [free]
         assert await cache.get(sync_lock_key(busy.id)) == "other-request"  # 남의 락은 풀지 않는다
         assert await cache.get(sync_lock_key(free.id)) is None  # 자기 락은 해제
+
+    @pytest.mark.asyncio
+    async def test_rereads_account_and_skips_deleted_one(self, make_account):
+        """잡 시작 때 읽은 계좌를 merge하면 stale is_active·자격증명이 커밋돼 대기 중 삭제를 되돌린다
+        (plans/156 A1). 새 세션에서 다시 읽어 그 행으로 sync하고, 삭제된 계좌는 건너뛴다."""
+        from app.core.cache_store import CacheStore
+        from app.services.accounts.sync_all_service import sync_accounts
+
+        stale_deleted, stale_live = make_account(name="삭제됨"), make_account(name="정상")
+        fresh_deleted = make_account(name="삭제됨")
+        fresh_deleted.id, fresh_deleted.is_active = stale_deleted.id, False
+        fresh_live = make_account(name="정상(새로 읽음)")
+        fresh_live.id = stale_live.id
+        by_id = {stale_deleted.id: fresh_deleted, stale_live.id: fresh_live}
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get = AsyncMock(side_effect=lambda _model, account_id: by_id[account_id])
+        mock_session.merge = AsyncMock(side_effect=AssertionError("merge 금지"))
+
+        with (
+            patch("app.services.accounts.sync_all_service.AsyncSessionLocal", return_value=mock_session),
+            patch("app.services.accounts.sync_all_service.get_cache_store", AsyncMock(return_value=CacheStore())),
+            patch("app.services.accounts.sync_all_service.sync_account", new_callable=AsyncMock) as mock_sync,
+        ):
+            failed = await sync_accounts([stale_deleted, stale_live], "test")
+
+        assert failed == []
+        assert [c.args[0] for c in mock_sync.await_args_list] == [fresh_live]

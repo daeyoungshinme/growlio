@@ -359,23 +359,33 @@ def rebalancing_plan_pending_template(
 
 
 def rebalancing_plan_execution_failed_template(
-    portfolio_name: str, side: str, error_message: str | None
+    portfolio_name: str, side: str, error_message: str | None, *, outcome_unknown: bool = False
 ) -> tuple[str, str]:
-    """AUTO 매수/매도 leg 실행 자체가 예외로 실패했을 때(개별 종목 실패가 아닌 leg 전체 실패) 발송."""
+    """AUTO 매수/매도 leg 실행 자체가 예외로 실패했을 때(개별 종목 실패가 아닌 leg 전체 실패) 발송.
+
+    `outcome_unknown` — 주문이 증권사에 접수됐는지 모르는 실패(결과 기록 유실·응답 유실). "체결되지 않았다,
+    직접 실행하라"고 안내하면 다시 실행해 중복 주문이 되므로 체결 내역 확인을 먼저 요청한다(plans/156 A3).
+    """
     side_label = "매수" if side == "BUY" else "매도"
-    subject = f"[Growlio] 리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}"
+    title = "리밸런싱 자동화 실행 결과 확인 필요" if outcome_unknown else "리밸런싱 자동화 실행 실패"
+    subject = (
+        f"[Growlio] 리밸런싱 자동화 {side_label} 결과 확인 필요 — {portfolio_name}"
+        if outcome_unknown
+        else f"[Growlio] 리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}"
+    )
     table = _kv_table(
         [
             ("포트폴리오", escape(portfolio_name)),
             ("실행 유형", f"자동 {side_label}"),
-            ("실패 사유", error_message or "알 수 없는 오류"),
+            ("확인 사유" if outcome_unknown else "실패 사유", escape(error_message or "알 수 없는 오류")),
         ]
     )
-    html = _email_div(
-        "리밸런싱 자동화 실행 실패",
-        "#dc2626",
-        table,
-        "이번 자동 실행 계획은 체결되지 않았습니다. Growlio 앱 리밸런싱 &gt; 이력 탭에서 상세 내용을 확인하고, "
-        "필요 시 직접 리밸런싱을 실행해주세요.",
+    footer = (
+        "실제 주문이 증권사에 접수됐을 수 있습니다. <b>다시 실행하기 전에</b> 증권사 앱에서 체결 내역을 먼저 "
+        "확인해주세요. 체결됐다면 다음 계좌 동기화 때 보유 종목에 반영됩니다."
+        if outcome_unknown
+        else "이번 자동 실행 계획은 체결되지 않았습니다. Growlio 앱 리밸런싱 &gt; 이력 탭에서 상세 내용을 확인하고, "
+        "필요 시 직접 리밸런싱을 실행해주세요."
     )
+    html = _email_div(title, "#d97706" if outcome_unknown else "#dc2626", table, footer)
     return subject, html

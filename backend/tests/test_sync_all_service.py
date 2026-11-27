@@ -118,7 +118,8 @@ class TestRunSyncAll:
         stored = json.loads(last_call.args[2])
         assert stored["status"] == "error"
         assert stored["failed_accounts"] == []
-        assert stored["error"] == "boom"
+        # 매핑 안 된 예외 원문(SQL·URL일 수 있음)은 상태 응답에 싣지 않는다 (plans/156 A5)
+        assert stored["error"] == "내부 오류가 발생했습니다(Exception)"
 
     @pytest.mark.asyncio
     async def test_records_failed_accounts_on_partial_failure(self, make_user_id, make_account, mock_cache):

@@ -250,7 +250,8 @@ class TestRunMonthlyReport:
 
     @pytest.mark.asyncio
     async def test_marks_sent_after_success(self):
-        """발송 성공 시 유저+대상월 dedup 키를 이력과 같은 커밋으로 기록한다."""
+        """발송 성공 시 유저+대상월 dedup 키를 이력과 **따로**, 먼저 커밋한다 — 한 커밋으로 묶으면 그 커밋 실패 시
+        30분 선점만 남아 catch-up이 다시 보낸다(plans/156 A6)."""
         user = _make_user()
         settings = _make_settings(enabled=True)
 
@@ -283,10 +284,66 @@ class TestRunMonthlyReport:
         mock_set.assert_awaited_once()
         key = mock_set.await_args.args[1]
         assert key.endswith(f"monthly_report:sent:{user.id}:2025-12")
-        assert mock_set.await_args.kwargs["commit"] is False
+        assert mock_set.await_args.kwargs.get("commit", True) is True
         # 발송 전에 짧은 TTL로 선점하고, 성공하면 전체 TTL로 덮는다(plans/122 A4)
         assert mock_claim.await_args.args[1] == key
         mock_delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_history_commit_failure_keeps_sent_mark(self):
+        """인앱 이력 커밋이 실패해도 발송 확정은 이미 커밋돼 catch-up이 같은 리포트를 다시 보내지 않는다."""
+        user = _make_user()
+        settings = _make_settings(enabled=True)
+
+        mock_session = AsyncMock()
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(user, settings)]
+        mock_session.execute = AsyncMock(return_value=execute_result)
+        mock_session.add = MagicMock()
+
+        async def commit():
+            if mock_session.add.called:  # 이력 행을 넣은 뒤의 커밋만 실패
+                raise RuntimeError("db blip")
+
+        mock_session.commit = AsyncMock(side_effect=commit)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs._job_helpers.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.monthly_report.claim_durable", new_callable=AsyncMock, return_value=True),
+            patch("app.jobs.monthly_report.delete_durable", new_callable=AsyncMock) as mock_delete,
+            patch("app.jobs.monthly_report.set_durable", new_callable=AsyncMock) as mock_set,
+            patch("app.jobs.monthly_report.today_kst", return_value=date(2026, 1, 1)),
+            patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
+            patch("app.jobs.monthly_report.get_net_deposits_for_year", new_callable=AsyncMock, return_value=0.0),
+            patch("app.jobs.monthly_report.get_annual_dividends_received", new_callable=AsyncMock, return_value=0.0),
+            patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock, return_value=True),
+        ):
+            from app.jobs.monthly_report import run_monthly_report
+
+            await run_monthly_report()  # 유저 실패는 run_per_user가 격리
+
+        mock_set.assert_awaited_once()
+        mock_delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_confirm_claim_retries_once(self):
+        from app.jobs import monthly_report as mr
+
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        with (
+            patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
+            patch(
+                "app.jobs.monthly_report.set_durable", new_callable=AsyncMock, side_effect=[RuntimeError("x"), None]
+            ) as mock_set,
+        ):
+            await mr._confirm_claim("k")
+        assert mock_set.await_count == 2
 
     @pytest.mark.asyncio
     async def test_releases_claim_when_send_fails(self):

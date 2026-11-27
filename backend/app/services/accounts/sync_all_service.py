@@ -69,17 +69,20 @@ async def sync_accounts(
                         logger.info("account_sync_skipped_locked", job=job_name, account_id=str(account.id))
                     else:
                         async with AsyncSessionLocal() as db:
-                            # account는 이 함수 호출 전 다른(이미 닫힌) 세션에서 조회되어 detached 상태이므로,
-                            # merge로 새 세션에 편입해야 sync_account() 내부의 account.deposit_krw 등
-                            # 속성 변경이 commit 시 실제로 반영된다.
-                            merged_account = await db.merge(account)
-                            await sync_account(merged_account, db, cache)
+                            # 잡 시작 때 읽은 account는 detached이고 컬럼이 전부 로드돼 있다(expire_on_commit=False).
+                            # merge하면 그 stale 값이 새 행에 복사돼, 대기 중 삭제(is_active=False·자격증명 삭제)나
+                            # 이름 수정을 커밋 때 되돌린다(plans/156 A1) — 새로 읽어 sync가 바꾼 컬럼만 쓰게 한다.
+                            fresh = await db.get(AssetAccount, account.id)
+                            if fresh is None or not fresh.is_active:
+                                logger.info("account_sync_skipped_inactive", job=job_name, account_id=str(account.id))
+                                return
+                            await sync_account(fresh, db, cache)
                         logger.info("account_synced", job=job_name, account_id=str(account.id), name=account.name)
             except Exception as e:
                 report_handled_failure(
                     "account_sync_failed", e, job=job_name, account_id=str(account.id), name=account.name
                 )
-                failed.append((str(account.id), account.name, str(e)))
+                failed.append((str(account.id), account.name, format_sync_error(e)))
         if on_progress:
             async with progress_lock:
                 done_count += 1

@@ -223,12 +223,14 @@ async def send_rebalancing_execution_email(
 
 
 async def send_rebalancing_plan_execution_failed_email(
-    to_email: str, portfolio_name: str, side: str, error_message: str | None
+    to_email: str, portfolio_name: str, side: str, error_message: str | None, *, outcome_unknown: bool = False
 ) -> bool:
     """AUTO 매수/매도 leg 실행 자체가 예외로 실패했을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
     return await _send_templated(
         to_email,
-        lambda: rebalancing_plan_execution_failed_template(portfolio_name, side, error_message),
+        lambda: rebalancing_plan_execution_failed_template(
+            portfolio_name, side, error_message, outcome_unknown=outcome_unknown
+        ),
         event="rebalancing_plan_execution_failed",
         portfolio=portfolio_name,
         side=side,
