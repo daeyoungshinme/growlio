@@ -474,3 +474,85 @@ class TestLegFailureNotice:
             assert "체결 내역을 확인" in body
         else:
             assert "체결되지 않았습니다" in body
+
+
+class TestLegExecutionResultNotice:
+    """leg 실행 완료 메일·푸시 — 그동안 호출부에서 통째로 mock돼 한 번도 실행되지 않았다 (plans/156 D)."""
+
+    @staticmethod
+    def _plan():
+        return SimpleNamespace(id=uuid.uuid4(), user_id=uuid.uuid4(), portfolio_id=uuid.uuid4())
+
+    @staticmethod
+    def _db(exec_result):
+        db = MagicMock()
+        db.scalar = AsyncMock(return_value=exec_result)
+        return db
+
+    @pytest.mark.asyncio
+    async def test_sends_email_and_push_with_counts(self):
+        from datetime import UTC, datetime
+
+        from app.services.rebalancing import plan_notifications as pn
+
+        exec_result = SimpleNamespace(
+            executed_at=datetime(2026, 11, 27, tzinfo=UTC),
+            result_items=[],
+            total_success=3,
+            total_fail=1,
+            total_skipped=0,
+        )
+        push = AsyncMock()
+        email = AsyncMock(return_value=True)
+        with (
+            patch.object(pn, "_plan_recipient", new=AsyncMock(return_value=("코어", "a@b.c", "tok"))),
+            patch.object(pn, "send_push_safely", new=push),
+            patch("app.services.notifications.email_service.send_rebalancing_execution_email", new=email),
+        ):
+            await pn._send_leg_execution_email(self._plan(), uuid.uuid4(), self._db(exec_result))
+
+        assert email.await_args.kwargs["total_success"] == 3
+        assert push.await_args.kwargs["body"] == "3건 완료, 1건 실패"
+        assert push.await_args.kwargs["data"]["type"] == "REBALANCING_EXECUTED"
+
+    @pytest.mark.asyncio
+    async def test_email_failure_still_sends_push(self):
+        from datetime import UTC, datetime
+
+        from app.services.rebalancing import plan_notifications as pn
+
+        exec_result = SimpleNamespace(
+            executed_at=datetime(2026, 11, 27, tzinfo=UTC),
+            result_items=[],
+            total_success=2,
+            total_fail=0,
+            total_skipped=0,
+        )
+        push = AsyncMock()
+        with (
+            patch.object(pn, "_plan_recipient", new=AsyncMock(return_value=("코어", "a@b.c", "tok"))),
+            patch.object(pn, "send_push_safely", new=push),
+            patch(
+                "app.services.notifications.email_service.send_rebalancing_execution_email",
+                new=AsyncMock(side_effect=RuntimeError("resend down")),
+            ),
+            patch.object(pn, "report_handled_failure") as report,
+        ):
+            await pn._send_leg_execution_email(self._plan(), uuid.uuid4(), self._db(exec_result))
+
+        report.assert_called_once()
+        assert push.await_args.kwargs["body"] == "2건 완료"
+
+    @pytest.mark.asyncio
+    async def test_missing_execution_sends_nothing(self):
+        from app.services.rebalancing import plan_notifications as pn
+
+        push = AsyncMock()
+        with (
+            patch.object(pn, "_plan_recipient", new=AsyncMock()) as recipient,
+            patch.object(pn, "send_push_safely", new=push),
+        ):
+            await pn._send_leg_execution_email(self._plan(), uuid.uuid4(), self._db(None))
+
+        recipient.assert_not_awaited()
+        push.assert_not_awaited()

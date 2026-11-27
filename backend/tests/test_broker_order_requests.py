@@ -557,3 +557,37 @@ class TestKiwoomCancelOrder:
 
         with pytest.raises(KiwoomApiError, match="취소가능수량"):
             await kiwoom_order.cancel_domestic_order("tok", "1", ticker="069500", order_no="K1", is_mock=True)
+
+
+class TestKiwoomOverseasRejection:
+    """해외 주문·취소 거부도 클라이언트 단계에서 `KiwoomApiError`로 올라온다 — order.py의 `return_code` 분기는
+    방어 코드라 닿지 않는다(plans/156 D). 거부가 성공처럼 흘러가면 주문 결과가 SUCCESS로 남는다."""
+
+    @pytest.mark.asyncio
+    async def test_overseas_order_rejection_raises(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(json={"return_code": 20, "return_msg": "주문가능금액이 부족합니다"})
+
+        with pytest.raises(KiwoomApiError, match="주문가능금액"):
+            await kiwoom_order.place_overseas_order(
+                "tok", "5012345678", side="BUY", ticker="QQQ", market="NASDAQ", quantity=1, is_mock=False
+            )
+
+    @pytest.mark.asyncio
+    async def test_overseas_cancel_rejection_raises(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(json={"return_code": 20, "return_msg": "취소가능수량이 없습니다"})
+
+        with pytest.raises(KiwoomApiError, match="취소가능수량"):
+            await kiwoom_order.cancel_overseas_order(
+                "tok", "5012345678", ticker="SPY", market="NYSE", order_no="U1", is_mock=False
+            )
+
+    @pytest.mark.asyncio
+    async def test_overseas_cancel_unknown_market_falls_back_to_nasdaq(self, httpx_mock: HTTPXMock):
+        """시장 미확정 취소는 ND로 보낸다 — 틀리면 증권사가 거부해 CANCEL_FAILED가 될 뿐 새 주문은 나가지 않는다."""
+        httpx_mock.add_response(json={"return_code": 0})
+
+        await kiwoom_order.cancel_overseas_order(
+            "tok", "5012345678", ticker="SPY", market="US", order_no="U1", is_mock=False
+        )
+
+        assert _body(httpx_mock.get_requests()[0])["stex_tp"] == "ND"
