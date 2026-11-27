@@ -168,7 +168,7 @@ export default function DipBuyCard() {
           <DipBuyRuleView
             key={index}
             rule={rule}
-            resetPct={resetPct}
+            resetPct={rule.reset_drawdown_pct ?? resetPct}
             hasCandidates={data?.has_candidates ?? false}
             onEdit={() => setEditingRule(rule)}
           />

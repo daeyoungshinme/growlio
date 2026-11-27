@@ -124,15 +124,33 @@ def test_should_reset_notified_only_cycle():
     assert calc.should_reset(-5.0, [], None, [0]) is False
 
 
-def test_should_reset_waits_for_recovery_above_shallow_first_tier():
-    """첫 구간이 3%보다 얕으면 그 구간 위로 회복해야 지운다 — 아니면 도달·회복이 같은 낙폭에서 겹쳐 매일 재알림."""
+def test_should_reset_keeps_gap_below_shallow_first_tier():
+    """첫 구간이 얕으면 그 절반 위로 회복해야 지운다 — 도달 기준과 같으면 종가가 오갈 때마다 기록이 지워진다."""
     shallow = [{"drawdown_pct": 2.0, "ratio_pct": 50.0}, {"drawdown_pct": 10.0, "ratio_pct": 50.0}]
     assert calc.should_reset(-2.5, [], None, [0], shallow) is False
-    assert calc.should_reset(-2.5, [{"tier": 0}], None, None, shallow) is False
-    assert calc.should_reset(-1.5, [], None, [0], shallow) is True
-    # 첫 구간이 3% 이상이면 기존 기준(−3% 이내) 그대로
+    assert calc.should_reset(-1.9, [{"tier": 0}], None, None, shallow) is False  # 첫 구간 위로 살짝 반등
+    assert calc.should_reset(-1.1, [], None, [0], shallow) is False
+    assert calc.should_reset(-0.9, [], None, [0], shallow) is True
+    three = [{"drawdown_pct": 3.0, "ratio_pct": 100.0}]
+    assert calc.should_reset(-2.9, [{"tier": 0}], None, None, three) is False
+    assert calc.should_reset(-1.4, [{"tier": 0}], None, None, three) is True
+    # 첫 구간이 6% 이상이면 기존 기준(−3% 이내) 그대로
     assert calc.should_reset(-2.9, [], None, [0], TIERS) is True
     assert calc.should_reset(-3.1, [], None, [0], TIERS) is False
+
+
+@pytest.mark.parametrize(
+    ("tiers", "expected"),
+    [
+        (None, 3.0),
+        ([], 3.0),
+        ([{"drawdown_pct": 10.0, "ratio_pct": 20.0}], 3.0),
+        ([{"drawdown_pct": 2.0, "ratio_pct": 20.0}], 1.0),
+        ([{"drawdown_pct": 1.0, "ratio_pct": 20.0}], 0.5),
+    ],
+)
+def test_reset_threshold_pct(tiers, expected):
+    assert calc.reset_threshold_pct(tiers) == expected
 
 
 @pytest.mark.parametrize(
@@ -601,18 +619,22 @@ async def test_summarize_user_resets_recovered_and_flags_tactical_hold(mock_db):
     assert out.dca_held_portfolios == ["나스닥 적립"]
 
 
-async def test_summarize_user_keeps_notified_shallow_tier_while_still_reached(mock_db):
-    """첫 구간 2%·낙폭 −2.5%: 알림 기록을 지우지 않는다 — 지우면 다음 08:10 job이 같은 구간을 또 알린다."""
+@pytest.mark.parametrize("dd", [-2.5, -1.9])
+async def test_summarize_user_keeps_shallow_tier_cycle_near_threshold(mock_db, dd):
+    """첫 구간 2%: 도달 중(−2.5%)이거나 살짝 반등(−1.9%)해도 기록을 지우지 않는다 — 지우면 다음 날 다시
+    떨어질 때 같은 구간을 또 알리고 이미 산 여윳돈으로 다시 사라고 권한다."""
     shallow = [{"drawdown_pct": 2.0, "ratio_pct": 50.0}, {"drawdown_pct": 10.0, "ratio_pct": 50.0}]
-    rule = _rule("QQQ", 100, tiers=shallow, notified_tiers=[0])
+    done = [{"tier": 0, "amount_krw": 1e6}]
+    rule = _rule("QQQ", 100, tiers=shallow, notified_tiers=[0], completed=done)
     with (
         patch.object(svc, "get_settings", AsyncMock(return_value=_settings())),
         patch.object(svc, "list_rules", AsyncMock(return_value=[rule])),
-        patch.object(svc, "index_drawdowns", AsyncMock(return_value={"QQQ": -2.5})),
+        patch.object(svc, "index_drawdowns", AsyncMock(return_value={"QQQ": dd})),
         patch.object(svc, "dca_held_portfolios", AsyncMock(return_value=[])),
     ):
         await svc.summarize_user(mock_db, None, USER, with_etfs=False, today=date(2026, 11, 23))
     assert rule.notified_tiers == [0]
+    assert rule.completed == done
     mock_db.commit.assert_not_awaited()
 
 
@@ -748,6 +770,7 @@ def test_get_status_serializes_summary(client):
     assert row["allocation_pct"] == 60
     assert row["base_krw"] == 6_000_000
     assert [t["state"] for t in row["tiers"]] == ["DUE", "WAITING", "WAITING"]
+    assert row["reset_drawdown_pct"] == 3.0  # 첫 구간 10% → 기본 기준
     assert row["etfs"][0]["amount_usd"] == 500.0
     assert row["etfs"][0]["price_krw"] == 750_000
     assert row["etfs"][0]["price_usd"] == 500.0
