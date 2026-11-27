@@ -49,9 +49,17 @@ if settings.sentry_dsn:
         environment=settings.app_env,
         release=settings.sentry_release or None,
         traces_sample_rate=0.1,
-        send_default_pii=False,
-        # 스택 지역변수에 복호화된 브로커 자격증명이 있을 수 있다 — report_handled_failure와 같은 이유
-        include_local_variables=False,
+        # sentry-sdk 3.0에서 send_default_pii·include_local_variables가 data_collection으로 통합됐고
+        # 기본값이 "수집"이다 — 2.x의 send_default_pii=False 의미를 항목별로 명시해 끈다
+        data_collection={
+            "user_info": False,
+            "cookies": {"mode": "off"},
+            # 요청 본문에 브로커 앱키·시크릿(계좌 연동)이 실린다
+            "http_bodies": [],
+            "database_query_data": False,
+            # 스택 지역변수에 복호화된 브로커 자격증명이 있을 수 있다 — report_handled_failure와 같은 이유
+            "stack_frame_variables": False,
+        },
     )
     logger.info(
         "sentry_initialized",

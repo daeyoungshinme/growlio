@@ -48,7 +48,7 @@ dependencies = [
     # Retry logic for external APIs
     "tenacity>=8.3.0,<10.0.0",
     # Error tracking
-    "sentry-sdk>=2.0.0,<3.0.0",  # [fastapi] extra는 fastapi 직접 의존과 같아 생략
+    "sentry-sdk>=3.0.0,<4.0.0",  # [fastapi] extra는 fastapi 직접 의존과 같아 생략
     # Metrics
     "prometheus-client>=0.20.0,<1.0.0",
     # FCM 푸시 알림 (선택적 — FIREBASE_CREDENTIALS_JSON 환경변수 설정 시 활성화)
