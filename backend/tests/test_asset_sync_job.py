@@ -185,7 +185,11 @@ class TestSyncAccountsLock:
             patch("app.services.accounts.sync_all_service.get_cache_store", AsyncMock(return_value=CacheStore())),
             patch("app.services.accounts.sync_all_service.sync_account", new_callable=AsyncMock) as mock_sync,
         ):
-            failed = await sync_accounts([stale_deleted, stale_live], "test")
+            on_progress = AsyncMock()
+            failed = await sync_accounts([stale_deleted, stale_live], "test", on_progress=on_progress)
 
         assert failed == []
         assert [c.args[0] for c in mock_sync.await_args_list] == [fresh_live]
+        # 건너뛴 계좌도 진행률에 센다 — 빠지면 "전체 갱신"이 1/2에 멈춘다(plans/157 A2)
+        assert on_progress.await_count == 2
+        assert on_progress.await_args_list[-1].args == (2, 2, 0)

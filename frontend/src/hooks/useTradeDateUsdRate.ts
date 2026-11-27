@@ -21,13 +21,16 @@ export function useTradeDateUsdRate(
   enabled: boolean,
   liveRate: number | null | undefined,
 ): TradeDateUsdRate {
+  // 기기 날짜 기준 — 백엔드는 KST 오늘 이후를 400으로 거절하므로 KST보다 늦은 시간대에선 "어제"가 폴백(현재 환율 +
+  // 안내)으로 끝난다. 저장값은 안전하다
   const isPast = !!tradeDate && tradeDate < localToday();
   const query = useQuery({
     queryKey: QUERY_KEYS.usdKrwOn(tradeDate),
     queryFn: () => fetchUsdKrwOn(tradeDate),
     enabled: enabled && isPast,
-    // 지난 날짜 종가는 바뀌지 않는다
-    staleTime: Infinity,
+    // 지난 날짜 종가는 바뀌지 않는다 — 단 못 받은 결과(null)는 다음 마운트에 다시 묻는다. 백엔드도 실패는
+    // 캐시하지 않는데 Infinity로 두면 그 날짜는 세션 내내 현재 환율로 저장됐다(plans/157 B1)
+    staleTime: (q) => (q.state.data?.usd_krw ? Infinity : 0),
   });
   const live = liveRate || null;
 

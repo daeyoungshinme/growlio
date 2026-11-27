@@ -131,7 +131,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `price_sync_sources.py` — 국내 Naver/pykrx 폴백 (Yahoo 클라우드 IP 차단 대비)
 - `stock_search_service.py` — 네이버(한글)/Yahoo(영문·티커) 검색
 - `market_data_fetcher.py` — 팩터·리스크용 배치 수익률 (개별 현재가와 별개)
-- `fx_history.py` — 지난 날짜 USD/KRW 종가(그날 이하 최근 거래일, 7일 캐시). 장중값이 아닌 종가라 대략의 환산이다
+- `fx_history.py` — 지난 날짜 USD/KRW 종가(그날 이하 최근 거래일, 7일 캐시 — 최근 3일은 일봉이 장중·지연일 수 있어 1시간). 장중값이 아닌 종가라 대략의 환산이다
 
 **리밸런싱 (`rebalancing/`)**
 - `service.py` — 리밸런싱 추천. 지수 그룹은 그룹 행 하나(`shares_to_trade=None`, 종목별은 `members`). 항목 접근(`_item_attr`)·그룹 행 조립·현재 보유 맵은 `analysis_items.py`
@@ -223,6 +223,7 @@ core/
   config.py     Settings(pydantic-settings)
   database.py   async engine/session, Base. `release_read_connection(db)` — 외부 I/O(증권사·시세·배당) 직전에 읽기 트랜잭션을 끝내 커넥션 반납(풀 5+2 고갈 방지). 읽기 경로에서만(flush된 쓰기는 구분 못 함)
   request_metrics.py 요청 단위 DB 쿼리 수·시간(ContextVar) — `http_request` 로그의 `db_queries`·`db_ms`. 요청 밖(잡)은 no-op
+  sentry_options.py `sentry_sdk.init`의 `data_collection`(3.0 — 항목별 기본값이 수집). 쿼리스트링은 끈다(KIS `CANO` 계좌번호가 기본 denylist에 안 걸림). `tests/test_sentry_options.py`가 SDK가 키를 그대로 받는지 검사
   timing.py     `StepTimer`(단계별 `*_ms` + `total_ms` + 요청 안이면 `db_queries` 차이를 `*_timing` 한 줄로) · `elapsed_ms`. 단계 계측은 이것만 쓴다. 요약은 `scripts/summarize_timing_logs.py <로그파일> [--by-request]`(배치 전후 비교)
   job_runner.py report_job_failure(로그+Sentry 스택) · report_handled_failure(루프 안 삼키는 항목 실패 — 스택 없는 capture, 자격증명 지역변수 보호) · run_per_user(유저별 동시성·실패 격리) — jobs와 알림 서비스 공용. **`except`+`logger.error`만으로는 Sentry에 안 간다**(structlog는 stdlib logging 미경유)
   logging.py    structlog 시크릿 redact + yfinance 404 소음 필터. 계좌번호·이메일은 utils/masking.py.

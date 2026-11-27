@@ -26,6 +26,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.logging import configure_logging, redact_secrets
 from app.core.request_metrics import reset_request_metrics, start_request_metrics
+from app.core.sentry_options import SENTRY_DATA_COLLECTION
 from app.exceptions import (
     AppError,
     ProviderApiError,
@@ -49,17 +50,7 @@ if settings.sentry_dsn:
         environment=settings.app_env,
         release=settings.sentry_release or None,
         traces_sample_rate=0.1,
-        # sentry-sdk 3.0에서 send_default_pii·include_local_variables가 data_collection으로 통합됐고
-        # 기본값이 "수집"이다 — 2.x의 send_default_pii=False 의미를 항목별로 명시해 끈다
-        data_collection={
-            "user_info": False,
-            "cookies": {"mode": "off"},
-            # 요청 본문에 브로커 앱키·시크릿(계좌 연동)이 실린다
-            "http_bodies": [],
-            "database_query_data": False,
-            # 스택 지역변수에 복호화된 브로커 자격증명이 있을 수 있다 — report_handled_failure와 같은 이유
-            "stack_frame_variables": False,
-        },
+        data_collection=SENTRY_DATA_COLLECTION,  # 항목별 수집 끄기 — core/sentry_options.py
     )
     logger.info(
         "sentry_initialized",
