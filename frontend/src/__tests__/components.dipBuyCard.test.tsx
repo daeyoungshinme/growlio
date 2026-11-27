@@ -220,6 +220,25 @@ describe("DipBuyCard", () => {
     expect(screen.queryByRole("button", { name: "추매했어요" })).not.toBeInTheDocument();
   });
 
+  it("규칙별 회복 기준이 있으면 그 값으로 안내한다(얕은 첫 구간)", async () => {
+    vi.mocked(fetchDipBuyStatus).mockResolvedValue(
+      status({
+        rules: [
+          rule({
+            due_amount_krw: 0,
+            due_tiers: [],
+            etfs: [],
+            drawdown_pct: -0.5,
+            reset_drawdown_pct: 1,
+          }),
+        ],
+        due_amount_krw: 0,
+      }),
+    );
+    renderCard();
+    expect(await screen.findByText(/고점 대비 −1% 이내로 회복하면/)).toBeInTheDocument();
+  });
+
   it("추천 후보에 그 지수 ETF가 없으면 후보 관리 링크를 보여준다", async () => {
     vi.mocked(fetchDipBuyStatus).mockResolvedValue(
       status({ rules: [rule({ etfs: [] })], has_candidates: false }),

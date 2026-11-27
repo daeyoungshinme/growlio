@@ -6,7 +6,8 @@
 - 구간은 낙폭 오름차순 `[{"drawdown_pct": 10, "ratio_pct": 20}, …]`. 낙폭이 `-drawdown_pct` 이하면 도달.
   한 하락 사이클에서 구간마다 한 번만 — 한 번에 여러 구간을 건너뛰면 합산.
 - 안내 금액은 규칙 남은 몫과 남은 여윳돈을 넘지 않는다(동시 발동이면 규칙 순서대로 여윳돈을 차감).
-- 지수가 고점 대비 `RESET_DRAWDOWN_PCT` 이내로 회복하면 그 규칙의 사이클 종료(완료 기록·기준액·알림 기록 초기화).
+- 지수가 고점 대비 `reset_threshold_pct`(3%와 첫 구간 절반 중 얕은 값) 이내로 회복하면 그 규칙의 사이클 종료
+  (완료 기록·기준액·알림 기록 초기화).
 
 plans/147 백테스트: 적립금을 줄여 모은 돈으로 추매하면 매달 전액 적립보다 IRR이 낮았다. 이 안내는 적립과
 별개인 여윳돈 전제다.
@@ -110,6 +111,17 @@ def due_amount(statuses: Sequence[TierStatus], cap_krw: float) -> float:
     return round(max(0.0, min(total, float(cap_krw))), 0)
 
 
+def reset_threshold_pct(tiers: Sequence[dict] | None) -> float:
+    """사이클을 끝낼 회복 기준(고점 대비 %) — `RESET_DRAWDOWN_PCT`와 첫 구간의 절반 중 얕은 값.
+
+    도달 기준(−첫 구간)과 회복 기준 사이에 간격을 둔다 — 같으면 종가가 기준선 근처를 오갈 때마다
+    완료·알림 기록이 지워져 이미 쓴 여윳돈으로 다시 사라고 권하고 같은 구간을 다시 알린다.
+    """
+    if not tiers:
+        return RESET_DRAWDOWN_PCT
+    return min(RESET_DRAWDOWN_PCT, float(tiers[0]["drawdown_pct"]) / 2)
+
+
 def should_reset(
     drawdown_pct: float | None,
     completed: Sequence[dict] | None,
@@ -117,20 +129,16 @@ def should_reset(
     notified_tiers: Sequence[int] | None = None,
     tiers: Sequence[dict] | None = None,
 ) -> bool:
-    """고점 근처로 회복했고 지울 사이클 기록이 있으면 True. 낙폭을 모르면 건드리지 않는다.
+    """고점 근처(`reset_threshold_pct`)로 회복했고 지울 사이클 기록이 있으면 True. 낙폭을 모르면 건드리지 않는다.
 
     알림만 받고 사지 않은 사이클(`notified_tiers`만 있음)도 지운다 —
     남기면 다음 하락에서 그 구간을 영영 다시 알리지 않는다.
-    첫 구간이 회복 기준(3%)보다 얕으면 그 구간 위로도 회복해야 한다 — 아니면 도달과 회복이 같은 낙폭에서
-    함께 성립해 매일 같은 구간을 다시 알리고, "추매했어요" 기록도 다음 조회 때 지워진다.
     """
     if drawdown_pct is None:
         return False
     if not completed and not cycle_base_krw and not notified_tiers:
         return False
-    if drawdown_pct <= -RESET_DRAWDOWN_PCT:
-        return False
-    return not tiers or not reached(tiers[0], drawdown_pct)
+    return drawdown_pct > -reset_threshold_pct(tiers)
 
 
 def recovered_above_tiers(tiers: Sequence[dict] | None, drawdown_pct: float | None) -> bool:

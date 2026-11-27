@@ -100,6 +100,7 @@ class DipBuyRuleStatus(BaseModel):
     due_amount_krw: float
     due_tiers: list[int]
     etfs: list[DipBuyEtf]
+    reset_drawdown_pct: float  # 고점 대비 이 % 이내로 회복하면 사이클 종료(3%와 첫 구간 절반 중 얕은 값)
 
 
 class DipBuyStatusResponse(BaseModel):

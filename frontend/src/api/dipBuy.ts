@@ -63,6 +63,8 @@ export interface DipBuyRule {
   due_amount_krw: number;
   due_tiers: number[];
   etfs: DipBuyEtf[];
+  /** 이 규칙의 사이클 종료 기준(고점 대비 %) — 3%와 첫 구간 절반 중 얕은 값. 옛 응답엔 없음 */
+  reset_drawdown_pct?: number;
 }
 
 export interface DipBuyStatus {
@@ -77,7 +79,7 @@ export interface DipBuyStatus {
   has_candidates: boolean;
   /** 지수별 52주 고점 대비 낙폭(규칙이 없는 지수도) — null = 확인 불가 */
   index_drawdowns: Partial<Record<DipBuyIndex, number | null>>;
-  /** 고점 대비 이 % 이내로 회복하면 완료 기록을 지우고 다음 하락을 기다린다 */
+  /** 기본 회복 기준(%) — 규칙별 값은 `DipBuyRule.reset_drawdown_pct`(첫 구간이 얕으면 더 작다) */
   reset_drawdown_pct: number;
 }
 

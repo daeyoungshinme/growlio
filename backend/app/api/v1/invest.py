@@ -35,7 +35,7 @@ from app.schemas.invest import (
     GoalFeasibilityPreview,
 )
 from app.services import dca_service, dip_buy_service, fx_extra_need_service, fx_plan_alerts, fx_plan_service
-from app.services.dip_buy_calculator import RESET_DRAWDOWN_PCT
+from app.services.dip_buy_calculator import RESET_DRAWDOWN_PCT, reset_threshold_pct
 from app.services.dividend import plan_service as dividend_plan_service
 from app.services.goal.goal_return_solver import build_feasibility_preview, months_until_year_end
 from app.services.portfolio.composition_calculator import build_asset_totals, exclude_real_estate
@@ -261,6 +261,7 @@ def _dip_buy_rule_row(s: dip_buy_service.RuleSummary) -> DipBuyRuleStatus:
         due_amount_krw=s.due_amount_krw,
         due_tiers=s.due_tiers,
         etfs=[DipBuyEtf(**asdict(e)) for e in s.etfs],
+        reset_drawdown_pct=reset_threshold_pct(rule.tiers),
     )
 
 
