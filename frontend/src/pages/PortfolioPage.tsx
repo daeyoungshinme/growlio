@@ -230,7 +230,7 @@ export default function PortfolioPage() {
         disabled: isSyncingAll,
         unavailable: false,
         spinning: isSyncingAll,
-        label: isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신",
+        label: isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "증권사에서 전체 갱신",
         shortLabel: isSyncingAll ? `${syncDone}/${syncTotal}` : "갱신",
       };
 

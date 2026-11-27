@@ -124,6 +124,17 @@ def test_should_reset_notified_only_cycle():
     assert calc.should_reset(-5.0, [], None, [0]) is False
 
 
+def test_should_reset_waits_for_recovery_above_shallow_first_tier():
+    """첫 구간이 3%보다 얕으면 그 구간 위로 회복해야 지운다 — 아니면 도달·회복이 같은 낙폭에서 겹쳐 매일 재알림."""
+    shallow = [{"drawdown_pct": 2.0, "ratio_pct": 50.0}, {"drawdown_pct": 10.0, "ratio_pct": 50.0}]
+    assert calc.should_reset(-2.5, [], None, [0], shallow) is False
+    assert calc.should_reset(-2.5, [{"tier": 0}], None, None, shallow) is False
+    assert calc.should_reset(-1.5, [], None, [0], shallow) is True
+    # 첫 구간이 3% 이상이면 기존 기준(−3% 이내) 그대로
+    assert calc.should_reset(-2.9, [], None, [0], TIERS) is True
+    assert calc.should_reset(-3.1, [], None, [0], TIERS) is False
+
+
 @pytest.mark.parametrize(
     ("dd", "expected"),
     [(-9.9, True), (-10.0, False), (-25.0, False), (None, False)],
@@ -520,6 +531,38 @@ async def test_update_rule_tier_threshold_change_drops_that_tiers_records(mock_d
     assert rule.notified_tiers == [1]
 
 
+async def test_update_rule_inserted_tier_moves_records(mock_db):
+    """얕은 구간을 앞에 넣어도 이미 산 구간 기록은 같은 낙폭의 새 순번으로 옮긴다 — 지우면 산 구간을 또 권한다."""
+    rule = _rule(cycle_base_krw=1e7, completed=[{"tier": 0, "amount_krw": 2e6}], notified_tiers=[0, 1])
+    _db_with(mock_db, _settings(), [rule])
+    new_tiers = [
+        {"drawdown_pct": 5.0, "ratio_pct": 10.0},
+        {"drawdown_pct": 10.0, "ratio_pct": 20.0},
+        {"drawdown_pct": 20.0, "ratio_pct": 30.0},
+    ]
+    await svc.update_rule(
+        mock_db, USER, rule.id, index_ticker="QQQ", allocation_pct=100, tiers=new_tiers, is_active=True
+    )
+    assert rule.completed == [{"tier": 1, "amount_krw": 2e6}]
+    assert rule.notified_tiers == [1, 2]
+    assert rule.cycle_base_krw == 1e7
+
+
+async def test_update_rule_removed_middle_tier_keeps_deeper_records(mock_db):
+    rule = _rule(
+        cycle_base_krw=1e7,
+        completed=[{"tier": 1, "amount_krw": 3e6}, {"tier": 2, "amount_krw": 5e6}],
+        notified_tiers=[0, 1, 2],
+    )
+    _db_with(mock_db, _settings(), [rule])
+    new_tiers = [{"drawdown_pct": 10.0, "ratio_pct": 20.0}, {"drawdown_pct": 30.0, "ratio_pct": 50.0}]
+    await svc.update_rule(
+        mock_db, USER, rule.id, index_ticker="QQQ", allocation_pct=100, tiers=new_tiers, is_active=True
+    )
+    assert rule.completed == [{"tier": 1, "amount_krw": 5e6}]
+    assert rule.notified_tiers == [0, 1]
+
+
 async def test_update_rule_allocation_change_rebases_cycle(mock_db):
     rule = _rule("QQQ", 50, cycle_base_krw=5e6, completed=[{"tier": 0, "amount_krw": 1e6}])
     _db_with(mock_db, _settings(reserve_krw=9e6), [rule])
@@ -556,6 +599,21 @@ async def test_summarize_user_resets_recovered_and_flags_tactical_hold(mock_db):
     assert out.next_notify_date == date(2026, 11, 25)
     assert out.due_amount_krw == 1_000_000  # QQQ 회복으로 초기화 → SPY 몫 1,000만 × 50% × 20%
     assert out.dca_held_portfolios == ["나스닥 적립"]
+
+
+async def test_summarize_user_keeps_notified_shallow_tier_while_still_reached(mock_db):
+    """첫 구간 2%·낙폭 −2.5%: 알림 기록을 지우지 않는다 — 지우면 다음 08:10 job이 같은 구간을 또 알린다."""
+    shallow = [{"drawdown_pct": 2.0, "ratio_pct": 50.0}, {"drawdown_pct": 10.0, "ratio_pct": 50.0}]
+    rule = _rule("QQQ", 100, tiers=shallow, notified_tiers=[0])
+    with (
+        patch.object(svc, "get_settings", AsyncMock(return_value=_settings())),
+        patch.object(svc, "list_rules", AsyncMock(return_value=[rule])),
+        patch.object(svc, "index_drawdowns", AsyncMock(return_value={"QQQ": -2.5})),
+        patch.object(svc, "dca_held_portfolios", AsyncMock(return_value=[])),
+    ):
+        await svc.summarize_user(mock_db, None, USER, with_etfs=False, today=date(2026, 11, 23))
+    assert rule.notified_tiers == [0]
+    mock_db.commit.assert_not_awaited()
 
 
 async def test_summarize_user_reports_index_drawdowns_without_rules(mock_db):

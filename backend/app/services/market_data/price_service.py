@@ -35,13 +35,15 @@ from app.utils.cache_keys import (
     PRICE_RETURN_MISS,
     TTL_PRICE_CURRENT,
     TTL_PRICE_MISS,
+    TTL_PRICE_MISS_SUSPECT,
     TTL_PRICE_RETURN,
     CacheStoreType,
     current_price_key,
     price_miss_key,
+    price_miss_suspect_key,
     price_return_key,
 )
-from app.utils.circuit_breaker import CircuitOpenError, kis_circuit, naver_circuit
+from app.utils.circuit_breaker import CircuitOpenError, kis_circuit, naver_circuit, yahoo_circuit
 from app.utils.currency import get_live_or_cached_usd_krw, get_usd_krw_rate
 
 logger = structlog.get_logger()
@@ -95,18 +97,57 @@ async def _read_known_misses(cache: CacheStoreType, tickers: list[tuple[str, str
     return {t for (t, _), flag in zip(tickers, flags, strict=False) if flag}
 
 
-def confirmed_misses(targets: list[tuple[str, str]], found: Callable[[tuple[str, str]], bool]) -> list[tuple[str, str]]:
-    """미스로 기록해도 되는 종목 — 같은 소스 묶음(국내·해외)에서 다른 종목은 받았는데 이 종목만 못 받은 경우.
+def classify_misses(
+    targets: list[tuple[str, str]],
+    found: Callable[[tuple[str, str]], bool],
+    source_ok: Callable[[bool], bool],
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """못 받은 종목을 (바로 기록, 의심)으로 나눈다 — 소스 묶음(국내·해외) 단위.
 
-    묶음 전체가 비면 상장폐지가 아니라 소스 장애(서킷 열림·차단)일 수 있다 — 서킷은 2분이면 닫히는데 미스 표식은
-    10분이라, 기록하면 짧은 장애가 10분짜리 시세 공백이 된다. 그래서 그때는 기록하지 않는다.
+    - 조회 뒤 그 묶음의 소스 서킷이 열려 있으면 둘 다 아님 — 서킷은 2분이면 닫히는데 미스 표식은 10분이라,
+      기록하면 짧은 장애가 10분짜리 시세 공백이 된다(`source_ok(domestic)`이 False).
+    - 같은 묶음에서 다른 종목은 받았으면 바로 기록.
+    - 묶음 전체가 비었으면 일시 장애일 수도 있어 의심만 — 연달아 또 실패하면 `resolve_misses`가 기록한다.
+      단일 종목 호출이나 다른 종목이 캐시 적중이라 혼자 조회된 상장폐지 종목도 이렇게 잡힌다.
     """
-    out: list[tuple[str, str]] = []
+    confirmed: list[tuple[str, str]] = []
+    suspects: list[tuple[str, str]] = []
     for domestic in (True, False):
         group = [tm for tm in targets if (tm[1].upper() in DOMESTIC_MARKETS) is domestic]
-        if any(found(tm) for tm in group):
-            out.extend(tm for tm in group if not found(tm))
-    return out
+        failed = [tm for tm in group if not found(tm)]
+        if not failed or not source_ok(domestic):
+            continue
+        (confirmed if len(failed) < len(group) else suspects).extend(failed)
+    return confirmed, suspects
+
+
+async def resolve_misses(
+    cache: CacheStoreType,
+    scope: str,
+    targets: list[tuple[str, str]],
+    found: Callable[[tuple[str, str]], bool],
+    source_ok: Callable[[bool], bool],
+) -> list[tuple[str, str]]:
+    """미스로 기록할 종목 — `classify_misses`의 의심 종목은 직전 의심 표식이 있을 때만(두 번째 연속 실패)."""
+    confirmed, suspects = classify_misses(targets, found, source_ok)
+    if not cache or not suspects:
+        return confirmed
+    keys = [price_miss_suspect_key(scope, t, m) for t, m in suspects]
+    flags = await cache.mget(keys)
+    confirmed += [tm for tm, flag in zip(suspects, flags, strict=False) if flag]
+    await asyncio.gather(
+        *(cache.set(k, "1", ex=TTL_PRICE_MISS_SUSPECT) for k, flag in zip(keys, flags, strict=False) if not flag)
+    )
+    return confirmed
+
+
+def _current_price_sources_ok(domestic: bool) -> bool:
+    """현재가 공개 소스 서킷이 닫혀 있나 — 국내는 Naver와 Yahoo(마지막 폴백), 해외는 Yahoo."""
+    return yahoo_circuit.is_available() and (not domestic or naver_circuit.is_available())
+
+
+def _return_sources_ok(_domestic: bool) -> bool:
+    return yahoo_circuit.is_available()
 
 
 async def _write_known_misses(cache: CacheStoreType, misses: list[tuple[str, str]]) -> None:
@@ -168,7 +209,10 @@ async def fetch_prices_batch(
 
     yahoo_targets = [(t, m) for t, m in public_targets if t not in price_map]
     price_map.update(await fetch_yahoo_batch(yahoo_targets))
-    await _write_known_misses(cache, confirmed_misses(public_targets, lambda tm: bool(price_map.get(tm[0]))))
+    misses = await resolve_misses(
+        cache, "current", public_targets, lambda tm: bool(price_map.get(tm[0])), _current_price_sources_ok
+    )
+    await _write_known_misses(cache, misses)
 
     missing = [(t, m) for t, m in remaining if t not in price_map or price_map[t] == 0]
     if missing:
@@ -286,7 +330,9 @@ async def get_historical_returns(
             )
         )
     asked = list(newly_fetched) + missing
-    still_missing = confirmed_misses(asked, lambda tm: tm in newly_fetched)
+    still_missing = await resolve_misses(
+        cache, f"return{years}y", asked, lambda tm: tm in newly_fetched, _return_sources_ok
+    )
     if still_missing and cache:
         await asyncio.gather(
             *(cache.setex(price_return_key(years, t, m), TTL_PRICE_MISS, PRICE_RETURN_MISS) for t, m in still_missing)

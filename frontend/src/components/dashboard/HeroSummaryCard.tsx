@@ -96,7 +96,7 @@ export default memo(function HeroSummaryCard({
                   onClick={onSync}
                   disabled={syncing}
                   className={`lg:hidden -m-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 ${TOUCH_TARGET_MIN_MOBILE_ONLY}`}
-                  aria-label="데이터 갱신"
+                  aria-label="새로고침"
                 >
                   <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
                 </button>

@@ -10,7 +10,7 @@ import InfoTip from "@/components/common/InfoTip";
 import { MONTH_LABELS } from "@/utils/dividendUtils";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
-import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
+import MonthlyOptimizationCard from "@/components/invest/MonthlyOptimizationCard";
 import { rebalancingUrl } from "@/utils/rebalancingUrl";
 import {
   dividendPlanQuery,
