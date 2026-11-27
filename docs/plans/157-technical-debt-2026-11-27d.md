@@ -1,6 +1,6 @@
 # 157. 기술부채 감사 — 156 A~F + Dependabot 머지분 (2026-11-27)
 
-상태: A1~A3·B1 구현, 마이그레이션 없음. 브랜치 `fix/157-tech-debt`.
+상태: A1~A3·B1 구현, 마이그레이션 없음. 브랜치 `fix/157-tech-debt`, PR #340.
 
 ## Context
 - 155 이후 main에 들어온 변경: 계획156 A~E(#330~#333)·F 해외 매매 거래일 환율(#339), Dependabot sentry-sdk 3.0(#338, 48ab914e에서 `data_collection`으로 이관)·프론트 deps 그룹·gradle 2건·uv 0.13.10.

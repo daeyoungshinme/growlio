@@ -174,7 +174,7 @@
 | [154](154-technical-debt-2026-11-27b.md) | 153 첫 감사. 실버그: 첫 구간이 3% 이하면 낙폭 추매 리셋 기준이 도달 기준(−첫 구간)과 같아 종가가 기준선 근처를 오갈 때마다 "추매했어요"·알림 기록이 지워짐(153 A1 보강, 3%는 147부터) → 리셋 기준 min(3%, 첫 구간/2), 카드 "−3% 이내 회복" 문구를 규칙별 값으로. 153 이관 `mark_completed` 실 DB 동시성 테스트 추가. 153 B(시세 미스)·A2(구간 기록 이동)는 문제 없음 확인 | 완료 |
 | [155](155-technical-debt-2026-11-27c.md) | 154 첫 감사. 코드 부채 0건(리셋 기준·취소 안내 히스테리시스·카드 문구 확인, 실 DB 이중 제출 테스트 CI passed). 운영 확인: Dependabot alerts가 꺼져 있음 → 켜기(사용자) | 완료(Dependabot 켜기는 사용자) |
 | [156](156-full-review-2026-11-27.md) | 프로젝트 전체 재검토(백엔드 정확성·프론트·테스트/CI/문서 3축). 실버그: 백그라운드 동기화 `merge`가 stale 계좌를 되써 삭제·App Key 삭제를 되돌림, 토스 매수가능금액 오류를 0원 예수금으로 저장, 결과 유실 leg에 "체결되지 않음·직접 실행" 알림(이중 주문 유도), KIS 계좌번호 로그 노출, `last_sync_error` 원문 예외, 월간 리포트 재발송, 토큰 동시 발급. 프론트: 보유 변경 시 효율성 분석 캐시 미무효화·포트폴리오 편집기 행 삭제 인덱스 어긋남·5xx 토스트 중복. 안전장치: `make migrate-down`·`db-reset`이 공유 Supabase 대상·태그 아무 커밋 release APK·docker 스모크 import만. 주문 확인 화면 0% 커버리지 | 완료(A~E #330~#333, F 거래일 환율 #339 — 사용자 조치 남음) |
-| [157](157-technical-debt-2026-11-27d.md) | 156 A~F·sentry-sdk 3.0 이관 첫 감사. Sentry 3.0 `url_query_params` 기본 denylist가 KIS `CANO`·`ACNT_PRDT_CD`를 안 걸러 계좌번호가 breadcrumb·span으로 나감, 156 A1의 비활성 계좌 `return`이 "전체 갱신" 진행률 갱신을 건너뜀, 최근 날짜 USD/KRW 종가를 미확정 값으로 7일 캐시, 거래일 환율 조회 실패(null)가 `staleTime: Infinity`로 세션 내내 고정 | 구현(PR 대기) |
+| [157](157-technical-debt-2026-11-27d.md) | 156 A~F·sentry-sdk 3.0 이관 첫 감사. Sentry 3.0 `url_query_params` 기본 denylist가 KIS `CANO`·`ACNT_PRDT_CD`를 안 걸러 계좌번호가 breadcrumb·span으로 나감, 156 A1의 비활성 계좌 `return`이 "전체 갱신" 진행률 갱신을 건너뜀, 최근 날짜 USD/KRW 종가를 미확정 값으로 7일 캐시, 거래일 환율 조회 실패(null)가 `staleTime: Infinity`로 세션 내내 고정 | 구현(PR #340) |
 
 ## 파일 없는 계획 기록
 
