@@ -127,7 +127,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - 쿼리 헬퍼: `_position_queries.py`, `_portfolio_queries.py`
 
 **시세 (`market_data/`)**
-- `price_service.py` — 현재가 단일 경로 `fetch_prices_batch`(캐시 → 국내 Naver/pykrx → Yahoo → KIS). 공개 소스 실패 표식(10분)은 같은 묶음(국내·해외)에 성공 종목이 있을 때만 남긴다(`confirmed_misses` — 묶음 전체 실패는 서킷 열림일 수 있음). `/stocks/price`·`prices-batch`도 이걸 쓰고 `kis_accounts`로 **요청에 지정된 소유 계좌만** KIS 폴백(내부 호출은 아무 KIS 계좌). `yahoo_price.py` — Yahoo 유틸. **브로커 잔고는 국내 market을 전부 "KOSPI"로 채운다** — `to_yf_symbol()`이 `_kosdaq_tickers`(FDR, 매일 07:00 갱신)로 `.KQ` 교정. 저장된 market은 매칭 키라 바꾸지 않음. pykrx 상장목록은 KRX 로그인 요구로 사용 불가
+- `price_service.py` — 현재가 단일 경로 `fetch_prices_batch`(캐시 → 국내 Naver/pykrx → Yahoo → KIS). 공개 소스 실패 표식(10분)은 그 묶음(국내·해외) 소스 서킷이 닫혀 있을 때만 — 묶음에 성공 종목이 있으면 바로, 묶음 전체 실패면 15분 안 두 번째 연속 실패에서 남긴다(`resolve_misses` — 한 번의 일시 장애를 10분 공백으로 만들지 않기 위함). `/stocks/price`·`prices-batch`도 이걸 쓰고 `kis_accounts`로 **요청에 지정된 소유 계좌만** KIS 폴백(내부 호출은 아무 KIS 계좌). `yahoo_price.py` — Yahoo 유틸. **브로커 잔고는 국내 market을 전부 "KOSPI"로 채운다** — `to_yf_symbol()`이 `_kosdaq_tickers`(FDR, 매일 07:00 갱신)로 `.KQ` 교정. 저장된 market은 매칭 키라 바꾸지 않음. pykrx 상장목록은 KRX 로그인 요구로 사용 불가
 - `price_sync_sources.py` — 국내 Naver/pykrx 폴백 (Yahoo 클라우드 IP 차단 대비)
 - `stock_search_service.py` — 네이버(한글)/Yahoo(영문·티커) 검색
 - `market_data_fetcher.py` — 팩터·리스크용 배치 수익률 (개별 현재가와 별개)

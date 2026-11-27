@@ -441,13 +441,64 @@ class TestPriceMissCache:
         assert second == {"QQQ": 500.0}
         assert yahoo.await_args_list[1].args[0] == [("QQQ", "NASDAQ")]
 
-    def test_confirmed_misses_per_source_group(self):
-        from app.services.market_data.price_service import confirmed_misses
+    def test_classify_misses_per_source_group(self):
+        from app.services.market_data.price_service import classify_misses
 
         targets = [("005930", "KOSPI"), ("999999", "KOSPI"), ("QQQ", "NASDAQ"), ("ZZZZ", "NASDAQ")]
         found = {"005930"}
-        # 국내는 성공 종목이 있어 실패분 기록, 해외는 전부 실패(Yahoo 장애일 수 있음)라 기록 안 함
-        assert confirmed_misses(targets, lambda tm: tm[0] in found) == [("999999", "KOSPI")]
+        # 국내는 성공 종목이 있어 실패분 바로 기록, 해외는 전부 실패(일시 장애일 수 있음)라 의심만
+        assert classify_misses(targets, lambda tm: tm[0] in found, lambda _d: True) == (
+            [("999999", "KOSPI")],
+            [("QQQ", "NASDAQ"), ("ZZZZ", "NASDAQ")],
+        )
+
+    def test_classify_misses_skips_group_whose_circuit_opened(self):
+        """일부가 성공했어도 조회 중 서킷이 열린 묶음의 실패분은 장애 탓일 수 있어 기록하지 않는다."""
+        from app.services.market_data.price_service import classify_misses
+
+        targets = [("005930", "KOSPI"), ("999999", "KOSPI"), ("ZZZZ", "NASDAQ")]
+        assert classify_misses(targets, lambda tm: tm[0] == "005930", lambda domestic: not domestic) == (
+            [],
+            [("ZZZZ", "NASDAQ")],
+        )
+
+    @pytest.mark.asyncio
+    async def test_lone_ticker_recorded_after_second_consecutive_failure(self, mock_db, override_settings):
+        """혼자 조회된 상장폐지 종목(단일 호출·나머지는 캐시 적중)도 두 번 연속 실패하면 미스로 기록한다."""
+        import uuid
+        from unittest.mock import AsyncMock, patch
+
+        from app.core.cache_store import CacheStore
+        from app.services.market_data.price_service import fetch_prices_batch
+
+        cache = CacheStore()
+        mock_db.scalar = AsyncMock(return_value=None)
+        ps = "app.services.market_data.price_service"
+        with patch(f"{ps}.fetch_yahoo_batch", new_callable=AsyncMock, return_value={}) as yahoo:
+            for _ in range(3):
+                await fetch_prices_batch(uuid.uuid4(), [("ZZZZ", "NASDAQ")], mock_db, cache)
+
+        assert [c.args[0] for c in yahoo.await_args_list] == [[("ZZZZ", "NASDAQ")], [("ZZZZ", "NASDAQ")], []]
+
+    @pytest.mark.asyncio
+    async def test_open_circuit_leaves_no_miss_or_suspect(self, mock_db, override_settings):
+        import uuid
+        from unittest.mock import AsyncMock, patch
+
+        from app.core.cache_store import CacheStore
+        from app.services.market_data.price_service import fetch_prices_batch
+        from app.utils.circuit_breaker import yahoo_circuit
+
+        cache = CacheStore()
+        mock_db.scalar = AsyncMock(return_value=None)
+        ps = "app.services.market_data.price_service"
+        for _ in range(yahoo_circuit.fail_max):
+            yahoo_circuit.record_failure()
+        with patch(f"{ps}.fetch_yahoo_batch", new_callable=AsyncMock, return_value={}) as yahoo:
+            for _ in range(3):
+                await fetch_prices_batch(uuid.uuid4(), [("ZZZZ", "NASDAQ")], mock_db, cache)
+
+        assert all(c.args[0] == [("ZZZZ", "NASDAQ")] for c in yahoo.await_args_list)
 
     @pytest.mark.asyncio
     async def test_current_price_miss_still_tries_kis(self, mock_db, override_settings):
@@ -509,3 +560,18 @@ class TestPriceMissCache:
             await get_historical_returns([("ZZZZ", "NASDAQ")], cache=cache)
 
         assert yahoo.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_historical_return_lone_miss_recorded_on_second_failure(self, override_settings):
+        from unittest.mock import AsyncMock, patch
+
+        from app.core.cache_store import CacheStore
+        from app.services.market_data.price_service import get_historical_returns
+
+        cache = CacheStore()
+        ps = "app.services.market_data.price_service"
+        with patch(f"{ps}.fetch_yahoo_returns_batch", new_callable=AsyncMock, return_value={}) as yahoo:
+            for _ in range(3):
+                await get_historical_returns([("ZZZZ", "NASDAQ")], cache=cache)
+
+        assert yahoo.await_count == 2  # 세 번째는 미스 표식으로 건너뛴다

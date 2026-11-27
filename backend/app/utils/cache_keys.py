@@ -28,6 +28,9 @@ def _env_prefix() -> str:
 TTL_PRICE_CURRENT = 900  # 현재가 15분
 # 공개 소스가 전부 실패한 현재가·기간 수익률 10분 — 상장폐지·비상장 코드가 매 요청 폴백 체인을 다시 돌지 않게
 TTL_PRICE_MISS = 600
+# 묶음 전체 실패(서킷은 닫힘) 첫 회의 의심 표식 — 이 안에 또 실패하면 미스로 기록한다. 성공한 종목은 현재가
+# 캐시(15분)로 그동안 다시 조회되지 않으므로 같은 길이로 둔다
+TTL_PRICE_MISS_SUSPECT = 900
 TTL_MONTHLY_TREND = 300  # 월별 추이 5분
 TTL_DASHBOARD_SUMMARY = 900  # 대시보드 전체 응답 15분 (sync 후 수동 무효화가 primary)
 TTL_DASHBOARD_HOME_EXTRAS = 900  # 홈 전용 부가 필드(주식 평가손익·달성 예상월) — 요약과 같은 수명·무효화
@@ -148,6 +151,11 @@ def price_miss_key(ticker: str, market: str) -> str:
 
     현재가 키와 분리해 그 키를 읽는 쪽이 표식을 가격으로 오해하지 않게 한다."""
     return f"{_env_prefix()}price:miss:{ticker}:{market}"
+
+
+def price_miss_suspect_key(scope: str, ticker: str, market: str) -> str:
+    """묶음 전체가 실패한 첫 회 표식(값 무관) — `scope`는 현재가 "current" / 기간 수익률 "return{N}y"."""
+    return f"{_env_prefix()}price:miss_suspect:{scope}:{ticker}:{market}"
 
 
 def price_return_key(years: int, ticker: str, market: str) -> str:
