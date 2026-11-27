@@ -32,7 +32,7 @@
 - [x] **계획 133 기간 일별 스냅샷 보정** (135 A2) — 2026-11-27 운영 적용(157). 대상은 수기 해외 계좌 1개, 14행 중 6행(11/2·3·4·11·12·14)이다. 스크립트 판정(현재 `deposit_usd`×1300 일괄 차감)은 맞지 않았다. 과다분이 날마다 달랐고(530만~2,023만 원), 정상인 11/5·13도 OK로 골랐다. 그래서 "현금+투자원금"(입출금 없는 계좌라 매수해도 일정)을 앞뒤 정상일로 선형 보간한 기준선에 맞춰 보정했다. 스크립트와 테스트는 삭제했다
 - [ ] 로그 `fx_plan_timing ms` 전후 비교 (124·127), `http_request duration_ms`로 action-items·analyze·tactical 전후 비교 (125) → 개선이 없으면 125 B3·B4 재검토
 - [ ] 로그 `kiwoom_overseas_fractional_qty` 발생 여부 (131) → 발생하면 P3-B
-- [ ] GitHub 저장소에서 Dependabot alerts가 꺼져 있는지 확인 (109) → 꺼져 있으면 켠다 — **2026-11-27 확인: 꺼져 있음(API 403) → 켜기(사용자)** (155)
+- [x] GitHub 저장소에서 Dependabot alerts가 꺼져 있는지 확인 (109) → 2026-11-27 꺼져 있음 확인(155) → 같은 날 켬. `vulnerability-alerts` 204, 의존성 그래프 패키지 1,052개, 경보 0건. Dependabot security updates(자동 수정 PR)는 꺼진 채로 둔다 (157)
 - [x] 마이그레이션 운영 적용 확인: rb1(136)·rb3(145)·db1(147) — 체인이 rb1→rb2→rb3→db1→db2로 선형이고 db2가 운영 적용됨(152 A10)이라 모두 적용된 상태 (156 E)
 - [ ] **계획 151 기준선 로그 수집** — `dashboard_summary_timing`(특히 `dividends_ms`)·`http_request duration_ms`·`db_queries`를 `scripts/summarize_timing_logs.py`로 요약 → P3-F 착수 여부 판단 (151)
 
