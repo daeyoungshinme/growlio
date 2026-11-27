@@ -73,7 +73,9 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 
 디렉토리: assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings, tax. 최상위 `ErrorBoundary.tsx`, `Toaster.tsx`(`growlio:toast` 이벤트 구독).
 
-**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 오버플로우 메뉴 — 아이콘+라벨 함께 렌더, 모바일 `title` 미동작 우회), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalBody`·`ModalFooter` — `Modal`은 스크롤을 두지 않아 **긴 본문은 `ModalBody`로 감싸야** 하단에 닿고(여백을 바꿀 땐 `className` 대신 `padding`), **입력 폼 모달의 저장 버튼은 `ModalFooter`에**(본문 끝이면 모바일 키보드에 가려짐, `<form id>` + 버튼 `form=`)), `OfflineBanner`, `PageLoadError`(페이지 전체 조회 실패 + 다시 시도), `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(의존성 없는 SVG 도넛 — 홈이 recharts 청크 없이 그림), `Tabs`, `ToggleRow`(행 전체가 label, 설정 목록은 이것), `SegmentedControl`(2~4개 보기 전환·시장가/지정가 같은 택일 — 칩 버튼 직접 만들지 말 것), `InfoTip`(탭으로 여는 설명 팝오버 — hover 전용 툴팁 금지), `TopLoadingBar`, `TreemapCell`
+**`common/`** (추가/삭제 시 갱신): `AccountActionsMenu`(⋯ 메뉴), `AmountUnitButtons`, `BiometricGuard`, `Button`, `CollapsibleCard`(카드 전체, controlled), `CollapsibleSection`(카드 내부 경량), `ConfirmModal`, `EditableNameField`, `EmptyState`, `FormInput`, `Modal`(+`ModalBody`·`ModalFooter`), `OfflineBanner`, `PageLoadError`, `PageLoader`, `PriceCell`, `SkeletonCard`, `SkeletonStatBox`, `SuggestionDropdown`, `MiniDonut`(홈이 recharts 청크 없이 그림), `Tabs`, `ToggleRow`(설정 목록은 이것), `SegmentedControl`(2~4개 택일 — 칩 버튼 직접 만들지 말 것), `InfoTip`(hover 전용 툴팁 금지), `TopLoadingBar`, `TreemapCell`
+
+- `Modal`은 스크롤을 두지 않는다 — **긴 본문은 `ModalBody`로 감싸고**(여백은 `className` 대신 `padding`), **입력 폼의 저장 버튼은 `ModalFooter`에**(본문 끝이면 모바일 키보드에 가려짐, `<form id>` + 버튼 `form=`).
 
 **`layout/`**: `RefreshContext`, `AppLayout`(로그인 후 셸 — 모달 열림 판정은 `hasOpenModal()`(`useModalBehavior`), body overflow로 추정 금지), `AuthLayout`(AppLayout 밖 전체 화면 — 인증·딥링크 확인 페이지는 이걸로 감싸야 safe-area·dvh가 잡힘), `Sidebar`, `BottomNav`
 
@@ -89,13 +91,13 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 - `portfolio/AllocationCard` — 자산탭 비중 분석(국내/해외·지수). 하위 뷰 `portfolio/allocation/`. 종목별 비중은 아래 보유 종목 목록(비중 열·비중순)이 담당 — "종목" 보기를 다시 만들지 말 것.
 - `assets/AccountHistoryTab` — 계좌관리 "내역"(`?history=` 현금 흐름/매수 내역).
 - `rebalancing/GoalAdjustTab` — 목표 조정(추천·전술 서브탭). 상단 포트폴리오 선택기는 **전술 모드만**, 추천은 `RecommendationCard` 적용 영역 select에서 고름 — 선택은 둘 다 URL `portfolioId` 공유. 콘텐츠 ErrorBoundary/Suspense는 **`key={mode}`로 모드마다 새 경계** — React Router v7이 URL 변경을 `startTransition`으로 감싸 공유 경계면 이전 모드 화면이 남는다.
-- `rebalancing/TacticalAllocationTab` — 전술 배분(국면·제안 비중·적용). 적용은 `POST /tactical/{id}/apply`(**주문 없음**) 후 포트폴리오 탭 실행 흐름으로 넘김. 표시 조각 `TacticalStatusParts.tsx`, 확인창 `TacticalApplyConfirmModal.tsx`, 백테스트 `TacticalBacktestSection.tsx`, 비중표 편집 `TacticalWeightsEditor.tsx`, 문구·색상 `tacticalLabels.ts`. 차트 지표는 이 탭이 아니라 진단 탭 `MarketSignalBanner` + `ChartTrendList`. **설정 upsert는 항상 현재 `tilt_shift_pct`·`dip_shift_pct`·`use_macro`를 함께 보낸다**(생략 시 서버 기본값으로 덮임).
-- `rebalancing/RecommendationCard` — 목표 역산 추천(목표 조정 › 추천 전용). 결과 렌더는 `RecommendationResultPanel.tsx`. 탭·적용 대상 파생은 `useRecommendationTargets.ts`. 전체 추천은 콜드 계산이 수십 초라 **카드 전체를 막지 않고 결과 영역만 로딩**. `gcTime: STALE_TIME.DAY`, `RebalancingPage`가 같은 queryKey로 미리 발화.
+- `rebalancing/TacticalAllocationTab` — 전술 배분. 적용은 `POST /tactical/{id}/apply`(**주문 없음**) 후 포트폴리오 탭 실행 흐름으로. 차트 지표는 이 탭이 아니라 진단 탭. **설정 upsert는 항상 현재 `tilt_shift_pct`·`dip_shift_pct`·`use_macro`를 함께 보낸다**(생략 시 서버 기본값으로 덮임).
+- `rebalancing/RecommendationCard` — 목표 역산 추천. 콜드 계산이 수십 초라 **카드 전체를 막지 않고 결과 영역만 로딩**. `RebalancingPage`가 같은 queryKey로 미리 발화.
 - **자동화 설정 모달(`RebalancingAlertModalRouter`)의 호스트는 `PortfolioManageTab` 하나뿐** — 다른 진입점은 `portfolioId=<id>&openAlert=1`(`openAlert=dca`는 적립식 자동매수 프리셋) URL 파라미터로 요청. 모달을 직접 마운트하지 말 것.
 - `invest/ChallengeSection` — 챌린지 탭. 홈 요약 `dashboard/ChallengeProgressCard`, 네비 빨간 점 `useChallengeNudge`(챌린지 목록으로 판정 — 기준일 20일은 백엔드 `_NUDGE_DAY_OF_MONTH`와 같게).
 - `invest/GoalSettingWizard` — 목표 최초 설정 6단계 마법사(`InvestPlanPage`의 재설정 모달과 별개).
-- `invest/FxPlanCard` — 계획 › 환전 탭 "달러 환전 계획"(`GET /invest/fx-plan`). 목표 환율 구간은 `syncFxPlanAlerts`(`PUT /invest/fx-plan/alerts`)로 한 번에 맞춘다 — 계획 알림(`source=FX_PLAN`)은 목표·금액이 바뀌면 교체, 같은 목표의 직접 등록 알림은 표시만, 다른 포트폴리오 계획이 같은 목표 알림을 가지면 `sharedRates`로 등록된 것으로 본다(서버가 하나만 둠). 산식은 `deposit_source`(정액/월 적립)·보유 달러 기준 시각 `held_usd_synced_at`(계좌관리 동기화 값, 수기 계좌가 섞이면 "직접 입력 포함")과 계좌별 `held_usd_accounts`를 표시하고 "달러 예수금 새로 받기"는 동기화 가능한 증권 계좌를 `useSyncAccounts`로 동기화한다(0달러 계좌는 응답에 없어 `accountsQuery`에서 고름). `fxPlanQuery`는 `api/queryOptions.ts` — `InvestPlanPage`가 환전 탭 진입 시 기본 기간(`FX_PLAN_DEFAULT_MONTHS`)으로 프리페치하므로 카드 기본 탭과 맞출 것. `waiting_fx_usd`>0이면 리밸런싱 이력 링크 안내. 옛 링크 `?tab=적립 계획#fx-plan`(발송된 메일·푸시)은 `legacyTabRedirect.legacyInvestPlanTab`이 환전 탭으로 옮긴다. `fxPlanBase`는 적립(`invalidateDcaData`)·동기화·계좌·포트폴리오·리밸런싱 알림·전술 연동 해제 무효화가 함께 지운다. 환율이 없으면 서버가 `NO_RATE`(달러 계산 안 함). 카드 맨 아래 `FxExtraNeedsSection`(추가 환전 — 여행 등, `GET /invest/fx-extra-needs`)은 상태 분기 밖이라 해외 포트폴리오가 없어도 보인다. 구간 목록 `FxTrancheList`, 알림 등록 상태 `utils/fxPlanAlerts.planAlertState`(범위 `portfolioId`/`fxNeedId` — 항목 알림은 `portfolio_id`가 null이라 범위 없이 비교하면 적립 계획 알림으로 잘못 센다)는 둘이 공유. 항목의 보관 증권 계좌(`reserved_account_id`, 모달 select — 수정에서 "계좌 밖"은 `null` 전송)를 고르면 적립 계획 보유 달러에서 빠지므로(`reserved_usd`) `invalidateFxExtraNeedData`가 `fxPlanBase`도 지운다.
-- `invest/DipBuyCard` — 적립 계획 탭 접힘 카드 "낙폭 추매 안내"(`GET /invest/dip-buy`, plans/147·148, 주문 없음, 포트폴리오와 무관). 여윳돈·알림 방식은 `DipBuySettingsModal`, 지수별 규칙(배분 %·구간)은 `DipBuyRuleModal`(Zod `schemas/dipBuy`). ETF 목록은 같은 지수 **대안**(하나만 산다) — 후보는 추천 등록 후보라 `invalidateGoalRecommendationData`도 이 카드를 지운다. 앵커 `#dip-buy`(`DIP_BUY_ANCHOR`)는 백엔드 링크·푸시 `DCA_DIP_BUY`·전술 탭 웅덩이 안내 링크와 같아야 함 — 해시 진입 펼침·스크롤은 `InvestPlanPage`의 `useAnchoredCollapsible`/`useScrollToAnchor`가 처리. 기본 구간 `DEFAULT_DIP_BUY_TIERS`는 백엔드 `dip_buy_calculator.DEFAULT_TIERS`와 같게. 지수(QQQ·SPY)마다 항상 한 칸(규칙 없으면 빈 칸) — 배분이 100%여도 추가할 수 있게 `shrink_others`로 다른 규칙을 비율대로 줄이며, 미리보기 `utils/dipBuyAllocation.shrinkAllocations`는 백엔드 `shrink_allocations`와 같은 규칙
+- `invest/FxPlanCard` — 계획 › 환전 탭(`GET /invest/fx-plan`). 구간 알림은 `syncFxPlanAlerts`로 한 번에 맞춘다(서버 규칙은 백엔드 `fx_plan_service`). 알림 등록 상태 `utils/fxPlanAlerts.planAlertState`는 **범위(`portfolioId`/`fxNeedId`)를 넣어 비교** — 항목 알림은 `portfolio_id`가 null이라 범위 없이 비교하면 적립 계획 알림으로 센다. `InvestPlanPage`가 `FX_PLAN_DEFAULT_MONTHS`로 프리페치하므로 카드 기본 기간과 맞출 것. 하단 `FxExtraNeedsSection`(추가 환전)은 상태 분기 밖 — 해외 포트폴리오가 없어도 보인다. 보관 계좌가 적립 계획 보유 달러를 줄이므로 `invalidateFxExtraNeedData`가 `fxPlanBase`도 지운다.
+- `invest/DipBuyCard` — 적립 계획 탭 "낙폭 추매 안내"(주문 없음). ETF 목록은 **대안**(하나만 산다), 후보가 추천 등록 후보라 `invalidateGoalRecommendationData`도 이 카드를 지운다. 앵커 `#dip-buy`(`DIP_BUY_ANCHOR`)는 백엔드 링크·푸시와 같아야 함. `DEFAULT_DIP_BUY_TIERS`·`utils/dipBuyAllocation.shrinkAllocations`는 백엔드(`DEFAULT_TIERS`·`shrink_allocations`)와 **같은 규칙**
 
 **Android 홈 위젯**: `useWidget.ts` ↔ `plugins/WidgetPlugin.ts` ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java` — 위젯 UI 변경 시 Java도 함께.
 
@@ -103,7 +105,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 
 _공통/입력_
 
-- `useExchangeRate` · `useForm` · `useStockSearch` · `useCurrencyInput` · `useCapsLockWarning` · `useTransactionFormState` · `useUsdAmountInput`(거래 금액 달러 입력 — 저장은 항상 원화, 환율 없이 USD 전환 시 금액 비움) · `useTradeDateUsdRate`(수기 해외 매매 단가 환산 환율 — 지난 거래일이면 그날(휴일이면 직전 거래일) 종가, 못 받으면 현재 환율로 대신하고 안내)
+- `useExchangeRate` · `useForm` · `useStockSearch` · `useCurrencyInput` · `useCapsLockWarning` · `useTransactionFormState` · `useUsdAmountInput`(달러 입력, 저장은 항상 원화) · `useTradeDateUsdRate`(수기 해외 매매 환산 — 거래일 종가, 실패 시 현재 환율로 대신하고 안내)
 - `useCollapsible` — `[isOpen, toggle, setIsOpen]`(setter 참조 고정)
 - `useLatestRef` — 한 번 등록하는 네이티브 리스너에서 최신 값 읽기. `useNavigate()`는 경로마다 새 함수라 effect deps에 넣으면 이동마다 재등록됨
 - `useTimeout` — 언마운트 시 해제되는 setTimeout. 상태를 바꾸는 지연 콜백은 맨 `setTimeout` 대신 이것
@@ -185,7 +187,7 @@ _기타_
 
 - 키 정의는 `constants/queryKeys.ts` 하나 — 문자열 하드코딩 금지, 전부 `QUERY_KEYS`에서 import.
 - 계좌·연도별로 분기되는 키는 무효화 전용 `xxxBase` 프리픽스 키(`portfolioOverviewBase`, `transactionsBase`, `taxSummaryBase` 등)가 따로 있다 — **무효화는 항상 Base 키로**(특정 accountId 키만 지우면 다른 조합이 stale).
-- 여러 화면이 같은 키로 조회하는 쿼리(portfolios·settings·market-signal·drift-summary·composite-signal-status·accounts·portfolio-overview lite·rebalancing-alerts·goal-recommendation overall·dca-analysis·isa-status·exchange-rate·exchange-rate-alerts·dashboard·tax-summary(`taxSummaryQuery(year, accountId)`)·dividend-plan(`dividendPlanQuery`)·action-items(`actionItemsQuery`)·challenges(`challengesQuery`)·rebalancing-plans(`rebalancingPlansQuery`)·market-outlook(`marketOutlookQuery`))는 `src/api/queryOptions.ts` 공용 정의 사용 — `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만, 예: 위저드 `staleTime: NONE`, 대시보드 폴링). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나(부팅은 `isHomeEntryPath`일 때만 — 딥링크 진입 화면과 경쟁하지 않게).
+- 여러 화면이 같은 키로 조회하는 쿼리는 `src/api/queryOptions.ts` 공용 정의 사용 — 쓰기 전에 거기 이미 있는지 확인. `useQuery(portfoliosQuery)`, 조건부는 `{ ...portfoliosQuery, enabled }`. 화면마다 queryFn·staleTime을 다시 적지 말 것(덮어쓰기는 이유가 있을 때만). 새 공용 쿼리도 여기에. 부팅·로그인 프리페치 목록은 `src/api/prefetch.ts` 하나(부팅은 `isHomeEntryPath`일 때만 — 딥링크 진입 화면과 경쟁하지 않게).
 
 **캐시 무효화 (`src/utils/queryInvalidation.ts`)** — 컴포넌트·훅에서 `queryClient.invalidateQueries()` 직접 호출 금지. 새 함수는 `invalidate<Domain>Data(queryClient)` 형태로 여기에 추가. 각 함수의 정확한 대상은 소스 확인.
 
@@ -235,24 +237,31 @@ _기타_
 
 **도메인 유틸 (`utils/`)** — 인라인 재구현 금지, 백엔드 공식 포팅본은 **양쪽을 함께 수정**
 
-- `depositDelta.ts` — 거래 수정 후 예수금 반영 제안액(차액만). 전액을 제안하면 이중 반영된다
-- `accounts.ts` — `isPortfolioAccount`/`isStockAccount`/`isBankAccount`(**`account.asset_type` 문자열을 전달**, 인라인 비교 금지), `isSyncableAccount`, `isBrokerBalanceAccount`(3사), `isOrderExecutableAccount`(KIS·키움만 — 백엔드 `ORDER_EXECUTABLE_ASSET_TYPES`와 같은 집합), `horizonTaggedAccounts`(기간별 합산은 `invested_krw + unrealized_pnl` — `amount_krw`는 예수금 포함이라 주식 총액보다 커짐)
-- `portfolio.ts` — `groupPositionsByTicker`, `getPortfolioTargetState`, `getPortfolioHorizon(TaxType)`, `inferHorizonTaxTypeFromAccounts`, `mergeAlertsByPortfolio`
-- `portfolioGroups.ts` — 지수 그룹 편집 순수 함수. 레버리지 멤버는 대표·국내 대체 후보에서 제외(백엔드 검증과 같은 규칙)
-- `components/rebalancing/rebalancingTradeMath.ts` — **분석 결과 그룹 행은 `shares_to_trade`가 null** — 주문·거래 요약은 `flattenTradeItems()`로 펼친 목록 사용
-- `tabUrl.ts` — 자산·계획·알림 설정 딥링크 빌더(`portfolioUrl`·`assetManagementUrl`·`investPlanUrl`·`notificationSettingsUrl`). 탭 인자는 `constants/tabs.ts` 유니온 — **`to="/invest-plan?tab=..."` 직접 조립 금지**. 값은 인코딩하지 않는다(백엔드·이메일 링크와 같은 모양)
-- `rebalancingUrl.ts` — `REBALANCING_TABS`·`GOAL_MODES`가 탭 이름 단일 정의(**백엔드 `email_service`·`insight_service`·`action_items_service`의 탭 문자열과 같아야 함**), `parseRebalancingTab`(옛 `rtab=추천/전술` 호환), `rebalancingUrl()`
-- `recommendationDrift.ts` — `RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3%p) — 백엔드 `compute_recommendation_drift`와 동일 로직. `foldIntoPortfolioGroups`는 백엔드 `fold_into_portfolio_groups`와 같은 규칙
-- `marketSignalRows.ts` — 매크로 8지표 행 변환(Tier 분류는 백엔드 `market_signal_service` 재사용)
-- `dcaScenarioProjection.ts` — 백엔드 `dca_service._build_projection_curve()` 포팅. 시나리오는 목표 수익률 ±3%p(`scenarioReturns`). 배당 목표 달성 예상은 `dividendGoalTimeline.ts`(주가 상승 미반영 — 문구에 가정을 함께 표시)
-- `legacyTabRedirect.ts` — 이메일·푸시에 저장된 옛 딥링크 호환 — **지우지 말 것**
-- `fxPlanAlerts.ts` — 환전 계획·추가 환전 항목의 알림 등록 상태(`planAlertState`). 범위 규칙은 백엔드 `fx_plan_service._in_scope`와 같게
-- `portfolio.ts` `isDriftingItem`/`driftProgress`/`getItemsDriftStatus` — 이탈 판정(상대 기준 포함). 백엔드 `drift_rule`과 **같은 규칙 — 함께 수정**. 항목 이탈 비교를 인라인(`Math.abs(diff) > threshold`)으로 쓰지 말 것
-- `riskLevel.ts` — 진단 위험 카드 4행(원화 손실액·낙폭·S&P500 대비·쏠림) 등급, 기준은 시장 대비. `diagnosisSummary.ts` — 진단 탭 요약 칩(`DiagnosisSummaryStrip`, 앵커 `constants/rebalancingConfig.DIAGNOSIS_ANCHORS`). `marketOutlook.ts` — 시장 종합 판단 배지·지수명(판정은 서버 `market_outlook`, **표시 전용**)
-- `rebalancingTiming.ts` — 진단 행 시점 판정(`timing`) 라벨·색·보조 정보·해외 양도세 공제 여유 문구. 판정 자체는 서버(`timing_verdict`). `TIMING_LABEL`은 백엔드 `action_items_service.TIMING_LABEL`과 같게
-- `portfolioTargetSource.ts` — 카드의 목표 비중 출처 한 줄. 추천을 적용·생성하는 경로는 `target_source: "RECOMMENDATION"`을 보내야 홈 "추천이 바뀜"이 뜬다
-- `accountReturn.ts` — 증권계좌 입금 대비 수익(평가액 vs 순입금 입금−출금). 배당은 평가액에 이미 있어 더하지 않고, 순입금 0 이하면 null(기록 이전 자금 계좌 부풀림 방지)
-- 그 외: `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `dividendUtils`(`weightBarColor` — 비중 막대 색 인라인 금지), `savingsProjection`, `goalFeasibility`, `dcaAutoBuy`(정액 목표 비중 분할 미리보기는 백엔드 `dca_allocation` TARGET과 같은 규칙 — GAP_FIRST는 서버만 구현, 함께 맞출 것), `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
+*백엔드와 같은 규칙이라 함께 고칠 것*
+
+| 프론트 | 백엔드 |
+| --- | --- |
+| `portfolio.isDriftingItem`/`driftProgress`/`getItemsDriftStatus` — 인라인 `Math.abs(diff) > threshold` 금지 | `drift_rule` |
+| `recommendationDrift`(3%p·`foldIntoPortfolioGroups`) | `recommendation_drift` |
+| `dcaScenarioProjection` | `dca_service._build_projection_curve` |
+| `dcaAutoBuy` 정액 분할 미리보기(GAP_FIRST는 서버만) | `dca_allocation` TARGET |
+| `fxPlanAlerts` 범위 규칙 | `fx_plan_service._in_scope` |
+| `rebalancingTiming.TIMING_LABEL` | `action_items_service.TIMING_LABEL` |
+| `rebalancingUrl` `REBALANCING_TABS`·`GOAL_MODES` | `email_service`·`insight_service`·`action_items_service` 탭 문자열 |
+| `portfolioGroups` 레버리지 멤버 제외 | 포트폴리오 검증 |
+| `accounts.isOrderExecutableAccount` | `ORDER_EXECUTABLE_ASSET_TYPES` |
+
+*함정*
+
+- `accounts.ts` — `isStockAccount` 등은 **`account.asset_type` 문자열을 전달**(인라인 비교 금지). 기간별 합산은 `invested_krw + unrealized_pnl` — `amount_krw`는 예수금 포함
+- `depositDelta.ts` — 거래 수정 후 예수금 제안은 **차액만**(전액이면 이중 반영)
+- `components/rebalancing/rebalancingTradeMath.ts` — **그룹 행은 `shares_to_trade`가 null** — 주문·거래 요약은 `flattenTradeItems()`로 펼친 목록
+- `tabUrl.ts` — 자산·계획·알림 설정 딥링크 빌더. **`to="/invest-plan?tab=..."` 직접 조립 금지**, 값은 인코딩하지 않는다(백엔드 링크와 같은 모양)
+- `legacyTabRedirect.ts` — 발송된 메일·푸시의 옛 딥링크 호환 — **지우지 말 것**
+- `portfolioTargetSource.ts` — 추천을 적용·생성하는 경로는 `target_source: "RECOMMENDATION"`을 보내야 홈 "추천이 바뀜"이 뜬다
+- `accountReturn.ts` — 배당은 평가액에 이미 있어 더하지 않고, 순입금 0 이하면 null
+- `marketOutlook.ts` — **표시 전용**(판정은 서버). `dividendUtils.weightBarColor` — 비중 막대 색 인라인 금지
+- 그 외: `portfolio`, `marketSignalRows`, `dividendGoalTimeline`, `riskLevel`, `diagnosisSummary`, `rebalancingAlertDescription`, `rebalancingThresholdRecommendation`, `etfOverlap`, `diagnosisInsights`, `savingsProjection`, `goalFeasibility`, `actionPriority`, `marketSignalBadge`, `notificationAlertGroups`
 
 **마켓 (`constants/markets.ts`)** — 인라인 문자열 비교 금지.
 
