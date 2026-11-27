@@ -29,7 +29,7 @@
 
 ### 운영
 
-- [ ] **계획 133 기간 일별 스냅샷 보정** — 운영 DB로 `cd backend && uv run python scripts/fix_manual_usd_double_count_133.py` dry-run → `check=OK` 행만 `--apply --ids` (135 A2)
+- [x] **계획 133 기간 일별 스냅샷 보정** (135 A2) — 2026-11-27 운영 적용(157). 대상은 수기 해외 계좌 1개, 14행 중 6행(11/2·3·4·11·12·14)이다. 스크립트 판정(현재 `deposit_usd`×1300 일괄 차감)은 맞지 않았다. 과다분이 날마다 달랐고(530만~2,023만 원), 정상인 11/5·13도 OK로 골랐다. 그래서 "현금+투자원금"(입출금 없는 계좌라 매수해도 일정)을 앞뒤 정상일로 선형 보간한 기준선에 맞춰 보정했다. 스크립트와 테스트는 삭제했다
 - [ ] 로그 `fx_plan_timing ms` 전후 비교 (124·127), `http_request duration_ms`로 action-items·analyze·tactical 전후 비교 (125) → 개선이 없으면 125 B3·B4 재검토
 - [ ] 로그 `kiwoom_overseas_fractional_qty` 발생 여부 (131) → 발생하면 P3-B
 - [ ] GitHub 저장소에서 Dependabot alerts가 꺼져 있는지 확인 (109) → 꺼져 있으면 켠다 — **2026-11-27 확인: 꺼져 있음(API 403) → 켜기(사용자)** (155)
