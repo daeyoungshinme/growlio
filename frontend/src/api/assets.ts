@@ -200,6 +200,14 @@ export const fetchIndexRegion = (
 export const fetchExchangeRate = (): Promise<{ usd_krw: number; is_fallback?: boolean }> =>
   apiGet<{ usd_krw: number; is_fallback?: boolean }>("/stocks/exchange-rate");
 
+/** 지난 날짜(주말·휴일이면 직전 거래일) USD/KRW 종가 — 조회 실패면 usd_krw=null (plans/156) */
+export const fetchUsdKrwOn = (
+  date: string,
+): Promise<{ usd_krw: number | null; rate_date: string | null }> =>
+  apiGet<{ usd_krw: number | null; rate_date: string | null }>("/stocks/exchange-rate/on", {
+    params: { date },
+  });
+
 export interface StockPrice {
   price_krw: number | null;
   price_usd: number | null;

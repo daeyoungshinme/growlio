@@ -54,6 +54,7 @@ export const QUERY_KEYS = {
   challenges: ["challenges"] as const,
   settings: ["settings"] as const,
   exchangeRate: ["exchange-rate"] as const,
+  usdKrwOn: (date: string) => ["usd-krw-on", date] as const,
   exchangeRateAlerts: ["exchange-rate-alerts"] as const,
   stockPriceAlerts: ["stock-price-alerts"] as const,
   rebalancingAlerts: ["rebalancing-alerts"] as const,
