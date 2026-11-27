@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.cache_store import CacheStore
 from app.services.market_data import fx_history
 from tests.api_helpers import make_mock_db, make_user, setup_app
 
@@ -50,6 +51,24 @@ class TestFetchUsdKrwOn:
 
         assert first == second == (1385.5, date(2026, 5, 8))
         assert sync.call_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("days_ago", "expected_ttl"),
+        [(1, "TTL_USD_KRW_ON_DATE_RECENT"), (3, "TTL_USD_KRW_ON_DATE_RECENT"), (4, "TTL_USD_KRW_ON_DATE")],
+    )
+    async def test_recent_dates_are_cached_briefly(self, days_ago, expected_ttl):
+        """최근 날짜는 일봉이 장중이거나 하루 늦게 올 수 있어 짧게만 캐시한다(plans/157 A3)."""
+        today = date(2026, 5, 15)
+        day = today - timedelta(days=days_ago)
+        with (
+            patch.object(fx_history, "today_kst", return_value=today),
+            patch.object(fx_history, "_sync_close_on_or_before", return_value=(1385.5, day)),
+            patch.object(fx_history, "set_cached_json", new_callable=AsyncMock) as set_cached,
+        ):
+            await fx_history.fetch_usd_krw_on(day, CacheStore())
+
+        assert set_cached.await_args.args[3] == getattr(fx_history, expected_ttl)
 
     @pytest.mark.asyncio
     async def test_failure_is_none_and_not_cached(self, mock_cache):

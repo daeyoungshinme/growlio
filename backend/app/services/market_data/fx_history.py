@@ -12,17 +12,22 @@ import structlog
 
 from app.utils.cache_keys import (
     TTL_USD_KRW_ON_DATE,
+    TTL_USD_KRW_ON_DATE_RECENT,
     CacheStoreType,
     get_cached_json,
     set_cached_json,
     usd_krw_on_date_key,
 )
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
 _FX_SYMBOL = "USDKRW=X"
 # 연휴(설·추석·연말)가 겹쳐도 직전 거래일 종가가 들어오도록 넉넉히
 _LOOKBACK_DAYS = 10
+# 이보다 최근 날짜는 확정값으로 보지 않는다 — `USDKRW=X` 일봉 날짜는 KST와 어긋나 KST 새벽의 "어제" 일봉은 아직
+# 장중이고, Yahoo가 하루 늦으면 전날 종가가 그날 값으로 온다. 7일 캐시하면 그 값이 굳는다(plans/157 A3)
+_SETTLED_AFTER_DAYS = 4
 
 
 def _sync_close_on_or_before(day: date) -> tuple[float, date] | None:
@@ -60,5 +65,7 @@ async def fetch_usd_krw_on(day: date, cache: CacheStoreType) -> tuple[float, dat
         logger.warning("usd_krw_on_date_missing", day=day.isoformat())
         return None
     rate, rate_day = found
-    await set_cached_json(cache, key, {"rate": rate, "date": rate_day.isoformat()}, TTL_USD_KRW_ON_DATE)
+    settled = day <= today_kst() - timedelta(days=_SETTLED_AFTER_DAYS)
+    ttl = TTL_USD_KRW_ON_DATE if settled else TTL_USD_KRW_ON_DATE_RECENT
+    await set_cached_json(cache, key, {"rate": rate, "date": rate_day.isoformat()}, ttl)
     return rate, rate_day

@@ -74,10 +74,13 @@ async def sync_accounts(
                             # 이름 수정을 커밋 때 되돌린다(plans/156 A1) — 새로 읽어 sync가 바꾼 컬럼만 쓰게 한다.
                             fresh = await db.get(AssetAccount, account.id)
                             if fresh is None or not fresh.is_active:
+                                # return 금지 — 진행률 갱신을 건너뛰면 "전체 갱신"이 멈춘다(plans/157 A2)
                                 logger.info("account_sync_skipped_inactive", job=job_name, account_id=str(account.id))
-                                return
-                            await sync_account(fresh, db, cache)
-                        logger.info("account_synced", job=job_name, account_id=str(account.id), name=account.name)
+                            else:
+                                await sync_account(fresh, db, cache)
+                                logger.info(
+                                    "account_synced", job=job_name, account_id=str(account.id), name=account.name
+                                )
             except Exception as e:
                 report_handled_failure(
                     "account_sync_failed", e, job=job_name, account_id=str(account.id), name=account.name
