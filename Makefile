@@ -12,8 +12,10 @@ down:
 migrate:
 	cd backend && uv run alembic upgrade head
 
+# 파괴적 DB 명령은 대상이 로컬인지 먼저 확인한다 — backend/.env가 운영(공유 Supabase)을 가리키는 경우가 흔하다.
+# 원격에 정말 실행하려면 ALLOW_REMOTE_DB=1 make migrate-down
 migrate-down:
-	cd backend && uv run alembic downgrade -1
+	cd backend && uv run python scripts/assert_local_db.py && uv run alembic downgrade -1
 
 install-backend:
 	cd backend && uv sync --extra dev --locked
@@ -63,6 +65,7 @@ format: format-backend
 	cd frontend && npm run format
 
 db-reset:
+	cd backend && uv run python scripts/assert_local_db.py
 	@echo "WARNING: This will DELETE all database data (docker volumes)!"
 	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
 	@sleep 5

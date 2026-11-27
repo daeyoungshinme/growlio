@@ -31,7 +31,7 @@ updates:
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
-      # tenacity: pyproject 상한(<10)과 일치 — 재시도 데코레이터를 5개 모듈에서 쓰므로 10.x는
+      # tenacity: pyproject 상한(<10)과 일치 — 재시도 데코레이터를 3개 모듈(asset_service·email_service·naver_retry)에서 쓰므로 10.x는
       # 상한을 넓히고 재시도 테스트를 확인하는 별도 PR로 올린다
       - dependency-name: "tenacity"
         update-types:
