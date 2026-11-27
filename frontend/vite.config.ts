@@ -128,13 +128,13 @@ export default defineConfig({
         "src/hooks/useSwipeNavigation.ts",
         "src/hooks/rebalancingExecution/types.ts",
       ],
-      // 2026-10-28 실측(lines 79.38/functions 67.33/branches 67.75/statements 77.97%)에서
-      // ~3%p 안전 마진을 두고 상향 — 임의 목표치가 아니라 측정값 기반.
+      // 2026-11-27 실측(lines 84.22/functions 73.98/branches 74.69/statements 82.95%)에서
+      // ~3%p 안전 마진을 두고 상향(plans/156 D) — 임의 목표치가 아니라 측정값 기반.
       thresholds: {
-        lines: 76,
-        functions: 64,
-        branches: 64,
-        statements: 75,
+        lines: 81,
+        functions: 71,
+        branches: 71,
+        statements: 80,
       },
     },
   },
