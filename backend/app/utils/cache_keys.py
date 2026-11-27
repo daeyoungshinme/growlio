@@ -106,6 +106,7 @@ TTL_KIS_AMEX_MASTER = 86400  # KIS 공식 아멕스(AMS) 종목마스터 티커 
 TTL_TECHNICAL_SIGNAL = 6 * 3600  # QQQ/SPY 일봉 기술적 지표 6시간 — 장중 변화 없음, 미국 장 마감 후 반나절 내 갱신
 TTL_TACTICAL_BACKTEST = 86400  # 전술 배분 백테스트 1일 — 과거 일봉 기반, 비중표 해시+기간이 키
 TTL_USD_KRW_HISTORY = 6 * 3600  # USD/KRW 1년 일봉(환전 계획 통계용) 6시간 — 유저 무관 전역 공유
+TTL_USD_KRW_ON_DATE = 7 * 86400  # 지난 날짜의 USD/KRW 종가 — 확정값이라 길게(수기 해외 거래 기록 환산, plans/156)
 TTL_TECHNICAL_SIGNAL_DEGRADED = 600  # 일부 종목 종가 조회 실패 결과는 10분만 — Yahoo 일시 장애 후 빠른 복구
 
 # ---------------------------------------------------------------------------
@@ -245,6 +246,11 @@ def technical_signal_key(tickers: tuple[str, ...], session: date) -> str:
     v5: 마지막으로 끝난 미국 거래일(`session`)을 키에 넣는다 — 장 마감 뒤 첫 조회가 새 종가로 다시 계산한다."""
     tickers_part = ",".join(sorted(tickers))
     return f"{_env_prefix()}technical_signal:{_TECHNICAL_SIGNAL_VERSION}:{session.isoformat()}:{tickers_part}"
+
+
+def usd_krw_on_date_key(day: date) -> str:
+    """특정 날짜(또는 직전 거래일) USD/KRW 종가 캐시 키 — 유저 무관 전역 공유."""
+    return f"{_env_prefix()}usd_krw_on:{day.isoformat()}"
 
 
 def usd_krw_history_key() -> str:

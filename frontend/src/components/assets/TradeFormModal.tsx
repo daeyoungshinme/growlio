@@ -16,6 +16,7 @@ import {
 import { tradeSchema } from "@/schemas/trade";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { useTradeDateUsdRate } from "@/hooks/useTradeDateUsdRate";
 import { isOverseasMarket } from "@/constants/markets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
@@ -25,7 +26,7 @@ import {
   TOUCH_TARGET_ROW,
 } from "@/constants/uiSizes";
 import { invalidateTradeData } from "@/utils/queryInvalidation";
-import { convertUsdToKrw, fmtKrwPrice, localToday } from "@/utils/format";
+import { convertUsdToKrw, fmtFxRate, fmtKrwPrice, localToday } from "@/utils/format";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import SegmentedControl from "@/components/common/SegmentedControl";
@@ -72,6 +73,8 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
 
   const overseas = stock ? isOverseasMarket(stock.market) : false;
   const priceInUsd = overseas && !editing;
+  // 해외 단가는 거래일 환율(지난 날짜면 그날 종가)로 원화 환산한다 (plans/156)
+  const tradeFx = useTradeDateUsdRate(tradeDate, priceInUsd, rate);
 
   const { data: records = [] } = useQuery<TradeRecord[]>({
     queryKey: QUERY_KEYS.tradesFor(accountId, stock?.ticker ?? "", stock?.market ?? ""),
@@ -138,11 +141,15 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
     e.preventDefault();
     setError(null);
     const rawPrice = Number(price);
-    if (priceInUsd && !rate) {
+    if (priceInUsd && tradeFx.loading) {
+      setError("거래일 환율을 불러오는 중입니다. 잠시 후 다시 저장해주세요");
+      return;
+    }
+    if (priceInUsd && !tradeFx.rate) {
       setError("환율 정보를 불러오지 못해 해외 종목 단가를 원화로 환산할 수 없습니다");
       return;
     }
-    const priceKrw = priceInUsd ? convertUsdToKrw(rawPrice, rate) : rawPrice;
+    const priceKrw = priceInUsd ? convertUsdToKrw(rawPrice, tradeFx.rate) : rawPrice;
     const parsed = tradeSchema.safeParse({
       account_id: accountId,
       side,
@@ -309,9 +316,11 @@ export default function TradeFormModal({ accounts, prefill, onClose }: Props) {
                 onChange={(e) => setPrice(e.target.value)}
                 className={`${INPUT_SM} w-full`}
               />
-              {priceInUsd && rate && price !== "" && (
+              {priceInUsd && price !== "" && (
                 <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                  ≈ {fmtKrwPrice(convertUsdToKrw(Number(price), rate))} (현재 환율)
+                  {tradeFx.rate
+                    ? `≈ ${fmtKrwPrice(convertUsdToKrw(Number(price), tradeFx.rate))} (${tradeFx.basis} ${fmtFxRate(tradeFx.rate)})`
+                    : tradeFx.basis}
                 </p>
               )}
             </div>

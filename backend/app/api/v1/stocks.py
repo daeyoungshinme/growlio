@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import date
 
 import structlog
 from fastapi import APIRouter, Depends, Query, Request
@@ -14,12 +15,14 @@ from app.api.v1._account_deps import get_owned_account
 from app.constants import DOMESTIC_MARKETS
 from app.core.cache_store import CacheStore, get_cache_store
 from app.core.database import get_db
+from app.exceptions import BadRequestError
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.user import User
 from app.schemas.stock import StockPriceBatchRequest
 from app.services.goal.recommendation_universe import resolve_index_region
+from app.services.market_data.fx_history import fetch_usd_krw_on
 from app.services.market_data.price_service import fetch_prices_batch
 from app.services.market_data.stock_search_service import search_stocks_by_query
 from app.utils.cache_keys import (
@@ -32,6 +35,7 @@ from app.utils.cache_keys import (
     USD_KRW_RATE as _USD_KRW_KEY,
 )
 from app.utils.currency import get_live_or_cached_usd_krw, refresh_usd_krw
+from app.utils.kst import today_kst
 
 logger = structlog.get_logger()
 
@@ -150,6 +154,28 @@ async def _price_entries(
         else:
             result[ticker] = {"price_krw": price, "price_usd": None, "usd_rate": None}
     return result
+
+
+@router.get("/exchange-rate/on")
+@limiter.limit("30/minute")
+async def get_exchange_rate_on(
+    request: Request,
+    day: date = Query(alias="date"),
+    current_user: User = Depends(get_current_user),
+    cache: CacheStore = Depends(get_cache_store),
+):
+    """지난 날짜(주말·휴일이면 직전 거래일)의 USD/KRW 종가 — 수기 해외 거래 기록을 거래일 환율로 환산(plans/156).
+
+    오늘·미래 날짜는 받지 않는다(실시간 환율은 `/exchange-rate`). 조회 실패면 `usd_krw=None` — 화면이 현재
+    환율로 대신하고 그렇게 했다고 알린다.
+    """
+    if day >= today_kst():
+        raise BadRequestError("오늘 이후 날짜는 현재 환율(/stocks/exchange-rate)을 사용하세요")
+    found = await fetch_usd_krw_on(day, cache)
+    if found is None:
+        return {"usd_krw": None, "rate_date": None}
+    rate, rate_day = found
+    return {"usd_krw": rate, "rate_date": rate_day.isoformat()}
 
 
 @router.get("/price")

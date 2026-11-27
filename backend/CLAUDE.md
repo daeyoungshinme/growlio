@@ -91,7 +91,7 @@ rebalancing_execution.py 주문 실행·이력 + 미체결 취소(POST /history/
 rebalancing_plan.py      대기 플랜 조회/취소/승인 + 환전 대기 재매수(retry-fx) (인증 필요)
 rebalancing_plan_public.py 이메일 링크 토큰 액션 — **인증 없음, Depends(get_current_user) 사용 금지**
 settings.py              DART 키 + 목표/알림 설정 (브로커 자격증명은 assets.py 소관)
-stocks.py                종목 검색 + /stocks/{index-region,exchange-rate,price,prices-batch}
+stocks.py                종목 검색 + /stocks/{index-region,exchange-rate,exchange-rate/on,price,prices-batch} — `exchange-rate/on?date=`은 지난 날짜 종가(수기 해외 매매 환산, 오늘·미래는 400)
 tax.py                   /tax/{summary,overseas-positions,overseas-realized,isa-status,pension-contribution,action-plan}
 transactions.py          입출금/배당 CRUD
 trades.py                수기 매매 CRUD + GET /trades/period-summary (기본 KST 이번 달, 미래 기간 400)
@@ -131,6 +131,7 @@ _alert_crud.py           환율/주가 알림 공용 reactivate·delete 팩토�
 - `price_sync_sources.py` — 국내 Naver/pykrx 폴백 (Yahoo 클라우드 IP 차단 대비)
 - `stock_search_service.py` — 네이버(한글)/Yahoo(영문·티커) 검색
 - `market_data_fetcher.py` — 팩터·리스크용 배치 수익률 (개별 현재가와 별개)
+- `fx_history.py` — 지난 날짜 USD/KRW 종가(그날 이하 최근 거래일, 7일 캐시). 장중값이 아닌 종가라 대략의 환산이다
 
 **리밸런싱 (`rebalancing/`)**
 - `service.py` — 리밸런싱 추천. 지수 그룹은 그룹 행 하나(`shares_to_trade=None`, 종목별은 `members`). 항목 접근(`_item_attr`)·그룹 행 조립·현재 보유 맵은 `analysis_items.py`

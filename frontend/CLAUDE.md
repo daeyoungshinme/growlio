@@ -103,7 +103,7 @@ api/client.ts (axios + Supabase access token 첨부 + 401 시 refreshSession 후
 
 _공통/입력_
 
-- `useExchangeRate` · `useForm` · `useStockSearch` · `useCurrencyInput` · `useCapsLockWarning` · `useTransactionFormState` · `useUsdAmountInput`(거래 금액 달러 입력 — 저장은 항상 원화, 환율 없이 USD 전환 시 금액 비움)
+- `useExchangeRate` · `useForm` · `useStockSearch` · `useCurrencyInput` · `useCapsLockWarning` · `useTransactionFormState` · `useUsdAmountInput`(거래 금액 달러 입력 — 저장은 항상 원화, 환율 없이 USD 전환 시 금액 비움) · `useTradeDateUsdRate`(수기 해외 매매 단가 환산 환율 — 지난 거래일이면 그날(휴일이면 직전 거래일) 종가, 못 받으면 현재 환율로 대신하고 안내)
 - `useCollapsible` — `[isOpen, toggle, setIsOpen]`(setter 참조 고정)
 - `useLatestRef` — 한 번 등록하는 네이티브 리스너에서 최신 값 읽기. `useNavigate()`는 경로마다 새 함수라 effect deps에 넣으면 이동마다 재등록됨
 - `useTimeout` — 언마운트 시 해제되는 setTimeout. 상태를 바꾸는 지연 콜백은 맨 `setTimeout` 대신 이것
