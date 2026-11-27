@@ -139,7 +139,7 @@ export default function DashboardPage() {
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
         >
           <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-          {syncing ? "갱신 중..." : "데이터 갱신"}
+          {syncing ? "새로고침 중..." : "새로고침"}
         </button>
       </div>
       {/* 모바일 카드 간격 24→12px — 카드 7~8장 기준 약 100px 절약 (docs/plans/67 Phase 3) */}

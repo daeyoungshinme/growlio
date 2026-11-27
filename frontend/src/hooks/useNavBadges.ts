@@ -22,7 +22,9 @@ function useRebalancingNeedsCount(): number {
   return useMemo(() => {
     if (driftSummaries && !driftInvalidated)
       return driftSummaries.filter((s) => s.needs_rebalancing).length;
-    // 이탈 포트폴리오가 2개↑면 서버가 한 행(`rebalance:all`)으로 묶고 개수는 `count`에 싣는다
+    // 이탈 포트폴리오가 2개↑면 서버가 한 행(`rebalance:all`)으로 묶고 개수는 `count`에 싣는다.
+    // 전술 적용 행이 뜬 포트폴리오는 서버가 REBALANCE 행에서 빼므로(같은 포트폴리오 중복 방지) 이 폴백은
+    // drift-summary 경로보다 적게 셀 수 있다 — 의도된 차이(plans/153 B3)
     return (actionItems ?? [])
       .filter((item) => item.kind === "REBALANCE")
       .reduce((sum, item) => sum + (item.count ?? 1), 0);

@@ -37,7 +37,7 @@ vi.mock("@/api/dividends", () => ({
 import TreemapChart from "@/components/portfolio/TreemapChart";
 import MonthlyTickerDetail from "@/components/portfolio/MonthlyTickerDetail";
 import MonthlyDividendChart from "@/components/portfolio/MonthlyDividendChart";
-import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
+import MonthlyOptimizationCard from "@/components/invest/MonthlyOptimizationCard";
 
 // ------- TreemapChart -------
 describe("TreemapChart", () => {

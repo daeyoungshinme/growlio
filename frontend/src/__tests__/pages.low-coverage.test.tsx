@@ -577,7 +577,7 @@ describe("PortfolioPage", () => {
   it("전체 갱신 버튼이 표시된다", async () => {
     renderPage(<PortfolioPage />);
     await waitFor(() => {
-      expect(screen.getByText("전체 갱신")).toBeInTheDocument();
+      expect(screen.getByText("증권사에서 전체 갱신")).toBeInTheDocument();
     });
   });
 
