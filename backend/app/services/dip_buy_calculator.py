@@ -115,17 +115,22 @@ def should_reset(
     completed: Sequence[dict] | None,
     cycle_base_krw: float | None,
     notified_tiers: Sequence[int] | None = None,
+    tiers: Sequence[dict] | None = None,
 ) -> bool:
     """고점 근처로 회복했고 지울 사이클 기록이 있으면 True. 낙폭을 모르면 건드리지 않는다.
 
     알림만 받고 사지 않은 사이클(`notified_tiers`만 있음)도 지운다 —
     남기면 다음 하락에서 그 구간을 영영 다시 알리지 않는다.
+    첫 구간이 회복 기준(3%)보다 얕으면 그 구간 위로도 회복해야 한다 — 아니면 도달과 회복이 같은 낙폭에서
+    함께 성립해 매일 같은 구간을 다시 알리고, "추매했어요" 기록도 다음 조회 때 지워진다.
     """
     if drawdown_pct is None:
         return False
     if not completed and not cycle_base_krw and not notified_tiers:
         return False
-    return drawdown_pct > -RESET_DRAWDOWN_PCT
+    if drawdown_pct <= -RESET_DRAWDOWN_PCT:
+        return False
+    return not tiers or not reached(tiers[0], drawdown_pct)
 
 
 def recovered_above_tiers(tiers: Sequence[dict] | None, drawdown_pct: float | None) -> bool:

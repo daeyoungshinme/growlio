@@ -141,7 +141,7 @@ def _opt(v: Any) -> float | None:
 
 def reset_if_recovered(rule: DipBuyRule, drawdown_pct: float | None) -> bool:
     """고점 근처로 회복했으면 완료·알림 기록과 기준액을 지운다(다음 하락 사이클). 바뀌었으면 True — 커밋은 호출부."""
-    if not should_reset(drawdown_pct, rule.completed, _opt(rule.cycle_base_krw), rule.notified_tiers):
+    if not should_reset(drawdown_pct, rule.completed, _opt(rule.cycle_base_krw), rule.notified_tiers, rule.tiers):
         return False
     rule.completed = []
     rule.cycle_base_krw = None
@@ -398,13 +398,10 @@ def _shrink_others(
             rule.cycle_base_krw = round(pool * pct / 100, 2)
 
 
-def _unchanged_tier_indexes(old: list[dict], new: list[dict]) -> set[int]:
-    """같은 순번에 같은 낙폭 기준이 남은 구간 순번."""
-    return {
-        i
-        for i, (o, n) in enumerate(zip(old, new, strict=False))
-        if float(o["drawdown_pct"]) == float(n["drawdown_pct"])
-    }
+def _tier_index_map(old: list[dict], new: list[dict]) -> dict[int, int]:
+    """옛 구간 순번 → 같은 낙폭 기준을 가진 새 구간 순번. 구간을 앞에 넣거나 빼도 남은 구간의 기록을 옮긴다."""
+    new_by_dd = {float(n["drawdown_pct"]): i for i, n in enumerate(new)}
+    return {i: new_by_dd[float(o["drawdown_pct"])] for i, o in enumerate(old) if float(o["drawdown_pct"]) in new_by_dd}
 
 
 def _clean_tiers(tiers: list[dict]) -> list[dict]:
@@ -479,10 +476,15 @@ async def update_rule(
         rule.cycle_base_krw = None
         rule.notified_tiers = []
     else:
-        # 기록은 구간 순번으로 남는다 — 사라졌거나 낙폭 기준이 바뀐 구간의 기록은 버린다(비율만 바뀐 구간은 유지)
-        kept = _unchanged_tier_indexes(rule.tiers or [], tiers)
-        rule.completed = [c for c in rule.completed or [] if int(c.get("tier", -1)) in kept]
-        rule.notified_tiers = [t for t in rule.notified_tiers or [] if int(t) in kept]
+        # 기록은 구간 순번으로 남는다 — 같은 낙폭 기준의 새 순번으로 옮기고, 사라졌거나 낙폭 기준이 바뀐 구간의
+        # 기록만 버린다(비율만 바뀐 구간은 유지)
+        moved = _tier_index_map(rule.tiers or [], tiers)
+        rule.completed = [
+            {**c, "tier": moved[int(c.get("tier", -1))]}
+            for c in rule.completed or []
+            if int(c.get("tier", -1)) in moved
+        ]
+        rule.notified_tiers = sorted(moved[int(t)] for t in rule.notified_tiers or [] if int(t) in moved)
         if rule.cycle_base_krw is not None and float(allocation_pct) != float(rule.allocation_pct):
             settings = await get_settings(db, user_id)
             pool = reserve_pool(float(settings.reserve_krw or 0) if settings else 0.0, [r.completed for r in rules])
