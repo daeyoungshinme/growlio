@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chartTooltipStyle, legendOrder } from "../chart";
+import { chartTooltipStyle, legendOrder, stackedTotal } from "../chart";
 
 describe("chartTooltipStyle", () => {
   it("라이트 모드 스타일 반환", () => {
@@ -43,5 +43,16 @@ describe("legendOrder", () => {
       "PENSION",
     ]);
     expect(sorter({ dataKey: "UNKNOWN" })).toBe(3); // 모르는 키는 맨 뒤
+  });
+});
+
+describe("stackedTotal", () => {
+  it("누적 막대 툴팁 항목 값을 합산한다", () => {
+    expect(stackedTotal([{ value: 70_000_000 }, { value: 30_000_000 }])).toBe(100_000_000);
+  });
+
+  it("숫자가 아닌 값·빈 payload는 0으로 본다", () => {
+    expect(stackedTotal([{ value: 10 }, { value: undefined }, { value: "x" }])).toBe(10);
+    expect(stackedTotal(undefined)).toBe(0);
   });
 });
